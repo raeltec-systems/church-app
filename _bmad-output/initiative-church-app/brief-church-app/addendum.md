@@ -52,3 +52,24 @@ Figures come from review sites and public pricing pages and change often. Verify
 - zicta.zm/market-reports/2024_annual_market_report.pdf
 - developer.apple.com/app-store/review/guidelines/
 - freedomhouse.org/country/zambia/freedom-net/2022
+
+## Design handoff vs spec 1.2: known conflicts (the spec wins)
+
+The handoff (`docs/design-handoff/`) was drawn before spec 1.2. Where its prototype behaviour differs from the spec, build the spec's behaviour while keeping the design's layout:
+
+1. **Recap publication.** In the handoff, submitting a cell report makes the summary and testimonies visible to members. Spec 1.2 says submitting a private report never publishes a recap. A recap needs a separate preview → publish step and can be corrected or withdrawn. Testimonies need consent.
+2. **Cell offering custody.** In the handoff, the offering block in the cell report has fields for two counters and a "Handed to the treasurer" checkbox. Spec 1.2 requires something stricter:
+   - each of the two distinct counters attests the count
+   - the handover is recorded separately
+   - a different, independent Treasurer or deputy records the receipt
+   - discrepancies are resolved through append-only corrections
+
+   A checkbox the leader ticks is not a receipt.
+3. **Pastoral care kanban.** In the handoff, dropping a card on most columns moves it directly. Spec 1.2 says dragging can never create consent. Moves that imply agreement (Confirmed, new time accepted) have to go through the member's response or a confirmation staff record after direct contact. The board also needs keyboard and list alternatives to drag and drop.
+4. **Admin role switcher.** The handoff's sidebar switch between Admin, Cell leader and Pastor is a prototype convenience. In production a switcher only chooses among roles the account has actually been granted, and the server enforces every scope.
+
+## Design pack contents
+- `docs/design-handoff/README.md`: design tokens (colour, type, radii, spacing), every screen described, state flows and the data additions the screens imply.
+- `design/BIC Kafue App.dc.html` and `design/BIC Kafue Admin.dc.html`: interactive prototypes. Mock data and state logic are in each file's `class Component` script.
+- `screenshots/`: 19 member-app screens and 13 admin screens.
+- All names, numbers, giving destinations and figures in the pack are placeholders.

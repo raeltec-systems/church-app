@@ -1,6 +1,6 @@
 # Cross-epic contracts and owner seams (story 1.5)
 
-Migration: `supabase/migrations/20261003190000_cross_epic_contracts.sql`.
+Migration: `supabase/migrations/20261003134340_cross_epic_contracts.sql`.
 
 ## Wire contract v1
 

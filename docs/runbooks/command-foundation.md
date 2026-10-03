@@ -2,7 +2,7 @@
 
 Every state change goes through one transactional command kernel, `app.cmd_execute`, in
 `supabase/migrations/20261003123459_command_foundation.sql`, hardened by
-`supabase/migrations/20261003170000_command_foundation_hardening.sql`. The synthetic `fixture_counter`
+`supabase/migrations/20261003131021_command_foundation_hardening.sql`. The synthetic `fixture_counter`
 aggregate is the reference consumer.
 
 ## Wire contract

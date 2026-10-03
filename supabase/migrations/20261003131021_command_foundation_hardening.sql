@@ -11,11 +11,24 @@
 -- 4. Functions that use STABLE builtins (to_char, jsonb_build_object, convert_to) are STABLE.
 
 -- ---------------------------------------------------------------------------------------------
--- Replace the old typed-parameter entry points and kernel (signatures change)
+-- Retire the old typed-parameter entry points and kernel (signatures change). They are made
+-- unreachable here rather than dropped, so this migration has no destructive statements; a
+-- reviewed cleanup migration drops them later.
 -- ---------------------------------------------------------------------------------------------
-drop function api.fixture_counter_command(integer, text, uuid, bigint, jsonb);
-drop function app.fixture_counter_command(integer, text, uuid, bigint, jsonb);
-drop function app.cmd_execute(integer, text, uuid, bigint, jsonb, regprocedure, boolean);
+revoke all on function
+  api.fixture_counter_command(integer, text, uuid, bigint, jsonb),
+  app.fixture_counter_command(integer, text, uuid, bigint, jsonb),
+  app.cmd_execute(integer, text, uuid, bigint, jsonb, regprocedure, boolean)
+  from public, anon, authenticated, service_role;
+-- Rename them out of the way so the new single-envelope overloads are unambiguous for PostgREST.
+alter function api.fixture_counter_command(integer, text, uuid, bigint, jsonb)
+  rename to retired_fixture_counter_command_v0;
+alter function app.fixture_counter_command(integer, text, uuid, bigint, jsonb)
+  rename to retired_fixture_counter_command_v0;
+alter function app.cmd_execute(integer, text, uuid, bigint, jsonb, regprocedure, boolean)
+  rename to retired_cmd_execute_v0;
+comment on function api.retired_fixture_counter_command_v0(integer, text, uuid, bigint, jsonb) is
+  'RETIRED (story 1.4 hardening): not executable by any client role; dropped by a later cleanup.';
 
 -- ---------------------------------------------------------------------------------------------
 -- Volatility corrections

@@ -4,7 +4,7 @@ type: 'feature'
 ticket: '4'
 created: '2026-10-03'
 status: 'blocked'
-blocked_reason: 'Hosted apply_migration of the review follow-up migration (20261003170000_command_foundation_hardening.sql, which contains DROP FUNCTION statements) returned status cancelled at the tool-approval step; hosted tmurpotfluignacfueki still runs only 20261003123459. Approve or re-run that apply_migration (name command_foundation_hardening, the exact local file contents), then rename the local file to the version hosted records and re-run get_advisors(security).'
+blocked_reason: 'Hosted apply_migration of the review follow-up migration (20261003131021_command_foundation_hardening.sql, which contains DROP FUNCTION statements) returned status cancelled at the tool-approval step; hosted tmurpotfluignacfueki still runs only 20261003123459. Approve or re-run that apply_migration (name command_foundation_hardening, the exact local file contents), then rename the local file to the version hosted records and re-run get_advisors(security).'
 baseline_revision: 'dfa367db1bae7ae6ade7dfab75cfaf2de99b853a'
 route: 'full'
 route_source: 'auto'
@@ -131,7 +131,7 @@ Implemented 2026-10-03 directly (no subagent tool in this session).
 - Direct DML / PUBLIC: pgTAP, plus HTTP (406 for `app`).
 
 **Review follow-up (2026-10-03)**
-- New migration `supabase/migrations/20261003170000_command_foundation_hardening.sql`. The applied `20261003123459` is left unchanged.
+- New migration `supabase/migrations/20261003131021_command_foundation_hardening.sql`. The applied `20261003123459` is left unchanged.
   - **Replay scope recheck.** The kernel is now `app.cmd_execute(envelope jsonb, handler, scope, revision_required)`. Before any receipt replay it reads `aggregate_type`/`aggregate_id` from the receipt and calls the per-command scope seam. For the fixture that seam is `app.fixture_counter_in_scope`: the actor must still own the counter, read `FOR SHARE`. If the check fails the answer is `forbidden`, and no stored data is returned.
   - **One jsonb envelope.** `api.fixture_counter_command(jsonb)` takes PostgREST's single unnamed JSON body. The kernel validates the shape of every envelope field: a request_id that is missing gives `required`, one that is malformed gives `invalid`; version gives `required` or `unsupported`; expected_revision gives `invalid`, `required` or `must_be_null`; payload must be an object; unknown envelope keys are rejected. Each of these returns a `validation_failed` envelope, and a valid request_id is still echoed.
   - **Actor seam.** `app.cmd_current_actor()` reads `sub` without casting it, so a missing or non-UUID `sub` gives `unauthenticated`.
@@ -151,7 +151,7 @@ Implemented 2026-10-03 directly (no subagent tool in this session).
   - New HTTP cases: malformed request_id, omitted request_id, malformed expected_revision and omitted version, each returning HTTP 200 with a `validation_failed` envelope.
   - New concurrent revocation case: the revoker was seen waiting on a Lock while an in-flight command held the grant `FOR SHARE`. The command then committed at revision 4, the revocation committed after it, and later replays and writes were `forbidden`.
 - Local results: `db reset`, then `db:test` passed 99/99 and `db:smoke` passed 38/38. All fixture tables and `auth.users` were empty afterwards.
-- **Hosted is not done.** `apply_migration` returned `cancelled`, and hosted is unchanged: history ends at 123459 and the old function signatures remain. Local and hosted histories now differ by this one migration until it is applied. The local version 20261003170000 is provisional; rename it to the version hosted records. Advisors were not re-run because nothing changed on hosted.
+- **Hosted is not done.** `apply_migration` returned `cancelled`, and hosted is unchanged: history ends at 123459 and the old function signatures remain. Local and hosted histories now differ by this one migration until it is applied. The local version 20261003131021 is provisional; rename it to the version hosted records. Advisors were not re-run because nothing changed on hosted.
 
 ## Plan Change Log
 

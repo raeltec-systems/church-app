@@ -1,0 +1,251 @@
+$ (cd packages/contracts/dart && dart test)
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+00:00 +0: loading test/fixtures_test.dart
+00:00 +0: test/fixtures_files_test.dart: test/fixtures.g.dart is up to date with packages/contracts/fixtures/v1
+00:00 +1: test/fixtures_test.dart: fixture set is present
+00:00 +2: test/fixtures_test.dart: account_ref declares contract version 1
+00:00 +3: test/fixtures_test.dart: account_ref valid: lowercase uuid
+00:00 +4: test/fixtures_test.dart: account_ref invalid: missing auth_user_id
+00:00 +5: test/fixtures_test.dart: account_ref invalid: braced uuid
+00:00 +6: test/fixtures_test.dart: account_ref invalid: uuid without hyphens
+00:00 +7: test/fixtures_test.dart: account_ref invalid: member_id is not an account
+00:00 +8: test/fixtures_test.dart: account_ref invalid: array
+00:00 +9: test/fixtures_test.dart: actor declares contract version 1
+00:00 +10: test/fixtures_test.dart: actor valid: member acting through an account
+00:00 +11: test/fixtures_test.dart: actor valid: system principal, no initiating member
+00:00 +12: test/fixtures_test.dart: actor valid: system principal, explicit null initiating member
+00:00 +13: test/fixtures_test.dart: actor valid: system principal with an initiating member recorded separately
+00:00 +14: test/fixtures_test.dart: actor invalid: missing kind
+00:00 +15: test/fixtures_test.dart: actor invalid: unknown kind
+00:00 +16: test/fixtures_test.dart: actor invalid: kind not a string
+00:00 +17: test/fixtures_test.dart: actor invalid: member without account
+00:00 +18: test/fixtures_test.dart: actor invalid: member with null member_id
+00:00 +19: test/fixtures_test.dart: actor invalid: member cannot carry system fields
+00:00 +20: test/fixtures_test.dart: actor invalid: system without job
+00:00 +21: test/fixtures_test.dart: actor invalid: system cannot select an arbitrary member actor
+00:00 +22: test/fixtures_test.dart: actor invalid: system with malformed initiating member
+00:00 +23: test/fixtures_test.dart: actor invalid: not an object
+00:00 +24: test/fixtures_test.dart: actor invalid: prototype-named key constructor
+00:00 +25: test/fixtures_test.dart: actor invalid: prototype-named key __proto__
+00:00 +26: test/fixtures_test.dart: actor invalid: prototype-named key toString
+00:00 +27: test/fixtures_test.dart: command_request declares contract version 1
+00:00 +28: test/fixtures_test.dart: command_request valid: create (expected_revision null)
+00:00 +29: test/fixtures_test.dart: command_request valid: create with expected_revision omitted
+00:00 +30: test/fixtures_test.dart: command_request valid: mutation of an existing aggregate
+00:00 +31: test/fixtures_test.dart: command_request valid: version written as 1.0
+00:00 +32: test/fixtures_test.dart: command_request valid: expected_revision written with an exponent
+00:00 +33: test/fixtures_test.dart: command_request valid: longest command (127 chars)
+00:00 +34: test/fixtures_test.dart: command_request invalid: not an object
+00:00 +35: test/fixtures_test.dart: command_request invalid: everything missing
+00:00 +36: test/fixtures_test.dart: command_request invalid: unsupported version
+00:00 +37: test/fixtures_test.dart: command_request invalid: version as string
+00:00 +38: test/fixtures_test.dart: command_request invalid: command without owner namespace
+00:00 +39: test/fixtures_test.dart: command_request invalid: command not a string
+00:00 +40: test/fixtures_test.dart: command_request invalid: malformed request_id
+00:00 +41: test/fixtures_test.dart: command_request invalid: expected_revision as string
+00:00 +42: test/fixtures_test.dart: command_request invalid: expected_revision zero
+00:00 +43: test/fixtures_test.dart: command_request invalid: payload array
+00:00 +44: test/fixtures_test.dart: command_request invalid: client-supplied actor is refused
+00:00 +45: test/fixtures_test.dart: command_request invalid: uppercase request_id
+00:00 +46: test/fixtures_test.dart: command_request invalid: version 1.5
+00:00 +47: test/fixtures_test.dart: command_request invalid: command too long (128 chars)
+00:00 +48: test/fixtures_test.dart: command_request invalid: uppercase command
+00:00 +49: test/fixtures_test.dart: command_request invalid: null command
+00:00 +50: test/fixtures_test.dart: command_request invalid: prototype-named key constructor
+00:00 +51: test/fixtures_test.dart: command_request invalid: prototype-named key __proto__
+00:00 +52: test/fixtures_test.dart: command_request invalid: prototype-named key toString
+00:00 +53: test/fixtures_test.dart: command_response declares contract version 1
+00:00 +54: test/fixtures_test.dart: command_response valid: success
+00:00 +55: test/fixtures_test.dart: command_response valid: success with null data
+00:00 +56: test/fixtures_test.dart: command_response valid: validation error with field errors
+00:00 +57: test/fixtures_test.dart: command_response valid: error before request_id was readable
+00:00 +58: test/fixtures_test.dart: command_response valid: conflict with readable current revision
+00:00 +59: test/fixtures_test.dart: command_response valid: unauthenticated
+00:00 +60: test/fixtures_test.dart: command_response valid: forbidden
+00:00 +61: test/fixtures_test.dart: command_response valid: not_found
+00:00 +62: test/fixtures_test.dart: command_response valid: rate_limited
+00:00 +63: test/fixtures_test.dart: command_response valid: unavailable
+00:00 +64: test/fixtures_test.dart: command_response valid: server-only field error codes
+00:00 +65: test/fixtures_test.dart: command_response valid: closed policy gate (public field, no internal gate name)
+00:00 +66: test/fixtures_test.dart: command_response valid: success revision written with an exponent
+00:00 +67: test/fixtures_test.dart: command_response invalid: unknown error code
+00:00 +68: test/fixtures_test.dart: command_response invalid: error without field_errors
+00:00 +69: test/fixtures_test.dart: command_response invalid: error without request_id key
+00:00 +70: test/fixtures_test.dart: command_response invalid: error with null message
+00:00 +71: test/fixtures_test.dart: command_response invalid: error message not a string
+00:00 +72: test/fixtures_test.dart: command_response invalid: field error value not a string
+00:00 +73: test/fixtures_test.dart: command_response invalid: error leaking SQL detail key
+00:00 +74: test/fixtures_test.dart: command_response invalid: error with fractional current revision
+00:00 +75: test/fixtures_test.dart: command_response invalid: success without revision
+00:00 +76: test/fixtures_test.dart: command_response invalid: success without data key
+00:00 +77: test/fixtures_test.dart: command_response invalid: success with null request_id
+00:00 +78: test/fixtures_test.dart: command_response invalid: not an object
+00:00 +79: test/fixtures_test.dart: command_response invalid: field error code outside the vocabulary
+00:00 +80: test/fixtures_test.dart: command_response invalid: success with error fields mixed in
+00:00 +81: test/fixtures_test.dart: command_response invalid: prototype-named key constructor
+00:00 +82: test/fixtures_test.dart: command_response invalid: prototype-named key __proto__
+00:00 +83: test/fixtures_test.dart: command_response invalid: prototype-named key toString
+00:00 +84: test/fixtures_test.dart: instant declares contract version 1
+00:00 +85: test/fixtures_test.dart: instant valid: server canonical form (microseconds)
+00:00 +86: test/fixtures_test.dart: instant valid: whole seconds
+00:00 +87: test/fixtures_test.dart: instant valid: milliseconds
+00:00 +88: test/fixtures_test.dart: instant valid: leap day
+00:00 +89: test/fixtures_test.dart: instant valid: century leap day
+00:00 +90: test/fixtures_test.dart: instant valid: end of year
+00:00 +91: test/fixtures_test.dart: instant valid: year one
+00:00 +92: test/fixtures_test.dart: instant invalid: offset instead of Z
+00:00 +93: test/fixtures_test.dart: instant invalid: no zone
+00:00 +94: test/fixtures_test.dart: instant invalid: lowercase z
+00:00 +95: test/fixtures_test.dart: instant invalid: space separator
+00:00 +96: test/fixtures_test.dart: instant invalid: date only
+00:00 +97: test/fixtures_test.dart: instant invalid: nanoseconds
+00:00 +98: test/fixtures_test.dart: instant invalid: empty fraction
+00:00 +99: test/fixtures_test.dart: instant invalid: not a leap year
+00:00 +100: test/fixtures_test.dart: instant invalid: century not a leap year
+00:00 +101: test/fixtures_test.dart: instant invalid: month 13
+00:00 +102: test/fixtures_test.dart: instant invalid: day zero
+00:00 +103: test/fixtures_test.dart: instant invalid: april 31
+00:00 +104: test/fixtures_test.dart: instant invalid: hour 24
+00:00 +105: test/fixtures_test.dart: instant invalid: leap second
+00:00 +106: test/fixtures_test.dart: instant invalid: year zero
+00:00 +107: test/fixtures_test.dart: instant invalid: five digit year
+00:00 +108: test/fixtures_test.dart: instant invalid: epoch number
+00:00 +109: test/fixtures_test.dart: instant invalid: null
+00:00 +110: test/fixtures_test.dart: instant invalid: object
+00:00 +111: test/fixtures_test.dart: lifecycle_event declares contract version 1
+00:00 +112: test/fixtures_test.dart: lifecycle_event valid: hold applied
+00:00 +113: test/fixtures_test.dart: lifecycle_event valid: hold released
+00:00 +114: test/fixtures_test.dart: lifecycle_event valid: scope revoked
+00:00 +115: test/fixtures_test.dart: lifecycle_event valid: account deactivated
+00:00 +116: test/fixtures_test.dart: lifecycle_event valid: deletion requested
+00:00 +117: test/fixtures_test.dart: lifecycle_event valid: cell transferred
+00:00 +118: test/fixtures_test.dart: lifecycle_event invalid: unregistered event
+00:00 +119: test/fixtures_test.dart: lifecycle_event invalid: missing event
+00:00 +120: test/fixtures_test.dart: lifecycle_event invalid: bad instant and revision
+00:00 +121: test/fixtures_test.dart: lifecycle_event invalid: private context is not part of the event
+00:00 +122: test/fixtures_test.dart: member_ref declares contract version 1
+00:00 +123: test/fixtures_test.dart: member_ref valid: lowercase uuid
+00:00 +124: test/fixtures_test.dart: member_ref invalid: missing member_id
+00:00 +125: test/fixtures_test.dart: member_ref invalid: null member_id
+00:00 +126: test/fixtures_test.dart: member_ref invalid: uppercase uuid is not canonical
+00:00 +127: test/fixtures_test.dart: member_ref invalid: not a uuid
+00:00 +128: test/fixtures_test.dart: member_ref invalid: number
+00:00 +129: test/fixtures_test.dart: member_ref invalid: phone number is never an identity
+00:00 +130: test/fixtures_test.dart: member_ref invalid: unknown key
+00:00 +131: test/fixtures_test.dart: member_ref invalid: not an object
+00:00 +132: test/fixtures_test.dart: member_ref invalid: null
+00:00 +133: test/fixtures_test.dart: member_ref invalid: prototype-named key constructor
+00:00 +134: test/fixtures_test.dart: member_ref invalid: prototype-named key __proto__
+00:00 +135: test/fixtures_test.dart: member_ref invalid: prototype-named key toString
+00:00 +136: test/fixtures_test.dart: money declares contract version 1
+00:00 +137: test/fixtures_test.dart: money valid: two decimals (XTS is the ISO 4217 testing code, not church policy)
+00:00 +138: test/fixtures_test.dart: money valid: integer amount
+00:00 +139: test/fixtures_test.dart: money valid: zero
+00:00 +140: test/fixtures_test.dart: money valid: zero with decimals
+00:00 +141: test/fixtures_test.dart: money valid: beyond float precision
+00:00 +142: test/fixtures_test.dart: money valid: classic float trap
+00:00 +143: test/fixtures_test.dart: money invalid: JSON number (float) amount
+00:00 +144: test/fixtures_test.dart: money invalid: JSON integer amount
+00:00 +145: test/fixtures_test.dart: money invalid: comma decimal
+00:00 +146: test/fixtures_test.dart: money invalid: thousands separator
+00:00 +147: test/fixtures_test.dart: money invalid: leading zero
+00:00 +148: test/fixtures_test.dart: money invalid: leading plus
+00:00 +149: test/fixtures_test.dart: money invalid: negative zero
+00:00 +150: test/fixtures_test.dart: money invalid: trailing point
+00:00 +151: test/fixtures_test.dart: money invalid: leading point
+00:00 +152: test/fixtures_test.dart: money invalid: exponent
+00:00 +153: test/fixtures_test.dart: money invalid: too many integer digits
+00:00 +154: test/fixtures_test.dart: money invalid: too many fraction digits
+00:00 +155: test/fixtures_test.dart: money invalid: whitespace
+00:00 +156: test/fixtures_test.dart: money invalid: currency symbol
+00:00 +157: test/fixtures_test.dart: money invalid: lowercase currency
+00:00 +158: test/fixtures_test.dart: money invalid: missing currency
+00:00 +159: test/fixtures_test.dart: money invalid: missing amount
+00:00 +160: test/fixtures_test.dart: money invalid: unknown key
+00:00 +161: test/fixtures_test.dart: money invalid: not an object
+00:00 +162: test/fixtures_test.dart: money invalid: negative amount (signs belong to owner rules)
+00:00 +163: test/fixtures_test.dart: money invalid: negative integer
+00:00 +164: test/fixtures_test.dart: money invalid: prototype-named key constructor
+00:00 +165: test/fixtures_test.dart: money invalid: prototype-named key __proto__
+00:00 +166: test/fixtures_test.dart: money invalid: prototype-named key toString
+00:00 +167: test/fixtures_test.dart: notification_key declares contract version 1
+00:00 +168: test/fixtures_test.dart: notification_key valid: full logical key
+00:00 +169: test/fixtures_test.dart: notification_key invalid: everything missing
+00:00 +170: test/fixtures_test.dart: notification_key invalid: local time without zone
+00:00 +171: test/fixtures_test.dart: notification_key invalid: account is not a recipient member
+00:00 +172: test/fixtures_test.dart: source_ref declares contract version 1
+00:00 +173: test/fixtures_test.dart: source_ref valid: first revision
+00:00 +174: test/fixtures_test.dart: source_ref valid: largest JS-safe revision
+00:00 +175: test/fixtures_test.dart: source_ref valid: longest token (63 chars)
+00:00 +176: test/fixtures_test.dart: source_ref valid: integral value written with an exponent (1e3)
+00:00 +177: test/fixtures_test.dart: source_ref valid: integral value written with a fraction (1.0)
+00:00 +178: test/fixtures_test.dart: source_ref valid: integral value written as 2E1
+00:00 +179: test/fixtures_test.dart: source_ref invalid: everything missing
+00:00 +180: test/fixtures_test.dart: source_ref invalid: revision zero
+00:00 +181: test/fixtures_test.dart: source_ref invalid: negative revision
+00:00 +182: test/fixtures_test.dart: source_ref invalid: fractional revision
+00:00 +183: test/fixtures_test.dart: source_ref invalid: revision as string
+00:00 +184: test/fixtures_test.dart: source_ref invalid: revision beyond JS-safe range
+00:00 +185: test/fixtures_test.dart: source_ref invalid: source_type with capitals
+00:00 +186: test/fixtures_test.dart: source_ref invalid: source_type with dot
+00:00 +187: test/fixtures_test.dart: source_ref invalid: source_type starting with digit
+00:00 +188: test/fixtures_test.dart: source_ref invalid: source_type longer than 63
+00:00 +189: test/fixtures_test.dart: source_ref invalid: empty source_type
+00:00 +190: test/fixtures_test.dart: source_ref invalid: null source_id
+00:00 +191: test/fixtures_test.dart: source_ref invalid: unknown key
+00:00 +192: test/fixtures_test.dart: source_ref invalid: non-integral exponent (1e-1)
+00:00 +193: test/fixtures_test.dart: source_ref invalid: very large exponent (1e300)
+00:00 +194: test/fixtures_test.dart: source_ref invalid: beyond JS-safe written as exponent (1e16)
+00:00 +195: test/fixtures_test.dart: source_ref invalid: prototype-named key constructor
+00:00 +196: test/fixtures_test.dart: source_ref invalid: prototype-named key __proto__
+00:00 +197: test/fixtures_test.dart: source_ref invalid: prototype-named key toString
+00:00 +198: test/fixtures_test.dart: task_source declares contract version 1
+00:00 +199: test/fixtures_test.dart: task_source valid: source and purpose
+00:00 +200: test/fixtures_test.dart: task_source invalid: missing purpose
+00:00 +201: test/fixtures_test.dart: task_source invalid: purpose with spaces
+00:00 +202: test/fixtures_test.dart: task_source invalid: revision does not belong to a task identity
+00:00 +203: test/fixtures_test.dart: task_source invalid: not an object
+00:00 +204: test/fixtures_test.dart: zoned_local declares contract version 1
+00:00 +205: test/fixtures_test.dart: zoned_local valid: UTC (TEST FIXTURE zone, not church policy)
+00:00 +206: test/fixtures_test.dart: zoned_local valid: area/location zone, wall time in a DST gap stays intent
+00:00 +207: test/fixtures_test.dart: zoned_local valid: area/region/location zone
+00:00 +208: test/fixtures_test.dart: zoned_local valid: another area
+00:00 +209: test/fixtures_test.dart: zoned_local valid: 64-char zone (shape only; existence is a server check)
+00:00 +210: test/fixtures_test.dart: zoned_local invalid: local with Z is an instant, not local intent
+00:00 +211: test/fixtures_test.dart: zoned_local invalid: local with offset
+00:00 +212: test/fixtures_test.dart: zoned_local invalid: local with fraction
+00:00 +213: test/fixtures_test.dart: zoned_local invalid: local without seconds
+00:00 +214: test/fixtures_test.dart: zoned_local invalid: impossible date
+00:00 +215: test/fixtures_test.dart: zoned_local invalid: missing zone (never inferred)
+00:00 +216: test/fixtures_test.dart: zoned_local invalid: offset is not a zone
+00:00 +217: test/fixtures_test.dart: zoned_local invalid: path traversal
+00:00 +218: test/fixtures_test.dart: zoned_local invalid: empty zone
+00:00 +219: test/fixtures_test.dart: zoned_local invalid: trailing slash
+00:00 +220: test/fixtures_test.dart: zoned_local invalid: zone not a string
+00:00 +221: test/fixtures_test.dart: zoned_local invalid: 65-char zone
+00:00 +222: test/fixtures_test.dart: zoned_local invalid: Etc alias
+00:00 +223: test/fixtures_test.dart: zoned_local invalid: signed Etc zone
+00:00 +224: test/fixtures_test.dart: zoned_local invalid: legacy POSIX-style zone
+00:00 +225: test/fixtures_test.dart: zoned_local invalid: Factory
+00:00 +226: test/fixtures_test.dart: zoned_local invalid: posix/ tree
+00:00 +227: test/fixtures_test.dart: zoned_local invalid: right/ tree
+00:00 +228: test/fixtures_test.dart: zoned_local invalid: legacy country alias
+00:00 +229: test/fixtures_test.dart: zoned_local invalid: UCT alias
+00:00 +230: test/fixtures_test.dart: zoned_local invalid: GMT alias
+00:00 +231: test/fixtures_test.dart: zoned_local invalid: too many segments
+00:00 +232: test/fixtures_test.dart: zoned_local invalid: lowercase area
+00:00 +233: test/fixtures_test.dart: zoned_local invalid: not an object
+00:00 +234: test/fixtures_test.dart: zoned_local invalid: prototype-named key constructor
+00:00 +235: test/fixtures_test.dart: zoned_local invalid: prototype-named key __proto__
+00:00 +236: test/fixtures_test.dart: zoned_local invalid: prototype-named key toString
+00:00 +237: test/fixtures_test.dart: the lifecycle event list equals the valid lifecycle fixtures
+00:00 +238: test/fixtures_test.dart: unknown kind is a programming error
+00:00 +239: test/fixtures_test.dart: money converts to exact minor units without floating point
+00:00 +240: test/fixtures_test.dart: instants keep microseconds; DateTime formatting is canonical and range-checked
+00:00 +241: test/fixtures_test.dart: omitted and explicit-null optional keys stay distinct
+00:00 +242: test/fixtures_test.dart: integers are checked by value on every platform
+00:00 +243: All tests passed!
+# exit=0

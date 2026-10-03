@@ -1,0 +1,33 @@
+{
+  "kind": "command_request",
+  "contract_version": 1,
+  "valid": [
+    {"name": "create (expected_revision null)", "value": {"version": 1, "command": "fixture_counter.create", "request_id": "00000000-0000-4000-8000-000000000001", "expected_revision": null, "payload": {"intent_key": "synthetic"}}},
+    {"name": "create with expected_revision omitted", "value": {"version": 1, "command": "fixture_counter.create", "request_id": "00000000-0000-4000-8000-000000000001", "payload": {}}},
+    {"name": "mutation of an existing aggregate", "value": {"version": 1, "command": "fixture_counter.increment", "request_id": "00000000-0000-4000-8000-000000000002", "expected_revision": 4, "payload": {"counter_id": "00000000-0000-4000-8000-000000000003", "by": 1}}},
+    {"name": "version written as 1.0", "value": {"version": 1.0, "command": "fixture_counter.create", "request_id": "00000000-0000-4000-8000-000000000001", "payload": {}}},
+    {"name": "expected_revision written with an exponent", "value": {"version": 1, "command": "fixture_counter.increment", "request_id": "00000000-0000-4000-8000-000000000001", "payload": {}, "expected_revision": 1e3}},
+    {"name": "longest command (127 chars)", "value": {"version": 1, "command": "fixture_counter.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "request_id": "00000000-0000-4000-8000-000000000001", "payload": {}}}
+  ],
+  "invalid": [
+    {"name": "not an object", "value": [], "field_errors": {"envelope": "must_be_object"}},
+    {"name": "everything missing", "value": {}, "field_errors": {"version": "required", "command": "required", "request_id": "required", "payload": "must_be_object"}},
+    {"name": "unsupported version", "value": {"version": 2, "command": "fixture_counter.create", "request_id": "00000000-0000-4000-8000-000000000001", "payload": {}}, "field_errors": {"version": "unsupported"}},
+    {"name": "version as string", "value": {"version": "1", "command": "fixture_counter.create", "request_id": "00000000-0000-4000-8000-000000000001", "payload": {}}, "field_errors": {"version": "unsupported"}},
+    {"name": "command without owner namespace", "value": {"version": 1, "command": "create", "request_id": "00000000-0000-4000-8000-000000000001", "payload": {}}, "field_errors": {"command": "invalid"}},
+    {"name": "command not a string", "value": {"version": 1, "command": 7, "request_id": "00000000-0000-4000-8000-000000000001", "payload": {}}, "field_errors": {"command": "invalid"}},
+    {"name": "malformed request_id", "value": {"version": 1, "command": "fixture_counter.create", "request_id": "abc", "payload": {}}, "field_errors": {"request_id": "invalid"}},
+    {"name": "expected_revision as string", "value": {"version": 1, "command": "fixture_counter.increment", "request_id": "00000000-0000-4000-8000-000000000001", "expected_revision": "4", "payload": {}}, "field_errors": {"expected_revision": "invalid"}},
+    {"name": "expected_revision zero", "value": {"version": 1, "command": "fixture_counter.increment", "request_id": "00000000-0000-4000-8000-000000000001", "expected_revision": 0, "payload": {}}, "field_errors": {"expected_revision": "invalid"}},
+    {"name": "payload array", "value": {"version": 1, "command": "fixture_counter.create", "request_id": "00000000-0000-4000-8000-000000000001", "payload": []}, "field_errors": {"payload": "must_be_object"}},
+    {"name": "client-supplied actor is refused", "value": {"version": 1, "command": "fixture_counter.create", "request_id": "00000000-0000-4000-8000-000000000001", "payload": {}, "actor_id": "00000000-0000-4000-8000-000000000002"}, "field_errors": {"actor_id": "unknown_field"}},
+    {"name": "uppercase request_id", "value": {"version": 1, "command": "fixture_counter.create", "request_id": "00000000-0000-4000-8000-00000000000A", "payload": {}}, "field_errors": {"request_id": "invalid"}},
+    {"name": "version 1.5", "value": {"version": 1.5, "command": "fixture_counter.create", "request_id": "00000000-0000-4000-8000-000000000001", "payload": {}}, "field_errors": {"version": "unsupported"}},
+    {"name": "command too long (128 chars)", "value": {"version": 1, "command": "fixture_counter.aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "request_id": "00000000-0000-4000-8000-000000000001", "payload": {}}, "field_errors": {"command": "invalid"}},
+    {"name": "uppercase command", "value": {"version": 1, "command": "Fixture_counter.create", "request_id": "00000000-0000-4000-8000-000000000001", "payload": {}}, "field_errors": {"command": "invalid"}},
+    {"name": "null command", "value": {"version": 1, "command": null, "request_id": "00000000-0000-4000-8000-000000000001", "payload": {}}, "field_errors": {"command": "required"}},
+    {"name": "prototype-named key constructor", "value": {"version": 1, "command": "fixture_counter.create", "request_id": "00000000-0000-4000-8000-000000000001", "payload": {}, "constructor": "x"}, "field_errors": {"constructor": "unknown_field"}},
+    {"name": "prototype-named key __proto__", "value": {"version": 1, "command": "fixture_counter.create", "request_id": "00000000-0000-4000-8000-000000000001", "payload": {}, "__proto__": "x"}, "field_errors": {"__proto__": "unknown_field"}},
+    {"name": "prototype-named key toString", "value": {"version": 1, "command": "fixture_counter.create", "request_id": "00000000-0000-4000-8000-000000000001", "payload": {}, "toString": "x"}, "field_errors": {"toString": "unknown_field"}}
+  ]
+}

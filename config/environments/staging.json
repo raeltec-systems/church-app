@@ -1,0 +1,69 @@
+{
+  "$comment": "Non-secret configuration only. Secrets are named here, never stored. See docs/runbooks/environments-and-promotion.md.",
+  "name": "staging",
+  "kind": "nonproduction",
+  "database_marker": "staging",
+  "supabase": {
+    "project_ref": "tmurpotfluignacfueki",
+    "project_name": "bic-kafue-platform-test",
+    "region": "eu-central-1",
+    "api_url": "https://tmurpotfluignacfueki.supabase.co",
+    "data_api_schemas": ["api"],
+    "publishable_key_source": "GitHub environment variable SUPABASE_PUBLISHABLE_KEY (environment: staging)"
+  },
+  "features": {
+    "private_access": false,
+    "outbound_sending": false,
+    "sms": false
+  },
+  "recipients": {
+    "mode": "synthetic_only",
+    "allowed_patterns": ["*@example.test", "*@example.com", "*.invalid", "israelmuyoba+*@gmail.com"],
+    "sink": "owner test-inbox tags only (owner-decisions-milestone-1.md)"
+  },
+  "deploy": {
+    "github_environment": "staging",
+    "requires_approval": false,
+    "secret_names": ["SUPABASE_ACCESS_TOKEN", "SUPABASE_DB_PASSWORD"],
+    "variable_names": ["SUPABASE_PUBLISHABLE_KEY"],
+    "web_hosting": {
+      "provider": "cloudflare-pages",
+      "project_variable": "CLOUDFLARE_PAGES_PROJECT",
+      "branch": "staging",
+      "secret_names": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]
+    }
+  },
+  "operations": {
+    "restricted_operators": ["israel"],
+    "system_route": {
+      "endpoint": "rest/v1/rpc/system_command (Content-Profile: api)",
+      "credential_header": "x-system-credential",
+      "allowed_commands": ["system.synthetic_probe"],
+      "access": "open",
+      "credential_source": "never in the repo: minted by tools/ops/system-credential.mjs into the gitignored .ops-state/; a restricted operator registers only its sha256 digest in this database"
+    },
+    "activation": {
+      "alerting": false,
+      "scheduler": false,
+      "production_system_access": false
+    },
+    "activation_gates": {
+      "alerting": ["q12_operations", "ops_alert_destination"],
+      "scheduler": ["q2_church_time", "q12_operations"],
+      "production_system_access": ["ops_system_access"]
+    }
+  },
+  "recovery": {
+    "journal": {
+      "adapter": "google_drive_folder",
+      "location": "the owner's private Google Drive folder bic-kafue-ops-SYNTHETIC-recovery-rehearsal (owner-only, SYNTHETIC data only; owner-decisions-milestone-1.md)"
+    },
+    "restore_target": "isolated_only",
+    "activation": {
+      "real_data_backups": false
+    },
+    "activation_gates": {
+      "real_data_backups": ["q4_personal_data", "q12_operations"]
+    }
+  }
+}

@@ -1,0 +1,17 @@
+# Story 1.3 re-run, part B: caller authentication. Every call here is refused
+# (or a rejected redemption) and must cause no Auth Admin request; the window
+# is then checked with sql/observe_admin_calls.sql (step 39).
+
+login ma-s0 --account ma --email israelmuyoba+bicauth-r13-x-ma@gmail.com --step 20-login-member-a
+rc-call --action issue --as none --step 21-no-jwt
+rc-call --action request --as forged-own --step 22-unsigned-jwt-claiming-this-project
+rc-call --action request --as forged-foreign --step 23-unsigned-jwt-of-another-project
+rc-call --action request --no-operator --step 24-no-operator-token
+rc-call --action issue --as anon --step 25-staff-action-with-anon-key
+rc-call --action issue --as session:ma-s0 --step 26-staff-action-by-member-session
+rc-call --action redeem --as session:staff-s1 --step 27-member-action-with-staff-session
+rc-call --action request --body {"project_ref":"tmurpotfluignacfueki"} --step 28-other-project-ref
+rc-call --action request --body {"url":"https://tmurpotfluignacfueki.supabase.co"} --step 29-other-project-url
+rc-call --action provision --body {"role":"member","tag":"Bad_Tag","password":"x"} --step 30-bad-tag
+rc-call --action complete --step 31-unknown-action
+rc-call --action redeem --body {"grant":"not-a-real-grant","login_email":"israelmuyoba+bicauth-r13-x-ma@gmail.com","password":"x"} --step 32-unknown-grant

@@ -17,3 +17,12 @@ supabase/.branches/
 # Local environment files; never commit secrets
 .env
 .env.*
+
+# Story 1.9 system credentials (tools/ops/system-credential.mjs); never commit
+.ops-state/
+
+# Agent worktrees (local only)
+.claude/worktrees/
+
+# Story 1.10 recovery rehearsal state (journal, synthetic backups, isolated stores); never commit
+.recovery-state/

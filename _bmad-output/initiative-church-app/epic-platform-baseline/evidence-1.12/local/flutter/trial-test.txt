@@ -1,0 +1,52 @@
+$ (cd trials/staff_web && flutter test)
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+Resolving dependencies...
+Downloading packages...
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.18.3 (1.19.0 available)
+  test_api 0.7.12 (0.7.14 available)
+  vector_math 2.4.0 (2.4.3 available)
+Got dependencies!
+4 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart
+00:00 +0: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +1: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +2: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +3: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +4: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +5: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +6: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +7: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +8: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +9: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +10: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +11: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +12: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +13: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +14: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: shows loading, then the status, message and updated time
+00:00 +15: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: zero rows shows the empty state, distinct from an error
+00:00 +16: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: unreachable shows the error panel; Try again re-requests
+00:01 +17: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: a server error is reported differently from no network
+00:01 +18: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: reload hides the old value while the new request runs
+00:01 +19: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/platform_status/platform_status_screen_test.dart: actions meet the minimum tap target
+00:01 +20: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: grid, view toggle and dialogs expose roles and names
+00:03 +21: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: arrow/Home/End/Control keys move focus and clamp at all edges
+00:05 +22: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: keyboard moves scroll the focused slot into view
+00:05 +23: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: a saved status shows in grid, list and CSV, and is announced after close
+00:06 +24: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: Cancel after changing member and status leaves the slot
+00:07 +25: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: Escape after changing member and status leaves the slot
+00:08 +26: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: the list view shows every slot with a labelled Change button
+00:08 +27: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: the status filter narrows grid and list to matching slots
+00:08 +28: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: filters that match no slot say so and block export
+00:09 +29: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: export preview states scope, leaks no private field, and downloads
+00:09 +30: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: a failed download is reported, not claimed
+00:09 +31: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: all buttons and fields meet the 44 px target
+00:09 +32: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: Grid view, both dialogs and the member menu fit at 200% text
+00:10 +33: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: List view, both dialogs and the member menu fit at 200% text
+00:10 +34: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: shell opens on the rota trial and reaches the tracer tab
+00:10 +35: All tests passed!
+# exit=0

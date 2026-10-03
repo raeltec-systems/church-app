@@ -23,6 +23,11 @@ context:
 
 **Approach:** Scaffold a locked official Flutter mobile app and a disposable Flutter Web trial. Add one Supabase migration that exposes a synthetic platform status only through an allowlisted `api` read. Show the status in both clients with honest loading, retry and failure states, and add a minimum CI smoke check.
 
+## Decisions
+
+- **Backend: both.** Local Supabase (CLI in Docker) for development and CI. The hosted isolated test project `bic-kafue-platform-test` (ref `tmurpotfluignacfueki`, eu-central-1, free plan, Raeltec Systems Limited org) proves the tracer remotely. It was created on the owner's instruction on 2026-10-03, holds synthetic data only, and its region is not a production decision.
+- **Native target: both.** A Linux desktop run in this session is the interim native evidence, and an Android APK is built. The owner's run of that APK on an Android phone or emulator against the hosted project closes the human gate.
+
 ## Boundaries & Constraints
 
 **Always:**
@@ -84,6 +89,7 @@ context:
   - widget tests using a fake repository
 - [ ] `trials/staff_web/` -- `flutter create --platforms web --empty` -- disposable trial (`apps/staff` waits for Q10). A minimal copy of the same read and states, plus a widget test. Its README marks it disposable.
 - [ ] `.github/workflows/ci.yml` -- `db` job (`supabase start`, `db test`) and `flutter` job (pinned 3.47.6: `pub get --enforce-lockfile`, `analyze` and `test` in both apps, `build web` for the trial) -- minimum smoke check.
+- [ ] Hosted project -- apply the same migration with the Supabase connector, seed the synthetic row, add `api` to the exposed schemas (the connector cannot change API settings, so this is an owner dashboard step if needed), and check the security advisors -- remote proof.
 - [ ] `docs/runbooks/tracer.md` -- how to start the local stack, run both clients with `--dart-define`, change the status with SQL, and simulate a failure.
 
 **Acceptance Criteria:**
@@ -103,15 +109,5 @@ The table has a single row (`id = 1`). Clients read `api.platform_status` throug
 - `cd trials/staff_web && flutter analyze && flutter test && flutter build web` -- expected: clean
 
 **Manual checks (if no CLI):**
-- Run both clients against the local stack, change the row and stop the API. Screenshots go into Implementation Notes.
-
-## Open Questions
-
-1. **Which Supabase backend proves the tracer?**
-   - (a) **Local Supabase only** (Docker in this session and in CI). It is isolated and synthetic and needs nothing from you, but it is reachable only from this machine.
-   - (b) **A hosted isolated Supabase test project you create** (free tier). You give me its URL and publishable key, and a DB connection string or access token for pushing the migration. Then your phone can reach it too.
-   - (c) **Both:** build and CI on local now, with the hosted project added later when you supply it.
-2. **Which native target gives the "native" evidence?** This session has no Android emulator (no KVM) and no iOS tools.
-   - (a) **Linux desktop run here** as interim native evidence, plus an Android APK artifact.
-   - (b) **You run the Android build on your own phone or emulator.** This needs a reachable backend, so 1(b) or 1(c).
-   - (c) **Both:** Linux desktop here now, and your Android run closes the ticket's human gate.
+- Run the Linux desktop app and the web trial against the hosted project, change the row, then point a client at an unreachable URL. Screenshots go into Implementation Notes.
+- Owner: install the APK on an Android device, check that it shows the hosted value, and toggle airplane mode to see the error and **Try again** states.

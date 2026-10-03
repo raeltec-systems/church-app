@@ -38,15 +38,18 @@
       "endpoint": "rest/v1/rpc/system_command (Content-Profile: api)",
       "credential_header": "x-system-credential",
       "allowed_commands": ["system.synthetic_probe"],
-      "activation": "owner_gate:ops_system_access",
-      "credential_source": "never in the repo: minted by tools/ops/system-credential.mjs into the gitignored .ops-state/; a restricted operator registers only its sha256 digest in this database after the owner approves ops_system_access"
+      "access": "owner_gate",
+      "credential_source": "never in the repo: minted by tools/ops/system-credential.mjs into the gitignored .ops-state/; a restricted operator registers only its sha256 digest in this database after the owner approves the ops_system_access gate in that database"
     },
-    "alerting": {
-      "enabled": false,
-      "gates": ["q12_operations", "ops_alert_destination"]
+    "activation": {
+      "alerting": false,
+      "scheduler": false,
+      "production_system_access": false
     },
-    "scheduler": {
-      "enabled": false
+    "activation_gates": {
+      "alerting": ["q12_operations", "ops_alert_destination"],
+      "scheduler": ["q2_church_time", "q12_operations"],
+      "production_system_access": ["ops_system_access"]
     }
   }
 }

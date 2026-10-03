@@ -162,11 +162,12 @@ export async function runMatrix({ env, apiUrl, key, token, userJwt, requireUserJ
   const unknown = mintToken(env);
   record('unknown_credential_same_environment', { credential: `${env} (well-formed, never registered)` },
     await call(rpc, { key, credential: unknown, envelope: probe(rid()) }));
+  // Never send another environment's real credential across environments: a freshly minted,
+  // correctly prefixed, unregistered token proves the prefix binding without exposing one.
   for (const other of ENVIRONMENT_NAMES.filter((e) => e !== env)) {
-    const stored = readStored(other);
     record(`wrong_environment_credential_${other}`,
-      { credential: stored ? `${other} (registered in the ${other} database)` : `${other} (well-formed)` },
-      await call(rpc, { key, credential: stored ?? mintToken(other), envelope: probe(rid()) }));
+      { credential: `${other} (freshly minted, well-formed, never registered)` },
+      await call(rpc, { key, credential: mintToken(other), envelope: probe(rid()) }));
   }
   if (userJwt) {
     record('user_jwt_with_valid_credential', { credential: `${env} (registered)`, authorization: 'synthetic user session JWT' },
@@ -226,7 +227,7 @@ async function main(argv) {
     const userJwt = process.env.SYSTEM_MATRIX_USER_JWT || null;
     const lines = await runMatrix({ env, apiUrl: apiUrlFor(env), key, token, userJwt,
       requireUserJwt: rest.includes('--require-user-jwt') });
-    const secrets = [token, userJwt, key, ...ENVIRONMENT_NAMES.map((e) => (e === env ? null : readStored(e)))];
+    const secrets = [token, userJwt, key];
     const out = scrub(lines.map((l) => JSON.stringify({ environment: env, ...l })).join('\n'), secrets);
     const file = arg(rest, '--out');
     if (file) writeFileSync(file, `${out}\n`);

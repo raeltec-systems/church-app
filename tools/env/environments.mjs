@@ -33,13 +33,23 @@ const PROJECT_REF_RE = /^[a-z]{20}$/;
 // operator the owner has named (owner-decisions-milestone-1.md). Both match the database.
 export const SYSTEM_COMMAND_ALLOWLIST = ['system.synthetic_probe'];
 export const RESTRICTED_OPERATORS = ['israel'];
-const ALERT_GATES = ['q12_operations', 'ops_alert_destination'];
+// Activation flags (frozen 1.9 decision): every flag is a boolean that must stay false here;
+// the named database gates (app.policy_approve, owner only) control real activation.
+export const ACTIVATION_GATES = {
+  alerting: ['q12_operations', 'ops_alert_destination'],
+  scheduler: ['q2_church_time', 'q12_operations'],
+  production_system_access: ['ops_system_access'],
+};
 
-/** Operations block: bounded system route, named operators, alerting and scheduler fail closed. */
+/** Operations block: bounded system route, named operators, activation flags fail closed. */
 export function validateOperations(file, ops) {
   const where = `${file}.json`;
   const errors = [];
   if (!ops || typeof ops !== 'object') return [`${where}: operations block is required`];
+  const allowedKeys = ['restricted_operators', 'system_route', 'activation', 'activation_gates'];
+  for (const k of Object.keys(ops).filter((k) => !allowedKeys.includes(k))) {
+    errors.push(`${where}: operations.${k} is not allowed; activation lives only in operations.activation`);
+  }
   const operators = ops.restricted_operators;
   if (!Array.isArray(operators) || operators.length === 0
       || operators.some((o) => !RESTRICTED_OPERATORS.includes(o))) {
@@ -54,25 +64,26 @@ export function validateOperations(file, ops) {
       || commands.some((c) => !SYSTEM_COMMAND_ALLOWLIST.includes(c))) {
     errors.push(`${where}: operations.system_route.allowed_commands must be a subset of ${SYSTEM_COMMAND_ALLOWLIST.join(', ')}`);
   }
-  const expected = file === 'production' ? 'owner_gate:ops_system_access' : 'open_nonproduction';
-  if (route.activation !== expected) {
-    errors.push(`${where}: operations.system_route.activation must be "${expected}"`);
+  // Non-production routes are open; production is closed until activation.production_system_access.
+  const expectedAccess = file === 'production' ? 'owner_gate' : 'open';
+  if (route.access !== expectedAccess) {
+    errors.push(`${where}: operations.system_route.access must be "${expectedAccess}"`);
   }
   if (Object.keys(route).some((k) => /secret|token|digest|password|key$/i.test(k))) {
     errors.push(`${where}: operations.system_route must not hold credential material`);
   }
-  const alerting = ops.alerting ?? {};
-  if (alerting.enabled !== false) {
-    errors.push(`${where}: operations.alerting.enabled must stay false; the ${ALERT_GATES.join(' and ')} gates control activation (no destination or Q12 thresholds are chosen)`);
+  const activation = ops.activation;
+  if (!activation || typeof activation !== 'object'
+      || JSON.stringify(Object.keys(activation).sort()) !== JSON.stringify(Object.keys(ACTIVATION_GATES).sort())) {
+    errors.push(`${where}: operations.activation must hold exactly ${Object.keys(ACTIVATION_GATES).join(', ')}`);
   }
-  if (JSON.stringify(alerting.gates) !== JSON.stringify(ALERT_GATES)) {
-    errors.push(`${where}: operations.alerting.gates must be ${JSON.stringify(ALERT_GATES)}`);
+  for (const [flag, gates] of Object.entries(ACTIVATION_GATES)) {
+    if (activation?.[flag] !== false) {
+      errors.push(`${where}: operations.activation.${flag} must stay false; the ${gates.join(' and ')} gate(s) control activation`);
+    }
   }
-  if (Object.keys(alerting).some((k) => !['enabled', 'gates'].includes(k))) {
-    errors.push(`${where}: operations.alerting holds no destination or thresholds; they are restricted owner values approved as database gates`);
-  }
-  if (ops.scheduler?.enabled !== false) {
-    errors.push(`${where}: operations.scheduler.enabled must stay false (no scheduler is enabled before Q2/Q12)`);
+  if (JSON.stringify(ops.activation_gates) !== JSON.stringify(ACTIVATION_GATES)) {
+    errors.push(`${where}: operations.activation_gates must be ${JSON.stringify(ACTIVATION_GATES)}`);
   }
   return errors;
 }

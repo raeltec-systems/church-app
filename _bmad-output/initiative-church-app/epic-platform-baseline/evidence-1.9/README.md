@@ -55,3 +55,19 @@ Only the two valid-credential probes succeeded. Every request that reached the d
 - Israel is the only operator.
 
 See `docs/runbooks/system-access-and-operations.md`.
+
+## Review fixes (2026-10-03 15:54–15:57)
+
+`staging-review-fixes.json` and `staging-matrix-review-fixes.jsonl` record the fixes.
+
+- **Migration.** Forward migration `20261003155428_system_access_review_fixes` is applied on staging, with the same sha256 as the local file.
+- **Disabling a principal.** `sys_disable_principal` now also revokes the principal's credentials, and each revocation is recorded as an operator action. Checked on staging with a throwaway principal.
+- **Health snapshot.**
+  - The route counters count only this environment's audit rows.
+  - A credential counts as active only while its principal is enabled.
+- **Matrix rerun.** The staging matrix was rerun: 14/14 pass. The user-session case was skipped, because the synthetic user is now banned; it passed in the first run.
+  - The wrong-environment cases now use freshly minted, never-registered tokens.
+- **Exposure of the local credential.** In the first run (`staging-matrix.jsonl`), the real **local** credential was sent to the staging test project as a wrong-environment case.
+  - Its only registration was in the local database, which has since been reset.
+  - The stored token was deleted.
+  - Staging never stored it and refused it.

@@ -108,6 +108,15 @@ Implemented 2026-10-03 directly (no subagent tool in this session).
 
 **Matrix audit:** Valid, Replay/conflict, Wrong environment (prefix and row binding, re-marking), Unknown/expired/revoked/missing/malformed, User JWT, Forged actor (envelope, payload, headers), Not allowlisted, Production gate — each covered by pgTAP and (except expired/revoked/production) by the HTTP matrix on local and staging; all ran and passed.
 
+**Review follow-up (2026-10-03)**
+- Forward migration `supabase/migrations/20261003155428_system_access_review_fixes.sql`, applied locally and on staging (recorded `20261003155428`, sha256 equal):
+  - `sys_disable_principal` revokes the principal's unrevoked credentials, with one operator action each.
+  - `ops_health_snapshot` filters the route counters on `environment = v_env`, and counts credentials only for enabled principals.
+- Config: flags moved to `operations.activation` (`alerting`, `scheduler`, `production_system_access`, all `false`) plus `operations.activation_gates`; `system_route.access` is `open` in local/staging and `owner_gate` in production. `validateOperations` rejects any other `operations` key and any non-`false` flag; tests updated.
+- `system-credential.mjs` matrix always mints unregistered tokens for the wrong-environment cases (new test stubs `fetch` and proves a stored staging token is never sent). The local credential that went to staging had no remaining registration (the local DB was reset), and the stored token was deleted.
+- Runbook: both alert gates are needed for `approved_no_dispatcher`, and from then on `verify-hosted.sql` fails promotions; adding an operator also needs `RESTRICTED_OPERATORS`; disabling revokes credentials; `sys_audit` growth is listed as a Q12 production gate.
+- pgTAP: `system_access_test.sql` now has 103 assertions (environment-filtered counters, disable cascade, disabled-principal credential counts).
+
 ## Plan Change Log
 
 ## Review Triage Log

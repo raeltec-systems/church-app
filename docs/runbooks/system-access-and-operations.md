@@ -9,7 +9,7 @@ This runbook covers:
 - activation gates that stay closed, and the production gates the owner must still resolve
 - support and deploy checks
 
-Architecture: AD-17 and AD-19. Owner decisions: `_bmad-output/initiative-church-app/owner-decisions-milestone-1.md`. Environments and promotion: `environments-and-promotion.md`. Migration: `supabase/migrations/20261003154040_bounded_system_access.sql`.
+Architecture: AD-17 and AD-19. Owner decisions: `_bmad-output/initiative-church-app/owner-decisions-milestone-1.md`. Environments and promotion: `environments-and-promotion.md`. Migrations: `supabase/migrations/20261003154040_bounded_system_access.sql` and the review fixes in `supabase/migrations/20261003155428_system_access_review_fixes.sql`.
 
 ## The system route
 
@@ -49,11 +49,16 @@ Each procedure takes the operator name, checks it against `app.ops_operators`, a
 | `app.sys_create_principal(name, purpose, operator)` | Creates a principal in this database's environment, granted every command of its purpose. The only purpose today is `synthetic_probe`. |
 | `app.sys_register_credential(principal_id, digest, label, ttl, operator)` | Registers a credential digest. The TTL is between 1 minute and 30 days. |
 | `app.sys_revoke_credential(credential_id, operator)` | Revokes a credential immediately. |
-| `app.sys_disable_principal(principal_id, operator)` | Disables a principal and all its credentials. |
+| `app.sys_disable_principal(principal_id, operator)` | Disables a principal and revokes every unrevoked credential it has. Each revocation is recorded as an operator action. |
 | `app.ops_health_snapshot(window)` | Content-free counts: successes, replays, rejections by reason, probe revision and time, active principals and credentials, credentials expiring within 7 days, system-access state, alert status. |
 | `app.ops_alert_status()` | `disabled` while `q12_operations` or `ops_alert_destination` is unresolved. There is no dispatcher in this story. |
 
-To add an operator later, the owner records the decision, then inserts one row into `app.ops_operators` through a reviewed migration.
+To add an operator later, the owner records the decision. Then two changes land together in one reviewed change:
+
+- a migration that inserts the row into `app.ops_operators`
+- the operator's name added to `RESTRICTED_OPERATORS` in `tools/env/environments.mjs`, plus `operations.restricted_operators` in the affected `config/environments/*.json`
+
+`env:check` rejects any operator not in that list.
 
 ## Credentials
 
@@ -103,22 +108,25 @@ Restores and clones keep the source database's marker and credentials. Re-assert
 
 ## Production gates (unresolved; not blockers for milestone 1 staging)
 
-Each gate stays closed: config flags stay `false`, and the database gates stay `unresolved` with no fixture. `env:check` rejects any attempt to enable them in config.
+Each gate stays closed. The config flags in `operations.activation` stay `false`, and the database gates stay `unresolved` with no fixture. `env:check` rejects any attempt to enable a flag in config.
 
 | Gate | What the owner must decide | How to open it (owner only) |
 |---|---|---|
 | `q12_operations` (Q12) | Alert thresholds, support floors, reminder lateness tolerance, RPO/RTO | `select app.policy_approve('q12_operations', '<json thresholds>', 'israel', '<decision note>');` in that environment |
-| `ops_alert_destination` (Q12) | The restricted alert destination, for example a private channel or inbox reference. Do not put the destination in the repo. | `select app.policy_approve('ops_alert_destination', '{"destination_ref": "<reference>"}', 'israel', '<note>');` Then a later story adds a dispatcher. Until then `ops_alert_status()` reports `approved_no_dispatcher`. |
+| `ops_alert_destination` (Q12) | The restricted alert destination, for example a private channel or inbox reference. Do not put the destination in the repo. | `select app.policy_approve('ops_alert_destination', '{"destination_ref": "<reference>"}', 'israel', '<note>');` Alerting stays `disabled` until **both** this gate and `q12_operations` are approved. Only then does `ops_alert_status()` report `approved_no_dispatcher`; a later story adds the dispatcher. |
 | `ops_system_access` (release) | Whether the system route may run in production | `select app.policy_approve('ops_system_access', '{"commands": ["system.synthetic_probe"]}', 'israel', '<note>');` in the production database, then register a production credential. |
-| Scheduler | None in this story. Production scheduling also waits for Q2. | `operations.scheduler.enabled` must stay `false`. |
-| Additional operators | Only Israel is named. | A reviewed migration adding a row to `app.ops_operators`. |
+| Scheduler | None in this story. Production scheduling also waits for Q2. | `operations.activation.scheduler` must stay `false`. |
+| System audit growth | Every call that reaches the route writes one `app.sys_audit` row, including unauthenticated calls. There is no rate limit or retention yet. | Q12 must set a rate limit and a retention period for `sys_audit` (and `ops_health_events`) before production goes live. A later story implements them. |
+| Additional operators | Only Israel is named. | See "Restricted operator" above: a reviewed migration plus the `RESTRICTED_OPERATORS` list in `tools/env/environments.mjs`. |
+
+**Promotion consequence.** As soon as both `q12_operations` and `ops_alert_destination` are approved in an environment, `ops_alert_status()` stops reporting `disabled`. From then on `tools/ci/verify-hosted.sql` fails every promotion to that environment, because it requires alerting to be disabled. This is the same rule as for `private_access` and `outbound_sending`. The later epic that ships the dispatcher must change `verify-hosted.sql` and the validator (`tools/env/environments.mjs`, `operations.activation.alerting`) together.
 
 `config/environments/*.json` → `operations` records the same state:
 
-- operators
-- route activation: `open_nonproduction`, or `owner_gate:ops_system_access` in production
-- `alerting.enabled: false` with its two gates
-- `scheduler.enabled: false`
+- `restricted_operators`: `["israel"]`
+- `system_route.access`: `open` in local and staging, `owner_gate` in production
+- `activation`: `alerting`, `scheduler` and `production_system_access`, all `false`
+- `activation_gates`: the database gates that control each flag
 
 The validator is `tools/env/environments.mjs` (`validateOperations`).
 

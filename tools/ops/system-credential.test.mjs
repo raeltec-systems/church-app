@@ -5,7 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { digestOf, judge, mintToken, scrub, tokenEnvironment, TOKEN_RE } from './system-credential.mjs';
+import { writeFileSync } from 'node:fs';
+import { digestOf, judge, mintToken, runMatrix, scrub, tokenEnvironment, TOKEN_RE } from './system-credential.mjs';
 import { findSecrets } from '../ci/secret-patterns.mjs';
 
 const CLI = fileURLToPath(new URL('./system-credential.mjs', import.meta.url));
@@ -61,4 +62,27 @@ test('mint stores the token 0600 in the state dir and prints only the digest', (
   assert.equal(JSON.parse(out).digest, digestOf(token));
   assert.equal(statSync(join(dir, 'local.credential')).mode & 0o777, 0o600);
   assert.throws(() => execFileSync('node', [CLI, 'mint', '--env', 'local'], { env, stdio: 'pipe' }));
+});
+
+test('the matrix never sends another environment\'s stored credential', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ops-state-'));
+  const staging = mintToken('staging');
+  writeFileSync(join(dir, 'staging.credential'), `${staging}\n`, { mode: 0o600 });
+  const prevDir = process.env.OPS_STATE_DIR;
+  const prevFetch = globalThis.fetch;
+  const sent = [];
+  process.env.OPS_STATE_DIR = dir;
+  globalThis.fetch = async (_url, init) => {
+    sent.push(init.headers['x-system-credential']);
+    return new Response('{}', { status: 200 });
+  };
+  try {
+    const lines = await runMatrix({ env: 'local', apiUrl: 'http://127.0.0.1:1', key: 'k', token: mintToken('local') });
+    assert.ok(lines.some((l) => l.case === 'wrong_environment_credential_staging'));
+  } finally {
+    globalThis.fetch = prevFetch;
+    if (prevDir === undefined) delete process.env.OPS_STATE_DIR; else process.env.OPS_STATE_DIR = prevDir;
+  }
+  assert.ok(!sent.includes(staging), 'the stored staging credential was sent');
+  assert.ok(sent.some((c) => typeof c === 'string' && c.startsWith('sysc_staging_')), 'a staging-prefixed token was still tried');
 });

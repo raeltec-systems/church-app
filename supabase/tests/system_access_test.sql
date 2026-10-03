@@ -4,7 +4,7 @@
 -- snapshot, alert status and activation gates fail closed. HTTP evidence: system_api_smoke.sh.
 -- All principals, credentials and data are SYNTHETIC; tokens are built at run time.
 begin;
-select plan(95);
+select plan(103);
 
 -- Calls the route the way PostgREST does: role switch, JWT claims and request headers.
 create function pg_temp.sys(
@@ -301,14 +301,36 @@ select is(app.ops_health_snapshot() ->> 'system_access', 'gate_closed', 'snapsho
 select app.policy_approve('ops_system_access', '{"commands": ["system.synthetic_probe"]}', 'synthetic owner', 'pgtap');
 select is(pg_temp.sys('anon', pg_temp.token('production', 'P'), pg_temp.probe('00000000-0000-4000-8000-00000000000a')) -> 'revision',
   '4'::jsonb, 'after owner approval the production probe succeeds');
+select is(app.ops_health_snapshot() -> 'system_route',
+  '{"succeeded": 1, "replayed": 0, "rejected": 1, "rejected_by_reason": {"system_access_gate_closed": 1}}'::jsonb,
+  'snapshot route counters cover only this environment''s audit rows');
+select is((app.ops_health_snapshot() ->> 'credentials_active')::int, 1, 'one active production credential');
 select app.sys_disable_principal((select v from t_ids where k = 'principal_prod'), 'israel');
+select is((select count(*)::int from app.sys_credentials c, t_ids i
+            where i.k = 'principal_prod' and c.principal_id = i.v and c.revoked_at is null), 0,
+  'disabling a principal revokes its credentials');
+select is((select count(*)::int from app.ops_operator_actions
+            where action = 'credential_revoked' and environment = 'production'), 1,
+  'the cascaded revocation is an attributed operator action');
 select is(pg_temp.sys('anon', pg_temp.token('production', 'P'), pg_temp.probe('00000000-0000-4000-8000-00000000000b')) ->> 'code',
+  'unauthenticated', 'a disabled principal''s credential is refused');
+select is(pg_temp.last_audit(), 'rejected:credential_revoked:anon', 'refusal audited as revoked');
+-- A principal disabled without the procedure (defence in depth): refused, and not counted.
+insert into t_ids values ('principal_prod2', app.sys_create_principal('pgtap-probe-two', 'synthetic_probe', 'israel'));
+select app.sys_register_credential((select v from t_ids where k = 'principal_prod2'),
+  pg_temp.digest(pg_temp.token('production', 'Q')), 'pgtap prod two', interval '1 hour', 'israel');
+update app.sys_principals set disabled_at = now() where principal_id = (select v from t_ids where k = 'principal_prod2');
+select is(app.ops_health_snapshot() -> 'credentials_active', '0'::jsonb,
+  'credentials of a disabled principal are not counted as active');
+select is(app.ops_health_snapshot() -> 'credentials_expiring_7d', '0'::jsonb,
+  'credentials of a disabled principal are not counted as expiring');
+select is(pg_temp.sys('anon', pg_temp.token('production', 'Q'), pg_temp.probe('00000000-0000-4000-8000-00000000000c')) ->> 'code',
   'unauthenticated', 'a disabled principal is refused');
 select is(pg_temp.last_audit(), 'rejected:principal_disabled:anon', 'disabled principal audited');
 select is(app.ops_alert_status() ->> 'alerting', 'disabled', 'alerting stays disabled in production');
 
 -- Every call was audited exactly once ------------------------------------------------------------
-select is((select count(*)::int from app.sys_audit), 26, 'every system-route call wrote one audit row (the service_role call never entered)');
+select is((select count(*)::int from app.sys_audit), 27, 'every system-route call wrote one audit row (the service_role call never entered)');
 select is((select count(*)::int from app.sys_audit where outcome = 'succeeded'), 4,
   'only the valid probe calls succeeded');
 

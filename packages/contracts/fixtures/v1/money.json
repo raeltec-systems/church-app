@@ -1,0 +1,34 @@
+{
+  "kind": "money",
+  "contract_version": 1,
+  "valid": [
+    {"name": "two decimals (XTS is the ISO 4217 testing code, not church policy)", "value": {"amount": "12.50", "currency": "XTS"}},
+    {"name": "integer amount", "value": {"amount": "100", "currency": "XTS"}},
+    {"name": "zero", "value": {"amount": "0", "currency": "XTS"}},
+    {"name": "zero with decimals", "value": {"amount": "0.00", "currency": "XTS"}},
+    {"name": "negative correction", "value": {"amount": "-3.25", "currency": "XTS"}},
+    {"name": "beyond float precision", "value": {"amount": "999999999999999.999999", "currency": "XTS"}},
+    {"name": "classic float trap", "value": {"amount": "0.30", "currency": "XTS"}}
+  ],
+  "invalid": [
+    {"name": "JSON number (float) amount", "value": {"amount": 12.5, "currency": "XTS"}, "field_errors": {"amount": "invalid"}},
+    {"name": "JSON integer amount", "value": {"amount": 12, "currency": "XTS"}, "field_errors": {"amount": "invalid"}},
+    {"name": "comma decimal", "value": {"amount": "12,50", "currency": "XTS"}, "field_errors": {"amount": "invalid"}},
+    {"name": "thousands separator", "value": {"amount": "1,000.00", "currency": "XTS"}, "field_errors": {"amount": "invalid"}},
+    {"name": "leading zero", "value": {"amount": "012.50", "currency": "XTS"}, "field_errors": {"amount": "invalid"}},
+    {"name": "leading plus", "value": {"amount": "+12.50", "currency": "XTS"}, "field_errors": {"amount": "invalid"}},
+    {"name": "negative zero", "value": {"amount": "-0.00", "currency": "XTS"}, "field_errors": {"amount": "invalid"}},
+    {"name": "trailing point", "value": {"amount": "12.", "currency": "XTS"}, "field_errors": {"amount": "invalid"}},
+    {"name": "leading point", "value": {"amount": ".5", "currency": "XTS"}, "field_errors": {"amount": "invalid"}},
+    {"name": "exponent", "value": {"amount": "1e3", "currency": "XTS"}, "field_errors": {"amount": "invalid"}},
+    {"name": "too many integer digits", "value": {"amount": "1000000000000000", "currency": "XTS"}, "field_errors": {"amount": "invalid"}},
+    {"name": "too many fraction digits", "value": {"amount": "1.0000001", "currency": "XTS"}, "field_errors": {"amount": "invalid"}},
+    {"name": "whitespace", "value": {"amount": " 12.50", "currency": "XTS"}, "field_errors": {"amount": "invalid"}},
+    {"name": "currency symbol", "value": {"amount": "12.50", "currency": "K"}, "field_errors": {"currency": "invalid"}},
+    {"name": "lowercase currency", "value": {"amount": "12.50", "currency": "xts"}, "field_errors": {"currency": "invalid"}},
+    {"name": "missing currency", "value": {"amount": "12.50"}, "field_errors": {"currency": "required"}},
+    {"name": "missing amount", "value": {"currency": "XTS"}, "field_errors": {"amount": "required"}},
+    {"name": "unknown key", "value": {"amount": "12.50", "currency": "XTS", "scale": 2}, "field_errors": {"$": "unknown_field"}},
+    {"name": "not an object", "value": "12.50 XTS", "field_errors": {"$": "must_be_object"}}
+  ]
+}

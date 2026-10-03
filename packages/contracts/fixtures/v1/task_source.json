@@ -1,0 +1,13 @@
+{
+  "kind": "task_source",
+  "contract_version": 1,
+  "valid": [
+    {"name": "source and purpose", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "purpose": "fixture_review"}}
+  ],
+  "invalid": [
+    {"name": "missing purpose", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001"}, "field_errors": {"purpose": "required"}},
+    {"name": "purpose with spaces", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "purpose": "fixture review"}, "field_errors": {"purpose": "invalid"}},
+    {"name": "revision does not belong to a task identity", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "purpose": "fixture_review", "source_revision": 1}, "field_errors": {"$": "unknown_field"}},
+    {"name": "not an object", "value": 3, "field_errors": {"$": "must_be_object"}}
+  ]
+}

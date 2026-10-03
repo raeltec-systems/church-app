@@ -12,3 +12,7 @@ on conflict (id) do update
       message = excluded.message,
       is_synthetic = excluded.is_synthetic,
       updated_at = excluded.updated_at;
+
+-- Story 1.5: mark this database as local development so labelled fixture policy values apply.
+-- Hosted projects are never seeded; an unmarked database behaves as production (fail closed).
+select app.platform_set_environment('local', 'supabase/seed.sql (local development only)');

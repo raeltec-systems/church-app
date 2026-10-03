@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   db:
-    name: db (local Supabase, pgTAP + API smoke)
+    name: db (local Supabase, pgTAP + API smoke + contract fixtures)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -25,6 +25,8 @@ jobs:
           cache: npm
       - name: Install pinned Supabase CLI
         run: npm ci
+      - name: Shared contract fixtures (TypeScript mapping)
+        run: npm run contracts:test
       - name: Start local stack (services the tracer needs)
         run: npx supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,storage-api,realtime,postgres-meta
       - name: pgTAP permission tests
@@ -51,6 +53,15 @@ jobs:
           flutter --version
           flutter --version | grep -q 'Flutter 3.47.6'
           flutter --version | grep -q 'Dart 3.13.5'
+      - name: contracts — pub get (locked)
+        working-directory: packages/contracts/dart
+        run: dart pub get --enforce-lockfile
+      - name: contracts — analyze
+        working-directory: packages/contracts/dart
+        run: dart analyze --fatal-infos
+      - name: contracts — shared fixtures (Dart mapping)
+        working-directory: packages/contracts/dart
+        run: dart test
       - name: mobile — pub get (locked)
         working-directory: apps/mobile
         run: flutter pub get --enforce-lockfile

@@ -139,6 +139,7 @@ Implemented 2026-10-03.
 - **Owner gate still open:** install the APK on an Android phone; check the hosted value and airplane-mode error → **Try again**.
 - Hosted HTTP write-denial was not probed from this session (local pgTAP + smoke cover the same migration).
 - iOS not built (no tooling); Android emulator unavailable (no KVM).
+- **Owner gate closed (2026-10-03, 14:04–14:05 local).** Israel installed the arm64 release APK (`bic-kafue-tracer-arm64.apk`, sha256 `b310d081…`, includes the retry/abort fix) on an Android phone on Airtel 4G and ran it against the hosted project. It showed the hosted synthetic row (operational, updated 12:02 UTC). In airplane mode it showed the "Couldn't reach the server" panel with **Try again**. Back online, it showed the hosted row again. Screenshots: `evidence-1.1/android-hosted-{1-initial,2-airplane-mode,3-recovered}.jpg`.
 
 ## Review Triage Log
 

@@ -1,0 +1,405 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{overflow:hidden;background:#0A0F1E}
+#stage{position:relative;overflow:hidden;font-family:Figtree,sans-serif;color:#0E1530}
+.layer{position:absolute;inset:0;display:none;overflow:hidden}
+.abs{position:absolute}
+.h{font-family:Outfit,sans-serif;font-weight:700;letter-spacing:-.02em;line-height:1.02}
+.mono{font-family:'JetBrains Mono',monospace;letter-spacing:.14em;text-transform:uppercase}
+.phone{position:absolute;left:0;top:0;width:390px;height:844px;border-radius:58px;overflow:hidden;box-shadow:0 50px 100px rgba(8,16,60,.35),0 10px 30px rgba(8,16,60,.2);transform-origin:0 0}
+.phone img{width:100%;height:100%;display:block}
+.bubble{position:absolute;display:flex;align-items:flex-end;gap:14px;white-space:nowrap}
+.bubble .av{width:52px;height:52px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font:700 20px Figtree;color:#fff}
+.bubble .tx{padding:16px 26px;border-radius:26px;font-weight:600;color:#0E1530;box-shadow:0 14px 40px rgba(0,0,0,.35)}
+.bubble .tx small{display:block;font-size:.6em;font-weight:700;margin-bottom:3px}
+.chip{display:inline-block;padding:10px 22px;border-radius:999px;font-weight:700;font-size:24px}
+.ripple{position:absolute;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;border:5px solid #0A7FE0;background:rgba(10,127,224,.25);pointer-events:none;z-index:6}
+.finger{position:absolute;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;background:rgba(255,255,255,.9);box-shadow:0 6px 20px rgba(0,0,0,.35),inset 0 0 0 3px rgba(10,127,224,.6);z-index:7}
+.browser{position:absolute;left:0;top:0;border-radius:22px;overflow:hidden;background:#fff;box-shadow:0 60px 120px rgba(0,0,0,.45);transform-origin:50% 0}
+.browser .bar{height:44px;background:#E9EDF5;display:flex;align-items:center;gap:10px;padding:0 18px}
+.browser .bar i{width:14px;height:14px;border-radius:50%;display:block}
+.browser .url{margin-left:20px;flex:1;height:26px;border-radius:8px;background:#fff;font:500 15px Figtree;color:#586079;display:flex;align-items:center;padding-left:14px}
+.browser .scr{position:relative;width:1440px;height:900px;transform-origin:0 0;overflow:hidden}
+.browser .scr img{position:absolute;inset:0;width:100%;height:100%;transform-origin:0 0}
+.ring{position:absolute;border-radius:50%;border:2px solid rgba(142,193,255,.5)}
+</style></head>
+<body><div id="stage">
+
+<div class="layer" id="s1" style="background:radial-gradient(circle at 50% 40%,#16245E 0%,#0A0F1E 70%)">
+  <div class="abs mono" id="s1tag" style="left:0;right:0;text-align:center;color:#8EC1FF;font-size:22px">Sunday morning · the church group chat</div>
+  <div id="bubbles"></div>
+  <div class="abs h" id="s1q" style="left:0;right:0;text-align:center;color:#fff">Sound familiar?</div>
+</div>
+
+<div class="layer" id="s2" style="background:radial-gradient(circle at 50% 50%,#1B2F8A 0%,#14246B 45%,#0A0F1E 100%)">
+  <div class="abs h" id="s2a" style="left:0;right:0;text-align:center;color:#fff">What if it was all<br><span style="color:#8EC1FF">in one place?</span></div>
+  <div id="rings"></div>
+  <img id="s2logo" src="logo-white.png" class="abs">
+</div>
+
+<div class="layer" id="s3" style="background:#F4F6FA">
+  <div class="abs" id="s3blob" style="width:1100px;height:1100px;border-radius:50%;background:radial-gradient(circle,#DCE7FA 0%,rgba(220,231,250,0) 70%)"></div>
+  <div class="abs" id="s3text">
+    <div class="mono" id="s3e" style="color:#0A7FE0">Introducing the BIC Kafue app</div>
+    <div class="h" id="s3h" style="color:#14246B;margin:18px 0 0 -8px">
+      <div id="w1">Your church.</div>
+      <div id="w2" style="color:#0A7FE0">In your pocket.</div>
+    </div>
+    <div id="s3sub" style="color:#586079;font-weight:500;margin-top:30px">Brethren in Christ Church Kafue · members, leaders &amp; pastors</div>
+  </div>
+  <div class="phone" id="s3p2"><img src="shots/app-home-guest.png"></div>
+  <div class="phone" id="s3p1"><img src="shots/app-home.png"></div>
+</div>
+
+<div class="layer" id="s4">
+  <div class="abs" id="s4bg" style="inset:0"></div>
+  <div class="abs" id="s4circle" style="width:1000px;height:1000px;border-radius:50%"></div>
+  <div class="abs" id="s4dark" style="inset:0;background:#0A0F1E"></div>
+  <div class="abs" id="s4text" style="display:flex;flex-direction:column">
+    <div class="mono" id="s4eye" style="margin-bottom:22px"></div>
+    <div class="h" id="s4title"></div>
+    <div id="s4sub" style="font-weight:500;line-height:1.35;margin-top:28px"></div>
+  </div>
+  <div class="phone" id="f2"><img></div>
+  <div class="phone" id="f1"><img></div>
+  <div class="phone" id="f3"><img src="shots/app-home-dark.png"></div>
+  <div class="ripple" id="tap"></div>
+  <div class="finger" id="finger"></div>
+  <div class="abs chip" id="toast" style="background:#DFF3E8;color:#0D6438;box-shadow:0 12px 30px rgba(0,0,0,.18);z-index:8;white-space:nowrap"></div>
+  <div class="abs" id="progress" style="display:flex;gap:12px"></div>
+</div>
+
+<div class="layer" id="s5" style="background:radial-gradient(circle at 30% 20%,#1B2F8A 0%,#14246B 40%,#0A0F1E 110%)">
+  <div class="abs mono" id="s5e" style="left:0;right:0;text-align:center;color:#8EC1FF;font-size:22px">For leaders, pastors &amp; the church office</div>
+  <div class="abs h" id="s5t" style="left:0;right:0;text-align:center;color:#fff"></div>
+  <div class="browser" id="win">
+    <div class="bar"><i style="background:#FF5F57"></i><i style="background:#FEBC2E"></i><i style="background:#28C840"></i><div class="url">Church admin · BIC Kafue</div></div>
+    <div class="scr" id="scr">
+      <img id="a0" src="shots/admin-duty-rotas.png"><img id="a1" src="shots/admin-cell-meetings.png"><img id="a2" src="shots/admin-pastor-home.png"><img id="a3" src="shots/admin-pastoral-care.png">
+    </div>
+  </div>
+  <div class="phone" id="s5p"><img src="shots/app-leader-coverage.png"></div>
+</div>
+
+<div class="layer" id="s6" style="background:#EAF0FA">
+  <div class="abs" id="wall"></div>
+  <div class="abs" style="inset:0;background:radial-gradient(ellipse at 50% 50%,rgba(244,246,250,.96) 0%,rgba(244,246,250,.85) 30%,rgba(244,246,250,0) 62%)"></div>
+  <div class="abs h" id="s6t" style="left:0;right:0;text-align:center;color:#14246B">Made for our<br><span style="color:#0A7FE0">church family.</span></div>
+</div>
+
+<div class="layer" id="s7" style="background:radial-gradient(circle at 50% 42%,#1E338F 0%,#14246B 42%,#0A0F1E 100%)">
+  <div id="rings2"></div>
+  <div class="abs" id="s7logo" style="border-radius:50%;background:#fff;box-shadow:0 0 0 14px rgba(255,255,255,.1),0 30px 80px rgba(0,0,0,.4)"><img src="logo.png" style="width:100%;height:100%;border-radius:50%"></div>
+  <div class="abs h" id="s7t" style="left:0;right:0;text-align:center;color:#fff">Coming soon.</div>
+  <div class="abs" id="s7s" style="text-align:center;color:#DCE6FF;font-weight:500">Sign up with just your phone number.</div>
+  <div class="abs" id="s7c" style="left:0;right:0;text-align:center">
+    <span class="chip" style="background:rgba(255,255,255,.12);color:#fff;border:2px solid rgba(255,255,255,.25);margin:6px">Android</span><span class="chip" style="background:rgba(255,255,255,.12);color:#fff;border:2px solid rgba(255,255,255,.25);margin:6px">iPhone</span><span class="chip" style="background:#0A7FE0;color:#fff;margin:6px">Church admin on the web</span>
+  </div>
+  <div class="abs" id="s7v" style="text-align:center;color:#9AA3BC;font-style:italic;line-height:1.4">“Know therefore that the LORD thy God, he is God, the faithful God…” <span class="mono" style="font-style:normal;font-size:.7em;color:#8EC1FF;margin-left:8px;white-space:nowrap">Deut 7:9</span></div>
+  <div class="abs" id="flash" style="inset:0;background:#fff;opacity:0"></div>
+</div>
+
+<div class="abs" id="gflash" style="inset:0;background:#fff;opacity:0;pointer-events:none"></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const p = (t, a, b) => clamp((t - a) / (b - a));
+const eo = x => 1 - Math.pow(1 - x, 3);
+const eio = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const back = x => { const c = 1.7; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, x) => a + (b - a) * x;
+const show = (id, on) => { $(id).style.display = on ? 'block' : 'none'; };
+const css = (id, o) => Object.assign($(id).style, o);
+const px = v => v + 'px';
+
+// ---------- format / layout ----------
+const FMT = new URLSearchParams(location.search).get('f') || '16x9';
+const [W, H] = { '16x9': [1920, 1080], '9x16': [1080, 1920], '1x1': [1080, 1080] }[FMT];
+document.documentElement.style.width = document.body.style.width = px(W);
+document.documentElement.style.height = document.body.style.height = px(H);
+css('stage', { width: px(W), height: px(H) });
+const LAYOUTS = {
+  '16x9': {
+    tagY: 70, bub: { x: 260, y0: 170, dy: 150, fs: 34, rows: 5 }, s1q: { y: 420, fs: 120 },
+    s2a: { y: 400, fs: 104 }, logo: { cx: 960, cy: 540, s: 400 },
+    s3: { tx: 150, ty: 300, w: 1000, hs: 150, es: 24, ss: 34, p1: [1320, 118, 1], p2: [1110, 150, .86], blob: [1050, -200] },
+    s4: { tx: 150, ty: 0, tw: 820, th: 1080, center: true, ts: 118, ss: 36, es: 24, ph: [1290, 118], ps: 1, two: 300, circ: [1290, 540], pg: [150, 1000] },
+    s5: { ey: 66, ty: 110, ts: 84, win: [250, 260, 1152], ph: [1380, 330, .9] },
+    s6: { y: 390, fs: 118, rows: 3 },
+    s7: { logo: [960, 270, 300], ty: 480, ts: 130, sy: 640, ss: 38, cy: 730, vy: 880, vs: 26, vw: 1500 },
+  },
+  '9x16': {
+    tagY: 150, bub: { x: 50, y0: 300, dy: 170, fs: 32, rows: 7 }, s1q: { y: 880, fs: 112 },
+    s2a: { y: 820, fs: 88 }, logo: { cx: 540, cy: 960, s: 440 },
+    s3: { tx: 90, ty: 200, w: 920, hs: 128, es: 22, ss: 32, p1: [450, 760, 1.12], p2: [120, 830, .98], blob: [-10, 600] },
+    s4: { tx: 90, ty: 170, tw: 900, th: 640, center: false, ts: 110, ss: 34, es: 22, ph: [540, 720], ps: 1.12, two: 260, circ: [540, 1190], pg: [90, 1830] },
+    s5: { ey: 200, ty: 250, ts: 76, win: [40, 520, 1000], ph: [560, 1000, .85] },
+    s6: { y: 820, fs: 92, rows: 5 },
+    s7: { logo: [540, 560, 360], ty: 880, ts: 128, sy: 1050, ss: 38, cy: 1140, vy: 1420, vs: 28, vw: 880 },
+  },
+  '1x1': {
+    tagY: 60, bub: { x: 50, y0: 130, dy: 128, fs: 28, rows: 6 }, s1q: { y: 450, fs: 104 },
+    s2a: { y: 420, fs: 84 }, logo: { cx: 540, cy: 540, s: 380 },
+    s3: { tx: 70, ty: 80, w: 940, hs: 104, es: 20, ss: 26, p1: [600, 450, .76], p2: [360, 490, .68], blob: [100, 200] },
+    s4: { tx: 70, ty: 0, tw: 470, th: 1080, center: true, ts: 76, ss: 27, es: 20, ph: [820, 130], ps: .78, two: 150, circ: [820, 540], pg: [70, 990], toast: 21 },
+    s5: { ey: 50, ty: 85, ts: 60, win: [50, 200, 860], ph: [740, 380, .72] },
+    s6: { y: 400, fs: 96, rows: 3 },
+    s7: { logo: [540, 230, 240], ty: 420, ts: 108, sy: 560, ss: 32, cy: 630, vy: 790, vs: 24, vw: 900 },
+  },
+};
+const LY = LAYOUTS[FMT];
+const PHH = 844, PHW = 390;
+// static placement
+css('s1tag', { top: px(LY.tagY) });
+css('s1q', { top: px(LY.s1q.y), fontSize: px(LY.s1q.fs) });
+css('s2a', { top: px(LY.s2a.y), fontSize: px(LY.s2a.fs) });
+css('s2logo', { left: px(LY.logo.cx - LY.logo.s / 2), top: px(LY.logo.cy - LY.logo.s / 2), width: px(LY.logo.s), height: px(LY.logo.s) });
+css('s3text', { left: px(LY.s3.tx), top: px(LY.s3.ty), width: px(LY.s3.w) });
+css('s3e', { fontSize: px(LY.s3.es) }); css('s3h', { fontSize: px(LY.s3.hs) }); css('s3sub', { fontSize: px(LY.s3.ss) });
+css('s3blob', { left: px(LY.s3.blob[0]), top: px(LY.s3.blob[1]) });
+css('s4text', { left: px(LY.s4.tx), top: px(LY.s4.ty), width: px(LY.s4.tw), height: px(LY.s4.th), justifyContent: LY.s4.center ? 'center' : 'flex-start' });
+css('s4eye', { fontSize: px(LY.s4.es) }); css('s4title', { fontSize: px(LY.s4.ts) }); css('s4sub', { fontSize: px(LY.s4.ss) });
+css('s4circle', { left: px(LY.s4.circ[0] - 500), top: px(LY.s4.circ[1] - 500) });
+css('progress', { left: px(LY.s4.pg[0]), top: px(LY.s4.pg[1]) });
+css('toast', { fontSize: px(LY.s4.toast || 30), padding: LY.s4.toast ? '12px 22px' : '16px 30px' });
+css('s5e', { top: px(LY.s5.ey) }); css('s5t', { top: px(LY.s5.ty), fontSize: px(LY.s5.ts) });
+const WS = LY.s5.win[2] / 1440;
+css('win', { width: px(LY.s5.win[2]), left: px(LY.s5.win[0]), top: px(LY.s5.win[1]) });
+css('scr', { width: px(1440 * WS), height: px(900 * WS) });
+[0, 1, 2, 3].forEach(j => css('a' + j, { width: px(1440 * WS), height: px(900 * WS) }));
+css('s6t', { top: px(LY.s6.y), fontSize: px(LY.s6.fs) });
+const L7 = LY.s7;
+css('s7logo', { left: px(L7.logo[0] - L7.logo[2] / 2), top: px(L7.logo[1] - L7.logo[2] / 2), width: px(L7.logo[2]), height: px(L7.logo[2]) });
+css('s7t', { top: px(L7.ty), fontSize: px(L7.ts) });
+css('s7s', { top: px(L7.sy), fontSize: px(L7.ss), left: px((W - L7.vw) / 2), width: px(L7.vw) });
+css('s7c', { top: px(L7.cy) });
+css('s7v', { top: px(L7.vy), fontSize: px(L7.vs), left: px((W - L7.vw) / 2), width: px(L7.vw) });
+const phoneT = (x, y, s, rot = 0) => `translate(${x}px,${y}px) rotate(${rot}deg) scale(${s})`;
+
+// ---------- S1 bubbles ----------
+const MSGS = [
+  ['Mwila', "Who's on the main door this Sunday?? 🚪", 0, '#FFF1CF', '#C9861A'],
+  ['Joseph', 'Is cell meeting still on Thursday?', 1, '#fff', '#0B4FA6'],
+  ['Ruth', 'What hymn number was that again 😅', 0, '#fff', '#0D6438'],
+  ['Peter', 'How do I send my tithe on MoMo?', 1, '#E3EEFC', '#6B3FA0'],
+  ['Grace', 'Can someone from church visit my mum? 🙏', 0, '#fff', '#A3241A'],
+  ['Abel', 'Sorry… which house is the venue?', 1, '#fff', '#0A7FE0'],
+  ['Esther', 'Did anyone record the sermon?', 0, '#fff', '#B4507A'],
+  ['Mwila', 'Hello?? 👀', 1, '#FFF1CF', '#C9861A'],
+];
+const BT = [0.35, 1.15, 1.95, 2.75, 3.55, 4.35, 4.85, 5.25];
+const bubs = MSGS.map((m, i) => {
+  const d = document.createElement('div'); d.className = 'bubble';
+  const av = `<div class="av" style="background:${m[4]}">${m[0][0]}</div>`;
+  const tx = `<div class="tx" style="background:${m[3]};font-size:${LY.bub.fs}px;border-bottom-${m[2] ? 'right' : 'left'}-radius:8px"><small style="color:${m[4]}">${m[0]}</small>${m[1]}</div>`;
+  d.innerHTML = m[2] ? tx + av : av + tx;
+  $('bubbles').appendChild(d); return d;
+});
+function S1(t) {
+  $('s1tag').style.opacity = eo(p(t, 0, .4)) * (1 - p(t, 5.2, 5.6));
+  const chaos = p(t, 4.6, 5.6);
+  const shown = BT.filter(x => x <= t).length;
+  bubs.forEach((d, i) => {
+    const a = eo(p(t, BT[i], BT[i] + .3)), s = back(p(t, BT[i], BT[i] + .35));
+    // smooth scroll: each new bubble pushes the stack up
+    let scroll = 0; for (let k = LY.bub.rows; k < BT.length; k++) scroll += eo(p(t, BT[k], BT[k] + .3));
+    const y = LY.bub.y0 + (i - scroll) * LY.bub.dy;
+    const left = MSGS[i][2] === 0;
+    const jx = Math.sin(i * 7 + t * 23) * 18 * chaos, jy = Math.cos(i * 5 + t * 19) * 14 * chaos;
+    d.style.left = left ? px(LY.bub.x + jx) : 'auto';
+    d.style.right = left ? 'auto' : px(LY.bub.x - jx);
+    d.style.top = px(y + jy);
+    d.style.opacity = a * clamp(1 - (LY.bub.y0 - 40 - y) / 80) * (1 - p(t, 5.2, 5.5));
+    d.style.transform = `scale(${s * (1 - .1 * chaos)}) rotate(${(left ? -1 : 1) * chaos * 3}deg)`;
+    d.style.transformOrigin = left ? '0 100%' : '100% 100%';
+    d.style.filter = `blur(${chaos * 6}px)`;
+  });
+  const q = p(t, 5.35, 5.6);
+  $('s1q').style.opacity = q * (1 - p(t, 5.85, 6));
+  $('s1q').style.transform = `scale(${lerp(1.4, 1, eo(q))})`;
+}
+// ---------- S2 ----------
+for (let i = 0; i < 4; i++) { const r = document.createElement('div'); r.className = 'ring'; $('rings').appendChild(r); }
+function S2(t) {
+  const a = p(t, 6, 6.5), out = p(t, 7.7, 8);
+  $('s2a').style.opacity = eo(a) * (1 - out);
+  $('s2a').style.transform = `translateY(${lerp(40, 0, eo(a)) - out * 40}px) scale(${1 + out * .1})`;
+  $('s2a').style.filter = `blur(${out * 10}px)`;
+  const l = p(t, 8, 8.6);
+  $('s2logo').style.opacity = eo(l);
+  $('s2logo').style.transform = `scale(${lerp(.4, 1, back(l)) + p(t, 8.6, 10) * .08}) rotate(${lerp(-25, 0, eo(l))}deg)`;
+  [...$('rings').children].forEach((r, i) => {
+    const k = p(t, 8.2 + i * .35, 9.6 + i * .35), sz = lerp(LY.logo.s, Math.max(W, H) * .8, eo(k));
+    r.style.width = r.style.height = px(sz); r.style.left = px(LY.logo.cx - sz / 2); r.style.top = px(LY.logo.cy - sz / 2);
+    r.style.opacity = k > 0 ? (1 - k) : 0;
+  });
+}
+// ---------- S3 ----------
+function S3(t) {
+  const w1 = p(t, 10.05, 10.4), w2 = p(t, 10.55, 10.9);
+  $('w1').style.opacity = w1; $('w1').style.transform = `translateY(${lerp(80, 0, eo(w1))}px)`;
+  $('w2').style.opacity = w2; $('w2').style.transform = `translateY(${lerp(80, 0, eo(w2))}px)`;
+  $('s3e').style.opacity = p(t, 11, 11.4);
+  const s = p(t, 11.3, 11.7); $('s3sub').style.opacity = s; $('s3sub').style.transform = `translateY(${lerp(20, 0, eo(s))}px)`;
+  const drift = (t - 10) * 6;
+  const [x1, y1, k1] = LY.s3.p1, [x2, y2, k2] = LY.s3.p2;
+  const ph = eo(p(t, 10.2, 11)), ph2 = eo(p(t, 10.6, 11.4));
+  $('s3p1').style.transform = phoneT(x1, y1 + lerp(H, 0, ph) - drift, k1, lerp(14, 4, ph));
+  $('s3p2').style.transform = phoneT(x2, y2 + lerp(H, 0, ph2) + drift, k2, lerp(-14, -6, ph2));
+  $('s3blob').style.transform = `scale(${1 + (t - 10) * .03})`;
+}
+// ---------- S4 features ----------
+const L = { bg: '#F4F6FA', ink: '#14246B', eye: '#0A7FE0', sub: '#586079', circ: '#DCE7FA' };
+const D = { bg: '#14246B', ink: '#FFFFFF', eye: '#8EC1FF', sub: '#C9D4F2', circ: '#1E338F' };
+const DK = { bg: '#0A0F1E', ink: '#DCE6FF', eye: '#8EC1FF', sub: '#9AA3BC', circ: '#131A2E' };
+const FEATS = [
+  { eye: 'Sermons', title: 'Missed Sunday?', sub: 'Catch every sermon, series and speaker, right from your phone.', a: 'app-sermons', th: L },
+  { eye: 'Bible & hymn book', title: 'Turn to<br>hymn 58.', sub: 'The Bible and our hymn book, built in. No more “which number?”', a: 'app-bible', b: 'app-hymns', th: D },
+  { eye: 'My duties', title: 'On duty<br>this Sunday?', sub: 'See your rota slot and accept it in one tap.', a: 'app-home', th: L, tap: [117, 479], toast: '✓ Accepted · Main door, Sun 4 Oct' },
+  { eye: 'Calendar', title: 'Never miss<br>a thing.', sub: 'Services, cell meetings and your duties in one calendar.', a: 'app-calendar', b: 'app-my-duties', th: D },
+  { eye: 'Cell groups', title: 'Cell life,<br>connected.', sub: 'Next meeting, venue, who leads what — and a recap if you missed it.', a: 'app-my-cell', b: 'app-cell-meeting-recap', th: L },
+  { eye: 'Pastoral care', title: 'Need a visit?', sub: 'Request a pastoral visit and get a time that works. Private to the pastoral team.', a: 'app-pastoral-visits', th: D, tap: [195, 392], toast: '✓ Visit accepted · Sat 10 Oct, 10:00' },
+  { eye: 'Giving', title: 'Giving,<br>made clear.', sub: 'Simple steps for Airtel Money, MTN MoMo and bank transfer.', a: 'app-give', b: 'app-give-instructions', th: L },
+  { eye: 'Dark mode', title: 'Late-night<br>devotions?', sub: 'We’ve got dark mode. 🌙', a: 'app-home', th: L, dark: true },
+];
+const F0 = 14, FD = 3;
+FEATS.forEach((f, i) => { const d = document.createElement('div'); d.style.cssText = 'width:44px;height:8px;border-radius:4px'; d.id = 'pg' + i; $('progress').appendChild(d); });
+let lastF = -1;
+const mix = (c1, c2, k) => { const h = c => [1, 3, 5].map(j => parseInt(c.slice(j, j + 2), 16)); const a = h(c1), b = h(c2); return `rgb(${a.map((v, j) => Math.round(lerp(v, b[j], k))).join(',')})`; };
+function S4(t) {
+  const i = clamp(Math.floor((t - F0) / FD), 0, FEATS.length - 1), f = FEATS[i], lt = t - F0 - i * FD;
+  const th = f.th, S = LY.s4;
+  if (i !== lastF) {
+    $('s4eye').textContent = String(i + 1).padStart(2, '0') + ' · ' + f.eye;
+    $('s4title').innerHTML = f.title; $('s4sub').innerHTML = f.sub;
+    $('f1').querySelector('img').src = 'shots/' + f.a + '.png';
+    if (f.b) $('f2').querySelector('img').src = 'shots/' + f.b + '.png';
+    $('toast').textContent = f.toast || '';
+    lastF = i;
+  }
+  // dark-mode circular wipe from the phone
+  const dk = f.dark ? eio(p(lt, 1.2, 1.9)) : 0;
+  const R = Math.hypot(W, H) * 1.05;
+  const cx = S.ph[0], cy = S.ph[1] + PHH * S.ps / 2;
+  $('s4dark').style.display = dk > 0 ? 'block' : 'none';
+  $('s4dark').style.clipPath = `circle(${dk * R}px at ${cx}px ${cy}px)`;
+  const tcol = k => dk > .5 && FMT !== '9x16' ? DK[k] : (FMT === '9x16' && dk > .35 ? DK[k] : th[k]);
+  $('s4bg').style.background = th.bg;
+  $('s4circle').style.background = th.circ;
+  $('s4circle').style.transform = `scale(${lerp(.3, 1, eo(p(lt, 0, .5))) + lt * .02})`;
+  $('s4eye').style.color = tcol('eye'); $('s4title').style.color = tcol('ink'); $('s4sub').style.color = tcol('sub');
+  const te = p(lt, .05, .4), tt = p(lt, .12, .5), ts = p(lt, .3, .7), out = p(lt, 2.75, 3);
+  $('s4eye').style.opacity = te * (1 - out); $('s4eye').style.transform = `translateX(${lerp(-40, 0, eo(te))}px)`;
+  $('s4title').style.opacity = tt * (1 - out); $('s4title').style.transform = `translateY(${lerp(60, 0, eo(tt)) - out * 30}px)`;
+  $('s4sub').style.opacity = ts * (1 - out); $('s4sub').style.transform = `translateY(${lerp(30, 0, eo(ts)) - out * 30}px)`;
+  // phones
+  const pin = eo(p(lt, 0, .55)), pout = eio(p(lt, 2.7, 3));
+  const two = !!f.b;
+  const ps = S.ps;
+  const baseX = (two ? S.ph[0] - S.two / 2 : S.ph[0]) - PHW * ps / 2, baseY = S.ph[1];
+  const lift = lt * 8;
+  const y1 = baseY + lerp(H, 0, pin) - lift - pout * H;
+  $('f1').style.transform = phoneT(baseX, y1, ps, lerp(10, two ? -3 : 0, pin));
+  if (two) {
+    const p2 = eo(p(lt, .35, .9));
+    $('f2').style.display = 'block';
+    $('f2').style.transform = phoneT(baseX + S.two, baseY + 40 * ps + lerp(H, 0, p2) + lift - pout * H, ps * .92, lerp(14, 5, p2));
+  } else $('f2').style.display = 'none';
+  if (f.dark) {
+    $('f3').style.display = 'block';
+    $('f3').style.transform = $('f1').style.transform;
+    $('f3').style.clipPath = `circle(${dk * 1000}px at ${PHW / 2}px ${PHH / 2}px)`;
+  } else $('f3').style.display = 'none';
+  // tap: finger lands, ripple, toast
+  const tap = $('tap'), toast = $('toast'), fin = $('finger');
+  if (f.tap) {
+    const x = baseX + f.tap[0] * ps, y = y1 + f.tap[1] * ps;
+    const fi = p(lt, .9, 1.25), fo = p(lt, 1.45, 1.75);
+    fin.style.display = fi > 0 && fo < 1 ? 'block' : 'none';
+    fin.style.left = px(x + lerp(160, 0, eo(fi))); fin.style.top = px(y + lerp(220, 0, eo(fi)));
+    const press = p(lt, 1.2, 1.28) * (1 - p(lt, 1.32, 1.45));
+    fin.style.transform = `scale(${1 - .18 * press})`; fin.style.opacity = eo(fi) * (1 - fo);
+    const k = p(lt, 1.25, 1.75);
+    tap.style.display = k > 0 && k < 1 ? 'block' : 'none';
+    tap.style.left = px(x); tap.style.top = px(y);
+    tap.style.transform = `scale(${lerp(.6, 3, eo(k))})`; tap.style.opacity = 1 - k;
+    const tk = p(lt, 1.4, 1.7);
+    toast.style.display = tk > 0 ? 'block' : 'none';
+    toast.style.left = px(baseX + PHW * ps / 2); toast.style.top = px(y1 + 690 * ps);
+    toast.style.transform = `translateX(-50%) translateY(${lerp(30, 0, back(tk))}px) scale(${lerp(.7, 1, back(tk))})`;
+    toast.style.opacity = tk * (1 - out);
+  } else { tap.style.display = 'none'; toast.style.display = 'none'; fin.style.display = 'none'; }
+  FEATS.forEach((_, j) => { const d = $('pg' + j); d.style.background = j === i ? tcol('eye') : (j < i ? tcol('sub') : th.circ); d.style.opacity = j <= i ? 1 : .6; d.style.width = px(j === i ? 80 : 44); });
+}
+// ---------- S5 admin ----------
+const ADM = ['Duty rotas, sorted.', 'Cell meetings, planned.', 'The whole church at a glance.', 'Pastoral care, cared for.'];
+// zoom focus per dashboard: [scale, fx, fy] (fx/fy = focus point in 0..1 of the screen)
+const ZOOM = [[1.35, .45, .25], [1.3, .55, .3], [1.3, .55, .2], [1.3, .4, .25]];
+function S5(t) {
+  const lt = t - 38;
+  $('s5e').style.opacity = eo(p(lt, 0, .4));
+  const idx = clamp(Math.floor((lt - .2) / 1.95), 0, 3), k = lt - .2 - idx * 1.95;
+  $('s5t').textContent = ADM[idx];
+  const ti = idx === 0 ? p(lt, .2, .5) : p(k, 0, .3);
+  $('s5t').style.opacity = idx === 0 ? ti : .3 + .7 * ti;
+  $('s5t').style.transform = `translateY(${lerp(20, 0, eo(ti))}px)`;
+  const w = eo(p(lt, 0, .7));
+  $('win').style.transform = `perspective(2000px) translateY(${lerp(H * .7, 0, w)}px) rotateX(${lerp(20, 4, w)}deg) scale(${1 + lt * .006})`;
+  for (let j = 0; j < 4; j++) {
+    const im = $('a' + j), st = .2 + j * 1.95;
+    const kk = j === 0 ? 1 : eo(p(lt, st - .25, st + .1));
+    im.style.opacity = j <= idx + 1 ? kk : 0;
+    const z = ZOOM[j], zk = eio(p(lt, st + .3, st + 1.9)) * (j <= idx ? 1 : 0);
+    const s = lerp(1, z[0], zk), sw = 1440 * WS, sh = 900 * WS;
+    im.style.transform = `translateX(${lerp(80, 0, kk)}px) translate(${-(s - 1) * sw * z[1]}px,${-(s - 1) * sh * z[2]}px) scale(${s})`;
+  }
+  const ph = eo(p(lt, .6, 1.3)), [px5, py5, ps5] = LY.s5.ph;
+  $('s5p').style.transform = phoneT(px5, py5 + lerp(H, 0, ph) - lt * 6, ps5, lerp(12, 4, ph));
+  $('s5p').style.zIndex = 3;
+}
+// ---------- S6 wall ----------
+const WALL = ['app-home', 'app-bible', 'app-sermons', 'app-give', 'app-calendar', 'app-my-cell', 'app-pastoral-visits', 'app-home-dark', 'app-hymns', 'app-duty-detail', 'app-profile', 'app-cell-meeting-recap', 'app-home-leader', 'app-give-instructions', 'app-phone-sign-up', 'app-leader-coverage', 'app-bible-dark', 'app-my-duties', 'app-home-guest'];
+const rows = [];
+const WR = LY.s6.rows, WW = Math.max(W, H) * 1.6, WH = WR * 700;
+css('wall', { left: px((W - WW) / 2), top: px((H - WH) / 2), width: px(WW), height: px(WH) });
+for (let r = 0; r < WR; r++) { const row = document.createElement('div'); row.className = 'abs'; row.style.cssText = `left:0;top:${r * 700}px;height:650px;display:flex;gap:40px;white-space:nowrap`; for (let c = 0; c < 12; c++) { const ph = document.createElement('div'); ph.className = 'phone'; ph.style.cssText = 'position:relative;flex:none;width:300px;height:650px;border-radius:45px;box-shadow:0 25px 50px rgba(8,16,60,.25)'; ph.innerHTML = `<img src="shots/${WALL[(r * 7 + c * 2) % WALL.length]}.png">`; row.appendChild(ph); } $('wall').appendChild(row); rows.push(row); }
+function S6(t) {
+  const lt = t - 46;
+  rows.forEach((row, r) => { row.style.transform = `translateX(${(r % 2 ? -1 : 1) * (lt * 90) - 400 + (r % 2) * 170}px)`; });
+  $('wall').style.transform = `rotate(-14deg) scale(${lerp(1.25, 1.05, eo(p(lt, 0, 1)))})`;
+  const k = p(lt, .3, .8);
+  $('s6t').style.opacity = k; $('s6t').style.transform = `scale(${lerp(1.3, 1, eo(k))})`;
+}
+// ---------- S7 outro ----------
+for (let i = 0; i < 5; i++) { const r = document.createElement('div'); r.className = 'ring'; $('rings2').appendChild(r); }
+function S7(t) {
+  const lt = t - 50;
+  $('flash').style.opacity = 1 - p(lt, 0, .5);
+  const l = p(lt, 0, .7);
+  $('s7logo').style.transform = `scale(${lerp(.3, 1, back(l)) + Math.sin(lt * 2) * .01})`;
+  [...$('rings2').children].forEach((r, i) => {
+    const k = ((lt * .5 + i / 5) % 1), sz = lerp(L7.logo[2], Math.max(W, H) * .75, k);
+    r.style.width = r.style.height = px(sz); r.style.left = px(L7.logo[0] - sz / 2); r.style.top = px(L7.logo[1] - sz / 2);
+    r.style.opacity = (1 - k) * .6 * p(lt, .3, 1);
+  });
+  const a = p(lt, .5, 1); $('s7t').style.opacity = a; $('s7t').style.transform = `translateY(${lerp(50, 0, eo(a))}px)`;
+  const b = p(lt, 1, 1.5); $('s7s').style.opacity = b; $('s7s').style.transform = `translateY(${lerp(30, 0, eo(b))}px)`;
+  const c = p(lt, 1.4, 1.9); $('s7c').style.opacity = c; $('s7c').style.transform = `translateY(${lerp(30, 0, eo(c))}px)`;
+  $('s7v').style.opacity = p(lt, 2.4, 3.2);
+  $('stage').style.opacity = 1 - p(t, 57.2, 58);
+}
+const SCENES = [['s1', 0, 6, S1], ['s2', 6, 10, S2], ['s3', 10, 14, S3], ['s4', 14, 38, S4], ['s5', 38, 46, S5], ['s6', 46, 50, S6], ['s7', 50, 58.1, S7]];
+window.render = t => {
+  for (const [id, a, b, fn] of SCENES) { const on = t >= a && t < b; show(id, on); if (on) fn(t); }
+  const fl = (t >= 10 ? 1 - p(t, 10, 10.35) : 0) + (t >= 46 ? (1 - p(t, 46, 46.25)) * .7 : 0) + (t >= 38 ? (1 - p(t, 38, 38.2)) * .4 : 0);
+  $('gflash').style.opacity = Math.min(1, fl);
+};
+window.ready = async () => { await document.fonts.ready; await Promise.all([...document.images].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; }))); return true; };
+render(0);
+</script>
+</body></html>

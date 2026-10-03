@@ -120,6 +120,21 @@ context:
 
 ## Review Triage Log
 
+**Pass 1 (quick lens, independent reviewer), 2026-10-03.** Verdicts: high 2 · medium 5 · low 3 · false 0. All 10 were patched. Evidence gaps that need new live captures go into the owner-gated rerun. Until then the README is corrected to match the log.
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---------|---------|-------|-------------------|
+| 1 | The project guard is a substring match, so lookalike hosts receive keys and passwords | high | patch | `run.mjs:99`, `:177`. Fix: strict https plus an exact hostname check. |
+| 2 | The probe SQL file leaves anon EXECUTE on `harness_whoami`, and the file differs from the hosted state | medium | patch | Revoked from public only. Fix: revoke from anon too and match the hosted state. |
+| 3 | The `session_live` diagnostic and the predicate disagree on `not_after` | low | patch | Align the diagnostic with the predicate. |
+| 4 | Log lines 5–6 come from an uncommitted harness version | medium | patch (rerun) | Recapture them or mark them legacy. |
+| 5 | README rows 8, 11 and 16 overstate the log; `/otp` 422 is the no-user path | high (evidence integrity) | patch (rerun) | Correct the rows now. The rerun probes every session and exercises `/otp` for the existing phone user. |
+| 6 | Manual note lines are presented as observations | medium | patch | Use a captured query or log subcommand. |
+| 7 | The CI evidence scan misses refresh tokens, OTPs, passwords and link tokens | medium | patch | Extend the patterns so CI enforces the AC. |
+| 8 | The state file uses a predictable path, its mode is set only on creation, and it follows symlinks | medium | patch | Fix: `mkdtemp` 0700, exclusive no-follow open, and cleanup. |
+| 9 | The link token is passed as a CLI argument | low | patch | Fix: read it from stdin or a file. |
+| 10 | The full owner email address is committed in the README | low | patch | Mask it consistently. |
+
 ## Verification
 
 **Commands:**

@@ -1,0 +1,7 @@
+vendor/
+shots/
+logo.png
+logo-white.png
+*.wav
+*.mp4
+still-*.jpg

@@ -1,0 +1,21 @@
+{
+  "kind": "member_ref",
+  "contract_version": 1,
+  "valid": [
+    {"name": "lowercase uuid", "value": {"member_id": "00000000-0000-4000-8000-000000000001"}}
+  ],
+  "invalid": [
+    {"name": "missing member_id", "value": {}, "field_errors": {"member_id": "required"}},
+    {"name": "null member_id", "value": {"member_id": null}, "field_errors": {"member_id": "required"}},
+    {"name": "uppercase uuid is not canonical", "value": {"member_id": "00000000-0000-4000-8000-00000000000A"}, "field_errors": {"member_id": "invalid"}},
+    {"name": "not a uuid", "value": {"member_id": "member-1"}, "field_errors": {"member_id": "invalid"}},
+    {"name": "number", "value": {"member_id": 1}, "field_errors": {"member_id": "invalid"}},
+    {"name": "phone number is never an identity", "value": {"member_id": "+260970000000"}, "field_errors": {"member_id": "invalid"}},
+    {"name": "unknown key", "value": {"member_id": "00000000-0000-4000-8000-000000000001", "phone": "+260970000000"}, "field_errors": {"phone": "unknown_field"}},
+    {"name": "not an object", "value": "00000000-0000-4000-8000-000000000001", "field_errors": {"$": "must_be_object"}},
+    {"name": "null", "value": null, "field_errors": {"$": "must_be_object"}},
+    {"name": "prototype-named key constructor", "value": {"member_id": "00000000-0000-4000-8000-000000000001", "constructor": "x"}, "field_errors": {"constructor": "unknown_field"}},
+    {"name": "prototype-named key __proto__", "value": {"member_id": "00000000-0000-4000-8000-000000000001", "__proto__": "x"}, "field_errors": {"__proto__": "unknown_field"}},
+    {"name": "prototype-named key toString", "value": {"member_id": "00000000-0000-4000-8000-000000000001", "toString": "x"}, "field_errors": {"toString": "unknown_field"}}
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "kind": "account_ref",
+  "contract_version": 1,
+  "valid": [
+    {"name": "lowercase uuid", "value": {"auth_user_id": "00000000-0000-4000-8000-000000000002"}}
+  ],
+  "invalid": [
+    {"name": "missing auth_user_id", "value": {}, "field_errors": {"auth_user_id": "required"}},
+    {"name": "braced uuid", "value": {"auth_user_id": "{00000000-0000-4000-8000-000000000002}"}, "field_errors": {"auth_user_id": "invalid"}},
+    {"name": "uuid without hyphens", "value": {"auth_user_id": "00000000000040008000000000000002"}, "field_errors": {"auth_user_id": "invalid"}},
+    {"name": "member_id is not an account", "value": {"member_id": "00000000-0000-4000-8000-000000000001"}, "field_errors": {"auth_user_id": "required", "member_id": "unknown_field"}},
+    {"name": "array", "value": ["00000000-0000-4000-8000-000000000002"], "field_errors": {"$": "must_be_object"}}
+  ]
+}

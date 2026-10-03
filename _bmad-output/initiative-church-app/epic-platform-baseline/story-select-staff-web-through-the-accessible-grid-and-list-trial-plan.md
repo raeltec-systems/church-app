@@ -125,6 +125,27 @@ context:
 
 ## Review Triage Log
 
+**Pass 1 (quick lens, independent reviewer), 2026-10-03.** Verdicts: high 3 · medium 7 · low 5 · false 1. Fifteen findings were patched through the builder. One was rejected.
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---------|---------|-------|-------------------|
+| 1 | No status filter; only a position filter exists | high | patch | The frozen matrix row names a status filter, and the matrix audit overstated it as covered. Fix: add a status filter, its empty message and tests. |
+| 2 | Focus visibility and names are checked on only 7 grid Tab stops | medium | patch | The AC says "every interactive control". Fix: extend the checks to the list view, dialogs and menus. |
+| 3 | The segment and tab focus indicator doesn't show which segment is focused; the pass rule ignores the accent delta | high | patch | `focus-visibility.json` shows the accent unchanged for Grid; tabs have no accent. Fix: per-control indicator and a stricter rule. |
+| 4 | Dialogs are an unnamed `alertdialog`; the table is unnamed | high | patch | AX-tree evidence confirms both. Fix: dialog role with a name, a table name, and an assertion. |
+| 5 | Cancel/Escape tested without any edit | medium | patch | Both tests dismiss immediately. Fix: edit first, then dismiss. |
+| 6 | Right and bottom edge clamping untested | low | patch | Fix: add the two missing edge cases. |
+| 7 | Status change not checked across grid, list and CSV; dead `listToggle` | medium | patch | The comment claims an export check that doesn't exist. Fix: assert all three views and remove the dead code. |
+| 8 | C9b checks only CSV counts | medium | patch | Fix: compare values against the fixture. |
+| 9 | CR-led and whitespace-led values never reach the downloaded CSV | low | patch | Covered by unit tests only. Fix: add fixture values. |
+| 10 | Preview not checked for private fields | low | patch | Holds by construction, but untested. Fix: add a check. |
+| 11 | The 27/27 headline counts emulated checks (C13 Pixel 7, C11 DPR zoom) | high (evidence integrity) | patch | Contradicts the plan's own decision. Fix: report real-browser and emulated checks separately. |
+| 12 | 200% zoom is emulated; clipped text undetected; dialogs never shown at 200% | medium | patch | The dropdown truncates long names with an ellipsis. Fix: real zoom or honest labelling, a clipping detector, and wrapping text. |
+| 13 | Export and Grid/List targets are 32px, below the 44px minimum | medium | patch | `zoom-200.json` shows 32px rects; the design contract requires ≥44. |
+| 14 | "Downloaded …" announced when only the click fired | medium | patch | Design contract override 5. Fix: say "Download started". |
+| 15 | Trial README wrong about the Platform status tab | low | patch | `main.dart` always shows the tab. |
+| 16 | `owner-decisions-milestone-1.md` lies outside the file boundary | false | reject | Copied on coordinator instruction; identical to the integration branch file, so no new content. |
+
 ## Verification
 
 **Commands:**

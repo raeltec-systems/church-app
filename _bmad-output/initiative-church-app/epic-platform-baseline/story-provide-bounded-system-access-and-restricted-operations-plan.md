@@ -3,12 +3,12 @@ title: 'Provide bounded system access and restricted operations'
 type: 'feature'
 ticket: '9'
 created: '2026-10-03'
-status: 'built'
+status: 'done'
 baseline_revision: 'ea6edb44eb596cebef40093c9243bbb6c795f169'
 route: 'full'
 route_source: 'auto'
-review: ''
-review_source: ''
+review: 'quick'
+review_source: 'pinned'
 lenses_ran: []
 review_loop_iteration: 0
 context:
@@ -120,6 +120,16 @@ Implemented 2026-10-03 directly (no subagent tool in this session).
 ## Plan Change Log
 
 ## Review Triage Log
+
+| Finding | Verdict | Route | Evidence |
+|---|---|---|---|
+| config ignores frozen `operations.activation.*` decision | medium | patch | config uses alerting.enabled/scheduler.enabled; plan change log empty |
+| snapshot counts disabled principals' credentials; sys_disable_principal leaves credentials unrevoked | medium | patch | snapshot filters only revoked_at/expires_at; runbook claims credentials disabled |
+| snapshot route counters not filtered by environment | low | patch | sys_audit counts ignore a.environment while other counts use v_env |
+| matrix sends live other-env credentials cross-environment | high | patch | runMatrix readStored(other); staging evidence shows local credential sent |
+| runbook misstates approved_no_dispatcher condition and omits verify-hosted consequence | low | patch | ops_alert_status needs both gates |
+| runbook omits RESTRICTED_OPERATORS change for new operator | low | patch | validateOperations hard-codes ['israel'] |
+| unauthenticated callers grow sys_audit without limit | medium | defer | known risk; rate/retention wait for Q12; listed as production gate |
 
 ## Verification
 

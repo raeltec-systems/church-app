@@ -144,6 +144,51 @@ function get(obj, dotted) {
 }
 
 /** Returns a list of human-readable violations (empty = valid). */
+// Story 1.10 (AD-14, AD-17): independent recovery journal and isolated restores. Q4 (retention
+// of the journal and backups) and Q12 (RPO/RTO, backup schedule) gate real-data backups; the
+// flag must stay false here. Adapters: tools/recovery/journal.mjs.
+export const RECOVERY_ACTIVATION_GATES = { real_data_backups: ['q4_personal_data', 'q12_operations'] };
+export const RECOVERY_JOURNAL_ADAPTERS = {
+  local: ['local_segments'],
+  staging: ['google_drive_folder', 'local_segments'],
+  production: ['owner_selection_required'],
+};
+
+/** Recovery block: journal adapter per environment, isolated restores only, activation off. */
+export function validateRecovery(file, rec) {
+  const where = `${file}.json`;
+  if (!rec || typeof rec !== 'object') return [`${where}: recovery block is required`];
+  const errors = [];
+  const allowedKeys = ['journal', 'restore_target', 'activation', 'activation_gates'];
+  for (const k of Object.keys(rec).filter((k) => !allowedKeys.includes(k))) {
+    errors.push(`${where}: recovery.${k} is not allowed`);
+  }
+  const adapters = RECOVERY_JOURNAL_ADAPTERS[file] ?? [];
+  if (!adapters.includes(rec.journal?.adapter)) {
+    errors.push(`${where}: recovery.journal.adapter must be one of ${adapters.join(', ')}`);
+  }
+  if (Object.keys(rec.journal ?? {}).some((k) => /secret|token|password|key$|credential|folder_id/i.test(k))) {
+    errors.push(`${where}: recovery.journal must not hold credentials or private identifiers`);
+  }
+  if (rec.restore_target !== 'isolated_only') {
+    errors.push(`${where}: recovery.restore_target must be "isolated_only" (never restore into a serving environment)`);
+  }
+  const activation = rec.activation;
+  if (!activation || typeof activation !== 'object'
+      || JSON.stringify(Object.keys(activation).sort()) !== JSON.stringify(Object.keys(RECOVERY_ACTIVATION_GATES).sort())) {
+    errors.push(`${where}: recovery.activation must hold exactly ${Object.keys(RECOVERY_ACTIVATION_GATES).join(', ')}`);
+  }
+  for (const [flag, gates] of Object.entries(RECOVERY_ACTIVATION_GATES)) {
+    if (activation?.[flag] !== false) {
+      errors.push(`${where}: recovery.activation.${flag} must stay false; the ${gates.join(' and ')} gates control activation`);
+    }
+  }
+  if (JSON.stringify(rec.activation_gates) !== JSON.stringify(RECOVERY_ACTIVATION_GATES)) {
+    errors.push(`${where}: recovery.activation_gates must be ${JSON.stringify(RECOVERY_ACTIVATION_GATES)}`);
+  }
+  return errors;
+}
+
 export function validateEnvironments(envs, { productionRef = process.env.PRODUCTION_PROJECT_REF || null } = {}) {
   const errors = [];
   const names = Object.keys(envs).sort();
@@ -175,6 +220,7 @@ export function validateEnvironments(envs, { productionRef = process.env.PRODUCT
       errors.push(`${where}: contains a secret-like value (${hit.rule}); configs hold names only`);
     }
     errors.push(...validateOperations(file, env.operations));
+    errors.push(...validateRecovery(file, env.recovery));
     const dep = env.deploy ?? {};
     if (file === 'production') {
       if (env.recipients?.mode !== 'disabled' || (env.recipients?.allowed_patterns ?? []).length !== 0) {
@@ -234,7 +280,7 @@ function main(argv) {
     const errors = validateEnvironments(envs);
     for (const e of errors) console.error(`environments: ${e}`);
     if (errors.length) return 1;
-    console.log(`environments: ${Object.keys(envs).length} configs valid (separate refs, synthetic non-production recipients, production private/sending disabled, bounded system route, alerting/scheduler off)`);
+    console.log(`environments: ${Object.keys(envs).length} configs valid (separate refs, synthetic non-production recipients, production private/sending disabled, bounded system route, alerting/scheduler off, isolated restores with real-data backups off)`);
     return 0;
   }
   if (cmd === 'target') {

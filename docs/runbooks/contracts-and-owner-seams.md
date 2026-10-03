@@ -74,7 +74,7 @@ Identity calls `app.contract_dispatch_lifecycle(event)` in lock order: domain ow
   - To use fixture policy on a local database, run `select app.platform_set_environment('local', '<you>');`.
   - On hosted staging, the operator runs `select app.platform_set_environment('staging', '<operator>');`. That is an entry 8 / owner action.
   - **Transitions are one-way.** A database marked production can only be re-marked production. A database that was ever marked staging or production can never be marked local.
-  - **Restores and clones.** A restored or cloned database keeps the marker of its source. The restore procedure must re-assert the correct marker before the database serves anything, for example `select app.platform_set_environment('production', '<operator>')` on a production restore. A clone made for testing must be created as a fresh database, not by downgrading a copy.
+  - **Restores and clones.** A restored or cloned database keeps the marker of its source. The restore procedure must re-assert the correct marker before the database serves anything, for example `select app.platform_set_environment('production', '<operator>')` on a production restore. A clone made for testing must be created as a fresh database, not by downgrading a copy. A restore also lands held (private_access and outbound_sending closed) until the independent recovery journal is reconciled; see `backup-and-restore.md` (story 1.10).
 - **Approving a gate.** Only the owner approves, per environment, with an attributed note:
   `select app.policy_approve('q2_church_time', '{"zone": "<IANA zone>", ...}', '<owner name>', '<decision reference>');`
   - `q9_money` must look like `{"currencies": {"<ISO 4217 code>": <integer scale 0..6>}}`.

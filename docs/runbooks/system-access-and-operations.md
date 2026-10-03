@@ -104,7 +104,7 @@ After every promotion that touches the system route, and when supporting an inci
 4. `get_advisors(security)`: only the intended `rls_enabled_no_policy` INFO findings on `app.*` deny-all tables.
 5. Scan the platform logs for credential leakage with `tools/ops/sql/observe_log_credential_scan.sql` (MCP `query_logs`). Every count must be 0.
 
-Restores and clones keep the source database's marker and credentials. Re-assert the marker, then revoke credentials of the source environment before serving (see `contracts-and-owner-seams.md`).
+Restores and clones keep the source database's marker and credentials. Re-assert the marker, then revoke credentials of the source environment before serving (see `contracts-and-owner-seams.md`). The full backup, journal and isolated-restore procedure is in `backup-and-restore.md` (story 1.10).
 
 ## Production gates (unresolved; not blockers for milestone 1 staging)
 

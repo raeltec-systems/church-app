@@ -51,5 +51,18 @@
       "scheduler": ["q2_church_time", "q12_operations"],
       "production_system_access": ["ops_system_access"]
     }
+  },
+  "recovery": {
+    "journal": {
+      "adapter": "owner_selection_required",
+      "location": "the owner selects an independent restricted journal and object store before real data (owner-decisions-milestone-1.md); Q4 sets its retention"
+    },
+    "restore_target": "isolated_only",
+    "activation": {
+      "real_data_backups": false
+    },
+    "activation_gates": {
+      "real_data_backups": ["q4_personal_data", "q12_operations"]
+    }
   }
 }

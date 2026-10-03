@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: 22
       - name: Policy tool tests (offline)
-        run: node --test tools/env/*.test.mjs tools/ci/*.test.mjs tools/ops/*.test.mjs
+        run: node --test tools/env/*.test.mjs tools/ci/*.test.mjs tools/ops/*.test.mjs tools/recovery/*.test.mjs
       - name: Environment configs are separate, secret-free and fail closed
         run: node tools/env/environments.mjs check
         env:
@@ -58,7 +58,7 @@ jobs:
         run: node tools/ci/check-migration-drift.mjs --env staging
 
   db:
-    name: db (local Supabase, pgTAP + API smoke + contract fixtures)
+    name: db (local Supabase, pgTAP + API smoke + contract fixtures + isolated restore rehearsal)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -71,12 +71,14 @@ jobs:
         run: npm ci
       - name: Shared contract fixtures (TypeScript mapping)
         run: npm run contracts:test
-      - name: Start local stack (services the tracer needs)
-        run: npx supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,storage-api,realtime,postgres-meta
+      - name: Start local stack (services the tracer and the restore rehearsal need)
+        run: npx supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,realtime,postgres-meta
       - name: pgTAP permission tests
         run: npm run db:test
       - name: Data API smoke checks
         run: npm run db:smoke
+      - name: Isolated database-plus-object restore rehearsal (story 1.10, local journal)
+        run: npm run recovery:rehearse
       - name: Stop local stack
         if: always()
         run: npx supabase stop --no-backup

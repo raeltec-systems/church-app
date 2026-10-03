@@ -1,0 +1,44 @@
+{
+  "folder": {
+    "id": "1vO9of9shtPnobUZlV3-hHdE-baXLc_VF",
+    "title": "journal",
+    "parent": "18v5zuOlrRr8UzJqNwLq5jpX5JOCI0t1h"
+  },
+  "files": [
+    {
+      "drive_file_id": "1S6bK3i6Y1TfaL7bauacQXKxJwXsD8uGT",
+      "title": "seg-0000000001-checkpoint.json",
+      "bytes": 262,
+      "sha256": "50193d2dec2dc026e4ae4795966d09dea7803725f88747bb67f60e561fff2305",
+      "identical_to_local_segment": true
+    },
+    {
+      "drive_file_id": "1g5w8UNiNxTNWnyABbjZRdYFrWEXtYfKb",
+      "title": "seg-0000000002-access_revoked.json",
+      "bytes": 315,
+      "sha256": "eb43ca2c6b85c1bb53b84179aa0511064396f515183248f790994f6c6875fa7b",
+      "identical_to_local_segment": true
+    },
+    {
+      "drive_file_id": "1mfvD8hKFSvWMT59GxKD7DbET5sxjSr7n",
+      "title": "seg-0000000003-deletion_manifest.json",
+      "bytes": 415,
+      "sha256": "e56ea8192031ceeaf3228c2d348b326303ed184ed2f93b4384703a5c3339477d",
+      "identical_to_local_segment": true
+    },
+    {
+      "drive_file_id": "1btP7xjPe4wIrib4dvzrVQ350wzTH4dUv",
+      "title": "seg-0000000004-deletion_completed.json",
+      "bytes": 367,
+      "sha256": "da3be6c5126de187d8e1c1430432ca22633309debaeccfbe56f5fe20389c8fdb",
+      "identical_to_local_segment": true
+    },
+    {
+      "drive_file_id": "1XKJ4ZF9GNLPUwmfxIlIe7hQpCIPRI897",
+      "title": "seg-0000000005-seal.json",
+      "bytes": 305,
+      "sha256": "7a98f26fc6a8f57ef2c33bcb9335ae0f3f4308d7666821a35577a3b816cc1c97",
+      "identical_to_local_segment": true
+    }
+  ]
+}

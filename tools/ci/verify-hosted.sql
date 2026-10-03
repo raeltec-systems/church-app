@@ -2,7 +2,8 @@
 --   psql "$DB_URL" -v ON_ERROR_STOP=1 -v expected_env=staging -f tools/ci/verify-hosted.sql
 -- Fails (non-zero exit) when the database marker is not the expected environment, or when the
 -- private_access / outbound_sending release gates are open in a baseline that must keep them
--- closed. Production stays private-disabled and sending-disabled until the owner approves those
+-- closed, or when the database is an unreconciled restore (story 1.10). Production stays
+-- private-disabled and sending-disabled until the owner approves those
 -- gates in that database.
 select set_config('ci.expected_env', :'expected_env', false);
 
@@ -37,6 +38,14 @@ begin
   if app.ops_alert_status() ->> 'alerting' <> 'disabled' then
     raise exception 'verify-hosted: alerting is not disabled in %', v_actual;
   end if;
-  raise notice 'verify-hosted: % marker confirmed; private_access and outbound_sending closed; alerting disabled', v_actual;
+  -- Story 1.10: a database restored from a backup stays held until journal reconciliation;
+  -- promotion must not proceed onto an unreconciled restore.
+  if to_regprocedure('app.rcv_serving_hold()') is null then
+    raise exception 'verify-hosted: app.rcv_serving_hold() is missing (story 1.10 migration not applied)';
+  end if;
+  if app.rcv_serving_hold() then
+    raise exception 'verify-hosted: % is an unreconciled restore (recovery hold active); see docs/runbooks/backup-and-restore.md', v_actual;
+  end if;
+  raise notice 'verify-hosted: % marker confirmed; private_access and outbound_sending closed; alerting disabled; no recovery hold', v_actual;
 end;
 $$;

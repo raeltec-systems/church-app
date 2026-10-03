@@ -52,5 +52,18 @@
       "scheduler": ["q2_church_time", "q12_operations"],
       "production_system_access": ["ops_system_access"]
     }
+  },
+  "recovery": {
+    "journal": {
+      "adapter": "google_drive_folder",
+      "location": "the owner's private Google Drive folder bic-kafue-ops-SYNTHETIC-recovery-rehearsal (owner-only, SYNTHETIC data only; owner-decisions-milestone-1.md)"
+    },
+    "restore_target": "isolated_only",
+    "activation": {
+      "real_data_backups": false
+    },
+    "activation_gates": {
+      "real_data_backups": ["q4_personal_data", "q12_operations"]
+    }
   }
 }

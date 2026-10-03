@@ -126,3 +126,25 @@ test('operations: bounded system route, named operator, activation flags fail cl
   delete missing.staging.operations;
   assert.match(validateEnvironments(missing).join('\n'), /operations block is required/);
 });
+
+test('recovery: per-environment journal adapter, isolated restores, real-data backups off', () => {
+  for (const [name, mutate, re] of [
+    ['local', (r) => { r.journal.adapter = 'google_drive_folder'; }, /journal.adapter must be one of local_segments/],
+    ['production', (r) => { r.journal.adapter = 'google_drive_folder'; }, /owner_selection_required/],
+    ['staging', (r) => { r.journal.folder_id = '1abcDEF'; }, /must not hold credentials/],
+    ['staging', (r) => { r.journal.access_token = 'x'; }, /must not hold credentials/],
+    ['staging', (r) => { r.restore_target = 'staging'; }, /isolated_only/],
+    ['production', (r) => { r.activation.real_data_backups = true; }, /real_data_backups must stay false/],
+    ['local', (r) => { r.activation.real_data_backups = 'false'; }, /real_data_backups must stay false/],
+    ['staging', (r) => { r.activation.extra = false; }, /must hold exactly/],
+    ['staging', (r) => { r.activation_gates.real_data_backups = ['q4_personal_data']; }, /activation_gates/],
+    ['local', (r) => { r.retention_days = 30; }, /recovery.retention_days is not allowed/],
+  ]) {
+    const bad = envs();
+    mutate(bad[name].recovery);
+    assert.match(validateEnvironments(bad).join('\n'), re, `${name}: ${mutate}`);
+  }
+  const missing = envs();
+  delete missing.production.recovery;
+  assert.match(validateEnvironments(missing).join('\n'), /recovery block is required/);
+});

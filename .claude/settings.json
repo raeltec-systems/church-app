@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "mcp__Supabase"
+      "mcp__Supabase",
+      "mcp__github__pull_request_read",
+      "Bash(flutter analyze)",
+      "Bash(flutter test)",
+      "Bash(npm run -s db:test)",
+      "Bash(docker info)"
     ]
   }
 }

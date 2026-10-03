@@ -2,7 +2,7 @@
 title: "Product Brief: BIC Kafue Church App"
 status: draft
 created: 2026-10-02
-updated: 2026-10-02
+updated: 2026-10-03
 ---
 
 # Product Brief: BIC Kafue Church App
@@ -15,7 +15,7 @@ Brethren in Christ Church Kafue has fewer than 200 members. Today it runs its Su
 
 The Church App is a Flutter mobile app for iOS and Android plus a staff web portal, built on Supabase. It turns each duty into an explicit request: the member is reminded on time, gives a clear Accept or Can't make it, and the leader sees every unfilled, declined or unanswered slot early enough to act. Around that core, it gives the congregation sermons, events, the Bible and hymn book, giving instructions, cell life, prayer and pastoral care in one place.
 
-One volunteer developer builds and maintains it, so every module reuses the same building blocks: assignments, responses, follow-ups, reminders and scoped permissions.
+One volunteer owner reviews and maintains it, with coding agents doing most of the implementation, so every module reuses the same building blocks: assignments, responses, follow-ups, reminders and scoped permissions.
 
 ## The Problem
 
@@ -95,16 +95,22 @@ The roughly 40 must-pass tests in spec §Milestones are the release gate. These 
 
 ## Delivery Reality
 
-The owner's target is **November 2026**, in their free time. That is four to eight weeks for one person. The full v1 scope (a mobile app and a web portal, seven milestones and about 40 launch tests) will not all fit.
+**Target: the full v1, all seven milestones, by November 2026.** This is the owner's decision. Coding agents write most of the implementation and the owner reviews it, working in their free time.
 
-`[ASSUMPTION — needs owner confirmation]` November 2026 means **the first live pilot of the duty loop**: milestones 1 and 2 (foundation, phone login, membership approval, scoped permissions, duties, programmes and reminders), tried with one department and one cell. The remaining milestones follow in the order the spec gives, until all of v1 passes its launch tests. Nothing is cut; the work is only sequenced. If the owner wants all of v1 by November, scope or capacity has to change, and that needs an explicit decision.
+What this means for the build:
 
-Lead times that can block the November date even for a pilot:
+- **Code is not the bottleneck.** Owner review time is, along with decisions and lead times outside the code. Keep changes small and reviewable, one ticket at a time. The spec's tests are the evidence a change is correct, so a reviewer can trust a passing suite instead of reading every line.
+- **Tests come first and run in CI.** RLS and permission tests, state-transition tests and reminder-worker tests are written alongside each feature, starting in milestone 1. Agents are least reliable on access control and concurrency, and a mistake there exposes care, prayer or finance data.
+- **Milestones still set the build order.** Each milestone is finished and tested before the next one leans on it, starting with the shared building blocks (records, permissions, assignments, reminders). Six modules built side by side on unproven foundations would be harder to review than building them one after another.
+
+Lead times outside the code, which can block November whatever the build speed:
 
 - registering an SMS sender ID with Zambian carriers (about 2–4 weeks)
 - choosing an SMS provider (Supabase supports some natively; Africa's Talking would need a custom auth hook)
 - creating the Apple and Google developer accounts
 - naming a time zone, the pilot department and cell, and their leaders
+- App Store and Play review, including the giving screen (allow for at least one rejection)
+- the staff beta and church onboarding in milestone 7, which run on the church's calendar
 
 ## Open Decisions
 
@@ -114,7 +120,7 @@ The spec (§Decisions for the church owner) lists ten decisions. Those that bloc
 2. **Duties:** pilot department and cell, response deadline, reminder timing and quiet hours.
 3. **Web:** confirm that Flutter Web works for the portal (accessibility and grid trial in milestone 1), and choose hosting and a domain.
 
-These must be settled before each module goes live, but don't block the pilot:
+These must be settled before each module goes live, but don't block milestones 1 and 2:
 
 - real giving destinations
 - safeguarding and youth rules
@@ -128,7 +134,7 @@ These must be settled before each module goes live, but don't block the pilot:
 - Members keep using WhatsApp anyway.
 - Smartphone ownership in Zambia is low (about 19% nationally in 2022; the figure is old and the congregation may differ). That makes leader-managed members without logins essential, not optional.
 - Store review of the giving screen.
-- The project depends on one developer; keep modules small and the support procedures written down.
+- The project depends on one owner as the only reviewer; keep modules small, tests strong and support procedures written down.
 
 ## Source Precedence
 

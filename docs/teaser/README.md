@@ -1,6 +1,6 @@
 # BIC Kafue app — teaser video
 
-A 58-second, 1920×1080 launch teaser built from the real design prototypes in
+A 58-second launch teaser, in 16:9 (1920×1080), 9:16 (1080×1920) and 1:1 (1080×1080), built from the real design prototypes in
 `docs/design-handoff/design/`. The soundtrack is synthesized from scratch in
 `music.mjs`, so it's royalty-free.
 
@@ -27,7 +27,11 @@ npx http-server ../design-handoff/design -p 8123 -s &   # prototypes
 npx http-server . -p 8124 -s &                          # video page
 node capture.mjs        # 3x screenshots of every app/admin screen -> shots/
 node music.mjs          # -> music.wav
-node render.mjs         # -> teaser.mp4
+# master to -14 LUFS / -1 dBTP (run loudnorm once to measure, then plug the numbers in):
+ffmpeg -i music.wav -af loudnorm=I=-14:TP=-1:LRA=11:print_format=json -f null -
+ffmpeg -i music.wav -af "loudnorm=I=-14:TP=-1:LRA=16:measured_I=..:measured_TP=..:measured_LRA=..:measured_thresh=..:linear=true,aresample=48000" master.wav
+node render.mjs 16x9    # also 9x16 and 1x1 -> teaser-<fmt>.mp4 (60 fps capture blended to 30 fps for motion blur)
 ```
-To edit copy or timing, change `video.html`; `node stills.mjs 12.5 30` renders single frames for a quick check.
+To edit copy or timing, change `video.html`; `./sheet.sh 9x16 6 4 12.5 30 41` renders a contact sheet of frames for review.
+Layouts for each format live in `LAYOUTS` at the top of the script in `video.html`.
 Scene times are shared with the music (`DROP`, `BREAK`, `WALL`, `END` in `music.mjs`), so change both together.

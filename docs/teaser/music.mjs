@@ -44,6 +44,9 @@ function pluck(t, m, v, pan = 1) {
   }
 }
 const arpPat = [0, 2, 1, 3, 4, 3, 2, 1];
+for (let s = 6 * 4; s < END * 4; s += 2) { // 8th notes from 6s
+  const t = s / 4 * 1, tt = t; // s in quarter-seconds? use 8ths (0.25s)
+}
 for (let k = 0; ; k++) {
   const t = 6 + k * 0.25; if (t >= END) break;
   if (t >= BREAK && t < BREAK + 1) continue;
@@ -106,6 +109,15 @@ impact(DROP, 1); impact(END, 1.1); impact(WALL, 0.6);
 for (let t = 14; t < BREAK; t += 3) { let lp = 0; for (let j = 0; j < SR * 0.35; j++) { const p = j / (SR * 0.35); lp += (0.02 + 0.2 * Math.sin(Math.PI * p)) * (rnd() - lp); add(Math.floor((t - 0.3) * SR) + j, lp * 0.12 * Math.sin(Math.PI * p)); } }
 // final bell chord
 [62, 66, 69, 74, 78].forEach((m, i) => pluck(END + i * 0.06, m + 12, 0.08, i % 2 ? 1.3 : 0.7));
+
+// SFX: finger taps + toast pops (duties @20s, pastoral @29s), dark-mode swoosh, admin swaps
+function click(t, v) { const i0 = Math.floor(t * SR); for (let j = 0; j < SR * 0.04; j++) { const tt = j / SR; const x = (Math.sin(2 * Math.PI * 1800 * tt) * 0.6 + rnd() * 0.4) * Math.exp(-tt * 160) * v; add(i0 + j, x); } }
+function pop(t, v) { const i0 = Math.floor(t * SR); let ph = 0; for (let j = 0; j < SR * 0.12; j++) { const tt = j / SR, f = 500 + 900 * Math.min(1, tt / 0.03); ph += 2 * Math.PI * f / SR; add(i0 + j, Math.sin(ph) * Math.exp(-tt * 35) * v); } }
+function swoosh(t0, len, v, up = true) { let lp = 0; for (let j = 0; j < SR * len; j++) { const q = j / (SR * len), k = 0.01 + 0.25 * (up ? q : 1 - q); lp += k * (rnd() - lp); const e = Math.sin(Math.PI * q); add(Math.floor(t0 * SR) + j, lp * v * e * (1.4 - q), lp * v * e * (0.6 + q)); } }
+for (const f0 of [20, 29]) { click(f0 + 1.2, 0.35); pop(f0 + 1.42, 0.22); pluck(f0 + 1.45, 86, 0.06); pluck(f0 + 1.52, 90, 0.05); }
+swoosh(35.15, 0.8, 0.35, false); pluck(35.9, 74, 0.05); pluck(36.0, 81, 0.05);
+for (const t of [39.95, 41.9, 43.85]) swoosh(t, 0.4, 0.18);
+swoosh(49.3, 0.7, 0.3);
 // stereo echo (dotted 8th) + gentle room
 const D = Math.floor(0.375 * SR);
 for (let i = D; i < N; i++) { L[i] += R[i - D] * 0.22; R[i] += L[i - D] * 0.22; }

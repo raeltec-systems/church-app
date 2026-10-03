@@ -168,6 +168,25 @@ Implemented 2026-10-03 directly (no subagent tool in this session).
 
 ## Review Triage Log
 
+**Pass 1 (quick lens, independent reviewer), 2026-10-03.** Verdicts: high 3 · medium 8 · low 3 · false 0. All 14 were patched.
+
+| # | Finding | Verdict | Route | Action |
+|---|---------|---------|-------|--------|
+| 1 | Focus is lost on every request-state transition | high | patch | Make focus deterministic, and add tests plus a browser assertion. |
+| 2 | Try again resends a stale body while the field stays editable | high | patch | Lock inputs, or drop the submitted body on edit. |
+| 3 | Stop checking resends the same input under a new `request_id` | medium | patch | Keep the id for unchanged input. |
+| 4 | Account change, sign-out, reload failure and stop are not announced | medium | patch | Announce each one via `sendAnnouncement`. |
+| 5 | Pointer and touch tab taps leave a permanent focus ring | medium | patch | Use `highlightMode`-aware rings and keyboard-only focus requests. |
+| 6 | Boundary guards miss relative imports and adapter re-exports | medium | patch | Check resolved paths, with negative tests. |
+| 7 | Mobile shell never run live; live check output not stored | medium | patch | Run it under Xvfb read-only and store the outputs. |
+| 8 | S2 counts repeated stops as unique; S1 is empty; no ring check | medium | patch | Assert unique stops and the tracer value, and add a ring check. |
+| 9 | Test names overstate; the unconfigured build sends no command | low | patch | Write honest tests and show the "no server configured" message. |
+| 10 | Dark focus ring uses the link colour; invented dark sidebar tokens | medium | patch | Use the contract accent and remove the invented tokens. |
+| 11 | Typography and staff layout tokens are not applied | medium | patch | Apply the design-contract values. |
+| 12 | Code duplicated between the apps | low | patch | Move shared composition into `client_core`. |
+| 13 | Mobile bottom safe area padded twice | low | patch | Remove the inner bottom padding. |
+| 14 | Bare 3xx/4xx treated as a definite "nothing changed" | high | patch | Treat only PostgREST-bodied 4xx as definite; anything else is an unknown outcome. |
+
 ## Verification
 
 **Commands:**

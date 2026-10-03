@@ -3,8 +3,7 @@ title: 'Rehearse isolated recovery with an independent journal'
 type: 'feature'
 ticket: '10'
 created: '2026-10-03'
-status: 'blocked'
-blocked_reason: 'Hosted staging only: apply_migration of supabase/migrations/20261003161000_recovery_journal.sql (name recovery_journal) to tmurpotfluignacfueki timed out twice at the connector approval step and nothing was applied. Owner: approve/re-run that apply_migration with the exact file contents (then rename the local file to the recorded version), or run promote.yml target staging. Everything else is built and verified locally.'
+status: 'built'
 baseline_revision: 'f93eac02d09b212822c8614a15fb4a5aa64a7685'
 route: 'full'
 route_source: 'auto'
@@ -70,7 +69,7 @@ context:
 - [x] `config/environments/*.json`, `tools/env/environments.mjs` (+test) -- `recovery` block, flags false.
 - [x] `tools/ci/verify-hosted.sql`, `.github/workflows/ci.yml`, `package.json`, `.gitignore` -- checks and scripts.
 - [x] `docs/runbooks/backup-and-restore.md` + links -- procedure, owner steps, gates.
-- [ ] Hosted staging -- apply migration (same name), verify not held, advisors. (BLOCKED: connector apply timed out twice; owner step)
+- [ ] Hosted staging -- apply migration (same name), verify not held, advisors. (connector apply timed out twice; the coordinator applies it after merge)
 - [x] `evidence-1.10/` -- raw outputs, Drive file ids/names.
 
 **Acceptance Criteria:**
@@ -124,6 +123,26 @@ Implemented 2026-10-03 directly (no subagent tool in this session).
 - Wrong restore id / unverified object: pgTAP.
 - Plain psql restore of the artifact lands held: rehearse restores the artifact with `psql`; session deletion is covered by pgTAP.
 - All of these ran and passed.
+
+**Review follow-up (2026-10-03)** (edits are in place because the migration is not on staging yet):
+- `rcv_hold_after_restore` refuses unless `app.restore_in_progress = 'on'` is set in the session, so a call outside a restore deletes no session. The artifact sets the flag, calls the hold, then resets it. The hold no longer checks operator rows; it only validates the name's format.
+- `rcv_apply_journal_entry` requires a valid `at`. A seal must carry `head_seq = seq - 1` and a `cutoff`, and the cutoff may not be after the seal's `at`. JS `validateEntry` enforces the same cutoff rule.
+- Journal appends:
+  - Local append claims each seq with a `wx` `claim-<seq>` file.
+  - Drive append re-lists after the create and fails with `journal fork` on a duplicate seq.
+  - The runbook documents the single-writer rule.
+- Before replay, `verifyJournal` compares the restored database's acks (seq and hash) with the journal (`journal_mismatch`). Any replay failure records a refusal (`journal_mismatch` or `replay_failed`).
+- `rehearse.mjs` commands:
+  - `restore` now only restores.
+  - `reconcile` exits 1 with the refusal reason.
+  - `status` and `scenario` are new.
+  - `all` adds a plain `psql -f` restore check (no `ON_ERROR_STOP`, no single transaction), which lands `restored_held`.
+- `validateRecovery` message reworded; the `validateEnvironments` JSDoc is back in place.
+- Verified:
+  - `db reset`, then the recovery pgTAP file passed 53 of 53.
+  - `tools/recovery` tests passed 12 of 12, and `tools/env` tests passed 12 of 12.
+  - `recovery:rehearse` exited 0, including the plain-psql check.
+  - The CLI checks behaved as expected: `reconcile absent` exits 1 with `journal_absent`, and a forked journal gives `journal_mismatch` with the hold kept.
 
 ## Plan Change Log
 

@@ -37,3 +37,7 @@ Every restore first landed `restored_held`. In that state `private_access` and `
 ## Hosted staging (`tmurpotfluignacfueki`)
 
 `apply_migration` with name `recovery_journal` and the exact local file contents (sha256 `08d43730…1ddf1`) timed out twice at 60 s. Afterwards `list_migrations` still ended at `20261003155428`, and `to_regclass('app.rcv_recovery_state')` returned null, so nothing was applied. This is an owner step; see `docs/runbooks/backup-and-restore.md`, "Owner steps". Nothing was restored into staging.
+
+## Note on the review follow-up
+
+This evidence was recorded before the review fixes. In the logs, `restore <scenario>` means what is now `scenario <scenario>` (restore plus reconcile). After the fixes, `npm run recovery:rehearse` also passes a plain `psql -f` restore check, which lands `restored_held`. A forked journal is refused with `journal_mismatch` before replay.

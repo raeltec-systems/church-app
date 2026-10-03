@@ -37,6 +37,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const HASH_RE = /^[0-9a-f]{64}$/;
 const BUCKET_RE = /^[a-z0-9][a-z0-9-]{2,62}$/;
 export const SEGMENT_RE = /^seg-(\d{10})-([a-z_]+)\.json$/;
+const claimName = (seq) => `claim-${String(seq).padStart(10, '0')}`;
 
 /** Canonical JSON: object keys sorted recursively, no whitespace. */
 export function canonical(value) {
@@ -79,6 +80,8 @@ export function validateEntry(entry) {
   if (entry.kind === 'seal') {
     if (!Number.isSafeInteger(entry.head_seq) || entry.head_seq !== entry.seq - 1) problems.push('seal head_seq must be seq - 1');
     if (!isIso(entry.cutoff)) problems.push('seal cutoff must be an ISO time');
+    // A seal vouches only for what was journaled before it was written.
+    else if (isIso(entry.at) && Date.parse(entry.cutoff) > Date.parse(entry.at)) problems.push('seal cutoff must not be after the seal');
   }
   return problems;
 }
@@ -126,7 +129,15 @@ export class LocalSegmentJournal {
     const entries = (await this.list()) ?? [];
     const head = entries.length ? entries[entries.length - 1] : null;
     const entry = buildEntry(head, fields, now);
-    // 'wx': fails if the segment exists, so nothing is ever overwritten.
+    // Single writer per journal. The per-seq claim ('wx', named by seq only) makes a concurrent
+    // append of the same seq fail instead of forking the journal; 'wx' on the segment means
+    // nothing is ever overwritten.
+    try {
+      writeFileSync(join(this.dir, claimName(entry.seq)), '', { flag: 'wx', mode: 0o600 });
+    } catch (e) {
+      if (e.code === 'EEXIST') throw new Error(`journal seq ${entry.seq} is already claimed (concurrent writer?); stop and check the journal`);
+      throw e;
+    }
     writeFileSync(join(this.dir, segmentName(entry)), serialize(entry), { flag: 'wx', mode: 0o600 });
     return entry;
   }
@@ -164,6 +175,12 @@ export class DriveJournal {
     const entry = buildEntry(head, fields, now);
     const created = await this.client.createFile({ title: segmentName(entry), parentId: this.folderId, text: serialize(entry) });
     this.lastCreated = { id: created.id, title: segmentName(entry) };
+    // Drive has no create-if-absent: re-list and fail loudly if another writer used this seq.
+    const prefix = segmentName(entry).slice(0, 15);
+    const same = (await this.client.listFolder(this.folderId)).filter((f) => f.title.startsWith(prefix));
+    if (same.length !== 1) {
+      throw new Error(`journal fork: ${same.length} Drive segments for seq ${entry.seq}; stop all writers and reconcile before continuing`);
+    }
     return entry;
   }
 }
@@ -218,12 +235,13 @@ export class DriveRestClient {
  * Completeness through a recovery cut-off.
  *   entries: list() result (null = absent)
  *   cutoff: ISO time the journal must be sealed at or after
- *   databaseWatermark: highest seq the restored database already acknowledged
+ *   databaseAcks: [{seq, hash}] the restored database already applied (its acknowledgements)
+ *   databaseWatermark: highest acknowledged seq (derived from databaseAcks when given)
  * Returns {complete, reason, head_seq, head_hash, count}. Reasons: journal_absent,
  * journal_malformed, journal_gap, journal_chain_broken, journal_unsealed,
- * journal_seal_before_cutoff, journal_behind_database.
+ * journal_seal_before_cutoff, journal_behind_database, journal_mismatch.
  */
-export function verifyJournal(entries, { cutoff, databaseWatermark = 0 } = {}) {
+export function verifyJournal(entries, { cutoff, databaseAcks = [], databaseWatermark = 0 } = {}) {
   const fail = (reason, extra = {}) => ({ complete: false, reason, head_seq: null, head_hash: null, count: entries?.length ?? 0, ...extra });
   if (!cutoff || !isIso(cutoff)) throw new Error('verifyJournal needs an ISO cutoff');
   if (!entries || entries.length === 0) return fail('journal_absent');
@@ -240,6 +258,10 @@ export function verifyJournal(entries, { cutoff, databaseWatermark = 0 } = {}) {
   const head = entries[entries.length - 1];
   if (head.kind !== 'seal') return fail('journal_unsealed');
   if (Date.parse(head.cutoff) < Date.parse(cutoff)) return fail('journal_seal_before_cutoff');
-  if (databaseWatermark > head.seq) return fail('journal_behind_database');
+  const watermark = Math.max(databaseWatermark, ...databaseAcks.map((a) => a.seq));
+  if (watermark > head.seq) return fail('journal_behind_database');
+  // The database's acknowledged entries must be this journal's entries, not another journal's.
+  const bad = databaseAcks.find((a) => entries[a.seq - 1]?.hash !== a.hash);
+  if (bad) return fail('journal_mismatch', { at_seq: bad.seq });
   return { complete: true, reason: null, head_seq: head.seq, head_hash: head.hash, count: entries.length };
 }

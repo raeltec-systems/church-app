@@ -8,7 +8,7 @@ Everything here is **SYNTHETIC**. Real-data backups stay off until the Q4 and Q1
 
 | Part | What it is | Where |
 |------|------------|-------|
-| Database bytes | `pg_dump` of the `app` and `api` schemas. The artifact ends with `select app.rcv_hold_after_restore('<backup_id>', '<operator>')`, so any restore of it (even a plain `psql -f`) lands **held** and deletes restored Auth sessions and refresh tokens. | Rehearsal: gitignored `.recovery-state/backups/<backup_id>/database.sql`, with a sha256 in `manifest.json`. |
+| Database bytes | `pg_dump` of the `app` and `api` schemas. The artifact ends with `set app.restore_in_progress = 'on'; select app.rcv_hold_after_restore('<backup_id>', '<operator>')`, so any restore of it lands **held** and deletes restored Auth sessions and refresh tokens. That includes a plain `psql -f` with no `ON_ERROR_STOP` and no single transaction; the rehearsal checks this case. | Rehearsal: gitignored `.recovery-state/backups/<backup_id>/database.sql`, with a sha256 in `manifest.json`. |
 | Object bytes | Each object is downloaded separately through the Storage API and checked against a sha256 in the manifest. | Rehearsal: `.recovery-state/backups/<backup_id>/objects/`, plus a copy and the manifest in the owner's Drive folder. |
 | Recovery journal | Append-only, hash-chained segments outside the database and its rollback lifecycle. Each segment holds opaque UUIDs, a bucket, the kind, seq, times and hashes, and nothing else. Every kind only denies: `access_revoked`, `deletion_manifest` (written before the destructive step), `deletion_completed`, plus `checkpoint` and `seal`. | `tools/recovery/journal.mjs`, behind an adapter. See "Journal adapters". |
 
@@ -16,6 +16,7 @@ Everything here is **SYNTHETIC**. Real-data backups stay off until the Q4 and Q1
 
 - `app.rcv_recovery_state` holds one of three states: `live`, `restored_held` or `reconciled`. A missing row counts as held.
 - While the state is `restored_held`, the release gates `private_access` and `outbound_sending` read as closed through `app.policy_effective` and `app.policy_is_open`. This applies even when the restored snapshot had them approved. The gates are the existing ones from 1.5, not new ones, and `tools/ci/verify-hosted.sql` (1.8) now also fails promotion onto a held database.
+- `app.rcv_hold_after_restore` runs only in a restore session, meaning `app.restore_in_progress = 'on'` is set in that session. A mistaken call on a live database is refused and signs nobody out. The function does not depend on operator rows in the restored snapshot; the operator name is used for attribution only.
 - `app.rcv_journal_acks` records the journal entries the database has applied. Its highest seq is the watermark that a snapshot carries.
 - `app.rcv_apply_journal_entry(entry, operator)` applies or replays one entry and is idempotent. If an applied seq comes back with a different hash, it fails with `journal_mismatch`.
 - `app.rcv_complete_reconciliation(restore_id, head_seq, head_hash, verified_absent[], operator)` clears the hold only when all of these hold:
@@ -32,9 +33,19 @@ Everything here is **SYNTHETIC**. Real-data backups stay off until the Q4 and Q1
 - the seq runs from 1 with no gaps;
 - every `prev_hash` and `hash` checks out;
 - the last entry is a `seal` whose `cutoff` is at or after the chosen recovery cut-off;
-- the head is at or after the restored database's watermark.
+- the head is at or after the restored database's watermark;
+- for every seq the restored database already applied, the database's recorded hash equals the journal's hash at that seq. Otherwise the reason is `journal_mismatch`, and the journal is refused before any replay.
 
-Otherwise it returns one of these reasons, and the hold stays: `journal_absent`, `journal_malformed`, `journal_gap`, `journal_chain_broken`, `journal_unsealed`, `journal_seal_before_cutoff`, `journal_behind_database`.
+A seal's `cutoff` can never be later than the seal's own `at`, because a seal only vouches for what was journaled before it was written. If any step of the replay fails, the tool records the refusal (`journal_mismatch` or `replay_failed`), and the hold stays.
+
+Otherwise it returns one of these reasons, and the hold stays: `journal_absent`, `journal_malformed`, `journal_gap`, `journal_chain_broken`, `journal_unsealed`, `journal_seal_before_cutoff`, `journal_behind_database`, `journal_mismatch`.
+
+**Single writer.** Each journal has exactly one writer at a time.
+
+- `LocalSegmentJournal` claims each seq with a create-only `claim-<seq>` file, so a concurrent append of the same seq fails.
+- `DriveJournal` lists the folder again after each create and fails loudly (`journal fork`) if two segments share a seq.
+
+If either error happens, stop every writer and reconcile the journal before writing again.
 
 ## Journal adapters
 
@@ -77,7 +88,11 @@ To run it step by step (for example, to mirror each segment to Drive in between)
 
 ```bash
 node tools/recovery/rehearse.mjs seed|backup|revoke|delete|seal
-node tools/recovery/rehearse.mjs restore <scenario> [--journal-dir <readback dir>] [--evidence <dir>]
+node tools/recovery/rehearse.mjs restore <scenario>       # restore T1 into isolated rcv_<scenario>; lands held
+node tools/recovery/rehearse.mjs reconcile <scenario> [--journal-dir <readback dir>] [--cutoff <iso>]
+                                                          # exits 1 with the refusal reason if incomplete
+node tools/recovery/rehearse.mjs status <scenario>        # recovery status and gate probe of that target
+node tools/recovery/rehearse.mjs scenario <scenario> [--journal-dir <dir>]   # restore + reconcile + expectations
 node tools/recovery/rehearse.mjs cleanup     # removes the container and any local marker it set
 ```
 
@@ -85,18 +100,23 @@ The journal in `.recovery-state/journal` is long-lived, because it is the indepe
 
 ## Restore procedure (any environment; operator: `israel`)
 
-1. **Decide the cut-off.** This is the time the source system stopped being trusted. Write a `seal` entry to the journal with `cutoff` at or after that time.
+1. **Decide the cut-off and seal.**
+   - Choose the recovery point: the time the source system stopped being trusted.
+   - Stop the journal's writer.
+   - Then write a `seal` whose `cutoff` is that recovery point. The seal's own time is "now", which is never earlier than its cutoff.
+   - Reconciliation requires a seal whose cutoff is at or after the recovery point you use.
 2. **Prepare an isolated target.** Use a new database or project with no clients pointed at it. Never use the live project.
-3. **Restore the database artifact** in one transaction (`psql -v ON_ERROR_STOP=1 --single-transaction -f database.sql`). The artifact applies the hold. If the backup came from somewhere else (for example, a provider's backup), run `select app.rcv_hold_after_restore('<backup id>', 'israel');` **before anything else**.
+3. **Restore the database artifact** in one transaction (`psql -v ON_ERROR_STOP=1 --single-transaction -f database.sql`). The artifact applies the hold. If the backup came from somewhere else (for example, a provider's backup), run `set app.restore_in_progress = 'on'; select app.rcv_hold_after_restore('<backup id>', 'israel'); reset app.restore_in_progress;` **before anything else**.
 4. **Re-assert the environment marker** for the target (`contracts-and-owner-seams.md`), and revoke the source environment's system credentials (`system-access-and-operations.md`).
 5. **Restore objects** from the object backup, checking each sha256 against the manifest.
-6. **Reconcile.**
-   - Read the journal from its independent location and run `verifyJournal` with the cut-off and `app.rcv_recovery_status()->>'journal_watermark'`.
+6. **Reconcile.** The rehearsal's reference implementation is `rehearse.mjs reconcile <target>` followed by `status <target>`.
+   - Read the journal from its independent location and run `verifyJournal` with the cut-off and the database's acknowledgements (`seq` and `entry_hash` from `app.rcv_journal_acks`).
    - If it is not complete, run `app.rcv_record_refusal` and **stop**. Access and sending stay disabled until the owner has revalidated access.
    - If it is complete:
      - apply every entry with `app.rcv_apply_journal_entry`;
      - delete each named object from the restored store and verify it is absent;
      - then run `app.rcv_complete_reconciliation`.
+   - If any replay step fails, record the refusal and stop.
 7. **Verify.** `app.rcv_recovery_status()` should show `reconciled`, and `tools/ci/verify-hosted.sql` must pass before any client is pointed at the target.
 
 ## Gates (unresolved; set by the owner, never by this runbook)

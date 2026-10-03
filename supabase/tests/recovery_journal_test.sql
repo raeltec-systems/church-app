@@ -5,7 +5,7 @@
 -- deleted objects are verified absent. The isolated end-to-end rehearsal (container restore,
 -- object store, journal adapters) is tools/recovery/rehearse.mjs. All data is SYNTHETIC.
 begin;
-select plan(44);
+select plan(53);
 
 create function pg_temp.h(p_n int) returns text
 language sql as $$ select lpad(to_hex(p_n), 64, '0') $$;
@@ -66,6 +66,12 @@ select is(pg_temp.err($$select app.rcv_apply_journal_entry(pg_temp.entry(9, 'acc
   '22023: journal entry needs a subject', 'a revocation needs its subject');
 select is(pg_temp.err($$select app.rcv_apply_journal_entry(pg_temp.entry(9, 'deletion_completed', '{"object": {"bucket": "rcv-synthetic-rehearsal", "object_id": "00000000-0000-4000-8000-0000000000b1", "path": "a/b"}}'), 'israel')$$),
   '22023: journal object must be {bucket, object_id}', 'object references are opaque');
+select is(pg_temp.err($$select app.rcv_apply_journal_entry(pg_temp.entry(9, 'access_revoked', '{"subject": "00000000-0000-4000-8000-000000000001"}') - 'at', 'israel')$$),
+  '22023: journal entry needs a valid at', 'a revocation without its time is refused (never acked with no effect)');
+select is(pg_temp.err($$select app.rcv_apply_journal_entry(pg_temp.entry(9, 'access_revoked', '{"subject": "00000000-0000-4000-8000-000000000001", "at": null}'), 'israel')$$),
+  '22023: journal entry needs a valid at', 'a null at is refused');
+select is(pg_temp.err($$select app.rcv_apply_journal_entry(pg_temp.entry(9, 'checkpoint', '{"at": "2026-13-45T99:00:00Z"}'), 'israel')$$),
+  '22023: journal entry needs a valid at', 'an invalid at is refused');
 select is(pg_temp.err($$select app.rcv_apply_journal_entry(pg_temp.entry(9, 'erase_everything'), 'israel')$$),
   '22023: malformed journal entry', 'unknown kinds are refused');
 select is(pg_temp.err($$select app.rcv_apply_journal_entry(pg_temp.entry(9, 'checkpoint') - 'hash', 'israel')$$),
@@ -81,10 +87,21 @@ insert into auth.users (id) values ('00000000-0000-4000-8000-0000000000aa');
 insert into auth.sessions (id, user_id) values ('00000000-0000-4000-8000-0000000000ab', '00000000-0000-4000-8000-0000000000aa');
 insert into auth.refresh_tokens (token, user_id, session_id)
 values ('SYNTHETIC-refresh', '00000000-0000-4000-8000-0000000000aa', '00000000-0000-4000-8000-0000000000ab');
+-- Outside a restore session the hold refuses and deletes nothing (no accidental global sign-out).
+select is(pg_temp.err($$select app.rcv_hold_after_restore('t1-SYNTHETIC', 'israel')$$),
+  '42501: rcv_hold_after_restore runs only in a restore session (app.restore_in_progress)',
+  'the hold refuses outside a restore session');
+select is((select count(*)::int from auth.sessions), 1, 'a refused hold deletes no session');
+select is((select state from app.rcv_recovery_state), 'live', 'a refused hold leaves the state live');
+-- Inside a restore session it does not depend on operator rows in the restored snapshot.
+update app.ops_operators set active = false where operator = 'israel';
+set local app.restore_in_progress = 'on';
 create temp table t_restore as select app.rcv_hold_after_restore('t1-SYNTHETIC', 'israel') as id;
+reset app.restore_in_progress;
+update app.ops_operators set active = true where operator = 'israel';
 grant select on t_restore to public;
 
-select is((select state from app.rcv_recovery_state), 'restored_held', 'restore lands held');
+select is((select state from app.rcv_recovery_state), 'restored_held', 'restore lands held (even with no active operator row)');
 select is((select count(*)::int from auth.sessions), 0, 'restored sessions are deleted');
 select is((select count(*)::int from auth.refresh_tokens), 0, 'restored refresh tokens are deleted');
 select is(app.policy_is_open('private_access'), false, 'held: private_access closed although the snapshot approved it');
@@ -121,7 +138,13 @@ select app.rcv_apply_journal_entry(pg_temp.entry(6, 'checkpoint'), 'israel');
 select is(pg_temp.err($$select app.rcv_complete_reconciliation((select id from t_restore), 6, pg_temp.h(6), '{00000000-0000-4000-8000-0000000000b1}', 'israel')$$),
   '22023: journal entries 1..head are not all applied', 'a gap (5 missing) is refused');
 delete from app.rcv_journal_acks where seq = 6;
-select app.rcv_apply_journal_entry(pg_temp.entry(5, 'seal', '{"head_seq": 4, "cutoff": "2026-10-03T13:00:00Z"}'), 'israel');
+select is(pg_temp.err($$select app.rcv_apply_journal_entry(pg_temp.entry(5, 'seal', '{"head_seq": 4, "cutoff": "2026-10-03T13:00:00Z"}'), 'israel')$$),
+  '22023: seal cutoff is after the seal', 'a seal cannot vouch for a cutoff after its own time');
+select is(pg_temp.err($$select app.rcv_apply_journal_entry(pg_temp.entry(5, 'seal', '{"head_seq": 3, "cutoff": "2026-10-03T11:00:00Z"}'), 'israel')$$),
+  '22023: seal needs head_seq = seq - 1 and a cutoff', 'a seal names its predecessor');
+select is(pg_temp.err($$select app.rcv_apply_journal_entry(pg_temp.entry(5, 'seal', '{"head_seq": 4}'), 'israel')$$),
+  '22023: seal needs head_seq = seq - 1 and a cutoff', 'a seal needs a cutoff');
+select app.rcv_apply_journal_entry(pg_temp.entry(5, 'seal', '{"head_seq": 4, "cutoff": "2026-10-03T11:00:00Z"}'), 'israel');
 select is(pg_temp.err($$select app.rcv_complete_reconciliation((select id from t_restore), 5, pg_temp.h(5), '{}', 'israel')$$),
   '22023: deleted objects not verified absent', 'the deleted object must be verified absent');
 select is(pg_temp.err($$select app.rcv_complete_reconciliation(gen_random_uuid(), 5, pg_temp.h(5), '{00000000-0000-4000-8000-0000000000b1}', 'israel')$$),

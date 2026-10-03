@@ -35,7 +35,7 @@ test('scenario journals are damaged copies with the expected verdicts', async ()
     assert.equal(await verdict('unsealed'), 'journal_unsealed');
     assert.equal(await verdict('early_seal'), null, 'early_seal keeps the journal; the later cutoff fails it');
     // The live journal is never modified by deriving scenarios.
-    assert.equal(readdirSync(join(dir, 'live')).length, 5);
+    assert.equal(readdirSync(join(dir, 'live')).filter((n) => n.startsWith('seg-')).length, 5);
     assert.match(readFileSync(join(dir, 'live', 'seg-0000000002-access_revoked.json'), 'utf8'), new RegExp(SUBJECT));
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

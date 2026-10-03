@@ -5,7 +5,10 @@
 -- restricted Google Drive folder for milestone 1). This migration adds the database side:
 --   * app.rcv_recovery_state: `live`, `restored_held` or `reconciled`. A restore lands in
 --     `restored_held` (the backup artifact itself calls app.rcv_hold_after_restore, so even a plain
---     `psql -f` of the artifact is held) and restored Auth sessions are deleted.
+--     `psql -f` of the artifact is held) and restored Auth sessions are deleted. The hold runs only
+--     inside a restore session (setting app.restore_in_progress = 'on', set by the artifact and the
+--     tool), so a mistaken call on a live database cannot sign everyone out; it does not depend on
+--     operator rows in the restored snapshot.
 --   * While held, the existing release gates `private_access` and `outbound_sending` read as closed
 --     through app.policy_effective / app.policy_is_open (redefined here with the same body plus
 --     the hold check), whatever the restored snapshot says they were. Missing state = held.
@@ -197,7 +200,31 @@ begin
     raise exception using errcode = '22023', message = 'malformed journal entry';
   end if;
   v_seq := (p_entry ->> 'seq')::bigint;
-  v_at := (p_entry ->> 'at')::timestamptz;
+  if jsonb_typeof(p_entry -> 'at') is distinct from 'string'
+     or (p_entry ->> 'at') !~ '^\d{4}-\d{2}-\d{2}T' then
+    raise exception using errcode = '22023', message = 'journal entry needs a valid at';
+  end if;
+  begin
+    v_at := (p_entry ->> 'at')::timestamptz;
+  exception when others then
+    raise exception using errcode = '22023', message = 'journal entry needs a valid at';
+  end;
+  if v_kind = 'seal' then
+    if jsonb_typeof(p_entry -> 'head_seq') is distinct from 'number'
+       or (p_entry ->> 'head_seq') !~ '^[0-9]{1,16}$'
+       or (p_entry ->> 'head_seq')::bigint <> v_seq - 1
+       or jsonb_typeof(p_entry -> 'cutoff') is distinct from 'string'
+       or (p_entry ->> 'cutoff') !~ '^\d{4}-\d{2}-\d{2}T' then
+      raise exception using errcode = '22023', message = 'seal needs head_seq = seq - 1 and a cutoff';
+    end if;
+    begin
+      if (p_entry ->> 'cutoff')::timestamptz > v_at then
+        raise exception using errcode = '22023', message = 'seal cutoff is after the seal';
+      end if;
+    exception when invalid_datetime_format or datetime_field_overflow then
+      raise exception using errcode = '22023', message = 'seal needs head_seq = seq - 1 and a cutoff';
+    end;
+  end if;
   if v_kind in ('access_revoked', 'deletion_manifest') then
     v_allowed := v_allowed || array['subject'];
   end if;
@@ -279,7 +306,15 @@ as $$
 declare
   v_restore uuid := gen_random_uuid();
 begin
-  perform app.rcv_require_operator(p_operator);
+  -- Only inside a restore session: the artifact/tool sets app.restore_in_progress = 'on'. The
+  -- operator name is attribution only, so a snapshot without operator rows still lands held.
+  if coalesce(current_setting('app.restore_in_progress', true), '') <> 'on' then
+    raise exception using errcode = '42501',
+      message = 'rcv_hold_after_restore runs only in a restore session (app.restore_in_progress)';
+  end if;
+  if p_operator is null or p_operator !~ '^[a-z][a-z0-9_-]{1,31}$' then
+    raise exception using errcode = '22023', message = 'operator name is required';
+  end if;
   if p_backup_id is null or p_backup_id !~ '^[A-Za-z0-9._:-]{1,80}$' then
     raise exception using errcode = '22023', message = 'backup id is required';
   end if;

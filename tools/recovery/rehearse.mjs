@@ -12,7 +12,13 @@
 //       (must reconcile). Exit 1 on any unexpected outcome.
 //   Step by step (used to mirror each journal segment to the owner's Drive folder in between):
 //       seed | backup | revoke | delete | seal
-//       restore <scenario> [--journal-dir <dir>] [--cutoff <iso>]
+//       restore <scenario>                  restore T1 into isolated database rcv_<scenario> (lands held)
+//       reconcile <scenario> [--journal-dir <dir>] [--cutoff <iso>]
+//                                           reconcile that restore from a journal; exit 1 with the
+//                                           refusal reason when the journal is absent or incomplete
+//       status <scenario>                   print the restored target's recovery status and gates
+//       scenario <scenario> [--journal-dir <dir>] [--cutoff <iso>]
+//                                           restore + reconcile, checked against the expected outcome
 //       cleanup            remove the isolated container and the local environment marker we set
 //
 // State (journal segments, the backup artifact, isolated object stores) lives in the gitignored
@@ -193,7 +199,9 @@ async function backup() {
   // Database bytes: the app and api schemas (schema + data). The artifact ends with the restore
   // hold, so even a plain `psql -f` of it lands held with restored sessions deleted.
   const dump = run('docker', ['exec', localEnv().DB_CONTAINER, 'pg_dump', '-U', 'postgres', '--schema=app', '--schema=api']).out;
-  const artifact = `${dump}\n\n-- Story 1.10 (AD-14): a restored snapshot starts held until journal reconciliation.\nselect app.rcv_hold_after_restore('${backupId}', '${OPERATOR}');\n`;
+  const artifact = `${dump}\n\n-- Story 1.10 (AD-14): a restored snapshot starts held until journal reconciliation.\n`
+    + `-- The hold runs only in a restore session and does not depend on restored operator rows.\n`
+    + `set app.restore_in_progress = 'on';\nselect app.rcv_hold_after_restore('${backupId}', '${OPERATOR}');\nreset app.restore_in_progress;\n`;
   writeFileSync(join(dir, 'database.sql'), artifact, { mode: 0o600 });
   // Object bytes, separately, through the Storage API.
   const res = await storage('GET', `object/authenticated/${BUCKET}/${r.object_id}`);
@@ -276,21 +284,41 @@ rollback;`);
   return lastJson(out);
 }
 
-async function restore(scenario, { journalDir, cutoff } = {}) {
+function scenarioDb(scenario) {
+  if (!/^[a-z_]{1,30}$/.test(scenario ?? '')) throw new Error('scenario must be a short lowercase name');
+  return { db: `rcv_${scenario}`, store: join(STATE_DIR, 'isolated-objects', scenario) };
+}
+
+function targetFacts(scenario) {
+  const r = loadRun();
+  const { db, store } = scenarioDb(scenario);
+  return {
+    status: JSON.parse(isoSql(db, 'select app.rcv_recovery_status()')),
+    subject_access_revoked: isoSql(db, `select access_revoked_at is not null from app.rcv_synthetic_subjects where subject_id = ${uuidLiteral(r.subject_id)}`) === 't',
+    object_present: existsSync(join(store, BUCKET, r.object_id)),
+    gates_if_approved: gateProbe(db),
+  };
+}
+
+function loadBackup() {
   const r = loadRun();
   if (!r.backup_id || !r.cutoff) throw new Error('run seed, backup, revoke, delete and seal first');
-  if (!/^[a-z_]{1,30}$/.test(scenario)) throw new Error('scenario must be a short lowercase name');
   const backupDir = join(STATE_DIR, 'backups', r.backup_id);
   const manifest = JSON.parse(readFileSync(join(backupDir, 'manifest.json'), 'utf8'));
   const artifact = readFileSync(join(backupDir, 'database.sql'), 'utf8');
   if (sha256(artifact) !== manifest.database.sha256) throw new Error('database artifact does not match its manifest');
+  return { r, backupDir, manifest, artifact };
+}
+
+/** Restores the T1 database artifact and objects into the isolated target (no reconciliation). */
+async function restoreTarget(scenario) {
+  const { r, backupDir, manifest, artifact } = loadBackup();
+  const { db, store } = scenarioDb(scenario);
   const image = ensureIsolated();
-  const db = `rcv_${scenario}`;
   run('docker', ['exec', ISOLATED, 'dropdb', '-U', 'postgres', '--if-exists', db]);
   run('docker', ['exec', ISOLATED, 'createdb', '-U', 'postgres', db]);
   run('docker', ['exec', '-i', ISOLATED, 'psql', '-U', 'postgres', '-d', db, '-X', '-q', '-v', 'ON_ERROR_STOP=1', '--single-transaction'], { input: artifact });
   // Objects into the isolated store, checked against the manifest.
-  const store = join(STATE_DIR, 'isolated-objects', scenario);
   rmSync(store, { recursive: true, force: true });
   for (const o of manifest.objects) {
     mkdirSync(join(store, o.bucket), { recursive: true, mode: 0o700 });
@@ -298,53 +326,71 @@ async function restore(scenario, { journalDir, cutoff } = {}) {
     if (sha256(readFileSync(src)) !== o.sha256) throw new Error('object backup does not match its manifest');
     copyFileSync(src, join(store, o.bucket, o.object_id));
   }
-  const objPath = join(store, BUCKET, r.object_id);
-  const restored = JSON.parse(isoSql(db, 'select app.rcv_recovery_status()'));
-  const restoredFacts = {
-    status: restored,
-    subject_access_revoked: isoSql(db, `select access_revoked_at is not null from app.rcv_synthetic_subjects where subject_id = ${uuidLiteral(r.subject_id)}`) === 't',
-    object_present: existsSync(objPath),
-    gates_if_approved: gateProbe(db),
-  };
+  return { target: { ...isolationFacts(), image, database: db, object_store: store }, backup_id: r.backup_id, restored: targetFacts(scenario) };
+}
 
-  // Reconcile from the journal.
+/** Plain `psql -f` of the artifact (no ON_ERROR_STOP, no single transaction) must land held. */
+function plainRestoreCheck() {
+  const { r, backupDir } = loadBackup();
+  ensureIsolated();
+  const db = 'rcv_plain_psql';
+  run('docker', ['exec', ISOLATED, 'dropdb', '-U', 'postgres', '--if-exists', db]);
+  run('docker', ['exec', ISOLATED, 'createdb', '-U', 'postgres', db]);
+  run('docker', ['cp', join(backupDir, 'database.sql'), `${ISOLATED}:/tmp/rcv-database.sql`]);
+  const res = run('docker', ['exec', ISOLATED, 'psql', '-U', 'postgres', '-d', db, '-X', '-q', '-f', '/tmp/rcv-database.sql'], { allowFail: true });
+  const status = JSON.parse(isoSql(db, 'select app.rcv_recovery_status()'));
+  return log('restore:plain_psql', { backup_id: r.backup_id, database: db, psql_exit_ok: res.ok, status, gates_if_approved: gateProbe(db) });
+}
+
+/** Reconciles an already-restored target from a journal. Returns {outcome, reason?, ...}. */
+async function reconcileTarget(scenario, { journalDir, cutoff } = {}) {
+  const r = loadRun();
+  const { db, store } = scenarioDb(scenario);
+  const restored = JSON.parse(isoSql(db, 'select app.rcv_recovery_status()'));
+  if (restored.state !== 'restored_held') throw new Error(`${db} is not a held restore (state ${restored.state})`);
   const jDir = journalDir ? resolve(journalDir)
     : scenario === 'complete' ? JOURNAL_DIR
       : deriveScenario(scenario, JOURNAL_DIR, join(STATE_DIR, 'scenarios', scenario));
   const theCutoff = cutoff ?? (scenario === 'early_seal' ? new Date(Date.parse(r.cutoff) + 3_600_000).toISOString() : r.cutoff);
   const entries = await new LocalSegmentJournal(jDir).list();
-  const verdict = verifyJournal(entries, { cutoff: theCutoff, databaseWatermark: restored.journal_watermark });
+  const acks = JSON.parse(isoSql(db, `select coalesce(json_agg(json_build_object('seq', seq, 'hash', entry_hash) order by seq), '[]') from app.rcv_journal_acks`));
+  const verdict = verifyJournal(entries, { cutoff: theCutoff, databaseAcks: acks });
+  const refuse = (reason) => {
+    isoSql(db, `select app.rcv_record_refusal(${uuidLiteral(restored.restore_id)}, '${reason}', '${OPERATOR}')`);
+    return { outcome: 'held', reason };
+  };
   let outcome;
   if (!verdict.complete) {
-    isoSql(db, `select app.rcv_record_refusal(${uuidLiteral(restored.restore_id)}, '${verdict.reason}', '${OPERATOR}')`);
-    outcome = { outcome: 'held', reason: verdict.reason };
+    outcome = refuse(verdict.reason);
   } else {
     const absent = [];
     const applied = [];
-    for (const e of entries) {
-      const res = JSON.parse(isoSql(db, `select app.rcv_apply_journal_entry(${jsonLiteral(e)}, '${OPERATOR}')`));
-      applied.push({ seq: res.seq, kind: res.kind, newly_applied: res.applied });
-      if (res.delete_object) {
-        const p = join(store, res.delete_object.bucket, res.delete_object.object_id);
-        if (existsSync(p)) unlinkSync(p);
-        if (existsSync(p)) throw new Error('restored object could not be removed');
-        if (!absent.includes(res.delete_object.object_id)) absent.push(res.delete_object.object_id);
+    try {
+      for (const e of entries) {
+        const res = JSON.parse(isoSql(db, `select app.rcv_apply_journal_entry(${jsonLiteral(e)}, '${OPERATOR}')`));
+        applied.push({ seq: res.seq, kind: res.kind, newly_applied: res.applied });
+        if (res.delete_object) {
+          const p = join(store, res.delete_object.bucket, res.delete_object.object_id);
+          if (existsSync(p)) unlinkSync(p);
+          if (existsSync(p)) throw new Error('restored object could not be removed');
+          if (!absent.includes(res.delete_object.object_id)) absent.push(res.delete_object.object_id);
+        }
       }
+      const done = JSON.parse(isoSql(db, `select app.rcv_complete_reconciliation(${uuidLiteral(restored.restore_id)}, ${verdict.head_seq}, '${verdict.head_hash}', array[${absent.map(uuidLiteral).join(',')}]::uuid[], '${OPERATOR}')`));
+      outcome = { outcome: done.state, applied, verified_absent: absent };
+    } catch (e) {
+      // Any replay failure keeps the hold and is recorded with a reason code.
+      outcome = { ...refuse(/journal_mismatch/.test(e.message) ? 'journal_mismatch' : 'replay_failed'), applied };
     }
-    const done = JSON.parse(isoSql(db, `select app.rcv_complete_reconciliation(${uuidLiteral(restored.restore_id)}, ${verdict.head_seq}, '${verdict.head_hash}', array[${absent.map(uuidLiteral).join(',')}]::uuid[], '${OPERATOR}')`));
-    outcome = { outcome: done.state, applied, verified_absent: absent };
   }
-  const after = {
-    status: JSON.parse(isoSql(db, 'select app.rcv_recovery_status()')),
-    subject_access_revoked: isoSql(db, `select access_revoked_at is not null from app.rcv_synthetic_subjects where subject_id = ${uuidLiteral(r.subject_id)}`) === 't',
-    object_present: existsSync(objPath),
-    gates_if_approved: gateProbe(db),
-  };
-  return log(`restore:${scenario}`, {
-    target: { ...isolationFacts(), image, database: db, object_store: store },
-    backup_id: r.backup_id, journal: { dir: jDir, cutoff: theCutoff, entries: entries?.length ?? 0, verdict },
-    restored: restoredFacts, ...outcome, after,
-  });
+  return { journal: { dir: jDir, cutoff: theCutoff, entries: entries?.length ?? 0, verdict }, ...outcome };
+}
+
+/** Restore + reconcile + facts, logged as one scenario record. */
+async function runScenario(scenario, opts = {}) {
+  const restored = await restoreTarget(scenario);
+  const rec = await reconcileTarget(scenario, opts);
+  return log(`restore:${scenario}`, { ...restored, ...rec, after: targetFacts(scenario) });
 }
 
 function cleanup({ keep = false } = {}) {
@@ -402,8 +448,15 @@ async function main(argv) {
     case 'revoke': await revoke(); break;
     case 'delete': await del(); break;
     case 'seal': await seal(); break;
-    case 'restore': {
-      const res = await restore(scenario, { journalDir, cutoff });
+    case 'restore': log(`restore-only:${scenario}`, await restoreTarget(scenario)); break;
+    case 'reconcile': {
+      const res = log(`reconcile:${scenario}`, await reconcileTarget(scenario, { journalDir, cutoff }));
+      if (res.outcome !== 'reconciled') { console.error(`held: ${res.reason}`); process.exitCode = 1; }
+      break;
+    }
+    case 'status': log(`status:${scenario}`, targetFacts(scenario)); break;
+    case 'scenario': {
+      const res = await runScenario(scenario, { journalDir, cutoff });
       const problems = expectScenario(scenario, res);
       if (problems.length) { console.error(problems.join('\n')); process.exitCode = 1; }
       break;
@@ -413,7 +466,12 @@ async function main(argv) {
       const problems = [];
       try {
         await seed(); await backup(); await revoke(); await del(); await seal();
-        for (const s of [...NEGATIVE_SCENARIOS, 'complete']) problems.push(...expectScenario(s, await restore(s)));
+        for (const s of [...NEGATIVE_SCENARIOS, 'complete']) problems.push(...expectScenario(s, await runScenario(s)));
+        const plain = plainRestoreCheck();
+        if (plain.status.state !== 'restored_held' || plain.gates_if_approved.private_access_if_approved
+            || plain.gates_if_approved.outbound_sending_if_approved) {
+          problems.push('plain psql -f restore did not land held with both gates closed');
+        }
       } finally {
         cleanup({ keep });
       }
@@ -422,7 +480,7 @@ async function main(argv) {
       break;
     }
     default:
-      console.error('usage: rehearse.mjs all|seed|backup|revoke|delete|seal|restore <scenario>|cleanup [--evidence dir] [--journal-dir dir] [--cutoff iso] [--keep]');
+      console.error('usage: rehearse.mjs all|seed|backup|revoke|delete|seal|restore|reconcile|status|scenario <scenario>|cleanup [--evidence dir] [--journal-dir dir] [--cutoff iso] [--keep]');
       process.exitCode = 2;
   }
 }

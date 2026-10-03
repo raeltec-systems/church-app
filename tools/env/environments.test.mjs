@@ -131,8 +131,8 @@ test('recovery: per-environment journal adapter, isolated restores, real-data ba
   for (const [name, mutate, re] of [
     ['local', (r) => { r.journal.adapter = 'google_drive_folder'; }, /journal.adapter must be one of local_segments/],
     ['production', (r) => { r.journal.adapter = 'google_drive_folder'; }, /owner_selection_required/],
-    ['staging', (r) => { r.journal.folder_id = '1abcDEF'; }, /must not hold credentials/],
-    ['staging', (r) => { r.journal.access_token = 'x'; }, /must not hold credentials/],
+    ['staging', (r) => { r.journal.folder_id = '1abcDEF'; }, /names the adapter only/],
+    ['staging', (r) => { r.journal.access_token = 'x'; }, /names the adapter only/],
     ['staging', (r) => { r.restore_target = 'staging'; }, /isolated_only/],
     ['production', (r) => { r.activation.real_data_backups = true; }, /real_data_backups must stay false/],
     ['local', (r) => { r.activation.real_data_backups = 'false'; }, /real_data_backups must stay false/],

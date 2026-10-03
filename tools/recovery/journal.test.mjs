@@ -42,7 +42,8 @@ test('entries refuse content and fields outside their kind', () => {
   assert.throws(() => buildEntry(null, { kind: 'access_revoked', subject: 'jane@example.com' }), /subject must be a uuid/);
   assert.throws(() => buildEntry(null, { kind: 'deletion_completed', object: { ...OBJECT, path: 'photos/jane.jpg' } }), /object must be/);
   assert.throws(() => buildEntry(null, { kind: 'wipe' }), /unknown kind/);
-  assert.deepEqual(validateEntry(buildEntry(null, { kind: 'seal', cutoff: CUTOFF })), []);
+  assert.deepEqual(validateEntry(buildEntry(null, { kind: 'seal', cutoff: CUTOFF }, T(31))), []);
+  assert.throws(() => buildEntry(null, { kind: 'seal', cutoff: T(45).toISOString() }, T(31)), /seal cutoff must not be after the seal/);
 });
 
 test('local segments are create-only and a complete journal verifies', async () => {
@@ -51,7 +52,7 @@ test('local segments are create-only and a complete journal verifies', async () 
     const j = new LocalSegmentJournal(join(dir, 'journal'));
     assert.equal(await j.list(), null);
     await fullJournal(j);
-    const names = readdirSync(join(dir, 'journal'));
+    const names = readdirSync(join(dir, 'journal')).filter((n) => n.startsWith('seg-'));
     assert.deepEqual(names, [
       'seg-0000000001-checkpoint.json', 'seg-0000000002-access_revoked.json',
       'seg-0000000003-deletion_manifest.json', 'seg-0000000004-deletion_completed.json',
@@ -79,6 +80,9 @@ test('absent, gap, tampered, unsealed, early seal and behind-database journals a
     assert.equal(reason(all.slice(0, 4)), 'journal_unsealed');
     assert.equal(reason(all, { cutoff: T(45).toISOString() }), 'journal_seal_before_cutoff');
     assert.equal(reason(all, { databaseWatermark: 6 }), 'journal_behind_database');
+    assert.equal(reason(all, { databaseAcks: [{ seq: 6, hash: all[4].hash }] }), 'journal_behind_database');
+    assert.equal(reason(all, { databaseAcks: [{ seq: 1, hash: all[0].hash }, { seq: 2, hash: 'f'.repeat(64) }] }), 'journal_mismatch');
+    assert.equal(reason(all, { databaseAcks: [{ seq: 1, hash: all[0].hash }] }), null);
     assert.equal(reason([...all.slice(0, 4), null, all[4]]), 'journal_malformed');
     // An unparseable segment on disk is malformed, not skipped.
     writeFileSync(join(dir, 'seg-0000000006-checkpoint.json'), '{not json');
@@ -129,4 +133,32 @@ test('DriveRestClient sends the bearer token, never a permission call, and repor
   assert.ok(seen.every((s) => s.auth === 'Bearer SYNTHETIC-token' && !s.url.includes('permissions')));
   await assert.rejects(() => c.download('fail'), (e) => e.message === 'drive GET failed: HTTP 403');
   assert.throws(() => new DriveRestClient({}), /access token/);
+});
+
+test('a concurrent local append of the same seq fails instead of forking the journal', async () => {
+  const dir = tmp();
+  try {
+    const a = new LocalSegmentJournal(dir);
+    const b = new LocalSegmentJournal(dir);
+    await a.append({ kind: 'checkpoint' }, T(1));
+    // Writer b read the head before a's second append, then both try seq 2 with different kinds.
+    const origList = b.list.bind(b);
+    const stale = await origList();
+    b.list = async () => stale;
+    await a.append({ kind: 'access_revoked', subject: SUBJECT }, T(2));
+    await assert.rejects(() => b.append({ kind: 'deletion_completed', object: OBJECT }, T(3)), /seq 2 is already claimed/);
+    assert.deepEqual(readdirSync(dir).filter((n) => n.startsWith('seg-')).length, 2);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('DriveJournal fails loudly when another writer used the same seq', async () => {
+  const files = [{ id: 'other', title: 'seg-0000000001-checkpoint.json', text: '' }];
+  const client = {
+    async listFolder() { return files.map(({ id, title }) => ({ id, title })); },
+    async download() { return '{}'; },
+    async createFile(f) { files.push({ id: 'mine', ...f }); return { id: 'mine', title: f.title }; },
+  };
+  const drive = new DriveJournal({ client, folderId: 'folder-1' });
+  drive.list = async () => null; // stale view: this writer thinks the journal is empty
+  await assert.rejects(() => drive.append({ kind: 'access_revoked', subject: SUBJECT }, T(2)), /journal fork: 2 Drive segments for seq 1/);
 });

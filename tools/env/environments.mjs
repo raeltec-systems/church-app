@@ -143,7 +143,6 @@ function get(obj, dotted) {
   return dotted.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj);
 }
 
-/** Returns a list of human-readable violations (empty = valid). */
 // Story 1.10 (AD-14, AD-17): independent recovery journal and isolated restores. Q4 (retention
 // of the journal and backups) and Q12 (RPO/RTO, backup schedule) gate real-data backups; the
 // flag must stay false here. Adapters: tools/recovery/journal.mjs.
@@ -167,8 +166,10 @@ export function validateRecovery(file, rec) {
   if (!adapters.includes(rec.journal?.adapter)) {
     errors.push(`${where}: recovery.journal.adapter must be one of ${adapters.join(', ')}`);
   }
+  // Drive IDs are not secret (evidence-1.10 records them), but in milestone 1 the config names
+  // the adapter only: credentials and adapter wiring (folder IDs, tokens) stay out of it.
   if (Object.keys(rec.journal ?? {}).some((k) => /secret|token|password|key$|credential|folder_id/i.test(k))) {
-    errors.push(`${where}: recovery.journal must not hold credentials or private identifiers`);
+    errors.push(`${where}: recovery.journal names the adapter only; credentials and adapter wiring (folder IDs, tokens) are not configured here in milestone 1`);
   }
   if (rec.restore_target !== 'isolated_only') {
     errors.push(`${where}: recovery.restore_target must be "isolated_only" (never restore into a serving environment)`);
@@ -189,6 +190,7 @@ export function validateRecovery(file, rec) {
   return errors;
 }
 
+/** Returns a list of human-readable violations (empty = valid). */
 export function validateEnvironments(envs, { productionRef = process.env.PRODUCTION_PROJECT_REF || null } = {}) {
   const errors = [];
   const names = Object.keys(envs).sort();

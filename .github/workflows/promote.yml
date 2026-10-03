@@ -172,6 +172,9 @@ jobs:
       - name: Hosted migration history has not drifted
         run: node tools/ci/check-migration-drift.mjs --env "$TARGET" --project-ref "${{ steps.target.outputs.ref }}"
 
+      - name: Target database is unmarked or already marked as this environment
+        run: node tools/ci/hosted-sql.mjs precheck "$TARGET" "${{ steps.target.outputs.ref }}"
+
       - name: Link the project
         run: npx supabase link --project-ref "${{ steps.target.outputs.ref }}" --password "$SUPABASE_DB_PASSWORD"
 

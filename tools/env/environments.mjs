@@ -254,11 +254,17 @@ export function validateEnvironments(envs, { productionRef = process.env.PRODUCT
  * Refuses a deploy unless `projectRef` is the project of environment `name` and of no other.
  * Production's ref is not in the repo; it must come from the protected environment variable.
  */
+// Hosted projects that exist only for evidence harnesses and must never be a deploy target.
+export const NON_DEPLOYABLE_REFS = Object.freeze(['szfyfezfvxyuvovnnakr' /* bic-kafue-auth-test */]);
+
 export function resolveDeployTarget(envs, name, projectRef) {
   const env = envs[name];
   if (!env || name === 'local') throw new Error(`"${name}" is not a deployable environment`);
   if (!projectRef || !PROJECT_REF_RE.test(projectRef)) {
     throw new Error(`${name}: no valid project ref supplied (owner step: set SUPABASE_PROJECT_REF / create the project)`);
+  }
+  if (NON_DEPLOYABLE_REFS.includes(projectRef)) {
+    throw new Error(`${name}: ${projectRef} is a test-harness project and is never a deploy target`);
   }
   const others = Object.values(envs).filter((e) => e.name !== name).map((e) => e.supabase?.project_ref).filter(Boolean);
   if (others.includes(projectRef)) throw new Error(`${name}: ${projectRef} belongs to another environment`);

@@ -6,6 +6,9 @@
 //   node tools/ci/hosted-sql.mjs ensure-marker <env> <ref> <set_by>
 //        Marks an UNMARKED database as <env> (app.platform_set_environment). An already-marked
 //        database must already carry <env>; it is never re-marked.
+//   node tools/ci/hosted-sql.mjs precheck <env> <ref>
+//        Before any migration: a database that already carries a marker must carry <env>
+//        (story 1.12 follow-up: a mis-set ref is refused before db push, not after).
 //   node tools/ci/hosted-sql.mjs verify <env> <ref>
 //        Runs tools/ci/verify-hosted.sql: marker == <env>, private_access/outbound_sending closed.
 
@@ -40,6 +43,19 @@ $$;
 select app.platform_current_environment() as environment;`;
 }
 
+export function precheckSql(env) {
+  if (!ENVS.includes(env)) throw new Error(`unknown environment ${env}`);
+  return `do $$
+begin
+  if to_regclass('app.platform_environment') is not null
+     and exists (select 1 from app.platform_environment)
+     and app.platform_current_environment() <> ${literal(env)} then
+    raise exception 'hosted database is marked %, refusing to migrate it as %', app.platform_current_environment(), ${literal(env)};
+  end if;
+end;
+$$;`;
+}
+
 async function query(ref, sql) {
   const token = process.env.SUPABASE_ACCESS_TOKEN;
   if (!token) throw new Error('SUPABASE_ACCESS_TOKEN is not set');
@@ -59,12 +75,17 @@ async function main([cmd, env, ref, setBy]) {
     console.log(`hosted-sql: ${env} marker -> ${await query(ref, ensureMarkerSql(env, setBy))}`);
     return 0;
   }
+  if (cmd === 'precheck') {
+    await query(ref, precheckSql(env));
+    console.log(`hosted-sql: ${env} (${ref}) is unmarked or already marked ${env}`);
+    return 0;
+  }
   if (cmd === 'verify') {
     await query(ref, verifySql(env));
     console.log(`hosted-sql: ${env} (${ref}) marker confirmed; private_access and outbound_sending closed`);
     return 0;
   }
-  console.error('usage: hosted-sql.mjs ensure-marker <env> <ref> <set_by> | verify <env> <ref>');
+  console.error('usage: hosted-sql.mjs ensure-marker <env> <ref> <set_by> | precheck <env> <ref> | verify <env> <ref>');
   return 2;
 }
 

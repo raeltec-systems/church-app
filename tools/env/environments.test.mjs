@@ -81,6 +81,7 @@ test('deploy targets cannot cross environments', () => {
   assert.throws(() => resolveDeployTarget(e, 'production', 'tmurpotfluignacfueki'), /another environment/);
   assert.throws(() => resolveDeployTarget(e, 'production', ''), /owner step/);
   assert.throws(() => resolveDeployTarget(e, 'local', 'tmurpotfluignacfueki'), /not a deployable/);
+  assert.throws(() => resolveDeployTarget(e, 'production', 'szfyfezfvxyuvovnnakr'), /test-harness project/);
   const p = resolveDeployTarget(e, 'production', FAKE_PROD);
   assert.equal(p.githubEnvironment, 'production');
   assert.equal(p.databaseMarker, 'production');

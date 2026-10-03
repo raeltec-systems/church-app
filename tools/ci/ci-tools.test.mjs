@@ -201,6 +201,14 @@ test('hosted SQL only targets known environments and quotes values', async () =>
   assert.throws(() => ensureMarkerSql('staging', ' '), /set_by/);
 });
 
+test('pre-push precheck refuses a database marked as another environment', async () => {
+  const { precheckSql } = await import('./hosted-sql.mjs');
+  const sql = precheckSql('production');
+  assert.match(sql, /to_regclass\('app\.platform_environment'\)/);
+  assert.match(sql, /<> 'production'/);
+  assert.throws(() => precheckSql('local'), /unknown environment/);
+});
+
 test('drift check skips (exit 0) when no access token is configured', async () => {
   const { spawnSync } = await import('node:child_process');
   const { fileURLToPath } = await import('node:url');

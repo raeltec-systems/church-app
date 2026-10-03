@@ -94,3 +94,11 @@ Decision (agent, under owner pre-approval): the 1.2 phone track is evidenced as 
 - `npm run db:test && npm run db:smoke && npm run recovery:rehearse` -- expected: exit 0.
 - `npm run ci:policy-test && npm run env:check && npm run ci:secrets && npm run ci:migrations -- --base origin/main` -- expected: exit 0.
 - `flutter analyze && flutter test` in each Flutter package -- expected: no issues, all pass.
+
+## Review Triage Log
+
+| Finding | Verdict | Route | Evidence |
+|---|---|---|---|
+| (builder risk) `resolveDeployTarget` accepts the auth-test project ref for production | medium | patch | environments.mjs had no list of harness-only refs; added NON_DEPLOYABLE_REFS + test |
+| (builder risk) promote.yml runs verify-hosted only after `db push`, so a mis-set ref is migrated before refusal | medium | patch | added `hosted-sql.mjs precheck` step before link/push; refuses a database marked as another environment; unit test added |
+| (builder risk) 1.4 plan `blocked_reason` stale | low | patch | hardening migration 20261003131021 is on staging; status set done |

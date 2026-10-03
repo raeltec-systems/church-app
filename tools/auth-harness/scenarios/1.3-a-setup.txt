@@ -1,0 +1,22 @@
+# Story 1.3 re-run, part A: accounts. Before: `init`, `rc-operator-token`,
+# register the digest (sql/register_operator_token.sql), record the function
+# and SQL fingerprints (steps 01-04, see README). Accounts are created by Auth
+# Admin with email_confirm: no email is sent.
+
+info --step 05-provider-info
+# The operator token can create plain synthetic accounts, never staff.
+rc-provision staff --tag r13-x-staff --role none --step 10-provision-staff-account-no-role
+rc-provision staff-try --tag r13-x-st2 --role staff --step 11-operator-token-cannot-create-staff
+rc-provision ma --tag r13-x-ma --role member --step 12-provision-member-a
+rc-provision mb --tag r13-x-mb --role member --step 12-provision-member-b
+rc-provision mc --tag r13-x-mc --role member --step 12-provision-member-c
+rc-provision md --tag r13-x-md --role member --step 12-provision-member-d
+rc-provision me --tag r13-x-me --role member --step 12-provision-member-e
+rc-provision mf --tag r13-x-mf --role member --step 12-provision-member-f
+rc-provision mg --tag r13-x-mg --role member --step 12-provision-member-g
+rc-provision mh --tag r13-x-mh --role member --step 12-provision-member-h
+rc-provision mi --tag r13-x-mi --role member --step 12-provision-member-i
+# Not yet staff: a trusted session of this account is refused for staff actions.
+login staff-s1 --account staff --email israelmuyoba+bicauth-r13-x-staff@gmail.com --step 13-login-staff-account
+rc-call --action issue --as session:staff-s1 --step 14-staff-action-before-out-of-band-enrolment
+# Next (out of band, operator via MCP): sql/enroll_staff.sql for r13-x-staff, attached as step 15.

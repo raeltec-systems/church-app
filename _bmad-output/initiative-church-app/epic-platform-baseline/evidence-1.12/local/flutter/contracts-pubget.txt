@@ -1,0 +1,9 @@
+$ (cd packages/contracts/dart && dart pub get --enforce-lockfile)
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+Resolving dependencies...
+Downloading packages...
+Got dependencies!
+# exit=0

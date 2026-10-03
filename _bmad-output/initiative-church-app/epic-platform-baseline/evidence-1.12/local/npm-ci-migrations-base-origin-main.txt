@@ -1,0 +1,9 @@
+$ npm run ci:migrations -- --base origin/main
+# started 2026-10-03T16:55:14Z at 2b3ad1824ea255bf2b59b196c239de2d25f4fdcf
+
+> ci:migrations
+> node tools/ci/check-migrations.mjs --base origin/main
+
+check-migrations: 6 new migration(s) since base
+check-migrations: 8 migration(s) ordered, unique and non-destructive (base origin/main)
+# exit=0 finished 2026-10-03T16:55:14Z

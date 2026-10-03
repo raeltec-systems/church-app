@@ -1,0 +1,305 @@
+$ npm run ci:policy-test
+# started 2026-10-03T16:55:13Z at 2b3ad1824ea255bf2b59b196c239de2d25f4fdcf
+
+> ci:policy-test
+> node --test tools/env/*.test.mjs tools/ci/*.test.mjs tools/ops/*.test.mjs tools/recovery/*.test.mjs
+
+TAP version 13
+# Subtest: additive later migration passes
+ok 1 - additive later migration passes
+  ---
+  duration_ms: 4.185638
+  type: 'test'
+  ...
+# Subtest: destructive statements in new migrations fail with line numbers
+ok 2 - destructive statements in new migrations fail with line numbers
+  ---
+  duration_ms: 1.002956
+  type: 'test'
+  ...
+# Subtest: comments, string literals and relaxations are not destructive
+ok 3 - comments, string literals and relaxations are not destructive
+  ---
+  duration_ms: 0.306712
+  type: 'test'
+  ...
+# Subtest: apostrophes inside dollar quotes and E-strings cannot hide a later DROP
+ok 4 - apostrophes inside dollar quotes and E-strings cannot hide a later DROP
+  ---
+  duration_ms: 0.37614
+  type: 'test'
+  ...
+# Subtest: an owner-approved cleanup marker allows destructive statements
+ok 5 - an owner-approved cleanup marker allows destructive statements
+  ---
+  duration_ms: 0.33196
+  type: 'test'
+  ...
+# Subtest: out-of-order, duplicate and badly named migrations fail
+ok 6 - out-of-order, duplicate and badly named migrations fail
+  ---
+  duration_ms: 0.246111
+  type: 'test'
+  ...
+# Subtest: merged migrations are immutable
+ok 7 - merged migrations are immutable
+  ---
+  duration_ms: 0.239505
+  type: 'test'
+  ...
+# Subtest: without a base every migration must be non-destructive
+ok 8 - without a base every migration must be non-destructive
+  ---
+  duration_ms: 0.113451
+  type: 'test'
+  ...
+# Subtest: drift: in sync, pending and drift cases
+ok 9 - drift: in sync, pending and drift cases
+  ---
+  duration_ms: 0.645929
+  type: 'test'
+  ...
+# Subtest: drift: parses MCP / Management API shapes
+ok 10 - drift: parses MCP / Management API shapes
+  ---
+  duration_ms: 10.49981
+  type: 'test'
+  ...
+# Subtest: repo mode finds real credentials but not role names or local defaults
+ok 11 - repo mode finds real credentials but not role names or local defaults
+  ---
+  duration_ms: 1.83089
+  type: 'test'
+  ...
+# Subtest: bundle mode refuses any JWT and service_role but allows a publishable key
+ok 12 - bundle mode refuses any JWT and service_role but allows a publishable key
+  ---
+  duration_ms: 0.535489
+  type: 'test'
+  ...
+# Subtest: bundle scan reads binary files too
+ok 13 - bundle scan reads binary files too
+  ---
+  duration_ms: 2.270613
+  type: 'test'
+  ...
+# Subtest: sealed artifacts verify and detect tampering or the wrong environment
+ok 14 - sealed artifacts verify and detect tampering or the wrong environment
+  ---
+  duration_ms: 9.782089
+  type: 'test'
+  ...
+# Subtest: hosted SQL only targets known environments and quotes values
+ok 15 - hosted SQL only targets known environments and quotes values
+  ---
+  duration_ms: 3.107846
+  type: 'test'
+  ...
+# Subtest: drift check skips (exit 0) when no access token is configured
+ok 16 - drift check skips (exit 0) when no access token is configured
+  ---
+  duration_ms: 61.153313
+  type: 'test'
+  ...
+# Subtest: system credentials are secrets in every mode; their digest and prefix are not
+ok 17 - system credentials are secrets in every mode; their digest and prefix are not
+  ---
+  duration_ms: 0.324322
+  type: 'test'
+  ...
+# Subtest: the committed configs are valid and separate
+ok 18 - the committed configs are valid and separate
+  ---
+  duration_ms: 4.423887
+  type: 'test'
+  ...
+# Subtest: production baseline keeps private access and sending disabled behind approval
+ok 19 - production baseline keeps private access and sending disabled behind approval
+  ---
+  duration_ms: 6.766638
+  type: 'test'
+  ...
+# Subtest: SMS cannot be enabled in any environment
+ok 20 - SMS cannot be enabled in any environment
+  ---
+  duration_ms: 1.315605
+  type: 'test'
+  ...
+# Subtest: non-production recipient patterns must be synthetic
+ok 21 - non-production recipient patterns must be synthetic
+  ---
+  duration_ms: 0.656321
+  type: 'test'
+  ...
+# Subtest: staging may only address synthetic recipients
+ok 22 - staging may only address synthetic recipients
+  ---
+  duration_ms: 1.275893
+  type: 'test'
+  ...
+# Subtest: a hand-edited non-synthetic pattern is still refused at send time
+ok 23 - a hand-edited non-synthetic pattern is still refused at send time
+  ---
+  duration_ms: 0.403802
+  type: 'test'
+  ...
+# Subtest: production refuses every recipient while sending is disabled
+ok 24 - production refuses every recipient while sending is disabled
+  ---
+  duration_ms: 0.431394
+  type: 'test'
+  ...
+# Subtest: deploy targets cannot cross environments
+ok 25 - deploy targets cannot cross environments
+  ---
+  duration_ms: 0.539445
+  type: 'test'
+  ...
+# Subtest: a non-production config naming the production project is rejected
+ok 26 - a non-production config naming the production project is rejected
+  ---
+  duration_ms: 1.151486
+  type: 'test'
+  ...
+# Subtest: configs cannot carry secret values
+ok 27 - configs cannot carry secret values
+  ---
+  duration_ms: 1.009389
+  type: 'test'
+  ...
+# Subtest: operations: bounded system route, named operator, activation flags fail closed
+ok 28 - operations: bounded system route, named operator, activation flags fail closed
+  ---
+  duration_ms: 5.0994
+  type: 'test'
+  ...
+# Subtest: recovery: per-environment journal adapter, isolated restores, real-data backups off
+ok 29 - recovery: per-environment journal adapter, isolated restores, real-data backups off
+  ---
+  duration_ms: 3.379661
+  type: 'test'
+  ...
+# Subtest: minted credentials are environment-prefixed, 256-bit and caught by the secret scan
+ok 30 - minted credentials are environment-prefixed, 256-bit and caught by the secret scan
+  ---
+  duration_ms: 3.542339
+  type: 'test'
+  ...
+# Subtest: digest is sha256 hex of the whole token (environment included)
+ok 31 - digest is sha256 hex of the whole token (environment included)
+  ---
+  duration_ms: 0.879732
+  type: 'test'
+  ...
+# Subtest: scrub removes stored secrets and any credential-shaped value
+ok 32 - scrub removes stored secrets and any credential-shaped value
+  ---
+  duration_ms: 0.651666
+  type: 'test'
+  ...
+# Subtest: token check, secret scan and scrubber share one credential shape
+ok 33 - token check, secret scan and scrubber share one credential shape
+  ---
+  duration_ms: 2.03791
+  type: 'test'
+  ...
+# Subtest: the matrix judge accepts only the expected outcome per case
+ok 34 - the matrix judge accepts only the expected outcome per case
+  ---
+  duration_ms: 0.494154
+  type: 'test'
+  ...
+# Subtest: mint stores the token 0600 in the state dir and prints only the digest
+ok 35 - mint stores the token 0600 in the state dir and prints only the digest
+  ---
+  duration_ms: 113.578845
+  type: 'test'
+  ...
+# Subtest: the matrix never sends another environment's stored credential
+ok 36 - the matrix never sends another environment's stored credential
+  ---
+  duration_ms: 42.067206
+  type: 'test'
+  ...
+# Subtest: canonical JSON sorts keys recursively
+ok 37 - canonical JSON sorts keys recursively
+  ---
+  duration_ms: 1.344541
+  type: 'test'
+  ...
+# Subtest: entries are hash-chained from the genesis hash
+ok 38 - entries are hash-chained from the genesis hash
+  ---
+  duration_ms: 1.421118
+  type: 'test'
+  ...
+# Subtest: entries refuse content and fields outside their kind
+ok 39 - entries refuse content and fields outside their kind
+  ---
+  duration_ms: 3.054206
+  type: 'test'
+  ...
+# Subtest: local segments are create-only and a complete journal verifies
+ok 40 - local segments are create-only and a complete journal verifies
+  ---
+  duration_ms: 8.080282
+  type: 'test'
+  ...
+# Subtest: absent, gap, tampered, unsealed, early seal and behind-database journals are incomplete
+ok 41 - absent, gap, tampered, unsealed, early seal and behind-database journals are incomplete
+  ---
+  duration_ms: 4.284676
+  type: 'test'
+  ...
+# Subtest: DriveJournal only creates files and reads back an identical journal
+ok 42 - DriveJournal only creates files and reads back an identical journal
+  ---
+  duration_ms: 11.698231
+  type: 'test'
+  ...
+# Subtest: DriveRestClient sends the bearer token, never a permission call, and reports HTTP errors without bodies
+ok 43 - DriveRestClient sends the bearer token, never a permission call, and reports HTTP errors without bodies
+  ---
+  duration_ms: 45.059768
+  type: 'test'
+  ...
+# Subtest: a concurrent local append of the same seq fails instead of forking the journal
+ok 44 - a concurrent local append of the same seq fails instead of forking the journal
+  ---
+  duration_ms: 1.609652
+  type: 'test'
+  ...
+# Subtest: DriveJournal fails loudly when another writer used the same seq
+ok 45 - DriveJournal fails loudly when another writer used the same seq
+  ---
+  duration_ms: 0.766059
+  type: 'test'
+  ...
+# Subtest: SQL literals refuse values that could escape their quoting
+ok 46 - SQL literals refuse values that could escape their quoting
+  ---
+  duration_ms: 1.423569
+  type: 'test'
+  ...
+# Subtest: scenario journals are damaged copies with the expected verdicts
+ok 47 - scenario journals are damaged copies with the expected verdicts
+  ---
+  duration_ms: 15.821205
+  type: 'test'
+  ...
+# Subtest: scenario expectations reject a gate that opens without a complete journal
+ok 48 - scenario expectations reject a gate that opens without a complete journal
+  ---
+  duration_ms: 2.149063
+  type: 'test'
+  ...
+1..48
+# tests 48
+# suites 0
+# pass 48
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 326.042795
+# exit=0 finished 2026-10-03T16:55:13Z

@@ -1,0 +1,18 @@
+{
+  "query": "select * from app.sys_audit order by id desc limit 14 (Supabase MCP execute_sql, read-only)",
+  "note": "ids 39-50 are this run (2026-10-03T17:01:30Z-17:01:32Z): 12 content-free rows for the 12 requests that reached the database; forged_jwt_bearer (401) and audit_table_not_exposed (406) were stopped by PostgREST. The credential used is the existing story 1.9 staging credential 9a2f74d7 (registered 2026-10-03T15:40:59Z, expires 2026-10-05T15:40:59Z, not revoked, principal enabled), checked by digest before the run. No credential was minted into .ops-state or registered for this run; the two wrong-environment cases are in-memory, never-stored, never-registered strings that the tool generates as negative probes.",
+  "rows": [
+    {"id": 50, "code": "forbidden", "reason": "command_not_allowed", "command": null, "outcome": "rejected", "caller_role": "anon", "environment": "staging", "credential_id": "9a2f74d7-a029-4552-98c8-bb0e8ed6cbbe", "occurred_at": "2026-10-03T17:01:32.403073+00:00"},
+    {"id": 49, "code": null, "reason": "ok", "command": "system.synthetic_probe", "outcome": "succeeded", "caller_role": "anon", "environment": "staging", "credential_id": "9a2f74d7-a029-4552-98c8-bb0e8ed6cbbe", "system_principal_id": "5ef59c0d-ab6e-43c4-bb82-d7d13e6609b6", "initiating_member_id": null, "occurred_at": "2026-10-03T17:01:32.251063+00:00"},
+    {"id": 48, "code": "validation_failed", "reason": "envelope_invalid", "command": "system.synthetic_probe", "outcome": "rejected", "occurred_at": "2026-10-03T17:01:32.100751+00:00"},
+    {"id": 47, "code": "validation_failed", "reason": "envelope_invalid", "command": "system.synthetic_probe", "outcome": "rejected", "occurred_at": "2026-10-03T17:01:31.946571+00:00"},
+    {"id": 46, "code": "unauthenticated", "reason": "wrong_environment", "command": "system.synthetic_probe", "outcome": "rejected", "credential_id": null, "system_principal_id": null, "occurred_at": "2026-10-03T17:01:31.65845+00:00"},
+    {"id": 45, "code": "unauthenticated", "reason": "wrong_environment", "command": "system.synthetic_probe", "outcome": "rejected", "credential_id": null, "system_principal_id": null, "occurred_at": "2026-10-03T17:01:31.502788+00:00"},
+    {"id": 44, "code": "unauthenticated", "reason": "credential_unknown", "command": "system.synthetic_probe", "outcome": "rejected", "credential_id": null, "occurred_at": "2026-10-03T17:01:31.119598+00:00"},
+    {"id": 43, "code": "unauthenticated", "reason": "credential_malformed", "command": "system.synthetic_probe", "outcome": "rejected", "credential_id": null, "occurred_at": "2026-10-03T17:01:30.978614+00:00"},
+    {"id": 42, "code": "unauthenticated", "reason": "credential_missing", "command": "system.synthetic_probe", "outcome": "rejected", "credential_id": null, "occurred_at": "2026-10-03T17:01:30.841376+00:00"},
+    {"id": 41, "code": "conflict", "reason": "request_conflict", "command": "system.synthetic_probe", "outcome": "rejected", "occurred_at": "2026-10-03T17:01:30.697688+00:00"},
+    {"id": 40, "code": null, "reason": "replay", "command": "system.synthetic_probe", "outcome": "replayed", "occurred_at": "2026-10-03T17:01:30.553461+00:00"},
+    {"id": 39, "code": null, "reason": "ok", "command": "system.synthetic_probe", "outcome": "succeeded", "system_principal_id": "5ef59c0d-ab6e-43c4-bb82-d7d13e6609b6", "initiating_member_id": null, "occurred_at": "2026-10-03T17:01:30.133756+00:00"}
+  ]
+}

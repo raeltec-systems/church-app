@@ -1,0 +1,46 @@
+$ psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f /tmp/claude-0/-home-user-church-app/53f9d846-6f17-5fcb-9db8-59c7e3ac6bf0/scratchpad/prod-gates.sql
+# started 2026-10-03T16:58:56Z at 2b3ad1824ea255bf2b59b196c239de2d25f4fdcf
+BEGIN
+ platform_set_environment 
+--------------------------
+ 
+(1 row)
+
+ marked_env 
+------------
+ production
+(1 row)
+
+         gate          |   state    | open 
+-----------------------+------------+------
+ ops_alert_destination | unresolved | f
+ ops_system_access     | unresolved | f
+ outbound_sending      | unresolved | f
+ private_access        | unresolved | f
+ q1_auth_recovery      | unresolved | f
+ q12_operations        | unresolved | f
+ q2_church_time        | unresolved | f
+ q4_personal_data      | unresolved | f
+ q9_money              | unresolved | f
+(9 rows)
+
+                                                  alert_status                                                   
+-----------------------------------------------------------------------------------------------------------------
+ {"alerting": "disabled", "dispatcher": "none", "unresolved_gates": ["q12_operations", "ops_alert_destination"]}
+(1 row)
+
+--- verify-hosted.sql with expected_env=production (rolled-back production marker):
+ set_config 
+------------
+ production
+(1 row)
+
+psql:tools/ci/verify-hosted.sql:51: NOTICE:  verify-hosted: production marker confirmed; private_access and outbound_sending closed; alerting disabled; no recovery hold
+DO
+ROLLBACK
+ local_marker_rows_after_rollback 
+----------------------------------
+                                0
+(1 row)
+
+# exit=0 finished 2026-10-03T16:58:56Z

@@ -37,6 +37,20 @@ jobs:
         if: always()
         run: npx supabase stop --no-backup
 
+  auth-harness:
+    name: auth harness (offline unit tests)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Harness helper tests (no network, no credentials)
+        run: node --test tools/auth-harness/*.test.mjs
+      - name: Evidence holds no tokens, keys, passwords, OTPs or link tokens
+        run: bash tools/auth-harness/scan-evidence.sh
+
   flutter:
     name: flutter (analyze, test, web build)
     runs-on: ubuntu-24.04

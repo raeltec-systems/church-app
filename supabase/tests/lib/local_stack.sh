@@ -12,7 +12,8 @@ require_local_stack() {
   eval "$(npx supabase status -o env 2>/dev/null | grep -E "$pattern")"
   local v
   for v in "$@"; do
-    [[ -n "${!v:-}" ]] || { echo "supabase status did not report $v (is the local stack running?)" >&2; exit 1; }
+    # Same `${VAR:?}` abort the scripts used before the sweep (frozen I/O matrix).
+    eval ": \"\${$v:?}\""
   done
 }
 

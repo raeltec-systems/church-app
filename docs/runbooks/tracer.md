@@ -17,7 +17,7 @@ Never pass a secret/service-role key to a client and never commit one.
 ```sh
 npm run db:start      # supabase start: applies supabase/migrations and supabase/seed.sql
 npm run db:test       # all pgTAP suites (supabase/tests/*.sql), including the tracer permissions
-npm run db:smoke      # all HTTP smoke scripts; api_smoke.sh is the tracer's (api readable, app/public not exposed, writes denied)
+npm run db:smoke      # HTTP smoke scripts plus the contract fixture check (psql); api_smoke.sh is the tracer's (api readable, app/public not exposed, writes denied)
 npx supabase status   # prints API_URL and PUBLISHABLE_KEY
 npm run db:reset      # re-create the database from migrations + seed
 ```

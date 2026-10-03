@@ -3,12 +3,12 @@ title: 'Refactor sweep'
 type: 'refactor'
 ticket: '11'
 created: '2026-10-03'
-status: 'built'
+status: 'done'
 baseline_revision: '33940ed7e354f8ff83255695ddfa5db2f6552236'
 route: 'full'
 route_source: 'auto'
-review: ''
-review_source: ''
+review: 'quick'
+review_source: 'pinned'
 lenses_ran: []
 review_loop_iteration: 0
 context: []
@@ -121,6 +121,11 @@ Verification, before → after (local stack reset from this worktree's migration
 ## Plan Change Log
 
 ## Review Triage Log
+
+| Finding | Verdict | Route | Evidence |
+|---|---|---|---|
+| local_stack.sh stack-down abort message differs from frozen `${VAR:?}` row | low | patch | helper printed custom text; patched to `eval ": \"\${$v:?}\""` (prints `VAR: parameter null or not set`) |
+| tracer.md calls db:smoke "all HTTP smoke scripts" though contract_fixtures_check.sh is psql-only | low | patch | package.json db:smoke includes contract_fixtures_check.sh; wording fixed |
 
 ## Verification
 

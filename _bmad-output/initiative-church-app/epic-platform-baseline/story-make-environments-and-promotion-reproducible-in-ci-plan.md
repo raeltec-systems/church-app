@@ -8,8 +8,8 @@ blocked_reason: 'Owner gate (ticket unknown + owner-decisions Environments): the
 baseline_revision: '85eb9fd5a4aeea15a5888aead7fb5fea6067bbf9'
 route: 'full'
 route_source: 'auto'
-review: ''
-review_source: ''
+review: 'quick'
+review_source: 'pinned'
 lenses_ran: []
 review_loop_iteration: 0
 context:
@@ -95,6 +95,15 @@ context:
 ## Plan Change Log
 
 ## Review Triage Log
+
+| Finding | Verdict | Route | Evidence |
+|---|---|---|---|
+| stripSql ignores dollar quotes / E-strings, hiding DROP | high | patch | reviewer repro: findDestructive returned [] for `$$Don't$$` then `drop table` |
+| promote.yml never enforces production approval | high | patch | GitHub auto-creates unprotected environments; repo-level var fallback for project ref |
+| promotion path runs check-migrations without --base; staging from any branch | medium | patch | workflow_call event_name is workflow_dispatch, so base rules skipped |
+| runbook C6 implies features.* flip reopens promotion | medium | patch (docs) | verify-hosted.sql ignores features.*; validator forbids true. Mechanism itself deferred to release epic |
+| runbook says one job; workflow has three | low | patch | promote.yml job graph |
+| drop identity/expression allowance undocumented | low | patch | strict code, docs mismatch |
 
 ## Verification
 

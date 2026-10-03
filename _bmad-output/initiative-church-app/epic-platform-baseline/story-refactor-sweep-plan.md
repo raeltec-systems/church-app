@@ -113,7 +113,7 @@ Verification, before → after (local stack reset from this worktree's migration
 | `npm run ci:policy-test` | 47 pass | 48 pass (+1 shared-shape test) |
 | `npm run env:check` | valid | valid |
 | `npm run ci:migrations -- --base origin/main` | 8 ordered, non-destructive | same |
-| `npm run ci:secrets` | clean, 968 files | clean (rerun after commit with the new files tracked) |
+| `npm run ci:secrets` | clean, 968 files | clean, 970 files (the helper and this plan are now tracked) |
 | `npm run recovery:rehearse` | `problems: []` | `problems: []` |
 | auth-harness `node --test` / `scan-evidence.sh` | 22 pass / clean | 22 pass / clean |
 | Flutter analyze/test | not run, because no package was touched | — |

@@ -46,7 +46,10 @@ Commits after the run touched only harness recording, not the function or the SQ
   - `failed` needs a definitive 4xx **and** zero changes.
   - Anything else, including a malformed outcome, is `uncertain`.
   - A late completion, or one on an already finished op, is appended to `late_outcomes` and changes nothing.
-- **Reconcile** applies to an `uncertain` op only. It is refused while any session created before dispatch is live. Staff can force it with `force_revoke`: an Auth Admin set of an undisclosed random password, which logs out every session. Reconcile clears `reconcile_required` (**not** the security hold) and sets a trust epoch: only sessions created after it pass the gate.
+- **Reconcile** applies to an `uncertain` op only. It is refused while any session created before dispatch is live. It clears `reconcile_required` (**not** the security hold), stamps `reconciled_at` and sets a trust epoch: only sessions created after it pass the gate.
+- **Force-revoke.** Since function v5 / hosted `009`, the target account is resolved in the database from the op, before any Auth Admin call. The op must exist, be `uncertain`, and belong to an enrolled account. A caller-supplied account id that differs is refused, and the refusal is recorded. Then Auth Admin sets an undisclosed random password, which logs out every session.
+- **Relink** (since `009`) requires the login staff reviewed. It is refused if Auth now holds a different one, and it returns the approved login (masked).
+- **Staff attribution.** Since `009`, staff-driven events carry the staff id (`staff`): reconcile (with `forced`), force-revoke, expire, hold, release and relink.
 - **Gate** (`harness_recovery_probe`): all of
   - 1.2's trusted password session;
   - the session was created at or after the trust epoch;
@@ -100,6 +103,32 @@ Commits after the run touched only harness recording, not the function or the SQ
 
 Step `39` covers the window of steps `21`–`32`: **0 Auth Admin requests**. The platform's function edge log holds only 9 of those 12 function requests, so the logs are incomplete; the 0 is the count of logged Admin requests.
 
+## Second review (function v5, hosted `009`), steps `400`–`500`
+
+| Item | Result | Steps |
+|---|---|---|
+| Provenance | Deployed v5 `index.ts` and `logic.mjs` sha256 equal the committed files (`f6756f2e…`, `35529901…`), with `verify_jwt` true. Hosted combined SQL digest `288d123d…` (25 functions, 4 triggers) equals the committed `001`–`005` applied locally. | `400`–`402` |
+| Force-revoke, mismatched account id | 409 `uid_mismatch`. The DB has a `force_revoke_refused` event with the staff id and **no** credential change before the next event, and the applied password still signs in. | `425`, `426`; DB `499` (n1 events) |
+| Force-revoke, target from the op | `force_revoke` event (staff id), then one credential change, then `reconciled` with `forced: true`; the old session is dead. | `427`, `428` |
+| Force-revoke on a non-uncertain op | 409 `op_not_uncertain`; no credential change; the password still signs in. | `433`, `434` |
+| Relink, wrong expected login | 409 `login_changed_since_review`; the correct login is approved and returned masked. | `440`, `441` |
+| Staff ids on hold / release / relink / reconcile | present in every event | DB `499` |
+| LOCAL container assertion test (`sql/local/test_fence.sql`, stub auth tables; **not hosted**) | All checks pass: identity insert, MFA status update and delete, and phone change are each detected; relink refuses an unreviewed login; an expired request cannot be bound; 30 requests per 10 min then `rate_limited`; a reconcile done more than 1 h after the op went uncertain is still re-opened by a later apply (window now measured from `reconciled_at`); force-revoke refuses a mismatched id and a non-uncertain op. | `403` |
+| Platform log secret scan, review window | 0 in all categories | `500` |
+
+The earlier rows above (steps `01`–`303`) ran on function v4 and hosted SQL through `008`.
+- `009` changed force-revoke, the reconcile window, relink, and the staff fields on events.
+- The `rc-relink` and `rc-reconcile` harness commands now send the expected login, and send an account id only on request.
+
+## Known limits for AD-20 production design (deferred, not fixed here)
+
+- **B.** A legitimate member credential change within 1 h after a recovery reconcile re-opens the op and holds access. This fails closed, but needs staff to clear it.
+- **C.** A late Auth apply of an old op that lands while a NEW op is in flight is attributed to the new op. The count-based fence makes the new op `uncertain`; it does not identify the old one.
+- **F.** The identity and MFA triggers run inside GoTrue transactions that may already hold other `auth.*` row locks. A lock inversion with GoTrue is not ruled out (the `002` header now says so).
+- **G.** The 30 s `expire_stuck` threshold is shorter than the worst-case function path (10 s per call, several calls, and an 8 s injected delay). Expiring early is fail-closed (uncertain or obsolete), but can race a still-running worker.
+- **H.** The request rate limit is project-wide and count-then-insert, so it is not exact under concurrency.
+- **#9.** The definitions digest covers function bodies, grants and trigger definitions, not tables, columns, indexes or defaults.
+
 ## Findings
 
 1. **Auth Admin password update revokes every session (v2.197.0).** `adminUserUpdate` runs `UpdatePassword(tx, nil)`, which logs out all of the user's sessions. The completion fence does not rely on this: it verifies it (`sessions_at_dispatch` > 0, then `pre_dispatch_sessions_live: 0`). An amendment to the frozen block is with the owner.
@@ -114,6 +143,6 @@ Step `39` covers the window of steps `21`–`32`: **0 Auth Admin requests**. The
 
 ## Not run (owner-gated or out of scope)
 
-- **Phone.** The phone binding change and phone-only reset identifier wait for 1.2's Phone-provider owner step. The `auth.users.phone` trigger branch was exercised only in the local container.
-- **Identity link/unlink by a user.** Needs OAuth or phone. Only Auth Admin delete produced identity events live (`197`); the insert path was exercised in the local container.
+- **Phone.** The phone binding change and phone-only reset identifier wait for 1.2's Phone-provider owner step. The `auth.users.phone` trigger branch has only the LOCAL container output (step `403`).
+- **Identity link/unlink by a user.** Needs OAuth or phone. Only Auth Admin delete produced identity events live (`197`); the insert path has LOCAL container output only (step `403`).
 - **Real-member data, production SMTP, SMS:** never in scope.

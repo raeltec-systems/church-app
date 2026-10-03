@@ -23,9 +23,12 @@
 --     keep access held until staff reconciliation; nothing here clears a
 --     security hold.
 --
--- Lock order everywhere: rc_account row, then rc_grant / rc_op rows. The
--- trigger runs inside GoTrue's transaction after its auth.users row lock and
--- takes only the rc_account lock, so the order cannot invert.
+-- Lock order in the harness RPCs: rc_account row, then rc_grant / rc_op rows.
+-- The auth.users trigger runs inside GoTrue's transaction after its
+-- auth.users row lock and takes only the rc_account lock. The identity/MFA
+-- triggers added in 004 also run inside GoTrue transactions that may hold
+-- other auth.* row locks in an order this harness does not control, so a
+-- lock inversion with GoTrue is NOT ruled out (known limit, evidence-1.3).
 --
 -- All harness_rc_* RPCs are executable by service_role only (the harness
 -- Edge Function); harness_recovery_probe() by authenticated only.

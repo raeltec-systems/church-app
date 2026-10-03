@@ -301,6 +301,7 @@ Deno.serve(async (req: Request) => {
             p_uid: uuidOrNull(body.auth_user_id),
             p_member_id: uuidOrNull(body.member_id),
             p_expected_link_revision: Number(body.expected_link_revision),
+            p_expected_email: str(body.expected_email),
           });
         } else if (action === 'hold') {
           r = await rpc('harness_rc_hold', { p_staff: staff, p_uid: uuidOrNull(body.auth_user_id), p_on: body.on === true });
@@ -315,17 +316,28 @@ Deno.serve(async (req: Request) => {
           r = await rpc('harness_rc_expire_stuck', { p_staff: staff, p_op: uuidOrNull(body.op_id) });
         } else if (action === 'reconcile') {
           const opId = uuidOrNull(body.op_id);
+          const forcedReq = body.force_revoke === true;
           let forced: Json | undefined;
-          if (body.force_revoke === true && opId) {
-            // Revoke every session by setting an undisclosed random password
-            // through Auth Admin; the member then needs a new grant. The DB
-            // still verifies that no pre-dispatch session is live.
-            const uid = uuidOrNull(body.auth_user_id);
-            if (!uid) return reply(400, { code: 'validation_failed' });
-            const a = await applyPassword(uid, randomPassword());
+          if (forcedReq) {
+            // The target is resolved and checked server-side from the op
+            // (exists, uncertain, enrolled account) BEFORE any Auth Admin
+            // call; a caller-supplied uid that differs is refused.
+            if (body.auth_user_id !== undefined && !uuidOrNull(body.auth_user_id)) {
+              return reply(400, { code: 'validation_failed' });
+            }
+            const t = await rpc('harness_rc_force_revoke_target', {
+              p_staff: staff,
+              p_op: opId,
+              p_claimed_uid: body.auth_user_id === undefined ? null : uuidOrNull(body.auth_user_id),
+            });
+            if (t.ok !== true) return reply(t.code === 'forbidden' ? 403 : t.code === 'not_found' ? 404 : 409, t);
+            // Revoke every session by setting an undisclosed random password;
+            // the member then needs a new grant. The DB still verifies that no
+            // pre-dispatch session is live.
+            const a = await applyPassword(t.auth_user_id as string, randomPassword());
             forced = { admin_status: a.adminStatus, admin_error: a.errorCode };
           }
-          r = await rpc('harness_rc_reconcile', { p_staff: staff, p_op: opId, p_note: str(body.note) });
+          r = await rpc('harness_rc_reconcile', { p_staff: staff, p_op: opId, p_note: str(body.note), p_forced: forcedReq });
           if (forced) r = { ...r, force_revoke: forced };
         } else if (action === 'instrument_delete_user') {
           // Harness instrumentation: Auth Admin deletion of a synthetic member.

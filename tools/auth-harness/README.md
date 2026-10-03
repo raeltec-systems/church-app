@@ -163,6 +163,10 @@ node run-script.mjs scenarios/1.3-f-email-post.txt
 $H cleanup
 ```
 
+Second review (function v5, hosted `009`): run `scenarios/1.3-g-review2-setup.txt`, enrol `r13-x-staff2` with `sql/enroll_staff.sql`, then run `scenarios/1.3-h-review2-runs.txt`.
+
+The LOCAL assertion test runs in a throwaway container with `--network none`: apply `sql/local/00_stubs.sql` as supabase_admin, then `001`-`005` as postgres, then `sql/local/test_fence.sql` as supabase_admin. It raises on any failed check.
+
 Account tags must be new for each project run, because Auth refuses an
 existing address. The member's grant secret (`hg_…`) and chosen password stay
 in the state dir. Staff output carries only the grant id, generation and

@@ -112,6 +112,16 @@ context:
   - The function's self-hash returned `unavailable` on the platform, so the `get_edge_function` content comparison is the source check.
 - **Post-run edits (recording only):** `rc-call` masks `login_email`, so the step `32` line was masked after capture; `scan-evidence.sh` skips `scenarios/`.
 
+- **Second review fixes (2026-10-03).** Forward migration `auth_harness_009_review2_fixes` (= `sql/005_review2_fixes.sql`), function v5, nothing dropped. The 3-argument reconcile and 4-argument relink are retired by revoking EXECUTE.
+  - Force-revoke resolves and checks its target from the op server-side (`harness_rc_force_revoke_target`) before the Admin call, refuses a mismatched account id, and records a `force_revoke` event with the staff id.
+  - A new `rc_op.reconciled_at` column, set on each reconcile, measures the 1 h re-open window.
+  - Relink requires the expected live login and returns the approved login, masked.
+  - Staff ids are recorded on reconcile (with `forced`), force-revoke, expire, hold, release and relink events.
+  - The `002` header no longer claims that lock inversion is impossible.
+  - New LOCAL container assertion test `sql/local/test_fence.sql` (with `00_stubs.sql`). It covers identity insert, MFA update/delete, phone, request expiry, rate limit, the >1 h reconcile re-open, and the force-revoke refusals.
+  - Live steps `400`–`500` were appended.
+  - Deferred items B, C, F, G, H and #9 are listed as known limits in the evidence README.
+
 ## Plan Change Log
 
 - 2026-10-03, independent security review (parent; not a step-04 loop).
@@ -141,6 +151,21 @@ context:
     - count-based attribution failing closed;
     - raw DB observation through `harness_rc_observe`;
     - start and end fingerprints.
+
+- 2026-10-03, second review (parent).
+  - **Findings:**
+    - Force-revoke trusted a body uid.
+    - The re-open window was measured from the wrong timestamp.
+    - Relink approved whatever login Auth held.
+    - Staff events had no staff attribution.
+    - Some trigger branches and the request expiry and rate-limit paths had no output.
+  - **Amended:** `sql/005_review2_fixes.sql` (hosted `009`), function v5, `rc-relink` and `rc-reconcile` CLI options, local assertion test, evidence steps `400`–`500`, and the evidence README (known limits). The frozen block is unchanged.
+  - **Avoids:**
+    - an Admin password reset on an account other than the op's;
+    - late applies escaping the hold;
+    - approving an unreviewed login;
+    - unattributed staff actions.
+  - **KEEP:** earlier evidence steps stay valid for unchanged paths. The second review only appended.
 
 ## Review Triage Log
 

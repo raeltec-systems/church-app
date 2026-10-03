@@ -199,10 +199,15 @@ export async function rcCommand(command, { pos, opt, step, client, state, saveSt
 
     case 'rc-relink': {
       const acct = need(rc.accounts, String(opt.account), 'account');
+      // Staff state the login they reviewed: the account's known login, or the
+      // new one after a reviewed change (--new-tag), or a deliberately wrong
+      // one (--expect-tag) for the negative test.
+      const expectTag = opt['expect-tag'] || opt['new-tag'];
       const body = {
         action: 'relink',
         auth_user_id: acct.auth_user_id,
         expected_link_revision: opt.expected !== undefined ? Number(opt.expected) : acct.link_revision,
+        expected_email: expectTag ? `israelmuyoba+bicauth-${expectTag}@gmail.com` : acct.email,
       };
       const r = await fn(body, { as: `session:${opt.staff}` });
       if (r.status === 200) {
@@ -231,10 +236,13 @@ export async function rcCommand(command, { pos, opt, step, client, state, saveSt
       const body = { action, op_id: op.op_id, note: opt.note ? String(opt.note) : undefined };
       if (command === 'rc-reconcile' && opt.force) {
         body.force_revoke = true;
-        body.auth_user_id = need(rc.accounts, op.account, 'account').auth_user_id;
+        // The function resolves the target from the op. --uid-of sends a
+        // (possibly mismatched) account id to prove it is refused.
+        if (opt['uid-of']) body.auth_user_id = need(rc.accounts, String(opt['uid-of']), 'account').auth_user_id;
       }
       const r = await fn(body, { as: `session:${opt.staff}` });
-      out({ op: opt.op, account: op.account, action, force_revoke: Boolean(opt.force), status: r.status, response: r.json });
+      out({ op: opt.op, account: op.account, action, force_revoke: Boolean(opt.force), uid_sent_of: opt['uid-of'] || null,
+        status: r.status, response: r.json });
       return;
     }
 

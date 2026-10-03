@@ -87,7 +87,7 @@ function drawAdmin(ctx, u, enter, leave) {
 const T = {
   x: LS ? S.x : W / 2, align: LS ? 'left' : 'center', y: LS ? 330 : P ? S.y + 110 : S.y + 60,
   size: FORMAT.pick({ '16x9': 84, '9x16': 80, '1x1': 58 }), kick: FORMAT.pick({ '16x9': 24, '9x16': 28, '1x1': 22 }),
-  body: FORMAT.pick({ '16x9': 30, '9x16': 32, '1x1': 26 }), maxW: LS ? 640 : S.w,
+  body: FORMAT.pick({ '16x9': 30, '9x16': 32, '1x1': 26 }), maxW: LS ? 600 : S.w,
 };
 function caption(ctx, u, a, b, kicker, lines, body) {
   if (u < a - 0.5 || u > b + 0.6) return;
@@ -157,7 +157,7 @@ function twoPhones(ctx, u) {
 function draw(ctx, u) {
   K.bg(ctx, u);
   if (u >= 108) { K.endCard(ctx, u, 108, { line1: 'Every cell, ready for Thursday.', foot: 'Plan once. Everyone sees their part.' }); return; }
-  caption(ctx, u, -0.6, 6.4, 'Cell leader journey', L1('Thursday’s meeting,', 'planned in a minute.'));
+  caption(ctx, u, -1.1, 6.4, 'Cell leader journey', L1('Thursday’s meeting,', 'planned in a minute.'));
   caption(ctx, u, 7.5, 23.5, 'Grace Banda · Mwembeshi Road cell', L1('Fill it in once.', 'Members see it live.'), 'Date, venue, Bible study and scripture.');
   caption(ctx, u, 24, 39.5, null, L1('Give every part', 'a leader.'), 'Each person sees their own part on their phone.');
   caption(ctx, u, 40, 51.3, null, L1('Publish. Everyone', 'gets the plan.'));

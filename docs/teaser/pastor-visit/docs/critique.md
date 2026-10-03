@@ -16,3 +16,28 @@ Also: end card's first frame is empty (logo spring starts at 0) -> pre-roll the 
 
 Checks failed: hook frame; longest gap 92-100 (5 s, no new event).
 Verdict: ANOTHER ROUND
+
+## Round 2
+| hook | read | motion | variety | brand | sync | min |
+|  7   |  8   |   8    |    8    |   8   |  8   |  7  |
+
+Worst three:
+1. [beat 0, all] Title is on frame 0 now, but its second line is still mid-rise and reads as clipped -> pre-roll the caption to beat -1.1.
+2. [beats 92-100, 16x9] The final laptop view sits on empty board space under the confirmed card -> refocus to (900, 470).
+3. [beats 72-77, 16x9] The declined view shows a lot of sidebar; acceptable because the card and its red note are fully legible, so left as is.
+
+Checks failed: none (longest gap now 92-100 with the push and a slow push-in).
+Verdict: ANOTHER ROUND (round 3 is the minimum)
+
+## Round 3
+| hook | read | motion | variety | brand | sync | min |
+|  8   |  8   |   8    |    8    |   8   |  9   |  8  |
+
+Worst three (remaining, minor):
+1. [beat 0, 16x9] Title now fully landed on frame 0 in every format.
+2. [laptop shots, 16x9] Whole-board views are small at phone size; every action shot zooms to the field or card being changed, which is what carries the story.
+3. [16x9] Headline column capped at 600 px so long titles never touch the laptop.
+
+Sync: 40-48 hits within 20 ms of an onset (median about 2 ms); the rest are deliberate off-beat accents. Mix -14.1 LUFS, true peak <= -1.1 dBTP.
+Checks failed: none.
+Verdict: READY

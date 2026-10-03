@@ -135,7 +135,7 @@ function draw(ctx, u) {
   if (u >= 140) { K.endCard(ctx, u, 140, { line1: 'Your church. In your pocket.', foot: 'Coming soon · “Know therefore that the LORD thy God, he is God, the faithful God.” Deut 7:9' }); return; }
   if (u >= 132) { wall(ctx, u); return; }
 
-  caption(ctx, u, -0.6, 8.6, L2('Joining takes', 'a minute.'), 'Your phone number and a code. No password.');
+  caption(ctx, u, -1.1, 8.6, L2('Joining takes', 'a minute.'), 'Your phone number and a code. No password.');
   caption(ctx, u, 9, 16.2, L2('Tell the church', 'who you are.'), 'The church office checks and approves.');
   caption(ctx, u, 16.6, 25.6, L2('Your church,', 'all in one place.'));
   caption(ctx, u, 26.5, 35.6, L2('A duty?', 'Accept in a tap.'));

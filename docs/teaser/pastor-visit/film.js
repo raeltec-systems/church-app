@@ -59,7 +59,7 @@ const boardFocus = (u) => {
     [0, [1240, 300, zBoard]], [6, [1330, 160, P ? 1.5 : 1.2]], [8, [720, 440, zModal]],
     [9, [720, 330, zModal]], [18, [800, 420, zModal]], [24, [770, 560, zModal]],
     [26, [608, 520, zCol]], [30, [608, 520, zCol]],
-    [66.5, [840, 440, zBoard]], [67, [842, 520, zCol]], [72, [374, 700, zCol]], [77, [1076, 520, zCol]], [82.5, [1076, 560, zCol]], [84, [842, 600, zCol]], [92, [842, 620, zCol * 1.1]],
+    [66.5, [840, 440, zBoard]], [67, [842, 520, zCol]], [72, [374, 700, zCol]], [77, [1076, 520, zCol]], [82.5, [1076, 560, zCol]], [84, [842, 600, zCol]], [92, [900, 470, zCol * 1.1]],
   ], SPRING.gentle);
 };
 
@@ -116,7 +116,7 @@ const T = {
   size: FORMAT.pick({ '16x9': 84, '9x16': 80, '1x1': 58 }),
   kick: FORMAT.pick({ '16x9': 24, '9x16': 28, '1x1': 22 }),
   body: FORMAT.pick({ '16x9': 30, '9x16': 32, '1x1': 26 }),
-  maxW: LS ? 640 : S.w,
+  maxW: LS ? 600 : S.w,
 };
 function caption(ctx, u, a, b, kicker, lines, body) {
   if (u < a - 0.5 || u > b + 0.6) return;
@@ -139,7 +139,7 @@ function draw(ctx, u) {
   if (u >= 100) { K.endCard(ctx, u, 100, { line1: 'Pastoral care, kept close.', foot: 'Visits stay private between members and the pastoral team.' }); return; }
 
   // captions
-  caption(ctx, u, -0.6, 7.2, 'Pastor journey', L1('A pastoral visit,', 'start to finish.'));
+  caption(ctx, u, -1.1, 7.2, 'Pastor journey', L1('A pastoral visit,', 'start to finish.'));
   caption(ctx, u, 8, 24.5, 'Church admin', L1('Schedule it', 'in one step.'), 'Member, reason, who is going, date and place.');
   caption(ctx, u, 25.2, 31.6, null, L1('Sent straight', 'to her phone.'));
   caption(ctx, u, 33, 39.4, 'Member app', L1('A request', 'she can answer.'));

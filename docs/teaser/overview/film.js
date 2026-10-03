@@ -38,7 +38,7 @@ const HITS = [
 
 // ------------------------------------------------------------ intro: the Sunday group chat (type only)
 const CHAT = [
-  [-0.5, 'Who’s on the main door on Sunday?', 'Esther', 0], [1.5, 'What hymn number was that?? 🙏', 'Peter', 1],
+  [-1.2, 'Who’s on the main door on Sunday?', 'Esther', 0], [-0.2, 'What hymn number was that?? 🙏', 'Peter', 1],
   [3, 'Is cell still at the Bandas’ on Thursday?', 'Ruth', 0], [4.5, 'Sorry, who did I give my offering envelope to?', 'Abel', 1],
   [6, 'Can someone send the sermon notes?', 'Joyce', 0],
 ];

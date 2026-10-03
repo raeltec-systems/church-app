@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Outfit:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>body{margin:0}*{box-sizing:border-box}a{color:#14246B}a:hover{color:#0A7FE0}input,textarea,button{font:inherit;color:inherit}::-webkit-scrollbar{width:0;height:0}</style>
+</helmet>
+<div style="{{ rootStyle }}">
+
+<div style="width:390px;height:844px;flex:none;border-radius:58px;padding:11px;background:#04060C;box-shadow:0 40px 90px rgba(14,24,70,.28),inset 0 0 0 2px #2A2F3D">
+<div style="position:relative;width:100%;height:100%;border-radius:47px;overflow:hidden;background:var(--bg);color:var(--ink);display:flex;flex-direction:column;font-size:16px;line-height:1.4">
+
+<div style="height:50px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:6px 32px 0;font-weight:600;font-size:15px;position:relative;z-index:30">
+<span>9:41</span>
+<div style="position:absolute;left:50%;top:11px;transform:translateX(-50%);width:118px;height:34px;border-radius:20px;background:#000"></div>
+<div style="display:flex;align-items:center;gap:6px;font-size:13px"><span>4G</span><div style="width:25px;height:12px;border-radius:4px;border:1.5px solid currentColor;padding:1.5px"><div style="width:70%;height:100%;background:currentColor;border-radius:1px"></div></div></div>
+</div>
+
+<div style="flex:none;display:flex;align-items:center;gap:10px;padding:4px 12px 10px 16px">
+<img src="assets/bic-logo.png" alt="Brethren in Christ Church Kafue" style="width:44px;height:44px;border-radius:50%;background:#fff;flex:none">
+<div style="flex:1"></div>
+<button onClick="{{ openSearch }}" aria-label="Search" style="width:44px;height:44px;border:0;background:transparent;border-radius:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink)"><svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></button>
+<sc-if value="{{ showMemberChrome }}" hint-placeholder-val="{{ true }}">
+<button onClick="{{ openChat }}" aria-label="Group chat, 5 unread" style="position:relative;width:44px;height:44px;border:0;background:transparent;border-radius:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink)"><svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg><span style="position:absolute;top:6px;right:5px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--acc);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">5</span></button>
+<button onClick="{{ openProfile }}" aria-label="Profile" style="width:44px;height:44px;border:0;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0"><span style="width:34px;height:34px;border-radius:50%;background:var(--brand);color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center">{{ initials }}</span></button>
+</sc-if>
+<sc-if value="{{ isGuest }}" hint-placeholder-val="{{ false }}">
+<button onClick="{{ openSignup }}" style="height:38px;padding:0 16px;border:0;border-radius:19px;background:var(--pri);color:#fff;font-weight:600;font-size:15px;cursor:pointer">Sign in</button>
+</sc-if>
+</div>
+
+<div style="flex:1;min-height:0;overflow-y:auto">
+
+<sc-if value="{{ t.home }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:22px;padding:4px 0 28px">
+<div style="display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:0 16px;scroll-padding:0 16px">
+<div style="flex:none;width:310px;aspect-ratio:16/9;border-radius:20px;background:var(--hero);color:#fff;padding:18px 20px;scroll-snap-align:start;position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;gap:4px">
+<div style="position:absolute;right:-70px;top:-70px;width:230px;height:230px;border-radius:50%;border:2px solid rgba(255,255,255,.16)"></div>
+<div style="position:absolute;right:-48px;top:-48px;width:186px;height:186px;border-radius:50%;border:1px solid rgba(255,255,255,.16)"></div>
+<img src="assets/bic-logo-white.png" alt="" style="position:absolute;right:6px;top:6px;width:80px;height:80px">
+<div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;opacity:.8">THEME FOR 2026</div>
+<div style="font-family:Outfit,sans-serif;font-weight:700;font-size:22px;line-height:1.1;max-width:230px;text-wrap:balance">God's faithfulness in Self Sustenance</div>
+<div style="font-size:14px;opacity:.85">Deuteronomy 7:9</div>
+</div>
+<sc-for list="{{ banners }}" as="b" hint-placeholder-count="2">
+<div onClick="{{ b.open }}" style="flex:none;width:310px;aspect-ratio:16/9;border-radius:20px;overflow:hidden;scroll-snap-align:start;position:relative;cursor:pointer;background:repeating-linear-gradient(135deg,var(--sf2) 0 12px,var(--line) 12px 13px)">
+<div style="position:absolute;top:12px;left:14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mut)">campaign banner</div>
+<div style="position:absolute;left:0;right:0;bottom:0;padding:28px 16px 14px;background:linear-gradient(transparent,rgba(8,14,40,.85));color:#fff"><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:19px">{{ b.title }}</div><div style="font-size:14px;opacity:.9">{{ b.when }}</div></div>
+</div>
+</sc-for>
+</div>
+
+<sc-if value="{{ isGuest }}" hint-placeholder-val="{{ false }}">
+<div style="margin:0 16px;padding:16px;border-radius:18px;background:var(--sf);border:1px solid var(--line);display:flex;align-items:center;gap:14px">
+<div style="flex:1"><div style="font-weight:600">Part of the church family?</div><div style="font-size:14px;color:var(--mut)">Sign in to see your duties, cell and prayer requests.</div></div>
+<button onClick="{{ openSignup }}" style="height:44px;padding:0 16px;border:0;border-radius:22px;background:var(--pri);color:#fff;font-weight:600;cursor:pointer;flex:none">Join</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ isPending }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ openProfile }}" style="margin:0 16px;padding:16px;border-radius:18px;background:var(--sf);border:1px solid var(--line);display:flex;flex-direction:column;gap:8px;cursor:pointer">
+<div style="font-weight:600">Your membership request</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px"><span style="{{ chips.amber }}">Awaiting church approval</span><span style="{{ cellChip }}">{{ cellStatus }}</span></div>
+<div style="font-size:14px;color:var(--mut)">Sermons, events, the Bible, hymns and giving are open to you now.</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isLeader }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ openLeader }}" style="margin:0 16px;padding:16px;border-radius:20px;background:var(--sf);border:1px solid var(--line);display:flex;flex-direction:column;gap:12px;cursor:pointer">
+<div style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:18px">Needs attention</div><div style="font-size:14px;color:var(--mut)">Ushering · next 7 days</div></div><svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:var(--mut);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m9 18 6-6-6-6"></path></svg></div>
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
+<sc-for list="{{ attention }}" as="a" hint-placeholder-count="4">
+<div style="padding:10px 8px;border-radius:12px;background:var(--sf2);display:flex;flex-direction:column;gap:2px"><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:22px">{{ a.n }}</div><div style="font-size:12px;line-height:1.2;color:var(--mut)">{{ a.label }}</div></div>
+</sc-for>
+</div>
+<div style="font-size:14px;color:var(--mut)">Sun 4 Oct: <strong style="color:var(--ink)">{{ sunConfirmed }}</strong></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isMember }}" hint-placeholder-val="{{ true }}">
+<div style="margin:0 16px;padding:18px;border-radius:22px;background:var(--hero);color:#fff;display:flex;flex-direction:column;gap:14px;position:relative;overflow:hidden">
+<div style="position:absolute;right:-60px;bottom:-60px;width:180px;height:180px;border-radius:50%;border:2px solid rgba(255,255,255,.12)"></div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:19px">My duties</div><sc-if value="{{ hasAwaiting }}" hint-placeholder-val="{{ true }}"><span style="padding:4px 10px;border-radius:999px;background:#FFD66B;color:#3A2600;font-size:13px;font-weight:700">{{ awaitingLabel }}</span></sc-if></div>
+<div onClick="{{ next.open }}" style="display:flex;gap:14px;align-items:center;cursor:pointer">
+<div style="width:54px;flex:none;border-radius:14px;background:rgba(255,255,255,.12);padding:8px 0;text-align:center;line-height:1.05"><div style="font-size:11px;font-weight:600;opacity:.8">{{ next.day }}</div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:24px">{{ next.d }}</div><div style="font-size:11px;font-weight:600;opacity:.8">{{ next.mon }}</div></div>
+<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:17px">{{ next.duty }}</div><div style="font-size:14px;opacity:.85">{{ next.dept }} · Report {{ next.report }}</div><div style="font-size:14px;opacity:.85">{{ next.place }}</div></div>
+</div>
+<sc-if value="{{ next.isAwaiting }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;gap:10px"><button onClick="{{ next.accept }}" style="flex:1;height:46px;border:0;border-radius:23px;background:#fff;color:#14246B;font-weight:700;cursor:pointer">Accept</button><button onClick="{{ next.decline }}" style="flex:1;height:46px;border:1.5px solid rgba(255,255,255,.5);border-radius:23px;background:transparent;color:#fff;font-weight:600;cursor:pointer">Can't make it</button></div>
+</sc-if>
+<sc-if value="{{ next.notAwaiting }}" hint-placeholder-val="{{ false }}"><div style="font-size:14px;font-weight:600">{{ next.label }}</div></sc-if>
+<button onClick="{{ openDuties }}" style="align-self:flex-start;border:0;background:transparent;color:#fff;font-weight:600;font-size:15px;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:3px">See all my duties</button>
+</div>
+</sc-if>
+
+<sc-if value="{{ visitCard }}" hint-placeholder-val="{{ true }}">
+<div style="margin:0 16px;padding:16px;border-radius:20px;background:var(--sf);border:1px solid var(--line);display:flex;flex-direction:column;gap:12px">
+<div onClick="{{ openVisits }}" style="display:flex;gap:12px;align-items:flex-start;cursor:pointer"><div style="flex:1"><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:18px">Pastoral visit</div><div style="font-size:14px;color:var(--mut)">{{ visit.who }} would like to visit</div></div><span style="{{ visit.chip }}">{{ visit.label }}</span></div>
+<div style="font-weight:600">{{ visit.when }} · {{ visit.where }}</div>
+<div style="display:flex;gap:8px"><button onClick="{{ visitAccept }}" style="flex:1;height:44px;border-radius:22px;border:0;background:var(--pri);color:#fff;font-weight:700;cursor:pointer">Accept</button><button onClick="{{ visitPostpone }}" style="flex:1;height:44px;border-radius:22px;border:1px solid var(--line);background:transparent;font-weight:600;font-size:15px;cursor:pointer">Another time</button><button onClick="{{ visitDecline }}" style="height:44px;padding:0 12px;border:0;background:transparent;color:var(--mut);font-weight:600;font-size:15px;cursor:pointer">Decline</button></div>
+</div>
+</sc-if>
+
+<sc-if value="{{ isLeader }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ openFollow }}" style="margin:0 16px;padding:14px 16px;border-radius:18px;background:var(--sf);border:1px solid var(--line);display:flex;align-items:center;gap:12px;cursor:pointer">
+<div style="flex:1"><div style="font-weight:600">My follow-ups</div><div style="font-size:14px;color:var(--mut)">Call visitor Mutale Banda · due today</div></div><span style="{{ chips.amber }}">2 open</span>
+</div>
+</sc-if>
+
+<sc-if value="{{ isMember }}" hint-placeholder-val="{{ true }}">
+<div onClick="{{ openCell }}" style="margin:0 16px;padding:16px;border-radius:20px;background:var(--sf);border:1px solid var(--line);display:flex;flex-direction:column;gap:12px;cursor:pointer">
+<div style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:18px">{{ cellInfo.name }}</div><div style="font-size:14px;color:var(--mut)">Next meeting</div></div><svg viewBox="0 0 24 24" style="width:22px;height:22px;fill:none;stroke:var(--mut);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m9 18 6-6-6-6"></path></svg></div>
+<div style="display:flex;gap:14px;align-items:center"><div style="width:52px;flex:none;border-radius:12px;background:var(--sf2);padding:6px 0;text-align:center;line-height:1.05"><div style="font-size:11px;font-weight:700;color:var(--mut)">{{ cellNext.day }}</div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:22px;color:var(--brand)">{{ cellNext.d }}</div><div style="font-size:11px;font-weight:700;color:var(--mut)">{{ cellNext.mon }}</div></div><div style="flex:1;min-width:0"><div style="font-weight:600">{{ cellNext.time }} · {{ cellNext.venue }}</div><div style="font-size:14px;color:var(--mut)">{{ cellNext.topic }} · Bible study led by {{ cellNext.studyLead }}</div></div></div>
+<sc-if value="{{ myPart }}" hint-placeholder-val="{{ true }}"><div style="display:flex;align-items:center;gap:8px;font-size:14px"><span style="{{ chips.blue }}">You're on</span>{{ myPart.part }} · {{ myPart.time }}</div></sc-if>
+</div>
+</sc-if>
+
+<div style="display:flex;flex-direction:column;gap:10px;padding:0 16px">
+<div style="display:flex;align-items:baseline;justify-content:space-between"><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:19px">Hymns for this Sunday</div><button onClick="{{ openHymnsTab }}" style="border:0;background:transparent;color:var(--link);font-weight:600;font-size:15px;cursor:pointer;padding:0">Hymn book</button></div>
+<div style="display:flex;gap:8px;overflow-x:auto">
+<sc-for list="{{ sundayHymns }}" as="h" hint-placeholder-count="3">
+<button onClick="{{ h.open }}" style="flex:none;display:flex;align-items:center;gap:10px;padding:10px 14px 10px 10px;border-radius:14px;border:1px solid var(--line);background:var(--sf);cursor:pointer;text-align:left"><span style="width:34px;height:34px;border-radius:10px;background:var(--blueBg);color:var(--blueFg);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center">{{ h.n }}</span><span style="font-weight:600;font-size:15px">{{ h.title }}</span></button>
+</sc-for>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:14px;padding:0 16px">
+<div style="font-family:Outfit,sans-serif;font-weight:600;font-size:19px">Coming up</div>
+<sc-for list="{{ events }}" as="e" hint-placeholder-count="3">
+<div onClick="{{ e.open }}" style="border-radius:18px;overflow:hidden;background:var(--sf);border:1px solid var(--line);cursor:pointer">
+<div style="aspect-ratio:16/9;background:repeating-linear-gradient(135deg,var(--sf2) 0 12px,var(--line) 12px 13px);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--mut)">{{ e.poster }}</div>
+<div style="padding:12px 14px 14px;display:flex;flex-direction:column;gap:2px"><div style="font-weight:700;font-size:17px">{{ e.title }}</div><div style="font-size:14px;color:var(--mut)">{{ e.when }} · {{ e.place }}</div></div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ t.bible }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:16px;padding:4px 16px 28px">
+<div style="display:flex;padding:4px;border-radius:14px;background:var(--sf2)"><button onClick="{{ setBible }}" style="{{ segBible }}">Bible</button><button onClick="{{ setHymns }}" style="{{ segHymns }}">Hymn book</button></div>
+<sc-if value="{{ bibleMode }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;gap:8px">
+<button onClick="{{ pickChapter }}" style="flex:1;height:46px;border-radius:14px;border:1px solid var(--line);background:var(--sf);font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:0 14px">John 3<svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:var(--mut);stroke-width:2"><path d="m6 9 6 6 6-6"></path></svg></button>
+<button onClick="{{ pickTranslation }}" style="width:96px;height:46px;border-radius:14px;border:1px solid var(--line);background:var(--sf);font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:0 14px">KJV<svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:var(--mut);stroke-width:2"><path d="m6 9 6 6 6-6"></path></svg></button>
+</div>
+<div style="padding:4px 4px 0"><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:30px;color:var(--brand)">John 3</div><div style="font-size:14px;color:var(--mut)">King James Version</div></div>
+<div style="display:flex;flex-direction:column;gap:12px;padding:0 4px;font-size:18px;line-height:1.6;text-wrap:pretty">
+<sc-for list="{{ verses }}" as="vs" hint-placeholder-count="5"><p style="margin:0"><sup style="font-size:12px;font-weight:700;color:var(--acc);margin-right:6px">{{ vs.n }}</sup>{{ vs.t }}</p></sc-for>
+</div>
+<div style="display:flex;gap:10px;padding-top:6px"><button onClick="{{ pickChapter }}" style="flex:1;height:46px;border-radius:23px;border:1px solid var(--line);background:var(--sf);font-weight:600;cursor:pointer">John 2</button><button onClick="{{ pickChapter }}" style="flex:1;height:46px;border-radius:23px;border:0;background:var(--pri);color:#fff;font-weight:600;cursor:pointer">John 4</button></div>
+</sc-if>
+<sc-if value="{{ hymnMode }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;align-items:center;gap:10px;height:50px;padding:0 14px;border-radius:14px;background:var(--sf);border:1px solid var(--line)"><svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:none;stroke:var(--mut);stroke-width:2;stroke-linecap:round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg><input value="{{ hymnQ }}" onChange="{{ onHymnQ }}" placeholder="Number, title or first line" style="flex:1;border:0;outline:0;background:transparent;font-size:16px"></div>
+<div style="display:flex;flex-direction:column;border-radius:18px;background:var(--sf);border:1px solid var(--line);overflow:hidden">
+<sc-for list="{{ hymnList }}" as="h" hint-placeholder-count="5">
+<div onClick="{{ h.open }}" style="display:flex;align-items:center;gap:14px;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer;min-height:64px">
+<span style="width:40px;flex:none;font-family:Outfit,sans-serif;font-weight:700;font-size:20px;color:var(--brand);text-align:center">{{ h.n }}</span>
+<div style="flex:1;min-width:0"><div style="font-weight:600">{{ h.title }}</div><div style="font-size:14px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ h.first }}</div></div>
+<sc-if value="{{ h.sunday }}" hint-placeholder-val="{{ false }}"><span style="{{ h.chip }}">Sunday</span></sc-if>
+</div>
+</sc-for>
+<sc-if value="{{ noHymns }}" hint-placeholder-val="{{ false }}"><div style="padding:24px;text-align:center;color:var(--mut)">No hymns match "{{ hymnQ }}".</div></sc-if>
+</div>
+</sc-if>
+</div>
+</sc-if>
+
+<sc-if value="{{ t.sermons }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:18px;padding:4px 16px 28px">
+<div onClick="{{ openLatest }}" style="border-radius:20px;overflow:hidden;background:var(--hero);color:#fff;cursor:pointer">
+<div style="aspect-ratio:16/9;background:repeating-linear-gradient(135deg,rgba(255,255,255,.06) 0 12px,rgba(255,255,255,.12) 12px 13px);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:12px;opacity:.8">series poster</div>
+<div style="padding:14px 16px 16px"><div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;opacity:.8">CURRENT SERIES</div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:22px">Rooted</div><div style="font-size:14px;opacity:.85">4 messages from Ephesians and the Gospels</div></div>
+</div>
+<div style="display:flex;gap:8px"><sc-for list="{{ sermonFilters }}" as="f" hint-placeholder-count="3"><button onClick="{{ f.set }}" style="{{ f.style }}">{{ f.label }}</button></sc-for></div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<sc-for list="{{ sermons }}" as="sm" hint-placeholder-count="4">
+<div onClick="{{ sm.open }}" style="display:flex;gap:14px;align-items:center;padding:10px 0;cursor:pointer">
+<div style="width:112px;flex:none;aspect-ratio:16/9;border-radius:12px;background:repeating-linear-gradient(135deg,var(--sf2) 0 8px,var(--line) 8px 9px);display:flex;align-items:center;justify-content:center"><span style="width:30px;height:30px;border-radius:50%;background:rgba(8,14,40,.7);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:14px;height:14px;fill:#fff"><path d="M7 4v16l13-8z"></path></svg></span></div>
+<div style="flex:1;min-width:0"><div style="font-weight:600;line-height:1.25">{{ sm.title }}</div><div style="font-size:14px;color:var(--mut)">{{ sm.speaker }}</div><div style="font-size:13px;color:var(--mut)">{{ sm.date }} · {{ sm.ref }}</div></div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ t.give }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:16px;padding:4px 16px 28px">
+<div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:28px;color:var(--brand)">How to give</div><div style="font-size:15px;color:var(--mut);text-wrap:pretty">Choose a method and follow the steps. You give through your provider; the app doesn't process or record gifts.</div></div>
+<div style="display:flex;flex-direction:column;border-radius:18px;background:var(--sf);border:1px solid var(--line);overflow:hidden">
+<sc-for list="{{ methods }}" as="m" hint-placeholder-count="4">
+<div onClick="{{ m.open }}" style="display:flex;align-items:center;gap:14px;padding:14px;border-bottom:1px solid var(--line);cursor:pointer;min-height:72px">
+<span style="width:46px;height:46px;flex:none;border-radius:12px;background:var(--sf2);border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mut)">{{ m.mark }}</span>
+<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:17px">{{ m.name }}</div><div style="font-size:14px;color:var(--mut)">{{ m.sub }}</div></div>
+<svg viewBox="0 0 24 24" style="width:20px;height:20px;fill:none;stroke:var(--mut);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m9 18 6-6-6-6"></path></svg>
+</div>
+</sc-for>
+</div>
+<div style="font-size:14px;color:var(--mut);padding:0 4px">Questions about giving? Call the church office on +260 97 000 0000.</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ t.calendar }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;flex-direction:column;gap:14px;padding:4px 16px 28px">
+<div style="font-family:Outfit,sans-serif;font-weight:700;font-size:28px;color:var(--brand)">October 2026</div>
+<sc-if value="{{ showMemberChrome }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;gap:8px"><button onClick="{{ toggleCalDuties }}" style="{{ calDutyChip }}">{{ calDutyLabel }}</button><button onClick="{{ toggleCalCell }}" style="{{ calCellChip }}">{{ calCellLabel }}</button></div>
+</sc-if>
+<sc-for list="{{ calItems }}" as="c" hint-placeholder-count="5">
+<div onClick="{{ c.open }}" style="display:flex;gap:12px;align-items:center;padding:10px;border-radius:16px;background:var(--sf);border:1px solid var(--line);cursor:pointer">
+<div style="width:52px;flex:none;border-radius:12px;background:var(--sf2);padding:6px 0;text-align:center;line-height:1.05"><div style="font-size:11px;font-weight:700;color:var(--mut)">{{ c.day }}</div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:22px;color:var(--brand)">{{ c.d }}</div><div style="font-size:11px;font-weight:700;color:var(--mut)">{{ c.mon }}</div></div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><div style="font-weight:600;line-height:1.25">{{ c.title }}</div><div style="font-size:14px;color:var(--mut)">{{ c.time }}</div><sc-if value="{{ c.tag }}" hint-placeholder-val="{{ false }}"><span style="{{ c.chip }}">{{ c.tag }}</span></sc-if></div>
+<sc-if value="{{ c.thumb }}" hint-placeholder-val="{{ false }}"><div style="width:72px;flex:none;aspect-ratio:16/9;border-radius:8px;background:repeating-linear-gradient(135deg,var(--sf2) 0 6px,var(--line) 6px 7px)"></div></sc-if>
+</div>
+</sc-for>
+</div>
+</sc-if>
+</div>
+
+<div style="flex:none;display:flex;padding:6px 4px 24px;background:var(--sf);border-top:1px solid var(--line)">
+<button onClick="{{ tabs.home }}" style="{{ tabStyle.home }}"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M9 22V12h6v10"></path></svg>Home</button>
+<button onClick="{{ tabs.bible }}" style="{{ tabStyle.bible }}"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"></path><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"></path></svg>Bible &amp; Hymns</button>
+<button onClick="{{ tabs.sermons }}" style="{{ tabStyle.sermons }}"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4"></path></svg>Sermons</button>
+<button onClick="{{ tabs.give }}" style="{{ tabStyle.give }}"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z"></path></svg>Give</button>
+<button onClick="{{ tabs.calendar }}" style="{{ tabStyle.calendar }}"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg>Calendar</button>
+</div>
+
+<sc-if value="{{ v.duties }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:50px;left:0;right:0;bottom:0;background:var(--bg);display:flex;flex-direction:column;z-index:5">
+<div style="flex:none;display:flex;align-items:center;gap:4px;padding:4px 12px 8px"><button onClick="{{ back }}" aria-label="Back" style="width:44px;height:44px;border:0;background:transparent;border-radius:22px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m15 18-6-6 6-6"></path></svg></button><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:20px">My duties</div></div>
+<div style="padding:0 16px 12px"><div style="display:flex;padding:4px;border-radius:14px;background:var(--sf2)"><sc-for list="{{ dutyTabs }}" as="dt" hint-placeholder-count="3"><button onClick="{{ dt.set }}" style="{{ dt.style }}">{{ dt.label }}</button></sc-for></div></div>
+<div style="flex:1;min-height:0;overflow-y:auto;padding:0 16px 28px;display:grid;align-content:start;grid-template-columns:minmax(0,1fr);grid-auto-rows:max-content;gap:10px">
+<sc-for list="{{ dutyList }}" as="d" hint-placeholder-count="2">
+<div onClick="{{ d.open }}" style="display:flex;gap:14px;padding:14px;border-radius:18px;background:var(--sf);border:1px solid var(--line);cursor:pointer">
+<div style="width:52px;flex:none;border-radius:12px;background:var(--sf2);padding:6px 0;text-align:center;line-height:1.05;align-self:flex-start"><div style="font-size:11px;font-weight:700;color:var(--mut)">{{ d.day }}</div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:22px;color:var(--brand)">{{ d.d }}</div><div style="font-size:11px;font-weight:700;color:var(--mut)">{{ d.mon }}</div></div>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px"><div style="font-weight:700;font-size:17px">{{ d.duty }}</div><div style="font-size:14px;color:var(--mut)">{{ d.dept }} · Report {{ d.report }}</div><div style="font-size:14px;color:var(--mut)">{{ d.place }}</div><span style="{{ d.chipStyle }}">{{ d.label }}</span></div>
+</div>
+</sc-for>
+<sc-if value="{{ dutyEmpty }}" hint-placeholder-val="{{ false }}"><div style="padding:48px 20px;text-align:center;color:var(--mut)">{{ dutyEmptyText }}</div></sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ v.duty }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:50px;left:0;right:0;bottom:0;background:var(--bg);display:flex;flex-direction:column;z-index:6">
+<div style="flex:none;display:flex;align-items:center;gap:4px;padding:4px 12px 8px"><button onClick="{{ back }}" aria-label="Back" style="width:44px;height:44px;border:0;background:transparent;border-radius:22px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m15 18-6-6 6-6"></path></svg></button><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:20px">Duty</div></div>
+<div style="flex:1;min-height:0;overflow-y:auto;padding:0 16px 20px;display:grid;align-content:start;grid-template-columns:minmax(0,1fr);grid-auto-rows:max-content;gap:16px">
+<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start"><span style="{{ cd.chipStyle }}">{{ cd.label }}</span><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:28px;line-height:1.1;color:var(--brand)">{{ cd.duty }}</div><div style="color:var(--mut)">{{ cd.dept }}</div></div>
+<div style="border-radius:18px;background:var(--sf);border:1px solid var(--line);overflow:hidden">
+<sc-for list="{{ cd.rows }}" as="r" hint-placeholder-count="5"><div style="display:flex;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)"><div style="width:104px;flex:none;font-size:14px;color:var(--mut)">{{ r.k }}</div><div style="flex:1;font-weight:500">{{ r.v }}</div></div></sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:14px;font-weight:700;color:var(--mut);letter-spacing:.04em">INSTRUCTIONS</div><div style="text-wrap:pretty">{{ cd.instructions }}</div></div>
+<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:var(--sf);border:1px solid var(--line)"><span style="width:40px;height:40px;border-radius:50%;background:var(--sf2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px">MP</span><div style="flex:1"><div style="font-weight:600">{{ cd.leader }}</div><div style="font-size:14px;color:var(--mut)">{{ cd.dept }} leader</div></div><button onClick="{{ callLeader }}" style="height:40px;padding:0 14px;border-radius:20px;border:1px solid var(--line);background:transparent;font-weight:600;cursor:pointer">Call</button></div>
+<button onClick="{{ addCal }}" style="height:46px;border-radius:23px;border:1px solid var(--line);background:var(--sf);font-weight:600;cursor:pointer">Add to calendar</button>
+<div style="font-size:13px;color:var(--mut);margin-top:-8px;text-align:center">An exported calendar entry may need updating if this duty changes.</div>
+</div>
+<div style="flex:none;padding:12px 16px 30px;border-top:1px solid var(--line);background:var(--sf);display:flex;flex-direction:column;gap:10px">
+<sc-if value="{{ cd.isAwaiting }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:10px"><button onClick="{{ cd.decline }}" style="flex:1;height:52px;border-radius:26px;border:1.5px solid var(--line);background:transparent;font-weight:600;cursor:pointer">Can't make it</button><button onClick="{{ cd.accept }}" style="flex:1;height:52px;border-radius:26px;border:0;background:var(--pri);color:#fff;font-weight:700;cursor:pointer">Accept</button></div></sc-if>
+<sc-if value="{{ cd.isSending }}" hint-placeholder-val="{{ false }}"><div style="height:52px;display:flex;align-items:center;justify-content:center;border-radius:26px;background:var(--grayBg);color:var(--mut);font-weight:600">Not sent yet · sending your response…</div></sc-if>
+<sc-if value="{{ cd.isAccepted }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><div style="font-weight:600;color:var(--greenFg)">You accepted this duty</div><button onClick="{{ cd.decline }}" style="height:44px;padding:0 14px;border:0;background:transparent;color:var(--redFg);font-weight:600;cursor:pointer">Can't make it anymore</button></div></sc-if>
+<sc-if value="{{ cd.isDeclined }}" hint-placeholder-val="{{ false }}"><div style="font-size:15px;color:var(--mut);text-align:center">{{ cd.leader }} has been told you can't make it and will arrange cover.</div></sc-if>
+<sc-if value="{{ cd.isPast }}" hint-placeholder-val="{{ false }}"><div style="font-size:15px;color:var(--mut);text-align:center">Recorded as completed by your leader.</div></sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ v.leader }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:50px;left:0;right:0;bottom:0;background:var(--bg);display:flex;flex-direction:column;z-index:5">
+<div style="flex:none;display:flex;align-items:center;gap:4px;padding:4px 12px 8px"><button onClick="{{ back }}" aria-label="Back" style="width:44px;height:44px;border:0;background:transparent;border-radius:22px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m15 18-6-6 6-6"></path></svg></button><div style="flex:1"><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:20px;line-height:1.1">Ushering coverage</div><div style="font-size:13px;color:var(--mut)">Next 7 days · Fri 2 – Thu 8 Oct</div></div></div>
+<div style="flex:1;min-height:0;overflow-y:auto;padding:0 16px 28px;display:grid;align-content:start;grid-template-columns:minmax(0,1fr);grid-auto-rows:max-content;gap:14px">
+<div style="padding:14px 16px;border-radius:18px;background:var(--hero);color:#fff;display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-weight:600">Sun 4 Oct · Morning service</div><div style="font-size:14px;opacity:.85">Report 08:30</div></div>
+<div style="font-family:Outfit,sans-serif;font-weight:700;font-size:24px">{{ sunConfirmed }}</div>
+<div style="height:8px;border-radius:4px;background:rgba(255,255,255,.18);overflow:hidden"><div style="{{ sunBar }}"></div></div>
+</div>
+<div style="display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:0 16px"><sc-for list="{{ coverFilters }}" as="cf" hint-placeholder-count="5"><button onClick="{{ cf.set }}" style="{{ cf.style }}">{{ cf.label }}</button></sc-for></div>
+<sc-for list="{{ coverList }}" as="c" hint-placeholder-count="4">
+<div style="padding:14px;border-radius:18px;background:var(--sf);border:1px solid var(--line);display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div style="min-width:0"><div style="font-weight:700">{{ c.name }}</div><div style="font-size:14px;color:var(--mut)">{{ c.pos }} · {{ c.when }}</div></div><span style="{{ c.chip }}">{{ c.label }}</span></div>
+<div style="font-size:14px">{{ c.detail }}</div>
+<sc-if value="{{ c.hasActions }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:8px;flex-wrap:wrap">
+<sc-if value="{{ c.canCall }}" hint-placeholder-val="{{ true }}"><button onClick="{{ c.call }}" style="height:40px;padding:0 14px;border-radius:20px;border:1px solid var(--line);background:transparent;font-weight:600;font-size:14px;cursor:pointer">Call</button></sc-if>
+<sc-if value="{{ c.canConfirm }}" hint-placeholder-val="{{ false }}"><button onClick="{{ c.confirm }}" style="height:40px;padding:0 14px;border-radius:20px;border:1px solid var(--line);background:transparent;font-weight:600;font-size:14px;cursor:pointer">Record confirmation</button></sc-if>
+<sc-if value="{{ c.canReassign }}" hint-placeholder-val="{{ false }}"><button onClick="{{ c.reassign }}" style="height:40px;padding:0 14px;border-radius:20px;border:0;background:var(--pri);color:#fff;font-weight:600;font-size:14px;cursor:pointer">{{ c.reassignLabel }}</button></sc-if>
+</div></sc-if>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ v.give }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:50px;left:0;right:0;bottom:0;background:var(--bg);display:flex;flex-direction:column;z-index:5">
+<div style="flex:none;display:flex;align-items:center;gap:4px;padding:4px 12px 8px"><button onClick="{{ back }}" aria-label="Back" style="width:44px;height:44px;border:0;background:transparent;border-radius:22px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m15 18-6-6 6-6"></path></svg></button><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:20px">How to give</div></div>
+<div style="flex:1;min-height:0;overflow-y:auto;padding:0 16px 28px;display:grid;align-content:start;grid-template-columns:minmax(0,1fr);grid-auto-rows:max-content;gap:16px">
+<div style="display:flex;align-items:center;gap:14px"><span style="width:56px;height:56px;flex:none;border-radius:14px;background:var(--sf2);border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--mut)">{{ cg.mark }}</span><div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:26px;line-height:1.1;color:var(--brand)">{{ cg.name }}</div><div style="color:var(--mut)">{{ cg.sub }}</div></div></div>
+<div style="padding:10px 14px;border-radius:12px;background:var(--amberBg);color:var(--amberFg);font-size:14px;font-weight:500">Sample details for design only. The church must supply and verify its own.</div>
+<sc-if value="{{ cg.hasDetails }}" hint-placeholder-val="{{ true }}">
+<div style="border-radius:18px;background:var(--sf);border:1px solid var(--line);overflow:hidden">
+<sc-for list="{{ cg.details }}" as="dv" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:10px;padding:10px 8px 10px 14px;border-bottom:1px solid var(--line);min-height:62px"><div style="flex:1;min-width:0"><div style="font-size:13px;color:var(--mut)">{{ dv.k }}</div><div style="font-weight:600;font-size:17px">{{ dv.v }}</div></div><sc-if value="{{ dv.copy }}" hint-placeholder-val="{{ true }}"><button onClick="{{ dv.copy }}" aria-label="Copy" style="height:40px;padding:0 12px;border-radius:20px;border:1px solid var(--line);background:transparent;font-weight:600;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px"><svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><rect x="8" y="8" width="13" height="13" rx="2"></rect><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"></path></svg>Copy</button></sc-if></div></sc-for>
+</div>
+</sc-if>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="font-family:Outfit,sans-serif;font-weight:600;font-size:19px">Steps</div>
+<sc-for list="{{ cg.steps }}" as="st" hint-placeholder-count="4"><div style="display:flex;gap:12px;align-items:flex-start"><span style="width:28px;height:28px;flex:none;border-radius:50%;background:var(--blueBg);color:var(--blueFg);font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center">{{ st.n }}</span><div style="padding-top:2px;text-wrap:pretty">{{ st.t }}</div></div></sc-for>
+</div>
+<sc-if value="{{ cg.dial }}" hint-placeholder-val="{{ false }}"><button onClick="{{ dial }}" style="height:52px;border-radius:26px;border:0;background:var(--pri);color:#fff;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px"><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.9.6 2.8.7a2 2 0 0 1 1.7 2z"></path></svg>Open dialler with {{ cg.dial }}</button></sc-if>
+<div style="padding:14px;border-radius:16px;background:var(--sf2);display:flex;flex-direction:column;gap:6px;font-size:14px"><div style="font-weight:600;font-size:15px">Before you confirm</div><div style="color:var(--mut);text-wrap:pretty">Check that your provider shows the beneficiary as <strong style="color:var(--ink)">Brethren in Christ Church Kafue</strong>. If the name is different, stop and call the church office.</div></div>
+<div style="font-size:13px;color:var(--mut);display:flex;flex-direction:column;gap:2px"><span>Details last verified {{ cg.verified }}</span><span>Questions: church office, +260 97 000 0000</span></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ v.sermon }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:50px;left:0;right:0;bottom:0;background:var(--bg);display:flex;flex-direction:column;z-index:5">
+<div style="flex:none;display:flex;align-items:center;gap:4px;padding:4px 12px 8px"><button onClick="{{ back }}" aria-label="Back" style="width:44px;height:44px;border:0;background:transparent;border-radius:22px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m15 18-6-6 6-6"></path></svg></button><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:20px">Sermon</div></div>
+<div style="flex:1;min-height:0;overflow-y:auto;padding:0 0 28px;display:grid;align-content:start;grid-template-columns:minmax(0,1fr);grid-auto-rows:max-content;gap:16px">
+<div style="aspect-ratio:16/9;background:#0A0F22;color:rgba(255,255,255,.6);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font-family:'JetBrains Mono',monospace;font-size:12px"><span style="width:60px;height:60px;border-radius:50%;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:26px;height:26px;fill:#fff"><path d="M7 4v16l13-8z"></path></svg></span>YouTube player</div>
+<div style="padding:0 16px;display:flex;flex-direction:column;gap:4px"><div style="font-size:13px;font-weight:700;color:var(--acc);letter-spacing:.04em">SERIES · ROOTED</div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:26px;line-height:1.1;color:var(--brand)">{{ cs.title }}</div><div style="color:var(--mut)">{{ cs.speaker }} · {{ cs.date }}</div></div>
+<div style="margin:0 16px;display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:var(--sf);border:1px solid var(--line)"><button onClick="{{ playAudio }}" aria-label="Play audio" style="width:44px;height:44px;flex:none;border-radius:50%;border:0;background:var(--pri);display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:#fff"><path d="M7 4v16l13-8z"></path></svg></button><div style="flex:1"><div style="font-weight:600">Listen to audio</div><div style="font-size:14px;color:var(--mut)">{{ cs.len }} · keeps playing with the screen locked</div></div></div>
+<div style="margin:0 16px;padding:12px 14px;border-radius:14px;background:var(--blueBg);color:var(--blueFg);font-weight:600">{{ cs.ref }}</div>
+<div style="padding:0 16px;display:flex;flex-direction:column;gap:10px;font-size:17px;line-height:1.6;text-wrap:pretty"><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:19px">Notes</div><p style="margin:0">{{ cs.notes1 }}</p><p style="margin:0">{{ cs.notes2 }}</p></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ v.hymn }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:50px;left:0;right:0;bottom:0;background:var(--bg);display:flex;flex-direction:column;z-index:5">
+<div style="flex:none;display:flex;align-items:center;gap:4px;padding:4px 12px 8px"><button onClick="{{ back }}" aria-label="Back" style="width:44px;height:44px;border:0;background:transparent;border-radius:22px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m15 18-6-6 6-6"></path></svg></button><div style="flex:1;font-family:Outfit,sans-serif;font-weight:600;font-size:20px">Hymn {{ ch.n }}</div><sc-if value="{{ showMemberChrome }}" hint-placeholder-val="{{ true }}"><button onClick="{{ toggleFav }}" style="{{ favStyle }}">{{ favLabel }}</button></sc-if></div>
+<div style="flex:1;min-height:0;overflow-y:auto;padding:4px 20px 32px;display:grid;align-content:start;grid-template-columns:minmax(0,1fr);grid-auto-rows:max-content;gap:20px">
+<div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:30px;line-height:1.1;color:var(--brand)">{{ ch.title }}</div><div style="color:var(--mut)">Key of {{ ch.key }}</div></div>
+<sc-for list="{{ ch.verses }}" as="hv" hint-placeholder-count="2">
+<div style="display:flex;flex-direction:column;gap:14px"><div style="display:flex;gap:12px"><span style="width:22px;flex:none;font-weight:700;color:var(--acc)">{{ hv.n }}</span><div style="white-space:pre-line;font-size:19px;line-height:1.55">{{ hv.t }}</div></div>
+<sc-if value="{{ ch.chorus }}" hint-placeholder-val="{{ false }}"><div style="margin-left:34px;padding-left:14px;display:flex;flex-direction:column;gap:4px"><span style="font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--mut)">CHORUS</span><div style="white-space:pre-line;font-size:19px;line-height:1.55;font-style:italic">{{ ch.chorus }}</div></div></sc-if></div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ v.event }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:50px;left:0;right:0;bottom:0;background:var(--bg);display:flex;flex-direction:column;z-index:5">
+<div style="flex:none;display:flex;align-items:center;gap:4px;padding:4px 12px 8px"><button onClick="{{ back }}" aria-label="Back" style="width:44px;height:44px;border:0;background:transparent;border-radius:22px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m15 18-6-6 6-6"></path></svg></button><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:20px">Event</div></div>
+<div style="flex:1;min-height:0;overflow-y:auto;padding:0 16px 28px;display:grid;align-content:start;grid-template-columns:minmax(0,1fr);grid-auto-rows:max-content;gap:16px">
+<div style="aspect-ratio:16/9;border-radius:18px;background:repeating-linear-gradient(135deg,var(--sf2) 0 12px,var(--line) 12px 13px);display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--mut)">event poster · tap to open full size</div>
+<div style="font-family:Outfit,sans-serif;font-weight:700;font-size:26px;line-height:1.1;color:var(--brand)">{{ ce.title }}</div>
+<div style="border-radius:18px;background:var(--sf);border:1px solid var(--line);overflow:hidden"><div style="display:flex;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)"><div style="width:72px;flex:none;font-size:14px;color:var(--mut)">When</div><div style="font-weight:500">{{ ce.when }}</div></div><div style="display:flex;gap:12px;padding:12px 14px"><div style="width:72px;flex:none;font-size:14px;color:var(--mut)">Where</div><div style="font-weight:500">{{ ce.place }}</div></div></div>
+<div style="text-wrap:pretty">{{ ce.desc }}</div>
+<button onClick="{{ addCal }}" style="height:52px;border-radius:26px;border:0;background:var(--pri);color:#fff;font-weight:700;cursor:pointer">Add to calendar</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ v.profile }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:50px;left:0;right:0;bottom:0;background:var(--bg);display:flex;flex-direction:column;z-index:5">
+<div style="flex:none;display:flex;align-items:center;gap:4px;padding:4px 12px 8px"><button onClick="{{ back }}" aria-label="Back" style="width:44px;height:44px;border:0;background:transparent;border-radius:22px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m15 18-6-6 6-6"></path></svg></button><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:20px">Profile</div></div>
+<div style="flex:1;min-height:0;overflow-y:auto;padding:0 16px 28px;display:grid;align-content:start;grid-template-columns:minmax(0,1fr);grid-auto-rows:max-content;gap:16px">
+<div style="display:flex;align-items:center;gap:14px"><span style="width:60px;height:60px;border-radius:50%;background:var(--brand);color:#fff;font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center">{{ initials }}</span><div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:22px">{{ profileName }}</div><div style="color:var(--mut)">+260 97 123 4567</div></div></div>
+<div style="border-radius:18px;background:var(--sf);border:1px solid var(--line);overflow:hidden">
+<div style="padding:14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px;align-items:flex-start"><div style="font-size:13px;color:var(--mut)">Church membership</div><span style="{{ churchChip }}">{{ churchStatus }}</span></div>
+<div style="padding:14px;display:flex;flex-direction:column;gap:6px;align-items:flex-start"><div style="font-size:13px;color:var(--mut)">My cell</div><span style="{{ cellChip }}">{{ cellStatus }}</span><button onClick="{{ cellChange }}" style="border:0;background:transparent;color:var(--link);font-weight:600;padding:4px 0;cursor:pointer">{{ cellAction }}</button></div>
+</div>
+<sc-if value="{{ isPending }}" hint-placeholder-val="{{ false }}"><div style="font-size:14px;color:var(--mut);text-wrap:pretty">The church office reviews requests, and your cell leader confirms you separately. Member features open once you're approved.</div></sc-if>
+<sc-if value="{{ isMember }}" hint-placeholder-val="{{ true }}">
+<div style="border-radius:18px;background:var(--sf);border:1px solid var(--line);overflow:hidden">
+<sc-for list="{{ menu }}" as="mi" hint-placeholder-count="6"><div onClick="{{ mi.open }}" style="display:flex;align-items:center;gap:12px;padding:0 14px;min-height:54px;border-bottom:1px solid var(--line);cursor:pointer"><div style="flex:1;font-weight:500">{{ mi.label }}</div><span style="font-size:14px;color:var(--mut)">{{ mi.meta }}</span><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:var(--mut);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m9 18 6-6-6-6"></path></svg></div></sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ isLeader }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-direction:column;gap:8px"><div style="font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--mut)">STAFF TOOLS</div><div onClick="{{ openLeader }}" style="display:flex;align-items:center;gap:12px;padding:0 14px;min-height:54px;border-radius:16px;background:var(--sf);border:1px solid var(--line);cursor:pointer"><div style="flex:1;font-weight:500">Ushering rota &amp; coverage</div><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:var(--mut);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m9 18 6-6-6-6"></path></svg></div></div></sc-if>
+<button onClick="{{ signOut }}" style="height:48px;border-radius:24px;border:1px solid var(--line);background:transparent;color:var(--redFg);font-weight:600;cursor:pointer">Sign out</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ v.chat }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:50px;left:0;right:0;bottom:0;background:var(--bg);display:flex;flex-direction:column;z-index:5">
+<div style="flex:none;display:flex;align-items:center;gap:4px;padding:4px 12px 8px"><button onClick="{{ back }}" aria-label="Back" style="width:44px;height:44px;border:0;background:transparent;border-radius:22px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m15 18-6-6 6-6"></path></svg></button><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:20px">Groups</div></div>
+<div style="flex:1;min-height:0;overflow-y:auto;padding:0 16px 28px;display:flex;flex-direction:column">
+<sc-for list="{{ groups }}" as="g" hint-placeholder-count="3"><div onClick="{{ g.open }}" style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);cursor:pointer"><span style="width:48px;height:48px;flex:none;border-radius:16px;background:var(--blueBg);color:var(--blueFg);font-weight:700;display:flex;align-items:center;justify-content:center">{{ g.mark }}</span><div style="flex:1;min-width:0"><div style="font-weight:600">{{ g.name }}</div><div style="font-size:14px;color:var(--mut);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ g.last }}</div></div><sc-if value="{{ g.unread }}" hint-placeholder-val="{{ false }}"><span style="min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--acc);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ g.unread }}</span></sc-if></div></sc-for>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ v.cell }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:50px;left:0;right:0;bottom:0;background:var(--bg);display:flex;flex-direction:column;z-index:5">
+<div style="flex:none;display:flex;align-items:center;gap:4px;padding:4px 12px 8px"><button onClick="{{ back }}" aria-label="Back" style="width:44px;height:44px;border:0;background:transparent;border-radius:22px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m15 18-6-6 6-6"></path></svg></button><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:20px">My cell</div></div>
+<div style="flex:1;min-height:0;overflow-y:auto;padding:0 16px 28px;display:grid;align-content:start;grid-template-columns:minmax(0,1fr);grid-auto-rows:max-content;gap:20px">
+<div style="padding:18px;border-radius:22px;background:var(--hero);color:#fff;display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden">
+<div style="position:absolute;right:-50px;top:-50px;width:160px;height:160px;border-radius:50%;border:2px solid rgba(255,255,255,.14)"></div>
+<div style="font-family:Outfit,sans-serif;font-weight:700;font-size:24px">{{ cellInfo.name }}</div>
+<div style="font-size:14px;opacity:.88">Leader {{ cellInfo.leader }} · Assistant {{ cellInfo.assistant }}</div>
+<div style="font-size:14px;opacity:.88">{{ cellInfo.schedule }} · {{ cellInfo.members }} members</div>
+<button onClick="{{ openChat }}" style="align-self:flex-start;margin-top:8px;height:40px;padding:0 16px;border-radius:20px;border:1.5px solid rgba(255,255,255,.5);background:transparent;color:#fff;font-weight:600;cursor:pointer">Open cell chat</button>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font-family:Outfit,sans-serif;font-weight:600;font-size:19px">Next meeting</div>
+<div style="border-radius:20px;background:var(--sf);border:1px solid var(--line);overflow:hidden">
+<div style="padding:16px;display:flex;gap:14px;align-items:center;border-bottom:1px solid var(--line)"><div style="width:56px;flex:none;border-radius:14px;background:var(--blueBg);color:var(--blueFg);padding:7px 0;text-align:center;line-height:1.05"><div style="font-size:11px;font-weight:700">{{ cellNext.day }}</div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:24px">{{ cellNext.d }}</div><div style="font-size:11px;font-weight:700">{{ cellNext.mon }}</div></div><div style="flex:1"><div style="font-weight:700;font-size:17px">{{ cellNext.dateLong }}</div><div style="color:var(--mut);font-size:15px">{{ cellNext.time }}</div></div></div>
+<div style="padding:14px 16px;display:flex;gap:12px;align-items:center;border-bottom:1px solid var(--line)"><svg viewBox="0 0 24 24" style="width:22px;height:22px;flex:none;fill:none;stroke:var(--acc);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg><div style="flex:1;min-width:0"><div style="font-weight:600">{{ cellNext.venue }}</div><div style="font-size:14px;color:var(--mut)">{{ cellNext.address }}</div></div><button onClick="{{ openMaps }}" style="height:40px;padding:0 14px;border-radius:20px;border:1px solid var(--line);background:transparent;font-weight:600;font-size:14px;cursor:pointer">Directions</button></div>
+<div style="padding:14px 16px;display:flex;flex-direction:column;gap:4px;border-bottom:1px solid var(--line)"><div style="font-size:13px;color:var(--mut)">Bible study</div><div style="font-weight:600">{{ cellNext.topic }}</div><div style="font-size:14px;color:var(--blueFg);font-weight:600">{{ cellNext.ref }}</div></div>
+<div style="padding:14px 16px 6px;font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--mut)">PROGRAMME</div>
+<sc-for list="{{ cellNext.programme }}" as="p" hint-placeholder-count="5"><div style="display:flex;gap:12px;align-items:center;padding:10px 16px"><span style="width:46px;flex:none;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--mut)">{{ p.time }}</span><div style="flex:1;min-width:0"><div style="font-weight:600">{{ p.part }}</div><div style="font-size:14px;color:var(--mut)">{{ p.who }}</div></div><sc-if value="{{ p.me }}" hint-placeholder-val="{{ false }}"><span style="{{ chips.blue }}">You</span></sc-if></div></sc-for>
+<div style="display:flex;gap:10px;padding:12px 16px 16px"><button onClick="{{ addCal }}" style="flex:1;height:46px;border-radius:23px;border:0;background:var(--pri);color:#fff;font-weight:600;cursor:pointer">Add to calendar</button><button onClick="{{ cantAttend }}" style="flex:1;height:46px;border-radius:23px;border:1px solid var(--line);background:transparent;font-weight:600;cursor:pointer">Can't attend</button></div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font-family:Outfit,sans-serif;font-weight:600;font-size:19px">Last meeting</div>
+<div onClick="{{ cellLast.open }}" style="border-radius:20px;background:var(--sf);border:1px solid var(--line);padding:16px;display:flex;flex-direction:column;gap:10px;cursor:pointer">
+<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><div style="font-weight:700;font-size:17px">{{ cellLast.topic }}</div><div style="font-size:14px;color:var(--blueFg);font-weight:600">{{ cellLast.ref }}</div></div><span style="{{ chips.gray }}">{{ cellLast.attendance }}</span></div>
+<div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px"><span style="color:var(--mut)">When</span><span>{{ cellLast.dateLong }}</span><span style="color:var(--mut)">Where</span><span>{{ cellLast.venue }}, {{ cellLast.address }}</span><span style="color:var(--mut)">Led by</span><span>{{ cellLast.ledBy }}</span></div>
+<div style="font-size:15px;text-wrap:pretty;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden">{{ cellLast.summary }}</div>
+<div style="color:var(--link);font-weight:600;font-size:15px">Read the recap</div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font-family:Outfit,sans-serif;font-weight:600;font-size:19px">Earlier meetings</div>
+<div style="border-radius:18px;background:var(--sf);border:1px solid var(--line);overflow:hidden">
+<sc-for list="{{ cellPast }}" as="m" hint-placeholder-count="2"><div onClick="{{ m.open }}" style="display:flex;gap:12px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--line);cursor:pointer"><div style="width:46px;flex:none;text-align:center;line-height:1.05"><div style="font-size:11px;font-weight:700;color:var(--mut)">{{ m.mon }}</div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:20px;color:var(--brand)">{{ m.d }}</div></div><div style="flex:1;min-width:0"><div style="font-weight:600">{{ m.topic }}</div><div style="font-size:14px;color:var(--mut)">Led by {{ m.ledBy }} · {{ m.venue }}</div></div><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:none;stroke:var(--mut);stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m9 18 6-6-6-6"></path></svg></div></sc-for>
+</div>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ v.meeting }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:50px;left:0;right:0;bottom:0;background:var(--bg);display:flex;flex-direction:column;z-index:6">
+<div style="flex:none;display:flex;align-items:center;gap:4px;padding:4px 12px 8px"><button onClick="{{ back }}" aria-label="Back" style="width:44px;height:44px;border:0;background:transparent;border-radius:22px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m15 18-6-6 6-6"></path></svg></button><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:20px">Meeting recap</div></div>
+<div style="flex:1;min-height:0;overflow-y:auto;padding:0 16px 28px;display:grid;align-content:start;grid-template-columns:minmax(0,1fr);grid-auto-rows:max-content;gap:18px">
+<div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:13px;font-weight:700;color:var(--acc);letter-spacing:.04em">{{ cm.dateLong }}</div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:28px;line-height:1.1;color:var(--brand)">{{ cm.topic }}</div><div style="font-weight:600;color:var(--blueFg)">{{ cm.ref }}</div></div>
+<div style="border-radius:18px;background:var(--sf);border:1px solid var(--line);overflow:hidden"><div style="display:flex;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)"><div style="width:80px;flex:none;font-size:14px;color:var(--mut)">Where</div><div style="font-weight:500">{{ cm.venue }}, {{ cm.address }}</div></div><div style="display:flex;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)"><div style="width:80px;flex:none;font-size:14px;color:var(--mut)">Led by</div><div style="font-weight:500">{{ cm.ledBy }}</div></div><div style="display:flex;gap:12px;padding:12px 14px"><div style="width:80px;flex:none;font-size:14px;color:var(--mut)">Attended</div><div style="font-weight:500">{{ cm.attendance }}</div></div></div>
+<div style="display:flex;flex-direction:column;gap:8px"><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:19px">What we discussed</div><div style="font-size:17px;line-height:1.6;text-wrap:pretty">{{ cm.summary }}</div></div>
+<div style="display:flex;flex-direction:column;gap:10px"><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:19px">Key points</div><sc-for list="{{ cm.points }}" as="pt" hint-placeholder-count="3"><div style="display:flex;gap:12px;align-items:flex-start"><span style="width:26px;height:26px;flex:none;border-radius:50%;background:var(--blueBg);color:var(--blueFg);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center">{{ pt.n }}</span><div style="padding-top:1px;text-wrap:pretty">{{ pt.t }}</div></div></sc-for></div>
+<div style="display:flex;flex-direction:column;gap:4px"><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:19px;margin-bottom:4px">Who led each part</div><div style="border-radius:18px;background:var(--sf);border:1px solid var(--line);overflow:hidden"><sc-for list="{{ cm.programme }}" as="p" hint-placeholder-count="4"><div style="display:flex;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)"><span style="width:46px;flex:none;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--mut)">{{ p.time }}</span><div style="flex:1;font-weight:500">{{ p.part }}</div><div style="font-size:14px;color:var(--mut)">{{ p.who }}</div></div></sc-for></div></div>
+<div style="font-size:13px;color:var(--mut);text-wrap:pretty">Prayer needs and pastoral notes from this meeting stay private to the cell leaders and pastors.</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ v.visits }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:50px;left:0;right:0;bottom:0;background:var(--bg);display:flex;flex-direction:column;z-index:5">
+<div style="flex:none;display:flex;align-items:center;gap:4px;padding:4px 12px 8px"><button onClick="{{ back }}" aria-label="Back" style="width:44px;height:44px;border:0;background:transparent;border-radius:22px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m15 18-6-6 6-6"></path></svg></button><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:20px">Pastoral visits</div></div>
+<div style="flex:1;min-height:0;overflow-y:auto;padding:0 16px 28px;display:grid;align-content:start;grid-template-columns:minmax(0,1fr);grid-auto-rows:max-content;gap:20px">
+<div style="font-size:15px;color:var(--mut);text-wrap:pretty">Visits are private between you and the pastoral team.</div>
+<div style="border-radius:20px;background:var(--sf);border:1px solid var(--line);overflow:hidden">
+<div style="padding:16px;display:flex;flex-direction:column;gap:6px;border-bottom:1px solid var(--line)"><span style="{{ visit.chip }}">{{ visit.label }}</span><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:22px;color:var(--brand)">{{ visit.when }}</div><div style="color:var(--mut)">{{ visit.who }} · {{ visit.where }}</div></div>
+<div style="display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)"><div style="width:72px;flex:none;font-size:14px;color:var(--mut)">Reason</div><div style="font-weight:500">{{ visit.reason }}</div></div>
+<div style="padding:14px 16px 16px;display:flex;flex-direction:column;gap:10px">
+<sc-if value="{{ visit.isAwaiting }}" hint-placeholder-val="{{ true }}"><button onClick="{{ visitAccept }}" style="height:50px;border-radius:25px;border:0;background:var(--pri);color:#fff;font-weight:700;cursor:pointer">Accept visit</button><div style="display:flex;gap:10px"><button onClick="{{ visitPostpone }}" style="flex:1;height:46px;border-radius:23px;border:1px solid var(--line);background:transparent;font-weight:600;cursor:pointer">Suggest another time</button><button onClick="{{ visitDecline }}" style="flex:1;height:46px;border-radius:23px;border:1px solid var(--line);background:transparent;color:var(--redFg);font-weight:600;cursor:pointer">Decline</button></div></sc-if>
+<sc-if value="{{ visit.isAccepted }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span style="font-weight:600;color:var(--greenFg)">You accepted this visit</span><button onClick="{{ visitPostpone }}" style="height:40px;border:0;background:transparent;color:var(--link);font-weight:600;cursor:pointer">Change time</button></div></sc-if>
+<sc-if value="{{ visit.isPostponed }}" hint-placeholder-val="{{ false }}"><div style="font-size:15px;text-wrap:pretty">You suggested <strong>{{ visit.alt }}</strong>. The pastor will confirm.</div></sc-if>
+<sc-if value="{{ visit.isDeclined }}" hint-placeholder-val="{{ false }}"><div style="font-size:15px;color:var(--mut)">You declined this visit. You can request one any time.</div></sc-if>
+</div>
+</div>
+<sc-if value="{{ hasVisitReqs }}" hint-placeholder-val="{{ false }}"><div style="display:flex;flex-direction:column;gap:10px"><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:19px">My requests</div><sc-for list="{{ visitReqs }}" as="rq" hint-placeholder-count="1"><div style="padding:14px 16px;border-radius:16px;background:var(--sf);border:1px solid var(--line);display:flex;flex-direction:column;gap:6px"><div style="display:flex;justify-content:space-between;gap:8px"><span style="font-weight:600">{{ rq.reason }}</span><span style="{{ rq.chip }}">Requested</span></div><div style="font-size:14px;color:var(--mut)">{{ rq.where }} · {{ rq.when }} · the pastor will suggest a time</div></div></sc-for></div></sc-if>
+<button onClick="{{ requestVisit }}" style="height:52px;border-radius:26px;border:1.5px solid var(--pri);background:transparent;color:var(--link);font-weight:700;cursor:pointer">Request a visit</button>
+<div style="display:flex;flex-direction:column;gap:10px"><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:19px">Past visits</div><sc-for list="{{ pastVisits }}" as="pv" hint-placeholder-count="1"><div style="padding:14px 16px;border-radius:16px;background:var(--sf);border:1px solid var(--line);display:flex;justify-content:space-between;gap:8px"><div><div style="font-weight:600">{{ pv.reason }}</div><div style="font-size:14px;color:var(--mut)">{{ pv.when }} · {{ pv.who }}</div></div><span style="{{ chips.gray }}">Completed</span></div></sc-for></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ v.signup }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;top:50px;left:0;right:0;bottom:0;background:var(--bg);display:flex;flex-direction:column;z-index:8">
+<div style="flex:none;display:flex;align-items:center;gap:4px;padding:4px 12px 8px"><button onClick="{{ suBack }}" aria-label="Back" style="width:44px;height:44px;border:0;background:transparent;border-radius:22px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg viewBox="0 0 24 24" style="width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="m15 18-6-6 6-6"></path></svg></button><div style="flex:1"></div><span style="font-size:14px;color:var(--mut);padding-right:8px">{{ suStepLabel }}</span></div>
+<div style="flex:1;min-height:0;overflow-y:auto;padding:0 20px 20px;display:grid;align-content:start;grid-template-columns:minmax(0,1fr);grid-auto-rows:max-content;gap:18px">
+
+<sc-if value="{{ su1 }}" hint-placeholder-val="{{ true }}">
+<img src="assets/bic-logo.png" alt="" style="width:72px;height:72px;border-radius:50%;background:#fff">
+<div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:28px;line-height:1.1;color:var(--brand)">Continue with phone</div><div style="color:var(--mut);margin-top:6px;text-wrap:pretty">We'll send a one-time code by SMS. No password needed.</div></div>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Mobile number</span><div style="display:flex;align-items:center;height:56px;border-radius:14px;border:1.5px solid var(--line);background:var(--sf);overflow:hidden"><span style="padding:0 12px 0 14px;font-weight:600;border-right:1px solid var(--line);height:100%;display:flex;align-items:center">+260</span><input value="{{ su.phone }}" onChange="{{ onPhone }}" inputmode="tel" placeholder="97 123 4567" style="flex:1;height:100%;border:0;outline:0;background:transparent;padding:0 14px;font-size:18px;letter-spacing:.03em"></div></label>
+<button onClick="{{ suSend }}" style="{{ suBtn1 }}">Send code</button>
+<div style="font-size:13px;color:var(--mut);text-align:center;text-wrap:pretty">Standard SMS rates may apply. A verified number does not by itself make you a church member.</div>
+</sc-if>
+
+<sc-if value="{{ su2 }}" hint-placeholder-val="{{ false }}">
+<div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:28px;line-height:1.1;color:var(--brand)">Enter the code</div><div style="color:var(--mut);margin-top:6px">Sent to +260 {{ su.phone }}. It expires in 10 minutes.</div></div>
+<input value="{{ su.code }}" onChange="{{ onCode }}" inputmode="numeric" maxlength="6" placeholder="••••••" style="height:64px;border-radius:14px;border:1.5px solid var(--line);background:var(--sf);outline:0;text-align:center;font-family:'JetBrains Mono',monospace;font-size:28px;letter-spacing:.5em;padding-left:.5em">
+<button onClick="{{ suVerify }}" style="{{ suBtn2 }}">Verify</button>
+<div style="display:flex;justify-content:space-between;font-size:15px"><button onClick="{{ suWrong }}" style="border:0;background:transparent;color:var(--link);font-weight:600;cursor:pointer;padding:8px 0">Wrong number?</button><span style="color:var(--mut);padding:8px 0">Resend in 0:45</span></div>
+<button onClick="{{ needHelp }}" style="border:0;background:transparent;color:var(--mut);cursor:pointer;padding:4px 0;text-decoration:underline;text-underline-offset:3px">I need help accessing my account</button>
+</sc-if>
+
+<sc-if value="{{ su3 }}" hint-placeholder-val="{{ false }}">
+<div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:28px;line-height:1.1;color:var(--brand)">About you</div><div style="color:var(--mut);margin-top:6px">The church office will check your request.</div></div>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Full name</span><input value="{{ su.name }}" onChange="{{ onName }}" placeholder="e.g. Mutinta Hamoonga" style="height:52px;border-radius:14px;border:1.5px solid var(--line);background:var(--sf);outline:0;padding:0 14px;font-size:17px"></label>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;font-weight:600">Which cell group do you belong to?</span>
+<sc-for list="{{ cellOpts }}" as="co" hint-placeholder-count="4"><button onClick="{{ co.pick }}" style="{{ co.style }}"><span style="{{ co.dot }}"></span><span style="display:flex;flex-direction:column;align-items:flex-start;text-align:left"><span style="font-weight:600">{{ co.name }}</span><span style="font-size:13px;color:var(--mut)">{{ co.area }}</span></span></button></sc-for>
+</div>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:14px;font-weight:600">Email <span style="font-weight:400;color:var(--mut)">(optional)</span></span><input value="{{ su.email }}" onChange="{{ onEmail }}" placeholder="you@example.com" style="height:52px;border-radius:14px;border:1.5px solid var(--line);background:var(--sf);outline:0;padding:0 14px;font-size:17px"></label>
+<div style="font-size:13px;color:var(--mut);padding:12px 14px;border-radius:12px;background:var(--sf2);text-wrap:pretty">Your details are used by the church for membership and pastoral care. Your phone and email stay hidden from the directory unless you choose to show them.</div>
+<button onClick="{{ suSubmit }}" style="{{ suBtn3 }}">Submit request</button>
+</sc-if>
+
+<sc-if value="{{ su4 }}" hint-placeholder-val="{{ false }}">
+<div style="width:64px;height:64px;border-radius:50%;background:var(--greenBg);color:var(--greenFg);display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 24 24" style="width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round"><path d="M20 6 9 17l-5-5"></path></svg></div>
+<div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:28px;line-height:1.1;color:var(--brand)">Request sent</div><div style="color:var(--mut);margin-top:6px;text-wrap:pretty">Thank you, {{ suFirst }}. You can correct your request until it's reviewed.</div></div>
+<div style="border-radius:18px;background:var(--sf);border:1px solid var(--line);overflow:hidden">
+<div style="padding:14px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:6px;align-items:flex-start"><div style="font-size:13px;color:var(--mut)">Church membership</div><span style="{{ chips.amber }}">Awaiting church approval</span></div>
+<div style="padding:14px;display:flex;flex-direction:column;gap:6px;align-items:flex-start"><div style="font-size:13px;color:var(--mut)">My cell</div><span style="{{ cellChip }}">{{ cellStatus }}</span></div>
+</div>
+<button onClick="{{ suDone }}" style="height:54px;border-radius:27px;border:0;background:var(--pri);color:#fff;font-weight:700;cursor:pointer">Continue to the app</button>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;justify-content:flex-end">
+<div onClick="{{ closeSheet }}" style="position:absolute;inset:0;background:rgba(5,10,30,.5)"></div>
+<div style="position:relative;background:var(--sf);border-radius:26px 26px 0 0;padding:10px 20px 34px;display:flex;flex-direction:column;gap:14px;max-height:88%;overflow-y:auto">
+<div style="width:40px;height:5px;border-radius:3px;background:var(--line);align-self:center"></div>
+<sc-if value="{{ sh.postpone }}" hint-placeholder-val="{{ false }}">
+<div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:22px">Suggest another time</div><div style="color:var(--mut)">Times the pastor has free</div></div>
+<sc-for list="{{ alts }}" as="a" hint-placeholder-count="3"><button onClick="{{ a.pick }}" style="height:52px;border-radius:14px;border:1.5px solid var(--line);background:var(--bg);font-weight:600;cursor:pointer;text-align:left;padding:0 16px">{{ a.label }}</button></sc-for>
+<button onClick="{{ otherTime }}" style="height:44px;border:0;background:transparent;color:var(--link);font-weight:600;cursor:pointer">None of these work — I'll call the office</button>
+</sc-if>
+<sc-if value="{{ sh.declineVisit }}" hint-placeholder-val="{{ false }}">
+<div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:22px">Decline this visit?</div><div style="color:var(--mut)">{{ visit.when }} · {{ visit.who }}</div></div>
+<textarea value="{{ note }}" onChange="{{ onNote }}" placeholder="Add a note for the pastor (optional)" rows="3" style="border-radius:14px;border:1.5px solid var(--line);background:var(--bg);outline:0;padding:12px 14px;font-size:16px;resize:none"></textarea>
+<button onClick="{{ visitDeclineSend }}" style="height:52px;border-radius:26px;border:0;background:var(--pri);color:#fff;font-weight:700;cursor:pointer">Decline visit</button>
+<button onClick="{{ closeSheet }}" style="height:44px;border:0;background:transparent;font-weight:600;cursor:pointer">Keep it</button>
+</sc-if>
+<sc-if value="{{ sh.requestVisit }}" hint-placeholder-val="{{ false }}">
+<div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:22px">Request a pastoral visit</div><div style="color:var(--mut)">Only the pastoral team sees this.</div></div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;font-weight:600">What is it about?</span><div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ rvReasons }}" as="o" hint-placeholder-count="6"><button onClick="{{ o.set }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;font-weight:600">Where?</span><div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ rvWhere }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.set }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:14px;font-weight:600">When suits you?</span><div style="display:flex;flex-wrap:wrap;gap:8px"><sc-for list="{{ rvWhen }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.set }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div>
+<textarea value="{{ rv.note }}" onChange="{{ onRvNote }}" placeholder="Anything the pastor should know (optional)" rows="2" style="border-radius:14px;border:1.5px solid var(--line);background:var(--bg);outline:0;padding:12px 14px;font-size:16px;resize:none"></textarea>
+<button onClick="{{ rvSubmit }}" style="{{ rvBtn }}">Send request</button>
+</sc-if>
+<sc-if value="{{ sh.decline }}" hint-placeholder-val="{{ false }}">
+<div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:22px">Can't make it?</div><div style="color:var(--mut)">{{ cd.duty }} · {{ cd.dateLong }}</div></div>
+<textarea value="{{ note }}" onChange="{{ onNote }}" placeholder="Add a note for your leader (optional)" rows="3" style="border-radius:14px;border:1.5px solid var(--line);background:var(--bg);outline:0;padding:12px 14px;font-size:16px;resize:none"></textarea>
+<button onClick="{{ declineSend }}" style="height:52px;border-radius:26px;border:0;background:var(--pri);color:#fff;font-weight:700;cursor:pointer">Let {{ cd.leaderShort }} know</button>
+<button onClick="{{ closeSheet }}" style="height:44px;border:0;background:transparent;font-weight:600;cursor:pointer">Cancel</button>
+</sc-if>
+<sc-if value="{{ sh.confirm }}" hint-placeholder-val="{{ false }}">
+<div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:22px">Record confirmation</div><div style="color:var(--mut)">{{ cc.name }} · {{ cc.pos }}, {{ cc.when }}</div></div>
+<input value="{{ note }}" onChange="{{ onNote }}" placeholder="How did they confirm? e.g. By phone" style="height:52px;border-radius:14px;border:1.5px solid var(--line);background:var(--bg);outline:0;padding:0 14px;font-size:16px">
+<div style="font-size:14px;color:var(--mut);text-wrap:pretty">Saved as "Confirmed by leader" with your name and the time, separate from a member's own response.</div>
+<button onClick="{{ confirmSave }}" style="height:52px;border-radius:26px;border:0;background:var(--pri);color:#fff;font-weight:700;cursor:pointer">Save confirmation</button>
+</sc-if>
+<sc-if value="{{ sh.reassign }}" hint-placeholder-val="{{ false }}">
+<div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:22px">Assign {{ cc.pos }}</div><div style="color:var(--mut)">{{ cc.when }} · Ushering members</div></div>
+<sc-for list="{{ candidates }}" as="m" hint-placeholder-count="4"><button onClick="{{ m.pick }}" style="display:flex;align-items:center;gap:12px;padding:10px 12px;min-height:60px;border-radius:14px;border:1px solid var(--line);background:var(--bg);cursor:pointer;text-align:left"><span style="width:38px;height:38px;flex:none;border-radius:50%;background:var(--sf2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">{{ m.ini }}</span><span style="flex:1;display:flex;flex-direction:column"><span style="font-weight:600">{{ m.name }}</span><span style="{{ m.metaStyle }}">{{ m.meta }}</span></span></button></sc-for>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;left:20px;right:20px;bottom:104px;z-index:40;padding:14px 16px;border-radius:14px;background:#0E1530;color:#fff;font-size:15px;font-weight:500;box-shadow:0 10px 30px rgba(0,0,0,.25);text-align:center">{{ toast }}</div>
+</sc-if>
+</div>
+</div>
+
+<div style="width:280px;flex:none;display:flex;flex-direction:column;gap:18px;padding-top:24px;color:var(--pageInk)">
+<div style="display:flex;align-items:center;gap:12px"><img src="assets/bic-logo.png" alt="" style="width:52px;height:52px;border-radius:50%;background:#fff"><div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:18px">BIC Kafue app</div><div style="font-size:13px;opacity:.7">v1 interactive prototype</div></div></div>
+<div style="display:flex;flex-direction:column;gap:8px"><div style="font-size:12px;font-weight:700;letter-spacing:.08em;opacity:.65">VIEW AS</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><sc-for list="{{ roles }}" as="r" hint-placeholder-count="4"><button onClick="{{ r.set }}" style="{{ r.style }}">{{ r.label }}</button></sc-for></div></div>
+<div style="display:flex;flex-direction:column;gap:8px"><div style="font-size:12px;font-weight:700;letter-spacing:.08em;opacity:.65">THEME</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button onClick="{{ setLight }}" style="{{ lightBtn }}">Light</button><button onClick="{{ setDark }}" style="{{ darkBtn }}">Dark</button></div></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:12px;font-weight:700;letter-spacing:.08em;opacity:.65">JUMP TO</div><sc-for list="{{ jumps }}" as="j" hint-placeholder-count="6"><button onClick="{{ j.go }}" style="height:38px;text-align:left;padding:0 12px;border-radius:10px;border:1px solid var(--pageLine);background:transparent;color:var(--pageInk);font-size:14px;font-weight:500;cursor:pointer">{{ j.label }}</button></sc-for></div>
+<div style="font-size:12px;line-height:1.5;opacity:.65;text-wrap:pretty">Giving numbers, names, yearly theme and rota data are placeholders. Navy and bright blue come from the emblem.</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;role&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;guest&quot;,&quot;pending&quot;,&quot;member&quot;,&quot;leader&quot;],&quot;default&quot;:&quot;member&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;dark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  state = {
+    role: this.props.role ?? 'member', dark: this.props.dark ?? false,
+    tab: 'home', stack: [], dutyTab: 'respond',
+    resp: { d1: 'awaiting', d2: 'awaiting', d3: 'accepted', d4: 'accepted' },
+    sheet: null, sheetId: null, note: '', toast: '',
+    bible: 'bible', hymnQ: '', sermonFilter: 'Latest', favs: { 12: true },
+    calDuties: true, calCell: false, coverFilter: 'all', cover: null,
+    visit: 'awaiting', visitAlt: '', visitReqs: [], rv: { reason: '', where: 'My home', when: 'Saturday', note: '' },
+    su: { step: 1, phone: '', code: '', name: '', cell: '', email: '' }
+  };
+  componentWillUnmount() { clearTimeout(this._t); clearTimeout(this._s); }
+  D() {
+    if (this._d) return this._d;
+    this._d = {
+      duties: [
+        { id: 'd1', key: 1004, day: 'SUN', d: '4', mon: 'OCT', dateLong: 'Sunday 4 October', duty: 'Main door', dept: 'Ushering', report: '08:30', time: '09:00–11:30', place: 'Main sanctuary, north entrance', deadline: 'Sat 3 Oct, 09:00', leader: 'Br. Mwansa Phiri', instructions: 'Greet people as they arrive, hand out bulletins and guide latecomers to the side seats. Collect the welcome cards after the service.' },
+        { id: 'd2', key: 1006, day: 'TUE', d: '6', mon: 'OCT', dateLong: 'Tuesday 6 October', duty: 'Lead Tuesday prayers', dept: 'Intercession', report: '17:15', time: '17:30–18:30', place: 'Prayer room', deadline: 'Mon 5 Oct, 17:15', leader: 'Br. Mwansa Phiri', topic: 'Praying for the nation · 1 Timothy 2:1–4', instructions: 'Open with a hymn, read the passage and lead three rounds of prayer. Keep to the hour.' },
+        { id: 'd3', key: 1011, day: 'SUN', d: '11', mon: 'OCT', dateLong: 'Sunday 11 October', duty: 'Cleaning after service', dept: 'Cleaning', report: '11:30', time: '11:30–12:30', place: 'Church hall', deadline: 'Fri 9 Oct, 11:30', leader: 'Br. Mwansa Phiri', instructions: 'Stack chairs, sweep the hall and lock the store room. Keys are with the caretaker.' },
+        { id: 'd4', key: 1018, day: 'SUN', d: '18', mon: 'OCT', dateLong: 'Sunday 18 October', duty: 'Sunday teaching (youth)', dept: 'Christian education', report: '08:45', time: '09:00–10:00', place: 'Youth room', deadline: 'Fri 16 Oct, 08:45', leader: 'Br. Mwansa Phiri', topic: 'Faith that works · James 2:14–26', instructions: 'Teach the lesson from the youth quarterly. Allow 15 minutes for questions.' },
+        { id: 'p1', past: true, key: 927, day: 'SUN', d: '27', mon: 'SEP', dateLong: 'Sunday 27 September', duty: 'Main door', dept: 'Ushering', report: '08:30', time: '09:00–11:30', place: 'Main sanctuary, north entrance', deadline: '—', leader: 'Br. Mwansa Phiri', instructions: 'Greet people as they arrive and hand out bulletins.' },
+        { id: 'p2', past: true, key: 913, day: 'SUN', d: '13', mon: 'SEP', dateLong: 'Sunday 13 September', duty: 'Cleaning after service', dept: 'Cleaning', report: '11:30', time: '11:30–12:30', place: 'Church hall', deadline: '—', leader: 'Br. Mwansa Phiri', instructions: 'Stack chairs and sweep the hall.' }
+      ],
+      cover: [
+        { id: 'c1', kind: 'unfilled', name: 'No one assigned', pos: 'Side door', when: 'Sun 4 Oct', sun: true, detail: 'This position needs a member.' },
+        { id: 'c2', kind: 'overdue', name: 'Chileshe Banda', pos: 'Offering team', when: 'Sun 4 Oct', sun: true, detail: 'Response was due Thu 1 Oct, 09:00. No reply yet.' },
+        { id: 'c3', kind: 'declined', name: 'Joseph Tembo', pos: 'Main door', when: 'Sun 4 Oct', sun: true, detail: 'Note: "Travelling to Lusaka this weekend."' },
+        { id: 'c4', kind: 'contact', name: 'Grace Mulenga', pos: 'Main door', when: 'Wed 7 Oct', detail: 'No app account. Contact her on her own number.' },
+        { id: 'c5', kind: 'awaiting', name: 'Ruth Zulu', pos: 'Parking', when: 'Sun 4 Oct', sun: true, detail: 'Respond by Sat 3 Oct, 09:00.' },
+        { id: 'c6', kind: 'confirmed', name: 'Mwila Chanda', pos: 'Main door', when: 'Sun 4 Oct', sun: true, detail: 'Accepted in the app.' },
+        { id: 'c7', kind: 'confirmed', name: 'Peter Lungu', pos: 'Main door', when: 'Sun 4 Oct', sun: true, detail: 'Accepted in the app.' },
+        { id: 'c8', kind: 'confirmed', name: 'Esther Mwale', pos: 'Side door', when: 'Sun 4 Oct', sun: true, detail: 'Accepted in the app.' },
+        { id: 'c9', kind: 'confirmed', name: 'Abel Sakala', pos: 'Parking', when: 'Sun 4 Oct', sun: true, detail: 'Accepted in the app.' },
+        { id: 'c10', kind: 'leaderConfirmed', name: 'Naomi Phiri', pos: 'Offering team', when: 'Sun 4 Oct', sun: true, detail: 'Confirmed in person by Mwansa Phiri, Wed 30 Sep.' },
+        { id: 'c11', kind: 'confirmed', name: 'Moses Daka', pos: 'Welcome desk', when: 'Sun 4 Oct', sun: true, detail: 'Accepted in the app.' }
+      ],
+      candidates: [
+        { name: 'Kabwe Musonda', meta: '1 duty this month' },
+        { name: 'Lydia Banda', meta: 'No duties this month' },
+        { name: 'Esther Mwale', meta: 'Conflict: already on Side door, Sun 4 Oct', warn: true },
+        { name: 'Daniel Mbewe', meta: '2 duties this month' }
+      ],
+      events: [
+        { id: 'e1', key: 1011, day: 'SUN', d: '11', mon: 'OCT', title: 'Harvest Thanksgiving Service', when: 'Sun 11 Oct · 09:00–12:00', time: '09:00–12:00', place: 'Main sanctuary', desc: 'A combined service of thanksgiving for the year, followed by a shared meal in the church hall. Everyone is welcome.' },
+        { id: 'e2', key: 1017, day: 'SAT', d: '17', mon: 'OCT', title: "Women's Fellowship Day", when: 'Sat 17 Oct · 10:00–14:00', time: '10:00–14:00', place: 'Church hall', desc: 'Worship, teaching and fellowship for the women of the church. Lunch is provided.' },
+        { id: 'e3', key: 1023, day: 'FRI', d: '23', mon: 'OCT', title: 'Youth Camp', when: 'Fri 23 Oct, 17:00 – Sun 25 Oct, 13:00', time: 'Fri 17:00 – Sun 25 Oct, 13:00', place: 'Kafue river campsite', desc: 'Three days of worship, Bible study and outdoor activities for ages 13–25. Registration forms are at the church office.' },
+        { id: 'e4', key: 1101, day: 'SUN', d: '1', mon: 'NOV', title: 'Communion Service', when: 'Sun 1 Nov · 09:00–11:30', time: '09:00–11:30', place: 'Main sanctuary', desc: 'Monthly communion service with feet washing.' }
+      ],
+      cell: [
+        { key: 1008, day: 'THU', d: '8', mon: 'OCT', title: 'Mwembeshi Road cell meeting', time: '18:00–19:30 · Banda home' },
+        { key: 1015, day: 'THU', d: '15', mon: 'OCT', title: 'Mwembeshi Road cell meeting', time: '18:00–19:30 · Banda home' }
+      ],
+      verses: [
+        [1, 'There was a man of the Pharisees, named Nicodemus, a ruler of the Jews:'],
+        [2, 'The same came to Jesus by night, and said unto him, Rabbi, we know that thou art a teacher come from God: for no man can do these miracles that thou doest, except God be with him.'],
+        [3, 'Jesus answered and said unto him, Verily, verily, I say unto thee, Except a man be born again, he cannot see the kingdom of God.'],
+        [4, 'Nicodemus saith unto him, How can a man be born when he is old? can he enter the second time into his mother\u2019s womb, and be born?'],
+        [5, 'Jesus answered, Verily, verily, I say unto thee, Except a man be born of water and of the Spirit, he cannot enter into the kingdom of God.'],
+        [6, 'That which is born of the flesh is flesh; and that which is born of the Spirit is spirit.']
+      ],
+      hymns: [
+        { n: 12, title: 'Blessed Assurance', key: 'D', first: 'Blessed assurance, Jesus is mine!', sunday: true, verses: ['Blessed assurance, Jesus is mine!\nO what a foretaste of glory divine!\nHeir of salvation, purchase of God,\nBorn of His Spirit, washed in His blood.', 'Perfect submission, perfect delight,\nVisions of rapture now burst on my sight;\nAngels descending bring from above\nEchoes of mercy, whispers of love.'], chorus: 'This is my story, this is my song,\nPraising my Saviour all the day long.' },
+        { n: 27, title: 'Holy, Holy, Holy', key: 'E\u266d', first: 'Holy, holy, holy! Lord God Almighty!', sunday: true, verses: ['Holy, holy, holy! Lord God Almighty!\nEarly in the morning our song shall rise to Thee;\nHoly, holy, holy! merciful and mighty!\nGod in three Persons, blessed Trinity!'] },
+        { n: 45, title: 'Amazing Grace', key: 'G', first: 'Amazing grace! how sweet the sound', verses: ['Amazing grace! how sweet the sound\nThat saved a wretch like me!\nI once was lost, but now am found;\nWas blind, but now I see.', '\u2019Twas grace that taught my heart to fear,\nAnd grace my fears relieved;\nHow precious did that grace appear\nThe hour I first believed!'] },
+        { n: 58, title: 'It Is Well with My Soul', key: 'C', first: 'When peace, like a river, attendeth my way', sunday: true, verses: ['When peace, like a river, attendeth my way,\nWhen sorrows like sea billows roll;\nWhatever my lot, Thou hast taught me to say,\nIt is well, it is well with my soul.'], chorus: 'It is well with my soul,\nIt is well, it is well with my soul.' },
+        { n: 73, title: 'What a Friend We Have in Jesus', key: 'F', first: 'What a friend we have in Jesus', verses: ['What a friend we have in Jesus,\nAll our sins and griefs to bear!\nWhat a privilege to carry\nEverything to God in prayer!'] },
+        { n: 88, title: 'To God Be the Glory', key: 'A\u266d', first: 'To God be the glory, great things He hath done', verses: ['To God be the glory, great things He hath done,\nSo loved He the world that He gave us His Son.'], chorus: 'Praise the Lord, praise the Lord,\nLet the earth hear His voice!' },
+        { n: 104, title: 'Rock of Ages', key: 'B\u266d', first: 'Rock of Ages, cleft for me', verses: ['Rock of Ages, cleft for me,\nLet me hide myself in Thee;\nLet the water and the blood,\nFrom Thy wounded side which flowed,\nBe of sin the double cure;\nSave from wrath and make me pure.'] }
+      ],
+      sermons: [
+        { id: 's1', title: 'Rooted in Love', speaker: 'Rev. Daniel Mweemba', date: 'Sun 27 Sep', ref: 'Ephesians 3:14–21', len: '41 min' },
+        { id: 's2', title: 'Built on the Rock', speaker: 'Pastor Ruth Hamweene', date: 'Sun 20 Sep', ref: 'Matthew 7:24–27', len: '38 min' },
+        { id: 's3', title: 'When the Storm Comes', speaker: 'Rev. Daniel Mweemba', date: 'Sun 13 Sep', ref: 'Mark 4:35–41', len: '44 min' },
+        { id: 's4', title: 'Grace for the Weary', speaker: 'Elder John Siame', date: 'Sun 6 Sep', ref: 'Matthew 11:28–30', len: '35 min' }
+      ],
+      methods: [
+        { id: 'airtel', mark: 'logo', name: 'Airtel Money', sub: 'Tithes & Offerings · ZMW', dial: '*000#', verified: '28 Sep 2026', details: [['Beneficiary', 'Brethren in Christ Church Kafue'], ['Merchant ID', '000000', true]], steps: ['Dial the starting code on your Airtel line, or tap the button below.', 'Choose Make payments, then Pay merchant.', 'Enter the merchant ID shown above.', 'Enter the amount and the reference TITHE or OFFERING.', 'Check the beneficiary name, then enter your PIN to confirm.'] },
+        { id: 'mtn', mark: 'logo', name: 'MTN MoMo', sub: 'Tithes & Offerings · ZMW', dial: '*000#', verified: '28 Sep 2026', details: [['Beneficiary', 'Brethren in Christ Church Kafue'], ['Till number', '000000', true]], steps: ['Dial the starting code on your MTN line, or tap the button below.', 'Choose Pay bill, then Till payment.', 'Enter the till number shown above.', 'Enter the amount and your reference.', 'Check the beneficiary name, then enter your PIN to confirm.'] },
+        { id: 'bank', mark: 'bank', name: 'Bank transfer', sub: 'Building Project · ZMW', verified: '21 Sep 2026', details: [['Bank', 'Sample Bank Zambia'], ['Account name', 'Brethren in Christ Church Kafue', true], ['Account number', '0000 0000 0000', true], ['Branch', 'Kafue · code 000', true], ['Reference', 'BUILDING + your name', true]], steps: ['Open your banking app or visit a branch.', 'Add the church as a new beneficiary using the details above.', 'Use the reference shown so the treasurer can identify the purpose.', 'Check the account name before you confirm.'] },
+        { id: 'cash', mark: 'cash', name: 'At church', sub: 'Offering during the service', verified: '21 Sep 2026', details: [], steps: ['Place your offering in the bag during the Sunday service.', 'For a named tithe envelope, ask an usher at the main door.'] }
+      ],
+      cellInfo: { name: 'Mwembeshi Road cell', leader: 'Grace Banda', assistant: 'Peter Lungu', schedule: 'Thursdays 18:00', members: 12 },
+      meetings: [
+        { id: 'm0', day: 'THU', d: '8', mon: 'OCT', dateLong: 'Thursday 8 October', time: '18:00–19:30', venue: 'Banda home', address: 'Plot 214, Mwembeshi Road', ledBy: 'Grace Banda', topic: 'Rooted in love', ref: 'Ephesians 3:14–21', programme: [['18:00', 'Opening prayer', 'Ruth Zulu'], ['18:10', 'Worship', 'Abel Sakala'], ['18:30', 'Bible study', 'Peter Lungu'], ['19:10', 'Prayer for one another', 'Grace Banda'], ['19:25', 'Closing prayer', 'Mwila Chanda']] },
+        { id: 'm1', day: 'THU', d: '1', mon: 'OCT', dateLong: 'Thursday 1 October', time: '18:00–19:30', venue: 'Lungu home', address: 'House 9, Kafue Estates', ledBy: 'Grace Banda', topic: 'Built on the rock', ref: 'Matthew 7:24–27', present: 12, visitors: 1, summary: 'We read the story of the two builders and talked about the difference between hearing Jesus\u2019 words and putting them into practice. Several members shared how a hard season showed them where their foundation really was.', points: ['Hearing is not the same as doing.', 'Storms come to both houses; the foundation makes the difference.', 'Each of us chose one teaching of Jesus to practise this week.'], programme: [['18:00', 'Opening prayer', 'Esther Mwale'], ['18:10', 'Worship', 'Abel Sakala'], ['18:30', 'Bible study', 'Grace Banda'], ['19:15', 'Closing prayer', 'Peter Lungu']] },
+        { id: 'm2', day: 'THU', d: '24', mon: 'SEP', dateLong: 'Thursday 24 September', time: '18:00–19:30', venue: 'Banda home', address: 'Plot 214, Mwembeshi Road', ledBy: 'Peter Lungu', topic: 'When the storm comes', ref: 'Mark 4:35–41', present: 10, visitors: 0, summary: 'We looked at the disciples in the boat and how fear and faith sat side by side. The group talked about practical ways to support one another when life gets rough.', points: ['Jesus was in the boat the whole time.', 'Fear is honest; bring it to Him.', 'We agreed to check on one another midweek.'], programme: [['18:00', 'Opening prayer', 'Mwila Chanda'], ['18:10', 'Worship', 'Abel Sakala'], ['18:30', 'Bible study', 'Peter Lungu'], ['19:15', 'Closing prayer', 'Grace Banda']] },
+        { id: 'm3', day: 'THU', d: '17', mon: 'SEP', dateLong: 'Thursday 17 September', time: '18:00–19:30', venue: 'Banda home', address: 'Plot 214, Mwembeshi Road', ledBy: 'Grace Banda', topic: 'Grace for the weary', ref: 'Matthew 11:28–30', present: 11, visitors: 2, summary: 'We talked about rest and what it means to take Jesus\u2019 yoke. Two visitors joined us and shared their stories.', points: ['Rest is a gift, not a reward.', 'His yoke is shared, not carried alone.'], programme: [['18:00', 'Opening prayer', 'Ruth Zulu'], ['18:30', 'Bible study', 'Grace Banda']] }
+      ],
+      groups: [
+        { mark: 'U', name: 'Ushers', last: 'Mwansa: Reminder, report at 08:30 on Sunday', unread: 3 },
+        { mark: 'MR', name: 'Mwembeshi Road cell', last: 'Grace: See you all on Thursday', unread: 2 },
+        { mark: 'C', name: 'Choir', last: 'Practice moved to Saturday 15:00', unread: 0 }
+      ]
+    };
+    return this._d;
+  }
+  toast(msg) { this.setState({ toast: msg }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 2200); }
+  go(v, id) { return () => this.setState(s => ({ stack: [...s.stack, { v, id }], sheet: null })); }
+  chip(c) { return { display: 'inline-flex', alignItems: 'center', alignSelf: 'flex-start', padding: '4px 10px', borderRadius: 999, fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', background: `var(--${c}Bg)`, color: c === 'gray' ? 'var(--mut)' : `var(--${c}Fg)` }; }
+  seg(on) { return { flex: 1, height: 40, border: 0, borderRadius: 11, cursor: 'pointer', fontWeight: 600, fontSize: 14, background: on ? 'var(--sf)' : 'transparent', color: on ? 'var(--ink)' : 'var(--mut)', boxShadow: on ? '0 1px 3px rgba(0,0,0,.12)' : 'none' }; }
+  pill(on) { return { flex: 'none', whiteSpace: 'nowrap', height: 38, padding: '0 14px', borderRadius: 19, cursor: 'pointer', fontWeight: 600, fontSize: 14, border: on ? '1.5px solid var(--pri)' : '1px solid var(--line)', background: on ? 'var(--pri)' : 'var(--sf)', color: on ? '#fff' : 'var(--ink)' }; }
+  respond(id) {
+    this.setState(s => ({ resp: { ...s.resp, [id]: 'sending' } }));
+    clearTimeout(this._s);
+    this._s = setTimeout(() => { this.setState(s => ({ resp: { ...s.resp, [id]: 'accepted' } })); this.toast('Accepted. Br. Mwansa Phiri can see your response.'); }, 1100);
+  }
+  visitVals(s, isMember) {
+    const st = s.visit;
+    const meta = { awaiting: ['Awaiting your reply', 'amber'], accepted: ['Confirmed', 'green'], postponed: ['New time suggested', 'blue'], declined: ['Declined', 'gray'] }[st];
+    const visit = { who: 'Rev. Daniel Mweemba', when: 'Sat 10 Oct, 10:00', where: 'Your home', reason: 'Prayer for family', label: meta[0], chip: this.chip(meta[1]), isAwaiting: st === 'awaiting', isAccepted: st === 'accepted', isPostponed: st === 'postponed', isDeclined: st === 'declined', alt: s.visitAlt };
+    const rv = s.rv, setRv = p => this.setState(x => ({ rv: { ...x.rv, ...p } }));
+    const mk = (list, key) => list.map(l => ({ label: l, style: this.pill(rv[key] === l), set: () => setRv({ [key]: l }) }));
+    return {
+      visit, visitCard: isMember && st === 'awaiting', openVisits: this.go('visits'),
+      visitAccept: () => { this.setState({ visit: 'accepted' }); this.toast('Visit confirmed. Rev. Daniel Mweemba has been told.'); },
+      visitPostpone: () => this.setState({ sheet: 'postpone', note: '' }),
+      visitDecline: () => this.setState({ sheet: 'declineVisit', note: '' }),
+      visitDeclineSend: () => { this.setState({ visit: 'declined', sheet: null }); this.toast('The pastor has been told'); },
+      alts: ['Sat 10 Oct, 15:00', 'Sun 11 Oct, 15:30', 'Tue 13 Oct, 17:30'].map(a => ({ label: a, pick: () => { this.setState({ visit: 'postponed', visitAlt: a, sheet: null }); this.toast('Sent. The pastor will confirm the new time.'); } })),
+      otherTime: () => { this.setState({ visit: 'postponed', visitAlt: 'a time agreed by phone', sheet: null }); this.toast('The church office will call you'); },
+      requestVisit: () => this.setState({ sheet: 'requestVisit', rv: { reason: '', where: 'My home', when: 'Saturday', note: '' } }),
+      rvReasons: mk(['Prayer', 'Illness', 'Bereavement', 'Counsel', 'Home blessing', 'Other'], 'reason'),
+      rvWhere: mk(['My home', 'Church office', 'Hospital'], 'where'),
+      rvWhen: mk(['Weekday evening', 'Saturday', 'Sunday afternoon'], 'when'),
+      rv, onRvNote: e => setRv({ note: e.target.value }),
+      rvBtn: { height: 52, borderRadius: 26, border: 0, fontWeight: 700, cursor: rv.reason ? 'pointer' : 'not-allowed', background: rv.reason ? 'var(--pri)' : 'var(--sf2)', color: rv.reason ? '#fff' : 'var(--mut)' },
+      rvSubmit: () => { if (!rv.reason) return; this.setState(x => ({ visitReqs: [{ reason: rv.reason, where: rv.where, when: rv.when, chip: this.chip('amber') }, ...x.visitReqs], sheet: null })); this.toast('Request sent privately to the pastoral team'); },
+      visitReqs: s.visitReqs, hasVisitReqs: s.visitReqs.length > 0,
+      pastVisits: [{ when: 'Mon 14 Sep', reason: 'Home blessing', who: 'Rev. Daniel Mweemba' }]
+    };
+  }
+  renderVals() {
+    const s = this.state, D = this.D(), chip = c => this.chip(c);
+    const role = s.role, isGuest = role === 'guest', isPending = role === 'pending', isLeader = role === 'leader', isMember = role === 'member' || isLeader;
+    const top = s.stack[s.stack.length - 1] || null;
+    const v = {}; ['duties', 'duty', 'leader', 'give', 'sermon', 'hymn', 'profile', 'chat', 'signup', 'event', 'cell', 'meeting', 'visits'].forEach(k => v[k] = !!top && top.v === k);
+    const back = () => this.setState(st => ({ stack: st.stack.slice(0, -1) }));
+    const dark = s.dark;
+    const vars = dark
+      ? { '--bg': '#0A0F1E', '--sf': '#131A2E', '--sf2': '#1B2440', '--ink': '#EDF0F7', '--mut': '#9AA3BC', '--line': '#26304D', '--pri': '#2A6FD0', '--brand': '#DCE6FF', '--link': '#8EC1FF', '--acc': '#3D9BF5', '--hero': '#182A7A', '--amberBg': '#3A2D10', '--amberFg': '#F5C866', '--greenBg': '#10301F', '--greenFg': '#7FD9A6', '--redBg': '#3A1614', '--redFg': '#F4A29A', '--blueBg': '#13284A', '--blueFg': '#9CC7FF', '--grayBg': '#1B2440', '--pageInk': '#E6EAF4', '--pageLine': 'rgba(255,255,255,.14)' }
+      : { '--bg': '#F4F6FA', '--sf': '#FFFFFF', '--sf2': '#EDF0F6', '--ink': '#0E1530', '--mut': '#586079', '--line': '#DFE4EE', '--pri': '#14246B', '--brand': '#14246B', '--link': '#14246B', '--acc': '#0A7FE0', '--hero': '#14246B', '--amberBg': '#FFF1CF', '--amberFg': '#6E4400', '--greenBg': '#DFF3E8', '--greenFg': '#0D6438', '--redBg': '#FCE5E2', '--redFg': '#A3241A', '--blueBg': '#E3EEFC', '--blueFg': '#0B4FA6', '--grayBg': '#EDF0F6', '--pageInk': '#14246B', '--pageLine': 'rgba(20,36,107,.18)' };
+    const rootStyle = { ...vars, minHeight: '100vh', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'flex-start', gap: 48, padding: '40px 24px', background: dark ? '#05080F' : '#E4E8F1', fontFamily: 'Figtree, system-ui, sans-serif', WebkitFontSmoothing: 'antialiased' };
+
+    const tabKeys = ['home', 'bible', 'sermons', 'give', 'calendar'];
+    const t = {}, tabs = {}, tabStyle = {};
+    tabKeys.forEach(k => { t[k] = s.tab === k; tabs[k] = () => this.setState({ tab: k, stack: [] }); tabStyle[k] = { flex: 1, minHeight: 54, border: 0, background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: 11.5, fontWeight: s.tab === k ? 700 : 500, color: s.tab === k ? 'var(--link)' : 'var(--mut)', padding: 0 }; });
+
+    const lbl = { awaiting: 'Awaiting your response', accepted: 'Accepted', declined: "Can't make it · sent", sending: 'Not sent · sending…', completed: 'Completed' };
+    const cc0 = { awaiting: 'amber', accepted: 'green', declined: 'red', sending: 'gray', completed: 'gray' };
+    const duties = D.duties.map(d => {
+      const st = d.past ? 'completed' : s.resp[d.id];
+      return { ...d, st, label: lbl[st], chipStyle: chip(cc0[st]), open: this.go('duty', d.id), isAwaiting: st === 'awaiting', isAccepted: st === 'accepted', isDeclined: st === 'declined', isSending: st === 'sending', isPast: !!d.past,
+        accept: () => this.respond(d.id), decline: () => this.setState({ sheet: 'decline', sheetId: d.id, note: '' }) };
+    });
+    const awaiting = duties.filter(d => d.st === 'awaiting').length;
+    const nx = duties.find(d => !d.past && d.st !== 'declined') || duties[0];
+    const next = { ...nx, notAwaiting: !nx.isAwaiting };
+    const dutyList = duties.filter(d => s.dutyTab === 'respond' ? (d.st === 'awaiting' || d.st === 'sending') : s.dutyTab === 'upcoming' ? (!d.past && (d.st === 'accepted' || d.st === 'declined')) : d.past);
+    const dutyTabs = [['respond', `Needs a response (${awaiting})`], ['upcoming', 'Upcoming'], ['past', 'Past']].map(([k, l]) => ({ label: l, style: this.seg(s.dutyTab === k), set: () => this.setState({ dutyTab: k }) }));
+    const curD = duties.find(d => top && d.id === top.id) || duties.find(d => d.id === s.sheetId) || duties[0];
+    const cd = { ...curD, leaderShort: 'Br. Mwansa', rows: [['Date', curD.dateLong], ['Report at', curD.report], ['Service', curD.time], ['Location', curD.place]].concat(curD.topic ? [['Topic', curD.topic]] : []).concat(curD.past ? [] : [['Respond by', curD.deadline]]).map(([k, v]) => ({ k, v })) };
+
+    const kindMeta = { unfilled: ['Unfilled', 'red'], overdue: ['Overdue response', 'red'], declined: ['Declined', 'red'], contact: ['Needs contact', 'amber'], awaiting: ['Awaiting response', 'amber'], confirmed: ['Confirmed', 'green'], leaderConfirmed: ['Confirmed by leader', 'green'] };
+    const cover = s.cover || D.cover;
+    const setCover = (id, patch) => this.setState(st => ({ cover: (st.cover || D.cover).map(c => c.id === id ? { ...c, ...patch } : c) }));
+    const filtOf = k => k === 'leaderConfirmed' ? 'confirmed' : k;
+    const coverAll = cover.map(c => ({ ...c, label: kindMeta[c.kind][0], chip: chip(kindMeta[c.kind][1]),
+      canCall: ['overdue', 'contact', 'awaiting'].includes(c.kind), canConfirm: ['overdue', 'contact'].includes(c.kind), canReassign: ['unfilled', 'overdue', 'declined'].includes(c.kind),
+      reassignLabel: c.kind === 'unfilled' ? 'Assign' : 'Reassign', hasActions: !['confirmed', 'leaderConfirmed'].includes(c.kind),
+      call: () => this.toast(`Opening phone to call ${c.name}`), confirm: () => this.setState({ sheet: 'confirm', sheetId: c.id, note: '' }), reassign: () => this.setState({ sheet: 'reassign', sheetId: c.id }) }));
+    const cnt = k => cover.filter(c => filtOf(c.kind) === k).length;
+    const coverFilters = [['all', 'All'], ['unfilled', 'Unfilled'], ['overdue', 'Overdue'], ['declined', 'Declined'], ['awaiting', 'Awaiting'], ['contact', 'Needs contact'], ['confirmed', 'Confirmed']].map(([k, l]) => ({ label: k === 'all' ? l : `${l} ${cnt(k)}`, style: this.pill(s.coverFilter === k), set: () => this.setState({ coverFilter: k }) }));
+    const order = { unfilled: 0, overdue: 1, declined: 2, contact: 3, awaiting: 4, leaderConfirmed: 5, confirmed: 6 };
+    const coverList = coverAll.filter(c => s.coverFilter === 'all' || filtOf(c.kind) === s.coverFilter).sort((a, b) => order[a.kind] - order[b.kind]);
+    const sun = cover.filter(c => c.sun), sunOk = sun.filter(c => c.kind === 'confirmed' || c.kind === 'leaderConfirmed').length;
+    const sunConfirmed = `${sunOk} of ${sun.length} confirmed`;
+    const sunBar = { width: `${Math.round(sunOk / sun.length * 100)}%`, height: '100%', background: '#4FB0FF', borderRadius: 4, transition: 'width .4s' };
+    const attention = [['Unfilled', cnt('unfilled')], ['Overdue', cnt('overdue')], ['Declined', cnt('declined')], ['Needs contact', cnt('contact')]].map(([label, n]) => ({ label, n }));
+    const cc = cover.find(c => c.id === s.sheetId) || cover[0];
+    const candidates = D.candidates.map(m => ({ ...m, ini: m.name.split(' ').map(x => x[0]).join(''), metaStyle: { fontSize: 13, color: m.warn ? 'var(--redFg)' : 'var(--mut)', fontWeight: m.warn ? 600 : 400 },
+      pick: () => { setCover(cc.id, { kind: 'awaiting', name: m.name, detail: 'New request sent. Respond by Sat 3 Oct, 09:00.' }); this.setState({ sheet: null }); this.toast(`${m.name} has been asked to serve`); } }));
+
+    const events = D.events.map(e => ({ ...e, poster: 'event poster', open: this.go('event', e.id) }));
+    const ce = D.events.find(e => top && e.id === top.id) || D.events[0];
+    const banners = events.slice(0, 2).map(e => ({ title: e.title, when: e.when, open: e.open }));
+
+    let cal = events.map(e => ({ ...e, time: `${e.time} · ${e.place}`, thumb: true, tag: '' }));
+    if (!isGuest && !isPending && s.calDuties) cal = cal.concat(duties.filter(d => !d.past && d.st !== 'declined').map(d => ({ key: d.key, day: d.day, d: d.d, mon: d.mon, title: `${d.duty} · ${d.dept}`, time: `Report ${d.report} · ${d.place}`, tag: 'My duty', chip: chip('blue'), open: d.open })));
+    if (!isGuest && !isPending && s.calCell) cal = cal.concat(D.cell.map(c => ({ ...c, tag: 'My cell', chip: chip('green'), open: this.go('cell') })));
+    const calItems = cal.sort((a, b) => a.key - b.key);
+
+    const q = s.hymnQ.trim().toLowerCase();
+    const hymnList = D.hymns.filter(h => !q || String(h.n).startsWith(q) || h.title.toLowerCase().includes(q) || h.first.toLowerCase().includes(q)).map(h => ({ ...h, chip: chip('blue'), open: this.go('hymn', h.n) }));
+    const hy = D.hymns.find(h => top && h.n === top.id) || D.hymns[0];
+    const ch = { ...hy, verses: hy.verses.map((t2, i) => ({ n: i + 1, t: t2 })) };
+    const fav = !!s.favs[hy.n];
+
+    const sermons = (s.sermonFilter === 'Speaker' ? [...D.sermons].sort((a, b) => a.speaker.localeCompare(b.speaker)) : D.sermons).map(x => ({ ...x, open: this.go('sermon', x.id) }));
+    const sm = D.sermons.find(x => top && x.id === top.id) || D.sermons[0];
+    const cs = { ...sm, notes1: `Paul prays that the church would be rooted and grounded in love. A tree's roots are unseen, yet they decide whether it stands when the wind comes. This message from ${sm.ref} looks at the hidden habits that keep a believer steady.`, notes2: 'Prayer, Scripture and fellowship are not extras to a busy week. They are where strength to serve comes from. This week, choose one passage to read each morning and one person to pray for by name.' };
+
+    const methods = D.methods.map(m => ({ ...m, open: this.go('give', m.id) }));
+    const gm = D.methods.find(m => top && m.id === top.id) || D.methods[0];
+    const cg = { ...gm, hasDetails: gm.details.length > 0, details: gm.details.map(([k, val, cp]) => ({ k, v: val, copy: cp ? () => { try { navigator.clipboard && navigator.clipboard.writeText(val); } catch (e) {} this.toast(`${k} copied`); } : null })), steps: gm.steps.map((x, i) => ({ n: i + 1, t: x })) };
+
+    const su = s.su, setSu = p => this.setState(st => ({ su: { ...st.su, ...p } }));
+    const digits = su.phone.replace(/\D/g, '');
+    const big = ok => ({ height: 54, borderRadius: 27, border: 0, fontWeight: 700, fontSize: 17, cursor: ok ? 'pointer' : 'not-allowed', background: ok ? 'var(--pri)' : 'var(--sf2)', color: ok ? '#fff' : 'var(--mut)' });
+    const cells = [['mwembeshi', 'Mwembeshi Road cell', 'Mwembeshi · Zone A'], ['estates', 'Kafue Estates cell', 'Kafue Estates · Zone B'], ['shikoswe', 'Shikoswe cell', 'Shikoswe · Zone B'], ['chanyanya', 'Chanyanya cell', 'Chanyanya · Zone C'], ['notsure', "I'm not sure", 'The church office will help you'], ['none', "I'm not in a cell yet", 'You can still apply for membership']];
+    const cellOpts = cells.map(([id, name, area]) => { const on = su.cell === id; return { name, area, pick: () => setSu({ cell: id }),
+      style: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', minHeight: 58, borderRadius: 14, cursor: 'pointer', background: on ? 'var(--blueBg)' : 'var(--sf)', border: on ? '2px solid var(--acc)' : '1.5px solid var(--line)' },
+      dot: { width: 20, height: 20, flex: 'none', borderRadius: '50%', border: on ? '6px solid var(--acc)' : '2px solid var(--line)', background: 'var(--sf)' } }; });
+    const pickedCell = cells.find(c => c[0] === su.cell);
+    let cellStatus, cellChip;
+    if (isMember) { cellStatus = 'Mwembeshi Road cell · Confirmed'; cellChip = chip('green'); }
+    else if (!pickedCell || su.cell === 'notsure') { cellStatus = 'Not sure · office will follow up'; cellChip = chip('gray'); }
+    else if (su.cell === 'none') { cellStatus = 'Not in a cell yet'; cellChip = chip('gray'); }
+    else { cellStatus = `${pickedCell[1]} · Awaiting confirmation`; cellChip = chip('amber'); }
+    const profileName = isPending ? (su.name.trim() || 'Mutinta Hamoonga') : 'Mwila Chanda';
+    const initials = profileName.split(' ').map(x => x[0]).slice(0, 2).join('').toUpperCase();
+
+    const roleBtn = on => ({ height: 40, borderRadius: 10, cursor: 'pointer', fontWeight: 600, fontSize: 14, border: on ? '1.5px solid var(--pageInk)' : '1px solid var(--pageLine)', background: on ? 'var(--pageInk)' : 'transparent', color: on ? (dark ? '#05080F' : '#fff') : 'var(--pageInk)' });
+    const setRole = r => this.setState({ role: r, stack: [], sheet: null });
+    const roles = [['guest', 'Guest'], ['pending', 'Pending'], ['member', 'Member'], ['leader', 'Leader']].map(([k, l]) => ({ label: l, style: roleBtn(role === k), set: () => setRole(k) }));
+    const jump = (label, fn) => ({ label, go: fn });
+    const jumps = [
+      jump('Home', () => this.setState({ tab: 'home', sheet: null, stack: [] })),
+      jump('My duties', () => this.setState({ role: isMember ? role : 'member', tab: 'home', sheet: null, stack: [{ v: 'duties' }] })),
+      jump('Duty detail', () => this.setState({ role: isMember ? role : 'member', tab: 'home', sheet: null, stack: [{ v: 'duty', id: 'd1' }] })),
+      jump('Leader coverage', () => this.setState({ role: 'leader', tab: 'home', sheet: null, stack: [{ v: 'leader' }] })),
+      jump('My cell', () => this.setState({ role: isMember ? role : 'member', tab: 'home', sheet: null, stack: [{ v: 'cell' }] })),
+      jump('Cell meeting recap', () => this.setState({ role: isMember ? role : 'member', tab: 'home', sheet: null, stack: [{ v: 'cell' }, { v: 'meeting', id: 'm1' }] })),
+      jump('Pastoral visits', () => this.setState({ role: isMember ? role : 'member', tab: 'home', sheet: null, stack: [{ v: 'visits' }] })),
+      jump('Give instructions', () => this.setState({ tab: 'give', sheet: null, stack: [{ v: 'give', id: 'airtel' }] })),
+      jump('Phone sign-up', () => this.setState({ role: 'guest', sheet: null, stack: [{ v: 'signup' }], su: { step: 1, phone: '', code: '', name: '', cell: '', email: '' } })),
+      jump('Profile', () => this.setState({ role: isGuest ? 'member' : role, sheet: null, stack: [{ v: 'profile' }] }))
+    ];
+
+    return {
+      rootStyle, t, tabs, tabStyle, v, back, isGuest, isPending, isLeader, isMember, showMemberChrome: !isGuest,
+      chips: { amber: chip('amber'), blue: chip('blue'), gray: chip('gray') }, toast: s.toast, initials, profileName,
+      ...(() => { const ME = 'Mwila Chanda'; const ms = D.meetings.map(m => ({ ...m, open: this.go('meeting', m.id), studyLead: (m.programme.find(p => p[1] === 'Bible study') || [])[2], programme: m.programme.map(([time, part, who]) => ({ time, part, who: who === ME ? 'You' : who, me: who === ME })), points: (m.points || []).map((p, i) => ({ n: i + 1, t: p })), attendance: m.present != null ? `${m.present} present · ${m.visitors} visitor${m.visitors === 1 ? '' : 's'}` : '' })); return { cellInfo: D.cellInfo, cellNext: ms[0], cellLast: ms[1], cellPast: ms.slice(2), cm: ms.find(m => top && m.id === top.id) || ms[1], myPart: ms[0].programme.find(p => p.me) || null }; })(),
+      openCell: this.go('cell'), openMaps: () => this.toast('Opening maps to Plot 214, Mwembeshi Road'), cantAttend: () => this.toast('Grace Banda will see you are excused'),
+      openSearch: () => this.toast('Search sermons, hymns and events'),
+      openChat: () => isPending ? this.toast('Group chat opens once your membership is approved') : this.go('chat')(),
+      openProfile: this.go('profile'), openSignup: () => this.setState({ stack: [{ v: 'signup' }] }),
+      openLeader: this.go('leader'), openDuties: this.go('duties'), openFollow: () => this.toast('My follow-ups: 2 open tasks'),
+      openHymnsTab: () => this.setState({ tab: 'bible', bible: 'hymns', stack: [] }),
+      banners, events, attention, sunConfirmed, sunBar,
+      hasAwaiting: awaiting > 0, awaitingLabel: `${awaiting} awaiting response`, next,
+      sundayHymns: D.hymns.filter(h => h.sunday).map(h => ({ n: h.n, title: h.title, open: this.go('hymn', h.n) })),
+      dutyTabs, dutyList, dutyEmpty: dutyList.length === 0, dutyEmptyText: s.dutyTab === 'respond' ? 'Nothing waiting for your response.' : s.dutyTab === 'upcoming' ? 'You have no upcoming duties.' : 'No past duties yet.',
+      cd, callLeader: () => this.toast('Opening phone to call Br. Mwansa Phiri'), addCal: () => this.toast('Added to your phone calendar'),
+      coverFilters, coverList, cc, candidates,
+      bibleMode: s.bible === 'bible', hymnMode: s.bible === 'hymns', segBible: this.seg(s.bible === 'bible'), segHymns: this.seg(s.bible === 'hymns'),
+      setBible: () => this.setState({ bible: 'bible' }), setHymns: () => this.setState({ bible: 'hymns' }),
+      pickChapter: () => this.toast('Book and chapter picker'), pickTranslation: () => this.toast('Translations cleared for use: KJV'),
+      verses: D.verses.map(([n, t2]) => ({ n, t: t2 })),
+      hymnQ: s.hymnQ, onHymnQ: e => this.setState({ hymnQ: e.target.value }), hymnList, noHymns: hymnList.length === 0,
+      ch, toggleFav: () => this.setState(st => ({ favs: { ...st.favs, [hy.n]: !st.favs[hy.n] } })), favLabel: fav ? 'Saved' : 'Save', favStyle: { ...this.pill(fav), marginRight: 4 },
+      sermonFilters: ['Latest', 'Series', 'Speaker'].map(l => ({ label: l, style: this.pill(s.sermonFilter === l), set: () => this.setState({ sermonFilter: l }) })),
+      sermons, cs, openLatest: this.go('sermon', 's1'), playAudio: () => this.toast('Playing audio'),
+      methods, cg, dial: () => this.toast(`Opening dialler with ${gm.dial}`),
+      calItems, toggleCalDuties: () => this.setState(st => ({ calDuties: !st.calDuties })), toggleCalCell: () => this.setState(st => ({ calCell: !st.calCell })),
+      calDutyChip: this.pill(s.calDuties), calCellChip: this.pill(s.calCell), calDutyLabel: s.calDuties ? '✓ My duties' : 'My duties', calCellLabel: s.calCell ? '✓ My cell' : 'My cell',
+      ce, groups: D.groups.map(g => ({ ...g, open: () => this.toast(`${g.name} chat`) })),
+      churchStatus: isPending ? 'Awaiting church approval' : 'Approved member', churchChip: chip(isPending ? 'amber' : 'green'),
+      cellStatus, cellChip, cellAction: isPending ? 'Correct my request' : 'Request a cell change',
+      cellChange: () => this.toast(isPending ? 'You can edit your request until it is reviewed' : 'Your new cell leader will confirm the change'),
+      menu: [['My cell', 'Mwembeshi Road', this.go('cell')], ['Pastoral visits', s.visit === 'awaiting' ? '1 to answer' : '', this.go('visits')], ['My duties', `${awaiting} to answer`, this.go('duties')], ['My follow-ups', isLeader ? '2 open' : '', () => this.toast('My follow-ups')], ['Prayer requests', '', () => this.toast('Prayer requests')], ['Directory', 'Hidden', () => this.toast('Choose which details members can see')], ['Departments', 'Ushering, Intercession', () => this.toast('Your departments')], ['Notifications', '', () => this.toast('Notification settings')], ['Account', '', () => this.toast('Account and deletion options')]].map(([label, meta, open]) => ({ label, meta, open })),
+      signOut: () => setRole('guest'),
+      su, su1: su.step === 1, su2: su.step === 2, su3: su.step === 3, su4: su.step === 4, suStepLabel: su.step < 4 ? `Step ${su.step} of 3` : '',
+      suBack: () => su.step > 1 && su.step < 4 ? setSu({ step: su.step - 1 }) : back(),
+      onPhone: e => setSu({ phone: e.target.value }), onCode: e => setSu({ code: e.target.value.replace(/\D/g, '').slice(0, 6) }),
+      onName: e => setSu({ name: e.target.value }), onEmail: e => setSu({ email: e.target.value }),
+      suBtn1: big(digits.length >= 9), suBtn2: big(su.code.length === 6), suBtn3: big(su.name.trim() && su.cell),
+      suSend: () => digits.length >= 9 && setSu({ step: 2 }), suVerify: () => su.code.length === 6 && setSu({ step: 3 }),
+      suSubmit: () => su.name.trim() && su.cell && setSu({ step: 4 }), suWrong: () => setSu({ step: 1, code: '' }),
+      needHelp: () => this.toast('The church office will verify you in person'),
+      suFirst: su.name.trim().split(' ')[0] || 'friend',
+      suDone: () => this.setState({ role: 'pending', stack: [], tab: 'home' }),
+      sheetOpen: !!s.sheet, sh: { decline: s.sheet === 'decline', confirm: s.sheet === 'confirm', reassign: s.sheet === 'reassign', postpone: s.sheet === 'postpone', declineVisit: s.sheet === 'declineVisit', requestVisit: s.sheet === 'requestVisit' },
+      ...this.visitVals(s, isMember),
+      closeSheet: () => this.setState({ sheet: null }), note: s.note, onNote: e => this.setState({ note: e.target.value }),
+      declineSend: () => { const id = s.sheetId; this.setState(st => ({ resp: { ...st.resp, [id]: 'declined' }, sheet: null })); this.toast('Br. Mwansa Phiri has been notified'); },
+      confirmSave: () => { setCover(cc.id, { kind: 'leaderConfirmed', detail: `Confirmed by Mwansa Phiri, Fri 2 Oct${s.note.trim() ? ' · ' + s.note.trim() : ''}` }); this.setState({ sheet: null }); this.toast('Recorded as Confirmed by leader'); },
+      roles, jumps, lightBtn: roleBtn(!dark), darkBtn: roleBtn(dark), setLight: () => this.setState({ dark: false }), setDark: () => this.setState({ dark: true })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Outfit:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>body{margin:0;background:#F4F6FA}*{box-sizing:border-box}a{color:#14246B}a:hover{color:#0A7FE0}input,textarea,button,select{font:inherit;color:inherit}</style>
+</helmet>
+<div style="min-height:100vh;display:flex;font-family:Figtree,system-ui,sans-serif;color:#0E1530;background:#F4F6FA;font-size:15px;line-height:1.4">
+
+<aside style="width:232px;flex:none;background:#14246B;color:#fff;display:flex;flex-direction:column;gap:22px;padding:20px 14px;position:sticky;top:0;height:100vh">
+<div style="display:flex;justify-content:center;padding:4px 0 6px"><img src="assets/bic-logo.png" alt="Brethren in Christ Church Kafue" style="width:84px;height:84px;border-radius:50%;background:#fff"></div>
+<div style="display:flex;flex-direction:column;gap:6px"><div style="font-size:11px;font-weight:700;letter-spacing:.1em;opacity:.6;padding:0 10px">SIGNED IN AS</div><div style="display:flex;flex-direction:column;gap:2px;padding:3px;border-radius:10px;background:rgba(255,255,255,.08)"><sc-for list="{{ roles }}" as="r" hint-placeholder-count="3"><button onClick="{{ r.set }}" style="{{ r.style }}">{{ r.label }}</button></sc-for></div><div style="font-size:12px;opacity:.7;padding:0 10px">{{ whoLine }}</div></div>
+<nav style="display:flex;flex-direction:column;gap:2px">
+<sc-for list="{{ nav }}" as="n" hint-placeholder-count="5"><button onClick="{{ n.go }}" style="{{ n.style }}"><span>{{ n.label }}</span><sc-if value="{{ n.badge }}" hint-placeholder-val="{{ false }}"><span style="min-width:22px;height:20px;padding:0 6px;border-radius:10px;background:#0A7FE0;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ n.badge }}</span></sc-if></button></sc-for>
+</nav>
+<div style="margin-top:auto;font-size:12px;opacity:.6;padding:0 10px;line-height:1.5">Church admin · v1 prototype. Changes here appear in the member app.</div>
+</aside>
+
+<main style="flex:1;min-width:0;display:flex;flex-direction:column">
+<header style="display:flex;align-items:center;gap:16px;padding:18px 32px;border-bottom:1px solid #DFE4EE;background:#fff;position:sticky;top:0;z-index:5">
+<div style="flex:1;min-width:0"><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:24px;color:#14246B">{{ pageTitle }}</div><div style="font-size:14px;color:#586079">{{ pageSub }}</div></div>
+<sc-if value="{{ showPublish }}" hint-placeholder-val="{{ false }}"><button onClick="{{ publishRota }}" style="{{ publishStyle }}">{{ publishLabel }}</button></sc-if>
+</header>
+
+<div style="padding:28px 32px 48px;display:flex;flex-direction:column;gap:24px;max-width:1280px;width:100%">
+
+<sc-if value="{{ p.overview }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px">
+<sc-for list="{{ tiles }}" as="t" hint-placeholder-count="4"><button onClick="{{ t.go }}" style="text-align:left;padding:18px;border-radius:16px;background:#fff;border:1px solid #DFE4EE;cursor:pointer;display:flex;flex-direction:column;gap:6px"><span style="font-family:Outfit,sans-serif;font-weight:700;font-size:34px;line-height:1;color:#14246B">{{ t.n }}</span><span style="font-weight:600">{{ t.label }}</span><span style="font-size:13px;color:#586079">{{ t.sub }}</span></button></sc-for>
+</div>
+<div style="background:#fff;border:1px solid #DFE4EE;border-radius:16px;overflow:hidden">
+<div style="padding:16px 20px;border-bottom:1px solid #DFE4EE;font-family:Outfit,sans-serif;font-weight:600;font-size:18px">Needs attention</div>
+<sc-for list="{{ attention }}" as="a" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid #EDF0F6"><span style="{{ a.chip }}">{{ a.tag }}</span><div style="flex:1;min-width:0"><div style="font-weight:600">{{ a.title }}</div><div style="font-size:13px;color:#586079">{{ a.sub }}</div></div><button onClick="{{ a.go }}" style="height:36px;padding:0 14px;border-radius:18px;border:1px solid #DFE4EE;background:#fff;font-weight:600;font-size:14px;cursor:pointer">Open</button></div></sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ p.members }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+<div style="display:flex;padding:4px;border-radius:12px;background:#EDF0F6"><sc-for list="{{ memberTabs }}" as="mt" hint-placeholder-count="2"><button onClick="{{ mt.set }}" style="{{ mt.style }}">{{ mt.label }}</button></sc-for></div>
+<div style="flex:1"></div>
+<sc-if value="{{ allTab }}" hint-placeholder-val="{{ false }}"><input value="{{ q }}" onChange="{{ onQ }}" placeholder="Search members" style="width:260px;max-width:100%;height:40px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;padding:0 12px;outline:0"><button onClick="{{ addMember }}" style="height:40px;padding:0 16px;border-radius:10px;border:0;background:#14246B;color:#fff;font-weight:600;cursor:pointer">Add member record</button></sc-if>
+</div>
+<sc-if value="{{ appTab }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:12px">
+<sc-for list="{{ apps }}" as="ap" hint-placeholder-count="3">
+<div style="background:#fff;border:1px solid #DFE4EE;border-radius:16px;padding:18px 20px;display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+<div style="flex:1;min-width:240px;display:flex;flex-direction:column;gap:6px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-weight:700;font-size:17px">{{ ap.name }}</span><span style="{{ ap.chip }}">{{ ap.statusLabel }}</span></div><div style="font-size:14px;color:#586079">{{ ap.phone }} · {{ ap.email }} · submitted {{ ap.submitted }}</div><div style="font-size:14px">Cell choice: <strong>{{ ap.cell }}</strong></div><sc-if value="{{ ap.dup }}" hint-placeholder-val="{{ false }}"><div style="font-size:14px;padding:8px 12px;border-radius:10px;background:#FFF1CF;color:#6E4400">{{ ap.dup }}</div></sc-if></div>
+<sc-if value="{{ ap.open }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:8px;flex-wrap:wrap"><sc-if value="{{ ap.dup }}" hint-placeholder-val="{{ false }}"><button onClick="{{ ap.link }}" style="height:40px;padding:0 14px;border-radius:10px;border:0;background:#14246B;color:#fff;font-weight:600;cursor:pointer">Link to existing record</button></sc-if><button onClick="{{ ap.approve }}" style="{{ ap.approveStyle }}">Approve</button><button onClick="{{ ap.ask }}" style="height:40px;padding:0 14px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;font-weight:600;cursor:pointer">Ask for details</button><button onClick="{{ ap.reject }}" style="height:40px;padding:0 14px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;color:#A3241A;font-weight:600;cursor:pointer">Reject</button></div></sc-if>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ allTab }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;gap:20px;align-items:flex-start">
+<div style="flex:1;min-width:0;background:#fff;border:1px solid #DFE4EE;border-radius:16px;overflow-x:auto">
+<div style="display:grid;grid-template-columns:minmax(180px,1.4fr) minmax(150px,1fr) minmax(160px,1.2fr) minmax(120px,.8fr) 110px;min-width:760px;font-size:12px;font-weight:700;letter-spacing:.06em;color:#586079;padding:12px 20px;border-bottom:1px solid #DFE4EE"><span>NAME</span><span>CELL</span><span>DEPARTMENTS</span><span>ROLES</span><span>ACCOUNT</span></div>
+<sc-for list="{{ memberRows }}" as="m" hint-placeholder-count="8"><div onClick="{{ m.open }}" style="{{ m.rowStyle }}"><span style="display:flex;flex-direction:column"><span style="font-weight:600">{{ m.name }}</span><span style="font-size:13px;color:#586079">{{ m.phone }}</span></span><span>{{ m.cell }}</span><span style="font-size:14px;color:#586079">{{ m.depts }}</span><span style="font-size:14px">{{ m.roleText }}</span><span style="{{ m.accChip }}">{{ m.acc }}</span></div></sc-for>
+</div>
+<sc-if value="{{ drawer }}" hint-placeholder-val="{{ false }}">
+<div style="width:320px;flex:none;background:#fff;border:1px solid #DFE4EE;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:16px;position:sticky;top:110px">
+<div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:20px">{{ dm.name }}</div><div style="font-size:14px;color:#586079">{{ dm.phone }}</div></div><button onClick="{{ closeDrawer }}" aria-label="Close" style="width:32px;height:32px;border-radius:16px;border:0;background:#EDF0F6;cursor:pointer;font-weight:700">×</button></div>
+<div style="display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px"><span style="color:#586079">Membership</span><span>Approved</span><span style="color:#586079">Cell</span><span>{{ dm.cell }}</span><span style="color:#586079">Departments</span><span>{{ dm.depts }}</span><span style="color:#586079">Account</span><span>{{ dm.acc }}</span></div>
+<div style="display:flex;flex-direction:column;gap:8px"><div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#586079">ROLES</div><div style="display:flex;gap:8px;flex-wrap:wrap"><sc-for list="{{ dm.roleToggles }}" as="rt" hint-placeholder-count="4"><button onClick="{{ rt.toggle }}" style="{{ rt.style }}">{{ rt.label }}</button></sc-for></div><div style="font-size:12px;color:#586079">Role changes are recorded in the audit log.</div></div>
+<div style="display:flex;flex-direction:column;gap:8px;padding-top:4px;border-top:1px solid #EDF0F6"><button onClick="{{ hold }}" style="height:40px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;font-weight:600;cursor:pointer">Place access review hold</button><button onClick="{{ deactivate }}" style="height:40px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;color:#A3241A;font-weight:600;cursor:pointer">Deactivate membership</button></div>
+</div>
+</sc-if>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{ p.cells }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+<sc-if value="{{ isAdmin }}" hint-placeholder-val="{{ true }}">
+<div style="width:280px;flex:none;display:flex;flex-direction:column;gap:10px">
+<sc-for list="{{ cellCards }}" as="c" hint-placeholder-count="4"><button onClick="{{ c.select }}" style="{{ c.style }}"><span style="display:flex;justify-content:space-between;width:100%;gap:8px"><span style="font-weight:700">{{ c.name }}</span><sc-if value="{{ c.req }}" hint-placeholder-val="{{ false }}"><span style="min-width:22px;height:20px;padding:0 6px;border-radius:10px;background:#0A7FE0;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center">{{ c.req }}</span></sc-if></span><span style="font-size:13px;color:#586079">{{ c.zone }} · {{ c.count }} members</span><span style="font-size:13px;color:#586079">Leader {{ c.leader }}</span></button></sc-for>
+<button onClick="{{ newCell }}" style="height:44px;border-radius:12px;border:1.5px dashed #C9D0E0;background:transparent;font-weight:600;color:#14246B;cursor:pointer">+ New cell</button>
+</div>
+</sc-if>
+<div style="flex:1;min-width:320px;display:flex;flex-direction:column;gap:16px">
+<div style="background:#fff;border:1px solid #DFE4EE;border-radius:16px;padding:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:#586079">Cell leader</span><select value="{{ sc.leader }}" onChange="{{ onLeader }}" style="height:42px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;padding:0 10px"><sc-for list="{{ peopleOpts }}" as="o" hint-placeholder-count="4"><option value="{{ o }}">{{ o }}</option></sc-for></select></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:#586079">Assistant</span><select value="{{ sc.assistant }}" onChange="{{ onAssistant }}" style="height:42px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;padding:0 10px"><sc-for list="{{ peopleOpts }}" as="o" hint-placeholder-count="4"><option value="{{ o }}">{{ o }}</option></sc-for></select></label>
+<div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:#586079">Meets</span><span style="height:42px;display:flex;align-items:center;font-weight:600">{{ sc.schedule }}</span></div>
+<div style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:#586079">Usual venue</span><span style="height:42px;display:flex;align-items:center;font-weight:600">{{ sc.venue }}</span></div>
+</div>
+<sc-if value="{{ hasReqs }}" hint-placeholder-val="{{ true }}">
+<div style="background:#fff;border:1px solid #DFE4EE;border-radius:16px;overflow:hidden"><div style="padding:14px 20px;border-bottom:1px solid #DFE4EE;font-family:Outfit,sans-serif;font-weight:600;font-size:17px">Membership requests</div>
+<sc-for list="{{ reqs }}" as="r" hint-placeholder-count="2"><div style="display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid #EDF0F6;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div style="font-weight:600">{{ r.name }}</div><div style="font-size:13px;color:#586079">{{ r.note }}</div></div><button onClick="{{ r.confirm }}" style="height:38px;padding:0 14px;border-radius:10px;border:0;background:#14246B;color:#fff;font-weight:600;cursor:pointer">Confirm in cell</button><button onClick="{{ r.decline }}" style="height:38px;padding:0 14px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;font-weight:600;cursor:pointer">Not in this cell</button></div></sc-for>
+</div>
+</sc-if>
+<div style="background:#fff;border:1px solid #DFE4EE;border-radius:16px;overflow:hidden"><div style="padding:14px 20px;border-bottom:1px solid #DFE4EE;display:flex;justify-content:space-between;align-items:center"><span style="font-family:Outfit,sans-serif;font-weight:600;font-size:17px">Members ({{ scMembers.length }})</span><span style="font-size:13px;color:#586079">Confirmed members only</span></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+<sc-for list="{{ scMembers }}" as="m" hint-placeholder-count="6"><div style="display:flex;align-items:center;gap:10px;padding:12px 20px;border-bottom:1px solid #EDF0F6"><span style="width:34px;height:34px;flex:none;border-radius:50%;background:#E3EEFC;color:#0B4FA6;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center">{{ m.ini }}</span><span style="display:flex;flex-direction:column"><span style="font-weight:600">{{ m.name }}</span><span style="font-size:12px;color:#586079">{{ m.tag }}</span></span></div></sc-for>
+</div></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ p.rotas }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;gap:8px;flex-wrap:wrap"><sc-for list="{{ depts }}" as="d" hint-placeholder-count="5"><button onClick="{{ d.set }}" style="{{ d.style }}">{{ d.label }}</button></sc-for></div>
+<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:#586079"><sc-for list="{{ legend }}" as="l" hint-placeholder-count="5"><span style="display:flex;align-items:center;gap:6px"><span style="{{ l.chip }}">{{ l.label }}</span></span></sc-for></div>
+<div style="background:#fff;border:1px solid #DFE4EE;border-radius:16px;overflow-x:auto">
+<div style="display:grid;grid-template-columns:160px repeat(4,minmax(170px,1fr));min-width:860px">
+<div style="padding:14px 16px;border-bottom:1px solid #DFE4EE;font-size:12px;font-weight:700;letter-spacing:.06em;color:#586079">POSITION</div>
+<sc-for list="{{ rotaDates }}" as="rd" hint-placeholder-count="4"><div style="padding:12px 16px;border-bottom:1px solid #DFE4EE;border-left:1px solid #EDF0F6"><div style="font-weight:700">{{ rd.label }}</div><div style="font-size:12px;color:#586079">{{ rd.cov }}</div></div></sc-for>
+<sc-for list="{{ rotaCells }}" as="rc" hint-placeholder-count="20">
+<sc-if value="{{ rc.isHead }}" hint-placeholder-val="{{ false }}"><div style="padding:14px 16px;border-bottom:1px solid #EDF0F6;font-weight:600;display:flex;align-items:center">{{ rc.pos }}</div></sc-if>
+<sc-if value="{{ rc.isSlot }}" hint-placeholder-val="{{ true }}"><div style="padding:8px;border-bottom:1px solid #EDF0F6;border-left:1px solid #EDF0F6;min-height:64px">
+<sc-if value="{{ rc.editing }}" hint-placeholder-val="{{ false }}"><select onChange="{{ rc.assign }}" value="" style="width:100%;height:44px;border-radius:10px;border:2px solid #0A7FE0;background:#fff;padding:0 8px"><option value="">Choose member…</option><sc-for list="{{ rc.opts }}" as="o" hint-placeholder-count="4"><option value="{{ o.name }}">{{ o.label }}</option></sc-for></select></sc-if>
+<sc-if value="{{ rc.show }}" hint-placeholder-val="{{ true }}"><button onClick="{{ rc.edit }}" style="{{ rc.style }}"><span style="font-weight:600;font-size:14px">{{ rc.name }}</span><span style="font-size:12px">{{ rc.label }}</span></button></sc-if>
+</div></sc-if>
+</sc-for>
+</div>
+</div>
+<div style="font-size:13px;color:#586079">Click a slot to assign or reassign. Drafts are visible only to the department leader, deputy and Pastor/Admin until published. Publishing asks each member to accept or decline in the app.</div>
+</sc-if>
+
+<sc-if value="{{ p.meetings }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+<div style="display:flex;padding:4px;border-radius:12px;background:#EDF0F6"><sc-for list="{{ meetTabs }}" as="mt" hint-placeholder-count="2"><button onClick="{{ mt.set }}" style="{{ mt.style }}">{{ mt.label }}</button></sc-for></div>
+<div style="flex:1"></div><span style="font-size:14px;color:#586079">Mwembeshi Road cell</span>
+</div>
+
+<sc-if value="{{ planTab }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+<div style="flex:1;min-width:440px;display:flex;flex-direction:column;gap:16px">
+<div style="background:#fff;border:1px solid #DFE4EE;border-radius:16px;padding:20px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px">
+<sc-for list="{{ planFields }}" as="f" hint-placeholder-count="6"><label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:#586079">{{ f.label }}</span><input value="{{ f.value }}" onChange="{{ f.onChange }}" style="height:42px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;padding:0 12px;outline:0"></label></sc-for>
+</div>
+<div style="background:#fff;border:1px solid #DFE4EE;border-radius:16px;overflow:hidden">
+<div style="padding:14px 20px;border-bottom:1px solid #DFE4EE;display:flex;justify-content:space-between;align-items:center"><span style="font-family:Outfit,sans-serif;font-weight:600;font-size:17px">Programme</span><span style="font-size:13px;color:#586079">Each person sees their part on their phone</span></div>
+<sc-for list="{{ prog }}" as="pr" hint-placeholder-count="5"><div style="display:grid;grid-template-columns:90px minmax(0,1fr) minmax(0,1fr) 36px;gap:10px;padding:10px 20px;border-bottom:1px solid #EDF0F6;align-items:center"><input value="{{ pr.time }}" onChange="{{ pr.onTime }}" style="height:40px;border-radius:10px;border:1px solid #DFE4EE;padding:0 10px;font-family:'JetBrains Mono',monospace;font-size:14px;outline:0"><input value="{{ pr.part }}" onChange="{{ pr.onPart }}" style="height:40px;border-radius:10px;border:1px solid #DFE4EE;padding:0 10px;outline:0"><select value="{{ pr.who }}" onChange="{{ pr.onWho }}" style="height:40px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;padding:0 8px"><sc-for list="{{ cellPeople }}" as="o" hint-placeholder-count="4"><option value="{{ o }}">{{ o }}</option></sc-for></select><button onClick="{{ pr.remove }}" aria-label="Remove" style="width:36px;height:36px;border-radius:18px;border:0;background:#EDF0F6;cursor:pointer;font-weight:700">×</button></div></sc-for>
+<div style="padding:12px 20px"><button onClick="{{ addPart }}" style="height:38px;padding:0 14px;border-radius:10px;border:1.5px dashed #C9D0E0;background:transparent;font-weight:600;color:#14246B;cursor:pointer">+ Add part</button></div>
+</div>
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button onClick="{{ publishMeeting }}" style="height:46px;padding:0 22px;border-radius:12px;border:0;background:#14246B;color:#fff;font-weight:700;cursor:pointer">{{ meetPublishLabel }}</button><button onClick="{{ cancelMeeting }}" style="height:46px;padding:0 18px;border-radius:12px;border:1px solid #DFE4EE;background:#fff;font-weight:600;cursor:pointer">Cancel this meeting</button><span style="font-size:13px;color:#586079">Members get a reminder the day before.</span></div>
+</div>
+<div style="width:340px;flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#586079">WHAT MEMBERS SEE</div>
+<div style="border-radius:28px;background:#fff;border:8px solid #0E1530;padding:18px 16px;display:flex;flex-direction:column;gap:12px">
+<div style="font-family:Outfit,sans-serif;font-weight:600;font-size:17px">Next meeting</div>
+<div style="display:flex;gap:12px;align-items:center"><div style="width:50px;flex:none;border-radius:12px;background:#E3EEFC;color:#0B4FA6;padding:6px 0;text-align:center;line-height:1.05"><div style="font-size:10px;font-weight:700">THU</div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:20px">8</div><div style="font-size:10px;font-weight:700">OCT</div></div><div><div style="font-weight:700">{{ plan.date }}</div><div style="font-size:13px;color:#586079">{{ plan.time }}</div></div></div>
+<div style="font-size:14px"><strong>{{ plan.venue }}</strong><br><span style="color:#586079">{{ plan.address }}</span></div>
+<div style="font-size:14px;padding:10px 12px;border-radius:12px;background:#F4F6FA"><div style="font-weight:600">{{ plan.topic }}</div><div style="color:#0B4FA6;font-weight:600">{{ plan.ref }}</div></div>
+<sc-for list="{{ prog }}" as="pr" hint-placeholder-count="5"><div style="display:flex;gap:10px;font-size:14px"><span style="width:40px;flex:none;font-family:'JetBrains Mono',monospace;font-size:12px;color:#586079;padding-top:2px">{{ pr.time }}</span><span style="flex:1"><span style="font-weight:600">{{ pr.part }}</span><br><span style="color:#586079">{{ pr.who }}</span></span></div></sc-for>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ recTab }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap">
+<div style="width:360px;flex:none;background:#fff;border:1px solid #DFE4EE;border-radius:16px;overflow:hidden">
+<div style="padding:14px 20px;border-bottom:1px solid #DFE4EE;display:flex;justify-content:space-between;align-items:center"><span style="font-family:Outfit,sans-serif;font-weight:600;font-size:17px">Attendance</span><span style="font-size:13px;color:#586079">{{ attSummary }}</span></div>
+<sc-for list="{{ attendance }}" as="at" hint-placeholder-count="8"><div style="display:flex;align-items:center;gap:10px;padding:8px 14px 8px 20px;border-bottom:1px solid #EDF0F6"><span style="flex:1;font-weight:500">{{ at.name }}</span><div style="display:flex;gap:4px"><sc-for list="{{ at.opts }}" as="o" hint-placeholder-count="3"><button onClick="{{ o.set }}" style="{{ o.style }}">{{ o.label }}</button></sc-for></div></div></sc-for>
+<div style="padding:12px 20px;display:flex;flex-direction:column;gap:8px"><div style="font-size:13px;font-weight:600;color:#586079">Visitors</div><sc-for list="{{ visitors }}" as="vi" hint-placeholder-count="1"><div style="font-size:14px">{{ vi }}</div></sc-for><div style="display:flex;gap:8px"><input value="{{ visitorName }}" onChange="{{ onVisitor }}" placeholder="Visitor name" style="flex:1;height:38px;border-radius:10px;border:1px solid #DFE4EE;padding:0 10px;outline:0"><button onClick="{{ addVisitor }}" style="height:38px;padding:0 12px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;font-weight:600;cursor:pointer">Add</button></div></div>
+</div>
+<div style="flex:1;min-width:380px;display:flex;flex-direction:column;gap:16px">
+<div style="background:#fff;border:1px solid #DFE4EE;border-radius:16px;padding:20px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><div style="font-family:Outfit,sans-serif;font-weight:600;font-size:17px">Thu 1 Oct · Lungu home</div><div style="font-size:13px;color:#586079">Led by Grace Banda · Built on the rock, Matthew 7:24–27</div></div><span style="{{ reportChip }}">{{ reportStatus }}</span></div>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:#586079">What we discussed <span style="font-weight:400">· shared with cell members</span></span><textarea value="{{ summary }}" onChange="{{ onSummary }}" rows="5" style="border-radius:10px;border:1px solid #DFE4EE;padding:10px 12px;outline:0;resize:vertical;line-height:1.5"></textarea></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:#586079">Testimonies <span style="font-weight:400">· shared with cell members</span></span><textarea value="{{ testimonies }}" onChange="{{ onTestimonies }}" rows="2" style="border-radius:10px;border:1px solid #DFE4EE;padding:10px 12px;outline:0;resize:vertical"></textarea></label>
+<div style="display:flex;flex-direction:column;gap:6px;padding:14px;border-radius:12px;background:#F4F6FA"><span style="font-size:13px;font-weight:600;color:#586079">Prayer needs &amp; pastoral issues · private to you, Peter Lungu and pastors</span><textarea value="{{ privateNotes }}" onChange="{{ onPrivate }}" rows="3" placeholder="Not shown to members or Admin" style="border-radius:10px;border:1px solid #DFE4EE;padding:10px 12px;outline:0;resize:vertical;background:#fff"></textarea></div>
+<div style="display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:12px;border:1px solid #DFE4EE">
+<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap"><span style="font-family:Outfit,sans-serif;font-weight:600;font-size:16px">Cell offering</span><span style="font-size:13px;color:#586079">Visible to you, the pastor and the treasurer</span></div>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px">
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:#586079">Amount (ZMW)</span><input value="{{ off.amount }}" onChange="{{ onOffAmount }}" inputmode="decimal" style="height:42px;border-radius:10px;border:1px solid #DFE4EE;padding:0 12px;outline:0;font-weight:600"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:#586079">Counted by</span><select value="{{ off.c1 }}" onChange="{{ onOffC1 }}" style="height:42px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;padding:0 8px"><sc-for list="{{ cellPeople }}" as="o" hint-placeholder-count="4"><option value="{{ o }}">{{ o }}</option></sc-for></select></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:#586079">Second counter</span><select value="{{ off.c2 }}" onChange="{{ onOffC2 }}" style="height:42px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;padding:0 8px"><sc-for list="{{ cellPeople }}" as="o" hint-placeholder-count="4"><option value="{{ o }}">{{ o }}</option></sc-for></select></label>
+</div>
+<button onClick="{{ toggleHanded }}" style="{{ handedStyle }}"><span style="{{ handedBox }}">{{ handedTick }}</span>Handed to the treasurer</button>
+</div>
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button onClick="{{ submitReport }}" style="height:46px;padding:0 22px;border-radius:12px;border:0;background:#14246B;color:#fff;font-weight:700;cursor:pointer">Submit report</button><span style="font-size:13px;color:#586079">{{ absentNote }}</span></div>
+</div>
+</div>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{ p.pOverview }}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px">
+<sc-for list="{{ pTiles }}" as="t" hint-placeholder-count="5"><button onClick="{{ t.go }}" style="text-align:left;padding:18px;border-radius:16px;background:#fff;border:1px solid #DFE4EE;cursor:pointer;display:flex;flex-direction:column;gap:6px"><span style="font-family:Outfit,sans-serif;font-weight:700;font-size:30px;line-height:1;color:#14246B">{{ t.n }}</span><span style="font-weight:600">{{ t.label }}</span><span style="font-size:13px;color:#586079">{{ t.sub }}</span></button></sc-for>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:20px">
+<div style="background:#fff;border:1px solid #DFE4EE;border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap"><span style="font-family:Outfit,sans-serif;font-weight:600;font-size:18px">Attendance</span><span style="font-size:13px;color:#586079">{{ svcSub }}</span></div>
+<div style="display:flex;gap:6px;flex-wrap:wrap"><sc-for list="{{ svcTabs }}" as="stb" hint-placeholder-count="4"><button onClick="{{ stb.set }}" style="{{ stb.style }}">{{ stb.label }}</button></sc-for></div>
+<div style="display:flex;align-items:flex-end;gap:10px;height:180px;padding-top:10px">
+<sc-for list="{{ svcTrend }}" as="w" hint-placeholder-count="8"><div style="flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px"><span style="font-size:12px;font-weight:700;color:#14246B">{{ w.v }}</span><div style="{{ w.bar }}"></div><span style="font-size:11px;color:#586079;white-space:nowrap">{{ w.label }}</span></div></sc-for>
+</div>
+</div>
+<div style="background:#fff;border:1px solid #DFE4EE;border-radius:16px;overflow:hidden;display:flex;flex-direction:column">
+<div style="padding:16px 20px;border-bottom:1px solid #DFE4EE;display:flex;justify-content:space-between;align-items:center"><span style="font-family:Outfit,sans-serif;font-weight:600;font-size:18px">Pastoral visits ahead</span><button onClick="{{ goCare }}" style="border:0;background:transparent;color:#14246B;font-weight:600;cursor:pointer">Pastoral care</button></div>
+<sc-for list="{{ upcomingVisits }}" as="uv" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid #EDF0F6"><div style="flex:1;min-width:0"><div style="font-weight:600">{{ uv.member }}</div><div style="font-size:13px;color:#586079">{{ uv.when }} · {{ uv.reason }}</div></div><span style="{{ uv.chip }}">{{ uv.label }}</span></div></sc-for>
+</div>
+</div>
+<div style="background:#fff;border:1px solid #DFE4EE;border-radius:16px;overflow-x:auto">
+<div style="padding:16px 20px;border-bottom:1px solid #DFE4EE;font-family:Outfit,sans-serif;font-weight:600;font-size:18px">Services &amp; meetings</div>
+<div style="display:grid;grid-template-columns:minmax(160px,1.2fr) 140px minmax(150px,1fr) 100px 100px 80px minmax(200px,1.4fr);min-width:1000px;font-size:12px;font-weight:700;letter-spacing:.06em;color:#586079;padding:12px 20px;border-bottom:1px solid #DFE4EE"><span>SERVICE</span><span>LAST HELD</span><span>LED BY</span><span>ATTENDED</span><span>VS 4-WK AVG</span><span>VISITORS</span><span>NEXT</span></div>
+<sc-for list="{{ services }}" as="sv" hint-placeholder-count="4"><div onClick="{{ sv.select }}" style="display:grid;grid-template-columns:minmax(160px,1.2fr) 140px minmax(150px,1fr) 100px 100px 80px minmax(200px,1.4fr);min-width:1000px;align-items:center;padding:14px 20px;border-bottom:1px solid #EDF0F6;cursor:pointer;font-size:14px"><span style="font-weight:600;font-size:15px">{{ sv.name }}</span><span>{{ sv.last }}</span><span>{{ sv.lead }}</span><span style="font-family:Outfit,sans-serif;font-weight:700;font-size:18px;color:#14246B">{{ sv.att }}</span><span style="{{ sv.diffStyle }}">{{ sv.diff }}</span><span>{{ sv.visitors }}</span><span style="color:#586079">{{ sv.next }}</span></div></sc-for>
+</div>
+<div style="background:#fff;border:1px solid #DFE4EE;border-radius:16px;overflow-x:auto">
+<div style="padding:16px 20px;border-bottom:1px solid #DFE4EE;font-family:Outfit,sans-serif;font-weight:600;font-size:18px">How the cells are doing</div>
+<div style="display:grid;grid-template-columns:minmax(150px,1.2fr) minmax(130px,1fr) 100px minmax(160px,1.2fr) 90px 120px 110px;min-width:900px;font-size:12px;font-weight:700;letter-spacing:.06em;color:#586079;padding:12px 20px;border-bottom:1px solid #DFE4EE"><span>CELL</span><span>LEADER</span><span>LAST MET</span><span>ATTENDANCE</span><span>4-WEEK</span><span>REPORT</span><span>GIVING · SEP</span></div>
+<sc-for list="{{ cellHealth }}" as="h" hint-placeholder-count="4"><div onClick="{{ h.open }}" style="display:grid;grid-template-columns:minmax(150px,1.2fr) minmax(130px,1fr) 100px minmax(160px,1.2fr) 90px 120px 110px;min-width:900px;align-items:center;padding:14px 20px;border-bottom:1px solid #EDF0F6;cursor:pointer"><span style="font-weight:600">{{ h.cell }}</span><span>{{ h.leader }}</span><span style="font-size:14px">{{ h.last }}</span><span style="display:flex;align-items:center;gap:10px"><span style="flex:1;height:8px;border-radius:4px;background:#EDF0F6;overflow:hidden"><span style="{{ h.bar }}"></span></span><span style="font-size:13px;font-weight:600;width:44px">{{ h.att }}</span></span><span style="font-size:14px;font-weight:600">{{ h.trend }}</span><span style="{{ h.chip }}">{{ h.report }}</span><span style="font-weight:600">{{ h.giving }}</span></div></sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ p.reports }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+<div style="width:320px;flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#586079">THIS WEEK</div>
+<sc-for list="{{ reportList }}" as="r" hint-placeholder-count="4"><button onClick="{{ r.select }}" style="{{ r.style }}"><span style="display:flex;justify-content:space-between;width:100%;gap:8px"><span style="font-weight:700">{{ r.cell }}</span><span style="{{ r.chip }}">{{ r.status }}</span></span><span style="font-size:13px;color:#586079">{{ r.date }} · {{ r.leader }}</span><span style="font-size:13px;color:#586079">{{ r.attLine }}</span></button></sc-for>
+</div>
+<div style="flex:1;min-width:380px;background:#fff;border:1px solid #DFE4EE;border-radius:16px;padding:22px 24px;display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:22px;color:#14246B">{{ cr.cell }} cell</div><div style="font-size:14px;color:#586079">{{ cr.date }} · led by {{ cr.leader }}</div></div><span style="{{ cr.chip }}">{{ cr.status }}</span></div>
+<sc-if value="{{ cr.missing }}" hint-placeholder-val="{{ false }}"><div style="padding:16px;border-radius:12px;background:#FFF1CF;color:#6E4400;display:flex;align-items:center;gap:14px;flex-wrap:wrap"><span style="flex:1">This report was due the day after the meeting. The leader was reminded this morning.</span><button onClick="{{ remindLeader }}" style="height:38px;padding:0 14px;border-radius:10px;border:0;background:#14246B;color:#fff;font-weight:600;cursor:pointer">Remind {{ cr.leader }}</button></div></sc-if>
+<sc-if value="{{ cr.submitted }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px"><sc-for list="{{ cr.stats }}" as="st" hint-placeholder-count="4"><div style="padding:12px 14px;border-radius:12px;background:#F4F6FA"><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:22px;color:#14246B">{{ st.v }}</div><div style="font-size:12px;color:#586079">{{ st.k }}</div></div></sc-for></div>
+<div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#586079">BIBLE STUDY</div><div style="font-weight:600">{{ cr.topic }}</div></div>
+<div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#586079">WHAT WAS DISCUSSED</div><div style="line-height:1.55;text-wrap:pretty">{{ cr.summary }}</div></div>
+<div style="display:flex;flex-direction:column;gap:4px"><div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#586079">TESTIMONIES</div><div style="line-height:1.55;text-wrap:pretty">{{ cr.testimonies }}</div></div>
+<div style="padding:16px;border-radius:12px;background:#F4F6FA;display:flex;flex-direction:column;gap:12px"><div style="font-size:12px;font-weight:700;letter-spacing:.06em;color:#586079">PRIVATE · CELL LEADERS AND PASTORS ONLY</div><div><div style="font-size:13px;font-weight:600;color:#586079">Prayer needs</div><div style="line-height:1.55">{{ cr.prayer }}</div></div><div><div style="font-size:13px;font-weight:600;color:#586079">Pastoral issues</div><div style="line-height:1.55">{{ cr.pastoral }}</div></div><sc-if value="{{ cr.visitFor }}" hint-placeholder-val="{{ false }}"><button onClick="{{ cr.schedule }}" style="align-self:flex-start;height:40px;padding:0 16px;border-radius:10px;border:0;background:#14246B;color:#fff;font-weight:600;cursor:pointer">Schedule a visit for {{ cr.visitFor }}</button></sc-if></div>
+</sc-if>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ p.giving }}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px">
+<sc-for list="{{ giveTiles }}" as="g" hint-placeholder-count="5"><div style="padding:16px 18px;border-radius:16px;background:#fff;border:1px solid #DFE4EE;display:flex;flex-direction:column;gap:8px"><span style="font-size:13px;font-weight:600;color:#586079">{{ g.label }}</span><span style="font-family:Outfit,sans-serif;font-weight:700;font-size:26px;line-height:1;color:#14246B">{{ g.total }}</span><span style="height:6px;border-radius:3px;background:#EDF0F6;overflow:hidden"><span style="{{ g.bar }}"></span></span><span style="font-size:12px;color:#586079">{{ g.sub }}</span></div></sc-for>
+</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><sc-for list="{{ giveFilters }}" as="f" hint-placeholder-count="5"><button onClick="{{ f.set }}" style="{{ f.style }}">{{ f.label }}</button></sc-for><div style="flex:1"></div><button onClick="{{ exportGiving }}" style="white-space:nowrap;height:38px;padding:0 16px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;font-weight:600;cursor:pointer">Export CSV</button></div>
+<div style="background:#fff;border:1px solid #DFE4EE;border-radius:16px;overflow-x:auto">
+<div style="display:grid;grid-template-columns:110px minmax(140px,1fr) 100px minmax(200px,1.4fr) 150px minmax(160px,1.2fr);min-width:900px;font-size:12px;font-weight:700;letter-spacing:.06em;color:#586079;padding:12px 20px;border-bottom:1px solid #DFE4EE"><span>MEETING</span><span>CELL</span><span>AMOUNT</span><span>COUNTED BY</span><span>TREASURER</span><span>NOTE</span></div>
+<sc-for list="{{ giveRows }}" as="g" hint-placeholder-count="8"><div style="display:grid;grid-template-columns:110px minmax(140px,1fr) 100px minmax(200px,1.4fr) 150px minmax(160px,1.2fr);min-width:900px;align-items:center;padding:12px 20px;border-bottom:1px solid #EDF0F6;font-size:14px"><span>{{ g.date }}</span><span style="font-weight:600">{{ g.cell }}</span><span style="font-weight:700">{{ g.amt }}</span><span style="color:#586079">{{ g.counted }}</span><span style="{{ g.chip }}">{{ g.tre }}</span><span style="color:#586079">{{ g.note }}</span></div></sc-for>
+</div>
+<div style="font-size:13px;color:#586079">Cell leaders record each offering with two counters. The treasurer confirms receipt. Members don't see these figures.</div>
+</sc-if>
+
+<sc-if value="{{ p.care }}" hint-placeholder-val="{{ false }}">
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span style="font-size:14px;color:#586079">Visits and care requests are private to the pastoral team.</span><div style="flex:1"></div><button onClick="{{ newVisit }}" style="height:42px;padding:0 18px;border-radius:10px;border:0;background:#14246B;color:#fff;font-weight:700;cursor:pointer">Schedule a visit</button></div>
+<div style="overflow-x:auto;margin:0 -4px;padding:0 4px 8px">
+<div style="display:grid;grid-template-columns:repeat(5,minmax(220px,1fr));gap:14px;min-width:1150px;align-items:start">
+<sc-for list="{{ careCols }}" as="col" hint-placeholder-count="5">
+<div onDragOver="{{ allowDrop }}" onDragEnter="{{ col.enter }}" onDrop="{{ col.drop }}" style="{{ col.style }}">
+<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 4px"><span style="font-weight:700">{{ col.label }}</span><span style="font-size:13px;font-weight:700;color:#586079">{{ col.count }}</span></div>
+<div style="font-size:12px;color:#586079;padding:0 4px;margin-top:-4px;line-height:1.3">{{ col.hint }}</div>
+<sc-for list="{{ col.items }}" as="it" hint-placeholder-count="2">
+<div draggable="true" onDragStart="{{ it.dragStart }}" onDragEnd="{{ dragEnd }}" style="{{ it.cardStyle }}">
+<div style="font-weight:700">{{ it.member }}</div>
+<span style="{{ it.chip }}">{{ it.reason }}</span>
+<div style="font-size:13px">{{ it.when }}</div>
+<div style="font-size:13px;color:#586079">{{ it.detail }}</div>
+<sc-if value="{{ it.actionLabel }}" hint-placeholder-val="{{ false }}"><button onClick="{{ it.action }}" style="margin-top:4px;height:36px;border-radius:9px;border:1px solid #DFE4EE;background:#fff;font-weight:600;font-size:13px;cursor:pointer">{{ it.actionLabel }}</button></sc-if>
+</div>
+</sc-for>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-if>
+
+</div>
+</main>
+
+<sc-if value="{{ modal }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;padding:24px">
+<div onClick="{{ closeModal }}" style="position:absolute;inset:0;background:rgba(5,10,30,.45)"></div>
+<div style="position:relative;width:460px;max-width:100%;background:#fff;border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:14px;box-shadow:0 30px 80px rgba(0,0,0,.25)">
+<div><div style="font-family:Outfit,sans-serif;font-weight:700;font-size:21px">{{ modalTitle }}</div><div style="font-size:14px;color:#586079">{{ modalSub }}</div></div>
+<sc-if value="{{ modalSchedule }}" hint-placeholder-val="{{ false }}">
+<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+<label style="display:flex;flex-direction:column;gap:6px;grid-column:1 / -1"><span style="font-size:13px;font-weight:600;color:#586079">Member</span><select value="{{ mf.member }}" onChange="{{ mOn.member }}" style="height:42px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;padding:0 8px"><option value="">Choose a member…</option><sc-for list="{{ memberNames }}" as="o" hint-placeholder-count="6"><option value="{{ o }}">{{ o }}</option></sc-for></select></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:#586079">Reason</span><select value="{{ mf.reason }}" onChange="{{ mOn.reason }}" style="height:42px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;padding:0 8px"><option value="">Choose…</option><sc-for list="{{ visitReasons }}" as="o" hint-placeholder-count="6"><option value="{{ o }}">{{ o }}</option></sc-for></select></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:#586079">Who is visiting</span><select value="{{ mf.who }}" onChange="{{ mOn.who }}" style="height:42px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;padding:0 8px"><sc-for list="{{ visitorsList }}" as="o" hint-placeholder-count="3"><option value="{{ o }}">{{ o }}</option></sc-for></select></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:#586079">Date</span><input type="date" value="{{ mf.date }}" onChange="{{ mOn.date }}" min="2026-10-02" style="height:42px;border-radius:10px;border:1px solid #DFE4EE;padding:0 10px;outline:0"></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-size:13px;font-weight:600;color:#586079">Time</span><input type="time" value="{{ mf.time }}" onChange="{{ mOn.time }}" step="900" style="height:42px;border-radius:10px;border:1px solid #DFE4EE;padding:0 10px;outline:0"></label>
+<label style="display:flex;flex-direction:column;gap:6px;grid-column:1 / -1"><span style="font-size:13px;font-weight:600;color:#586079">Where</span><select value="{{ mf.where }}" onChange="{{ mOn.where }}" style="height:42px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;padding:0 8px"><sc-for list="{{ whereList }}" as="o" hint-placeholder-count="4"><option value="{{ o }}">{{ o }}</option></sc-for></select></label>
+</div>
+<div style="font-size:13px;color:#586079">The member gets a request on their phone to accept, suggest another time or decline.</div>
+</sc-if>
+<sc-if value="{{ modalComplete }}" hint-placeholder-val="{{ false }}"><textarea value="{{ mNote }}" onChange="{{ onMNote }}" rows="4" placeholder="Private visit note (pastoral team only)" style="border-radius:10px;border:1px solid #DFE4EE;padding:10px 12px;outline:0;resize:vertical"></textarea></sc-if>
+<div style="display:flex;gap:10px;justify-content:flex-end"><button onClick="{{ closeModal }}" style="height:42px;padding:0 16px;border-radius:10px;border:1px solid #DFE4EE;background:#fff;font-weight:600;cursor:pointer">Cancel</button><button onClick="{{ saveModal }}" style="height:42px;padding:0 18px;border-radius:10px;border:0;background:#14246B;color:#fff;font-weight:700;cursor:pointer">{{ modalSave }}</button></div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}"><div style="position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:50;padding:12px 18px;border-radius:12px;background:#0E1530;color:#fff;font-weight:500;box-shadow:0 10px 30px rgba(0,0,0,.25)">{{ toast }}</div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;role&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;admin&quot;,&quot;cellLeader&quot;,&quot;pastor&quot;],&quot;default&quot;:&quot;admin&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = {
+    role: this.props.role ?? 'admin', page: 'overview', memberTab: 'apps', q: '', drawer: null, toast: '',
+    appSt: {}, extraRoles: {}, cellSel: 'mw', cellReqSt: {}, leaders: {}, dept: 'Ushering', rota: null, editing: null, published: false,
+    meetTab: 'plan', meetPublished: false, repSel: 'ke', giveCell: 'All', visits: null, modal: null, mId: null, mf: {}, mNote: '',
+    off: { amount: '435', c1: 'Peter Lungu', c2: 'Esther Mwale', handed: false },
+    plan: { date: 'Thursday 8 October', time: '18:00–19:30', venue: 'Banda home', address: 'Plot 214, Mwembeshi Road', topic: 'Rooted in love', ref: 'Ephesians 3:14–21' },
+    prog: [['18:00', 'Opening prayer', 'Ruth Zulu'], ['18:10', 'Worship', 'Abel Sakala'], ['18:30', 'Bible study', 'Peter Lungu'], ['19:10', 'Prayer for one another', 'Grace Banda'], ['19:25', 'Closing prayer', 'Mwila Chanda']],
+    att: {}, visitors: ['Mutale Banda · agreed to a follow-up call'], visitorName: '', reportSent: false,
+    summary: 'We read the story of the two builders and talked about the difference between hearing Jesus\u2019 words and putting them into practice.', testimonies: 'Esther shared how the group\u2019s support helped during her mother\u2019s illness.', privateNotes: ''
+  };
+  componentWillUnmount() { clearTimeout(this._t); }
+  toast(m) { this.setState({ toast: m }); clearTimeout(this._t); this._t = setTimeout(() => this.setState({ toast: '' }), 2400); }
+  chip(c) { const m = { amber: ['#FFF1CF', '#6E4400'], green: ['#DFF3E8', '#0D6438'], red: ['#FCE5E2', '#A3241A'], blue: ['#E3EEFC', '#0B4FA6'], gray: ['#EDF0F6', '#586079'] }[c]; return { display: 'inline-flex', alignItems: 'center', alignSelf: 'flex-start', padding: '3px 10px', borderRadius: 999, fontSize: 12.5, fontWeight: 600, whiteSpace: 'nowrap', background: m[0], color: m[1] }; }
+  seg(on) { return { height: 36, padding: '0 16px', border: 0, borderRadius: 9, cursor: 'pointer', fontWeight: 600, fontSize: 14, background: on ? '#fff' : 'transparent', color: on ? '#0E1530' : '#586079', boxShadow: on ? '0 1px 3px rgba(0,0,0,.1)' : 'none' }; }
+  pill(on) { return { height: 38, padding: '0 16px', whiteSpace: 'nowrap', flex: 'none', borderRadius: 19, cursor: 'pointer', fontWeight: 600, fontSize: 14, border: on ? '1.5px solid #14246B' : '1px solid #DFE4EE', background: on ? '#14246B' : '#fff', color: on ? '#fff' : '#0E1530' }; }
+  moveVisit(id, to) {
+    const v = (this.state.visits || this.D().visits).find(x => x.id === id);
+    if (!v || v.st === to) return;
+    if (to === 'awaiting') return this.openSchedule(v.member, v.reason, v.detail, v.id);
+    if (to === 'completed') return this.setState({ modal: 'complete', mId: v.id, mNote: '' });
+    const msg = { requested: `${v.member} moved back to Requested`, confirmed: `${v.member}'s visit marked as confirmed`, postponed: `${v.member}'s visit marked as needing a new time` }[to];
+    this.setVisit(id, { st: to, ...(to === 'confirmed' && v.alt ? { when: v.alt } : {}) });
+    this.toast(msg);
+  }
+  setVisit(id, patch) { this.setState(x => ({ visits: (x.visits || this.D().visits).map(v => v.id === id ? { ...v, ...patch } : v) })); }
+  openSchedule(member, reason, source, id) { this.setState({ modal: 'schedule', mId: id || null, mf: { member: member || '', reason: reason || '', date: '2026-10-10', time: '15:00', who: 'Rev. Daniel Mweemba', where: 'Member\u2019s home', source: source || 'Scheduled by the pastor' } }); }
+  pastorVals(s, D, chip, counts) {
+    const fmt = n => 'K ' + Number(n).toLocaleString('en-US');
+    const off = s.off, sent = s.reportSent;
+    const cellNames = ['Mwembeshi Road', 'Kafue Estates', 'Shikoswe', 'Chanyanya'];
+    const G = D.giving.slice().sort((a, b) => new Date(b[1].slice(4) + ' 2026') - new Date(a[1].slice(4) + ' 2026'));
+    if (sent) G.unshift(['Mwembeshi Road', 'Thu 1 Oct', Number(off.amount) || 0, `${off.c1}, ${off.c2}`, off.handed ? 'Handed over' : 'Pending', 'From Thu 1 Oct report']);
+    const sepRows = D.giving.filter(g => g[1].includes('Sep') && typeof g[2] === 'number');
+    const totals = cellNames.map(c => sepRows.filter(g => g[0] === c).reduce((a, g) => a + g[2], 0));
+    const max = Math.max(...totals), all = totals.reduce((a, b) => a + b, 0);
+    const pending = G.filter(g => g[4] === 'Pending').length;
+    const giveTiles = [{ label: 'All cells · September', total: fmt(all), bar: { display: 'block', height: '100%', width: '100%', background: '#14246B' }, sub: `${sepRows.length} meetings recorded` }].concat(cellNames.map((c, i) => ({ label: c, total: fmt(totals[i]), bar: { display: 'block', height: '100%', width: `${Math.round(totals[i] / max * 100)}%`, background: '#0A7FE0' }, sub: `${G.filter(g => g[0] === c && g[4] === 'Pending').length} pending hand-over` })));
+    const giveFilters = ['All', ...cellNames].map(c => ({ label: c, style: this.pill(s.giveCell === c), set: () => this.setState({ giveCell: c }) }));
+    const giveRows = G.filter(g => s.giveCell === 'All' || g[0] === s.giveCell).map(([cell, date, amt, counted, tre, note]) => ({ cell, date, amt: typeof amt === 'number' ? fmt(amt) : amt, counted, tre, note, chip: chip(tre === 'Pending' ? 'amber' : tre === '—' ? 'gray' : 'green') }));
+
+    const visits = s.visits || D.visits;
+    const mwRep = sent ? { id: 'mw', cell: 'Mwembeshi Road', date: 'Thu 1 Oct', leader: 'Grace Banda', present: counts.present, total: 12, visitors: s.visitors.length, offering: fmt(Number(off.amount) || 0), topic: 'Built on the rock · Matthew 7:24–27', summary: s.summary, testimonies: s.testimonies || 'None recorded.', prayer: s.privateNotes || 'None recorded.', pastoral: 'None recorded.' } : { id: 'mw', cell: 'Mwembeshi Road', date: 'Thu 1 Oct', leader: 'Grace Banda', missing: true };
+    const reportList = [mwRep, ...D.reports].map(r => ({ ...r, status: r.missing ? 'Missing' : 'Submitted', chip: chip(r.missing ? 'amber' : 'green'), attLine: r.missing ? 'Due Fri 2 Oct' : `${r.present} of ${r.total} present · ${r.visitors} visitor${r.visitors === 1 ? '' : 's'}`, select: () => this.setState({ repSel: r.id }), style: { textAlign: 'left', padding: '14px 16px', borderRadius: 14, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 3, background: '#fff', border: s.repSel === r.id ? '2px solid #0A7FE0' : '1px solid #DFE4EE' } }));
+    const c0 = reportList.find(r => r.id === s.repSel) || reportList[0];
+    const cr = { ...c0, submitted: !c0.missing, missing: !!c0.missing, visitFor: c0.visitFor && !visits.some(v => v.member === c0.visitFor) ? c0.visitFor : '', stats: c0.missing ? [] : [{ k: 'Present', v: c0.present }, { k: 'Absent or excused', v: c0.total - c0.present }, { k: 'Visitors', v: c0.visitors }, { k: 'Offering', v: c0.offering }], schedule: () => this.openSchedule(c0.visitFor, 'Bereavement', `Raised in ${c0.cell} cell report`) };
+
+    const reasonC = r => ({ Bereavement: 'red', Illness: 'amber', 'Prayer for family': 'blue', 'Home blessing': 'green', Counsel: 'blue', 'Absent from cell': 'gray' }[r] || 'gray');
+    const cols = [['requested', 'Requested', 'From members or cell reports'], ['awaiting', 'Awaiting member', 'Sent to their phone'], ['confirmed', 'Confirmed', 'Member accepted'], ['postponed', 'New time suggested', 'Member asked to move it'], ['completed', 'Completed', 'Last 30 days']];
+    const careCols = cols.map(([k, l, h]) => { const items = visits.filter(v => v.st === k).map(v => ({ ...v, dragStart: e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', v.id); this.setState({ dragId: v.id }); }, cardStyle: { background: '#fff', border: '1px solid #DFE4EE', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', gap: 6, cursor: 'grab', opacity: s.dragId === v.id ? .45 : 1, boxShadow: '0 1px 2px rgba(14,21,48,.06)' }, chip: chip(reasonC(v.reason)), actionLabel: { requested: 'Schedule visit', confirmed: 'Mark completed', postponed: 'Accept new time' }[k] || '',
+      action: k === 'requested' ? () => this.openSchedule(v.member, v.reason, v.detail, v.id) : k === 'confirmed' ? () => this.setState({ modal: 'complete', mId: v.id, mNote: '' }) : k === 'postponed' ? () => { this.setVisit(v.id, { st: 'confirmed', when: v.alt, detail: `${v.who} · new time accepted` }); this.toast(`${v.member} told the visit is now ${v.alt}`); } : null })); return { label: l, hint: h, count: items.length, items, enter: () => s.dragOver !== k && this.setState({ dragOver: k }), drop: e => { e.preventDefault(); const id = e.dataTransfer.getData('text/plain') || s.dragId; this.setState({ dragId: null, dragOver: null }); this.moveVisit(id, k); },
+      style: { display: 'flex', flexDirection: 'column', gap: 10, padding: 12, borderRadius: 16, minHeight: 220, background: s.dragOver === k && s.dragId ? '#DCE7FA' : '#EBEEF5', outline: s.dragOver === k && s.dragId ? '2px dashed #0A7FE0' : '2px dashed transparent', outlineOffset: -2, transition: 'background .15s' } }; });
+    const upcomingVisits = visits.filter(v => ['awaiting', 'confirmed', 'postponed'].includes(v.st)).map(v => ({ ...v, label: { awaiting: 'Awaiting member', confirmed: 'Confirmed', postponed: 'New time suggested' }[v.st], chip: chip({ awaiting: 'amber', confirmed: 'green', postponed: 'blue' }[v.st]) }));
+
+    const mwPresent = sent ? counts.present : null;
+    const lastWeek = (mwPresent ?? 10) + 8 + 5 + 6;
+    const trendVals = [28, 30, 27, 31, 30, 32, 29, lastWeek], labels = ['13 Aug', '20 Aug', '27 Aug', '3 Sep', '10 Sep', '17 Sep', '24 Sep', '1 Oct'];
+    const trend = trendVals.map((v, i) => ({ v, label: labels[i], bar: { width: '100%', maxWidth: 40, height: Math.round(v / 34 * 120), borderRadius: '8px 8px 3px 3px', background: i === 7 ? '#0A7FE0' : '#14246B' } }));
+    const SV = { sunday: ['Sunday service', [142, 151, 138, 156, 149, 160, 147, 153], ['9 Aug', '16 Aug', '23 Aug', '30 Aug', '6 Sep', '13 Sep', '20 Sep', '27 Sep'], 200, 'Sundays 09:00 · last 8 weeks'], midweek: ['Midweek service', [48, 52, 45, 55, 50, 58, 49, 54], ['12 Aug', '19 Aug', '26 Aug', '2 Sep', '9 Sep', '16 Sep', '23 Sep', '30 Sep'], 80, 'Wednesdays 17:30 · last 8 weeks'], prayer: ['Prayer meeting', [22, 25, 19, 27, 24, 26, 21, 28], ['11 Aug', '18 Aug', '25 Aug', '1 Sep', '8 Sep', '15 Sep', '22 Sep', '29 Sep'], 40, 'Tuesdays 17:30 · last 8 weeks'], cells: ['Cell groups', trendVals, labels, 34, 'All cells · of 34 members'] };
+    const svcKey = s.svc || 'sunday', sv = SV[svcKey];
+    const svcTrend = sv[1].map((v, i) => ({ v, label: sv[2][i], bar: { width: '100%', maxWidth: 40, height: Math.round(v / sv[3] * 120), borderRadius: '8px 8px 3px 3px', background: i === 7 ? '#0A7FE0' : '#14246B' } }));
+    const svcTabs = Object.entries(SV).map(([k, x]) => ({ label: x[0], set: () => this.setState({ svc: k }), style: { height: 32, padding: '0 12px', borderRadius: 16, whiteSpace: 'nowrap', cursor: 'pointer', fontWeight: 600, fontSize: 13, border: svcKey === k ? '1.5px solid #14246B' : '1px solid #DFE4EE', background: svcKey === k ? '#14246B' : '#fff', color: svcKey === k ? '#fff' : '#0E1530' } }));
+    const services = [['sunday', 'Sunday service', 'Sun 27 Sep, 09:00', 'Rev. Daniel Mweemba', 153, 152, 6, 'Sun 4 Oct · ushering 6 of 10 confirmed'], ['midweek', 'Midweek service', 'Wed 30 Sep, 17:30', 'Pastor Ruth Hamweene', 54, 52, 2, 'Wed 7 Oct · 1 usher needs contact'], ['prayer', 'Tuesday prayers', 'Tue 29 Sep, 17:30', 'Intercession team', 28, 24, 0, 'Tue 6 Oct · Mwila Chanda leading'], ['cells', 'Cell groups (4)', '25 Sep – 1 Oct', '4 cell leaders', lastWeek, 30, 3, 'Thu 8 Oct · Mwembeshi Road']].map(([k, name, last, lead, att, avg, visitors, next]) => { const d = att - avg; return { name, last, lead, att, visitors, next, diff: `${d >= 0 ? '+' : ''}${d} (${d >= 0 ? 'up' : 'down'})`, diffStyle: { fontWeight: 600, color: d >= 0 ? '#0D6438' : '#A3241A' }, select: () => this.setState({ svc: k }) }; });
+    const H = [['mw', 'Mwembeshi Road', 'Grace Banda', 'Thu 1 Oct', mwPresent, 12, 'Steady'], ['ke', 'Kafue Estates', 'Mwansa Phiri', 'Wed 30 Sep', 8, 9, 'Rising'], ['sh', 'Shikoswe', 'Moses Daka', 'Tue 29 Sep', 5, 7, 'Falling'], ['ch', 'Chanyanya', 'Joseph Tembo', 'Fri 25 Sep', 6, 6, 'Steady']];
+    const cellHealth = H.map(([id, cell, leader, last, pr, tot, tr], i) => ({ cell, leader, last, trend: tr, att: pr == null ? '—' : `${pr}/${tot}`, bar: { display: 'block', height: '100%', width: pr == null ? 0 : `${Math.round(pr / tot * 100)}%`, background: pr != null && pr / tot < .75 ? '#E0A100' : '#0A7FE0' }, report: id === 'mw' && !sent ? 'Missing' : 'Submitted', chip: chip(id === 'mw' && !sent ? 'amber' : 'green'), giving: fmt(totals[i]), open: () => this.setState({ page: 'reports', repSel: id }) }));
+    const missing = sent ? 0 : 1;
+    const pTiles = [
+      { n: '186', label: 'Approved members', sub: '34 in cells · 3 applications', go: () => this.toast('Membership is managed by the church office') },
+      { n: '153', label: 'Sunday attendance', sub: 'Sun 27 Sep · 6 visitors', go: () => this.setState({ svc: 'sunday' }) },
+      { n: '21', label: 'Visitors this month', sub: 'Services and cells', go: () => this.setState({ page: 'reports' }) },
+      { n: String(upcomingVisits.length), label: 'Pastoral visits ahead', sub: `${visits.filter(v => v.st === 'requested').length} new requests`, go: () => this.setState({ page: 'care' }) },
+      { n: String(missing), label: 'Missing reports', sub: 'Due the day after each meeting', go: () => this.setState({ page: 'reports', repSel: 'mw' }) },
+      { n: fmt(all), label: 'Cell giving · Sep', sub: `${pending} hand-overs pending`, go: () => this.setState({ page: 'giving' }) }
+    ];
+
+    const mf = s.mf, setMf = k => e => { const val = e.target.value; this.setState(x => ({ mf: { ...x.mf, [k]: val } })); };
+    const mFields = [['member', 'Member'], ['reason', 'Reason'], ['date', 'Date'], ['time', 'Time'], ['who', 'Who is visiting', 1], ['where', 'Where', 1]].map(([k, l, full]) => ({ label: l, value: mf[k] || '', onChange: setMf(k), wrap: { display: 'flex', flexDirection: 'column', gap: 6, gridColumn: full ? '1 / -1' : 'auto' } }));
+    const mv = visits.find(v => v.id === s.mId) || {};
+    const off2 = k => e => { const val = e.target.value; this.setState(x => ({ off: { ...x.off, [k]: val } })); };
+    return {
+      pTiles, trend, cellHealth, upcomingVisits, goCare: () => this.setState({ page: 'care' }),
+      reportList, cr, remindLeader: () => this.toast(`Reminder sent to ${c0.leader}`),
+      giveTiles, giveFilters, giveRows, exportGiving: () => this.toast('Cell giving for September exported'),
+      careCols, allowDrop: e => e.preventDefault(), dragEnd: () => this.setState({ dragId: null, dragOver: null }), services, svcTrend, svcTabs, svcSub: sv[4],
+      mf, mOn: Object.fromEntries(['member', 'reason', 'who', 'date', 'time', 'where'].map(k => [k, setMf(k)])),
+      memberNames: [...new Set([...D.members.map(m => m.name), 'Elijah Kapata', 'Agnes Tembo', 'Joyce Lungu', 'Kabwe Musonda', 'Daniel Mbewe', 'Faith Chola', ...(mf.member ? [mf.member] : [])])].sort(),
+      visitReasons: [...new Set(['Prayer for family', 'Illness', 'Bereavement', 'Counsel', 'Home blessing', 'New member', 'Absent from cell', ...(mf.reason ? [mf.reason] : [])])],
+      visitorsList: ['Rev. Daniel Mweemba', 'Pastor Ruth Hamweene', 'Elder John Siame'], whereList: ['Member\u2019s home', 'Church office', 'Hospital', 'Other'],
+      newVisit: () => this.openSchedule('', '', ''),
+      modal: !!s.modal, modalSchedule: s.modal === 'schedule', modalComplete: s.modal === 'complete',
+      modalTitle: s.modal === 'complete' ? `Visit with ${mv.member}` : 'Schedule a pastoral visit', modalSub: s.modal === 'complete' ? 'Mark as completed' : (mf.source || ''),
+      modalSave: s.modal === 'complete' ? 'Mark completed' : 'Send to member', mFields, mNote: s.mNote, onMNote: e => this.setState({ mNote: e.target.value }),
+      closeModal: () => this.setState({ modal: null }),
+      saveModal: () => {
+        if (s.modal === 'complete') { this.setVisit(s.mId, { st: 'completed', when: 'Fri 2 Oct', detail: 'Visit note saved (private)' }); this.setState({ modal: null }); return this.toast('Visit marked completed'); }
+        if (!mf.member.trim()) return this.toast('Add the member\u2019s name');
+        const patch = { st: 'awaiting', when: `${new Date(mf.date + 'T12:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', '')}, ${mf.time}`, who: mf.who, detail: `${mf.who} · ${mf.where}` };
+        if (s.mId) this.setVisit(s.mId, patch); else this.setState(x => ({ visits: [...(x.visits || D.visits), { id: 'v' + Date.now(), member: mf.member, reason: mf.reason || 'Visit', ...patch }] }));
+        this.setState({ modal: null }); this.toast(`${mf.member} has been asked on their phone`);
+      },
+      off, onOffAmount: off2('amount'), onOffC1: off2('c1'), onOffC2: off2('c2'), toggleHanded: () => this.setState(x => ({ off: { ...x.off, handed: !x.off.handed } })),
+      handedStyle: { alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 10, height: 40, padding: '0 14px 0 10px', borderRadius: 10, border: '1px solid #DFE4EE', background: off.handed ? '#DFF3E8' : '#fff', color: off.handed ? '#0D6438' : '#0E1530', fontWeight: 600, cursor: 'pointer' },
+      handedBox: { width: 20, height: 20, borderRadius: 5, border: off.handed ? '0' : '1.5px solid #C9D0E0', background: off.handed ? '#0D6438' : '#fff', color: '#fff', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }, handedTick: off.handed ? '✓' : ''
+    };
+  }
+  D() {
+    if (this._d) return this._d;
+    const M = (name, phone, cell, depts, roles, acc) => ({ name, phone, cell, depts, roles, acc });
+    this._d = {
+      members: [
+        M('Grace Banda', '+260 97 210 3344', 'Mwembeshi Road', 'Intercession', ['Cell leader'], 'app'),
+        M('Peter Lungu', '+260 96 554 0912', 'Mwembeshi Road', 'Ushering', ['Cell assistant'], 'app'),
+        M('Mwansa Phiri', '+260 97 880 1276', 'Kafue Estates', 'Ushering, Cleaning', ['Dept leader'], 'app'),
+        M('Mwila Chanda', '+260 97 123 4567', 'Mwembeshi Road', 'Ushering, Intercession', [], 'app'),
+        M('Ruth Zulu', '+260 95 301 2280', 'Mwembeshi Road', 'Ushering', [], 'app'),
+        M('Abel Sakala', '+260 97 646 1190', 'Mwembeshi Road', 'Ushering, Choir', [], 'app'),
+        M('Esther Mwale', '+260 96 220 7781', 'Mwembeshi Road', 'Ushering', [], 'app'),
+        M('Grace Mulenga', 'Own number on file', 'Shikoswe', 'Ushering', [], 'none'),
+        M('Joseph Tembo', '+260 97 455 0021', 'Chanyanya', 'Ushering', [], 'app'),
+        M('Daniel Mweemba', '+260 97 000 1122', 'Kafue Estates', 'Preaching', ['Pastor'], 'app'),
+        M('Naomi Phiri', '+260 96 870 3302', 'Kafue Estates', 'Ushering', ['Media'], 'app'),
+        M('Moses Daka', '+260 95 118 4409', 'Shikoswe', 'Ushering', [], 'hold')
+      ],
+      apps: [
+        { id: 'a1', name: 'Mutinta Hamoonga', phone: '+260 97 662 1043', email: 'No email', submitted: 'Fri 2 Oct', cell: 'Kafue Estates cell' },
+        { id: 'a2', name: 'Chileshe Banda', phone: '+260 96 301 7715', email: 'chileshe.b@example.com', submitted: 'Thu 1 Oct', cell: 'Mwembeshi Road cell', dup: 'Possible existing record: Chileshe Banda, Mwembeshi Road, no app login. Check identity before linking.' },
+        { id: 'a3', name: 'Bwalya Kunda', phone: '+260 95 744 2208', email: 'No email', submitted: 'Tue 29 Sep', cell: "I'm not sure" }
+      ],
+      cells: [
+        { id: 'mw', name: 'Mwembeshi Road', zone: 'Zone A', leader: 'Grace Banda', assistant: 'Peter Lungu', schedule: 'Thursdays · 18:00–19:30', venue: 'Banda home, Plot 214', members: ['Grace Banda', 'Peter Lungu', 'Mwila Chanda', 'Ruth Zulu', 'Abel Sakala', 'Esther Mwale', 'Chileshe Banda', 'Lydia Banda', 'Kabwe Musonda', 'Agnes Tembo', 'John Siame', 'Mary Siame'], reqs: [{ id: 'r1', name: 'Chileshe Banda', note: 'Applied Thu 1 Oct · has an existing offline record' }, { id: 'r2', name: 'Kelvin Mumba', note: 'Transfer from Shikoswe cell · requested Wed 30 Sep' }] },
+        { id: 'ke', name: 'Kafue Estates', zone: 'Zone B', leader: 'Mwansa Phiri', assistant: 'Naomi Phiri', schedule: 'Wednesdays · 18:30–20:00', venue: 'Phiri home, House 41', members: ['Mwansa Phiri', 'Naomi Phiri', 'Daniel Mweemba', 'Ruth Hamweene', 'Daniel Mbewe', 'Precious Mbewe', 'Brian Chola', 'Faith Chola', 'Elijah Kapata'], reqs: [{ id: 'r3', name: 'Mutinta Hamoonga', note: 'New applicant · Fri 2 Oct' }] },
+        { id: 'sh', name: 'Shikoswe', zone: 'Zone B', leader: 'Moses Daka', assistant: 'Grace Mulenga', schedule: 'Tuesdays · 18:00–19:30', venue: 'Daka home', members: ['Moses Daka', 'Grace Mulenga', 'Patrick Zimba', 'Martha Zimba', 'Joyce Lungu', 'Ben Hamusonde', 'Rose Hamusonde'], reqs: [] },
+        { id: 'ch', name: 'Chanyanya', zone: 'Zone C', leader: 'Joseph Tembo', assistant: 'Abel Sakala', schedule: 'Fridays · 17:30–19:00', venue: 'Tembo home', members: ['Joseph Tembo', 'Sarah Tembo', 'Felix Mwanza', 'Ireen Mwanza', 'Paul Nkonde', 'Hope Nkonde'], reqs: [] }
+      ],
+      positions: { Ushering: ['Main door', 'Side door', 'Parking', 'Offering team', 'Welcome desk'], Cleaning: ['Hall', 'Sanctuary', 'Grounds'], Intercession: ['Tuesday prayers', 'Pre-service prayer'], Preaching: ['Main service', 'Midweek'], 'Christian education': ['Youth class', 'Children class', 'Adult class'] },
+      dates: ['Sun 4 Oct', 'Sun 11 Oct', 'Sun 18 Oct', 'Sun 25 Oct'],
+      rota: {
+        'Main door|0': ['Mwila Chanda', 'confirmed'], 'Main door|1': ['Joseph Tembo', 'declined'], 'Main door|2': ['Peter Lungu', 'draft'], 'Main door|3': ['Mwila Chanda', 'draft'],
+        'Side door|0': ['Esther Mwale', 'confirmed'], 'Side door|2': ['Abel Sakala', 'draft'],
+        'Parking|0': ['Ruth Zulu', 'awaiting'], 'Parking|1': ['Abel Sakala', 'confirmed'], 'Parking|3': ['Ruth Zulu', 'draft'],
+        'Offering team|0': ['Naomi Phiri', 'leader'], 'Offering team|1': ['Esther Mwale', 'awaiting'], 'Offering team|2': ['Naomi Phiri', 'draft'],
+        'Welcome desk|0': ['Moses Daka', 'confirmed'], 'Welcome desk|1': ['Grace Mulenga', 'contact'], 'Welcome desk|3': ['Esther Mwale', 'draft']
+      },
+      reports: [
+        { id: 'ke', cell: 'Kafue Estates', date: 'Wed 30 Sep', leader: 'Mwansa Phiri', present: 8, total: 9, visitors: 0, offering: 'K 640', topic: 'Built on the rock · Matthew 7:24–27', summary: 'We compared the two builders and talked about obedience in ordinary life: work, family and money. The group agreed to read the Sermon on the Mount together this month.', testimonies: 'Brian Chola was offered the job he interviewed for last month.', prayer: 'Faith Chola is recovering from malaria. Precious Mbewe asked for prayer for her exams.', pastoral: 'Elijah Kapata lost his father last week and would value a visit from the pastor.', visitFor: 'Elijah Kapata' },
+        { id: 'sh', cell: 'Shikoswe', date: 'Tue 29 Sep', leader: 'Moses Daka', present: 5, total: 7, visitors: 1, offering: 'K 230', topic: 'Grace for the weary · Matthew 11:28–30', summary: 'A quiet evening focused on rest. Two members were away for work, and one visitor from the market joined us.', testimonies: 'None this week.', prayer: 'Patrick Zimba is travelling for work this month.', pastoral: 'Attendance has dropped for three weeks; Moses would like advice on encouraging members.' },
+        { id: 'ch', cell: 'Chanyanya', date: 'Fri 25 Sep', leader: 'Joseph Tembo', present: 6, total: 6, visitors: 2, offering: 'K 330', topic: 'When the storm comes · Mark 4:35–41', summary: 'Everyone attended, and two visitors came with Felix. We discussed trusting God through a difficult farming season.', testimonies: 'Hope Nkonde shared about the safe delivery of her baby.', prayer: 'Felix Mwanza for his farm this rainy season.', pastoral: 'The two visitors would like to know more about the church.' }
+      ],
+      giving: [
+        ['Mwembeshi Road', 'Thu 24 Sep', 365, 'Peter Lungu, Esther Mwale', 'Received 25 Sep', ''], ['Mwembeshi Road', 'Thu 17 Sep', 520, 'Peter Lungu, Esther Mwale', 'Received 18 Sep', 'Includes a thanksgiving offering'], ['Mwembeshi Road', 'Thu 10 Sep', 415, 'Peter Lungu, Ruth Zulu', 'Received 11 Sep', ''], ['Mwembeshi Road', 'Thu 3 Sep', 380, 'Peter Lungu, Esther Mwale', 'Received 4 Sep', ''],
+        ['Kafue Estates', 'Wed 30 Sep', 640, 'Naomi Phiri, Daniel Mbewe', 'Pending', ''], ['Kafue Estates', 'Wed 23 Sep', 590, 'Naomi Phiri, Daniel Mbewe', 'Received 24 Sep', ''], ['Kafue Estates', 'Wed 16 Sep', 655, 'Naomi Phiri, Brian Chola', 'Received 17 Sep', ''], ['Kafue Estates', 'Wed 9 Sep', 580, 'Naomi Phiri, Daniel Mbewe', 'Received 10 Sep', ''], ['Kafue Estates', 'Wed 2 Sep', 610, 'Naomi Phiri, Daniel Mbewe', 'Received 3 Sep', ''],
+        ['Shikoswe', 'Tue 29 Sep', 230, 'Grace Mulenga, Joyce Lungu', 'Pending', ''], ['Shikoswe', 'Tue 22 Sep', 260, 'Grace Mulenga, Joyce Lungu', 'Received 23 Sep', ''], ['Shikoswe', 'Tue 15 Sep', '—', '—', '—', 'Meeting cancelled'], ['Shikoswe', 'Tue 8 Sep', 240, 'Grace Mulenga, Joyce Lungu', 'Received 9 Sep', ''], ['Shikoswe', 'Tue 1 Sep', 210, 'Grace Mulenga, Patrick Zimba', 'Received 2 Sep', ''],
+        ['Chanyanya', 'Fri 25 Sep', 330, 'Abel Sakala, Sarah Tembo', 'Received 26 Sep', ''], ['Chanyanya', 'Fri 18 Sep', 310, 'Abel Sakala, Sarah Tembo', 'Received 19 Sep', 'Treasurer counted K 305 · difference noted'], ['Chanyanya', 'Fri 11 Sep', 285, 'Abel Sakala, Sarah Tembo', 'Received 12 Sep', ''], ['Chanyanya', 'Fri 4 Sep', 300, 'Abel Sakala, Paul Nkonde', 'Received 5 Sep', '']
+      ],
+      visits: [
+        { id: 'v1', member: 'Mwila Chanda', reason: 'Prayer for family', st: 'awaiting', when: 'Sat 10 Oct, 10:00', who: 'Rev. Daniel Mweemba', detail: 'Rev. Daniel Mweemba · Member\u2019s home' },
+        { id: 'v2', member: 'Ruth Zulu', reason: 'Illness', st: 'requested', when: 'Requested Thu 1 Oct', detail: 'Asked in the app · prefers Saturday afternoon' },
+        { id: 'v3', member: 'Joyce Lungu', reason: 'Counsel', st: 'requested', when: 'Requested Wed 30 Sep', detail: 'Asked in the app · church office, weekday evening' },
+        { id: 'v4', member: 'Agnes Tembo', reason: 'Home blessing', st: 'confirmed', when: 'Sun 11 Oct, 15:30', who: 'Rev. Daniel Mweemba', detail: 'Rev. Daniel Mweemba, Elder John Siame' },
+        { id: 'v5', member: 'Kabwe Musonda', reason: 'Absent from cell', st: 'postponed', when: 'Was Thu 8 Oct, 17:00', alt: 'Tue 13 Oct, 17:00', who: 'Pastor Ruth Hamweene', detail: 'Suggested Tue 13 Oct, 17:00 instead' },
+        { id: 'v6', member: 'Daniel Mbewe', reason: 'Home blessing', st: 'awaiting', when: 'Sat 17 Oct, 14:00', who: 'Elder John Siame', detail: 'Elder John Siame · Member\u2019s home' },
+        { id: 'v7', member: 'Faith Chola', reason: 'Illness', st: 'completed', when: 'Mon 28 Sep', detail: 'Visit note saved (private)' }
+      ],
+      pool: ['Mwila Chanda', 'Peter Lungu', 'Ruth Zulu', 'Abel Sakala', 'Esther Mwale', 'Grace Mulenga', 'Joseph Tembo', 'Naomi Phiri', 'Moses Daka', 'Kabwe Musonda', 'Lydia Banda']
+    };
+    return this._d;
+  }
+  renderVals() {
+    const s = this.state, D = this.D(), chip = c => this.chip(c);
+    const isAdmin = s.role === 'admin';
+    const go = pg => () => this.setState({ page: pg, drawer: null, editing: null });
+    const pendingApps = D.apps.filter(a => !s.appSt[a.id]).length;
+    const cells = D.cells.map(c => ({ ...c, leader: (s.leaders[c.id] || {}).leader || c.leader, assistant: (s.leaders[c.id] || {}).assistant || c.assistant, reqsOpen: c.reqs.filter(r => !s.cellReqSt[r.id]) }));
+    const rota = s.rota || D.rota;
+    const drafts = Object.values(rota).filter(v => v[1] === 'draft').length;
+    const navAll = [['overview', 'Overview', 0], ['members', 'Members', pendingApps], ['cells', 'Cell groups', cells.reduce((n, c) => n + c.reqsOpen.length, 0)], ['rotas', 'Duty rotas', 0], ['meetings', 'Cell meetings', 0]];
+    const navLeader = [['overview', 'Overview', 0], ['cells', 'My cell', cells[0].reqsOpen.length], ['meetings', 'Cell meetings', 0]];
+    const isPastor = s.role === 'pastor';
+    const vis = (s.visits || D.visits);
+    const navPastor = [['overview', 'Overview', 0], ['reports', 'Cell reports', s.reportSent ? 0 : 1], ['giving', 'Cell giving', 0], ['care', 'Pastoral care', vis.filter(v => v.st === 'requested' || v.st === 'postponed').length]];
+    const nav = (isAdmin ? navAll : isPastor ? navPastor : navLeader).map(([k, l, b]) => ({ label: l, badge: b || 0, go: go(k), style: { height: 40, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px', borderRadius: 10, border: 0, cursor: 'pointer', fontWeight: 600, fontSize: 15, textAlign: 'left', background: s.page === k ? 'rgba(255,255,255,.14)' : 'transparent', color: '#fff', opacity: s.page === k ? 1 : .82 } }));
+    const allowed = isAdmin ? ['overview', 'members', 'cells', 'rotas', 'meetings'] : isPastor ? ['overview', 'reports', 'giving', 'care'] : ['overview', 'cells', 'meetings'];
+    const page = allowed.includes(s.page) ? s.page : 'overview';
+    const p = { overview: page === 'overview' && !isPastor, pOverview: page === 'overview' && isPastor, reports: page === 'reports', giving: page === 'giving', care: page === 'care', members: page === 'members', cells: page === 'cells', rotas: page === 'rotas', meetings: page === 'meetings' };
+    const titles = { reports: ['Cell reports', 'Weekly reports from cell leaders'], giving: ['Cell giving', 'Offerings recorded at cell meetings'], care: ['Pastoral care', 'Visits and care requests'], overview: ['Overview', isPastor ? 'The whole congregation · week of 2 Oct 2026' : isAdmin ? 'Church-wide · week of 2 Oct 2026' : 'Mwembeshi Road cell'], members: ['Members', 'Applications, member records, roles and account access'], cells: [isAdmin ? 'Cell groups' : 'My cell', 'Leaders, schedules and confirmed membership'], rotas: ['Duty rotas', `${s.dept} · October 2026`], meetings: ['Cell meetings', 'Plan the next meeting and record the last one'] };
+    const roles = [['admin', 'Admin'], ['cellLeader', 'Cell leader'], ['pastor', 'Pastor']].map(([k, l]) => ({ label: l, set: () => this.setState({ role: k, page: 'overview', cellSel: 'mw', drawer: null }), style: { height: 32, border: 0, borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13, background: s.role === k ? '#fff' : 'transparent', color: s.role === k ? '#14246B' : '#fff' } }));
+
+    const unf = D.positions.Ushering.filter(ps => !rota[`${ps}|0`]).length;
+    const tiles = isAdmin ? [
+      { n: pendingApps, label: 'Membership applications', sub: 'Waiting for review', go: () => this.setState({ page: 'members', memberTab: 'apps' }) },
+      { n: cells.reduce((n, c) => n + c.reqsOpen.length, 0), label: 'Cell requests', sub: 'Waiting for cell confirmation', go: go('cells') },
+      { n: 4, label: 'Duty gaps this week', sub: 'Unfilled, declined or overdue', go: go('rotas') },
+      { n: drafts, label: 'Draft rota slots', sub: 'Not yet published', go: go('rotas') }
+    ] : [
+      { n: cells[0].reqsOpen.length, label: 'Membership requests', sub: 'Waiting for your confirmation', go: go('cells') },
+      { n: s.reportSent ? 0 : 1, label: 'Report due', sub: 'Thu 1 Oct meeting', go: () => this.setState({ page: 'meetings', meetTab: 'record' }) },
+      { n: 2, label: 'Open follow-ups', sub: 'Visitor call · absent member', go: go('meetings') },
+      { n: 12, label: 'Members', sub: 'Confirmed in your cell', go: go('cells') }
+    ];
+    const attention = (isAdmin ? [
+      ['red', 'Duty', 'Main door, Sun 11 Oct', 'Joseph Tembo declined · needs a replacement', go('rotas')],
+      ['amber', 'Review', 'Chileshe Banda applied again', 'Possible duplicate of an existing record', () => this.setState({ page: 'members', memberTab: 'apps' })],
+      ['amber', 'Report', 'Mwembeshi Road cell report missing', 'Meeting on Thu 1 Oct · due Fri 2 Oct', go('meetings')],
+      ['gray', 'Access', 'Moses Daka · access review', 'Reported a changed phone number', () => this.setState({ page: 'members', memberTab: 'all', drawer: 'Moses Daka' })]
+    ] : [
+      ['amber', 'Report', 'Weekly report for Thu 1 Oct', 'Due today', () => this.setState({ page: 'meetings', meetTab: 'record' })],
+      ['blue', 'Visitor', 'Call Mutale Banda', 'Agreed to a follow-up call · due today', () => this.toast('Opening phone to call Mutale Banda')],
+      ['amber', 'Absent', 'Kabwe Musonda missed 3 meetings', 'Check in this week', () => this.toast('Follow-up assigned to you')]
+    ]).map(([c, tag, title, sub, g]) => ({ chip: chip(c), tag, title, sub, go: g }));
+
+    const apps = D.apps.map(a => { const st = s.appSt[a.id]; const lab = { approved: ['Approved', 'green'], linked: ['Linked to existing record', 'green'], rejected: ['Rejected', 'red'], asked: ['Details requested', 'blue'] }[st] || ['Awaiting review', 'amber'];
+      const set = v => () => { this.setState(x => ({ appSt: { ...x.appSt, [a.id]: v } })); this.toast({ approved: `${a.name} approved · cell confirmation still with the cell leader`, linked: `Account linked to the existing record for ${a.name}`, rejected: `${a.name} rejected`, asked: `Message sent to ${a.name}` }[v]); };
+      return { ...a, dup: a.dup || '', open: !st || st === 'asked', statusLabel: lab[0], chip: chip(lab[1]), approve: set('approved'), link: set('linked'), reject: set('rejected'), ask: set('asked'),
+        approveStyle: a.dup ? { height: 40, padding: '0 14px', borderRadius: 10, border: '1px solid #DFE4EE', background: '#fff', fontWeight: 600, cursor: 'pointer' } : { height: 40, padding: '0 14px', borderRadius: 10, border: 0, background: '#14246B', color: '#fff', fontWeight: 600, cursor: 'pointer' } }; });
+    const memberTabs = [['apps', `Applications (${pendingApps})`], ['all', 'All members']].map(([k, l]) => ({ label: l, style: this.seg(s.memberTab === k), set: () => this.setState({ memberTab: k }) }));
+    const accMap = { app: ['App account', 'green'], none: ['No login', 'gray'], hold: ['Access review', 'amber'] };
+    const rolesOf = m => [...m.roles.filter(r => !['Media', 'Pastor', 'Admin'].includes(r)), ...['Media', 'Pastor', 'Admin'].filter(r => (s.extraRoles[m.name] || {})[r] ?? m.roles.includes(r))];
+    const q = s.q.trim().toLowerCase();
+    const memberRows = D.members.filter(m => !q || m.name.toLowerCase().includes(q) || m.cell.toLowerCase().includes(q)).map(m => ({ ...m, roleText: rolesOf(m).join(', ') || 'Member', acc: accMap[m.acc][0], accChip: chip(accMap[m.acc][1]), open: () => this.setState({ drawer: m.name }),
+      rowStyle: { display: 'grid', gridTemplateColumns: 'minmax(180px,1.4fr) minmax(150px,1fr) minmax(160px,1.2fr) minmax(120px,.8fr) 110px', minWidth: 760, alignItems: 'center', padding: '12px 20px', borderBottom: '1px solid #EDF0F6', cursor: 'pointer', background: s.drawer === m.name ? '#E3EEFC' : '#fff' } }));
+    const dmRaw = D.members.find(m => m.name === s.drawer) || D.members[0];
+    const dm = { ...dmRaw, acc: accMap[dmRaw.acc][0], roleToggles: ['Media', 'Pastor', 'Admin', 'Prayer team'].map(r => { const on = (s.extraRoles[dmRaw.name] || {})[r] ?? dmRaw.roles.includes(r); return { label: r, style: this.pill(on), toggle: () => this.setState(x => ({ extraRoles: { ...x.extraRoles, [dmRaw.name]: { ...(x.extraRoles[dmRaw.name] || {}), [r]: !on } } })) }; }) };
+
+    const selId = isAdmin ? s.cellSel : 'mw';
+    const sc = cells.find(c => c.id === selId);
+    const cellCards = cells.map(c => ({ ...c, count: c.members.length, req: c.reqsOpen.length, select: () => this.setState({ cellSel: c.id }), style: { textAlign: 'left', padding: '14px 16px', borderRadius: 14, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 3, background: '#fff', border: c.id === selId ? '2px solid #0A7FE0' : '1px solid #DFE4EE' } }));
+    const setLead = k => e => { const val = e.target.value; this.setState(x => ({ leaders: { ...x.leaders, [selId]: { ...(x.leaders[selId] || {}), [k]: val } } })); this.toast(`${val} set as ${k === 'leader' ? 'cell leader' : 'assistant'}`); };
+    const reqs = sc.reqsOpen.map(r => ({ ...r, confirm: () => { this.setState(x => ({ cellReqSt: { ...x.cellReqSt, [r.id]: 'ok' } })); this.toast(`${r.name} confirmed in ${sc.name} cell · cell chat access granted`); }, decline: () => { this.setState(x => ({ cellReqSt: { ...x.cellReqSt, [r.id]: 'no' } })); this.toast('Sent to the church office to follow up'); } }));
+    const scMembers = sc.members.map(n => ({ name: n, ini: n.split(' ').map(x => x[0]).join(''), tag: n === sc.leader ? 'Leader' : n === sc.assistant ? 'Assistant' : 'Member' }));
+
+    const stMeta = { confirmed: ['Confirmed', 'green'], leader: ['Confirmed by leader', 'green'], awaiting: ['Awaiting response', 'amber'], declined: ['Declined', 'red'], contact: ['Needs contact', 'amber'], draft: ['Draft', 'gray'] };
+    const legend = Object.values(stMeta).map(([label, c]) => ({ label, chip: chip(c) }));
+    const positions = D.positions[s.dept];
+    const deptRota = s.dept === 'Ushering' ? rota : {};
+    const rotaDates = D.dates.map((d, i) => { const ok = positions.filter(ps => deptRota[`${ps}|${i}`] && ['confirmed', 'leader'].includes(deptRota[`${ps}|${i}`][1])).length; return { label: d, cov: `${ok} of ${positions.length} confirmed` }; });
+    const rotaCells = [];
+    positions.forEach(ps => {
+      rotaCells.push({ isHead: true, isSlot: false, pos: ps });
+      D.dates.forEach((d, i) => {
+        const key = `${ps}|${i}`, a = deptRota[key], editing = s.editing === key;
+        const meta = a ? stMeta[a[1]] : null;
+        const busy = new Set(positions.filter(o => o !== ps && deptRota[`${o}|${i}`]).map(o => deptRota[`${o}|${i}`][0]));
+        const colors = { green: ['#DFF3E8', '#0D6438'], amber: ['#FFF1CF', '#6E4400'], red: ['#FCE5E2', '#A3241A'], gray: ['#F4F6FA', '#586079'] };
+        const col = meta ? colors[meta[1]] : null;
+        rotaCells.push({ isHead: false, isSlot: true, editing, show: !editing, name: a ? a[0] : '+ Assign', label: a ? meta[0] : 'Unfilled',
+          style: a ? { width: '100%', minHeight: 48, textAlign: 'left', padding: '6px 10px', borderRadius: 10, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 1, background: col[0], color: col[1], border: a[1] === 'draft' ? '1.5px dashed #C9D0E0' : '1px solid transparent' }
+            : { width: '100%', minHeight: 48, textAlign: 'left', padding: '6px 10px', borderRadius: 10, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 1, background: '#fff', color: '#A3241A', border: '1.5px dashed #F0B8B1' },
+          edit: () => this.setState({ editing: key }),
+          opts: D.pool.map(n => ({ name: n, label: busy.has(n) ? `${n} · already serving` : n })),
+          assign: e => { const n = e.target.value; if (!n) return this.setState({ editing: null }); const status = i === 0 || i === 1 ? 'awaiting' : 'draft'; this.setState(x => ({ rota: { ...(x.rota || D.rota), [key]: [n, status] }, editing: null })); this.toast(busy.has(n) ? `Conflict noted: ${n} is already serving on ${d}` : status === 'awaiting' ? `${n} asked to serve · awaiting response` : `${n} added to draft`); } });
+      });
+    });
+    const depts = Object.keys(D.positions).map(k => ({ label: k, style: this.pill(s.dept === k), set: () => this.setState({ dept: k, editing: null }) }));
+
+    const plan = s.plan, setPlan = k => e => { const val = e.target.value; this.setState(x => ({ plan: { ...x.plan, [k]: val } })); };
+    const planFields = [['date', 'Date'], ['time', 'Time'], ['venue', 'Venue'], ['address', 'Address'], ['topic', 'Bible study topic'], ['ref', 'Scripture']].map(([k, l]) => ({ label: l, value: plan[k], onChange: setPlan(k) }));
+    const setProg = (i, j) => e => { const val = e.target.value; this.setState(x => ({ prog: x.prog.map((r, ri) => ri === i ? r.map((c, ci) => ci === j ? val : c) : r) })); };
+    const prog = s.prog.map((r, i) => ({ time: r[0], part: r[1], who: r[2], onTime: setProg(i, 0), onPart: setProg(i, 1), onWho: setProg(i, 2), remove: () => this.setState(x => ({ prog: x.prog.filter((_, ri) => ri !== i) })) }));
+    const cellPeople = cells[0].members;
+    const meetTabs = [['plan', 'Next meeting · Thu 8 Oct'], ['record', 'Last meeting · Thu 1 Oct']].map(([k, l]) => ({ label: l, style: this.seg(s.meetTab === k), set: () => this.setState({ meetTab: k }) }));
+    const attOpts = [['present', 'Present', '#0D6438', '#DFF3E8'], ['absent', 'Absent', '#A3241A', '#FCE5E2'], ['excused', 'Excused', '#0B4FA6', '#E3EEFC']];
+    const attDefault = n => n === 'Kabwe Musonda' || n === 'Agnes Tembo' ? 'absent' : n === 'John Siame' ? 'excused' : 'present';
+    const attendance = cellPeople.map(n => { const cur = s.att[n] || attDefault(n); return { name: n, opts: attOpts.map(([k, l, fg, bg]) => ({ label: l, set: () => this.setState(x => ({ att: { ...x.att, [n]: k } })), style: { height: 30, padding: '0 9px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 600, border: cur === k ? `1.5px solid ${fg}` : '1px solid #DFE4EE', background: cur === k ? bg : '#fff', color: cur === k ? fg : '#586079' } })) }; });
+    const counts = cellPeople.reduce((o, n) => { const k = s.att[n] || attDefault(n); o[k]++; return o; }, { present: 0, absent: 0, excused: 0 });
+
+    return {
+      roles, nav, isAdmin, whoLine: isAdmin ? 'Admin · church office' : isPastor ? 'Rev. Daniel Mweemba · Pastor' : 'Grace Banda · Mwembeshi Road',
+      ...this.pastorVals(s, D, chip, counts), p, pageTitle: titles[page][0], pageSub: titles[page][1], toast: s.toast,
+      showPublish: p.rotas && s.dept === 'Ushering', publishLabel: drafts ? `Publish ${drafts} draft slots` : 'All slots published',
+      publishStyle: { height: 42, padding: '0 18px', borderRadius: 10, border: 0, fontWeight: 700, cursor: drafts ? 'pointer' : 'default', background: drafts ? '#14246B' : '#EDF0F6', color: drafts ? '#fff' : '#586079' },
+      publishRota: () => { if (!drafts) return; const r = { ...rota }; Object.keys(r).forEach(k => { if (r[k][1] === 'draft') r[k] = [r[k][0], 'awaiting']; }); this.setState({ rota: r }); this.toast(`${drafts} assignments published · members asked to accept or decline`); },
+      tiles, attention, memberTabs, appTab: s.memberTab === 'apps', allTab: s.memberTab === 'all', apps, q: s.q, onQ: e => this.setState({ q: e.target.value }),
+      addMember: () => this.toast('New record for a member without a phone or email'), memberRows, drawer: !!s.drawer, dm, closeDrawer: () => this.setState({ drawer: null }),
+      hold: () => this.toast(`${dm.name}: private access paused until identity check`), deactivate: () => this.toast(`${dm.name}: future duties flagged for reassignment`),
+      cellCards, sc, peopleOpts: sc.members, onLeader: setLead('leader'), onAssistant: setLead('assistant'), hasReqs: reqs.length > 0, reqs, scMembers, newCell: () => this.toast('New cell'),
+      depts, legend, rotaDates, rotaCells,
+      meetTabs, planTab: s.meetTab === 'plan', recTab: s.meetTab === 'record', planFields, plan, prog, cellPeople,
+      addPart: () => this.setState(x => ({ prog: [...x.prog, ['', 'New part', cellPeople[0]]] })),
+      meetPublishLabel: s.meetPublished ? 'Update members' : 'Publish to members',
+      publishMeeting: () => { this.setState({ meetPublished: true }); this.toast('Published · each person is told about their part'); },
+      cancelMeeting: () => this.toast('Meeting cancelled · reminders stopped and members told'),
+      attendance, attSummary: `${counts.present} present · ${counts.absent} absent · ${counts.excused} excused`,
+      visitors: s.visitors, visitorName: s.visitorName, onVisitor: e => this.setState({ visitorName: e.target.value }),
+      addVisitor: () => s.visitorName.trim() && this.setState(x => ({ visitors: [...x.visitors, x.visitorName.trim()], visitorName: '' })),
+      summary: s.summary, testimonies: s.testimonies, privateNotes: s.privateNotes,
+      onSummary: e => this.setState({ summary: e.target.value }), onTestimonies: e => this.setState({ testimonies: e.target.value }), onPrivate: e => this.setState({ privateNotes: e.target.value }),
+      reportStatus: s.reportSent ? 'Report submitted' : 'Report due today', reportChip: chip(s.reportSent ? 'green' : 'amber'),
+      absentNote: counts.absent ? 'Members absent 3 meetings in a row get a follow-up flag.' : '',
+      submitReport: () => { this.setState({ reportSent: true }); this.toast('Report submitted · recap now visible to cell members'); }
+    };
+  }
+}
+</script>
+</body>
+</html>

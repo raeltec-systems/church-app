@@ -162,3 +162,15 @@ Implemented 2026-10-03 directly (no subagent tool in this session).
   - **KEEP:** lock order (authority FOR SHARE, then receipt reservation, then aggregate FOR UPDATE); receipts only for successes; subtransaction rollback; fixed safe messages.
 
 ## Review Triage Log
+
+**Pass 1 (quick lens, independent reviewer), 2026-10-03.** Verdicts: high 1 · medium 2 · low 4 · false 0. All 7 were patched in place through a follow-up migration, because the original migration was already applied on hosted. The parent session chose an in-place amendment over reverting and re-deriving: the plan's intent was right, and only kernel detail was missing.
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---------|---------|-------|-------------------|
+| 1 | Receipt replay rechecks the command grant but not the caller's current scope on the stored aggregate | high | bad_plan → in-place amendment | AD-2 says "Recheck access before replaying a receipt". `cmd_execute` returns the stored result after only `cmd_authorize`, and the receipt's aggregate fields are never read. Fix: a per-command scope-recheck seam on replay, a test, and a runbook step. |
+| 2 | Malformed or omitted envelope fields return raw PostgREST/SQL errors (22P02, PGRST202 with parameter hints) | medium | bad_plan → in-place amendment | The reviewer reproduced this on the local stack. It breaks the Consistency Conventions error vocabulary. Fix: validate the envelope inside the function, plus HTTP smoke cases. |
+| 3 | A non-UUID `sub` maps to `validation_failed` instead of `unauthenticated`; internal cast errors map to `validation_failed` | medium | patch | Caused by the `invalid_text_representation` branch in the exception map. Fix: resolve the actor defensively, and map unexpected internal errors to `unavailable`. |
+| 4 | `cmd_utc` and its callers are marked IMMUTABLE but call STABLE `to_char` | low | patch | Checked `provolatile='s'`. Direct relabel. |
+| 5 | The smoke script's `new_actor` failure doesn't abort, and a created user can leak | low | patch | `exit` in the `$(…)` subshell doesn't stop the script. Direct fix. |
+| 6 | `hold_lock` bypasses the docker-exec psql fallback | low | patch | It calls host `psql` directly. Direct fix. |
+| 7 | Coverage gaps: concurrent revocation under FOR SHARE, `must_be_null`, non-object payload, increment validation | low | patch | The plan's decisions claim these behaviours but no test covers them. Add the tests. |

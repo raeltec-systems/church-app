@@ -46,12 +46,8 @@ jobs:
           node-version: 22
       - name: Harness helper tests (no network, no credentials)
         run: node --test tools/auth-harness/*.test.mjs
-      - name: Evidence holds no full JWTs or keys
-        run: |
-          if grep -rEn 'eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{10,}|sb_(secret|publishable)_[A-Za-z0-9_-]{8,}' \
-              _bmad-output/initiative-church-app/epic-platform-baseline/evidence-1.2 tools/auth-harness; then
-            echo "token-shaped value found"; exit 1
-          fi
+      - name: Evidence holds no tokens, keys, passwords, OTPs or link tokens
+        run: bash tools/auth-harness/scan-evidence.sh
 
   flutter:
     name: flutter (analyze, test, web build)

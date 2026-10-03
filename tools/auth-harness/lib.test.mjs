@@ -2,7 +2,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  ALLOWED_HOST,
+  AuthClient,
   amrHasPassword,
+  assertAllowedOrigin,
   maskIdentifier,
   parseRedirectLocation,
   parseVerifyLink,
@@ -89,16 +92,16 @@ test('amrHasPassword: only an explicit password entry is trusted', () => {
 
 test('parseVerifyLink extracts token/type/redirect and rejects other URLs', () => {
   const p = parseVerifyLink(
-    'https://ref.supabase.co/auth/v1/verify?token=abc&type=recovery&redirect_to=http://localhost:3000',
+    'https://szfyfezfvxyuvovnnakr.supabase.co/auth/v1/verify?token=abc&type=recovery&redirect_to=http://localhost:3000',
   );
   assert.deepEqual(p, {
-    origin: 'https://ref.supabase.co',
+    origin: 'https://szfyfezfvxyuvovnnakr.supabase.co',
     token: 'abc',
     type: 'recovery',
     redirectTo: 'http://localhost:3000',
   });
   assert.throws(() => parseVerifyLink('https://evil.example/login?token=a&type=b'));
-  assert.throws(() => parseVerifyLink('https://ref.supabase.co/auth/v1/verify?type=signup'));
+  assert.throws(() => parseVerifyLink('https://szfyfezfvxyuvovnnakr.supabase.co/auth/v1/verify?type=signup'));
 });
 
 test('parseRedirectLocation distinguishes session, error, pkce and empty redirects', () => {
@@ -119,4 +122,52 @@ test('parseRedirectLocation distinguishes session, error, pkce and empty redirec
 test('maskIdentifier keeps only plus-tag or last digits', () => {
   assert.equal(maskIdentifier('person+bicauth-e1@gmail.com'), '…+bicauth-e1@gmail.com');
   assert.equal(maskIdentifier('+260970000101'), '…0101');
+});
+
+test('assertAllowedOrigin accepts only https://<auth-test ref>.supabase.co', () => {
+  assert.equal(ALLOWED_HOST, 'szfyfezfvxyuvovnnakr.supabase.co');
+  assert.equal(
+    assertAllowedOrigin('https://szfyfezfvxyuvovnnakr.supabase.co/'),
+    'https://szfyfezfvxyuvovnnakr.supabase.co',
+  );
+  const bypasses = [
+    'https://szfyfezfvxyuvovnnakr.attacker.example',
+    'https://szfyfezfvxyuvovnnakr.supabase.co.attacker.example',
+    'https://attacker.example/szfyfezfvxyuvovnnakr.supabase.co',
+    'https://attacker.example/?h=szfyfezfvxyuvovnnakr',
+    'https://szfyfezfvxyuvovnnakr.supabase.co@attacker.example',
+    'https://user:pw@szfyfezfvxyuvovnnakr.supabase.co',
+    'http://szfyfezfvxyuvovnnakr.supabase.co',
+    'https://szfyfezfvxyuvovnnakr.supabase.co:8443',
+    'https://tmurpotfluignacfueki.supabase.co',
+    'szfyfezfvxyuvovnnakr',
+    '',
+  ];
+  for (const u of bypasses) assert.throws(() => assertAllowedOrigin(u), Error, u);
+});
+
+test('AuthClient refuses any other project before sending a request', () => {
+  let called = false;
+  const fetchImpl = () => {
+    called = true;
+  };
+  assert.throws(
+    () => new AuthClient({ url: 'https://szfyfezfvxyuvovnnakr.attacker.example', apikey: 'k', fetchImpl }),
+  );
+  assert.equal(called, false);
+  const c = new AuthClient({ url: 'https://szfyfezfvxyuvovnnakr.supabase.co/', apikey: 'k', fetchImpl });
+  assert.equal(c.url, 'https://szfyfezfvxyuvovnnakr.supabase.co');
+});
+
+test('parseVerifyLink rejects look-alike link hosts and paths', () => {
+  for (const host of [
+    'https://szfyfezfvxyuvovnnakr.attacker.example',
+    'http://szfyfezfvxyuvovnnakr.supabase.co',
+    'https://szfyfezfvxyuvovnnakr.supabase.co@attacker.example',
+  ]) {
+    assert.throws(() => parseVerifyLink(`${host}/auth/v1/verify?token=a&type=signup`), Error, host);
+  }
+  assert.throws(() =>
+    parseVerifyLink('https://szfyfezfvxyuvovnnakr.supabase.co/x/auth/v1/verify?token=a&type=signup'),
+  );
 });

@@ -83,7 +83,40 @@ context:
 - **`/recover` existence oracle.** For a known address `/recover` returns 429 when throttled, while an unknown address returns 200. This is recorded as a finding for identity.
 - **Evidence labelling.** One evidence line was relabelled from the ad-hoc step `x` to `33b-probe-password-session-A-repeat`. Its content was not changed.
 
+- **Review fixes (2026-10-03, parent review).**
+  - **Project guard:** now `assertAllowedOrigin()` in `lib.mjs`. It requires https, the exact host `szfyfezfvxyuvovnnakr.supabase.co`, no port and no userinfo. It covers both `SUPABASE_URL` and email links, with unit tests for the bypass cases.
+  - **State storage:** state lives in a private `mkdtemp` directory (`init`, 0700, owner-checked). Reads use `O_NOFOLLOW`; writes go through an `O_EXCL` temp file plus rename at 0600. `cleanup` deletes it.
+  - **Links:** `verify-link` reads the link from stdin.
+  - **`otp`:** records `create_user` and documents the no-user path.
+  - **Raw evidence:** new `attach` command plus committed read-only queries `sql/observe_{probe_grants,account_sessions,auth_logs}.sql`. `note` is commentary only.
+  - **CI scan:** moved to `scan-evidence.sh`, which covers JWTs, keys, `Hx!` passwords, `token=`/hex link tokens, unredacted secret JSON keys and unmasked inbox addresses in evidence.
+  - **SQL probe:** made exactly reproducible, adding `harness.session_live()` (with the `not_after` check) shared by the predicate and `harness_whoami`, and revoking `anon` everywhere. The hosted project was reconciled with migration `auth_harness_004_reconcile_probe` (the full file), and the result was captured as step 98.
+  - **Evidence README:** rewritten so every claim cites log steps.
+    - Lines 5 and 6 are marked legacy.
+    - Notes 68 and 94 are no longer used as observations.
+    - Row 8 (signup-link session not re-probed), row 11 (C not refreshed) and row 16 (phone `/otp` was the no-user path) are corrected.
+    - Unsupported items are marked "to re-capture".
+    - Inbox addresses are masked.
+  - **Cleanup and new runs:** the old fixed-path state file and wrapper were deleted. Steps 98 and 99 were attached from MCP output.
+
 ## Plan Change Log
+
+- 2026-10-03, parent review (not a step-04 loop).
+  - **Findings:**
+    - The project guard used a substring match.
+    - The SQL file did not match hosted grants, and the diagnostic omitted `not_after`.
+    - Evidence relied on legacy lines and free-text notes.
+    - The README overstated rows 8, 11 and 16.
+    - The CI scan was too narrow.
+    - The state file was unsafe, link tokens were passed in argv, and inbox addresses were unmasked.
+  - **Amended:** harness code, tests, CI scan, SQL file plus hosted 004, and the evidence README, as listed in Implementation Notes. The frozen intent is unchanged.
+  - **Avoids:** credentials sent to a look-alike host; evidence claims with no captured output; secrets or link tokens leaking through argv, a predictable temp file or evidence that CI fails to scan.
+  - **KEEP:**
+    - native-endpoint calls with no dependencies;
+    - the AMR-plus-live-session predicate;
+    - redaction through `scrub()`;
+    - step-labelled JSONL evidence;
+    - the owner-gated rerun list in the evidence README.
 
 ## Review Triage Log
 

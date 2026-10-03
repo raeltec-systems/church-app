@@ -3,15 +3,41 @@
 -- szfyfezfvxyuvovnnakr). This is NOT an application migration and must never
 -- be copied into supabase/migrations.
 --
+-- The file is idempotent and is the exact hosted definition. It was applied
+-- through the Supabase MCP as migration auth_harness_004_reconcile_probe,
+-- which superseded the earlier partial migrations 001 to 003. Hosted grants
+-- are checked by sql/observe_probe_grants.sql.
+--
 -- harness.trusted_password_session() mirrors the session half of the AD-3
--- private-data predicate: the signed JWT's amr must contain a `password`
--- entry AND its session_id must still exist in auth.sessions for the same
--- user (a live session). Membership, binding, hold and grant checks belong to
--- the identity epic and are out of scope here.
+-- private-data predicate:
+--   * the signed JWT's amr must contain a `password` entry, AND
+--   * its session_id must still exist in auth.sessions for the same user and
+--     must not be past not_after (a live session).
+-- Membership, binding, hold and grant checks belong to the identity epic and
+-- are out of scope here.
 
 create schema if not exists harness;
-revoke all on schema harness from public;
+revoke all on schema harness from public, anon;
 grant usage on schema harness to authenticated;
+
+-- Live-session half, shared by the predicate and the diagnostic.
+create or replace function harness.session_live()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from auth.sessions s
+    where s.id = nullif(auth.jwt() ->> 'session_id', '')::uuid
+      and s.user_id = auth.uid()
+      and (s.not_after is null or s.not_after > now())
+  );
+$$;
+revoke all on function harness.session_live() from public, anon;
+grant execute on function harness.session_live() to authenticated;
 
 create or replace function harness.trusted_password_session()
 returns boolean
@@ -26,22 +52,16 @@ as $$
       from jsonb_array_elements(coalesce(auth.jwt() -> 'amr', '[]'::jsonb)) as a(entry)
       where a.entry ->> 'method' = 'password'
     )
-    and exists (
-      select 1
-      from auth.sessions s
-      where s.id = nullif(auth.jwt() ->> 'session_id', '')::uuid
-        and s.user_id = auth.uid()
-        and (s.not_after is null or s.not_after > now())
-    ),
+    and harness.session_live(),
     false
   );
 $$;
-revoke all on function harness.trusted_password_session() from public;
+revoke all on function harness.trusted_password_session() from public, anon;
 grant execute on function harness.trusted_password_session() to authenticated;
 
 -- One synthetic "private" row per user, readable/writable only under the
 -- trusted predicate. Lives in an unexposed schema; reached through the
--- security-invoker RPCs below so RLS applies to the caller.
+-- security-invoker RPC below so RLS applies to the caller.
 create table if not exists harness.private_probe (
   user_id uuid primary key,
   note text not null default 'synthetic private probe row',
@@ -51,15 +71,24 @@ alter table harness.private_probe enable row level security;
 revoke all on harness.private_probe from public, anon, authenticated;
 grant select, insert on harness.private_probe to authenticated;
 
-drop policy if exists private_probe_select on harness.private_probe;
-create policy private_probe_select on harness.private_probe
-  for select to authenticated
-  using (user_id = (select auth.uid()) and (select harness.trusted_password_session()));
-
-drop policy if exists private_probe_insert on harness.private_probe;
-create policy private_probe_insert on harness.private_probe
-  for insert to authenticated
-  with check (user_id = (select auth.uid()) and (select harness.trusted_password_session()));
+do $$
+begin
+  if not exists (select 1 from pg_policies
+                 where schemaname = 'harness' and tablename = 'private_probe'
+                   and policyname = 'private_probe_select') then
+    create policy private_probe_select on harness.private_probe
+      for select to authenticated
+      using (user_id = (select auth.uid()) and (select harness.trusted_password_session()));
+  end if;
+  if not exists (select 1 from pg_policies
+                 where schemaname = 'harness' and tablename = 'private_probe'
+                   and policyname = 'private_probe_insert') then
+    create policy private_probe_insert on harness.private_probe
+      for insert to authenticated
+      with check (user_id = (select auth.uid()) and (select harness.trusted_password_session()));
+  end if;
+end;
+$$;
 
 -- Private-data probe: inserts the caller's row if allowed, then returns how
 -- many private rows the caller can see (1 = allowed, 0 = denied by RLS).
@@ -92,11 +121,11 @@ $$;
 revoke all on function public.harness_private_probe() from public, anon;
 grant execute on function public.harness_private_probe() to authenticated;
 
--- Hosted apply (2026-10-03) ran this file as migrations
--- auth_harness_001..003 via the Supabase MCP; this file is the idempotent sum.
-
 -- Diagnostic RPC: what the server sees for the caller's session. Returns only
--- method names, aal, the live-session flag and the predicate result.
+-- method names, aal, the live-session flag (the SAME predicate half as above)
+-- and the predicate result. It is an intentional SECURITY DEFINER diagnostic,
+-- because it must read auth.sessions, and it returns only the caller's own
+-- session facts.
 create or replace function public.harness_whoami()
 returns jsonb
 language sql
@@ -112,15 +141,9 @@ as $$
       from jsonb_array_elements(coalesce(auth.jwt() -> 'amr', '[]'::jsonb)) as a(entry)
     ), '[]'::jsonb),
     'aal', auth.jwt() ->> 'aal',
-    'session_live', exists (
-      select 1 from auth.sessions s
-      where s.id = nullif(auth.jwt() ->> 'session_id', '')::uuid
-        and s.user_id = auth.uid()
-    ),
+    'session_live', harness.session_live(),
     'trusted_password_session', harness.trusted_password_session()
   );
 $$;
-revoke all on function public.harness_whoami() from public;
+revoke all on function public.harness_whoami() from public, anon;
 grant execute on function public.harness_whoami() to authenticated;
--- Advisor note: harness_whoami is an intentional SECURITY DEFINER diagnostic
--- (it must read auth.sessions); it returns only the caller's own session facts.

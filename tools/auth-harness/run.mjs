@@ -5,17 +5,34 @@
 //   SUPABASE_URL                 isolated auth-test project URL (required)
 //   SUPABASE_PUBLISHABLE_KEY     publishable/anon key only (required)
 //   HARNESS_EVIDENCE             evidence JSONL path (default: evidence-1.2/harness-log.jsonl)
-//   HARNESS_STATE                local token/password state (default: OS temp dir, mode 0600)
+//   HARNESS_STATE_DIR            private state dir printed by `init` (required for every
+//                                command except init/attach/note)
 //
 // Usage: node run.mjs <command> [args] [--step <name>]
+// Email links are read from stdin (never argv): `verify-link <label> < link.txt`.
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  appendFileSync,
+  closeSync,
+  constants as FS,
+  fchmodSync,
+  fstatSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeSync,
+} from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   AuthClient,
+  assertAllowedOrigin,
   maskIdentifier,
   parseRedirectLocation,
   parseVerifyLink,
@@ -26,14 +43,14 @@ import {
 } from './lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const ALLOWED_REF = 'szfyfezfvxyuvovnnakr';
 const EVIDENCE =
   process.env.HARNESS_EVIDENCE ||
   resolve(
     HERE,
     '../../_bmad-output/initiative-church-app/epic-platform-baseline/evidence-1.2/harness-log.jsonl',
   );
-const STATE = process.env.HARNESS_STATE || join(tmpdir(), 'bic-auth-harness-state.json');
+const STATE_PREFIX = 'bic-auth-harness-';
+const STATE_FILE = 'state.json';
 
 function parseArgs(argv) {
   const pos = [];
@@ -49,12 +66,60 @@ function parseArgs(argv) {
   return { pos, opt };
 }
 
-function loadState() {
-  if (!existsSync(STATE)) return { sessions: {}, passwords: {} };
-  return JSON.parse(readFileSync(STATE, 'utf8'));
+// State (live tokens + generated passwords) lives in a private mkdtemp dir
+// (0700, owned by us, not a symlink). Files are opened with O_NOFOLLOW and
+// written via an O_EXCL temp file + rename, so a planted symlink or a
+// pre-existing file cannot redirect or widen them.
+function stateDir() {
+  const dir = process.env.HARNESS_STATE_DIR;
+  if (!dir) throw new Error('HARNESS_STATE_DIR is not set: run `init` and export the printed dir');
+  const st = lstatSync(dir);
+  if (!st.isDirectory() || st.isSymbolicLink()) throw new Error('HARNESS_STATE_DIR is not a real directory');
+  if (!basename(dir).startsWith(STATE_PREFIX)) throw new Error('HARNESS_STATE_DIR was not created by `init`');
+  if ((st.mode & 0o077) !== 0) throw new Error('HARNESS_STATE_DIR must be mode 0700');
+  if (typeof process.getuid === 'function' && st.uid !== process.getuid()) {
+    throw new Error('HARNESS_STATE_DIR is not owned by the current user');
+  }
+  return dir;
 }
+
+function loadState() {
+  const file = join(stateDir(), STATE_FILE);
+  let fd;
+  try {
+    fd = openSync(file, FS.O_RDONLY | FS.O_NOFOLLOW);
+  } catch (e) {
+    if (e.code === 'ENOENT') return { sessions: {}, passwords: {} };
+    throw e;
+  }
+  try {
+    const st = fstatSync(fd);
+    if (!st.isFile() || (st.mode & 0o077) !== 0) throw new Error('state file must be a private regular file');
+    return JSON.parse(readFileSync(fd, 'utf8'));
+  } finally {
+    closeSync(fd);
+  }
+}
+
 function saveState(s) {
-  writeFileSync(STATE, JSON.stringify(s), { mode: 0o600 });
+  const dir = stateDir();
+  const tmp = join(dir, `.${STATE_FILE}.${randomBytes(6).toString('hex')}`);
+  const fd = openSync(tmp, FS.O_WRONLY | FS.O_CREAT | FS.O_EXCL | FS.O_NOFOLLOW, 0o600);
+  try {
+    fchmodSync(fd, 0o600);
+    writeSync(fd, JSON.stringify(s));
+  } finally {
+    closeSync(fd);
+  }
+  renameSync(tmp, join(dir, STATE_FILE));
+}
+
+function readStdin() {
+  try {
+    return readFileSync(0, 'utf8').trim();
+  } catch {
+    return '';
+  }
 }
 
 function record(step, command, data) {
@@ -95,13 +160,60 @@ function requireSession(state, label) {
 async function main() {
   const [command, ...rest] = process.argv.slice(2);
   const { pos, opt } = parseArgs(rest);
-  const url = process.env.SUPABASE_URL;
-  if (!url || !url.includes(ALLOWED_REF)) {
-    throw new Error(`SUPABASE_URL must be the isolated auth-test project (${ALLOWED_REF})`);
-  }
-  const client = new AuthClient({ url, apikey: process.env.SUPABASE_PUBLISHABLE_KEY });
-  const state = loadState();
   const step = opt.step;
+
+  // Offline commands: no network, no credentials.
+  switch (command) {
+    case 'init': {
+      const dir = mkdtempSync(join(tmpdir(), STATE_PREFIX));
+      // mkdtemp creates 0700; assert rather than trust umask.
+      if ((lstatSync(dir).mode & 0o077) !== 0) throw new Error('mkdtemp dir is not private');
+      console.log(`export HARNESS_STATE_DIR=${dir}`);
+      return;
+    }
+    case 'cleanup': {
+      // Removes live tokens and generated passwords. Run at the end of every session.
+      const dir = stateDir();
+      rmSync(dir, { recursive: true, force: true });
+      console.log(JSON.stringify({ removed_state_dir: true }));
+      return;
+    }
+    case 'attach': {
+      // Attach raw output of a committed read-only query (MCP execute_sql/query_logs)
+      // as evidence. stdin = the raw JSON result. --source = committed query file.
+      if (!opt.source) throw new Error('--source <committed query file> required');
+      const src = resolve(HERE, String(opt.source));
+      if (!src.startsWith(resolve(HERE, 'sql') + '/')) throw new Error('--source must be a file under tools/auth-harness/sql/');
+      readFileSync(src); // must exist
+      const raw = readStdin();
+      let parsed;
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        throw new Error('stdin must be the raw JSON query result');
+      }
+      record(step, command, {
+        source: `tools/auth-harness/${String(opt.source).replace(/^\.\//, '')}`,
+        via: opt.via || 'supabase-mcp',
+        window: opt.window || undefined,
+        raw_result: parsed,
+      });
+      return;
+    }
+    case 'note':
+      // Operator commentary only. Notes are NOT observations; evidence claims must cite
+      // harness calls or `attach` lines.
+      record(step, command, { operator_note: pos.join(' ') });
+      return;
+    default:
+      break;
+  }
+
+  const client = new AuthClient({
+    url: process.env.SUPABASE_URL,
+    apikey: process.env.SUPABASE_PUBLISHABLE_KEY,
+  });
+  const state = loadState();
 
   switch (command) {
     case 'info': {
@@ -154,10 +266,18 @@ async function main() {
 
     case 'otp': {
       const id = identifier(opt);
-      const body = { ...id, create_user: false };
+      // create_user defaults to false: for a phone that has no user, Auth answers
+      // `otp_disabled` ("Signups not allowed for otp") before any provider logic.
+      // To exercise the no-SMS path, target an EXISTING phone user.
+      const createUser = Boolean(opt['create-user']);
+      const body = { ...id, create_user: createUser };
       if (opt.redirect) body.email_redirect_to = opt.redirect;
       const r = await client.otp(body);
-      record(step, command, { request: maskedId(id), status: r.status, response: r.json });
+      record(step, command, {
+        request: { ...maskedId(id), create_user: createUser },
+        status: r.status,
+        response: r.json,
+      });
       break;
     }
 
@@ -172,9 +292,11 @@ async function main() {
 
     case 'verify-link': {
       // Calls /verify exactly as the emailed link would, without following the redirect.
-      const [label, link] = pos;
-      const p = parseVerifyLink(link);
-      if (!p.origin.includes(ALLOWED_REF)) throw new Error('link is not for the auth-test project');
+      // The one-use link is read from stdin so it never appears in argv or shell history.
+      const [label, extra] = pos;
+      if (extra) throw new Error('pass the link on stdin, not as an argument');
+      const p = parseVerifyLink(readStdin());
+      assertAllowedOrigin(p.origin, 'verify link');
       const r = await client.verifyGet(p.token, p.type, p.redirectTo);
       const loc = parseRedirectLocation(r.location);
       if (loc.kind === 'session') storeSession(state, label, loc);
@@ -310,21 +432,17 @@ async function main() {
           { session_id: summarizeJwt(v.access_token)?.claims.session_id, sub: summarizeJwt(v.access_token)?.claims.sub, stored_at: v.stored_at },
         ]),
       );
-      console.log(JSON.stringify({ state_file: STATE, accounts: Object.keys(state.passwords), sessions: out }, null, 2));
-      break;
-    }
-
-    case 'note': {
-      record(step, command, { note: pos.join(' ') });
+      console.log(JSON.stringify({ accounts: Object.keys(state.passwords), sessions: out }, null, 2));
       break;
     }
 
     default:
       console.error(
-        'commands: info | signup <account> --phone|--email | login <label> --account <a> --phone|--email [--wrong] | ' +
-          'otp --phone|--email | recover --email [--redirect] | verify-link <label> <url> | verify-otp <label> --phone [--type --token] | ' +
-          'probe <label> | refresh <label> [--as <label>] | set-email <label> --email [--redirect] | ' +
-          'set-password <label> --account <a> | logout <label> [--scope] | sessions | note <text>',
+        'commands: init | cleanup | info | signup <account> --phone|--email | login <label> --account <a> --phone|--email [--wrong] | ' +
+          'otp --phone|--email [--create-user] | recover --email [--redirect] | verify-link <label> (link on stdin) | ' +
+          'verify-otp <label> --phone [--type --token] | probe <label> | refresh <label> [--as <label>] | ' +
+          'set-email <label> --email [--redirect] | set-password <label> --account <a> | logout <label> [--scope] | ' +
+          'sessions | attach --source sql/<file> (raw JSON on stdin) | note <text>',
       );
       process.exitCode = 2;
   }

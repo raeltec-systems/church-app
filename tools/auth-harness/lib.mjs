@@ -32,6 +32,28 @@ const PUBLISHABLE_RE = /sb_(publishable|secret)_[A-Za-z0-9_-]+/g;
 const QUERY_SECRET_RE =
   /([?&#](?:access_token|refresh_token|token|token_hash|code|provider_token)=)[^&#\s"]+/g;
 
+/** The only Auth host the harness may talk to (isolated auth-test project). */
+export const ALLOWED_HOST = 'szfyfezfvxyuvovnnakr.supabase.co';
+
+/**
+ * Parse a URL and require it to be exactly the isolated auth-test project over
+ * https (no userinfo, no custom port). Returns the normalized origin. Substring
+ * checks are not used: `https://<ref>.attacker.example` must fail.
+ */
+export function assertAllowedOrigin(value, what = 'URL') {
+  let u;
+  try {
+    u = new URL(String(value));
+  } catch {
+    throw new Error(`${what} is not a valid URL`);
+  }
+  if (u.protocol !== 'https:' || u.hostname !== ALLOWED_HOST || u.port !== '' ||
+      u.username !== '' || u.password !== '') {
+    throw new Error(`${what} must be https://${ALLOWED_HOST} (the isolated auth-test project)`);
+  }
+  return u.origin;
+}
+
 /** Short stable digest used to correlate ids across evidence without exposing them. */
 export function tag(value) {
   if (value === null || value === undefined || value === '') return null;
@@ -116,12 +138,13 @@ export function amrHasPassword(amr) {
 }
 
 /**
- * Parse a Supabase Auth email link (…/auth/v1/verify?token=…&type=…&redirect_to=…).
+ * Parse a Supabase Auth email link (/auth/v1/verify with token, type and redirect_to query parameters).
  * Returns the pieces needed to call /verify ourselves without following the redirect.
  */
 export function parseVerifyLink(link) {
-  const u = new URL(link);
-  if (!u.pathname.endsWith('/auth/v1/verify')) {
+  const u = new URL(String(link).trim());
+  assertAllowedOrigin(u.href, 'verify link');
+  if (u.pathname !== '/auth/v1/verify') {
     throw new Error('not a Supabase /auth/v1/verify link');
   }
   const token = u.searchParams.get('token');
@@ -167,7 +190,8 @@ export function parseRedirectLocation(location) {
 export class AuthClient {
   constructor({ url, apikey, fetchImpl = globalThis.fetch }) {
     if (!url || !apikey) throw new Error('SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY are required');
-    this.url = url.replace(/\/$/, '');
+    // Only the origin is kept; any path/query on SUPABASE_URL is ignored.
+    this.url = assertAllowedOrigin(url, 'SUPABASE_URL');
     this.apikey = apikey;
     this.fetch = fetchImpl;
   }

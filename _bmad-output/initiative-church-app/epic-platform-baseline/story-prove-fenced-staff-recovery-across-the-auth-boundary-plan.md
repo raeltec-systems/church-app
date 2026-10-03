@@ -3,13 +3,13 @@ title: 'Prove fenced staff recovery across the Auth boundary'
 type: 'feature'
 ticket: '3'
 created: '2026-10-03'
-status: 'built'
+status: 'done'
 blocked_reason: ''
 baseline_revision: 'd03e82423fcdb3e719919d1ffddac73216f9e446'
 route: 'full'
 route_source: 'auto'
-review: ''
-review_source: ''
+review: 'quick'
+review_source: 'pinned'
 lenses_ran: []
 review_loop_iteration: 0
 context:
@@ -168,6 +168,44 @@ context:
   - **KEEP:** earlier evidence steps stay valid for unchanged paths. The second review only appended.
 
 ## Review Triage Log
+
+## Review Triage Log
+
+**Pass 1 (independent security review), 2026-10-03.** Verdicts: high 8 · medium 6 · low 1 · false 0. All 15 were sent back as patches. Every matrix row is to be re-run against the committed code, and the evidence replaced.
+
+| # | Finding | Verdict | Route | Action |
+|---|---------|---------|-------|--------|
+| 1 | The trigger misses identity, MFA and user-delete changes | high | patch | Cover these changes or supersede them with a hold. |
+| 2 | The `failed` verdict ignores credential changes during the dispatch window | high | patch | Require `n_changes = 0` for `failed`, otherwise mark the op uncertain. |
+| 3 | Stuck dispatched or pending ops have no staff path | medium | patch | Add an audited timeout path and a fetch timeout. |
+| 4 | A late apply after reconcile is neither held nor recorded | high | patch | Hold the account and record the late outcome. |
+| 5 | Reconcile restores access without checking sessions | high | patch | Require a revocation check before reconcile. Correct the README wording. |
+| 6 | Holds and binding review don't block grants | high | patch | Refuse issue/begin while held. A hold supersedes outstanding grants. Bind to the approved identifier. |
+| 7 | The operator token alone can mint staff | high | patch | Staff enrolment must require an existing trusted session. |
+| 8 | `replay_complete` can forge a success | high | patch | Restrict it to terminal ops, or remove it. |
+| 9 | Evidence was produced with uncommitted v1/v2 code; scenarios are broken | high (evidence integrity) | patch | Fix the scenarios and re-run all rows. |
+| 10 | The revocation evidence passes trivially | medium | patch | Re-evidence with real pre-dispatch sessions. |
+| 11 | Caller checks are not evidenced | medium | patch | Capture `verify_jwt`, the source hash, a foreign-issuer JWT, and logs. |
+| 12 | The log secret scan is too narrow | medium | patch | Scan metadata and URL-encoded forms too. |
+| 13 | Edge function: 500 on bad input, leaked RPC names, unvalidated outcomes | medium | patch | Return 400s and generic codes, and validate inputs. |
+| 14 | `rc_request` has no expiry or member binding | medium | patch | Add expiry, a rate limit and binding at verification. |
+| 15 | v1/v2 created server-side sign-in sessions | low | patch | Removed in v3. Make sure no evidence relies on them. |
+
+### Second-pass security review (commit 6ffeaa4)
+
+| Finding | Verdict | Route | Evidence |
+|---|---|---|---|
+| D force_revoke resets any uid before checks | high | patch | index.ts:319-329 uses body.auth_user_id; reconcile check runs after the Admin reset |
+| A re-open window measured from uncertain time | high | patch | reconcile never sets a timestamp; 004:66 compares completed_at |
+| E relink approves live email | medium | patch | 004:611-616 copies auth.users.email; guard is link_revision only |
+| I staff actions unattributed | medium | patch | event payloads lack staff id; force_revoke has no event |
+| #1/#14 evidence gaps | medium | patch | no raw output for identity/factor-update/phone branches, request expiry, rate limit |
+| B member change after recovery holds account | low | defer | fail-closed; production AD-20 design concern |
+| C late apply during new pending op not held | medium | defer | harness edge; recorded for AD-20 production design |
+| F GoTrue lock inversion | maybe-false (medium) | defer | not verifiable offline; comment corrected |
+| G 30 s expiry < worst-case path | low | defer | fails closed via late_outcome_recorded |
+| H project-wide, non-atomic rate limit | medium | defer | harness only; production needs per-login atomic limit |
+| #9 digest excludes indexes/columns/defaults | low | defer | definitions digest scope |
 
 ## Verification
 

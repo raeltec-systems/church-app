@@ -10,9 +10,11 @@
 //     and every new migration's version is later than every base version (promotion stays
 //     version-ordered, so hosted projects apply it after what they already have).
 //  3. New migrations (all migrations without --base) are non-destructive: DROP / TRUNCATE
-//     outside comments and string literals fail, unless the file carries an explicit
-//     `-- owner-approved-cleanup: <decision reference>` line. ALTER ... DROP NOT NULL / DROP
-//     DEFAULT and ON COMMIT DROP are relaxations, not data loss, and are allowed.
+//     outside comments and string literals ('…', E'…', non-body $tag$…$tag$) fail, unless the
+//     file carries an explicit `-- owner-approved-cleanup: <decision reference>` line. Function
+//     and DO bodies (dollar quotes after AS / DO) are scanned as code. Allowed relaxations:
+//     ALTER ... DROP NOT NULL, DROP DEFAULT, ON COMMIT DROP, and DROP IDENTITY / DROP
+//     EXPRESSION only in their `IF EXISTS` form (the bare forms still fail).
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -22,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export const NAME_RE = /^(\d{14})_[a-z0-9_]+\.sql$/;
 export const CLEANUP_MARKER_RE = /^--[ \t]*owner-approved-cleanup:[ \t]*\S[^\n]*$/m;
+const DOLLAR_TAG_RE = /^\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$/;
 
 /** Blanks comments and quoted literals/identifiers, keeping newlines so lines still match. */
 export function stripSql(sql) {
@@ -44,10 +47,23 @@ export function stripSql(sql) {
       }
       out += blank(sql.slice(i, j));
       i = j;
+    } else if (c === '$' && DOLLAR_TAG_RE.test(sql.slice(i, i + 65))) {
+      // Dollar quote: $$…$$ or $tag$…$tag$. A function or DO body (after AS / DO) is code and is
+      // scanned recursively; any other dollar-quoted string is a literal and is blanked.
+      const tag = DOLLAR_TAG_RE.exec(sql.slice(i, i + 65))[0];
+      const close = sql.indexOf(tag, i + tag.length);
+      const stop = close === -1 ? sql.length : close + tag.length;
+      const body = sql.slice(i + tag.length, close === -1 ? sql.length : close);
+      const isCode = /\b(as|do)\s*$/i.test(stripSql(sql.slice(Math.max(0, i - 200), i)));
+      out += blank(tag) + (isCode ? stripSql(body) : blank(body)) + (close === -1 ? '' : blank(tag));
+      i = stop;
     } else if (c === "'" || c === '"') {
+      // E'…' strings also allow backslash escapes (E'it\'s').
+      const escapes = c === "'" && /[eE]/.test(sql[i - 1] ?? '') && !/[A-Za-z0-9_$]/.test(sql[i - 2] ?? '');
       let j = i + 1;
       while (j < sql.length) {
-        if (sql[j] === c && sql[j + 1] === c) j += 2;
+        if (escapes && sql[j] === '\\') j += 2;
+        else if (sql[j] === c && sql[j + 1] === c) j += 2;
         else if (sql[j] === c) { j++; break; } else j++;
       }
       out += blank(sql.slice(i, j));

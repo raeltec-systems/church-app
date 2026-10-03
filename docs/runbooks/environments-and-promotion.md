@@ -50,7 +50,11 @@ These checks need no secrets, so they pass from a clean checkout before any owne
     - Names follow `<14-digit version>_<snake>.sql`, and versions are unique.
     - Already-merged migrations are immutable: no edit, rename or delete.
     - Each new version is later than every merged version.
-    - `DROP` / `TRUNCATE` outside comments and string literals fails unless the file has a `-- owner-approved-cleanup: <decision reference>` line. `DROP NOT NULL`, `DROP DEFAULT` and `ON COMMIT DROP` are allowed.
+    - `DROP` / `TRUNCATE` outside comments and string literals fails unless the file has a `-- owner-approved-cleanup: <decision reference>` line. String literals include `'…'`, `E'…'` and dollar-quoted strings that are not function or `DO` bodies. Function and `DO` bodies are scanned as code. These forms are allowed:
+      - `DROP NOT NULL`
+      - `DROP DEFAULT`
+      - `ON COMMIT DROP`
+      - `DROP IDENTITY IF EXISTS` and `DROP EXPRESSION IF EXISTS`. Without `IF EXISTS`, these two still fail.
     - To retire an object, revoke all privileges and rename it (`retired_<name>_v0`). Drops wait for an owner-approved cleanup migration.
   - the **repository secret scan** (`npm run ci:secrets`), which looks for:
     - `sb_secret_…`, `sbp_…` access tokens, any JWT, private keys, GitHub tokens, long bearer tokens
@@ -75,9 +79,18 @@ node tools/ci/check-migration-drift.mjs --env staging --hosted-file <list.json> 
 
 ## Promotion (`.github/workflows/promote.yml`, manual)
 
-Start it from Actions, then **promote**, then **Run workflow** with target `staging` or `production`. One job runs these steps in this order:
+Start it from Actions, then **promote**, then **Run workflow** with target `staging` or `production`, on `main`. The workflow has four jobs, ordered by `needs`. Each job fails closed, and a failed job stops every job after it.
 
-1. It reruns all CI checks from a clean checkout (`workflow_call`).
+- **`checks`** reruns all CI checks from a clean checkout (`workflow_call`).
+- **`preflight`** runs without a GitHub environment, so it never auto-creates one:
+  - It refuses any ref other than `main`, for staging and production alike.
+  - It runs `check-migrations.mjs --base origin/main` on full history.
+  - For production only, it reads `GET /repos/{owner}/{repo}/environments/production` with `github.token`. It fails unless the environment exists and has a `required_reviewers` rule with at least one reviewer.
+  - For production only, it fails if `SUPABASE_PROJECT_REF` resolves outside the environment, meaning it is defined at repository or organization level. The ref must live only on the `production` environment.
+- **`staging-precondition`** runs for production only. Staging must already be synced with this commit (`--require-synced`).
+- **`promote`** runs in the target environment, so production waits for the required reviewer's approval. Its steps run in this order:
+
+1. It refuses any ref other than `main` again, and refuses a production run with no environment-scoped `SUPABASE_PROJECT_REF`.
 2. It guards the target:
    - Staging takes its ref from `config/environments/staging.json`. Production takes it from the `SUPABASE_PROJECT_REF` variable.
    - A ref that belongs to another environment is refused.
@@ -103,11 +116,13 @@ Start it from Actions, then **promote**, then **Run workflow** with target `stag
    - Then it runs `wrangler pages deploy` of exactly that directory.
    - Without the hosting secrets, the job ends after the upload with a notice. The verified artifact is the deliverable.
 
-Production also requires:
+For production, all of the following must hold:
 
-- the run to be on `main`
-- staging to be synced with this commit (`--require-synced` against staging)
-- approval from the `production` environment's required reviewer
+- the run is on `main`
+- the `production` environment is protected by required reviewers (checked by `preflight`)
+- `SUPABASE_PROJECT_REF` is scoped to the environment
+- staging is synced with this commit
+- the reviewer approves the run
 
 Command versions stay backwards compatible (AD-17 expand/contract). Old command versions are retained until supported clients migrate, so a backend promoted first never breaks clients already deployed. Rollback is forward repair: add a new migration. There is no destructive down-migration.
 
@@ -133,6 +148,7 @@ Do these in GitHub at **github.com/raeltec-systems/church-app**.
    - Under **Deployment branches and tags**, choose **Selected branches and tags** and add `main`.
    - Add the secrets `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` for the **production** project only, after step C.
    - Add the variables `SUPABASE_PROJECT_REF` (the new production ref) and `SUPABASE_PUBLISHABLE_KEY` (the production `sb_publishable_…` key).
+   - Put `SUPABASE_PROJECT_REF` **only** on this environment, never under repository variables. The `preflight` job refuses a production run while a repository-level value exists, and also while the environment has no Required reviewers rule.
 3. Optional, to turn on the drift check in every CI run: go to **Settings → Secrets and variables → Actions → Repository secrets** and add `SUPABASE_ACCESS_TOKEN`. A token for the staging account is enough; it is read-only use. After step C, also add the repository variable `PRODUCTION_PROJECT_REF`, so `env:check` proves no non-production config names it.
 
 4. Recommended, because the repository is public: go to **Settings → Advanced Security** (named **Code security** on some accounts) and enable **Secret Protection** and **Push protection**. They are free for public repositories, and GitHub's scanner then backs up `ci:secrets`. Secrets are never passed to workflows from fork pull requests, so the drift check skips there.
@@ -174,7 +190,7 @@ and add `NETLIFY_AUTH_TOKEN` / `NETLIFY_SITE_ID`.
    - Configure no SMS provider, no Send SMS hook, no test OTPs and no phone MFA.
 4. Fill in the `production` GitHub environment (step A2).
 5. Run **promote** with target `staging` and check that it is green. Then run **promote** with target `production` and approve the deployment when GitHub asks. The first run marks the database `production`, which is terminal. It verifies that `private_access` and `outbound_sending` are closed.
-6. Do not approve the `private_access` or `outbound_sending` gates (`app.policy_approve`) until their release epics say so. Promotion fails while either gate is open and `features.*` in `config/environments/production.json` is still `false`.
+6. Do not approve the `private_access` or `outbound_sending` gates (`app.policy_approve`) until their release epics say so. Opening either gate is out of scope for milestone 1. While a gate is open, every promotion to that environment fails, because `tools/ci/verify-hosted.sql` requires both gates closed. Changing `features.*` does not help either: `env:check` rejects `true`. A later release epic must change `verify-hosted.sql` and the validator (`tools/env/environments.mjs`) together to allow an approved gate.
 
 ## Evidence
 

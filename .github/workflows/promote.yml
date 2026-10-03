@@ -1,11 +1,12 @@
 # Promotion: reviewed migrations, then immutable client builds, to staging or production (story 1.8).
 #
-# Manual only. Order inside one environment-protected job: every CI check (clean checkout) ->
-# target/secret guards -> drift check -> migrations (backend first) -> marker + gate verification
-# -> client build sealed with checksums + bundle secret scan -> verified artifact upload ->
-# optional static-host deploy of exactly that verified artifact.
-# Production additionally needs: run from main, staging already synced with this commit, the
-# GitHub "production" environment approval, and the owner-created project (SUPABASE_PROJECT_REF).
+# Manual only, from main only. Jobs, ordered by `needs`:
+#   checks (all CI checks, clean checkout) -> preflight (no environment: main only, migration
+#   policy vs origin/main, production environment must exist with required reviewers and an
+#   environment-scoped SUPABASE_PROJECT_REF) -> [production: staging-precondition, staging in
+#   sync] -> promote (environment-protected: target/secret guards -> drift check -> migrations,
+#   backend first -> marker + gate verification -> sealed client build + bundle scan -> verified
+#   artifact upload -> optional static-host deploy of exactly that verified artifact).
 # Owner steps: docs/runbooks/environments-and-promotion.md.
 
 name: promote
@@ -32,19 +33,68 @@ jobs:
     uses: ./.github/workflows/ci.yml
     secrets: inherit
 
+  # Fail-closed guards that run WITHOUT an environment, so a missing environment is never
+  # auto-created unprotected and repository-level variables are visible on their own.
+  preflight:
+    name: preflight (main only, migration policy vs main, production protection)
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    env:
+      TARGET: ${{ inputs.target }}
+      # Without an environment these resolve to repository/organization-level values only.
+      REPO_LEVEL_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Promotion runs only from main (staging and production)
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Promotion must run from main (got $GITHUB_REF)"
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Migrations are ordered, immutable and non-destructive relative to origin/main
+        run: node tools/ci/check-migrations.mjs --base origin/main
+      - name: Production environment exists with a required-reviewer rule
+        if: inputs.target == 'production'
+        run: |
+          if ! gh api "repos/$GITHUB_REPOSITORY/environments/production" > env.json; then
+            echo "::error::GitHub environment 'production' does not exist or cannot be read; create it with Required reviewers (docs/runbooks/environments-and-promotion.md, owner step A2)"
+            exit 1
+          fi
+          if ! node -e '
+            const e = require("./env.json");
+            const r = (e.protection_rules || []).find((p) => p.type === "required_reviewers");
+            process.exit(r && (r.reviewers || []).length > 0 ? 0 : 1);
+          '; then
+            echo "::error::GitHub environment 'production' has no required-reviewer protection rule (owner step A2)"
+            exit 1
+          fi
+          echo "production environment is protected by required reviewers"
+      - name: Production project ref is environment-scoped only
+        if: inputs.target == 'production'
+        run: |
+          if [ -n "$REPO_LEVEL_PROJECT_REF" ]; then
+            echo "::error::SUPABASE_PROJECT_REF is defined at repository/organization level; delete it there and set it only on the 'production' environment (owner step A2)"
+            exit 1
+          fi
+
   staging-precondition:
     name: staging already carries this commit's migrations
     if: inputs.target == 'production'
-    needs: checks
+    needs: [checks, preflight]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment: staging
     steps:
-      - name: Production promotes only from main
-        if: github.ref != 'refs/heads/main'
-        run: |
-          echo "::error::Production promotion must run from main (got $GITHUB_REF)"
-          exit 1
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -61,10 +111,10 @@ jobs:
 
   promote:
     name: promote ${{ inputs.target }}
-    needs: [checks, staging-precondition]
+    needs: [checks, preflight, staging-precondition]
     # staging-precondition is skipped for staging; it must have succeeded for production.
     if: >-
-      always() && needs.checks.result == 'success' &&
+      always() && needs.checks.result == 'success' && needs.preflight.result == 'success' &&
       (inputs.target == 'staging' || needs.staging-precondition.result == 'success')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -91,8 +141,11 @@ jobs:
       - name: Resolve and guard the target project
         id: target
         run: |
-          if [ "$TARGET" = "production" ] && [ "$GITHUB_REF" != "refs/heads/main" ]; then
-            echo "::error::Production promotion must run from main"; exit 1
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::Promotion must run from main"; exit 1
+          fi
+          if [ "$TARGET" = "production" ] && [ -z "$PROJECT_REF_VAR" ]; then
+            echo "::error::SUPABASE_PROJECT_REF is not set on the 'production' environment (owner step A2)"; exit 1
           fi
           if [ "$TARGET" = "staging" ]; then
             ref=$(node tools/env/environments.mjs get staging supabase.project_ref)

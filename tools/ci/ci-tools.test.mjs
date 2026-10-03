@@ -48,6 +48,26 @@ select "drop" from app.t;`;
   assert.equal(stripSql("a 'b\nc' d").split('\n').length, 2);
 });
 
+test('apostrophes inside dollar quotes and E-strings cannot hide a later DROP', () => {
+  const cases = [
+    ["comment on table app.t is $$Don't use$$;\ndrop table app.u;", 2],
+    ["insert into app.t(note) values (E'it\\'s');\ndrop table app.u;", 2],
+    ["comment on table app.t is $doc$Don't $$ use$doc$;\nselect 1;\ndrop table app.u;", 3],
+    ["create function app.f() returns void language plpgsql as $fn$\nbegin\n  raise notice 'x'; -- don't\n  drop table app.u;\nend;\n$fn$;", 4],
+    ['do $$\nbegin\n  drop view app.v;\nend $$;', 3],
+  ];
+  for (const [sql, line] of cases) {
+    const hits = findDestructive(sql);
+    assert.equal(hits.length, 1, sql);
+    assert.equal(hits[0].line, line, sql);
+  }
+  // A DROP inside a literal (non-body) dollar quote or E-string is text, not a statement.
+  assert.deepEqual(findDestructive("comment on table app.t is $$drop me$$;\nselect E'a\\'drop';"), []);
+  // Bare DROP IDENTITY / DROP EXPRESSION stay strict; only the IF EXISTS forms are allowed.
+  assert.equal(findDestructive('alter table app.t alter column x drop identity;').length, 1);
+  assert.deepEqual(findDestructive('alter table app.t alter column x drop identity if exists;'), []);
+});
+
 test('an owner-approved cleanup marker allows destructive statements', () => {
   const sql = '-- owner-approved-cleanup: decision 2026-11-01 retire v0 functions\ndrop function app.retired_x_v0();';
   const r = evaluate({ files: files({ '20261004000000_c.sql': sql }), baseNames: BASE, changed: [] });

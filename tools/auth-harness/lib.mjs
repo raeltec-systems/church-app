@@ -25,6 +25,13 @@ const SECRET_KEYS = new Set([
   'email_change_token_current',
   'phone_change_token',
   'reauthentication_token',
+  // story 1.3: member-held grant secrets, their digests and the operator token
+  'grant',
+  'grant_secret',
+  'grant_digest',
+  'operator',
+  'operator_token',
+  'x-harness-operator',
 ]);
 
 const JWT_RE = /eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;
@@ -76,6 +83,8 @@ export function maskIdentifier(value) {
 
 function scrubString(s) {
   return s
+    .replace(/hg_[A-Za-z0-9_-]{20,}/g, '[redacted-grant]')
+    .replace(/ho_[A-Za-z0-9_-]{20,}/g, '[redacted-operator]')
     .replace(JWT_RE, '[redacted-jwt]')
     .replace(PUBLISHABLE_RE, '[redacted-key]')
     .replace(QUERY_SECRET_RE, '$1[redacted]');
@@ -130,6 +139,16 @@ export function summarizeJwt(jwt) {
       lifetime_s: c.exp && c.iat ? c.exp - c.iat : null,
     },
   };
+}
+
+/** Decode a JWT payload (no verification); null when not a JWT. */
+export function decodeJwtPayloadNode(jwt) {
+  if (typeof jwt !== 'string' || jwt.split('.').length !== 3) return null;
+  try {
+    return b64urlJson(jwt.split('.')[1]);
+  } catch {
+    return null;
+  }
 }
 
 /** Client-side mirror of the AMR half of harness.trusted_password_session(). */
@@ -246,6 +265,36 @@ export class AuthClient {
   rpc(name, bearer) {
     return this.call(`/rest/v1/rpc/${name}`, { method: 'POST', body: {}, bearer });
   }
+  /** Story 1.3: call the harness-only Edge Function. operator = harness operator token. */
+  fn(name, body, { bearer, operator } = {}) {
+    return this.call(`/functions/v1/${name}`, {
+      method: 'POST',
+      body,
+      bearer,
+      headers: operator ? { 'x-harness-operator': operator } : {},
+    });
+  }
+}
+
+const UUID_ANY_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/g;
+
+/** Scrub, then replace every UUID (account, member, grant, op, request ids) by its digest tag. */
+export function tagUuids(value) {
+  const walk = (v) => {
+    if (typeof v === 'string') return v.replace(UUID_ANY_RE, (m) => tag(m));
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)]));
+    return v;
+  };
+  return walk(scrub(value));
+}
+
+/** Member-held grant secret ('hg_' + 32 random bytes) and operator token ('ho_' + 32 bytes). */
+export const GRANT_SECRET_RE = /hg_[A-Za-z0-9_-]{20,}/g;
+export const OPERATOR_TOKEN_RE = /ho_[A-Za-z0-9_-]{20,}/g;
+
+export function sha256Hex(text) {
+  return createHash('sha256').update(String(text)).digest('hex');
 }
 
 /** Reduce a GoTrue user object to non-secret evidence fields. */

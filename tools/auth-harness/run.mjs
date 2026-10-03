@@ -7,6 +7,8 @@
 //   HARNESS_EVIDENCE             evidence JSONL path (default: evidence-1.2/harness-log.jsonl)
 //   HARNESS_STATE_DIR            private state dir printed by `init` (required for every
 //                                command except init/attach/note)
+//   SUPABASE_ANON_JWT            story 1.3 `rc-*` only: the project's legacy anon key (a
+//                                publishable-class JWT; the Edge Function gateway needs a JWT)
 //
 // Usage: node run.mjs <command> [args] [--step <name>]
 // Email links are read from stdin (never argv): `verify-link <label> < link.txt`.
@@ -41,6 +43,7 @@ import {
   summarizeSession,
   summarizeUser,
 } from './lib.mjs';
+import { rcCommand } from './recovery-cli.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const EVIDENCE =
@@ -214,6 +217,11 @@ async function main() {
     apikey: process.env.SUPABASE_PUBLISHABLE_KEY,
   });
   const state = loadState();
+
+  if (command.startsWith('rc-')) {
+    await rcCommand(command, { pos, opt, step, client, state, saveState, record });
+    return;
+  }
 
   switch (command) {
     case 'info': {
@@ -442,7 +450,11 @@ async function main() {
           'otp --phone|--email [--create-user] | recover --email [--redirect] | verify-link <label> (link on stdin) | ' +
           'verify-otp <label> --phone [--type --token] | probe <label> | refresh <label> [--as <label>] | ' +
           'set-email <label> --email [--redirect] | set-password <label> --account <a> | logout <label> [--scope] | ' +
-          'sessions | attach --source sql/<file> (raw JSON on stdin) | note <text>',
+          'sessions | attach --source sql/<file> (raw JSON on stdin) | note <text> | ' +
+          'rc-operator-token | rc-provision <a> --tag --role | rc-request <g> | rc-issue <g> --staff <s> --account <a> ' +
+          '[--member-of <a2>] [--ttl] | rc-redeem <g> --account <a> [--login-as <a2>] [--inject] [--parallel n] [--weak] [--op <o>] | ' +
+          'rc-resume <g> --op <o> --account <a> | rc-relink --staff <s> --account <a> | rc-hold --staff <s> --account <a> [--off] | ' +
+          'rc-reconcile|rc-replay --staff <s> --op <o> | rc-probe <session> | rc-call --action <x> [--as] [--no-operator] [--body]',
       );
       process.exitCode = 2;
   }

@@ -1,0 +1,33 @@
+# Story 1.3 phase 3b: continuation of phase 3 after it stopped at step 215
+# (see the note below). Same state dir.
+
+# Happy path with database-verified revocation. (First attempt, steps 210-214:
+# the harness logged in with the stale local password, because gc4-op had
+# applied a candidate password; 214 still succeeded. Rerun with gc7:)
+login mc-s3 --account mc --email israelmuyoba+bicauth-r13-mc@gmail.com --step 240-login-member-c-session-3
+login mc-s4 --account mc --email israelmuyoba+bicauth-r13-mc@gmail.com --step 241-login-member-c-session-4
+rc-request gc7 --step 242-member-c-request-7
+rc-issue gc7 --staff staff-s1 --account mc --step 243-staff-issue-gc7
+rc-redeem gc7 --account mc --step 244-redeem-gc7-happy-v3
+probe mc-s3 --step 245-probe-old-session-c3
+refresh mc-s4 --step 246-refresh-old-session-c4
+login mc-s5 --account mc --email israelmuyoba+bicauth-r13-mc@gmail.com --step 247-fresh-login-member-c
+rc-probe mc-s5 --step 248-probe-fresh-session-c5
+
+# Parallel redemption again on v3.
+rc-request gc6 --step 220-member-c-request-6
+rc-issue gc6 --staff staff-s1 --account mc --step 221-staff-issue-gc6
+rc-redeem gc6 --account mc --parallel 8 --step 222-eight-parallel-redeems-of-gc6
+
+# Native password change racing a dispatched op.
+login md-s3 --account md --email israelmuyoba+bicauth-r13-md@gmail.com --step 230-login-member-d-session-3
+rc-request gd4 --step 231-member-d-request-4
+rc-issue gd4 --staff staff-s1 --account md --step 232-staff-issue-gd4
+rc-redeem gd4 --account md --inject delay_apply --concurrent-change md-s3 --op gd4-op --step 233-native-change-races-dispatched-gd4
+login md-s4 --account md@gd4-op --email israelmuyoba+bicauth-r13-md@gmail.com --step 234-login-with-final-password
+rc-probe md-s4 --step 235-probe-while-race-unreconciled
+rc-relink --staff staff-s1 --account md --step 236-relink-blocked-after-race
+rc-reconcile --staff staff-s1 --op gd4-op --note checked-auth-state --step 237-staff-reconcile-gd4
+rc-probe md-s4 --step 238-probe-after-reconcile
+
+rc-observe --staff staff-s1 --step 299-db-state-final

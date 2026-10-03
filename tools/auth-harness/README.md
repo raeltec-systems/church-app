@@ -1,4 +1,4 @@
-# Auth provider harness (story 1.2)
+# Auth provider harness (stories 1.2 and 1.3)
 
 A retained, dependency-free harness that calls native Supabase Auth (GoTrue) and
 PostgREST endpoints directly against the **isolated** project
@@ -106,3 +106,45 @@ in the dashboard for `bic-kafue-auth-test`:
 3. **Authentication → URL Configuration**: Site URL and redirect allowlist only
    when a real redirect is under test. The harness works with the default
    `http://localhost:3000`, because it never follows the redirect.
+
+## Story 1.3: fenced assisted recovery
+
+Evidence lands in `evidence-1.3/` (set `HARNESS_EVIDENCE` to its
+`harness-log.jsonl`). Results and findings: `evidence-1.3/README.md`.
+
+### Hosted pieces (auth-test project only)
+
+- `sql/002_recovery_fence.sql` (migrations `auth_harness_005` and `007`):
+  `harness.rc_*` tables (RLS on, no client grants), the `auth.users` trigger
+  that advances the recovery generation on any password/email/phone change
+  inside GoTrue's transaction, and service-only `harness_rc_*` RPCs for
+  request, issue, begin, dispatch, complete, relink, hold and reconcile.
+  `public.harness_recovery_probe()` is the full private-data gate.
+- `sql/003_recovery_observe.sql` (migration `006`): `harness_rc_observe()`,
+  exactly `sql/observe_recovery_state.sql`, so database state is recorded raw.
+- `functions/harness-recovery/` (Edge Function, `verify_jwt` on): the only
+  holder of the service key, read from the platform environment. Deploy it
+  with the Supabase MCP `deploy_edge_function` (files `index.ts` and
+  `logic.mjs`). It refuses any other project, URL or token issuer, requires
+  the operator token and, for staff actions, a trusted password session of an
+  enrolled staff account. Fault injection (`stop_after_begin`, `delay_apply`,
+  `lost_response`, `late_apply`) exists for the adversarial runs only.
+
+### Running
+
+```sh
+eval "$($H init)"
+export SUPABASE_ANON_JWT=<legacy anon key>   # the function gateway needs a JWT
+$H rc-operator-token                          # prints the digest only
+# register the digest with sql/register_operator_token.sql (Supabase MCP)
+$H rc-provision staff --tag r13-staff --role staff
+node tools/auth-harness/run-script.mjs tools/auth-harness/scenarios/1.3-phase1-grants.txt
+node tools/auth-harness/run-script.mjs tools/auth-harness/scenarios/1.3-phase2-fences.txt
+node tools/auth-harness/run-script.mjs tools/auth-harness/scenarios/1.3-phase3-db-verified.txt
+$H cleanup
+```
+
+Account tags must be new for each project run (Auth refuses an existing
+address). The member's grant secret (`hg_…`) and chosen password stay in the
+state dir; staff output carries only the grant id, generation and expiry.
+`rc-call` sends deliberately wrong callers; never put a secret in `--body`.

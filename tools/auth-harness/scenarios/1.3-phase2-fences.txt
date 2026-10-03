@@ -1,0 +1,69 @@
+# Story 1.3 phase 2: database state after phase 1, concurrency, fenced dispatch,
+# holds, transport uncertainty and late external outcomes. Continues the state
+# dir and accounts of phase 1. No email is sent.
+
+rc-observe --staff staff-s1 --step 79-db-state-after-phase1
+
+# Concurrent resets: six parallel redemptions of one grant.
+login mc-s1 --account mc --email israelmuyoba+bicauth-r13-mc@gmail.com --step 80-login-member-c
+rc-request gc3 --step 81-member-c-request-3
+rc-issue gc3 --staff staff-s1 --account mc --step 82-staff-issue-gc3
+rc-redeem gc3 --account mc --parallel 6 --step 83-six-parallel-redeems-of-gc3
+probe mc-s1 --step 84-probe-old-session-c1-after-reset
+
+# Pending op + native credential change before dispatch.
+login md-s1 --account md --email israelmuyoba+bicauth-r13-md@gmail.com --step 90-login-member-d
+rc-request gd1 --step 91-member-d-request
+rc-issue gd1 --staff staff-s1 --account md --step 92-staff-issue-gd1
+rc-redeem gd1 --account md --inject stop_after_begin --op gd1-op --step 93-begin-gd1-stop-before-dispatch
+rc-relink --staff staff-s1 --account md --step 94-relink-while-op-pending
+set-password md-s1 --account md --step 95-member-d-direct-change-while-pending
+rc-resume gd1 --op gd1-op --account md --step 96-resume-gd1-after-direct-change
+rc-probe md-s1 --step 97-probe-member-d-own-session
+
+# Security hold applied while a reset is in flight survives its success.
+rc-request gd2 --step 100-member-d-request-2
+rc-issue gd2 --staff staff-s1 --account md --step 101-staff-issue-gd2
+rc-redeem gd2 --account md --inject stop_after_begin --op gd2-op --step 102-begin-gd2
+rc-hold --staff staff-s1 --account md --step 103-hold-while-op-in-flight
+rc-request gd3 --step 104-member-d-request-3
+rc-issue gd3 --staff staff-s1 --account md --step 105-issue-while-op-in-flight
+rc-resume gd2 --op gd2-op --account md --step 106-resume-gd2-succeeds
+login md-s2 --account md --email israelmuyoba+bicauth-r13-md@gmail.com --step 107-fresh-login-member-d
+rc-probe md-s2 --step 108-probe-held-account-after-reset
+rc-hold --staff staff-s1 --account md --off --step 109-staff-release-hold
+rc-probe md-s2 --step 110-probe-after-hold-release
+
+# Lost response: Auth applied, the caller never learns it.
+rc-request ga2 --step 120-member-a-request-2
+rc-issue ga2 --staff staff-s1 --account ma --step 121-staff-issue-ga2
+rc-redeem ga2 --account ma --inject lost_response --op ga2-op --step 122-redeem-ga2-lost-response
+login ma-s4 --account ma@ga2-op --email israelmuyoba+bicauth-r13-ma@gmail.com --step 123-login-with-password-auth-applied
+rc-probe ma-s4 --step 124-probe-while-uncertain
+rc-relink --staff staff-s1 --account ma --step 125-relink-blocked-by-uncertain-op
+rc-request ga3 --step 126-member-a-request-3
+rc-issue ga3 --staff staff-s1 --account ma --step 127-issue-blocked-by-uncertain-op
+rc-reconcile --staff staff-s1 --op ga2-op --note checked-auth-state --step 128-staff-reconcile-ga2
+rc-issue ga3 --staff staff-s1 --account ma --step 129-issue-ga3-after-reconcile
+rc-relink --staff staff-s1 --account ma --step 130-relink-after-reconcile
+rc-redeem ga3 --account ma --login-as ma --step 131-redeem-ga3-after-relink
+rc-probe ma-s4 --step 132-probe-after-reconcile-and-relink
+
+# Late external outcome: the caller times out first, Auth applies afterwards.
+login mb-s2 --account mb --email israelmuyoba+bicauth-r13-mb@gmail.com --step 140-login-member-b-again
+rc-request gb4 --step 141-member-b-request-4
+rc-issue gb4 --staff staff-s1 --account mb --step 142-staff-issue-gb4
+rc-redeem gb4 --account mb --inject late_apply --op gb4-op --step 143-redeem-gb4-late-apply
+probe mb-s2 --step 144-probe-old-session-b2-after-late-apply
+login mb-s3 --account mb@gb4-op --email israelmuyoba+bicauth-r13-mb@gmail.com --step 145-login-with-late-applied-password
+rc-probe mb-s3 --step 146-probe-while-late-outcome-unreconciled
+rc-replay --staff staff-s1 --op gb4-op --step 147-another-late-completion
+
+# Applied but revocation failed: uncertain, old session held.
+rc-request gc4 --step 150-member-c-request-4
+login mc-s2 --account mc --email israelmuyoba+bicauth-r13-mc@gmail.com --step 151-login-member-c-again
+rc-issue gc4 --staff staff-s1 --account mc --step 152-staff-issue-gc4
+rc-redeem gc4 --account mc --inject skip_revoke --op gc4-op --step 153-redeem-gc4-revocation-skipped
+rc-probe mc-s2 --step 154-probe-live-old-session-while-uncertain
+
+rc-observe --staff staff-s1 --step 199-db-state-after-phase2

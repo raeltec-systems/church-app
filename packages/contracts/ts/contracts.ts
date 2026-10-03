@@ -1,5 +1,5 @@
 // Wire contract v1 — TypeScript mapping (for the Q10 React/Next.js alternative and any JS tool).
-// Mirrors app.contract_check (supabase/migrations/20261003190000_cross_epic_contracts.sql) and
+// Mirrors app.contract_check (supabase/migrations/20261003134340_cross_epic_contracts.sql) and
 // must pass the shared fixtures in ../fixtures/v1. Types and shape checks only: no business
 // rules. Registration membership, zone existence and money scale are server-side checks.
 // Erasable TypeScript only, so Node runs it with built-in type stripping.

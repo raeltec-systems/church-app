@@ -1,5 +1,5 @@
 // Wire contract v1 shape checks. Mirrors app.contract_check
-// (supabase/migrations/20261003190000_cross_epic_contracts.sql) and the TypeScript mapping;
+// (supabase/migrations/20261003134340_cross_epic_contracts.sql) and the TypeScript mapping;
 // all three pass the shared fixtures in packages/contracts/fixtures/v1. No business rules:
 // registration membership, IANA zone existence and money scale are server-side checks.
 // Behaves identically on the Dart VM and on the web (integers are checked by value).

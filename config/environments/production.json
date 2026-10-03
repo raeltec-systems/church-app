@@ -1,0 +1,35 @@
+{
+  "$comment": "Production BASELINE template. The project does not exist yet (owner gate in owner-decisions-milestone-1.md). Private access and sending stay disabled until the owner approves their release gates in the production database.",
+  "name": "production",
+  "kind": "production",
+  "database_marker": "production",
+  "supabase": {
+    "project_ref": null,
+    "project_ref_source": "GitHub environment variable SUPABASE_PROJECT_REF (environment: production), set by the owner after creating the project",
+    "api_url": null,
+    "data_api_schemas": ["api"],
+    "publishable_key_source": "GitHub environment variable SUPABASE_PUBLISHABLE_KEY (environment: production)"
+  },
+  "features": {
+    "private_access": false,
+    "outbound_sending": false,
+    "sms": false
+  },
+  "recipients": {
+    "mode": "disabled",
+    "allowed_patterns": [],
+    "sink": null
+  },
+  "deploy": {
+    "github_environment": "production",
+    "requires_approval": true,
+    "secret_names": ["SUPABASE_ACCESS_TOKEN", "SUPABASE_DB_PASSWORD"],
+    "variable_names": ["SUPABASE_PROJECT_REF", "SUPABASE_PUBLISHABLE_KEY"],
+    "web_hosting": {
+      "provider": "cloudflare-pages",
+      "project_variable": "CLOUDFLARE_PAGES_PROJECT",
+      "branch": "main",
+      "secret_names": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]
+    }
+  }
+}

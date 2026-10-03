@@ -55,7 +55,8 @@ A build without both defines shows an "App not configured" screen rather than fa
 
 `bic-kafue-platform-test` (ref `tmurpotfluignacfueki`, eu-central-1) holds synthetic data only.
 URL `https://tmurpotfluignacfueki.supabase.co`; take the publishable key from the dashboard
-(Project Settings → API Keys) or the Supabase connector. It is not staging or production.
+(Project Settings → API Keys) or the Supabase connector. Since story 1.8 it is the **staging** environment (database marker
+`staging`); it is not production. See `environments-and-promotion.md`.
 
 **Owner step (required once):** Dashboard → Project Settings → Data API → *Exposed schemas*: add
 `api` and remove `public` and `graphql_public`; set *Extra search path* to `api`. Until then the API

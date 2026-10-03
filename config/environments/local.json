@@ -1,0 +1,29 @@
+{
+  "$comment": "Non-secret configuration only. Secrets are named here, never stored. See docs/runbooks/environments-and-promotion.md.",
+  "name": "local",
+  "kind": "nonproduction",
+  "database_marker": "local",
+  "supabase": {
+    "project_ref": null,
+    "api_url": "http://127.0.0.1:54321",
+    "data_api_schemas": ["api"],
+    "publishable_key_source": "npx supabase status (local key, supplied at run time only)"
+  },
+  "features": {
+    "private_access": false,
+    "outbound_sending": false,
+    "sms": false
+  },
+  "recipients": {
+    "mode": "synthetic_only",
+    "allowed_patterns": ["*@example.test", "*@example.com", "*.invalid"],
+    "sink": "local Mailpit (supabase/config.toml [local_smtp])"
+  },
+  "deploy": {
+    "github_environment": null,
+    "requires_approval": false,
+    "secret_names": [],
+    "variable_names": [],
+    "web_hosting": null
+  }
+}

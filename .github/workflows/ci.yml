@@ -4,15 +4,59 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The promotion workflow reruns every check from a clean checkout before deploying.
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # Never cancel checks that a promotion run (workflow_dispatch caller) is waiting on.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
 
 jobs:
+  policy:
+    name: policy (environments, migration promotion, secrets, staging drift)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Policy tool tests (offline)
+        run: node --test tools/env/*.test.mjs tools/ci/*.test.mjs
+      - name: Environment configs are separate, secret-free and fail closed
+        run: node tools/env/environments.mjs check
+        env:
+          PRODUCTION_PROJECT_REF: ${{ vars.PRODUCTION_PROJECT_REF }}
+      - name: Migrations are version-ordered, immutable once merged and non-destructive
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          base=""
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            base="origin/$BASE_REF"
+          elif [ "$EVENT_NAME" = "push" ] && [ -n "$BEFORE" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            base="$BEFORE"
+          fi
+          if [ -n "$base" ]; then
+            node tools/ci/check-migrations.mjs --base "$base"
+          else
+            node tools/ci/check-migrations.mjs
+          fi
+      - name: No secrets in tracked files
+        run: node tools/ci/scan-secrets.mjs
+      - name: Staging migration-history drift (skipped until the owner adds SUPABASE_ACCESS_TOKEN)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node tools/ci/check-migration-drift.mjs --env staging
+
   db:
     name: db (local Supabase, pgTAP + API smoke + contract fixtures)
     runs-on: ubuntu-24.04
@@ -130,3 +174,8 @@ jobs:
       - name: staff web trial — build web
         working-directory: trials/staff_web
         run: flutter build web
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Web bundles carry no secret, JWT or service_role reference
+        run: node tools/ci/scan-secrets.mjs --bundle apps/staff/build/web trials/staff_web/build/web

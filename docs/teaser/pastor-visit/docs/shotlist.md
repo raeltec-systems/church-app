@@ -29,3 +29,8 @@ Formats:
 
 Longest gap without a new event: beats 0–7 (4.4 s, the hook's cursor glide; type lands @2).
 \* new screen or state, see `../JOURNEYS-NEW-SCREENS.md`.
+
+## Changes made while building (after sign-off)
+- Member responses run Accept → Decline → Suggest (was Accept → Suggest → Decline), so the last answer leads
+  straight into the pastor's *Accept new time*. The board outcomes follow the same order.
+- Captions were shortened ("Church admin", "Member app") so they fit beside the laptop.

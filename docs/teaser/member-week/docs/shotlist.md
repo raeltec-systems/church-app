@@ -28,3 +28,8 @@ Formats:
 
 Longest gap without a new event: beats 104–116 (scroll keeps moving; caption @108).
 \* new screen or state, see `../JOURNEYS-NEW-SCREENS.md`.
+
+## Changes made while building (after sign-off)
+- Sign-up follows the prototype's three real steps (number → code → About you → Request sent), then a
+  "Welcome to BIC Kafue" push marks the approval before Home.
+- Saturday also shows My cell's next meeting after the recap.

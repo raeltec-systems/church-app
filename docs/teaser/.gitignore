@@ -9,3 +9,4 @@ node_modules/
 */audio/*.wav
 out/
 */assets/rec/
+journeys/proto/

@@ -25,3 +25,9 @@ Formats:
 
 Longest gap without a new event: beats 0–7 (3.75 s).
 \* new screen or state, see `../JOURNEYS-NEW-SCREENS.md`.
+
+## Changes made while building (after sign-off)
+- Cast: the member who confirms is Mwila Chanda (her part in the prototype is Closing prayer); Ruth Zulu
+  answers Tentative; Abel Sakala can't make it ("At a funeral in Mazabuka, sorry."); Grace gives Worship to Lydia Banda.
+- The topic and scripture are typed as "Rooted in love · Ephesians 3:14–21" so they match what the member app shows.
+- Leads are picked live for three parts instead of adding a new Testimony part (keeps the programme in time order).

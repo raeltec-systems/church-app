@@ -17,3 +17,6 @@ supabase/.branches/
 # Local environment files; never commit secrets
 .env
 .env.*
+
+# Agent worktrees (local only)
+.claude/worktrees/

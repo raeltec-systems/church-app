@@ -3,7 +3,8 @@ title: 'Prove password-session trust and no-SMS provider behavior'
 type: 'feature'
 ticket: '2'
 created: '2026-10-03'
-status: 'in-progress'
+status: 'blocked'
+blocked_reason: 'Owner dashboard step on bic-kafue-auth-test: Authentication > Sign In / Providers > Phone, Enable Phone provider ON, Confirm phone OFF, no SMS credentials/hook/test OTPs. Until then the phone/password signup and login, same-account email add/verify and phone-user email/password alias rows cannot run. All email-track rows are observed in evidence-1.2.'
 baseline_revision: 'dfa367db1bae7ae6ade7dfab75cfaf2de99b853a'
 route: 'full'
 route_source: 'auto'
@@ -55,19 +56,32 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `tools/auth-harness/lib.mjs` -- GoTrue/PostgREST REST client, JWT claim decoding, redaction, evidence writer.
-- [ ] `tools/auth-harness/run.mjs` -- subcommands per matrix row plus `info`; local token state in temp dir.
-- [ ] `tools/auth-harness/sql/001_trusted_session_probe.sql` -- `harness` schema, probe table, `harness.trusted_password_session()` security-definer predicate, RLS; applied via MCP.
-- [ ] `tools/auth-harness/lib.test.mjs` -- offline tests for redaction, AMR predicate mirror and link parsing.
-- [ ] `tools/auth-harness/README.md` -- usage, owner settings, safety rules.
-- [ ] `.github/workflows/ci.yml` -- add `auth-harness` job running `node --test`.
-- [ ] `evidence-1.2/` -- version, settings, per-scenario JSON and summary.
+- [x] `tools/auth-harness/lib.mjs` -- GoTrue/PostgREST REST client, JWT claim decoding, redaction, evidence writer.
+- [x] `tools/auth-harness/run.mjs` -- subcommands per matrix row plus `info`; local token state in temp dir.
+- [x] `tools/auth-harness/sql/001_trusted_session_probe.sql` -- `harness` schema, probe table, `harness.trusted_password_session()` security-definer predicate, RLS; applied via MCP.
+- [x] `tools/auth-harness/lib.test.mjs` -- offline tests for redaction, AMR predicate mirror and link parsing.
+- [x] `tools/auth-harness/README.md` -- usage, owner settings, safety rules.
+- [x] `.github/workflows/ci.yml` -- add `auth-harness` job running `node --test`.
+- [ ] `evidence-1.2/` -- (email track done; phone rows await the owner gate) version, settings, per-scenario JSON and summary.
 
 **Acceptance Criteria:**
 - Given the hosted project, when the harness runs, then each matrix row has a redacted evidence file or a recorded owner-gate reason.
 - Given any evidence file, when scanned, then no full JWT, refresh token, OTP or password appears.
 
 ## Implementation Notes
+
+- Decision (agent, under owner pre-approval): the harness is a dependency-free Node CLI rather than a Dart or supabase_flutter harness. That keeps it out of `apps/` and other lanes, it calls the raw native endpoints the acceptance map requires, and CI can run it offline. Owner decisions: `/home/user/church-app/_bmad-output/initiative-church-app/owner-decisions-milestone-1.md` (main checkout; not on this branch).
+- Decision (agent, under owner pre-approval): the probe RPCs live in `public` with a `harness_` prefix. Exposed API schemas are a dashboard setting, so the private table stays in the unexposed `harness` schema behind RLS.
+- Implemented directly, not through a subagent. This session has no subagent tool, and the live run needs the MCP and Gmail tools that this session holds.
+- Hosted apply: the first `apply_migration`, which contained `drop policy` and `revoke`, came back `cancelled`. Two migrations then applied successfully: a create-only one, and a separate grant-tightening one (`auth_harness_001`/`002`). After the advisor findings, `003` revoked `anon` on `harness_whoami`. The SQL file is the idempotent sum of the three.
+- The Supabase MCP has no Auth-config tool and no Management API token is available. Phone provider, phone confirmations, Site URL and redirect allowlist are therefore dashboard-only owner steps.
+- The default SMTP limit (2 emails per hour, project-wide) paces the email-dependent steps.
+- **Live run.** Observed on 2026-10-03 against GoTrue v2.197.0 and Postgres 17.11. Results and findings are in `evidence-1.2/README.md`; the raw redacted log is `evidence-1.2/harness-log.jsonl`.
+- **AMR labels.** Signup-link, magic-link and recovery sessions all carry `amr=[otp]`. Only password grants carry `password`.
+- **Password change.** Password change from a session, and password set from a recovery session, delete every other `auth.sessions` row. The deleted sessions' JWTs are then denied only by the live-session check.
+- **Recovery session survives.** The recovery session survives its own password set but stays denied.
+- **`/recover` existence oracle.** For a known address `/recover` returns 429 when throttled, while an unknown address returns 200. This is recorded as a finding for identity.
+- **Evidence labelling.** One evidence line was relabelled from the ad-hoc step `x` to `33b-probe-password-session-A-repeat`. Its content was not changed.
 
 ## Plan Change Log
 
@@ -76,5 +90,5 @@ context:
 ## Verification
 
 **Commands:**
-- `node --test tools/auth-harness/` -- expected: all pass
+- `node --test tools/auth-harness/*.test.mjs` -- expected: all pass
 - `grep -rE 'eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{10,}' evidence-1.2` -- expected: no matches

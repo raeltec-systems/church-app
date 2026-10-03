@@ -92,6 +92,9 @@ $$;
 revoke all on function public.harness_private_probe() from public, anon;
 grant execute on function public.harness_private_probe() to authenticated;
 
+-- Hosted apply (2026-10-03) ran this file as migrations
+-- auth_harness_001..003 via the Supabase MCP; this file is the idempotent sum.
+
 -- Diagnostic RPC: what the server sees for the caller's session. Returns only
 -- method names, aal, the live-session flag and the predicate result.
 create or replace function public.harness_whoami()
@@ -118,4 +121,6 @@ as $$
   );
 $$;
 revoke all on function public.harness_whoami() from public;
-grant execute on function public.harness_whoami() to anon, authenticated;
+grant execute on function public.harness_whoami() to authenticated;
+-- Advisor note: harness_whoami is an intentional SECURITY DEFINER diagnostic
+-- (it must read auth.sessions); it returns only the caller's own session facts.

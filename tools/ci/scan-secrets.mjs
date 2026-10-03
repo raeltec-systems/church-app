@@ -3,7 +3,9 @@
 //
 //   node tools/ci/scan-secrets.mjs                     scan every git-tracked file (repo mode)
 //   node tools/ci/scan-secrets.mjs --bundle <dir>...   scan built client output (bundle mode:
-//                                                      any JWT, service_role or sb_secret_ fails)
+//                                                      any JWT, any service_role reference or a
+//                                                      real sb_secret_ key fails; the bare prefix
+//                                                      that supabase-dart compares against does not)
 // Findings print the file, line and rule, never the value.
 
 import { execFileSync } from 'node:child_process';

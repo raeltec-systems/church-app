@@ -37,6 +37,19 @@ test('scrub removes stored secrets and any credential-shaped value', () => {
   assert.match(out, /sysc_staging_\[redacted\]/);
 });
 
+test('token check, secret scan and scrubber share one credential shape', () => {
+  const body = 'Ab3-_'.repeat(8) + 'xyz';
+  for (const bad of [`sysc_prod_${body}`, `sysc_local_${body.slice(1)}`, `sysk_local_${body}`]) {
+    assert.ok(!TOKEN_RE.test(bad), bad);
+    assert.deepEqual(findSecrets(bad), [], bad);
+    assert.equal(scrub(bad, []), bad);
+  }
+  const good = `sysc_production_${body}`;
+  assert.ok(TOKEN_RE.test(good));
+  assert.equal(findSecrets(good)[0].rule, 'system_credential');
+  assert.equal(scrub(good, []), 'sysc_production_[redacted]');
+});
+
 test('the matrix judge accepts only the expected outcome per case', () => {
   const ctx = { env: 'local', requestId: 'r1', principalId: 'p1' };
   const actor = { kind: 'system', system_principal_id: 'p1', job_id: 'r1', initiating_member_id: null };

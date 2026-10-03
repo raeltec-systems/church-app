@@ -6,8 +6,8 @@
 # Usage: npm run db:smoke   (expects `npm run db:start`; needs curl, jq and psql; SYNTHETIC users and data only)
 set -euo pipefail
 
-eval "$(npx supabase status -o env 2>/dev/null | grep -E '^(API_URL|PUBLISHABLE_KEY|SECRET_KEY|SERVICE_ROLE_KEY|DB_URL)=')"
-: "${API_URL:?}" "${PUBLISHABLE_KEY:?}" "${SECRET_KEY:?}" "${SERVICE_ROLE_KEY:?}" "${DB_URL:?}"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/local_stack.sh"
+require_local_stack API_URL PUBLISHABLE_KEY SECRET_KEY SERVICE_ROLE_KEY DB_URL
 RPC="$API_URL/rest/v1/rpc/fixture_counter_command"
 fail=0
 WORK=$(mktemp -d)
@@ -19,29 +19,13 @@ expect() { # name expected actual
   if [[ "$3" == "$2" ]]; then ok "$1 ($3)"; else bad "$1: expected $2, got $3"; fi
 }
 
-die() { echo "SETUP FAILED - $1" >&2; exit 1; }
-
-pg() { # psql against the local database: host psql, or the db container as fallback
-  if command -v psql >/dev/null 2>&1; then
-    psql "$DB_URL" -X -qtA -v ON_ERROR_STOP=1 "$@"
-  else
-    docker exec -i -e PGAPPNAME="${PGAPPNAME:-psql}" \
-      "$(docker ps --filter name=supabase_db_ --format '{{.Names}}' | head -1)" \
-      psql -U postgres -X -qtA -v ON_ERROR_STOP=1 "$@"
-  fi
-}
-sql() { pg -c "$1"; }
-
-uuid() { cat /proc/sys/kernel/random/uuid; }
-
 cleanup() {
   for id in "${USERS[@]:-}"; do
     [[ -z "$id" ]] && continue
     sql "delete from app.cmd_receipts where actor_id = '$id';
          delete from app.fixture_counters where created_by = '$id';
          delete from app.fixture_command_grants where actor_id = '$id';" >/dev/null || true
-    curl -s -o /dev/null -X DELETE "$API_URL/auth/v1/admin/users/$id" \
-      -H "apikey: $SECRET_KEY" -H "Authorization: Bearer $SERVICE_ROLE_KEY" || true
+    synthetic_user_delete "$id"
   done
   rm -rf "$WORK"
 }
@@ -51,17 +35,10 @@ trap cleanup EXIT
 # cleanup as soon as it exists, and sets ACTOR_ID and ACTOR_TOKEN. Any failure aborts the run.
 new_actor() {
   local email="fixture-$(uuid)@example.test" password="Fixture-$(uuid)"
-  ACTOR_ID=$(curl -s -X POST "$API_URL/auth/v1/admin/users" \
-    -H "apikey: $SECRET_KEY" -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
-    -H 'Content-Type: application/json' \
-    -d "{\"email\":\"$email\",\"password\":\"$password\",\"email_confirm\":true}" | jq -r .id) \
-    || die "admin user creation request failed"
+  ACTOR_ID=$(synthetic_user_create "$email" "$password") || die "admin user creation request failed"
   [[ "$ACTOR_ID" =~ ^[0-9a-f-]{36}$ ]] || die "could not create a synthetic user"
   USERS+=("$ACTOR_ID")
-  ACTOR_TOKEN=$(curl -s -X POST "$API_URL/auth/v1/token?grant_type=password" \
-    -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Type: application/json' \
-    -d "{\"email\":\"$email\",\"password\":\"$password\"}" | jq -r .access_token) \
-    || die "password sign-in request failed"
+  ACTOR_TOKEN=$(synthetic_user_token "$email" "$password") || die "password sign-in request failed"
   [[ -n "$ACTOR_TOKEN" && "$ACTOR_TOKEN" != null ]] || die "could not sign in the synthetic user"
 }
 

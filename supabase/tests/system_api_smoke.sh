@@ -9,8 +9,8 @@
 set -euo pipefail
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-eval "$(npx supabase status -o env 2>/dev/null | grep -E '^(API_URL|PUBLISHABLE_KEY|SECRET_KEY|SERVICE_ROLE_KEY|DB_URL)=')"
-: "${API_URL:?}" "${PUBLISHABLE_KEY:?}" "${SECRET_KEY:?}" "${SERVICE_ROLE_KEY:?}" "${DB_URL:?}"
+source "$ROOT/supabase/tests/lib/local_stack.sh"
+require_local_stack API_URL PUBLISHABLE_KEY SECRET_KEY SERVICE_ROLE_KEY DB_URL
 WORK=$(mktemp -d)
 chmod 700 "$WORK"
 USER_ID=""
@@ -19,25 +19,10 @@ CREDENTIAL_ID=""
 MARKED=0
 fail=0
 
-die() { echo "SETUP FAILED - $1" >&2; exit 1; }
-pg() {
-  if command -v psql >/dev/null 2>&1; then
-    psql "$DB_URL" -X -qtA -v ON_ERROR_STOP=1 "$@"
-  else
-    docker exec -i "$(docker ps --filter name=supabase_db_ --format '{{.Names}}' | head -1)" \
-      psql -U postgres -X -qtA -v ON_ERROR_STOP=1 "$@"
-  fi
-}
-sql() { pg -c "$1"; }
-uuid() { cat /proc/sys/kernel/random/uuid; }
-
 cleanup() {
   [[ -n "$CREDENTIAL_ID" ]] && sql "select app.sys_revoke_credential('$CREDENTIAL_ID', 'israel');" >/dev/null || true
   [[ -n "$PRINCIPAL_ID" ]] && sql "select app.sys_disable_principal('$PRINCIPAL_ID', 'israel');" >/dev/null || true
-  if [[ -n "$USER_ID" ]]; then
-    curl -s -o /dev/null -X DELETE "$API_URL/auth/v1/admin/users/$USER_ID" \
-      -H "apikey: $SECRET_KEY" -H "Authorization: Bearer $SERVICE_ROLE_KEY" || true
-  fi
+  [[ -n "$USER_ID" ]] && synthetic_user_delete "$USER_ID"
   if [[ "$MARKED" == 1 ]]; then
     # Restore the unmarked state this script found (local stack only).
     sql "delete from app.platform_environment where set_by = 'system-api-smoke';
@@ -67,13 +52,9 @@ CREDENTIAL_ID=$(sql "select app.sys_register_credential('$PRINCIPAL_ID', '$diges
 
 # A real synthetic user session.
 email="system-smoke-$(uuid)@example.test"; password="Smoke-$(uuid)"
-USER_ID=$(curl -s -X POST "$API_URL/auth/v1/admin/users" \
-  -H "apikey: $SECRET_KEY" -H "Authorization: Bearer $SERVICE_ROLE_KEY" -H 'Content-Type: application/json' \
-  -d "{\"email\":\"$email\",\"password\":\"$password\",\"email_confirm\":true}" | jq -r .id)
+USER_ID=$(synthetic_user_create "$email" "$password")
 [[ "$USER_ID" =~ ^[0-9a-f-]{36}$ ]] || die "could not create a synthetic user"
-SYSTEM_MATRIX_USER_JWT=$(curl -s -X POST "$API_URL/auth/v1/token?grant_type=password" \
-  -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Type: application/json' \
-  -d "{\"email\":\"$email\",\"password\":\"$password\"}" | jq -r .access_token)
+SYSTEM_MATRIX_USER_JWT=$(synthetic_user_token "$email" "$password")
 [[ -n "$SYSTEM_MATRIX_USER_JWT" && "$SYSTEM_MATRIX_USER_JWT" != null ]] || die "could not sign in"
 export SYSTEM_MATRIX_USER_JWT SUPABASE_PUBLISHABLE_KEY="$PUBLISHABLE_KEY" SUPABASE_API_URL="$API_URL"
 

@@ -27,10 +27,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # Each step runs the package.json script of the same name, so local runs and CI cannot drift.
       - name: Policy tool tests (offline)
-        run: node --test tools/env/*.test.mjs tools/ci/*.test.mjs tools/ops/*.test.mjs tools/recovery/*.test.mjs
+        run: npm run ci:policy-test
       - name: Environment configs are separate, secret-free and fail closed
-        run: node tools/env/environments.mjs check
+        run: npm run env:check
         env:
           PRODUCTION_PROJECT_REF: ${{ vars.PRODUCTION_PROJECT_REF }}
       - name: Migrations are version-ordered, immutable once merged and non-destructive
@@ -46,16 +47,16 @@ jobs:
             base="$BEFORE"
           fi
           if [ -n "$base" ]; then
-            node tools/ci/check-migrations.mjs --base "$base"
+            npm run ci:migrations -- --base "$base"
           else
-            node tools/ci/check-migrations.mjs
+            npm run ci:migrations
           fi
       - name: No secrets in tracked files
-        run: node tools/ci/scan-secrets.mjs
+        run: npm run ci:secrets
       - name: Staging migration-history drift (skipped until the owner adds SUPABASE_ACCESS_TOKEN)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-        run: node tools/ci/check-migration-drift.mjs --env staging
+        run: npm run ci:drift:staging
 
   db:
     name: db (local Supabase, pgTAP + API smoke + contract fixtures + isolated restore rehearsal)

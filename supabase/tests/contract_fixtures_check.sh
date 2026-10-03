@@ -7,17 +7,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 FIXTURES="$ROOT/packages/contracts/fixtures/v1"
 
-eval "$(npx supabase status -o env 2>/dev/null | grep -E '^DB_URL=')"
-: "${DB_URL:?}"
-
-pg() { # psql against the local database: host psql, or the db container as fallback
-  if command -v psql >/dev/null 2>&1; then
-    psql "$DB_URL" -X -qtA -v ON_ERROR_STOP=1 "$@"
-  else
-    docker exec -i "$(docker ps --filter name=supabase_db_ --format '{{.Names}}' | head -1)" \
-      psql -U postgres -X -qtA -v ON_ERROR_STOP=1 "$@"
-  fi
-}
+source "$ROOT/supabase/tests/lib/local_stack.sh"
+require_local_stack DB_URL
 
 fail=0
 total=0

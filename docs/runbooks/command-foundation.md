@@ -2,8 +2,14 @@
 
 Every state change goes through one transactional command kernel, `app.cmd_execute`, in
 `supabase/migrations/20261003123459_command_foundation.sql`, hardened by
-`supabase/migrations/20261003131021_command_foundation_hardening.sql`. The synthetic `fixture_counter`
-aggregate is the reference consumer.
+`supabase/migrations/20261003131021_command_foundation_hardening.sql`. Its current definition is in
+`supabase/migrations/20261003134340_cross_epic_contracts.sql` (story 1.5), where envelope validation
+delegates to the wire contract `app.contract_check('command_request', …)`. The synthetic
+`fixture_counter` aggregate is the reference consumer.
+
+Related runbooks:
+- `contracts-and-owner-seams.md`: the wire contract, its fixtures and the owner-prefix and dependency guards that every new command function must pass.
+- `system-access-and-operations.md`: the bounded system route (`app.sys_execute`), which reuses the kernel's error envelope.
 
 ## Wire contract
 
@@ -20,6 +26,8 @@ aggregate is the reference consumer.
 - Timeout means the outcome is unknown. Retry with the same `request_id` and the same body to get the original result. Sending the same `request_id` with a changed body returns `conflict`.
 
 ## Adding a command
+
+Name every new `app` object with its owning module's registered prefix (see `contracts-and-owner-seams.md`, "Owner registry and guards"); pgTAP fails on unowned names and on calls outside the allowed module edges.
 
 1. Write a handler `app.<owner>_<aggregate>_<verb>(p_actor uuid, p_expected_revision bigint, p_payload jsonb) returns jsonb` with `set search_path = ''` and qualified names. It must:
    - reject unknown payload fields and validate inputs with `app.cmd_fail('validation_failed', '{"field": "reason"}')`

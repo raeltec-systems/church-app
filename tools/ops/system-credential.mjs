@@ -20,10 +20,11 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SYSTEM_CREDENTIAL_PATTERN } from '../ci/secret-patterns.mjs';
 import { ENVIRONMENT_NAMES, loadEnvironments } from '../env/environments.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-export const TOKEN_RE = /^sysc_(local|staging|production)_[A-Za-z0-9_-]{43}$/;
+export const TOKEN_RE = new RegExp(`^${SYSTEM_CREDENTIAL_PATTERN}$`);
 export const PROBE = 'system.synthetic_probe';
 
 export function stateDir() {
@@ -61,7 +62,7 @@ export function readStored(env) {
 export function scrub(text, secrets) {
   let out = String(text);
   for (const s of secrets.filter(Boolean)) out = out.split(s).join('[redacted]');
-  return out.replace(/sysc_(local|staging|production)_[A-Za-z0-9_-]{43}/g, 'sysc_$1_[redacted]');
+  return out.replace(new RegExp(SYSTEM_CREDENTIAL_PATTERN, 'g'), 'sysc_$1_[redacted]');
 }
 
 function arg(argv, name, fallback = undefined) {

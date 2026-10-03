@@ -1,4 +1,4 @@
-// Overview: the BIC Kafue app in 60 seconds. Pure function of time; 120 bpm (0.5 s/beat), 120 beats, drop at 20.
+// Overview: the Kafue Brethren in Christ Church App in 60 seconds. Pure function of time; 120 bpm (0.5 s/beat), 120 beats, drop at 20.
 // Plan: docs/shotlist.md. Footage: the member and admin recordings in rec/ (journeys/rec-*.mjs).
 import * as M from './lib/motion.js';
 import { makeKit } from '../journeys/kit.js';
@@ -75,13 +75,13 @@ function titles(ctx, u) {
     K.headline(ctx, [['What if it was all', C.navy], ['in one place?', C.blue]], W / 2, LS ? 300 : P ? S.y + 260 : S.y + 150, FORMAT.pick({ '16x9': 96, '9x16': 96, '1x1': 72 }), u, 12, { align: 'center', exit: 19.6 });
     const logo = K.img('../journeys/assets/logo.png'); const k = springU(u, 14, SPRING.bouncy) * (1 - E.inBack(prog(u, 19.4, 20), 1.5));
     const ls = FORMAT.pick({ '16x9': 280, '9x16': 380, '1x1': 280 });
-    if (logo && k > 0) { ctx.save(); ctx.translate(W / 2, LS ? 690 : P ? H * 0.58 : H * 0.62); ctx.scale(k, k); ctx.rotate((1 - k) * 0.5 + 0.03 * Math.sin(u)); ctx.beginPath(); ctx.arc(0, 0, ls / 2, 0, M.TAU); ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(14,24,70,.18)'; ctx.shadowBlur = 50; ctx.fill(); ctx.shadowColor = 'transparent'; ctx.drawImage(logo, -ls / 2, -ls / 2, ls, ls); ctx.restore(); }
+    if (logo && k > 0) { ctx.save(); ctx.translate(W / 2, LS ? 690 : P ? H * 0.58 : H * 0.62); ctx.scale(k, k); ctx.rotate((1 - k) * 0.5 + 0.03 * Math.sin(u)); ctx.beginPath(); ctx.arc(0, 0, ls / 2, 0, M.TAU); ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(14,24,70,.18)'; ctx.shadowBlur = 50; ctx.fill(); ctx.shadowColor = 'transparent'; ctx.clip(); ctx.drawImage(logo, -ls / 2, -ls / 2, ls, ls); ctx.restore(); }
   }
 }
 
 // ------------------------------------------------------------ features
 const FEATURES = [
-  [20, 28, 'Your church.', 'In your pocket.', 'Brethren in Christ Church Kafue'],
+  [20, 28, 'Your church.', 'In your pocket.', 'Kafue Brethren in Christ Church App'],
   [28, 36, 'Duties,', 'answered in a tap.', 'Your leader sees it straight away.'],
   [36, 44, 'Bible and', 'hymn book.', 'Find hymn 58 before the first verse ends.'],
   [44, 52, 'Every sermon,', 'any time.', 'Listen again, read the notes.'],

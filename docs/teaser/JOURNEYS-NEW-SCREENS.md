@@ -7,12 +7,12 @@ Please approve (or change) each one before it goes into the real app.
 
 | # | Screen / state | Used in | Why it was needed | Where |
 |---|---|---|---|---|
-| 1 | **Lock screen and push notifications** (BIC Kafue icon, title, one or two lines, "now") | all four | Neither prototype has OS-level notifications. Copy follows the spec's notifications section. | drawn in `journeys/kit.js` (`K.lock`, `K.banner`) |
+| 1 | **Lock screen and push notifications** (app icon, title, one or two lines, "now") | all four | Neither prototype has OS-level notifications. Copy follows the spec's notifications section. | drawn in `journeys/kit.js` (`K.lock`, `K.banner`) |
 | 2 | **SMS code notification** during phone sign-up | Member | The prototype has the code screen but not the incoming SMS. | `K.banner({ app: 'sms' })` |
 | 3 | **Member: "Confirm your part" sheet** on My cell (Yes, I'll lead it / Tentative / note / Can't make it), and the part chip changing to Confirmed / Tentative / Can't make it | Cell leader | Flagged in the brief as missing. Built from the duty "Can't make it?" sheet. | patch "part sheet" in `patch.mjs` |
 | 4 | **Leader: per-part status on Cell meetings** (Confirmed / Tentative / Can't make it / Waiting chip on every programme row, "x of 5 parts confirmed", and an "Updated · changed parts are sent to their phones" toast when re-publishing) | Cell leader | Flagged in the brief as missing. Uses the chip colours of the pastoral care board. | patches "prog status …" |
 | 5 | **Pastor: declined visit card** (the card returns to *Requested* with a red "Declined by member" box quoting the member's note, and *Schedule visit* to try again) | Pastor | The board has no declined state, but the member app already sends a decline note. | patch "declined card" |
-| 6 | **New notification types**: "Pastoral visit request", "Visit confirmed", "Cell meeting · Thu 8 Oct" (your part), "New duty", "Welcome to BIC Kafue" (membership approved), "Meeting recap posted" | as listed | Part of #1, listed so each message can be approved. | in each `film.js` |
+| 6 | **New notification types**: "Pastoral visit request", "Visit confirmed", "Cell meeting · Thu 8 Oct" (your part), "New duty", "Welcome to Kafue BICC" (membership approved), "Meeting recap posted" | as listed | Part of #1, listed so each message can be approved. | in each `film.js` |
 | 7 | **Entrance motion** for sheets (slide up), modals and cards (rise), toasts (pop) and status chips (pop) | all four | The prototypes switch states instantly. | patch "motion css" |
 
 ## Prototype bug found while recording
@@ -34,3 +34,8 @@ Please approve (or change) each one before it goes into the real app.
   drawn over the real control while the real option is selected.
 
 All names, numbers and amounts are the prototypes' placeholders.
+
+## App name in the videos
+Our own copy uses the full name **Kafue Brethren in Christ Church App** (end cards, the overview's opening line,
+the sign-up SMS). Push titles that must fit on one line use **Kafue BICC** ("Welcome to Kafue BICC").
+Text inside the recorded prototype screens is the prototypes' own and is unchanged.

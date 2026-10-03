@@ -9,6 +9,7 @@ for f in 16x9 9x16 1x1; do node $SK/scripts/render.mjs --film $film --format $f 
 node $SK/scripts/sfx.mjs $film | tail -1
 node $SK/scripts/mix.mjs $film | tail -4
 for f in 16x9 9x16 1x1; do node $SK/scripts/render.mjs --film $film --format $f --poster | tail -1; done
+for f in 16x9 9x16 1x1; do node $SK/scripts/render.mjs --film $film --format $f --contact --workers 4 | tail -1; done
 mkdir -p out/delivery
 cp out/$film/final.mp4 out/delivery/$film-16x9.mp4
 cp out/$film/final_9x16.mp4 out/delivery/$film-9x16.mp4

@@ -73,8 +73,8 @@ const screen = (clip, sched) => (c, u) => { K.drawClip(c, clip, u, sched, 368, 8
 function mainScreen(c, u) {
   if (u < 26) {
     screen('signup', SIGNUP)(c, u);
-    K.banner(c, { app: 'sms', title: 'Messages', body: '482913 is your BIC Kafue code. It expires in 10 minutes.', k: springU(u, 5, SPRING.snappy) * (1 - prog(u, 7.6, 8.2)) });
-    K.banner(c, { title: 'Welcome to BIC Kafue', body: 'The church office approved your membership. Welcome to the family!', k: springU(u, 15.9, SPRING.snappy) * (1 - prog(u, 19.5, 20.2)) });
+    K.banner(c, { app: 'sms', title: 'Messages', body: '482913 is your Kafue Brethren in Christ Church App code. It expires in 10 minutes.', k: springU(u, 5, SPRING.snappy) * (1 - prog(u, 7.6, 8.2)) });
+    K.banner(c, { title: 'Welcome to Kafue BICC', body: 'The church office approved your membership. Welcome to the family!', k: springU(u, 15.9, SPRING.snappy) * (1 - prog(u, 19.5, 20.2)) });
     return;
   }
   if (u < 36) {

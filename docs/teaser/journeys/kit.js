@@ -267,20 +267,24 @@ export function makeKit(M) {
     });
   };
   // End card: emblem + lines, shared by all films.
-  K.endCard = (ctx, u, u0, { line1, line2 = 'BIC Kafue app', foot = '' } = {}) => {
+  K.endCard = (ctx, u, u0, { line1, line2 = 'Kafue Brethren in Christ Church App', foot = '' } = {}) => {
     K.bg(ctx, u);
     const s = FORMAT.safe; const portrait = FORMAT.portrait;
     const logo = K.img('../journeys/assets/logo.png');
     const ls = FORMAT.pick({ '16x9': 230, '9x16': 300, '1x1': 220 });
     const k = springU(u, u0 - 0.35, SPRING.bouncy);
     const lx = portrait || FORMAT.square ? W / 2 : s.x + ls / 2, ly = portrait ? s.y + s.h * 0.3 : FORMAT.square ? H * 0.3 : H / 2;
-    if (logo && k > 0) { ctx.save(); ctx.translate(lx, ly); ctx.scale(k, k); ctx.rotate((1 - k) * -0.4); ctx.shadowColor = 'rgba(14,24,70,.18)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 14; ctx.beginPath(); ctx.arc(0, 0, ls / 2, 0, M.TAU); ctx.fillStyle = '#fff'; ctx.fill(); ctx.shadowColor = 'transparent'; ctx.drawImage(logo, -ls / 2, -ls / 2, ls, ls); ctx.restore(); }
+    if (logo && k > 0) { ctx.save(); ctx.translate(lx, ly); ctx.scale(k, k); ctx.rotate((1 - k) * -0.4); ctx.shadowColor = 'rgba(14,24,70,.18)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 14; ctx.beginPath(); ctx.arc(0, 0, ls / 2, 0, M.TAU); ctx.fillStyle = '#fff'; ctx.fill(); ctx.shadowColor = 'transparent'; ctx.clip(); ctx.drawImage(logo, -ls / 2, -ls / 2, ls, ls); ctx.restore(); }
     const center = portrait || FORMAT.square;
     const tx = center ? W / 2 : lx + ls / 2 + 70, align = center ? 'center' : 'left';
-    const size = FORMAT.pick({ '16x9': 96, '9x16': 92, '1x1': 74 });
+    const size = K.fit(ctx, [[line1]], FORMAT.pick({ '16x9': 96, '9x16': 92, '1x1': 74 }), center ? s.w : W - (lx + ls / 2 + 70) - s.x);
     const ty = portrait ? s.y + s.h * 0.55 : FORMAT.square ? H * 0.6 : H / 2 - 10;
     K.headline(ctx, [[line1, C.navy]], tx, ty, size, u, u0 - 0.1, { align });
-    K.kicker(ctx, line2, tx, ty + size * 0.9, FORMAT.pick({ '16x9': 30, '9x16': 34, '1x1': 28 }), u, u0 + 0.8, { align });
+    // the app's full name, tracked caps: shrink until it fits the line it sits on
+    let ks = FORMAT.pick({ '16x9': 30, '9x16': 34, '1x1': 28 }); const kw = center ? s.w : W - tx - s.x;
+    ctx.font = font(ks, 700, UI); ctx.letterSpacing = `${ks * 0.22}px`; const w0 = ctx.measureText(line2.toUpperCase()).width; ctx.letterSpacing = '0px';
+    if (w0 > kw) ks = Math.floor(ks * kw / w0);
+    K.kicker(ctx, line2, tx, ty + size * 0.9, ks, u, u0 + 0.8, { align });
     if (foot) K.body(ctx, foot, tx, ty + size * 0.9 + FORMAT.pick({ '16x9': 64, '9x16': 76, '1x1': 58 }), FORMAT.pick({ '16x9': 28, '9x16': 32, '1x1': 26 }), u, u0 + 1.2, { align, maxW: center ? s.w : W - tx - s.x });
   };
   return K;

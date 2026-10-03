@@ -1,0 +1,571 @@
+{
+  "generated": "2026-10-03T13:45:43.874Z",
+  "label": "chrome-for-testing-153",
+  "browser": "chrome-for-testing-153 153.0.8010.12 (headless)",
+  "url": "http://127.0.0.1:8766/",
+  "readyMs": 1333,
+  "summary": {
+    "desktop": {
+      "passed": 29,
+      "total": 29
+    },
+    "emulated": {
+      "passed": 1,
+      "total": 1
+    }
+  },
+  "failed": 0,
+  "checks": [
+    {
+      "id": "C1",
+      "kind": "desktop",
+      "name": "semantics tree present without a user \"enable accessibility\" step",
+      "result": "pass",
+      "detail": {
+        "readyMs": 1333
+      }
+    },
+    {
+      "id": "C2a",
+      "kind": "desktop",
+      "name": "grid is a named table with row/columnheader/cell roles",
+      "result": "pass",
+      "detail": {
+        "table": {
+          "role": "table",
+          "name": "Ushering rota: positions by Sunday"
+        },
+        "rows": 7,
+        "headers": [
+          "Position",
+          "Sun 4 Oct",
+          "Sun 11 Oct",
+          "Sun 18 Oct",
+          "Sun 25 Oct",
+          "Sun 1 Nov",
+          "Sun 8 Nov",
+          "Sun 15 Nov",
+          "Sun 22 Nov"
+        ],
+        "cells": 54
+      }
+    },
+    {
+      "id": "C2b",
+      "kind": "desktop",
+      "name": "all 48 slots are buttons named \"position, date: member, status\"",
+      "result": "pass",
+      "detail": {
+        "slots": 48
+      }
+    },
+    {
+      "id": "C2c",
+      "kind": "desktop",
+      "name": "heading, filters, view radios, export and tabs are named",
+      "result": "pass",
+      "detail": {
+        "h1": {
+          "role": "heading",
+          "name": "Duty rotas",
+          "props": {
+            "level": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "C2d",
+      "kind": "desktop",
+      "name": "view toggle exposes the selected view (radio group, checked)",
+      "result": "pass",
+      "detail": {
+        "toggles": [
+          {
+            "role": "radio",
+            "name": "Grid",
+            "props": {
+              "focusable": true,
+              "checked": "true"
+            }
+          },
+          {
+            "role": "radio",
+            "name": "List",
+            "props": {
+              "focusable": true,
+              "checked": "false"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "C4a",
+      "kind": "desktop",
+      "name": "Tab reaches every control in visual order and DOM focus follows (never <body> inside the app)",
+      "result": "pass",
+      "detail": {
+        "names": [
+          "tab: Rota grid trial",
+          "tab: Platform status",
+          "textbox: Filter positions e.g. door",
+          "button: Filter by status All statuses",
+          "radio: Grid",
+          "radio: List",
+          "button: Export CSV…",
+          "button: Main door, Sun 4 Oct: Test Mwila A, Confirmed"
+        ]
+      }
+    },
+    {
+      "id": "C4b",
+      "kind": "desktop",
+      "name": "the grid is a single Tab stop (roving focus)",
+      "result": "pass",
+      "detail": {
+        "names": [
+          "tab: Rota grid trial",
+          "tab: Platform status",
+          "textbox: Filter positions e.g. door",
+          "button: Filter by status All statuses",
+          "radio: Grid",
+          "radio: List",
+          "button: Export CSV…",
+          "button: Main door, Sun 4 Oct: Test Mwila A, Confirmed"
+        ]
+      }
+    },
+    {
+      "id": "C4c",
+      "kind": "desktop",
+      "name": "every focused control has a role and a non-empty name",
+      "result": "pass",
+      "detail": {
+        "names": [
+          "tab: Rota grid trial",
+          "tab: Platform status",
+          "textbox: Filter positions e.g. door",
+          "button: Filter by status All statuses",
+          "radio: Grid",
+          "radio: List",
+          "button: Export CSV…",
+          "button: Main door, Sun 4 Oct: Test Mwila A, Confirmed"
+        ]
+      }
+    },
+    {
+      "id": "C6",
+      "kind": "desktop",
+      "name": "arrows/Home/End/Control move slot by slot, clamp at all four edges, scroll into view",
+      "result": "pass",
+      "detail": {
+        "back": true,
+        "moveLog": [
+          {
+            "key": "ArrowLeft",
+            "note": "left edge",
+            "got": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+            "ok": true,
+            "inView": true
+          },
+          {
+            "key": "ArrowUp",
+            "note": "top edge",
+            "got": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+            "ok": true,
+            "inView": true
+          },
+          {
+            "key": "ArrowRight",
+            "got": "Main door, Sun 11 Oct: Test Joseph B, Confirmed by leader",
+            "ok": true,
+            "inView": true
+          },
+          {
+            "key": "ArrowDown",
+            "got": "Side door, Sun 11 Oct: Test Naomi E, Declined",
+            "ok": true,
+            "inView": true
+          },
+          {
+            "key": "End",
+            "got": "Side door, Sun 22 Nov: -Test Space K, Needs contact",
+            "ok": true,
+            "inView": true
+          },
+          {
+            "key": "ArrowRight",
+            "note": "right edge",
+            "got": "Side door, Sun 22 Nov: -Test Space K, Needs contact",
+            "ok": true,
+            "inView": true
+          },
+          {
+            "key": "Control+End",
+            "got": "Children's door, Sun 22 Nov: Test Mwila A, Confirmed by leader",
+            "ok": true,
+            "inView": true
+          },
+          {
+            "key": "ArrowDown",
+            "note": "bottom edge",
+            "got": "Children's door, Sun 22 Nov: Test Mwila A, Confirmed by leader",
+            "ok": true,
+            "inView": true
+          },
+          {
+            "key": "Home",
+            "got": "Children's door, Sun 4 Oct: Test Naomi E, Confirmed by leader",
+            "ok": true,
+            "inView": true
+          },
+          {
+            "key": "Control+Home",
+            "got": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+            "ok": true,
+            "inView": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "C7a",
+      "kind": "desktop",
+      "name": "slot dialog is role \"dialog\" named by its title",
+      "result": "pass",
+      "detail": {
+        "dlg": {
+          "role": "dialog",
+          "name": "Main door — Sun 4 Oct",
+          "props": {
+            "modal": true
+          }
+        }
+      }
+    },
+    {
+      "id": "C7b",
+      "kind": "desktop",
+      "name": "changing member and status then Escape or Cancel leaves the slot unchanged and restores focus",
+      "result": "pass",
+      "detail": {
+        "before": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+        "dialogShowedEdit": true,
+        "afterEscape": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+        "afterCancel": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+        "focusAfterEscape": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+        "focusAfterCancel": "Main door, Sun 4 Oct: Test Mwila A, Confirmed"
+      }
+    },
+    {
+      "id": "C7c",
+      "kind": "desktop",
+      "name": "keyboard-only edit saves, focus returns to the slot, and the change is announced politely",
+      "result": "pass",
+      "detail": {
+        "saved": "Main door, Sun 4 Oct: Test Mwila A, Declined",
+        "focus": "Main door, Sun 4 Oct: Test Mwila A, Declined",
+        "live": "Saved. Main door, Sun 4 Oct: Test Mwila A, Declined."
+      }
+    },
+    {
+      "id": "C8a",
+      "kind": "desktop",
+      "name": "status filter shows only matching slots; others are labelled \"hidden by status filter\"",
+      "result": "pass",
+      "detail": {
+        "shown": 6,
+        "hidden": 18,
+        "rows": 4
+      }
+    },
+    {
+      "id": "C8b",
+      "kind": "desktop",
+      "name": "filters matching no slot show \"No slots match\" and disable export with a reason",
+      "result": "pass",
+      "detail": {
+        "exportNode": {
+          "role": "button",
+          "name": "Export CSV…",
+          "props": {
+            "disabled": true
+          }
+        }
+      }
+    },
+    {
+      "id": "C8c",
+      "kind": "desktop",
+      "name": "position filter narrows the grid to matching rows",
+      "result": "pass",
+      "detail": {
+        "rows": 4
+      }
+    },
+    {
+      "id": "C9a",
+      "kind": "desktop",
+      "name": "export dialog is a named \"dialog\"; preview states scope, columns, exclusions, warning; preview has no private field",
+      "result": "pass",
+      "detail": {
+        "edlg": {
+          "role": "dialog",
+          "name": "Export rota CSV",
+          "props": {
+            "modal": true
+          }
+        },
+        "preview": "\"Date\",\"Position\",\"Member\",\"Status\",\"Note\" \"2026-10-04\",\"Main door\",\"Test Mwila A\",\"Declined\",\"\" \"2026-10-11\",\"Main door\",\"Test Joseph B\",\"Confirmed by leader\",\"Bring the \"\"spare\"\" lanyard, then lock up\" \"2026-10-18\",\"Main door\",\"Test Esther C\",\"Declined\",\"'=1+2\""
+      }
+    },
+    {
+      "id": "C9b",
+      "kind": "desktop",
+      "name": "CSV: BOM, CRLF, allowlisted header, 24×5, and every Member/Status/Note equals the app state (golden file + grid names)",
+      "result": "pass",
+      "detail": {
+        "identicalToGolden": true,
+        "mismatches": []
+      }
+    },
+    {
+      "id": "C9c",
+      "kind": "desktop",
+      "name": "formula-led values (=, +, -, @, tab, CR, and space-led) are neutralised; none start raw",
+      "result": "pass",
+      "detail": {
+        "triggerKinds": [
+          "=",
+          "+",
+          "-",
+          "@",
+          "\t",
+          "\r",
+          " "
+        ],
+        "raw": []
+      }
+    },
+    {
+      "id": "C9d",
+      "kind": "desktop",
+      "name": "no private field (phone, care note) in the file",
+      "result": "pass",
+      "detail": {}
+    },
+    {
+      "id": "C9e",
+      "kind": "desktop",
+      "name": "announces \"Download started: <file> (24 rows)\" rather than claiming the save finished",
+      "result": "pass",
+      "detail": {
+        "live": "Saved. Main door, Sun 4 Oct: Test Mwila A, Declined. | Download started: bic-kafue-rota-trial-SYNTHETIC.csv (24 rows)."
+      }
+    },
+    {
+      "id": "C10a",
+      "kind": "desktop",
+      "name": "list view: 6 named lists of 48 items, 48 named Change buttons, level-2 headings",
+      "result": "pass",
+      "detail": {
+        "lists": 6,
+        "items": 48,
+        "change": 48
+      }
+    },
+    {
+      "id": "C10b",
+      "kind": "desktop",
+      "name": "the Declined edit shows in grid, list and CSV alike",
+      "result": "pass",
+      "detail": {
+        "grid": "Main door, Sun 4 Oct: Test Mwila A, Declined",
+        "list": "Sun 4 Oct\nTest Mwila A\nDeclined | Change Main door, Sun 4 Oct",
+        "csv": [
+          "2026-10-04",
+          "Main door",
+          "Test Mwila A",
+          "Declined",
+          ""
+        ]
+      }
+    },
+    {
+      "id": "C10c",
+      "kind": "desktop",
+      "name": "list Change opens the same named slot dialog by keyboard; Escape restores focus",
+      "result": "pass",
+      "detail": {
+        "firstChange": "Change Main door, Sun 4 Oct",
+        "listDialog": {
+          "role": "dialog",
+          "name": "Main door — Sun 4 Oct",
+          "props": {
+            "modal": true
+          }
+        },
+        "focusAfter": "Change Main door, Sun 4 Oct"
+      }
+    },
+    {
+      "id": "C5",
+      "kind": "desktop",
+      "name": "every audited focused control shows a ≥3:1 focus change over ≥ a 2 px perimeter area of its own box (28 controls: page Tab order; slot dialog; status menu options; export dialog; list Change buttons (first 6 of 48))",
+      "result": "pass",
+      "detail": {
+        "failed": []
+      }
+    },
+    {
+      "id": "C3",
+      "kind": "desktop",
+      "name": "every interactive node, table, list and dialog has a non-empty accessible name (grid page, slot dialog, status menu, export dialog, list view)",
+      "result": "pass",
+      "detail": {
+        "unnamed": []
+      }
+    },
+    {
+      "id": "C14",
+      "kind": "desktop",
+      "name": "every visible interactive target is at least 44×44 CSS px (5 screen states)",
+      "result": "pass",
+      "detail": {
+        "small": []
+      }
+    },
+    {
+      "id": "C0",
+      "kind": "desktop",
+      "name": "no page errors during the desktop run",
+      "result": "pass",
+      "detail": {
+        "errors": []
+      }
+    },
+    {
+      "id": "C11",
+      "kind": "desktop",
+      "name": "200% browser zoom (real browser zoom preference): all slots exposed, no page-level horizontal scroll, no text cut by the window, far column reachable, both dialogs fit, list fits",
+      "result": "pass",
+      "detail": {
+        "vp": {
+          "width": 683,
+          "height": 378,
+          "dpr": 2,
+          "rootFontSize": "16px"
+        },
+        "slots": 48,
+        "gridCut": [],
+        "listCut": [],
+        "pageScrollsHorizontally": false,
+        "farVisible": true,
+        "slotDlg": {
+          "ok": true,
+          "name": "Main door — Sun 22 Nov",
+          "geo": {
+            "left": 111.5,
+            "right": 571.5,
+            "vw": 683,
+            "cut": []
+          },
+          "buttons": [
+            "Cancel",
+            "Save",
+            "Member +Test Plus G",
+            "Status Confirmed"
+          ]
+        },
+        "exportDlg": {
+          "ok": true,
+          "name": "Export rota CSV",
+          "geo": {
+            "left": 111.5,
+            "right": 571.5,
+            "vw": 683,
+            "cut": []
+          },
+          "buttons": [
+            "Cancel",
+            "Download CSV"
+          ]
+        },
+        "listInside": true
+      }
+    },
+    {
+      "id": "C12",
+      "kind": "desktop",
+      "name": "200% browser font size: root 32px, text ~2×, all slots exposed, no text cut, far column reachable, both dialogs fit, list fits",
+      "result": "pass",
+      "detail": {
+        "vp": {
+          "width": 1366,
+          "height": 900,
+          "dpr": 1,
+          "rootFontSize": "32px"
+        },
+        "slots": 48,
+        "gridCut": [],
+        "listCut": [],
+        "pageScrollsHorizontally": false,
+        "farVisible": true,
+        "slotDlg": {
+          "ok": true,
+          "name": "Main door — Sun 22 Nov",
+          "geo": {
+            "left": 453,
+            "right": 913,
+            "vw": 1366,
+            "cut": []
+          },
+          "buttons": [
+            "Cancel",
+            "Save",
+            "Member +Test Plus G",
+            "Status Confirmed"
+          ]
+        },
+        "exportDlg": {
+          "ok": true,
+          "name": "Export rota CSV",
+          "geo": {
+            "left": 453,
+            "right": 913,
+            "vw": 1366,
+            "cut": []
+          },
+          "buttons": [
+            "Cancel",
+            "Download CSV"
+          ]
+        },
+        "listInside": true,
+        "headingRatio": 2.03
+      }
+    },
+    {
+      "id": "C13",
+      "kind": "emulated",
+      "name": "mobile emulation (Pixel 7 viewport, touch, mobile UA): boots, exposes slots, a tap opens the named slot dialog",
+      "result": "pass",
+      "detail": {
+        "rect": {
+          "x": 244,
+          "y": 770.5
+        },
+        "dialog": {
+          "role": "dialog",
+          "name": "Main door — Sun 4 Oct",
+          "props": {
+            "modal": true
+          }
+        },
+        "errors": [],
+        "note": "emulation, not a device run"
+      }
+    }
+  ]
+}

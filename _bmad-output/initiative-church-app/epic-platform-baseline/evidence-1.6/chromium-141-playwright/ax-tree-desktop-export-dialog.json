@@ -1,0 +1,125 @@
+[
+  {
+    "role": "RootWebArea",
+    "name": "BIC Kafue staff web trial",
+    "props": {
+      "focusable": true,
+      "focused": true,
+      "url": "http://127.0.0.1:8766/"
+    }
+  },
+  {
+    "role": "dialog",
+    "name": "Export rota CSV",
+    "props": {
+      "modal": true
+    }
+  },
+  {
+    "role": "heading",
+    "name": "Export rota CSV",
+    "props": {
+      "focusable": true,
+      "focused": true,
+      "level": 2
+    }
+  },
+  {
+    "role": "group",
+    "name": ""
+  },
+  {
+    "role": "button",
+    "name": "Cancel",
+    "props": {
+      "focusable": true
+    }
+  },
+  {
+    "role": "button",
+    "name": "Download CSV",
+    "props": {
+      "focusable": true
+    }
+  },
+  {
+    "role": "StaticText",
+    "name": "Export rota CSV"
+  },
+  {
+    "role": "StaticText",
+    "name": "Cancel"
+  },
+  {
+    "role": "StaticText",
+    "name": "Download CSV"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Export rota CSV"
+  },
+  {
+    "role": "StaticText",
+    "name": "Scope: 24 rows — positions: matching “door”; status: all (the slots shown by the current filters)."
+  },
+  {
+    "role": "StaticText",
+    "name": "Columns: Date, Position, Member, Status, Note."
+  },
+  {
+    "role": "StaticText",
+    "name": "Not included: phone numbers and care notes."
+  },
+  {
+    "role": "StaticText",
+    "name": "Text that a spreadsheet could run as a formula is prefixed with an apostrophe so it shows as plain text."
+  },
+  {
+    "role": "StaticText",
+    "name": "Warning: the downloaded file is outside the app’s access controls. Store and delete it under the church’s agreed process. It is not emailed or shared automatically."
+  },
+  {
+    "role": "StaticText",
+    "name": "Preview (first rows):"
+  },
+  {
+    "role": "StaticText",
+    "name": "\"Date\",\"Position\",\"Member\",\"Status\",\"Note\" \"2026-10-04\",\"Main door\",\"Test Mwila A\",\"Declined\",\"\" \"2026-10-11\",\"Main door\",\"Test Joseph B\",\"Confirmed by leader\",\"Bring the \"\"spare\"\" lanyard, then lock up\" \"2026-10-18\",\"Main door\",\"Test Esther C\",\"Declined\",\"'=1+2\""
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Cancel"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Download CSV"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Scope: 24 rows — positions: matching “door”; status: all (the slots shown by the current filters)."
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Columns: Date, Position, Member, Status, Note."
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Not included: phone numbers and care notes."
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Text that a spreadsheet could run as a formula is prefixed with an apostrophe so it shows as plain text."
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Warning: the downloaded file is outside the app’s access controls. Store and delete it under the church’s agreed process. It is not emailed or shared automatically."
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Preview (first rows):"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "\"Date\",\"Position\",\"Member\",\"Status\",\"Note\" \"2026-10-04\",\"Main door\",\"Test Mwila A\",\"Declined\",\"\" \"2026-10-11\",\"Main door\",\"Test Joseph B\",\"Confirmed by leader\",\"Bring the \"\"spare\"\" lanyard, then lock up\" \"2026-10-18\",\"Main door\",\"Test Esther C\",\"Declined\",\"'=1+2\""
+  }
+]

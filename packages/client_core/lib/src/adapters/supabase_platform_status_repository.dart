@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase/supabase.dart';
 
-import 'platform_status.dart';
+import '../domain/platform_status.dart';
 
 /// Supabase adapter for [PlatformStatusRepository].
 ///

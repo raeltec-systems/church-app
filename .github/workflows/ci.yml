@@ -79,6 +79,24 @@ jobs:
       - name: contracts — shared fixtures in Chrome (dart2js number model)
         working-directory: packages/contracts/dart
         run: dart test -p chrome
+      - name: design system — pub get (locked)
+        working-directory: packages/design_system
+        run: flutter pub get --enforce-lockfile
+      - name: design system — analyze
+        working-directory: packages/design_system
+        run: flutter analyze
+      - name: design system — test (tokens, contrast, accessible primitives)
+        working-directory: packages/design_system
+        run: flutter test
+      - name: client core — pub get (locked)
+        working-directory: packages/client_core
+        run: flutter pub get --enforce-lockfile
+      - name: client core — analyze
+        working-directory: packages/client_core
+        run: flutter analyze
+      - name: client core — test (request states, adapters, boundaries)
+        working-directory: packages/client_core
+        run: flutter test
       - name: mobile — pub get (locked)
         working-directory: apps/mobile
         run: flutter pub get --enforce-lockfile
@@ -88,6 +106,18 @@ jobs:
       - name: mobile — test
         working-directory: apps/mobile
         run: flutter test
+      - name: staff — pub get (locked)
+        working-directory: apps/staff
+        run: flutter pub get --enforce-lockfile
+      - name: staff — analyze
+        working-directory: apps/staff
+        run: flutter analyze
+      - name: staff — test
+        working-directory: apps/staff
+        run: flutter test
+      - name: staff — build web
+        working-directory: apps/staff
+        run: flutter build web --no-web-resources-cdn
       - name: staff web trial — pub get (locked)
         working-directory: trials/staff_web
         run: flutter pub get --enforce-lockfile

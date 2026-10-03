@@ -1,0 +1,23 @@
+name: church_client_core
+description: Shared client application layer for the BIC Kafue mobile and staff clients - ports, contract adapters, Riverpod controllers and shared screens. Only lib/src/adapters imports Supabase.
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  church_contracts:
+    path: ../contracts/dart
+  church_design_system:
+    path: ../design_system
+  flutter_riverpod: 3.4.3
+  http: 1.6.0
+  supabase: 2.16.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

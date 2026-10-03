@@ -1,4 +1,4 @@
-import 'package:bic_kafue_mobile/platform_status/platform_status.dart';
+import 'package:church_client_core/church_client_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

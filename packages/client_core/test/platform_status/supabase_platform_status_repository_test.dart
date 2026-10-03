@@ -1,11 +1,11 @@
 import 'dart:convert';
 
-import 'package:bic_kafue_mobile/platform_status/platform_status.dart';
-import 'package:bic_kafue_mobile/platform_status/supabase_platform_status_repository.dart';
+import 'package:church_client_core/church_client_core.dart';
+import 'package:church_client_core/supabase_adapters.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase/supabase.dart';
 
 void main() {
   late List<http.Request> sent;

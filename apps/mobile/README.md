@@ -1,7 +1,10 @@
 # bic_kafue_mobile
 
 Flutter mobile client (Android, iOS; Linux desktop is used only as interim native evidence).
-Story 1.1 holds just the platform-status tracer. See `docs/runbooks/tracer.md` to run it.
+A go_router shell over the shared packages (`packages/design_system`, `packages/client_core`):
+the platform-status tracer (story 1.1) and the synthetic fixture command with honest request
+states (story 1.7). `lib/main.dart` is the composition root and the only file that touches
+Supabase. See `docs/runbooks/tracer.md` and `docs/runbooks/client-shells.md`.
 
 ```sh
 flutter run -d linux \

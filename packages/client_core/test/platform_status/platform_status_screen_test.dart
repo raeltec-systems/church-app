@@ -1,5 +1,6 @@
-import 'package:bic_kafue_mobile/platform_status/platform_status.dart';
-import 'package:bic_kafue_mobile/platform_status/platform_status_screen.dart';
+import 'package:church_client_core/church_client_core.dart';
+
+import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -8,7 +9,10 @@ import 'fake_platform_status_repository.dart';
 Future<FakePlatformStatusRepository> pumpScreen(WidgetTester tester) async {
   final repo = FakePlatformStatusRepository();
   await tester.pumpWidget(
-    MaterialApp(home: PlatformStatusScreen(repository: repo)),
+    MaterialApp(
+      theme: churchMobileTheme(Brightness.light),
+      home: PlatformStatusScreen(repository: repo),
+    ),
   );
   return repo;
 }

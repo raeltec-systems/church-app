@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:bic_kafue_mobile/platform_status/platform_status.dart';
+import 'package:church_client_core/church_client_core.dart';
 
 /// Test double: each call to [fetch] returns the next queued completer, so a
 /// test controls exactly when and how every request finishes.

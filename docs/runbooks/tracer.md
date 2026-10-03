@@ -35,7 +35,12 @@ export SUPABASE_PUBLISHABLE_KEY=<PUBLISHABLE_KEY from `npx supabase status`>
   --dart-define=SUPABASE_URL=$SUPABASE_URL \
   --dart-define=SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY)
 
-# Disposable staff web trial
+# Staff web portal shell (Flutter Web, provisionally selected by story 1.6)
+(cd apps/staff && flutter run -d web-server --web-port 8081 \
+  --dart-define=SUPABASE_URL=$SUPABASE_URL \
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY)
+
+# Disposable staff web trial (1.6 evidence app)
 (cd trials/staff_web && flutter run -d web-server --web-port 8080 \
   --dart-define=SUPABASE_URL=$SUPABASE_URL \
   --dart-define=SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY)
@@ -76,8 +81,8 @@ docker exec supabase_db_church-app psql -U postgres -c \
   "update app.platform_status set status = 'degraded', message = 'SYNTHETIC: changed by SQL', updated_at = now() where id = 1;"
 ```
 
-Hosted: run the same `update` in the dashboard SQL editor. Then press **Reload** (top-right) in
-either client; the new value appears. To see the empty state: `delete from app.platform_status;`
+Hosted: run the same `update` in the dashboard SQL editor. Then press **Reload** (top-right of the
+**Platform status** destination) in any client; the new value appears. To see the empty state: `delete from app.platform_status;`
 then reload ("No platform status recorded"); restore with `npm run db:reset` or re-run `supabase/seed.sql`.
 
 ## 4. Simulate a failure

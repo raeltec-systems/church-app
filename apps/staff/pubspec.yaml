@@ -1,5 +1,5 @@
-name: bic_kafue_mobile
-description: "BIC Kafue mobile app (Flutter iOS/Android)."
+name: bic_kafue_staff
+description: "BIC Kafue staff web portal shell (Flutter Web, provisionally selected by the 1.6 trial)."
 publish_to: 'none'
 version: 0.1.0+1
 

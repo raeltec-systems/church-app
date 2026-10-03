@@ -1,61 +1,119 @@
 # Evidence 1.3: fenced staff recovery across the Auth boundary
 
-- **Project:** `bic-kafue-auth-test` (`szfyfezfvxyuvovnnakr`), synthetic accounts only (`…+bicauth-r13-*@gmail.com`, created by Auth Admin with `email_confirm`, so **no email was sent** by this story).
-- **Observed:** 2026-10-03, GoTrue **v2.197.0** (step `00`), Postgres **17.11** (step `300`).
-- **Raw log:** [`harness-log.jsonl`](harness-log.jsonl), one redacted JSON line per harness call, keyed by `step`. Ids are digests (`h:` + 10 hex); grant secrets, operator token, passwords and tokens are redacted and never written (`scan-evidence.sh` enforces it in CI).
-- **Database state is captured raw, not transcribed:** steps `79`, `199` and `299` are the output of `public.harness_rc_observe()` (exactly [`sql/observe_recovery_state.sql`](../../../../tools/auth-harness/sql/observe_recovery_state.sql)) returned through the function's staff-only `observe` action. Steps `01`, `300`, `301` and `302` are `attach` lines of committed read-only queries.
-- **Harness:** [`tools/auth-harness/`](../../../../tools/auth-harness/README.md); scenarios in `tools/auth-harness/scenarios/1.3-*.txt`.
+- **Project:** `bic-kafue-auth-test` (`szfyfezfvxyuvovnnakr`). Synthetic accounts only: `…+bicauth-r13-x-*@gmail.com`, created by Auth Admin with `email_confirm`. The only emails sent were the 2 Secure-email-change mails for steps `203`/`204`.
+- **Observed:** 2026-10-03, 14:38–14:51 UTC. GoTrue **v2.197.0** (step `05`), Postgres **17.11** (step `03`).
+- **Raw log:** [`harness-log.jsonl`](harness-log.jsonl), one redacted JSON line per harness call, keyed by `step`. Ids are digests (`h:` + 10 hex). Grant secrets, operator token, passwords and tokens are never written; `scan-evidence.sh` enforces this in CI.
+- **This log replaces the earlier one in full.** That run (function v1–v3, SQL before `008`) is in git history only. Nothing here relies on it, including the v1/v2 server-created sign-in session used for revocation (removed in v3).
+
+## Provenance of this run (code under test = committed code)
+
+| What | Start | End |
+|---|---|---|
+| Edge Function `harness-recovery` | step `02`: version **4**, `verify_jwt: true`. The sha256 of the deployed `index.ts` and `logic.mjs` (from `get_edge_function`) **equals** the committed files (`34c6b27f…`, `35529901…`). | step `300`: still version 4 with the same `ezbr_sha256` (`list_edge_functions`). The `same_version_and_ezbr_as_step_02` field in that line was added by the operator. |
+| Hosted SQL (`001`–`004` = migrations `auth_harness_001`–`008`) | step `03`: per-function and per-trigger `md5` and grants. Every value equals step `04`, which is the committed files applied to a local Postgres 17.11 container. | step `301`: hosted combined digest `f26c2bb6…` (22 functions, 4 triggers) equals step `302` (the committed files). |
+
+The function's own `version` action (step `01`) could not read its source on the platform (`unavailable`). The `get_edge_function` comparison above is the source check.
+
+Commits after the run touched only harness recording, not the function or the SQL:
+- `rc-call` now masks `login_email` in what it records. The one affected line (step `32`) was masked after capture; that is its only edit.
+- `scan-evidence.sh` now skips `scenarios/`.
 
 ## Mechanism under test (harness model of AD-20)
 
-| Piece | Where | What it does |
-|---|---|---|
-| Generation | `harness.rc_account.generation` | Advanced by every recovery event: grant (re)issue, relink, reconcile and **any native credential change**. Grants are valid only at the exact generation and link revision they were bound to. |
-| Trusted detection | trigger `rc_auth_credential_change` on `auth.users` | Runs inside GoTrue's own transaction when `encrypted_password`, `email` or `phone` changes: advances the generation, supersedes outstanding grants, records the in-flight op (if any). If it fails, GoTrue's write fails (fail closed). |
-| Grants | `harness.rc_grant` | Member device generates the secret and sends only its SHA-256 digest (`rc-request`); staff binds case, member, account, link revision, generation, purpose and expiry (`rc-issue`). One issued grant per account (partial unique index). |
-| One in flight | `harness.rc_op` + partial unique index | `begin` consumes the grant and records one pending op under the account lock. Pending/dispatched/uncertain ops block new grants, relinks and overlapping resets. |
-| Fences | `harness_rc_dispatch`, `harness_rc_complete` | Dispatch requires op generation = account generation; completion accepts success only if Auth reported the apply, **exactly one** password-only change was recorded for the op since dispatch, and **no session created before dispatch is still live** (DB-verified). Anything else: `uncertain`, access held until staff `reconcile`. Late or replayed completions are recorded, never applied. |
-| Privileged Auth | Edge Function `harness-recovery` (`verify_jwt` on) | Only holder of the service key (platform env). Refuses other projects/URLs and foreign tokens, requires a registered operator token, and requires a trusted password session of enrolled staff for staff actions. |
-| Private-data gate | `public.harness_recovery_probe()` | 1.2's trusted password session **and** no security hold, no unresolved/uncertain op and no unreviewed binding change. (1.2's `harness_private_probe` is the session half only; where the two differ below, the recovery gate is the full predicate.) |
+- **Generation** (`harness.rc_account.generation`). It advances on:
+  - grant issue;
+  - security hold;
+  - relink;
+  - reconcile;
+  - every credential or binding change detected by the triggers.
 
-Function versions: v1 for steps `10`–`75`; v2 (adds `observe`) for `79`–`199`; v3 for `200`+. Hosted SQL: migrations `auth_harness_005` (fence), `006` (observe), `007` (DB-verified revocation). The committed files `sql/002_recovery_fence.sql` + `003_recovery_observe.sql` reproduce the hosted definitions exactly: every function and trigger `md5` at step `300` (hosted) equals step `301` (the committed files applied to a local Postgres 17.11 container).
+  A grant is valid only at the exact generation and link revision it was bound to.
+- **Trusted detection.** Triggers run inside GoTrue's own transaction:
+  - `auth.users`: password, email or phone change, and user delete;
+  - `auth.identities`: insert or delete;
+  - `auth.mfa_factors`: insert, delete, or a change to `status` or `secret`.
 
-## Results by required run
+  A binding change (email, phone, identity, MFA, delete) sets `binding_review_required`; delete also sets a hold. A change with no op in flight, on an account whose op is uncertain or was reconciled less than an hour ago, re-opens that op and sets reconcile-required and a hold.
+- **Requests.**
+  - The member device sends the digest of a secret it generated, plus the login it claims.
+  - Staff can bind a request only to the account whose **approved** login matches.
+  - A request is single-use, expires after 30 minutes, and is rate limited.
+- **Grants and redemption.** Redemption checks against the approved login, never the live Auth email. A hold or a pending binding review refuses both issue and redemption.
+- **One unresolved op per account**, enforced by a partial unique index. The account stays blocked until the op is done, or until staff expire it (stuck) or reconcile it.
+- **Dispatch** is fenced by generation and records `sessions_at_dispatch`.
+- **Completion.**
+  - `succeeded` needs all of: Auth reported the apply; exactly one password-only change since dispatch; zero live sessions created before dispatch.
+  - `failed` needs a definitive 4xx **and** zero changes.
+  - Anything else, including a malformed outcome, is `uncertain`.
+  - A late completion, or one on an already finished op, is appended to `late_outcomes` and changes nothing.
+- **Reconcile** applies to an `uncertain` op only. It is refused while any session created before dispatch is live. Staff can force it with `force_revoke`: an Auth Admin set of an undisclosed random password, which logs out every session. Reconcile clears `reconcile_required` (**not** the security hold) and sets a trust epoch: only sessions created after it pass the gate.
+- **Gate** (`harness_recovery_probe`): all of
+  - 1.2's trusted password session;
+  - the session was created at or after the trust epoch;
+  - no hold;
+  - no unresolved op;
+  - no pending binding review.
+- **Caller authentication.**
+  - Platform `verify_jwt` checks the signature.
+  - The function refuses any other project ref, URL or issuer.
+  - Every call needs the operator token, checked by digest.
+  - Staff actions need a trusted password session of an account enrolled **out of band** by SQL (step `15`). The operator token cannot create staff (step `11`).
+
+## Results
 
 | Run | Result | Steps |
 |---|---|---|
-| Happy path | Member-held secret, staff output has no secret (`staff_output_contains_secret:false`); op `succeeded`; both older sessions dead (probe `session_live:false`, refresh `refresh_token_not_found`); old password `invalid_credentials`; fresh password login passes the gate; generation advanced by the trigger in the op's dispatch window. Re-run on v3 with DB-verified revocation: `pre_dispatch_sessions_live: 0`. | `30`–`38`; `240`–`248`; DB `299` (ma events 7–10; mc events 96–99) |
-| Unused grant + direct password change | Member B changes password natively (`PUT /user`, 200); trigger advanced generation 2→3 and superseded the unused grant; redemption rejected (`grant_superseded`). | `50`–`54`; DB `299` (mb events 15–16) |
-| Superseded grants | Reissue supersedes the older grant; older redemption rejected. | `60`–`64`; DB (mb events 17–21) |
-| Replay / expiry | Consumed grant replay rejected (`grant_consumed`); 1 s grant rejected after expiry and marked `expired`. | `39`, `70`–`72`; DB (ma 11, mc 27) |
-| Cross-member | A grant for member B presented with member C's identifier is rejected **and burned**; the owner's retry then fails (`grant_burned`). Staff binding member B to account C is refused (`link_mismatch`). | `65`–`68`; DB (mb 22–23, mc 24) |
-| Relink blocked by unresolved work | Relink refused while an op is pending (`94`), while uncertain (`125`) and after the race (`236`); new grant refused while in flight/uncertain (`105`, `127`). After `reconcile`, relink succeeds (link revision 2, generation +1) and the grant issued before it is dead (`131`, `grant_superseded`). | `94`, `105`, `125`–`131`, `236`; DB (ma 65–71, md 47, 54, 120) |
-| Concurrent resets | 6 (v2) and 8 (v3) parallel redemptions of one grant: exactly one `succeeded`, all others `grant_rejected`; DB shows one op and `grant_consumed` rejections. | `83`, `222`; DB (mc 35–43, 102–112) |
-| Pending op + native change | Op begun, member changes password natively, then resume: dispatch fenced → `obsolete` with **no Auth call**; account released. | `93`–`97`; DB (md 46–49) |
-| Native change racing a dispatched op | Native change lands between dispatch and the Admin call: two credential changes in the window → `uncertain`, access held, relink blocked until reconcile. | `233`–`238`; DB (md 116–121) |
-| Injected transport uncertainty (lost response) | Auth applied, caller got 504 `unknown`; op `uncertain`; a fresh password session is still **denied** by the gate (`reconcile_required`) until staff reconcile. | `122`–`128`, `132`; DB (ma 61–67) |
-| Late external outcome | Caller times out first (op `uncertain`), Auth applies afterwards: trigger advances generation; the late completion and a replayed one are recorded as `late_outcome_recorded`, never applied; access held until reconcile. | `143`–`147`, `200`–`202`; DB (mb 74–79, 86) |
-| Stale completion | Replaying the completion of a succeeded op is rejected (`stale`). | `40`; DB (ma 12) |
-| Holds stay effective | Hold applied while an op is in flight (`in_flight:true`); the reset succeeds; fresh password session is denied (`security_hold:true`) until staff release. | `102`–`110`; DB (md 52–58) |
-| Definitive Auth failure | Weak password: Admin 422 `weak_password` → op `failed`, no credential change, account released. | `75`; DB (mc 30–32) |
-| Caller authentication | No JWT 401; no operator token 401; staff action with anon key 403; staff action by a non-staff member's trusted session 403; member action with a user session 403; other project ref/URL 400 `wrong_project`. All before any Auth Admin call. | `20`–`26` |
-| No secret in output or logs | Evidence scan clean (CI). Platform logs for the run window (auth, audit, edge, function, Postgres, PostgREST, pgbouncer): **0** password-, grant-, operator-token-, JWT- or secret-key-shaped values; the function itself logs nothing but boot/shutdown. | `302` |
+| Happy path with real pre-dispatch sessions | 3 live sessions at dispatch → op `succeeded` with `pre_dispatch_sessions_live: 0`. Old session dead (probe and refresh fail), old password `invalid_credentials`, fresh login passes the gate. Revocation is done by the Auth Admin password update itself. | `40`–`50`; DB `299` (ma op 1) |
+| Unused grant + direct password change | The native change advanced the generation and superseded the grant; redemption is rejected. | `55`–`59` |
+| Superseded grant | Reissue supersedes the older grant. | `60`–`64` |
+| Replay / expiry | A consumed grant is rejected; a 1 s grant is rejected after expiry. | `51`, `72`–`74` |
+| Cross-member | A grant used with another member's login is rejected and burned (the owner's retry also fails). A request claiming member B is refused for account C (`request_for_other_account`), and B's link is refused for account C (`link_mismatch`). The request binds once to B; a second bind is refused (`request_not_open`). | `65`–`71` |
+| Definitive Auth failure | Weak password with no change in the window → `failed`. | `77` |
+| Admin 4xx **with** a change in the window | Admin `weak_password` plus a concurrent native change → `uncertain`, not `failed`. Reconcile is refused (pre-dispatch session live) until `force_revoke`; the old session is then dead. | `118`–`121`; DB (md op 3) |
+| Holds | A hold supersedes the issued grant; redemption and new issue are refused while held; the gate is denied; issue works after release. | `80`–`89` |
+| Concurrent resets | 8 parallel redemptions: exactly one `succeeded`, 7 `grant_rejected`; old session dead. | `93`, `94` |
+| Pending op + native change | Dispatch is fenced → `obsolete`, no Auth call. Relink is refused while the op is pending. | `100`–`106` |
+| Native change racing a dispatched op | Two changes in the window → `uncertain`; relink is blocked until reconcile. | `112`–`114`; DB (md op 2, `changes_since_dispatch: 2`) |
+| Lost response | Caller gets 504 `unknown`; op `uncertain`. A fresh login with the applied password is denied (`reconcile_required`); relink and issue are blocked. After reconcile, a session from before the reconcile is denied (`session_after_trust_epoch:false`) and a fresh login is allowed. A grant issued before a relink dies. | `130`–`144` |
+| Late outcome while uncertain | The late completion is recorded (`late_outcome_recorded`). Replay of an unfinished op is refused (`not_finished`). | `152`–`154` |
+| Late outcome **after** reconcile | Staff reconcile before Auth applies; Auth applies 8 s later. The trigger re-opens the op as uncertain and holds the account (`late_change_reopened_op`), and the gate denies. A second reconcile (forced) leaves the hold in place. | `160`–`167`; DB (mh) |
+| Stuck ops | Pending: `expire_stuck` is refused before 30 s, then the op is abandoned (`obsolete`). Dispatched with a crashed worker: the gate is denied while in flight; after 30 s the op is timed out to `uncertain`; reconcile is refused (session live) until `force_revoke`. | `170`–`183` |
+| Stale completion | Replaying a finished op's **recorded** outcome is rejected (`stale`) and appended to `late_outcomes`. | `52` |
+| Binding: native email change | Both links confirmed → trigger sets binding review. The gate is denied; the old grant is rejected; issue is refused; staff relink approves the new login; then issue and redeem with the new login succeed. | `200`–`212` |
+| Binding: native MFA (TOTP) enrolment | Binding review: the gate is denied and issue is refused until staff relink. | `190`–`196` |
+| Binding: user deleted (Auth Admin) | Delete and identity-delete events; the account is held and in binding review. | `197`; DB (mg) |
+| Caller authentication | See the table below. | `11`, `14`, `20`–`32`, `39` |
+| No secret in output or logs | The evidence scan is clean. Platform logs for the run window show 0 matches for each value type in the message **and** all metadata attributes (URL, path, headers, JWT fields), including URL-encoded forms. The `x-harness-operator` header was never logged. | `303` |
+
+### Caller authentication
+
+| Case | Expected | Observed |
+|---|---|---|
+| No `Authorization` (publishable `apikey` only) | refused | 401 from the **function** (`foreign_or_unsupported_token`): the platform let it through, so the function's own check is what refuses it (`21`) |
+| Unsigned JWT claiming this project / another project | 401 | 401 `UNAUTHORIZED_LEGACY_JWT` from the platform (`22`, `23`). No genuinely signed token from another project was used. |
+| No operator token | 401 | 401 `operator_required` (`24`) |
+| Staff action with anon key / by member session / before staff enrolment | 403 | 403 (`25`, `26`, `14`) |
+| Member action with a user session | 403 | 403 `requires_anon` (`27`) |
+| Other project ref or URL in body | refused | **400** `wrong_project` (`28`, `29`), by design: the body is invalid for this project |
+| Bad tag / unknown action | 400 | 400 `validation_failed` (`30`, `31`; a bad tag no longer returns 500) |
+| Operator token tries to create staff | 403 | 403 `staff_enrolment_out_of_band` (`11`) |
+
+Step `39` covers the window of steps `21`–`32`: **0 Auth Admin requests**. The platform's function edge log holds only 9 of those 12 function requests, so the logs are incomplete; the 0 is the count of logged Admin requests.
 
 ## Findings
 
-1. **Auth Admin password update revokes every session on v2.197.0.** `adminUserUpdate` calls `UpdatePassword(tx, nil)`, which runs `Logout` for the user in the same transaction. Step `153`/`154` (function v2 skipped its own extra revocation) still found the old session dead. The original plan assumed the opposite; v3 dropped the self-reported revocation, and the completion fence now verifies it in the database (`pre_dispatch_sessions_live: 0`, steps `214`, `244`, `222`).
-2. **Trusted detection works at the database boundary.** Every native and Admin credential change of an enrolled account produced exactly one `native_credential_change` event inside GoTrue's transaction (DB `299`). The detection cannot tell an Admin apply from a native change, so attribution is by count in the dispatch window; ambiguity is `uncertain` (step `233`).
-3. **Reconciliation is a manual staff decision in this harness.** It clears the hold flag and advances the generation, but it does not itself re-verify Auth state. The identity epic must define what staff check (for example, live sessions and the credential change events) before reconciling.
-4. **The 1.2 session probe alone is not the private-data gate.** Fresh password sessions during an uncertain op pass `harness_private_probe` but fail the recovery gate (steps `124`, `146`, `235`). Identity must use the full predicate.
-5. **Advisors** (post-run): `rls_enabled_no_policy` for the `harness.rc_*` tables (intended: no client access at all) and `authenticated_security_definer_function_executable` for `harness_recovery_probe` and 1.2's `harness_whoami` (intended: own-session facts only). `auth_leaked_password_protection` is disabled (dashboard setting, Pro plan).
+1. **Auth Admin password update revokes every session (v2.197.0).** `adminUserUpdate` runs `UpdatePassword(tx, nil)`, which logs out all of the user's sessions. The completion fence does not rely on this: it verifies it (`sessions_at_dispatch` > 0, then `pre_dispatch_sessions_live: 0`). An amendment to the frozen block is with the owner.
+2. **Detection is count-based.** An Admin apply and a native change look the same, so any ambiguity is `uncertain` (`112`, `118`).
+3. **Reconcile is still a staff decision.** The DB enforces revoked pre-dispatch sessions (or a forced revoke) and a new trust epoch. Identity must define what staff check before reconciling.
+4. **The 1.2 session probe alone is not the gate.** Several sessions pass `harness_private_probe` but fail the recovery gate (e.g. `134`, `139`, `165`, `179`).
+5. **Platform behaviour.** `verify_jwt` let through a request with only the publishable `apikey` (`21`). The function's own caller check refused it.
+6. **Advisors** (after the earlier run; unchanged in kind):
+   - `rls_enabled_no_policy` on the `harness.rc_*` tables (intended: no client access);
+   - `authenticated_security_definer_function_executable` for `harness_recovery_probe` and `harness_whoami` (own-session facts only);
+   - leaked-password protection is off (dashboard setting).
 
-## Harness notes (not observations)
+## Not run (owner-gated or out of scope)
 
-- In phase 1, the evidence key `grant` held the grant *label* and was redacted by the over-broad secret key list; from step `81` the key is `grant_label`. Step names identify the grant.
-- Steps `210`/`211` failed with `invalid_credentials` because the local state still held the pre-`gc4-op` password (that op applied a candidate password and stayed uncertain). The happy path was re-run as `240`–`248`.
-
-## Not run here (owner-gated or out of scope)
-
-- **Phone-specific rows** (phone binding change detection, phone-only reset identifier): need 1.2's owner step to enable the Phone provider. The trigger already watches `phone` and sets `binding_review_required`; the live check waits for that step.
-- **Native email change detection:** with Secure email change on, a live run costs two Supabase emails plus both confirmations against the ~2/hour sender limit. The trigger watches `email` the same way; run it with the phone rows.
-- Real-member data, production SMTP and any SMS configuration: never in scope.
+- **Phone.** The phone binding change and phone-only reset identifier wait for 1.2's Phone-provider owner step. The `auth.users.phone` trigger branch was exercised only in the local container.
+- **Identity link/unlink by a user.** Needs OAuth or phone. Only Auth Admin delete produced identity events live (`197`); the insert path was exercised in the local container.
+- **Real-member data, production SMTP, SMS:** never in scope.

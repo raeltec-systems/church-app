@@ -20,6 +20,8 @@ patterns=(
   # Story 1.3 member-held grant secrets and harness operator tokens
   'hg_[A-Za-z0-9_-]{20,}'
   'ho_[A-Za-z0-9_-]{20,}'
+  # Undisclosed random password set by force-revoke reconciliation
+  'Rv![A-Za-z0-9]{16,}'
   # Token values in URLs/fragments that are not redacted
   '[?&#](access_token|refresh_token|token|token_hash|code|provider_token)=(?!\[redacted\])[^&#\s"]+'
   # GoTrue email-link tokens (56 hex) and token hashes
@@ -30,7 +32,7 @@ patterns=(
 
 fail=0
 for p in "${patterns[@]}"; do
-  if grep -rPn --exclude=scan-evidence.sh --exclude='*.test.mjs' --exclude='*.sql' -- "$p" "${paths[@]}"; then
+  if grep -rPn --exclude=scan-evidence.sh --exclude='*.test.mjs' --exclude='*.sql' --exclude-dir=scenarios -- "$p" "${paths[@]}"; then
     echo "scan-evidence: forbidden pattern found: $p" >&2
     fail=1
   fi

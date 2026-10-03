@@ -5,7 +5,8 @@
 -- creates or replaces objects and never drops anything. Applied through the
 -- Supabase MCP as migration auth_harness_005_recovery_fence; the completion
 -- and replay functions were then replaced by auth_harness_007_db_verified_revocation.
--- This file is the idempotent sum (see the story 1.3 plan).
+-- 004_review_fixes.sql (auth_harness_008) supersedes several functions here;
+-- apply 001-004 in order to reproduce the hosted definitions.
 --
 -- What it proves (harness-scoped model of the Identity-owned mechanism):
 --   * rc_account.generation is the recovery/credential generation. Every

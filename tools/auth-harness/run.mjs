@@ -451,10 +451,13 @@ async function main() {
           'verify-otp <label> --phone [--type --token] | probe <label> | refresh <label> [--as <label>] | ' +
           'set-email <label> --email [--redirect] | set-password <label> --account <a> | logout <label> [--scope] | ' +
           'sessions | attach --source sql/<file> (raw JSON on stdin) | note <text> | ' +
-          'rc-operator-token | rc-provision <a> --tag --role | rc-request <g> | rc-issue <g> --staff <s> --account <a> ' +
+          'rc-operator-token | rc-version | rc-provision <a> --tag --role member|none | rc-request <g> --account <a> | ' +
+          'rc-issue <g> --staff <s> --account <a> ' +
           '[--member-of <a2>] [--ttl] | rc-redeem <g> --account <a> [--login-as <a2>] [--inject] [--parallel n] [--weak] [--op <o>] | ' +
           'rc-resume <g> --op <o> --account <a> | rc-relink --staff <s> --account <a> | rc-hold --staff <s> --account <a> [--off] | ' +
-          'rc-reconcile|rc-replay --staff <s> --op <o> | rc-probe <session> | rc-call --action <x> [--as] [--no-operator] [--body]',
+          'rc-reconcile [--force]|rc-replay|rc-expire --staff <s> --op <o> | rc-delete-user --staff <s> --account <a> | ' +
+          'rc-mfa-enroll <session> | rc-observe --staff <s> [--prefix] | rc-probe <session> | ' +
+          'rc-call --action <x> [--as anon|none|forged-own|forged-foreign|session:<l>] [--no-operator] [--body]',
       );
       process.exitCode = 2;
   }

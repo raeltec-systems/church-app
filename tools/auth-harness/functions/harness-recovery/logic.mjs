@@ -70,9 +70,16 @@ export function classifyCaller(claims) {
 }
 
 export const MEMBER_ACTIONS = new Set(['request', 'redeem', 'resume']);
-export const STAFF_ACTIONS = new Set(['issue', 'relink', 'hold', 'reconcile', 'replay_complete', 'observe']);
-export const OPERATOR_ACTIONS = new Set(['provision']);
-export const INJECTIONS = new Set(['stop_after_begin', 'lost_response', 'late_apply', 'delay_apply']);
+export const STAFF_ACTIONS = new Set([
+  'issue', 'relink', 'hold', 'reconcile', 'replay_complete', 'observe', 'expire_stuck', 'instrument_delete_user',
+]);
+export const OPERATOR_ACTIONS = new Set(['provision', 'version']);
+export const INJECTIONS = new Set([
+  'stop_after_begin', 'crash_after_dispatch', 'delay_apply', 'lost_response', 'late_apply', 'late_apply_background',
+]);
+/** Roles the operator token may provision. Staff are enrolled out of band only. */
+export const PROVISION_ROLES = new Set(['member', 'none']);
+export const SYNTHETIC_EMAIL_RE = /^israelmuyoba\+bicauth-[a-z0-9][a-z0-9-]{0,23}@gmail\.com$/;
 
 /** Which caller kind each action requires. */
 export function requiredCaller(action) {
@@ -109,6 +116,20 @@ export function buildOutcome({ adminStatus, adminThrew, transport }) {
     applied,
     transport: adminThrew ? 'lost' : transport === 'lost' ? 'lost' : 'ok',
   };
+}
+
+/**
+ * fetch with a hard timeout. A timed-out call rejects (AbortError), which the
+ * caller reports as transport 'lost', i.e. an uncertain outcome.
+ */
+export async function fetchWithTimeout(fetchImpl, url, init, ms) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms);
+  try {
+    return await fetchImpl(url, { ...init, signal: ctl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Keep only an Auth error's code: never its body, which may echo input. */

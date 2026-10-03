@@ -50,8 +50,16 @@ export async function rcCommand(command, { pos, opt, step, client, state, saveSt
   const bearerFor = (spec) => {
     if (!spec || spec === 'anon') return anonJwt();
     if (spec === 'none') return undefined;
+    if (spec === 'forged-own' || spec === 'forged-foreign') {
+      // A JWT that is NOT signed by this project: claims for this project
+      // (forged-own) or for another project/issuer (forged-foreign), random
+      // signature. The gateway's verify_jwt must reject both.
+      const b = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+      const ref = spec === 'forged-own' ? OWN_REF : 'tmurpotfluignacfueki';
+      return `${b({ alg: 'HS256', typ: 'JWT' })}.${b({ iss: 'supabase', ref, role: 'anon', iat: 1, exp: 4102444800 })}.${randomBytes(32).toString('base64url')}`;
+    }
     if (spec.startsWith('session:')) return need(state.sessions, spec.slice(8), 'session').access_token;
-    throw new Error('--as must be anon | none | session:<label>');
+    throw new Error('--as must be anon | none | forged-own | forged-foreign | session:<label>');
   };
   const fn = async (body, { as = 'anon', withOperator = true } = {}) =>
     client.fn(FN, body, { bearer: bearerFor(as), operator: withOperator ? operator() : undefined });
@@ -67,12 +75,18 @@ export async function rcCommand(command, { pos, opt, step, client, state, saveSt
       return;
     }
 
+    case 'rc-version': {
+      const r = await fn({ action: 'version' });
+      out({ status: r.status, response: r.json });
+      return;
+    }
+
     case 'rc-provision': {
       const [account] = pos;
-      const role = opt.role === 'staff' ? 'staff' : 'member';
+      const role = ['staff', 'none'].includes(opt.role) ? opt.role : 'member';
       const password = newMemberPassword();
       const r = await fn({ action: 'provision', tag: String(opt.tag), role, password });
-      if (r.status === 200) {
+      if (r.status === 200 && role !== 'staff') {
         state.passwords[account] = password;
         rc.accounts[account] = {
           role,
@@ -89,12 +103,15 @@ export async function rcCommand(command, { pos, opt, step, client, state, saveSt
 
     case 'rc-request': {
       // Member device: generate the secret locally, send only its digest.
+      // The member also states which login they are recovering; staff can
+      // bind the request only to the account whose approved login matches.
       const [grant] = pos;
+      const claim = need(rc.accounts, String(opt.account), 'account');
       const secret = newSecret('hg_');
-      const r = await fn({ action: 'request', grant_digest: sha256Hex(secret) });
+      const r = await fn({ action: 'request', grant_digest: sha256Hex(secret), claimed_login: claim.email });
       if (r.status === 200) rc.grants[grant] = { secret, request_ref: r.json.request_ref };
       saveState(state);
-      out({ grant_label: grant, status: r.status, response: r.json, sent: 'digest_only' });
+      out({ grant_label: grant, claimed_account: opt.account, status: r.status, response: r.json, sent: 'digest_and_claimed_login' });
       return;
     }
 
@@ -191,6 +208,8 @@ export async function rcCommand(command, { pos, opt, step, client, state, saveSt
       if (r.status === 200) {
         acct.link_revision = r.json.link_revision;
         acct.member_id = r.json.member_id;
+        // The approved login is now the account's current Auth email.
+        if (opt['new-tag']) acct.email = `israelmuyoba+bicauth-${opt['new-tag']}@gmail.com`;
       }
       saveState(state);
       out({ account: opt.account, staff_session: opt.staff, status: r.status, response: r.json });
@@ -205,12 +224,37 @@ export async function rcCommand(command, { pos, opt, step, client, state, saveSt
     }
 
     case 'rc-reconcile':
-    case 'rc-replay': {
+    case 'rc-replay':
+    case 'rc-expire': {
       const op = need(rc.ops, String(opt.op), 'op');
-      const action = command === 'rc-reconcile' ? 'reconcile' : 'replay_complete';
-      const r = await fn({ action, op_id: op.op_id, note: opt.note ? String(opt.note) : undefined },
-        { as: `session:${opt.staff}` });
-      out({ op: opt.op, account: op.account, action, status: r.status, response: r.json });
+      const action = { 'rc-reconcile': 'reconcile', 'rc-replay': 'replay_complete', 'rc-expire': 'expire_stuck' }[command];
+      const body = { action, op_id: op.op_id, note: opt.note ? String(opt.note) : undefined };
+      if (command === 'rc-reconcile' && opt.force) {
+        body.force_revoke = true;
+        body.auth_user_id = need(rc.accounts, op.account, 'account').auth_user_id;
+      }
+      const r = await fn(body, { as: `session:${opt.staff}` });
+      out({ op: opt.op, account: op.account, action, force_revoke: Boolean(opt.force), status: r.status, response: r.json });
+      return;
+    }
+
+    case 'rc-delete-user': {
+      const acct = need(rc.accounts, String(opt.account), 'account');
+      const r = await fn({ action: 'instrument_delete_user', auth_user_id: acct.auth_user_id }, { as: `session:${opt.staff}` });
+      out({ account: opt.account, status: r.status, response: r.json });
+      return;
+    }
+
+    case 'rc-mfa-enroll': {
+      // Native TOTP factor enrolment from the member's own session (no SMS).
+      // The response carries the TOTP secret/QR: only status and id are kept.
+      const [label] = pos;
+      const s = need(state.sessions, label, 'session');
+      const r = await client.call('/auth/v1/factors', {
+        method: 'POST', bearer: s.access_token, body: { factor_type: 'totp', friendly_name: `harness-${label}` },
+      });
+      out({ label, status: r.status, factor_id: r.json?.id ?? null, factor_type: r.json?.type ?? null,
+        error: r.status === 200 ? undefined : { error_code: r.json?.error_code, msg: r.json?.msg } });
       return;
     }
 
@@ -239,7 +283,9 @@ export async function rcCommand(command, { pos, opt, step, client, state, saveSt
       if (opt.action) body.action = String(opt.action);
       if (opt['grant-of']) body.grant = need(rc.grants, String(opt['grant-of']), 'grant').secret;
       const r = await fn(body, { as: opt.as ? String(opt.as) : 'anon', withOperator: !opt['no-operator'] });
-      out({ as: opt.as || 'anon', operator_sent: !opt['no-operator'], body, status: r.status, response: r.json });
+      const recorded = { ...body };
+      for (const k of ['login_email', 'claimed_login']) if (recorded[k]) recorded[k] = maskIdentifier(recorded[k]);
+      out({ as: opt.as || 'anon', operator_sent: !opt['no-operator'], body: recorded, status: r.status, response: r.json });
       return;
     }
 

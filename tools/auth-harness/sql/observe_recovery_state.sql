@@ -7,10 +7,10 @@
 -- replacing :tag_prefix and :since, then pipe the raw JSON into
 -- `run.mjs attach --source sql/observe_recovery_state.sql`.
 with acct as (
-  select a.*, u.email
+  select a.*, coalesce(u.email, a.approved_email) as email, u.id is null as auth_user_deleted
   from harness.rc_account a
-  join auth.users u on u.id = a.auth_user_id
-  where u.email like 'israelmuyoba+bicauth-' || ':tag_prefix' || '%@gmail.com'
+  left join auth.users u on u.id = a.auth_user_id
+  where coalesce(u.email, a.approved_email) like 'israelmuyoba+bicauth-' || ':tag_prefix' || '%@gmail.com'
 
 )
 select jsonb_build_object(
@@ -25,6 +25,10 @@ select jsonb_build_object(
       'security_hold', a.security_hold,
       'reconcile_required', a.reconcile_required,
       'binding_review_required', a.binding_review_required,
+      'approved_login', regexp_replace(coalesce(a.approved_email, ''), '^[^+]*', '…'),
+      'approved_login_is_current', a.approved_email is not distinct from a.email,
+      'auth_user_deleted', a.auth_user_deleted,
+      'trusted_since', a.trusted_since,
       'in_flight_op', case when a.in_flight_op is null then null
                       else 'h:' || left(encode(sha256(a.in_flight_op::text::bytea), 'hex'), 10) end,
       'live_sessions', (select count(*) from auth.sessions s where s.user_id = a.auth_user_id
@@ -38,6 +42,7 @@ select jsonb_build_object(
       'ops', (select coalesce(jsonb_agg(jsonb_build_object(
           'op', 'h:' || left(encode(sha256(o.op_id::text::bytea), 'hex'), 10),
           'status', o.status, 'generation', o.generation, 'outcome', o.outcome,
+          'sessions_at_dispatch', o.sessions_at_dispatch,
           'late_outcomes', o.late_outcomes) order by o.created_at), '[]'::jsonb)
         from harness.rc_op o where o.auth_user_id = a.auth_user_id),
       'events', (select coalesce(jsonb_agg(jsonb_build_object(
@@ -51,6 +56,14 @@ select jsonb_build_object(
         from harness.rc_event e where e.auth_user_id = a.auth_user_id and e.at > ':since'::timestamptz)
     ) order by a.email)
     from acct a
+  ),
+  'requests', (
+    select jsonb_build_object(
+      'open', count(*) filter (where q.status = 'open' and q.expires_at > now()),
+      'bound', count(*) filter (where q.status = 'bound'),
+      'expired_unbound', count(*) filter (where q.status = 'open' and q.expires_at <= now()))
+    from harness.rc_request q
+    where q.created_at > ':since'::timestamptz
   ),
   'unbound_rejections', (
     select count(*) from harness.rc_event e

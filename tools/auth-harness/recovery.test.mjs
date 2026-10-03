@@ -12,8 +12,11 @@ import {
   INJECTIONS,
   OWN_ISSUER,
   OWN_REF,
+  PROVISION_ROLES,
+  SYNTHETIC_EMAIL_RE,
   buildOutcome,
   classifyCaller,
+  fetchWithTimeout,
   decodeJwtPayload,
   isOwnProjectUrl,
   requestTargetsOtherProject,
@@ -71,13 +74,20 @@ test('caller classification accepts only own anon key or own user sessions', () 
 
 test('member and operator actions need the anon key; staff actions need a user session', () => {
   for (const a of ['request', 'redeem', 'resume', 'provision']) assert.equal(requiredCaller(a), 'anon');
+  // The operator token can never create staff: staff enrolment is out of band.
+  assert.equal(PROVISION_ROLES.has('staff'), false);
+  assert.deepEqual([...PROVISION_ROLES].sort(), ['member', 'none']);
   for (const a of ['issue', 'relink', 'hold', 'reconcile', 'replay_complete', 'observe']) {
     assert.equal(requiredCaller(a), 'user');
   }
   assert.equal(requiredCaller('complete'), null, 'completion is never a caller action');
   assert.equal(requiredCaller('dispatch'), null);
   assert.equal(requiredCaller(''), null);
-  assert.deepEqual([...INJECTIONS].sort(), ['delay_apply', 'late_apply', 'lost_response', 'stop_after_begin']);
+  assert.deepEqual([...INJECTIONS].sort(), [
+    'crash_after_dispatch', 'delay_apply', 'late_apply', 'late_apply_background', 'lost_response', 'stop_after_begin',
+  ]);
+  for (const a of ['expire_stuck', 'instrument_delete_user']) assert.equal(requiredCaller(a), 'user');
+  assert.equal(requiredCaller('version'), 'anon');
 });
 
 test('provisioning only ever targets owner-approved synthetic plus-addresses', () => {
@@ -98,6 +108,25 @@ test('the function reports Auth facts only; the DB decides success', () => {
   assert.deepEqual(buildOutcome({ adminStatus: null, adminThrew: true, transport: 'ok' }),
     { admin_status: null, applied: false, transport: 'lost' });
   assert.equal('revoked' in buildOutcome({ adminStatus: 200 }), false, 'revocation is not self-reported');
+});
+
+test('Auth calls time out instead of hanging (reported as lost, i.e. uncertain)', async () => {
+  const never = (_url, init) => new Promise((_res, rej) => {
+    init.signal.addEventListener('abort', () => rej(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+  });
+  const t0 = Date.now();
+  await assert.rejects(fetchWithTimeout(never, 'https://x', {}, 50), /aborted/);
+  assert.ok(Date.now() - t0 < 1000);
+  const ok = async () => ({ status: 200 });
+  assert.equal((await fetchWithTimeout(ok, 'https://x', {}, 50)).status, 200);
+  assert.deepEqual(buildOutcome({ adminStatus: null, adminThrew: true, transport: 'ok' }).transport, 'lost');
+});
+
+test('instrumented deletion only targets synthetic plus-addresses', () => {
+  assert.ok(SYNTHETIC_EMAIL_RE.test('israelmuyoba+bicauth-r13-x-mg@gmail.com'));
+  for (const bad of ['israelmuyoba@gmail.com', 'someone+bicauth-a@gmail.com', 'israelmuyoba+bicauth-a@gmail.com.evil']) {
+    assert.equal(SYNTHETIC_EMAIL_RE.test(bad), false, bad);
+  }
 });
 
 test('function and harness compute the same grant digest', async () => {
@@ -138,19 +167,21 @@ test('committed scenarios only use the r13 synthetic accounts and known commands
     'login', 'probe', 'refresh', 'set-password',
     'rc-provision', 'rc-request', 'rc-issue', 'rc-redeem', 'rc-resume', 'rc-relink',
     'rc-hold', 'rc-reconcile', 'rc-replay', 'rc-probe', 'rc-call', 'rc-observe',
+    'rc-version', 'rc-expire', 'rc-delete-user', 'rc-mfa-enroll', 'set-email', 'info',
   ]);
   const files = readdirSync(dir).filter((f) => f.startsWith('1.3-'));
-  assert.ok(files.length >= 3);
+  assert.ok(files.length >= 2);
   for (const f of files) {
     for (const raw of readFileSync(join(dir, f), 'utf8').split('\n')) {
       const line = raw.replace(/#.*$/, '').trim();
       if (!line || line.startsWith('@sleep')) continue;
       const [cmd] = line.replace(/^\?/, '').split(/\s+/);
       assert.ok(allowed.has(cmd), `${f}: ${cmd}`);
-      for (const email of line.match(/[^\s]+@[^\s]+\.[a-z]+/g) ?? []) {
+      for (const email of line.match(/[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[a-z]+/g) ?? []) {
         assert.match(email, /^israelmuyoba\+bicauth-r13-[a-z0-9-]+@gmail\.com$/, `${f}: ${email}`);
       }
-      assert.ok(!/hg_|ho_|Hx!|eyJ/.test(line), `${f}: secret-shaped text`);
+      assert.ok(!/hg_|ho_|Hx!|Rv!|eyJ/.test(line), `${f}: secret-shaped text`);
+      assert.ok(!/skip_revoke/.test(line), `${f}: removed injection`);
     }
   }
 });

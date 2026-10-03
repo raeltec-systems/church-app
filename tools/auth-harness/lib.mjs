@@ -32,6 +32,10 @@ const SECRET_KEYS = new Set([
   'operator',
   'operator_token',
   'x-harness-operator',
+  // MFA enrolment responses (TOTP secret / QR / otpauth URI)
+  'secret',
+  'qr_code',
+  'uri',
 ]);
 
 const JWT_RE = /eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;

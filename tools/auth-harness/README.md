@@ -114,37 +114,57 @@ Evidence lands in `evidence-1.3/` (set `HARNESS_EVIDENCE` to its
 
 ### Hosted pieces (auth-test project only)
 
-- `sql/002_recovery_fence.sql` (migrations `auth_harness_005` and `007`):
-  `harness.rc_*` tables (RLS on, no client grants), the `auth.users` trigger
-  that advances the recovery generation on any password/email/phone change
-  inside GoTrue's transaction, and service-only `harness_rc_*` RPCs for
-  request, issue, begin, dispatch, complete, relink, hold and reconcile.
-  `public.harness_recovery_probe()` is the full private-data gate.
-- `sql/003_recovery_observe.sql` (migration `006`): `harness_rc_observe()`,
-  exactly `sql/observe_recovery_state.sql`, so database state is recorded raw.
-- `functions/harness-recovery/` (Edge Function, `verify_jwt` on): the only
-  holder of the service key, read from the platform environment. Deploy it
-  with the Supabase MCP `deploy_edge_function` (files `index.ts` and
-  `logic.mjs`). It refuses any other project, URL or token issuer, requires
-  the operator token and, for staff actions, a trusted password session of an
-  enrolled staff account. Fault injection (`stop_after_begin`, `delay_apply`,
-  `lost_response`, `late_apply`) exists for the adversarial runs only.
+- `sql/002_recovery_fence.sql`, `003_recovery_observe.sql`,
+  `004_review_fixes.sql` (migrations `auth_harness_005`-`008`; together with
+  `001` they are the exact hosted definitions):
+  - `harness.rc_*` tables, with RLS on and no client grants;
+  - triggers on `auth.users`, `auth.identities` and `auth.mfa_factors` that
+    advance the recovery generation inside GoTrue's transaction;
+  - service-only `harness_rc_*` RPCs;
+  - `public.harness_recovery_probe()`, the full private-data gate.
+- `functions/harness-recovery/` is the Edge Function (`verify_jwt` on).
+  - Deploy it with the Supabase MCP `deploy_edge_function`, sending files
+    `index.ts` and `logic.mjs`.
+  - It is the only holder of the service key, which it reads from the
+    platform environment.
+  - It refuses any other project, URL or token issuer, and requires the
+    operator token.
+  - Staff actions also need a trusted password session of an account
+    enrolled out of band (`sql/enroll_staff.sql`). The operator token cannot
+    create staff.
+  - Fault injection exists for the adversarial runs only:
+    `stop_after_begin`, `crash_after_dispatch`, `delay_apply`,
+    `lost_response`, `late_apply`, `late_apply_background`.
 
-### Running
+### Running (the sequence recorded in evidence-1.3)
 
 ```sh
 eval "$($H init)"
-export SUPABASE_ANON_JWT=<legacy anon key>   # the function gateway needs a JWT
-$H rc-operator-token                          # prints the digest only
-# register the digest with sql/register_operator_token.sql (Supabase MCP)
-$H rc-provision staff --tag r13-staff --role staff
-node tools/auth-harness/run-script.mjs tools/auth-harness/scenarios/1.3-phase1-grants.txt
-node tools/auth-harness/run-script.mjs tools/auth-harness/scenarios/1.3-phase2-fences.txt
-node tools/auth-harness/run-script.mjs tools/auth-harness/scenarios/1.3-phase3-db-verified.txt
+export SUPABASE_ANON_JWT=<legacy anon key>    # the function gateway needs a JWT
+$H rc-operator-token                           # prints the digest only
+# MCP: sql/register_operator_token.sql with that digest
+$H rc-version --step 01-function-version-start
+# MCP get_edge_function -> node edge-function-fingerprint.mjs -> attach (02);
+# MCP sql/observe_recovery_definitions.sql -> attach (03); same query on the
+# committed files in a local container -> attach (04)
+node run-script.mjs scenarios/1.3-a-setup.txt
+# MCP: sql/enroll_staff.sql for the staff account -> attach (15)
+node run-script.mjs scenarios/1.3-b-callers.txt
+# MCP query_logs: sql/observe_admin_calls.sql for the part-B window -> attach (39)
+node run-script.mjs scenarios/1.3-c-grants.txt
+node run-script.mjs scenarios/1.3-d-fences.txt
+$H login me-s1 --account me --email <me plus-address> --step 200-login-member-e
+node run-script.mjs scenarios/1.3-e-email-pre.txt   # sends 2 Auth emails
+$H verify-link me-email-new --step 203-... < link-to-new-address.txt
+$H verify-link me-email-cur --step 204-... < link-to-current-address.txt
+node run-script.mjs scenarios/1.3-f-email-post.txt
+# end: list_edge_functions (300); observe_recovery_definitions_digest.sql
+# hosted (301) and committed (302); observe_log_secret_scan.sql (303)
 $H cleanup
 ```
 
-Account tags must be new for each project run (Auth refuses an existing
-address). The member's grant secret (`hg_…`) and chosen password stay in the
-state dir; staff output carries only the grant id, generation and expiry.
-`rc-call` sends deliberately wrong callers; never put a secret in `--body`.
+Account tags must be new for each project run, because Auth refuses an
+existing address. The member's grant secret (`hg_…`) and chosen password stay
+in the state dir. Staff output carries only the grant id, generation and
+expiry. `rc-call` sends deliberately wrong callers; never put a real secret in
+`--body`.

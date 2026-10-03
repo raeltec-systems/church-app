@@ -11,21 +11,25 @@
 //   3. Harness operator token (x-harness-operator), checked by digest.
 //   4. Per action: member/operator actions use the anon key (the member has
 //      no session); staff actions need a live trusted password session
-//      (1.2 predicate) of an enrolled staff account.
+//      (1.2 predicate) of a staff account enrolled out of band.
 //
 // Nothing here logs request bodies. Responses never contain a password, a
-// grant secret, a digest or a token.
+// grant secret, a digest or a token. Server-side logs carry coarse codes only.
 
 import {
+  HEX64_RE,
   INJECTIONS,
   OWN_REF,
   OWN_URL,
+  PROVISION_ROLES,
+  SYNTHETIC_EMAIL_RE,
+  TAG_RE,
   UUID_RE,
-  HEX64_RE,
   authErrorCode,
   buildOutcome,
   classifyCaller,
   decodeJwtPayload,
+  fetchWithTimeout,
   isOwnProjectUrl,
   requestTargetsOtherProject,
   requiredCaller,
@@ -35,8 +39,11 @@ import {
 
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+const CALL_TIMEOUT_MS = 10_000;
+const LATE_APPLY_DELAY_MS = 8_000;
 
 type Json = Record<string, unknown>;
+declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
 
 function reply(status: number, body: Json): Response {
   return new Response(JSON.stringify(body), {
@@ -46,7 +53,7 @@ function reply(status: number, body: Json): Response {
 }
 
 async function call(path: string, init: { method?: string; bearer: string; apikey: string; body?: unknown }) {
-  const res = await fetch(OWN_URL + path, {
+  const res = await fetchWithTimeout(fetch, OWN_URL + path, {
     method: init.method ?? 'POST',
     headers: {
       apikey: init.apikey,
@@ -54,7 +61,7 @@ async function call(path: string, init: { method?: string; bearer: string; apike
       ...(init.body !== undefined ? { 'content-type': 'application/json' } : {}),
     },
     body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-  });
+  }, CALL_TIMEOUT_MS);
   const text = await res.text();
   let json: unknown = null;
   try {
@@ -65,9 +72,14 @@ async function call(path: string, init: { method?: string; bearer: string; apike
   return { status: res.status, json: json as Json | null };
 }
 
+class RpcError extends Error {}
+
 async function rpc(name: string, args: Json): Promise<Json> {
   const r = await call(`/rest/v1/rpc/${name}`, { bearer: SERVICE_KEY, apikey: SERVICE_KEY, body: args });
-  if (r.status !== 200 || r.json === null) throw new Error(`rpc_failed:${name}:${r.status}`);
+  if (r.status !== 200 || r.json === null) {
+    console.error(`harness-recovery rpc_failed ${name} ${r.status}`);
+    throw new RpcError('rpc_failed');
+  }
   return r.json;
 }
 
@@ -85,6 +97,9 @@ async function requireStaff(bearer: string): Promise<string | null> {
   return staff.status === 200 && staff.json === (true as unknown) ? uid : null;
 }
 
+// Auth Admin password set. On the observed Auth version this also logs out
+// every session of the account in the same Auth transaction; the database
+// verifies that independently before accepting success or reconciliation.
 async function applyPassword(uid: string, password: string) {
   try {
     const r = await call(`/auth/v1/admin/users/${uid}`, {
@@ -95,14 +110,24 @@ async function applyPassword(uid: string, password: string) {
     });
     return { adminStatus: r.status, adminThrew: false, errorCode: r.status === 200 ? null : authErrorCode(r.json) };
   } catch {
+    // Network error or CALL_TIMEOUT_MS elapsed: the outcome is unknown.
     return { adminStatus: null, adminThrew: true, errorCode: null };
   }
 }
 
-// begin -> fenced dispatch -> Auth Admin set -> fenced completion. Auth Admin
-// password update logs out every session of the account in the same Auth
-// transaction (observed Auth version); the completion fence verifies that in
-// the database rather than trusting this function's report.
+async function complete(opId: string, generation: number, outcome: Json): Promise<Json> {
+  try {
+    return await rpc('harness_rc_complete', { p_op: opId, p_generation: generation, p_outcome: outcome });
+  } catch {
+    // Completion could not be recorded: never leave the op dispatched.
+    await rpc('harness_rc_mark_uncertain', { p_op: opId, p_reason: 'completion_not_recorded' }).catch(() => null);
+    return { status: 'uncertain', access_held: true };
+  }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// begin -> fenced dispatch -> Auth Admin set -> fenced completion.
 async function runOp(op: Json, password: string, inject: string | undefined): Promise<Response> {
   const opId = op.op_id as string;
   const generation = op.generation as number;
@@ -111,27 +136,40 @@ async function runOp(op: Json, password: string, inject: string | undefined): Pr
   const d = await rpc('harness_rc_dispatch', { p_op: opId, p_generation: generation });
   if (d.ok !== true) return reply(409, { status: 'obsolete', op_id: opId, code: 'conflict' });
 
-  if (inject === 'late_apply') {
-    // The caller gives up waiting (timeout) BEFORE Auth answers; Auth then
-    // applies late and the real outcome arrives after the op is uncertain.
+  if (inject === 'crash_after_dispatch') {
+    // Harness-only: the worker dies after dispatch; nothing reaches Auth.
+    return reply(202, { status: 'dispatched', op_id: opId, injected: 'crash_after_dispatch' });
+  }
+
+  if (inject === 'late_apply' || inject === 'late_apply_background') {
+    // The caller gives up waiting (timeout) BEFORE Auth answers; Auth applies
+    // later and the real outcome arrives after the op is uncertain (and, in
+    // the background variant, possibly after staff reconciled it).
     await rpc('harness_rc_mark_uncertain', { p_op: opId, p_reason: 'injected_timeout' });
-    const a = await applyPassword(uid, password);
-    const late = await rpc('harness_rc_complete', {
-      p_op: opId,
-      p_generation: generation,
-      p_outcome: { ...buildOutcome({ ...a, transport: 'ok' }), late: true },
-    });
-    return reply(202, { status: 'uncertain', op_id: opId, late_completion: late, admin_error: a.errorCode });
+    const late = async () => {
+      if (inject === 'late_apply_background') await sleep(LATE_APPLY_DELAY_MS);
+      const a = await applyPassword(uid, password);
+      return {
+        admin_error: a.errorCode,
+        completion: await complete(opId, generation, { ...buildOutcome({ ...a, transport: 'ok' }), late: true }),
+      };
+    };
+    if (inject === 'late_apply_background' && typeof EdgeRuntime !== 'undefined') {
+      EdgeRuntime.waitUntil(late().catch(() => null));
+      return reply(202, { status: 'uncertain', op_id: opId, late_apply_in_ms: LATE_APPLY_DELAY_MS });
+    }
+    const r = await late();
+    return reply(202, { status: 'uncertain', op_id: opId, late_completion: r.completion, admin_error: r.admin_error });
   }
 
   if (inject === 'delay_apply') {
     // Harness-only: hold the dispatched op open so a concurrent native
     // credential change can land between dispatch and the Admin call.
-    await new Promise((r) => setTimeout(r, 4000));
+    await sleep(4000);
   }
   const a = await applyPassword(uid, password);
   const outcome = buildOutcome({ ...a, transport: inject === 'lost_response' ? 'lost' : 'ok' });
-  const c = await rpc('harness_rc_complete', { p_op: opId, p_generation: generation, p_outcome: outcome });
+  const c = await complete(opId, generation, outcome);
   if (inject === 'lost_response') {
     // The member's client never sees Auth's answer.
     return reply(504, { status: 'unknown', op_id: opId, code: 'unavailable', recorded: c.status });
@@ -146,6 +184,24 @@ async function runOp(op: Json, password: string, inject: string | undefined): Pr
 
 function str(v: unknown): string | null {
   return typeof v === 'string' && v.length > 0 && v.length <= 512 ? v : null;
+}
+
+function randomPassword(): string {
+  const b = new Uint8Array(32);
+  crypto.getRandomValues(b);
+  return 'Rv!' + btoa(String.fromCharCode(...b)).replace(/[+/=]/g, '');
+}
+
+async function sourceHashes(): Promise<Json> {
+  const out: Json = {};
+  for (const f of ['index.ts', 'logic.mjs']) {
+    try {
+      out[f] = await sha256Hex(await Deno.readTextFile(new URL(`./${f}`, import.meta.url)));
+    } catch {
+      out[f] = 'unavailable';
+    }
+  }
+  return out;
 }
 
 Deno.serve(async (req: Request) => {
@@ -176,11 +232,15 @@ Deno.serve(async (req: Request) => {
     if (inject !== undefined && !INJECTIONS.has(inject)) return reply(400, { code: 'validation_failed' });
 
     switch (action) {
+      case 'version':
+        return reply(200, { own_ref: OWN_REF, source_sha256: await sourceHashes() });
       case 'provision': {
         // Synthetic plus-address account, confirmed by Admin (no email sent).
+        // Members only: staff enrolment is out of band (sql/enroll_staff.sql).
+        if (body.role === 'staff') return reply(403, { code: 'forbidden', reason: 'staff_enrolment_out_of_band' });
         const password = str(body.password);
-        const role = body.role === 'staff' ? 'staff' : body.role === 'member' ? 'member' : null;
-        if (!password || !role) return reply(400, { code: 'validation_failed' });
+        const role = typeof body.role === 'string' && PROVISION_ROLES.has(body.role) ? body.role : null;
+        if (!password || !role || !TAG_RE.test(String(body.tag))) return reply(400, { code: 'validation_failed' });
         const email = syntheticEmail(String(body.tag));
         const created = await call('/auth/v1/admin/users', {
           bearer: SERVICE_KEY,
@@ -190,14 +250,16 @@ Deno.serve(async (req: Request) => {
         if (created.status !== 200 || !created.json?.id) {
           return reply(created.status === 422 ? 409 : 502, { code: 'conflict', auth_error: authErrorCode(created.json) });
         }
-        const enrolled = await rpc('harness_rc_enroll', { p_uid: created.json.id, p_role: role });
+        if (role === 'none') return reply(200, { auth_user_id: created.json.id, ok: true, role: 'none' });
+        const enrolled = await rpc('harness_rc_enroll', { p_uid: created.json.id, p_role: 'member' });
         return reply(200, { auth_user_id: created.json.id, ...enrolled });
       }
       case 'request': {
         const digest = str(body.grant_digest);
-        if (!digest || !HEX64_RE.test(digest)) return reply(400, { code: 'validation_failed' });
-        const r = await rpc('harness_rc_request', { p_digest: digest });
-        return reply(r.ok === true ? 200 : 409, r);
+        const claimed = str(body.claimed_login);
+        if (!digest || !HEX64_RE.test(digest) || !claimed) return reply(400, { code: 'validation_failed' });
+        const r = await rpc('harness_rc_request', { p_digest: digest, p_claimed_login: claimed });
+        return reply(r.ok === true ? 200 : r.code === 'rate_limited' ? 429 : r.code === 'validation_failed' ? 400 : 409, r);
       }
       case 'redeem': {
         const grant = str(body.grant);
@@ -249,8 +311,32 @@ Deno.serve(async (req: Request) => {
             p_since: str(body.since) ?? '-infinity',
           });
           return reply(200, { ok: true, observation: obs });
+        } else if (action === 'expire_stuck') {
+          r = await rpc('harness_rc_expire_stuck', { p_staff: staff, p_op: uuidOrNull(body.op_id) });
         } else if (action === 'reconcile') {
-          r = await rpc('harness_rc_reconcile', { p_staff: staff, p_op: uuidOrNull(body.op_id), p_note: str(body.note) });
+          const opId = uuidOrNull(body.op_id);
+          let forced: Json | undefined;
+          if (body.force_revoke === true && opId) {
+            // Revoke every session by setting an undisclosed random password
+            // through Auth Admin; the member then needs a new grant. The DB
+            // still verifies that no pre-dispatch session is live.
+            const uid = uuidOrNull(body.auth_user_id);
+            if (!uid) return reply(400, { code: 'validation_failed' });
+            const a = await applyPassword(uid, randomPassword());
+            forced = { admin_status: a.adminStatus, admin_error: a.errorCode };
+          }
+          r = await rpc('harness_rc_reconcile', { p_staff: staff, p_op: opId, p_note: str(body.note) });
+          if (forced) r = { ...r, force_revoke: forced };
+        } else if (action === 'instrument_delete_user') {
+          // Harness instrumentation: Auth Admin deletion of a synthetic member.
+          const uid = uuidOrNull(body.auth_user_id);
+          if (!uid) return reply(400, { code: 'validation_failed' });
+          const u = await call(`/auth/v1/admin/users/${uid}`, { method: 'GET', bearer: SERVICE_KEY, apikey: SERVICE_KEY });
+          if (u.status !== 200 || !SYNTHETIC_EMAIL_RE.test(String(u.json?.email ?? ''))) {
+            return reply(404, { code: 'not_found' });
+          }
+          const del = await call(`/auth/v1/admin/users/${uid}`, { method: 'DELETE', bearer: SERVICE_KEY, apikey: SERVICE_KEY });
+          return reply(del.status === 200 ? 200 : 502, { ok: del.status === 200, admin_status: del.status });
         } else {
           r = await rpc('harness_rc_replay_complete', { p_staff: staff, p_op: uuidOrNull(body.op_id) });
         }
@@ -258,8 +344,8 @@ Deno.serve(async (req: Request) => {
       }
     }
   } catch (e) {
-    // Only a coarse reason; never request content.
-    const msg = e instanceof Error ? e.message : '';
-    return reply(500, { code: 'unavailable', reason: msg.startsWith('rpc_failed:') ? msg : 'internal' });
+    // Generic code only; the coarse reason (never request content) is logged.
+    console.error(`harness-recovery unhandled ${e instanceof RpcError ? 'rpc_failed' : 'internal'}`);
+    return reply(500, { code: 'unavailable' });
   }
 });

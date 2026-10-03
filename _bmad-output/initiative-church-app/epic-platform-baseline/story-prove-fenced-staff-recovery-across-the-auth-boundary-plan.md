@@ -68,7 +68,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `tools/auth-harness/sql/002_recovery_fence.sql` -- harness recovery tables, `auth.users` credential trigger, service-only `harness_rc_*` RPCs, authenticated `harness_recovery_probe()`; applied as `auth_harness_005_recovery_fence` + `007_db_verified_revocation`.
+- [x] `tools/auth-harness/sql/002_recovery_fence.sql`, `004_review_fixes.sql` -- harness recovery tables, `auth.users`/`auth.identities`/`auth.mfa_factors` triggers, service-only `harness_rc_*` RPCs, authenticated `harness_recovery_probe()`; applied as `auth_harness_005`, `007`, `008`.
 - [x] `tools/auth-harness/functions/harness-recovery/index.ts` + `logic.mjs` -- edge function; pure guards/classification in `logic.mjs` (Node-testable).
 - [x] `tools/auth-harness/run.mjs`, `lib.mjs`, `recovery-cli.mjs`, `run-script.mjs` -- `rc-*` commands, grant/operator secret handling, redaction, committed scenario runner.
 - [x] `tools/auth-harness/recovery.test.mjs` -- offline tests for logic guards, outcome classification and redaction.
@@ -94,14 +94,60 @@ context:
 - **Owner-gated rows:** phone binding change and phone-only reset identifier wait on 1.2's Phone provider step; native email-change detection is deferred to the same rerun to respect the ~2 emails/hour limit.
 - Evidence quirks (documented in the evidence README): the phase-1 label key `grant` was over-redacted (renamed `grant_label`); steps `210`/`211` used a stale local password and the happy path was re-run as `240`–`248`.
 
+- **Independent security review fixes (2026-10-03, second pass).** All changes on the hosted project are additive: migration `auth_harness_008_review_fixes` (= `sql/004_review_fixes.sql`) and function version 4. Nothing was dropped; the one-argument `harness_rc_request(text)` is retired by revoking EXECUTE.
+  - Detection now also covers `auth.identities` insert/delete, `auth.mfa_factors` insert/delete/status-or-secret update, and `auth.users` delete. Binding changes require staff review; delete also holds.
+  - An unattributed change on an account with an uncertain op, or one reconciled within the last hour, re-opens that op and holds access.
+  - `failed` needs zero changes in the window, and a malformed outcome is `uncertain`. Late or finished-op completions are recorded in `late_outcomes`. Dispatch records `sessions_at_dispatch`.
+  - Reconcile is refused while a pre-dispatch session is live; `force_revoke` sets an undisclosed random password through Auth Admin. Reconcile sets a trust epoch, and the gate requires a session created after it.
+  - Holds and binding review refuse issue and redemption. A hold advances the generation (supersedes grants). Redemption checks the approved login.
+  - Staff are enrolled out of band (`sql/enroll_staff.sql`); the operator token cannot provision staff.
+  - Replay only re-submits the recorded outcome of a finished op.
+  - Staff `expire_stuck` handles stuck ops: pending older than 30 s becomes obsolete, dispatched older than 30 s becomes uncertain. All function calls have a 10 s timeout.
+  - Requests carry the claimed login, expire after 30 min, are rate limited (30 per 10 min) and are single-use.
+  - A bad tag returns 400. The catch-all returns a generic `unavailable` and logs only a coarse reason. A completion that fails to record marks the op uncertain.
+  - The log scan now covers metadata attributes and URL-encoded forms. New observers: `observe_admin_calls.sql`, `observe_recovery_definitions_digest.sql`, and the function fingerprint (`edge-function-fingerprint.mjs`).
+- **Re-run.** Every matrix row was re-run against the committed function v4 and the committed SQL `001`–`004`. Fingerprints were recorded at the start (steps `02`–`04`) and end (`300`–`302`). The old evidence log and scenarios were removed; only git history holds them.
+  - The re-run used 2 Supabase Auth emails, for the native email change.
+  - Phone rows stay owner-gated.
+  - The function's self-hash returned `unavailable` on the platform, so the `get_edge_function` content comparison is the source check.
+- **Post-run edits (recording only):** `rc-call` masks `login_email`, so the step `32` line was masked after capture; `scan-evidence.sh` skips `scenarios/`.
+
 ## Plan Change Log
+
+- 2026-10-03, independent security review (parent; not a step-04 loop).
+  - **Findings:**
+    - Detection gaps: identities, MFA and user delete.
+    - `failed` ignored changes in the window.
+    - Stuck ops had no staff path.
+    - A late apply after reconcile was not held.
+    - Reconcile did not verify sessions.
+    - Holds and binding review did not block grants.
+    - The operator token could mint staff.
+    - Replay could fabricate outcomes.
+    - Evidence came from older code and the revocation evidence was weak.
+    - Caller checks and the log scan were too narrow.
+    - Function error handling had small gaps.
+    - The request model had no expiry or binding.
+  - **Amended:** `sql/004_review_fixes.sql` (hosted `008`), function v4, harness CLI, scenarios `1.3-a`…`1.3-f`, observers, tests, scan, and both READMEs. The evidence was fully re-run. The frozen block is unchanged; the "Admin update revokes sessions" amendment is with the owner, and the explicit DB verification of post-dispatch revocation is kept.
+  - **Avoids:**
+    - grants surviving holds or binding changes;
+    - silent release of ops after ambiguous outcomes;
+    - access restored without verified revocation;
+    - staff minted by the harness caller;
+    - evidence that does not match committed code.
+  - **KEEP:**
+    - member-held grant digests;
+    - one unresolved op per account;
+    - count-based attribution failing closed;
+    - raw DB observation through `harness_rc_observe`;
+    - start and end fingerprints.
 
 ## Review Triage Log
 
 ## Verification
 
 **Commands:**
-- `node --test tools/auth-harness/*.test.mjs` -- expected: all pass (20/20 on 2026-10-03)
+- `node --test tools/auth-harness/*.test.mjs` -- expected: all pass (22/22 on 2026-10-03, after the review fixes)
 - `bash tools/auth-harness/scan-evidence.sh` -- expected: clean (clean on 2026-10-03)
 
 **Manual checks:**

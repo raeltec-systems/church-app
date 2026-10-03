@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Command foundation (story 1.4) through the real Data API (PostgREST + Auth) of the running
 # local stack: duplicates, changed-payload replay, stale revisions, simultaneous writes,
-# rolled-back failures, revoked fixture authority and denied direct access.
+# rolled-back failures, malformed envelopes, revoked fixture authority (including a revocation
+# racing an in-flight command) and denied direct access.
 # Usage: npm run db:smoke   (expects `npm run db:start`; needs curl, jq and psql; SYNTHETIC users and data only)
 set -euo pipefail
 
@@ -18,14 +19,18 @@ expect() { # name expected actual
   if [[ "$3" == "$2" ]]; then ok "$1 ($3)"; else bad "$1: expected $2, got $3"; fi
 }
 
-sql() { # privileged SQL against the local database (psql, or the db container as fallback)
+die() { echo "SETUP FAILED - $1" >&2; exit 1; }
+
+pg() { # psql against the local database: host psql, or the db container as fallback
   if command -v psql >/dev/null 2>&1; then
-    psql "$DB_URL" -X -qtA -v ON_ERROR_STOP=1 -c "$1"
+    psql "$DB_URL" -X -qtA -v ON_ERROR_STOP=1 "$@"
   else
-    docker exec -i "$(docker ps --filter name=supabase_db_ --format '{{.Names}}' | head -1)" \
-      psql -U postgres -X -qtA -v ON_ERROR_STOP=1 -c "$1"
+    docker exec -i -e PGAPPNAME="${PGAPPNAME:-psql}" \
+      "$(docker ps --filter name=supabase_db_ --format '{{.Names}}' | head -1)" \
+      psql -U postgres -X -qtA -v ON_ERROR_STOP=1 "$@"
   fi
 }
+sql() { pg -c "$1"; }
 
 uuid() { cat /proc/sys/kernel/random/uuid; }
 
@@ -42,31 +47,39 @@ cleanup() {
 }
 trap cleanup EXIT
 
-new_actor() { # prints "user_id access_token" for a fresh synthetic email/password user
-  local email="fixture-$(uuid)@example.test" password="Fixture-$(uuid)" id token
-  id=$(curl -s -X POST "$API_URL/auth/v1/admin/users" \
+# Creates a fresh synthetic email/password user in this shell (not a subshell), registers it for
+# cleanup as soon as it exists, and sets ACTOR_ID and ACTOR_TOKEN. Any failure aborts the run.
+new_actor() {
+  local email="fixture-$(uuid)@example.test" password="Fixture-$(uuid)"
+  ACTOR_ID=$(curl -s -X POST "$API_URL/auth/v1/admin/users" \
     -H "apikey: $SECRET_KEY" -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
     -H 'Content-Type: application/json' \
-    -d "{\"email\":\"$email\",\"password\":\"$password\",\"email_confirm\":true}" | jq -r .id)
-  token=$(curl -s -X POST "$API_URL/auth/v1/token?grant_type=password" \
+    -d "{\"email\":\"$email\",\"password\":\"$password\",\"email_confirm\":true}" | jq -r .id) \
+    || die "admin user creation request failed"
+  [[ "$ACTOR_ID" =~ ^[0-9a-f-]{36}$ ]] || die "could not create a synthetic user"
+  USERS+=("$ACTOR_ID")
+  ACTOR_TOKEN=$(curl -s -X POST "$API_URL/auth/v1/token?grant_type=password" \
     -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Type: application/json' \
-    -d "{\"email\":\"$email\",\"password\":\"$password\"}" | jq -r .access_token)
-  [[ "$id" =~ ^[0-9a-f-]{36}$ && "$token" != null ]] || { echo "could not create a synthetic user" >&2; exit 1; }
-  echo "$id $token"
+    -d "{\"email\":\"$email\",\"password\":\"$password\"}" | jq -r .access_token) \
+    || die "password sign-in request failed"
+  [[ -n "$ACTOR_TOKEN" && "$ACTOR_TOKEN" != null ]] || die "could not sign in the synthetic user"
 }
 
-call() { # out_file token command request_id expected_revision(json) payload(json) -> http code
+raw_call() { # out_file token body -> http code
   local out=$1 token=$2 auth=()
   [[ -n "$token" ]] && auth=(-H "Authorization: Bearer $token")
   curl -s -o "$out" -w '%{http_code}' -X POST "$RPC" \
     -H "apikey: $PUBLISHABLE_KEY" "${auth[@]}" \
-    -H 'Content-Profile: api' -H 'Content-Type: application/json' \
-    -d "{\"version\":1,\"command\":\"$3\",\"request_id\":\"$4\",\"expected_revision\":$5,\"payload\":$6}"
+    -H 'Content-Profile: api' -H 'Content-Type: application/json' -d "$3"
+}
+call() { # out_file token command request_id expected_revision(json) payload(json) -> http code
+  raw_call "$1" "$2" \
+    "{\"version\":1,\"command\":\"$3\",\"request_id\":\"$4\",\"expected_revision\":$5,\"payload\":$6}"
 }
 
 # Hold the counter row lock for a few seconds so the next requests really arrive together.
 hold_lock() { # counter_id seconds
-  PGAPPNAME=fixture_lock_holder psql "$DB_URL" -X -qtA \
+  PGAPPNAME=fixture_lock_holder pg \
     -c 'begin' -c "select 1 from app.fixture_counters where id = '$1' for update" \
     -c "select pg_sleep($2)" -c 'commit' >/dev/null &
   HOLDER=$!
@@ -88,8 +101,8 @@ max_lock_waiters() { # polls until the holder ends; prints the most requests see
   echo "$max"
 }
 
-read -r A A_TOKEN <<<"$(new_actor)"; USERS+=("$A")
-read -r B B_TOKEN <<<"$(new_actor)"; USERS+=("$B")
+new_actor; A=$ACTOR_ID; A_TOKEN=$ACTOR_TOKEN
+new_actor; B=$ACTOR_ID; B_TOKEN=$ACTOR_TOKEN
 
 # Denied access ---------------------------------------------------------------------------------
 code=$(call "$WORK/anon" "" fixture_counter.create "$(uuid)" null '{"intent_key":"anon"}')
@@ -160,13 +173,56 @@ expect "failed write committed no receipt" 0 "$(sql "select count(*) from app.cm
 call "$WORK/scope" "$B_TOKEN" fixture_counter.increment "$(uuid)" 3 "{\"counter_id\":\"$COUNTER\",\"by\":1}" >/dev/null
 expect "another actor's counter is not_found" not_found "$(jq -r .code "$WORK/scope")"
 
+# Malformed or missing envelope fields come back as contract envelopes, not raw errors ----------
+envelope_case() { # name body field expected_reason
+  local code
+  code=$(raw_call "$WORK/env" "$A_TOKEN" "$2")
+  expect "$1" "200|validation_failed|$4" \
+    "$code|$(jq -r --arg f "$3" '.code + "|" + (.field_errors[$f] // "")' "$WORK/env")"
+}
+envelope_case "malformed request_id is a validation_failed envelope" \
+  "{\"version\":1,\"command\":\"fixture_counter.create\",\"request_id\":\"not-a-uuid\",\"payload\":{\"intent_key\":\"e1\"}}" \
+  request_id invalid
+envelope_case "omitted request_id is a validation_failed envelope" \
+  "{\"version\":1,\"command\":\"fixture_counter.create\",\"payload\":{\"intent_key\":\"e2\"}}" \
+  request_id required
+envelope_case "malformed expected_revision is a validation_failed envelope" \
+  "{\"version\":1,\"command\":\"fixture_counter.increment\",\"request_id\":\"$(uuid)\",\"expected_revision\":\"abc\",\"payload\":{\"counter_id\":\"$COUNTER\",\"by\":1}}" \
+  expected_revision invalid
+envelope_case "omitted version is a validation_failed envelope" \
+  "{\"command\":\"fixture_counter.create\",\"request_id\":\"$(uuid)\",\"payload\":{\"intent_key\":\"e3\"}}" \
+  version required
+expect "malformed envelopes changed nothing" "2|3" "$(sql "select value || '|' || revision from app.fixture_counters where id = '$COUNTER'")"
+
+# Concurrent revocation waits for an in-flight command holding the grant row FOR SHARE ----------
+hold_lock "$COUNTER" 4
+call "$WORK/inflight" "$A_TOKEN" fixture_counter.increment "$(uuid)" 3 "{\"counter_id\":\"$COUNTER\",\"by\":1}" >/dev/null &
+CMD_PID=$!
+for _ in $(seq 1 50); do
+  [[ "$(sql "select count(*) from pg_stat_activity
+              where wait_event_type = 'Lock' and application_name <> 'fixture_lock_holder'")" -ge 1 ]] && break
+  sleep 0.1
+done
+PGAPPNAME=fixture_revoker pg -c "update app.fixture_command_grants set revoked_at = now()
+  where actor_id = '$A' and command = 'fixture_counter.increment'" >/dev/null &
+REV_PID=$!
+revoker_waited=0
+while kill -0 "$HOLDER" 2>/dev/null; do
+  [[ "$(sql "select count(*) from pg_stat_activity
+              where application_name = 'fixture_revoker' and wait_event_type = 'Lock'")" == 1 ]] && revoker_waited=1
+  sleep 0.1
+done
+wait "$CMD_PID" "$REV_PID" "$HOLDER"
+expect "revocation waited on the in-flight command's grant lock" 1 "$revoker_waited"
+expect "the command authorised before the revocation completed" 4 "$(jq -r .revision "$WORK/inflight")"
+expect "the revocation committed afterwards" 1 "$(sql "select count(*) from app.fixture_command_grants
+  where actor_id = '$A' and command = 'fixture_counter.increment' and revoked_at is not null")"
+
 # Revoked authority ----------------------------------------------------------------------------
-sql "update app.fixture_command_grants set revoked_at = now()
-      where actor_id = '$A' and command = 'fixture_counter.increment'" >/dev/null
 call "$WORK/revoked_replay" "$A_TOKEN" fixture_counter.increment "$REQ_DUP" 1 "{\"counter_id\":\"$COUNTER\",\"by\":1}" >/dev/null
 expect "revoked authority blocks receipt replay" forbidden "$(jq -r .code "$WORK/revoked_replay")"
-call "$WORK/revoked_new" "$A_TOKEN" fixture_counter.increment "$(uuid)" 3 "{\"counter_id\":\"$COUNTER\",\"by\":1}" >/dev/null
+call "$WORK/revoked_new" "$A_TOKEN" fixture_counter.increment "$(uuid)" 4 "{\"counter_id\":\"$COUNTER\",\"by\":1}" >/dev/null
 expect "revoked authority blocks new writes" forbidden "$(jq -r .code "$WORK/revoked_new")"
-expect "nothing changed after revocation" "2|3" "$(sql "select value || '|' || revision from app.fixture_counters where id = '$COUNTER'")"
+expect "nothing changed after revocation" "3|4" "$(sql "select value || '|' || revision from app.fixture_counters where id = '$COUNTER'")"
 
 exit $fail

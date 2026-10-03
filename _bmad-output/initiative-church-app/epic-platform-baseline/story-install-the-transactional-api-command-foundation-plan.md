@@ -3,7 +3,8 @@ title: 'Install the transactional API command foundation'
 type: 'feature'
 ticket: '4'
 created: '2026-10-03'
-status: 'built'
+status: 'blocked'
+blocked_reason: 'Hosted apply_migration of the review follow-up migration (20261003170000_command_foundation_hardening.sql, which contains DROP FUNCTION statements) returned status cancelled at the tool-approval step; hosted tmurpotfluignacfueki still runs only 20261003123459. Approve or re-run that apply_migration (name command_foundation_hardening, the exact local file contents), then rename the local file to the version hosted records and re-run get_advisors(security).'
 baseline_revision: 'dfa367db1bae7ae6ade7dfab75cfaf2de99b853a'
 route: 'full'
 route_source: 'auto'
@@ -129,6 +130,35 @@ Implemented 2026-10-03 directly (no subagent tool in this session).
 - No actor / bad envelope: pgTAP; anon is checked in pgTAP and over HTTP (401).
 - Direct DML / PUBLIC: pgTAP, plus HTTP (406 for `app`).
 
+**Review follow-up (2026-10-03)**
+- New migration `supabase/migrations/20261003170000_command_foundation_hardening.sql`. The applied `20261003123459` is left unchanged.
+  - **Replay scope recheck.** The kernel is now `app.cmd_execute(envelope jsonb, handler, scope, revision_required)`. Before any receipt replay it reads `aggregate_type`/`aggregate_id` from the receipt and calls the per-command scope seam. For the fixture that seam is `app.fixture_counter_in_scope`: the actor must still own the counter, read `FOR SHARE`. If the check fails the answer is `forbidden`, and no stored data is returned.
+  - **One jsonb envelope.** `api.fixture_counter_command(jsonb)` takes PostgREST's single unnamed JSON body. The kernel validates the shape of every envelope field: a request_id that is missing gives `required`, one that is malformed gives `invalid`; version gives `required` or `unsupported`; expected_revision gives `invalid`, `required` or `must_be_null`; payload must be an object; unknown envelope keys are rejected. Each of these returns a `validation_failed` envelope, and a valid request_id is still echoed.
+  - **Actor seam.** `app.cmd_current_actor()` reads `sub` without casting it, so a missing or non-UUID `sub` gives `unauthenticated`.
+  - **Exception mapping.** The kernel now maps only `PCMD1`. Every other error gives `unavailable`. The handlers translate their own known constraint outcomes: a unique violation on intent_key gives `conflict`, and a value check violation gives `validation_failed {"by": "out_of_range"}`. The `by` cast now runs only after the shape checks.
+  - **Volatility.** `cmd_utc`, `cmd_error_envelope`, `cmd_payload_hash` and `fixture_counter_data`/`fixture_counter_outcome` are now STABLE, because they call STABLE builtins.
+- `command_foundation_test.sql` now has 70 assertions. New cases:
+  - replay is in scope; then scope is lost while the grant is kept, and the replay is `forbidden` and discloses nothing
+  - a non-UUID `sub` gives `unauthenticated`
+  - an internal cast error gives `unavailable`, with no receipt
+  - create with a revision gives `must_be_null`
+  - a non-object payload is rejected
+  - malformed request_id and malformed expected_revision are rejected
+  - all nine increment `by`/`counter_id`/extra-field branches
+- `command_api_smoke.sh` now has 32 checks.
+  - `new_actor` runs in the main shell, aborts setup on any failure, and registers the user for cleanup as soon as it is created.
+  - `hold_lock` and `sql` share the psql or docker-exec fallback `pg()`.
+  - New HTTP cases: malformed request_id, omitted request_id, malformed expected_revision and omitted version, each returning HTTP 200 with a `validation_failed` envelope.
+  - New concurrent revocation case: the revoker was seen waiting on a Lock while an in-flight command held the grant `FOR SHARE`. The command then committed at revision 4, the revocation committed after it, and later replays and writes were `forbidden`.
+- Local results: `db reset`, then `db:test` passed 99/99 and `db:smoke` passed 38/38. All fixture tables and `auth.users` were empty afterwards.
+- **Hosted is not done.** `apply_migration` returned `cancelled`, and hosted is unchanged: history ends at 123459 and the old function signatures remain. Local and hosted histories now differ by this one migration until it is applied. The local version 20261003170000 is provisional; rename it to the version hosted records. Advisors were not re-run because nothing changed on hosted.
+
 ## Plan Change Log
+
+- 2026-10-03, review follow-up (coordinator review findings):
+  - **Findings:** receipt replay did not recheck aggregate scope; typed RPC parameters leaked raw PostgREST and SQL errors for malformed envelopes; a non-UUID `sub` and internal cast errors were reported as `validation_failed`; some functions were mis-marked IMMUTABLE; the smoke setup's failure and cleanup were unsafe and its lock holder skipped the docker fallback; coverage was missing for concurrent revocation, `must_be_null`, non-object payloads and the increment validation branches.
+  - **Amended:** added the follow-up migration above (kernel signature now `(jsonb, handler, scope, revision_required)`; api now takes one jsonb envelope), the matching tests and the runbook steps.
+  - **Avoids:** replay disclosing results after a loss of scope, contract-breaking raw errors, and misclassified internal failures.
+  - **KEEP:** lock order (authority FOR SHARE, then receipt reservation, then aggregate FOR UPDATE); receipts only for successes; subtransaction rollback; fixed safe messages.
 
 ## Review Triage Log

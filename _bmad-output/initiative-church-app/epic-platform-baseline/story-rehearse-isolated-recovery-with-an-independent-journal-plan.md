@@ -3,12 +3,13 @@ title: 'Rehearse isolated recovery with an independent journal'
 type: 'feature'
 ticket: '10'
 created: '2026-10-03'
-status: 'built'
+status: 'blocked'
+blocked_reason: 'staging apply of recovery_journal needs owner approval (MCP apply timed out 3x awaiting confirmation of in-function auth session delete)'
 baseline_revision: 'f93eac02d09b212822c8614a15fb4a5aa64a7685'
 route: 'full'
 route_source: 'auto'
-review: ''
-review_source: ''
+review: 'quick'
+review_source: 'pinned'
 lenses_ran: []
 review_loop_iteration: 0
 context:
@@ -147,6 +148,19 @@ Implemented 2026-10-03 directly (no subagent tool in this session).
 ## Plan Change Log
 
 ## Review Triage Log
+
+| Finding | Verdict | Route | Evidence |
+|---|---|---|---|
+| (parent) rcv_hold_after_restore can wipe live sessions if called by a DB owner on a live DB | medium | patch | function deletes all auth.sessions/refresh_tokens; only client grants revoked |
+| hosted staging migration not applied | medium | parent action | evidence README: staging ends at 20261003155428; applied by parent after merge |
+| reconcile/status commands missing | medium | patch | rehearse.mjs main() switch lacks both; `restore absent` exits 0 |
+| seal cutoff can exceed its own `at` | high | patch | validateEntry checks ISO only; defeats journal_seal_before_cutoff |
+| SQL accepts entries without `at`; revocation ack'd without effect | high | patch | coalesce(access_revoked_at, NULL) then reconciliation clears hold |
+| artifact hold fails under plain psql if operator row absent | medium | patch | rcv_require_operator reads restored snapshot; rest of dump loads |
+| concurrent appends fork journal | low | patch | read-head-then-create; Drive allows duplicate names |
+| hash mismatch crashes replay with no refusal | medium | patch | verifyJournal compares seq only |
+| folder_id called private but committed in evidence | low | patch | validator wording vs evidence files |
+| displaced JSDoc | low | patch | environments.mjs ~146-190 |
 
 ## Verification
 

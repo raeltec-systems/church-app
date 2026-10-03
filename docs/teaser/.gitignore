@@ -5,3 +5,8 @@ logo-white.png
 *.wav
 *.mp4
 still-*.jpg
+node_modules/
+*/audio/*.wav
+out/
+*/assets/rec/
+journeys/proto/

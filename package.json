@@ -1,0 +1,15 @@
+{
+  "name": "church-app",
+  "private": true,
+  "description": "BIC Kafue church app monorepo tooling (Supabase CLI pin and database scripts).",
+  "scripts": {
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:test": "supabase test db",
+    "db:smoke": "bash supabase/tests/api_smoke.sh"
+  },
+  "devDependencies": {
+    "supabase": "2.119.0"
+  }
+}

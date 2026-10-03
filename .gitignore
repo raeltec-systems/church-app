@@ -1,0 +1,19 @@
+# Generated BMAD skill output
+_bmad/render/
+
+# Node tooling (Supabase CLI pin)
+node_modules/
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/
+
+# Flutter / Dart build outputs (each app also has its own .gitignore)
+**/.dart_tool/
+**/build/
+**/.flutter-plugins-dependencies
+*.iml
+
+# Local environment files; never commit secrets
+.env
+.env.*

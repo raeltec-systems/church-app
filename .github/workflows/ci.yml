@@ -1,0 +1,74 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  db:
+    name: db (local Supabase, pgTAP + API smoke)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install pinned Supabase CLI
+        run: npm ci
+      - name: Start local stack (services the tracer needs)
+        run: npx supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,storage-api,realtime,postgres-meta
+      - name: pgTAP permission tests
+        run: npm run db:test
+      - name: Data API smoke checks
+        run: npm run db:smoke
+      - name: Stop local stack
+        if: always()
+        run: npx supabase stop --no-backup
+
+  flutter:
+    name: flutter (analyze, test, web build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.6
+          cache: true
+      - name: Check pinned toolchain
+        run: |
+          flutter --version
+          flutter --version | grep -q 'Flutter 3.47.6'
+          flutter --version | grep -q 'Dart 3.13.5'
+      - name: mobile — pub get (locked)
+        working-directory: apps/mobile
+        run: flutter pub get --enforce-lockfile
+      - name: mobile — analyze
+        working-directory: apps/mobile
+        run: flutter analyze
+      - name: mobile — test
+        working-directory: apps/mobile
+        run: flutter test
+      - name: staff web trial — pub get (locked)
+        working-directory: trials/staff_web
+        run: flutter pub get --enforce-lockfile
+      - name: staff web trial — analyze
+        working-directory: trials/staff_web
+        run: flutter analyze
+      - name: staff web trial — test
+        working-directory: trials/staff_web
+        run: flutter test
+      - name: staff web trial — build web
+        working-directory: trials/staff_web
+        run: flutter build web

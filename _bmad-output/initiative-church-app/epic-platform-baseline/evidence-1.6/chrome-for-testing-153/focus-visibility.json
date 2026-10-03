@@ -1,0 +1,58 @@
+[
+  {
+    "control": "tab: Rota grid trial",
+    "changedRatio": 0.7721,
+    "accentFocused": 0,
+    "accentUnfocused": 0,
+    "w": 695,
+    "h": 60
+  },
+  {
+    "control": "tab: Platform status",
+    "changedRatio": 0.7683,
+    "accentFocused": 0,
+    "accentUnfocused": 0,
+    "w": 689,
+    "h": 60
+  },
+  {
+    "control": "textbox: Filter positions e.g. door",
+    "changedRatio": 0.1363,
+    "accentFocused": 1873,
+    "accentUnfocused": 0,
+    "w": 340,
+    "h": 66
+  },
+  {
+    "control": "radio: Grid",
+    "changedRatio": 0.46,
+    "accentFocused": 574,
+    "accentUnfocused": 574,
+    "w": 91,
+    "h": 44
+  },
+  {
+    "control": "radio: List",
+    "changedRatio": 0.6016,
+    "accentFocused": 584,
+    "accentUnfocused": 0,
+    "w": 91,
+    "h": 44
+  },
+  {
+    "control": "button: Export CSV…",
+    "changedRatio": 0.5796,
+    "accentFocused": 918,
+    "accentUnfocused": 0,
+    "w": 157,
+    "h": 44
+  },
+  {
+    "control": "button: Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+    "changedRatio": 0.7553,
+    "accentFocused": 1198,
+    "accentUnfocused": 0,
+    "w": 170,
+    "h": 71
+  }
+]

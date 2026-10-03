@@ -1,0 +1,1514 @@
+[
+  {
+    "role": "RootWebArea",
+    "name": "BIC Kafue staff web trial",
+    "props": {
+      "focusable": true,
+      "focused": true,
+      "url": "http://127.0.0.1:8766/"
+    }
+  },
+  {
+    "role": "group",
+    "name": ""
+  },
+  {
+    "role": "heading",
+    "name": "BIC Kafue staff web trial",
+    "props": {
+      "focusable": true,
+      "focused": true,
+      "level": 2
+    }
+  },
+  {
+    "role": "tablist",
+    "name": "",
+    "props": {
+      "multiselectable": false,
+      "orientation": "horizontal"
+    }
+  },
+  {
+    "role": "heading",
+    "name": "Duty rotas",
+    "props": {
+      "level": 1
+    }
+  },
+  {
+    "role": "radio",
+    "name": "Grid",
+    "props": {
+      "focusable": true,
+      "checked": "true"
+    }
+  },
+  {
+    "role": "radio",
+    "name": "List",
+    "props": {
+      "focusable": true,
+      "checked": "false"
+    }
+  },
+  {
+    "role": "button",
+    "name": "Export CSV…",
+    "props": {
+      "focusable": true
+    }
+  },
+  {
+    "role": "StaticText",
+    "name": "BIC Kafue staff web trial"
+  },
+  {
+    "role": "tab",
+    "name": "Rota grid trial",
+    "props": {
+      "focusable": true,
+      "selected": true
+    }
+  },
+  {
+    "role": "tab",
+    "name": "Platform status",
+    "props": {
+      "focusable": true,
+      "selected": false
+    }
+  },
+  {
+    "role": "StaticText",
+    "name": "Duty rotas"
+  },
+  {
+    "role": "StaticText",
+    "name": "Ushering · October–November 2026 · SYNTHETIC test data — not real people"
+  },
+  {
+    "role": "textbox",
+    "name": "Filter positions",
+    "props": {
+      "invalid": "false",
+      "focusable": true,
+      "editable": "plaintext",
+      "settable": true,
+      "multiline": false,
+      "readonly": false,
+      "required": false
+    }
+  },
+  {
+    "role": "StaticText",
+    "name": "Export CSV…"
+  },
+  {
+    "role": "StaticText",
+    "name": "Status key:"
+  },
+  {
+    "role": "StaticText",
+    "name": "Confirmed"
+  },
+  {
+    "role": "StaticText",
+    "name": "Confirmed by leader"
+  },
+  {
+    "role": "StaticText",
+    "name": "Awaiting response"
+  },
+  {
+    "role": "StaticText",
+    "name": "Needs contact"
+  },
+  {
+    "role": "StaticText",
+    "name": "Declined"
+  },
+  {
+    "role": "StaticText",
+    "name": "Draft"
+  },
+  {
+    "role": "StaticText",
+    "name": "Unfilled"
+  },
+  {
+    "role": "group",
+    "name": ""
+  },
+  {
+    "role": "StaticText",
+    "name": "Grid keys: arrow keys move between slots; Home and End jump within a row; Control+Home and Control+End jump to the first and last slot; Enter opens a slot; Tab leaves the grid."
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "BIC Kafue staff web trial"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Duty rotas"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Ushering · October–November 2026 · SYNTHETIC test data — not real people"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Export CSV…"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Status key:"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed by leader"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Awaiting response"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Needs contact"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Declined"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Draft"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Unfilled"
+  },
+  {
+    "role": "table",
+    "name": ""
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Grid keys: arrow keys move between slots; Home and End jump within a row; Control+Home and Control+End jump to the first and last slot; Enter opens a slot; Tab leaves the grid."
+  },
+  {
+    "role": "row",
+    "name": ""
+  },
+  {
+    "role": "row",
+    "name": ""
+  },
+  {
+    "role": "row",
+    "name": ""
+  },
+  {
+    "role": "row",
+    "name": ""
+  },
+  {
+    "role": "row",
+    "name": ""
+  },
+  {
+    "role": "row",
+    "name": ""
+  },
+  {
+    "role": "row",
+    "name": ""
+  },
+  {
+    "role": "columnheader",
+    "name": "Position",
+    "props": {
+      "readonly": false,
+      "required": false
+    }
+  },
+  {
+    "role": "columnheader",
+    "name": "Sun 4 Oct",
+    "props": {
+      "readonly": false,
+      "required": false
+    }
+  },
+  {
+    "role": "columnheader",
+    "name": "Sun 11 Oct",
+    "props": {
+      "readonly": false,
+      "required": false
+    }
+  },
+  {
+    "role": "columnheader",
+    "name": "Sun 18 Oct",
+    "props": {
+      "readonly": false,
+      "required": false
+    }
+  },
+  {
+    "role": "columnheader",
+    "name": "Sun 25 Oct",
+    "props": {
+      "readonly": false,
+      "required": false
+    }
+  },
+  {
+    "role": "columnheader",
+    "name": "Sun 1 Nov",
+    "props": {
+      "readonly": false,
+      "required": false
+    }
+  },
+  {
+    "role": "columnheader",
+    "name": "Sun 8 Nov",
+    "props": {
+      "readonly": false,
+      "required": false
+    }
+  },
+  {
+    "role": "columnheader",
+    "name": "Sun 15 Nov",
+    "props": {
+      "readonly": false,
+      "required": false
+    }
+  },
+  {
+    "role": "columnheader",
+    "name": "Sun 22 Nov",
+    "props": {
+      "readonly": false,
+      "required": false
+    }
+  },
+  {
+    "role": "cell",
+    "name": "Main door"
+  },
+  {
+    "role": "cell",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Confirmed"
+  },
+  {
+    "role": "cell",
+    "name": "Main door, Sun 11 Oct: Test Joseph B, Needs contact"
+  },
+  {
+    "role": "cell",
+    "name": "Main door, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "cell",
+    "name": "Main door, Sun 25 Oct: Test Ruth D, Awaiting response"
+  },
+  {
+    "role": "cell",
+    "name": "Main door, Sun 1 Nov: Test Naomi E, Draft"
+  },
+  {
+    "role": "cell",
+    "name": "Main door, Sun 8 Nov: Test Moses F, Confirmed by leader"
+  },
+  {
+    "role": "cell",
+    "name": "Main door, Sun 15 Nov: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Declined"
+  },
+  {
+    "role": "cell",
+    "name": "Main door, Sun 22 Nov: +Test Plus G, Confirmed"
+  },
+  {
+    "role": "cell",
+    "name": "Side door"
+  },
+  {
+    "role": "cell",
+    "name": "Side door, Sun 4 Oct: Test Ruth D, Confirmed"
+  },
+  {
+    "role": "cell",
+    "name": "Side door, Sun 11 Oct: Test Naomi E, Needs contact"
+  },
+  {
+    "role": "cell",
+    "name": "Side door, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "cell",
+    "name": "Side door, Sun 25 Oct: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Awaiting response"
+  },
+  {
+    "role": "cell",
+    "name": "Side door, Sun 1 Nov: +Test Plus G, Draft"
+  },
+  {
+    "role": "cell",
+    "name": "Side door, Sun 8 Nov: -Test Minus H, Confirmed by leader"
+  },
+  {
+    "role": "cell",
+    "name": "Side door, Sun 15 Nov: @Test At I, Declined"
+  },
+  {
+    "role": "cell",
+    "name": "Side door, Sun 22 Nov: Test Mwila A, Confirmed"
+  },
+  {
+    "role": "cell",
+    "name": "Parking"
+  },
+  {
+    "role": "cell",
+    "name": "Parking, Sun 4 Oct: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Confirmed"
+  },
+  {
+    "role": "cell",
+    "name": "Parking, Sun 11 Oct: +Test Plus G, Needs contact"
+  },
+  {
+    "role": "cell",
+    "name": "Parking, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "cell",
+    "name": "Parking, Sun 25 Oct: @Test At I, Awaiting response"
+  },
+  {
+    "role": "cell",
+    "name": "Parking, Sun 1 Nov: Test Mwila A, Draft"
+  },
+  {
+    "role": "cell",
+    "name": "Parking, Sun 8 Nov: Test Joseph B, Confirmed by leader"
+  },
+  {
+    "role": "cell",
+    "name": "Parking, Sun 15 Nov: Test Esther C, Declined"
+  },
+  {
+    "role": "cell",
+    "name": "Parking, Sun 22 Nov: Test Ruth D, Confirmed"
+  },
+  {
+    "role": "cell",
+    "name": "Offering team"
+  },
+  {
+    "role": "cell",
+    "name": "Offering team, Sun 4 Oct: @Test At I, Confirmed"
+  },
+  {
+    "role": "cell",
+    "name": "Offering team, Sun 11 Oct: Test Mwila A, Needs contact"
+  },
+  {
+    "role": "cell",
+    "name": "Offering team, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "cell",
+    "name": "Offering team, Sun 25 Oct: Test Esther C, Awaiting response"
+  },
+  {
+    "role": "cell",
+    "name": "Offering team, Sun 1 Nov: Test Ruth D, Draft"
+  },
+  {
+    "role": "cell",
+    "name": "Offering team, Sun 8 Nov: Test Naomi E, Confirmed by leader"
+  },
+  {
+    "role": "cell",
+    "name": "Offering team, Sun 15 Nov: Test Moses F, Declined"
+  },
+  {
+    "role": "cell",
+    "name": "Offering team, Sun 22 Nov: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Confirmed"
+  },
+  {
+    "role": "cell",
+    "name": "Welcome desk"
+  },
+  {
+    "role": "cell",
+    "name": "Welcome desk, Sun 4 Oct: Test Esther C, Confirmed"
+  },
+  {
+    "role": "cell",
+    "name": "Welcome desk, Sun 11 Oct: Test Ruth D, Needs contact"
+  },
+  {
+    "role": "cell",
+    "name": "Welcome desk, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "cell",
+    "name": "Welcome desk, Sun 25 Oct: Test Moses F, Awaiting response"
+  },
+  {
+    "role": "cell",
+    "name": "Welcome desk, Sun 1 Nov: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Draft"
+  },
+  {
+    "role": "cell",
+    "name": "Welcome desk, Sun 8 Nov: +Test Plus G, Confirmed by leader"
+  },
+  {
+    "role": "cell",
+    "name": "Welcome desk, Sun 15 Nov: -Test Minus H, Declined"
+  },
+  {
+    "role": "cell",
+    "name": "Welcome desk, Sun 22 Nov: @Test At I, Confirmed"
+  },
+  {
+    "role": "cell",
+    "name": "Children's door"
+  },
+  {
+    "role": "cell",
+    "name": "Children's door, Sun 4 Oct: Test Moses F, Confirmed"
+  },
+  {
+    "role": "cell",
+    "name": "Children's door, Sun 11 Oct: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Needs contact"
+  },
+  {
+    "role": "cell",
+    "name": "Children's door, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "cell",
+    "name": "Children's door, Sun 25 Oct: -Test Minus H, Awaiting response"
+  },
+  {
+    "role": "cell",
+    "name": "Children's door, Sun 1 Nov: @Test At I, Draft"
+  },
+  {
+    "role": "cell",
+    "name": "Children's door, Sun 8 Nov: Test Mwila A, Confirmed by leader"
+  },
+  {
+    "role": "cell",
+    "name": "Children's door, Sun 15 Nov: Test Joseph B, Declined"
+  },
+  {
+    "role": "cell",
+    "name": "Children's door, Sun 22 Nov: Test Esther C, Confirmed"
+  },
+  {
+    "role": "StaticText",
+    "name": "Main door"
+  },
+  {
+    "role": "button",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+    "props": {
+      "focusable": true
+    }
+  },
+  {
+    "role": "button",
+    "name": "Main door, Sun 11 Oct: Test Joseph B, Needs contact"
+  },
+  {
+    "role": "button",
+    "name": "Main door, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "button",
+    "name": "Main door, Sun 25 Oct: Test Ruth D, Awaiting response"
+  },
+  {
+    "role": "button",
+    "name": "Main door, Sun 1 Nov: Test Naomi E, Draft"
+  },
+  {
+    "role": "button",
+    "name": "Main door, Sun 8 Nov: Test Moses F, Confirmed by leader"
+  },
+  {
+    "role": "button",
+    "name": "Main door, Sun 15 Nov: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Declined"
+  },
+  {
+    "role": "button",
+    "name": "Main door, Sun 22 Nov: +Test Plus G, Confirmed"
+  },
+  {
+    "role": "StaticText",
+    "name": "Side door"
+  },
+  {
+    "role": "button",
+    "name": "Side door, Sun 4 Oct: Test Ruth D, Confirmed"
+  },
+  {
+    "role": "button",
+    "name": "Side door, Sun 11 Oct: Test Naomi E, Needs contact"
+  },
+  {
+    "role": "button",
+    "name": "Side door, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "button",
+    "name": "Side door, Sun 25 Oct: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Awaiting response"
+  },
+  {
+    "role": "button",
+    "name": "Side door, Sun 1 Nov: +Test Plus G, Draft"
+  },
+  {
+    "role": "button",
+    "name": "Side door, Sun 8 Nov: -Test Minus H, Confirmed by leader"
+  },
+  {
+    "role": "button",
+    "name": "Side door, Sun 15 Nov: @Test At I, Declined"
+  },
+  {
+    "role": "button",
+    "name": "Side door, Sun 22 Nov: Test Mwila A, Confirmed"
+  },
+  {
+    "role": "StaticText",
+    "name": "Parking"
+  },
+  {
+    "role": "button",
+    "name": "Parking, Sun 4 Oct: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Confirmed"
+  },
+  {
+    "role": "button",
+    "name": "Parking, Sun 11 Oct: +Test Plus G, Needs contact"
+  },
+  {
+    "role": "button",
+    "name": "Parking, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "button",
+    "name": "Parking, Sun 25 Oct: @Test At I, Awaiting response"
+  },
+  {
+    "role": "button",
+    "name": "Parking, Sun 1 Nov: Test Mwila A, Draft"
+  },
+  {
+    "role": "button",
+    "name": "Parking, Sun 8 Nov: Test Joseph B, Confirmed by leader"
+  },
+  {
+    "role": "button",
+    "name": "Parking, Sun 15 Nov: Test Esther C, Declined"
+  },
+  {
+    "role": "button",
+    "name": "Parking, Sun 22 Nov: Test Ruth D, Confirmed"
+  },
+  {
+    "role": "StaticText",
+    "name": "Offering team"
+  },
+  {
+    "role": "button",
+    "name": "Offering team, Sun 4 Oct: @Test At I, Confirmed"
+  },
+  {
+    "role": "button",
+    "name": "Offering team, Sun 11 Oct: Test Mwila A, Needs contact"
+  },
+  {
+    "role": "button",
+    "name": "Offering team, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "button",
+    "name": "Offering team, Sun 25 Oct: Test Esther C, Awaiting response"
+  },
+  {
+    "role": "button",
+    "name": "Offering team, Sun 1 Nov: Test Ruth D, Draft"
+  },
+  {
+    "role": "button",
+    "name": "Offering team, Sun 8 Nov: Test Naomi E, Confirmed by leader"
+  },
+  {
+    "role": "button",
+    "name": "Offering team, Sun 15 Nov: Test Moses F, Declined"
+  },
+  {
+    "role": "button",
+    "name": "Offering team, Sun 22 Nov: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Confirmed"
+  },
+  {
+    "role": "StaticText",
+    "name": "Welcome desk"
+  },
+  {
+    "role": "button",
+    "name": "Welcome desk, Sun 4 Oct: Test Esther C, Confirmed"
+  },
+  {
+    "role": "button",
+    "name": "Welcome desk, Sun 11 Oct: Test Ruth D, Needs contact"
+  },
+  {
+    "role": "button",
+    "name": "Welcome desk, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "button",
+    "name": "Welcome desk, Sun 25 Oct: Test Moses F, Awaiting response"
+  },
+  {
+    "role": "button",
+    "name": "Welcome desk, Sun 1 Nov: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Draft"
+  },
+  {
+    "role": "button",
+    "name": "Welcome desk, Sun 8 Nov: +Test Plus G, Confirmed by leader"
+  },
+  {
+    "role": "button",
+    "name": "Welcome desk, Sun 15 Nov: -Test Minus H, Declined"
+  },
+  {
+    "role": "button",
+    "name": "Welcome desk, Sun 22 Nov: @Test At I, Confirmed"
+  },
+  {
+    "role": "StaticText",
+    "name": "Children's door"
+  },
+  {
+    "role": "button",
+    "name": "Children's door, Sun 4 Oct: Test Moses F, Confirmed"
+  },
+  {
+    "role": "button",
+    "name": "Children's door, Sun 11 Oct: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Needs contact"
+  },
+  {
+    "role": "button",
+    "name": "Children's door, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "button",
+    "name": "Children's door, Sun 25 Oct: -Test Minus H, Awaiting response"
+  },
+  {
+    "role": "button",
+    "name": "Children's door, Sun 1 Nov: @Test At I, Draft"
+  },
+  {
+    "role": "button",
+    "name": "Children's door, Sun 8 Nov: Test Mwila A, Confirmed by leader"
+  },
+  {
+    "role": "button",
+    "name": "Children's door, Sun 15 Nov: Test Joseph B, Declined"
+  },
+  {
+    "role": "button",
+    "name": "Children's door, Sun 22 Nov: Test Esther C, Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Main door"
+  },
+  {
+    "role": "StaticText",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Confirmed"
+  },
+  {
+    "role": "StaticText",
+    "name": "Main door, Sun 11 Oct: Test Joseph B, Needs contact"
+  },
+  {
+    "role": "StaticText",
+    "name": "Main door, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "StaticText",
+    "name": "Main door, Sun 25 Oct: Test Ruth D, Awaiting response"
+  },
+  {
+    "role": "StaticText",
+    "name": "Main door, Sun 1 Nov: Test Naomi E, Draft"
+  },
+  {
+    "role": "StaticText",
+    "name": "Main door, Sun 8 Nov: Test Moses F, Confirmed by leader"
+  },
+  {
+    "role": "StaticText",
+    "name": "Main door, Sun 15 Nov: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Declined"
+  },
+  {
+    "role": "StaticText",
+    "name": "Main door, Sun 22 Nov: +Test Plus G, Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Side door"
+  },
+  {
+    "role": "StaticText",
+    "name": "Side door, Sun 4 Oct: Test Ruth D, Confirmed"
+  },
+  {
+    "role": "StaticText",
+    "name": "Side door, Sun 11 Oct: Test Naomi E, Needs contact"
+  },
+  {
+    "role": "StaticText",
+    "name": "Side door, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "StaticText",
+    "name": "Side door, Sun 25 Oct: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Awaiting response"
+  },
+  {
+    "role": "StaticText",
+    "name": "Side door, Sun 1 Nov: +Test Plus G, Draft"
+  },
+  {
+    "role": "StaticText",
+    "name": "Side door, Sun 8 Nov: -Test Minus H, Confirmed by leader"
+  },
+  {
+    "role": "StaticText",
+    "name": "Side door, Sun 15 Nov: @Test At I, Declined"
+  },
+  {
+    "role": "StaticText",
+    "name": "Side door, Sun 22 Nov: Test Mwila A, Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Parking"
+  },
+  {
+    "role": "StaticText",
+    "name": "Parking, Sun 4 Oct: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Confirmed"
+  },
+  {
+    "role": "StaticText",
+    "name": "Parking, Sun 11 Oct: +Test Plus G, Needs contact"
+  },
+  {
+    "role": "StaticText",
+    "name": "Parking, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "StaticText",
+    "name": "Parking, Sun 25 Oct: @Test At I, Awaiting response"
+  },
+  {
+    "role": "StaticText",
+    "name": "Parking, Sun 1 Nov: Test Mwila A, Draft"
+  },
+  {
+    "role": "StaticText",
+    "name": "Parking, Sun 8 Nov: Test Joseph B, Confirmed by leader"
+  },
+  {
+    "role": "StaticText",
+    "name": "Parking, Sun 15 Nov: Test Esther C, Declined"
+  },
+  {
+    "role": "StaticText",
+    "name": "Parking, Sun 22 Nov: Test Ruth D, Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Offering team"
+  },
+  {
+    "role": "StaticText",
+    "name": "Offering team, Sun 4 Oct: @Test At I, Confirmed"
+  },
+  {
+    "role": "StaticText",
+    "name": "Offering team, Sun 11 Oct: Test Mwila A, Needs contact"
+  },
+  {
+    "role": "StaticText",
+    "name": "Offering team, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "StaticText",
+    "name": "Offering team, Sun 25 Oct: Test Esther C, Awaiting response"
+  },
+  {
+    "role": "StaticText",
+    "name": "Offering team, Sun 1 Nov: Test Ruth D, Draft"
+  },
+  {
+    "role": "StaticText",
+    "name": "Offering team, Sun 8 Nov: Test Naomi E, Confirmed by leader"
+  },
+  {
+    "role": "StaticText",
+    "name": "Offering team, Sun 15 Nov: Test Moses F, Declined"
+  },
+  {
+    "role": "StaticText",
+    "name": "Offering team, Sun 22 Nov: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Welcome desk"
+  },
+  {
+    "role": "StaticText",
+    "name": "Welcome desk, Sun 4 Oct: Test Esther C, Confirmed"
+  },
+  {
+    "role": "StaticText",
+    "name": "Welcome desk, Sun 11 Oct: Test Ruth D, Needs contact"
+  },
+  {
+    "role": "StaticText",
+    "name": "Welcome desk, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "StaticText",
+    "name": "Welcome desk, Sun 25 Oct: Test Moses F, Awaiting response"
+  },
+  {
+    "role": "StaticText",
+    "name": "Welcome desk, Sun 1 Nov: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Draft"
+  },
+  {
+    "role": "StaticText",
+    "name": "Welcome desk, Sun 8 Nov: +Test Plus G, Confirmed by leader"
+  },
+  {
+    "role": "StaticText",
+    "name": "Welcome desk, Sun 15 Nov: -Test Minus H, Declined"
+  },
+  {
+    "role": "StaticText",
+    "name": "Welcome desk, Sun 22 Nov: @Test At I, Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Children's door"
+  },
+  {
+    "role": "StaticText",
+    "name": "Children's door, Sun 4 Oct: Test Moses F, Confirmed"
+  },
+  {
+    "role": "StaticText",
+    "name": "Children's door, Sun 11 Oct: =HYPERLINK(\"https://example.invalid\",\"Injected\"), Needs contact"
+  },
+  {
+    "role": "StaticText",
+    "name": "Children's door, Sun 18 Oct: no one assigned, Unfilled"
+  },
+  {
+    "role": "StaticText",
+    "name": "Children's door, Sun 25 Oct: -Test Minus H, Awaiting response"
+  },
+  {
+    "role": "StaticText",
+    "name": "Children's door, Sun 1 Nov: @Test At I, Draft"
+  },
+  {
+    "role": "StaticText",
+    "name": "Children's door, Sun 8 Nov: Test Mwila A, Confirmed by leader"
+  },
+  {
+    "role": "StaticText",
+    "name": "Children's door, Sun 15 Nov: Test Joseph B, Declined"
+  },
+  {
+    "role": "StaticText",
+    "name": "Children's door, Sun 22 Nov: Test Esther C, Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Main door, Sun 4 Oct: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Test Mwila A, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Main door, Sun 11 Oct: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Test Joseph B, Needs "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "contact"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Main door, Sun 18 Oct: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "no one assigned, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Unfilled"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Main door, Sun 25 Oct: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Test Ruth D, Awaiting "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "response"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Main door, Sun 1 Nov: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Test Naomi E, Draft"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Main door, Sun 8 Nov: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Test Moses F, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed by leader"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Main door, Sun 15 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Nov: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "=HYPERLINK(\"https://example.invalid\",\"Injected\"), "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Declined"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Main door, Sun 22 Nov: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "+Test Plus G, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Side door, Sun 4 Oct: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Test Ruth D, Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Side door, Sun 11 Oct: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Test Naomi E, Needs "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "contact"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Side door, Sun 18 Oct: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "no one assigned, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Unfilled"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Side door, Sun 25 Oct: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "=HYPERLINK(\"https://example.invalid\",\"Injected\"), "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Awaiting response"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Side door, Sun 1 Nov: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "+Test Plus G, Draft"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Side door, Sun 8 Nov: -"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Test Minus H, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed by leader"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Side door, Sun 15 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Nov: @Test At I, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Declined"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Side door, Sun 22 Nov: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Test Mwila A, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Parking, Sun 4 Oct: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "=HYPERLINK(\"https://example.invalid\",\"Injected\"), "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Parking, Sun 11 Oct: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "+Test Plus G, Needs "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "contact"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Parking, Sun 18 Oct: no "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "one assigned, Unfilled"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Parking, Sun 25 Oct: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "@Test At I, Awaiting "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "response"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Parking, Sun 1 Nov: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Test Mwila A, Draft"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Parking, Sun 8 Nov: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Test Joseph B, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed by leader"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Parking, Sun 15 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Nov: Test Esther C, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Declined"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Parking, Sun 22 Nov: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Test Ruth D, Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Offering team, Sun 4 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Oct: @Test At I, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Offering team, Sun 11 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Oct: Test Mwila A, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Needs contact"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Offering team, Sun 18 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Oct: no one assigned, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Unfilled"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Offering team, Sun 25 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Oct: Test Esther C, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Awaiting response"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Offering team, Sun 1 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Nov: Test Ruth D, Draft"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Offering team, Sun 8 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Nov: Test Naomi E, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed by leader"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Offering team, Sun "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "15 Nov: Test Moses "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "F, Declined"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Offering team, Sun 22 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Nov: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "=HYPERLINK(\"https://example.invalid\",\"Injected\"), "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Welcome desk, Sun 4 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Oct: Test Esther C, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Welcome desk, Sun 11 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Oct: Test Ruth D, Needs "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "contact"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Welcome desk, Sun 18 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Oct: no one assigned, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Unfilled"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Welcome desk, Sun 25 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Oct: Test Moses F, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Awaiting response"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Welcome desk, Sun 1 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Nov: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "=HYPERLINK(\"https://example.invalid\",\"Injected\"), "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Draft"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Welcome desk, Sun 8 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Nov: +Test Plus G, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed by leader"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Welcome desk, Sun "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "15 Nov: -Test Minus "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "H, Declined"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Welcome desk, Sun 22 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Nov: @Test At I, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Children's door, Sun 4 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Oct: Test Moses F, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Children's door, Sun 11 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Oct: "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "=HYPERLINK(\"https://example.invalid\",\"Injected\"), "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Needs contact"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Children's door, Sun 18 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Oct: no one assigned, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Unfilled"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Children's door, Sun 25 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Oct: -Test Minus H, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Awaiting response"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Children's door, Sun 1 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Nov: @Test At I, Draft"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Children's door, Sun 8 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Nov: Test Mwila A, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed by leader"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Children's door, Sun 15 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Nov: Test Joseph B, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Declined"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Children's door, Sun 22 "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Nov: Test Esther C, "
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Confirmed"
+  }
+]

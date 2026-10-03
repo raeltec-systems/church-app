@@ -1,0 +1,102 @@
+[
+  {
+    "role": "RootWebArea",
+    "name": "BIC Kafue staff web trial",
+    "props": {
+      "focusable": true,
+      "focused": true,
+      "url": "http://127.0.0.1:8766/"
+    }
+  },
+  {
+    "role": "alertdialog",
+    "name": "",
+    "props": {
+      "modal": true
+    }
+  },
+  {
+    "role": "generic",
+    "name": "Alert"
+  },
+  {
+    "role": "button",
+    "name": "Cancel",
+    "props": {
+      "focusable": true
+    }
+  },
+  {
+    "role": "button",
+    "name": "Save",
+    "props": {
+      "focusable": true
+    }
+  },
+  {
+    "role": "generic",
+    "name": "Main door — Sun 4 Oct",
+    "props": {
+      "focusable": true,
+      "focused": true
+    }
+  },
+  {
+    "role": "button",
+    "name": "Member Test Mwila A",
+    "props": {
+      "invalid": "false",
+      "focusable": true,
+      "expanded": false
+    }
+  },
+  {
+    "role": "button",
+    "name": "Status Confirmed",
+    "props": {
+      "invalid": "false",
+      "focusable": true,
+      "expanded": false
+    }
+  },
+  {
+    "role": "StaticText",
+    "name": "Cancel"
+  },
+  {
+    "role": "StaticText",
+    "name": "Save"
+  },
+  {
+    "role": "StaticText",
+    "name": "Main door — Sun 4 Oct"
+  },
+  {
+    "role": "StaticText",
+    "name": "Member Test Mwila A"
+  },
+  {
+    "role": "StaticText",
+    "name": "Status Confirmed"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Cancel"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Save"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Main door — Sun 4 Oct"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Member Test Mwila A"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Status Confirmed"
+  }
+]

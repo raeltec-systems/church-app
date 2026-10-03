@@ -1,0 +1,366 @@
+[
+  {
+    "key": "Tab",
+    "note": "traversal",
+    "role": "tab",
+    "name": "Rota grid trial",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "traversal",
+    "role": "tab",
+    "name": "Platform status",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "traversal",
+    "role": "textbox",
+    "name": "Filter positions e.g. door",
+    "tag": "INPUT"
+  },
+  {
+    "key": "Tab",
+    "note": "traversal",
+    "role": "radio",
+    "name": "Grid",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "traversal",
+    "role": "radio",
+    "name": "List",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "traversal",
+    "role": "button",
+    "name": "Export CSV…",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "traversal",
+    "role": "button",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "traversal",
+    "role": "generic",
+    "name": "",
+    "tag": "BODY"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "return to grid",
+    "role": "button",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowLeft",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowUp",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowRight",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Main door, Sun 11 Oct: Test Joseph B, Needs contact",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Side door, Sun 11 Oct: Test Naomi E, Needs contact",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "End",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Side door, Sun 22 Nov: Test Mwila A, Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Control+End",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Children's door, Sun 22 Nov: Test Esther C, Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Home",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Children's door, Sun 4 Oct: Test Moses F, Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Control+Home",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open slot",
+    "role": "generic",
+    "name": "Main door — Sun 4 Oct",
+    "tag": "SPAN"
+  },
+  {
+    "key": "Tab",
+    "note": "to status field",
+    "role": "button",
+    "name": "Member Test Mwila A",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to status field",
+    "role": "button",
+    "name": "Status Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open status menu",
+    "role": "menuitem",
+    "name": "Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "choose status",
+    "role": "menuitem",
+    "name": "Confirmed by leader",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "choose status",
+    "role": "menuitem",
+    "name": "Awaiting response",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "choose status",
+    "role": "menuitem",
+    "name": "Needs contact",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "choose status",
+    "role": "menuitem",
+    "name": "Declined",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "select status",
+    "role": "button",
+    "name": "Status Declined",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to Save",
+    "role": "button",
+    "name": "Cancel",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to Save",
+    "role": "button",
+    "name": "Save",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "save",
+    "role": "button",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Declined",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "reopen slot",
+    "role": "generic",
+    "name": "Main door — Sun 4 Oct",
+    "tag": "SPAN"
+  },
+  {
+    "key": "Escape",
+    "note": "cancel with Escape",
+    "role": "button",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Declined",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to filter",
+    "role": "button",
+    "name": "Export CSV…",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to filter",
+    "role": "radio",
+    "name": "List",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to filter",
+    "role": "radio",
+    "name": "Grid",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to filter",
+    "role": "textbox",
+    "name": "Filter positions e.g. door",
+    "tag": "INPUT"
+  },
+  {
+    "key": "Tab",
+    "note": "to export",
+    "role": "radio",
+    "name": "Grid",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to export",
+    "role": "radio",
+    "name": "List",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to export",
+    "role": "button",
+    "name": "Export CSV…",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open export",
+    "role": "generic",
+    "name": "Export rota CSV",
+    "tag": "SPAN"
+  },
+  {
+    "key": "Tab",
+    "note": "to download",
+    "role": "button",
+    "name": "Cancel",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to download",
+    "role": "button",
+    "name": "Download CSV",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "download",
+    "role": "button",
+    "name": "Export CSV…",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to filter",
+    "role": "radio",
+    "name": "List",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to filter",
+    "role": "radio",
+    "name": "Grid",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to filter",
+    "role": "textbox",
+    "name": "Filter positions",
+    "tag": "INPUT"
+  },
+  {
+    "key": "Tab",
+    "note": "to List",
+    "role": "radio",
+    "name": "Grid",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to List",
+    "role": "radio",
+    "name": "List",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Space",
+    "note": "switch to list",
+    "role": "radio",
+    "name": "List",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "into list",
+    "role": "button",
+    "name": "Export CSV…",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to first Change",
+    "role": "button",
+    "name": "Change Main door, Sun 4 Oct",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open from list",
+    "role": "generic",
+    "name": "Main door — Sun 4 Oct",
+    "tag": "SPAN"
+  },
+  {
+    "key": "Escape",
+    "note": "close",
+    "role": "button",
+    "name": "Change Main door, Sun 4 Oct",
+    "tag": "FLT-SEMANTICS"
+  }
+]

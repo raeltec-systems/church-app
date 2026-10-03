@@ -1,0 +1,46 @@
+{
+  "slots": 48,
+  "layout": {
+    "rects": {
+      "filter": {
+        "x": 32,
+        "right": 680,
+        "width": 648,
+        "height": 78
+      },
+      "grid": {
+        "x": 688,
+        "right": 769.53125,
+        "width": 81.53125,
+        "height": 40
+      },
+      "list": {
+        "x": 769.5328369140625,
+        "right": 851.0640869140625,
+        "width": 81.53125,
+        "height": 40
+      },
+      "export": {
+        "x": 867.0656127929688,
+        "right": 1066.175048828125,
+        "width": 199.10943603515625,
+        "height": 40
+      }
+    },
+    "heading": {
+      "height": 69,
+      "width": 220.390625
+    },
+    "pageScrollsHorizontally": false,
+    "rootFontSize": "32px"
+  },
+  "toolbarInside": true,
+  "farVisible": true,
+  "listInside": true,
+  "id": "C12",
+  "baselineHeading": {
+    "height": 34,
+    "width": 111.4375
+  },
+  "headingRatio": 2.03
+}

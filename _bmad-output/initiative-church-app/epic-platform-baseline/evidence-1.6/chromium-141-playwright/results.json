@@ -1,0 +1,545 @@
+{
+  "generated": "2026-10-03T13:00:31.546Z",
+  "label": "chromium-141-playwright",
+  "browser": "chromium-141-playwright 141.0.7390.37",
+  "url": "http://127.0.0.1:8766/",
+  "readyMs": 1420,
+  "passed": 27,
+  "failed": 0,
+  "checks": [
+    {
+      "id": "C1",
+      "name": "semantics tree is present without a user \"enable accessibility\" step",
+      "result": "pass",
+      "detail": {
+        "readyMs": 1420
+      }
+    },
+    {
+      "id": "C2a",
+      "name": "grid exposes table/row/columnheader/cell roles",
+      "result": "pass",
+      "detail": {
+        "rows": 7,
+        "headers": [
+          "Position",
+          "Sun 4 Oct",
+          "Sun 11 Oct",
+          "Sun 18 Oct",
+          "Sun 25 Oct",
+          "Sun 1 Nov",
+          "Sun 8 Nov",
+          "Sun 15 Nov",
+          "Sun 22 Nov"
+        ],
+        "cells": 54
+      }
+    },
+    {
+      "id": "C2b",
+      "name": "all 48 slots are buttons named \"position, date: member, status\"",
+      "result": "pass",
+      "detail": {
+        "slots": 48,
+        "sample": [
+          "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+          "Main door, Sun 11 Oct: Test Joseph B, Needs contact",
+          "Main door, Sun 18 Oct: no one assigned, Unfilled"
+        ]
+      }
+    },
+    {
+      "id": "C2c",
+      "name": "page heading, filter field, view toggle, export and tabs are named",
+      "result": "pass",
+      "detail": {
+        "h1": {
+          "role": "heading",
+          "name": "Duty rotas",
+          "props": {
+            "level": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "C2d",
+      "name": "view toggle exposes which view is selected (radio, checked)",
+      "result": "pass",
+      "detail": {
+        "toggles": [
+          {
+            "role": "radio",
+            "name": "Grid",
+            "props": {
+              "focusable": true,
+              "checked": "true"
+            }
+          },
+          {
+            "role": "radio",
+            "name": "List",
+            "props": {
+              "focusable": true,
+              "checked": "false"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "C3",
+      "name": "every interactive node has a non-empty accessible name",
+      "result": "pass",
+      "detail": {
+        "unnamed": []
+      }
+    },
+    {
+      "id": "C4a",
+      "name": "Tab reaches every control in visual order, DOM focus follows (not <body>)",
+      "result": "pass",
+      "detail": {
+        "names": [
+          "tab: Rota grid trial",
+          "tab: Platform status",
+          "textbox: Filter positions e.g. door",
+          "radio: Grid",
+          "radio: List",
+          "button: Export CSV…",
+          "button: Main door, Sun 4 Oct: Test Mwila A, Confirmed"
+        ]
+      }
+    },
+    {
+      "id": "C4b",
+      "name": "the grid is one Tab stop (roving focus) and Tab then leaves the page content",
+      "result": "pass",
+      "detail": {
+        "slotStops": 1
+      }
+    },
+    {
+      "id": "C4c",
+      "name": "every focused control has a role and a name",
+      "result": "pass",
+      "detail": {
+        "names": [
+          "tab: Rota grid trial",
+          "tab: Platform status",
+          "textbox: Filter positions e.g. door",
+          "radio: Grid",
+          "radio: List",
+          "button: Export CSV…",
+          "button: Main door, Sun 4 Oct: Test Mwila A, Confirmed"
+        ]
+      }
+    },
+    {
+      "id": "C5",
+      "name": "every focused control looks visibly different from its unfocused state (≥3% of pixels in its box)",
+      "result": "pass",
+      "detail": [
+        [
+          "tab: Rota grid trial",
+          0.7721,
+          0
+        ],
+        [
+          "tab: Platform status",
+          0.7683,
+          0
+        ],
+        [
+          "textbox: Filter positions e.g. door",
+          0.1363,
+          1873
+        ],
+        [
+          "radio: Grid",
+          0.46,
+          0
+        ],
+        [
+          "radio: List",
+          0.6016,
+          584
+        ],
+        [
+          "button: Export CSV…",
+          0.5796,
+          918
+        ],
+        [
+          "button: Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+          0.7553,
+          1198
+        ]
+      ]
+    },
+    {
+      "id": "C6",
+      "name": "arrow/Home/End/Control keys move focus slot by slot, stop at edges and scroll into view",
+      "result": "pass",
+      "detail": {
+        "back": true,
+        "moveLog": [
+          {
+            "key": "ArrowLeft",
+            "got": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+            "ok": true,
+            "inView": true
+          },
+          {
+            "key": "ArrowUp",
+            "got": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+            "ok": true,
+            "inView": true
+          },
+          {
+            "key": "ArrowRight",
+            "got": "Main door, Sun 11 Oct: Test Joseph B, Needs contact",
+            "ok": true,
+            "inView": true
+          },
+          {
+            "key": "ArrowDown",
+            "got": "Side door, Sun 11 Oct: Test Naomi E, Needs contact",
+            "ok": true,
+            "inView": true
+          },
+          {
+            "key": "End",
+            "got": "Side door, Sun 22 Nov: Test Mwila A, Confirmed",
+            "ok": true,
+            "inView": true
+          },
+          {
+            "key": "Control+End",
+            "got": "Children's door, Sun 22 Nov: Test Esther C, Confirmed",
+            "ok": true,
+            "inView": true
+          },
+          {
+            "key": "Home",
+            "got": "Children's door, Sun 4 Oct: Test Moses F, Confirmed",
+            "ok": true,
+            "inView": true
+          },
+          {
+            "key": "Control+Home",
+            "got": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+            "ok": true,
+            "inView": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "C7a",
+      "name": "keyboard-only slot edit: dialog opens, status changes, focus returns to the slot",
+      "result": "pass",
+      "detail": {
+        "dialog": {
+          "role": "alertdialog",
+          "name": "",
+          "props": {
+            "modal": true
+          }
+        },
+        "focusedAfter": "Main door, Sun 4 Oct: Test Mwila A, Declined",
+        "savedSlot": "Main door, Sun 4 Oct: Test Mwila A, Declined"
+      }
+    },
+    {
+      "id": "C7b",
+      "name": "the change is announced through the polite live region",
+      "result": "pass",
+      "detail": {
+        "live": "Saved. Main door, Sun 4 Oct: Test Mwila A, Declined."
+      }
+    },
+    {
+      "id": "C7c",
+      "name": "Escape closes the dialog without changes and restores focus",
+      "result": "pass",
+      "detail": {
+        "focused": "Main door, Sun 4 Oct: Test Mwila A, Declined"
+      }
+    },
+    {
+      "id": "C8a",
+      "name": "a filter matching nothing says so and disables export with a reason",
+      "result": "pass",
+      "detail": {
+        "exportNode": {
+          "role": "button",
+          "name": "Export CSV…",
+          "props": {
+            "disabled": true,
+            "focusable": true
+          }
+        }
+      }
+    },
+    {
+      "id": "C8b",
+      "name": "filtering positions narrows the grid rows",
+      "result": "pass",
+      "detail": {
+        "rows": 4
+      }
+    },
+    {
+      "id": "C9a",
+      "name": "export preview states scope, columns, exclusions and the outside-access warning",
+      "result": "pass",
+      "detail": {}
+    },
+    {
+      "id": "C9b",
+      "name": "downloaded CSV: BOM, allowlisted header, 24 filtered rows, 5 columns each, CRLF",
+      "result": "pass",
+      "detail": {
+        "filename": "bic-kafue-rota-trial-SYNTHETIC.csv",
+        "bom": true,
+        "crlfRows": 25,
+        "header": [
+          "Date",
+          "Position",
+          "Member",
+          "Status",
+          "Note"
+        ],
+        "rows": 24,
+        "columnsPerRow": [
+          5
+        ],
+        "positions": [
+          "Main door",
+          "Side door",
+          "Children's door"
+        ],
+        "rawTriggerFields": [],
+        "neutralisedFields": [
+          "'=1+2",
+          "'\tTab-led note",
+          "'=HYPERLINK(\"https://example.invalid\",\"Injected\")",
+          "'+Test Plus G",
+          "'=1+2",
+          "'=1+2",
+          "'\tTab-led note",
+          "'=HYPERLINK(\"https://example.invalid\",\"Injected\")",
+          "'+Test Plus G",
+          "'-Test Minus H",
+          "'@Test At I",
+          "'=1+2",
+          "'\tTab-led note",
+          "'=HYPERLINK(\"https://example.invalid\",\"Injected\")",
+          "'=1+2",
+          "'-Test Minus H",
+          "'\tTab-led note",
+          "'@Test At I",
+          "'=1+2"
+        ],
+        "privateLeak": false,
+        "editedSlot": [
+          "2026-10-04",
+          "Main door",
+          "Test Mwila A",
+          "Declined",
+          ""
+        ]
+      }
+    },
+    {
+      "id": "C9c",
+      "name": "formula-led values are neutralised with a leading apostrophe; none start raw",
+      "result": "pass",
+      "detail": {
+        "rawTrigger": [],
+        "neutralised": [
+          "'=1+2",
+          "'\tTab-led note",
+          "'=HYPERLINK(\"https://example.invalid\",\"Injected\")",
+          "'+Test Plus G",
+          "'=1+2",
+          "'=1+2",
+          "'\tTab-led note",
+          "'=HYPERLINK(\"https://example.invalid\",\"Injected\")",
+          "'+Test Plus G",
+          "'-Test Minus H",
+          "'@Test At I",
+          "'=1+2",
+          "'\tTab-led note",
+          "'=HYPERLINK(\"https://example.invalid\",\"Injected\")",
+          "'=1+2",
+          "'-Test Minus H",
+          "'\tTab-led note",
+          "'@Test At I",
+          "'=1+2"
+        ]
+      }
+    },
+    {
+      "id": "C9d",
+      "name": "no private field (phone, care note) is in the file",
+      "result": "pass",
+      "detail": {}
+    },
+    {
+      "id": "C9e",
+      "name": "the keyboard edit made in the grid is in the export",
+      "result": "pass",
+      "detail": {
+        "editedSlot": [
+          "2026-10-04",
+          "Main door",
+          "Test Mwila A",
+          "Declined",
+          ""
+        ]
+      }
+    },
+    {
+      "id": "C10a",
+      "name": "list view: 6 lists, 48 list items, 48 named Change buttons, level-2 headings",
+      "result": "pass",
+      "detail": {
+        "lists": 6,
+        "items": 48,
+        "change": 48
+      }
+    },
+    {
+      "id": "C10b",
+      "name": "list items are operable by keyboard (Change opens the same slot dialog)",
+      "result": "pass",
+      "detail": {
+        "firstChange": "Change Main door, Sun 4 Oct",
+        "listDialog": true,
+        "focusAfter": "Change Main door, Sun 4 Oct",
+        "listToggle": []
+      }
+    },
+    {
+      "id": "C0",
+      "name": "no page errors during the desktop run",
+      "result": "pass",
+      "detail": {
+        "errors": []
+      }
+    },
+    {
+      "id": "C11",
+      "name": "200% zoom: all slots exposed, toolbar wraps inside the window, no page-level horizontal scroll, grid end reachable, list fits",
+      "result": "pass",
+      "detail": {
+        "slots": 48,
+        "layout": {
+          "rects": {
+            "filter": {
+              "x": 32,
+              "right": 360,
+              "width": 328,
+              "height": 54
+            },
+            "grid": {
+              "x": 368,
+              "right": 447.953125,
+              "width": 79.953125,
+              "height": 32
+            },
+            "list": {
+              "x": 447.9664001464844,
+              "right": 527.9195556640625,
+              "width": 79.95315551757812,
+              "height": 32
+            },
+            "export": {
+              "x": 32,
+              "right": 177.09375,
+              "width": 145.09375,
+              "height": 32
+            }
+          },
+          "heading": {
+            "height": 34,
+            "width": 111.4375
+          },
+          "pageScrollsHorizontally": false,
+          "rootFontSize": "16px"
+        },
+        "toolbarInside": true,
+        "farVisible": true,
+        "listInside": true,
+        "id": "C11"
+      }
+    },
+    {
+      "id": "C12",
+      "name": "200% browser font size: root font 32px, text renders ~2×, all slots exposed, toolbar inside, grid end reachable, list fits",
+      "result": "pass",
+      "detail": {
+        "slots": 48,
+        "layout": {
+          "rects": {
+            "filter": {
+              "x": 32,
+              "right": 680,
+              "width": 648,
+              "height": 78
+            },
+            "grid": {
+              "x": 688,
+              "right": 769.53125,
+              "width": 81.53125,
+              "height": 40
+            },
+            "list": {
+              "x": 769.5328369140625,
+              "right": 851.0640869140625,
+              "width": 81.53125,
+              "height": 40
+            },
+            "export": {
+              "x": 867.0656127929688,
+              "right": 1066.175048828125,
+              "width": 199.10943603515625,
+              "height": 40
+            }
+          },
+          "heading": {
+            "height": 69,
+            "width": 220.390625
+          },
+          "pageScrollsHorizontally": false,
+          "rootFontSize": "32px"
+        },
+        "toolbarInside": true,
+        "farVisible": true,
+        "listInside": true,
+        "id": "C12",
+        "baselineHeading": {
+          "height": 34,
+          "width": 111.4375
+        },
+        "headingRatio": 2.03
+      }
+    },
+    {
+      "id": "C13",
+      "name": "mobile emulation (Pixel 7 viewport, touch, mobile UA): boots, exposes slots, a tap opens the slot dialog",
+      "result": "pass",
+      "detail": {
+        "rect": {
+          "x": 241,
+          "y": 598.5
+        },
+        "dialog": true,
+        "errors": [],
+        "classification": "emulated, not a device run"
+      }
+    }
+  ]
+}

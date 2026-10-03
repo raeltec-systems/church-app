@@ -29,6 +29,54 @@ const RESERVED_DOMAINS = ['example.com', 'example.net', 'example.org'];
 
 const PROJECT_REF_RE = /^[a-z]{20}$/;
 
+// Story 1.9 (AD-19): the only command any system principal may run, and the only restricted
+// operator the owner has named (owner-decisions-milestone-1.md). Both match the database.
+export const SYSTEM_COMMAND_ALLOWLIST = ['system.synthetic_probe'];
+export const RESTRICTED_OPERATORS = ['israel'];
+const ALERT_GATES = ['q12_operations', 'ops_alert_destination'];
+
+/** Operations block: bounded system route, named operators, alerting and scheduler fail closed. */
+export function validateOperations(file, ops) {
+  const where = `${file}.json`;
+  const errors = [];
+  if (!ops || typeof ops !== 'object') return [`${where}: operations block is required`];
+  const operators = ops.restricted_operators;
+  if (!Array.isArray(operators) || operators.length === 0
+      || operators.some((o) => !RESTRICTED_OPERATORS.includes(o))) {
+    errors.push(`${where}: operations.restricted_operators must name only owner-selected operators (${RESTRICTED_OPERATORS.join(', ')})`);
+  }
+  const route = ops.system_route ?? {};
+  if (route.credential_header !== 'x-system-credential') {
+    errors.push(`${where}: operations.system_route.credential_header must be x-system-credential`);
+  }
+  const commands = route.allowed_commands;
+  if (!Array.isArray(commands) || commands.length === 0
+      || commands.some((c) => !SYSTEM_COMMAND_ALLOWLIST.includes(c))) {
+    errors.push(`${where}: operations.system_route.allowed_commands must be a subset of ${SYSTEM_COMMAND_ALLOWLIST.join(', ')}`);
+  }
+  const expected = file === 'production' ? 'owner_gate:ops_system_access' : 'open_nonproduction';
+  if (route.activation !== expected) {
+    errors.push(`${where}: operations.system_route.activation must be "${expected}"`);
+  }
+  if (Object.keys(route).some((k) => /secret|token|digest|password|key$/i.test(k))) {
+    errors.push(`${where}: operations.system_route must not hold credential material`);
+  }
+  const alerting = ops.alerting ?? {};
+  if (alerting.enabled !== false) {
+    errors.push(`${where}: operations.alerting.enabled must stay false; the ${ALERT_GATES.join(' and ')} gates control activation (no destination or Q12 thresholds are chosen)`);
+  }
+  if (JSON.stringify(alerting.gates) !== JSON.stringify(ALERT_GATES)) {
+    errors.push(`${where}: operations.alerting.gates must be ${JSON.stringify(ALERT_GATES)}`);
+  }
+  if (Object.keys(alerting).some((k) => !['enabled', 'gates'].includes(k))) {
+    errors.push(`${where}: operations.alerting holds no destination or thresholds; they are restricted owner values approved as database gates`);
+  }
+  if (ops.scheduler?.enabled !== false) {
+    errors.push(`${where}: operations.scheduler.enabled must stay false (no scheduler is enabled before Q2/Q12)`);
+  }
+  return errors;
+}
+
 export function loadEnvironments(dir = CONFIG_DIR) {
   const envs = {};
   for (const file of readdirSync(dir).filter((f) => f.endsWith('.json')).sort()) {
@@ -115,6 +163,7 @@ export function validateEnvironments(envs, { productionRef = process.env.PRODUCT
     for (const hit of findSecrets(JSON.stringify(env), { mode: 'bundle' })) {
       errors.push(`${where}: contains a secret-like value (${hit.rule}); configs hold names only`);
     }
+    errors.push(...validateOperations(file, env.operations));
     const dep = env.deploy ?? {};
     if (file === 'production') {
       if (env.recipients?.mode !== 'disabled' || (env.recipients?.allowed_patterns ?? []).length !== 0) {
@@ -174,7 +223,7 @@ function main(argv) {
     const errors = validateEnvironments(envs);
     for (const e of errors) console.error(`environments: ${e}`);
     if (errors.length) return 1;
-    console.log(`environments: ${Object.keys(envs).length} configs valid (separate refs, synthetic non-production recipients, production private/sending disabled)`);
+    console.log(`environments: ${Object.keys(envs).length} configs valid (separate refs, synthetic non-production recipients, production private/sending disabled, bounded system route, alerting/scheduler off)`);
     return 0;
   }
   if (cmd === 'target') {

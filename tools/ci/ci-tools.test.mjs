@@ -212,3 +212,12 @@ test('drift check skips (exit 0) when no access token is configured', async () =
   assert.equal(r.status, 0);
   assert.match(r.stdout, /skipped: SUPABASE_ACCESS_TOKEN is not set/);
 });
+
+test('system credentials are secrets in every mode; their digest and prefix are not', () => {
+  const token = `sysc_staging_${'Ab3-_'.repeat(8)}xyz`;
+  assert.equal(token.length, 'sysc_staging_'.length + 43);
+  assert.equal(findSecrets(`x=${token}`)[0].rule, 'system_credential');
+  assert.equal(findSecrets(`"${token}"`, { mode: 'bundle' })[0].rule, 'system_credential');
+  assert.ok(!JSON.stringify(findSecrets(token)).includes(token.slice(12)), 'findings never echo the value');
+  assert.deepEqual(findSecrets(`sysc_local_short sysc_<env>_<43> ${'a'.repeat(64)}`), []);
+});

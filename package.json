@@ -7,10 +7,10 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
-    "db:smoke": "bash supabase/tests/api_smoke.sh && bash supabase/tests/command_api_smoke.sh && bash supabase/tests/contract_fixtures_check.sh",
+    "db:smoke": "bash supabase/tests/api_smoke.sh && bash supabase/tests/command_api_smoke.sh && bash supabase/tests/contract_fixtures_check.sh && bash supabase/tests/system_api_smoke.sh",
     "contracts:test": "node --test packages/contracts/ts/contracts.test.ts",
     "env:check": "node tools/env/environments.mjs check",
-    "ci:policy-test": "node --test tools/env/*.test.mjs tools/ci/*.test.mjs",
+    "ci:policy-test": "node --test tools/env/*.test.mjs tools/ci/*.test.mjs tools/ops/*.test.mjs",
     "ci:migrations": "node tools/ci/check-migrations.mjs",
     "ci:secrets": "node tools/ci/scan-secrets.mjs",
     "ci:drift:staging": "node tools/ci/check-migration-drift.mjs --env staging"

@@ -32,20 +32,23 @@ select is(
   0,
   'no app/api function is executable by PUBLIC'
 );
-select is(
-  (select count(*)::int
-     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname in ('app', 'api') and has_function_privilege('anon', p.oid, 'EXECUTE')),
-  0,
-  'anon can execute no app/api function'
+-- Story 1.9 adds the system route pair (system credential only; see system_access_test.sql).
+select results_eq(
+  $$select (n.nspname || '.' || p.proname)::text collate "C"
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname in ('app', 'api') and has_function_privilege('anon', p.oid, 'EXECUTE')
+     order by 1$$,
+  $$values ('api.system_command'::text collate "C"), ('app.sys_command')$$,
+  'anon can execute only the system route pair'
 );
 select results_eq(
   $$select (n.nspname || '.' || p.proname)::text collate "C"
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname in ('app', 'api') and has_function_privilege('authenticated', p.oid, 'EXECUTE')
      order by 1$$,
-  $$values ('api.fixture_counter_command'::text collate "C"), ('app.fixture_counter_command')$$,
-  'authenticated can execute only the api wrapper and its definer entry point'
+  $$values ('api.fixture_counter_command'::text collate "C"), ('api.system_command'),
+           ('app.fixture_counter_command'), ('app.sys_command')$$,
+  'authenticated can execute only the command wrappers and their definer entry points (the system route refuses sessions)'
 );
 select is_definer('app', 'fixture_counter_command',
   array['jsonb'], 'the app entry point is SECURITY DEFINER');

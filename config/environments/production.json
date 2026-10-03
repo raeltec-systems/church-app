@@ -31,5 +31,22 @@
       "branch": "main",
       "secret_names": ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"]
     }
+  },
+  "operations": {
+    "restricted_operators": ["israel"],
+    "system_route": {
+      "endpoint": "rest/v1/rpc/system_command (Content-Profile: api)",
+      "credential_header": "x-system-credential",
+      "allowed_commands": ["system.synthetic_probe"],
+      "activation": "owner_gate:ops_system_access",
+      "credential_source": "never in the repo: minted by tools/ops/system-credential.mjs into the gitignored .ops-state/; a restricted operator registers only its sha256 digest in this database after the owner approves ops_system_access"
+    },
+    "alerting": {
+      "enabled": false,
+      "gates": ["q12_operations", "ops_alert_destination"]
+    },
+    "scheduler": {
+      "enabled": false
+    }
   }
 }

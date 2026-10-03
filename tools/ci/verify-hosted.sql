@@ -29,6 +29,14 @@ begin
   if app.policy_is_open('outbound_sending') then
     raise exception 'verify-hosted: outbound_sending gate is open in %', v_actual;
   end if;
-  raise notice 'verify-hosted: % marker confirmed; private_access and outbound_sending closed', v_actual;
+  -- Story 1.9: alerting stays disabled until the owner approves Q12 thresholds and the
+  -- restricted alert destination; this baseline ships no dispatcher.
+  if to_regprocedure('app.ops_alert_status()') is null then
+    raise exception 'verify-hosted: app.ops_alert_status() is missing (story 1.9 migration not applied)';
+  end if;
+  if app.ops_alert_status() ->> 'alerting' <> 'disabled' then
+    raise exception 'verify-hosted: alerting is not disabled in %', v_actual;
+  end if;
+  raise notice 'verify-hosted: % marker confirmed; private_access and outbound_sending closed; alerting disabled', v_actual;
 end;
 $$;

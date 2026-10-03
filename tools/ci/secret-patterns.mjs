@@ -10,6 +10,8 @@ const JWT_RE = /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/
 const RULES = [
   { rule: 'supabase_secret_key', re: /\bsb_secret_[A-Za-z0-9_-]{12,}/g },
   { rule: 'supabase_access_token', re: /\bsbp_(?:v0_)?[A-Za-z0-9]{32,}/g },
+  // Story 1.9 system credential (tools/ops/system-credential.mjs); only its digest may be stored.
+  { rule: 'system_credential', re: /\bsysc_(?:local|staging|production)_[A-Za-z0-9_-]{43}(?![A-Za-z0-9_-])/g },
   { rule: 'private_key', re: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----/g },
   { rule: 'github_token', re: /\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{60,})/g },
   { rule: 'cloudflare_or_generic_bearer', re: /\bBearer\s+(?!\$|<|\[|\{)[A-Za-z0-9._~+/-]{40,}=*/g },

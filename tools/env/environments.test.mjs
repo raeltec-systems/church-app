@@ -98,3 +98,27 @@ test('configs cannot carry secret values', () => {
   bad.staging.supabase.note = 'sb_' + 'secret_' + 'A'.repeat(32);
   assert.match(validateEnvironments(bad).join('\n'), /secret-like/);
 });
+
+test('operations: bounded system route, named operator, alerting and scheduler fail closed', () => {
+  for (const [name, mutate, re] of [
+    ['staging', (o) => { o.system_route.allowed_commands.push('fixture_counter.increment'); }, /allowed_commands/],
+    ['local', (o) => { o.system_route.allowed_commands = []; }, /allowed_commands/],
+    ['production', (o) => { o.system_route.activation = 'open_nonproduction'; }, /activation/],
+    ['staging', (o) => { o.system_route.activation = 'owner_gate:ops_system_access'; }, /activation/],
+    ['staging', (o) => { o.restricted_operators = ['israel', 'someone']; }, /restricted_operators/],
+    ['local', (o) => { o.restricted_operators = []; }, /restricted_operators/],
+    ['production', (o) => { o.alerting.enabled = true; }, /alerting.enabled/],
+    ['staging', (o) => { o.alerting.destination = 'ops@example.test'; }, /no destination/],
+    ['staging', (o) => { o.alerting.thresholds = { p95_ms: 1 }; }, /no destination or thresholds/],
+    ['production', (o) => { o.scheduler.enabled = true; }, /scheduler/],
+    ['local', (o) => { o.system_route.credential_digest = 'a'.repeat(64); }, /credential material/],
+    ['staging', (o) => { o.system_route.credential_header = 'authorization'; }, /credential_header/],
+  ]) {
+    const bad = envs();
+    mutate(bad[name].operations);
+    assert.match(validateEnvironments(bad).join('\n'), re, `${name}: ${mutate}`);
+  }
+  const missing = envs();
+  delete missing.staging.operations;
+  assert.match(validateEnvironments(missing).join('\n'), /operations block is required/);
+});

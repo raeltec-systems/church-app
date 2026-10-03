@@ -25,5 +25,22 @@
     "secret_names": [],
     "variable_names": [],
     "web_hosting": null
+  },
+  "operations": {
+    "restricted_operators": ["israel"],
+    "system_route": {
+      "endpoint": "rest/v1/rpc/system_command (Content-Profile: api)",
+      "credential_header": "x-system-credential",
+      "allowed_commands": ["system.synthetic_probe"],
+      "activation": "open_nonproduction",
+      "credential_source": "never in the repo: minted by tools/ops/system-credential.mjs into the gitignored .ops-state/; a restricted operator registers only its sha256 digest in this database"
+    },
+    "alerting": {
+      "enabled": false,
+      "gates": ["q12_operations", "ops_alert_destination"]
+    },
+    "scheduler": {
+      "enabled": false
+    }
   }
 }

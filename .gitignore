@@ -18,5 +18,8 @@ supabase/.branches/
 .env
 .env.*
 
+# Story 1.9 system credentials (tools/ops/system-credential.mjs); never commit
+.ops-state/
+
 # Agent worktrees (local only)
 .claude/worktrees/

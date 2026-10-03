@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: 22
       - name: Policy tool tests (offline)
-        run: node --test tools/env/*.test.mjs tools/ci/*.test.mjs
+        run: node --test tools/env/*.test.mjs tools/ci/*.test.mjs tools/ops/*.test.mjs
       - name: Environment configs are separate, secret-free and fail closed
         run: node tools/env/environments.mjs check
         env:

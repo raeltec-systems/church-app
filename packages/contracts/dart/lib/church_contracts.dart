@@ -12,6 +12,8 @@ export 'src/check.dart'
         check,
         contractVersion,
         errorCodeNames,
+        fieldErrorCodeNames,
+        integerIn,
         lifecycleEventNames,
         maxRevision,
         require;

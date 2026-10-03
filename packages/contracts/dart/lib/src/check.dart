@@ -2,6 +2,7 @@
 // (supabase/migrations/20261003190000_cross_epic_contracts.sql) and the TypeScript mapping;
 // all three pass the shared fixtures in packages/contracts/fixtures/v1. No business rules:
 // registration membership, IANA zone existence and money scale are server-side checks.
+// Behaves identically on the Dart VM and on the web (integers are checked by value).
 
 const int contractVersion = 1;
 
@@ -49,6 +50,21 @@ const List<String> errorCodeNames = [
   'unavailable',
 ];
 
+/// Every field error code a server path may return (mirrors app.contract_field_error_codes).
+const List<String> fieldErrorCodeNames = [
+  'required',
+  'invalid',
+  'unknown_field',
+  'must_be_object',
+  'unsupported',
+  'must_be_null',
+  'out_of_range',
+  'unknown',
+  'unregistered',
+  'scale_exceeded',
+  'gate_closed',
+];
+
 /// Same shape as app.contract_check: `valid` plus field path -> error code.
 class CheckResult {
   const CheckResult(this.fieldErrors);
@@ -73,9 +89,9 @@ final _command = RegExp(r'^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$');
 final _instant = RegExp(
     r'^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\.[0-9]{1,6})?Z$');
 final _local = RegExp(r'^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})$');
-final _zone = RegExp(r'^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*$');
-final _amount = RegExp(r'^-?(0|[1-9][0-9]{0,14})(\.[0-9]{1,6})?$');
-final _negativeZero = RegExp(r'^-0(\.0+)?$');
+final _zone = RegExp(r'^(UTC|(Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia|Europe'
+    r'|Indian|Pacific)(/[A-Za-z][A-Za-z0-9_+-]*){1,2})$');
+final _amount = RegExp(r'^(0|[1-9][0-9]{0,14})(\.[0-9]{1,6})?$');
 final _currency = RegExp(r'^[A-Z]{3}$');
 
 typedef _Rule = String? Function(Object? value);
@@ -96,10 +112,19 @@ final _Rule _uuidError = _string(_uuid);
 final _Rule _tokenError = _string(_token);
 final _Rule _zoneError = _string(_zone, maxLength: 64);
 final _Rule _currencyError = _string(_currency);
+final _Rule _amountError = _string(_amount);
 
-String? revisionError(Object? v) {
+/// Integers are defined by value: `1`, `1.0` and `1e0` are the same integer on every
+/// platform (the VM decodes `1.0`/`1e3` as doubles, the web as numbers).
+bool integerIn(Object? v, num min, num max) {
+  if (v is int) return v >= min && v <= max;
+  if (v is double) return v.isFinite && v == v.truncateToDouble() && v >= min && v <= max;
+  return false;
+}
+
+String? _revisionError(Object? v) {
   if (v == null) return 'required';
-  return v is int && v >= 1 && v <= maxRevision ? null : 'invalid';
+  return integerIn(v, 1, maxRevision) ? null : 'invalid';
 }
 
 bool _calendarOk(RegExpMatch m) {
@@ -120,26 +145,27 @@ _Rule _dateTime(RegExp re) => (v) {
 final _Rule _instantError = _dateTime(_instant);
 final _Rule _localError = _dateTime(_local);
 
-String? _amountError(Object? v) {
-  if (v == null) return 'required';
-  return v is String && _amount.hasMatch(v) && !_negativeZero.hasMatch(v) ? null : 'invalid';
-}
-
 String? _fieldErrorsError(Object? v) {
   if (v == null) return 'required';
-  return v is Map && v.values.every((x) => x is String) ? null : 'invalid';
+  return v is Map && v.values.every((x) => x is String && fieldErrorCodeNames.contains(x))
+      ? null
+      : 'invalid';
 }
 
-Map<String, String> _object(Map<dynamic, dynamic> o, Map<String, _Rule> rules,
-    {String root = r'$'}) {
+/// Rule errors per key plus `{"<key>": "unknown_field"}` for every key outside the rules.
+Map<String, String> _object(Map<dynamic, dynamic> o, Map<String, _Rule> rules) {
   final errors = <String, String>{};
   rules.forEach((key, rule) {
     final e = rule(o[key]);
     if (e != null) errors[key] = e;
   });
-  if (o.keys.any((k) => !rules.containsKey(k))) errors[root] = 'unknown_field';
+  for (final k in o.keys) {
+    if (!rules.containsKey(k)) errors['$k'] = 'unknown_field';
+  }
   return errors;
 }
+
+String? _accept(Object? _) => null;
 
 final Map<ContractKind, Map<String, _Rule>> _rules = {
   ContractKind.memberRef: {'member_id': _uuidError},
@@ -147,7 +173,7 @@ final Map<ContractKind, Map<String, _Rule>> _rules = {
   ContractKind.sourceRef: {
     'source_type': _tokenError,
     'source_id': _uuidError,
-    'source_revision': revisionError,
+    'source_revision': _revisionError,
   },
   ContractKind.taskSource: {
     'source_type': _tokenError,
@@ -157,7 +183,7 @@ final Map<ContractKind, Map<String, _Rule>> _rules = {
   ContractKind.notificationKey: {
     'source_type': _tokenError,
     'source_id': _uuidError,
-    'source_revision': revisionError,
+    'source_revision': _revisionError,
     'recipient_member_id': _uuidError,
     'reminder_kind': _tokenError,
     'scheduled_at': _instantError,
@@ -166,13 +192,59 @@ final Map<ContractKind, Map<String, _Rule>> _rules = {
     'event': _oneOf(lifecycleEventNames),
     'member_id': _uuidError,
     'occurred_at': _instantError,
-    'identity_revision': revisionError,
+    'identity_revision': _revisionError,
   },
   ContractKind.zonedLocal: {'local': _localError, 'zone': _zoneError},
   ContractKind.money: {'amount': _amountError, 'currency': _currencyError},
 };
 
-String? _accept(Object? _) => null;
+final Map<String, _Rule> _memberActor = {
+  'kind': _accept,
+  'member_id': _uuidError,
+  'auth_user_id': _uuidError,
+};
+final Map<String, _Rule> _systemActor = {
+  'kind': _accept,
+  'system_principal_id': _uuidError,
+  'job_id': _uuidError,
+  'initiating_member_id': _nullable(_uuidError),
+};
+final Map<String, _Rule> _commandRequest = {
+  'version': (v) => v == null ? 'required' : (integerIn(v, 1, 1) ? null : 'unsupported'),
+  'command': _string(_command, maxLength: 127),
+  'request_id': _uuidError,
+  'expected_revision': _nullable(_revisionError),
+  'payload': (v) => v is Map ? null : 'must_be_object',
+};
+
+/// The key rules for an object value of [kind]; null when the shape cannot be determined.
+Map<String, _Rule>? _keyRules(ContractKind kind, Map<dynamic, dynamic> o) {
+  switch (kind) {
+    case ContractKind.actor:
+      final k = o['kind'];
+      return k == 'member' ? _memberActor : (k == 'system' ? _systemActor : null);
+    case ContractKind.commandRequest:
+      return _commandRequest;
+    case ContractKind.commandResponse:
+      if (o.containsKey('code')) {
+        return {
+          'request_id': (v) =>
+              o.containsKey('request_id') ? _nullable(_uuidError)(v) : 'required',
+          'code': _oneOf(errorCodeNames),
+          'message': (v) => v == null ? 'required' : (v is String ? null : 'invalid'),
+          'field_errors': _fieldErrorsError,
+          'current_revision': _nullable(_revisionError),
+        };
+      }
+      return {
+        'request_id': _uuidError,
+        'data': (v) => o.containsKey('data') ? null : 'required',
+        'revision': _revisionError,
+      };
+    default:
+      return _rules[kind];
+  }
+}
 
 /// Checks a decoded JSON value (as produced by `jsonDecode`) against wire contract v1.
 CheckResult check(ContractKind kind, Object? value) {
@@ -180,57 +252,14 @@ CheckResult check(ContractKind kind, Object? value) {
     final e = _instantError(value);
     return CheckResult(e == null ? const {} : {r'$': e});
   }
-  final root = kind == ContractKind.commandRequest ? 'envelope' : r'$';
-  if (value is! Map) return CheckResult({root: 'must_be_object'});
-
-  switch (kind) {
-    case ContractKind.actor:
-      final k = value['kind'];
-      if (k == null) return const CheckResult({'kind': 'required'});
-      if (k == 'member') {
-        return CheckResult(_object(value,
-            {'kind': _accept, 'member_id': _uuidError, 'auth_user_id': _uuidError}));
-      }
-      if (k == 'system') {
-        return CheckResult(_object(value, {
-          'kind': _accept,
-          'system_principal_id': _uuidError,
-          'job_id': _uuidError,
-          'initiating_member_id': _nullable(_uuidError),
-        }));
-      }
-      return const CheckResult({'kind': 'invalid'});
-    case ContractKind.commandRequest:
-      return CheckResult(_object(
-        value,
-        {
-          'version': (v) => v == null ? 'required' : (v is int && v == 1 ? null : 'unsupported'),
-          'command': _string(_command, maxLength: 127),
-          'request_id': _uuidError,
-          'expected_revision': _nullable(revisionError),
-          'payload': (v) => v is Map ? null : 'must_be_object',
-        },
-        root: 'envelope',
-      ));
-    case ContractKind.commandResponse:
-      if (value.containsKey('code')) {
-        return CheckResult(_object(value, {
-          'request_id': (v) =>
-              value.containsKey('request_id') ? _nullable(_uuidError)(v) : 'required',
-          'code': _oneOf(errorCodeNames),
-          'message': (v) => v == null ? 'required' : (v is String ? null : 'invalid'),
-          'field_errors': _fieldErrorsError,
-          'current_revision': _nullable(revisionError),
-        }));
-      }
-      return CheckResult(_object(value, {
-        'request_id': _uuidError,
-        'data': (v) => value.containsKey('data') ? null : 'required',
-        'revision': revisionError,
-      }));
-    default:
-      return CheckResult(_object(value, _rules[kind]!));
+  if (value is! Map) {
+    return CheckResult({kind == ContractKind.commandRequest ? 'envelope' : r'$': 'must_be_object'});
   }
+  if (kind == ContractKind.actor) {
+    if (value['kind'] == null) return const CheckResult({'kind': 'required'});
+    if (_keyRules(kind, value) == null) return const CheckResult({'kind': 'invalid'});
+  }
+  return CheckResult(_object(value, _keyRules(kind, value)!));
 }
 
 /// Throws [ContractViolation] unless [value] satisfies [kind].

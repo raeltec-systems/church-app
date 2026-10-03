@@ -62,6 +62,9 @@ jobs:
       - name: contracts — shared fixtures (Dart mapping)
         working-directory: packages/contracts/dart
         run: dart test
+      - name: contracts — shared fixtures in Chrome (dart2js number model)
+        working-directory: packages/contracts/dart
+        run: dart test -p chrome
       - name: mobile — pub get (locked)
         working-directory: apps/mobile
         run: flutter pub get --enforce-lockfile

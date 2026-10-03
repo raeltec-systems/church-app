@@ -13,10 +13,13 @@
     {"name": "kind not a string", "value": {"kind": 1}, "field_errors": {"kind": "invalid"}},
     {"name": "member without account", "value": {"kind": "member", "member_id": "00000000-0000-4000-8000-000000000001"}, "field_errors": {"auth_user_id": "required"}},
     {"name": "member with null member_id", "value": {"kind": "member", "member_id": null, "auth_user_id": "00000000-0000-4000-8000-000000000002"}, "field_errors": {"member_id": "required"}},
-    {"name": "member cannot carry system fields", "value": {"kind": "member", "member_id": "00000000-0000-4000-8000-000000000001", "auth_user_id": "00000000-0000-4000-8000-000000000002", "system_principal_id": "00000000-0000-4000-8000-000000000003"}, "field_errors": {"$": "unknown_field"}},
+    {"name": "member cannot carry system fields", "value": {"kind": "member", "member_id": "00000000-0000-4000-8000-000000000001", "auth_user_id": "00000000-0000-4000-8000-000000000002", "system_principal_id": "00000000-0000-4000-8000-000000000003"}, "field_errors": {"system_principal_id": "unknown_field"}},
     {"name": "system without job", "value": {"kind": "system", "system_principal_id": "00000000-0000-4000-8000-000000000003"}, "field_errors": {"job_id": "required"}},
-    {"name": "system cannot select an arbitrary member actor", "value": {"kind": "system", "system_principal_id": "00000000-0000-4000-8000-000000000003", "job_id": "00000000-0000-4000-8000-000000000001", "member_id": "00000000-0000-4000-8000-000000000002"}, "field_errors": {"$": "unknown_field"}},
+    {"name": "system cannot select an arbitrary member actor", "value": {"kind": "system", "system_principal_id": "00000000-0000-4000-8000-000000000003", "job_id": "00000000-0000-4000-8000-000000000001", "member_id": "00000000-0000-4000-8000-000000000002"}, "field_errors": {"member_id": "unknown_field"}},
     {"name": "system with malformed initiating member", "value": {"kind": "system", "system_principal_id": "00000000-0000-4000-8000-000000000003", "job_id": "00000000-0000-4000-8000-000000000001", "initiating_member_id": "x"}, "field_errors": {"initiating_member_id": "invalid"}},
-    {"name": "not an object", "value": "member", "field_errors": {"$": "must_be_object"}}
+    {"name": "not an object", "value": "member", "field_errors": {"$": "must_be_object"}},
+    {"name": "prototype-named key constructor", "value": {"kind": "member", "member_id": "00000000-0000-4000-8000-000000000001", "auth_user_id": "00000000-0000-4000-8000-000000000002", "constructor": "x"}, "field_errors": {"constructor": "unknown_field"}},
+    {"name": "prototype-named key __proto__", "value": {"kind": "member", "member_id": "00000000-0000-4000-8000-000000000001", "auth_user_id": "00000000-0000-4000-8000-000000000002", "__proto__": "x"}, "field_errors": {"__proto__": "unknown_field"}},
+    {"name": "prototype-named key toString", "value": {"kind": "member", "member_id": "00000000-0000-4000-8000-000000000001", "auth_user_id": "00000000-0000-4000-8000-000000000002", "toString": "x"}, "field_errors": {"toString": "unknown_field"}}
   ]
 }

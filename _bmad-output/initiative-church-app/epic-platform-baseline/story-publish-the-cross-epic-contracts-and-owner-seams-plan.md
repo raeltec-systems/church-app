@@ -70,7 +70,7 @@ context:
 - [x] `packages/contracts/dart/` -- `church_contracts` pure-Dart package: validators, typed models, fixture test, locked deps.
 - [x] `packages/contracts/ts/` -- `contracts.ts` validators/types plus `contracts.test.ts` (`node --test`).
 - [x] `supabase/migrations/<ts>_cross_epic_contracts.sql` -- `contract_check`, registries, guard, registration and dispatch seams, policy gates, environment marker, grants.
-- [x] `supabase/seed.sql` -- mark the local environment.
+- [x] ~~`supabase/seed.sql` -- mark the local environment.~~ Reverted in review follow-up: nothing writes the marker automatically (see Plan Change Log).
 - [x] `supabase/tests/cross_epic_contracts_test.sql` -- pgTAP: privileges, ownership/boundary guard, registration accept/reject, dispatch order and atomicity, source hook, gate behaviour per environment, money scale, zone existence.
 - [x] `supabase/tests/contract_fixtures_check.sh` + `package.json` -- run every fixture through `app.contract_check`; `contracts:test` script for TS.
 - [x] `.github/workflows/ci.yml` -- Dart package get/analyze/test in `flutter`; TS fixtures in `db`.
@@ -126,7 +126,7 @@ Implemented 2026-10-03 directly (no subagent tool in this session).
 - `dart pub get --enforce-lockfile && dart analyze --fatal-infos && dart test` in `packages/contracts/dart`: no issues, 185/185.
 - No Flutter app was touched, so `flutter analyze` / `flutter test` were not needed.
 
-**Hosted: NOT applied (coordinator instruction).** Apply exactly `supabase/migrations/20261003190000_cross_epic_contracts.sql` (sha256 `df81481dc03b3f571d0208d481f2db30b471eb1456741aad06c52accd04e978d`) to `tmurpotfluignacfueki`, after `20261003131021_command_foundation_hardening`. If hosted records a different version, rename the local file to match. Hosted will then behave as production (no environment row), so every gate stays closed. To use fixtures on staging, an operator runs `select app.platform_set_environment('staging', '<operator>');` (entry 8 / owner). After applying, run `get_advisors(security)`; expect only `rls_enabled_no_policy` INFO on the new deny-all tables.
+**Hosted: NOT applied (coordinator instruction).** Apply exactly `supabase/migrations/20261003190000_cross_epic_contracts.sql` (sha256 `5dd307da72f451293692089a3f5cb156e66da5f1bed00a8d40598082f8238df9` (as of the review follow-up)) to `tmurpotfluignacfueki`, after `20261003131021_command_foundation_hardening`. If hosted records a different version, rename the local file to match. The migration also create-or-replaces `app.cmd_execute` (same signature, non-destructive), so the kernel's envelope validation uses the contract. Hosted will then behave as production (no environment row), so every gate stays closed. To use fixtures on staging, an operator runs `select app.platform_set_environment('staging', '<operator>');` (entry 8 / owner); after that, staging can only move to production. After applying, run `get_advisors(security)`; expect only `rls_enabled_no_policy` INFO on the new deny-all tables.
 
 **Matrix audit:** each row is covered, and each covering test ran and passed:
 - Valid and Invalid fixture: `contract_fixtures_check.sh`, Dart `fixtures_test.dart` and TS `contracts.test.ts`, all over the same files, including the Dart/TS decode→encode round trip.
@@ -135,6 +135,86 @@ Implemented 2026-10-03 directly (no subagent tool in this session).
 - Approve without approver: pgTAP.
 
 
+**Review follow-up (2026-10-03).** The migration was edited in place: it is not applied anywhere hosted, still has no destructive statements, and still sorts after `20261003131021`.
+- **Guards.**
+  - `contract_boundary_violations()` now scans:
+    - `prosrc` plus `pg_get_function_sqlbody`, so `BEGIN ATOMIC` bodies are covered
+    - view definitions, RLS policy expressions and column defaults
+    - triggers on `app` tables; a trigger whose function lives outside `app` is reported
+  - New `contract_unpinned_functions()` requires `search_path = ''` on every `app`/`api` function, so references must be schema-qualified. Registration also refuses an unpinned handler.
+  - The `platform -> fixture` module edge is gone. Instead an object-level exception, `contract_dependency_exceptions`, covers only `app.cmd_authorize(uuid,text)`.
+  - The `retired_` prefix is gone. Exactly three signatures are listed in `contract_retired_functions`; any other `retired_*` name is unowned.
+- **Kernel.** `app.cmd_execute` is create-or-replaced with the same signature. Its envelope validation now calls `contract_check('command_request')` and adds only `command: unsupported` and `expected_revision: required/must_be_null`.
+  - Behaviour changes: a missing command is `required`; an uppercase request_id is `invalid`; `expected_revision` 0 is `invalid`; unknown keys are reported per key.
+  - The 1.4 suite still passes unchanged.
+  - `contract_fixtures_check.sh` now also sends every `command_request` fixture through `api.fixture_counter_command`, as an authenticated actor with no grant, in a rolled-back transaction.
+- **Contract rules (SQL, Dart and TS identically):**
+  - unknown keys are reported on the key itself
+  - integers are checked by value (`1e3`, `1.0` valid; `1.5`, `1e-1`, `1e16`, `1e300` invalid)
+  - money is unsigned
+  - zones are canonical `Area/Location` names or `UTC`, at most 64 characters
+  - a field-error-code vocabulary (`contract_field_error_codes`) is validated in `command_response`
+  - lifecycle event names have a single source, `app.contract_lifecycle_events`, which `contract_check` reads. The old list function was removed, and pgTAP and both client tests compare the lists.
+- **Policy.**
+  - A closed gate's error is now `{"policy": "gate_closed"}`.
+  - `policy_approve('q9_money', …)` validates `{"currencies": {"<ISO>": 0..6}}`.
+  - The Q2 fixture zone is now `UTC`.
+- **Environment.**
+  - `seed.sql` was reverted, so nothing writes the marker automatically.
+  - `platform_set_environment` refuses any move away from production, and refuses `local` once staging or production has ever been recorded. Every marking is recorded in `platform_environment_history`.
+  - The runbook says restores and clones must re-assert the marker.
+- **TypeScript.**
+  - Own-property checks via `hasOwnProperty.call`, and error keys are written with `defineProperty`, so `constructor`, `__proto__` and `toString` are reported.
+  - A real `encode` writes exactly the contract keys the value carries.
+- **Dart.**
+  - `Optional<T>` keeps an omitted key distinct from an explicit null (`SystemActor.initiatingMemberId`, `CommandRequest.expectedRevision`, `CommandError.currentRevision`).
+  - Integers are read via `num`.
+  - `Instant.fromDateTime` throws for years outside 1..9999; `Money` is unsigned.
+  - The fixtures are embedded verbatim in `test/fixtures.g.dart`, generated by `tool/embed_fixtures.dart`; a VM test fails when the copy is stale. The same tests run under `dart test -p chrome`.
+  - `dart_test.yaml` passes `--no-sandbox`. CI gained a Chrome step.
+- **Round trips** in both client tests now compare exactly, with no null stripping.
+- **New fixtures:**
+  - boundary cases: 63-character token, 64- and 65-character zone, 127- and 128-character command
+  - uppercase and zero envelope cases
+  - number spellings: exponents, `1.0`, `1.5`, `1e300`
+  - prototype-named keys
+  - zone aliases: `Etc/`, `posix/`, `right/`, `EST5EDT`, `Factory`, `US/Eastern`, `UCT`, `GMT`
+  - negative money
+  - server-only field error codes
+- **Docs.** The runbook now says every change, additions included, needs a version bump. It also documents the guards, environment transitions and restore re-assertion.
+- **Verification (local).**
+  - `npx supabase db reset`, then `npm run db:test`: 201/201 (102 in `cross_epic_contracts_test.sql`).
+  - `npm run db:smoke`: exit 0, with 223 fixture cases against SQL plus 25 envelopes through the api.
+  - `npm run contracts:test`: 226/226.
+  - `dart analyze --fatal-infos`: no issues.
+  - `dart test`: 243/243.
+  - `CHROME_EXECUTABLE=/opt/pw-browsers/chromium-1243/chrome-linux64/chrome dart test -p chrome`: 242/242. The VM-only staleness test is skipped in the browser.
+
 ## Plan Change Log
+
+- 2026-10-03, review follow-up (coordinator review findings):
+  - **Findings:**
+    - The boundary guard missed `BEGIN ATOMIC` bodies, unqualified names, views, policies, defaults and triggers.
+    - The platform->fixture exception covered the whole platform module, and the retired prefix covered any `retired_*` name.
+    - The kernel and the contract disagreed on envelope codes.
+    - TS key checks followed the prototype chain, and number handling differed across runtimes.
+    - The round trip lost the difference between an omitted key and an explicit null.
+    - Unknown keys were reported on the root.
+    - The runbook contradicted strict versioning.
+    - The seed wrote the environment marker, and transitions were reversible.
+    - Zone aliases were admitted.
+    - The lifecycle list had two sources.
+    - Internal gate names leaked into errors, and server-only codes were missing from clients.
+    - q9 approvals were not validated.
+    - Money was signed.
+    - `Instant.fromDateTime` accepted 5-digit years.
+  - **Amended:**
+    - Frozen decision overridden: "`seed.sql` marks local only" no longer holds. Nothing writes the marker; local scripts and the operator set it.
+    - Frozen decision refined: unknown keys are now reported per key, as the decision intended. The earlier implementation used the root.
+    - Zone fixture `Etc/UTC` replaced by `UTC`.
+    - Money is unsigned.
+    - Kernel envelope validation now comes from the contract.
+  - **Avoids:** guard bypasses, drifting envelope codes, a hosted database marked local, cross-runtime fixture disagreement, and contract-level feature decisions on sign.
+  - **KEEP:** registry-based hook dispatch, signature-text storage (no reg* columns), fail-closed gates with labelled fixtures, and one fixture set for SQL, Dart and TS.
 
 ## Review Triage Log

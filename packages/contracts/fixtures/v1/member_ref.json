@@ -11,8 +11,11 @@
     {"name": "not a uuid", "value": {"member_id": "member-1"}, "field_errors": {"member_id": "invalid"}},
     {"name": "number", "value": {"member_id": 1}, "field_errors": {"member_id": "invalid"}},
     {"name": "phone number is never an identity", "value": {"member_id": "+260970000000"}, "field_errors": {"member_id": "invalid"}},
-    {"name": "unknown key", "value": {"member_id": "00000000-0000-4000-8000-000000000001", "phone": "+260970000000"}, "field_errors": {"$": "unknown_field"}},
+    {"name": "unknown key", "value": {"member_id": "00000000-0000-4000-8000-000000000001", "phone": "+260970000000"}, "field_errors": {"phone": "unknown_field"}},
     {"name": "not an object", "value": "00000000-0000-4000-8000-000000000001", "field_errors": {"$": "must_be_object"}},
-    {"name": "null", "value": null, "field_errors": {"$": "must_be_object"}}
+    {"name": "null", "value": null, "field_errors": {"$": "must_be_object"}},
+    {"name": "prototype-named key constructor", "value": {"member_id": "00000000-0000-4000-8000-000000000001", "constructor": "x"}, "field_errors": {"constructor": "unknown_field"}},
+    {"name": "prototype-named key __proto__", "value": {"member_id": "00000000-0000-4000-8000-000000000001", "__proto__": "x"}, "field_errors": {"__proto__": "unknown_field"}},
+    {"name": "prototype-named key toString", "value": {"member_id": "00000000-0000-4000-8000-000000000001", "toString": "x"}, "field_errors": {"toString": "unknown_field"}}
   ]
 }

@@ -3,19 +3,23 @@
 -- 1. Wire contract v1: `app.contract_check(kind, value)` is the SQL authority for the shared
 --    fixtures in packages/contracts/fixtures/v1 (identifiers, actor, source/purpose, revisions,
 --    UTC instants, church-local intent, exact money, command request/response). The Dart and
---    TypeScript client mappings pass the same fixtures.
+--    TypeScript client mappings pass the same fixtures. The command kernel's envelope
+--    validation (app.cmd_execute) now delegates to it, so the two cannot drift.
 -- 2. Owner registry (AD-1): modules, their object-name prefixes, the allowed dependency edges
---    from the architecture's binding diagram and a guard that reports unowned `app` objects
---    and literal references to an owner a module may not depend on.
+--    from the architecture's binding diagram, explicit object-level exceptions and retired
+--    objects, and guards that report unowned `app` objects, functions without an empty
+--    search_path, and references to an owner a module may not depend on (function bodies,
+--    BEGIN ATOMIC bodies, views, RLS policies, column defaults and triggers).
 -- 3. Owner seams: source owners register source types (with a current-state check hook),
 --    purposes and reminder kinds; owners register lifecycle hooks. Emitters call hooks through
 --    the registry, so they never reference another owner's implementation.
 -- 4. Fail-closed policy gates (AD-9, AD-17, AD-18): unresolved decisions stay closed. Labelled
 --    fixture values are honoured only in an explicitly marked local/staging environment; an
---    unmarked database behaves as production. No gate is approved here.
+--    unmarked database behaves as production, and production can never be downgraded.
+--    No gate is approved here.
 --
--- Everything here is migration-time or server-internal: no client role gets any privilege.
--- No feature business rules or concrete state machines; owners add those in later epics.
+-- No destructive statements. Everything is migration-time or server-internal: no client role
+-- gets any privilege. No feature business rules or concrete state machines.
 
 -- ---------------------------------------------------------------------------------------------
 -- Wire contract v1 validators (shape only; registration, zone existence and money scale are
@@ -52,7 +56,20 @@ as $$
   end;
 $$;
 
--- Monotonic revision: JSON integer 1..2^53-1 (safe in every client runtime).
+-- Integers are defined by value: any JSON number whose value is an exact integer in range
+-- (1, 1.0 and 1e0 are the same integer in every runtime).
+create function app.contract_integer_in(p_value jsonb, p_min numeric, p_max numeric)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select jsonb_typeof(p_value) = 'number'
+     and (p_value #>> '{}')::numeric = trunc((p_value #>> '{}')::numeric)
+     and (p_value #>> '{}')::numeric between p_min and p_max;
+$$;
+
+-- Monotonic revision: integer 1..2^53-1 (safe in every client runtime).
 create function app.contract_revision_error(p_value jsonb, p_nullable boolean default false)
 returns text
 language sql
@@ -62,10 +79,7 @@ as $$
   select case
     when p_value is null or jsonb_typeof(p_value) = 'null' then
       case when p_nullable then null else 'required' end
-    when jsonb_typeof(p_value) = 'number'
-         and (p_value #>> '{}') ~ '^[1-9][0-9]{0,15}$'
-         and (p_value #>> '{}')::numeric <= 9007199254740991
-      then null
+    when app.contract_integer_in(p_value, 1, 9007199254740991) then null
     else 'invalid'
   end;
 $$;
@@ -147,7 +161,8 @@ begin
 end;
 $$;
 
--- IANA zone name shape; existence is checked server-side by contract_require.
+-- Canonical IANA Area/Location name (or UTC), at most 64 chars. No Etc/, posix/, right/ or
+-- legacy aliases (EST5EDT, US/Eastern, Factory, UCT). Existence is checked server-side.
 create function app.contract_zone_error(p_value jsonb)
 returns text
 language sql
@@ -158,14 +173,15 @@ as $$
     when p_value is null or jsonb_typeof(p_value) = 'null' then 'required'
     when jsonb_typeof(p_value) = 'string'
          and length(p_value #>> '{}') <= 64
-         and (p_value #>> '{}') ~ '^[A-Za-z][A-Za-z0-9_+-]*(/[A-Za-z0-9_+-]+)*$'
+         and (p_value #>> '{}') ~ ('^(UTC|(Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia'
+                                   '|Europe|Indian|Pacific)(/[A-Za-z][A-Za-z0-9_+-]*){1,2})$')
       then null
     else 'invalid'
   end;
 $$;
 
--- Exact decimal string: no float, no exponent, no separators, <= 15 integer and <= 6 fraction
--- digits, no negative zero. The approved per-currency scale is a policy check (Q9).
+-- Exact unsigned decimal string: no float, sign, exponent or separators, <= 15 integer and
+-- <= 6 fraction digits. Signs belong to owner rules; the approved scale is a Q9 policy check.
 create function app.contract_amount_error(p_value jsonb)
 returns text
 language sql
@@ -175,8 +191,7 @@ as $$
   select case
     when p_value is null or jsonb_typeof(p_value) = 'null' then 'required'
     when jsonb_typeof(p_value) = 'string'
-         and (p_value #>> '{}') ~ '^-?(0|[1-9][0-9]{0,14})(\.[0-9]{1,6})?$'
-         and (p_value #>> '{}') !~ '^-0(\.0+)?$'
+         and (p_value #>> '{}') ~ '^(0|[1-9][0-9]{0,14})(\.[0-9]{1,6})?$'
       then null
     else 'invalid'
   end;
@@ -195,18 +210,16 @@ as $$
   end;
 $$;
 
--- {"$": "unknown_field"} when the object carries a key outside the allowed set.
-create function app.contract_unknown_keys(p_value jsonb, p_allowed text[], p_root text default '$')
+-- {"<key>": "unknown_field"} for every key outside the allowed set.
+create function app.contract_unknown_keys(p_value jsonb, p_allowed text[])
 returns jsonb
 language sql
 stable
 set search_path = ''
 as $$
-  select case
-    when exists (select 1 from jsonb_object_keys(p_value) k where k <> all (p_allowed))
-      then jsonb_build_object(p_root, 'unknown_field')
-    else '{}'::jsonb
-  end;
+  select coalesce(jsonb_object_agg(k, 'unknown_field'), '{}'::jsonb)
+    from jsonb_object_keys(p_value) k
+   where k <> all (p_allowed);
 $$;
 
 create function app.contract_error_codes()
@@ -219,19 +232,20 @@ as $$
                'rate_limited', 'unavailable'];
 $$;
 
--- Contract v1 lifecycle events (Identity-owned stub list, AD-14). A new event is a contract
--- version change: update this list, app.contract_lifecycle_events and the shared fixtures.
-create function app.contract_lifecycle_event_names()
+-- Every field error code any server path may return (clients validate against this list).
+create function app.contract_field_error_codes()
 returns text[]
 language sql
 immutable
 set search_path = ''
 as $$
-  select array['access_hold_applied', 'access_hold_released', 'scope_revoked',
-               'account_deactivated', 'deletion_requested', 'cell_transferred'];
+  select array['required', 'invalid', 'unknown_field', 'must_be_object', 'unsupported',
+               'must_be_null', 'out_of_range', 'unknown', 'unregistered', 'scale_exceeded',
+               'gate_closed'];
 $$;
 
 -- The single SQL authority for the shared v1 fixtures. Returns {valid, field_errors}.
+-- Lifecycle event names come from app.contract_lifecycle_events (single source).
 create function app.contract_check(p_kind text, p_value jsonb)
 returns jsonb
 language plpgsql
@@ -241,11 +255,11 @@ as $$
 declare
   v jsonb := coalesce(p_value, 'null'::jsonb);
   e jsonb := '{}'::jsonb;
-  v_root text := case when p_kind = 'command_request' then 'envelope' else '$' end;
 begin
-  if p_kind not in ('member_ref', 'account_ref', 'actor', 'source_ref', 'task_source',
-                    'notification_key', 'lifecycle_event', 'instant', 'zoned_local', 'money',
-                    'command_request', 'command_response') then
+  if p_kind is null
+     or p_kind not in ('member_ref', 'account_ref', 'actor', 'source_ref', 'task_source',
+                       'notification_key', 'lifecycle_event', 'instant', 'zoned_local', 'money',
+                       'command_request', 'command_response') then
     raise exception using errcode = '22023', message = 'unknown contract kind';
   end if;
 
@@ -255,7 +269,8 @@ begin
   end if;
 
   if jsonb_typeof(v) <> 'object' then
-    e := jsonb_build_object(v_root, 'must_be_object');
+    e := jsonb_build_object(case when p_kind = 'command_request' then 'envelope' else '$' end,
+                            'must_be_object');
     return jsonb_build_object('valid', false, 'field_errors', e);
   end if;
 
@@ -318,7 +333,8 @@ begin
            'event', case
                       when coalesce(jsonb_typeof(v -> 'event'), 'null') = 'null' then 'required'
                       when jsonb_typeof(v -> 'event') = 'string'
-                           and (v ->> 'event') = any (app.contract_lifecycle_event_names()) then null
+                           and exists (select 1 from app.contract_lifecycle_events le
+                                        where le.event = v ->> 'event') then null
                       else 'invalid'
                     end,
            'member_id', app.contract_uuid_error(v -> 'member_id'),
@@ -340,11 +356,12 @@ begin
          || app.contract_unknown_keys(v, array['amount', 'currency']);
 
   when 'command_request' then
-    -- Mirrors the kernel envelope (20261003170000) with stricter revision and command shapes.
+    -- Authoritative envelope shape; app.cmd_execute calls this and adds only the per-command
+    -- checks (allowlisted command -> unsupported, expected_revision required/must_be_null).
     e := jsonb_build_object(
            'version', case
                         when coalesce(jsonb_typeof(v -> 'version'), 'null') = 'null' then 'required'
-                        when jsonb_typeof(v -> 'version') = 'number' and (v ->> 'version') = '1' then null
+                        when app.contract_integer_in(v -> 'version', 1, 1) then null
                         else 'unsupported'
                       end,
            'command', case
@@ -359,8 +376,7 @@ begin
            'payload', case when jsonb_typeof(v -> 'payload') = 'object' then null
                            else 'must_be_object' end)
          || app.contract_unknown_keys(
-              v, array['version', 'command', 'request_id', 'expected_revision', 'payload'],
-              'envelope');
+              v, array['version', 'command', 'request_id', 'expected_revision', 'payload']);
 
   when 'command_response' then
     if v ? 'code' then
@@ -385,7 +401,8 @@ begin
                                when jsonb_typeof(v -> 'field_errors') = 'object'
                                     and not exists (
                                       select 1 from jsonb_each(v -> 'field_errors') f
-                                       where jsonb_typeof(f.value) <> 'string')
+                                       where jsonb_typeof(f.value) <> 'string'
+                                          or (f.value #>> '{}') <> all (app.contract_field_error_codes()))
                                  then null
                                else 'invalid'
                              end,
@@ -409,29 +426,137 @@ $$;
 comment on function app.contract_check(text, jsonb) is
   'Wire contract v1 shape authority; packages/contracts/fixtures/v1 is its shared test set.';
 
--- Server-side use: raises the kernel's validation_failed (PCMD1) with the contract field errors,
--- and adds the server-only zone existence check.
-create function app.contract_require(p_kind text, p_value jsonb)
-returns void
+-- ---------------------------------------------------------------------------------------------
+-- Kernel envelope validation delegates to the contract (same signature: create or replace)
+-- ---------------------------------------------------------------------------------------------
+create or replace function app.cmd_execute(
+  p_envelope jsonb,
+  p_handler regprocedure,
+  p_scope regprocedure,
+  p_revision_required boolean
+) returns jsonb
 language plpgsql
-volatile
 set search_path = ''
 as $$
 declare
-  v_result jsonb := app.contract_check(p_kind, p_value);
+  v_errors jsonb;
+  v_request_id uuid;
+  v_command text;
+  v_expected bigint;
+  v_payload jsonb;
+  v_actor uuid;
+  v_stored jsonb;
+  v_agg_type text;
+  v_agg_id uuid;
+  v_in_scope boolean;
+  v_outcome jsonb;
+  v_envelope jsonb;
+  v_code text;
+  v_detail text;
+  v_detail_json jsonb;
 begin
-  if not (v_result ->> 'valid')::boolean then
-    perform app.cmd_fail('validation_failed', v_result -> 'field_errors');
+  -- Envelope shape: wire contract v1 (app.contract_check), all field errors at once.
+  v_errors := app.contract_check('command_request', p_envelope) -> 'field_errors';
+
+  if jsonb_typeof(p_envelope) = 'object' then
+    if not (v_errors ? 'request_id') then
+      v_request_id := (p_envelope ->> 'request_id')::uuid;
+    end if;
+    -- Per-command checks, only on fields the contract accepted.
+    if not (v_errors ? 'command') then
+      if p_handler is null then
+        v_errors := v_errors || '{"command": "unsupported"}';
+      else
+        v_command := p_envelope ->> 'command';
+      end if;
+    end if;
+    if not (v_errors ? 'expected_revision') then
+      if coalesce(jsonb_typeof(p_envelope -> 'expected_revision'), 'null') <> 'null' then
+        v_expected := (p_envelope ->> 'expected_revision')::numeric::bigint;
+      end if;
+      if p_handler is not null then
+        if p_revision_required and v_expected is null then
+          v_errors := v_errors || '{"expected_revision": "required"}';
+        elsif not p_revision_required and v_expected is not null then
+          v_errors := v_errors || '{"expected_revision": "must_be_null"}';
+        end if;
+      end if;
+    end if;
+    v_payload := p_envelope -> 'payload';
   end if;
-  if p_kind = 'zoned_local'
-     and not exists (select 1 from pg_catalog.pg_timezone_names z where z.name = p_value ->> 'zone') then
-    perform app.cmd_fail('validation_failed', '{"zone": "unknown"}');
+
+  if v_errors <> '{}'::jsonb then
+    return app.cmd_error_envelope(v_request_id, 'validation_failed', v_errors);
   end if;
+
+  begin
+    v_actor := app.cmd_current_actor();
+    perform app.cmd_authorize(v_actor, v_command);
+
+    v_stored := app.cmd_reserve_receipt(
+      v_actor, v_command, v_request_id,
+      app.cmd_payload_hash(1, v_command, v_expected, v_payload)
+    );
+    if v_stored is not null then
+      -- AD-2: recheck current access on the receipt's aggregate before replaying it.
+      select r.aggregate_type, r.aggregate_id
+        into v_agg_type, v_agg_id
+        from app.cmd_receipts r
+       where r.actor_id = v_actor and r.command = v_command and r.request_id = v_request_id;
+      execute format('select %s($1, $2, $3)', p_scope::regproc)
+        into v_in_scope
+        using v_actor, v_agg_type, v_agg_id;
+      if v_in_scope is not true then
+        perform app.cmd_fail('forbidden');
+      end if;
+      return v_stored;
+    end if;
+
+    execute format('select %s($1, $2, $3)', p_handler::regproc)
+      into v_outcome
+      using v_actor, v_expected, v_payload;
+
+    v_envelope := jsonb_build_object(
+      'request_id', v_request_id,
+      'data', v_outcome -> 'data',
+      'revision', (v_outcome ->> 'revision')::bigint
+    );
+
+    update app.cmd_receipts r
+       set result = v_envelope,
+           aggregate_type = v_outcome ->> 'aggregate_type',
+           aggregate_id = (v_outcome ->> 'aggregate_id')::uuid
+     where r.actor_id = v_actor
+       and r.command = v_command
+       and r.request_id = v_request_id
+       and r.result is null;
+    if not found then
+      perform app.cmd_fail('unavailable');
+    end if;
+
+    return v_envelope;
+  exception
+    when sqlstate 'PCMD1' then
+      get stacked diagnostics v_code = message_text, v_detail = pg_exception_detail;
+      v_detail_json := v_detail::jsonb;
+      return app.cmd_error_envelope(
+        v_request_id, v_code,
+        v_detail_json -> 'field_errors',
+        (v_detail_json ->> 'current_revision')::bigint
+      );
+    when others then
+      -- Unexpected internal failure: rolled back, reported without SQL detail.
+      raise log 'cmd % request % failed: sqlstate %', v_command, v_request_id, sqlstate;
+      return app.cmd_error_envelope(v_request_id, 'unavailable');
+  end;
 end;
 $$;
 
+revoke all on function app.cmd_execute(jsonb, regprocedure, regprocedure, boolean)
+  from public, anon, authenticated, service_role;
+
 -- ---------------------------------------------------------------------------------------------
--- Owner registry (AD-1) and boundary guard
+-- Owner registry (AD-1) and boundary guards
 -- ---------------------------------------------------------------------------------------------
 
 create table app.contract_modules (
@@ -462,10 +587,25 @@ create table app.contract_module_dependencies (
 comment on table app.contract_module_dependencies is
   'Allowed "may depend on/call" edges from the architecture dependency diagram.';
 
+-- One named function may reference one module outside its module's edges, with a reason.
+create table app.contract_dependency_exceptions (
+  function_signature text not null,
+  to_module text not null references app.contract_modules (module),
+  reason text not null check (length(btrim(reason)) > 0),
+  primary key (function_signature, to_module)
+);
+
+-- Exactly these retired functions (revoked + renamed, awaiting an owner-approved drop) belong
+-- to the inert `retired` module. Any other retired_* name stays unowned and fails the guard.
+create table app.contract_retired_functions (
+  function_signature text primary key,
+  reason text not null check (length(btrim(reason)) > 0)
+);
+
 insert into app.contract_modules (module, lock_rank, description) values
   ('platform', null, 'Command kernel, wire contracts, owner registry, policy gates, tracer status'),
   ('orchestration', null, 'Cross-domain application commands that call owner operations'),
-  ('retired', null, 'Inert objects retired by revoke + rename (retired_<name>_v<n>) awaiting an owner-approved drop'),
+  ('retired', null, 'Explicitly listed retired functions awaiting an owner-approved drop'),
   ('identity', 10, 'Members, account links, approvals, grants, settings, lifecycle'),
   ('content', 20, 'Publishing and instruction-only giving'),
   ('cells', 20, 'Cell membership, meetings, programmes, registers, reports, recaps'),
@@ -483,7 +623,7 @@ insert into app.contract_modules (module, lock_rank, description) values
 insert into app.contract_module_prefixes (prefix, module) values
   ('cmd_', 'platform'), ('contract_', 'platform'), ('policy_', 'platform'),
   ('platform_', 'platform'),
-  ('orch_', 'orchestration'), ('retired_', 'retired'),
+  ('orch_', 'orchestration'),
   ('identity_', 'identity'), ('content_', 'content'), ('cells_', 'cells'), ('care_', 'care'),
   ('prayer_', 'prayer'), ('directory_', 'directory'), ('services_', 'services'),
   ('offerings_', 'offerings'), ('chat_', 'chat'), ('duties_', 'duties'),
@@ -494,7 +634,7 @@ insert into app.contract_module_dependencies (from_module, to_module)
 select m.module, 'platform' from app.contract_modules m where m.module <> 'platform'
 union
 select m.module, 'identity' from app.contract_modules m
- where m.module not in ('platform', 'identity', 'fixture')
+ where m.module not in ('platform', 'identity', 'fixture', 'retired')
 union
 -- Owners may call Duties, Follow-ups and Notifications operations.
 select o.module, t.target
@@ -506,17 +646,24 @@ select 'duties', t.target from (values ('followups'), ('notifications')) t (targ
 union
 select 'followups', 'notifications'
 union
--- Temporary, recorded exception: the kernel's authorization seam app.cmd_authorize (story 1.4)
--- reads the SYNTHETIC fixture grants until the identity epic replaces its body.
-select 'platform', 'fixture'
-union
 -- Cross-domain orchestration may call every owner.
 select 'orchestration', m.module from app.contract_modules m
- where m.module not in ('orchestration', 'platform', 'identity')
+ where m.module not in ('orchestration', 'platform', 'identity', 'retired')
 union
--- Retired objects have no client privileges and keep their original bodies.
-select 'retired', m.module from app.contract_modules m
- where m.module not in ('retired', 'platform', 'identity');
+-- The retired story 1.4 entry points keep their original bodies over the fixture aggregate.
+select 'retired', 'fixture';
+
+insert into app.contract_dependency_exceptions (function_signature, to_module, reason) values
+  ('app.cmd_authorize(uuid,text)', 'fixture',
+   'Story 1.4 authorization seam reads the SYNTHETIC fixture grants until the identity epic replaces its body');
+
+insert into app.contract_retired_functions (function_signature, reason) values
+  ('app.retired_fixture_counter_command_v0(integer,text,uuid,bigint,jsonb)',
+   'Story 1.4 typed entry point, superseded by the jsonb envelope'),
+  ('api.retired_fixture_counter_command_v0(integer,text,uuid,bigint,jsonb)',
+   'Story 1.4 typed api wrapper, superseded by the jsonb envelope'),
+  ('app.retired_cmd_execute_v0(integer,text,uuid,bigint,jsonb,regprocedure,boolean)',
+   'Story 1.4 typed kernel, superseded by the jsonb envelope');
 
 -- Owning module of an app object name: the longest registered prefix.
 create function app.contract_object_module(p_name text)
@@ -532,7 +679,22 @@ as $$
    limit 1;
 $$;
 
--- App tables, views, sequences and functions with no registered owner prefix.
+-- Owning module of a function: an explicitly listed retired function, else its name prefix.
+create function app.contract_function_module(p_function regprocedure)
+returns text
+language sql
+stable
+set search_path = ''
+as $$
+  select case
+    when exists (select 1 from app.contract_retired_functions r
+                  where r.function_signature = p_function::text) then 'retired'
+    else app.contract_object_module((select p.proname::text from pg_catalog.pg_proc p
+                                      where p.oid = p_function))
+  end;
+$$;
+
+-- App tables, views, sequences and functions with no registered owner.
 create function app.contract_unowned_objects()
 returns table (object_kind text, object_name text)
 language sql
@@ -548,47 +710,111 @@ as $$
      and c.relkind in ('r', 'p', 'v', 'm', 'S')
      and app.contract_object_module(c.relname) is null
   union all
-  select 'function', p.proname::text
+  select 'function', p.oid::regprocedure::text
     from pg_catalog.pg_proc p
     join pg_catalog.pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'app'
-     and app.contract_object_module(p.proname) is null;
+     and app.contract_function_module(p.oid::regprocedure) is null;
 $$;
 
--- Literal references from an app function body to an app object whose owner the function's
--- module may not depend on. A lint over function source: registered hooks are called through
--- the registry (no literal reference), which is the sanctioned way to reach another owner.
-create function app.contract_boundary_violations()
-returns table (function_name text, function_module text, referenced_object text,
-               referenced_module text)
+-- app/api functions without `search_path = ''`: unqualified names would escape the guard.
+create function app.contract_unpinned_functions()
+returns table (function_signature text)
 language sql
 stable
 set search_path = ''
 as $$
-  select distinct f.proname::text, f.module, r.object_name, r.module
-    from (
-      select p.proname, p.prosrc, app.contract_object_module(p.proname) as module
-        from pg_catalog.pg_proc p
-        join pg_catalog.pg_namespace n on n.oid = p.pronamespace
-       where n.nspname = 'app'
-    ) f
+  select p.oid::regprocedure::text
+    from pg_catalog.pg_proc p
+    join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+   where n.nspname in ('app', 'api')
+     and not coalesce('search_path=""' = any (p.proconfig), false);
+$$;
+
+-- References to an app object whose owner the source's module may not depend on. Sources:
+-- function bodies (plpgsql/sql text and BEGIN ATOMIC bodies), view definitions, RLS policy
+-- expressions, column defaults and trigger functions on app tables. Deparsed text is
+-- schema-qualified because this function runs with an empty search_path; functions must pin
+-- an empty search_path (contract_unpinned_functions). Dynamic SQL is not visible: reach
+-- another owner through registered hooks instead.
+create function app.contract_boundary_violations()
+returns table (source_kind text, source_name text, source_module text,
+               referenced_object text, referenced_module text)
+language sql
+stable
+set search_path = ''
+as $$
+  with sources (source_kind, source_name, source_module, body) as (
+    select 'function', p.oid::regprocedure::text, app.contract_function_module(p.oid::regprocedure),
+           coalesce(p.prosrc, '') || ' ' || coalesce(pg_catalog.pg_get_function_sqlbody(p.oid), '')
+      from pg_catalog.pg_proc p
+      join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'app'
+    union all
+    select 'view', 'app.' || c.relname, app.contract_object_module(c.relname),
+           pg_catalog.pg_get_viewdef(c.oid)
+      from pg_catalog.pg_class c
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'app' and c.relkind in ('v', 'm')
+    union all
+    select 'policy', 'app.' || c.relname || '.' || pol.polname, app.contract_object_module(c.relname),
+           coalesce(pg_catalog.pg_get_expr(pol.polqual, pol.polrelid), '') || ' '
+           || coalesce(pg_catalog.pg_get_expr(pol.polwithcheck, pol.polrelid), '')
+      from pg_catalog.pg_policy pol
+      join pg_catalog.pg_class c on c.oid = pol.polrelid
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'app'
+    union all
+    select 'default', 'app.' || c.relname || '.' || a.attname, app.contract_object_module(c.relname),
+           pg_catalog.pg_get_expr(d.adbin, d.adrelid)
+      from pg_catalog.pg_attrdef d
+      join pg_catalog.pg_class c on c.oid = d.adrelid
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+      join pg_catalog.pg_attribute a on a.attrelid = d.adrelid and a.attnum = d.adnum
+     where n.nspname = 'app'
+    union all
+    select 'trigger', 'app.' || c.relname || '.' || t.tgname, app.contract_object_module(c.relname),
+           t.tgfoid::regproc::text
+      from pg_catalog.pg_trigger t
+      join pg_catalog.pg_class c on c.oid = t.tgrelid
+      join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = 'app' and not t.tgisinternal
+  )
+  select distinct s.source_kind, s.source_name, s.source_module, r.object_name, r.module
+    from sources s
    cross join lateral (
       select lower(m[1]) as object_name, app.contract_object_module(lower(m[1])) as module
-        from regexp_matches(f.prosrc, '"?\mapp"?\s*\.\s*"?([a-z0-9_]+)', 'gi') as m
+        from regexp_matches(s.body, '"?\mapp"?\s*\.\s*"?([a-z0-9_]+)', 'gi') as m
    ) r
-   where f.module is not null
+   where s.source_module is not null
      and r.module is not null
-     and r.module <> f.module
+     and r.module <> s.source_module
      and not exists (
        select 1 from app.contract_module_dependencies d
-        where d.from_module = f.module and d.to_module = r.module
-     );
+        where d.from_module = s.source_module and d.to_module = r.module
+     )
+     and not (s.source_kind = 'function' and exists (
+       select 1 from app.contract_dependency_exceptions x
+        where x.function_signature = s.source_name and x.to_module = r.module
+     ))
+  union
+  -- A trigger on an app table must run an app function.
+  select 'trigger', 'app.' || c.relname || '.' || t.tgname, app.contract_object_module(c.relname),
+         t.tgfoid::regproc::text, 'outside_app'
+    from pg_catalog.pg_trigger t
+    join pg_catalog.pg_class c on c.oid = t.tgrelid
+    join pg_catalog.pg_namespace n on n.oid = c.relnamespace
+    join pg_catalog.pg_proc p on p.oid = t.tgfoid
+    join pg_catalog.pg_namespace pn on pn.oid = p.pronamespace
+   where n.nspname = 'app' and not t.tgisinternal and pn.nspname <> 'app';
 $$;
 
 -- ---------------------------------------------------------------------------------------------
 -- Owner seams: lifecycle hooks, source types, purposes, reminder kinds
 -- ---------------------------------------------------------------------------------------------
 
+-- Single source of the contract v1 lifecycle event names (Identity-owned stub list, AD-14).
+-- A new event is a contract version change: add it here and to the shared fixtures.
 create table app.contract_lifecycle_events (
   event text primary key check (event ~ '^[a-z][a-z0-9_]{0,62}$'),
   emitter_module text not null default 'identity' references app.contract_modules (module),
@@ -646,15 +872,14 @@ begin
 end;
 $$;
 
--- The handler must be an app function named with the registering owner's prefix and have
--- exactly the given argument/return types.
+-- The handler must be an app function named with the registering owner's prefix, pin an empty
+-- search_path and have exactly the given argument/return types.
 create function app.contract_validate_handler(
   p_module text,
   p_handler regprocedure,
   p_return regtype
 ) returns text
 language plpgsql
-volatile
 set search_path = ''
 as $$
 declare
@@ -664,7 +889,7 @@ begin
                   where m.module = p_module and m.lock_rank is not null) then
     perform app.contract_registration_fail('unknown or non-owner module: ' || coalesce(p_module, '<null>'));
   end if;
-  select p.proname, n.nspname, p.pronargs, p.proargtypes, p.prorettype, p.proretset
+  select p.proname, n.nspname, p.pronargs, p.proargtypes, p.prorettype, p.proretset, p.proconfig
     into v_proc
     from pg_catalog.pg_proc p
     join pg_catalog.pg_namespace n on n.oid = p.pronamespace
@@ -672,7 +897,7 @@ begin
   if not found or v_proc.nspname <> 'app' then
     perform app.contract_registration_fail('handler must be an app function');
   end if;
-  if app.contract_object_module(v_proc.proname) is distinct from p_module then
+  if app.contract_function_module(p_handler) is distinct from p_module then
     perform app.contract_registration_fail(
       format('handler %s is not owned by module %s', p_handler, p_module));
   end if;
@@ -680,6 +905,10 @@ begin
      or v_proc.prorettype <> p_return::oid or v_proc.proretset then
     perform app.contract_registration_fail(
       format('handler %s must take (jsonb) and return %s', p_handler, p_return));
+  end if;
+  if not coalesce('search_path=""' = any (v_proc.proconfig), false) then
+    perform app.contract_registration_fail(
+      format('handler %s must set search_path = ''''', p_handler));
   end if;
   return p_handler::text;
 end;
@@ -733,7 +962,6 @@ $$;
 create function app.contract_require_source_owner(p_module text, p_source_type text)
 returns void
 language plpgsql
-volatile
 set search_path = ''
 as $$
 begin
@@ -774,6 +1002,30 @@ begin
   end if;
   insert into app.contract_reminder_kinds (source_type, reminder_kind)
   values (p_source_type, p_reminder_kind);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------------------------
+-- Server-side contract use
+-- ---------------------------------------------------------------------------------------------
+
+-- Raises the kernel's validation_failed (PCMD1) with the contract field errors, and adds the
+-- server-only zone existence check.
+create function app.contract_require(p_kind text, p_value jsonb)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_result jsonb := app.contract_check(p_kind, p_value);
+begin
+  if not (v_result ->> 'valid')::boolean then
+    perform app.cmd_fail('validation_failed', v_result -> 'field_errors');
+  end if;
+  if p_kind = 'zoned_local'
+     and not exists (select 1 from pg_catalog.pg_timezone_names z where z.name = p_value ->> 'zone') then
+    perform app.cmd_fail('validation_failed', '{"zone": "unknown"}');
+  end if;
 end;
 $$;
 
@@ -846,12 +1098,21 @@ $$;
 -- Environment marker and fail-closed policy gates
 -- ---------------------------------------------------------------------------------------------
 
--- Absent row = production behaviour. Local seed marks 'local'; a hosted project is marked only
--- by its operator (entry 8 / owner), so an unmarked hosted database never honours fixtures.
+-- Absent row = production behaviour. Nothing (no seed) writes it automatically: an operator or
+-- a local script sets it. Production is terminal, and a database ever marked staging or
+-- production can never be marked local. A restored or cloned database keeps the source's
+-- marker: the restore procedure must re-assert it before serving.
 create table app.platform_environment (
   singleton boolean primary key default true check (singleton),
   environment text not null check (environment in ('local', 'staging', 'production')),
   set_by text not null check (length(btrim(set_by)) > 0),
+  set_at timestamptz not null default now()
+);
+
+create table app.platform_environment_history (
+  id bigint generated always as identity primary key,
+  environment text not null check (environment in ('local', 'staging', 'production')),
+  set_by text not null,
   set_at timestamptz not null default now()
 );
 
@@ -869,11 +1130,30 @@ returns void
 language plpgsql
 set search_path = ''
 as $$
+declare
+  v_current text := (select e.environment from app.platform_environment e for update);
 begin
+  if p_environment is null or p_environment not in ('local', 'staging', 'production') then
+    raise exception using errcode = '22023', message = 'unknown environment';
+  end if;
+  if length(btrim(coalesce(p_set_by, ''))) = 0 then
+    raise exception using errcode = '22023', message = 'set_by is required';
+  end if;
+  if v_current = 'production' and p_environment <> 'production' then
+    raise exception using errcode = '22023', message = 'a production database cannot be re-marked';
+  end if;
+  if p_environment = 'local' and exists (
+       select 1 from app.platform_environment_history h
+        where h.environment in ('staging', 'production')) then
+    raise exception using errcode = '22023',
+      message = 'a database ever marked staging or production cannot be marked local';
+  end if;
   insert into app.platform_environment (singleton, environment, set_by)
-  values (true, p_environment, p_set_by)
+  values (true, p_environment, btrim(p_set_by))
   on conflict (singleton) do update
     set environment = excluded.environment, set_by = excluded.set_by, set_at = now();
+  insert into app.platform_environment_history (environment, set_by)
+  values (p_environment, btrim(p_set_by));
 end;
 $$;
 
@@ -909,7 +1189,7 @@ insert into app.policy_gates (gate, decision_ref, description, fixture_value) va
    null),
   ('q2_church_time', 'Q2',
    'Church IANA zone, pilots, deadlines and quiet hours; gates production scheduling',
-   '{"fixture_label": "TEST FIXTURE - not church policy", "zone": "Etc/UTC", "quiet_hours": null}'),
+   '{"fixture_label": "TEST FIXTURE - not church policy", "zone": "UTC", "quiet_hours": null}'),
   ('q4_personal_data', 'Q4',
    'Youth/contact/visitor safeguards, retention, deletion and backups; gates live personal data',
    null),
@@ -924,11 +1204,11 @@ insert into app.policy_gates (gate, decision_ref, description, fixture_value) va
   ('outbound_sending', 'Release gate',
    'Sending push/email to recipients from this environment', null);
 
--- Effective policy value or the kernel's `unavailable` (PCMD1) when the gate is closed.
+-- Effective policy value, or the kernel's `unavailable` (PCMD1) with the public field error
+-- {"policy": "gate_closed"} when the gate is closed (internal gate names are not exposed).
 create function app.policy_effective(p_gate text)
 returns jsonb
 language plpgsql
-volatile
 set search_path = ''
 as $$
 declare
@@ -945,7 +1225,7 @@ begin
      and app.platform_current_environment() in ('local', 'staging') then
     return jsonb_build_object('gate', p_gate, 'source', 'fixture', 'value', v_gate.fixture_value);
   end if;
-  perform app.cmd_fail('unavailable', jsonb_build_object(p_gate, 'gate_closed'));
+  perform app.cmd_fail('unavailable', '{"policy": "gate_closed"}');
   return null;
 end;
 $$;
@@ -953,7 +1233,6 @@ $$;
 create function app.policy_is_open(p_gate text)
 returns boolean
 language plpgsql
-volatile
 set search_path = ''
 as $$
 begin
@@ -984,6 +1263,16 @@ begin
   if p_value ? 'fixture_label' then
     raise exception using errcode = '22023', message = 'a fixture value cannot be approved';
   end if;
+  if p_gate = 'q9_money' and (
+       jsonb_typeof(p_value -> 'currencies') is distinct from 'object'
+       or (p_value -> 'currencies') = '{}'::jsonb
+       or exists (select 1 from jsonb_each(p_value -> 'currencies') c
+                   where c.key !~ '^[A-Z]{3}$'
+                      or jsonb_typeof(c.value) <> 'number'
+                      or (c.value #>> '{}') !~ '^[0-6]$')) then
+    raise exception using errcode = '22023',
+      message = 'q9_money needs {"currencies": {"<ISO 4217 code>": <integer scale 0..6>}}';
+  end if;
   update app.policy_gates g
      set state = 'approved', approved_value = p_value, approved_by = btrim(p_approved_by),
          approved_at = now(), approval_note = btrim(p_note)
@@ -1002,7 +1291,6 @@ $$;
 create function app.contract_money_amount(p_money jsonb)
 returns numeric
 language plpgsql
-volatile
 set search_path = ''
 as $$
 declare
@@ -1022,19 +1310,18 @@ begin
 end;
 $$;
 
--- Wire form of an exact amount at the approved scale; never rounds silently.
+-- Wire form of an exact non-negative amount at the approved scale; never rounds silently.
 create function app.contract_money_json(p_amount numeric, p_currency text)
 returns jsonb
 language plpgsql
-volatile
 set search_path = ''
 as $$
 declare
   v_scale integer;
 begin
   v_scale := (app.policy_effective('q9_money') -> 'value' -> 'currencies' ->> p_currency)::integer;
-  if v_scale is null or p_amount is null or p_amount <> round(p_amount, v_scale)
-     or abs(p_amount) >= 1e15 then
+  if v_scale is null or p_amount is null or p_amount < 0 or p_amount <> round(p_amount, v_scale)
+     or p_amount >= 1e15 then
     raise exception using errcode = '22023', message = 'amount not representable at the approved scale';
   end if;
   return jsonb_build_object('amount', round(p_amount, v_scale)::text, 'currency', p_currency);
@@ -1071,6 +1358,7 @@ begin
   end if;
   return jsonb_build_object(
     'key', p_key || jsonb_build_object(
+             'source_revision', (p_key ->> 'source_revision')::numeric::bigint,
              'scheduled_at', app.cmd_utc((p_key ->> 'scheduled_at')::timestamptz)),
     'policy_source', v_policy ->> 'source');
 end;

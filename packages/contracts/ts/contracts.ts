@@ -12,7 +12,7 @@ export type CheckResult = { valid: boolean; field_errors: FieldErrors };
 
 export type Uuid = string;
 export type Instant = string; // UTC RFC3339, e.g. 2026-10-03T12:34:56.123456Z
-export type Revision = number; // integer 1..2^53-1
+export type Revision = number; // integer value 1..2^53-1
 
 export type MemberRef = { member_id: Uuid };
 export type AccountRef = { auth_user_id: Uuid };
@@ -50,7 +50,7 @@ export type LifecycleEvent = {
   identity_revision: Revision;
 };
 export type ZonedLocal = { local: string; zone: string };
-export type Money = { amount: string; currency: string }; // exact decimal string, never a float
+export type Money = { amount: string; currency: string }; // exact unsigned decimal string
 export const ERROR_CODES = [
   "validation_failed",
   "unauthenticated",
@@ -61,6 +61,21 @@ export const ERROR_CODES = [
   "unavailable",
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
+/** Every field error code a server path may return (mirrors app.contract_field_error_codes). */
+export const FIELD_ERROR_CODES = [
+  "required",
+  "invalid",
+  "unknown_field",
+  "must_be_object",
+  "unsupported",
+  "must_be_null",
+  "out_of_range",
+  "unknown",
+  "unregistered",
+  "scale_exceeded",
+  "gate_closed",
+] as const;
+export type FieldErrorCode = (typeof FIELD_ERROR_CODES)[number];
 export type CommandRequest = {
   version: 1;
   command: string;
@@ -73,8 +88,8 @@ export type CommandError = {
   request_id: Uuid | null;
   code: ErrorCode;
   message: string;
-  field_errors: FieldErrors;
-  current_revision?: Revision;
+  field_errors: Record<string, FieldErrorCode>;
+  current_revision?: Revision | null;
 };
 export type CommandResponse = CommandSuccess | CommandError;
 
@@ -99,17 +114,23 @@ const TOKEN_RE = /^[a-z][a-z0-9_]{0,62}$/;
 const COMMAND_RE = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
 const INSTANT_RE = /^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(\.[0-9]{1,6})?Z$/;
 const LOCAL_RE = /^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})$/;
-const ZONE_RE = /^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+)*$/;
-const AMOUNT_RE = /^-?(0|[1-9][0-9]{0,14})(\.[0-9]{1,6})?$/;
-const NEG_ZERO_RE = /^-0(\.0+)?$/;
+const ZONE_RE =
+  /^(UTC|(Africa|America|Antarctica|Arctic|Asia|Atlantic|Australia|Europe|Indian|Pacific)(\/[A-Za-z][A-Za-z0-9_+-]*){1,2})$/;
+const AMOUNT_RE = /^(0|[1-9][0-9]{0,14})(\.[0-9]{1,6})?$/;
 const CURRENCY_RE = /^[A-Z]{3}$/;
 
 type Value = unknown;
 type ErrorFn = (v: Value) => string | null;
+type Obj = Record<string, unknown>;
 
+const hasOwn = (o: object, k: string): boolean => Object.prototype.hasOwnProperty.call(o, k);
+const own = (o: Obj, k: string): unknown => (hasOwn(o, k) ? o[k] : undefined);
 const isMissing = (v: Value): boolean => v === undefined || v === null;
-const isObject = (v: Value): v is Record<string, unknown> =>
-  typeof v === "object" && v !== null && !Array.isArray(v);
+const isObject = (v: Value): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
+/** Sets a key as an own data property, even for names like "__proto__". */
+const put = (o: Obj, k: string, v: unknown): void => {
+  Object.defineProperty(o, k, { value: v, enumerable: true, writable: true, configurable: true });
+};
 
 function stringRule(re: RegExp, maxLength = Infinity): ErrorFn {
   return (v) => {
@@ -122,11 +143,16 @@ const uuidError = stringRule(UUID_RE);
 const tokenError = stringRule(TOKEN_RE);
 const zoneError = stringRule(ZONE_RE, 64);
 const currencyError = stringRule(CURRENCY_RE);
+const amountError = stringRule(AMOUNT_RE);
 const nullable = (fn: ErrorFn): ErrorFn => (v) => (isMissing(v) ? null : fn(v));
+
+/** Integers are defined by value (1, 1.0 and 1e0 are the same integer). */
+const integerIn = (v: Value, min: number, max: number): boolean =>
+  typeof v === "number" && Number.isInteger(v) && v >= min && v <= max;
 
 function revisionError(v: Value): string | null {
   if (isMissing(v)) return "required";
-  return typeof v === "number" && Number.isSafeInteger(v) && v >= 1 ? null : "invalid";
+  return integerIn(v, 1, Number.MAX_SAFE_INTEGER) ? null : "invalid";
 }
 
 function calendarOk(m: RegExpExecArray): boolean {
@@ -148,11 +174,6 @@ function dateTimeRule(re: RegExp): ErrorFn {
 const instantError = dateTimeRule(INSTANT_RE);
 const localError = dateTimeRule(LOCAL_RE);
 
-function amountError(v: Value): string | null {
-  if (isMissing(v)) return "required";
-  return typeof v === "string" && AMOUNT_RE.test(v) && !NEG_ZERO_RE.test(v) ? null : "invalid";
-}
-
 function enumRule(values: readonly string[]): ErrorFn {
   return (v) => {
     if (isMissing(v)) return "required";
@@ -160,26 +181,36 @@ function enumRule(values: readonly string[]): ErrorFn {
   };
 }
 
-function objectRules(
-  o: Record<string, unknown>,
-  rules: Record<string, ErrorFn>,
-  root = "$",
-): FieldErrors {
+function fieldErrorsError(v: Value): string | null {
+  if (isMissing(v)) return "required";
+  return isObject(v) &&
+    Object.keys(v).every((k) => {
+      const code = v[k];
+      return typeof code === "string" && (FIELD_ERROR_CODES as readonly string[]).includes(code);
+    })
+    ? null
+    : "invalid";
+}
+
+/** Rule errors per key plus {"<key>": "unknown_field"} for every own key outside the rules. */
+function objectRules(o: Obj, rules: Record<string, ErrorFn>): FieldErrors {
   const errors: FieldErrors = {};
-  for (const [key, rule] of Object.entries(rules)) {
-    const e = rule(o[key]);
-    if (e !== null) errors[key] = e;
+  for (const key of Object.keys(rules)) {
+    const e = rules[key](own(o, key));
+    if (e !== null) put(errors, key, e);
   }
-  if (Object.keys(o).some((k) => !(k in rules))) errors[root] = "unknown_field";
+  for (const key of Object.keys(o)) {
+    if (!hasOwn(rules, key)) put(errors, key, "unknown_field");
+  }
   return errors;
 }
 
-function fieldErrorsError(v: Value): string | null {
-  if (isMissing(v)) return "required";
-  return isObject(v) && Object.values(v).every((x) => typeof x === "string") ? null : "invalid";
-}
+const accept: ErrorFn = () => null;
 
-const RULES: Record<Exclude<Kind, "instant" | "actor" | "command_request" | "command_response">, Record<string, ErrorFn>> = {
+type PlainKind = "member_ref" | "account_ref" | "source_ref" | "task_source" | "notification_key" |
+  "lifecycle_event" | "zoned_local" | "money";
+
+const RULES: Record<PlainKind, Record<string, ErrorFn>> = {
   member_ref: { member_id: uuidError },
   account_ref: { auth_user_id: uuidError },
   source_ref: { source_type: tokenError, source_id: uuidError, source_revision: revisionError },
@@ -202,6 +233,49 @@ const RULES: Record<Exclude<Kind, "instant" | "actor" | "command_request" | "com
   money: { amount: amountError, currency: currencyError },
 };
 
+const MEMBER_ACTOR: Record<string, ErrorFn> = { kind: accept, member_id: uuidError, auth_user_id: uuidError };
+const SYSTEM_ACTOR: Record<string, ErrorFn> = {
+  kind: accept,
+  system_principal_id: uuidError,
+  job_id: uuidError,
+  initiating_member_id: nullable(uuidError),
+};
+const COMMAND_REQUEST: Record<string, ErrorFn> = {
+  version: (v) => (isMissing(v) ? "required" : integerIn(v, 1, 1) ? null : "unsupported"),
+  command: stringRule(COMMAND_RE, 127),
+  request_id: uuidError,
+  expected_revision: nullable(revisionError),
+  payload: (v) => (isObject(v) ? null : "must_be_object"),
+};
+const commandError = (o: Obj): Record<string, ErrorFn> => ({
+  request_id: (v) => (hasOwn(o, "request_id") ? nullable(uuidError)(v) : "required"),
+  code: enumRule(ERROR_CODES),
+  message: (v) => (isMissing(v) ? "required" : typeof v === "string" ? null : "invalid"),
+  field_errors: fieldErrorsError,
+  current_revision: nullable(revisionError),
+});
+const commandSuccess = (o: Obj): Record<string, ErrorFn> => ({
+  request_id: uuidError,
+  data: () => (hasOwn(o, "data") ? null : "required"),
+  revision: revisionError,
+});
+
+/** The key rules that apply to an object value of this kind (null when the shape is unknown). */
+function rulesFor(kind: Exclude<Kind, "instant">, o: Obj): Record<string, ErrorFn> | null {
+  switch (kind) {
+    case "actor": {
+      const k = own(o, "kind");
+      return k === "member" ? MEMBER_ACTOR : k === "system" ? SYSTEM_ACTOR : null;
+    }
+    case "command_request":
+      return COMMAND_REQUEST;
+    case "command_response":
+      return hasOwn(o, "code") ? commandError(o) : commandSuccess(o);
+    default:
+      return RULES[kind];
+  }
+}
+
 const KINDS: readonly Kind[] = [
   "member_ref", "account_ref", "actor", "source_ref", "task_source", "notification_key",
   "lifecycle_event", "instant", "zoned_local", "money", "command_request", "command_response",
@@ -218,50 +292,12 @@ export function check(kind: Kind, value: Value): CheckResult {
     const e = instantError(value);
     return done(e === null ? {} : { $: e });
   }
-  const root = kind === "command_request" ? "envelope" : "$";
-  if (!isObject(value)) return done({ [root]: "must_be_object" });
-
-  switch (kind) {
-    case "actor":
-      if (isMissing(value.kind)) return done({ kind: "required" });
-      if (value.kind === "member") {
-        return done(objectRules(value, { kind: () => null, member_id: uuidError, auth_user_id: uuidError }));
-      }
-      if (value.kind === "system") {
-        return done(objectRules(value, {
-          kind: () => null,
-          system_principal_id: uuidError,
-          job_id: uuidError,
-          initiating_member_id: nullable(uuidError),
-        }));
-      }
-      return done({ kind: "invalid" });
-    case "command_request":
-      return done(objectRules(value, {
-        version: (v) => (isMissing(v) ? "required" : v === 1 ? null : "unsupported"),
-        command: stringRule(COMMAND_RE, 127),
-        request_id: uuidError,
-        expected_revision: nullable(revisionError),
-        payload: (v) => (isObject(v) ? null : "must_be_object"),
-      }, "envelope"));
-    case "command_response":
-      if ("code" in value) {
-        return done(objectRules(value, {
-          request_id: (v) => (v === undefined ? "required" : nullable(uuidError)(v)),
-          code: enumRule(ERROR_CODES),
-          message: (v) => (isMissing(v) ? "required" : typeof v === "string" ? null : "invalid"),
-          field_errors: fieldErrorsError,
-          current_revision: nullable(revisionError),
-        }));
-      }
-      return done(objectRules(value, {
-        request_id: uuidError,
-        data: (v) => (v === undefined ? "required" : null),
-        revision: revisionError,
-      }));
-    default:
-      return done(objectRules(value, RULES[kind]));
+  if (!isObject(value)) return done({ [kind === "command_request" ? "envelope" : "$"]: "must_be_object" });
+  if (kind === "actor") {
+    if (isMissing(own(value, "kind"))) return done({ kind: "required" });
+    if (rulesFor(kind, value) === null) return done({ kind: "invalid" });
   }
+  return done(objectRules(value, rulesFor(kind, value)!));
 }
 
 export class ContractViolation extends Error {
@@ -274,11 +310,29 @@ export class ContractViolation extends Error {
   }
 }
 
-/** Typed decode: returns the value unchanged when valid, otherwise throws ContractViolation. */
+const cloneJson = (v: unknown): unknown => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
+
+/** Typed decode: a fresh copy of the contract keys when valid, otherwise ContractViolation. */
 export function decode<K extends Kind>(kind: K, value: unknown): ContractKinds[K] {
   const result = check(kind, value);
   if (!result.valid) throw new ContractViolation(kind, result.field_errors);
-  return value as ContractKinds[K];
+  return encode(kind, value as ContractKinds[K]) as ContractKinds[K];
 }
 
-export const isCommandError = (r: CommandResponse): r is CommandError => "code" in r;
+/**
+ * Wire form of a contract value: exactly the contract keys the value carries, so an omitted
+ * optional key stays omitted and an explicit null stays null. Throws if the value is invalid.
+ */
+export function encode<K extends Kind>(kind: K, value: ContractKinds[K]): Json {
+  const result = check(kind, value);
+  if (!result.valid) throw new ContractViolation(kind, result.field_errors);
+  if (kind === "instant") return value as Json;
+  const o = value as unknown as Obj;
+  const out: Obj = {};
+  for (const key of Object.keys(rulesFor(kind as Exclude<Kind, "instant">, o)!)) {
+    if (hasOwn(o, key)) put(out, key, cloneJson(o[key]));
+  }
+  return out as Json;
+}
+
+export const isCommandError = (r: CommandResponse): r is CommandError => hasOwn(r, "code");

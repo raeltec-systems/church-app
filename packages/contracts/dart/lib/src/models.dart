@@ -7,6 +7,24 @@ Map<String, Object?> _map(ContractKind kind, Object? json) {
   return (json as Map).cast<String, Object?>();
 }
 
+/// A validated integral JSON number (the VM may decode `1e3` or `1.0` as a double).
+int _int(Object? v) => (v as num).toInt();
+int? _intOrNull(Object? v) => v == null ? null : _int(v);
+
+/// An optional wire key: absent, or present with a value that may itself be null. Keeps an
+/// omitted key distinct from an explicit null through decode -> encode.
+class Optional<T> {
+  const Optional.absent()
+      : present = false,
+        value = null;
+  const Optional.of(this.value) : present = true;
+  final bool present;
+  final T? value;
+
+  static Optional<T> fromKey<T>(Map<String, Object?> m, String key, T? Function(Object?) read) =>
+      m.containsKey(key) ? Optional.of(read(m[key])) : Optional<T>.absent();
+}
+
 /// UTC instant kept in its exact wire form (microseconds survive on every platform).
 class Instant {
   Instant.fromJson(Object? json) : wire = _instant(json);
@@ -20,6 +38,9 @@ class Instant {
   }
 
   static String _format(DateTime t) {
+    if (t.year < 1 || t.year > 9999) {
+      throw ArgumentError.value(t, 'at', 'year must be 0001..9999 for the wire contract');
+    }
     String p(int v, [int w = 2]) => v.toString().padLeft(w, '0');
     return '${p(t.year, 4)}-${p(t.month)}-${p(t.day)}T${p(t.hour)}:${p(t.minute)}:${p(t.second)}'
         '.${p(t.millisecond * 1000 + t.microsecond, 6)}Z';
@@ -62,7 +83,8 @@ sealed class Actor {
         : SystemActor(
             systemPrincipalId: m['system_principal_id'] as String,
             jobId: m['job_id'] as String,
-            initiatingMemberId: m['initiating_member_id'] as String?,
+            initiatingMemberId:
+                Optional.fromKey<String>(m, 'initiating_member_id', (v) => v as String?),
           );
   }
   Map<String, Object?> toJson();
@@ -78,16 +100,22 @@ class MemberActor extends Actor {
 }
 
 class SystemActor extends Actor {
-  const SystemActor({required this.systemPrincipalId, required this.jobId, this.initiatingMemberId});
+  const SystemActor({
+    required this.systemPrincipalId,
+    required this.jobId,
+    this.initiatingMemberId = const Optional.absent(),
+  });
   final String systemPrincipalId;
   final String jobId;
-  final String? initiatingMemberId;
+
+  /// The human who started the job, recorded separately from the system executor.
+  final Optional<String> initiatingMemberId;
   @override
   Map<String, Object?> toJson() => {
         'kind': 'system',
         'system_principal_id': systemPrincipalId,
         'job_id': jobId,
-        if (initiatingMemberId != null) 'initiating_member_id': initiatingMemberId,
+        if (initiatingMemberId.present) 'initiating_member_id': initiatingMemberId.value,
       };
 }
 
@@ -98,7 +126,7 @@ class SourceRef {
     return SourceRef(
       sourceType: m['source_type'] as String,
       sourceId: m['source_id'] as String,
-      sourceRevision: m['source_revision'] as int,
+      sourceRevision: _int(m['source_revision']),
     );
   }
   final String sourceType;
@@ -138,7 +166,7 @@ class NotificationKey {
       source: SourceRef(
         sourceType: m['source_type'] as String,
         sourceId: m['source_id'] as String,
-        sourceRevision: m['source_revision'] as int,
+        sourceRevision: _int(m['source_revision']),
       ),
       recipientMemberId: m['recipient_member_id'] as String,
       reminderKind: m['reminder_kind'] as String,
@@ -183,7 +211,7 @@ class LifecycleEvent {
       event: LifecycleEventName.fromWire(m['event'] as String),
       memberId: m['member_id'] as String,
       occurredAt: Instant.fromJson(m['occurred_at']),
-      identityRevision: m['identity_revision'] as int,
+      identityRevision: _int(m['identity_revision']),
     );
   }
   final LifecycleEventName event;
@@ -210,7 +238,7 @@ class ZonedLocal {
   Map<String, Object?> toJson() => {'local': local, 'zone': zone};
 }
 
-/// Exact decimal amount as a string plus currency. Never a double.
+/// Exact unsigned decimal amount as a string plus currency. Never a double.
 class Money {
   const Money._(this.amount, this.currency);
   factory Money.fromJson(Object? json) {
@@ -228,11 +256,8 @@ class Money {
     if (fractionDigits > scale) {
       throw ArgumentError.value(amount, 'amount', 'more fraction digits than scale $scale');
     }
-    final negative = amount.startsWith('-');
-    final parts = (negative ? amount.substring(1) : amount).split('.');
-    final fraction = (parts.length > 1 ? parts[1] : '').padRight(scale, '0');
-    final units = BigInt.parse(parts[0] + fraction);
-    return negative ? -units : units;
+    final parts = amount.split('.');
+    return BigInt.parse(parts[0] + (parts.length > 1 ? parts[1] : '').padRight(scale, '0'));
   }
 
   Map<String, Object?> toJson() => {'amount': amount, 'currency': currency};
@@ -256,7 +281,7 @@ class CommandRequest {
   const CommandRequest({
     required this.command,
     required this.requestId,
-    this.expectedRevision,
+    this.expectedRevision = const Optional.absent(),
     this.payload = const {},
   });
   factory CommandRequest.fromJson(Object? json) {
@@ -264,7 +289,7 @@ class CommandRequest {
     return CommandRequest(
       command: m['command'] as String,
       requestId: m['request_id'] as String,
-      expectedRevision: m['expected_revision'] as int?,
+      expectedRevision: Optional.fromKey<int>(m, 'expected_revision', _intOrNull),
       payload: (m['payload'] as Map).cast<String, Object?>(),
     );
   }
@@ -273,15 +298,15 @@ class CommandRequest {
   /// Caller-generated UUID; reuse it when retrying an unknown outcome.
   final String requestId;
 
-  /// Null for create; required for an existing aggregate.
-  final int? expectedRevision;
+  /// Absent or null for create; required for an existing aggregate.
+  final Optional<int> expectedRevision;
   final Map<String, Object?> payload;
 
   Map<String, Object?> toJson() => {
         'version': contractVersion,
         'command': command,
         'request_id': requestId,
-        'expected_revision': expectedRevision,
+        if (expectedRevision.present) 'expected_revision': expectedRevision.value,
         'payload': payload,
       };
 }
@@ -296,13 +321,13 @@ sealed class CommandResponse {
         code: ErrorCode.fromWire(m['code'] as String),
         message: m['message'] as String,
         fieldErrors: (m['field_errors'] as Map).cast<String, String>(),
-        currentRevision: m['current_revision'] as int?,
+        currentRevision: Optional.fromKey<int>(m, 'current_revision', _intOrNull),
       );
     }
     return CommandSuccess(
       requestId: m['request_id'] as String,
       data: m['data'],
-      revision: m['revision'] as int,
+      revision: _int(m['revision']),
     );
   }
   Map<String, Object?> toJson();
@@ -323,7 +348,7 @@ class CommandError extends CommandResponse {
     required this.code,
     required this.message,
     required this.fieldErrors,
-    this.currentRevision,
+    this.currentRevision = const Optional.absent(),
   });
   final String? requestId;
   final ErrorCode code;
@@ -331,14 +356,14 @@ class CommandError extends CommandResponse {
   final Map<String, String> fieldErrors;
 
   /// Present only where the caller may read it (conflicts).
-  final int? currentRevision;
+  final Optional<int> currentRevision;
   @override
   Map<String, Object?> toJson() => {
         'request_id': requestId,
         'code': code.wireName,
         'message': message,
         'field_errors': fieldErrors,
-        if (currentRevision != null) 'current_revision': currentRevision,
+        if (currentRevision.present) 'current_revision': currentRevision.value,
       };
 }
 

@@ -218,3 +218,25 @@ Implemented 2026-10-03 directly (no subagent tool in this session).
   - **KEEP:** registry-based hook dispatch, signature-text storage (no reg* columns), fail-closed gates with labelled fixtures, and one fixture set for SQL, Dart and TS.
 
 ## Review Triage Log
+
+**Pass 1 (quick lens, independent reviewer), 2026-10-03.** Verdicts: high 5 · medium 8 · low 4 · false 0. All 17 were patched in place. The migration had not yet been applied to any hosted project.
+
+| # | Finding | Verdict | Route | Evidence / action |
+|---|---------|---------|-------|-------------------|
+| 1 | Boundary guard misses BEGIN ATOMIC bodies, unqualified references, views, policies, triggers and defaults | high | patch | The reviewer reproduced `cells_atomic_peek` and the unqualified read in a rolled-back transaction. Fix: scan `prosqlbody`, require an empty search_path, and extend coverage to those object types. |
+| 2 | The platform→fixture exception covers the whole module | medium | patch | Pin the exception to `cmd_authorize`. |
+| 3 | The `retired_` prefix escapes both guards | high | patch | Limit it to an explicit list of three functions and assert they have no EXECUTE. |
+| 4 | The contract check and the kernel envelope disagree | high | patch | Reproduced: uppercase `request_id`, a missing command, revision 0. Fix: one authoritative implementation, with fixtures run through the live command. |
+| 5 | The TypeScript unknown-key check follows the prototype chain | high | patch | Reproduced with `constructor` and `__proto__`. Fix: own-property checks. |
+| 6 | Exponent and float integers diverge across SQL, TS, the Dart VM and dart2js | medium | patch | Fix: one by-value integral rule, plus fixtures. |
+| 7 | Round-trip AC not really tested; omission vs explicit null is lost | medium | patch | Fix: a real TS encoder and Dart tests that keep nulls. |
+| 8 | Unknown keys reported on `$`, not on the key itself | medium | patch | Contradicts the plan decision. |
+| 9 | Runbook versioning contradicts strict v1 | low | patch | Fix the doc. |
+| 10 | The seed blindly marks the environment `local`; marker downgrade allowed | high | patch | Hosted, preview branches or seeded restores could switch fixtures on. Fix: no seed write, and refuse downgrades. |
+| 11 | Zone validation admits non-IANA names | medium | patch | Reproduced with `Factory`, `EST5EDT`, `posix/…`. |
+| 12 | Two lifecycle-event lists can drift | low | patch | Fix: single source plus an assertion. |
+| 13 | Server-only error codes, and gate names used as field keys | medium | patch | Fix: add the codes to the clients and use a stable public field. |
+| 14 | `q9_money` approval scale not validated | low | patch | Fix: validate 0–6 and test. |
+| 15 | Signed money is a feature decision in the contracts package | medium | patch | The plan forbids business rules there. Fix: unsigned money. |
+| 16 | Dart `Instant` with a 5-digit year | low | patch | Fix: reject out-of-range years. |
+| 17 | Missing limit fixtures | medium | patch | Grouped with #4–#6: add the boundary fixtures. |

@@ -10,10 +10,11 @@ import '../domain/commands.dart';
 /// `Content-Profile: api` and the whole envelope as the single JSON body.
 ///
 /// Outcome rules (architecture "Client state", story 1.4):
-/// - a contract-valid error envelope, or an API refusal carrying a PostgREST
-///   or Postgres error code, is definite: the command did not apply;
-/// - an abort/timeout, a transport failure, a gateway status (502/503/504),
-///   a non-JSON or contract-invalid body, or a mismatched request id is
+/// - a contract-valid error envelope, or an API refusal whose body carries a
+///   PostgREST or Postgres error code, is definite: the command did not apply;
+/// - an abort/timeout, a transport failure, any bare HTTP status without a
+///   PostgREST body (proxy 408, 3xx, gateway 5xx, 401 from the gateway…), a
+///   non-JSON or contract-invalid body, or a mismatched request id is
 ///   unknown outcome: never success.
 class SupabaseCommandGateway implements CommandGateway {
   SupabaseCommandGateway(
@@ -72,18 +73,14 @@ class SupabaseCommandGateway implements CommandGateway {
 
   CommandOutcome _fromApiError(CommandRequest request, PostgrestException e) {
     final code = e.code ?? '';
-    final status = RegExp(r'^\d{3}$').hasMatch(code) ? int.parse(code) : null;
-    if (status != null) {
-      // No PostgREST/Postgres code: the body did not come from PostgREST
-      // (gateway page, proxy, truncated 2xx body).
-      if (status == 401) return _refused(request, ErrorCode.unauthenticated);
-      if (status == 403) return _refused(request, ErrorCode.forbidden);
-      if (status == 429) return _refused(request, ErrorCode.rateLimited);
-      if (status >= 200 && status < 300 || status >= 500) {
-        return CommandUnknownOutcome(e);
-      }
-      return _refused(request, ErrorCode.unavailable);
-    }
+    // Only an answer from PostgREST itself (a Postgres SQLSTATE or a PGRST
+    // code in its JSON body) is definite. A bare HTTP status (proxy 408, 3xx,
+    // gateway 5xx, an HTML page, a truncated 2xx body) does not say whether
+    // the command ran: unknown outcome, so the same request is checked again.
+    final fromPostgrest =
+        RegExp(r'^PGRST\d+$').hasMatch(code) ||
+        RegExp(r'^[0-9A-Z]{5}$').hasMatch(code);
+    if (!fromPostgrest) return CommandUnknownOutcome(e);
     // PostgREST rejected the call before running it (JWT, privileges,
     // unknown function) or Postgres aborted the transaction: nothing applied.
     if (code == '42501') {

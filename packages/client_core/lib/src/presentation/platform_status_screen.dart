@@ -87,11 +87,11 @@ class _PlatformStatusScreenState extends State<PlatformStatusScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(ChurchGeometry.mobileContentPadding),
+            padding: ChurchLayout.of(context).pagePadding,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
               child: DefaultTextStyle.merge(
-                style: ChurchType.body.copyWith(color: c.ink),
+                style: ChurchLayout.of(context).body.copyWith(color: c.ink),
                 child: switch (_state) {
                   _Loading() => const _LoadingView(),
                   _Loaded(:final status) => _StatusView(status: status),

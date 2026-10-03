@@ -110,7 +110,61 @@ Implemented 2026-10-03 directly (no subagent tool in this session).
 - Pending, Success, Validation, Conflict (reload unavailable and reload success), Unavailable (same envelope resent), Unknown outcome (same id + body; Stop checking; malformed success body), Denied ×3, Account change (switch; sign-out mid-request with late response dropped): `client_core/test/fixture/fixture_command_screen_test.dart`; transport mapping in `test/adapters/supabase_command_gateway_test.dart`; staff/mobile app tests repeat create/conflict/account change.
 - Text scale 2.0 / keyboard: client_core 2x tests (light + dark) and Tab order test; staff 2x desktop/narrow + sidebar→top bar; mobile 2x light/dark; both shells' Tab order and focus retention; browser S2/S3/S5.
 
+**Review follow-up (2026-10-03, coordinator review).** Each finding was fixed with the smallest change that does the job:
+- **Focus.** `RequestStateBanner(focusNode:)` is now a programmatic focus target named by its title; it is not a Tab stop and not a heading. Every request-state transition moves focus to the banner it reports. This covers submit, Try again, Check again, Stop checking and Reload. The account notice takes focus; Dismiss returns focus to Intent key.
+- **Stale retry.** After `unavailable`, editing an input withdraws Try again (`inputChanged()`), so the next submit is the edited input with a new id. `canRetry` gates the action.
+- **Request ids.** Stop checking keeps the command as `unconfirmed`. Resubmitting the same input (same command, revision and payload) reuses its `request_id`; a changed input gets a new one. The first definite outcome for that id settles it.
+- **Announcements.** Every banner change is announced through `SemanticsService.sendAnnouncement`, with its own message: sending, every outcome, "Couldn't reload. <reason>", "Reloaded. …", "Stopped checking. …", not sent, and account changed or signed out.
+- **Focus rings after pointer use.** `FocusVisibility` (design system) works like `:focus-visible`: rings show only when the highlight mode is traditional *and* the last input was a key press. A desktop mouse click, which keeps the traditional mode, therefore shows no ring. `goFromNav` asks the shell to refocus the tab only after keyboard activation.
+- **Boundary guards.** The guards now resolve every import and export directive, both package URIs and relative paths, through the shared `boundaryViolations` in `testing.dart`. client_core allows only `lib/src/adapters/`, `supabase_adapters.dart` and `composition.dart`. Each app allows only `lib/main.dart -> composition.dart`. Negative tests cover relative adapter imports, barrel re-exports, and the adapter and composition package URIs.
+- **Live evidence.**
+  - The mobile shell ran natively (Linux desktop, Xvfb) against the running local stack. Raw output is in `mobile-linux-live.txt`, screenshots in `04-…`/`05-…`: the tracer showed `Status: operational`, and the signed-out Create showed "Not saved: sign-in required".
+  - The `live_local_check` output is stored in `live-local-check.txt`.
+- **Browser smoke: 7/7.**
+  - S1 records the tracer value.
+  - S2 tabs until focus wraps or leaves the page, and asserts unique stops with role and name.
+  - S3 is new: a 1.6 C5-style contrast-change check on every stop (7 controls, crops in `focus/`).
+  - S4 asserts that focus lands on the refusal banner.
+  - S6a/b replace the old S5a/b.
+- **Test names.**
+  - "protected state is dropped when leaving and returning" became "an account switch drops the protected state". A real leave/re-enter test shows the state is kept and checked again under the same id. Decision (agent, under owner pre-approval): AD-13 clears protected state on sign-out or account change, not on navigation. Keeping it across navigation prevents an unconfirmed command from being resubmitted under a new id.
+  - The unconfigured test now sends a command. `UnconfiguredCommandGateway` returns a new `CommandNotSent` outcome, shown as "Not sent: no server configured" with no retry.
+- **Tokens.**
+  - The dark focus ring is the dark accent `#3D9BF5`.
+  - The sidebar tokens moved out of `ChurchColors` into the light-only `ChurchStaffChrome`. The invented dark values are gone.
+- **Typography and layout.** New `ChurchLayout` extension: mobile body 16 and padding 16; staff body 15, padding 28/32/48 and max width 1280. App bar titles: mobile 28/700 brand; staff 24/700 `#14246B` on a white header with a bottom line and title spacing 32. Mobile tab labels are 11.5.
+- **Duplication.** `AppConfig` and `compositionOverrides` (`composition.dart`), plus `buildClientRouter`, `goFromNav`, `NavFocusRequest`, `ClientPaths` and `ClientTestHarness`, now live in client_core. Each app keeps only its shell layout. The apps' `config.dart` files are removed, and `supabase_flutter` is now a dependency of client_core only.
+- **Mobile safe area.** The shell removes bottom padding from the page (`MediaQuery.removePadding`), and the tab bar's `SafeArea` applies the inset once. A test simulates a 34 px bottom inset.
+- **Gateway.** Only a PostgREST-bodied error (a SQLSTATE or a PGRST code) is definite. Any bare status (408, 3xx, 429, a gateway 401, 404 HTML, 5xx) is now unknown outcome; tests cover each.
+- **Verification.**
+  - `pub get --enforce-lockfile`, `analyze` and `test` pass in all four packages: design_system 14, client_core 72, mobile 13, staff 13.
+  - The staff web release build and the browser smoke against the local API passed 7/7.
+  - The mobile Linux release build and the live run passed.
+  - `trials/`, `supabase/` and `packages/contracts` are untouched.
+
 ## Plan Change Log
+
+- 2026-10-03, review follow-up (coordinator review findings):
+  - **Findings:** fourteen, listed in Implementation Notes under "Review follow-up".
+  - **Amended:**
+    - Frozen decision refined: `request_id` reuse now also covers an unchanged input after Stop checking. Editing after `unavailable` withdraws the retry.
+    - Frozen decision (memory-only protected state) clarified: the state is kept across navigation and dropped on any account change. A new definite outcome type, `CommandNotSent`, was added for unconfigured builds.
+    - Gateway rule tightened: bare HTTP statuses are unknown outcome.
+  - **Avoids:**
+    - keyboard focus dropped to the page on state changes;
+    - a stale body resent after an edit;
+    - duplicate ids for one input;
+    - silent state changes for screen-reader users;
+    - focus rings that persist after a mouse click or tap;
+    - adapter leaks the guards could not see;
+    - a double safe-area inset;
+    - proxy statuses wrongly read as "nothing changed".
+  - **KEEP:**
+    - the single-navigator shells;
+    - the outside 3 px ring;
+    - the tab `NavItem` on `InkWell`;
+    - account-generation keyed forms;
+    - the honest unavailable Reload until a fixture read view exists.
 
 ## Review Triage Log
 

@@ -185,16 +185,23 @@ void main() {
         ErrorCode.unavailable,
       );
     });
+  });
 
-    test('a bare 429 is rate_limited', () async {
-      final g = gatewayWith(
-        (r) async => http.Response('slow down', 429, request: r),
-      );
-      expect(
-        (await send(g) as CommandRefused).error.code,
-        ErrorCode.rateLimited,
-      );
-    });
+  group('a bare status without a PostgREST body is unknown outcome', () {
+    for (final (status, body) in [
+      (408, 'Request Timeout'),
+      (302, ''),
+      (429, 'slow down'),
+      (401, '{"message":"Invalid API key"}'),
+      (404, '<html>not found</html>'),
+    ]) {
+      test('$status', () async {
+        final g = gatewayWith(
+          (r) async => http.Response(body, status, request: r),
+        );
+        expect(await send(g), isA<CommandUnknownOutcome>());
+      });
+    }
   });
 
   test('session adapter reports no account when signed out', () async {

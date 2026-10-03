@@ -5,26 +5,14 @@ import 'package:church_client_core/church_client_core.dart';
 import 'package:church_client_core/testing.dart';
 import 'package:church_contracts/church_contracts.dart';
 import 'package:church_design_system/church_design_system.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class _Status implements PlatformStatusRepository {
-  @override
-  Future<PlatformStatus?> fetch() async => PlatformStatus(
-    status: 'operational',
-    message: 'SYNTHETIC tracer status',
-    isSynthetic: true,
-    updatedAt: DateTime.utc(2026, 10, 3, 9, 5),
-  );
-}
-
-class Harness {
-  final gateway = FakeCommandGateway();
-  final session = FakeSession('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-}
+typedef Harness = ClientTestHarness;
 
 Future<Harness> pumpStaff(
   WidgetTester tester, {
@@ -38,16 +26,10 @@ Future<Harness> pumpStaff(
   tester.platformDispatcher.textScaleFactorTestValue = textScale;
   addTearDown(tester.view.reset);
   addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-  final h = Harness();
+  final h = ClientTestHarness();
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [
-        commandGatewayProvider.overrideWithValue(h.gateway),
-        sessionRepositoryProvider.overrideWithValue(h.session),
-        requestIdsProvider.overrideWithValue(SequentialRequestIds()),
-        if (configured)
-          platformStatusRepositoryProvider.overrideWithValue(_Status()),
-      ],
+      overrides: h.overrides(configured: configured),
       child: StaffApp(initialLocation: location),
     ),
   );
@@ -62,6 +44,9 @@ Future<void> tapKey(WidgetTester tester, String key) async {
 }
 
 void main() {
+  // Each test starts as a fresh app: no input seen yet.
+  setUp(FocusVisibility.instance.reset);
+
   testWidgets('tracer read shows in the shell; sidebar tabs are named', (
     tester,
   ) async {
@@ -78,11 +63,19 @@ void main() {
     handle.dispose();
   });
 
-  testWidgets('unconfigured build explains itself and refuses commands', (
+  testWidgets('unconfigured build explains itself and does not send commands', (
     tester,
   ) async {
     await pumpStaff(tester, configured: false);
     expect(find.byKey(const Key('missing-config')), findsOneWidget);
+    await tapKey(tester, 'nav-/fixture');
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('intent-key-field')), 'k');
+    await tapKey(tester, 'create-button');
+    await tester.pump();
+    expect(find.text('Not sent: no server configured'), findsOneWidget);
+    expect(find.text(UnconfiguredCommandGateway.reason), findsOneWidget);
+    expect(find.byKey(const Key('try-again-button')), findsNothing);
   });
 
   testWidgets('synthetic read/write fixture: create, change, conflict kept', (
@@ -126,9 +119,7 @@ void main() {
     expect(find.byKey(const Key('counter-card')), findsNothing);
   });
 
-  testWidgets('protected state is dropped when leaving and returning', (
-    tester,
-  ) async {
+  testWidgets('an account switch drops the protected state', (tester) async {
     final h = await pumpStaff(tester, location: '/fixture');
     await tester.enterText(find.byKey(const Key('intent-key-field')), 'k');
     await tapKey(tester, 'create-button');
@@ -144,6 +135,61 @@ void main() {
     expect(find.text('Value 3'), findsNothing);
     expect(find.text('The signed-in account changed'), findsOneWidget);
   });
+
+  testWidgets(
+    'leaving and returning keeps this account\'s in-memory state (AD-13 '
+    'clears it on account change, not on navigation)',
+    (tester) async {
+      final h = await pumpStaff(tester, location: '/fixture');
+      await tester.enterText(find.byKey(const Key('intent-key-field')), 'k');
+      await tapKey(tester, 'create-button');
+      h.gateway.sent.last.unknown();
+      await tester.pump();
+      expect(find.text('Not confirmed'), findsOneWidget);
+      await tapKey(tester, 'nav-/status');
+      await tester.pumpAndSettle();
+      expect(find.text('Not confirmed'), findsNothing);
+      await tapKey(tester, 'nav-/fixture');
+      await tester.pumpAndSettle();
+      // The unconfirmed command is still known, so it is checked again under
+      // its own request id instead of being resubmitted as a new one.
+      expect(find.text('Not confirmed'), findsOneWidget);
+      await tapKey(tester, 'check-again-button');
+      expect(
+        h.gateway.sent.last.request.requestId,
+        h.gateway.sent.first.request.requestId,
+      );
+    },
+  );
+
+  for (final kind in [PointerDeviceKind.touch, PointerDeviceKind.mouse]) {
+    testWidgets('a $kind tap on a tab leaves no focus ring behind', (
+      tester,
+    ) async {
+      await pumpStaff(tester);
+      await tester.tap(find.byKey(const Key('nav-/fixture')), kind: kind);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('intent-key-field')), findsOneWidget);
+      expect(
+        FocusManager.instance.primaryFocus?.context
+            ?.findAncestorWidgetOfExactType<NavItem>(),
+        isNull,
+        reason: 'a tap does not move focus to the tab',
+      );
+      // No FocusRing anywhere draws a ring after pointer use.
+      for (final ring in tester.widgetList<Container>(
+        find.descendant(
+          of: find.byType(FocusRing),
+          matching: find.byType(Container),
+        ),
+      )) {
+        final d = ring.decoration;
+        if (d is BoxDecoration && d.border is Border) {
+          expect((d.border! as Border).top.color, Colors.transparent);
+        }
+      }
+    });
+  }
 
   testWidgets('keyboard: Tab reaches the nav tabs first; Enter navigates', (
     tester,
@@ -191,27 +237,34 @@ void main() {
     expect(dy('nav-/fixture'), dy('nav-/status'));
   });
 
-  test('only the composition root imports Supabase; no client persistence', () {
+  test('only the composition root reaches Supabase; no client persistence', () {
     final files = Directory('lib')
         .listSync(recursive: true)
         .whereType<File>()
         .where((f) => f.path.endsWith('.dart'));
-    final sdk = RegExp(
-      r'''package:(supabase|supabase_flutter|gotrue|postgrest|http)/''',
-    );
     final persistence = RegExp(
       r'''package:(shared_preferences|hive|sqflite|drift|isar|path_provider|flutter_secure_storage)/|dart:html|localStorage|sessionStorage|indexedDB''',
     );
     for (final f in files) {
+      final path = f.path.replaceAll(r'\\', '/');
       final src = f.readAsStringSync();
-      if (!f.path.endsWith('main.dart')) {
-        expect(sdk.hasMatch(src), isFalse, reason: f.path);
+      final reached = boundaryViolations(path, src);
+      if (path == 'lib/main.dart') {
+        expect(reached, ['package:church_client_core/composition.dart']);
+      } else {
+        expect(reached, isEmpty, reason: path);
       }
-      expect(persistence.hasMatch(src), isFalse, reason: f.path);
+      expect(persistence.hasMatch(src), isFalse, reason: path);
     }
-    expect(
-      File('lib/main.dart').readAsStringSync(),
-      contains('persistSession: false'),
-    );
+  });
+
+  test('the app guard catches a shell that reaches the adapters', () {
+    for (final src in [
+      "import 'package:church_client_core/supabase_adapters.dart';",
+      "import 'package:church_client_core/composition.dart';",
+      "import 'package:supabase_flutter/supabase_flutter.dart';",
+    ]) {
+      expect(boundaryViolations('lib/app.dart', src), isNotEmpty, reason: src);
+    }
   });
 }

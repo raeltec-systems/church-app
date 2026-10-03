@@ -7,32 +7,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class Harness {
-  Harness(this.gateway, this.session, this.reader);
-  final FakeCommandGateway gateway;
-  final FakeSession session;
-  final FakeFixtureReader reader;
-}
+typedef Harness = ClientTestHarness;
 
 Future<Harness> pumpFixture(
   WidgetTester tester, {
   String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   double textScale = 1,
   Brightness brightness = Brightness.light,
+  bool configured = true,
 }) async {
-  final h = Harness(
-    FakeCommandGateway(),
-    FakeSession(account),
-    FakeFixtureReader(),
-  );
+  final h = ClientTestHarness(account: account);
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [
-        commandGatewayProvider.overrideWithValue(h.gateway),
-        sessionRepositoryProvider.overrideWithValue(h.session),
-        fixtureCounterReaderProvider.overrideWithValue(h.reader),
-        requestIdsProvider.overrideWithValue(SequentialRequestIds()),
-      ],
+      overrides: h.overrides(configured: configured),
       child: MaterialApp(
         theme: churchMobileTheme(brightness),
         home: MediaQuery(
@@ -70,6 +57,22 @@ Future<void> createConfirmed(
   h.gateway.sent.last.confirm(fixtureCounterData(value: value), 1);
   await tester.pump();
 }
+
+/// Whether keyboard focus sits inside the widget keyed [key].
+bool focusIn(String key) {
+  final ctx = FocusManager.instance.primaryFocus?.context;
+  if (ctx == null) return false;
+  if (ctx.widget.key == Key(key)) return true;
+  var found = false;
+  ctx.visitAncestorElements((e) {
+    found = e.widget.key == Key(key);
+    return !found;
+  });
+  return found;
+}
+
+List<String> announced(WidgetTester tester) =>
+    tester.takeAnnouncements().map((a) => a.message).toList();
 
 void main() {
   testWidgets('pending: Sending…, inputs read-only, no success claimed', (
@@ -388,6 +391,215 @@ void main() {
       "[<'by-field'>]",
       "[<'increment-button'>]",
     ]);
+  });
+
+  group('focus follows the request state', () {
+    testWidgets('submit moves focus to Sending…, then to the outcome', (
+      tester,
+    ) async {
+      final h = await pumpFixture(tester);
+      await tester.enterText(intentField, 'synthetic-demo');
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+      await tester.pump();
+      expect(focusIn('state-pending'), isTrue);
+      h.gateway.sent.last.unknown();
+      await tester.pump();
+      await tester.pump();
+      expect(focusIn('state-unknown'), isTrue);
+
+      // Check again: pending, then the result.
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(focusIn('check-again-button'), isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      await tester.pump();
+      expect(focusIn('state-pending'), isTrue);
+      h.gateway.sent.last.refuse(ErrorCode.unavailable);
+      await tester.pump();
+      await tester.pump();
+      expect(focusIn('state-unavailable'), isTrue);
+
+      // Try again: pending, then confirmed.
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pump();
+      expect(focusIn('try-again-button'), isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+      await tester.pump();
+      h.gateway.sent.last.confirm(fixtureCounterData(), 1);
+      await tester.pump();
+      await tester.pump();
+      expect(focusIn('state-confirmed'), isTrue);
+    });
+
+    testWidgets('Stop checking and Reload move focus to their result', (
+      tester,
+    ) async {
+      final h = await pumpFixture(tester);
+      await createConfirmed(tester, h);
+      await tapKey(tester, 'increment-button');
+      h.gateway.sent.last.unknown();
+      await tester.pump();
+      await tapKey(tester, 'discard-button');
+      await tester.pump();
+      expect(focusIn('state-discarded'), isTrue);
+
+      await tapKey(tester, 'increment-button');
+      h.gateway.sent.last.refuse(
+        ErrorCode.conflict,
+        currentRevision: const Optional.of(3),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(focusIn('state-conflict'), isTrue);
+      await tapKey(tester, 'reload-button');
+      await tester.pump();
+      await tester.pump();
+      expect(focusIn('state-conflict'), isTrue);
+      h.reader.next = FixtureCounter.fromCommandData(fixtureCounterData(), 3);
+      await tapKey(tester, 'reload-button');
+      await tester.pump();
+      await tester.pump();
+      expect(focusIn('state-reloaded'), isTrue);
+    });
+
+    testWidgets('account notice takes focus; Dismiss returns to the form', (
+      tester,
+    ) async {
+      final h = await pumpFixture(tester);
+      h.session.switchTo(null);
+      await tester.pump();
+      await tester.pump();
+      expect(focusIn('state-account-changed'), isTrue);
+      await tapKey(tester, 'dismiss-account-change');
+      await tester.pump();
+      expect(focusIn('intent-key-field'), isTrue);
+    });
+  });
+
+  group('announcements', () {
+    testWidgets('outcomes, failed reload, reloaded and stopped checking', (
+      tester,
+    ) async {
+      final h = await pumpFixture(tester);
+      await createConfirmed(tester, h, value: 2);
+      expect(announced(tester), contains('Saved. Value 2, revision 1.'));
+
+      await tapKey(tester, 'increment-button');
+      h.gateway.sent.last.refuse(
+        ErrorCode.conflict,
+        currentRevision: const Optional.of(3),
+      );
+      await tester.pump();
+      expect(
+        announced(tester),
+        contains(
+          'Not saved. The counter changed. Reload before applying again.',
+        ),
+      );
+      await tapKey(tester, 'reload-button');
+      await tester.pump();
+      expect(announced(tester).last, "Couldn't reload. test: no read endpoint");
+      h.reader.next = FixtureCounter.fromCommandData(fixtureCounterData(), 3);
+      await tapKey(tester, 'reload-button');
+      await tester.pump();
+      expect(announced(tester).last, 'Reloaded. The counter is at revision 3.');
+
+      await tapKey(tester, 'increment-button');
+      h.gateway.sent.last.unknown();
+      await tester.pump();
+      expect(announced(tester).last, 'Not confirmed. Check again.');
+      await tapKey(tester, 'discard-button');
+      expect(
+        announced(tester).last,
+        'Stopped checking. The last change may still have been applied.',
+      );
+    });
+
+    testWidgets('account switch and sign-out are announced', (tester) async {
+      final h = await pumpFixture(tester);
+      h.session.switchTo('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+      await tester.pump();
+      await tester.pump();
+      expect(
+        announced(tester).single,
+        'The signed-in account changed. Information and unsent changes from '
+        'the previous account were cleared from this screen.',
+      );
+      h.session.switchTo(null);
+      await tester.pump();
+      await tester.pump();
+      expect(announced(tester).single, startsWith('You were signed out.'));
+    });
+  });
+
+  testWidgets('unavailable then edited: Try again is withdrawn, never stale', (
+    tester,
+  ) async {
+    final h = await pumpFixture(tester);
+    await createConfirmed(tester, h);
+    await tester.enterText(byField, '2');
+    await tapKey(tester, 'increment-button');
+    final first = h.gateway.sent.last;
+    first.refuse(ErrorCode.unavailable);
+    await tester.pump();
+    expect(find.byKey(const Key('try-again-button')), findsOneWidget);
+
+    await tester.enterText(byField, '3');
+    await tester.pump();
+    expect(find.byKey(const Key('try-again-button')), findsNothing);
+    expect(find.textContaining('You edited your entry'), findsOneWidget);
+    await tapKey(tester, 'increment-button');
+    final second = h.gateway.sent.last;
+    expect((second.wire['payload']! as Map)['by'], 3);
+    expect(second.request.requestId, isNot(first.request.requestId));
+    second.confirm(fixtureCounterData(value: 3), 2);
+    await tester.pump();
+    expect(find.text('Value 3'), findsOneWidget);
+  });
+
+  testWidgets('after Stop checking, the same input keeps its request id', (
+    tester,
+  ) async {
+    final h = await pumpFixture(tester);
+    await createConfirmed(tester, h);
+    await tester.enterText(byField, '4');
+    await tapKey(tester, 'increment-button');
+    final first = h.gateway.sent.last;
+    first.unknown();
+    await tester.pump();
+    await tapKey(tester, 'discard-button');
+
+    await tapKey(tester, 'increment-button');
+    final again = h.gateway.sent.last;
+    expect(again.request.requestId, first.request.requestId);
+    expect(again.wire, first.wire);
+    again.refuse(ErrorCode.unavailable);
+    await tester.pump();
+
+    // A changed input is a new request.
+    await tester.enterText(byField, '5');
+    await tapKey(tester, 'increment-button');
+    expect(
+      h.gateway.sent.last.request.requestId,
+      isNot(first.request.requestId),
+    );
+  });
+
+  testWidgets('unconfigured build: the command is reported as not sent', (
+    tester,
+  ) async {
+    await pumpFixture(tester, configured: false);
+    await tester.enterText(intentField, 'synthetic-demo');
+    await tapKey(tester, 'create-button');
+    await tester.pump();
+    expect(find.byKey(const Key('state-not-sent')), findsOneWidget);
+    expect(find.text('Not sent: no server configured'), findsOneWidget);
+    expect(find.text(UnconfiguredCommandGateway.reason), findsOneWidget);
+    expect(find.byKey(const Key('try-again-button')), findsNothing);
+    expect(find.byKey(const Key('check-again-button')), findsNothing);
   });
 
   for (final brightness in Brightness.values) {

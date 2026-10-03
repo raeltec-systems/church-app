@@ -3,6 +3,7 @@ import 'dart:ui' show CheckedState, Tristate;
 
 import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -62,7 +63,6 @@ void main() {
           'ink on red banner': (c.ink, c.redBg),
           'ink on amber banner': (c.ink, c.amberBg),
           'ink on blue banner': (c.ink, c.blueBg),
-          'sidebar text': (c.onSidebarMuted, c.sidebar),
         };
         pairs.forEach((k, v) {
           expect(contrast(v.$1, v.$2), greaterThanOrEqualTo(4.5), reason: k);
@@ -72,11 +72,29 @@ void main() {
       test('$name focus ring is >=3:1 against bg and surface', () {
         expect(contrast(c.focus, c.bg), greaterThanOrEqualTo(3));
         expect(contrast(c.focus, c.surface), greaterThanOrEqualTo(3));
-        expect(contrast(c.onSidebar, c.sidebar), greaterThanOrEqualTo(3));
       });
     }
 
+    test('staff chrome (light only) meets contrast on navy', () {
+      const navy = ChurchStaffChrome.sidebar;
+      expect(
+        contrast(ChurchStaffChrome.onSidebarMuted, navy),
+        greaterThanOrEqualTo(4.5),
+      );
+      expect(
+        contrast(ChurchStaffChrome.onSidebar, navy),
+        greaterThanOrEqualTo(4.5),
+      );
+      final active = Color.alphaBlend(ChurchStaffChrome.activeItem, navy);
+      expect(
+        contrast(ChurchStaffChrome.onSidebar, active),
+        greaterThanOrEqualTo(4.5),
+      );
+    });
+
     test('design-contract values are carried verbatim', () {
+      expect(ChurchColors.dark.focus, ChurchColors.dark.accent);
+      expect(ChurchColors.light.focus, ChurchColors.light.accent);
       expect(ChurchColors.light.bg, const Color(0xFFF4F6FA));
       expect(ChurchColors.dark.bg, const Color(0xFF0A0F1E));
       expect(ChurchColors.light.primary, const Color(0xFF14246B));
@@ -121,6 +139,86 @@ void main() {
     await tester.pump();
     expect(ringShown(tester, 'A'), isFalse);
     expect(ringShown(tester, 'B'), isTrue);
+  });
+
+  testWidgets('pointer or touch focus shows no ring; keyboard focus does', (
+    tester,
+  ) async {
+    addTearDown(
+      () => FocusManager.instance.highlightStrategy =
+          FocusHighlightStrategy.automatic,
+    );
+    final node = FocusNode();
+    addTearDown(node.dispose);
+    await tester.pumpWidget(
+      _host(
+        FocusRing(
+          child: TextButton(
+            focusNode: node,
+            onPressed: () {},
+            child: const Text('A'),
+          ),
+        ),
+      ),
+    );
+    FocusManager.instance.highlightStrategy =
+        FocusHighlightStrategy.alwaysTouch;
+    node.requestFocus();
+    await tester.pump();
+    expect(node.hasFocus, isTrue);
+    expect(ringShown(tester, 'A'), isFalse);
+    FocusManager.instance.highlightStrategy =
+        FocusHighlightStrategy.alwaysTraditional;
+    FocusVisibility.instance.reset();
+    await tester.pump();
+    expect(ringShown(tester, 'A'), isTrue);
+
+    // A mouse click (highlight mode stays traditional on desktop) hides it.
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.down(const Offset(1, 1));
+    await mouse.up();
+    await tester.pump();
+    expect(node.hasFocus, isTrue);
+    expect(ringShown(tester, 'A'), isFalse);
+    // The next key press shows it again.
+    await tester.sendKeyEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.pump();
+    expect(ringShown(tester, 'A'), isTrue);
+  });
+
+  testWidgets('a focusable banner is a named focus target, not a Tab stop', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    final node = FocusNode();
+    addTearDown(node.dispose);
+    await tester.pumpWidget(
+      _host(
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RequestStateBanner(
+              focusNode: node,
+              tone: StatusTone.warning,
+              title: 'Not confirmed',
+              message: 'Check again.',
+            ),
+            TextButton(onPressed: () {}, child: const Text('Next')),
+          ],
+        ),
+      ),
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+    expect(node.hasFocus, isFalse, reason: 'not in the Tab order');
+    node.requestFocus();
+    await tester.pump();
+    final sem = tester.getSemantics(
+      find.bySemanticsLabel(RegExp('^Not confirmed')),
+    );
+    expect(sem.flagsCollection.isFocused, Tristate.isTrue);
+    expect(find.text('Check again.'), findsOneWidget);
+    handle.dispose();
   });
 
   testWidgets('ChurchDialog is a dialog named by its title', (tester) async {

@@ -10,3 +10,4 @@ export 'src/domain/platform_status.dart';
 export 'src/domain/session.dart';
 export 'src/presentation/fixture_command_screen.dart';
 export 'src/presentation/platform_status_screen.dart';
+export 'src/presentation/shell_routing.dart';

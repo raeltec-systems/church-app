@@ -54,6 +54,7 @@ Future<void> main(List<String> args) async {
     CommandConfirmed() => 'CONFIRMED (unexpected)',
     CommandRefused(:final error) => 'refused: ${error.code.wireName}',
     CommandUnknownOutcome(:final cause) => 'unknown outcome: $cause',
+    CommandNotSent(:final reason) => 'not sent: $reason',
   };
   stdout.writeln('fixture_counter.create signed out: $description');
   ok &=

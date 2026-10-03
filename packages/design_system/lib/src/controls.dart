@@ -175,17 +175,18 @@ class NavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
     final fg = onDark
-        ? (selected ? c.onSidebar : c.onSidebarMuted)
+        ? (selected
+              ? ChurchStaffChrome.onSidebar
+              : ChurchStaffChrome.onSidebarMuted)
         : (selected ? c.link : c.muted);
     final highlight = onDark
-        ? (selected ? c.onSidebar.withValues(alpha: 0.16) : Colors.transparent)
+        ? (selected ? ChurchStaffChrome.activeItem : Colors.transparent)
         : (selected ? c.blueBg : Colors.transparent);
     final text = Text(
       label,
       textAlign: vertical ? TextAlign.center : TextAlign.start,
-      style: TextStyle(
+      style: (vertical ? ChurchType.tabLabel : ChurchType.staffBody).copyWith(
         color: fg,
-        fontSize: vertical ? 12 : 15,
         fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
       ),
     );
@@ -211,7 +212,7 @@ class NavItem extends StatelessWidget {
       selected: selected,
       container: true,
       child: FocusRing(
-        color: onDark ? c.onSidebar : null,
+        color: onDark ? ChurchStaffChrome.onSidebar : null,
         radius: 12,
         child: Material(
           color: highlight,
@@ -296,7 +297,13 @@ class RequestStateBanner extends StatelessWidget {
     this.icon,
     this.busy = false,
     this.actions = const [],
+    this.focusNode,
   });
+
+  /// When given, the banner is a programmatic focus target named by [title]
+  /// (not a Tab stop), so a screen can move focus to the state it reports
+  /// instead of losing it when the triggering control is disabled or removed.
+  final FocusNode? focusNode;
 
   final StatusTone tone;
   final String title;
@@ -311,74 +318,105 @@ class RequestStateBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
     final (bg, fg) = toneColors(c, tone);
-    return Semantics(
-      container: true,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(ChurchGeometry.cardPadding),
-        decoration: BoxDecoration(
-          color: bg,
-          border: Border.all(color: fg),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (busy)
-                  SizedBox.square(
-                    dimension: 22,
-                    child: CircularProgressIndicator(strokeWidth: 3, color: fg),
-                  )
-                else
-                  ExcludeSemantics(
-                    child: Icon(icon ?? Icons.info_outline, color: fg),
-                  ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Semantics(
-                    header: true,
-                    child: Text(
-                      title,
-                      style: ChurchType.cardTitle.copyWith(color: fg),
-                    ),
+    final node = focusNode;
+    final panel = Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(ChurchGeometry.cardPadding),
+      decoration: BoxDecoration(
+        color: bg,
+        border: Border.all(color: fg),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (busy)
+                SizedBox.square(
+                  dimension: 22,
+                  child: CircularProgressIndicator(strokeWidth: 3, color: fg),
+                )
+              else
+                ExcludeSemantics(
+                  child: Icon(icon ?? Icons.info_outline, color: fg),
+                ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Semantics(
+                  // A focusable banner is itself named by its title; it is
+                  // not also a heading (that would hide the name).
+                  header: node == null,
+                  excludeSemantics: node != null,
+                  child: Text(
+                    title,
+                    style: ChurchType.cardTitle.copyWith(color: fg),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(message, style: ChurchType.body.copyWith(color: c.ink)),
-            if (actions.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final a in actions)
-                    FocusRing(
-                      child: a.primary
-                          ? FilledButton(
-                              key: a.key,
-                              onPressed: a.onPressed,
-                              child: Text(a.label),
-                            )
-                          : OutlinedButton(
-                              key: a.key,
-                              onPressed: a.onPressed,
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: c.ink,
-                                side: BorderSide(color: fg),
-                              ),
-                              child: Text(a.label),
-                            ),
-                    ),
-                ],
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: ChurchLayout.of(context).body.copyWith(color: c.ink),
+          ),
+          if (actions.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final a in actions)
+                  FocusRing(
+                    child: a.primary
+                        ? FilledButton(
+                            key: a.key,
+                            onPressed: a.onPressed,
+                            child: Text(a.label),
+                          )
+                        : OutlinedButton(
+                            key: a.key,
+                            onPressed: a.onPressed,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: c.ink,
+                              side: BorderSide(color: fg),
+                            ),
+                            child: Text(a.label),
+                          ),
+                  ),
+              ],
+            ),
           ],
+        ],
+      ),
+    );
+    if (node == null) return Semantics(container: true, child: panel);
+    return Semantics(
+      container: true,
+      label: title,
+      child: Focus(
+        focusNode: node,
+        skipTraversal: true,
+        child: ListenableBuilder(
+          listenable: node,
+          builder: (context, _) => FocusHighlightBuilder(
+            builder: (context, keyboardMode) => Container(
+              padding: const EdgeInsets.all(ChurchGeometry.focusRingWidth + 1),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: keyboardMode && node.hasPrimaryFocus
+                      ? c.focus
+                      : Colors.transparent,
+                  width: ChurchGeometry.focusRingWidth,
+                ),
+              ),
+              child: panel,
+            ),
+          ),
         ),
       ),
     );

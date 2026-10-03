@@ -1,17 +1,21 @@
 {
   "url": "http://127.0.0.1:8767/",
-  "passed": 6,
-  "total": 6,
+  "passed": 7,
+  "total": 7,
   "results": [
     {
       "id": "S1",
       "name": "tracer read shows the local API value",
       "pass": true,
-      "detail": {}
+      "detail": {
+        "statusValue": [
+          "Status: operational\nSYNTHETIC tracer status: the platform path is reachable. Not real church data.\nUpdated 2026-10-03 13:40 UTC\nSynthetic test data"
+        ]
+      }
     },
     {
       "id": "S2",
-      "name": "Tab starts at the named navigation tabs; every stop has a role and a name",
+      "name": "Tab: named tabs first, every stop unique with a role and a name, reaches the end of the page",
       "pass": true,
       "detail": {
         "stops": [
@@ -26,47 +30,106 @@
           {
             "role": "button",
             "name": "Reload"
+          }
+        ],
+        "end": "wrapped to tab: Platform status"
+      }
+    },
+    {
+      "id": "S3",
+      "name": "every Tab stop shows a >=3:1 focus change over >= a 2 px perimeter area (7 controls)",
+      "pass": true,
+      "detail": {
+        "focusResults": [
+          {
+            "n": "01",
+            "where": "platform status page",
+            "control": "tab: Platform status",
+            "requiredPixels": 1048,
+            "contrastChangePixels": 1504,
+            "baseline": "button: Reload",
+            "pass": true
           },
           {
-            "role": "button",
-            "name": "Reload"
+            "n": "02",
+            "where": "platform status page",
+            "control": "tab: Fixture command",
+            "requiredPixels": 1048,
+            "contrastChangePixels": 1504,
+            "baseline": "button: Reload",
+            "pass": true
           },
           {
-            "role": "button",
-            "name": "Reload"
+            "n": "03",
+            "where": "platform status page",
+            "control": "button: Reload",
+            "requiredPixels": 384,
+            "contrastChangePixels": 608,
+            "baseline": "tab: Fixture command",
+            "pass": true
           },
           {
-            "role": "button",
-            "name": "Reload"
+            "n": "04",
+            "where": "fixture command page",
+            "control": "input: Intent key",
+            "requiredPixels": 4132,
+            "contrastChangePixels": 6018,
+            "baseline": "tab: Platform status",
+            "pass": true
+          },
+          {
+            "n": "05",
+            "where": "fixture command page",
+            "control": "button: Create counter",
+            "requiredPixels": 756,
+            "contrastChangePixels": 1168,
+            "baseline": "tab: Platform status",
+            "pass": true
+          },
+          {
+            "n": "06",
+            "where": "fixture command page",
+            "control": "tab: Platform status",
+            "requiredPixels": 1048,
+            "contrastChangePixels": 1504,
+            "baseline": "button: Create counter",
+            "pass": true
+          },
+          {
+            "n": "07",
+            "where": "fixture command page",
+            "control": "tab: Fixture command",
+            "requiredPixels": 1048,
+            "contrastChangePixels": 1504,
+            "baseline": "button: Create counter",
+            "pass": true
           }
         ]
       }
     },
     {
-      "id": "S3",
-      "name": "keyboard-only fixture command, signed out: refused honestly, never Saved",
+      "id": "S4",
+      "name": "keyboard-only command, signed out: focus moves to the refusal banner; never Saved",
       "pass": true,
       "detail": {
         "afterNav": {
           "role": "tab",
           "name": "Fixture command"
         },
-        "fixtureStops": [
-          {
-            "role": "input",
-            "name": "Intent key"
-          }
-        ],
         "createStop": {
           "role": "button",
           "name": "Create counter"
+        },
+        "afterSubmit": {
+          "role": "flt-semantics",
+          "name": "Not saved: sign-in required\nThe server needs a signed-in account for this command. Sign-in arrives with the identity wor"
         },
         "refused": true,
         "claimedSaved": false
       }
     },
     {
-      "id": "S4",
+      "id": "S5",
       "name": "no page errors (desktop)",
       "pass": true,
       "detail": {
@@ -74,7 +137,7 @@
       }
     },
     {
-      "id": "S5a",
+      "id": "S6a",
       "name": "narrow 390 px window: fixture screen renders, no page-level horizontal scroll",
       "pass": true,
       "detail": {
@@ -83,7 +146,7 @@
       }
     },
     {
-      "id": "S5b",
+      "id": "S6b",
       "name": "200% browser font size: fixture screen renders, no page-level horizontal scroll",
       "pass": true,
       "detail": {

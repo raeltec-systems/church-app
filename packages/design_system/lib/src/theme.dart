@@ -5,6 +5,11 @@ import 'tokens.dart';
 /// Mobile theme: full light/dark token swap.
 ThemeData churchMobileTheme(Brightness brightness) => _theme(
   brightness == Brightness.dark ? ChurchColors.dark : ChurchColors.light,
+  layout: ChurchLayout.mobile,
+  // Screen title 28/700 in brand.
+  title: ChurchType.mobileScreenTitle,
+  headerBackground: null,
+  titleSpacing: ChurchGeometry.mobileContentPadding,
   inputRadius: ChurchGeometry.mobileInputRadius,
   // Mobile buttons are fully rounded (radius half the height).
   buttonShape: const StadiumBorder(),
@@ -13,6 +18,11 @@ ThemeData churchMobileTheme(Brightness brightness) => _theme(
 /// Staff web theme: light palette only, navy sidebar.
 ThemeData churchStaffTheme() => _theme(
   ChurchColors.light,
+  layout: ChurchLayout.staff,
+  // Page title 24/700 #14246B on a white header, padding 18/32.
+  title: ChurchType.staffPageTitle,
+  headerBackground: ChurchColors.light.surface,
+  titleSpacing: 32,
   inputRadius: ChurchGeometry.staffInputRadius,
   buttonShape: RoundedRectangleBorder(
     borderRadius: BorderRadius.circular(ChurchGeometry.staffButtonRadius),
@@ -21,6 +31,10 @@ ThemeData churchStaffTheme() => _theme(
 
 ThemeData _theme(
   ChurchColors c, {
+  required ChurchLayout layout,
+  required TextStyle title,
+  required Color? headerBackground,
+  required double titleSpacing,
   required double inputRadius,
   required OutlinedBorder buttonShape,
 }) {
@@ -57,13 +71,26 @@ ThemeData _theme(
     scaffoldBackgroundColor: c.bg,
     visualDensity: VisualDensity.standard,
     materialTapTargetSize: MaterialTapTargetSize.padded,
-    extensions: [c],
+    extensions: [c, layout],
+    textTheme: Typography.material2021(platform: TargetPlatform.android)
+        .englishLike
+        .apply(bodyColor: c.ink, displayColor: c.ink)
+        .copyWith(
+          bodyLarge: layout.body.copyWith(color: c.ink),
+          bodyMedium: layout.body.copyWith(color: c.ink),
+        ),
     // Keyboard highlight for list/menu items: near-solid accent, >=3:1
     // against the unfocused item (1.6 finding 4).
     focusColor: c.focus.withValues(alpha: 0.85),
     appBarTheme: AppBarTheme(
-      backgroundColor: c.bg,
+      backgroundColor: headerBackground ?? c.bg,
       foregroundColor: c.brand,
+      titleTextStyle: title.copyWith(color: c.brand),
+      titleSpacing: titleSpacing,
+      centerTitle: false,
+      shape: headerBackground == null
+          ? null
+          : Border(bottom: BorderSide(color: c.line)),
       elevation: 0,
       scrolledUnderElevation: 0,
       // Room for a 48 px action plus its outside focus ring.

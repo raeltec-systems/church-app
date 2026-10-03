@@ -7,42 +7,18 @@ import 'package:go_router/go_router.dart';
 /// Platform destinations only. The five member tabs (Home, Bible & Hymns,
 /// Sermons, Give, Calendar) arrive with their feature epics.
 const mobileDestinations = [
-  (path: '/status', label: 'Status', icon: Icons.monitor_heart_outlined),
-  (path: '/fixture', label: 'Fixture', icon: Icons.science_outlined),
+  (
+    path: ClientPaths.status,
+    label: 'Status',
+    icon: Icons.monitor_heart_outlined,
+  ),
+  (path: ClientPaths.fixture, label: 'Fixture', icon: Icons.science_outlined),
 ];
-
-/// One navigator, no nested shell navigator, so keyboard traversal reaches
-/// both the page and the tab bar.
-GoRouter buildMobileRouter({String initialLocation = '/status'}) {
-  Page<void> page(GoRouterState state, Widget screen) => NoTransitionPage(
-    key: state.pageKey,
-    child: MobileShell(
-      location: state.uri.path,
-      focusSelectedNav: state.extra is NavFocusRequest,
-      child: screen,
-    ),
-  );
-  return GoRouter(
-    initialLocation: initialLocation,
-    routes: [
-      GoRoute(path: '/', redirect: (_, _) => '/status'),
-      GoRoute(
-        path: '/status',
-        pageBuilder: (_, state) =>
-            page(state, const PlatformStatusDestination()),
-      ),
-      GoRoute(
-        path: '/fixture',
-        pageBuilder: (_, state) => page(state, const FixtureCommandScreen()),
-      ),
-    ],
-  );
-}
 
 class MobileApp extends StatefulWidget {
   const MobileApp({
     super.key,
-    this.initialLocation = '/status',
+    this.initialLocation = ClientPaths.status,
     this.themeMode,
   });
 
@@ -56,8 +32,13 @@ class MobileApp extends StatefulWidget {
 }
 
 class _MobileAppState extends State<MobileApp> {
-  late final GoRouter _router = buildMobileRouter(
+  late final GoRouter _router = buildClientRouter(
     initialLocation: widget.initialLocation,
+    shell: (location, focusSelectedNav, child) => MobileShell(
+      location: location,
+      focusSelectedNav: focusSelectedNav,
+      child: child,
+    ),
   );
 
   @override
@@ -101,7 +82,15 @@ class MobileShell extends StatelessWidget {
         policy: WidgetOrderTraversalPolicy(),
         child: Column(
           children: [
-            Expanded(child: FocusTraversalGroup(child: child)),
+            // The tab bar below owns the bottom safe area; pages must not add
+            // it again.
+            Expanded(
+              child: MediaQuery.removePadding(
+                context: context,
+                removeBottom: true,
+                child: FocusTraversalGroup(child: child),
+              ),
+            ),
             DecoratedBox(
               decoration: BoxDecoration(
                 color: c.surface,
@@ -131,10 +120,7 @@ class MobileShell extends StatelessWidget {
                                 selected: location == d.path,
                                 autofocus:
                                     focusSelectedNav && location == d.path,
-                                onTap: () => context.go(
-                                  d.path,
-                                  extra: const NavFocusRequest(),
-                                ),
+                                onTap: () => goFromNav(context, d.path),
                               ),
                             ),
                         ],
@@ -149,9 +135,4 @@ class MobileShell extends StatelessWidget {
       ),
     );
   }
-}
-
-/// `extra` of a navigation started from the shell's tabs.
-class NavFocusRequest {
-  const NavFocusRequest();
 }

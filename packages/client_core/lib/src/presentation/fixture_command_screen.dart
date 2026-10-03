@@ -19,14 +19,15 @@ class FixtureCommandScreen extends ConsumerWidget {
     // Keyed by account generation: an account change discards the form's
     // local text along with the controller's protected state.
     final generation = ref.watch(accountGenerationProvider);
+    final layout = ChurchLayout.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Fixture command')),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(ChurchGeometry.mobileContentPadding),
+          padding: layout.pagePadding,
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
+              constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
               child: _FixtureForm(key: ValueKey('fixture-form-$generation')),
             ),
           ),
@@ -49,11 +50,41 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
   String? _localIntentError;
   String? _localByError;
 
+  /// Focus target for the request-state banner: every transition moves
+  /// keyboard focus to the state it reports, so focus is never lost when the
+  /// triggering control is disabled or its banner action disappears.
+  final _stateFocus = FocusNode(debugLabel: 'request state');
+  final _accountFocus = FocusNode(debugLabel: 'account changed');
+  final _intentFocus = FocusNode(debugLabel: 'intent key');
+
+  @override
+  void initState() {
+    super.initState();
+    // This form is rebuilt for each account generation: report the change.
+    final change = ref.read(accountProvider).lastChange;
+    if (change != null && change != AccountChange.signedIn) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _accountFocus.requestFocus();
+        announce(context, '${_accountTitle(change)}. $_accountMessage');
+      });
+    }
+  }
+
   @override
   void dispose() {
     _intentKey.dispose();
     _by.dispose();
+    _stateFocus.dispose();
+    _accountFocus.dispose();
+    _intentFocus.dispose();
     super.dispose();
+  }
+
+  void _focusState() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _stateFocus.context != null) _stateFocus.requestFocus();
+    });
   }
 
   FixtureCounterController get _controller =>
@@ -85,9 +116,10 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
     final s = ref.watch(fixtureCounterControllerProvider);
     final account = ref.watch(accountProvider);
     ref.listen(fixtureCounterControllerProvider, (prev, next) {
-      if (prev?.phase == next.phase) return;
-      final spoken = _announcement(next);
-      if (spoken != null) announce(context, spoken);
+      final spoken = _announcement(prev, next);
+      if (spoken == null) return;
+      announce(context, spoken);
+      _focusState();
     });
 
     final serverFieldErrors = s.phase == FixturePhase.validation
@@ -105,7 +137,7 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
             : null);
 
     return DefaultTextStyle.merge(
-      style: ChurchType.body.copyWith(color: c.ink),
+      style: ChurchLayout.of(context).body.copyWith(color: c.ink),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -127,20 +159,18 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
               when change != AccountChange.signedIn) ...[
             RequestStateBanner(
               key: const Key('state-account-changed'),
+              focusNode: _accountFocus,
               tone: StatusTone.info,
               icon: Icons.switch_account_outlined,
-              title: change == AccountChange.signedOut
-                  ? 'You were signed out'
-                  : 'The signed-in account changed',
-              message:
-                  'Information and unsent changes from the previous account '
-                  'were cleared from this screen.',
+              title: _accountTitle(change),
+              message: _accountMessage,
               actions: [
-                BannerAction(
-                  'Dismiss',
-                  () => ref.read(accountProvider.notifier).acknowledgeChange(),
-                  key: const Key('dismiss-account-change'),
-                ),
+                BannerAction('Dismiss', () {
+                  ref.read(accountProvider.notifier).acknowledgeChange();
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) _intentFocus.requestFocus();
+                  });
+                }, key: const Key('dismiss-account-change')),
               ],
             ),
             const SizedBox(height: ChurchGeometry.sectionGap),
@@ -166,11 +196,13 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
               RevealOnFocus(
                 child: TextField(
                   key: const Key('intent-key-field'),
+                  focusNode: _intentFocus,
                   controller: _intentKey,
                   readOnly: !s.canCreate,
                   textInputAction: TextInputAction.done,
                   onSubmitted: (_) => s.canCreate ? _create() : null,
                   onChanged: (_) {
+                    _controller.inputChanged();
                     if (_localIntentError != null) {
                       setState(() => _localIntentError = null);
                     }
@@ -213,6 +245,7 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
                     ],
                     onSubmitted: (_) => s.canIncrement ? _increment() : null,
                     onChanged: (_) {
+                      _controller.inputChanged();
                       if (_localByError != null) {
                         setState(() => _localByError = null);
                       }
@@ -251,8 +284,9 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
     switch (s.phase) {
       case FixturePhase.idle:
         if (s.discardedUnconfirmed) {
-          return const RequestStateBanner(
-            key: Key('state-discarded'),
+          return RequestStateBanner(
+            key: const Key('state-discarded'),
+            focusNode: _stateFocus,
             tone: StatusTone.warning,
             icon: Icons.help_outline,
             title: 'Stopped checking',
@@ -264,6 +298,7 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
         if (s.reloaded) {
           return RequestStateBanner(
             key: const Key('state-reloaded'),
+            focusNode: _stateFocus,
             tone: StatusTone.info,
             title: 'Reloaded',
             message:
@@ -274,8 +309,9 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
         }
         return null;
       case FixturePhase.pending:
-        return const RequestStateBanner(
-          key: Key('state-pending'),
+        return RequestStateBanner(
+          key: const Key('state-pending'),
+          focusNode: _stateFocus,
           tone: StatusTone.info,
           busy: true,
           title: 'Sending…',
@@ -284,8 +320,9 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
               'does.',
         );
       case FixturePhase.reloading:
-        return const RequestStateBanner(
-          key: Key('state-reloading'),
+        return RequestStateBanner(
+          key: const Key('state-reloading'),
+          focusNode: _stateFocus,
           tone: StatusTone.info,
           busy: true,
           title: 'Reloading…',
@@ -294,14 +331,16 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
       case FixturePhase.confirmed:
         return RequestStateBanner(
           key: const Key('state-confirmed'),
+          focusNode: _stateFocus,
           tone: StatusTone.success,
           icon: Icons.check_circle_outline,
           title: 'Saved',
           message: 'The server confirmed revision ${s.counter?.revision}.',
         );
       case FixturePhase.validation:
-        return const RequestStateBanner(
-          key: Key('state-validation'),
+        return RequestStateBanner(
+          key: const Key('state-validation'),
+          focusNode: _stateFocus,
           tone: StatusTone.danger,
           icon: Icons.error_outline,
           title: 'Not saved: check your entry',
@@ -311,8 +350,9 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
         );
       case FixturePhase.conflict:
         if (!s.staleRevision) {
-          return const RequestStateBanner(
-            key: Key('state-conflict-create'),
+          return RequestStateBanner(
+            key: const Key('state-conflict-create'),
+            focusNode: _stateFocus,
             tone: StatusTone.warning,
             icon: Icons.warning_amber_outlined,
             title: 'Not saved: this already exists',
@@ -324,6 +364,7 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
         final current = s.error?.currentRevision;
         return RequestStateBanner(
           key: const Key('state-conflict'),
+          focusNode: _stateFocus,
           tone: StatusTone.warning,
           icon: Icons.warning_amber_outlined,
           title: 'Not saved: the counter changed',
@@ -346,26 +387,32 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
       case FixturePhase.unavailable:
         return RequestStateBanner(
           key: const Key('state-unavailable'),
+          focusNode: _stateFocus,
           tone: StatusTone.danger,
           icon: Icons.cloud_off_outlined,
           title: code == ErrorCode.rateLimited
               ? 'Not saved: too many requests'
               : 'Not saved: service unavailable',
-          message:
-              'The server could not run this command, so nothing changed. '
-              'Your entry is kept.',
+          message: s.canRetry
+              ? 'The server could not run this command, so nothing changed. '
+                    'Your entry is kept.'
+              : 'The server could not run this command, so nothing changed. '
+                    'You edited your entry: submit it to send it as a new '
+                    'request.',
           actions: [
-            BannerAction(
-              'Try again',
-              ctl.retry,
-              key: const Key('try-again-button'),
-              primary: true,
-            ),
+            if (s.canRetry)
+              BannerAction(
+                'Try again',
+                ctl.retry,
+                key: const Key('try-again-button'),
+                primary: true,
+              ),
           ],
         );
       case FixturePhase.unknownOutcome:
         return RequestStateBanner(
           key: const Key('state-unknown'),
+          focusNode: _stateFocus,
           tone: StatusTone.warning,
           icon: Icons.help_outline,
           title: 'Not confirmed',
@@ -387,6 +434,15 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
             ),
           ],
         );
+      case FixturePhase.notSent:
+        return RequestStateBanner(
+          key: const Key('state-not-sent'),
+          focusNode: _stateFocus,
+          tone: StatusTone.danger,
+          icon: Icons.cloud_off_outlined,
+          title: 'Not sent: no server configured',
+          message: s.notSentReason ?? 'The command was not sent.',
+        );
       case FixturePhase.denied:
         final (title, message) = switch (code) {
           ErrorCode.unauthenticated => (
@@ -405,6 +461,7 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
         };
         return RequestStateBanner(
           key: const Key('state-denied'),
+          focusNode: _stateFocus,
           tone: StatusTone.danger,
           icon: Icons.block,
           title: title,
@@ -414,16 +471,50 @@ class _FixtureFormState extends ConsumerState<_FixtureForm> {
   }
 }
 
-String? _announcement(FixtureFormState s) => switch (s.phase) {
-  FixturePhase.confirmed =>
-    'Saved. Value ${s.counter?.value}, revision ${s.counter?.revision}.',
-  FixturePhase.validation => 'Not saved. Check your entry.',
-  FixturePhase.conflict => 'Not saved. The counter changed.',
-  FixturePhase.unavailable => 'Not saved. Service unavailable.',
-  FixturePhase.unknownOutcome => 'Not confirmed. Check again.',
-  FixturePhase.denied => 'Not saved.',
-  _ => null,
-};
+/// What to announce (and where focus moves) when the form state changes;
+/// null when nothing the user should hear changed.
+String? _announcement(FixtureFormState? prev, FixtureFormState next) {
+  if (prev != null &&
+      prev.phase == next.phase &&
+      prev.discardedUnconfirmed == next.discardedUnconfirmed &&
+      prev.reloaded == next.reloaded) {
+    return null;
+  }
+  return switch (next.phase) {
+    FixturePhase.pending => 'Sending.',
+    FixturePhase.reloading => 'Reloading.',
+    FixturePhase.confirmed =>
+      'Saved. Value ${next.counter?.value}, revision ${next.counter?.revision}.',
+    FixturePhase.validation => 'Not saved. Check your entry.',
+    FixturePhase.conflict when prev?.phase == FixturePhase.reloading =>
+      "Couldn't reload. ${next.reloadProblem ?? ''}".trim(),
+    FixturePhase.conflict when next.staleRevision =>
+      'Not saved. The counter changed. Reload before applying again.',
+    FixturePhase.conflict =>
+      'Not saved. This account already has a counter with this intent key.',
+    FixturePhase.unavailable => 'Not saved. Service unavailable.',
+    FixturePhase.unknownOutcome => 'Not confirmed. Check again.',
+    FixturePhase.denied => switch (next.error?.code) {
+      ErrorCode.unauthenticated => 'Not saved. Sign-in required.',
+      ErrorCode.forbidden => 'Not saved. Not allowed.',
+      _ => 'Not saved. Counter not found.',
+    },
+    FixturePhase.notSent => 'Not sent. No server configured.',
+    FixturePhase.idle when next.discardedUnconfirmed =>
+      'Stopped checking. The last change may still have been applied.',
+    FixturePhase.idle when next.reloaded =>
+      'Reloaded. The counter is at revision ${next.counter?.revision}.',
+    FixturePhase.idle => null,
+  };
+}
+
+String _accountTitle(AccountChange change) => change == AccountChange.signedOut
+    ? 'You were signed out'
+    : 'The signed-in account changed';
+
+const _accountMessage =
+    'Information and unsent changes from the previous account were cleared '
+    'from this screen.';
 
 String? _fieldMessage(String field, String? code) {
   if (code == null) return null;

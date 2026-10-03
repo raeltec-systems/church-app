@@ -8,43 +8,19 @@ import 'package:go_router/go_router.dart';
 /// roles and scopes, which the identity epic provides.
 const staffDestinations = [
   (
-    path: '/status',
+    path: ClientPaths.status,
     label: 'Platform status',
     icon: Icons.monitor_heart_outlined,
   ),
-  (path: '/fixture', label: 'Fixture command', icon: Icons.science_outlined),
+  (
+    path: ClientPaths.fixture,
+    label: 'Fixture command',
+    icon: Icons.science_outlined,
+  ),
 ];
 
-/// One navigator, no nested shell navigator: a nested navigator's focus
-/// scope would confine keyboard traversal to the page and skip the sidebar.
-GoRouter buildStaffRouter({String initialLocation = '/status'}) {
-  Page<void> page(GoRouterState state, Widget screen) => NoTransitionPage(
-    key: state.pageKey,
-    child: StaffShell(
-      location: state.uri.path,
-      focusSelectedNav: state.extra is NavFocusRequest,
-      child: screen,
-    ),
-  );
-  return GoRouter(
-    initialLocation: initialLocation,
-    routes: [
-      GoRoute(path: '/', redirect: (_, _) => '/status'),
-      GoRoute(
-        path: '/status',
-        pageBuilder: (_, state) =>
-            page(state, const PlatformStatusDestination()),
-      ),
-      GoRoute(
-        path: '/fixture',
-        pageBuilder: (_, state) => page(state, const FixtureCommandScreen()),
-      ),
-    ],
-  );
-}
-
 class StaffApp extends StatefulWidget {
-  const StaffApp({super.key, this.initialLocation = '/status'});
+  const StaffApp({super.key, this.initialLocation = ClientPaths.status});
 
   final String initialLocation;
 
@@ -53,8 +29,13 @@ class StaffApp extends StatefulWidget {
 }
 
 class _StaffAppState extends State<StaffApp> {
-  late final GoRouter _router = buildStaffRouter(
+  late final GoRouter _router = buildClientRouter(
     initialLocation: widget.initialLocation,
+    shell: (location, focusSelectedNav, child) => StaffShell(
+      location: location,
+      focusSelectedNav: focusSelectedNav,
+      child: child,
+    ),
   );
 
   @override
@@ -92,7 +73,6 @@ class StaffShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = ChurchColors.of(context);
     final nav = FocusTraversalGroup(
       child: Semantics(
         role: SemanticsRole.tabBar,
@@ -109,8 +89,7 @@ class StaffShell extends StatelessWidget {
                   selected: location == d.path,
                   onDark: true,
                   autofocus: focusSelectedNav && location == d.path,
-                  onTap: () =>
-                      context.go(d.path, extra: const NavFocusRequest()),
+                  onTap: () => goFromNav(context, d.path),
                 ),
             ];
             return _wide(context)
@@ -127,7 +106,9 @@ class StaffShell extends StatelessWidget {
       header: true,
       child: Text(
         'BIC Kafue staff',
-        style: ChurchType.cardTitle.copyWith(color: c.onSidebar),
+        style: ChurchType.cardTitle.copyWith(
+          color: ChurchStaffChrome.onSidebar,
+        ),
       ),
     );
     // Navigation first, then content: the same order the browser's DOM Tab
@@ -142,7 +123,7 @@ class StaffShell extends StatelessWidget {
             children: [
               Container(
                 width: ChurchGeometry.staffSidebarWidth,
-                color: c.sidebar,
+                color: ChurchStaffChrome.sidebar,
                 padding: const EdgeInsets.symmetric(
                   vertical: 20,
                   horizontal: 14,
@@ -167,7 +148,7 @@ class StaffShell extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Material(
-              color: c.sidebar,
+              color: ChurchStaffChrome.sidebar,
               child: SafeArea(
                 bottom: false,
                 child: Padding(
@@ -193,9 +174,4 @@ class StaffShell extends StatelessWidget {
         mq.size.width / mq.textScaler.scale(1) >=
             ChurchGeometry.staffCompactBreakpoint;
   }
-}
-
-/// `extra` of a navigation started from the shell's tabs.
-class NavFocusRequest {
-  const NavFocusRequest();
 }

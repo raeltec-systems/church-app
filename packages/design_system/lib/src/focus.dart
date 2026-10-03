@@ -1,11 +1,106 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/semantics.dart';
 
 import 'tokens.dart';
 
+/// Whether focus indicators should be visible, like CSS `:focus-visible`:
+/// the focus highlight mode is traditional (no touch) *and* the most recent
+/// input was a key press, not a pointer (mouse, touch or stylus) press. A
+/// desktop mouse click therefore leaves no ring, and neither does a tap.
+class FocusVisibility extends ChangeNotifier {
+  FocusVisibility._();
+
+  static final FocusVisibility instance = FocusVisibility._();
+
+  bool _keyboard = true;
+  bool _attached = false;
+
+  bool get visible {
+    _attach();
+    return _keyboard &&
+        FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
+  }
+
+  void _attach() {
+    if (_attached) return;
+    _attached = true;
+    GestureBinding.instance.pointerRouter.addGlobalRoute(_onPointer);
+    HardwareKeyboard.instance.addHandler(_onKey);
+    FocusManager.instance.addHighlightModeListener((_) => notifyListeners());
+  }
+
+  void _onPointer(PointerEvent event) {
+    if (event is PointerDownEvent && _keyboard) {
+      _keyboard = false;
+      notifyListeners();
+    }
+  }
+
+  bool _onKey(KeyEvent event) {
+    if (event is KeyDownEvent && !_keyboard) {
+      _keyboard = true;
+      notifyListeners();
+    }
+    return false;
+  }
+
+  /// Test hook: forget the last input (as at startup).
+  @visibleForTesting
+  void reset() {
+    if (_attached) {
+      // Test bindings may drop global handlers between tests: re-register.
+      GestureBinding.instance.pointerRouter.removeGlobalRoute(_onPointer);
+      HardwareKeyboard.instance.removeHandler(_onKey);
+      GestureBinding.instance.pointerRouter.addGlobalRoute(_onPointer);
+      HardwareKeyboard.instance.addHandler(_onKey);
+    }
+    _attach();
+    _keyboard = true;
+    notifyListeners();
+  }
+}
+
+/// True when focus indicators must be visible (see [FocusVisibility]).
+bool get keyboardFocusVisible => FocusVisibility.instance.visible;
+
+/// Rebuilds [builder] whenever [keyboardFocusVisible] may have changed.
+class FocusHighlightBuilder extends StatefulWidget {
+  const FocusHighlightBuilder({super.key, required this.builder});
+
+  final Widget Function(BuildContext context, bool keyboardMode) builder;
+
+  @override
+  State<FocusHighlightBuilder> createState() => _FocusHighlightBuilderState();
+}
+
+class _FocusHighlightBuilderState extends State<FocusHighlightBuilder> {
+  @override
+  void initState() {
+    super.initState();
+    FocusVisibility.instance.addListener(_changed);
+  }
+
+  @override
+  void dispose() {
+    FocusVisibility.instance.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      widget.builder(context, keyboardFocusVisible);
+}
+
 /// Draws a [ChurchGeometry.focusRingWidth] ring *outside* [child] whenever
-/// focus is on [child] or a descendant, so the ring contrasts with the page
-/// rather than with the control's own fill (1.6 finding 4).
+/// keyboard focus is on [child] or a descendant, so the ring contrasts with
+/// the page rather than with the control's own fill (1.6 finding 4). Focus
+/// from a pointer or touch shows no ring.
 ///
 /// The ring is per control: wrap each focusable control separately, never a
 /// whole group (1.6 finding 2).
@@ -19,8 +114,8 @@ class FocusRing extends StatelessWidget {
 
   final Widget child;
 
-  /// Ring colour; defaults to the theme's focus token. Use the sidebar's
-  /// on-colour (white) on navy surfaces.
+  /// Ring colour; defaults to the theme's focus token. Use
+  /// [ChurchStaffChrome.onSidebar] (white) on navy surfaces.
   final Color? color;
   final double radius;
 
@@ -31,9 +126,9 @@ class FocusRing extends StatelessWidget {
       canRequestFocus: false,
       skipTraversal: true,
       includeSemantics: false,
-      child: Builder(
-        builder: (context) {
-          final focused = Focus.of(context).hasFocus;
+      child: FocusHighlightBuilder(
+        builder: (context, keyboardMode) {
+          final focused = keyboardMode && Focus.of(context).hasFocus;
           return Container(
             padding: const EdgeInsets.all(ChurchGeometry.focusRingWidth + 1),
             decoration: BoxDecoration(

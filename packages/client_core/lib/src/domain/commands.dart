@@ -33,6 +33,13 @@ final class CommandUnknownOutcome extends CommandOutcome {
   final Object? cause;
 }
 
+/// The command was never sent (for example, the build has no server
+/// configured). Definite: nothing applied, and retrying cannot help.
+final class CommandNotSent extends CommandOutcome {
+  const CommandNotSent(this.reason);
+  final String reason;
+}
+
 /// Application port that sends one versioned command envelope to an `api`
 /// command function.
 abstract interface class CommandGateway {
@@ -63,18 +70,14 @@ class SecureRequestIds implements RequestIds {
 }
 
 /// [CommandGateway] for a build without a backend configuration: every
-/// command is refused as `unavailable` without being sent.
+/// command is reported as not sent.
 class UnconfiguredCommandGateway implements CommandGateway {
   const UnconfiguredCommandGateway();
 
+  static const reason =
+      'This build has no server configured, so the command was not sent.';
+
   @override
   Future<CommandOutcome> send(String function, CommandRequest request) async =>
-      CommandRefused(
-        CommandError(
-          requestId: request.requestId,
-          code: ErrorCode.unavailable,
-          message: 'This build has no server configured.',
-          fieldErrors: const {},
-        ),
-      );
+      const CommandNotSent(reason);
 }

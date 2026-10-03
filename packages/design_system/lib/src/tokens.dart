@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 /// Semantic colour tokens from design-contract.md "Tokens, type and geometry".
 ///
 /// Mobile swaps the full set between [light] and [dark]; staff web uses
-/// [light] only (with the navy sidebar). Screens read colours through
+/// [light] only, with the navy sidebar in [ChurchStaffChrome]. Screens read colours through
 /// `ChurchColors.of(context)` and never hard-code hex values.
 @immutable
 class ChurchColors extends ThemeExtension<ChurchColors> {
@@ -31,9 +31,6 @@ class ChurchColors extends ThemeExtension<ChurchColors> {
     required this.blueBg,
     required this.blueFg,
     required this.grayBg,
-    required this.sidebar,
-    required this.onSidebar,
-    required this.onSidebarMuted,
   });
 
   static const light = ChurchColors(
@@ -61,9 +58,6 @@ class ChurchColors extends ThemeExtension<ChurchColors> {
     blueBg: Color(0xFFE3EEFC),
     blueFg: Color(0xFF0B4FA6),
     grayBg: Color(0xFFEDF0F6),
-    sidebar: Color(0xFF14246B),
-    onSidebar: Color(0xFFFFFFFF),
-    onSidebarMuted: Color(0xFFDCE6FF),
   );
 
   static const dark = ChurchColors(
@@ -79,7 +73,8 @@ class ChurchColors extends ThemeExtension<ChurchColors> {
     brand: Color(0xFFDCE6FF),
     link: Color(0xFF8EC1FF),
     accent: Color(0xFF3D9BF5),
-    focus: Color(0xFF8EC1FF),
+    // Focus ring: the dark accent token.
+    focus: Color(0xFF3D9BF5),
     hero: Color(0xFF182A7A),
     amberBg: Color(0xFF3A2D10),
     amberFg: Color(0xFFF5C866),
@@ -90,9 +85,6 @@ class ChurchColors extends ThemeExtension<ChurchColors> {
     blueBg: Color(0xFF13284A),
     blueFg: Color(0xFF9CC7FF),
     grayBg: Color(0xFF1B2440),
-    sidebar: Color(0xFF182A7A),
-    onSidebar: Color(0xFFFFFFFF),
-    onSidebarMuted: Color(0xFFDCE6FF),
   );
 
   final Brightness brightness;
@@ -123,11 +115,6 @@ class ChurchColors extends ThemeExtension<ChurchColors> {
   /// Neutral chip background; its foreground is [muted].
   final Color grayBg;
 
-  /// Staff navigation sidebar (light palette: `#14246B`).
-  final Color sidebar;
-  final Color onSidebar;
-  final Color onSidebarMuted;
-
   /// The tokens of the nearest theme; falls back to [light].
   static ChurchColors of(BuildContext context) =>
       Theme.of(context).extension<ChurchColors>() ?? light;
@@ -137,6 +124,60 @@ class ChurchColors extends ThemeExtension<ChurchColors> {
 
   @override
   ChurchColors lerp(ChurchColors? other, double t) =>
+      other == null || t < 0.5 ? this : other;
+}
+
+/// Staff navigation chrome. The contract defines it for the staff light
+/// palette only (staff web has no dark mode).
+abstract final class ChurchStaffChrome {
+  /// Sidebar `#14246B`.
+  static const sidebar = Color(0xFF14246B);
+
+  /// Selected item text and the focus ring on navy.
+  static const onSidebar = Color(0xFFFFFFFF);
+
+  /// Unselected item text on navy (the brand tint `#DCE6FF`).
+  static const onSidebarMuted = Color(0xFFDCE6FF);
+
+  /// "Active navigation translucent white".
+  static const activeItem = Color(0x29FFFFFF);
+}
+
+/// Surface layout and body type: mobile and staff differ (design contract).
+@immutable
+class ChurchLayout extends ThemeExtension<ChurchLayout> {
+  const ChurchLayout({
+    required this.body,
+    required this.pagePadding,
+    required this.contentMaxWidth,
+  });
+
+  /// Mobile: body 16, horizontal content padding 16.
+  static const mobile = ChurchLayout(
+    body: ChurchType.body,
+    pagePadding: EdgeInsets.all(ChurchGeometry.mobileContentPadding),
+    contentMaxWidth: 640,
+  );
+
+  /// Staff: body 15, content padding 28/32/48, max width 1280.
+  static const staff = ChurchLayout(
+    body: ChurchType.staffBody,
+    pagePadding: EdgeInsets.fromLTRB(32, 28, 32, 48),
+    contentMaxWidth: ChurchGeometry.staffContentMaxWidth,
+  );
+
+  final TextStyle body;
+  final EdgeInsets pagePadding;
+  final double contentMaxWidth;
+
+  static ChurchLayout of(BuildContext context) =>
+      Theme.of(context).extension<ChurchLayout>() ?? mobile;
+
+  @override
+  ChurchLayout copyWith() => this;
+
+  @override
+  ChurchLayout lerp(ChurchLayout? other, double t) =>
       other == null || t < 0.5 ? this : other;
 }
 
@@ -171,6 +212,8 @@ abstract final class ChurchGeometry {
 /// Type scale (size / weight) from the design contract. Families (Outfit,
 /// Figtree, JetBrains Mono) are not bundled yet: platform fonts are used.
 abstract final class ChurchType {
+  /// Mobile tab labels 11.5 (700 active / 500 inactive).
+  static const tabLabel = TextStyle(fontSize: 11.5);
   static const mobileScreenTitle = TextStyle(
     fontSize: 28,
     fontWeight: FontWeight.w700,

@@ -5,6 +5,10 @@ library;
 import 'dart:async';
 
 import 'package:church_contracts/church_contracts.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
+
+import 'src/application/providers.dart';
+import 'src/domain/platform_status.dart';
 
 import 'src/domain/commands.dart';
 import 'src/domain/fixture_counter.dart';
@@ -116,3 +120,78 @@ Map<String, Object?> fixtureCounterData({
   'is_synthetic': true,
   'updated_at': '2026-10-03T12:00:00Z',
 };
+
+/// A configured platform status that answers immediately.
+class FakePlatformStatus implements PlatformStatusRepository {
+  @override
+  Future<PlatformStatus?> fetch() async => PlatformStatus(
+    status: 'operational',
+    message: 'SYNTHETIC tracer status',
+    isSynthetic: true,
+    updatedAt: DateTime.utc(2026, 10, 3, 9, 5),
+  );
+}
+
+/// The fakes and provider overrides an app or screen test runs against.
+class ClientTestHarness {
+  ClientTestHarness({String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'})
+    : session = FakeSession(account);
+
+  final gateway = FakeCommandGateway();
+  final FakeSession session;
+  final reader = FakeFixtureReader();
+
+  /// [configured] false leaves the unconfigured defaults for the gateway and
+  /// the platform status (as a build without `--dart-define`s).
+  List<Override> overrides({bool configured = true}) => [
+    sessionRepositoryProvider.overrideWithValue(session),
+    fixtureCounterReaderProvider.overrideWithValue(reader),
+    requestIdsProvider.overrideWithValue(SequentialRequestIds()),
+    if (configured) ...[
+      commandGatewayProvider.overrideWithValue(gateway),
+      platformStatusRepositoryProvider.overrideWithValue(FakePlatformStatus()),
+    ],
+  ];
+}
+
+final _directive = RegExp(
+  r'''^\s*(?:import|export)\s+['"]([^'"]+)['"]''',
+  multiLine: true,
+);
+final _sdkPackage = RegExp(
+  r'^package:(supabase|supabase_flutter|gotrue|postgrest|realtime_client|storage_client|functions_client|http)/',
+);
+
+/// Import/export targets in [source] (the file at the package-relative
+/// [path], e.g. `lib/src/presentation/x.dart`) that only a composition root
+/// or an adapter may reach: the Supabase/http SDKs, the adapters (by package
+/// URI or by a relative path that resolves into them), `supabase_adapters.dart`
+/// and `composition.dart`. Relative paths are resolved against [path].
+List<String> boundaryViolations(String path, String source) {
+  const ownPackage = 'package:church_client_core/';
+  bool restricted(String libPath) =>
+      libPath.startsWith('lib/src/adapters/') ||
+      libPath == 'lib/supabase_adapters.dart' ||
+      libPath == 'lib/composition.dart';
+  final found = <String>[];
+  for (final m in _directive.allMatches(source)) {
+    final uri = m.group(1)!;
+    if (uri.startsWith('dart:')) continue;
+    if (_sdkPackage.hasMatch(uri)) {
+      found.add(uri);
+    } else if (uri.startsWith(ownPackage)) {
+      if (restricted('lib/${uri.substring(ownPackage.length)}')) found.add(uri);
+    } else if (!uri.startsWith('package:')) {
+      final parts = path.split('/')..removeLast();
+      for (final seg in uri.split('/')) {
+        if (seg == '..') {
+          if (parts.isNotEmpty) parts.removeLast();
+        } else if (seg != '.') {
+          parts.add(seg);
+        }
+      }
+      if (restricted(parts.join('/'))) found.add(uri);
+    }
+  }
+  return found;
+}

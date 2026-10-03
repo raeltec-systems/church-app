@@ -9,15 +9,24 @@
     }
   },
   {
-    "role": "alertdialog",
-    "name": "",
+    "role": "dialog",
+    "name": "Main door — Sun 4 Oct",
     "props": {
       "modal": true
     }
   },
   {
-    "role": "generic",
-    "name": "Alert"
+    "role": "heading",
+    "name": "Main door — Sun 4 Oct",
+    "props": {
+      "focusable": true,
+      "focused": true,
+      "level": 2
+    }
+  },
+  {
+    "role": "group",
+    "name": ""
   },
   {
     "role": "button",
@@ -34,12 +43,8 @@
     }
   },
   {
-    "role": "generic",
-    "name": "Main door — Sun 4 Oct",
-    "props": {
-      "focusable": true,
-      "focused": true
-    }
+    "role": "StaticText",
+    "name": "Main door — Sun 4 Oct"
   },
   {
     "role": "button",
@@ -68,7 +73,7 @@
     "name": "Save"
   },
   {
-    "role": "StaticText",
+    "role": "InlineTextBox",
     "name": "Main door — Sun 4 Oct"
   },
   {
@@ -86,10 +91,6 @@
   {
     "role": "InlineTextBox",
     "name": "Save"
-  },
-  {
-    "role": "InlineTextBox",
-    "name": "Main door — Sun 4 Oct"
   },
   {
     "role": "InlineTextBox",

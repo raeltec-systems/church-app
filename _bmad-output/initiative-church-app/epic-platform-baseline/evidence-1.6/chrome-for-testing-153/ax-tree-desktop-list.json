@@ -21,7 +21,7 @@
   },
   {
     "role": "tablist",
-    "name": "",
+    "name": "Trial sections",
     "props": {
       "multiselectable": false,
       "orientation": "horizontal"
@@ -35,20 +35,19 @@
     }
   },
   {
-    "role": "radio",
-    "name": "Grid",
+    "role": "button",
+    "name": "Filter by status All statuses",
     "props": {
+      "invalid": "false",
       "focusable": true,
-      "checked": "false"
+      "expanded": false
     }
   },
   {
-    "role": "radio",
-    "name": "List",
+    "role": "radiogroup",
+    "name": "View",
     "props": {
-      "focusable": true,
-      "focused": true,
-      "checked": "true"
+      "required": false
     }
   },
   {
@@ -67,7 +66,7 @@
   },
   {
     "role": "list",
-    "name": ""
+    "name": "Main door slots"
   },
   {
     "role": "heading",
@@ -78,7 +77,7 @@
   },
   {
     "role": "list",
-    "name": ""
+    "name": "Side door slots"
   },
   {
     "role": "heading",
@@ -89,7 +88,7 @@
   },
   {
     "role": "list",
-    "name": ""
+    "name": "Parking slots"
   },
   {
     "role": "heading",
@@ -100,7 +99,7 @@
   },
   {
     "role": "list",
-    "name": ""
+    "name": "Offering team slots"
   },
   {
     "role": "heading",
@@ -111,7 +110,7 @@
   },
   {
     "role": "list",
-    "name": ""
+    "name": "Welcome desk slots"
   },
   {
     "role": "heading",
@@ -122,7 +121,7 @@
   },
   {
     "role": "list",
-    "name": ""
+    "name": "Children's door slots"
   },
   {
     "role": "StaticText",
@@ -167,6 +166,27 @@
   },
   {
     "role": "StaticText",
+    "name": "Filter by status All statuses"
+  },
+  {
+    "role": "radio",
+    "name": "Grid",
+    "props": {
+      "focusable": true,
+      "checked": "false"
+    }
+  },
+  {
+    "role": "radio",
+    "name": "List",
+    "props": {
+      "focusable": true,
+      "focused": true,
+      "checked": "true"
+    }
+  },
+  {
+    "role": "StaticText",
     "name": "Export CSV…"
   },
   {
@@ -203,7 +223,7 @@
   },
   {
     "role": "StaticText",
-    "name": "Downloaded bic-kafue-rota-trial-SYNTHETIC.csv with 24 rows."
+    "name": "Download started: bic-kafue-rota-trial-SYNTHETIC.csv (24 rows)."
   },
   {
     "role": "StaticText",
@@ -218,14 +238,14 @@
   },
   {
     "role": "listitem",
-    "name": "Sun 11 Oct Test Joseph B Needs contact",
+    "name": "Sun 11 Oct Test Joseph B Confirmed by leader",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 18 Oct No one assigned Unfilled",
+    "name": "Sun 18 Oct Test Esther C Declined",
     "props": {
       "level": 1
     }
@@ -239,21 +259,21 @@
   },
   {
     "role": "listitem",
-    "name": "Sun 1 Nov Test Naomi E Draft",
+    "name": "Sun 1 Nov Test Naomi E Awaiting response",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 8 Nov Test Moses F Confirmed by leader",
+    "name": "Sun 8 Nov Test Moses F Declined",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 15 Nov =HYPERLINK(\"https://example.invalid\",\"Injected\") Declined",
+    "name": "Sun 15 Nov =HYPERLINK(\"https://example.invalid\",\"Injected\") Confirmed by leader",
     "props": {
       "level": 1
     }
@@ -271,28 +291,28 @@
   },
   {
     "role": "listitem",
-    "name": "Sun 4 Oct Test Ruth D Confirmed",
+    "name": "Sun 4 Oct Test Ruth D Needs contact",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 11 Oct Test Naomi E Needs contact",
+    "name": "Sun 11 Oct Test Naomi E Declined",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 18 Oct No one assigned Unfilled",
+    "name": "Sun 18 Oct Test Moses F Confirmed",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 25 Oct =HYPERLINK(\"https://example.invalid\",\"Injected\") Awaiting response",
+    "name": "Sun 25 Oct =HYPERLINK(\"https://example.invalid\",\"Injected\") Draft",
     "props": {
       "level": 1
     }
@@ -306,7 +326,7 @@
   },
   {
     "role": "listitem",
-    "name": "Sun 8 Nov -Test Minus H Confirmed by leader",
+    "name": "Sun 8 Nov -Test Minus H Confirmed",
     "props": {
       "level": 1
     }
@@ -320,7 +340,7 @@
   },
   {
     "role": "listitem",
-    "name": "Sun 22 Nov Test Mwila A Confirmed",
+    "name": "Sun 22 Nov -Test Space K Needs contact",
     "props": {
       "level": 1
     }
@@ -331,56 +351,56 @@
   },
   {
     "role": "listitem",
-    "name": "Sun 4 Oct =HYPERLINK(\"https://example.invalid\",\"Injected\") Confirmed",
+    "name": "Sun 4 Oct No one assigned Unfilled",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 11 Oct +Test Plus G Needs contact",
+    "name": "Sun 11 Oct +Test Plus G Confirmed",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 18 Oct No one assigned Unfilled",
+    "name": "Sun 18 Oct -Test Minus H Needs contact",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 25 Oct @Test At I Awaiting response",
+    "name": "Sun 25 Oct @Test At I Confirmed by leader",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 1 Nov Test Mwila A Draft",
+    "name": "Sun 1 Nov -Test Space K Confirmed by leader",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 8 Nov Test Joseph B Confirmed by leader",
+    "name": "Sun 8 Nov Test Mwila A Needs contact",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 15 Nov Test Esther C Declined",
+    "name": "Sun 15 Nov Test Joseph B Confirmed",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 22 Nov Test Ruth D Confirmed",
+    "name": "Sun 22 Nov No one assigned Unfilled",
     "props": {
       "level": 1
     }
@@ -391,14 +411,14 @@
   },
   {
     "role": "listitem",
-    "name": "Sun 4 Oct @Test At I Confirmed",
+    "name": "Sun 4 Oct @Test At I Awaiting response",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 11 Oct Test Mwila A Needs contact",
+    "name": "Sun 11 Oct -Test Space K Needs contact",
     "props": {
       "level": 1
     }
@@ -412,35 +432,35 @@
   },
   {
     "role": "listitem",
-    "name": "Sun 25 Oct Test Esther C Awaiting response",
+    "name": "Sun 25 Oct Test Joseph B Declined",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 1 Nov Test Ruth D Draft",
+    "name": "Sun 1 Nov Test Esther C Declined",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 8 Nov Test Naomi E Confirmed by leader",
+    "name": "Sun 8 Nov No one assigned Unfilled",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 15 Nov Test Moses F Declined",
+    "name": "Sun 15 Nov Test Naomi E Needs contact",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 22 Nov =HYPERLINK(\"https://example.invalid\",\"Injected\") Confirmed",
+    "name": "Sun 22 Nov Test Moses F Awaiting response",
     "props": {
       "level": 1
     }
@@ -451,56 +471,56 @@
   },
   {
     "role": "listitem",
-    "name": "Sun 4 Oct Test Esther C Confirmed",
+    "name": "Sun 4 Oct Test Joseph B Draft",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 11 Oct Test Ruth D Needs contact",
+    "name": "Sun 11 Oct No one assigned Unfilled",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 18 Oct No one assigned Unfilled",
+    "name": "Sun 18 Oct Test Ruth D Awaiting response",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 25 Oct Test Moses F Awaiting response",
+    "name": "Sun 25 Oct Test Naomi E Confirmed",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 1 Nov =HYPERLINK(\"https://example.invalid\",\"Injected\") Draft",
+    "name": "Sun 1 Nov Test Moses F Confirmed",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 8 Nov +Test Plus G Confirmed by leader",
+    "name": "Sun 8 Nov =HYPERLINK(\"https://example.invalid\",\"Injected\") Awaiting response",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 15 Nov -Test Minus H Declined",
+    "name": "Sun 15 Nov No one assigned Unfilled",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 22 Nov @Test At I Confirmed",
+    "name": "Sun 22 Nov -Test Minus H Draft",
     "props": {
       "level": 1
     }
@@ -511,56 +531,56 @@
   },
   {
     "role": "listitem",
-    "name": "Sun 4 Oct Test Moses F Confirmed",
+    "name": "Sun 4 Oct Test Naomi E Confirmed by leader",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 11 Oct =HYPERLINK(\"https://example.invalid\",\"Injected\") Needs contact",
+    "name": "Sun 11 Oct Test Moses F Awaiting response",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 18 Oct No one assigned Unfilled",
+    "name": "Sun 18 Oct =HYPERLINK(\"https://example.invalid\",\"Injected\") Draft",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 25 Oct -Test Minus H Awaiting response",
+    "name": "Sun 25 Oct +Test Plus G Needs contact",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 1 Nov @Test At I Draft",
+    "name": "Sun 1 Nov -Test Minus H Needs contact",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 8 Nov Test Mwila A Confirmed by leader",
+    "name": "Sun 8 Nov @Test At I Draft",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 15 Nov Test Joseph B Declined",
+    "name": "Sun 15 Nov -Test Space K Awaiting response",
     "props": {
       "level": 1
     }
   },
   {
     "role": "listitem",
-    "name": "Sun 22 Nov Test Esther C Confirmed",
+    "name": "Sun 22 Nov Test Mwila A Confirmed by leader",
     "props": {
       "level": 1
     }
@@ -583,6 +603,10 @@
   },
   {
     "role": "InlineTextBox",
+    "name": "Filter by status All statuses"
+  },
+  {
+    "role": "InlineTextBox",
     "name": "Export CSV…"
   },
   {
@@ -619,7 +643,7 @@
   },
   {
     "role": "InlineTextBox",
-    "name": "Downloaded bic-kafue-rota-trial-SYNTHETIC.csv with 24 rows."
+    "name": "Download started: bic-kafue-rota-trial-SYNTHETIC.csv (24 rows)."
   },
   {
     "role": "InlineTextBox",

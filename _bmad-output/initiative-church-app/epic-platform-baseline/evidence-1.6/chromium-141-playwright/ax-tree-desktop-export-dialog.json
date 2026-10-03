@@ -9,15 +9,24 @@
     }
   },
   {
-    "role": "alertdialog",
-    "name": "",
+    "role": "dialog",
+    "name": "Export rota CSV",
     "props": {
       "modal": true
     }
   },
   {
-    "role": "generic",
-    "name": "Alert"
+    "role": "heading",
+    "name": "Export rota CSV",
+    "props": {
+      "focusable": true,
+      "focused": true,
+      "level": 2
+    }
+  },
+  {
+    "role": "group",
+    "name": ""
   },
   {
     "role": "button",
@@ -34,16 +43,8 @@
     }
   },
   {
-    "role": "generic",
-    "name": "Export rota CSV",
-    "props": {
-      "focusable": true,
-      "focused": true
-    }
-  },
-  {
-    "role": "group",
-    "name": ""
+    "role": "StaticText",
+    "name": "Export rota CSV"
   },
   {
     "role": "StaticText",
@@ -54,24 +55,12 @@
     "name": "Download CSV"
   },
   {
-    "role": "StaticText",
-    "name": "Export rota CSV"
-  },
-  {
-    "role": "InlineTextBox",
-    "name": "Cancel"
-  },
-  {
-    "role": "InlineTextBox",
-    "name": "Download CSV"
-  },
-  {
     "role": "InlineTextBox",
     "name": "Export rota CSV"
   },
   {
     "role": "StaticText",
-    "name": "Scope: 3 positions × 8 Sundays = 24 rows (the positions shown by the current filter)."
+    "name": "Scope: 24 rows — positions: matching “door”; status: all (the slots shown by the current filters)."
   },
   {
     "role": "StaticText",
@@ -95,11 +84,19 @@
   },
   {
     "role": "StaticText",
-    "name": "\"Date\",\"Position\",\"Member\",\"Status\",\"Note\" \"2026-10-04\",\"Main door\",\"Test Mwila A\",\"Declined\",\"\" \"2026-10-11\",\"Main door\",\"Test Joseph B\",\"Needs contact\",\"Bring the \"\"spare\"\" lanyard, then lock up\" \"2026-10-18\",\"Main door\",\"\",\"Unfilled\",\"'=1+2\""
+    "name": "\"Date\",\"Position\",\"Member\",\"Status\",\"Note\" \"2026-10-04\",\"Main door\",\"Test Mwila A\",\"Declined\",\"\" \"2026-10-11\",\"Main door\",\"Test Joseph B\",\"Confirmed by leader\",\"Bring the \"\"spare\"\" lanyard, then lock up\" \"2026-10-18\",\"Main door\",\"Test Esther C\",\"Declined\",\"'=1+2\""
   },
   {
     "role": "InlineTextBox",
-    "name": "Scope: 3 positions × 8 Sundays = 24 rows (the positions shown by the current filter)."
+    "name": "Cancel"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Download CSV"
+  },
+  {
+    "role": "InlineTextBox",
+    "name": "Scope: 24 rows — positions: matching “door”; status: all (the slots shown by the current filters)."
   },
   {
     "role": "InlineTextBox",
@@ -123,6 +120,6 @@
   },
   {
     "role": "InlineTextBox",
-    "name": "\"Date\",\"Position\",\"Member\",\"Status\",\"Note\" \"2026-10-04\",\"Main door\",\"Test Mwila A\",\"Declined\",\"\" \"2026-10-11\",\"Main door\",\"Test Joseph B\",\"Needs contact\",\"Bring the \"\"spare\"\" lanyard, then lock up\" \"2026-10-18\",\"Main door\",\"\",\"Unfilled\",\"'=1+2\""
+    "name": "\"Date\",\"Position\",\"Member\",\"Status\",\"Note\" \"2026-10-04\",\"Main door\",\"Test Mwila A\",\"Declined\",\"\" \"2026-10-11\",\"Main door\",\"Test Joseph B\",\"Confirmed by leader\",\"Bring the \"\"spare\"\" lanyard, then lock up\" \"2026-10-18\",\"Main door\",\"Test Esther C\",\"Declined\",\"'=1+2\""
   }
 ]

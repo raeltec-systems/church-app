@@ -8,12 +8,13 @@ It has two tabs:
 
 - **Rota grid trial** (story 1.6, Q10): a SYNTHETIC duty rota (6 positions × 8 Sundays). It has a
   keyboard-operable grid (one Tab stop, then arrow keys, Home/End, Control+Home/End and Enter),
-  an equivalent list view, a position filter, a slot dialog that changes the member or status,
-  and a CSV export. The export shows a preview first. It uses an allowlist of columns,
-  neutralises spreadsheet formulas and includes no private fields. Every status has a text
-  label.
-- **Platform status** (story 1.1 tracer): the read of `api.platform_status`. It is shown only when
-  the build has Supabase `--dart-define`s.
+  an equivalent list view, position and status filters, a slot dialog that changes the member
+  or status, and a CSV export. The export shows a preview first. It uses an allowlist of
+  columns, neutralises spreadsheet formulas and includes no private fields. Every status has a
+  text label.
+- **Platform status** (story 1.1 tracer): the tab is always present. With Supabase
+  `--dart-define`s it reads `api.platform_status`. Without them, it shows a "Platform status not
+  configured" message.
 
 ## Run the app
 
@@ -37,6 +38,11 @@ PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs BROWSER_LABEL=chromium node tool
 # another Chromium-family browser (e.g. Chrome or Edge):
 CHROMIUM_EXECUTABLE=/path/to/chrome BROWSER_LABEL=chrome node tool/browser_trial.mjs
 ```
+
+The harness byte-compares the downloaded CSV with
+`test/rota_trial/golden/door-export-after-edit.csv`. A widget test checks that same file against
+`buildRotaCsv`. To regenerate it after a fixture change, run
+`UPDATE_GOLDEN=1 flutter test test/rota_trial/rota_trial_screen_test.dart`.
 
 The harness uses CDP, so it runs only on Chromium-family browsers. Firefox, Safari, Android
 Chrome and real screen readers need the manual spot-check in `evidence-1.6/README.md`.

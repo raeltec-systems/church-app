@@ -13,32 +13,35 @@
   "columnsPerRow": [
     5
   ],
-  "positions": [
-    "Main door",
-    "Side door",
-    "Children's door"
-  ],
+  "identicalToGolden": true,
+  "memberStatusMismatchesVsGrid": [],
   "rawTriggerFields": [],
   "neutralisedFields": [
     "'=1+2",
     "'\tTab-led note",
+    "'\rCR-led note",
     "'=HYPERLINK(\"https://example.invalid\",\"Injected\")",
+    "'  =SUM(1,2) after spaces",
     "'+Test Plus G",
     "'=1+2",
-    "'=1+2",
     "'\tTab-led note",
+    "'=HYPERLINK(\"https://example.invalid\",\"Injected\")",
+    "'+Test Plus G",
+    "'\rCR-led note",
+    "'-Test Minus H",
+    "'  =SUM(1,2) after spaces",
+    "'@Test At I",
+    "'  -Test Space K",
+    "'\rCR-led note",
+    "'  =SUM(1,2) after spaces",
     "'=HYPERLINK(\"https://example.invalid\",\"Injected\")",
     "'+Test Plus G",
     "'-Test Minus H",
-    "'@Test At I",
     "'=1+2",
-    "'\tTab-led note",
-    "'=HYPERLINK(\"https://example.invalid\",\"Injected\")",
-    "'=1+2",
-    "'-Test Minus H",
-    "'\tTab-led note",
     "'@Test At I",
-    "'=1+2"
+    "'\tTab-led note",
+    "'  -Test Space K",
+    "'\rCR-led note"
   ],
   "privateLeak": false,
   "editedSlot": [

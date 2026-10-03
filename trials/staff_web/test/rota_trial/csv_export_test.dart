@@ -73,9 +73,12 @@ void main() {
       expect(csv, contains('"\'@Test At I"'));
       expect(csv, contains('"\'=1+2"'));
       expect(csv, contains('"\'\tTab-led note"'));
+      expect(csv, contains('"\'\rCR-led note"'));
+      expect(csv, contains('"\'  =SUM(1,2) after spaces"'));
+      expect(csv, contains('"\'  -Test Space K"'));
       // No field opens with a raw trigger.
       expect(
-        RegExp(r'(^|,)"[=+\-@\t\r]', multiLine: true).hasMatch(csv),
+        RegExp(r'(^|,)"\s*[=+\-@\t\r]', multiLine: true).hasMatch(csv),
         isFalse,
       );
     });

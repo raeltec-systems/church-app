@@ -1,41 +1,44 @@
 {
-  "slots": 48,
-  "layout": {
-    "rects": {
-      "filter": {
-        "x": 32,
-        "right": 360,
-        "width": 328,
-        "height": 54
-      },
-      "grid": {
-        "x": 368,
-        "right": 447.953125,
-        "width": 79.953125,
-        "height": 32
-      },
-      "list": {
-        "x": 447.9664001464844,
-        "right": 527.9195556640625,
-        "width": 79.95315551757812,
-        "height": 32
-      },
-      "export": {
-        "x": 32,
-        "right": 177.09375,
-        "width": 145.09375,
-        "height": 32
-      }
-    },
-    "heading": {
-      "height": 34,
-      "width": 111.4375
-    },
-    "pageScrollsHorizontally": false,
+  "vp": {
+    "width": 683,
+    "height": 380,
+    "dpr": 2,
     "rootFontSize": "16px"
   },
-  "toolbarInside": true,
+  "slots": 48,
+  "gridCut": [],
+  "listCut": [],
+  "pageScrollsHorizontally": false,
   "farVisible": true,
-  "listInside": true,
-  "id": "C11"
+  "slotDlg": {
+    "ok": true,
+    "name": "Main door — Sun 22 Nov",
+    "geo": {
+      "left": 111.5,
+      "right": 571.5,
+      "vw": 683,
+      "cut": []
+    },
+    "buttons": [
+      "Cancel",
+      "Save",
+      "Member +Test Plus G",
+      "Status Confirmed"
+    ]
+  },
+  "exportDlg": {
+    "ok": true,
+    "name": "Export rota CSV",
+    "geo": {
+      "left": 111.5,
+      "right": 571.5,
+      "vw": 683,
+      "cut": []
+    },
+    "buttons": [
+      "Cancel",
+      "Download CSV"
+    ]
+  },
+  "listInside": true
 }

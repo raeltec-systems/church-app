@@ -172,6 +172,11 @@ class RotaFixture {
         displayName: '@Test At I',
         privatePhone: '+260 000 000 010',
       ),
+      Member(
+        id: 'm11',
+        displayName: '  -Test Space K',
+        privatePhone: '+260 000 000 011',
+      ),
     ];
     const notes = [
       '',
@@ -179,13 +184,17 @@ class RotaFixture {
       '=1+2',
       '\tTab-led note',
       'Line one\nLine two',
+      '\rCR-led note',
+      '  =SUM(1,2) after spaces',
     ];
     const statuses = SlotStatus.values;
     final slots = <List<RotaSlot>>[];
     for (var r = 0; r < positions.length; r++) {
       final row = <RotaSlot>[];
       for (var c = 0; c < dates.length; c++) {
-        final seed = r * 7 + c * 3;
+        // Not every status appears in every row, so a position + status
+        // filter can match nothing.
+        final seed = r * 3 + c * c;
         final status = statuses[seed % statuses.length];
         final member = status == SlotStatus.unfilled
             ? null

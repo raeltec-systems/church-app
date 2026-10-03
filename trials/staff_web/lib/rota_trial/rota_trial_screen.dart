@@ -3,7 +3,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
 import 'csv_export.dart';
@@ -28,6 +28,9 @@ abstract final class TrialTokens {
 /// Width of the visible keyboard focus ring.
 const double kFocusRingWidth = 3;
 
+/// Minimum target size from the design contract.
+const double kMinTarget = 44;
+
 typedef FileDownloader = bool Function(
   String filename,
   String content,
@@ -40,6 +43,166 @@ enum RotaView { grid, list }
 const Duration kAnnouncementDelay = Duration(milliseconds: 400);
 
 const String kCsvFilename = 'bic-kafue-rota-trial-SYNTHETIC.csv';
+
+/// Draws a [kFocusRingWidth] ring *outside* [child] whenever focus is on
+/// [child] or a descendant, so the ring contrasts with the page rather than
+/// with the control's own fill.
+class FocusRing extends StatelessWidget {
+  const FocusRing({
+    super.key,
+    required this.child,
+    this.color = TrialTokens.accent,
+    this.radius = 14,
+  });
+
+  final Widget child;
+  final Color color;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      canRequestFocus: false,
+      skipTraversal: true,
+      includeSemantics: false,
+      child: Builder(
+        builder: (context) {
+          final focused = Focus.of(context).hasFocus;
+          return Container(
+            padding: const EdgeInsets.all(kFocusRingWidth + 1),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(radius),
+              border: Border.all(
+                color: focused ? color : Colors.transparent,
+                width: kFocusRingWidth,
+              ),
+            ),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// A modal dialog exposed as role `dialog` whose accessible name is its
+/// title. (Material's AlertDialog is exposed as an unnamed `alertdialog`.)
+class TrialDialog extends StatelessWidget {
+  const TrialDialog({
+    super.key,
+    required this.title,
+    required this.content,
+    required this.actions,
+  });
+
+  final String title;
+  final Widget content;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      semanticsRole: SemanticsRole.none,
+      child: Semantics(
+        container: true,
+        role: SemanticsRole.dialog,
+        scopesRoute: true,
+        namesRoute: true,
+        explicitChildNodes: true,
+        label: title,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 460),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Semantics(
+                  header: true,
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w700,
+                      color: TrialTokens.ink,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Flexible(child: SingleChildScrollView(child: content)),
+                const SizedBox(height: 16),
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: actions,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// [Table] whose semantics node carries an accessible name.
+class _LabelledTable extends Table {
+  _LabelledTable({
+    super.key,
+    required this.label,
+    super.children,
+    super.columnWidths,
+    super.border,
+    super.defaultVerticalAlignment,
+  });
+
+  final String label;
+
+  @override
+  RenderTable createRenderObject(BuildContext context) {
+    return _LabelledRenderTable(
+      label: label,
+      columns: children.isNotEmpty ? children[0].children.length : 0,
+      rows: children.length,
+      columnWidths: columnWidths,
+      defaultColumnWidth: defaultColumnWidth,
+      textDirection: textDirection ?? Directionality.of(context),
+      border: border,
+      rowDecorations: [for (final r in children) r.decoration],
+      configuration: createLocalImageConfiguration(context),
+      defaultVerticalAlignment: defaultVerticalAlignment,
+      textBaseline: textBaseline,
+    );
+  }
+}
+
+class _LabelledRenderTable extends RenderTable {
+  _LabelledRenderTable({
+    required this.label,
+    super.columns,
+    super.rows,
+    super.columnWidths,
+    super.defaultColumnWidth,
+    required super.textDirection,
+    super.border,
+    super.rowDecorations,
+    super.configuration,
+    super.defaultVerticalAlignment,
+    super.textBaseline,
+  });
+
+  final String label;
+
+  @override
+  void describeSemanticsConfiguration(SemanticsConfiguration config) {
+    super.describeSemanticsConfiguration(config);
+    config
+      ..label = label
+      ..textDirection = textDirection;
+  }
+}
 
 class RotaTrialScreen extends StatefulWidget {
   const RotaTrialScreen({
@@ -68,10 +231,13 @@ class _RotaTrialScreenState extends State<RotaTrialScreen> {
   ];
   final _filter = TextEditingController();
   final _horizontal = ScrollController();
+  SlotStatus? _statusFilter;
   RotaView _view = RotaView.grid;
   int _activeRow = 0;
   int _activeCol = 0;
   String _announcement = '';
+
+  int get _cols => widget.fixture.dates.length;
 
   @override
   void initState() {
@@ -104,19 +270,38 @@ class _RotaTrialScreenState extends State<RotaTrialScreen> {
     super.dispose();
   }
 
-  List<int> get _visibleRows {
+  bool _positionMatches(int r) {
     final q = _filter.text.trim().toLowerCase();
-    return [
-      for (var r = 0; r < _slots.length; r++)
-        if (q.isEmpty || widget.fixture.positions[r].toLowerCase().contains(q))
-          r,
-    ];
+    return q.isEmpty || widget.fixture.positions[r].toLowerCase().contains(q);
   }
 
+  /// Whether slot (r, c) passes both filters.
+  bool _matches(int r, int c) =>
+      _positionMatches(r) &&
+      (_statusFilter == null || _slots[r][c].status == _statusFilter);
+
+  /// Rows with at least one matching slot.
+  List<int> get _visibleRows => [
+    for (var r = 0; r < _slots.length; r++)
+      if (List.generate(_cols, (c) => _matches(r, c)).any((m) => m)) r,
+  ];
+
+  List<RotaSlot> get _visibleSlots => [
+    for (var r = 0; r < _slots.length; r++)
+      for (var c = 0; c < _cols; c++)
+        if (_matches(r, c)) _slots[r][c],
+  ];
+
   void _ensureActiveVisible() {
-    final rows = _visibleRows;
-    if (rows.isNotEmpty && !rows.contains(_activeRow)) {
-      _activeRow = rows.first;
+    if (_matches(_activeRow, _activeCol)) return;
+    for (final r in _visibleRows) {
+      for (var c = 0; c < _cols; c++) {
+        if (_matches(r, c)) {
+          _activeRow = r;
+          _activeCol = c;
+          return;
+        }
+      }
     }
   }
 
@@ -126,9 +311,10 @@ class _RotaTrialScreenState extends State<RotaTrialScreen> {
         '${member ?? 'no one assigned'}, ${slot.status.label}';
   }
 
-  /// Arrow keys move between slots; Home/End jump within a row, and with
-  /// Control to the first/last slot. Tab is left to normal traversal, which
-  /// enters and leaves the grid at the active slot (roving tab stop).
+  /// Arrow keys move to the next matching slot in that direction and stop at
+  /// the edge; Home/End jump within a row, and with Control to the first/last
+  /// slot. Tab is left to normal traversal, which enters and leaves the grid at
+  /// the active slot (roving tab stop).
   KeyEventResult _onGridKey(FocusNode _, KeyEvent event) {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
@@ -136,29 +322,46 @@ class _RotaTrialScreenState extends State<RotaTrialScreen> {
     final rows = _visibleRows;
     final rowIndex = rows.indexOf(_activeRow);
     if (rowIndex < 0) return KeyEventResult.ignored;
-    final lastCol = widget.fixture.dates.length - 1;
     final ctrl = HardwareKeyboard.instance.isControlPressed;
-    var nextRowIndex = rowIndex;
-    var nextCol = _activeCol;
+    final cells = <(int, int)>[
+      for (final r in rows)
+        for (var c = 0; c < _cols; c++)
+          if (_matches(r, c)) (r, c),
+    ];
+    (int, int)? target;
+    (int, int)? firstWhere(bool Function((int, int)) test) {
+      for (final cell in cells) {
+        if (test(cell)) return cell;
+      }
+      return null;
+    }
+
+    (int, int)? lastWhere(bool Function((int, int)) test) {
+      for (final cell in cells.reversed) {
+        if (test(cell)) return cell;
+      }
+      return null;
+    }
+
+    final (r0, c0) = (_activeRow, _activeCol);
+    int ri(int r) => rows.indexOf(r);
     switch (event.logicalKey) {
       case LogicalKeyboardKey.arrowLeft:
-        nextCol = math.max(0, _activeCol - 1);
+        target = lastWhere((x) => x.$1 == r0 && x.$2 < c0);
       case LogicalKeyboardKey.arrowRight:
-        nextCol = math.min(lastCol, _activeCol + 1);
+        target = firstWhere((x) => x.$1 == r0 && x.$2 > c0);
       case LogicalKeyboardKey.arrowUp:
-        nextRowIndex = math.max(0, rowIndex - 1);
+        target = lastWhere((x) => x.$2 == c0 && ri(x.$1) < ri(r0));
       case LogicalKeyboardKey.arrowDown:
-        nextRowIndex = math.min(rows.length - 1, rowIndex + 1);
+        target = firstWhere((x) => x.$2 == c0 && ri(x.$1) > ri(r0));
       case LogicalKeyboardKey.home:
-        nextCol = 0;
-        if (ctrl) nextRowIndex = 0;
+        target = ctrl ? cells.first : firstWhere((x) => x.$1 == r0);
       case LogicalKeyboardKey.end:
-        nextCol = lastCol;
-        if (ctrl) nextRowIndex = rows.length - 1;
+        target = ctrl ? cells.last : lastWhere((x) => x.$1 == r0);
       default:
         return KeyEventResult.ignored;
     }
-    _activate(rows[nextRowIndex], nextCol);
+    _activate(target?.$1 ?? r0, target?.$2 ?? c0);
     return KeyEventResult.handled;
   }
 
@@ -188,7 +391,10 @@ class _RotaTrialScreenState extends State<RotaTrialScreen> {
           _SlotDialog(slot: _slots[r][c], members: widget.fixture.members),
     );
     if (!mounted || updated == null) return;
-    setState(() => _slots[r][c] = updated);
+    setState(() {
+      _slots[r][c] = updated;
+      _ensureActiveVisible();
+    });
     _announce('Saved. ${_slotLabel(updated)}.');
   }
 
@@ -209,24 +415,30 @@ class _RotaTrialScreenState extends State<RotaTrialScreen> {
     });
   }
 
+  String get _scopeDescription {
+    final q = _filter.text.trim();
+    return 'positions: ${q.isEmpty ? 'all' : 'matching “$q”'}; '
+        'status: ${_statusFilter?.label ?? 'all'}';
+  }
+
   Future<void> _openExport() async {
-    final rows = _visibleRows;
-    final slots = [for (final r in rows) ..._slots[r]];
+    final slots = _visibleSlots;
     final csv = buildRotaCsv(slots, widget.fixture.memberById);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => _ExportDialog(
-        positions: rows.length,
-        dates: widget.fixture.dates.length,
+        scope: _scopeDescription,
         rows: slots.length,
         preview: csv.substring(1).split('\r\n').take(4).join('\n'),
       ),
     );
     if (!mounted || confirmed != true) return;
     final ok = widget.download(kCsvFilename, csv, 'text/csv;charset=utf-8');
+    // Only the browser's save step is observable here, not the file landing
+    // on disk, so say that the download started.
     _announce(
       ok
-          ? 'Downloaded $kCsvFilename with ${slots.length} rows.'
+          ? 'Download started: $kCsvFilename (${slots.length} rows).'
           : 'The download did not start. Nothing was saved; try again.',
     );
   }
@@ -281,13 +493,13 @@ class _RotaTrialScreenState extends State<RotaTrialScreen> {
                 ),
                 const SizedBox(height: 12),
                 if (rows.isEmpty)
-                  Padding(
-                    key: const Key('empty-filter'),
-                    padding: const EdgeInsets.symmetric(vertical: 24),
+                  const Padding(
+                    key: Key('empty-filter'),
+                    padding: EdgeInsets.symmetric(vertical: 24),
                     child: Text(
-                      'No positions match “${_filter.text.trim()}”. '
-                      'Clear the filter to see the rota.',
-                      style: const TextStyle(fontSize: 15),
+                      'No slots match these filters. Clear the position or '
+                      'status filter to see the rota.',
+                      style: TextStyle(fontSize: 15),
                     ),
                   )
                 else if (_view == RotaView.grid)
@@ -317,7 +529,7 @@ class _RotaTrialScreenState extends State<RotaTrialScreen> {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         SizedBox(
-          width: math.min(320 * scale, width),
+          width: math.min(280 * scale, width),
           child: TextField(
             key: const Key('position-filter'),
             controller: _filter,
@@ -328,34 +540,55 @@ class _RotaTrialScreenState extends State<RotaTrialScreen> {
             ),
           ),
         ),
-        SegmentedButton<RotaView>(
-          key: const Key('view-toggle'),
-          // SegmentedButton does not expose which segment is selected to the
-          // browser, so each segment is announced as a radio button.
-          segments: [
-            ButtonSegment(
-              value: RotaView.grid,
-              label: _segmentLabel('Grid', _view == RotaView.grid),
-              icon: const Icon(Icons.grid_on),
+        SizedBox(
+          width: math.min(260 * scale, width),
+          child: DropdownButtonFormField<SlotStatus?>(
+            key: const Key('status-filter'),
+            initialValue: _statusFilter,
+            isExpanded: true,
+            itemHeight: null,
+            decoration: const InputDecoration(
+              labelText: 'Filter by status',
+              border: OutlineInputBorder(),
             ),
-            ButtonSegment(
-              value: RotaView.list,
-              label: _segmentLabel('List', _view == RotaView.list),
-              icon: const Icon(Icons.view_list),
-            ),
-          ],
-          selected: {_view},
-          onSelectionChanged: (s) => setState(() => _view = s.single),
+            items: [
+              const DropdownMenuItem(value: null, child: Text('All statuses')),
+              for (final s in SlotStatus.values)
+                DropdownMenuItem(value: s, child: Text(s.label)),
+            ],
+            onChanged: (s) => setState(() {
+              _statusFilter = s;
+              _ensureActiveVisible();
+            }),
+          ),
         ),
-        FilledButton.icon(
-          key: const Key('export-button'),
-          onPressed: exportBlocked ? null : _openExport,
-          icon: const Icon(Icons.download),
-          label: const Text('Export CSV…'),
+        // A radio pair rather than SegmentedButton: SegmentedButton does not
+        // expose its selected segment to the browser, and its focus ring
+        // outlines the whole control rather than the focused segment.
+        Semantics(
+          role: SemanticsRole.radioGroup,
+          label: 'View',
+          explicitChildNodes: true,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _viewOption(RotaView.grid, 'Grid', Icons.grid_on),
+              const SizedBox(width: 4),
+              _viewOption(RotaView.list, 'List', Icons.view_list),
+            ],
+          ),
+        ),
+        FocusRing(
+          child: FilledButton.icon(
+            key: const Key('export-button'),
+            onPressed: exportBlocked ? null : _openExport,
+            icon: const Icon(Icons.download),
+            label: const Text('Export CSV…'),
+          ),
         ),
         if (exportBlocked)
           const Text(
-            'Nothing to export: no positions match the filter.',
+            'Nothing to export: no slots match the filters.',
             key: Key('export-blocked-reason'),
             style: TextStyle(fontSize: 14, color: TrialTokens.muted),
           ),
@@ -363,11 +596,29 @@ class _RotaTrialScreenState extends State<RotaTrialScreen> {
     );
   }
 
-  Widget _segmentLabel(String text, bool selected) => Semantics(
-    inMutuallyExclusiveGroup: true,
-    checked: selected,
-    child: Text(text),
-  );
+  Widget _viewOption(RotaView view, String label, IconData icon) {
+    final selected = _view == view;
+    return FocusRing(
+      child: OutlinedButton.icon(
+        key: Key('view-$label'),
+        onPressed: () => setState(() => _view = view),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: selected ? const Color(0xFFDCE6FF) : null,
+          foregroundColor: TrialTokens.primary,
+          side: BorderSide(
+            color: selected ? TrialTokens.primary : TrialTokens.muted,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        icon: Icon(selected ? Icons.check : icon),
+        label: Semantics(
+          inMutuallyExclusiveGroup: true,
+          checked: selected,
+          child: Text(label),
+        ),
+      ),
+    );
+  }
 
   Widget _grid(List<int> rows, double scale) {
     final dates = widget.fixture.dates;
@@ -388,14 +639,15 @@ class _RotaTrialScreenState extends State<RotaTrialScreen> {
         ),
       ),
     );
-    final table = Table(
+    final table = _LabelledTable(
       key: const Key('rota-grid'),
+      label: 'Ushering rota: positions by Sunday',
       defaultVerticalAlignment: TableCellVerticalAlignment.middle,
       border: TableBorder.all(color: TrialTokens.line),
       columnWidths: {
         0: FixedColumnWidth(140 * scale),
         for (var c = 1; c <= dates.length; c++)
-          c: FixedColumnWidth(170 * scale),
+          c: FixedColumnWidth(176 * scale),
       },
       children: [
         TableRow(
@@ -425,8 +677,10 @@ class _RotaTrialScreenState extends State<RotaTrialScreen> {
               for (var c = 0; c < dates.length; c++)
                 TableCell(
                   child: Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: _slotButton(r, c),
+                    padding: const EdgeInsets.all(3),
+                    child: _matches(r, c)
+                        ? _slotButton(r, c)
+                        : _filteredOutCell(r, c),
                   ),
                 ),
             ],
@@ -446,6 +700,18 @@ class _RotaTrialScreenState extends State<RotaTrialScreen> {
           padding: const EdgeInsets.only(bottom: 14),
           child: table,
         ),
+      ),
+    );
+  }
+
+  Widget _filteredOutCell(int r, int c) {
+    final slot = _slots[r][c];
+    return Semantics(
+      label: '${slot.position}, ${slot.date.label}: hidden by status filter',
+      excludeSemantics: true,
+      child: const Padding(
+        padding: EdgeInsets.all(12),
+        child: Text('—', style: TextStyle(color: TrialTokens.muted)),
       ),
     );
   }
@@ -496,16 +762,18 @@ class _RotaTrialScreenState extends State<RotaTrialScreen> {
           ),
           Semantics(
             role: SemanticsRole.list,
+            label: '${widget.fixture.positions[r]} slots',
             explicitChildNodes: true,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (var c = 0; c < _slots[r].length; c++)
-                  Semantics(
-                    role: SemanticsRole.listItem,
-                    container: true,
-                    child: _listItem(r, c),
-                  ),
+                for (var c = 0; c < _cols; c++)
+                  if (_matches(r, c))
+                    Semantics(
+                      role: SemanticsRole.listItem,
+                      container: true,
+                      child: _listItem(r, c),
+                    ),
               ],
             ),
           ),
@@ -540,11 +808,13 @@ class _RotaTrialScreenState extends State<RotaTrialScreen> {
             style: const TextStyle(fontSize: 15),
           ),
           StatusChip(status: slot.status),
-          OutlinedButton(
-            onPressed: () => _openSlot(r, c),
-            child: Text(
-              'Change',
-              semanticsLabel: 'Change ${slot.position}, ${slot.date.label}',
+          FocusRing(
+            child: OutlinedButton(
+              onPressed: () => _openSlot(r, c),
+              child: Text(
+                'Change',
+                semanticsLabel: 'Change ${slot.position}, ${slot.date.label}',
+              ),
             ),
           ),
         ],
@@ -585,18 +855,32 @@ class _StatusButton extends StatelessWidget {
       container: true,
       button: true,
       label: semanticLabel,
-      child: Material(
-        color: status.background,
-        borderRadius: radius,
-        child: InkWell(
-          focusNode: focusNode,
-          canRequestFocus: canRequestFocus,
-          onTap: onPressed,
+      child: ListenableBuilder(
+        listenable: focusNode,
+        builder: (context, child) => Container(
+          padding: const EdgeInsets.all(kFocusRingWidth + 1),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: focusNode.hasFocus
+                  ? TrialTokens.accent
+                  : Colors.transparent,
+              width: kFocusRingWidth,
+            ),
+          ),
+          child: child,
+        ),
+        child: Material(
+          color: status.background,
           borderRadius: radius,
-          child: ExcludeSemantics(
-            child: ListenableBuilder(
-              listenable: focusNode,
-              builder: (context, child) => Container(
+          child: InkWell(
+            focusNode: focusNode,
+            canRequestFocus: canRequestFocus,
+            focusColor: Colors.transparent,
+            onTap: onPressed,
+            borderRadius: radius,
+            child: ExcludeSemantics(
+              child: Container(
                 constraints: const BoxConstraints(minHeight: 48),
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(
@@ -605,36 +889,28 @@ class _StatusButton extends StatelessWidget {
                 ),
                 decoration: BoxDecoration(
                   borderRadius: radius,
-                  border: focusNode.hasFocus
-                      ? Border.all(
-                          color: TrialTokens.accent,
-                          width: kFocusRingWidth,
-                        )
-                      : Border.all(
-                          color: dashed
-                              ? const Color(0xFFC9D0E0)
-                              : status.background,
-                        ),
+                  border: Border.all(
+                    color: dashed ? const Color(0xFFC9D0E0) : status.background,
+                  ),
                 ),
-                child: child,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    primary,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: status.foreground,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      primary,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: status.foreground,
+                      ),
                     ),
-                  ),
-                  Text(
-                    secondary,
-                    style: TextStyle(fontSize: 12, color: status.foreground),
-                  ),
-                ],
+                    Text(
+                      secondary,
+                      style: TextStyle(fontSize: 12, color: status.foreground),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -704,76 +980,79 @@ class _SlotDialogState extends State<_SlotDialog> {
   @override
   Widget build(BuildContext context) {
     final assignable = SlotStatus.values.where((s) => s != SlotStatus.unfilled);
-    return AlertDialog(
-      title: Text('${widget.slot.position} — ${widget.slot.date.label}'),
-      content: SizedBox(
-        width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            DropdownButtonFormField<String?>(
-              key: const Key('slot-member'),
-              initialValue: _memberId,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Member',
-                border: OutlineInputBorder(),
-              ),
-              items: [
-                const DropdownMenuItem(
-                  value: null,
-                  child: Text('No one assigned'),
-                ),
-                for (final m in widget.members)
-                  DropdownMenuItem(
-                    value: m.id,
-                    child: Text(m.displayName, overflow: TextOverflow.ellipsis),
-                  ),
-              ],
-              onChanged: (id) => setState(() {
-                _memberId = id;
-                if (id == null) {
-                  _status = SlotStatus.unfilled;
-                } else if (_status == SlotStatus.unfilled) {
-                  _status = SlotStatus.draft;
-                }
-              }),
+    return TrialDialog(
+      title: '${widget.slot.position} — ${widget.slot.date.label}',
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Long synthetic names wrap (itemHeight: null) instead of being
+          // ellipsised, including at 200% text.
+          DropdownButtonFormField<String?>(
+            key: const Key('slot-member'),
+            initialValue: _memberId,
+            isExpanded: true,
+            itemHeight: null,
+            decoration: const InputDecoration(
+              labelText: 'Member',
+              border: OutlineInputBorder(),
             ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<SlotStatus>(
-              key: const Key('slot-status'),
-              initialValue: _status,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Status',
-                border: OutlineInputBorder(),
+            items: [
+              const DropdownMenuItem(
+                value: null,
+                child: Text('No one assigned'),
               ),
-              items: [
-                for (final s
-                    in _memberId == null ? [SlotStatus.unfilled] : assignable)
-                  DropdownMenuItem(value: s, child: Text(s.label)),
-              ],
-              onChanged: (s) => setState(() => _status = s ?? _status),
+              for (final m in widget.members)
+                DropdownMenuItem(value: m.id, child: Text(m.displayName)),
+            ],
+            onChanged: (id) => setState(() {
+              _memberId = id;
+              if (id == null) {
+                _status = SlotStatus.unfilled;
+              } else if (_status == SlotStatus.unfilled) {
+                _status = SlotStatus.draft;
+              }
+            }),
+          ),
+          const SizedBox(height: 16),
+          DropdownButtonFormField<SlotStatus>(
+            key: ValueKey('slot-status-${_memberId == null}'),
+            initialValue: _status,
+            isExpanded: true,
+            itemHeight: null,
+            decoration: const InputDecoration(
+              labelText: 'Status',
+              border: OutlineInputBorder(),
             ),
-          ],
-        ),
+            items: [
+              for (final s
+                  in _memberId == null ? [SlotStatus.unfilled] : assignable)
+                DropdownMenuItem(value: s, child: Text(s.label)),
+            ],
+            onChanged: (s) => setState(() => _status = s ?? _status),
+          ),
+        ],
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          key: const Key('slot-save'),
-          onPressed: () => Navigator.of(context).pop(
-            widget.slot.copyWith(
-              memberId: _memberId,
-              clearMember: _memberId == null,
-              status: _status,
-            ),
+        FocusRing(
+          child: TextButton(
+            key: const Key('slot-cancel'),
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
           ),
-          child: const Text('Save'),
+        ),
+        FocusRing(
+          child: FilledButton(
+            key: const Key('slot-save'),
+            onPressed: () => Navigator.of(context).pop(
+              widget.slot.copyWith(
+                memberId: _memberId,
+                clearMember: _memberId == null,
+                status: _status,
+              ),
+            ),
+            child: const Text('Save'),
+          ),
         ),
       ],
     );
@@ -782,80 +1061,78 @@ class _SlotDialogState extends State<_SlotDialog> {
 
 class _ExportDialog extends StatelessWidget {
   const _ExportDialog({
-    required this.positions,
-    required this.dates,
+    required this.scope,
     required this.rows,
     required this.preview,
   });
 
-  final int positions;
-  final int dates;
+  final String scope;
   final int rows;
   final String preview;
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Export rota CSV'),
-      content: SizedBox(
-        width: 460,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Scope: $positions positions × $dates Sundays = $rows rows '
-                '(the positions shown by the current filter).',
-                key: const Key('export-scope'),
-              ),
-              const SizedBox(height: 8),
-              Text('Columns: ${kCsvColumns.join(', ')}.'),
-              const SizedBox(height: 8),
-              const Text('Not included: phone numbers and care notes.'),
-              const SizedBox(height: 8),
-              const Text(
-                'Text that a spreadsheet could run as a formula is prefixed '
-                'with an apostrophe so it shows as plain text.',
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(10),
-                color: TrialTokens.amberBg,
-                child: const Text(
-                  'Warning: the downloaded file is outside the app’s access '
-                  'controls. Store and delete it under the church’s agreed '
-                  'process. It is not emailed or shared automatically.',
-                  style: TextStyle(color: TrialTokens.amberFg),
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text('Preview (first rows):'),
-              const SizedBox(height: 4),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                color: TrialTokens.surface2,
-                child: Text(
-                  preview,
-                  key: const Key('export-preview'),
-                  style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
-                ),
-              ),
-            ],
+    return TrialDialog(
+      title: 'Export rota CSV',
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Scope: $rows rows — $scope (the slots shown by the current '
+            'filters).',
+            key: const Key('export-scope'),
           ),
-        ),
+          const SizedBox(height: 8),
+          Text('Columns: ${kCsvColumns.join(', ')}.'),
+          const SizedBox(height: 8),
+          const Text('Not included: phone numbers and care notes.'),
+          const SizedBox(height: 8),
+          const Text(
+            'Text that a spreadsheet could run as a formula is prefixed '
+            'with an apostrophe so it shows as plain text.',
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            color: TrialTokens.amberBg,
+            child: const Text(
+              'Warning: the downloaded file is outside the app’s access '
+              'controls. Store and delete it under the church’s agreed '
+              'process. It is not emailed or shared automatically.',
+              style: TextStyle(color: TrialTokens.amberFg),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text('Preview (first rows):'),
+          const SizedBox(height: 4),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(8),
+            color: TrialTokens.surface2,
+            child: Text(
+              preview,
+              key: const Key('export-preview'),
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+            ),
+          ),
+        ],
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
+        FocusRing(
+          child: TextButton(
+            key: const Key('export-cancel'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
         ),
-        FilledButton.icon(
-          key: const Key('export-download'),
-          onPressed: () => Navigator.of(context).pop(true),
-          icon: const Icon(Icons.download),
-          label: const Text('Download CSV'),
+        FocusRing(
+          child: FilledButton.icon(
+            key: const Key('export-download'),
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.download),
+            label: const Text('Download CSV'),
+          ),
         ),
       ],
     );

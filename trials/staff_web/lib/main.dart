@@ -45,41 +45,38 @@ Future<void> main() async {
   );
 }
 
-/// Keyboard focus ring shared by the trial's buttons.
-final WidgetStateProperty<BorderSide?> _focusSide =
-    WidgetStateProperty.resolveWith(
-      (states) => states.contains(WidgetState.focused)
-          ? const BorderSide(color: TrialTokens.accent, width: kFocusRingWidth)
-          : null,
-    );
-
 ThemeData trialTheme() {
-  final focusStyle = ButtonStyle(side: _focusSide);
+  // Standard density everywhere: the desktop default (compact) shrinks
+  // buttons to 32 px, below the design contract's 44 px target.
+  const minTarget = ButtonStyle(
+    minimumSize: WidgetStatePropertyAll(Size(kMinTarget, 48)),
+    visualDensity: VisualDensity.standard,
+  );
   return ThemeData(
     colorSchemeSeed: TrialTokens.primary,
-    filledButtonTheme: FilledButtonThemeData(style: focusStyle),
-    outlinedButtonTheme: OutlinedButtonThemeData(style: focusStyle),
-    textButtonTheme: TextButtonThemeData(style: focusStyle),
-    segmentedButtonTheme: SegmentedButtonThemeData(style: focusStyle),
+    visualDensity: VisualDensity.standard,
+    // Keyboard highlight for list/menu items (e.g. dropdown options):
+    // a near-solid accent, ≥3:1 against the unfocused white item.
+    focusColor: TrialTokens.accent.withValues(alpha: 0.85),
+    filledButtonTheme: const FilledButtonThemeData(style: minTarget),
+    outlinedButtonTheme: const OutlinedButtonThemeData(style: minTarget),
+    textButtonTheme: const TextButtonThemeData(style: minTarget),
     inputDecorationTheme: const InputDecorationTheme(
       focusedBorder: OutlineInputBorder(
         borderSide: BorderSide(
           color: TrialTokens.accent,
-          width: kFocusRingWidth,
+          // One px wider than the ring: the inner 3 px replace field background.
+          width: kFocusRingWidth + 1,
         ),
-      ),
-    ),
-    tabBarTheme: TabBarThemeData(
-      overlayColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.focused)
-            ? TrialTokens.accent.withValues(alpha: 0.45)
-            : null,
       ),
     ),
   );
 }
 
 /// Two destinations: the Q10 rota trial (default) and the 1.1 tracer status.
+///
+/// Custom tabs instead of [TabBar]: TabBar's only focus cue is a faint ink
+/// overlay, which fails a 3:1 focus-change contrast check on the navy bar.
 class TrialShell extends StatefulWidget {
   const TrialShell({super.key, required this.rota, required this.status});
 
@@ -90,16 +87,8 @@ class TrialShell extends StatefulWidget {
   State<TrialShell> createState() => _TrialShellState();
 }
 
-class _TrialShellState extends State<TrialShell>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabs = TabController(length: 2, vsync: this)
-    ..addListener(() => setState(() {}));
-
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
-  }
+class _TrialShellState extends State<TrialShell> {
+  int _index = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -108,23 +97,88 @@ class _TrialShellState extends State<TrialShell>
         backgroundColor: TrialTokens.primary,
         foregroundColor: Colors.white,
         title: const Text('BIC Kafue staff web trial'),
-        bottom: TabBar(
-          controller: _tabs,
-          labelColor: Colors.white,
-          unselectedLabelColor: const Color(0xFFDCE6FF),
-          indicatorColor: Colors.white,
-          tabs: const [
-            Tab(text: 'Rota grid trial'),
-            Tab(text: 'Platform status'),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Semantics(
+            role: SemanticsRole.tabBar,
+            label: 'Trial sections',
+            explicitChildNodes: true,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+              child: Row(
+                children: [
+                  _ShellTab(
+                    label: 'Rota grid trial',
+                    selected: _index == 0,
+                    onTap: () => setState(() => _index = 0),
+                  ),
+                  _ShellTab(
+                    label: 'Platform status',
+                    selected: _index == 1,
+                    onTap: () => setState(() => _index = 1),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
       body: IndexedStack(
-        index: _tabs.index,
+        index: _index,
         children: [
-          ExcludeFocus(excluding: _tabs.index != 0, child: widget.rota),
-          ExcludeFocus(excluding: _tabs.index != 1, child: widget.status),
+          ExcludeFocus(excluding: _index != 0, child: widget.rota),
+          ExcludeFocus(excluding: _index != 1, child: widget.status),
         ],
+      ),
+    );
+  }
+}
+
+class _ShellTab extends StatelessWidget {
+  const _ShellTab({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Semantics(
+        role: SemanticsRole.tab,
+        selected: selected,
+        container: true,
+        child: FocusRing(
+          color: Colors.white,
+          radius: 10,
+          child: InkWell(
+            onTap: onTap,
+            focusColor: Colors.transparent,
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 44),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: selected ? Colors.white : Colors.transparent,
+                    width: 3,
+                  ),
+                ),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: selected ? Colors.white : const Color(0xFFDCE6FF),
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

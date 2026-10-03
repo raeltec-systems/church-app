@@ -4,7 +4,7 @@ type: 'feature'
 ticket: '6'
 created: '2026-10-03'
 status: 'blocked'
-blocked_reason: 'Owner spot-check needed: Firefox, Edge, desktop Safari, Chrome on a real Android device and a real screen reader (NVDA or VoiceOver, plus TalkBack) cannot run in this environment. Flutter Web is provisionally selected after passing all 27 automated checks on Chrome for Testing 153 and Chromium 141. Steps are in evidence-1.6/README.md (Owner spot-check).'
+blocked_reason: 'Owner spot-check needed: Firefox, Edge, desktop Safari, Chrome on a real Android device and real screen readers (NVDA or VoiceOver, plus TalkBack) cannot run in this environment. Flutter Web is provisionally selected after passing 29/29 desktop (non-emulated) checks on desktop Chrome (Chrome for Testing 153), with the same result on Chromium 141; the one emulated check (Pixel 7) passed but counts for no matrix entry. Steps are in evidence-1.6/README.md (Owner spot-check).'
 baseline_revision: 'dfa367db1bae7ae6ade7dfab75cfaf2de99b853a'
 route: 'full'
 route_source: 'auto'
@@ -84,11 +84,44 @@ context:
 - Implemented directly (no subagent tool in this session). Files: `trials/staff_web/lib/main.dart` (semantics forced on, `TrialShell` with tabs, focus-ring theme); `lib/rota_trial/{rota_fixture,csv_export,download,download_stub,download_web,rota_trial_screen}.dart`; `test/rota_trial/{csv_export_test,rota_trial_screen_test}.dart`; `tool/browser_trial.mjs`; `README.md`; `pubspec.yaml`/`pubspec.lock` (`web` 1.1.1 is now a direct dependency at the same version). CI is unchanged: the existing analyze/test/build web steps cover the trial. The browser harness is not in CI because CI has no pinned browsers.
 - Browser findings fixed in the app: browser Tab ignores `skipTraversal`, so the roving tab stop uses `InkWell(canRequestFocus:)`; `SegmentedButton` hid its selection, so segments are exposed as radios; `Semantics(liveRegion)` never announced, so the app calls `SemanticsService.sendAnnouncement` after the dialog closes; `requestFocus` did not scroll, so keyboard moves call `Scrollable.ensureVisible`. Widget tests passed before each browser fix, so browser-level evidence is required.
 - Environment: only Chromium builds exist under `/opt/pw-browsers`: Playwright Chromium 141 and Chrome for Testing 153 (run through `CHROMIUM_EXECUTABLE`). The sandbox reports `navigator.language` as `en-US@posix`, which Flutter rejects at start-up, so the harness pins the `en-GB` locale.
-- Results: 27/27 checks pass on both browsers (`evidence-1.6/chrome-for-testing-153/results.json`, `evidence-1.6/chromium-141-playwright/results.json`). The matrix, decision, findings and owner spot-check steps are in `evidence-1.6/README.md`.
+- Results (superseded by the review revision below): the first run reported 27/27, mixing emulated checks into the total.
 - Decision (agent, under owner pre-approval): Flutter Web is **provisionally selected**. The React/Next.js trial was not built because Flutter passed every check that could run here. A must-pass spot-check failure with no app-level fix reopens Q10. Entry 1.7 can start on the provisional selection.
-- Matrix test audit: grid keyboard (widget test plus C6); status change and cancel shown in grid, list and CSV (widget tests plus C7, C9e); CSV injection and allowlist (unit tests plus C9b–d); 200% text (widget tests at 2.0 scale plus C11/C12); empty filter (widget test plus C8a). All ran and passed.
+- Matrix test audit (first pass, corrected below): it wrongly counted the free-text position filter as the matrix's status filter.
+- Review revision (2026-10-03). Changes:
+  - Added a **status filter**. Non-matching cells read "…: hidden by status filter"; when nothing matches, "No slots match these filters" appears and export is disabled with a reason. The fixture now varies statuses by row, so a position plus status combination can match nothing.
+  - Dialogs are `TrialDialog`: role `dialog`, named by the title. The table is named through a `Table`/`RenderTable` subclass.
+  - Focus indicators:
+    - `FocusRing` draws a 3 px accent ring outside each button.
+    - The view toggle is a named radio group of two buttons; `SegmentedButton` is gone.
+    - The shell uses custom tabs in a named tab list with a white ring; `TabBar` is gone.
+    - Text fields have a 4 px focused border, and menu options a near-solid accent highlight.
+  - Every target is at least 48 px tall (standard density).
+  - Dropdown items wrap instead of ellipsising.
+  - The download announcement now says "Download started: <file> (N rows)."
+  - The fixture adds CR-led and space-led values.
+  - A golden CSV (`test/rota_trial/golden/door-export-after-edit.csv`) is shared by the widget test and the harness.
+  - Harness:
+    - Focus visibility uses a contrast-change area rule on each control's own box, measured against a non-adjacent, same-layout baseline. It covers 28 controls: the page, slot dialog fields and buttons, status menu options, export dialog buttons and 6 of 48 list Change buttons.
+    - Names are checked in 5 states, and the 44 px target check is new.
+    - Cancel and Escape are tested after editing both member and status.
+    - All four edges clamp.
+    - The edit is checked in grid, list and CSV.
+    - The CSV is byte-compared with the golden file and its Member/Status values cross-checked against the grid.
+    - The preview text is checked for privacy.
+    - Zoom is **real browser zoom** (profile default-zoom preference, DPR 2), with both dialogs opened.
+    - Checks carry `kind` `desktop` or `emulated`, and results report the two separately.
+  - Results: **desktop 29/29** on Chrome for Testing 153 and Chromium 141, plus **emulated 1/1** (C13 only). Trial README corrected: the Platform status tab is always present.
+- Matrix test audit (revised). Every check below ran and passed:
+  - **Grid keyboard:** widget test "clamp at all edges" and harness C6.
+  - **Status change:** widget test "grid, list and CSV" and harness C7c/C10b.
+  - **Cancel/Escape after editing:** widget tests and harness C7b.
+  - **CSV injection and allowlist:** csv unit tests and harness C9b–d, with all 7 trigger kinds.
+  - **200% text:** widget tests with both dialogs and the menu at 2.0 scale (no truncation or overflow) and harness C11/C12.
+  - **Empty status filter:** widget test "filters that match no slot" and harness C8b.
 
 ## Plan Change Log
+
+- 2026-10-03 — review findings: the status filter was missing from the frozen matrix; focus and name checks covered only top-level stops; the focus pass rule accepted faint tints and neighbour contamination; dialogs and the table were unnamed; the cancel tests made no edit; only two edges were tested; the CSV checked counts only; the emulated checks were counted in the headline; zoom was emulated; targets were 32 px; "Downloaded" overclaimed. Amended: the implementation and harness as listed in Implementation Notes ("Review revision"). This avoids claiming accessibility passes that were not measured on the real control, and avoids presenting emulation as matrix coverage. KEEP: roving tab stop on `InkWell(canRequestFocus)`, post-dialog `sendAnnouncement`, `ensureSemantics`, the evidence layout under `evidence-1.6/<browser>/`, and the honest gap matrix.
 
 ## Review Triage Log
 

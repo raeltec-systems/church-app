@@ -1,46 +1,45 @@
 {
-  "slots": 48,
-  "layout": {
-    "rects": {
-      "filter": {
-        "x": 32,
-        "right": 680,
-        "width": 648,
-        "height": 78
-      },
-      "grid": {
-        "x": 688,
-        "right": 769.53125,
-        "width": 81.53125,
-        "height": 40
-      },
-      "list": {
-        "x": 769.5328369140625,
-        "right": 851.0640869140625,
-        "width": 81.53125,
-        "height": 40
-      },
-      "export": {
-        "x": 867.0656127929688,
-        "right": 1066.175048828125,
-        "width": 199.10943603515625,
-        "height": 40
-      }
-    },
-    "heading": {
-      "height": 69,
-      "width": 220.390625
-    },
-    "pageScrollsHorizontally": false,
+  "vp": {
+    "width": 1366,
+    "height": 900,
+    "dpr": 1,
     "rootFontSize": "32px"
   },
-  "toolbarInside": true,
+  "slots": 48,
+  "gridCut": [],
+  "listCut": [],
+  "pageScrollsHorizontally": false,
   "farVisible": true,
-  "listInside": true,
-  "id": "C12",
-  "baselineHeading": {
-    "height": 34,
-    "width": 111.4375
+  "slotDlg": {
+    "ok": true,
+    "name": "Main door — Sun 22 Nov",
+    "geo": {
+      "left": 453,
+      "right": 913,
+      "vw": 1366,
+      "cut": []
+    },
+    "buttons": [
+      "Cancel",
+      "Save",
+      "Member +Test Plus G",
+      "Status Confirmed"
+    ]
   },
+  "exportDlg": {
+    "ok": true,
+    "name": "Export rota CSV",
+    "geo": {
+      "left": 453,
+      "right": 913,
+      "vw": 1366,
+      "cut": []
+    },
+    "buttons": [
+      "Cancel",
+      "Download CSV"
+    ]
+  },
+  "listInside": true,
   "headingRatio": 2.03
 }

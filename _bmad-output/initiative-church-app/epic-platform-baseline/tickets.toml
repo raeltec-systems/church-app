@@ -1,0 +1,165 @@
+# Whole opening-epic plan; entries remain planned until a build writes its plan.
+# Later epics retain envelopes. Unknowns are gates, not silently selected values.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Run the mobile and trial-web tracer through Supabase"
+description = "Using owner-provided or already authorized isolated project access, create the official locked Flutter scaffold, minimum CI smoke check and Supabase API migration so a native app and disposable Flutter Web trial display the same synthetic database-backed platform status through an allowlisted read with loading, retry and failure states."
+verify = "From a clean checkout and CI smoke run, launch one native target and the web trial, change the synthetic platform status in the backend, and observe the same real API result and a recoverable network failure on both clients."
+covers = ["P1"]
+after = []
+hitl = true
+risk = "high"
+unknown = "An owner must supply or approve isolated Supabase project access and available native test hardware or simulator; no live personal data or production provider selection is required."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#stack", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#structural-seed"]
+external_check = "Entry 12 repeats the clean-checkout cross-client tracer independently of this story's smoke check."
+
+[[entry]]
+id = 2
+type = "story"
+title = "Prove password-session trust and no-SMS provider behavior"
+description = "Build and retain a synthetic-account provider harness in a dedicated isolated Auth test project that demonstrates native phone/password signup and login, optional same-account verified email, password AMR and live-session checks, neutral recovery responses, private-data denial for OTP/magic-link/recovery-only sessions and native password-change session invalidation with no SMS configuration using owner-approved test inboxes and redirects."
+verify = "Run the harness against the actual isolated Auth version and capture private-data denial for non-password sessions, permitted same-account email verification/reset and verified-email/password alias behavior under the same access gate, fresh-password-login requirements and old-session denial without any SMS delivery path."
+covers = ["P2"]
+after = [1]
+hitl = true
+risk = "high"
+unknown = "Actual Auth claim, session-revocation and email/redirect behavior must be observed using approved test inboxes and recorded provider configuration; a failed assumption blocks its identity implementation rather than being waived."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-3--person-identity-and-live-account-trust-adopted", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-20--phonepassword-with-optional-verified-email-recovery-no-sms-adopted", "_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#auth-verification-detail"]
+external_check = "Israel reviews captured provider evidence and an independent security reviewer challenges alternate Auth routes before production private-access implementation consumes the result."
+
+[[entry]]
+id = 3
+type = "story"
+title = "Prove fenced staff recovery across the Auth boundary"
+description = "Extend the isolated provider harness to prove trusted native credential-change detection, generation-bound single-use grants and one privileged reset in flight, including superseded grants, cross-member attempts, relinking blocks and uncertain or late external Auth outcomes and present the independent security evidence for owner acceptance."
+verify = "Run adversarial concurrent-reset and direct-change scenarios against real Auth plus injected transport uncertainty and demonstrate that old grants cannot mutate a newer binding, unresolved work blocks relinking, holds remain effective and no password or usable grant enters staff output or logs."
+covers = ["P3"]
+after = [2]
+hitl = true
+risk = "high"
+unknown = "The trusted provider-change detection and dispatch/completion fence must be proved before assisted recovery is enabled, and failure requires a recorded architecture decision rather than a custom password store or weaker identity check."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-20--phonepassword-with-optional-verified-email-recovery-no-sms-adopted", "_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#auth-verification-detail"]
+external_check = "An independent security review repeats an unused-grant/direct-password-change case and an uncertain-reset/relink race, with Israel approving the evidence before the identity epic starts assisted-reset implementation."
+
+[[entry]]
+id = 4
+type = "story"
+title = "Install the transactional API command foundation"
+description = "Extend the tracer's backend owner/API boundary with a reusable command envelope, restricted grants, current-actor authorization interface, safe errors, revision locking and payload-bound request receipts using one synthetic aggregate and no feature business rules."
+verify = "Exercise duplicate requests, changed-payload replay, stale revisions, simultaneous writes, rolled-back failures and revoked fixture authority through the real API and show atomic outcomes with denied direct table DML and PUBLIC execution."
+covers = ["P4"]
+after = [1]
+hitl = false
+risk = "high"
+unknown = "Exact SQL function privileges and extension availability must be checked on the provisioned PostgreSQL build without assuming seed versions were installed."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-2--one-transactional-command-and-read-contract-assumption", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#consistency-conventions"]
+external_check = "Entry 12 runs an independent API-role and receipt/revision concurrency suite against the deployed migration."
+
+[[entry]]
+id = 5
+type = "story"
+title = "Publish the cross-epic contracts and owner seams"
+description = "Publish versioned member/account identifiers, actor/source/purpose/revision contracts, time and exact-money encodings, owner interfaces and lifecycle/notification registration stubs with shared client fixtures and explicit policy-gate configuration."
+verify = "Validate both client mappings against identical valid and invalid fixtures and show owner adapters can register lifecycle and source hooks without importing another owner's implementation or activating unresolved production policy."
+covers = ["P5", "P8"]
+after = [4]
+hitl = false
+risk = "medium"
+unknown = "Feature owners will add their owned schemas and concrete state machines in later epics, while church zone and numeric policies remain unset for production until Q2 and the relevant decision are resolved."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-18--contract-first-integration-and-release-gates-adopted", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#consistency-conventions"]
+
+[[entry]]
+id = 6
+type = "story"
+title = "Select staff web through the accessible grid and list trial"
+description = "Build a synthetic dense-grid/list and CSV trial in Flutter Web, test keyboard, focus, screen-reader, text scaling and supported browsers, and if it fails run the equivalent trial in the proposed React/Next.js alternative before recording the owner-selected passing route under the unchanged server contract."
+verify = "A reviewer completes equivalent grid and list operations, focus and screen-reader navigation, text scaling and safe synthetic CSV download on the agreed browser matrix in the selected framework; a failed Flutter trial requires passing equivalent alternative evidence before this story is complete."
+covers = ["P6"]
+after = [1]
+hitl = true
+risk = "medium"
+unknown = "Q10 framework selection and Q12 trial browser/device support need owner input, but unresolved production hosting or final performance thresholds do not stop a synthetic trial."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#staff-web-portal", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#tokens-type-and-geometry", "_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md#decision-register"]
+
+[[entry]]
+id = 7
+type = "story"
+title = "Establish the selected client shells and safe request states"
+description = "Create the selected staff application shell and shared mobile design primitives with semantic themes, accessible controls, contract adapters, memory-only protected fixture state and honest pending, conflict, unavailable and account-change states."
+verify = "Run the same synthetic read/write fixture on mobile and the selected web client, demonstrate keyboard and text-scaling behavior, preserve recoverable input after conflict, and clear protected fixture state on logout or account change without writing it to persistent caches."
+covers = ["P1", "P5", "P6"]
+after = [5, 6]
+hitl = false
+risk = "medium"
+unknown = "The framework output from entry 6 determines staff shell implementation, while real membership navigation and role-authorized screens belong to identity and feature epics."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-13--public-caching-private-session-state-and-file-gates-assumption", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-16--shared-client-contract-and-accessible-surfaces-assumption", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#tokens-type-and-geometry"]
+
+[[entry]]
+id = 8
+type = "story"
+title = "Make environments and promotion reproducible in CI"
+description = "Define separate local, hosted-staging and production configurations and promote reviewed migrations and immutable platform client builds through clean CI checks to an owner-approved production baseline with private features and sending disabled, server-only secrets and synthetic nonproduction recipients."
+verify = "From a clean CI runner, deploy and check isolated staging and the approved private-disabled production baseline, then demonstrate distinct secrets and provider configuration, compatible promotion and the inability of a nonproduction path to select production recipients or credentials."
+covers = ["P7"]
+after = [7]
+hitl = true
+risk = "high"
+unknown = "Hosting/domain/region/plan access and budget require owner choices under Q10 before the production-baseline deployment; CI and staging preparation may proceed, but this story is not complete while that deployment remains gated."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-17--separated-environments-and-recoverable-operation-assumption", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-18--contract-first-integration-and-release-gates-adopted"]
+external_check = "Entry 12 inspects built client configuration and independently verifies environment isolation and clean-checkout promotion."
+
+[[entry]]
+id = 9
+type = "story"
+title = "Provide bounded system access and restricted operations"
+description = "Implement an environment-bound allowlisted system-command adapter using a synthetic operation, content-free health and audit events, owner-selected restricted operator access and explicit fail-closed activation flags with a support/deploy runbook."
+verify = "Invoke the system endpoint with valid and wrong-environment credentials, user JWTs and forged actor fields and show only the permitted operation succeeds, with attributable content-free audit output and unresolved production gates still disabled."
+covers = ["P8"]
+after = [5, 8]
+hitl = true
+risk = "high"
+unknown = "Named operators, restricted alert destination and Q12 operational thresholds must be selected before live operation, and no reminder scheduler or user-role impersonation is enabled by this story."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-19--bounded-system-principals-assumption", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-17--separated-environments-and-recoverable-operation-assumption"]
+external_check = "Entry 12 independently attempts user-to-system privilege escalation and checks that client bundles contain no system credential."
+
+[[entry]]
+id = 10
+type = "story"
+title = "Rehearse isolated recovery with an independent journal"
+description = "Using an owner-selected restricted journal/backup location, implement the append-only recovery-journal boundary outside database rollback and a minimal database-plus-object backup/restore procedure using one synthetic subject and object, replaying revocations/deletions before private-serving or sending can be enabled."
+verify = "Restore an older synthetic database and object snapshot into isolation, reconcile a newer journal revocation/deletion and remove the restored object, then prove an absent or incomplete journal keeps access and sending disabled."
+covers = ["P9"]
+after = [5, 9]
+hitl = true
+risk = "high"
+unknown = "The independent journal and object-backup location plus restricted operator need an explicit owner choice, while Q4 retention and Q12 RPO/RTO remain gates for real-data operation and the full release restore demonstration."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-14--atomic-local-lifecycle-resumable-external-deletion-assumption", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-17--separated-environments-and-recoverable-operation-assumption"]
+external_check = "Israel witnesses the synthetic restore and entry 12 independently checks access remains disabled when a recovery-journal watermark is incomplete."
+
+[[entry]]
+id = 11
+type = "story"
+title = "Refactor sweep"
+description = "Clean up platform duplication, boundary drift and maintainability findings recorded during the completed stories without changing scope or absorbing unfinished source behavior."
+verify = "Review the completed-story findings, apply only justified cleanup and rerun the affected existing checks without weakening contracts or acceptance behavior."
+covers = ["P10"]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+hitl = false
+risk = "medium"
+unknown = "The exact cleanup scope is selected from build records when this story starts, and any omitted feature behavior requires its own implementation entry."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-18--contract-first-integration-and-release-gates-adopted"]
+
+[[entry]]
+id = 12
+type = "story"
+title = "Verify the platform from checkout through isolated recovery"
+description = "Run the closing cross-platform suite over the tracer, actual-provider evidence harnesses, command races, shared fixtures, selected accessible shell, CI/environment separation, system-principal restrictions and synthetic restore gate after cleanup with the owner confirming required native test access and the recorded evidence."
+verify = "A clean build of both clients against isolated staging passes the integrated platform scenarios, independent security checks and incomplete-journal denial, with failed provider assumptions and unapproved production policies visibly blocking the corresponding identity or deployment activation."
+covers = ["P1", "P2", "P3", "P4", "P5", "P6", "P7", "P8", "P9", "P10"]
+after = [11]
+hitl = true
+risk = "medium"
+unknown = "A native iOS target may require owner-provided signing or hardware, and the installed AOSP emulator must not be presented as FCM delivery evidence."
+references = ["_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#verification-boundaries", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-18--contract-first-integration-and-release-gates-adopted"]

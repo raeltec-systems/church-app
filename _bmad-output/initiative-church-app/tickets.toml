@@ -1,0 +1,114 @@
+# Drafted by bmad-ticket; table order is build order and IDs remain stable.
+# Local files are not a publication commit or an implementation status.
+
+[[epic]]
+id = 1
+slug = "epic-platform-baseline"
+title = "A runnable, testable platform with proven authentication mechanisms"
+covers = []
+after = []
+
+[[epic]]
+id = 2
+slug = "epic-identity-and-scoped-access"
+title = "Membership, recovery and scoped access"
+covers = ["CAP-3", "CAP-4", "CAP-16"]
+after = [{ epic = 1, needs = "Versioned command/read/access fixtures, module ownership and test scaffold, synthetic proof of the selected Supabase no-SMS password/session mechanism, and the staff trial result before framework-dependent screens." }]
+
+[[epic]]
+id = 3
+slug = "epic-durable-inbox-and-reminders"
+title = "Durable inbox and reliable reminders"
+covers = ["CAP-7"]
+after = [{ epic = 1, needs = "Shared source/purpose/event and command fixtures, authenticated system-principal boundary, synthetic CI/environment separation and server-secret conventions." }, { epic = 2, needs = "Current account/grant eligibility checks, account-to-member bindings, holds and token-revocation hooks; the whole membership UI need not be complete." }]
+
+[[epic]]
+id = 4
+slug = "epic-duties-coverage-and-follow-ups"
+title = "Assigned duties, coverage and accountable follow-up"
+covers = ["CAP-5", "CAP-6"]
+after = [{ epic = 1, needs = "Shared owner registry, command/revision/idempotency contracts, lock-order fixtures and accessible reusable client primitives." }, { epic = 2, needs = "Stable member/account identity, department/cell authority, accountless contact attribution and current lifecycle/access hooks." }, { epic = 3, needs = "Transactional enqueue/cancel/inbox APIs, policy-versioned scheduling and synthetic source-contract fixtures; all later domain notification integrations are not prerequisites." }]
+
+[[epic]]
+id = 5
+slug = "epic-cell-meetings-and-programmes"
+title = "Cell meetings and revisioned programmes"
+covers = ["CAP-9"]
+after = [{ epic = 2, needs = "Cells-owned confirmed membership, safe signup labels, current cell authority and transfer/lifecycle operations." }, { epic = 3, needs = "Source registration and transactional meeting/duty reminder scheduling/cancellation contracts." }, { epic = 4, needs = "Duties create/link/revise/cancel and conflict APIs, Follow-ups source operations and both-client fixtures; the full department UI need not be complete." }]
+
+[[epic]]
+id = 6
+slug = "epic-public-content-and-giving"
+title = "Public church content and giving instructions"
+covers = ["CAP-1", "CAP-2"]
+after = [{ epic = 1, needs = "Public API/asset/cache boundary, client navigation/design primitives and build/test scaffold." }, { epic = 2, needs = "Current Media/Admin/worship publication grants and member-only favourite identity; public reading itself does not require sign-in." }, { epic = 3, needs = "Generic publication notification operations for optional announcement push; basic public reading can proceed independently." }, { epic = 4, needs = "Safe event-to-duty reference and owner-review mismatch contract, plus approved sermon-draft reference fields; not full duty UI completion." }]
+
+[[epic]]
+id = 7
+slug = "epic-cell-attendance-and-private-reports"
+title = "Cell attendance, consented visitors and private reports"
+covers = ["CAP-8"]
+after = [{ epic = 2, needs = "Stable accountless/member identity, cell/care grants, membership effective dates, safe contact provenance and lifecycle hooks." }, { epic = 3, needs = "Source-specific report/task reminder and cancellation contracts." }, { epic = 4, needs = "Follow-ups owner APIs, source/purpose registration, restricted task context and authorized attributed owner actions." }, { epic = 5, needs = "Canonical Cells meeting/occurrence IDs, meeting held/cancelled lifecycle and separate actual programme-leader records; not every programme screen." }]
+
+[[epic]]
+id = 8
+slug = "epic-safe-cell-recaps"
+title = "Separately published member-safe recaps"
+covers = ["CAP-10"]
+after = [{ epic = 2, needs = "Current cell audience, source-specific publication grants, lifecycle invalidation and no-private-cache client contract." }, { epic = 5, needs = "Canonical meeting references and attributed actual programme-leader/substitution projection." }, { epic = 7, needs = "Separate report-versus-recap storage boundary and scoped aggregate attendance/held-meeting read contract; full visitor/report UI completion is unnecessary." }]
+
+[[epic]]
+id = 9
+slug = "epic-pastoral-visits"
+title = "Agreed pastoral visits and continuing care"
+covers = ["CAP-11"]
+after = [{ epic = 2, needs = "Current explicit care/visitor scopes, stable member/contact attribution, accountless access model and lifecycle hooks." }, { epic = 3, needs = "Proposal/deadline/appointment reminder adapters and transactional cancellation contracts." }, { epic = 4, needs = "Canonical Follow-ups operations, safe conflict query and minimal routing-context contracts." }, { epic = 7, needs = "Permission-preserving private-report referral reference contract for the report-originated entry point; member-originated visits may be built earlier." }]
+
+[[epic]]
+id = 10
+slug = "epic-private-prayer-and-replies"
+title = "Private prayer requests and pastoral replies"
+covers = ["CAP-14"]
+after = [{ epic = 2, needs = "Stable author/member links, designated lead-pastor versus prayer-team grants, live access and deletion hooks." }, { epic = 3, needs = "Generic private reply inbox adapter and recipient resolution boundary without identity-bearing payloads." }]
+
+[[epic]]
+id = 11
+slug = "epic-opt-in-member-directory"
+title = "Opt-in member directory and safe contact fields"
+covers = ["CAP-15"]
+after = [{ epic = 2, needs = "Approved member identity, separate contact and credential fields, explicit consent/assisted-attribution primitives, current access and lifecycle events." }]
+
+[[epic]]
+id = 12
+slug = "epic-service-counts-and-trends"
+title = "Scoped service counts and honest participation trends"
+covers = ["CAP-12"]
+after = [{ epic = 2, needs = "Scoped recorder and authorized overview grants, stable actor attribution and staff handover hooks." }, { epic = 3, needs = "Missing-count/task notification contract and cancellation behavior." }, { epic = 4, needs = "Follow-ups source/purpose registration, accountable recorder task operations and safe routing projection." }, { epic = 6, needs = "Stable public event reference/occurrence-link contract for services linked to existing events; no need to await all content features." }, { epic = 7, needs = "Scoped historical-roster-based cell aggregate/coverage projection for the shared overview; service recording can be implemented independently of its full UI." }]
+
+[[epic]]
+id = 13
+slug = "epic-cell-offering-custody"
+title = "Aggregate cell-offering custody and safe export"
+covers = ["CAP-13"]
+after = [{ epic = 2, needs = "Stable member/account distinction, explicit counter/custodian/finance scopes, staff handover and approved retention/lifecycle hooks." }, { epic = 3, needs = "Generic source-linked custody/discrepancy reminder and cancellation operations." }, { epic = 4, needs = "Follow-ups owner APIs for accountable outstanding-custody/discrepancy work with separate restricted finance context." }, { epic = 5, needs = "Canonical cell meeting ID, owning-cell authority and meeting cancellation contract; attendance/report completion is not a prerequisite." }, { epic = 1, needs = "Exact wire-money convention, restricted export/API test substrate and selected web framework's accessible CSV/grid capability." }]
+
+[[epic]]
+id = 14
+slug = "epic-staff-portal-and-mobile-continuity"
+title = "Staff portal completion and mobile continuity"
+covers = ["CAP-16", "CAP-12"]
+after = [{ epic = 1, needs = "Recorded web trial/selection, accessible design primitives and shared wire/contract fixtures before framework-dependent work." }, { epic = 2, needs = "Same-account web/mobile authentication, current grant navigation and lifecycle/session invalidation contracts." }, { epic = 3, needs = "Durable staff inbox and generic refresh/deep-link contract." }, { epic = 4, needs = "Scoped rota/coverage/task APIs and accessible client integration points." }, { epic = 5, needs = "Programme management/member projection and meeting navigation contract." }, { epic = 6, needs = "Authorized content/publication administration contract." }, { epic = 7, needs = "Attendance/private-report operations and safe operational overview projection." }, { epic = 8, needs = "Recap draft/preview/publication operations and member-safe read projection." }, { epic = 9, needs = "Care board/list projection and consent-preserving transition commands." }, { epic = 10, needs = "Prayer/reply entry points and anonymous-identity privacy fixtures." }, { epic = 11, needs = "Directory consent/search projection and current visibility fixtures." }, { epic = 12, needs = "Count capture/correction/missing queues and scope-safe metric projections." }, { epic = 13, needs = "Restricted custody/summary/export interfaces and finance-grant fixtures." }]
+
+[[epic]]
+id = 15
+slug = "epic-conditional-moderated-chat"
+title = "Conditional moderated group chat"
+covers = ["CAP-17"]
+after = [{ epic = 2, needs = "Current active-account/group grants, confirmed-cell membership and transfer/deletion/lifecycle hooks." }, { epic = 3, needs = "Separate chat notification category/group mute, generic refresh signaling and authorized private-link delivery contract." }, { epic = 1, needs = "Authenticated private-file access, object ownership and deletion contract plus client test scaffold." }]
+
+[[epic]]
+id = 16
+slug = "epic-release-and-operational-acceptance"
+title = "Full-v1 release and operational acceptance"
+covers = ["CAP-1", "CAP-2", "CAP-3", "CAP-4", "CAP-5", "CAP-6", "CAP-7", "CAP-8", "CAP-9", "CAP-10", "CAP-11", "CAP-12", "CAP-13", "CAP-14", "CAP-15", "CAP-16"]
+after = [{ epic = 1, needs = "Reproducible builds, CI/environment/backup topology and platform verification artifacts; release preparation may start from the contracts." }, { epic = 2, needs = "Membership/recovery/access/lifecycle acceptance evidence, support procedures and the independent recovery journal contract." }, { epic = 3, needs = "Worker/inbox/device-provider evidence, operational health and reminder recovery procedures." }, { epic = 4, needs = "Duty/follow-up pilot and revision/concurrency/direct-contact evidence." }, { epic = 5, needs = "Cell programme pilot and notice/response/actual-participation evidence." }, { epic = 6, needs = "Verified publication rights/destinations, public-content behavior and external handoff evidence." }, { epic = 7, needs = "Cell register/visitor/report privacy and recorded-observation evidence." }, { epic = 8, needs = "Recap publication/consent/audience/withdrawal evidence." }, { epic = 9, needs = "Visit negotiation/direct-consent/continuing-care evidence and operator procedure." }, { epic = 10, needs = "Prayer/reply and anonymous-author access evidence." }, { epic = 11, needs = "Directory consent/hidden-field/youth-gate evidence." }, { epic = 12, needs = "Approved count-definition, correction/missing-data/trend evidence and recorder procedure." }, { epic = 13, needs = "Approved custody/independence/correction/export evidence and finance handover/retention procedure." }, { epic = 14, needs = "Completed required staff/mobile continuity evidence across shared contracts and supported browser/native surfaces." }]

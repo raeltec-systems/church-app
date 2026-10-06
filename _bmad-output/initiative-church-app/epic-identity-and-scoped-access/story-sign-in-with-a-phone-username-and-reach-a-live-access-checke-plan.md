@@ -4,7 +4,7 @@ type: 'feature'
 ticket: '1'
 created: '2026-10-06'
 status: 'blocked'
-blocked_reason: 'Owner steps for the hosted staging verify (hitl): (1) apply 20261003161000_recovery_journal then 20261006120000_identity_live_access to staging tmurpotfluignacfueki; (2) Management API PATCH enabling phone without SMS on staging; (3) native + staff-web demonstration on staging. Everything else is built and verified locally; exact steps in docs/runbooks/identity-access.md (Owner steps).'
+blocked_reason: 'Owner steps for the hosted staging verify (hitl): (1) apply 20261006215306_recovery_journal (+ 20261006215400_recovery_journal_hold) then 20261006215842_identity_live_access to staging tmurpotfluignacfueki; (2) Management API PATCH enabling phone without SMS on staging; (3) native + staff-web demonstration on staging. Everything else is built and verified locally; exact steps in docs/runbooks/identity-access.md (Owner steps).'
 baseline_revision: 'f0a115dc4a51e50cdd7d35f9eb1f7551b7c5a9ab'
 route: 'full'
 route_source: 'auto'
@@ -58,12 +58,12 @@ context:
 - `supabase/tests/*.sql` (pgTAP), `supabase/tests/*_smoke.sh` -- patterns for DB tests and REST smoke; add new files, register smoke in root `package.json` `db:smoke`.
 - `packages/client_core` -- ports in `lib/src/domain`, adapters only in `lib/src/adapters` (guard test), providers in `lib/src/application/providers.dart`, routes in `lib/src/presentation/shell_routing.dart`, fakes in `lib/testing.dart`, composition in `lib/composition.dart` (keep `persistSession:false`).
 - `apps/mobile/lib/app.dart`, `apps/staff/lib/app.dart` -- nav destination lists; add the account destination.
-- Local GoTrue has phone forced off by CLI 2.119.0 (evidence-1.2/local-cli-phone-gate.txt); staging lacks `20261003161000_recovery_journal` (owner gate from 1.10/1.12) and phone provider.
+- Local GoTrue has phone forced off by CLI 2.119.0 (evidence-1.2/local-cli-phone-gate.txt); staging lacks `20261006215306_recovery_journal (+ 20261006215400_recovery_journal_hold)` (owner gate from 1.10/1.12) and phone provider.
 
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261006120000_identity_live_access.sql` -- identity tables, settings (fixture dormancy 90 days, labelled), predicate, activity refresh, `api.identity_my_member_summary()`, restricted synthetic-link seeding function.
+- [x] `supabase/migrations/20261006215842_identity_live_access.sql` -- identity tables, settings (fixture dormancy 90 days, labelled), predicate, activity refresh, `api.identity_my_member_summary()`, restricted synthetic-link seeding function.
 - [x] `supabase/tests/identity_live_access_test.sql` -- pgTAP for every matrix row plus grants.
 - [x] `supabase/tests/identity_api_smoke.sh` + `package.json` -- REST: anon denied, app table not reachable.
 - [x] `tools/auth-harness/local-phone-auth.mjs` -- local-only: recreate the CLI auth container with phone on, sms autoconfirm on, no provider/hook/test OTP; refuses any non-local target.
@@ -86,7 +86,7 @@ context:
 - Decision (agent, under owner pre-approval): the approved link for the tracer is created by a restricted, operator-only seeding function that refuses production and binds the account's current Auth phone; Admin linking is entry 5.
 - Decision (agent, under owner pre-approval): the migration is not applied to staging, because staging still lacks the 1.10 migration and applying 2.1 first would break version order.
 
-- Built directly (no subagent tool in this session). Files: migration `20261006120000_identity_live_access.sql`; pgTAP `identity_live_access_test.sql` (71); smoke `identity_api_smoke.sh` (in `db:smoke`); `tools/auth-harness/local-phone-auth.mjs` (+ tests); `tools/identity-e2e/run.mjs` (+ tests); client_core domain `phone_username`, `account_auth`, `member_access`, adapters `supabase_account_auth_gateway`, `supabase_member_access_repository`, `account_controllers`, screens `sign_in_screen`, `account_screen`, routes `/account`, `/sign-in`, `/create-account`, fakes in `testing.dart`, `tool/live_identity_check.dart`; app nav entries and app tests; CI auth-harness job runs the new node tests and scans `evidence-2.1`; runbook `docs/runbooks/identity-access.md`.
+- Built directly (no subagent tool in this session). Files: migration `20261006215842_identity_live_access.sql`; pgTAP `identity_live_access_test.sql` (71); smoke `identity_api_smoke.sh` (in `db:smoke`); `tools/auth-harness/local-phone-auth.mjs` (+ tests); `tools/identity-e2e/run.mjs` (+ tests); client_core domain `phone_username`, `account_auth`, `member_access`, adapters `supabase_account_auth_gateway`, `supabase_member_access_repository`, `account_controllers`, screens `sign_in_screen`, `account_screen`, routes `/account`, `/sign-in`, `/create-account`, fakes in `testing.dart`, `tool/live_identity_check.dart`; app nav entries and app tests; CI auth-harness job runs the new node tests and scans `evidence-2.1`; runbook `docs/runbooks/identity-access.md`.
 - Cross-lane edit (necessary): `supabase/tests/command_foundation_test.sql` keeps an exact allowlist of functions `authenticated` may execute; it now also lists `api.identity_my_member_summary` and its definer entry point.
 - Decision (agent, under owner pre-approval): local phone sign-in uses a documented local-only switch that recreates the CLI auth container with exactly `GOTRUE_EXTERNAL_PHONE_ENABLED=true` and `GOTRUE_SMS_AUTOCONFIRM=true` and refuses any SMS provider/credential/hook/test OTP/phone MFA. It mirrors the hosted Management API body; CI keeps the CLI default and its smoke signs in through the verified-email alias (same predicate).
 - Decision (agent, under owner pre-approval): denial reasons go only to the caller about their own account (`not_linked`, `review_required`, `untrusted_session`, `unavailable`); screens show generic copy. HTTP 401 for unauthenticated/untrusted, 403 otherwise.

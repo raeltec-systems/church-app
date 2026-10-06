@@ -1,6 +1,6 @@
 # Runbook: identity live access (story 2.1)
 
-Architecture: AD-3, AD-4, AD-13, AD-20. Migration: `supabase/migrations/20261006120000_identity_live_access.sql`.
+Architecture: AD-3, AD-4, AD-13, AD-20. Migration: `supabase/migrations/20261006215842_identity_live_access.sql`.
 Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.1/`.
 
 ## What exists
@@ -83,7 +83,7 @@ It binds the account's **current** Auth phone and email.
 
 The staging project is `bic-kafue-platform-test`, ref `tmurpotfluignacfueki`.
 
-1. **Apply the pending migrations in version order.** Staging ends at `20261003155428`, so apply `20261003161000_recovery_journal` (pending since story 1.10) first, then `20261006120000_identity_live_access`.
+1. **Apply the pending migrations in version order.** Staging ends at `20261003155428`, so apply `20261006215306_recovery_journal (+ 20261006215400_recovery_journal_hold)` (pending since story 1.10) first, then `20261006215842_identity_live_access`.
    - Use either the `promote` workflow, or the Supabase connector's `apply_migration` with the exact file contents and names.
    - Then run `tools/ci/verify-hosted.sql` with `expected_env=staging`.
 2. **Enable phone sign-in without SMS.** Use the same Management API call already used on `bic-kafue-auth-test` (the dashboard refuses it). Use your own personal access token, and never paste it into the repo or the chat:

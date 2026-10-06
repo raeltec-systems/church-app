@@ -50,6 +50,6 @@ Everything here is **LOCAL** (Supabase CLI 2.119.0, GoTrue v2.197.0, Postgres 17
 
 These are not done, and are not claimed here. Exact steps are in `docs/runbooks/identity-access.md`, "Owner steps".
 
-1. **Staging migrations.** Apply `20261003161000_recovery_journal` (pending since story 1.10) and then `20261006120000_identity_live_access` on `tmurpotfluignacfueki`. The order matters, so this migration was not applied ahead of 1.10.
+1. **Staging migrations.** Apply `20261006215306_recovery_journal (+ 20261006215400_recovery_journal_hold)` (pending since story 1.10) and then `20261006215842_identity_live_access` on `tmurpotfluignacfueki`. The order matters, so this migration was not applied ahead of 1.10.
 2. **Staging phone provider.** Enable it through the Management API `PATCH …/projects/tmurpotfluignacfueki/config/auth`, with the same no-SMS body used on `bic-kafue-auth-test`. The dashboard refuses this change, and the agent has no Management API token.
 3. **Native and staff-web demonstration on staging.** Build both clients against staging, then show the approved member's summary on a native target and on staff web. Also show the denials for an unlinked account, a signed-out client and a direct table query, and that no SMS was sent. This needs a device and the owner's hands.

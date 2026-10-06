@@ -12,7 +12,7 @@ Everything here is **SYNTHETIC**. Real-data backups stay off until the Q4 and Q1
 | Object bytes | Each object is downloaded separately through the Storage API and checked against a sha256 in the manifest. | Rehearsal: `.recovery-state/backups/<backup_id>/objects/`, plus a copy and the manifest in the owner's Drive folder. |
 | Recovery journal | Append-only, hash-chained segments outside the database and its rollback lifecycle. Each segment holds opaque UUIDs, a bucket, the kind, seq, times and hashes, and nothing else. Every kind only denies: `access_revoked`, `deletion_manifest` (written before the destructive step), `deletion_completed`, plus `checkpoint` and `seal`. | `tools/recovery/journal.mjs`, behind an adapter. See "Journal adapters". |
 
-### Database side (`supabase/migrations/20261003161000_recovery_journal.sql`)
+### Database side (`supabase/migrations/20261006215306_recovery_journal (+ 20261006215400_recovery_journal_hold).sql`)
 
 - `app.rcv_recovery_state` holds one of three states: `live`, `restored_held` or `reconciled`. A missing row counts as held.
 - While the state is `restored_held`, the release gates `private_access` and `outbound_sending` read as closed through `app.policy_effective` and `app.policy_is_open`. This applies even when the restored snapshot had them approved. The gates are the existing ones from 1.5, not new ones, and `tools/ci/verify-hosted.sql` (1.8) now also fails promotion onto a held database.
@@ -132,7 +132,7 @@ The journal in `.recovery-state/journal` is long-lived, because it is the indepe
 ## Owner steps
 
 1. **Unattended Drive journal.** Only needed if Drive stays the journal before the production store is chosen. Create an OAuth token restricted to the rehearsal folder, store it only in a server or CI secret store, and wire it to `DriveRestClient`. Until then, operators write the journal through the connector.
-2. **Hosted staging schema.** Apply `20261003161000_recovery_journal.sql` to `tmurpotfluignacfueki`. Either approve the Supabase connector's `apply_migration` (name `recovery_journal`) and then rename the local file to the version it records, or run the `promote.yml` staging promotion, which applies it under its own version.
+2. **Hosted staging schema.** Apply `20261006215306_recovery_journal (+ 20261006215400_recovery_journal_hold).sql` to `tmurpotfluignacfueki`. Either approve the Supabase connector's `apply_migration` (name `recovery_journal`) and then rename the local file to the version it records, or run the `promote.yml` staging promotion, which applies it under its own version.
 3. Resolve Q4 and Q12, and choose the production journal and object store.
 
 ## Tests

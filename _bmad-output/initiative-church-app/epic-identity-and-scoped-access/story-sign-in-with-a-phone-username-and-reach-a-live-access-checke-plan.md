@@ -3,8 +3,7 @@ title: 'Sign in with a phone username and reach a live-access-checked read'
 type: 'feature'
 ticket: '1'
 created: '2026-10-06'
-status: 'blocked'
-blocked_reason: 'Staging server checks pass (evidence-2.2/staging-verify.md); remaining hitl step: owner demonstration of the native app on a real phone against staging.'
+status: 'done'
 baseline_revision: 'f0a115dc4a51e50cdd7d35f9eb1f7551b7c5a9ab'
 route: 'full'
 route_source: 'auto'
@@ -116,3 +115,7 @@ context:
 | no pgTAP for restore-hold half of synthetic bypass | medium | patch | migration 305-308 untested condition |
 | runbook 4.8 under-describes /otp side effect (F1) | low | patch | evidence-1.2 H25, evidence-2.1 E18 |
 | re-sign-in same account keeps stale denial | low | patch | _onAccount early return + distinct() |
+
+## Hosted verification
+
+Staging server checks and the owner's Android demonstration are recorded in `evidence-2.2/staging-verify.md` (2026-10-06).

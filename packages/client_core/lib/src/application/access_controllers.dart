@@ -31,6 +31,7 @@ class MyAccessController extends Notifier<MyAccessState> {
 
   @override
   MyAccessState build() {
+    _again = false;
     final generation = ref.watch(accountGenerationProvider);
     final accountId = ref.watch(accountProvider.select((s) => s.accountId));
     if (accountId == null) {
@@ -53,19 +54,27 @@ class MyAccessController extends Notifier<MyAccessState> {
   }
 
   Future<void> _load(int generation) async {
+    // Every terminal path clears the pending re-read: it belongs to this
+    // account generation only.
     if (!ref.mounted || ref.read(accountGenerationProvider) != generation) {
+      _again = false;
       return;
     }
-    if (ref.read(accountProvider).accountId == null) return;
+    if (ref.read(accountProvider).accountId == null) {
+      _again = false;
+      return;
+    }
     // Keep showing the last answer while asking again (navigation only).
     state = MyAccessState(loading: true, result: state.result);
     final result = await ref.read(grantsRepositoryProvider).fetchMyAccess();
     if (!ref.mounted || ref.read(accountGenerationProvider) != generation) {
+      _again = false;
       return;
     }
     state = MyAccessState(result: result);
     if (result is AccessReadDenied<MemberGrants> &&
         result.denial == AccessDenial.untrustedSession) {
+      _again = false;
       // Same rule as the member summary (story 2.2): end the session here.
       await ref.read(accountProvider.notifier).endUntrustedSession();
       return;
@@ -75,6 +84,15 @@ class MyAccessController extends Notifier<MyAccessState> {
       await _load(generation);
     }
   }
+}
+
+/// The one hook for protected denials (story 2.3). Any `forbidden` or
+/// `unauthenticated` answer from a protected read or command may mean the
+/// caller's grants or session changed, so the caller's access (and with it
+/// the navigation) is read again. The controller coalesces repeated calls.
+void noteProtectedDenial(Ref ref) {
+  if (!ref.mounted) return;
+  ref.read(myAccessProvider.notifier).refresh();
 }
 
 final myAccessProvider = NotifierProvider<MyAccessController, MyAccessState>(
@@ -89,6 +107,9 @@ enum GrantNotice {
   /// Changed elsewhere (stale tab): the roster was reloaded.
   changedElsewhere,
   lastAdmin,
+
+  /// Separation of duty: an Admin cannot grant to their own record.
+  selfGrant,
   noLongerAdmin,
   signInAgain,
   roleUnavailable,
@@ -216,11 +237,17 @@ class GrantAdminController extends Notifier<GrantAdminState> {
         notice: state.notice,
         noticeAction: state.noticeAction,
       ),
-      AccessReadFailed() => state.copyWith(loading: false, result: r),
+      // No answer: the members are dropped too, so nothing is shown that the
+      // server did not just confirm (the banner says why the list is empty).
+      AccessReadFailed() => GrantAdminState(
+        result: r,
+        notice: state.notice,
+        noticeAction: state.noticeAction,
+      ),
     };
     if (r is AccessReadDenied<GrantRoster>) {
       // The navigation follows the server's current answer.
-      await ref.read(myAccessProvider.notifier).refresh();
+      noteProtectedDenial(ref);
     }
   }
 
@@ -350,7 +377,12 @@ class GrantAdminController extends Notifier<GrantAdminState> {
       case CommandRefused(:final error):
         final notice = switch (error.code) {
           ErrorCode.conflict => GrantNotice.changedElsewhere,
-          ErrorCode.forbidden when error.fieldErrors['role'] == 'unsupported' =>
+          ErrorCode.forbidden
+              when error.fieldErrors['member_id'] == 'unsupported' =>
+            GrantNotice.selfGrant,
+          ErrorCode.forbidden
+              when !action.grant &&
+                  error.fieldErrors['role'] == 'unsupported' =>
             GrantNotice.lastAdmin,
           ErrorCode.forbidden => GrantNotice.noLongerAdmin,
           ErrorCode.unauthenticated => GrantNotice.signInAgain,
@@ -365,10 +397,13 @@ class GrantAdminController extends Notifier<GrantAdminState> {
           notice: notice,
           noticeAction: action,
         );
-        if (notice != GrantNotice.lastAdmin) await _reload(epoch);
-        if (notice == GrantNotice.signInAgain ||
-            notice == GrantNotice.noLongerAdmin) {
-          await ref.read(myAccessProvider.notifier).refresh();
+        if (notice != GrantNotice.lastAdmin &&
+            notice != GrantNotice.selfGrant) {
+          await _reload(epoch);
+        }
+        if (error.code == ErrorCode.forbidden ||
+            error.code == ErrorCode.unauthenticated) {
+          noteProtectedDenial(ref);
         }
       case CommandUnknownOutcome():
         state = state.copyWith(

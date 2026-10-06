@@ -71,3 +71,31 @@ These need hosted access or the owner:
   - The first real Admin (entry 14).
 
   Record each approval with `app.identity_approve_church_setting(...)` or `app.identity_bootstrap_admin(...)` as the restricted operator.
+
+## Review fixes (2026-10-06)
+
+The review found the following problems, and each one is fixed:
+
+- **Separation of duty.** An Admin can no longer grant itself a role or scope (`forbidden`, `{"member_id": "unsupported"}`), and no audit row is written.
+- **Lead pastor.** No Admin command can grant `lead_pastor`. Only the restricted operator assigns it, with `app.identity_designate_lead_pastor(member_id, operator)` behind the Q4 setting or fixture, and the assignment is audited and journalled.
+- **Usable Admin.** The definition now uses the predicate's own non-session conditions. Those conditions are factored into `app.identity_account_standing` and `app.identity_link_dormancy`, and the predicate is rebuilt from them with the same outcomes and order. The 2.1 and 2.2 pgTAP pass unchanged.
+- **Comment on concurrent holds.** It is corrected: a hold or link change made concurrently can still leave zero usable Admins, and the bootstrap is the way out.
+- **Operator journal.** The bootstrap, the church-setting approval and the lead-pastor designation are journalled in `app.ops_operator_actions`. The 1.9 table was retired by rename and recreated with a wider action list, because widening its CHECK would need a DROP.
+- **Sequences.** All privileges on `identity_access_audit_event_id_seq` and the journal sequences are revoked from client roles, and the pgTAP privilege check now covers sequences.
+- **Real-format Zambian numbers.** They are removed from the branch: the grants test, the 1.5 contract fixtures (`member_ref`), and the 1.2 harness SQL, scripts and tests now use fictional values.
+- **Client denial hook.** Every protected denial now goes through `noteProtectedDenial`: grant commands, roster reads, fixture commands and the member summary. Each one re-reads access.
+- **Navigation refresh.** `AccessRefresher` always refreshes. The controller merges overlapping reads (a request made during a read in flight is followed by one more read), and that pending re-read is dropped on every terminal path, including an untrusted answer.
+- **Failed roster reload.** It drops the members and their buttons.
+
+Tests run for these fixes:
+
+| Check | Result |
+|---|---|
+| pgTAP `identity_grants_test.sql` | 113 pass (was 94); adds self-grant refusals, lead-pastor designation, dormant/banned Admins for both the last-Admin refusal and the bootstrap, journal rows and sequence privileges |
+| `identity_live_access`, `identity_session_trust`, `system_access`, `cross_epic_contracts`, `command_foundation` | pass (545 total in that run) |
+| client_core | 161 pass (adds coalescing, untrusted dropping a pending re-read, the denial hook from fixture and summary, failed reload, self-grant) |
+| mobile, staff | 17 and 16 pass |
+| contracts | TS 226 and Dart 243 pass |
+| `ci:migrations` | ordered and non-destructive |
+
+`local-pgtap.txt`, `local-api-smoke.txt` and `local-grants-e2e.jsonl` above are from the run before these fixes. The full re-run is done by the parent.

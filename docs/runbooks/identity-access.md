@@ -171,7 +171,9 @@ Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/ev
 ### Model
 
 - **Roles** (`app.identity_roles`): `admin`, `pastor`, `media`, `lead_pastor`, held independently. No role implies a care, finance or any other scope.
-  - `lead_pastor` also needs the Identity church setting `lead_pastor_designation` (Q4). A labelled TEST FIXTURE enables it in local and staging only. In production it stays unset, so the role can be neither granted nor used.
+  - `lead_pastor` is never granted by an Admin command. Only the restricted operator assigns it, naming one member: `select app.identity_designate_lead_pastor('<member_id>', 'israel');`. The assignment is audited and journalled.
+    - It works only while the Identity church setting `lead_pastor_designation` (Q4) is in force. A labelled TEST FIXTURE enables the setting in local and staging only; in production it stays unset, so the role can be neither assigned nor used.
+    - An Admin may still remove the role with `identity.revoke_role`.
 - **Scope kinds** (`app.identity_scope_kinds`): each owning module registers its kinds at migration time with `app.identity_register_scope_kind(module, kind, target_hook, description)`. The target hook is `(jsonb {scope_kind, scope_id}) -> boolean` and checks that the target exists.
   - This story registers only the SYNTHETIC `fixture_care` and `fixture_finance` kinds.
   - Cells registers `cell` at entry 6; Care, Offerings, Prayer and the other owners register their own kinds.
@@ -219,8 +221,12 @@ Send `POST /rest/v1/rpc/identity_grant_command` with `Content-Profile: api` and 
   | Unregistered kind or unknown target | `validation_failed` (`scope_kind: unregistered`, `scope_id: unknown`) |
 
 - **Requirements**: a role needs an approved member with a live account link. A scope needs an approved member.
+- **Separation of duty**: no grant command (role or scope) may target the acting Admin's own member record: `forbidden`, `{"member_id": "unsupported"}`, with nothing audited. An Admin may still revoke its own grants, subject to the last-Admin rule. `identity.grant_role` with `lead_pastor` returns `forbidden`, `{"role": "unsupported"}`.
 - **Side effects**: every revocation dispatches the `scope_revoked` lifecycle event to registered owner hooks inside the same transaction.
-- **Usable Admin**: an active Admin grant on an approved member with an active link, no pending binding review and no open hold. Dormancy is per session and is not counted.
+- **Usable Admin**: an active Admin grant whose account passes every non-session condition of the predicate (`app.identity_account_standing` = `ok`, and `app.identity_link_dormancy` is null).
+  - Those conditions are: the Auth user is not deleted, banned or anonymous; the member is approved; the link is active with no binding review; the Auth phone and email equal the approved binding; there is no open hold; and the account is not dormant.
+  - The predicate itself is built from the same two helpers.
+- **Concurrency**: grant commands are serialised, so two Admins removing each other cannot both succeed. A hold, link change or Auth change that commits at the same time is not serialised and is never blocked, so it can leave zero usable Admins. The way out is the bootstrap below, which is allowed exactly while no usable Admin exists.
 
 ### Reads
 
@@ -238,7 +244,9 @@ select app.identity_bootstrap_admin('<member_id>', 'israel');
 
 - The bootstrap is allowed only while no usable Admin exists: the first Admin, or recovery when every Admin is held or in review.
 - The member must be approved, with an active link and no binding review.
-- It is audited as `admin_bootstrapped` with the operator.
+- It is audited as `admin_bootstrapped` with the operator and journalled in `app.ops_operator_actions`.
+- The church-setting approval and the lead-pastor designation are journalled there too.
+- The 1.9 journal table was retired by rename (`app.ops_retired_operator_actions_v0`, rows copied, privileges revoked) and recreated with a wider action list, because widening its CHECK needs a DROP. Drop the retired table in a later owner-approved cleanup.
 - Staging uses synthetic Admins. Naming the first real Admin is the production gate at entry 14.
 
 ### Clients

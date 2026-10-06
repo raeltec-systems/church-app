@@ -2,6 +2,8 @@
 // screen with honest command states. Fakes only; the real adapter is covered
 // by identity_adapters_test-style mapping tests below and by
 // tools/identity-e2e/grants.mjs against the local stack.
+import 'dart:async';
+
 import 'package:church_client_core/church_client_core.dart';
 import 'package:church_client_core/supabase_adapters.dart' show accessDenialFor;
 import 'package:church_client_core/testing.dart';
@@ -209,6 +211,97 @@ void main() {
     });
   });
 
+  group('protected denials and coalescing', () {
+    Future<void> flush() async {
+      for (var i = 0; i < 5; i++) {
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+
+    test(
+      'a refresh during an in-flight read is followed by another read',
+      () async {
+        final h = ClientTestHarness();
+        final c = ProviderContainer(overrides: h.overrides());
+        addTearDown(c.dispose);
+        final gate = Completer<void>();
+        h.grants.myAccessGate = gate;
+        c.read(myAccessProvider);
+        await flush();
+        expect(h.grants.myAccessCalls, 1);
+        // A navigation while the first read is still in flight.
+        await c.read(myAccessProvider.notifier).refresh();
+        expect(h.grants.myAccessCalls, 1);
+        h.grants.myAccessGate = null;
+        h.grants.myAccess = AccessReadOk(syntheticGrants(roles: ['media']));
+        gate.complete();
+        await flush();
+        expect(h.grants.myAccessCalls, 2);
+        expect(c.read(myAccessProvider).grants?.roles, ['media']);
+      },
+    );
+
+    test('an untrusted answer drops a pending re-read', () async {
+      final h = ClientTestHarness();
+      final c = ProviderContainer(overrides: h.overrides());
+      addTearDown(c.dispose);
+      final gate = Completer<void>();
+      h.grants.myAccessGate = gate;
+      h.grants.myAccess = const AccessReadDenied(AccessDenial.untrustedSession);
+      c.read(myAccessProvider);
+      await flush();
+      await c.read(myAccessProvider.notifier).refresh();
+      gate.complete();
+      await flush();
+      expect(h.auth.signOuts, 1);
+      expect(h.grants.myAccessCalls, 1);
+      // Signed in again: one fresh read, no leftover re-read.
+      h.grants.myAccessGate = null;
+      h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.session.switchTo('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
+      await flush();
+      c.read(myAccessProvider);
+      await flush();
+      expect(h.grants.myAccessCalls, 2);
+    });
+
+    test(
+      'a forbidden fixture command re-reads access (one denial hook)',
+      () async {
+        final h = ClientTestHarness();
+        final c = ProviderContainer(overrides: h.overrides());
+        addTearDown(c.dispose);
+        c.read(myAccessProvider);
+        await flush();
+        final before = h.grants.myAccessCalls;
+        final sent = c
+            .read(fixtureCounterControllerProvider.notifier)
+            .create('synthetic-k');
+        await flush();
+        h.gateway.sent.single.refuse(ErrorCode.forbidden);
+        await sent;
+        await flush();
+        expect(h.grants.myAccessCalls, before + 1);
+      },
+    );
+
+    test('a denied member summary re-reads access (one denial hook)', () async {
+      final h = ClientTestHarness();
+      final c = ProviderContainer(overrides: h.overrides());
+      addTearDown(c.dispose);
+      c.read(myAccessProvider);
+      await flush();
+      final before = h.grants.myAccessCalls;
+      c.read(memberSummaryControllerProvider);
+      await flush();
+      h.memberAccess.answer(
+        const MemberAccessDenied(MemberAccessDenial.reviewRequired),
+      );
+      await flush();
+      expect(h.grants.myAccessCalls, before + 1);
+    });
+  });
+
   group('Admin grant screen', () {
     Future<ClientTestHarness> openRoster(
       WidgetTester tester, {
@@ -327,6 +420,56 @@ void main() {
       await tapKey(tester, 'grant-check-again');
       expect(h.gateway.sent.length, 2);
       expect(h.gateway.sent.last.wire, first.wire);
+    });
+
+    testWidgets('a failed reload drops the roster and its buttons', (
+      tester,
+    ) async {
+      final h = await openRoster(tester);
+      expect(find.text('SYNTHETIC Member Two'), findsOneWidget);
+      await tapKey(tester, 'roster-reload');
+      h.grants.answerRoster(const AccessReadFailed(unreachable: true));
+      await settle(tester);
+      expect(byKey('access-failed'), findsOneWidget);
+      expect(find.text('SYNTHETIC Member Two'), findsNothing);
+      expect(byKey('role-$_member-pastor'), findsNothing);
+    });
+
+    testWidgets('an Admin cannot grant to itself (separation of duty)', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.adminGrants,
+        setUp: (h) => h.grants.myAccess = AccessReadOk(
+          syntheticGrants(memberId: _member, roles: ['admin']),
+        ),
+      );
+      h.grants.answerRoster(AccessReadOk(syntheticRoster(roles: ['admin'])));
+      await settle(tester);
+      expect(
+        tester.widget<OutlinedButton>(byKey('role-$_member-pastor')).onPressed,
+        isNull,
+      );
+      // Removing its own role is still allowed (the server keeps one Admin).
+      expect(
+        tester.widget<FilledButton>(byKey('role-$_member-admin')).onPressed,
+        isNotNull,
+      );
+    });
+
+    testWidgets('a self-grant refusal is explained without a reload', (
+      tester,
+    ) async {
+      final h = await openRoster(tester);
+      await tapKey(tester, 'role-$_member-pastor');
+      h.gateway.sent.single.refuse(
+        ErrorCode.forbidden,
+        fieldErrors: {'member_id': 'unsupported'},
+      );
+      await settle(tester);
+      expect(byKey('grant-notice-selfGrant'), findsOneWidget);
+      expect(h.grants.rosterCalls.length, 1);
     });
 
     testWidgets('a non-Admin sees the server\'s denial, not members', (

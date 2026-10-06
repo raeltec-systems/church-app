@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/commands.dart';
 import '../domain/fixture_counter.dart';
+import 'access_controllers.dart';
 import 'providers.dart';
 
 /// Where the fixture command form stands. Only [confirmed] follows a server
@@ -286,6 +287,11 @@ class FixtureCounterController extends Notifier<FixtureFormState> {
         .send(FixtureCounterCommands.function, submitted.request);
     // A response for a previous account (or a disposed screen) is dropped.
     if (!_current(epoch)) return;
+    if (outcome is CommandRefused &&
+        (outcome.error.code == ErrorCode.forbidden ||
+            outcome.error.code == ErrorCode.unauthenticated)) {
+      noteProtectedDenial(ref);
+    }
     // A definite outcome settles an earlier unconfirmed send of this id.
     final settled =
         outcome is! CommandUnknownOutcome &&

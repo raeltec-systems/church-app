@@ -21,7 +21,13 @@
 --   * Authorizer registry (platform): app.cmd_authorize now calls the authorizer an owner
 --     registered for the command's namespace, and otherwise keeps the 1.4 fixture grants. The
 --     platform still depends on no owner (the call is through the registry).
---   * Restricted-operator bootstrap of an Admin, allowed only while no usable Admin exists.
+--   * Restricted-operator bootstrap of an Admin, allowed only while no usable Admin exists, and
+--     the restricted-operator lead-pastor designation (never an Admin command). Every operator
+--     procedure is journalled in app.ops_operator_actions (1.9) as well as Identity's audit.
+--   * Separation of duty: no grant command may target the acting Admin's own member record.
+--   * The predicate's account/link conditions (everything except the session itself and the
+--     release gate) are factored into app.identity_account_standing and
+--     app.identity_link_dormancy; the predicate and the usable-Admin count both use them.
 --   * Identity church settings (Q-values) that stay unset and fail closed.
 --
 -- Helpers for later owners (all read current rows; none trusts a client value):
@@ -133,6 +139,50 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------------------------
+-- Platform: widen the restricted-operator journal (1.9) for Identity's operator procedures
+-- ---------------------------------------------------------------------------------------------
+-- The 1.9 table's inline CHECK lists only the system-principal actions, and widening a CHECK
+-- needs DROP CONSTRAINT, which the non-destructive migration policy forbids. So the 1.9 table is
+-- retired by rename (its rows copied first, every privilege revoked) and replaced by one of the
+-- same shape with a wider action list. app.ops_record_action names the table and is unchanged.
+-- target_id may be null only for a church-setting approval (it has no row id).
+
+alter table app.ops_operator_actions rename to ops_retired_operator_actions_v0;
+alter index app.ops_operator_actions_pkey rename to ops_retired_operator_actions_v0_pkey;
+alter sequence app.ops_operator_actions_id_seq rename to ops_retired_operator_actions_v0_id_seq;
+revoke all on table app.ops_retired_operator_actions_v0 from public, anon, authenticated, service_role;
+revoke all on sequence app.ops_retired_operator_actions_v0_id_seq
+  from public, anon, authenticated, service_role;
+comment on table app.ops_retired_operator_actions_v0 is
+  'RETIRED (story 2.3): rows copied to app.ops_operator_actions; dropped by a later owner-approved cleanup.';
+
+create table app.ops_operator_actions (
+  id bigint generated always as identity primary key,
+  occurred_at timestamptz not null default now(),
+  environment text not null,
+  operator text not null references app.ops_operators (operator),
+  action text not null check (action in (
+    'principal_created', 'principal_disabled', 'credential_registered', 'credential_revoked',
+    'admin_bootstrapped', 'lead_pastor_designated', 'church_setting_approved')),
+  target_id uuid,
+  check (target_id is not null or action = 'church_setting_approved')
+);
+
+comment on table app.ops_operator_actions is
+  'Attributable, content-free record of every restricted operator action (1.9; widened by 2.3).';
+
+insert into app.ops_operator_actions (id, occurred_at, environment, operator, action, target_id)
+overriding system value
+select r.id, r.occurred_at, r.environment, r.operator, r.action, r.target_id
+  from app.ops_retired_operator_actions_v0 r;
+select setval(pg_catalog.pg_get_serial_sequence('app.ops_operator_actions', 'id'),
+              coalesce((select max(a.id) from app.ops_operator_actions a), 0) + 1, false);
+
+alter table app.ops_operator_actions enable row level security;
+revoke all on table app.ops_operator_actions from public, anon, authenticated, service_role;
+revoke all on sequence app.ops_operator_actions_id_seq from public, anon, authenticated, service_role;
+
+-- ---------------------------------------------------------------------------------------------
 -- Identity church settings (Q-values): unset means fail closed
 -- ---------------------------------------------------------------------------------------------
 
@@ -220,6 +270,7 @@ begin
   values (p_setting, v_version, p_value, 'approved', btrim(p_note), p_operator);
   insert into app.identity_access_audit (action, actor_kind, operator, setting, revision_after)
   values ('church_setting_approved', 'operator', p_operator, p_setting, v_version);
+  perform app.ops_record_action(p_operator, 'church_setting_approved', null);
   return v_version;
 end;
 $$;
@@ -392,7 +443,7 @@ create table app.identity_access_audit (
   environment text not null default app.platform_current_environment(),
   action text not null check (action in ('role_granted', 'role_revoked', 'scope_granted',
                                          'scope_revoked', 'admin_bootstrapped',
-                                         'church_setting_approved')),
+                                         'lead_pastor_designated', 'church_setting_approved')),
   actor_kind text not null check (actor_kind in ('member', 'operator')),
   actor_member_id uuid,
   actor_account_id uuid,
@@ -421,6 +472,191 @@ alter table app.identity_grants enable row level security;
 alter table app.identity_access_audit enable row level security;
 revoke all on table app.identity_grant_sets, app.identity_grants, app.identity_access_audit
   from public, anon, authenticated, service_role;
+revoke all on sequence app.identity_access_audit_event_id_seq
+  from public, anon, authenticated, service_role;
+
+-- ---------------------------------------------------------------------------------------------
+-- Account standing: the predicate's non-session conditions, shared with the usable-Admin count
+-- ---------------------------------------------------------------------------------------------
+
+-- Everything the predicate checks about an ACCOUNT before the session's trust epoch: the Auth
+-- user (not deleted, banned or anonymous), the live link to an approved member, the link state
+-- and pending binding review, the approved binding against the current Auth phone/email (an
+-- approved recovery email only while confirmed) and open holds.
+--   outcome: 'untrusted_session' | 'not_linked' | 'review_required' | 'ok'
+create function app.identity_account_standing(p_auth_user_id uuid)
+returns table (outcome text, member_id uuid, link_id uuid, sessions_valid_after timestamptz)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_phone text;
+  v_email text;
+  v_email_confirmed boolean;
+  v_link app.identity_account_links;
+  v_member app.identity_members;
+begin
+  select nullif(btrim(u.phone), ''), lower(nullif(btrim(u.email), '')),
+         u.email_confirmed_at is not null
+    into v_phone, v_email, v_email_confirmed
+    from auth.users u
+   where u.id = p_auth_user_id
+     and u.deleted_at is null
+     and not coalesce(u.is_anonymous, false)
+     and (u.banned_until is null or u.banned_until <= now());
+  if not found then
+    return query select 'untrusted_session'::text, null::uuid, null::uuid, null::timestamptz;
+    return;
+  end if;
+
+  -- No row lock: the predicate must also run inside read-only (GET) requests.
+  select l.* into v_link
+    from app.identity_account_links l
+   where l.auth_user_id = p_auth_user_id and l.link_state <> 'ended';
+  if not found then
+    return query select 'not_linked'::text, null::uuid, null::uuid, null::timestamptz;
+    return;
+  end if;
+  select m.* into v_member from app.identity_members m where m.member_id = v_link.member_id;
+  if v_member.membership_state <> 'approved' then
+    return query select 'not_linked'::text, null::uuid, null::uuid, null::timestamptz;
+    return;
+  end if;
+  if v_link.link_state <> 'active' or v_link.binding_review_required
+     or v_phone is null
+     or '+' || ltrim(v_phone, '+') <> v_link.approved_phone
+     or coalesce(v_email, '') <> coalesce(v_link.approved_recovery_email, '')
+     or (v_link.approved_recovery_email is not null and not v_email_confirmed)
+     or exists (select 1 from app.identity_holds h
+                 where h.member_id = v_member.member_id and h.released_at is null) then
+    return query select 'review_required'::text, v_member.member_id, v_link.link_id,
+                        v_link.sessions_valid_after;
+    return;
+  end if;
+  return query select 'ok'::text, v_member.member_id, v_link.link_id, v_link.sessions_valid_after;
+end;
+$$;
+
+-- Dormancy against the PREVIOUSLY stored activity: null when in use, 'unavailable' when the
+-- dormancy setting is unset here, 'review_required' when dormant.
+create function app.identity_link_dormancy(p_link_id uuid)
+returns text
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_days integer := (app.identity_setting('dormancy_days') ->> 'days')::integer;
+begin
+  if v_days is null then
+    return 'unavailable';
+  end if;
+  if exists (select 1 from app.identity_account_links l
+              where l.link_id = p_link_id
+                and coalesce(l.last_member_activity_at, l.approved_at)
+                    < now() - make_interval(days => v_days)) then
+    return 'review_required';
+  end if;
+  return null;
+end;
+$$;
+
+-- The live-access predicate (2.1, 2.2), same signature and outcomes in the same order, now
+-- composed of the shared standing helpers:
+--   unauthenticated -> untrusted_session (JWT / session / server AMR) -> account standing
+--   (untrusted_session, not_linked, review_required) -> untrusted_session (trust epoch)
+--   -> dormancy (unavailable, review_required) -> unavailable (release gate) -> granted.
+create or replace function app.identity_access_evaluate()
+returns table (outcome text, member_id uuid, link_id uuid)
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  c_uuid constant text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+  v_claims jsonb := app.identity_request_claims();
+  v_sub uuid;
+  v_session uuid;
+  v_session_created timestamptz;
+  v_standing record;
+  v_dormancy text;
+begin
+  if coalesce(v_claims ->> 'sub', '') !~* c_uuid then
+    return query select 'unauthenticated'::text, null::uuid, null::uuid;
+    return;
+  end if;
+  v_sub := (v_claims ->> 'sub')::uuid;
+
+  -- Session half (story 1.2): signed `password` AMR AND a live session row for this subject.
+  if coalesce(v_claims ->> 'role', '') <> 'authenticated'
+     or coalesce(v_claims ->> 'is_anonymous', 'false') = 'true'
+     or jsonb_typeof(v_claims -> 'amr') is distinct from 'array'
+     or not exists (
+       select 1 from jsonb_array_elements(v_claims -> 'amr') a(entry)
+        where jsonb_typeof(a.entry) = 'object' and a.entry ->> 'method' = 'password')
+     or coalesce(v_claims ->> 'session_id', '') !~* c_uuid then
+    return query select 'untrusted_session'::text, null::uuid, null::uuid;
+    return;
+  end if;
+  v_session := (v_claims ->> 'session_id')::uuid;
+  select s.created_at into v_session_created
+    from auth.sessions s
+   where s.id = v_session and s.user_id = v_sub
+     and (s.not_after is null or s.not_after > now());
+  if not found then
+    return query select 'untrusted_session'::text, null::uuid, null::uuid;
+    return;
+  end if;
+  -- Story 2.2: the server's own record of how this session authenticated must say `password`.
+  if not exists (
+    select 1 from auth.mfa_amr_claims c
+     where c.session_id = v_session and c.authentication_method = 'password') then
+    return query select 'untrusted_session'::text, null::uuid, null::uuid;
+    return;
+  end if;
+
+  select st.* into v_standing from app.identity_account_standing(v_sub) st;
+  if v_standing.outcome in ('untrusted_session', 'not_linked') then
+    return query select v_standing.outcome, null::uuid, null::uuid;
+    return;
+  elsif v_standing.outcome <> 'ok' then
+    return query select v_standing.outcome, v_standing.member_id, v_standing.link_id;
+    return;
+  end if;
+
+  -- Sessions from before a credential change, hold or review stay dead: sign in again.
+  if v_standing.sessions_valid_after is not null
+     and (v_session_created is null
+          or v_session_created <= v_standing.sessions_valid_after + app.identity_epoch_margin()) then
+    return query select 'untrusted_session'::text, null::uuid, null::uuid;
+    return;
+  end if;
+
+  v_dormancy := app.identity_link_dormancy(v_standing.link_id);
+  if v_dormancy is not null then
+    return query select v_dormancy, v_standing.member_id, v_standing.link_id;
+    return;
+  end if;
+
+  if not (app.policy_is_open('private_access')
+          or (exists (select 1 from app.identity_members m
+                       where m.member_id = v_standing.member_id and m.is_synthetic)
+              and app.platform_current_environment() in ('local', 'staging')
+              and not app.rcv_serving_hold())) then
+    return query select 'unavailable'::text, v_standing.member_id, v_standing.link_id;
+    return;
+  end if;
+
+  return query select 'granted'::text, v_standing.member_id, v_standing.link_id;
+end;
+$$;
+
+comment on function app.identity_access_evaluate() is
+  'AD-3 live-access predicate for human sessions (2.1, hardened by 2.2, factored by 2.3). Every '
+  'protected surface must use it.';
 
 -- ---------------------------------------------------------------------------------------------
 -- Grant evaluation (composes the live-access predicate; reads current rows every call)
@@ -557,25 +793,25 @@ begin
 end;
 $$;
 
--- Admins whose access is usable now (approved member, active link without pending binding
--- review, no open hold), optionally excluding one member. Dormancy and session state are
--- per-session and not counted here.
+-- Admins whose access is usable now: an active Admin grant whose account passes every
+-- non-session condition of the predicate (app.identity_account_standing = 'ok' and not dormant;
+-- the dormancy setting must be in force). Optionally excludes one member. Not counted: the
+-- caller's session itself and the environment's release gate.
 create function app.identity_usable_admin_count(p_except_member uuid default null)
 returns integer
 language sql
 stable
+security definer
 set search_path = ''
 as $$
   select count(*)::integer
     from app.identity_grants g
-    join app.identity_members m on m.member_id = g.member_id
-    join app.identity_account_links l on l.member_id = g.member_id and l.link_state = 'active'
+    join app.identity_account_links l on l.member_id = g.member_id and l.link_state <> 'ended'
+   cross join lateral app.identity_account_standing(l.auth_user_id) st
    where g.role = 'admin' and g.revoked_at is null
-     and m.membership_state = 'approved'
-     and not l.binding_review_required
      and (p_except_member is null or g.member_id <> p_except_member)
-     and not exists (select 1 from app.identity_holds h
-                      where h.member_id = g.member_id and h.released_at is null);
+     and st.outcome = 'ok' and st.member_id = g.member_id
+     and app.identity_link_dormancy(l.link_id) is null;
 $$;
 
 -- Wire form of one member's current grants (effective roles only).
@@ -765,6 +1001,14 @@ begin
   select a.* into v_actor from app.identity_command_actor(p_actor) a;
   v_set := app.identity_lock_grant_set(p_payload, array['member_id', 'role'], p_expected_revision);
   v_role := app.identity_role_payload(p_payload);
+  -- Separation of duty: an Admin never grants to their own member record.
+  if v_set.member_id = v_actor.member_id then
+    perform app.cmd_fail('forbidden', '{"member_id": "unsupported"}');
+  end if;
+  -- The lead-pastor designation is made only by the restricted operator procedure.
+  if v_role = 'lead_pastor' then
+    perform app.cmd_fail('forbidden', '{"role": "unsupported"}');
+  end if;
   -- Roles are for approved members with a live account link.
   if not exists (select 1 from app.identity_members m
                   where m.member_id = v_set.member_id and m.membership_state = 'approved')
@@ -848,7 +1092,11 @@ begin
   if not found then
     perform app.cmd_fail('conflict', null, v_set.revision);
   end if;
-  -- Serialised on the admin catalogue row by the authorizer, so this count cannot race.
+  -- Grant commands are serialised on the admin catalogue row by the authorizer, so two Admins
+  -- removing each other cannot both succeed. A hold, link change or Auth change committed
+  -- concurrently (or later) is NOT serialised here and is never blocked: it can still leave
+  -- zero usable Admins. The designed way out is the restricted-operator bootstrap, which is
+  -- allowed exactly while no usable Admin exists.
   if v_role = 'admin' and app.identity_usable_admin_count(v_set.member_id) = 0 then
     perform app.cmd_fail('forbidden', '{"role": "unsupported"}');
   end if;
@@ -876,6 +1124,10 @@ begin
   v_set := app.identity_lock_grant_set(p_payload, array['member_id', 'scope_kind', 'scope_id'],
                                        p_expected_revision);
   select sp.* into v_scope from app.identity_scope_payload(p_payload) sp;
+  -- Separation of duty: an Admin never grants a scope (care, finance ...) to themselves.
+  if v_set.member_id = v_actor.member_id then
+    perform app.cmd_fail('forbidden', '{"member_id": "unsupported"}');
+  end if;
   if not exists (select 1 from app.identity_members m
                   where m.member_id = v_set.member_id and m.membership_state = 'approved') then
     perform app.cmd_fail('validation_failed', '{"member_id": "invalid"}');
@@ -1078,8 +1330,10 @@ begin
                  end,
     'roles', (select jsonb_agg(jsonb_build_object(
                        'role', r.role,
-                       'available', r.requires_setting is null
-                                    or app.identity_church_setting_enabled(r.requires_setting))
+                       -- lead_pastor is designated by the restricted operator, never here.
+                       'available', r.role <> 'lead_pastor'
+                                    and (r.requires_setting is null
+                                         or app.identity_church_setting_enabled(r.requires_setting)))
                      order by r.sort_order)
                 from app.identity_roles r),
     'scope_kinds', coalesce((select jsonb_agg(k.scope_kind order by k.scope_kind)
@@ -1122,12 +1376,12 @@ begin
     raise exception using errcode = '22023',
       message = 'a usable Admin exists: grant Admin through the audited Admin command';
   end if;
-  if not exists (select 1 from app.identity_members m
-                  join app.identity_account_links l on l.member_id = m.member_id
-                 where m.member_id = p_member_id and m.membership_state = 'approved'
-                   and l.link_state = 'active' and not l.binding_review_required) then
+  if not exists (select 1 from app.identity_account_links l
+                  cross join lateral app.identity_account_standing(l.auth_user_id) st
+                 where l.member_id = p_member_id and l.link_state <> 'ended'
+                   and st.outcome = 'ok' and app.identity_link_dormancy(l.link_id) is null) then
     raise exception using errcode = '22023',
-      message = 'the member must be approved with an active account link';
+      message = 'the member must be approved with a usable account link';
   end if;
   perform 1 from app.identity_grant_sets s where s.member_id = p_member_id for update;
   if exists (select 1 from app.identity_grants g
@@ -1141,12 +1395,59 @@ begin
   insert into app.identity_access_audit (action, actor_kind, operator, target_member_id, grant_id,
                                          role, revision_after)
   values ('admin_bootstrapped', 'operator', p_operator, p_member_id, v_grant, 'admin', v_revision);
+  perform app.ops_record_action(p_operator, 'admin_bootstrapped', v_grant);
   return v_grant;
 end;
 $$;
 
 comment on function app.identity_bootstrap_admin(uuid, text) is
   'Restricted operator only (no grants): first Admin, or recovery when no usable Admin exists.';
+
+-- Designates the lead pastor (Q4): only this restricted-operator procedure grants `lead_pastor`,
+-- naming one member, and only while the lead_pastor_designation setting is in force (approved,
+-- or the labelled fixture in local/staging). Journalled and audited. Admins may still remove
+-- the role through identity.revoke_role (removing access is never an escalation).
+create function app.identity_designate_lead_pastor(p_member_id uuid, p_operator text)
+returns uuid
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_grant uuid;
+  v_revision bigint;
+begin
+  perform app.ops_require_operator(p_operator);
+  if not app.identity_church_setting_enabled('lead_pastor_designation') then
+    raise exception using errcode = '22023',
+      message = 'the lead-pastor designation is not approved for this environment (Q4)';
+  end if;
+  if not exists (select 1 from app.identity_members m
+                  join app.identity_account_links l on l.member_id = m.member_id
+                 where m.member_id = p_member_id and m.membership_state = 'approved'
+                   and l.link_state <> 'ended') then
+    raise exception using errcode = '22023',
+      message = 'the member must be approved with a live account link';
+  end if;
+  perform 1 from app.identity_grant_sets s where s.member_id = p_member_id for update;
+  if exists (select 1 from app.identity_grants g
+              where g.member_id = p_member_id and g.role = 'lead_pastor' and g.revoked_at is null) then
+    raise exception using errcode = '22023', message = 'the member is already lead pastor';
+  end if;
+  insert into app.identity_grants (member_id, role, granted_by_operator)
+  values (p_member_id, 'lead_pastor', p_operator)
+  returning grant_id into v_grant;
+  v_revision := app.identity_bump_grant_set(p_member_id);
+  insert into app.identity_access_audit (action, actor_kind, operator, target_member_id, grant_id,
+                                         role, revision_after)
+  values ('lead_pastor_designated', 'operator', p_operator, p_member_id, v_grant, 'lead_pastor',
+          v_revision);
+  perform app.ops_record_action(p_operator, 'lead_pastor_designated', v_grant);
+  return v_grant;
+end;
+$$;
+
+comment on function app.identity_designate_lead_pastor(uuid, text) is
+  'Restricted operator only (no grants): names the lead pastor under the Q4 setting.';
 
 -- ---------------------------------------------------------------------------------------------
 -- SYNTHETIC fixture scopes: prove that Admin and combined roles reach no care/finance surface
@@ -1260,6 +1561,10 @@ revoke all on function
   app.identity_admin_member_grants(text, uuid),
   api.identity_admin_member_grants(text, uuid),
   app.identity_bootstrap_admin(uuid, text),
+  app.identity_designate_lead_pastor(uuid, text),
+  app.identity_account_standing(uuid),
+  app.identity_link_dormancy(uuid),
+  app.identity_access_evaluate(),
   app.fixture_scope_target_exists(jsonb),
   app.fixture_scoped_read(text, uuid),
   api.fixture_scoped_read(text, uuid)

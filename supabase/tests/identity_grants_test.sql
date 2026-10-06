@@ -6,7 +6,7 @@
 -- HTTP evidence with real GoTrue sessions: tools/identity-e2e/grants.mjs. Every account, phone
 -- and name here is SYNTHETIC (fictional range +1 202 555 0131-0139).
 begin;
-select plan(94);
+select plan(113);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000023' || lpad(n::text, 2, '0'))::uuid $$;
@@ -121,8 +121,20 @@ select ok(not exists (
                              'app.cmd_authorizers', 'app.fixture_scope_targets']) t
    cross join unnest(array['anon', 'authenticated', 'service_role']) r
    cross join unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE']) p
+   where has_table_privilege(r, t, p))
+  and not exists (
+  select 1 from unnest(array['app.identity_access_audit_event_id_seq',
+                             'app.ops_operator_actions_id_seq',
+                             'app.ops_retired_operator_actions_v0_id_seq']) q
+   cross join unnest(array['anon', 'authenticated', 'service_role']) r
+   cross join unnest(array['USAGE', 'SELECT', 'UPDATE']) p
+   where has_sequence_privilege(r, q, p))
+  and not exists (
+  select 1 from unnest(array['app.ops_operator_actions', 'app.ops_retired_operator_actions_v0']) t
+   cross join unnest(array['anon', 'authenticated', 'service_role']) r
+   cross join unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE']) p
    where has_table_privilege(r, t, p)),
-  'no client role has any privilege on grant, audit, settings or registry tables');
+  'no client role has any privilege on grant, audit, settings, registry or operator-journal tables or their sequences');
 select ok(not exists (
   select 1 from information_schema.columns
    where table_schema = 'app' and table_name = 'identity_access_audit'
@@ -212,6 +224,9 @@ select results_eq($$select action || ':' || actor_kind || ':' || operator || ':'
                       from app.identity_access_audit where action = 'admin_bootstrapped'$$,
   $$values ('admin_bootstrapped:operator:israel:admin:2')$$,
   'the bootstrap is audited with the operator, no member actor');
+select is((select string_agg(action || ':' || operator, ',' order by id) from app.ops_operator_actions
+            where action in ('admin_bootstrapped', 'lead_pastor_designated', 'church_setting_approved')),
+  'admin_bootstrapped:israel', 'the bootstrap is journalled in the restricted-operator journal');
 select throws_ok(format('select app.identity_bootstrap_admin(%L, %L)', pg_temp.m(2), 'israel'),
   '22023', null, 'no second bootstrap while a usable Admin exists');
 select is(pg_temp.roles(1), 'admin', 'the Admin''s next call lists admin');
@@ -296,9 +311,19 @@ select is((select r -> 'field_errors' from pg_temp.cmd(pg_temp.c(1), 'identity.g
 -- Combined roles: Admin + Pastor + Media on member 3, Admin only on member 4 ------------------------
 select is((select r ->> 'revision' from pg_temp.cmd(pg_temp.c(1), 'identity.grant_role', 1,
             jsonb_build_object('member_id', pg_temp.m(3), 'role', 'admin')) r), '2', 'grant Admin to 3');
-select is((select r ->> 'revision' from pg_temp.cmd(pg_temp.c(3), 'identity.grant_role', 2,
+select is((select r -> 'field_errors' from pg_temp.cmd(pg_temp.c(3), 'identity.grant_role', 2,
+            jsonb_build_object('member_id', pg_temp.m(3), 'role', 'pastor')) r),
+  '{"member_id": "unsupported"}'::jsonb,
+  'the new Admin acts at once (same session), but may not grant a role to itself');
+select is((select r ->> 'revision' from pg_temp.cmd(pg_temp.c(3), 'identity.grant_role', 1,
+            jsonb_build_object('member_id', pg_temp.m(8), 'role', 'media')) r), '2',
+  'the new Admin acts at once (same session) for another member');
+select is((select r ->> 'revision' from pg_temp.cmd(pg_temp.c(3), 'identity.revoke_role', 2,
+            jsonb_build_object('member_id', pg_temp.m(8), 'role', 'media')) r), '3',
+  'and removes it again');
+select is((select r ->> 'revision' from pg_temp.cmd(pg_temp.c(1), 'identity.grant_role', 2,
             jsonb_build_object('member_id', pg_temp.m(3), 'role', 'pastor')) r), '3',
-  'the new Admin acts at once (same session): grants itself Pastor');
+  'another Admin grants Pastor to 3');
 select is((select r ->> 'revision' from pg_temp.cmd(pg_temp.c(1), 'identity.grant_role', 3,
             jsonb_build_object('member_id', pg_temp.m(3), 'role', 'media')) r), '4', 'grant Media to 3');
 select is((select r ->> 'revision' from pg_temp.cmd(pg_temp.c(1), 'identity.grant_role', 1,
@@ -306,9 +331,20 @@ select is((select r ->> 'revision' from pg_temp.cmd(pg_temp.c(1), 'identity.gran
 select is(pg_temp.roles(3), 'admin,pastor,media', 'member 3 holds Admin, Pastor and Media independently');
 
 -- Lead pastor (Q4 fixture) -------------------------------------------------------------------------
-select is((select r ->> 'revision' from pg_temp.cmd(pg_temp.c(1), 'identity.grant_role', 2,
-            jsonb_build_object('member_id', pg_temp.m(2), 'role', 'lead_pastor')) r), '3',
-  'local: lead_pastor can be granted under the labelled fixture');
+select is((select r -> 'field_errors' from pg_temp.cmd(pg_temp.c(1), 'identity.grant_role', 2,
+            jsonb_build_object('member_id', pg_temp.m(2), 'role', 'lead_pastor')) r),
+  '{"role": "unsupported"}'::jsonb, 'no Admin command can grant lead_pastor');
+select throws_ok(format('select app.identity_designate_lead_pastor(%L, %L)', pg_temp.m(2), 'mallory'),
+  '42501', null, 'the designation needs a restricted operator');
+select isnt(app.identity_designate_lead_pastor(pg_temp.m(2), 'israel'), null,
+  'local: the restricted operator designates the lead pastor under the labelled fixture');
+select ok(pg_temp.rev(pg_temp.m(2)) = 3
+          and exists (select 1 from app.identity_access_audit
+                       where action = 'lead_pastor_designated' and operator = 'israel'
+                         and target_member_id = pg_temp.m(2))
+          and exists (select 1 from app.ops_operator_actions
+                       where action = 'lead_pastor_designated' and operator = 'israel'),
+  'the designation is audited and journalled');
 delete from app.platform_environment;
 select ok(not app.identity_member_has_role(pg_temp.m(2), 'lead_pastor')
           and app.identity_member_has_role(pg_temp.m(2), 'pastor'),
@@ -317,9 +353,8 @@ select app.platform_set_environment('local', 'pgtap 2.3');
 create temp table saved_setting as
   select * from app.identity_church_settings where setting = 'lead_pastor_designation';
 delete from app.identity_church_settings where setting = 'lead_pastor_designation';
-select is((select r -> 'field_errors' from pg_temp.cmd(pg_temp.c(1), 'identity.grant_role', 1,
-            jsonb_build_object('member_id', pg_temp.m(5), 'role', 'lead_pastor')) r),
-  '{"policy": "gate_closed"}'::jsonb, 'with the setting unset, granting lead_pastor is unavailable');
+select throws_ok(format('select app.identity_designate_lead_pastor(%L, %L)', pg_temp.m(5), 'israel'),
+  '22023', null, 'with the setting unset, no lead pastor can be designated');
 insert into app.identity_church_settings select * from saved_setting;
 
 -- Scopes and the fixture care/finance surfaces -----------------------------------------------------
@@ -340,6 +375,19 @@ select is((select r ->> 'revision' from pg_temp.cmd(pg_temp.c(1), 'identity.gran
             jsonb_build_object('member_id', (select member_id from accountless), 'scope_kind', 'fixture_care',
                                'scope_id', '00000000-0000-4000-b000-000000002302')) r),
   '2', 'an approved member without an account can hold a scope');
+select is((select r -> 'field_errors' from pg_temp.cmd(pg_temp.c(1), 'identity.grant_scope', 2,
+            jsonb_build_object('member_id', pg_temp.m(1), 'scope_kind', 'fixture_care',
+                               'scope_id', '00000000-0000-4000-b000-000000002301')) r),
+  '{"member_id": "unsupported"}'::jsonb, 'an Admin cannot grant itself a care scope');
+select is((select r -> 'field_errors' from pg_temp.cmd(pg_temp.c(1), 'identity.grant_role', 2,
+            jsonb_build_object('member_id', pg_temp.m(1), 'role', 'media')) r),
+  '{"member_id": "unsupported"}'::jsonb, 'nor a role');
+select ok(not exists (select 1 from app.identity_access_audit
+                       where action in ('role_granted', 'scope_granted')
+                         and target_member_id = pg_temp.m(1))
+          and pg_temp.read(pg_temp.c(1), $$select api.fixture_scoped_read('fixture_care', '00000000-0000-4000-b000-000000002301')$$)
+              = 'PT403|forbidden|not_granted',
+  'no self-grant was recorded and the Admin still reaches no care surface');
 select is(pg_temp.read(pg_temp.c(5), $$select api.fixture_scoped_read('fixture_care', '00000000-0000-4000-b000-000000002301')$$),
   'ok {"content": "SYNTHETIC fixture surface", "scope_id": "00000000-0000-4000-b000-000000002301", "scope_kind": "fixture_care"}',
   'the scoped member reads exactly its care scope');
@@ -415,8 +463,8 @@ select is((select e ->> 'account'
   'no_login', 'an accountless member shows as No login');
 select is((select substr(v, 4)::jsonb -> 'roles'
              from pg_temp.read(pg_temp.c(1), 'select api.identity_admin_member_grants()') v),
-  '[{"role": "admin", "available": true}, {"role": "pastor", "available": true}, {"role": "media", "available": true}, {"role": "lead_pastor", "available": true}]'::jsonb,
-  'the role catalogue says which roles can be granted here');
+  '[{"role": "admin", "available": true}, {"role": "pastor", "available": true}, {"role": "media", "available": true}, {"role": "lead_pastor", "available": false}]'::jsonb,
+  'the role catalogue says which roles an Admin can grant here (never lead_pastor)');
 select is(pg_temp.read(pg_temp.c(5), 'select api.identity_admin_member_grants()'),
   'PT403|forbidden|not_granted', 'a non-Admin cannot list grants');
 
@@ -443,6 +491,20 @@ select ok(pg_temp.rev(pg_temp.m(1)) = 2 and app.identity_member_has_role(pg_temp
           and not exists (select 1 from app.cmd_receipts where request_id = pg_temp.req(9)),
   'the refused removal changed nothing and kept no receipt');
 select is(app.identity_usable_admin_count(), 1, 'one usable Admin remains');
+-- A dormant Admin and a banned Admin do not count either.
+select is((select r ->> 'revision' from pg_temp.cmd(pg_temp.c(1), 'identity.grant_role', 3,
+            jsonb_build_object('member_id', pg_temp.m(8), 'role', 'admin')) r), '4', 'grant Admin to 8');
+update app.identity_account_links set last_member_activity_at = now() - interval '200 days'
+ where member_id = pg_temp.m(8);
+select is((select r -> 'field_errors' from pg_temp.cmd(pg_temp.c(1), 'identity.revoke_role', 2,
+            jsonb_build_object('member_id', pg_temp.m(1), 'role', 'admin')) r),
+  '{"role": "unsupported"}'::jsonb, 'a dormant Admin does not count: the last usable Admin stays');
+update app.identity_account_links set last_member_activity_at = now() where member_id = pg_temp.m(8);
+update auth.users set banned_until = now() + interval '1 day' where id = pg_temp.u(8);
+select is((select r -> 'field_errors' from pg_temp.cmd(pg_temp.c(1), 'identity.revoke_role', 2,
+            jsonb_build_object('member_id', pg_temp.m(1), 'role', 'admin')) r),
+  '{"role": "unsupported"}'::jsonb, 'a banned Admin does not count: the last usable Admin stays');
+select is(app.identity_usable_admin_count(), 1, 'still one usable Admin (8 is banned, 4 held)');
 select throws_ok(format('select app.identity_bootstrap_admin(%L, %L)', pg_temp.m(6), 'israel'),
   '22023', null, 'bootstrap stays refused while one usable Admin exists');
 -- With a second usable Admin, self-removal is allowed and takes effect at once.
@@ -454,10 +516,28 @@ select is((select r -> 'data' -> 'roles' from pg_temp.cmd(pg_temp.c(1), 'identit
 select is(pg_temp.roles(1), '', 'its next call lists no role');
 
 -- Recovery bootstrap when no usable Admin exists ---------------------------------------------------
-insert into app.identity_holds (member_id, hold_kind, reason, placed_by)
-values (pg_temp.m(6), 'security', 'SYNTHETIC pgtap hold', 'pgtap 2.3');
+-- Admins left: 4 (held), 6 (made dormant now), 8 (banned).
+update app.identity_account_links set last_member_activity_at = now() - interval '200 days'
+ where member_id = pg_temp.m(6);
+select is(app.identity_usable_admin_count(), 0, 'held, dormant and banned Admins are not usable');
+select throws_ok(format('select app.identity_bootstrap_admin(%L, %L)', pg_temp.m(8), 'israel'),
+  '22023', null, 'a banned member cannot be bootstrapped');
 select isnt(app.identity_bootstrap_admin(pg_temp.m(7), 'israel'), null,
-  'with every Admin held, the restricted operator may bootstrap a recovery Admin');
+  'with every Admin held, dormant or banned, the restricted operator bootstraps a recovery Admin');
+select is((select count(*)::int from app.ops_operator_actions
+            where action = 'admin_bootstrapped' and operator = 'israel'), 2,
+  'both bootstraps are journalled');
+
+-- Church-setting approval (restricted operator) is journalled ----------------------------------------
+select is(app.identity_approve_church_setting('operational_contact', '{"route": "SYNTHETIC church office"}',
+                                              'israel', 'pgtap: synthetic approval'), 1,
+  'the operator records an approved church setting');
+select ok(app.identity_church_setting('operational_contact') ->> 'route' = 'SYNTHETIC church office'
+          and exists (select 1 from app.ops_operator_actions
+                       where action = 'church_setting_approved' and operator = 'israel' and target_id is null)
+          and exists (select 1 from app.identity_access_audit
+                       where action = 'church_setting_approved' and setting = 'operational_contact'),
+  'the approval is in force, audited and journalled');
 
 -- Registry guards ----------------------------------------------------------------------------------
 select throws_ok($$select app.cmd_register_authorizer('cells', 'app.identity_authorize_command(jsonb)')$$,

@@ -110,6 +110,17 @@ context:
   - Staging apply and the device demonstration are for the parent and owner (`evidence-2.3/README.md`).
 - Environment: the parent restarted Docker mid-build. The stack was restarted without the analytics services (`supabase start -x vector,logflare,...`) and reset.
 
+- Review fixes (parent review, 2026-10-06):
+  - Grants to oneself are refused (separation of duty).
+  - `lead_pastor` is assigned only by the restricted operator (`identity_designate_lead_pastor`).
+  - The usable-Admin count uses the predicate's own non-session conditions, factored into `identity_account_standing` and `identity_link_dormancy`, and the predicate is rebuilt from them.
+  - The concurrency comment is corrected; bootstrap is the recovery path.
+  - Operator procedures are journalled. The 1.9 journal table was retired by rename and recreated with a wider CHECK, because a DROP CONSTRAINT is forbidden.
+  - Audit and journal sequences are revoked from client roles.
+  - Real-format +260 numbers are removed branch-wide (grants test, contract fixtures, 1.2 harness).
+  - Client: a single `noteProtectedDenial` hook, `AccessRefresher` always refreshes, the pending re-read is cleared on every terminal path, and a failed roster reload drops the members.
+- Decision (agent, under owner pre-approval): an Admin may still revoke `lead_pastor` (removing access is never an escalation); only granting it is reserved to the operator.
+
 ## Verification
 
 **Commands:**

@@ -25,10 +25,10 @@ class _AccessRefresherState extends ConsumerState<AccessRefresher> {
   void initState() {
     super.initState();
     _lifecycle = AppLifecycleListener(onResume: _refresh);
-    // The first read is started by the controller itself; later shells
-    // (navigations) ask again.
-    final s = ref.read(myAccessProvider);
-    if (!s.loading) Future.microtask(_refresh);
+    // Every shell (navigation) asks again. A read already in flight is
+    // followed by one more (the controller coalesces), so a navigation is
+    // never answered by a read that started before it.
+    Future.microtask(_refresh);
   }
 
   void _refresh() {
@@ -266,6 +266,8 @@ class _GrantAdminScreenState extends ConsumerState<GrantAdminScreen> {
   Widget build(BuildContext context) {
     final s = ref.watch(grantAdminProvider);
     final ctl = ref.read(grantAdminProvider.notifier);
+    // Rebuild when the caller's own member id is known (self-grant buttons).
+    ref.watch(myAccessProvider.select((a) => a.grants?.memberId));
     final children = <Widget>[];
     final notice = s.notice;
     if (s.pending case final p?) {
@@ -366,6 +368,11 @@ class _GrantAdminScreenState extends ConsumerState<GrantAdminScreen> {
         'The last Admin can\'t be removed',
         'Grant Admin to another member with access first, so the church is '
             'never left without an Admin.',
+      ),
+      GrantNotice.selfGrant => (
+        StatusTone.warning,
+        'Not allowed',
+        'Another Admin must grant you a role or scope. Nothing was changed.',
       ),
       GrantNotice.noLongerAdmin => (
         StatusTone.warning,
@@ -503,7 +510,9 @@ class _GrantAdminScreenState extends ConsumerState<GrantAdminScreen> {
     final held = m.grants.hasRole(r.role);
     final label = ChurchRoles.label(r.role);
     final key = Key('role-${m.memberId}-${r.role}');
-    final enabled = !s.busy && (held || r.available);
+    // Separation of duty: the server refuses a grant to the acting Admin.
+    final self = ref.read(myAccessProvider).grants?.memberId == m.memberId;
+    final enabled = !s.busy && (held || (r.available && !self));
     // Text says the state; colour is never the only signal.
     return FocusRing(
       child: held
@@ -520,7 +529,13 @@ class _GrantAdminScreenState extends ConsumerState<GrantAdminScreen> {
               onPressed: enabled
                   ? () => ctl.setRole(m, r.role, grant: true)
                   : null,
-              child: Text(r.available ? 'Grant $label' : '$label (not set up)'),
+              child: Text(
+                !r.available
+                    ? '$label (not granted here)'
+                    : self
+                    ? '$label (another Admin grants this)'
+                    : 'Grant $label',
+              ),
             ),
     );
   }

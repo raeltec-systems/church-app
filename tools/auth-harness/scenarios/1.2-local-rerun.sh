@@ -20,7 +20,7 @@ export HARNESS_TARGET=local SUPABASE_URL=http://127.0.0.1:54321
 H="node tools/auth-harness/run.mjs"
 LINK="node tools/auth-harness/local-mailpit-link.mjs"
 DB="docker exec -i supabase_db_church-app psql -U postgres -d postgres -X -A -t -q"
-P=+260970000201
+P=+12025550191
 E=${HARNESS_INBOX_LOCAL:?set HARNESS_INBOX_LOCAL}+bicauth-l1@gmail.com
 eval "$($H init)"
 trap '$H cleanup >/dev/null' EXIT

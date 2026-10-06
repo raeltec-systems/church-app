@@ -235,9 +235,14 @@ class FakeGrants implements GrantsRepository {
   void answerRoster(AccessRead<GrantRoster> r) =>
       pendingRoster.removeAt(0).complete(r);
 
+  /// When set, every my-access read waits for it before answering.
+  Completer<void>? myAccessGate;
+
   @override
   Future<AccessRead<MemberGrants>> fetchMyAccess() async {
     myAccessCalls++;
+    final gate = myAccessGate;
+    if (gate != null) await gate.future;
     return myAccess;
   }
 

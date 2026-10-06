@@ -125,7 +125,8 @@ Migration: `supabase/migrations/20261006220500_identity_session_trust.sql`. Evid
 - `password` in the **server's** session AMR record (`auth.mfa_amr_claims`) as well as in the signed JWT `amr`. Magic-link, email-OTP, signup-link and recovery sessions carry `otp` and stay denied, also after refresh.
 - a non-anonymous Auth user;
 - an approved recovery email only while Auth holds it **confirmed**;
-- a session created at or after the link's **trust epoch** (`sessions_valid_after`); otherwise `untrusted_session` (sign in again).
+- no pending **binding review** (`binding_review_required`);
+- a session created more than **5 s** (`app.identity_epoch_margin()`) after the link's **trust epoch** (`sessions_valid_after`); otherwise `untrusted_session` (sign in again).
 
 Order: session/JWT, link and member, link state, binding, holds, trust epoch, dormancy (on the stored activity, before any refresh), release gate. Denials never write activity.
 
@@ -135,20 +136,24 @@ Triggers run inside GoTrue's own transaction and act only on accounts with a liv
 
 | Auth change | Effect on the link |
 |---|---|
-| phone, email, soft delete, hard delete (`auth.users`); identity added or removed (`auth.identities`); MFA factor added, changed or removed (`auth.mfa_factors`) | `link_state` → `review_required` (persists even if the value is changed back), generation +1, trust epoch moved |
+| phone, email, soft delete, hard delete (`auth.users`); identity added, removed or re-pointed to another user/provider id (`auth.identities`); MFA factor added, changed or removed (`auth.mfa_factors`; no-op updates ignored) | `binding_review_required` set (whatever the link state; survives reverts, suspension and unsuspension), an `active` link → `review_required`, generation +1, trust epoch moved |
 | password (native `PUT /user`, recovery, Auth Admin), ban or unban | generation +1, trust epoch moved (every earlier session must sign in again, including the one that changed the password) |
-| hold placed (`identity_holds` insert); any `link_state` change, including re-approval | trust epoch moved |
+| hold placed (`identity_holds` insert); any `link_state` change, including re-approval | trust epoch moved, event recorded |
+| a new link for an account or member that had one (relink after `ended`) | starts with a trust epoch and the next generation; a first link has none |
 
 `app.identity_credential_events` records each change by **kind only** (no phone, email or secret values). If a trigger fails, GoTrue's write fails too (fail closed).
 
-Re-approving a link after review (entries 5/8) sets `link_state = 'active'`; that moves the epoch again, so only sessions created after the approval pass. Until those workflows exist, a restricted operator does it in SQL for synthetic accounts only.
+Re-approving a link after review (entries 5/8) records a new `binding_revision` (which alone clears `binding_review_required`) and sets `link_state = 'active'`; that moves the epoch again, so only sessions created after the approval pass. Until those workflows exist, a restricted operator does it in SQL for synthetic accounts only.
 
-Known limits: GoTrue's lock order around the triggers is not under our control (1.3 limit F); the epoch compares GoTrue's session `created_at` with the database clock, so a GoTrue clock running behind the database would deny a fresh sign-in until the gap passes (fail closed).
+Known limits:
+
+- GoTrue's lock order around the triggers is not under our control (1.3 limit F).
+- The epoch (database clock, stamped inside the changing transaction) is compared with GoTrue's session `created_at` plus a 5 s margin. A GoTrue clock **ahead** of the database by more than the margin, or a session created while the changing transaction is held open longer than the margin, can still be admitted (fail open); keep Auth and database clocks synchronised. A GoTrue clock behind only delays a fresh sign-in (fail closed).
 
 ### Clients
 
 - Only the Auth session persists (see "Sign-in on the clients"). Reopening the app restores it and the SDK refreshes it; the server re-checks it on every read.
-- When the server answers `untrusted_session` (signed out or revoked elsewhere, a credential change, a hold, a pre-approval session), the client ends the session on the device, removes the stored session, clears protected state and shows **Please sign in again**. `review_required`, `not_linked` and `unavailable` keep the session and withhold only the data.
+- When the predicate answers `untrusted_session` (signed out or revoked elsewhere, a credential change, a hold, a pre-approval session), the client ends the session on the device, removes the stored session, clears protected state and shows **Please sign in again**. `review_required`, `not_linked` and `unavailable` keep the session and withhold only the data. A JWT that PostgREST itself rejects (`PGRST301`/`PGRST303`, expired or invalid) is refreshed once and retried; it never ends the session by itself.
 - Returning to the foreground asks the server again before the summary is relied on.
 - Staff web also keeps the SDK's PKCE code-verifier store (browser `localStorage`, from supabase_flutter); no sign-in flow here uses it and it never holds tokens or member data.
 

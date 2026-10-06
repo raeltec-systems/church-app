@@ -10,9 +10,9 @@ Everything here is **LOCAL** (Supabase CLI 2.119.0, GoTrue v2.197.0, Postgres 17
 
 | File | What it shows |
 |---|---|
-| [`local-pgtap.txt`](local-pgtap.txt) | Whole pgTAP suite, 488 assertions passing; `identity_session_trust_test.sql` (60) and the adjusted `identity_live_access_test.sql` (71). |
+| [`local-pgtap.txt`](local-pgtap.txt) | After the review fixes: `identity_session_trust_test.sql` (83) and the adjusted `identity_live_access_test.sql` (74), from a fresh `db reset`. Before them the whole suite ran 488/488. |
 | [`local-api-smoke.txt`](local-api-smoke.txt) | `identity_api_smoke.sh` with the CLI's default config (phone off, as CI): adds refresh, magic-link and recovery sessions, and a direct Auth email change. |
-| [`local-e2e-log.jsonl`](local-e2e-log.jsonl) | `tools/identity-e2e/run.mjs` with the local phone switch on: 30 checks pass (2.1's `E10`–`E23` plus `E30`–`E45`). Status codes, reasons, AMR names and change kinds only. |
+| [`local-e2e-log.jsonl`](local-e2e-log.jsonl) | `tools/identity-e2e/run.mjs` with the local phone switch on: 30 checks pass (2.1's `E10`–`E23` plus `E30`–`E45`). Every denial route (`E35`, `E36`, `E38`–`E40`, `E42`, `E43`, `E44`) asserts unchanged activity; fresh sign-ins after an epoch wait out the 5 s margin. Status codes, reasons, AMR names and change kinds only. |
 | [`local-client-adapter-check.txt`](local-client-adapter-check.txt) | The real Dart adapters both apps use: refresh, reopen from the stored session, revocation from another device, sign-out. |
 
 ## Results against the plan's I/O matrix
@@ -27,6 +27,17 @@ Everything here is **LOCAL** (Supabase CLI 2.119.0, GoTrue v2.197.0, Postgres 17
 | Revoked / signed out | E2E `E22`, `E42` (global sign-out), `E43` (ban/unban); adapter `S4`–`S6`; Flutter tests (untrusted answer ends the session on both app shells) | 401 `untrusted_session`; revoked refresh fails; unbanning does not revive the old session. The client ends its local session, removes the stored session and clears protected state. |
 | Dormant fixture | E2E `E44`; pgTAP dormancy rows | `TEST FIXTURE - proposed 90-day dormancy, not church policy`; activity set 91 days back; sign-in and refresh succeed at Auth, the read is 403 `review_required`, activity unchanged. |
 | Hold placed then released | pgTAP hold rows | Denied while open; after release, pre-hold sessions stay `untrusted_session`; a fresh sign-in is granted. |
+
+## Review fixes (second pass)
+
+- **Durable binding review.** `binding_review_required` is set by every detected binding change whatever the link state, survives value reverts, suspension and unsuspension, and is cleared only by a re-approval that records a new `binding_revision` (pgTAP: suspend → change → revert → unsuspend → fresh sign-in → `review_required`; a direct reset of the flag is refused).
+- **Relink after `ended`.** A new link for an account or member that had one starts with a trust epoch at its creation and the next credential generation; sessions from the old link or from while unlinked are refused (pgTAP). A first link for a fresh signup has none.
+- **Epoch margin.** A session must be created more than 5 s (`app.identity_epoch_margin()`) after the epoch. Known limits: a GoTrue clock ahead of the database by more than the margin, and a session created while the changing transaction is held open longer than the margin, can still be admitted (fail open); a GoTrue clock behind only delays a fresh sign-in.
+- **Change guards and moves.** A no-op `auth.mfa_factors` update records nothing; an `auth.identities` row re-pointed to another user or provider id is recorded for both accounts (pgTAP).
+- **Link-state events.** Review, suspension, end, re-approval and relink each write an `identity_account_links` event (pgTAP; visible in `E41` and the smoke).
+- **PostgREST JWT rejections** (`PGRST301`/`PGRST303`) are no longer treated as an untrusted session: the adapter refreshes once and retries; a second rejection is a failure that keeps the session; a refused refresh is signed out by the SDK. Only the predicate's `untrusted_session` ends the session (Flutter adapter and controller tests).
+- **2.1 tests** now exercise the predicate's value comparison by changing only the approved binding, and use fresh sessions after real epoch moves instead of clearing the epoch.
+- **Persistence wiring.** `test/identity/persisted_session_wiring_test.dart` runs supabase_flutter's own persistence with `AuthSessionStorage` over a scripted Auth: sign-in and refresh write the session, a restart restores it without a sign-in call, sign-out removes it.
 
 ## Findings
 

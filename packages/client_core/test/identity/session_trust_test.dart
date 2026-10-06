@@ -215,6 +215,17 @@ void main() {
       });
     }
 
+    testWidgets('a failed read (e.g. a JWT PostgREST still rejects after the '
+        "adapter's refresh) keeps the session", (tester) async {
+      final h = await pumpAccount(tester);
+      h.memberAccess.answer(const MemberAccessFailed(unreachable: false));
+      await settleShort(tester);
+      expect(h.auth.signOuts, 0);
+      expect(h.session.currentAccountId, _a);
+      expect(byKey('summary-failed'), findsOneWidget);
+      expect(byKey('session-ended'), findsNothing);
+    });
+
     testWidgets('returning to the foreground asks the server again', (
       tester,
     ) async {

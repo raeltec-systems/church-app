@@ -118,10 +118,12 @@ class MemberSummaryController extends Notifier<MemberSummaryState> {
     state = MemberSummaryState(result: result);
     if (result is MemberAccessDenied &&
         result.denial == MemberAccessDenial.untrustedSession) {
-      // Story 2.2: the server no longer trusts this session (revoked, signed
-      // out elsewhere, from before a credential change or hold, or not a
-      // password sign-in). End it here too: protected state is dropped with
-      // the account generation and the stored session is removed.
+      // Story 2.2: the live-access predicate no longer trusts this session
+      // (revoked, signed out elsewhere, from before a credential change or
+      // hold, or not a password sign-in). End it here too: protected state is
+      // dropped with the account generation and the stored session is
+      // removed. A JWT that PostgREST rejects (expired/invalid) never gets
+      // here: the adapter refreshes once and retries, then reports a failure.
       await ref.read(accountProvider.notifier).endUntrustedSession();
     }
   }

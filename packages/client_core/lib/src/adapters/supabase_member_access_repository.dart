@@ -22,6 +22,34 @@ class SupabaseMemberAccessRepository implements MemberAccessRepository {
     if (_client.auth.currentSession == null) {
       return const MemberAccessDenied(MemberAccessDenial.signedOut);
     }
+    final (first, rejected) = await _once();
+    if (rejected == null) return first!;
+    // Story 2.2: PostgREST rejected the JWT itself (expired or invalid,
+    // PGRST301/PGRST303). That is not the server's access decision: refresh
+    // once and ask again. Only the predicate's own denial ends the session.
+    try {
+      await _client.auth.refreshSession();
+    } on AuthRetryableFetchException catch (e) {
+      return MemberAccessFailed(unreachable: true, cause: e);
+    } on AuthException catch (e) {
+      // Auth refused the refresh token: the SDK has ended the local session.
+      return _client.auth.currentSession == null
+          ? const MemberAccessDenied(MemberAccessDenial.signedOut)
+          : MemberAccessFailed(unreachable: false, cause: e);
+    } on http.ClientException catch (e) {
+      return MemberAccessFailed(unreachable: true, cause: e);
+    } catch (e) {
+      return MemberAccessFailed(unreachable: false, cause: e);
+    }
+    final (second, stillRejected) = await _once();
+    if (stillRejected != null) {
+      return MemberAccessFailed(unreachable: false, cause: stillRejected);
+    }
+    return second!;
+  }
+
+  /// One request. Returns the result, or the PostgREST JWT rejection.
+  Future<(MemberAccessResult?, PostgrestException?)> _once() async {
     final Object? body;
     try {
       body = await _client
@@ -30,23 +58,27 @@ class SupabaseMemberAccessRepository implements MemberAccessRepository {
           .retry(enabled: false)
           .abortSignal(Future<void>.delayed(timeout));
     } on RequestAbortedException catch (e) {
-      return MemberAccessFailed(unreachable: true, cause: e);
+      return (MemberAccessFailed(unreachable: true, cause: e), null);
     } on TimeoutException catch (e) {
-      return MemberAccessFailed(unreachable: true, cause: e);
+      return (MemberAccessFailed(unreachable: true, cause: e), null);
     } on http.ClientException catch (e) {
-      return MemberAccessFailed(unreachable: true, cause: e);
+      return (MemberAccessFailed(unreachable: true, cause: e), null);
     } on PostgrestException catch (e) {
+      if (isJwtRejection(e.code)) return (null, e);
       final denial = memberAccessDenialFor(e.code, e.message, e.details);
-      return denial == null
-          ? MemberAccessFailed(unreachable: false, cause: e)
-          : MemberAccessDenied(denial);
+      return (
+        denial == null
+            ? MemberAccessFailed(unreachable: false, cause: e)
+            : MemberAccessDenied(denial),
+        null,
+      );
     } catch (e) {
-      return MemberAccessFailed(unreachable: false, cause: e);
+      return (MemberAccessFailed(unreachable: false, cause: e), null);
     }
     try {
-      return MemberAccessGranted(MemberSummary.fromJson(body));
+      return (MemberAccessGranted(MemberSummary.fromJson(body)), null);
     } on FormatException catch (e) {
-      return MemberAccessFailed(unreachable: false, cause: e);
+      return (MemberAccessFailed(unreachable: false, cause: e), null);
     }
   }
 }
@@ -60,9 +92,8 @@ MemberAccessDenial? memberAccessDenialFor(
 ) {
   // Signed-out callers have no EXECUTE on the read.
   if (code == '42501') return MemberAccessDenial.signedOut;
-  if (code == 'PGRST301' || code == 'PGRST303') {
-    return MemberAccessDenial.untrustedSession;
-  }
+  // A JWT rejected by PostgREST is not an access decision (see isJwtRejection).
+  if (isJwtRejection(code)) return null;
   final reason = details?.toString();
   switch (message) {
     case 'unauthenticated':
@@ -78,3 +109,7 @@ MemberAccessDenial? memberAccessDenialFor(
   }
   return null;
 }
+
+/// PostgREST rejected the JWT itself (expired / invalid), before the
+/// live-access predicate ran.
+bool isJwtRejection(String? code) => code == 'PGRST301' || code == 'PGRST303';

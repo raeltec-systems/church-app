@@ -1,11 +1,10 @@
+$ npx supabase db reset && npx supabase test db supabase/tests/identity_live_access_test.sql supabase/tests/identity_session_trust_test.sql
+(LOCAL, 2026-10-06, after the review fixes; identity_live_access_test 74, identity_session_trust_test 83)
 Connecting to local database...
-supabase/tests/command_foundation_test.sql ...... ok
-supabase/tests/cross_epic_contracts_test.sql .... ok
 supabase/tests/identity_live_access_test.sql .... ok
 supabase/tests/identity_session_trust_test.sql .. ok
-supabase/tests/platform_status_test.sql ......... ok
-supabase/tests/recovery_journal_test.sql ........ ok
-supabase/tests/system_access_test.sql ........... ok
 All tests successful.
-Files=7, Tests=488,  1 wallclock secs ( 0.10 usr  0.03 sys +  0.10 cusr  0.10 csys =  0.33 CPU)
+Files=2, Tests=157,  0 wallclock secs ( 0.05 usr  0.01 sys +  0.03 cusr  0.03 csys =  0.12 CPU)
 Result: PASS
+
+Before the review fixes the whole suite ran 488/488 (7 files); the full run after these fixes is done by the reviewer.

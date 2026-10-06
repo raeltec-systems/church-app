@@ -6,15 +6,21 @@
 --     auth.identities and auth.mfa_factors run inside GoTrue's own transaction. For a LINKED
 --     account every credential change advances app.identity_account_links.credential_generation
 --     and sets the link's session trust epoch (sessions_valid_after); a binding change (phone,
---     email, identity added/removed, MFA factor, delete) also moves an active link to
---     review_required, which persists even if the value is later changed back. Only change kinds
---     are recorded, never phone/email values or secrets. Unlinked accounts are ignored.
---   * A hold placed on a member, or any link state change, also sets the trust epoch, so the
---     sessions it was meant to stop never come back when it clears, and a re-approved link
---     admits only sessions created after the approval.
+--     email, identity added/removed/moved, MFA factor, delete) also sets the durable
+--     binding_review_required flag (and moves an active link to review_required). The flag
+--     persists through value reverts, suspension and unsuspension; only a re-approval that
+--     records a new binding_revision clears it. Only change kinds are recorded, never
+--     phone/email values or secrets. Unlinked accounts are ignored.
+--   * A hold placed on a member, or any link state change, also sets the trust epoch (and
+--     records an event), so the sessions it was meant to stop never come back when it clears,
+--     and a re-approved link admits only sessions created after the approval.
+--   * A link inserted for an account or member that had an earlier link (a relink after
+--     `ended`) starts with a trust epoch at its creation and the next credential generation, so
+--     no session from before the relink passes. A first link for a fresh signup has no epoch.
 --   * The predicate now also requires: `password` in the SERVER's session AMR record
---     (auth.mfa_amr_claims) as well as in the signed JWT `amr`; a session created at or after
---     the link's trust epoch; a non-anonymous Auth user; and, when a recovery email is approved,
+--     (auth.mfa_amr_claims) as well as in the signed JWT `amr`; no pending binding review; a
+--     session created more than the safety margin (5 s, identity_epoch_margin()) after the
+--     link's trust epoch; a non-anonymous Auth user; and, when a recovery email is approved,
 --     that the current Auth email is confirmed.
 --
 -- Order of the predicate's checks (first failure wins):
@@ -27,9 +33,14 @@
 --   * F: the triggers take the Identity link row lock inside GoTrue transactions that already
 --     hold auth.* row locks. Identity never touches auth.* rows while holding a link lock, so no
 --     inversion is known, but GoTrue's internal lock order is not under our control.
---   * The trust epoch is compared with GoTrue's session created_at (GoTrue's clock) against the
---     database clock_timestamp(). A GoTrue clock behind the database by more than the time a
---     person takes to sign in again would deny a fresh session (fail closed).
+--   * The trust epoch (database clock_timestamp() inside the changing transaction) is compared
+--     with GoTrue's session created_at (GoTrue's clock). A session must be created MORE than
+--     identity_epoch_margin() (5 s) after the epoch. Residual cases: (a) a GoTrue clock AHEAD of
+--     the database by more than the margin could admit a session opened just before the change
+--     (fail open); a GoTrue clock behind only delays fresh sign-ins (fail closed); (b) a session
+--     created while the changing transaction is still open, more than the margin after the
+--     epoch was stamped (a transaction held open > 5 s), is admitted (fail open). Both need
+--     clock sync and short Auth transactions; neither is reachable by a client alone.
 --
 -- No destructive statements. No client privileges. The api wrapper and its grants are unchanged.
 
@@ -39,12 +50,25 @@
 
 alter table app.identity_account_links
   add column credential_generation bigint not null default 1 check (credential_generation >= 1),
-  add column sessions_valid_after timestamptz;
+  add column sessions_valid_after timestamptz,
+  add column binding_review_required boolean not null default false;
 
 comment on column app.identity_account_links.credential_generation is
   'AD-20 recovery/credential generation: advanced by every detected Auth credential change.';
 comment on column app.identity_account_links.sessions_valid_after is
-  'Session trust epoch: only Auth sessions created at or after it may pass the predicate.';
+  'Session trust epoch: only Auth sessions created more than identity_epoch_margin() after it '
+  'may pass the predicate.';
+comment on column app.identity_account_links.binding_review_required is
+  'A direct Auth binding change was detected. Cleared only by a re-approval that records a new '
+  'binding_revision; never by reverting the value or by a link state change.';
+
+-- Safety margin between a trust epoch and an admissible session (clock skew / commit delay).
+create function app.identity_epoch_margin()
+returns interval
+language sql
+immutable
+set search_path = ''
+as $$ select interval '5 seconds' $$;
 
 -- ---------------------------------------------------------------------------------------------
 -- Credential events (kinds only; no values)
@@ -102,6 +126,7 @@ begin
                                          clock_timestamp()),
          link_state = case when p_binding and l.link_state = 'active'
                            then 'review_required' else l.link_state end,
+         binding_review_required = l.binding_review_required or p_binding,
          updated_at = now()
    where l.auth_user_id = p_auth_user_id and l.link_state <> 'ended'
   returning l.link_id, l.credential_generation, l.sessions_valid_after
@@ -159,9 +184,17 @@ begin
   if tg_op = 'INSERT' then
     perform app.identity_note_credential_change(new.user_id, 'auth_identities',
       array['identity_added'], true);
-  else
+  elsif tg_op = 'DELETE' then
     perform app.identity_note_credential_change(old.user_id, 'auth_identities',
       array['identity_removed'], true);
+  else
+    -- An identity re-pointed to another user or provider id: both accounts are affected.
+    perform app.identity_note_credential_change(old.user_id, 'auth_identities',
+      array['identity_moved'], true);
+    if new.user_id is distinct from old.user_id then
+      perform app.identity_note_credential_change(new.user_id, 'auth_identities',
+        array['identity_moved'], true);
+    end if;
   end if;
   return null;
 end;
@@ -206,32 +239,108 @@ create trigger identity_credential_identity_change
   for each row
   execute function app.identity_on_auth_identity_change();
 
-create trigger identity_credential_mfa_change
-  after insert or delete or update of status, secret, phone, factor_type on auth.mfa_factors
+create trigger identity_credential_identity_moved
+  after update of user_id, provider_id, provider on auth.identities
   for each row
+  when ((old.user_id, old.provider_id, old.provider)
+        is distinct from (new.user_id, new.provider_id, new.provider))
+  execute function app.identity_on_auth_identity_change();
+
+create trigger identity_credential_mfa_change
+  after insert or delete on auth.mfa_factors
+  for each row
+  execute function app.identity_on_auth_mfa_change();
+
+create trigger identity_credential_mfa_update
+  after update of status, secret, phone, factor_type on auth.mfa_factors
+  for each row
+  when ((old.status, old.secret, old.phone, old.factor_type)
+        is distinct from (new.status, new.secret, new.phone, new.factor_type))
   execute function app.identity_on_auth_mfa_change();
 
 -- Every link state change moves the trust epoch: leaving 'active' (review, suspension, end)
 -- stops existing sessions, and returning to 'active' (the reviewed re-approval of entries 5/8)
 -- admits only sessions created after the approval, never one opened while access was in review
--- (the 1.3 reconcile rule).
-create function app.identity_on_link_state_change()
+-- (the 1.3 reconcile rule). The pending binding review flag survives everything except a
+-- re-approval that records a new binding_revision.
+create function app.identity_on_link_update()
 returns trigger
 language plpgsql
+security definer
 set search_path = ''
 as $$
 begin
-  new.sessions_valid_after := greatest(coalesce(new.sessions_valid_after, '-infinity'),
-                                       clock_timestamp());
+  if new.binding_revision > old.binding_revision then
+    new.binding_review_required := false;  -- re-approval recorded a new binding revision
+  elsif old.binding_review_required then
+    new.binding_review_required := true;   -- nothing else clears a pending binding review
+  end if;
+  if new.link_state is distinct from old.link_state then
+    new.sessions_valid_after := greatest(coalesce(new.sessions_valid_after, '-infinity'),
+                                         clock_timestamp());
+    insert into app.identity_credential_events (link_id, source, kinds, binding_review,
+                                                generation_after, epoch_after)
+    values (new.link_id, 'identity_account_links', array['link_' || new.link_state],
+            new.binding_review_required, new.credential_generation, new.sessions_valid_after);
+  end if;
   return new;
 end;
 $$;
 
 create trigger identity_link_state_epoch
-  before update of link_state on app.identity_account_links
+  before update on app.identity_account_links
   for each row
-  when (old.link_state is distinct from new.link_state)
-  execute function app.identity_on_link_state_change();
+  execute function app.identity_on_link_update();
+
+-- A relink (a new link for an account or member that had one before) starts with a trust epoch
+-- at its creation and the next credential generation; a first link keeps no epoch.
+create function app.identity_on_link_insert()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_prior_generation bigint;
+begin
+  select max(l.credential_generation) into v_prior_generation
+    from app.identity_account_links l
+   where l.auth_user_id = new.auth_user_id or l.member_id = new.member_id;
+  if v_prior_generation is not null then
+    new.credential_generation := greatest(new.credential_generation, v_prior_generation + 1);
+    new.sessions_valid_after := greatest(coalesce(new.sessions_valid_after, '-infinity'),
+                                         clock_timestamp());
+  end if;
+  return new;
+end;
+$$;
+
+create trigger identity_link_insert_epoch
+  before insert on app.identity_account_links
+  for each row
+  execute function app.identity_on_link_insert();
+
+create function app.identity_on_link_inserted()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.sessions_valid_after is not null then
+    insert into app.identity_credential_events (link_id, source, kinds, binding_review,
+                                                generation_after, epoch_after)
+    values (new.link_id, 'identity_account_links', array['link_relinked'], false,
+            new.credential_generation, new.sessions_valid_after);
+  end if;
+  return null;
+end;
+$$;
+
+create trigger identity_link_inserted_event
+  after insert on app.identity_account_links
+  for each row
+  execute function app.identity_on_link_inserted();
 
 -- A hold placed on a member moves the trust epoch of the member's live link.
 create function app.identity_on_hold_placed()
@@ -354,7 +463,7 @@ begin
   end if;
   -- A detected direct Auth binding change keeps the link in review until the authorised
   -- workflow accepts it, even if the value is changed back.
-  if v_link.link_state <> 'active' then
+  if v_link.link_state <> 'active' or v_link.binding_review_required then
     return query select 'review_required'::text, v_member.member_id, v_link.link_id;
     return;
   end if;
@@ -377,7 +486,8 @@ begin
 
   -- Sessions from before a credential change, hold or review stay dead: sign in again.
   if v_link.sessions_valid_after is not null
-     and (v_session_created is null or v_session_created < v_link.sessions_valid_after) then
+     and (v_session_created is null
+          or v_session_created <= v_link.sessions_valid_after + app.identity_epoch_margin()) then
     return query select 'untrusted_session'::text, null::uuid, null::uuid;
     return;
   end if;
@@ -420,6 +530,9 @@ revoke all on function
   app.identity_on_auth_user_change(),
   app.identity_on_auth_identity_change(),
   app.identity_on_auth_mfa_change(),
-  app.identity_on_link_state_change(),
+  app.identity_epoch_margin(),
+  app.identity_on_link_update(),
+  app.identity_on_link_insert(),
+  app.identity_on_link_inserted(),
   app.identity_on_hold_placed()
   from public, anon, authenticated, service_role;

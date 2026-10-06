@@ -93,6 +93,7 @@ context:
 - Surprise: an Auth Admin email change also inserts an `email` identity (detected twice). The local stack was reset once by the parent session during the build; all evidence was re-run after the merge.
 - Staff web: with a configured build the session key is used only with `sessionStorage`; supabase_flutter's own PKCE verifier store still references `localStorage` (unused by password sign-in, no tokens).
 - Not done: hosted apply/repeat (owner promotion), device/emulator run of the Keystore/Keychain restore (deferred-work.md).
+- Review fixes (parent review, second pass): durable `binding_review_required` (cleared only by a new `binding_revision`); relink after `ended` starts with an epoch and the next generation; 5 s epoch margin (`app.identity_epoch_margin()`) with the residual fail-open cases documented in the migration header, runbook and evidence; guarded `auth.mfa_factors` update trigger; `auth.identities` move trigger (both users); link-state and relink events; PGRST301/303 refresh-once-and-retry in `SupabaseMemberAccessRepository` (only the predicate's `untrusted_session` ends the session); 2.1 pgTAP now exercises the value comparison via the approved side and re-signs in after real epoch moves; E2E asserts unchanged activity on every denial route and waits out the margin; new `persisted_session_wiring_test.dart` covers supabase_flutter's persistence through `AuthSessionStorage`.
 
 ## Verification
 
@@ -101,3 +102,20 @@ context:
 - `node tools/auth-harness/local-phone-auth.mjs on && node tools/identity-e2e/run.mjs --evidence … && node tools/auth-harness/local-phone-auth.mjs off` -- expected: all checks pass
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/mobile`, `apps/staff` -- expected: pass
 - Results (2026-10-06, local, after merging the integration branch): `db:test` 488/488 (session trust 60, live access 71); `db:smoke` all ok, phone off (identity 19); E2E 30/30 with the phone switch on; live adapter check PASS (signup + `session` S1-S6); client_core 136, mobile 15, staff 15 tests pass, analyze clean; staff web build (with and without dart-defines) + bundle scan clean; `ci:migrations --base origin/main` ordered and non-destructive; `ci:secrets`, `ci:policy-test` (49), `env:check`, `recovery:rehearse`, harness node tests (36), `scan-evidence` on evidence-2.2 clean. Phone switch turned off afterwards; synthetic users cleaned up.
+
+- Results after the review fixes (2026-10-06, local, targeted): `db reset` + identity pgTAP 157/157 (live access 74, session trust 83); `identity_api_smoke.sh` 19 ok (phone off); E2E 30/30 (phone on, then off); live adapter check PASS; client_core analyze clean, `identity_adapters_test` + `persisted_session_wiring_test` 25, `session_trust_test` + `boundaries_test` 29 pass; `ci:migrations --base origin/main` clean.
+
+## Review Triage Log
+
+| Finding | Verdict | Route | Evidence |
+|---|---|---|---|
+| binding change on a non-active link laundered by suspend/revert/unsuspend | high | patch | `binding_review_required` flag; pgTAP suspend-change-revert-unsuspend row |
+| relink after `ended` re-admitted old sessions | high | patch | `identity_on_link_insert`; pgTAP relink rows |
+| epoch comparison fails open on clock skew / open transaction | medium | patch | 5 s margin + documented residual limits |
+| MFA update trigger without change guard | low | patch | WHEN guard; pgTAP no-op update |
+| identity re-pointed by UPDATE not detected | medium | patch | `identity_credential_identity_moved`; pgTAP |
+| link-state epoch moves without events | low | patch | events from `identity_on_link_update` / `_inserted`; pgTAP |
+| PGRST301/303 signed the user out | medium | patch | adapter refresh-and-retry; adapter + controller tests |
+| 2.1 `reapprove` cleared the epoch (impossible path) | medium | patch | value comparison via approved side; fresh sessions after epochs |
+| E2E denials did not assert unchanged activity | low | patch | `E36`, `E38`-`E40`, `E42`, `E43` |
+| persisted-session wiring untested | medium | patch | `persisted_session_wiring_test.dart` |

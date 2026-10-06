@@ -1,3 +1,4 @@
+$ bash supabase/tests/identity_api_smoke.sh     (LOCAL, CLI default config: phone off; 2026-10-06, after the review fixes)
 ok   - linked synthetic member reads own summary (200)
 ok   - summary is the caller's own record
 ok   - unlinked account is forbidden (403)
@@ -15,5 +16,5 @@ ok   - magiclink session (otp AMR) is denied (401 untrusted_session)
 ok   - recovery session (otp AMR) is denied (401 untrusted_session)
 ok   - a direct Auth email change puts the account in review (403 review_required)
 ok   - a fresh sign-in with the changed email is still in review
-ok   - the change is recorded by kind (email)
+ok   - the change is recorded by kind (link_review_required,email)
 ok   - no SMS provider configured

@@ -214,6 +214,8 @@ async function main() {
     const linkState = (id) => psql(`select link_state || ' gen=' || credential_generation from app.identity_account_links where auth_user_id = '${id}' and link_state <> 'ended'`);
     const events = (id) => psql(`select coalesce(string_agg(e.source || ':' || array_to_string(e.kinds, '+'), ', ' order by e.event_id), '') from app.identity_credential_events e join app.identity_account_links l using (link_id) where l.auth_user_id = '${id}'`);
     const reason = (r) => (r.status === 200 ? 'granted' : `${r.status} ${r.json?.details ?? r.json?.message}`);
+    // A fresh sign-in counts only once it is past the trust epoch plus its 5 s safety margin.
+    const pastMargin = () => new Promise((resolve) => setTimeout(resolve, 6000));
     const sameMember = (r, id) => r.status === 200 && r.json?.member_id === id;
 
     // E30: token refresh keeps the password session and its access (no password prompt).
@@ -254,16 +256,19 @@ async function main() {
     // E36: password set from the recovery session: the recovery session stays denied, every
     // session from before is dead, the old password fails, a fresh password sign-in is granted.
     const pwD2 = password();
+    const actD36 = activityOf(userD);
     const setPw = await http('PUT', '/auth/v1/user', { token: vRc.json?.access_token, body: { password: pwD2 } });
     const rRc2 = await read(vRc.json?.access_token);
     const rDold = await read(sDp.json?.access_token);
     const oldPw = await signIn(D, pwD);
+    const act36 = activityOf(userD) === actD36;
+    await pastMargin();
     const sD2 = await signIn(D, pwD2);
     const rD2 = await read(sD2.json?.access_token);
     check('E36-recovery-password-set-needs-fresh-sign-in',
-      setPw.status === 200 && rRc2.status === 401 && rDold.status === 401 && oldPw.status === 400 && rD2.status === 200,
+      setPw.status === 200 && rRc2.status === 401 && rDold.status === 401 && oldPw.status === 400 && rD2.status === 200 && act36,
       { set_status: setPw.status, recovery_session: reason(rRc2), pre_reset_session: reason(rDold), old_password: oldPw.status,
-        fresh_sign_in: reason(rD2), link: linkState(userD) });
+        denials_left_activity_unchanged: act36, fresh_sign_in: reason(rD2), link: linkState(userD) });
 
     // E37: the verified email/password alias resolves to the same account and member.
     const sDe = await signInEmail(DMAIL, pwD2);
@@ -279,53 +284,67 @@ async function main() {
     psql(`select app.identity_seed_synthetic_link('${userE}', 'SYNTHETIC E2E Change Member', 'identity-e2e 2.2')`);
     const sE = await signIn(E, pwE);
     const rE0 = await read(sE.json?.access_token);
+    const actE = activityOf(userE);
     const chg = await adminUpdate(userE, { phone: E2 });
     const rE1 = await read(sE.json?.access_token);
     const back = await adminUpdate(userE, { phone: E });
     const rE2 = await read(sE.json?.access_token);
     const sE2 = await signIn(E, pwE);
     const rE3 = await read(sE2.json?.access_token);
+    const act38 = activityOf(userE) === actE;
     check('E38-direct-phone-change-review-even-after-revert',
       rE0.status === 200 && chg.status === 200 && rE1.json?.details === 'review_required' && back.status === 200
-        && rE2.json?.details === 'review_required' && rE3.json?.details === 'review_required',
-      { before: reason(rE0), stale_token_after_change: reason(rE1), after_revert: reason(rE2), fresh_sign_in_before_review: reason(rE3), link: linkState(userE) });
-    psql(`update app.identity_account_links set link_state = 'active' where auth_user_id = '${userE}'`);
+        && rE2.json?.details === 'review_required' && rE3.json?.details === 'review_required' && act38,
+      { before: reason(rE0), stale_token_after_change: reason(rE1), after_revert: reason(rE2), fresh_sign_in_before_review: reason(rE3),
+        activity_unchanged: act38, link: linkState(userE) });
+    // Simulated reviewed re-approval (entries 5/8): a new binding revision and an active link.
+    psql(`update app.identity_account_links set link_state = 'active', binding_revision = binding_revision + 1 where auth_user_id = '${userE}'`);
     const rE4 = await read(sE.json?.access_token);
     const rE4b = await read(sE2.json?.access_token);
+    const act39 = activityOf(userE) === actE;
+    await pastMargin();
     const sE3 = await signIn(E, pwE);
     const rE5 = await read(sE3.json?.access_token);
     check('E39-after-reapproval-stale-tokens-dead-fresh-granted',
-      rE4.json?.details === 'untrusted_session' && rE4b.json?.details === 'untrusted_session' && rE5.status === 200,
-      { pre_change_token: reason(rE4), during_review_token: reason(rE4b), fresh_sign_in: reason(rE5) });
+      rE4.json?.details === 'untrusted_session' && rE4b.json?.details === 'untrusted_session' && act39 && rE5.status === 200,
+      { pre_change_token: reason(rE4), during_review_token: reason(rE4b), activity_unchanged: act39, fresh_sign_in: reason(rE5) });
+    const actE40 = activityOf(userE);
     const em = await adminUpdate(userE, { email: EMAIL2, email_confirm: true });
     const rE6 = await read(sE3.json?.access_token);
     const sE4 = await signIn(E, pwE);
     const rE7 = await read(sE4.json?.access_token);
-    check('E40-direct-email-change-review', em.status === 200 && rE6.json?.details === 'review_required' && rE7.json?.details === 'review_required',
-      { stale_token: reason(rE6), fresh_sign_in: reason(rE7), link: linkState(userE) });
-    check('E41-changes-recorded-by-kind', /auth_users:phone, auth_users:phone, .*auth_users:email/.test(events(userE)),
+    const act40 = activityOf(userE) === actE40;
+    check('E40-direct-email-change-review', em.status === 200 && rE6.json?.details === 'review_required' && rE7.json?.details === 'review_required' && act40,
+      { stale_token: reason(rE6), fresh_sign_in: reason(rE7), activity_unchanged: act40, link: linkState(userE) });
+    check('E41-changes-recorded-by-kind', /auth_users:phone, auth_users:phone, .*identity_account_links:link_active.*auth_users:email/.test(events(userE)),
       { events: events(userE) });
 
     // E42: global sign-out revokes every session of the account.
     const sA1 = await signIn(A, pwA);
     const sA2 = await signIn(A, pwA);
+    const actA42 = activityOf(uid(A));
     const outAll = await http('POST', '/auth/v1/logout?scope=global', { token: sA1.json?.access_token });
     const rA1 = await read(sA1.json?.access_token);
     const rA2 = await read(sA2.json?.access_token);
     const rA2r = await refresh(sA2.json?.refresh_token);
-    check('E42-global-sign-out-revokes-all', outAll.status === 204 && rA1.status === 401 && rA2.status === 401 && rA2r.status >= 400,
-      { logout_status: outAll.status, session_1: reason(rA1), session_2: reason(rA2), refresh_status: rA2r.status });
+    const act42 = activityOf(uid(A)) === actA42;
+    check('E42-global-sign-out-revokes-all', outAll.status === 204 && rA1.status === 401 && rA2.status === 401 && rA2r.status >= 400 && act42,
+      { logout_status: outAll.status, session_1: reason(rA1), session_2: reason(rA2), refresh_status: rA2r.status, activity_unchanged: act42 });
 
     // E43: ban (Auth Admin revocation); unbanning does not revive the old session.
     const sA3 = await signIn(A, pwA);
+    const actA43 = activityOf(uid(A));
     const ban = await adminUpdate(uid(A), { ban_duration: '24h' });
     const rA3 = await read(sA3.json?.access_token);
     const unban = await adminUpdate(uid(A), { ban_duration: 'none' });
     const rA3b = await read(sA3.json?.access_token);
+    const act43 = activityOf(uid(A)) === actA43;
+    await pastMargin();
     const sA4 = await signIn(A, pwA);
     const rA4 = await read(sA4.json?.access_token);
-    check('E43-ban-revokes-and-unban-does-not-revive', ban.status === 200 && rA3.status === 401 && unban.status === 200 && rA3b.status === 401 && rA4.status === 200,
-      { banned: reason(rA3), old_session_after_unban: reason(rA3b), fresh_sign_in: reason(rA4) });
+    check('E43-ban-revokes-and-unban-does-not-revive',
+      ban.status === 200 && rA3.status === 401 && unban.status === 200 && rA3b.status === 401 && act43 && rA4.status === 200,
+      { banned: reason(rA3), old_session_after_unban: reason(rA3b), activity_unchanged: act43, fresh_sign_in: reason(rA4) });
 
     // E44: dormant labelled-fixture account: prior activity is read before any refresh.
     const pwF = password();

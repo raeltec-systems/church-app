@@ -272,6 +272,103 @@ void main() {
       });
     }
 
+    group('a JWT rejected by PostgREST (not an access decision)', () {
+      Map<String, Object?> summary() => {
+        'member_id': '22222222-2222-4222-8222-222222222222',
+        'display_name': 'SYNTHETIC Member One',
+        'membership_state': 'approved',
+        'phone_username': '+12025550101',
+        'has_recovery_email': false,
+        'is_synthetic': true,
+      };
+
+      Future<SupabaseClient> scripted(
+        List<http.Response Function(http.Request)> rpcs, {
+        bool refreshRefused = false,
+      }) async {
+        var i = 0;
+        final client = clientWith((r) async {
+          if (r.url.path == '/auth/v1/token' &&
+              r.url.queryParameters['grant_type'] == 'refresh_token' &&
+              refreshRefused) {
+            return json(r, {
+              'code': 400,
+              'error_code': 'refresh_token_not_found',
+              'msg': 'Invalid Refresh Token: Refresh Token Not Found',
+            }, 400);
+          }
+          if (r.url.path.startsWith('/auth/')) return json(r, _session());
+          return rpcs[i++](r);
+        });
+        await client.auth.signInWithPassword(
+          phone: '+12025550101',
+          password: 'p',
+        );
+        return client;
+      }
+
+      http.Response rejected(http.Request r, String code) =>
+          json(r, {'code': code, 'message': 'JWT expired'}, 401);
+
+      bool refreshed() => sent.any(
+        (r) => r.url.queryParameters['grant_type'] == 'refresh_token',
+      );
+
+      for (final code in ['PGRST301', 'PGRST303']) {
+        test('$code: refresh once and retry -> granted', () async {
+          final client = await scripted([
+            (r) => rejected(r, code),
+            (r) => json(r, summary()),
+          ]);
+          final out = await SupabaseMemberAccessRepository(client)
+              .fetchMySummary();
+          expect(out, isA<MemberAccessGranted>());
+          expect(refreshed(), isTrue);
+          expect(client.auth.currentSession, isNotNull);
+        });
+      }
+
+      test(
+        'rejected again after the refresh: a failure, session kept',
+        () async {
+          final client = await scripted([
+            (r) => rejected(r, 'PGRST301'),
+            (r) => rejected(r, 'PGRST301'),
+          ]);
+          final out = await SupabaseMemberAccessRepository(client)
+              .fetchMySummary();
+          expect(
+            out,
+            isA<MemberAccessFailed>().having((f) => f.unreachable, 'u', false),
+          );
+          expect(client.auth.currentSession, isNotNull);
+        },
+      );
+
+      test('refresh refused by Auth: signed out (the SDK ended it)', () async {
+        final client = await scripted([
+          (r) => rejected(r, 'PGRST303'),
+        ], refreshRefused: true);
+        final out = await SupabaseMemberAccessRepository(client)
+            .fetchMySummary();
+        expect(
+          out,
+          isA<MemberAccessDenied>().having(
+            (d) => d.denial,
+            'd',
+            MemberAccessDenial.signedOut,
+          ),
+        );
+        expect(client.auth.currentSession, isNull);
+      });
+
+      test('a JWT rejection never maps to untrustedSession', () {
+        for (final code in ['PGRST301', 'PGRST303']) {
+          expect(memberAccessDenialFor(code, 'JWT expired', null), isNull);
+        }
+      });
+    });
+
     test('a malformed summary is a failure, never data', () async {
       final client = await signedIn(
         (r) async => json(r, {'display_name': 'x'}),

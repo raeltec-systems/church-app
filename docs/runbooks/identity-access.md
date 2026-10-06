@@ -165,7 +165,7 @@ Known limits:
 
 ## Scoped roles and grants (story 2.3)
 
-Architecture: AD-2, AD-3, AD-4, AD-19. Migration: `supabase/migrations/20261006235500_identity_grants.sql`.
+Architecture: AD-2, AD-3, AD-4, AD-19. Migration: `supabase/migrations/20261006234820_identity_grants.sql`.
 Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.3/`.
 
 ### Model

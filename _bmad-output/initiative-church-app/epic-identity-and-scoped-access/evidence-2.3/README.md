@@ -1,6 +1,6 @@
 # Evidence: story 2.3 — grant scoped roles with audited, immediate effect
 
-**Run:** 2026-10-06, on the LOCAL stack only (Supabase CLI 2.119.0), after `npx supabase db reset` with all migrations up to `20261006235500_identity_grants.sql`.
+**Run:** 2026-10-06, on the LOCAL stack only (Supabase CLI 2.119.0), after `npx supabase db reset` with all migrations up to `20261006234820_identity_grants.sql`.
 
 **Data:** every record is SYNTHETIC. Numbers come only from `+1 202 555 0131–0158` and emails only from `@example.test`. Each run deleted every user, link, member, grant, audit row and fixture target it created. No hosted project was changed.
 
@@ -57,7 +57,7 @@ Client tests:
 
 These need hosted access or the owner:
 
-- **Staging apply.** The parent session applies `20261006235500_identity_grants.sql` to `bic-kafue-platform-test` after review. It needs the 2.1 and 2.2 migrations, which are already on staging.
+- **Staging apply.** The parent session applies `20261006234820_identity_grants.sql` to `bic-kafue-platform-test` after review. It needs the 2.1 and 2.2 migrations, which are already on staging.
 - **The device demonstration of the ticket's verify line.** Grant and revoke on the staff web build against staging, and watch an already signed-in Android session and an open browser tab change at the next request. Steps:
   1. Seed two synthetic links as the restricted operator.
   2. Run `select app.identity_bootstrap_admin('<admin member_id>', 'israel');` on staging.

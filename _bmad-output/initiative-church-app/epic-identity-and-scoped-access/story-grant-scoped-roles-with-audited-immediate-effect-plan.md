@@ -72,7 +72,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261006235500_identity_grants.sql` -- authorizer registry and `cmd_authorize`; roles, church settings, scope-kind registry, grant sets, grants, audit; the helpers `identity_has_role/has_scope/require_grant/evaluate_grant`; Identity authorizer; the four commands; the `api.identity_grant_command`, `api.identity_my_access` and `api.identity_admin_member_grants` reads; the bootstrap; the fixture scope kinds and `api.fixture_scoped_read`.
+- [x] `supabase/migrations/20261006234820_identity_grants.sql` -- authorizer registry and `cmd_authorize`; roles, church settings, scope-kind registry, grant sets, grants, audit; the helpers `identity_has_role/has_scope/require_grant/evaluate_grant`; Identity authorizer; the four commands; the `api.identity_grant_command`, `api.identity_my_access` and `api.identity_admin_member_grants` reads; the bootstrap; the fixture scope kinds and `api.fixture_scoped_read`.
 - [x] `supabase/tests/identity_grants_test.sql` -- pgTAP for the matrix, locks, audit, settings, privileges and registry guards; update `command_foundation_test.sql`.
 - [x] `supabase/tests/identity_api_smoke.sh` -- anon is denied the new api functions.
 - [x] `tools/identity-e2e/grants.mjs` -- real Auth sessions: mid-session grant and revoke, stale revision, last Admin, combined and Admin-only fixture denial, replay; redacted evidence; cleanup.
@@ -87,7 +87,7 @@ context:
 ## Implementation Notes
 
 - Built directly, because this session has no subagent tool. Files:
-  - Migration: `20261006235500_identity_grants.sql`.
+  - Migration: `20261006234820_identity_grants.sql`.
   - Database tests: pgTAP `identity_grants_test.sql` (94); `identity_api_smoke.sh` (+6 checks).
   - E2E tools: `tools/identity-e2e/grants.mjs` (+ `grants.test.mjs`) and `live-grants-check.sh`.
   - client_core:

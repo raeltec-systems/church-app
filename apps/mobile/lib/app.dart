@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:go_router/go_router.dart';
 
-/// Platform destinations only. The five member tabs (Home, Bible & Hymns,
+/// Platform destinations plus the member's account (story 2.1). The five member tabs (Home, Bible & Hymns,
 /// Sermons, Give, Calendar) arrive with their feature epics.
 const mobileDestinations = [
   (
@@ -13,6 +13,7 @@ const mobileDestinations = [
     icon: Icons.monitor_heart_outlined,
   ),
   (path: ClientPaths.fixture, label: 'Fixture', icon: Icons.science_outlined),
+  (path: ClientPaths.account, label: 'Account', icon: Icons.person_outline),
 ];
 
 class MobileApp extends StatefulWidget {

@@ -10,7 +10,9 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'src/application/providers.dart';
 import 'src/domain/platform_status.dart';
 
+import 'src/domain/account_auth.dart';
 import 'src/domain/commands.dart';
+import 'src/domain/member_access.dart';
 import 'src/domain/fixture_counter.dart';
 import 'src/domain/session.dart';
 
@@ -132,6 +134,91 @@ class FakePlatformStatus implements PlatformStatusRepository {
   );
 }
 
+/// One sign-up or sign-in the fake gateway received; complete it to answer.
+class SentAuth {
+  SentAuth(this.createAccount, this.phoneE164);
+  final bool createAccount;
+  final String phoneE164;
+  final Completer<AuthOutcome> _answer = Completer<AuthOutcome>();
+}
+
+/// [AccountAuthGateway] whose calls wait for the test. A success switches
+/// [session] to the given account, as Supabase Auth would.
+class FakeAccountAuth implements AccountAuthGateway {
+  FakeAccountAuth(this.session);
+  final FakeSession session;
+  final List<SentAuth> sent = [];
+  int signOuts = 0;
+
+  SentAuth get last => sent.last;
+
+  void succeed(String accountId) {
+    last._answer.complete(AuthSucceeded(accountId));
+    session.switchTo(accountId);
+  }
+
+  void fail(AuthFailure failure, {List<String> reasons = const []}) =>
+      last._answer.complete(AuthFailed(failure, serverReasons: reasons));
+
+  Future<AuthOutcome> _record(bool create, String phone) {
+    final a = SentAuth(create, phone);
+    sent.add(a);
+    return a._answer.future;
+  }
+
+  @override
+  Future<AuthOutcome> signUp({
+    required String phoneE164,
+    required String password,
+  }) => _record(true, phoneE164);
+
+  @override
+  Future<AuthOutcome> signIn({
+    required String phoneE164,
+    required String password,
+  }) => _record(false, phoneE164);
+
+  @override
+  Future<void> signOut() async {
+    signOuts++;
+    session.switchTo(null);
+  }
+}
+
+/// [MemberAccessRepository] answered by the test; each call waits for
+/// [answer] unless [next] is set.
+class FakeMemberAccess implements MemberAccessRepository {
+  MemberAccessResult? next;
+  final List<Completer<MemberAccessResult>> pending = [];
+  int calls = 0;
+
+  void answer(MemberAccessResult result) =>
+      pending.removeAt(0).complete(result);
+
+  @override
+  Future<MemberAccessResult> fetchMySummary() {
+    calls++;
+    final n = next;
+    if (n != null) return Future.value(n);
+    final c = Completer<MemberAccessResult>();
+    pending.add(c);
+    return c.future;
+  }
+}
+
+/// A synthetic member summary.
+MemberSummary syntheticMemberSummary({
+  String name = 'SYNTHETIC Member One',
+  String phone = '+12025550101',
+}) => MemberSummary(
+  memberId: '22222222-2222-4222-8222-222222222222',
+  displayName: name,
+  membershipState: 'approved',
+  phoneUsername: phone,
+  hasRecoveryEmail: false,
+  isSynthetic: true,
+);
+
 /// The fakes and provider overrides an app or screen test runs against.
 class ClientTestHarness {
   ClientTestHarness({String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'})
@@ -140,6 +227,8 @@ class ClientTestHarness {
   final gateway = FakeCommandGateway();
   final FakeSession session;
   final reader = FakeFixtureReader();
+  late final auth = FakeAccountAuth(session);
+  final memberAccess = FakeMemberAccess();
 
   /// [configured] false leaves the unconfigured defaults for the gateway and
   /// the platform status (as a build without `--dart-define`s).
@@ -148,6 +237,8 @@ class ClientTestHarness {
     fixtureCounterReaderProvider.overrideWithValue(reader),
     requestIdsProvider.overrideWithValue(SequentialRequestIds()),
     if (configured) ...[
+      accountAuthGatewayProvider.overrideWithValue(auth),
+      memberAccessRepositoryProvider.overrideWithValue(memberAccess),
       commandGatewayProvider.overrideWithValue(gateway),
       platformStatusRepositoryProvider.overrideWithValue(FakePlatformStatus()),
     ],

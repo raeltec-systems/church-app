@@ -17,6 +17,7 @@ const staffDestinations = [
     label: 'Fixture command',
     icon: Icons.science_outlined,
   ),
+  (path: ClientPaths.account, label: 'My account', icon: Icons.person_outline),
 ];
 
 class StaffApp extends StatefulWidget {

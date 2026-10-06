@@ -46,9 +46,10 @@ select results_eq(
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname in ('app', 'api') and has_function_privilege('authenticated', p.oid, 'EXECUTE')
      order by 1$$,
-  $$values ('api.fixture_counter_command'::text collate "C"), ('api.system_command'),
-           ('app.fixture_counter_command'), ('app.sys_command')$$,
-  'authenticated can execute only the command wrappers and their definer entry points (the system route refuses sessions)'
+  $$values ('api.fixture_counter_command'::text collate "C"), ('api.identity_my_member_summary'),
+           ('api.system_command'), ('app.fixture_counter_command'),
+           ('app.identity_my_member_summary'), ('app.sys_command')$$,
+  'authenticated can execute only the command wrappers, the live-access-checked identity read (story 2.1) and their definer entry points (the system route refuses sessions)'
 );
 select is_definer('app', 'fixture_counter_command',
   array['jsonb'], 'the app entry point is SECURITY DEFINER');

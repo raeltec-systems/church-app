@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# Identity live access (story 2.1) through the real Data API (PostgREST + Auth) of the running
+# local stack: the allowlisted read api.identity_my_member_summary for a seeded synthetic member,
+# an unlinked account, a signed-out client, a revoked session, and direct table queries.
+#
+# The local CLI forces the phone provider off (evidence-1.2/local-cli-phone-gate.txt), so CI signs
+# in through the verified-email alias of a phone account (AD-20: same account, same predicate).
+# Phone sign-in itself is exercised by tools/identity-e2e with tools/auth-harness/local-phone-auth.sh.
+# Usage: npm run db:smoke   (needs curl, jq and psql; SYNTHETIC users and data only)
+set -euo pipefail
+
+source "$(dirname "${BASH_SOURCE[0]}")/lib/local_stack.sh"
+require_local_stack API_URL PUBLISHABLE_KEY SECRET_KEY SERVICE_ROLE_KEY DB_URL
+RPC="$API_URL/rest/v1/rpc/identity_my_member_summary"
+fail=0
+WORK=$(mktemp -d)
+USERS=()
+MARKED=0
+
+ok()   { echo "ok   - $1"; }
+bad()  { echo "FAIL - $1"; fail=1; }
+expect() { # name expected actual [body]
+  if [[ "$3" == "$2" ]]; then ok "$1 ($3)"; else bad "$1: expected $2, got $3 ${4:-}"; fi
+}
+
+cleanup() {
+  for id in "${USERS[@]:-}"; do
+    [[ -z "$id" ]] && continue
+    sql "delete from app.identity_binding_history h using app.identity_account_links l
+          where h.link_id = l.link_id and l.auth_user_id = '$id';
+         with gone as (delete from app.identity_account_links where auth_user_id = '$id' returning member_id)
+         delete from app.identity_members m using gone where m.member_id = gone.member_id;" >/dev/null || true
+    synthetic_user_delete "$id"
+  done
+  if [[ "$MARKED" == 1 ]]; then
+    sql "delete from app.platform_environment where set_by = 'identity-api-smoke';
+         delete from app.platform_environment_history where set_by = 'identity-api-smoke';" >/dev/null || true
+  fi
+  rm -rf "$WORK"
+}
+trap cleanup EXIT
+
+current=$(sql "select coalesce((select environment from app.platform_environment), '')")
+if [[ -z "$current" ]]; then
+  sql "select app.platform_set_environment('local', 'identity-api-smoke');" >/dev/null
+  MARKED=1
+elif [[ "$current" != local ]]; then
+  die "local database is marked '$current'"
+fi
+
+# Synthetic phone account (fictional NANP range) with a verified synthetic email alias.
+new_user() { # phone email password -> sets USER_ID
+  USER_ID=$(curl -s -X POST "$API_URL/auth/v1/admin/users" \
+    -H "apikey: $SECRET_KEY" -H "Authorization: Bearer $SERVICE_ROLE_KEY" -H 'Content-Type: application/json' \
+    -d "{\"phone\":\"$1\",\"phone_confirm\":true,\"email\":\"$2\",\"email_confirm\":true,\"password\":\"$3\"}" | jq -r .id)
+  [[ "$USER_ID" =~ ^[0-9a-f-]{36}$ ]] || die "could not create a synthetic user"
+  USERS+=("$USER_ID")
+}
+sign_in() { # email password -> prints the session JSON
+  curl -s -X POST "$API_URL/auth/v1/token?grant_type=password" \
+    -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Type: application/json' \
+    -d "{\"email\":\"$1\",\"password\":\"$2\"}"
+}
+read_summary() { # token -> http code; body in $WORK/out
+  local auth=()
+  [[ -n "$1" ]] && auth=(-H "Authorization: Bearer $1")
+  curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$RPC" -H "apikey: $PUBLISHABLE_KEY" "${auth[@]}" \
+    -H 'Content-Profile: api' -H 'Content-Type: application/json' -d '{}'
+}
+
+PW1="Synthetic-$(uuid)"; PW2="Synthetic-$(uuid)"
+new_user "+12025550161" "identity-smoke-1-$(uuid | cut -c1-8)@example.test" "$PW1"; U1=$USER_ID
+E1=$(sql "select email from auth.users where id = '$U1'")
+new_user "+12025550162" "identity-smoke-2-$(uuid | cut -c1-8)@example.test" "$PW2"; U2=$USER_ID
+E2=$(sql "select email from auth.users where id = '$U2'")
+sql "select app.identity_seed_synthetic_link('$U1', 'SYNTHETIC Smoke Member', 'identity-api-smoke');" >/dev/null
+
+S1=$(sign_in "$E1" "$PW1"); T1=$(jq -r .access_token <<<"$S1"); R1=$(jq -r .refresh_token <<<"$S1")
+T2=$(sign_in "$E2" "$PW2" | jq -r .access_token)
+[[ -n "$T1" && "$T1" != null && -n "$T2" && "$T2" != null ]] || die "synthetic sign-in failed"
+
+code=$(read_summary "$T1"); body=$(cat "$WORK/out")
+expect "linked synthetic member reads own summary" 200 "$code" "$body"
+[[ "$(jq -r .display_name <<<"$body")" == "SYNTHETIC Smoke Member" && "$(jq -r .phone_username <<<"$body")" == "+12025550161" ]] \
+  && ok "summary is the caller's own record" || bad "unexpected summary: $body"
+
+code=$(read_summary "$T2"); body=$(cat "$WORK/out")
+expect "unlinked account is forbidden" 403 "$code" "$body"
+[[ "$(jq -r .message <<<"$body"):$(jq -r .details <<<"$body")" == "forbidden:not_linked" ]] \
+  && ok "unlinked denial is generic (forbidden/not_linked)" || bad "unlinked body: $body"
+
+code=$(read_summary ""); expect "signed-out client is refused" 401 "$code" "$(cat "$WORK/out")"
+
+code=$(curl -s -o "$WORK/out" -w '%{http_code}' "$API_URL/rest/v1/identity_members" \
+  -H "apikey: $PUBLISHABLE_KEY" -H "Authorization: Bearer $T1" -H 'Accept-Profile: app')
+expect "direct query of the app schema is refused (not exposed)" 406 "$code" "$(cat "$WORK/out")"
+for rel in identity_members identity_account_links identity_holds; do
+  code=$(curl -s -o "$WORK/out" -w '%{http_code}' "$API_URL/rest/v1/$rel" \
+    -H "apikey: $PUBLISHABLE_KEY" -H "Authorization: Bearer $T1" -H 'Accept-Profile: api')
+  expect "no api relation named $rel" 404 "$code" "$(cat "$WORK/out")"
+done
+
+# Sign-out (scope local) deletes the session row: the still-unexpired JWT is denied.
+curl -s -o /dev/null -X POST "$API_URL/auth/v1/logout?scope=local" -H "apikey: $PUBLISHABLE_KEY" \
+  -H "Authorization: Bearer $T1"
+code=$(read_summary "$T1"); body=$(cat "$WORK/out")
+expect "revoked session's unexpired JWT is refused" 401 "$code" "$body"
+[[ "$(jq -r .details <<<"$body")" == "untrusted_session" ]] && ok "revoked session reason" || bad "revoked body: $body"
+code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API_URL/auth/v1/token?grant_type=refresh_token" \
+  -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$R1\"}")
+expect "revoked session cannot refresh" 400 "$code"
+
+# No SMS configuration exists on this stack.
+sms=$(curl -s "$API_URL/auth/v1/settings" -H "apikey: $PUBLISHABLE_KEY" | jq -r '.sms_provider // ""')
+[[ -z "$sms" ]] && ok "no SMS provider configured" || bad "sms_provider is '$sms'"
+
+exit $fail

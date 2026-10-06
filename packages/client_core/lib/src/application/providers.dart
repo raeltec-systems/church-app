@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/account_auth.dart';
 import '../domain/commands.dart';
 import '../domain/fixture_counter.dart';
+import '../domain/member_access.dart';
 import '../domain/platform_status.dart';
 import '../domain/session.dart';
 
@@ -22,6 +24,14 @@ final fixtureCounterReaderProvider = Provider<FixtureCounterReader>(
 /// Null when the build has no backend configuration.
 final platformStatusRepositoryProvider = Provider<PlatformStatusRepository?>(
   (ref) => null,
+);
+
+final accountAuthGatewayProvider = Provider<AccountAuthGateway>(
+  (ref) => const UnconfiguredAccountAuthGateway(),
+);
+
+final memberAccessRepositoryProvider = Provider<MemberAccessRepository>(
+  (ref) => const UnconfiguredMemberAccessRepository(),
 );
 
 final requestIdsProvider = Provider<RequestIds>((ref) => SecureRequestIds());

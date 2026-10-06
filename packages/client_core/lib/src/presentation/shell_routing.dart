@@ -2,8 +2,10 @@ import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
+import 'account_screen.dart';
 import 'fixture_command_screen.dart';
 import 'platform_status_screen.dart';
+import 'sign_in_screen.dart';
 
 /// Platform destinations shared by both shells. Real member and staff
 /// navigation (filtered by granted roles and scopes) arrives with the identity
@@ -11,6 +13,11 @@ import 'platform_status_screen.dart';
 abstract final class ClientPaths {
   static const status = '/status';
   static const fixture = '/fixture';
+
+  /// The signed-in member's own membership (story 2.1).
+  static const account = '/account';
+  static const signIn = '/sign-in';
+  static const createAccount = '/create-account';
 }
 
 /// `extra` of a navigation started from a shell tab by the keyboard: the
@@ -48,6 +55,19 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.fixture,
         pageBuilder: (_, state) => page(state, const FixtureCommandScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.account,
+        pageBuilder: (_, state) => page(state, const AccountScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.signIn,
+        pageBuilder: (_, state) => page(state, const SignInScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.createAccount,
+        pageBuilder: (_, state) =>
+            page(state, const SignInScreen(createAccount: true)),
       ),
     ],
   );

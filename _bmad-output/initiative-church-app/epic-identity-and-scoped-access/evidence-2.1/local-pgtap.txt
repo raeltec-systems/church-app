@@ -1,0 +1,5 @@
+Connecting to local database...
+supabase/tests/identity_live_access_test.sql .. ok
+All tests successful.
+Files=1, Tests=67,  1 wallclock secs ( 0.05 usr  0.01 sys +  0.01 cusr  0.01 csys =  0.08 CPU)
+Result: PASS

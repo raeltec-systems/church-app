@@ -3,7 +3,7 @@ library;
 
 /// Application port over the auth session.
 ///
-/// Sign-in itself belongs to the identity epic; the shells only observe the
+/// Sign-in goes through `AccountAuthGateway` (story 2.1); this port only observes the
 /// current account so protected state can be cleared when it changes.
 abstract interface class SessionRepository {
   /// The current account's `auth_user_id`, or null when signed out.

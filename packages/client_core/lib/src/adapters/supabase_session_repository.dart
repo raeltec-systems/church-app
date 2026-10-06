@@ -3,7 +3,7 @@ import 'package:supabase/supabase.dart';
 import '../domain/session.dart';
 
 /// Supabase Auth adapter for [SessionRepository]. Observes only; sign-in
-/// flows belong to the identity epic.
+/// goes through SupabaseAccountAuthGateway (story 2.1).
 class SupabaseSessionRepository implements SessionRepository {
   SupabaseSessionRepository(this._client);
 

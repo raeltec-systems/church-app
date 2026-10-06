@@ -39,6 +39,9 @@ Future<List<Override>> compositionOverrides(AppConfig config) async {
     publishableKey: config.publishableKey,
     postgrestOptions: const PostgrestClientOptions(schema: 'api'),
     // AD-13: no persisted session; protected state lives in memory only.
+    // Story 2.1 keeps this: the session lasts while the app runs (the SDK
+    // refreshes it) and a restart asks for the password again. Durable,
+    // platform-secured session storage is deferred (deferred-work.md).
     authOptions: const FlutterAuthClientOptions(
       persistSession: false,
       detectSessionInUri: false,
@@ -52,6 +55,12 @@ Future<List<Override>> compositionOverrides(AppConfig config) async {
     commandGatewayProvider.overrideWithValue(SupabaseCommandGateway(client)),
     sessionRepositoryProvider.overrideWithValue(
       SupabaseSessionRepository(client),
+    ),
+    accountAuthGatewayProvider.overrideWithValue(
+      SupabaseAccountAuthGateway(client),
+    ),
+    memberAccessRepositoryProvider.overrideWithValue(
+      SupabaseMemberAccessRepository(client),
     ),
   ];
 }

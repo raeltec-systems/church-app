@@ -63,6 +63,53 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets(
+    'story 2.1: account tab -> member summary; sign out; phone sign-in again',
+    (tester) async {
+      final h = await pumpStaff(tester);
+      await tapKey(tester, 'nav-/account');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.text('My membership'), findsWidgets);
+      h.memberAccess.answer(MemberAccessGranted(syntheticMemberSummary()));
+      await tester.pumpAndSettle();
+      expect(find.text('SYNTHETIC Member One'), findsOneWidget);
+      expect(find.text('Sign-in username: +12025550101'), findsOneWidget);
+
+      await tapKey(tester, 'sign-out');
+      await tester.pumpAndSettle();
+      expect(find.text('SYNTHETIC Member One'), findsNothing);
+      await tapKey(tester, 'go-sign-in');
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('phone-field')),
+        '+44 7700 900123',
+      );
+      await tester.enterText(
+        find.byKey(const Key('password-field')),
+        'Synthetic-pw',
+      );
+      await tapKey(tester, 'submit-button');
+      expect(h.auth.last.phoneE164, '+447700900123');
+      h.auth.succeed('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      h.memberAccess.answer(
+        MemberAccessGranted(
+          syntheticMemberSummary(
+            name: 'SYNTHETIC Member Three',
+            phone: '+447700900123',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('SYNTHETIC Member Three'), findsOneWidget);
+      expect(h.memberAccess.calls, 2);
+    },
+  );
+
   testWidgets('unconfigured build explains itself and does not send commands', (
     tester,
   ) async {

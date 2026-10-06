@@ -2,14 +2,15 @@ import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
+import 'access_screens.dart';
 import 'account_screen.dart';
 import 'fixture_command_screen.dart';
 import 'platform_status_screen.dart';
 import 'sign_in_screen.dart';
 
-/// Platform destinations shared by both shells. Real member and staff
-/// navigation (filtered by granted roles and scopes) arrives with the identity
-/// and feature epics.
+/// Destinations shared by both shells. Which ones a shell shows follows the
+/// server's current grants (story 2.3, `myAccessProvider`); a route itself is
+/// never the control: every screen's data comes from a server-checked read.
 abstract final class ClientPaths {
   static const status = '/status';
   static const fixture = '/fixture';
@@ -18,6 +19,12 @@ abstract final class ClientPaths {
   static const account = '/account';
   static const signIn = '/sign-in';
   static const createAccount = '/create-account';
+
+  /// The signed-in member's current roles and scopes (story 2.3).
+  static const access = '/access';
+
+  /// Staff web, Admin only: grant and remove roles (story 2.3).
+  static const adminGrants = '/admin/grants';
 }
 
 /// `extra` of a navigation started from a shell tab by the keyboard: the
@@ -59,6 +66,14 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.account,
         pageBuilder: (_, state) => page(state, const AccountScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.access,
+        pageBuilder: (_, state) => page(state, const MyAccessScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.adminGrants,
+        pageBuilder: (_, state) => page(state, const GrantAdminScreen()),
       ),
       GoRoute(
         path: ClientPaths.signIn,

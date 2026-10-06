@@ -2,11 +2,13 @@ import 'package:church_client_core/church_client_core.dart';
 import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-/// Platform destinations only. Real staff navigation is filtered by granted
-/// roles and scopes, which the identity epic provides.
-const staffDestinations = [
+typedef StaffDestination = ({String path, String label, IconData icon});
+
+/// Destinations every staff session sees.
+const staffDestinations = <StaffDestination>[
   (
     path: ClientPaths.status,
     label: 'Platform status',
@@ -18,6 +20,28 @@ const staffDestinations = [
     icon: Icons.science_outlined,
   ),
   (path: ClientPaths.account, label: 'My account', icon: Icons.person_outline),
+];
+
+/// Story 2.3: shown while the server grants the caller member access.
+const staffAccessDestination = (
+  path: ClientPaths.access,
+  label: 'My access',
+  icon: Icons.badge_outlined,
+);
+
+/// Story 2.3: shown while the server's current answer includes Admin.
+const staffAdminDestination = (
+  path: ClientPaths.adminGrants,
+  label: 'Roles & access',
+  icon: Icons.admin_panel_settings_outlined,
+);
+
+/// The sidebar for the caller's current grants. Presentation only: hiding an
+/// entry is not a control, and every screen's data is checked by the server.
+List<StaffDestination> staffDestinationsFor(MemberGrants? grants) => [
+  ...staffDestinations,
+  if (grants != null) staffAccessDestination,
+  if (grants?.isAdmin ?? false) staffAdminDestination,
 ];
 
 class StaffApp extends StatefulWidget {
@@ -58,7 +82,7 @@ class _StaffAppState extends State<StaffApp> {
 
 /// Navy sidebar (232 px) on wide windows; a navy top bar on narrow windows
 /// or at large text sizes, so content never scrolls sideways.
-class StaffShell extends StatelessWidget {
+class StaffShell extends ConsumerWidget {
   const StaffShell({
     super.key,
     required this.location,
@@ -73,7 +97,10 @@ class StaffShell extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final destinations = staffDestinationsFor(
+      ref.watch(myAccessProvider.select((s) => s.grants)),
+    );
     final nav = FocusTraversalGroup(
       child: Semantics(
         role: SemanticsRole.tabBar,
@@ -82,7 +109,7 @@ class StaffShell extends StatelessWidget {
         child: Builder(
           builder: (context) {
             final items = [
-              for (final d in staffDestinations)
+              for (final d in destinations)
                 NavItem(
                   key: Key('nav-${d.path}'),
                   label: d.label,
@@ -121,6 +148,17 @@ class StaffShell extends StatelessWidget {
       removeBottom: true,
       child: FocusTraversalGroup(child: child),
     );
+    // Story 2.3: every navigation (a new shell) and every resume asks the
+    // server for the caller's grants again.
+    return AccessRefresher(child: _layout(context, brand, nav, content));
+  }
+
+  Widget _layout(
+    BuildContext context,
+    Widget brand,
+    Widget nav,
+    Widget content,
+  ) {
     if (_wide(context)) {
       return Scaffold(
         body: FocusTraversalGroup(

@@ -3,7 +3,7 @@ title: 'Grant scoped roles with audited, immediate effect'
 type: 'feature'
 ticket: '3'
 created: '2026-10-06'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '77bf40f0e0f55b43fe6e8ab990761786a2af1eef'
 route: 'full'
 route_source: 'auto'
@@ -72,13 +72,13 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261006235500_identity_grants.sql` -- authorizer registry and `cmd_authorize`; roles, church settings, scope-kind registry, grant sets, grants, audit; the helpers `identity_has_role/has_scope/require_grant/evaluate_grant`; Identity authorizer; the four commands; the `api.identity_grant_command`, `api.identity_my_access` and `api.identity_admin_member_grants` reads; the bootstrap; the fixture scope kinds and `api.fixture_scoped_read`.
-- [ ] `supabase/tests/identity_grants_test.sql` -- pgTAP for the matrix, locks, audit, settings, privileges and registry guards; update `command_foundation_test.sql`.
-- [ ] `supabase/tests/identity_api_smoke.sh` -- anon is denied the new api functions.
-- [ ] `tools/identity-e2e/grants.mjs` -- real Auth sessions: mid-session grant and revoke, stale revision, last Admin, combined and Admin-only fixture denial, replay; redacted evidence; cleanup.
-- [ ] `packages/client_core` -- grants domain, adapter, `MyAccessController`, grant-driven destinations, `MyAccessScreen`, `GrantAdminScreen`, routes, fakes, tests; live check `grants` mode.
-- [ ] `apps/{mobile,staff}` -- navigation from grants; app tests.
-- [ ] `docs/runbooks/identity-access.md`, `evidence-2.3/README.md`, CI evidence scan.
+- [x] `supabase/migrations/20261006235500_identity_grants.sql` -- authorizer registry and `cmd_authorize`; roles, church settings, scope-kind registry, grant sets, grants, audit; the helpers `identity_has_role/has_scope/require_grant/evaluate_grant`; Identity authorizer; the four commands; the `api.identity_grant_command`, `api.identity_my_access` and `api.identity_admin_member_grants` reads; the bootstrap; the fixture scope kinds and `api.fixture_scoped_read`.
+- [x] `supabase/tests/identity_grants_test.sql` -- pgTAP for the matrix, locks, audit, settings, privileges and registry guards; update `command_foundation_test.sql`.
+- [x] `supabase/tests/identity_api_smoke.sh` -- anon is denied the new api functions.
+- [x] `tools/identity-e2e/grants.mjs` -- real Auth sessions: mid-session grant and revoke, stale revision, last Admin, combined and Admin-only fixture denial, replay; redacted evidence; cleanup.
+- [x] `packages/client_core` -- grants domain, adapter, `MyAccessController`, grant-driven destinations, `MyAccessScreen`, `GrantAdminScreen`, routes, fakes, tests; live check `grants` mode.
+- [x] `apps/{mobile,staff}` -- navigation from grants; app tests.
+- [x] `docs/runbooks/identity-access.md`, `evidence-2.3/README.md`, CI evidence scan.
 
 **Acceptance Criteria:**
 - Given two signed-in sessions, when an Admin grants and then revokes a role, then the other session's next protected call reflects each change, with no re-sign-in, and audit rows exist.
@@ -86,9 +86,38 @@ context:
 
 ## Implementation Notes
 
+- Built directly, because this session has no subagent tool. Files:
+  - Migration: `20261006235500_identity_grants.sql`.
+  - Database tests: pgTAP `identity_grants_test.sql` (94); `identity_api_smoke.sh` (+6 checks).
+  - E2E tools: `tools/identity-e2e/grants.mjs` (+ `grants.test.mjs`) and `live-grants-check.sh`.
+  - client_core:
+    - `domain/access_grants.dart`, `adapters/supabase_grants_repository.dart`;
+    - `application/access_controllers.dart` (`myAccessProvider`, `grantAdminProvider`);
+    - `presentation/access_screens.dart` (`AccessRefresher`, `MyAccessScreen`, `GrantAdminScreen`);
+    - routes `/access` and `/admin/grants`, fakes (`FakeGrants`), `tool/live_grants_check.dart`, `test/identity/grants_test.dart`.
+  - App shells built from grants: `staffDestinationsFor`, `mobileDestinationsFor`.
+  - Runbook section, `evidence-2.3/README.md` and the CI evidence scan.
+- Cross-lane edits (necessary):
+  - The `command_foundation_test.sql` allowlist now includes the four new client-executable pairs.
+  - The cleanup SQL in `identity_api_smoke.sh`, `tools/identity-e2e/run.mjs` and `live-adapter-check.sh` deletes grants and grant sets before members, because grant sets now reference members.
+  - The 2.2 phone E2E (`run.mjs`) was not re-run, because it needs the auth container to be recreated with the phone switch. Its cleanup change is the same SQL that the smoke run exercised.
+- Decision (agent, under owner pre-approval): `cmd_authorize` is replaced in place (same signature) by a registry dispatch, and `cmd_current_request_id` attributes audit rows to the in-flight receipt. The `fixture` module gains an edge to `identity`; every owner may use Identity checks, and the fixture module needs it for the synthetic care and finance surfaces.
+- Decision (agent, under owner pre-approval): the Admin screen grants and removes roles, and removes scopes. Granting a scope needs a target picker from the scope's owner (cell, department and others), so that waits for those owners. The command and its tests exist already.
+- Decision (agent, under owner pre-approval): the E2E and adapter checks sign in through the verified email alias of synthetic phone accounts (same account, same predicate), so the local phone switch was not needed.
+- Gates (owner):
+  - `lead_pastor_designation` (Q4) and `operational_contact` (Q1) stay unset in production. Only a labelled fixture enables lead pastor in local and staging.
+  - Naming the first real Admin is entry 14.
+  - Staging apply and the device demonstration are for the parent and owner (`evidence-2.3/README.md`).
+- Environment: the parent restarted Docker mid-build. The stack was restarted without the analytics services (`supabase start -x vector,logflare,...`) and reset.
+
 ## Verification
 
 **Commands:**
 - `npm run db:test && npm run db:smoke` -- expected: pass
 - `node tools/auth-harness/local-phone-auth.mjs on && node tools/identity-e2e/grants.mjs --evidence … && … off` -- expected: all pass
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/mobile`, `apps/staff` -- expected: pass
+- Results (2026-10-06, local):
+  - `db:test` 608/608 (grants 94); `db:smoke` all ok.
+  - `grants.mjs` 18/18; live adapter check L1–L8 pass.
+  - Flutter tests: client_core 154, mobile 17, staff 16; analyze clean, format clean; staff web build ok.
+  - `ci:migrations --base origin/main` ordered and non-destructive; `ci:secrets` and `scan-evidence` clean; node tool tests pass.

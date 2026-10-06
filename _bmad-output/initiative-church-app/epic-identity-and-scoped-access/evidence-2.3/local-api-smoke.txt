@@ -1,0 +1,87 @@
+
+> db:smoke
+> bash supabase/tests/api_smoke.sh && bash supabase/tests/command_api_smoke.sh && bash supabase/tests/contract_fixtures_check.sh && bash supabase/tests/system_api_smoke.sh && bash supabase/tests/identity_api_smoke.sh
+
+ok   - anon reads api.platform_status (200)
+ok   - app schema is not exposed (PGRST106) (406)
+ok   - public schema is not exposed (406)
+ok   - anon INSERT through api is denied (401)
+ok   - anon UPDATE through api is denied (401)
+ok   - anon DELETE through api is denied (401)
+ok   - anon cannot execute the command RPC (401)
+ok   - actor without fixture authority is forbidden (forbidden)
+ok   - direct table insert into app is not reachable (PGRST106) (406)
+ok   - the app kernel is not reachable over HTTP (406)
+ok   - create returns revision 1 (1)
+ok   - changed-payload replay conflicts (conflict)
+ok   - duplicates were in flight together (5 waiting on locks)
+ok   - all 5 duplicates return one identical result (1)
+ok   - duplicate result is the first increment (2)
+ok   - duplicates applied once (1|2)
+ok   - one receipt for the duplicated request (1)
+ok   - writers were in flight together (8 waiting on locks)
+ok   - exactly one simultaneous writer wins (1)
+ok   - the other 7 get conflict with current_revision 3 (7)
+ok   - counter advanced exactly once (2|3)
+ok   - stale revision conflicts (conflict|3)
+ok   - failing write returns validation_failed (validation_failed)
+ok   - error carries no SQL detail
+ok   - failed write rolled back the aggregate (2|3)
+ok   - failed write committed no receipt (0)
+ok   - another actor's counter is not_found (not_found)
+ok   - malformed request_id is a validation_failed envelope (200|validation_failed|invalid)
+ok   - omitted request_id is a validation_failed envelope (200|validation_failed|required)
+ok   - malformed expected_revision is a validation_failed envelope (200|validation_failed|invalid)
+ok   - omitted version is a validation_failed envelope (200|validation_failed|required)
+ok   - malformed envelopes changed nothing (2|3)
+ok   - revocation waited on the in-flight command's grant lock (1)
+ok   - the command authorised before the revocation completed (4)
+ok   - the revocation committed afterwards (1)
+ok   - revoked authority blocks receipt replay (forbidden)
+ok   - revoked authority blocks new writes (forbidden)
+ok   - nothing changed after revocation (3|4)
+ok   - account_ref: 6 fixture cases match app.contract_check
+ok   - actor: 17 fixture cases match app.contract_check
+ok   - command_request: 25 fixture cases match app.contract_check
+ok   - command_response: 30 fixture cases match app.contract_check
+ok   - instant: 26 fixture cases match app.contract_check
+ok   - lifecycle_event: 10 fixture cases match app.contract_check
+ok   - member_ref: 13 fixture cases match app.contract_check
+ok   - money: 30 fixture cases match app.contract_check
+ok   - notification_key: 4 fixture cases match app.contract_check
+ok   - source_ref: 25 fixture cases match app.contract_check
+ok   - task_source: 5 fixture cases match app.contract_check
+ok   - zoned_local: 32 fixture cases match app.contract_check
+# 223 fixture cases checked against SQL
+ok   - command_request: 25 fixture envelopes agree with api.fixture_counter_command
+matrix: 15 cases passed
+ok   - system route HTTP matrix (15 cases)
+ok   - one audit row per call that reached the route (13)
+ok   - only the valid and forged-header probes succeeded
+ok   - no forged principal or member in the audit
+ok   - the user session was refused and audited as authenticated
+ok   - linked synthetic member reads own summary (200)
+ok   - summary is the caller's own record
+ok   - unlinked account is forbidden (403)
+ok   - unlinked denial is generic (forbidden/not_linked)
+ok   - signed-out client is refused (401)
+ok   - direct query of the app schema is refused (not exposed) (406)
+ok   - no api relation named identity_members (404)
+ok   - no api relation named identity_account_links (404)
+ok   - no api relation named identity_holds (404)
+ok   - revoked session's unexpired JWT is refused (401)
+ok   - revoked session reason
+ok   - revoked session cannot refresh (400)
+ok   - a refreshed password session keeps access (200)
+ok   - magiclink session (otp AMR) is denied (401 untrusted_session)
+ok   - recovery session (otp AMR) is denied (401 untrusted_session)
+ok   - a direct Auth email change puts the account in review (403 review_required)
+ok   - a fresh sign-in with the changed email is still in review
+ok   - the change is recorded by kind (link_review_required,email)
+ok   - signed-out client cannot call identity_my_access (401)
+ok   - signed-out client cannot call identity_grant_command (401)
+ok   - signed-out client cannot call identity_admin_member_grants (401)
+ok   - signed-out client cannot call fixture_scoped_read (401)
+ok   - an unlinked account reads no access (403)
+ok   - an unlinked account cannot grant roles (forbidden envelope)
+ok   - no SMS provider configured

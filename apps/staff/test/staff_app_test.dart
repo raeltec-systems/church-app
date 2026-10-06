@@ -204,6 +204,33 @@ void main() {
     expect(find.byKey(const Key('counter-card')), findsNothing);
   });
 
+  testWidgets(
+    'story 2.3: the sidebar follows the server\'s current grants at the next '
+    'navigation (grant, then revoke in another tab)',
+    (tester) async {
+      final h = await pumpStaff(tester);
+      expect(find.byKey(const Key('nav-/admin/grants')), findsNothing);
+      expect(find.byKey(const Key('nav-/access')), findsNothing);
+
+      // An Admin elsewhere grants Admin; this already open tab sees it at its
+      // next protected request (the navigation asks again).
+      h.grants.myAccess = AccessReadOk(syntheticGrants(roles: ['admin']));
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('nav-/admin/grants')), findsOneWidget);
+      expect(find.byKey(const Key('nav-/access')), findsOneWidget);
+
+      // Admin removed elsewhere: the next navigation drops the entry.
+      h.grants.myAccess = AccessReadOk(syntheticGrants(revision: 3));
+      await tapKey(tester, 'nav-/access');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('nav-/admin/grants')), findsNothing);
+      expect(find.byKey(const Key('no-roles')), findsOneWidget);
+    },
+  );
+
   testWidgets('an account switch drops the protected state', (tester) async {
     final h = await pumpStaff(tester, location: '/fixture');
     await tester.enterText(find.byKey(const Key('intent-key-field')), 'k');

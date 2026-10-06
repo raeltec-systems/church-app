@@ -7,8 +7,8 @@ status: 'built'
 baseline_revision: '77bf40f0e0f55b43fe6e8ab990761786a2af1eef'
 route: 'full'
 route_source: 'auto'
-review: ''
-review_source: ''
+review: 'quick'
+review_source: 'pinned'
 lenses_ran: []
 review_loop_iteration: 0
 context:
@@ -132,3 +132,18 @@ context:
   - `grants.mjs` 18/18; live adapter check L1–L8 pass.
   - Flutter tests: client_core 154, mobile 17, staff 16; analyze clean, format clean; staff web build ok.
   - `ci:migrations --base origin/main` ordered and non-destructive; `ci:secrets` and `scan-evidence` clean; node tool tests pass.
+
+## Review Triage Log
+
+| Finding | Verdict | Route | Evidence |
+|---|---|---|---|
+| Admin can self-grant care/finance scopes and roles | high | patch | no actor≠target check in grant functions; violates I6 |
+| lead_pastor designation not bound to a member | high | patch | `{"enabled": true}` only; any Admin can self-designate |
+| usable-Admin count looser than predicate; recovery bootstrap refuses | high | patch | ignores dormancy, Auth mismatch, ban/delete |
+| real-format Zambian number in grants.test.mjs | medium | patch | owner decision 2026-10-06 |
+| bootstrap/setting approval not in operator journal | medium | patch | 1.9 procedures use ops_record_action |
+| audit sequence privileges not revoked | low | patch | earlier migrations revoke sequences |
+| last-Admin rule vs concurrent holds/link changes | medium | patch (doc) | no shared lock; bootstrap recovery is the way out once count is fixed |
+| access not re-read after every forbidden | low | patch | only GrantAdminController refreshes |
+| navigation during in-flight read dropped; stale `_again` | low | patch | AccessRefresher.initState skip |
+| stale roster shown on network failure | low | patch | copyWith keeps members |

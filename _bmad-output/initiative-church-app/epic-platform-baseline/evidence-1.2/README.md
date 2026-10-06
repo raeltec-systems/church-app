@@ -94,22 +94,74 @@
 - **`PUT /user {password}` asked for no reauthentication (row 8).** Recent-password proof must be enforced by the app. Secure password change could trigger email or SMS nonces, which AD-20 forbids for phone-only accounts.
 - **Open operational items (Q1).** The leaked-password advisor is open, and default SMTP is not fit for production recovery.
 
-## To re-capture in the owner-gated rerun (Phone provider ON, Confirm phone OFF, no SMS)
+## LOCAL run (2026-10-03, local Supabase CLI stack): phone track blocked by the CLI; email gaps closed
 
-Use the committed harness (`init`, then links piped on stdin, then `cleanup`). Attach raw query output with `attach`.
+Everything in this section is **LOCAL**, not hosted. Raw log: [`local-harness-log.jsonl`](local-harness-log.jsonl). Every line carries `harness_target: "LOCAL"`; steps are prefixed `L`. The script is `tools/auth-harness/scenarios/1.2-local-rerun.sh`.
 
-1. Re-capture steps 22 and 23 (signup link verify and probe) with the committed tool.
-2. Phone/password signup and login for a phone account (`amr`, probe allowed), with a wrong password vs an unknown phone.
-3. `/otp` with `--phone` for the **existing** phone user (no-SMS path with the provider enabled), plus a direct `/verify` guess.
-4. Add an email on the same account with `PUT /user {email}`, then verify the link. Expect the same user id, a confirmed email and no second user.
-5. Email/password alias login on that phone user: `amr=[password]`, same user, allowed.
-6. After both the password change and the reset, **probe and refresh every other session**. That includes the signup-link and magic-link sessions and every password session.
-7. Attach `observe_account_sessions.sql` after each revocation, `observe_auth_logs.sql` for the rerun window, and `observe_probe_grants.sql`.
+- **Versions (LOCAL):** Supabase CLI **2.119.0**; Auth **GoTrue v2.197.0** (step `L00`, `/auth/v1/health`, the same version as hosted); Postgres **17.11** (step `L14`).
+- **Probe parity:** `001_trusted_session_probe.sql` was applied to the local DB. Its four function definitions have the **same md5** as hosted step `98` (step `L90`). The local PostgREST exposes only the `api` schema, so the RPCs were reached through the pass-through SECURITY INVOKER wrappers in `sql/local/10_local_api_probe_wrappers.sql`. `supabase db reset` removed all harness objects after the run.
+- **Temporary local config for the run (reverted; `supabase/config.toml` is unchanged in the commit):** `[auth.sms] enable_signup = true`, `enable_confirmations = false`, every SMS provider disabled, with no test OTPs, no Send SMS hook and no phone MFA. For hosted parity of the email rows, `[auth.email] enable_confirmations = true` was also set. Mail went only to the local Mailpit and was read by `tools/auth-harness/local-mailpit-link.mjs`.
 
-**Owner action.** In the Supabase dashboard for `bic-kafue-auth-test`, go to **Authentication → Sign In / Providers → Phone**:
+### Phone track: the CLI refuses to enable phone without an SMS provider
 
-1. Turn **Enable Phone provider** on and turn **Confirm phone** off.
-2. Leave the SMS provider credentials empty. Add no Send SMS hook, no test OTPs and no phone MFA.
-3. Save.
+Raw capture: [`local-cli-phone-gate.txt`](local-cli-phone-gate.txt).
 
-If the dashboard will not save without SMS credentials, report that, because it changes AD-20.
+- On start, CLI 2.119.0 printed `WARN: no SMS provider is enabled. Disabling phone login`. It then set `GOTRUE_EXTERNAL_PHONE_ENABLED=false`, even with `[auth.sms] enable_signup = true`.
+- The CLI source condition requires one of `twilio`, `twilio_verify`, `messagebird`, `textlocal` or `vonage` to be **enabled**. Enabling one is exactly what story 1.2 forbids, so it was not configured. A Send SMS hook or test OTPs would not satisfy the condition either.
+- **Harness confirmation (LOCAL), all with the provider forced off:**
+
+| Step | Call | Result |
+|---|---|---|
+| `L00` | settings | `external.phone=false`, `phone_autoconfirm=true`, `sms_provider=""` |
+| `L10` | `/signup` phone | 400 `phone_provider_disabled` |
+| `L11` | `/token` phone | 422 `phone_provider_disabled` |
+| `L12` | `/otp` phone, `create_user:true` | 400 `phone_provider_disabled` ("Unsupported phone provider") |
+| `L13` | `/verify` sms guess | 403 `otp_expired` |
+
+- `L14` (`observe_local_sms_state.sql`) found 0 phone users, 0 phone MFA factors and 0 phone one-time tokens. `L91` (local GoTrue log) found `sms_mentions = 0`.
+- **Result:** the phone/password rows (matrix rows 1, 3, 4 and the phone-OTP row with an existing phone user) are **not proven**, locally or hosted.
+- **The pattern across config surfaces:** both supported Supabase surfaces, the hosted dashboard and the local CLI, refuse to switch on the phone provider without SMS provider credentials. GoTrue itself was not tested with phone enabled and no provider; that would need a direct container override, which was not authorised. **This is an AD-20 risk, not yet a contradiction.** See the plan's blocked reason.
+
+### Email track re-captured on LOCAL Auth (account `…+bicauth-l1`)
+
+| Rerun item | Steps | Observed (LOCAL) |
+|---|---|---|
+| 1. Legacy steps 22/23 (signup link) | L20–L24b | `email_not_confirmed` before the link (L21). The link gave a 303 with fragment `signup` and JWT `amr=[otp]`, `aal1` (L22). The probe showed `session_live=true` but `trusted_password_session=false`, so it was **denied** (L23). Refresh kept `otp` and was still denied (L24, L24b). |
+| Password sessions, neutral errors | L30–L34 | Login gave `amr=[password]` and was **allowed** (L34). Wrong password and unknown account both returned 400 `invalid_credentials` with the same message (L32, L33). |
+| Magic link | L40–L42 | Fragment `magiclink`, `amr=[otp]`, **denied** (L42). |
+| 6a. Password change from session B: probe and refresh **every** other session | L50, L60–L64 | **A**, the **signup-link** session (refreshed) and the **magic-link** session all showed `session_live=false`, were denied, got `/user` 403 (L61), and their refresh failed with `refresh_token_not_found` (L62). **B** stayed allowed and refreshable. The old password was refused (L63). Live sessions went from 4 to only B (L50 → L64). |
+| 6b. Recovery reset: probe and refresh every other session | L70–L80 | Recovery link: fragment `recovery`, `amr=[otp]`, denied (L74, L75). After the password set, **C**, **D** and the post-change **B** were all denied and their refresh failed (L77, L78). The recovery session stayed live and refreshable, still `otp`, and still denied (L77, L78). A fresh login was allowed (L79b). L80 shows only the recovery and fresh sessions. |
+| Neutral recovery | L72, L73 | Known and unknown addresses both returned 200 `{}`. There was no local throttle (local email rate limit), so the hosted 429 oracle (row 15) was not exercised here. |
+| 7. Observations | L50, L64, L80, L90, L91 | `observe_local_account_sessions.sql` after each revocation; probe grants; GoTrue log summary with **0 SMS mentions**. |
+
+These close the hosted README's "to re-capture" gaps for rows 8 and 11 and the legacy lines 5–6 **on LOCAL GoTrue v2.197.0**. The hosted legacy lines remain marked legacy.
+
+## Still owner-gated (hosted `bic-kafue-auth-test`)
+
+The CLI does not permit the local phone run, so every phone row stays open on hosted:
+
+1. Phone/password signup and login (`amr=[password]`, probe allowed), with a wrong password vs an unknown phone.
+2. `/otp --phone` for the **existing** phone user: no SMS, no session. Also a direct `/verify` guess.
+3. Add an email on the phone account with `PUT /user {email}`, then verify the link: same user id, no second user.
+4. Email/password alias on that phone user.
+5. Attach `observe_account_sessions.sql`, `observe_auth_logs.sql` (expect `sms_mentions = 0`) and `observe_probe_grants.sql`.
+
+**Owner action (Management API, since the dashboard refuses).** Run this with your own personal access token. Never paste the token into the repo or chat.
+
+```http
+PATCH https://api.supabase.com/v1/projects/szfyfezfvxyuvovnnakr/config/auth
+Authorization: Bearer <owner personal access token>
+Content-Type: application/json
+
+{
+  "external_phone_enabled": true,
+  "sms_autoconfirm": true,
+  "hook_send_sms_enabled": false,
+  "mfa_phone_enroll_enabled": false,
+  "mfa_phone_verify_enabled": false
+}
+```
+
+- **What the body leaves out:** it sets **no** `sms_provider`, no `sms_twilio_*`, `sms_messagebird_*`, `sms_textlocal_*`, `sms_vonage_*` or `sms_twilio_verify_*` field, and no `sms_test_otp`.
+- **Check afterwards:** `GET` the same URL. Every `sms_*` credential and `sms_test_otp` must be null or empty, and `/auth/v1/settings` must show `external.phone: true` and `phone_autoconfirm: true`.
+- **If the API refuses** (for example, a 4xx that asks for SMS provider credentials): do **not** add credentials. Report the response body. That would be the third Supabase surface to refuse, and AD-20 then needs an architecture decision.

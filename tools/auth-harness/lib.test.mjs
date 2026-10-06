@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
   ALLOWED_HOST,
+  LOCAL_ORIGIN,
+  harnessTarget,
   AuthClient,
   amrHasPassword,
   assertAllowedOrigin,
@@ -170,4 +172,30 @@ test('parseVerifyLink rejects look-alike link hosts and paths', () => {
   assert.throws(() =>
     parseVerifyLink('https://szfyfezfvxyuvovnnakr.supabase.co/x/auth/v1/verify?token=a&type=signup'),
   );
+});
+
+test('harnessTarget is local only for HARNESS_TARGET=local exactly', () => {
+  assert.equal(harnessTarget({}), 'hosted');
+  assert.equal(harnessTarget({ HARNESS_TARGET: 'LOCAL' }), 'hosted');
+  assert.equal(harnessTarget({ HARNESS_TARGET: 'local' }), 'local');
+});
+
+test('local target accepts exactly http://127.0.0.1:54321 and never the hosted project', () => {
+  assert.equal(LOCAL_ORIGIN, 'http://127.0.0.1:54321');
+  assert.equal(assertAllowedOrigin('http://127.0.0.1:54321/auth/v1', 'u', 'local'), LOCAL_ORIGIN);
+  for (const u of [
+    'http://localhost:54321',
+    'https://127.0.0.1:54321',
+    'http://127.0.0.1:54322',
+    'http://127.0.0.1',
+    'http://user:pw@127.0.0.1:54321',
+    'http://127.0.0.1:54321@attacker.example',
+    'https://szfyfezfvxyuvovnnakr.supabase.co',
+  ]) {
+    assert.throws(() => assertAllowedOrigin(u, 'u', 'local'), Error, u);
+  }
+  // The hosted guard never accepts the local origin.
+  assert.throws(() => assertAllowedOrigin(LOCAL_ORIGIN, 'u', 'hosted'));
+  assert.throws(() => parseVerifyLink(`${LOCAL_ORIGIN}/auth/v1/verify?token=a&type=signup`, 'hosted'));
+  assert.equal(parseVerifyLink(`${LOCAL_ORIGIN}/auth/v1/verify?token=a&type=signup`, 'local').type, 'signup');
 });

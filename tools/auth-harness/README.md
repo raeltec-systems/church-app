@@ -93,6 +93,22 @@ the redirect origin and the fragment type or error, and keeps the session locall
 Offline checks (also in CI): `node --test tools/auth-harness/*.test.mjs` and
 `bash tools/auth-harness/scan-evidence.sh`.
 
+## LOCAL target (story 1.2 local rerun)
+
+- **Enabling it.** `HARNESS_TARGET=local` switches the single allowed origin to exactly `http://127.0.0.1:54321`, the local Supabase CLI stack.
+  - Local mode never accepts the hosted project, and hosted mode never accepts local.
+  - Each evidence line carries `harness_target: "LOCAL"`.
+  - The default log is `evidence-1.2/local-harness-log.jsonl`.
+- **The script.** `scenarios/1.2-local-rerun.sh` is the recorded run, and its header lists its preconditions:
+  - the probe plus `sql/local/10_local_api_probe_wrappers.sql` applied to the local DB;
+  - the local publishable key in the environment.
+- **Helpers.**
+  - `local-mailpit-link.mjs` reads verify links from the local Mailpit for piping into `verify-link`.
+  - `local-auth-logs.mjs` summarises the local GoTrue log for `attach`.
+  - `sql/local/observe_local_*` hold the local read-only queries.
+- **Cleanup.** Run `supabase db reset` afterwards to remove the harness objects.
+- **Known gate.** Supabase CLI 2.119.0 forces the phone provider off unless an SMS provider is enabled. See `evidence-1.2/local-cli-phone-gate.txt`. Never enable one to get past this.
+
 ## Hosted settings the harness needs (dashboard only)
 
 The Supabase MCP tools cannot change Auth configuration, so the owner sets these

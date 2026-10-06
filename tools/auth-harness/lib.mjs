@@ -47,19 +47,40 @@ const QUERY_SECRET_RE =
 export const ALLOWED_HOST = 'szfyfezfvxyuvovnnakr.supabase.co';
 
 /**
- * Parse a URL and require it to be exactly the isolated auth-test project over
- * https (no userinfo, no custom port). Returns the normalized origin. Substring
- * checks are not used: `https://<ref>.attacker.example` must fail.
+ * The local Supabase CLI stack's API origin (story 1.2 LOCAL phone track).
+ * Selected only by HARNESS_TARGET=local; it never widens the hosted guard.
  */
-export function assertAllowedOrigin(value, what = 'URL') {
+export const LOCAL_ORIGIN = 'http://127.0.0.1:54321';
+
+/** 'local' only when HARNESS_TARGET is exactly 'local'; anything else is the hosted project. */
+export function harnessTarget(env = process.env) {
+  return env.HARNESS_TARGET === 'local' ? 'local' : 'hosted';
+}
+
+/**
+ * Parse a URL and require it to be exactly the run's single allowed origin.
+ * Hosted (default): the isolated auth-test project over https, no userinfo, no
+ * custom port. Local: exactly http://127.0.0.1:54321. Returns the normalized
+ * origin. Substring checks are not used: `https://<ref>.attacker.example` must
+ * fail, and one target never accepts the other's origin.
+ */
+export function assertAllowedOrigin(value, what = 'URL', target = harnessTarget()) {
   let u;
   try {
     u = new URL(String(value));
   } catch {
     throw new Error(`${what} is not a valid URL`);
   }
-  if (u.protocol !== 'https:' || u.hostname !== ALLOWED_HOST || u.port !== '' ||
-      u.username !== '' || u.password !== '') {
+  if (u.username !== '' || u.password !== '') {
+    throw new Error(`${what} must not carry userinfo`);
+  }
+  if (target === 'local') {
+    if (u.origin !== LOCAL_ORIGIN) {
+      throw new Error(`${what} must be ${LOCAL_ORIGIN} (the local Supabase stack)`);
+    }
+    return u.origin;
+  }
+  if (u.protocol !== 'https:' || u.hostname !== ALLOWED_HOST || u.port !== '') {
     throw new Error(`${what} must be https://${ALLOWED_HOST} (the isolated auth-test project)`);
   }
   return u.origin;
@@ -164,9 +185,9 @@ export function amrHasPassword(amr) {
  * Parse a Supabase Auth email link (/auth/v1/verify with token, type and redirect_to query parameters).
  * Returns the pieces needed to call /verify ourselves without following the redirect.
  */
-export function parseVerifyLink(link) {
+export function parseVerifyLink(link, target = harnessTarget()) {
   const u = new URL(String(link).trim());
-  assertAllowedOrigin(u.href, 'verify link');
+  assertAllowedOrigin(u.href, 'verify link', target);
   if (u.pathname !== '/auth/v1/verify') {
     throw new Error('not a Supabase /auth/v1/verify link');
   }
@@ -211,10 +232,11 @@ export function parseRedirectLocation(location) {
 }
 
 export class AuthClient {
-  constructor({ url, apikey, fetchImpl = globalThis.fetch }) {
+  constructor({ url, apikey, fetchImpl = globalThis.fetch, target = harnessTarget() }) {
     if (!url || !apikey) throw new Error('SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY are required');
     // Only the origin is kept; any path/query on SUPABASE_URL is ignored.
-    this.url = assertAllowedOrigin(url, 'SUPABASE_URL');
+    this.url = assertAllowedOrigin(url, 'SUPABASE_URL', target);
+    this.target = target;
     this.apikey = apikey;
     this.fetch = fetchImpl;
   }

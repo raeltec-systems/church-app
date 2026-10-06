@@ -4,7 +4,7 @@ type: 'feature'
 ticket: '2'
 created: '2026-10-03'
 status: 'blocked'
-blocked_reason: 'Owner dashboard step on bic-kafue-auth-test: Authentication > Sign In / Providers > Phone, Enable Phone provider ON, Confirm phone OFF, no SMS credentials/hook/test OTPs. Until then the phone/password signup and login, same-account email add/verify and phone-user email/password alias rows cannot run. All email-track rows are observed in evidence-1.2.'
+blocked_reason: 'AD-20 phone track not provable on either surface tried: (1) hosted dashboard refuses to enable the Phone provider without SMS provider credentials; (2) local Supabase CLI 2.119.0 forces GOTRUE_EXTERNAL_PHONE_ENABLED=false ("WARN: no SMS provider is enabled. Disabling phone login") unless twilio/twilio_verify/messagebird/textlocal/vonage is enabled (evidence-1.2/local-cli-phone-gate.txt). Remaining owner step: Management API PATCH /v1/projects/szfyfezfvxyuvovnnakr/config/auth with the body in evidence-1.2/README.md (no SMS provider); if it also refuses, AD-20 needs an architecture decision. Email track fully observed (hosted + LOCAL rerun).'
 baseline_revision: 'dfa367db1bae7ae6ade7dfab75cfaf2de99b853a'
 route: 'full'
 route_source: 'auto'
@@ -62,7 +62,8 @@ context:
 - [x] `tools/auth-harness/lib.test.mjs` -- offline tests for redaction, AMR predicate mirror and link parsing.
 - [x] `tools/auth-harness/README.md` -- usage, owner settings, safety rules.
 - [x] `.github/workflows/ci.yml` -- add `auth-harness` job running `node --test`.
-- [ ] `evidence-1.2/` -- (email track done; phone rows await the owner gate) version, settings, per-scenario JSON and summary.
+- [ ] `evidence-1.2/` -- (email track done on hosted and re-captured on LOCAL; phone rows blocked: dashboard and local CLI both refuse phone without an SMS provider; Management API owner step pending) version, settings, per-scenario JSON and summary.
+- [x] `tools/auth-harness/` LOCAL target -- `HARNESS_TARGET=local` (exact `http://127.0.0.1:54321`), `local-mailpit-link.mjs`, `local-auth-logs.mjs`, `sql/local/observe_local_*`, `sql/local/10_local_api_probe_wrappers.sql`, `scenarios/1.2-local-rerun.sh`, plus unit tests for the local guard.
 
 **Acceptance Criteria:**
 - Given the hosted project, when the harness runs, then each matrix row has a redacted evidence file or a recorded owner-gate reason.
@@ -99,7 +100,26 @@ context:
     - Inbox addresses are masked.
   - **Cleanup and new runs:** the old fixed-path state file and wrapper were deleted. Steps 98 and 99 were attached from MCP output.
 
+- **LOCAL rerun (2026-10-03, resumed build; owner direction pending, parent chose the reversible "local now, hosted parity later" option).**
+  - **Authorisation:** the parent authorised this builder, as the only one running, to use the local Supabase stack. The frozen "Only project `szfyfezfvxyuvovnnakr`" boundary is not renegotiated. The local run is labelled LOCAL throughout, kept in a separate log, and treated as supporting evidence, not hosted proof.
+  - **Decision (agent, under owner pre-approval):** the harness gained a separate `HARNESS_TARGET=local` origin rather than a widened hosted guard. Each target accepts only its own exact origin, and unit tests cover both directions.
+  - **Finding (blocking):** Supabase CLI 2.119.0 refuses to enable phone without an SMS provider. With `[auth.sms] enable_signup = true` and no provider it prints `WARN: no SMS provider is enabled. Disabling phone login` and sets `GOTRUE_EXTERNAL_PHONE_ENABLED=false`. Its condition needs `twilio`, `twilio_verify`, `messagebird`, `textlocal` or `vonage` to be **enabled**; a hook or test OTPs would not satisfy it. Per the brief, nothing was configured to get past it.
+    - Evidence: `evidence-1.2/local-cli-phone-gate.txt` and log steps `L00`, `L10`–`L14`.
+    - Both config surfaces tried (the hosted dashboard and the local CLI) now refuse. GoTrue itself was not tested with phone on and no provider. That would need a direct env override on the auth container, which was not authorised and was not done.
+    - This is an **AD-20 risk at the configuration-surface level**. It is not yet a GoTrue-level contradiction.
+  - **Email track re-captured on LOCAL GoTrue v2.197.0** (the same version as hosted, with identical probe definitions by md5). This covers the legacy steps 22/23 (`L20`–`L24b`), and probe plus refresh of **every** other session after both the password change (`L60`–`L64`) and the recovery reset (`L70`–`L80`). All results match the hosted findings, and the local GoTrue log has 0 SMS mentions (`L91`).
+  - **`supabase/config.toml`:** the change was temporary (`[auth.sms] enable_signup = true`; `[auth.email] enable_confirmations = true` for hosted parity) and was reverted. The commit leaves the file unchanged, because the sms flag has no effect under this CLI and only adds a warning.
+  - **Local clean-up and checks:** `supabase db reset` removed the harness objects. `npm run db:test`, `db:smoke` and `recovery:rehearse`, the harness tests, `scan-evidence.sh`, `ci:secrets`, `ci:policy-test` and `ci:migrations` all pass.
+  - **Hosted parity (named gate, not dropped): identity/production gate "AD-20 hosted phone provider without SMS".**
+    - **Owner step:** Management API `PATCH https://api.supabase.com/v1/projects/szfyfezfvxyuvovnnakr/config/auth` with the owner's own personal access token, and this body: `{"external_phone_enabled": true, "sms_autoconfirm": true, "hook_send_sms_enabled": false, "mfa_phone_enroll_enabled": false, "mfa_phone_verify_enabled": false}`.
+      - The body sets no `sms_provider`, no `sms_*` provider credential fields and no `sms_test_otp`.
+      - Verify with `GET` on the same URL, then with `/auth/v1/settings`.
+    - **If the API refuses** without SMS credentials: escalate to an architecture decision on AD-20, for example a different identifier model or an accepted SMS provider. Do not configure one inside 1.2.
+    - **If it succeeds:** run the "Still owner-gated" list in `evidence-1.2/README.md` with the hosted harness.
+
 ## Plan Change Log
+
+- 2026-10-03, resumed build (LOCAL rerun). The local stack was used under parent authorisation. The local CLI phone gate is recorded as the blocking finding. The email-track gaps (legacy 22/23, and the every-session probe and refresh after revocation) were closed on LOCAL. The hosted owner step changed from the dashboard to the Management API. The frozen block is unchanged.
 
 - 2026-10-03, parent review (not a step-04 loop).
   - **Findings:**

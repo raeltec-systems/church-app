@@ -7,6 +7,10 @@
 //   HARNESS_EVIDENCE             evidence JSONL path (default: evidence-1.2/harness-log.jsonl)
 //   HARNESS_STATE_DIR            private state dir printed by `init` (required for every
 //                                command except init/attach/note)
+//   HARNESS_TARGET               `local` = the local Supabase CLI stack (http://127.0.0.1:54321)
+//                                only; default/anything else = the hosted auth-test project.
+//                                Local runs label every evidence line `harness_target: "LOCAL"`
+//                                and default to evidence-1.2/local-harness-log.jsonl.
 //   SUPABASE_ANON_JWT            story 1.3 `rc-*` only: the project's legacy anon key (a
 //                                publishable-class JWT; the Edge Function gateway needs a JWT)
 //
@@ -35,6 +39,7 @@ import { fileURLToPath } from 'node:url';
 import {
   AuthClient,
   assertAllowedOrigin,
+  harnessTarget,
   maskIdentifier,
   parseRedirectLocation,
   parseVerifyLink,
@@ -46,11 +51,13 @@ import {
 import { rcCommand } from './recovery-cli.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const TARGET = harnessTarget();
 const EVIDENCE =
   process.env.HARNESS_EVIDENCE ||
   resolve(
     HERE,
-    '../../_bmad-output/initiative-church-app/epic-platform-baseline/evidence-1.2/harness-log.jsonl',
+    '../../_bmad-output/initiative-church-app/epic-platform-baseline/evidence-1.2/' +
+      (TARGET === 'local' ? 'local-harness-log.jsonl' : 'harness-log.jsonl'),
   );
 const STATE_PREFIX = 'bic-auth-harness-';
 const STATE_FILE = 'state.json';
@@ -126,7 +133,13 @@ function readStdin() {
 }
 
 function record(step, command, data) {
-  const entry = scrub({ ts: new Date().toISOString(), step: step || command, command, ...data });
+  const entry = scrub({
+    ts: new Date().toISOString(),
+    step: step || command,
+    command,
+    ...(TARGET === 'local' ? { harness_target: 'LOCAL' } : {}),
+    ...data,
+  });
   mkdirSync(dirname(EVIDENCE), { recursive: true });
   appendFileSync(EVIDENCE, JSON.stringify(entry) + '\n');
   console.log(JSON.stringify(entry, null, 2));

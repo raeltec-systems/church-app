@@ -84,11 +84,14 @@ class MobileShell extends StatelessWidget {
         child: Column(
           children: [
             // The tab bar below owns the bottom safe area; pages must not add
-            // it again.
+            // it again. This Scaffold also already shrinks for the on-screen
+            // keyboard; the page's own Scaffold must not shrink for it a second
+            // time, or the page body is left with no height while typing.
             Expanded(
-              child: MediaQuery.removePadding(
-                context: context,
-                removeBottom: true,
+              child: MediaQuery(
+                data: MediaQuery.of(context)
+                    .removePadding(removeBottom: true)
+                    .removeViewInsets(removeBottom: true),
                 child: FocusTraversalGroup(child: child),
               ),
             ),

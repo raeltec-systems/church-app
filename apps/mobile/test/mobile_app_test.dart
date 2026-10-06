@@ -324,6 +324,31 @@ void main() {
     expect(844 - bar.bottom, greaterThanOrEqualTo(34 - 0.5));
   });
 
+  testWidgets(
+    'with the keyboard open, the focused sign-in field stays visible',
+    (tester) async {
+      // Owner device report: typing into the phone or password field left a
+      // blank page, because the shell and the page both shrank for the keyboard.
+      await pumpMobile(tester, location: '/sign-in');
+      for (final key in ['phone-field', 'password-field']) {
+        tester.view.viewInsets = const FakeViewPadding(bottom: 336);
+        addTearDown(tester.view.resetViewInsets);
+        await tester.tap(find.byKey(Key(key)));
+        await tester.pumpAndSettle();
+        final page = tester.element(find.byType(SignInScreen));
+        expect(MediaQuery.viewInsetsOf(page).bottom, 0, reason: key);
+        final field = tester.getRect(find.byKey(Key(key)));
+        final bar = tester.getRect(find.bySemanticsLabel('App sections'));
+        expect(field.height, greaterThan(20), reason: key);
+        expect(field.top, greaterThanOrEqualTo(0), reason: key);
+        expect(field.bottom, lessThanOrEqualTo(bar.top + 0.5), reason: key);
+        expect(bar.bottom, lessThanOrEqualTo(844 - 336 + 0.5), reason: key);
+        tester.view.resetViewInsets();
+        await tester.pumpAndSettle();
+      }
+    },
+  );
+
   test('only the composition root reaches Supabase; no client persistence', () {
     final files = Directory('lib')
         .listSync(recursive: true)

@@ -114,7 +114,13 @@ class StaffShell extends StatelessWidget {
     );
     // Navigation first, then content: the same order the browser's DOM Tab
     // order follows, so widget tests and browsers agree.
-    final content = FocusTraversalGroup(child: child);
+    // The shell Scaffold already shrinks for an on-screen keyboard; the page's
+    // own Scaffold must not shrink for it again (that left no room to type).
+    final content = MediaQuery.removeViewInsets(
+      context: context,
+      removeBottom: true,
+      child: FocusTraversalGroup(child: child),
+    );
     if (_wide(context)) {
       return Scaffold(
         body: FocusTraversalGroup(

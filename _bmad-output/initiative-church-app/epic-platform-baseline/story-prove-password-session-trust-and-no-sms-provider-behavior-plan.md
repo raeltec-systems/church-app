@@ -3,8 +3,8 @@ title: 'Prove password-session trust and no-SMS provider behavior'
 type: 'feature'
 ticket: '2'
 created: '2026-10-03'
-status: 'blocked'
-blocked_reason: 'AD-20 phone track not provable on either surface tried: (1) hosted dashboard refuses to enable the Phone provider without SMS provider credentials; (2) local Supabase CLI 2.119.0 forces GOTRUE_EXTERNAL_PHONE_ENABLED=false ("WARN: no SMS provider is enabled. Disabling phone login") unless twilio/twilio_verify/messagebird/textlocal/vonage is enabled (evidence-1.2/local-cli-phone-gate.txt). Remaining owner step: Management API PATCH /v1/projects/szfyfezfvxyuvovnnakr/config/auth with the body in evidence-1.2/README.md (no SMS provider); if it also refuses, AD-20 needs an architecture decision. Email track fully observed (hosted + LOCAL rerun).'
+status: 'built'
+blocked_reason: ''
 baseline_revision: 'dfa367db1bae7ae6ade7dfab75cfaf2de99b853a'
 route: 'full'
 route_source: 'auto'
@@ -62,7 +62,8 @@ context:
 - [x] `tools/auth-harness/lib.test.mjs` -- offline tests for redaction, AMR predicate mirror and link parsing.
 - [x] `tools/auth-harness/README.md` -- usage, owner settings, safety rules.
 - [x] `.github/workflows/ci.yml` -- add `auth-harness` job running `node --test`.
-- [ ] `evidence-1.2/` -- (email track done on hosted and re-captured on LOCAL; phone rows blocked: dashboard and local CLI both refuse phone without an SMS provider; Management API owner step pending) version, settings, per-scenario JSON and summary.
+- [x] `evidence-1.2/` -- version, settings, per-scenario JSON and summary. Email track on hosted (2026-10-03) and LOCAL; phone track on hosted (2026-10-06, `H…` steps) after the owner's Management API change; owner readback in `owner-management-api-readback.txt`.
+- [x] `tools/auth-harness/` hosted phone track -- `signup --no-password`, `sql/observe_phone_sms_state.sql`, `sql/observe_auth_sms_attempts.sql`, `scenarios/1.2-hosted-{a-phone,b-email-alias,c-recovery,d-signup-link}.txt`.
 - [x] `tools/auth-harness/` LOCAL target -- `HARNESS_TARGET=local` (exact `http://127.0.0.1:54321`), `local-mailpit-link.mjs`, `local-auth-logs.mjs`, `sql/local/observe_local_*`, `sql/local/10_local_api_probe_wrappers.sql`, `scenarios/1.2-local-rerun.sh`, plus unit tests for the local guard.
 
 **Acceptance Criteria:**
@@ -117,7 +118,19 @@ context:
     - **If the API refuses** without SMS credentials: escalate to an architecture decision on AD-20, for example a different identifier model or an accepted SMS provider. Do not configure one inside 1.2.
     - **If it succeeds:** run the "Still owner-gated" list in `evidence-1.2/README.md` with the hosted harness.
 
+- **Hosted phone track (2026-10-06, resumed build after the owner's Management API PATCH).**
+  - **Owner-supplied evidence:** the owner's `GET …/config/auth` readback (`external_phone_enabled:true`, `sms_autoconfirm:true`, `sms_provider:"twilio"`, `sms_test_otp:null`; no credentials set) is recorded verbatim and labelled owner-supplied in `evidence-1.2/owner-management-api-readback.txt`. `"twilio"` is the default label. The harness corroborated it (`H00`) and proved there are no credentials: every phone `/otp` returned 500 "Unable to get SMS provider", logged as "missing Twilio account SID" (`H20`, `H21`, `H39`, `H68`, `H73`).
+  - **Decision (agent, under owner pre-approval):** synthetic phones use the NANP fictional range `+1 202 555 0100–0199`, not the `+26097…` example in the frozen block. `+26097` is a live Zambian mobile range; the fictional range is never assignable, so it is the more conservative reading of "synthetic, test-range phones". The frozen block is unchanged.
+  - **Result: AD-20 holds on hosted GoTrue v2.197.0.** Phone+password signup and login give `amr=[password]` sessions that pass the predicate; wrong password and unknown phone get the same `invalid_credentials`; passwordless `/signup` is refused; no SMS was sent (0 successful sends in the Auth log; 0 phone one-time tokens). The configuration-surface risk recorded on 2026-10-03 is resolved: the Management API accepts phone without an SMS provider, while the dashboard and the local CLI do not. Production must use the same API step.
+  - **Same account and alias:** `PUT /user {email}` from a phone session, then the emailed link, gave the same `sub`, identities `[email, phone]` and one user; the email-change link session is `amr=[otp]` and denied. A pending (unverified) address does not recover. The verified email with the same password signs in to the same user with `amr=[password]`.
+  - **Every session probed and refreshed** after the password change (`H41a`–`H45b`) and after the recovery reset (`H56a`–`H59b`): all others revoked (`session_live=false`, `/user` 403, refresh `refresh_token_not_found`); the changing session and the recovery session survive; the recovery session stays denied until logout.
+  - **Finding F1 (for the identity epic, not a blocker):** `/otp {phone, create_user:true}` returns 500 but still creates a phone-confirmed user with a server-side session (AMR recorded as `password`, tokens never returned). With `sms_autoconfirm`, any phone number can be pre-registered without proof of possession, through `/otp` or `/signup`. The identity epic must treat the Auth phone as an unverified handle, bind members only through the staff-approved claim (AD-3), and give staff a path for a squatted number.
+  - **Hosted legacy lines 5–6 and the row-8 signup-link gap:** re-captured on hosted with account `…+bicauth-e2` (scenario `1.2-hosted-d-signup-link.txt`, `H81`–`H92`): signup-link session `amr=[otp]` denied, and revoked by a later password change. It was paced past the 2-per-hour SMTP limit (the first attempt `H80` was refused 429 `over_email_send_rate_limit`).
+  - **Cleanup (`H93`, `H94`):** this run's 3 synthetic users and their 2 probe rows were deleted with a scoped SQL delete through the MCP; `H94` shows 0 phone users, tokens and factors left. The story 1.2 `e1` and story 1.3 accounts were left untouched. The harness state dir and the scratch link files were removed.
+
 ## Plan Change Log
+
+- 2026-10-06, resumed build (hosted phone track). The owner's Management API change cleared the blocking gate. The full former "Still owner-gated" list ran on hosted and passed; status `built`. Added harness `signup --no-password`, two read-only observation queries and four hosted scenario files. The phone range moved to the NANP fictional range (Decision above). The frozen block is unchanged.
 
 - 2026-10-03, resumed build (LOCAL rerun). The local stack was used under parent authorisation. The local CLI phone gate is recorded as the blocking finding. The email-track gaps (legacy 22/23, and the every-session probe and refresh after revocation) were closed on LOCAL. The hosted owner step changed from the dashboard to the Management API. The frozen block is unchanged.
 
@@ -160,3 +173,4 @@ context:
 **Commands:**
 - `node --test tools/auth-harness/*.test.mjs` -- expected: all pass
 - `grep -rE 'eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{10,}' evidence-1.2` -- expected: no matches
+- `bash tools/auth-harness/scan-evidence.sh` -- expected: clean

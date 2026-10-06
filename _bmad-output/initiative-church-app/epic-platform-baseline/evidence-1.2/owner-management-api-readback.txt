@@ -1,0 +1,31 @@
+OWNER-SUPPLIED EVIDENCE (not captured by the harness or by an agent tool)
+=========================================================================
+
+Story 1.2, hosted project bic-kafue-auth-test (szfyfezfvxyuvovnnakr).
+Relayed to the builder on 2026-10-06 by the parent session; pasted by the owner
+from their own terminal. No token or secret was shared.
+
+Owner action: Management API
+  PATCH https://api.supabase.com/v1/projects/szfyfezfvxyuvovnnakr/config/auth
+  with the no-SMS body from evidence-1.2/README.md:
+  {"external_phone_enabled": true, "sms_autoconfirm": true,
+   "hook_send_sms_enabled": false, "mfa_phone_enroll_enabled": false,
+   "mfa_phone_verify_enabled": false}
+  (no sms_provider, no sms_* provider credential field, no sms_test_otp)
+
+Owner GET readback of the same URL (the fields the owner pasted, verbatim):
+  "external_phone_enabled":true
+  "sms_autoconfirm":true
+  "sms_provider":"twilio"
+  "sms_test_otp":null
+
+Owner statement: no SMS provider credentials were set. "twilio" is Supabase's
+default provider label, present before the PATCH as well (see harness step
+00-provider-info, 2026-10-03, sms_provider "twilio" with phone disabled).
+
+Independent corroboration captured by the harness (not owner-supplied):
+  - H00-provider-info-after-owner-patch: /auth/v1/settings shows
+    external.phone=true, phone_autoconfirm=true, sms_provider="twilio".
+  - H20/H21/H39/H68: every phone /otp returns 500 "Unable to get SMS provider".
+  - H73 (observe_auth_sms_attempts.sql): each of those requests is logged with
+    error "missing Twilio account SID", i.e. the provider has no credentials.

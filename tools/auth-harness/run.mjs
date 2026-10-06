@@ -247,15 +247,18 @@ async function main() {
     case 'signup': {
       const [account] = pos;
       const id = identifier(opt);
-      state.passwords[account] = newPassword();
-      const body = { ...id, password: state.passwords[account] };
+      // --no-password: the passwordless phone signup attempt (story 1.2 no-SMS row).
+      // GoTrue must refuse it; no password is generated or stored.
+      const noPassword = Boolean(opt['no-password']);
+      if (!noPassword) state.passwords[account] = newPassword();
+      const body = noPassword ? { ...id } : { ...id, password: state.passwords[account] };
       if (opt.redirect) body.email_redirect_to = opt.redirect;
       const r = await client.signup(body);
       if (r.json?.access_token) storeSession(state, account, r.json);
       saveState(state);
       record(step, command, {
         account,
-        request: maskedId(id),
+        request: noPassword ? { ...maskedId(id), password_sent: false } : maskedId(id),
         status: r.status,
         session: r.json?.access_token ? summarizeSession(r.json) : null,
         user: r.json?.access_token ? undefined : summarizeUser(r.json?.user ?? r.json),
@@ -459,7 +462,7 @@ async function main() {
 
     default:
       console.error(
-        'commands: init | cleanup | info | signup <account> --phone|--email | login <label> --account <a> --phone|--email [--wrong] | ' +
+        'commands: init | cleanup | info | signup <account> --phone|--email [--no-password] | login <label> --account <a> --phone|--email [--wrong] | ' +
           'otp --phone|--email [--create-user] | recover --email [--redirect] | verify-link <label> (link on stdin) | ' +
           'verify-otp <label> --phone [--type --token] | probe <label> | refresh <label> [--as <label>] | ' +
           'set-email <label> --email [--redirect] | set-password <label> --account <a> | logout <label> [--scope] | ' +

@@ -20,7 +20,8 @@ Evidence lands in
 - Publishable key only, supplied by environment at run time. Never a secret,
   service-role key or database password.
 - Synthetic accounts only: `israelmuyoba+bicauth-<tag>@gmail.com` (owner-approved
-  plus-addresses) and test-range phone numbers such as `+260970000101`.
+  plus-addresses) and phones in the NANP fictional range `+1 202 555 0100–0199`
+  (never assignable), e.g. `+12025550101`.
 - Passwords are generated per account and kept with live tokens in a private
   state directory, `HARNESS_STATE_DIR`:
   - `init` creates it with `mkdtemp`, mode 0700, owned by you.
@@ -70,10 +71,11 @@ H="node tools/auth-harness/run.mjs"
 eval "$($H init)"                      # exports HARNESS_STATE_DIR
 
 $H info --step 00-provider-info
-$H signup p1 --phone +260970000101 --step 10-phone-signup
-$H login p1-a --account p1 --phone +260970000101
+$H signup p1 --phone +12025550101 --step 10-phone-signup
+$H login p1-a --account p1 --phone +12025550101
 $H probe p1-a
-$H otp --phone +260970000101           # existing user: the no-SMS path
+$H otp --phone +12025550101            # existing user: the no-SMS path
+$H signup p2 --phone +12025550103 --no-password   # must be refused
 $H set-email p1-a --email <approved plus-address for tag p1>
 $H verify-link p1-email < link.txt     # link on stdin, never argv
 $H recover --email <approved plus-address for tag p1>
@@ -107,21 +109,32 @@ Offline checks (also in CI): `node --test tools/auth-harness/*.test.mjs` and
   - `local-auth-logs.mjs` summarises the local GoTrue log for `attach`.
   - `sql/local/observe_local_*` hold the local read-only queries.
 - **Cleanup.** Run `supabase db reset` afterwards to remove the harness objects.
-- **Known gate.** Supabase CLI 2.119.0 forces the phone provider off unless an SMS provider is enabled. See `evidence-1.2/local-cli-phone-gate.txt`. Never enable one to get past this.
+- **Known gate.** Supabase CLI 2.119.0 forces the phone provider off unless an SMS provider is enabled. See `evidence-1.2/local-cli-phone-gate.txt`. Never enable one to get past this; the phone track runs on hosted instead.
 
-## Hosted settings the harness needs (dashboard only)
+## Hosted settings the harness needs
 
-The Supabase MCP tools cannot change Auth configuration, so the owner sets these
-in the dashboard for `bic-kafue-auth-test`:
+The Supabase MCP tools cannot change Auth configuration, and the dashboard
+refuses to enable the Phone provider without SMS credentials. The owner
+therefore set the phone settings for `bic-kafue-auth-test` through the
+Management API (done 2026-10-06; body and checks in
+`evidence-1.2/README.md`, "Former owner gate"):
 
-1. **Authentication → Sign In / Providers → Phone**: enable **Phone provider**,
-   turn **Confirm phone** off, and leave the SMS provider credentials empty. Do
-   not add a Send SMS hook or test OTPs.
-2. **Authentication → Sign In / Providers → Email**: keep **Confirm email** on and
-   **Secure email change** on.
-3. **Authentication → URL Configuration**: Site URL and redirect allowlist only
+1. **Phone:** `external_phone_enabled: true`, `sms_autoconfirm: true`,
+   `hook_send_sms_enabled: false`, phone MFA off, and **no** `sms_*` provider
+   credentials or `sms_test_otp`. `sms_provider` keeps its default label
+   `twilio`; every phone `/otp` must fail with "Unable to get SMS provider".
+2. **Email** (dashboard): keep **Confirm email** on and **Secure email change** on.
+3. **URL Configuration** (dashboard): Site URL and redirect allowlist only
    when a real redirect is under test. The harness works with the default
    `http://localhost:3000`, because it never follows the redirect.
+
+Hosted phone-track run (story 1.2, 2026-10-06): scenarios
+`1.2-hosted-a-phone.txt` → `b-email-alias` → `c-recovery` → `d-signup-link`,
+with the hand-run steps listed in each header, plus the read-only queries
+`sql/observe_phone_sms_state.sql` (MCP `execute_sql`) and
+`sql/observe_auth_sms_attempts.sql` (MCP `query_logs`). The default SMTP allows
+2 Auth emails per hour, so part D runs an hour after parts B/C. Delete the
+run's synthetic users afterwards and attach `observe_phone_sms_state.sql`.
 
 ## Story 1.3: fenced assisted recovery
 

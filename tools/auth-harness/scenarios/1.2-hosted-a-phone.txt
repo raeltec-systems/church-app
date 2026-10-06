@@ -1,0 +1,22 @@
+# Story 1.2 hosted phone track, part A (after the owner's Management API PATCH:
+# external_phone_enabled=true, sms_autoconfirm=true, no SMS provider credentials).
+# Synthetic phones: NANP fictional range +1-202-555-0100..0199 (never assigned).
+# Already run by hand before this file: `info --step H00-provider-info-after-owner-patch`
+# and `signup p1 --phone +12025550101 --step H10-phone-password-signup`.
+
+# Rows 1/2: phone+password signup session and password login.
+probe p1 --step H11-probe-phone-signup-session
+login p1-a --account p1 --phone +12025550101 --step H12-phone-password-login-A
+?login p1-x --account p1 --phone +12025550101 --wrong --step H13-phone-wrong-password
+?login p9-x --account p1 --phone +12025550199 --wrong --step H14-unknown-phone-login
+probe p1-a --step H15-probe-phone-session-A
+refresh p1-a --step H16-refresh-phone-session-A
+probe p1-a --step H17-probe-phone-session-A-refreshed
+login p1-b --account p1 --phone +12025550101 --step H18-phone-password-login-B
+
+# Phone OTP / no-SMS rows: nothing may be sent and no session issued.
+otp --phone +12025550101 --step H20-otp-phone-existing-user
+otp --phone +12025550102 --create-user --step H21-otp-phone-new-user-create
+?signup p2 --phone +12025550103 --no-password --step H22-phone-signup-without-password
+?verify-otp p1-guess --phone +12025550101 --type sms --step H23-verify-sms-guess-existing-user
+?verify-otp p2-guess --phone +12025550102 --type sms --step H24-verify-sms-guess-otp-phone

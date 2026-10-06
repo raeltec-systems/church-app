@@ -8,8 +8,8 @@ blocked_reason: 'Owner steps for the hosted staging verify (hitl): (1) apply 202
 baseline_revision: 'f0a115dc4a51e50cdd7d35f9eb1f7551b7c5a9ab'
 route: 'full'
 route_source: 'auto'
-review: ''
-review_source: ''
+review: 'quick'
+review_source: 'pinned'
 lenses_ran: []
 review_loop_iteration: 0
 context:
@@ -103,3 +103,16 @@ context:
 - `node tools/auth-harness/local-phone-auth.mjs on && node tools/identity-e2e/run.mjs && node tools/auth-harness/local-phone-auth.mjs off` -- expected: all scenarios as the matrix
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/mobile`, `apps/staff` -- expected: pass
 - Results (2026-10-06, local): db:test 424/424 (identity 71); db:smoke all ok (identity 13); recovery:rehearse no problems; E2E 15/15; adapter live check PASS x2; client_core 116, mobile 14, staff 14 tests pass; analyze clean; staff web build + bundle scan clean; ci:migrations, ci:secrets, ci:policy-test, env:check, scan-evidence clean. Evidence: `evidence-2.1/README.md`.
+
+## Review Triage Log
+
+| Finding | Verdict | Route | Evidence |
+|---|---|---|---|
+| real-format Zambian number +260971234567 in tests | medium | patch | identity_live_access_test.sql:90, run.test.mjs:16; owner decision 2026-10-06 forbids |
+| 7-digit numbers accepted; plan says 8–15 | low | patch | phone_username.dart:126; migration CHECK {6,14} |
+| dial code doubled for national input already carrying it | medium | patch | phone_username.dart:105-115; `260…`→`+260260…` accepted |
+| plan/smoke reference missing local-phone-auth.sh | low | patch | only .mjs delivered |
+| local-phone-auth `off` leaves SMS autoconfirm on | low | patch | withPhone(env,false) forces AUTOCONFIRM=true |
+| no pgTAP for restore-hold half of synthetic bypass | medium | patch | migration 305-308 untested condition |
+| runbook 4.8 under-describes /otp side effect (F1) | low | patch | evidence-1.2 H25, evidence-2.1 E18 |
+| re-sign-in same account keeps stale denial | low | patch | _onAccount early return + distinct() |

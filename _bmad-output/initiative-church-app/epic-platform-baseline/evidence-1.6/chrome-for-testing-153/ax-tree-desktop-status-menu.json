@@ -1,0 +1,66 @@
+[
+  {
+    "role": "RootWebArea",
+    "name": "BIC Kafue staff web trial",
+    "props": {
+      "focusable": true,
+      "focused": true,
+      "url": "http://127.0.0.1:8766/"
+    }
+  },
+  {
+    "role": "menu",
+    "name": "Popup menu",
+    "props": {
+      "orientation": "vertical",
+      "owns": "flt-semantic-node-165 flt-semantic-node-166 flt-semantic-node-167 flt-semantic-node-168 flt-semantic-node-169 flt-semantic-node-170"
+    }
+  },
+  {
+    "role": "menuitem",
+    "name": "Confirmed",
+    "props": {
+      "focusable": true,
+      "focused": true
+    }
+  },
+  {
+    "role": "menuitem",
+    "name": "Confirmed by leader",
+    "props": {
+      "focusable": true
+    }
+  },
+  {
+    "role": "menuitem",
+    "name": "Awaiting response",
+    "props": {
+      "focusable": true
+    }
+  },
+  {
+    "role": "menuitem",
+    "name": "Needs contact",
+    "props": {
+      "focusable": true
+    }
+  },
+  {
+    "role": "menuitem",
+    "name": "Declined",
+    "props": {
+      "focusable": true
+    }
+  },
+  {
+    "role": "menuitem",
+    "name": "Draft",
+    "props": {
+      "focusable": true
+    }
+  },
+  {
+    "role": "group",
+    "name": ""
+  }
+]

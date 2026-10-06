@@ -1,0 +1,43 @@
+# Production deployment activation refusals (2026-10-03T16:58:27Z, HEAD 2b3ad1824ea255bf2b59b196c239de2d25f4fdcf)
+$ node tools/env/environments.mjs get production supabase.project_ref
+environments: production.supabase.project_ref is not set
+# exit=1
+
+$ node tools/env/environments.mjs target production
+environments: production: no valid project ref supplied (owner step: set SUPABASE_PROJECT_REF / create the project)
+# exit=1
+
+$ node tools/env/environments.mjs target production tmurpotfluignacfueki
+environments: production: tmurpotfluignacfueki belongs to another environment
+# exit=1
+
+$ node tools/env/environments.mjs target production szfyfezfvxyuvovnnakr
+{"name":"production","projectRef":"szfyfezfvxyuvovnnakr","apiUrl":"https://szfyfezfvxyuvovnnakr.supabase.co","githubEnvironment":"production","databaseMarker":"production"}
+# exit=0
+
+$ node tools/env/environments.mjs recipients production synthetic+probe@example.test
+environments: production: refused 1 recipient(s); production sending is disabled until the outbound_sending gate is approved
+# exit=1
+
+$ node tools/env/environments.mjs get production features
+{"private_access":false,"outbound_sending":false,"sms":false}
+# exit=0
+
+$ node tools/env/environments.mjs get production operations.activation
+{"alerting":false,"scheduler":false,"production_system_access":false}
+# exit=0
+
+$ node tools/env/environments.mjs get production recovery.activation
+{"real_data_backups":false}
+# exit=0
+
+$ node tools/ci/check-migration-drift.mjs --env production
+check-migration-drift: drift check for production skipped: no project ref (owner step in docs/runbooks/environments-and-promotion.md)
+# exit=0
+
+# Promote preflight step 'Migrations are ordered, immutable and non-destructive relative to origin/main' (passes; it is not an activation gate):
+$ node tools/ci/check-migrations.mjs --base origin/main
+check-migrations: 6 new migration(s) since base
+check-migrations: 8 migration(s) ordered, unique and non-destructive (base origin/main)
+# exit=0
+

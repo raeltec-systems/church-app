@@ -1,0 +1,30 @@
+$ (cd apps/staff && flutter test)
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+Resolving dependencies...
+Downloading packages...
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.18.3 (1.19.0 available)
+  test_api 0.7.12 (0.7.14 available)
+  vector_math 2.4.0 (2.4.3 available)
+Got dependencies!
+4 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/apps/staff/test/staff_app_test.dart
+00:00 +0: tracer read shows in the shell; sidebar tabs are named
+00:00 +1: unconfigured build explains itself and does not send commands
+00:01 +2: synthetic read/write fixture: create, change, conflict kept
+00:01 +3: an account switch drops the protected state
+00:01 +4: leaving and returning keeps this account's in-memory state (AD-13 clears it on account change, not on navigation)
+00:02 +5: a PointerDeviceKind.touch tap on a tab leaves no focus ring behind
+00:02 +6: a PointerDeviceKind.mouse tap on a tab leaves no focus ring behind
+00:02 +7: keyboard: Tab reaches the nav tabs first; Enter navigates
+00:02 +8: 2x text, desktop: both destinations render without overflow
+00:02 +9: 2x text, narrow: both destinations render without overflow
+00:03 +10: sidebar at 1x; top bar at 2x text on the same window
+00:03 +11: only the composition root reaches Supabase; no client persistence
+00:03 +12: the app guard catches a shell that reaches the adapters
+00:03 +13: All tests passed!
+# exit=0

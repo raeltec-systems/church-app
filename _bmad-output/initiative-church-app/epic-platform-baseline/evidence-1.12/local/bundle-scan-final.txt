@@ -1,0 +1,4 @@
+$ node tools/ci/scan-secrets.mjs --bundle /tmp/claude-0/-home-user-church-app/53f9d846-6f17-5fcb-9db8-59c7e3ac6bf0/scratchpad/artifacts/staff-web-staging /tmp/claude-0/-home-user-church-app/53f9d846-6f17-5fcb-9db8-59c7e3ac6bf0/scratchpad/artifacts/apk-unzipped
+# started 2026-10-03T17:06:31Z at 2b3ad1824ea255bf2b59b196c239de2d25f4fdcf
+scan-secrets: clean (bundle mode, 408 files)
+# exit=0 finished 2026-10-03T17:06:31Z

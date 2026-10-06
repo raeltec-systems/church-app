@@ -1,0 +1,16 @@
+name: church_design_system
+description: Semantic design tokens, themes and accessible primitives shared by the BIC Kafue mobile and staff clients (design-contract.md, AD-16).
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0

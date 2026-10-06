@@ -1,0 +1,92 @@
+# Story 1.3 re-run, part D: fenced dispatch/completion, injected transport
+# uncertainty, late outcomes, stuck ops, reconciliation and binding changes.
+
+# Pending op + native password change before dispatch -> obsolete, no Auth call.
+login md-s1 --account md --email israelmuyoba+bicauth-r13-x-md@gmail.com --step 100-login-member-d
+rc-request gd1 --account md --step 101-member-d-request
+rc-issue gd1 --staff staff-s1 --account md --step 102-staff-issue-gd1
+rc-redeem gd1 --account md --inject stop_after_begin --op gd1-op --step 103-begin-gd1-stop-before-dispatch
+rc-relink --staff staff-s1 --account md --step 104-relink-while-op-pending
+set-password md-s1 --account md --step 105-direct-change-while-pending
+rc-resume gd1 --op gd1-op --account md --step 106-resume-gd1-dispatch-fenced
+
+# Native password change racing a dispatched op -> two changes -> uncertain.
+rc-request gd2 --account md --step 110-member-d-request-2
+rc-issue gd2 --staff staff-s1 --account md --step 111-staff-issue-gd2
+rc-redeem gd2 --account md --inject delay_apply --concurrent-change md-s1 --op gd2-op --step 112-native-change-races-dispatched-gd2
+rc-relink --staff staff-s1 --account md --step 113-relink-blocked-after-race
+rc-reconcile --staff staff-s1 --op gd2-op --note checked-auth-state --step 114-reconcile-gd2
+
+# Admin 4xx WITH a native change in the window -> uncertain, not failed.
+login md-s2 --account md@gd2-op --email israelmuyoba+bicauth-r13-x-md@gmail.com --step 115-login-member-d-final-password
+rc-request gd3 --account md --step 116-member-d-request-3
+rc-issue gd3 --staff staff-s1 --account md --step 117-staff-issue-gd3
+rc-redeem gd3 --account md --weak --inject delay_apply --concurrent-change md-s2 --op gd3-op --step 118-admin-4xx-with-native-change
+rc-reconcile --staff staff-s1 --op gd3-op --note checked-auth-state --step 119-reconcile-refused-session-live
+rc-reconcile --staff staff-s1 --op gd3-op --force --note force-revoke --step 120-reconcile-with-force-revoke
+probe md-s2 --step 121-probe-old-session-after-force-revoke
+
+# Lost response: Auth applied, caller never learns it.
+rc-request ga2 --account ma --step 130-member-a-request-2
+rc-issue ga2 --staff staff-s1 --account ma --step 131-staff-issue-ga2
+rc-redeem ga2 --account ma --inject lost_response --op ga2-op --step 132-redeem-ga2-lost-response
+login ma-s4 --account ma@ga2-op --email israelmuyoba+bicauth-r13-x-ma@gmail.com --step 133-login-with-applied-password
+rc-probe ma-s4 --step 134-probe-while-uncertain
+rc-relink --staff staff-s1 --account ma --step 135-relink-blocked-by-uncertain-op
+rc-request ga3 --account ma --step 136-member-a-request-3
+rc-issue ga3 --staff staff-s1 --account ma --step 137-issue-blocked-by-uncertain-op
+rc-reconcile --staff staff-s1 --op ga2-op --note checked-auth-state --step 138-reconcile-ga2
+rc-probe ma-s4 --step 139-probe-session-from-before-reconcile
+login ma-s5 --account ma@ga2-op --email israelmuyoba+bicauth-r13-x-ma@gmail.com --step 140-fresh-login-after-reconcile
+rc-probe ma-s5 --step 141-probe-fresh-session-after-reconcile
+rc-issue ga3 --staff staff-s1 --account ma --step 142-issue-ga3-after-reconcile
+rc-relink --staff staff-s1 --account ma --step 143-relink-after-reconcile
+rc-redeem ga3 --account ma --step 144-redeem-ga3-after-relink
+
+# Late external outcome while uncertain (caller timed out first).
+rc-request gb4 --account mb --step 150-member-b-request-4
+rc-issue gb4 --staff staff-s1 --account mb --step 151-staff-issue-gb4
+rc-redeem gb4 --account mb --inject late_apply --op gb4-op --step 152-redeem-gb4-late-apply
+rc-replay --staff staff-s1 --op gb4-op --step 153-replay-refused-unfinished-op
+rc-reconcile --staff staff-s1 --op gb4-op --note checked-auth-state --step 154-reconcile-gb4
+
+# Late external outcome AFTER reconciliation (account with no sessions).
+rc-request gh1 --account mh --step 160-member-h-request
+rc-issue gh1 --staff staff-s1 --account mh --step 161-staff-issue-gh1
+rc-redeem gh1 --account mh --inject late_apply_background --op gh1-op --step 162-redeem-gh1-late-apply-in-background
+rc-reconcile --staff staff-s1 --op gh1-op --note before-late-apply --step 163-reconcile-before-auth-applies
+@sleep 15
+login mh-s1 --account mh@gh1-op --email israelmuyoba+bicauth-r13-x-mh@gmail.com --step 164-login-with-late-applied-password
+rc-probe mh-s1 --step 165-probe-after-late-apply-reopened-op
+rc-reconcile --staff staff-s1 --op gh1-op --force --note after-late-apply --step 166-reconcile-again-force-revoke
+rc-probe mh-s1 --step 167-probe-after-second-reconcile-still-held
+
+# Stuck ops: abandoned pending op; timed-out dispatched op (worker crash).
+rc-request gc4 --account mc --step 170-member-c-request-4
+rc-issue gc4 --staff staff-s1 --account mc --step 171-staff-issue-gc4
+rc-redeem gc4 --account mc --inject stop_after_begin --op gc4-op --step 172-begin-gc4-and-stop
+rc-expire --staff staff-s1 --op gc4-op --step 173-expire-too-early
+@sleep 32
+rc-expire --staff staff-s1 --op gc4-op --step 174-expire-abandoned-pending
+login mc-s2 --account mc --email israelmuyoba+bicauth-r13-x-mc@gmail.com --step 175-login-member-c
+rc-request gc5 --account mc --step 176-member-c-request-5
+rc-issue gc5 --staff staff-s1 --account mc --step 177-staff-issue-gc5
+rc-redeem gc5 --account mc --inject crash_after_dispatch --op gc5-op --step 178-crash-after-dispatch
+rc-probe mc-s2 --step 179-probe-during-stuck-dispatch
+@sleep 32
+rc-expire --staff staff-s1 --op gc5-op --step 180-expire-timed-out-dispatch
+rc-reconcile --staff staff-s1 --op gc5-op --note no-auth-change-seen --step 181-reconcile-refused-sessions-live
+rc-reconcile --staff staff-s1 --op gc5-op --force --note force-revoke --step 182-reconcile-with-force-revoke
+probe mc-s2 --step 183-probe-old-session-after-force-revoke
+
+# Binding changes: native MFA factor enrolment; Admin deletion of the user.
+login mf-s1 --account mf --email israelmuyoba+bicauth-r13-x-mf@gmail.com --step 190-login-member-f
+rc-mfa-enroll mf-s1 --step 191-native-totp-factor-enrolment
+rc-probe mf-s1 --step 192-probe-after-mfa-change
+rc-request gf1 --account mf --step 193-member-f-request
+rc-issue gf1 --staff staff-s1 --account mf --step 194-issue-while-binding-review
+rc-relink --staff staff-s1 --account mf --step 195-staff-review-relink
+rc-issue gf1 --staff staff-s1 --account mf --step 196-issue-after-review
+rc-delete-user --staff staff-s1 --account mg --step 197-admin-delete-member-g
+
+rc-observe --staff staff-s1 --prefix r13-x- --step 199-db-state-after-part-d

@@ -4,17 +4,62 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The promotion workflow reruns every check from a clean checkout before deploying.
+  workflow_call:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # Never cancel checks that a promotion run (workflow_dispatch caller) is waiting on.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.event_name == 'push' }}
 
 jobs:
+  policy:
+    name: policy (environments, migration promotion, secrets, staging drift)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Each step runs the package.json script of the same name, so local runs and CI cannot drift.
+      - name: Policy tool tests (offline)
+        run: npm run ci:policy-test
+      - name: Environment configs are separate, secret-free and fail closed
+        run: npm run env:check
+        env:
+          PRODUCTION_PROJECT_REF: ${{ vars.PRODUCTION_PROJECT_REF }}
+      - name: Migrations are version-ordered, immutable once merged and non-destructive
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          base=""
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            base="origin/$BASE_REF"
+          elif [ "$EVENT_NAME" = "push" ] && [ -n "$BEFORE" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            base="$BEFORE"
+          fi
+          if [ -n "$base" ]; then
+            npm run ci:migrations -- --base "$base"
+          else
+            npm run ci:migrations
+          fi
+      - name: No secrets in tracked files
+        run: npm run ci:secrets
+      - name: Staging migration-history drift (skipped until the owner adds SUPABASE_ACCESS_TOKEN)
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: npm run ci:drift:staging
+
   db:
-    name: db (local Supabase, pgTAP + API smoke)
+    name: db (local Supabase, pgTAP + API smoke + contract fixtures + isolated restore rehearsal)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -25,15 +70,33 @@ jobs:
           cache: npm
       - name: Install pinned Supabase CLI
         run: npm ci
-      - name: Start local stack (services the tracer needs)
-        run: npx supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,storage-api,realtime,postgres-meta
+      - name: Shared contract fixtures (TypeScript mapping)
+        run: npm run contracts:test
+      - name: Start local stack (services the tracer and the restore rehearsal need)
+        run: npx supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,realtime,postgres-meta
       - name: pgTAP permission tests
         run: npm run db:test
       - name: Data API smoke checks
         run: npm run db:smoke
+      - name: Isolated database-plus-object restore rehearsal (story 1.10, local journal)
+        run: npm run recovery:rehearse
       - name: Stop local stack
         if: always()
         run: npx supabase stop --no-backup
+
+  auth-harness:
+    name: auth harness (offline unit tests)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Harness helper tests (no network, no credentials)
+        run: node --test tools/auth-harness/*.test.mjs
+      - name: Evidence holds no tokens, keys, passwords, OTPs or link tokens
+        run: bash tools/auth-harness/scan-evidence.sh
 
   flutter:
     name: flutter (analyze, test, web build)
@@ -51,6 +114,36 @@ jobs:
           flutter --version
           flutter --version | grep -q 'Flutter 3.47.6'
           flutter --version | grep -q 'Dart 3.13.5'
+      - name: contracts — pub get (locked)
+        working-directory: packages/contracts/dart
+        run: dart pub get --enforce-lockfile
+      - name: contracts — analyze
+        working-directory: packages/contracts/dart
+        run: dart analyze --fatal-infos
+      - name: contracts — shared fixtures (Dart mapping)
+        working-directory: packages/contracts/dart
+        run: dart test
+      - name: contracts — shared fixtures in Chrome (dart2js number model)
+        working-directory: packages/contracts/dart
+        run: dart test -p chrome
+      - name: design system — pub get (locked)
+        working-directory: packages/design_system
+        run: flutter pub get --enforce-lockfile
+      - name: design system — analyze
+        working-directory: packages/design_system
+        run: flutter analyze
+      - name: design system — test (tokens, contrast, accessible primitives)
+        working-directory: packages/design_system
+        run: flutter test
+      - name: client core — pub get (locked)
+        working-directory: packages/client_core
+        run: flutter pub get --enforce-lockfile
+      - name: client core — analyze
+        working-directory: packages/client_core
+        run: flutter analyze
+      - name: client core — test (request states, adapters, boundaries)
+        working-directory: packages/client_core
+        run: flutter test
       - name: mobile — pub get (locked)
         working-directory: apps/mobile
         run: flutter pub get --enforce-lockfile
@@ -60,6 +153,18 @@ jobs:
       - name: mobile — test
         working-directory: apps/mobile
         run: flutter test
+      - name: staff — pub get (locked)
+        working-directory: apps/staff
+        run: flutter pub get --enforce-lockfile
+      - name: staff — analyze
+        working-directory: apps/staff
+        run: flutter analyze
+      - name: staff — test
+        working-directory: apps/staff
+        run: flutter test
+      - name: staff — build web
+        working-directory: apps/staff
+        run: flutter build web --no-web-resources-cdn
       - name: staff web trial — pub get (locked)
         working-directory: trials/staff_web
         run: flutter pub get --enforce-lockfile
@@ -72,3 +177,8 @@ jobs:
       - name: staff web trial — build web
         working-directory: trials/staff_web
         run: flutter build web
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Web bundles carry no secret, JWT or service_role reference
+        run: node tools/ci/scan-secrets.mjs --bundle apps/staff/build/web trials/staff_web/build/web

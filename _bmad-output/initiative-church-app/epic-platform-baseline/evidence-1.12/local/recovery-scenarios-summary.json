@@ -1,0 +1,117 @@
+{
+ "source": "npm-recovery-rehearse.txt (this run)",
+ "scenarios": [
+  {
+   "scenario": "absent",
+   "journal_verdict": "journal_absent",
+   "outcome": "held",
+   "restored_state": "restored_held",
+   "after_state": "restored_held",
+   "after_last_refusal": "journal_absent",
+   "private_access_open_after": false,
+   "outbound_sending_open_after": false,
+   "gates_if_approved_after": {
+    "private_access_if_approved": false,
+    "outbound_sending_if_approved": false
+   },
+   "subject_access_revoked_after": false,
+   "object_present_after": true
+  },
+  {
+   "scenario": "gap",
+   "journal_verdict": "journal_gap",
+   "outcome": "held",
+   "restored_state": "restored_held",
+   "after_state": "restored_held",
+   "after_last_refusal": "journal_gap",
+   "private_access_open_after": false,
+   "outbound_sending_open_after": false,
+   "gates_if_approved_after": {
+    "private_access_if_approved": false,
+    "outbound_sending_if_approved": false
+   },
+   "subject_access_revoked_after": false,
+   "object_present_after": true
+  },
+  {
+   "scenario": "tampered",
+   "journal_verdict": "journal_chain_broken",
+   "outcome": "held",
+   "restored_state": "restored_held",
+   "after_state": "restored_held",
+   "after_last_refusal": "journal_chain_broken",
+   "private_access_open_after": false,
+   "outbound_sending_open_after": false,
+   "gates_if_approved_after": {
+    "private_access_if_approved": false,
+    "outbound_sending_if_approved": false
+   },
+   "subject_access_revoked_after": false,
+   "object_present_after": true
+  },
+  {
+   "scenario": "unsealed",
+   "journal_verdict": "journal_unsealed",
+   "outcome": "held",
+   "restored_state": "restored_held",
+   "after_state": "restored_held",
+   "after_last_refusal": "journal_unsealed",
+   "private_access_open_after": false,
+   "outbound_sending_open_after": false,
+   "gates_if_approved_after": {
+    "private_access_if_approved": false,
+    "outbound_sending_if_approved": false
+   },
+   "subject_access_revoked_after": false,
+   "object_present_after": true
+  },
+  {
+   "scenario": "early_seal",
+   "journal_verdict": "journal_seal_before_cutoff",
+   "outcome": "held",
+   "restored_state": "restored_held",
+   "after_state": "restored_held",
+   "after_last_refusal": "journal_seal_before_cutoff",
+   "private_access_open_after": false,
+   "outbound_sending_open_after": false,
+   "gates_if_approved_after": {
+    "private_access_if_approved": false,
+    "outbound_sending_if_approved": false
+   },
+   "subject_access_revoked_after": false,
+   "object_present_after": true
+  },
+  {
+   "scenario": "complete",
+   "journal_verdict": "complete",
+   "outcome": "reconciled",
+   "restored_state": "restored_held",
+   "after_state": "reconciled",
+   "after_last_refusal": null,
+   "private_access_open_after": false,
+   "outbound_sending_open_after": false,
+   "gates_if_approved_after": {
+    "private_access_if_approved": true,
+    "outbound_sending_if_approved": true
+   },
+   "subject_access_revoked_after": true,
+   "object_present_after": false
+  },
+  {
+   "scenario": "plain_psql",
+   "journal_verdict": null,
+   "outcome": null,
+   "restored_state": "restored_held",
+   "after_state": null,
+   "after_last_refusal": null,
+   "private_access_open_after": false,
+   "outbound_sending_open_after": false,
+   "gates_if_approved_after": {
+    "private_access_if_approved": false,
+    "outbound_sending_if_approved": false
+   },
+   "subject_access_revoked_after": null,
+   "object_present_after": null
+  }
+ ]
+}

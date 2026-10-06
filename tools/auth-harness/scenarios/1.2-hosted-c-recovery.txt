@@ -1,6 +1,6 @@
 # Story 1.2 hosted phone track, part C (recovery of the phone user through its
 # verified email alias). Before: part B, then by hand
-#   recover --email israelmuyoba+bicauth-ph1@gmail.com --step H50-recover-verified-alias-email
+#   recover --email <inbox>+bicauth-ph1@gmail.com --step H50-recover-verified-alias-email
 #   recover --email <unknown plus-address> --step H51-recover-unknown-email
 #   verify-link p1-rec --step H52-verify-recovery-link   < link (Gmail)
 #   verify-link p1-rec2 --step H53-recovery-link-reused  < same link
@@ -18,9 +18,9 @@ probe p1-c --step H58a-probe-session-C-after-reset
 probe p1-d --step H59a-probe-session-D-after-reset
 ?refresh p1-d --step H59b-refresh-session-D-after-reset
 ?login p1-old2 --account p1@previous --phone +12025550101 --step H60-pre-reset-password-phone-refused
-?login p1-old3 --account p1@previous --email israelmuyoba+bicauth-ph1@gmail.com --step H61-pre-reset-password-email-refused
+?login p1-old3 --account p1@previous --email <inbox>+bicauth-ph1@gmail.com --step H61-pre-reset-password-email-refused
 login p1-f --account p1 --phone +12025550101 --step H62-fresh-phone-login-after-reset
-login p1-g --account p1 --email israelmuyoba+bicauth-ph1@gmail.com --step H63-fresh-email-login-after-reset
+login p1-g --account p1 --email <inbox>+bicauth-ph1@gmail.com --step H63-fresh-email-login-after-reset
 probe p1-f --step H64a-probe-fresh-phone-session
 probe p1-g --step H64b-probe-fresh-email-session
 # The app must sign the recovery session out after reset.

@@ -14,6 +14,7 @@ import {
   scrub,
   summarizeJwt,
   summarizeSession,
+  summarizeSignup,
   tag,
 } from './lib.mjs';
 
@@ -198,4 +199,14 @@ test('local target accepts exactly http://127.0.0.1:54321 and never the hosted p
   assert.throws(() => assertAllowedOrigin(LOCAL_ORIGIN, 'u', 'hosted'));
   assert.throws(() => parseVerifyLink(`${LOCAL_ORIGIN}/auth/v1/verify?token=a&type=signup`, 'hosted'));
   assert.equal(parseVerifyLink(`${LOCAL_ORIGIN}/auth/v1/verify?token=a&type=signup`, 'local').type, 'signup');
+});
+
+test('summarizeSignup reports an error body only as error, never as user', () => {
+  const err = summarizeSignup({ code: 400, error_code: 'validation_failed', msg: 'Signup requires a valid password' });
+  assert.equal(err.user, undefined);
+  assert.equal(err.session, null);
+  assert.deepEqual(err.error, { error_code: 'validation_failed', msg: 'Signup requires a valid password' });
+  const pending = summarizeSignup({ id: 'u1', email: 'a+bicauth-x@example.com', identities: [] });
+  assert.equal(pending.error, undefined);
+  assert.equal(pending.user.id, tag('u1'));
 });

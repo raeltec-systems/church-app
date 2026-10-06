@@ -133,8 +133,17 @@ Hosted phone-track run (story 1.2, 2026-10-06): scenarios
 with the hand-run steps listed in each header, plus the read-only queries
 `sql/observe_phone_sms_state.sql` (MCP `execute_sql`) and
 `sql/observe_auth_sms_attempts.sql` (MCP `query_logs`). The default SMTP allows
-2 Auth emails per hour, so part D runs an hour after parts B/C. Delete the
-run's synthetic users afterwards and attach `observe_phone_sms_state.sql`.
+2 Auth emails per hour, so part D runs an hour after parts B/C. Afterwards,
+delete only the run's synthetic users with `sql/cleanup_1_2_phone_run.sql`
+(the exact scoped delete used on 2026-10-06; not read-only) and attach
+`sql/observe_phone_sms_state.sql` and `sql/observe_cleanup_1_2_phone_run.sql`.
+`sql/observe_auth_audit_actions.sql` lists masked Auth audit events for a window.
+
+Scenario files never contain the owner mailbox: they write
+`<inbox>+bicauth-<tag>@gmail.com`, and `run-script.mjs` replaces `<inbox>`
+with `HARNESS_INBOX_LOCAL` (the mailbox local part, set at run time).
+`scan-evidence.sh` checks the scenario files too; a scenario line that sends
+deliberately invalid dummy secrets carries `# scan-evidence:allow`.
 
 ## Story 1.3: fenced assisted recovery
 

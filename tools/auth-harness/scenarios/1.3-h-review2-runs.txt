@@ -1,6 +1,6 @@
 # Story 1.3, second review, part H: server-side force-revoke target, relink
 # expected login, staff attribution (function v5, hosted 009).
-login staff2-s1 --account staff2 --email israelmuyoba+bicauth-r13-x-staff2@gmail.com --step 420-login-staff2
+login staff2-s1 --account staff2 --email <inbox>+bicauth-r13-x-staff2@gmail.com --step 420-login-staff2
 
 # n1: an uncertain op (lost response).
 rc-request gn1 --account n1 --step 421-member-n1-request
@@ -9,7 +9,7 @@ rc-redeem gn1 --account n1 --inject lost_response --op gn1-op --step 423-redeem-
 rc-observe --staff staff2-s1 --prefix r13-x-n --step 424-db-before-force-revoke-attempts
 # Mismatched uid: refused before any Auth Admin call; the applied password still works.
 rc-reconcile --staff staff2-s1 --op gn1-op --force --uid-of n2 --step 425-force-revoke-mismatched-uid
-login n1-s1 --account n1@gn1-op --email israelmuyoba+bicauth-r13-x-n1@gmail.com --step 426-password-unchanged-after-refusal
+login n1-s1 --account n1@gn1-op --email <inbox>+bicauth-r13-x-n1@gmail.com --step 426-password-unchanged-after-refusal
 # Matching target resolved from the op: forced reconcile.
 rc-reconcile --staff staff2-s1 --op gn1-op --force --step 427-force-revoke-target-from-op
 probe n1-s1 --step 428-session-revoked-by-force
@@ -19,7 +19,7 @@ rc-request gn2 --account n2 --step 430-member-n2-request
 rc-issue gn2 --staff staff2-s1 --account n2 --step 431-staff-issue-gn2
 rc-redeem gn2 --account n2 --op gn2-op --step 432-redeem-gn2-succeeds
 rc-reconcile --staff staff2-s1 --op gn2-op --force --step 433-force-revoke-non-uncertain-op
-login n2-s1 --account n2 --email israelmuyoba+bicauth-r13-x-n2@gmail.com --step 434-password-unchanged-after-refusal
+login n2-s1 --account n2 --email <inbox>+bicauth-r13-x-n2@gmail.com --step 434-password-unchanged-after-refusal
 
 # Relink approves only the login staff reviewed.
 rc-relink --staff staff2-s1 --account n2 --expect-tag r13-x-other --step 440-relink-wrong-expected-login

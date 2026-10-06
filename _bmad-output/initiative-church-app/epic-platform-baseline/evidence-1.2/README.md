@@ -1,7 +1,7 @@
 # Evidence 1.2: password-session trust and no-SMS provider behaviour
 
 - **Project:** `bic-kafue-auth-test` (`szfyfezfvxyuvovnnakr`), eu-central-1. This is an isolated Auth test project with synthetic accounts only.
-- **Observed:** 2026-10-03 (email track, steps `00`–`99`) and 2026-10-06 (hosted phone track after the owner's Management API change, steps `H00`–`H9x`; see [Hosted phone track](#hosted-phone-track-2026-10-06-after-the-owners-management-api-change)).
+- **Observed:** 2026-10-03 (email track, steps `00`–`99`) and 2026-10-06 (hosted phone track after the owner's Management API change, steps `H00`–`H98`; see [Hosted phone track](#hosted-phone-track-2026-10-06-after-the-owners-management-api-change)).
 - **Raw log:** [`harness-log.jsonl`](harness-log.jsonl). There is one redacted JSON line per harness call, keyed by `step`.
   - JWTs are reduced to the header plus the trust claims, with `sub` and `session_id` replaced by digests.
   - Refresh tokens, link tokens, OTPs, passwords and keys are redacted.
@@ -18,9 +18,9 @@
 - **The predicate.** `harness.trusted_password_session()` requires both of these:
   - a `password` entry in the verified JWT `amr`;
   - a live `auth.sessions` row for `session_id` and the same user, with `not_after` not passed.
-- **Legacy lines (not relied on).** Log lines 5 and 6 (steps `22-verify-signup-link` and `23-probe-signup-link-session`) were written by an earlier, uncommitted harness build. That build put the JWT summary under a key that redaction then blanked. The same session was re-probed with the committed tool at step `24-probe-signup-session-jwt`, and only that line is cited. Step 22 is used only for its HTTP status and redirect shape. The rerun re-captures both steps.
+- **Legacy lines (not relied on).** Log lines 5 and 6 (steps `22-verify-signup-link` and `23-probe-signup-link-session`) were written by an earlier, uncommitted harness build. That build put the JWT summary under a key that redaction then blanked. The same session was re-probed with the committed tool at step `24-probe-signup-session-jwt`, and only that line is cited. Step 22 is used only for its HTTP status and redirect shape. The same scenario was reproduced on hosted on 2026-10-06 with a new account (`…+bicauth-e2`, steps H81–H86); the legacy lines themselves stay legacy.
 - **Operator notes are not observations.** Steps `68-sql-session-rows-after-password-change` and `94-sql-and-auth-log-observations` are free-text notes with no captured query output, so no claim below depends on them. Raw query output is attached with `run.mjs attach` and a committed query file in `tools/auth-harness/sql/`, as at steps `98` and `99`.
-- **"To re-capture"** marks a claim the committed log does not yet support. It is scheduled for the owner-gated rerun.
+- **"Reproduced on <account> (H…)"** marks a 2026-10-03 gap that was later covered by a different account or run, not by the original session. **"Inferred"** marks a claim supported only indirectly.
 
 ## Versions
 
@@ -35,7 +35,7 @@
 | Setting | Value | Meaning |
 |---|---|---|
 | `external.phone` | **false** | Phone provider was disabled (the project default) on 2026-10-03. The owner enabled it on 2026-10-06 through the Management API; see the hosted phone track section. |
-| `phone_autoconfirm` | false | Phone confirmations are still on. They must be turned off when phone is enabled. |
+| `phone_autoconfirm` | false | Phone confirmations were on at step `00`. Since the owner's change on 2026-10-06 it is `true` (H00). |
 | `sms_provider` | `twilio` | Default label only. The harness configured no credentials or hook; the dashboard is not readable here. |
 | `external.email` / `mailer_autoconfirm` | true / false | Email provider is on and email confirmation is required. |
 
@@ -61,15 +61,15 @@
 | 5 | Wrong password vs unknown account | 31, 32 | both 400 `invalid_credentials`, same message | neutral ✔ |
 | 6 | Refresh password session | 34, 35 | refreshed JWT keeps `amr=[password]`; allowed | ✔ |
 | 7 | Magic link (`/otp` email) | 40–42b | session `amr=[otp]` (fragment type `magiclink`); denied | **denied** ✔ |
-| 8 | Password change via `PUT /user` from session B (no reauth or nonce prompted) | 60–67 | See the note after the table. | revocation ✔ for A and the magic-link session; signup-link session re-captured on hosted 2026-10-06 (H90a, H90b) ✔ |
+| 8 | Password change via `PUT /user` from session B (no reauth or nonce prompted) | 60–67 | See the note after the table. | revocation ✔ for A and the magic-link session; signup-link session not covered here — reproduced on `…+bicauth-e2` (H87–H91) |
 | 9 | Recovery link (`/recover` → `/verify`) | 81–83 | Fragment type `recovery`, but JWT `amr=[otp]`; denied | **denied** ✔ |
 | 10 | Set password from recovery session | 84–87 | 200. The recovery session stays live (85) and refreshable with `amr=[otp]` (86), and stays denied (85, 87). | gate holds ✔ |
-| 11 | Pre-reset password sessions C and D after the recovery password set | 88, 88b, 89 | Both C and D show `session_live=false` and are denied. D's refresh failed with `refresh_token_not_found`. C was not refreshed in this run; the 2026-10-06 phone run refreshed every pre-reset session (H57b–H59b). | revocation ✔ |
+| 11 | Pre-reset password sessions C and D after the recovery password set | 88, 88b, 89 | Both C and D show `session_live=false` and are denied. D's refresh failed with `refresh_token_not_found`. C was not refreshed. | revocation ✔; C refresh not covered here — reproduced on phone account `…0101` (H57b–H59b) |
 | 12 | Fresh password login after reset | 90–92 | Pre-reset password refused `invalid_credentials`; new login `amr=[password]`; allowed | ✔ |
 | 13 | Recovery link reused | 93 | `otp_expired` | one-use ✔ |
 | 14 | Explicit logout of recovery session | 95–97 | 204; that JWT then denied (`session_live=false`); session E still allowed | ✔ |
 | 15 | `/recover` unknown vs known address | 50–55, 81 | Unknown: always 200 `{}`. Known: 200 `{}` normally, but 429 inside the throttle windows. | neutral except when throttled ⚠ |
-| 16 | Phone with provider disabled | 10, 70–72 | See the note after the table. | phone path refused while disabled. Existing phone user with phone enabled: H20, H39, H68 ✔ |
+| 16 | Phone paths while the phone provider was disabled (2026-10-03) | 10, 70–72 | See the note after the table. | refused while disabled. The phone-enabled rows are in the hosted phone track section (P3, P4). |
 | 17 | No SMS activity in the run window | 99 | `observe_auth_logs.sql` over 12:00–13:45Z: every path/error group has `sms_mentions = 0` | ✔ for this window |
 
 **Row 8 detail (steps 60–67).**
@@ -120,7 +120,7 @@ Raw capture: [`local-cli-phone-gate.txt`](local-cli-phone-gate.txt).
 
 - `L14` (`observe_local_sms_state.sql`) found 0 phone users, 0 phone MFA factors and 0 phone one-time tokens. `L91` (local GoTrue log) found `sms_mentions = 0`.
 - **Result (2026-10-03):** the phone/password rows (matrix rows 1, 3, 4 and the phone-OTP row with an existing phone user) were **not proven**, locally or hosted. They have since been proven on hosted; see the hosted phone track section.
-- **The pattern across config surfaces:** both supported Supabase surfaces, the hosted dashboard and the local CLI, refuse to switch on the phone provider without SMS provider credentials. GoTrue itself was not tested with phone enabled and no provider; that would need a direct container override, which was not authorised. **This is an AD-20 risk, not yet a contradiction.** See the plan's blocked reason.
+- **The pattern across config surfaces:** both supported Supabase surfaces, the hosted dashboard and the local CLI, refuse to switch on the phone provider without SMS provider credentials. GoTrue itself was not tested with phone enabled and no provider; that would need a direct container override, which was not authorised. **This was an AD-20 risk, not a contradiction.** It was resolved on 2026-10-06: the Management API accepts phone without an SMS provider (hosted phone track section).
 
 ### Email track re-captured on LOCAL Auth (account `…+bicauth-l1`)
 
@@ -138,57 +138,56 @@ These close the hosted README's "to re-capture" gaps for rows 8 and 11 and the l
 
 ## Hosted phone track (2026-10-06, after the owner's Management API change)
 
-The former "Still owner-gated" list is now closed on hosted. Raw log: the `H…` steps of [`harness-log.jsonl`](harness-log.jsonl). Scenario files: `tools/auth-harness/scenarios/1.2-hosted-{a-phone,b-email-alias,c-recovery,d-signup-link}.txt` (the few hand-run steps are listed in each file's header).
+The former "Still owner-gated" list was run on hosted. Every item ran; one matrix row (phone `/otp`) is only **partially** met (P4, finding F1), and the synthetic phone range differs from the frozen plan. Both need owner acceptance (plan `blocked_reason`). Raw log: the `H…` steps of [`harness-log.jsonl`](harness-log.jsonl). Scenario files: `tools/auth-harness/scenarios/1.2-hosted-{a-phone,b-email-alias,c-recovery,d-signup-link}.txt` (the hand-run steps are listed in each file's header).
 
 ### Configuration (owner-supplied, then corroborated)
 
-- **Owner-supplied evidence:** [`owner-management-api-readback.txt`](owner-management-api-readback.txt). The owner ran the Management API `PATCH …/config/auth` with the no-SMS body and pasted the `GET` readback: `external_phone_enabled: true`, `sms_autoconfirm: true`, `sms_provider: "twilio"`, `sms_test_otp: null`. The owner set **no** provider credentials. This line is the owner's statement, not a harness capture.
-- **Harness corroboration:** `H00` (`/auth/v1/settings`): `external.phone=true`, `phone_autoconfirm=true`, `sms_provider="twilio"`, `mailer_autoconfirm=false`; GoTrue **v2.197.0**. `"twilio"` is Supabase's default provider label (it was already shown at step `00` on 2026-10-03, with phone off).
-- **No credentials, proven empirically:** every phone `/otp` (H20, H21, H39, H68) returned 500 `unexpected_failure` "Unable to get SMS provider", and the Auth log records each as `error: "missing Twilio account SID"` (H73).
-- **Probe unchanged:** `H71` (`observe_probe_grants.sql`): the four story-1.2 probe functions have the same md5 as step `98`, `anon` has no EXECUTE and no `harness` schema usage, RLS is on. (The listing now also shows story 1.3's `rc_*` objects.)
-- **Synthetic phones:** NANP fictional range `+1 202 555 0100–0199` (`+12025550101`, `…0102`, `…0103`, `…0199`). These numbers are reserved for fiction and never assigned. The plan's earlier `+26097…` example is a live Zambian mobile range, so it was not used.
+- **Owner-supplied evidence:** [`owner-management-api-readback.txt`](owner-management-api-readback.txt). The owner ran the Management API `PATCH …/config/auth` with the no-SMS body and pasted the `GET` readback: `external_phone_enabled: true`, `sms_autoconfirm: true`, `sms_provider: "twilio"`, `sms_test_otp: null`. The owner states no provider credentials were set. This is the owner's statement, not a harness capture.
+- **Harness corroboration:** `H00` (`/auth/v1/settings`): `external.phone=true`, `phone_autoconfirm=true`, `sms_provider="twilio"`, `mailer_autoconfirm=false`; GoTrue **v2.197.0**. `"twilio"` is Supabase's default provider label (already shown at step `00` on 2026-10-03, with phone off).
+- **No credentials, shown empirically:** every phone `/otp` (H20, H21, H39, H68) returned 500 `unexpected_failure` "Unable to get SMS provider", and the Auth log records each as `error: "missing Twilio account SID"` (H73).
+- **Probe unchanged:** `H71` (`observe_probe_grants.sql`): the four story-1.2 probe functions have the same md5 as step `98`, `anon` has no EXECUTE and no `harness` schema usage, RLS is on. (The listing also shows story 1.3's `rc_*` objects.)
+- **Synthetic phones (deviation from the frozen plan, owner acceptance pending):** NANP fictional range `+1 202 555 0100–0199` (`…0101`, `…0102`, `…0103`, `…0199`), reserved for fiction and never assigned. The frozen block names `+26097…`, which is a live Zambian mobile range, so it was not used.
 
 ### Results (account `…0101` / `…+bicauth-ph1`)
 
 | # | Matrix row / owner-gated item | Steps | Observed on hosted | Verdict |
 |---|---|---|---|---|
-| P1 | Phone/password signup, confirmations off, no SMS provider | H10, H11, H25 | 200 with a session: JWT `amr=[password]`, `aal1`, `phone_confirmed=true`, one `phone` identity. Probe **allowed**. H25: `confirmation_sent_at` null, no phone one-time tokens. | ✔ **AD-20 holds** |
+| P1 | Phone/password signup, confirmations off, no SMS provider | H10, H11, H25 | 200 with a session: JWT `amr=[password]`, `aal1`, `phone_confirmed=true`, one `phone` identity. Probe **allowed**. H25: `confirmation_sent_at` null, no phone one-time tokens. | ✔ |
 | P2 | Phone password login; wrong password vs unknown phone | H12–H18 | Login `amr=[password]`, allowed (H15); refresh keeps `password` and stays allowed (H16, H17). Wrong password (H13) and unknown phone `…0199` (H14) both 400 `invalid_credentials`, same message. | ✔ neutral |
-| P3 | `/otp` phone for the **existing** user (no SMS, no session) | H20, H39, H68, H73 | 500 "Unable to get SMS provider" each time (before and after the email alias and after the reset). No session or token in the response. Log: "missing Twilio account SID". | ✔ no SMS |
-| P4 | Passwordless phone signup attempts | H21, H22, H24, H25 | `/signup` phone without a password: 400 `validation_failed` "Signup requires a valid password" (H22), no user created for `…0103` (H25). `/otp` with `create_user:true` for new phone `…0102`: 500 "Unable to get SMS provider" (H21), **but see finding F1**. Direct `/verify` sms guess on `…0102`: 403 `otp_expired` (H24). | ✔ no SMS / no client session; ⚠ F1 |
+| P3 | `/otp` phone for the **existing** user | H20, H39, H68, H73 | 500 "Unable to get SMS provider" each time (before and after the email alias and after the reset). No session or token in the response. Log: "missing Twilio account SID". | ✔ no SMS, no session |
+| P4 | Passwordless phone attempts | H21, H22, H24, H25 | `/signup` phone without a password: 400 `validation_failed` "Signup requires a valid password" (H22); no user for `…0103` (H25). `/otp` with `create_user:true` for new phone `…0102`: 500 "Unable to get SMS provider" and no tokens returned (H21), **but H25 shows a phone-confirmed user `…0102` and a live `auth.sessions` row whose `mfa_amr_claims` method is `password`, although no password was supplied** (F1). Direct `/verify` sms guess on `…0102`: 403 `otp_expired` (H24). | **partial:** no SMS, no tokens returned; server-side user + session created (F1) |
 | P5 | Direct `/verify` sms guess, existing user | H23 | 403 `otp_expired` | ✔ |
-| P6 | Same-account email: `PUT /user {email}` from phone session B, then verify | H30, H32–H35, H70 | 200 with `new_email` pending (H30). The Supabase mail went only to `…+bicauth-ph1` (subject "Confirm your new email address"). Link → 303, fragment `email_change`, a session with `amr=[otp]` for the **same** `sub` (H32), **denied** (H34). Reused link: `otp_expired` (H33). B remains allowed (H35). H70: one user with identities `[email, phone]`, `email_confirmed=true`; `users_with_ph_alias_email = 1` (no second user). | ✔ same account |
-| P7 | Unverified email cannot recover | H31 | `/recover` for the still-pending address: 200 `{}`, and no recovery mail arrived in the inbox (only the email-change mail was present). | ✔ |
+| P6 | Same-account email: `PUT /user {email}` from phone session B, then verify | H30, H32–H35, H70, H95 | 200 with `new_email` pending (H30; audit `user_modified` at 16:59:40, H95). The link → 303, fragment `email_change`, a session with `amr=[otp]` for the **same** `sub` (H32), **denied** (H34). Reused link: `otp_expired` (H33). B remains allowed (H35). H70: one user with identities `[email, phone]`, `email_confirmed=true`; `users_with_ph_alias_email = 1` (no second user). Delivery to `…+bicauth-ph1` is **inferred** from H32: the one-use link that verified came from that inbox. | ✔ same account |
+| P7 | Unverified (pending) email cannot recover | H31, H95 | `/recover` for the still-pending address: 200 `{}` (H31, 16:59:58Z). H95 (`observe_auth_audit_actions.sql`, 16:59:00–17:01:30Z): no `user_recovery_requested` between H30's `user_modified` (16:59:40) and H32's (17:00:08); the next email recovery event is H50's at 17:00:53. That no mail was sent is **inferred** from this, with H50 delivered and the 2-per-hour limit (H80) as indirect support. | ✔ (audit-backed; non-delivery inferred) |
 | P8 | Email/password alias of the phone user | H36–H38 | Login with the verified email and the **same** password: same `sub`, `amr=[password]`, **allowed**. Wrong password: 400 `invalid_credentials`. | ✔ |
 | P9 | Password change from session B: probe **and** refresh every other session | H40–H49b | Signup session, A, email-alias session and email-change session: all `session_live=false`, **denied**, `/user` 403, refresh `refresh_token_not_found` (H41a–H44b). B allowed and refreshable (H45a, H45b). Old password refused on phone (H46); new password works on phone and email, both allowed (H47–H49b). | ✔ |
 | P10 | Recovery through the email alias; probe and refresh every other session after the reset | H50–H67 | Known and unknown address both 200 `{}` (H50, H51). Link → fragment `recovery`, JWT `amr=[otp]`, **denied** (H52, H54); reused link `otp_expired` (H53). After setting the password from it (H55): B, C and D all `session_live=false`, denied, refresh `refresh_token_not_found` (H57a–H59b). The recovery session stays live and refreshable, still `otp`, still **denied** (H56a–H56c). Pre-reset password refused on phone and email (H60, H61). Fresh phone and email logins allowed (H62–H64b). Logout of the recovery session: 204, then `session_live=false` (H65, H66); the fresh session stays allowed (H67). | ✔ |
-| P11 | Observations | H25, H70, H71, H72, H73 | `observe_phone_sms_state.sql` (H25 ran the version before the `users_with_ph_alias_email` field was added; H70 the committed one): 0 phone one-time tokens, 0 phone MFA factors, no `confirmation_sent_at`/`phone_change_sent_at`/`reauthentication_sent_at`. `observe_auth_logs.sql` over 16:55–17:03:30Z (H72): the only SMS-mentioning request lines are the 4 `/otp` 500s. `observe_auth_sms_attempts.sql` (H73): every SMS-channel request ended in status 500 "missing Twilio account SID"; **0 successful SMS sends**. | ✔ |
+| P11 | SMS observations | H25, H70, H72, H73, H96, H97 | `observe_phone_sms_state.sql`: 0 phone one-time tokens, 0 phone MFA factors, no confirmation/phone-change/reauthentication `*_sent_at`. `observe_auth_logs.sql` (16:55–17:03:30Z, H72): the only SMS-mentioning request lines are the 4 `/otp` 500s. `observe_auth_sms_attempts.sql` (H73): each SMS-channel audit line pairs with a request line ending 500 "missing Twilio account SID". **0 successful SMS sends is an inference** from that pairing; a successful send's log signature was never observed here (no provider exists). Part-D window 17:03:30–18:03:40Z (H96, H97): no SMS-mentioning line. | ✔ no SMS (inferred from logs) |
 
 ### Findings for the identity epic (hosted phone track)
 
-- **AD-20 holds on hosted GoTrue v2.197.0.** With the phone provider on, `sms_autoconfirm` on and no SMS credentials, phone+password signup and login work, issue `amr=[password]` sessions, and pass the trusted-session predicate (P1, P2). No SMS can be sent (P3, P4, P11). The only blocker was the configuration surface: the dashboard and the local CLI refuse this setting, while the Management API accepts it. **Production needs the same Management API step** (record it in the environment runbook).
-- **F1: `/otp {phone, create_user:true}` creates a confirmed phone user even though the send fails.** H21 returned 500, but H25 shows user `…0102` created with `phone_confirmed=true`, a `phone` identity, and a live session whose AMR is recorded as `password`. No tokens reached the client, so nobody can use that session, and the probe gate is unaffected. But anyone can **pre-register (squat) any phone number** through `/otp` or `/signup`, with no proof of possession. That is inherent to AD-20 with `sms_autoconfirm` (the same is true of `/signup`). The identity epic must therefore treat the Auth phone as an unverified login handle: binding to a member happens only through the staff-approved claim (AD-3), and a squatted number needs a staff recovery path. `/otp` itself cannot be switched off while the phone provider is on; Auth rate limits or CAPTCHA are the levers if abuse appears.
-- **Auth audit log labels phone `/otp` as `user_recovery_requested` with channel `sms`** (H73), even though nothing was sent. Monitoring must key on the request status and error, not on the audit action.
-- **The email alias is the recovery channel for phone accounts.** Same user id, same password, and recovery through it revokes every other session (P6–P10). An unverified (pending) address does not recover (P7).
-- **The phone-track results match the email-track findings above:** gate on `password` in `amr`, keep the live-session check, and sign the recovery session out after reset.
+- **AD-20 holds for phone+password, with F1 as an open constraint.** With the phone provider on, `sms_autoconfirm` on and no SMS credentials, phone+password signup and login work, issue `amr=[password]` sessions, and pass the trusted-session predicate (P1, P2). No SMS was sent (P3, P4, P11). The dashboard and the local CLI refuse this configuration; the Management API accepts it, so **production needs the same Management API step**.
+- **F1: on the `/otp {phone, create_user:true}` path, `amr=password` does not prove a user-supplied password.** H21 returned 500 and no tokens, yet H25 shows a new phone-confirmed user `…0102` with a live `auth.sessions` row whose AMR claim is `password`, although the caller sent no password. Nobody received that session's tokens, so the probe was not reachable with it here. But the identity predicate **must not rely on AMR alone**: it also needs the app-side, staff-approved member binding (AD-3). Because `sms_autoconfirm` lets anyone register any number (through `/otp` or `/signup`) with no proof of possession, staff also need a **number-reclaim** path for a squatted number. `/otp` itself cannot be switched off while the phone provider is on; Auth rate limits or CAPTCHA are the levers if abuse appears.
+- **The Auth audit log labels phone `/otp` as `user_recovery_requested` with channel `sms`** (H73), even though nothing was sent. Monitoring must key on the request status and error, not on the audit action.
+- **The email alias is the recovery channel for phone accounts.** Same user id, same password, and recovery through it revokes every other session (P6, P8–P10). A pending address does not recover (P7).
+- **The phone-track results match the email-track findings above:** gate on `password` in `amr` plus the live-session check plus the AD-3 binding, and sign the recovery session out after reset.
 
-### Hosted legacy lines 5–6 and the row-8 signup-link gap (account `…+bicauth-e2`)
+### Hosted signup-link scenario (legacy lines 5–6 and the row-8 gap), account `…+bicauth-e2`
 
-Paced past the default SMTP limit (2 emails per hour, project-wide): the first attempt at 17:03Z was refused 429 `over_email_send_rate_limit` "email rate limit exceeded" (H80); the retry at 18:02Z sent the mail (H81).
+This reproduces the 2026-10-03 gaps with a new account; it is not evidence about the original `e1` sessions. It was paced past the default SMTP limit (2 emails per hour, project-wide): the attempt at 17:03Z was refused 429 `over_email_send_rate_limit` "email rate limit exceeded" (H80); the retry at 18:02Z sent the mail (H81).
 
 | Item | Steps | Observed on hosted | Verdict |
 |---|---|---|---|
 | Login before confirmation | H82 | 400 `email_not_confirmed` | ✔ |
-| Signup confirmation link (replaces legacy 22/23) | H83–H86 | 303, fragment `signup`, JWT `amr=[otp]`, `aal1`; `session_live=true` but **denied**; refresh keeps `otp` and stays denied | ✔ |
-| Signup-link session after a password change (row-8 gap) | H87–H91 | Password session A allowed (H88). After `PUT /user {password}` from A (H89), the refreshed signup-link session is `session_live=false`, denied, `/user` 403, refresh `refresh_token_not_found` (H90a, H90b); A stays allowed (H91). | ✔ |
-| No SMS activity in the part-D window | H92 | `observe_auth_sms_attempts.sql` over 17:03:30–18:10Z: no SMS-mentioning Auth line | ✔ |
+| Signup confirmation link (legacy lines 5–6) | H83–H86 | 303, fragment `signup`, JWT `amr=[otp]`, `aal1`; `session_live=true` but **denied**; refresh keeps `otp` and stays denied | ✔ reproduced |
+| Signup-link session after a password change (row 8) | H87–H91 | Password session A allowed (H88). After `PUT /user {password}` from A (H89), the refreshed signup-link session is `session_live=false`, denied, `/user` 403, refresh `refresh_token_not_found` (H90a, H90b); A stays allowed (H91). | ✔ reproduced |
+| No SMS activity, part-D window | H92, H96, H97 | H92 was captured at 18:03:41Z with a requested end of 18:10Z (later than the capture), so its effective window was 17:03:30Z to the call time and may miss lines still being ingested. It was re-run with fixed bounds 17:03:30–18:03:40Z after ingestion: H96 (`observe_auth_sms_attempts.sql`) no line; H97 (`observe_auth_logs.sql`) shows the part-D request lines with `sms_mentions = 0`. | ✔ |
 
-With this, the hosted log no longer depends on legacy lines 5–6, and rows 8 and 11 above are now covered on hosted as well (row 11's C/D refresh: H57b–H59b for the phone account).
+### Cleanup (H93, H98; H94)
 
-### Cleanup (H93, H94)
-
-- **H93 (operator note):** this run's synthetic users only (`…0101`, `…0102`, `…+bicauth-e2`; 3 users) and their 2 `harness.private_probe` rows were deleted through the Supabase MCP. No user was created for `…0103` or `…0199`. The story 1.2 `e1` account and the story 1.3 accounts were left alone.
+- **H93 (operator note):** the exact scoped delete, now committed as [`tools/auth-harness/sql/cleanup_1_2_phone_run.sql`](../../../../tools/auth-harness/sql/cleanup_1_2_phone_run.sql), removed only this run's 3 synthetic users (`…0101`, `…0102`, `…+bicauth-e2`) and their 2 `harness.private_probe` rows. No user existed for `…0103` or `…0199`.
 - **H94 (`observe_phone_sms_state.sql`):** 0 users in the range, 0 users with any phone, 0 alias users, 0 phone one-time tokens, 0 phone MFA factors.
+- **H98 (`observe_cleanup_1_2_phone_run.sql`):** `run_users_remaining = 0`, `run_probe_rows_remaining = 0`, `e1_present = true`, 17 story-1.3 accounts present; 18 users in total (the masked `e1` and `r13-*` addresses are listed).
 - The harness state directory (live tokens and generated passwords) was removed with `run.mjs cleanup`; the emailed links were held only in scratch files outside the repo and deleted after use.
 
 ## Former owner gate (closed 2026-10-06)

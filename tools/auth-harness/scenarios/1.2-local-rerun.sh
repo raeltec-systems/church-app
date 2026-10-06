@@ -21,7 +21,7 @@ H="node tools/auth-harness/run.mjs"
 LINK="node tools/auth-harness/local-mailpit-link.mjs"
 DB="docker exec -i supabase_db_church-app psql -U postgres -d postgres -X -A -t -q"
 P=+260970000201
-E=israelmuyoba+bicauth-l1@gmail.com
+E=${HARNESS_INBOX_LOCAL:?set HARNESS_INBOX_LOCAL}+bicauth-l1@gmail.com
 eval "$($H init)"
 trap '$H cleanup >/dev/null' EXIT
 sessions() { $DB -v ident="$1" < tools/auth-harness/sql/local/observe_local_account_sessions.sql \
@@ -50,7 +50,7 @@ $H probe l1-signup-r --step L24b-probe-refreshed-signup-link-session
 $H login l1-a --account l1 --email $E --step L30-password-login-A
 $H login l1-b --account l1 --email $E --step L31-password-login-B
 $H login l1-x --account l1 --email $E --wrong --step L32-wrong-password
-$H login l1-y --account l1u --email israelmuyoba+bicauth-l1-unknown@gmail.com --wrong --step L33-unknown-account
+$H login l1-y --account l1u --email ${HARNESS_INBOX_LOCAL:?set HARNESS_INBOX_LOCAL}+bicauth-l1-unknown@gmail.com --wrong --step L33-unknown-account
 $H probe l1-a --step L34-probe-A
 T=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 $H otp --email $E --step L40-magic-link-request
@@ -68,7 +68,7 @@ $H login l1-c --account l1 --email $E --step L70-password-login-C
 $H login l1-d --account l1 --email $E --step L71-password-login-D
 T=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 $H recover --email $E --step L72-recover-known
-$H recover --email israelmuyoba+bicauth-l1-unknown@gmail.com --step L73-recover-unknown
+$H recover --email ${HARNESS_INBOX_LOCAL:?set HARNESS_INBOX_LOCAL}+bicauth-l1-unknown@gmail.com --step L73-recover-unknown
 mail "reset" "$T" | $H verify-link l1-rec --step L74-verify-recovery-link
 $H probe l1-rec --step L75-probe-recovery-session
 $H set-password l1-rec --account l1 --step L76-set-password-from-recovery

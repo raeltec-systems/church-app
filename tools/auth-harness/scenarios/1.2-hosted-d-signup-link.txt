@@ -2,13 +2,13 @@
 # gap (signup-link session after a password change). One Auth email; the
 # default SMTP allows 2 per hour project-wide, so run it outside the window of
 # parts B/C. Before, by hand:
-#   signup e2 --email israelmuyoba+bicauth-e2@gmail.com --step H81-email-signup-e2
-#   login e2-early --account e2 --email israelmuyoba+bicauth-e2@gmail.com --step H82-login-before-confirm
+#   signup e2 --email <inbox>+bicauth-e2@gmail.com --step H81-email-signup-e2
+#   login e2-early --account e2 --email <inbox>+bicauth-e2@gmail.com --step H82-login-before-confirm
 #   verify-link e2-signup --step H83-verify-signup-link   < link (Gmail)
 probe e2-signup --step H84-probe-signup-link-session
 refresh e2-signup --as e2-signup-r --step H85-refresh-signup-link-session
 probe e2-signup-r --step H86-probe-signup-link-session-refreshed
-login e2-a --account e2 --email israelmuyoba+bicauth-e2@gmail.com --step H87-email-password-login-A
+login e2-a --account e2 --email <inbox>+bicauth-e2@gmail.com --step H87-email-password-login-A
 probe e2-a --step H88-probe-password-session-A
 set-password e2-a --account e2 --step H89-password-change-from-A
 probe e2-signup-r --step H90a-probe-signup-link-session-after-change

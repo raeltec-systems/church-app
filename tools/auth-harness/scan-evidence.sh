@@ -32,14 +32,18 @@ patterns=(
 
 fail=0
 for p in "${patterns[@]}"; do
-  if grep -rPn --exclude=scan-evidence.sh --exclude='*.test.mjs' --exclude='*.sql' --exclude-dir=scenarios -- "$p" "${paths[@]}"; then
+  # Scenario lines that send deliberately invalid dummy values carry the marker
+  # `# scan-evidence:allow` (a comment run-script.mjs strips); only those are skipped.
+  if grep -rPn --exclude=scan-evidence.sh --exclude='*.test.mjs' --exclude='*.sql' -- "$p" "${paths[@]}" \
+      | grep -vP '^[^:]*/scenarios/[^:]*:[0-9]+:.*# scan-evidence:allow'; then
     echo "scan-evidence: forbidden pattern found: $p" >&2
     fail=1
   fi
 done
-# Evidence masks owner-inbox addresses as …+bicauth-<tag>@gmail.com; the full
-# local part may appear only in harness usage docs, never in evidence.
-for EVIDENCE in "${EVIDENCE_DIRS[@]}"; do
+# Evidence masks owner-inbox addresses as …+bicauth-<tag>@gmail.com and scenario
+# files use <inbox>+bicauth-<tag>@gmail.com; the full local part may appear only
+# in harness code/usage docs, never in evidence or scenarios.
+for EVIDENCE in "${EVIDENCE_DIRS[@]}" tools/auth-harness/scenarios; do
   if [ -d "$EVIDENCE" ] && grep -rPn -- '[A-Za-z0-9._-]+\+bicauth-[A-Za-z0-9-]*@' "$EVIDENCE"; then
     echo "scan-evidence: unmasked owner-inbox address in evidence" >&2
     fail=1

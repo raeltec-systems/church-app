@@ -4,4 +4,4 @@
 # owner's Gmail and fed to `verify-link` on stdin (steps 203/204, see README).
 rc-request ge1 --account me --step 201-member-e-request
 rc-issue ge1 --staff staff-s1 --account me --step 201-staff-issue-ge1
-set-email me-s1 --email israelmuyoba+bicauth-r13-x-me2@gmail.com --step 202-native-email-change-request
+set-email me-s1 --email <inbox>+bicauth-r13-x-me2@gmail.com --step 202-native-email-change-request

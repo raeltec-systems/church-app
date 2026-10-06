@@ -177,11 +177,20 @@ test('committed scenarios only use the r13 synthetic accounts and known commands
       if (!line || line.startsWith('@sleep')) continue;
       const [cmd] = line.replace(/^\?/, '').split(/\s+/);
       assert.ok(allowed.has(cmd), `${f}: ${cmd}`);
-      for (const email of line.match(/[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[a-z]+/g) ?? []) {
-        assert.match(email, /^israelmuyoba\+bicauth-r13-[a-z0-9-]+@gmail\.com$/, `${f}: ${email}`);
+      for (const email of line.match(/(?:<inbox>)?[A-Za-z0-9._+-]+@[A-Za-z0-9.-]+\.[a-z]+/g) ?? []) {
+        // The owner mailbox is masked as <inbox> (expanded by run-script.mjs).
+        assert.match(email, /^<inbox>\+bicauth-r13-[a-z0-9-]+@gmail\.com$/, `${f}: ${email}`);
       }
       assert.ok(!/hg_|ho_|Hx!|Rv!|eyJ/.test(line), `${f}: secret-shaped text`);
       assert.ok(!/skip_revoke/.test(line), `${f}: removed injection`);
     }
+  }
+});
+
+test('every committed scenario masks the owner mailbox as <inbox>', () => {
+  const dir = join(HERE, 'scenarios');
+  for (const f of readdirSync(dir)) {
+    const text = readFileSync(join(dir, f), 'utf8');
+    assert.ok(!/israelmuyoba/.test(text), `${f}: unmasked owner mailbox`);
   }
 });

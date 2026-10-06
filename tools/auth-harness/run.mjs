@@ -46,6 +46,7 @@ import {
   scrub,
   summarizeJwt,
   summarizeSession,
+  summarizeSignup,
   summarizeUser,
 } from './lib.mjs';
 import { rcCommand } from './recovery-cli.mjs';
@@ -250,7 +251,8 @@ async function main() {
       // --no-password: the passwordless phone signup attempt (story 1.2 no-SMS row).
       // GoTrue must refuse it; no password is generated or stored.
       const noPassword = Boolean(opt['no-password']);
-      if (!noPassword) state.passwords[account] = newPassword();
+      if (noPassword) delete state.passwords[account];
+      else state.passwords[account] = newPassword();
       const body = noPassword ? { ...id } : { ...id, password: state.passwords[account] };
       if (opt.redirect) body.email_redirect_to = opt.redirect;
       const r = await client.signup(body);
@@ -260,9 +262,7 @@ async function main() {
         account,
         request: noPassword ? { ...maskedId(id), password_sent: false } : maskedId(id),
         status: r.status,
-        session: r.json?.access_token ? summarizeSession(r.json) : null,
-        user: r.json?.access_token ? undefined : summarizeUser(r.json?.user ?? r.json),
-        error: r.json?.error_code ? { error_code: r.json.error_code, msg: r.json.msg } : undefined,
+        ...summarizeSignup(r.json),
       });
       break;
     }

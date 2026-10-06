@@ -2,22 +2,22 @@
 # fences, request binding, holds and concurrent redemption.
 
 # Happy path: two live sessions exist before dispatch.
-login ma-s1 --account ma --email israelmuyoba+bicauth-r13-x-ma@gmail.com --step 40-login-member-a-session-1
-login ma-s2 --account ma --email israelmuyoba+bicauth-r13-x-ma@gmail.com --step 41-login-member-a-session-2
+login ma-s1 --account ma --email <inbox>+bicauth-r13-x-ma@gmail.com --step 40-login-member-a-session-1
+login ma-s2 --account ma --email <inbox>+bicauth-r13-x-ma@gmail.com --step 41-login-member-a-session-2
 rc-probe ma-s1 --step 42-probe-a1-before-reset
 rc-request ga1 --account ma --step 43-member-a-request
 rc-issue ga1 --staff staff-s1 --account ma --step 44-staff-issue-ga1
 rc-redeem ga1 --account ma --step 45-redeem-ga1
 probe ma-s1 --step 46-probe-old-session-a1
 refresh ma-s2 --step 47-refresh-old-session-a2
-login ma-old --account ma@previous --email israelmuyoba+bicauth-r13-x-ma@gmail.com --step 48-old-password
-login ma-s3 --account ma --email israelmuyoba+bicauth-r13-x-ma@gmail.com --step 49-fresh-login
+login ma-old --account ma@previous --email <inbox>+bicauth-r13-x-ma@gmail.com --step 48-old-password
+login ma-s3 --account ma --email <inbox>+bicauth-r13-x-ma@gmail.com --step 49-fresh-login
 rc-probe ma-s3 --step 50-probe-fresh-session
 rc-redeem ga1 --account ma --step 51-replay-consumed-grant
 rc-replay --staff staff-s1 --op ga1-op --step 52-replay-recorded-completion-of-finished-op
 
 # Unused grant + direct password change.
-login mb-s1 --account mb --email israelmuyoba+bicauth-r13-x-mb@gmail.com --step 55-login-member-b
+login mb-s1 --account mb --email <inbox>+bicauth-r13-x-mb@gmail.com --step 55-login-member-b
 rc-request gb1 --account mb --step 56-member-b-request
 rc-issue gb1 --staff staff-s1 --account mb --step 57-staff-issue-gb1
 set-password mb-s1 --account mb --step 58-member-b-direct-password-change
@@ -47,7 +47,7 @@ rc-issue gc2 --staff staff-s1 --account mc --step 76-staff-issue-gc2
 rc-redeem gc2 --account mc --weak --step 77-redeem-gc2-weak-password
 
 # Security hold: supersedes the issued grant and blocks issue and redemption.
-login mi-s1 --account mi --email israelmuyoba+bicauth-r13-x-mi@gmail.com --step 80-login-member-i
+login mi-s1 --account mi --email <inbox>+bicauth-r13-x-mi@gmail.com --step 80-login-member-i
 rc-request gi1 --account mi --step 81-member-i-request
 rc-issue gi1 --staff staff-s1 --account mi --step 82-staff-issue-gi1
 rc-hold --staff staff-s1 --account mi --step 83-hold-member-i
@@ -59,7 +59,7 @@ rc-hold --staff staff-s1 --account mi --off --step 88-release-hold
 rc-issue gi2 --staff staff-s1 --account mi --step 89-issue-gi2-after-release
 
 # Concurrent resets: eight parallel redemptions of one grant, with live sessions.
-login mc-s1 --account mc --email israelmuyoba+bicauth-r13-x-mc@gmail.com --step 90-login-member-c
+login mc-s1 --account mc --email <inbox>+bicauth-r13-x-mc@gmail.com --step 90-login-member-c
 rc-request gc3 --account mc --step 91-member-c-request-3
 rc-issue gc3 --staff staff-s1 --account mc --step 92-staff-issue-gc3
 rc-redeem gc3 --account mc --parallel 8 --step 93-eight-parallel-redeems

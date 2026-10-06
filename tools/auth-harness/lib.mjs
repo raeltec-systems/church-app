@@ -349,3 +349,16 @@ export function summarizeSession(r) {
     user: r.user ? summarizeUser(r.user) : undefined,
   };
 }
+
+/**
+ * Evidence fields for a /signup response. A session response yields `session`;
+ * a user-only response (confirmation pending) yields `user`; an error yields
+ * only `error` (the error body is never reported as a user).
+ */
+export function summarizeSignup(json) {
+  if (json?.access_token) return { session: summarizeSession(json), user: undefined, error: undefined };
+  if (json?.error_code || json?.code >= 400) {
+    return { session: null, user: undefined, error: { error_code: json.error_code ?? null, msg: json.msg ?? null } };
+  }
+  return { session: null, user: summarizeUser(json?.user ?? json), error: undefined };
+}

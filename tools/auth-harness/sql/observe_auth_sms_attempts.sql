@@ -1,11 +1,14 @@
 -- Read-only ClickHouse query for Supabase MCP query_logs (project
--- szfyfezfvxyuvovnnakr), story 1.2 hosted phone track. Pass
--- iso_timestamp_start/end covering the harness run. Lists every Auth log line
--- that mentions SMS or Twilio, reduced to non-secret fields: actor ids, IPs and
--- request ids are dropped and the phone is cut to its last 4 digits. A
--- successful SMS send would show as an /otp (or /resend, /user phone change,
--- /reauthenticate) line with status 200; a provider failure shows status 500
--- with the provider error. Pipe the raw JSON result into
+-- szfyfezfvxyuvovnnakr), story 1.2 hosted phone track. It has NO time filter
+-- of its own: the window is the iso_timestamp_start/end passed to query_logs,
+-- and lines ingested after the call are not included (log-ingestion lag).
+-- Lists every Auth log line that mentions SMS or Twilio, reduced to non-secret
+-- fields: actor ids, IPs and request ids are dropped and the phone is cut to
+-- its last 4 digits. It does not identify a successful send directly: what a
+-- successful send logs was not observed on this project (no provider exists).
+-- "0 successful sends" is therefore an inference: every SMS-channel request
+-- line in the window ended with status 500 and a provider error, paired with
+-- its audit line. Pipe the raw JSON result into
 -- `run.mjs attach --source sql/observe_auth_sms_attempts.sql`.
 select
   timestamp,

@@ -1,6 +1,6 @@
 # Story 1.2 hosted phone track, part B. Before: part A, then by hand
-#   set-email p1-b --email israelmuyoba+bicauth-ph1@gmail.com --step H30-phone-user-add-email
-#   recover --email israelmuyoba+bicauth-ph1@gmail.com --step H31-recover-unverified-pending-email
+#   set-email p1-b --email <inbox>+bicauth-ph1@gmail.com --step H30-phone-user-add-email
+#   recover --email <inbox>+bicauth-ph1@gmail.com --step H31-recover-unverified-pending-email
 #   verify-link p1-emailchg --step H32-verify-email-change-link   < link (Gmail)
 #   verify-link p1-emailchg2 --step H33-email-change-link-reused  < same link
 
@@ -8,9 +8,9 @@
 probe p1-emailchg --step H34-probe-email-change-session
 probe p1-b --step H35-probe-session-B-after-email-verified
 # Row 4: email/password alias of the phone user, same password.
-login p1-e --account p1 --email israelmuyoba+bicauth-ph1@gmail.com --step H36-email-alias-password-login
+login p1-e --account p1 --email <inbox>+bicauth-ph1@gmail.com --step H36-email-alias-password-login
 probe p1-e --step H37-probe-email-alias-session
-?login p1-ex --account p1 --email israelmuyoba+bicauth-ph1@gmail.com --wrong --step H38-email-alias-wrong-password
+?login p1-ex --account p1 --email <inbox>+bicauth-ph1@gmail.com --wrong --step H38-email-alias-wrong-password
 otp --phone +12025550101 --step H39-otp-phone-existing-user-with-email
 
 # Password change from session B: every other session must be revoked.
@@ -27,6 +27,6 @@ probe p1-b --step H45a-probe-session-B-after-change
 refresh p1-b --step H45b-refresh-session-B-after-change
 ?login p1-old --account p1@previous --phone +12025550101 --step H46-old-password-phone-refused
 login p1-c --account p1 --phone +12025550101 --step H47-new-password-phone-login-C
-login p1-d --account p1 --email israelmuyoba+bicauth-ph1@gmail.com --step H48-new-password-email-login-D
+login p1-d --account p1 --email <inbox>+bicauth-ph1@gmail.com --step H48-new-password-email-login-D
 probe p1-c --step H49a-probe-session-C
 probe p1-d --step H49b-probe-session-D

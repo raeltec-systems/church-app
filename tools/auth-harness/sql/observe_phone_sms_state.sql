@@ -1,9 +1,15 @@
 -- Read-only (story 1.2 hosted phone track): phone users in the synthetic NANP
--- fictional range +1-202-555-01xx, their sessions with AMR methods, and every
--- trace an SMS send would leave (phone OTP/confirmation/change tokens, one-time
--- tokens, phone MFA factors). Ids and phones are returned only as digests /
--- last-4. Run via Supabase MCP execute_sql against szfyfezfvxyuvovnnakr. Pipe
--- the raw JSON result into `run.mjs attach --source sql/observe_phone_sms_state.sql`.
+-- fictional range +1-202-555-01xx, their auth.sessions rows with AMR methods,
+-- and the SMS-related traces this query checks: the users' confirmation /
+-- phone-change / reauthentication token flags and *_sent_at columns, phone-type
+-- one-time tokens, and phone MFA factors. Limits: `live_sessions` counts
+-- auth.sessions rows and does NOT filter on not_after (not_after is listed per
+-- session); recovery_token / recovery_sent_at are not checked (recovery here is
+-- email-only). Ids and phones are returned only as digests / last-4. Run via
+-- Supabase MCP execute_sql against szfyfezfvxyuvovnnakr. Steps H25 ran this
+-- query before the `users_with_ph_alias_email` field was added; H70 and H94 ran
+-- this file. Pipe the raw JSON result into
+-- `run.mjs attach --source sql/observe_phone_sms_state.sql`.
 select jsonb_build_object(
   'observed_at', now(),
   'phone_users', coalesce((

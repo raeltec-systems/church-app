@@ -3,7 +3,7 @@ title: 'Enforce live session trust across alternate Auth routes'
 type: 'feature'
 ticket: '2'
 created: '2026-10-06'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '19d0441408aa4bb47daf63eb8e313c6abda8f804'
 route: 'full'
 route_source: 'auto'
@@ -72,12 +72,12 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261006220500_identity_session_trust.sql` -- link columns `credential_generation`, `sessions_valid_after`; `app.identity_credential_events`; triggers on auth.users (password/email/phone/deleted_at/banned_until, delete), auth.identities (insert/delete), auth.mfa_factors; link/hold triggers set the epoch; predicate hardening.
-- [ ] `supabase/tests/identity_session_trust_test.sql` -- pgTAP for the matrix plus privileges; adjust `identity_live_access_test.sql` fixtures.
-- [ ] `tools/identity-e2e/run.mjs` -- real-API scenarios: refresh, magic link, email OTP, recovery + password set, alias, direct phone/email change + revert + re-approval, global logout, ban, dormant fixture, activity unchanged on denials.
-- [ ] `packages/client_core` -- secure session storage adapter (mobile `flutter_secure_storage`, web `sessionStorage`), persistence on, `sessionExpired` account change, controller ends local session on `untrustedSession`, resume revalidation; tests; live check `session` mode (refresh, simulated restart via `recoverSession`, sign-out, server revocation).
-- [ ] `apps/{mobile,staff}/test` -- app-shell tests: refresh keeps summary, sign-out clears, untrusted answer ends session.
-- [ ] `docs/runbooks/identity-access.md`, `evidence-2.2/README.md`, `deferred-work.md` (close persistence entry reference).
+- [x] `supabase/migrations/20261006220500_identity_session_trust.sql` -- link columns `credential_generation`, `sessions_valid_after`; `app.identity_credential_events`; triggers on auth.users (password/email/phone/deleted_at/banned_until, delete), auth.identities (insert/delete), auth.mfa_factors; link/hold triggers set the epoch; predicate hardening.
+- [x] `supabase/tests/identity_session_trust_test.sql` -- pgTAP for the matrix plus privileges; adjust `identity_live_access_test.sql` fixtures.
+- [x] `tools/identity-e2e/run.mjs` -- real-API scenarios: refresh, magic link, email OTP, recovery + password set, alias, direct phone/email change + revert + re-approval, global logout, ban, dormant fixture, activity unchanged on denials.
+- [x] `packages/client_core` -- secure session storage adapter (mobile `flutter_secure_storage`, web `sessionStorage`), persistence on, `sessionEnded` account change, controller ends local session on `untrustedSession`, resume revalidation; tests; live check `session` mode (refresh, simulated restart via `recoverSession`, sign-out, server revocation).
+- [x] `apps/{mobile,staff}/test` -- app-shell tests: refresh keeps summary, sign-out clears, untrusted answer ends session.
+- [x] `docs/runbooks/identity-access.md`, `evidence-2.2/README.md`, `deferred-work.md` (close persistence entry reference).
 
 **Acceptance Criteria:**
 - Given the local stack with the phone switch on, when the E2E and live adapter check run, then every alternate route is denied without an activity write and refresh/restart keep access.
@@ -85,9 +85,19 @@ context:
 
 ## Implementation Notes
 
+- Built directly (no subagent tool in this session). Files: migration `20261006220500_identity_session_trust.sql`; pgTAP `identity_session_trust_test.sql` (60) and `identity_live_access_test.sql` (fixtures gain server AMR rows and an explicit session `created_at`; a `reapprove` helper simulates re-approval where 2.1 rows now hit persistent review/epoch); smoke `identity_api_smoke.sh` (+6 checks); `tools/identity-e2e/run.mjs` (`E30`-`E45`, cleanup of credential events/holds, more redacted keys) and `live-adapter-check.sh`; client_core adapters `auth_session_storage*.dart`, `composition.dart` (persistence on), `providers.dart` (`AccountChange.sessionEnded`, `endUntrustedSession`), `account_controllers.dart`, `account_screen.dart` (session-ended banner, resume revalidation), `boundaries_test.dart` (persistence allowed only in the Auth-session adapter files), `session_trust_test.dart`, `tool/live_identity_check.dart` (`session` mode); app-shell tests on mobile and staff; CI scans `evidence-2.2`; runbook section; evidence README; deferred-work entry.
+- Decision (agent, under owner pre-approval): every `link_state` change (including back to `active`) moves the trust epoch. The first E2E run (`E39`) showed a session opened during review being granted after re-approval; 1.3's reconcile rule (only sessions after the epoch) is now applied to re-approval too.
+- Decision (agent, under owner pre-approval): the client ends its local session (and stored session) only on `untrusted_session`; `review_required`, `not_linked`, `unavailable` keep the session and withhold data, so the generic review screen stays reachable.
+- Dependencies: `flutter_secure_storage` 10.0.0 and `web` 1.1.1 (pinned) in client_core; app lockfiles and the mobile Linux plugin registrant updated by `pub get`.
+- Surprise: the integration branch renamed migrations mid-build (`20261006215306/215400/215842`); this story's migration was renamed from `20261006180000_` to `20261006220500_` and the branch re-merged cleanly.
+- Surprise: an Auth Admin email change also inserts an `email` identity (detected twice). The local stack was reset once by the parent session during the build; all evidence was re-run after the merge.
+- Staff web: with a configured build the session key is used only with `sessionStorage`; supabase_flutter's own PKCE verifier store still references `localStorage` (unused by password sign-in, no tokens).
+- Not done: hosted apply/repeat (owner promotion), device/emulator run of the Keystore/Keychain restore (deferred-work.md).
+
 ## Verification
 
 **Commands:**
 - `npm run db:test && npm run db:smoke` -- expected: pass
 - `node tools/auth-harness/local-phone-auth.mjs on && node tools/identity-e2e/run.mjs --evidence … && node tools/auth-harness/local-phone-auth.mjs off` -- expected: all checks pass
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/mobile`, `apps/staff` -- expected: pass
+- Results (2026-10-06, local, after merging the integration branch): `db:test` 488/488 (session trust 60, live access 71); `db:smoke` all ok, phone off (identity 19); E2E 30/30 with the phone switch on; live adapter check PASS (signup + `session` S1-S6); client_core 136, mobile 15, staff 15 tests pass, analyze clean; staff web build (with and without dart-defines) + bundle scan clean; `ci:migrations --base origin/main` ordered and non-destructive; `ci:secrets`, `ci:policy-test` (49), `env:check`, `recovery:rehearse`, harness node tests (36), `scan-evidence` on evidence-2.2 clean. Phone switch turned off afterwards; synthetic users cleaned up.

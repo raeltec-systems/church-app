@@ -30,3 +30,9 @@ test('secret-bearing keys are redacted at any depth', () => {
     redact({ a: { access_token: 'x', ok: 1 }, password: 'p', list: [{ refresh_token: 'r' }] }),
     { a: { access_token: '[redacted]', ok: 1 }, password: '[redacted]', list: [{ refresh_token: '[redacted]' }] });
 });
+
+test('story 2.2: link tokens, email OTPs and emails are redacted too', () => {
+  assert.deepEqual(
+    redact({ hashed_token: 'h', token_hash: 't', email_otp: '123456', action_link: 'l', email: 'e', kinds: 'email' }),
+    { hashed_token: '[redacted]', token_hash: '[redacted]', email_otp: '[redacted]', action_link: '[redacted]', email: '[redacted]', kinds: 'email' });
+});

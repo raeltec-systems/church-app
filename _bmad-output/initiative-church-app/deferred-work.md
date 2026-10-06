@@ -14,3 +14,7 @@
 - source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-sign-in-with-a-phone-username-and-reach-a-live-access-checke-plan.md`
   summary: Staff number-reclaim path for a phone username squatted through phone `/otp` create_user (F1); 2.1 reproduced the unlinked user row locally (evidence-2.1 E18).
   evidence: owner decision 2026-10-06 (F1 accepted as constraint); 2.1 only guarantees such accounts get no member access.
+
+- source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-enforce-live-session-trust-across-alternate-auth-routes-plan.md`
+  summary: Run the 2.2 session-persistence path (flutter_secure_storage Keystore/Keychain restore after app restart) on a real Android/iOS device or emulator, and repeat the 2.2 alternate-route checks on hosted staging after the owner promotes 20261006220500_identity_session_trust.
+  evidence: 2.2 closed the 2.1 persistence deferral with platform-secured storage, verified by widget tests, the plugin mock and the live SDK restore path only; no device toolchain here and staging promotion is owner-gated.

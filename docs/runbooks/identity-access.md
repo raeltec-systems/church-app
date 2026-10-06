@@ -48,7 +48,7 @@ Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/ev
 - The phone username is any country code, normalized to E.164 by `normalizePhoneUsername`. +260 is only the picker's initial value.
 - The clients use native `signUp(phone, password)` and `signInWithPassword(phone, password)` only. They have no OTP, code entry or resend.
 - Errors are generic.
-- The session lives in memory (`persistSession: false`): it is refreshed while the app runs, and a restart asks for the password again. Durable secure storage is deferred (see `deferred-work.md`).
+- Story 2.2: only the Auth session persists (mobile: Keystore/Keychain via `flutter_secure_storage`, "after first unlock, this device only"; staff web: the tab's `sessionStorage`, so a reload keeps it and closing the tab ends it). Protected member data stays in memory. See [Session trust (story 2.2)](#session-trust-story-22).
 - Sign-out (local scope) ends this device's session and clears protected state.
 
 ## Local runs
@@ -113,3 +113,47 @@ The staging project is `bic-kafue-platform-test`, ref `tmurpotfluignacfueki`.
    8. No SMS: `POST /auth/v1/otp {"phone":"+12025550152"}` returns 500 "Unable to get SMS provider", and no message is sent.
       - This probe is the F1 path. Besides the 500, it **creates a phone-confirmed Auth user for `+1 202 555 0152`**, and that user can end up with a live session whose AMR is `password`. It has no member link, so step 4.6's denial still applies. You must delete it in step 5.
 5. **Clean up.** Delete the synthetic links and members, then the Auth users for `+1 202 555 0150–0152`. Include `0152`, the user the `/otp` probe created; deleting an Auth user also ends its sessions. Use the same statements as `tools/identity-e2e/run.mjs` `cleanup`, then check that `select count(*) from auth.users where phone in ('12025550150','12025550151','12025550152')` returns 0.
+
+## Session trust (story 2.2)
+
+Migration: `supabase/migrations/20261006220500_identity_session_trust.sql`. Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.2/`. Not applied to hosted: it is the owner's promotion step, after `20261006215842_identity_live_access`.
+
+### What changed in the predicate
+
+`app.identity_access_evaluate()` keeps its signature. In addition to the 2.1 checks it now requires:
+
+- `password` in the **server's** session AMR record (`auth.mfa_amr_claims`) as well as in the signed JWT `amr`. Magic-link, email-OTP, signup-link and recovery sessions carry `otp` and stay denied, also after refresh.
+- a non-anonymous Auth user;
+- an approved recovery email only while Auth holds it **confirmed**;
+- a session created at or after the link's **trust epoch** (`sessions_valid_after`); otherwise `untrusted_session` (sign in again).
+
+Order: session/JWT, link and member, link state, binding, holds, trust epoch, dormancy (on the stored activity, before any refresh), release gate. Denials never write activity.
+
+### Trusted detection of direct Auth changes (the 1.3 mechanism, owned by Identity)
+
+Triggers run inside GoTrue's own transaction and act only on accounts with a live link (unlinked accounts are ignored):
+
+| Auth change | Effect on the link |
+|---|---|
+| phone, email, soft delete, hard delete (`auth.users`); identity added or removed (`auth.identities`); MFA factor added, changed or removed (`auth.mfa_factors`) | `link_state` → `review_required` (persists even if the value is changed back), generation +1, trust epoch moved |
+| password (native `PUT /user`, recovery, Auth Admin), ban or unban | generation +1, trust epoch moved (every earlier session must sign in again, including the one that changed the password) |
+| hold placed (`identity_holds` insert); any `link_state` change, including re-approval | trust epoch moved |
+
+`app.identity_credential_events` records each change by **kind only** (no phone, email or secret values). If a trigger fails, GoTrue's write fails too (fail closed).
+
+Re-approving a link after review (entries 5/8) sets `link_state = 'active'`; that moves the epoch again, so only sessions created after the approval pass. Until those workflows exist, a restricted operator does it in SQL for synthetic accounts only.
+
+Known limits: GoTrue's lock order around the triggers is not under our control (1.3 limit F); the epoch compares GoTrue's session `created_at` with the database clock, so a GoTrue clock running behind the database would deny a fresh sign-in until the gap passes (fail closed).
+
+### Clients
+
+- Only the Auth session persists (see "Sign-in on the clients"). Reopening the app restores it and the SDK refreshes it; the server re-checks it on every read.
+- When the server answers `untrusted_session` (signed out or revoked elsewhere, a credential change, a hold, a pre-approval session), the client ends the session on the device, removes the stored session, clears protected state and shows **Please sign in again**. `review_required`, `not_linked` and `unavailable` keep the session and withhold only the data.
+- Returning to the foreground asks the server again before the summary is relied on.
+- Staff web also keeps the SDK's PKCE code-verifier store (browser `localStorage`, from supabase_flutter); no sign-in flow here uses it and it never holds tokens or member data.
+
+### Local runs
+
+- `npm run db:test` includes `supabase/tests/identity_session_trust_test.sql`; `npm run db:smoke` adds refresh, magic-link and recovery sessions and a direct email change through the real API (CLI default config).
+- With `node tools/auth-harness/local-phone-auth.mjs on`: `node tools/identity-e2e/run.mjs` (steps `E30`–`E45`), then `FLUTTER_ROOT=<flutter sdk> bash tools/identity-e2e/live-adapter-check.sh` for the real client adapters (refresh, reopen from the stored session, revocation from another device, sign-out). Then `node tools/auth-harness/local-phone-auth.mjs off`.
+- Cleanup of synthetic accounts must delete `app.identity_credential_events` rows before their links (foreign key); the E2E and smoke scripts do.

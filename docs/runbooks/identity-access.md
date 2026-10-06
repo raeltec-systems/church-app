@@ -116,7 +116,7 @@ The staging project is `bic-kafue-platform-test`, ref `tmurpotfluignacfueki`.
 
 ## Session trust (story 2.2)
 
-Migration: `supabase/migrations/20261006220500_identity_session_trust.sql`. Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.2/`. Not applied to hosted: it is the owner's promotion step, after `20261006215842_identity_live_access`.
+Migration: `supabase/migrations/20261006223524_identity_session_trust.sql`. Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.2/`. Not applied to hosted: it is the owner's promotion step, after `20261006215842_identity_live_access`.
 
 ### What changed in the predicate
 

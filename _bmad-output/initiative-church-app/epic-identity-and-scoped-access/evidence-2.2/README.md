@@ -1,6 +1,6 @@
 # Evidence 2.2: live session trust across alternate Auth routes
 
-Everything here is **LOCAL** (Supabase CLI 2.119.0, GoTrue v2.197.0, Postgres 17), synthetic data only, observed on 2026-10-06 after merging the integration branch (migrations `…215306`, `…215400`, `…215842`, then this story's `20261006220500_identity_session_trust`). Nothing was applied to a hosted project, and no hosted Auth check was needed: every route was driven through native GoTrue endpoints locally.
+Everything here is **LOCAL** (Supabase CLI 2.119.0, GoTrue v2.197.0, Postgres 17), synthetic data only, observed on 2026-10-06 after merging the integration branch (migrations `…215306`, `…215400`, `…215842`, then this story's `20261006223524_identity_session_trust`). Nothing was applied to a hosted project, and no hosted Auth check was needed: every route was driven through native GoTrue endpoints locally.
 
 - **Phone numbers:** reserved fictional ranges only (`+1 202 555 0100–0199`, `+44 7700 900000–900999`). **Emails:** `@example.test` only.
 - **SMS:** none configured at any point; the local phone switch (`tools/auth-harness/local-phone-auth.mjs`) was turned `off` after the runs.
@@ -48,5 +48,5 @@ Everything here is **LOCAL** (Supabase CLI 2.119.0, GoTrue v2.197.0, Postgres 17
 
 ## Not done here
 
-- Hosted apply of `20261006220500_identity_session_trust` and a hosted repeat (owner promotion; staging is owner-gated).
+- Hosted apply of `20261006223524_identity_session_trust` and a hosted repeat (owner promotion; staging is owner-gated).
 - Mobile secure storage was exercised through `flutter_secure_storage`'s test mock and the SDK restore path; it was not run on a physical device or emulator.

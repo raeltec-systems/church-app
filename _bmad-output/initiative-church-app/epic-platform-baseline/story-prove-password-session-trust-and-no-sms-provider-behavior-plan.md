@@ -3,8 +3,7 @@ title: 'Prove password-session trust and no-SMS provider behavior'
 type: 'feature'
 ticket: '2'
 created: '2026-10-03'
-status: 'blocked'
-blocked_reason: 'Owner acceptance needed: (1) the /otp create_user path leaves a server-side passwordless session carrying password AMR (F1) — accept as identity-epic constraint; (2) synthetic phone range changed from frozen +26097… to fictional +1 202 555 01xx.'
+status: 'done'
 baseline_revision: 'dfa367db1bae7ae6ade7dfab75cfaf2de99b853a'
 route: 'full'
 route_source: 'auto'
@@ -26,7 +25,7 @@ context:
 
 ## Boundaries & Constraints
 
-**Always:** Only project `szfyfezfvxyuvovnnakr`; synthetic accounts (`+26097…` test-range phones, `israelmuyoba+bicauth-<tag>@gmail.com`). Publishable key only, from env at run time. Evidence redacts JWTs to header + needed claims, never stores access/refresh tokens, OTPs, link tokens or passwords. Harness state with live tokens stays in the OS temp dir. Predicate requires a `password` entry in signed `amr` and a live `auth.sessions` row for `session_id`.
+**Always:** Only project `szfyfezfvxyuvovnnakr`; synthetic accounts (phones only from ranges reserved as fictional, e.g. `+1 202 555 0100–0199`; never a guessed "test" range inside a live national plan such as Zambia's `+260…`; `israelmuyoba+bicauth-<tag>@gmail.com`). Publishable key only, from env at run time. Evidence redacts JWTs to header + needed claims, never stores access/refresh tokens, OTPs, link tokens or passwords. Harness state with live tokens stays in the OS temp dir. Predicate requires a `password` entry in signed `amr` and a live `auth.sessions` row for `session_id`.
 
 **Never:** Configure SMS, an SMS provider, Send SMS hook, test OTPs or SMS MFA. Touch `supabase/migrations`, `apps/`, `trials/` or the platform project. Use service-role/secret keys. Read any mail beyond Supabase Auth mails to the approved plus-addresses.
 
@@ -44,6 +43,10 @@ context:
 | Password change | `PUT /user {password}` from session A | session B row deleted; B's unexpired JWT probe denied, B refresh fails | — |
 | Phone OTP | `/otp {phone}` | no SMS sent, no session | error recorded |
 
+
+**Owner decisions (2026-10-06, renegotiated by the owner):**
+- Synthetic phones: the original `+26097…` "test range" was an unresearched assumption; Zambia's +260 plan has several live operator ranges (e.g. 97/96/95/77/76/57). Tests use only reserved fictional ranges. The product itself is not Zambia-only: sign-in numbers are any country code in international format (FR, design contract: "+260 is an initial country-picker presentation"); validation must not assume Zambian operator prefixes.
+- F1 accepted as an identity-epic constraint: a phone `/otp` with create_user can register any number and leave a server-side session carrying `password` AMR without tokens reaching the caller. Member access therefore requires the staff-approved binding (AD-3), never AMR alone, and staff need a way to reclaim a number registered by someone else (2.1/2.2/2.5).
 </frozen-after-approval>
 
 ## Code Map

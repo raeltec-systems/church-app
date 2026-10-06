@@ -10,8 +10,8 @@
 //   GOTRUE_SMS_AUTOCONFIRM=true          (sms_autoconfirm; phone confirmation off)
 // It refuses to run if any SMS provider, credential, hook, test OTP or phone MFA setting is
 // present, and touches only the container named supabase_auth_<project_id> on the CLI network.
-// `off` restores GOTRUE_EXTERNAL_PHONE_ENABLED=false; `supabase stop && supabase start` also
-// returns to the CLI's own configuration.
+// `on` records the CLI's original values of both keys in a container label; `off` restores
+// exactly those values. `supabase stop && supabase start` also returns to the CLI's configuration.
 //
 // Usage: node tools/auth-harness/local-phone-auth.mjs on|off|status
 import { execFileSync } from 'node:child_process';
@@ -41,15 +41,31 @@ export function smsViolations(env) {
   return env.filter((e) => FORBIDDEN.some((re) => re.test(e)));
 }
 
-/** The env list with the phone provider set as requested and sms autoconfirm on. */
-export function withPhone(env, enabled) {
-  const set = {
-    GOTRUE_EXTERNAL_PHONE_ENABLED: String(enabled),
-    GOTRUE_SMS_AUTOCONFIRM: 'true',
-  };
-  const out = env.filter((e) => !Object.keys(set).some((k) => e.startsWith(`${k}=`)));
-  for (const [k, v] of Object.entries(set)) out.push(`${k}=${v}`);
+const SWITCHED = ['GOTRUE_EXTERNAL_PHONE_ENABLED', 'GOTRUE_SMS_AUTOCONFIRM'];
+/** Container label holding the CLI's original values while the switch is on. */
+export const ORIGINAL_LABEL = 'church-app.local-phone-auth.original';
+const MARKER_LABEL = 'church-app.local-phone-auth';
+
+/** The CLI's values of the switched keys (null = unset), as stored in ORIGINAL_LABEL. */
+export function captureOriginals(env) {
+  return Object.fromEntries(SWITCHED.map((k) => {
+    const e = env.find((x) => x.startsWith(`${k}=`));
+    return [k, e === undefined ? null : e.slice(k.length + 1)];
+  }));
+}
+
+/** The env list with each switched key set to `values[k]`, or removed when null. */
+export function withValues(env, values) {
+  const out = env.filter((e) => !SWITCHED.some((k) => e.startsWith(`${k}=`)));
+  for (const k of SWITCHED) {
+    if (values[k] !== null && values[k] !== undefined) out.push(`${k}=${values[k]}`);
+  }
   return out;
+}
+
+/** The env list with the phone provider on and sms autoconfirm on (phone confirmation off). */
+export function withPhoneOn(env) {
+  return withValues(env, { GOTRUE_EXTERNAL_PHONE_ENABLED: 'true', GOTRUE_SMS_AUTOCONFIRM: 'true' });
 }
 
 function docker(args, opts = {}) {
@@ -79,13 +95,30 @@ function main(mode) {
     console.log(`${name}: ${phone ?? 'GOTRUE_EXTERNAL_PHONE_ENABLED unset'}; no SMS provider, hook, test OTP or phone MFA`);
     return;
   }
-  const next = withPhone(env, mode === 'on');
+  const labels = { ...(info.Config.Labels ?? {}) };
+  const stored = labels[ORIGINAL_LABEL];
+  delete labels[ORIGINAL_LABEL];
+  delete labels[MARKER_LABEL];
+  let next;
+  if (mode === 'on') {
+    // Keep the first capture: re-running `on` must not record the switched values as originals.
+    const originals = stored ?? JSON.stringify(captureOriginals(env));
+    next = withPhoneOn(env);
+    labels[ORIGINAL_LABEL] = originals;
+    labels[MARKER_LABEL] = 'story-2.1';
+  } else {
+    if (stored === undefined) {
+      console.log(`${name}: not switched; already the CLI's own configuration`);
+      return;
+    }
+    // Restore exactly the CLI's values recorded by `on`.
+    next = withValues(env, JSON.parse(stored));
+  }
   if (smsViolations(next).length) throw new Error('refusing: result would contain SMS configuration');
   const args = ['run', '-d', '--name', name, '--network', network,
     '--network-alias', 'auth', '--restart', 'unless-stopped',
     '--add-host', 'host.docker.internal:host-gateway'];
-  for (const [k, v] of Object.entries(info.Config.Labels ?? {})) args.push('--label', `${k}=${v}`);
-  args.push('--label', 'church-app.local-phone-auth=story-2.1');
+  for (const [k, v] of Object.entries(labels)) args.push('--label', `${k}=${v}`);
   const hc = info.Config.Healthcheck;
   if (hc?.Test?.[0] === 'CMD-SHELL') {
     args.push('--health-cmd', hc.Test[1], '--health-interval', `${hc.Interval / 1e9}s`,
@@ -98,7 +131,7 @@ function main(mode) {
   for (let i = 0; i < 60; i++) {
     const s = docker(['inspect', '-f', '{{.State.Health.Status}}', name]).trim();
     if (s === 'healthy') {
-      console.log(`${name}: GOTRUE_EXTERNAL_PHONE_ENABLED=${mode === 'on'}, GOTRUE_SMS_AUTOCONFIRM=true; no SMS provider (LOCAL only)`);
+      console.log(`${name}: ${next.filter((e) => SWITCHED.some((k) => e.startsWith(`${k}=`))).join(', ') || 'switched keys unset'}; no SMS provider (LOCAL only)`);
       return;
     }
     execFileSync('sleep', ['1']);

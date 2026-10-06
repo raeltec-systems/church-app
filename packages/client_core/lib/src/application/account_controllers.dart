@@ -43,6 +43,11 @@ class SignInController extends Notifier<SignInState> {
         ? await gateway.signUp(phoneE164: phoneE164, password: password)
         : await gateway.signIn(phoneE164: phoneE164, password: password);
     if (!ref.mounted) return;
+    if (outcome is AuthSucceeded) {
+      // A new session, even for the same account, gets a fresh server
+      // decision: drop any earlier answer (for example a stale denial).
+      ref.invalidate(memberSummaryControllerProvider);
+    }
     state = switch (outcome) {
       AuthSucceeded() => SignInState(
         phase: SignInPhase.succeeded,

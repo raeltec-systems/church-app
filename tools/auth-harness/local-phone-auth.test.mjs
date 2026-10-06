@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { projectId, smsViolations, withPhone } from './local-phone-auth.mjs';
+import { captureOriginals, projectId, smsViolations, withPhoneOn, withValues } from './local-phone-auth.mjs';
 
 test('reads project_id from config.toml', () => {
   assert.equal(projectId('# x\nproject_id = "church-app"\n'), 'church-app');
@@ -22,10 +22,18 @@ test('any SMS provider, credential, hook, test OTP or phone MFA is refused', () 
   }
 });
 
-test('withPhone changes exactly the phone switch and autoconfirm', () => {
+test('on changes exactly the phone switch and autoconfirm', () => {
   const env = ['A=1', 'GOTRUE_EXTERNAL_PHONE_ENABLED=false', 'GOTRUE_SMS_AUTOCONFIRM=false'];
-  assert.deepEqual(withPhone(env, true).sort(),
+  assert.deepEqual(withPhoneOn(env).sort(),
     ['A=1', 'GOTRUE_EXTERNAL_PHONE_ENABLED=true', 'GOTRUE_SMS_AUTOCONFIRM=true'].sort());
-  assert.ok(withPhone(env, false).includes('GOTRUE_EXTERNAL_PHONE_ENABLED=false'));
-  assert.deepEqual(smsViolations(withPhone(env, true)), []);
+  assert.deepEqual(smsViolations(withPhoneOn(env)), []);
+});
+
+test('off restores the captured CLI values exactly, including unset keys', () => {
+  const cli = ['A=1', 'GOTRUE_EXTERNAL_PHONE_ENABLED=false'];
+  const originals = JSON.parse(JSON.stringify(captureOriginals(cli)));
+  assert.deepEqual(originals, { GOTRUE_EXTERNAL_PHONE_ENABLED: 'false', GOTRUE_SMS_AUTOCONFIRM: null });
+  assert.deepEqual(withValues(withPhoneOn(cli), originals).sort(), [...cli].sort());
+  const cli2 = ['GOTRUE_EXTERNAL_PHONE_ENABLED=false', 'GOTRUE_SMS_AUTOCONFIRM=false'];
+  assert.deepEqual(withValues(withPhoneOn(cli2), captureOriginals(cli2)).sort(), [...cli2].sort());
 });

@@ -5,7 +5,7 @@
 #
 # The local CLI forces the phone provider off (evidence-1.2/local-cli-phone-gate.txt), so CI signs
 # in through the verified-email alias of a phone account (AD-20: same account, same predicate).
-# Phone sign-in itself is exercised by tools/identity-e2e with tools/auth-harness/local-phone-auth.sh.
+# Phone sign-in itself is exercised by tools/identity-e2e with `node tools/auth-harness/local-phone-auth.mjs on`.
 # Usage: npm run db:smoke   (needs curl, jq and psql; SYNTHETIC users and data only)
 set -euo pipefail
 

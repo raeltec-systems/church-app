@@ -9,7 +9,7 @@ Everything here is **LOCAL** (Supabase CLI 2.119.0, GoTrue v2.197.0, Postgres 17
 
 | File | What it shows |
 |---|---|
-| [`local-pgtap.txt`](local-pgtap.txt) | `supabase/tests/identity_live_access_test.sql`: 67 assertions, all passing. |
+| [`local-pgtap.txt`](local-pgtap.txt) | `supabase/tests/identity_live_access_test.sql`: 71 assertions, all passing. |
 | [`local-api-smoke.txt`](local-api-smoke.txt) | `supabase/tests/identity_api_smoke.sh` through PostgREST and Auth, with the CLI's default config (phone off). Sign-in uses the verified-email alias of a phone account. |
 | [`local-e2e-log.jsonl`](local-e2e-log.jsonl) | `tools/identity-e2e/run.mjs`: phone sign-up and sign-in through native GoTrue with the local-only phone switch on. 15 checks pass. The log keeps status codes, error codes and AMR names only, never tokens or passwords. |
 | [`local-client-adapter-check.txt`](local-client-adapter-check.txt) | The real Dart adapters the apps use (`SupabaseAccountAuthGateway`, `SupabaseMemberAccessRepository`) doing sign-up, then the operator link, then a new-client sign-in, read and sign-out. |
@@ -23,7 +23,7 @@ Everything here is **LOCAL** (Supabase CLI 2.119.0, GoTrue v2.197.0, Postgres 17
 | Signed out | pgTAP "signed-out client: no EXECUTE"; smoke; E2E `E20`; adapter "read after sign-out: signedOut" | 401, permission denied for anon. The client sends no request without a session. |
 | Untrusted session | pgTAP: otp, recovery, empty, missing or malformed AMR; another account's session; deleted session; `not_after` passed; banned user; anon role claim; anonymous session; activity untouched | 401 `unauthenticated` / `untrusted_session`. After local sign-out, the still-unexpired JWT is refused and its refresh fails (smoke, `E22`), while another session of the same account keeps working (`E22`). |
 | Binding drift, hold, dormant | pgTAP: changed Auth phone; unapproved, approved and removed email; open hold and its release; link in review; deactivated member; dormancy at 91 days and at the approval baseline; inside the window | 403 `review_required`. Dormancy is evaluated before refresh, and a denial never refreshes activity. |
-| Gate closed | pgTAP: non-synthetic member with closed `private_access`, then owner approval; unmarked (production) database ignores fixture settings; staging honours the labelled fixture while the gate stays closed | 403 `unavailable` until approved. Production fails closed. |
+| Gate closed | pgTAP: non-synthetic member with closed `private_access`, then owner approval; unmarked (production) database ignores fixture settings; staging honours the labelled fixture while the gate stays closed; a held restore (`restored_held`) removes the synthetic bypass in local and staging | 403 `unavailable` until approved. Production fails closed. |
 | Direct table query | smoke; E2E `E21` | `app` schema returns 406 (not exposed). `identity_*` under `api` returns 404. pgTAP: no client role holds any table privilege, and RLS is on. |
 | Sign-up and sign-in | E2E `E10`, `E15`–`E18`; Flutter tests `test/identity/*`, app tests | Normalized E.164 is sent. Wrong password and unknown phone get the same `invalid_credentials` (`E15`). A duplicate username is refused with 422 (`E16`). A passwordless sign-up is refused (`E17`). |
 

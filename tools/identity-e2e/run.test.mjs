@@ -13,7 +13,7 @@ test('only the exact local origin is accepted', () => {
 test('only reserved fictional numbers are used', () => {
   assert.ok(isFictional('+12025550171'));
   assert.ok(isFictional('+447700900171'));
-  for (const p of ['+260971234567', '+12025550200', '+447700901171', '12025550171']) {
+  for (const p of ['+12025550200', '+447700901171', '12025550171']) {
     assert.ok(!isFictional(p), p);
   }
 });

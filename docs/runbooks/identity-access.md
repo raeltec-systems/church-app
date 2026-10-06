@@ -57,7 +57,7 @@ Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/ev
 - Phone sign-in end to end:
   1. `node tools/auth-harness/local-phone-auth.mjs on`. This is **local only**. It recreates the CLI auth container with `GOTRUE_EXTERNAL_PHONE_ENABLED=true` and `GOTRUE_SMS_AUTOCONFIRM=true`, and refuses if any SMS provider, credential, hook, test OTP or phone MFA is present.
   2. `node tools/identity-e2e/run.mjs [--evidence file.jsonl]`.
-  3. `node tools/auth-harness/local-phone-auth.mjs off`. `supabase stop && supabase start` also restores the CLI's config.
+  3. `node tools/auth-harness/local-phone-auth.mjs off`. This restores the exact values the CLI had for both keys, which `on` recorded in a container label. `supabase stop && supabase start` also restores the CLI's config.
 - To exercise the real client adapters, run `packages/client_core/tool/live_identity_check.dart`. See its header.
 
 ## Seeding a synthetic approved member (restricted operator only)
@@ -111,4 +111,5 @@ The staging project is `bic-kafue-platform-test`, ref `tmurpotfluignacfueki`.
    6. Signed out: **Sign out**. The screen returns to the sign-in prompt and the summary is gone.
    7. Direct table query: `GET /rest/v1/identity_members` with `Accept-Profile: app` returns 406, and with `Accept-Profile: api` returns 404.
    8. No SMS: `POST /auth/v1/otp {"phone":"+12025550152"}` returns 500 "Unable to get SMS provider", and no message is sent.
-5. **Clean up.** Delete the synthetic links and members, then the Auth users for `+1 202 555 0150–0152`. Use the same statements as `tools/identity-e2e/run.mjs` `cleanup`.
+      - This probe is the F1 path. Besides the 500, it **creates a phone-confirmed Auth user for `+1 202 555 0152`**, and that user can end up with a live session whose AMR is `password`. It has no member link, so step 4.6's denial still applies. You must delete it in step 5.
+5. **Clean up.** Delete the synthetic links and members, then the Auth users for `+1 202 555 0150–0152`. Include `0152`, the user the `/otp` probe created; deleting an Auth user also ends its sessions. Use the same statements as `tools/identity-e2e/run.mjs` `cleanup`, then check that `select count(*) from auth.users where phone in ('12025550150','12025550151','12025550152')` returns 0.

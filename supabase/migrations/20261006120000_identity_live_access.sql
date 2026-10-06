@@ -56,7 +56,7 @@ create table app.identity_account_links (
     check (link_state in ('active', 'review_required', 'suspended', 'ended')),
   -- Approved credential binding (versioned): normalized E.164 phone username and the optional
   -- verified recovery email. Compared with the CURRENT auth.users values on every check.
-  approved_phone text not null check (approved_phone ~ '^\+[1-9][0-9]{6,14}$'),
+  approved_phone text not null check (approved_phone ~ '^\+[1-9][0-9]{7,14}$'),
   approved_recovery_email text check (
     approved_recovery_email is null
     or (approved_recovery_email = lower(btrim(approved_recovery_email))

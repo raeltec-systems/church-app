@@ -4,6 +4,7 @@ import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 const _a = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const _b = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -217,6 +218,23 @@ void main() {
       expect(find.textContaining('Reason: length'), findsOneWidget);
     });
 
+    testWidgets(
+      'the form shows the exact international username before submit',
+      (tester) async {
+        await pumpAt(tester, ClientPaths.signIn);
+        expect(
+          find.text('For example +260 …, or a local number.'),
+          findsOneWidget,
+        );
+        await tester.enterText(byKey('phone-field'), '12025550101');
+        await tester.pump();
+        expect(find.text("You'll sign in as +260 12025550101"), findsOneWidget);
+        await tester.enterText(byKey('phone-field'), '+1 202 555 0101');
+        await tester.pump();
+        expect(find.text("You'll sign in as +12025550101"), findsOneWidget);
+      },
+    );
+
     testWidgets('help routes explain staff help without SMS', (tester) async {
       await pumpAt(tester, ClientPaths.signIn);
       await tapKey(tester, 'forgot-password');
@@ -309,6 +327,31 @@ void main() {
       expect(find.text('SYNTHETIC Member One'), findsNothing);
       expect(byKey('go-sign-in'), findsOneWidget);
     });
+
+    testWidgets(
+      'signing in again as the same account replaces a stale denial',
+      (tester) async {
+        final h = await pumpAt(tester, ClientPaths.account, account: _a);
+        h.memberAccess.answer(
+          const MemberAccessDenied(MemberAccessDenial.untrustedSession),
+        );
+        await settleShort(tester);
+        expect(byKey('denied-untrustedSession'), findsOneWidget);
+        GoRouter.of(tester.element(byKey('refresh-summary')))
+            .go(ClientPaths.signIn);
+        await settleShort(tester);
+        await tester.enterText(byKey('phone-field'), '+12025550101');
+        await tester.enterText(byKey('password-field'), 'Synthetic-pw-1');
+        await tapKey(tester, 'submit-button');
+        h.auth.succeed(_a); // same account id: no account change event
+        await settleShort(tester);
+        expect(byKey('denied-untrustedSession'), findsNothing);
+        expect(h.memberAccess.calls, 2);
+        h.memberAccess.answer(MemberAccessGranted(syntheticMemberSummary()));
+        await settleShort(tester);
+        expect(byKey('member-summary'), findsOneWidget);
+      },
+    );
 
     testWidgets('an account switch drops the previous member and reads again', (
       tester,

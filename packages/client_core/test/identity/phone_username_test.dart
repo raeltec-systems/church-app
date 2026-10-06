@@ -61,4 +61,35 @@ void main() {
       PhoneUsernameProblem.tooLong,
     );
   });
+
+  DialingCountry picker(String iso) =>
+      dialingCountries.firstWhere((c) => c.isoCode == iso);
+
+  test('E.164 length: 7 digits rejected, 8 and 15 accepted, 16 rejected', () {
+    expect(problem('+1234567', _uk), PhoneUsernameProblem.tooShort);
+    expect(ok('+12345678', _uk), '+12345678');
+    expect(ok('+123456789012345', _uk), '+123456789012345');
+    expect(problem('+1234567890123456', _uk), PhoneUsernameProblem.tooLong);
+  });
+
+  test(
+    'a number already starting with the picked calling code is not doubled',
+    () {
+      // Repro: `260…` with the +260 picker used to become +260260….
+      expect(ok('260 100 000 001', defaultDialingCountry), '+260100000001');
+      expect(ok('44 7700 900123', picker('GB')), '+447700900123');
+      expect(ok('12025550101', picker('US')), '+12025550101');
+      // The national form still works for the same countries.
+      expect(ok('07700 900123', picker('GB')), '+447700900123');
+      expect(ok('202 555 0101', picker('US')), '+12025550101');
+      // Only a full national length after the code counts as international.
+      expect(ok('44 1234', picker('GB')), '+44441234');
+    },
+  );
+
+  test('another country\'s number without + keeps the picked code (shown before submit)', () {
+    // Repro: `12025550101` with the +260 picker. It cannot be told apart from
+    // a national number, so the sign-in screen shows the result first.
+    expect(ok('12025550101', defaultDialingCountry), '+26012025550101');
+  });
 }

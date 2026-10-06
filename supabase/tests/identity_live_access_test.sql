@@ -4,7 +4,7 @@
 -- gate and the restricted synthetic seeding. HTTP evidence: identity_api_smoke.sh and
 -- tools/identity-e2e. Every account, phone and name here is SYNTHETIC (fictional ranges only).
 begin;
-select plan(67);
+select plan(71);
 
 -- Calls the read the way PostgREST does: role switch plus verified JWT claims.
 -- Returns 'ok' + the summary, or '<sqlstate>|<message>|<detail>'.
@@ -87,7 +87,7 @@ insert into auth.users (id, aud, role, phone, phone_confirmed_at) values
   (pg_temp.u(1), 'authenticated', 'authenticated', '12025550101', now()),
   (pg_temp.u(2), 'authenticated', 'authenticated', '12025550102', now()),
   (pg_temp.u(3), 'authenticated', 'authenticated', '447700900123', now()),
-  (pg_temp.u(4), 'authenticated', 'authenticated', '260971234567', now());
+  (pg_temp.u(4), 'authenticated', 'authenticated', '12025550200', now());
 insert into auth.sessions (id, user_id, aal) values
   (pg_temp.s(1), pg_temp.u(1), 'aal1'),
   (pg_temp.s(2), pg_temp.u(2), 'aal1'),
@@ -235,6 +235,20 @@ select is(pg_temp.read('authenticated', pg_temp.claims(pg_temp.u(3), pg_temp.s(3
 update app.policy_gates set state = 'unresolved', approved_value = null, approved_by = null,
        approved_at = null, approval_note = null where gate = 'private_access';
 
+-- A held restore removes the synthetic bypass in local and staging.
+update app.rcv_recovery_state set state = 'restored_held', restore_id = gen_random_uuid(),
+       updated_by = 'pgtap';
+select is(pg_temp.read('authenticated', pg_temp.claims(pg_temp.u(1), pg_temp.s(1))),
+  'PT403|unavailable|unavailable', 'local + held restore: synthetic member is unavailable');
+update app.rcv_recovery_state set state = 'live', restore_id = null, updated_by = 'pgtap';
+select is(pg_temp.read('authenticated', pg_temp.claims(pg_temp.u(1), pg_temp.s(1))) like 'ok %', true,
+  'live again: synthetic member is served');
+
+-- Approved phones are E.164 with 8 to 15 digits.
+select throws_ok($$update app.identity_account_links set approved_phone = '+1202555'
+                    where auth_user_id = pg_temp.u(1)$$,
+  '23514', null, 'a 7-digit approved phone is rejected');
+
 -- Unmarked database = production: the fixture dormancy setting is ignored, so access fails closed.
 delete from app.platform_environment;
 select is(app.identity_setting('dormancy_days'), null, 'production ignores fixture settings');
@@ -259,6 +273,10 @@ select is(app.identity_setting('dormancy_days'), '{"days": 90}'::jsonb, 'staging
 select is(pg_temp.read('authenticated', pg_temp.claims(pg_temp.u(1), pg_temp.s(1))) like 'ok %', true,
   'staging serves a synthetic member with private_access closed');
 select ok(not app.policy_is_open('private_access'), 'and the private_access gate itself stays closed');
+update app.rcv_recovery_state set state = 'restored_held', restore_id = gen_random_uuid(),
+       updated_by = 'pgtap';
+select is(pg_temp.read('authenticated', pg_temp.claims(pg_temp.u(1), pg_temp.s(1))),
+  'PT403|unavailable|unavailable', 'staging + held restore: synthetic member is unavailable');
 
 select * from finish();
 rollback;

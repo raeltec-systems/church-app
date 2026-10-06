@@ -4,8 +4,12 @@
 /// Any country code is accepted. The country picker only supplies the country
 /// code for a number typed in national form; +260 is its initial value, not an
 /// assumption about where a member lives. No rule here depends on a country's
-/// operator prefixes: the only national-form rule is removing the country's
-/// trunk prefix (for example the leading 0 of `07700 900123` in the UK).
+/// operator prefixes. National-form rules: a number that already starts with
+/// the picked country's calling code followed by a national number of that
+/// country's length is taken as international (so the code is never added
+/// twice); otherwise the country's trunk prefix is removed once (for example
+/// the leading 0 of `07700 900123` in the UK) and the calling code is added.
+/// E.164: 8 to 15 digits after the `+`.
 library;
 
 /// One entry of the country picker.
@@ -15,6 +19,7 @@ class DialingCountry {
     this.isoCode,
     this.dialCode, {
     this.trunkPrefix = '0',
+    this.nationalLengths = const {},
   });
 
   final String name;
@@ -29,37 +34,65 @@ class DialingCountry {
   /// form; empty when the country has none (it is then part of the number).
   final String trunkPrefix;
 
+  /// Lengths of the country's national significant numbers. Used only to
+  /// recognise a number typed with the calling code but without `+`; empty
+  /// when not curated (such input is then shown back before submit).
+  final Set<int> nationalLengths;
+
   String get label => '$name (+$dialCode)';
 }
 
 /// The picker's initial country (design contract: +260 is only the initial
 /// presentation).
-const defaultDialingCountry = DialingCountry('Zambia', 'ZM', '260');
+const defaultDialingCountry = DialingCountry(
+  'Zambia',
+  'ZM',
+  '260',
+  nationalLengths: {9},
+);
 
 /// Countries offered by the picker. Any other country code can be typed in
 /// international form (starting with + or 00) in the phone field.
 const dialingCountries = <DialingCountry>[
   defaultDialingCountry,
-  DialingCountry('Angola', 'AO', '244', trunkPrefix: ''),
-  DialingCountry('Australia', 'AU', '61'),
-  DialingCountry('Botswana', 'BW', '267', trunkPrefix: ''),
-  DialingCountry('Canada', 'CA', '1', trunkPrefix: '1'),
-  DialingCountry('Congo (DRC)', 'CD', '243'),
+  DialingCountry('Angola', 'AO', '244', trunkPrefix: '', nationalLengths: {9}),
+  DialingCountry('Australia', 'AU', '61', nationalLengths: {9}),
+  DialingCountry(
+    'Botswana',
+    'BW',
+    '267',
+    trunkPrefix: '',
+    nationalLengths: {7, 8},
+  ),
+  DialingCountry('Canada', 'CA', '1', trunkPrefix: '1', nationalLengths: {10}),
+  DialingCountry('Congo (DRC)', 'CD', '243', nationalLengths: {9}),
   DialingCountry('Germany', 'DE', '49'),
-  DialingCountry('Ghana', 'GH', '233'),
-  DialingCountry('India', 'IN', '91'),
+  DialingCountry('Ghana', 'GH', '233', nationalLengths: {9}),
+  DialingCountry('India', 'IN', '91', nationalLengths: {10}),
   DialingCountry('Ireland', 'IE', '353'),
-  DialingCountry('Kenya', 'KE', '254'),
-  DialingCountry('Malawi', 'MW', '265'),
-  DialingCountry('Mozambique', 'MZ', '258', trunkPrefix: ''),
-  DialingCountry('Namibia', 'NA', '264'),
-  DialingCountry('Nigeria', 'NG', '234'),
-  DialingCountry('South Africa', 'ZA', '27'),
-  DialingCountry('Tanzania', 'TZ', '255'),
-  DialingCountry('Uganda', 'UG', '256'),
-  DialingCountry('United Arab Emirates', 'AE', '971'),
-  DialingCountry('United Kingdom', 'GB', '44'),
-  DialingCountry('United States', 'US', '1', trunkPrefix: '1'),
+  DialingCountry('Kenya', 'KE', '254', nationalLengths: {9}),
+  DialingCountry('Malawi', 'MW', '265', nationalLengths: {7, 9}),
+  DialingCountry(
+    'Mozambique',
+    'MZ',
+    '258',
+    trunkPrefix: '',
+    nationalLengths: {8, 9},
+  ),
+  DialingCountry('Namibia', 'NA', '264', nationalLengths: {8, 9}),
+  DialingCountry('Nigeria', 'NG', '234', nationalLengths: {8, 10}),
+  DialingCountry('South Africa', 'ZA', '27', nationalLengths: {9}),
+  DialingCountry('Tanzania', 'TZ', '255', nationalLengths: {9}),
+  DialingCountry('Uganda', 'UG', '256', nationalLengths: {9}),
+  DialingCountry('United Arab Emirates', 'AE', '971', nationalLengths: {8, 9}),
+  DialingCountry('United Kingdom', 'GB', '44', nationalLengths: {9, 10}),
+  DialingCountry(
+    'United States',
+    'US',
+    '1',
+    trunkPrefix: '1',
+    nationalLengths: {10},
+  ),
   DialingCountry('Zimbabwe', 'ZW', '263'),
 ];
 
@@ -78,7 +111,7 @@ class PhoneUsernameResult {
   const PhoneUsernameResult.problem(PhoneUsernameProblem this.problem)
     : value = null;
 
-  /// `+<country code><number>`, 7 to 15 digits (E.164).
+  /// `+<country code><number>`, 8 to 15 digits (E.164).
   final String? value;
   final PhoneUsernameProblem? problem;
 }
@@ -108,10 +141,16 @@ PhoneUsernameResult normalizePhoneUsername(
         PhoneUsernameProblem.invalidCharacters,
       );
     }
-    if (country.trunkPrefix.isNotEmpty && s.startsWith(country.trunkPrefix)) {
-      s = s.substring(country.trunkPrefix.length);
+    if (s.startsWith(country.dialCode) &&
+        country.nationalLengths.contains(s.length - country.dialCode.length)) {
+      // Already international without the '+': do not add the code twice.
+      digits = s;
+    } else {
+      if (country.trunkPrefix.isNotEmpty && s.startsWith(country.trunkPrefix)) {
+        s = s.substring(country.trunkPrefix.length);
+      }
+      digits = '${country.dialCode}$s';
     }
-    digits = '${country.dialCode}$s';
   }
   if (digits.isEmpty || !_digits.hasMatch(digits)) {
     return const PhoneUsernameResult.problem(
@@ -123,7 +162,7 @@ PhoneUsernameResult normalizePhoneUsername(
       PhoneUsernameProblem.invalidCountryCode,
     );
   }
-  if (digits.length < 7) {
+  if (digits.length < 8) {
     return const PhoneUsernameResult.problem(PhoneUsernameProblem.tooShort);
   }
   if (digits.length > 15) {

@@ -73,6 +73,20 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         );
   }
 
+  /// Shows the exact international username before submit, so a number read
+  /// with the wrong country code is visible.
+  String _phonePreview() {
+    final value = normalizePhoneUsername(_phone.text, _country).value;
+    if (value == null) {
+      return 'For example +${_country.dialCode} …, or a local number.';
+    }
+    final code = '+${_country.dialCode}';
+    final shown = value.startsWith(code)
+        ? '$code ${value.substring(code.length)}'
+        : value;
+    return "You'll sign in as $shown";
+  }
+
   void _edited() {
     ref.read(signInControllerProvider.notifier).edited();
     if (_phoneError != null || _passwordError != null) {
@@ -222,11 +236,17 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                               RegExp(r'[0-9+\-\s().]'),
                             ),
                           ],
-                          onChanged: (_) => _edited(),
+                          onChanged: (_) {
+                            _edited();
+                            setState(() {}); // refresh the sign-in preview
+                          },
                           decoration: InputDecoration(
                             labelText: 'Phone number (your username)',
-                            helperText:
-                                'For example +${_country.dialCode} …, or a local number.',
+                            helper: Text(
+                              _phonePreview(),
+                              key: const Key('phone-preview'),
+                            ),
+                            helperMaxLines: 3,
                             errorText: _phoneError,
                           ),
                         ),

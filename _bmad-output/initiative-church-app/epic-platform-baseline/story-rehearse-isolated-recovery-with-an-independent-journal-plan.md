@@ -3,8 +3,7 @@ title: 'Rehearse isolated recovery with an independent journal'
 type: 'feature'
 ticket: '10'
 created: '2026-10-03'
-status: 'blocked'
-blocked_reason: 'staging apply of recovery_journal needs owner approval (MCP apply timed out 3x awaiting confirmation of in-function auth session delete)'
+status: 'done'
 baseline_revision: 'f93eac02d09b212822c8614a15fb4a5aa64a7685'
 route: 'full'
 route_source: 'auto'
@@ -63,7 +62,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261003161000_recovery_journal.sql` -- `rcv_` prefix; `rcv_recovery_state`, `rcv_journal_acks`, `rcv_events`, SYNTHETIC `rcv_fixture_subjects/objects`; `rcv_apply_journal_entry`, `rcv_hold_after_restore`, `rcv_complete_reconciliation`, `rcv_serving_hold`, `rcv_recovery_status`, fixture helpers; redefined `policy_effective`; no grants.
+- [x] `supabase/migrations/20261006215306_recovery_journal (+ 20261006215400_recovery_journal_hold).sql` -- `rcv_` prefix; `rcv_recovery_state`, `rcv_journal_acks`, `rcv_events`, SYNTHETIC `rcv_fixture_subjects/objects`; `rcv_apply_journal_entry`, `rcv_hold_after_restore`, `rcv_complete_reconciliation`, `rcv_serving_hold`, `rcv_recovery_status`, fixture helpers; redefined `policy_effective`; no grants.
 - [x] `supabase/tests/recovery_journal_test.sql` -- pgTAP for hold/gates, replay idempotency, completion guards, privileges, session invalidation.
 - [x] `tools/recovery/journal.mjs` (+test) -- entry schema, hashing, `LocalSegmentJournal`, `DriveJournal` (injected client), `verifyJournal`.
 - [x] `tools/recovery/rehearse.mjs` (+test where pure) -- seed/backup/revoke/delete/seal/restore/reconcile/status/`all`; isolated container target.
@@ -82,7 +81,7 @@ context:
 Implemented 2026-10-03 directly (no subagent tool in this session).
 
 **What landed**
-- Migration `20261003161000_recovery_journal.sql` (additive). It adds:
+- Migration `20261006215306_recovery_journal (+ 20261006215400_recovery_journal_hold).sql` (additive). It adds:
   - the `rcv_` prefix, owned by `platform`;
   - `rcv_recovery_state` (seeded `live`), `rcv_journal_acks`, `rcv_events` (content-free) and the SYNTHETIC `rcv_synthetic_subjects`/`rcv_synthetic_objects`;
   - the operator-only functions `rcv_apply_journal_entry`, `rcv_hold_after_restore` (also deletes `auth.refresh_tokens`/`auth.sessions` when present), `rcv_record_refusal`, `rcv_complete_reconciliation`, `rcv_serving_hold` (a missing row counts as held) and `rcv_recovery_status`;
@@ -168,3 +167,9 @@ Implemented 2026-10-03 directly (no subagent tool in this session).
 - `npx supabase db reset && npm run db:test && npm run db:smoke` -- pass.
 - `npm run ci:policy-test && npm run env:check && npm run ci:migrations && npm run ci:secrets` -- pass.
 - `npm run recovery:rehearse` -- all scenarios as the matrix; evidence saved.
+
+## Hosted apply (2026-10-06)
+
+- The connector's approval prompt never reached the owner (3 timeouts, 2 cancels). The migration was split: `20261006215306_recovery_journal` (everything except the hold function) applied through the connector; `20261006215400_recovery_journal_hold` (the restore-only session wipe) pasted by the owner in the staging SQL editor and recorded in `supabase_migrations.schema_migrations` without statement text.
+- Staging readback: function present, no execute for anon/authenticated/service_role; marker `staging`, both gates closed, alerting disabled, no recovery hold. Security advisors: only the expected RLS-no-policy INFO notes plus the pre-existing leaked-password warning.
+- Local files were renamed to the hosted versions; `db:test`, `db:smoke`, `recovery:rehearse` and `ci:migrations` pass after a reset.

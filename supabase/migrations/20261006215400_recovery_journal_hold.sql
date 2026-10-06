@@ -12,8 +12,6 @@ as $$
 declare
   v_restore uuid := gen_random_uuid();
 begin
-  -- Only inside a restore session: the artifact/tool sets app.restore_in_progress = 'on'. The
-  -- operator name is attribution only, so a snapshot without operator rows still lands held.
   if coalesce(current_setting('app.restore_in_progress', true), '') <> 'on' then
     raise exception using errcode = '42501',
       message = 'rcv_hold_after_restore runs only in a restore session (app.restore_in_progress)';

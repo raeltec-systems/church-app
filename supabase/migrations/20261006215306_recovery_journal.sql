@@ -273,8 +273,6 @@ begin
     values (app.platform_current_environment(), p_operator, 'entry_applied', v_restore, v_seq);
   end if;
 
-  -- Effects are re-applied every time (deny-only, idempotent): a restored older row is fixed
-  -- even when its acknowledgement survived in the snapshot.
   if v_kind in ('access_revoked', 'deletion_manifest') then
     update app.rcv_synthetic_subjects s
        set access_revoked_at = coalesce(s.access_revoked_at, v_at)
@@ -380,8 +378,6 @@ begin
   if not found then
     raise exception using errcode = '22023', message = 'unknown policy gate';
   end if;
-  -- Story 1.10 (AD-14): an unreconciled restore keeps private serving and sending closed,
-  -- whatever approval the restored snapshot carries.
   if p_gate in ('private_access', 'outbound_sending') and app.rcv_serving_hold() then
     perform app.cmd_fail('unavailable', '{"policy": "gate_closed"}');
     return null;

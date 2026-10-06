@@ -2,6 +2,9 @@
 # Identity live access (story 2.1) through the real Data API (PostgREST + Auth) of the running
 # local stack: the allowlisted read api.identity_my_member_summary for a seeded synthetic member,
 # an unlinked account, a signed-out client, a revoked session, and direct table queries.
+# Story 2.2 adds native alternate routes with the CLI's default config: token refresh keeps
+# access; magic-link and recovery sessions (Auth Admin generate_link redeemed at native /verify,
+# so no email is sent) are denied; a direct Auth email change puts the account in review.
 #
 # The local CLI forces the phone provider off (evidence-1.2/local-cli-phone-gate.txt), so CI signs
 # in through the verified-email alias of a phone account (AD-20: same account, same predicate).
@@ -28,6 +31,8 @@ cleanup() {
     [[ -z "$id" ]] && continue
     sql "delete from app.identity_binding_history h using app.identity_account_links l
           where h.link_id = l.link_id and l.auth_user_id = '$id';
+         delete from app.identity_credential_events e using app.identity_account_links l
+          where e.link_id = l.link_id and l.auth_user_id = '$id';
          with gone as (delete from app.identity_account_links where auth_user_id = '$id' returning member_id)
          delete from app.identity_members m using gone where m.member_id = gone.member_id;" >/dev/null || true
     synthetic_user_delete "$id"
@@ -109,6 +114,39 @@ expect "revoked session's unexpired JWT is refused" 401 "$code" "$body"
 code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API_URL/auth/v1/token?grant_type=refresh_token" \
   -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$R1\"}")
 expect "revoked session cannot refresh" 400 "$code"
+
+# Story 2.2: alternate native Auth routes on the same linked account.
+admin() { # method path json -> body
+  curl -s -X "$1" "$API_URL/auth/v1$2" -H "apikey: $SECRET_KEY" -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+    -H 'Content-Type: application/json' -d "$3"
+}
+verify_hash() { # type token_hash -> access token
+  curl -s -X POST "$API_URL/auth/v1/verify" -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Type: application/json' \
+    -d "{\"type\":\"$1\",\"token_hash\":\"$2\"}" | jq -r .access_token
+}
+S3=$(sign_in "$E1" "$PW1"); R3=$(jq -r .refresh_token <<<"$S3")
+T3=$(curl -s -X POST "$API_URL/auth/v1/token?grant_type=refresh_token" -H "apikey: $PUBLISHABLE_KEY" \
+  -H 'Content-Type: application/json' -d "{\"refresh_token\":\"$R3\"}" | jq -r .access_token)
+code=$(read_summary "$T3"); expect "a refreshed password session keeps access" 200 "$code" "$(cat "$WORK/out")"
+for type in magiclink recovery; do
+  H=$(admin POST /admin/generate_link "{\"type\":\"$type\",\"email\":\"$E1\"}" | jq -r .hashed_token)
+  TL=$(verify_hash "$type" "$H")
+  [[ -n "$TL" && "$TL" != null ]] || bad "$type link did not produce a session"
+  code=$(read_summary "$TL"); body=$(cat "$WORK/out")
+  [[ "$code:$(jq -r .details <<<"$body")" == "401:untrusted_session" ]] \
+    && ok "$type session (otp AMR) is denied (401 untrusted_session)" || bad "$type session: $code $body"
+done
+admin PUT "/admin/users/$U1" "{\"email\":\"changed-$E1\",\"email_confirm\":true}" >/dev/null
+code=$(read_summary "$T3"); body=$(cat "$WORK/out")
+[[ "$code:$(jq -r .details <<<"$body")" == "403:review_required" ]] \
+  && ok "a direct Auth email change puts the account in review (403 review_required)" || bad "after email change: $code $body"
+T4=$(sign_in "changed-$E1" "$PW1" | jq -r .access_token)
+code=$(read_summary "$T4"); body=$(cat "$WORK/out")
+[[ "$code:$(jq -r .details <<<"$body")" == "403:review_required" ]] \
+  && ok "a fresh sign-in with the changed email is still in review" || bad "fresh sign-in after change: $code $body"
+kinds=$(sql "select string_agg(array_to_string(e.kinds, '+'), ',' order by e.event_id) from app.identity_credential_events e
+              join app.identity_account_links l using (link_id) where l.auth_user_id = '$U1'")
+[[ "$kinds" == *email* ]] && ok "the change is recorded by kind ($kinds)" || bad "credential events: '$kinds'"
 
 # No SMS configuration exists on this stack.
 sms=$(curl -s "$API_URL/auth/v1/settings" -H "apikey: $PUBLISHABLE_KEY" | jq -r '.sms_provider // ""')

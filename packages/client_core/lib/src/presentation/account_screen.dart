@@ -11,11 +11,40 @@ import 'shell_routing.dart' show ClientPaths;
 /// "My membership": the signed-in member's own summary from the server's
 /// live-access-checked read, or a generic state that says what to do next.
 /// Shown the same way on mobile and staff web.
-class AccountScreen extends ConsumerWidget {
+///
+/// When the app returns to the foreground (or a web tab becomes visible
+/// again), the summary is asked for again before it is relied on (AD-13); the
+/// server re-checks the session each time.
+class AccountScreen extends ConsumerStatefulWidget {
   const AccountScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AccountScreen> createState() => _AccountScreenState();
+}
+
+class _AccountScreenState extends ConsumerState<AccountScreen> {
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _revalidate);
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  void _revalidate() {
+    if (!mounted || ref.read(accountProvider).accountId == null) return;
+    if (ref.read(memberSummaryControllerProvider).loading) return;
+    ref.read(memberSummaryControllerProvider.notifier).refresh();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
     final layout = ChurchLayout.of(context);
     final account = ref.watch(accountProvider);
@@ -28,17 +57,33 @@ class AccountScreen extends ConsumerWidget {
     }
 
     final children = <Widget>[];
-    if (account.lastChange == AccountChange.signedOut ||
-        account.lastChange == AccountChange.switched) {
+    final change = account.lastChange;
+    if (change == AccountChange.signedOut ||
+        change == AccountChange.switched ||
+        change == AccountChange.sessionEnded) {
       children.addAll([
         RequestStateBanner(
-          key: const Key('account-changed'),
-          tone: StatusTone.info,
-          icon: Icons.switch_account_outlined,
-          title: account.lastChange == AccountChange.signedOut
-              ? 'Signed out'
-              : 'Account changed',
-          message: 'Information from the previous session was cleared from this device.',
+          key: Key(
+            change == AccountChange.sessionEnded
+                ? 'session-ended'
+                : 'account-changed',
+          ),
+          tone: change == AccountChange.sessionEnded
+              ? StatusTone.warning
+              : StatusTone.info,
+          icon: change == AccountChange.sessionEnded
+              ? Icons.lock_clock_outlined
+              : Icons.switch_account_outlined,
+          title: switch (change) {
+            AccountChange.sessionEnded => 'Please sign in again',
+            AccountChange.signedOut => 'Signed out',
+            _ => 'Account changed',
+          },
+          message: change == AccountChange.sessionEnded
+              ? 'This sign-in is no longer valid, so it was ended on this '
+                    'device and its information was cleared. Sign in with '
+                    'your phone number and password.'
+              : 'Information from the previous session was cleared from this device.',
           actions: [
             BannerAction(
               'Dismiss',

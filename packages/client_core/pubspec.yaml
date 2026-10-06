@@ -14,10 +14,12 @@ dependencies:
   church_design_system:
     path: ../design_system
   flutter_riverpod: 3.4.3
+  flutter_secure_storage: 10.0.0
   go_router: 18.0.2
   http: 1.6.0
   supabase: 2.16.2
   supabase_flutter: 2.18.0
+  web: 1.1.1
 
 dev_dependencies:
   flutter_test:

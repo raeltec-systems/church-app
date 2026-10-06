@@ -6,6 +6,7 @@ library;
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'src/adapters/auth_session_storage.dart';
 import 'src/application/providers.dart';
 import 'supabase_adapters.dart';
 
@@ -38,12 +39,13 @@ Future<List<Override>> compositionOverrides(AppConfig config) async {
     url: config.supabaseUrl,
     publishableKey: config.publishableKey,
     postgrestOptions: const PostgrestClientOptions(schema: 'api'),
-    // AD-13: no persisted session; protected state lives in memory only.
-    // Story 2.1 keeps this: the session lasts while the app runs (the SDK
-    // refreshes it) and a restart asks for the password again. Durable,
-    // platform-secured session storage is deferred (deferred-work.md).
-    authOptions: const FlutterAuthClientOptions(
-      persistSession: false,
+    // Story 2.2 (I2, AD-13): only the Auth session persists, in
+    // platform-secured storage (mobile Keystore/Keychain; staff web the
+    // browser tab's session store), so reopening keeps a valid session without a password
+    // prompt and the SDK refreshes it. Protected domain state stays in memory.
+    // The server re-checks the session on every protected request.
+    authOptions: FlutterAuthClientOptions(
+      localStorage: AuthSessionStorage.forPlatform(),
       detectSessionInUri: false,
     ),
   );

@@ -116,6 +116,14 @@ class MemberSummaryController extends Notifier<MemberSummaryState> {
       return;
     }
     state = MemberSummaryState(result: result);
+    if (result is MemberAccessDenied &&
+        result.denial == MemberAccessDenial.untrustedSession) {
+      // Story 2.2: the server no longer trusts this session (revoked, signed
+      // out elsewhere, from before a credential change or hold, or not a
+      // password sign-in). End it here too: protected state is dropped with
+      // the account generation and the stored session is removed.
+      await ref.read(accountProvider.notifier).endUntrustedSession();
+    }
   }
 }
 

@@ -83,12 +83,42 @@ void main() {
     });
   });
 
-  test('no client persistence API anywhere in the package', () {
+  // Story 2.2: the Auth session (tokens) persists in platform-secured
+  // storage through exactly these adapter files. Nothing else persists, and
+  // they import no domain type, so no protected record can reach storage.
+  const authSessionStorageFiles = {
+    'lib/src/adapters/auth_session_storage.dart',
+    'lib/src/adapters/auth_session_storage_tab_web.dart',
+  };
+
+  test('no client persistence API anywhere else in the package', () {
     final offenders = [
       for (final f in _dart('lib'))
-        if (_persistence.hasMatch(f.readAsStringSync())) f.path,
+        if (!authSessionStorageFiles.contains(f.path.replaceAll(r'\\', '/')) &&
+            f.path.replaceAll(r'\\', '/') != 'lib/composition.dart' &&
+            _persistence.hasMatch(f.readAsStringSync()))
+          f.path,
     ];
     expect(offenders, isEmpty);
+  });
+
+  test('the Auth session storage adapters hold no domain or app state', () {
+    for (final path in authSessionStorageFiles) {
+      final source = File(path).readAsStringSync();
+      expect(source, isNot(contains('/domain/')), reason: path);
+      expect(source, isNot(contains('/application/')), reason: path);
+      expect(source, isNot(contains('localStorage.')), reason: path);
+    }
+    // The composition root names the SDK's `localStorage:` option once, to
+    // hand it that adapter; nothing else there persists.
+    final composition = File('lib/composition.dart').readAsStringSync();
+    expect(_persistence.allMatches(composition).map((m) => m[0]).toList(), [
+      'localStorage',
+    ]);
+    expect(
+      composition,
+      contains('localStorage: AuthSessionStorage.forPlatform()'),
+    );
   });
 
   test(

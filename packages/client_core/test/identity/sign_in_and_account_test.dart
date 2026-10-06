@@ -270,9 +270,10 @@ void main() {
         'denied-reviewRequired',
         'Access review required',
       ),
+      // Story 2.2: an untrusted session is also ended on this device.
       (
         MemberAccessDenial.untrustedSession,
-        'denied-untrustedSession',
+        'session-ended',
         'Please sign in again',
       ),
       (
@@ -333,10 +334,10 @@ void main() {
       (tester) async {
         final h = await pumpAt(tester, ClientPaths.account, account: _a);
         h.memberAccess.answer(
-          const MemberAccessDenied(MemberAccessDenial.untrustedSession),
+          const MemberAccessDenied(MemberAccessDenial.reviewRequired),
         );
         await settleShort(tester);
-        expect(byKey('denied-untrustedSession'), findsOneWidget);
+        expect(byKey('denied-reviewRequired'), findsOneWidget);
         GoRouter.of(tester.element(byKey('refresh-summary')))
             .go(ClientPaths.signIn);
         await settleShort(tester);
@@ -345,7 +346,7 @@ void main() {
         await tapKey(tester, 'submit-button');
         h.auth.succeed(_a); // same account id: no account change event
         await settleShort(tester);
-        expect(byKey('denied-untrustedSession'), findsNothing);
+        expect(byKey('denied-reviewRequired'), findsNothing);
         expect(h.memberAccess.calls, 2);
         h.memberAccess.answer(MemberAccessGranted(syntheticMemberSummary()));
         await settleShort(tester);

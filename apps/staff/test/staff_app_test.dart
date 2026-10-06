@@ -110,6 +110,44 @@ void main() {
     },
   );
 
+  testWidgets(
+    'story 2.2: refresh and resume keep the session; a session the server no '
+    'longer trusts is ended and its state cleared',
+    (tester) async {
+      final h = await pumpStaff(tester);
+      await tapKey(tester, 'nav-/account');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      h.memberAccess.answer(MemberAccessGranted(syntheticMemberSummary()));
+      await tester.pumpAndSettle();
+      expect(find.text('SYNTHETIC Member One'), findsOneWidget);
+
+      // Token refresh: same account id, nothing is dropped or re-asked.
+      h.session.switchTo(h.session.currentAccountId);
+      await tester.pumpAndSettle();
+      expect(find.text('SYNTHETIC Member One'), findsOneWidget);
+      expect(h.memberAccess.calls, 1);
+
+      // Back to the foreground: the server is asked again, no password prompt.
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(h.memberAccess.calls, 2);
+      expect(find.byKey(const Key('password-field')), findsNothing);
+      // Revoked elsewhere (or a credential change): the answer is untrusted.
+      h.memberAccess.answer(
+        const MemberAccessDenied(MemberAccessDenial.untrustedSession),
+      );
+      await tester.pumpAndSettle();
+      expect(h.auth.signOuts, 1);
+      expect(h.session.currentAccountId, isNull);
+      expect(find.byKey(const Key('session-ended')), findsOneWidget);
+      expect(find.text('SYNTHETIC Member One'), findsNothing);
+      expect(find.byKey(const Key('go-sign-in')), findsOneWidget);
+    },
+  );
+
   testWidgets('unconfigured build explains itself and does not send commands', (
     tester,
   ) async {

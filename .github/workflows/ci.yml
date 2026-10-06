@@ -99,6 +99,8 @@ jobs:
         run: bash tools/auth-harness/scan-evidence.sh
       - name: Story 2.1 evidence and identity E2E tool hold no credentials
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.1 tools/identity-e2e
+      - name: Story 2.2 evidence holds no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.2
 
   flutter:
     name: flutter (analyze, test, web build)

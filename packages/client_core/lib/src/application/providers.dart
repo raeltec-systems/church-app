@@ -37,7 +37,15 @@ final memberAccessRepositoryProvider = Provider<MemberAccessRepository>(
 final requestIdsProvider = Provider<RequestIds>((ref) => SecureRequestIds());
 
 /// How the signed-in account last changed.
-enum AccountChange { signedIn, signedOut, switched }
+enum AccountChange {
+  signedIn,
+  signedOut,
+  switched,
+
+  /// The server stopped trusting this session (signed out or revoked
+  /// elsewhere, a credential change, a hold): this device ended it.
+  sessionEnded,
+}
 
 /// The account the client acts for. [generation] increases on every change;
 /// protected state is scoped to one generation.
@@ -64,10 +72,14 @@ class AccountController extends Notifier<AccountState> {
     return AccountState(accountId: session.currentAccountId, generation: 0);
   }
 
+  bool _ending = false;
+
   void _onAccount(String? id) {
     if (id == state.accountId) return;
+    final ending = _ending;
+    _ending = false;
     final change = id == null
-        ? AccountChange.signedOut
+        ? (ending ? AccountChange.sessionEnded : AccountChange.signedOut)
         : state.accountId == null
         ? AccountChange.signedIn
         : AccountChange.switched;
@@ -76,6 +88,16 @@ class AccountController extends Notifier<AccountState> {
       generation: state.generation + 1,
       lastChange: change,
     );
+  }
+
+  /// Ends this device's session because the server answered that it is no
+  /// longer trusted. Protected state is dropped with the account generation,
+  /// and the stored session is removed so a restart cannot reuse it.
+  Future<void> endUntrustedSession() async {
+    if (state.accountId == null) return;
+    _ending = true;
+    // _onAccount clears the flag when the sign-out reaches the session.
+    await ref.read(accountAuthGatewayProvider).signOut();
   }
 
   /// Hides the "account changed" notice; protected state stays cleared.

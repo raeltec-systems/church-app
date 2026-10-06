@@ -1,6 +1,12 @@
 #!/usr/bin/env node
 // Story 2.1 end-to-end on the LOCAL stack: phone/password sign-up and sign-in through native
 // GoTrue (no SMS), then the live-access-checked read api.identity_my_member_summary.
+// Story 2.2 extends it (E30-E45) with direct native Auth calls for every alternate route: token
+// refresh, magic link, email OTP, recovery and a password set from it, the verified email/password
+// alias, direct Auth phone/email changes (with revert and simulated re-approval), global sign-out,
+// ban and a dormant labelled-fixture account. Magic-link/OTP/recovery tokens come from the Auth
+// Admin generate_link endpoint (local secret key, never logged) and are redeemed at native
+// /auth/v1/verify, so no email is sent.
 //
 // Preconditions: `npx supabase start`, migrations applied, and the local-only phone switch
 //   node tools/auth-harness/local-phone-auth.mjs on
@@ -43,7 +49,7 @@ export function amrMethods(jwt) {
   }
 }
 
-const SECRET_KEYS = /^(access_token|refresh_token|password|token|apikey|authorization)$/i;
+const SECRET_KEYS = /^(access_token|refresh_token|password|token|apikey|authorization|hashed_token|token_hash|email_otp|action_link|email)$/i;
 /** Deep copy with secret-bearing keys redacted. */
 export function redact(value) {
   if (Array.isArray(value)) return value.map(redact);
@@ -58,8 +64,10 @@ function localKey() {
   const env = execFileSync('npx', ['supabase', 'status', '-o', 'env'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   const url = /^API_URL="([^"]+)"/m.exec(env)?.[1];
   const key = /^PUBLISHABLE_KEY="([^"]+)"/m.exec(env)?.[1];
-  if (!url || !key) throw new Error('local stack is not running');
-  return { origin: assertLocalOrigin(url), key };
+  const secret = /^SECRET_KEY="([^"]+)"/m.exec(env)?.[1];
+  const service = /^SERVICE_ROLE_KEY="([^"]+)"/m.exec(env)?.[1];
+  if (!url || !key || !secret || !service) throw new Error('local stack is not running');
+  return { origin: assertLocalOrigin(url), key, secret, service };
 }
 
 function psql(sql) {
@@ -71,7 +79,7 @@ async function main() {
   const evidenceIdx = process.argv.indexOf('--evidence');
   const evidence = evidenceIdx > 0 ? process.argv[evidenceIdx + 1] : null;
   if (evidence) writeFileSync(evidence, '');
-  const { origin, key } = localKey();
+  const { origin, key, secret, service } = localKey();
   const results = [];
   const log = (step, data) => {
     const line = { step, target: 'LOCAL', at: new Date().toISOString(), ...redact(data) };
@@ -82,9 +90,10 @@ async function main() {
     results.push({ step, ok });
     log(step, { verdict: ok ? 'pass' : 'FAIL', ...data });
   };
-  async function http(method, path, { token, body, profile } = {}) {
-    const headers = { apikey: key, 'Content-Type': 'application/json' };
-    if (token) headers.Authorization = `Bearer ${token}`;
+  async function http(method, path, { token, body, profile, admin } = {}) {
+    const headers = { apikey: admin ? secret : key, 'Content-Type': 'application/json' };
+    if (admin) headers.Authorization = `Bearer ${service}`;
+    else if (token) headers.Authorization = `Bearer ${token}`;
     if (profile) headers[method === 'GET' ? 'Accept-Profile' : 'Content-Profile'] = profile;
     const res = await fetch(`${origin}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
     const text = await res.text();
@@ -99,16 +108,24 @@ async function main() {
   const err = (r) => ({ status: r.status, code: r.json?.error_code ?? r.json?.message, detail: r.json?.details, msg: r.json?.msg });
 
   const A = '+12025550171', B = '+12025550172', C = '+447700900171', U = '+12025550179';
-  for (const p of [A, B, C, U]) if (!isFictional(p)) throw new Error(`not fictional: ${p}`);
-  const digits = [A, B, C, U].map((p) => `'${p.slice(1)}'`).join(',');
+  // Story 2.2 accounts: D email alias, E direct changes (E2 = its changed phone), F dormant.
+  const D = '+12025550173', E = '+12025550174', E2 = '+12025550176', F = '+12025550175';
+  const DMAIL = 'synthetic-2-2-e2e-alias@example.test', EMAIL2 = 'synthetic-2-2-e2e-changed@example.test';
+  for (const p of [A, B, C, U, D, E, E2, F]) if (!isFictional(p)) throw new Error(`not fictional: ${p}`);
+  const digits = [A, B, C, U, D, E, E2, F].map((p) => `'${p.slice(1)}'`).join(',');
+  const ours = `(u.phone in (${digits}) or u.email like 'synthetic-2-2-e2e-%@example.test')`;
   const cleanup = () => psql(`
     delete from app.identity_binding_history h using app.identity_account_links l, auth.users u
-     where h.link_id = l.link_id and l.auth_user_id = u.id and u.phone in (${digits});
+     where h.link_id = l.link_id and l.auth_user_id = u.id and ${ours};
+    delete from app.identity_credential_events e using app.identity_account_links l, auth.users u
+     where e.link_id = l.link_id and l.auth_user_id = u.id and ${ours};
+    delete from app.identity_holds h using app.identity_account_links l, auth.users u
+     where h.member_id = l.member_id and l.auth_user_id = u.id and ${ours};
     with gone as (delete from app.identity_account_links l using auth.users u
-                   where l.auth_user_id = u.id and u.phone in (${digits}) returning l.member_id)
+                   where l.auth_user_id = u.id and ${ours} returning l.member_id)
     delete from app.identity_members m using gone where m.member_id = gone.member_id;
-    delete from auth.users where phone in (${digits});
-    select count(*) from auth.users where phone in (${digits});`);
+    delete from auth.users u where ${ours};
+    select count(*) from auth.users u where ${ours};`);
 
   const marker = psql(`select coalesce((select environment from app.platform_environment), '')`);
   let marked = false;
@@ -185,6 +202,149 @@ async function main() {
 
     const activity = psql(`select last_member_activity_at is not null from app.identity_account_links where auth_user_id = '${userA}'`);
     check('E23-activity-recorded-only-after-grant', activity === 't', { activity_recorded: activity === 't' });
+
+    // ---- Story 2.2: alternate Auth routes, revocation, direct changes, dormancy ----
+    const refresh = (rt) => http('POST', '/auth/v1/token?grant_type=refresh_token', { body: { refresh_token: rt } });
+    const signInEmail = (email, pw) => http('POST', '/auth/v1/token?grant_type=password', { body: { email, password: pw } });
+    const adminUpdate = (id, body) => http('PUT', `/auth/v1/admin/users/${id}`, { admin: true, body });
+    const generateLink = (type, email) => http('POST', '/auth/v1/admin/generate_link', { admin: true, body: { type, email } });
+    const verifyHash = (type, tokenHash) => http('POST', '/auth/v1/verify', { body: { type, token_hash: tokenHash } });
+    const uid = (phone) => psql(`select id from auth.users where phone = '${phone.slice(1)}'`);
+    const activityOf = (id) => psql(`select coalesce(last_member_activity_at::text, 'none') from app.identity_account_links where auth_user_id = '${id}' and link_state <> 'ended'`);
+    const linkState = (id) => psql(`select link_state || ' gen=' || credential_generation from app.identity_account_links where auth_user_id = '${id}' and link_state <> 'ended'`);
+    const events = (id) => psql(`select coalesce(string_agg(e.source || ':' || array_to_string(e.kinds, '+'), ', ' order by e.event_id), '') from app.identity_credential_events e join app.identity_account_links l using (link_id) where l.auth_user_id = '${id}'`);
+    const reason = (r) => (r.status === 200 ? 'granted' : `${r.status} ${r.json?.details ?? r.json?.message}`);
+    const sameMember = (r, id) => r.status === 200 && r.json?.member_id === id;
+
+    // E30: token refresh keeps the password session and its access (no password prompt).
+    const sA = await signIn(A, pwA);
+    const sAr = await refresh(sA.json?.refresh_token);
+    const rAr = await read(sAr.json?.access_token);
+    check('E30-refresh-keeps-access', sAr.status === 200 && amrMethods(sAr.json?.access_token).includes('password') && rAr.status === 200,
+      { refresh_status: sAr.status, amr: amrMethods(sAr.json?.access_token), read: reason(rAr) });
+
+    // D: phone account with a verified email alias, created by Auth Admin and seeded as approved.
+    const pwD = password();
+    const cD = await http('POST', '/auth/v1/admin/users', { admin: true, body: { phone: D, email: DMAIL, password: pwD, phone_confirm: true, email_confirm: true } });
+    const userD = cD.json?.id;
+    psql(`select app.identity_seed_synthetic_link('${userD}', 'SYNTHETIC E2E Alias Member', 'identity-e2e 2.2')`);
+    const sDp = await signIn(D, pwD);
+    log('E31-setup-alias-account', { create_status: cD.status, phone_session: sDp.status, activity: activityOf(userD) });
+
+    // E32-E34: magic link, email OTP and recovery sessions (all otp AMR) are denied, no activity.
+    const before = activityOf(userD);
+    const ml = await generateLink('magiclink', DMAIL);
+    const vMl = await verifyHash('magiclink', ml.json?.hashed_token);
+    const rMl = await read(vMl.json?.access_token);
+    check('E32-magic-link-session-denied', vMl.status === 200 && rMl.status === 401 && rMl.json?.details === 'untrusted_session',
+      { verify_status: vMl.status, amr: amrMethods(vMl.json?.access_token), read: reason(rMl) });
+    const ot = await generateLink('magiclink', DMAIL);
+    const vOt = await http('POST', '/auth/v1/verify', { body: { type: 'email', email: DMAIL, token: ot.json?.email_otp } });
+    const rOt = await read(vOt.json?.access_token);
+    const rOtR = await read((await refresh(vOt.json?.refresh_token)).json?.access_token);
+    check('E33-email-otp-session-denied-also-after-refresh', vOt.status === 200 && rOt.status === 401 && rOtR.status === 401,
+      { verify_status: vOt.status, amr: amrMethods(vOt.json?.access_token), read: reason(rOt), read_after_refresh: reason(rOtR) });
+    const rc = await generateLink('recovery', DMAIL);
+    const vRc = await verifyHash('recovery', rc.json?.hashed_token);
+    const rRc = await read(vRc.json?.access_token);
+    check('E34-recovery-session-denied', vRc.status === 200 && rRc.status === 401 && rRc.json?.details === 'untrusted_session',
+      { verify_status: vRc.status, amr: amrMethods(vRc.json?.access_token), read: reason(rRc) });
+    check('E35-denials-wrote-no-activity', activityOf(userD) === before, { before, after: activityOf(userD) });
+
+    // E36: password set from the recovery session: the recovery session stays denied, every
+    // session from before is dead, the old password fails, a fresh password sign-in is granted.
+    const pwD2 = password();
+    const setPw = await http('PUT', '/auth/v1/user', { token: vRc.json?.access_token, body: { password: pwD2 } });
+    const rRc2 = await read(vRc.json?.access_token);
+    const rDold = await read(sDp.json?.access_token);
+    const oldPw = await signIn(D, pwD);
+    const sD2 = await signIn(D, pwD2);
+    const rD2 = await read(sD2.json?.access_token);
+    check('E36-recovery-password-set-needs-fresh-sign-in',
+      setPw.status === 200 && rRc2.status === 401 && rDold.status === 401 && oldPw.status === 400 && rD2.status === 200,
+      { set_status: setPw.status, recovery_session: reason(rRc2), pre_reset_session: reason(rDold), old_password: oldPw.status,
+        fresh_sign_in: reason(rD2), link: linkState(userD) });
+
+    // E37: the verified email/password alias resolves to the same account and member.
+    const sDe = await signInEmail(DMAIL, pwD2);
+    const rDe = await read(sDe.json?.access_token);
+    check('E37-email-alias-same-account-same-checks',
+      sDe.status === 200 && sDe.json?.user?.id === userD && amrMethods(sDe.json?.access_token).includes('password') && sameMember(rDe, rD2.json?.member_id),
+      { status: sDe.status, same_sub: sDe.json?.user?.id === userD, amr: amrMethods(sDe.json?.access_token), read: reason(rDe), same_member: sameMember(rDe, rD2.json?.member_id) });
+
+    // E38-E41: direct Auth phone/email change on a linked account (Auth Admin, bypassing Identity).
+    const pwE = password();
+    await signUp(E, pwE);
+    const userE = uid(E);
+    psql(`select app.identity_seed_synthetic_link('${userE}', 'SYNTHETIC E2E Change Member', 'identity-e2e 2.2')`);
+    const sE = await signIn(E, pwE);
+    const rE0 = await read(sE.json?.access_token);
+    const chg = await adminUpdate(userE, { phone: E2 });
+    const rE1 = await read(sE.json?.access_token);
+    const back = await adminUpdate(userE, { phone: E });
+    const rE2 = await read(sE.json?.access_token);
+    const sE2 = await signIn(E, pwE);
+    const rE3 = await read(sE2.json?.access_token);
+    check('E38-direct-phone-change-review-even-after-revert',
+      rE0.status === 200 && chg.status === 200 && rE1.json?.details === 'review_required' && back.status === 200
+        && rE2.json?.details === 'review_required' && rE3.json?.details === 'review_required',
+      { before: reason(rE0), stale_token_after_change: reason(rE1), after_revert: reason(rE2), fresh_sign_in_before_review: reason(rE3), link: linkState(userE) });
+    psql(`update app.identity_account_links set link_state = 'active' where auth_user_id = '${userE}'`);
+    const rE4 = await read(sE.json?.access_token);
+    const rE4b = await read(sE2.json?.access_token);
+    const sE3 = await signIn(E, pwE);
+    const rE5 = await read(sE3.json?.access_token);
+    check('E39-after-reapproval-stale-tokens-dead-fresh-granted',
+      rE4.json?.details === 'untrusted_session' && rE4b.json?.details === 'untrusted_session' && rE5.status === 200,
+      { pre_change_token: reason(rE4), during_review_token: reason(rE4b), fresh_sign_in: reason(rE5) });
+    const em = await adminUpdate(userE, { email: EMAIL2, email_confirm: true });
+    const rE6 = await read(sE3.json?.access_token);
+    const sE4 = await signIn(E, pwE);
+    const rE7 = await read(sE4.json?.access_token);
+    check('E40-direct-email-change-review', em.status === 200 && rE6.json?.details === 'review_required' && rE7.json?.details === 'review_required',
+      { stale_token: reason(rE6), fresh_sign_in: reason(rE7), link: linkState(userE) });
+    check('E41-changes-recorded-by-kind', /auth_users:phone, auth_users:phone, .*auth_users:email/.test(events(userE)),
+      { events: events(userE) });
+
+    // E42: global sign-out revokes every session of the account.
+    const sA1 = await signIn(A, pwA);
+    const sA2 = await signIn(A, pwA);
+    const outAll = await http('POST', '/auth/v1/logout?scope=global', { token: sA1.json?.access_token });
+    const rA1 = await read(sA1.json?.access_token);
+    const rA2 = await read(sA2.json?.access_token);
+    const rA2r = await refresh(sA2.json?.refresh_token);
+    check('E42-global-sign-out-revokes-all', outAll.status === 204 && rA1.status === 401 && rA2.status === 401 && rA2r.status >= 400,
+      { logout_status: outAll.status, session_1: reason(rA1), session_2: reason(rA2), refresh_status: rA2r.status });
+
+    // E43: ban (Auth Admin revocation); unbanning does not revive the old session.
+    const sA3 = await signIn(A, pwA);
+    const ban = await adminUpdate(uid(A), { ban_duration: '24h' });
+    const rA3 = await read(sA3.json?.access_token);
+    const unban = await adminUpdate(uid(A), { ban_duration: 'none' });
+    const rA3b = await read(sA3.json?.access_token);
+    const sA4 = await signIn(A, pwA);
+    const rA4 = await read(sA4.json?.access_token);
+    check('E43-ban-revokes-and-unban-does-not-revive', ban.status === 200 && rA3.status === 401 && unban.status === 200 && rA3b.status === 401 && rA4.status === 200,
+      { banned: reason(rA3), old_session_after_unban: reason(rA3b), fresh_sign_in: reason(rA4) });
+
+    // E44: dormant labelled-fixture account: prior activity is read before any refresh.
+    const pwF = password();
+    await signUp(F, pwF);
+    const userF = uid(F);
+    psql(`select app.identity_seed_synthetic_link('${userF}', 'SYNTHETIC E2E Dormant Member', 'identity-e2e 2.2')`);
+    psql(`update app.identity_account_links set last_member_activity_at = now() - interval '91 days' where auth_user_id = '${userF}'`);
+    const dormantBefore = activityOf(userF);
+    const fixture = psql(`select label from app.identity_settings where setting = 'dormancy_days' order by version desc limit 1`);
+    const sF = await signIn(F, pwF);
+    const sFr = await refresh(sF.json?.refresh_token);
+    const rF = await read(sFr.json?.access_token);
+    check('E44-dormant-fixture-denied-without-activity-update',
+      sF.status === 200 && sFr.status === 200 && rF.json?.details === 'review_required' && activityOf(userF) === dormantBefore,
+      { fixture_label: fixture, sign_in: sF.status, refresh: sFr.status, read: reason(rF), activity_unchanged: activityOf(userF) === dormantBefore });
+
+    // E45: what Identity recorded for the alias account (kinds only).
+    check('E45-recovery-reset-recorded', /auth_users:password/.test(events(userD)) && linkState(userD).startsWith('active'),
+      { events: events(userD), link: linkState(userD) });
   } finally {
     const smsLines = execFileSync('docker', ['logs', '--since', startedAt, 'supabase_auth_church-app'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     const sent = smsLines.split('\n').filter((l) => /sms/i.test(l) && !/Unable to get SMS provider|sms_provider|missing/i.test(l));

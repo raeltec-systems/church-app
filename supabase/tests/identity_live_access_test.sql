@@ -88,11 +88,25 @@ insert into auth.users (id, aud, role, phone, phone_confirmed_at) values
   (pg_temp.u(2), 'authenticated', 'authenticated', '12025550102', now()),
   (pg_temp.u(3), 'authenticated', 'authenticated', '447700900123', now()),
   (pg_temp.u(4), 'authenticated', 'authenticated', '12025550200', now());
-insert into auth.sessions (id, user_id, aal) values
-  (pg_temp.s(1), pg_temp.u(1), 'aal1'),
-  (pg_temp.s(2), pg_temp.u(2), 'aal1'),
-  (pg_temp.s(3), pg_temp.u(3), 'aal1'),
-  (pg_temp.s(4), pg_temp.u(4), 'aal1');
+insert into auth.sessions (id, user_id, aal, created_at) values
+  (pg_temp.s(1), pg_temp.u(1), 'aal1', now() - interval '1 hour'),
+  (pg_temp.s(2), pg_temp.u(2), 'aal1', now() - interval '1 hour'),
+  (pg_temp.s(3), pg_temp.u(3), 'aal1', now() - interval '1 hour'),
+  (pg_temp.s(4), pg_temp.u(4), 'aal1', now() - interval '1 hour');
+-- Story 2.2: the server's own AMR record for each session (GoTrue writes it on sign-in).
+insert into auth.mfa_amr_claims (id, session_id, created_at, updated_at, authentication_method)
+select gen_random_uuid(), pg_temp.s(n), now(), now(), 'password' from generate_series(1, 4) n;
+
+-- Story 2.2 hardening: a detected direct Auth change, a hold or a link review persists and
+-- moves the session trust epoch (identity_session_trust_test.sql covers that). The 2.1 rows
+-- below then simulate the reviewed re-approval of entries 5/8 plus a fresh sign-in with this.
+create function pg_temp.reapprove(p_user uuid) returns void
+language sql as $$
+  update app.identity_account_links set link_state = 'active'
+   where auth_user_id = p_user and link_state <> 'ended';
+  update app.identity_account_links set sessions_valid_after = null
+   where auth_user_id = p_user and link_state <> 'ended';
+$$;
 
 -- Seeding guards
 select throws_ok($$select app.identity_seed_synthetic_link(pg_temp.u(1), 'Real Name', 'pgtap')$$,
@@ -173,12 +187,15 @@ select is(pg_temp.read('authenticated', pg_temp.claims(pg_temp.u(1), pg_temp.s(1
   'PT403|forbidden|review_required', 'an unapproved recovery email needs review');
 update app.identity_account_links set approved_recovery_email = 'synthetic-2-1@example.test'
  where auth_user_id = pg_temp.u(1);
+update auth.users set email_confirmed_at = now() where id = pg_temp.u(1);
+select pg_temp.reapprove(pg_temp.u(1));
 select matches(pg_temp.read('authenticated', pg_temp.claims(pg_temp.u(1), pg_temp.s(1))),
   '^ok .*"has_recovery_email": true', 'an approved binding with email is granted');
 update auth.users set email = null where id = pg_temp.u(1);
 select is(pg_temp.read('authenticated', pg_temp.claims(pg_temp.u(1), pg_temp.s(1))),
   'PT403|forbidden|review_required', 'a removed approved email needs review');
 update app.identity_account_links set approved_recovery_email = null where auth_user_id = pg_temp.u(1);
+select pg_temp.reapprove(pg_temp.u(1));
 
 insert into app.identity_holds (member_id, hold_kind, reason, placed_by)
 select member_id, 'security', 'pgtap synthetic hold', 'pgtap'
@@ -186,13 +203,14 @@ select member_id, 'security', 'pgtap synthetic hold', 'pgtap'
 select is(pg_temp.read('authenticated', pg_temp.claims(pg_temp.u(1), pg_temp.s(1))),
   'PT403|forbidden|review_required', 'an open hold denies every session');
 update app.identity_holds set released_at = now(), released_by = 'pgtap';
+select pg_temp.reapprove(pg_temp.u(1));
 select is(pg_temp.read('authenticated', pg_temp.claims(pg_temp.u(1), pg_temp.s(1))) like 'ok %', true,
   'a released hold no longer denies');
 
 update app.identity_account_links set link_state = 'review_required' where auth_user_id = pg_temp.u(1);
 select is(pg_temp.read('authenticated', pg_temp.claims(pg_temp.u(1), pg_temp.s(1))),
   'PT403|forbidden|review_required', 'a link in review is denied');
-update app.identity_account_links set link_state = 'active' where auth_user_id = pg_temp.u(1);
+select pg_temp.reapprove(pg_temp.u(1));
 update app.identity_members m set membership_state = 'deactivated'
   from app.identity_account_links l where l.member_id = m.member_id and l.auth_user_id = pg_temp.u(1);
 select is(pg_temp.read('authenticated', pg_temp.claims(pg_temp.u(1), pg_temp.s(1))),

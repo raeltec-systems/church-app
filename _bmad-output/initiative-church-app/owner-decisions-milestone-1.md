@@ -20,3 +20,7 @@ Constraints that still hold:
 - **Hosted phone provider:** enabled by the owner via Management API PATCH on `bic-kafue-auth-test` (no SMS provider/credentials). Production needs the same PATCH (the dashboard refuses).
 - **Phone numbers are international:** any country code, normalized to international format; +260 is only the default picker value. No validation may assume Zambian operator prefixes. Tests use only reserved fictional ranges (e.g. `+1 202 555 0100–0199`).
 - **F1 accepted as constraint:** passwordless `/otp` create_user can register any number with a server-side `password`-AMR session (no tokens returned). Identity access must require the staff-approved binding, not AMR alone; staff need number reclaim.
+
+## 2026-10-06 — story 1.3 frozen-block amendment
+
+- Approved: Supabase Auth Admin password update signs out all sessions; the recovery function relies on it and verifies it in the database (uncertain outcome if any pre-reset session survives).

@@ -31,7 +31,7 @@ context:
 **Never:** SMS/phone provider configuration; staff seeing a password or usable grant; direct writes to `auth.users`/password hashes; claiming Auth API atomicity; editing `supabase/`, `apps/`, `trials/` or the platform project; more than the minimum Supabase Auth emails.
 
 **Decision (agent, under owner pre-approval):** Accounts are email/password synthetic plus-addresses created through the function's Admin create with `email_confirm` (zero emails); phone-specific rows (phone binding change, phone-only reset identifier) are owner-gated with 1.2's Phone provider step.
-**Decision (agent, under owner pre-approval):** Hosted GoTrue v2.197.0 Admin password update does not revoke sessions (source `internal/api/admin.go`), so the function revokes by password-grant with the member-chosen password followed by `/logout?scope=global`; failure of that step is an uncertain outcome.
+**Decision (owner-approved amendment, 2026-10-06):** Supabase Auth (v2.197.0) Admin password update signs out all of the user's sessions. The recovery function relies on this and verifies it in the database: if any session from before the reset is still live, the outcome is uncertain and access stays held until staff reconcile.
 **Decision (agent, under owner pre-approval):** A credential change seen while an op is dispatched is attributed to that op only when it is the single change and the Auth calls succeeded; otherwise the op becomes `uncertain` (fail closed).
 **Decision (agent, under owner pre-approval):** A grant presented with another account's identifier is burned, not merely refused.
 
@@ -215,3 +215,5 @@ context:
 
 **Manual checks:**
 - Evidence README rows each cite harness or raw-observation steps in `evidence-1.3/harness-log.jsonl`.
+
+- 2026-10-06, owner approved the frozen-block amendment: the Admin-update session decision now matches the observed behaviour (evidence-1.3 finding 1). No code change.

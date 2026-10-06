@@ -131,7 +131,7 @@ The earlier rows above (steps `01`–`303`) ran on function v4 and hosted SQL th
 
 ## Findings
 
-1. **Auth Admin password update revokes every session (v2.197.0).** `adminUserUpdate` runs `UpdatePassword(tx, nil)`, which logs out all of the user's sessions. The completion fence does not rely on this: it verifies it (`sessions_at_dispatch` > 0, then `pre_dispatch_sessions_live: 0`). An amendment to the frozen block is with the owner.
+1. **Auth Admin password update revokes every session (v2.197.0).** `adminUserUpdate` runs `UpdatePassword(tx, nil)`, which logs out all of the user's sessions. The completion fence does not rely on this: it verifies it (`sessions_at_dispatch` > 0, then `pre_dispatch_sessions_live: 0`). The owner approved the matching frozen-block amendment on 2026-10-06.
 2. **Detection is count-based.** An Admin apply and a native change look the same, so any ambiguity is `uncertain` (`112`, `118`).
 3. **Reconcile is still a staff decision.** The DB enforces revoked pre-dispatch sessions (or a forced revoke) and a new trust epoch. Identity must define what staff check before reconciling.
 4. **The 1.2 session probe alone is not the gate.** Several sessions pass `harness_private_probe` but fail the recovery gate (e.g. `134`, `139`, `165`, `179`).

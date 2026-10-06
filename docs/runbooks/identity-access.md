@@ -162,3 +162,106 @@ Known limits:
 - `npm run db:test` includes `supabase/tests/identity_session_trust_test.sql`; `npm run db:smoke` adds refresh, magic-link and recovery sessions and a direct email change through the real API (CLI default config).
 - With `node tools/auth-harness/local-phone-auth.mjs on`: `node tools/identity-e2e/run.mjs` (steps `E30`–`E45`), then `FLUTTER_ROOT=<flutter sdk> bash tools/identity-e2e/live-adapter-check.sh` for the real client adapters (refresh, reopen from the stored session, revocation from another device, sign-out). Then `node tools/auth-harness/local-phone-auth.mjs off`.
 - Cleanup of synthetic accounts must delete `app.identity_credential_events` rows before their links (foreign key); the E2E and smoke scripts do.
+
+## Scoped roles and grants (story 2.3)
+
+Architecture: AD-2, AD-3, AD-4, AD-19. Migration: `supabase/migrations/20261006235500_identity_grants.sql`.
+Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.3/`.
+
+### Model
+
+- **Roles** (`app.identity_roles`): `admin`, `pastor`, `media`, `lead_pastor`, held independently. No role implies a care, finance or any other scope.
+  - `lead_pastor` is never granted by an Admin command. Only the restricted operator assigns it, naming one member: `select app.identity_designate_lead_pastor('<member_id>', 'israel');`. The assignment is audited and journalled.
+    - It works only while the Identity church setting `lead_pastor_designation` (Q4) is in force. A labelled TEST FIXTURE enables the setting in local and staging only; in production it stays unset, so the role can be neither assigned nor used.
+    - An Admin may still remove the role with `identity.revoke_role`.
+- **Scope kinds** (`app.identity_scope_kinds`): each owning module registers its kinds at migration time with `app.identity_register_scope_kind(module, kind, target_hook, description)`. The target hook is `(jsonb {scope_kind, scope_id}) -> boolean` and checks that the target exists.
+  - This story registers only the SYNTHETIC `fixture_care` and `fixture_finance` kinds.
+  - Cells registers `cell` at entry 6; Care, Offerings, Prayer and the other owners register their own kinds.
+- **Grants** (`app.identity_grants`): one active row per member and role, or per member and scope. Each row records who granted and revoked it (member and acting account, or the restricted operator).
+- **Grant sets** (`app.identity_grant_sets`): one revisioned aggregate per member. Its revision is the `expected_revision` of every grant command.
+- **Audit** (`app.identity_access_audit`): action, actor (member and account, or operator), `request_id`, target, grant, role or scope, and the new revision. It holds ids and codes only, never names, phones, emails or free text.
+- **Church settings** (`app.identity_church_settings`): `lead_pastor_designation` and `operational_contact` (Q1).
+  - With no approved row, a setting is unset and fails closed.
+  - Fixture rows count only in local and staging.
+  - The restricted operator records an owner decision with `app.identity_approve_church_setting(setting, value, 'israel', '<decision note>')`.
+
+### Immediate effect
+
+Every helper first calls `app.identity_access_evaluate()` and then reads the current grant rows. A grant or revocation therefore applies to the next protected call of a session that is already signed in. Nothing about grants is cached in the JWT, and the client never caches grants beyond its account generation.
+
+Helpers for owner code (none of them is client-executable):
+
+| Helper | Use |
+|---|---|
+| `app.identity_evaluate_grant(role, scope_kind, scope_id)` | Returns `(outcome, member_id, link_id)`. The outcome is the predicate's own denial, `not_granted` or `granted`. |
+| `app.identity_has_role(role)`, `app.identity_has_scope(kind, id)` | Booleans for RLS policies and reads. |
+| `app.identity_require_grant(role, kind, id, lock)` | Raises 401 or 403 (detail `not_granted` when only the grant is missing). With `lock => true` it share-locks the grant row for a command, so a concurrent revocation waits. Do not lock in GET or read-only requests. |
+
+### Commands (1.4 envelope)
+
+Send `POST /rest/v1/rpc/identity_grant_command` with `Content-Profile: api` and the body `{version: 1, command, request_id, expected_revision, payload}`.
+
+| Command | Payload |
+|---|---|
+| `identity.grant_role`, `identity.revoke_role` | `{member_id, role}` |
+| `identity.grant_scope`, `identity.revoke_scope` | `{member_id, scope_kind, scope_id}` |
+
+- **Who may call**: an Admin whose session passes the predicate. The platform's `app.cmd_authorize` calls the authorizer registered for the `identity` namespace (`app.cmd_authorizers`). Other owners register their own authorizer with `app.cmd_register_authorizer(module, handler)`. Commands outside a registered namespace keep the 1.4 fixture grants.
+- **Locks**: the admin catalogue row FOR UPDATE, then the actor's Admin grant FOR SHARE, then the receipt, then the target grant set FOR UPDATE. Two Admins removing each other are serialised: exactly one succeeds (E2E `G23`).
+- **Results and refusals**:
+
+  | Outcome | Response |
+  |---|---|
+  | Success | `data = {member_id, revision, roles, scopes}` |
+  | Stale tab | `conflict` with `current_revision` |
+  | Not an Admin, or Admin removed | `forbidden` |
+  | Untrusted session | `unauthenticated` |
+  | Last usable Admin | `forbidden`, `{"role": "unsupported"}` |
+  | Role whose setting is unset | `unavailable`, `{"policy": "gate_closed"}` |
+  | Unregistered kind or unknown target | `validation_failed` (`scope_kind: unregistered`, `scope_id: unknown`) |
+
+- **Requirements**: a role needs an approved member with a live account link. A scope needs an approved member.
+- **Separation of duty**: no grant command (role or scope) may target the acting Admin's own member record: `forbidden`, `{"member_id": "unsupported"}`, with nothing audited. An Admin may still revoke its own grants, subject to the last-Admin rule. `identity.grant_role` with `lead_pastor` returns `forbidden`, `{"role": "unsupported"}`.
+- **Side effects**: every revocation dispatches the `scope_revoked` lifecycle event to registered owner hooks inside the same transaction.
+- **Usable Admin**: an active Admin grant whose account passes every non-session condition of the predicate (`app.identity_account_standing` = `ok`, and `app.identity_link_dormancy` is null).
+  - Those conditions are: the Auth user is not deleted, banned or anonymous; the member is approved; the link is active with no binding review; the Auth phone and email equal the approved binding; there is no open hold; and the account is not dormant.
+  - The predicate itself is built from the same two helpers.
+- **Concurrency**: grant commands are serialised, so two Admins removing each other cannot both succeed. A hold, link change or Auth change that commits at the same time is not serialised and is never blocked, so it can leave zero usable Admins. The way out is the bootstrap below, which is allowed exactly while no usable Admin exists.
+
+### Reads
+
+| Endpoint | Returns |
+|---|---|
+| `api.identity_my_access()` | The caller's roles and scopes. Clients build navigation from it. |
+| `api.identity_admin_member_grants(after_display_name, after_member_id)` | Admin only. Pages of 50 approved members with `account` (`app_account`, `no_login` or `access_review`), their grants, and the role catalogue with `available`. It carries no care, finance or contact fields. |
+| `api.fixture_scoped_read(scope_kind, scope_id)` | SYNTHETIC. Readable only with that exact scope. |
+
+### Bootstrap and recovery Admin (restricted operator)
+
+```sql
+select app.identity_bootstrap_admin('<member_id>', 'israel');
+```
+
+- The bootstrap is allowed only while no usable Admin exists: the first Admin, or recovery when every Admin is held or in review.
+- The member must be approved, with an active link and no binding review.
+- It is audited as `admin_bootstrapped` with the operator and journalled in `app.ops_operator_actions`.
+- The church-setting approval and the lead-pastor designation are journalled there too.
+- The 1.9 journal table was retired by rename (`app.ops_retired_operator_actions_v0`, rows copied, privileges revoked) and recreated with a wider action list, because widening its CHECK needs a DROP. Drop the retired table in a later owner-approved cleanup.
+- Staging uses synthetic Admins. Naming the first real Admin is the production gate at entry 14.
+
+### Clients
+
+- Both shells read `api.identity_my_access` again on every navigation (each navigation builds a new shell) and when the app resumes.
+- Staff web shows **My access** when access is granted and **Roles & access** (`/admin/grants`) while the answer includes Admin. Mobile shows **Access** with the current roles.
+- Navigation is presentation only. A refused grant command triggers a fresh access read, so a removed Admin's open tab loses the entry at once, and the grant screen then shows the server's denial instead of members.
+- Unknown command outcomes are checked again under the same `request_id`.
+
+### Local runs
+
+```bash
+npx supabase db reset           # empty Admin roster
+node tools/identity-e2e/grants.mjs --evidence <file>.jsonl
+FLUTTER_ROOT=/opt/sdk/flutter bash tools/identity-e2e/live-grants-check.sh
+```
+
+Both sign in through the verified email alias of synthetic phone accounts, so the CLI phone gate stays off. Both clean up every user, link, member, grant, audit row and fixture target they create.

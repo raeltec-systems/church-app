@@ -6,17 +6,17 @@
 select jsonb_build_object(
   'observed_at', now(),
   'postgres_version', version(),
-  'harness_phone_users', (select count(*) from auth.users where phone like '26097000%'),
+  'harness_phone_users', (select count(*) from auth.users where phone like '120255501%'),
   'phone_mfa_factors', (select count(*) from auth.mfa_factors where factor_type::text = 'phone'),
   'phone_one_time_tokens', (select count(*) from auth.one_time_tokens
-                            where relates_to like '26097000%'),
+                            where relates_to like '120255501%'),
   'users_with_phone_confirmation_token', (select count(*) from auth.users
-                                          where phone like '26097000%'
+                                          where phone like '120255501%'
                                             and coalesce(confirmation_token, '') <> ''),
   'users_with_phone_change_token', (select count(*) from auth.users
-                                    where phone like '26097000%'
+                                    where phone like '120255501%'
                                       and coalesce(phone_change_token, '') <> ''),
   'phone_users_with_confirmation_sent_at', (select count(*) from auth.users
-                                            where phone like '26097000%'
+                                            where phone like '120255501%'
                                               and confirmation_sent_at is not null)
 ) as observation;

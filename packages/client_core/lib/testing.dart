@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'src/application/providers.dart';
 import 'src/domain/platform_status.dart';
 
+import 'src/domain/access_grants.dart';
 import 'src/domain/account_auth.dart';
 import 'src/domain/commands.dart';
 import 'src/domain/member_access.dart';
@@ -219,6 +220,98 @@ MemberSummary syntheticMemberSummary({
   isSynthetic: true,
 );
 
+/// [GrantsRepository] answered by the test. [myAccess] answers every
+/// my-access read at once (default: not linked, so no grant-driven
+/// destinations); roster reads wait for [answerRoster] unless [roster] is set.
+class FakeGrants implements GrantsRepository {
+  AccessRead<MemberGrants> myAccess = const AccessReadDenied(
+    AccessDenial.notLinked,
+  );
+  AccessRead<GrantRoster>? roster;
+  final List<Completer<AccessRead<GrantRoster>>> pendingRoster = [];
+  final List<RosterCursor?> rosterCalls = [];
+  int myAccessCalls = 0;
+
+  void answerRoster(AccessRead<GrantRoster> r) =>
+      pendingRoster.removeAt(0).complete(r);
+
+  /// When set, every my-access read waits for it before answering.
+  Completer<void>? myAccessGate;
+
+  @override
+  Future<AccessRead<MemberGrants>> fetchMyAccess() async {
+    myAccessCalls++;
+    final gate = myAccessGate;
+    if (gate != null) await gate.future;
+    return myAccess;
+  }
+
+  @override
+  Future<AccessRead<GrantRoster>> fetchRoster({RosterCursor? after}) {
+    rosterCalls.add(after);
+    final r = roster;
+    if (r != null) return Future.value(r);
+    final c = Completer<AccessRead<GrantRoster>>();
+    pendingRoster.add(c);
+    return c.future;
+  }
+}
+
+/// Synthetic grants of one member.
+MemberGrants syntheticGrants({
+  String memberId = '22222222-2222-4222-8222-222222222222',
+  int revision = 1,
+  List<String> roles = const [],
+  List<ScopeGrant> scopes = const [],
+}) => MemberGrants(
+  memberId: memberId,
+  revision: revision,
+  roles: roles,
+  scopes: scopes,
+);
+
+/// The wire form of [syntheticGrants] (a grant command's success `data`).
+Map<String, Object?> grantsData({
+  String memberId = '33333333-3333-4333-8333-333333333333',
+  int revision = 2,
+  List<String> roles = const [],
+}) => {
+  'member_id': memberId,
+  'revision': revision,
+  'roles': roles,
+  'scopes': const <Object?>[],
+};
+
+/// A synthetic roster page with one member (no login state variations).
+GrantRoster syntheticRoster({
+  String memberId = '33333333-3333-4333-8333-333333333333',
+  String name = 'SYNTHETIC Member Two',
+  int revision = 1,
+  List<String> roles = const [],
+  bool leadPastorAvailable = true,
+}) => GrantRoster(
+  members: [
+    RosterMember(
+      memberId: memberId,
+      displayName: name,
+      isSynthetic: true,
+      account: AccountStanding.appAccount,
+      grants: syntheticGrants(
+        memberId: memberId,
+        revision: revision,
+        roles: roles,
+      ),
+    ),
+  ],
+  roles: [
+    const RoleOption('admin', available: true),
+    const RoleOption('pastor', available: true),
+    const RoleOption('media', available: true),
+    RoleOption('lead_pastor', available: leadPastorAvailable),
+  ],
+  next: null,
+);
+
 /// The fakes and provider overrides an app or screen test runs against.
 class ClientTestHarness {
   ClientTestHarness({String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'})
@@ -229,6 +322,7 @@ class ClientTestHarness {
   final reader = FakeFixtureReader();
   late final auth = FakeAccountAuth(session);
   final memberAccess = FakeMemberAccess();
+  final grants = FakeGrants();
 
   /// [configured] false leaves the unconfigured defaults for the gateway and
   /// the platform status (as a build without `--dart-define`s).
@@ -239,6 +333,7 @@ class ClientTestHarness {
     if (configured) ...[
       accountAuthGatewayProvider.overrideWithValue(auth),
       memberAccessRepositoryProvider.overrideWithValue(memberAccess),
+      grantsRepositoryProvider.overrideWithValue(grants),
       commandGatewayProvider.overrideWithValue(gateway),
       platformStatusRepositoryProvider.overrideWithValue(FakePlatformStatus()),
     ],

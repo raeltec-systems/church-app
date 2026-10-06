@@ -52,7 +52,7 @@ begin
 
   -- 3. phone change -> binding review
   select generation into g0 from harness.rc_account where auth_user_id = a;
-  update auth.users set phone = '260970000999' where id = a;
+  update auth.users set phone = '12025550199' where id = a;
   select * into acct from harness.rc_account where auth_user_id = a;
   assert acct.generation = g0 + 1 and acct.binding_review_required, 'phone change not detected';
   insert into t_result (check_name, ok, detail) values ('phone_change_detected', true,

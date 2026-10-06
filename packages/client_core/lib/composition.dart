@@ -64,5 +64,8 @@ Future<List<Override>> compositionOverrides(AppConfig config) async {
     memberAccessRepositoryProvider.overrideWithValue(
       SupabaseMemberAccessRepository(client),
     ),
+    grantsRepositoryProvider.overrideWithValue(
+      SupabaseGrantsRepository(client),
+    ),
   ];
 }

@@ -37,6 +37,8 @@ echo "== cleanup"
 docker exec supabase_db_church-app psql -U postgres -qtAX -c "
   delete from app.identity_binding_history h using app.identity_account_links l, auth.users u where h.link_id = l.link_id and l.auth_user_id = u.id and u.phone = '$DIGITS';
   delete from app.identity_credential_events e using app.identity_account_links l, auth.users u where e.link_id = l.link_id and l.auth_user_id = u.id and u.phone = '$DIGITS';
+  delete from app.identity_grants g using app.identity_account_links l, auth.users u where g.member_id = l.member_id and l.auth_user_id = u.id and u.phone = '$DIGITS';
+  delete from app.identity_grant_sets s using app.identity_account_links l, auth.users u where s.member_id = l.member_id and l.auth_user_id = u.id and u.phone = '$DIGITS';
   with gone as (delete from app.identity_account_links l using auth.users u where l.auth_user_id = u.id and u.phone = '$DIGITS' returning l.member_id)
   delete from app.identity_members m using gone where m.member_id = gone.member_id;
   delete from auth.users where phone = '$DIGITS';

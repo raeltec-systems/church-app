@@ -9,6 +9,7 @@
 # The local CLI forces the phone provider off (evidence-1.2/local-cli-phone-gate.txt), so CI signs
 # in through the verified-email alias of a phone account (AD-20: same account, same predicate).
 # Phone sign-in itself is exercised by tools/identity-e2e with `node tools/auth-harness/local-phone-auth.mjs on`.
+# Story 2.3 adds: the grant command and grant reads refuse signed-out and unlinked callers.
 # Usage: npm run db:smoke   (needs curl, jq and psql; SYNTHETIC users and data only)
 set -euo pipefail
 
@@ -33,6 +34,10 @@ cleanup() {
           where h.link_id = l.link_id and l.auth_user_id = '$id';
          delete from app.identity_credential_events e using app.identity_account_links l
           where e.link_id = l.link_id and l.auth_user_id = '$id';
+         delete from app.identity_grants g using app.identity_account_links l
+          where g.member_id = l.member_id and l.auth_user_id = '$id';
+         delete from app.identity_grant_sets s using app.identity_account_links l
+          where s.member_id = l.member_id and l.auth_user_id = '$id';
          with gone as (delete from app.identity_account_links where auth_user_id = '$id' returning member_id)
          delete from app.identity_members m using gone where m.member_id = gone.member_id;" >/dev/null || true
     synthetic_user_delete "$id"
@@ -147,6 +152,26 @@ code=$(read_summary "$T4"); body=$(cat "$WORK/out")
 kinds=$(sql "select string_agg(array_to_string(e.kinds, '+'), ',' order by e.event_id) from app.identity_credential_events e
               join app.identity_account_links l using (link_id) where l.auth_user_id = '$U1'")
 [[ "$kinds" == *email* ]] && ok "the change is recorded by kind ($kinds)" || bad "credential events: '$kinds'"
+
+# Story 2.3: the grant command and grant reads need a session (no EXECUTE for anon).
+for call in 'identity_my_access|{}' 'identity_grant_command|{}' 'identity_admin_member_grants|{}' \
+            "fixture_scoped_read|{\"scope_kind\":\"fixture_care\",\"scope_id\":\"$(uuid)\"}"; do
+  fn=${call%%|*}
+  code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/rest/v1/rpc/$fn" \
+    -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Profile: api' -H 'Content-Type: application/json' -d "${call#*|}")
+  expect "signed-out client cannot call $fn" 401 "$code" "$(cat "$WORK/out")"
+done
+T5=$(sign_in "$E2" "$PW2" | jq -r .access_token)
+code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/rest/v1/rpc/identity_my_access" \
+  -H "apikey: $PUBLISHABLE_KEY" -H "Authorization: Bearer $T5" -H 'Content-Profile: api' \
+  -H 'Content-Type: application/json' -d '{}')
+expect "an unlinked account reads no access" 403 "$code" "$(cat "$WORK/out")"
+GRANT_BODY="{\"version\":1,\"command\":\"identity.grant_role\",\"request_id\":\"$(uuid)\",\"expected_revision\":1,\"payload\":{\"member_id\":\"$(uuid)\",\"role\":\"admin\"}}"
+code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/rest/v1/rpc/identity_grant_command" \
+  -H "apikey: $PUBLISHABLE_KEY" -H "Authorization: Bearer $T5" -H 'Content-Profile: api' \
+  -H 'Content-Type: application/json' -d "$GRANT_BODY")
+[[ "$code:$(jq -r .code "$WORK/out")" == "200:forbidden" ]] \
+  && ok "an unlinked account cannot grant roles (forbidden envelope)" || bad "grant as unlinked: $code $(cat "$WORK/out")"
 
 # No SMS configuration exists on this stack.
 sms=$(curl -s "$API_URL/auth/v1/settings" -H "apikey: $PUBLISHABLE_KEY" | jq -r '.sms_provider // ""')

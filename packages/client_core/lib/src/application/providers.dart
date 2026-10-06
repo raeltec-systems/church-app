@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/access_grants.dart';
 import '../domain/account_auth.dart';
 import '../domain/commands.dart';
 import '../domain/fixture_counter.dart';
@@ -32,6 +33,11 @@ final accountAuthGatewayProvider = Provider<AccountAuthGateway>(
 
 final memberAccessRepositoryProvider = Provider<MemberAccessRepository>(
   (ref) => const UnconfiguredMemberAccessRepository(),
+);
+
+/// Story 2.3: the caller's own grants and the Admin grant roster.
+final grantsRepositoryProvider = Provider<GrantsRepository>(
+  (ref) => const UnconfiguredGrantsRepository(),
 );
 
 final requestIdsProvider = Provider<RequestIds>((ref) => SecureRequestIds());

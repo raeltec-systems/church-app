@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/account_auth.dart';
 import '../domain/member_access.dart';
+import 'access_controllers.dart';
 import 'providers.dart';
 
 enum SignInPhase { idle, pending, failed, succeeded }
@@ -116,6 +117,10 @@ class MemberSummaryController extends Notifier<MemberSummaryState> {
       return;
     }
     state = MemberSummaryState(result: result);
+    if (result is MemberAccessDenied &&
+        result.denial != MemberAccessDenial.signedOut) {
+      noteProtectedDenial(ref);
+    }
     if (result is MemberAccessDenied &&
         result.denial == MemberAccessDenial.untrustedSession) {
       // Story 2.2: the live-access predicate no longer trusts this session

@@ -124,7 +124,7 @@ test('parseRedirectLocation distinguishes session, error, pkce and empty redirec
 
 test('maskIdentifier keeps only plus-tag or last digits', () => {
   assert.equal(maskIdentifier('person+bicauth-e1@gmail.com'), '…+bicauth-e1@gmail.com');
-  assert.equal(maskIdentifier('+260970000101'), '…0101');
+  assert.equal(maskIdentifier('+12025550101'), '…0101');
 });
 
 test('assertAllowedOrigin accepts only https://<auth-test ref>.supabase.co', () => {

@@ -199,6 +199,36 @@ void main() {
     expect(find.byKey(const Key('counter-card')), findsNothing);
   });
 
+  testWidgets(
+    'story 2.3: an already signed-in session shows a role granted and then '
+    'revoked elsewhere at its next request, without signing in again',
+    (tester) async {
+      final h = await pumpMobile(tester);
+      expect(find.byKey(const Key('nav-/access')), findsNothing);
+
+      h.grants.myAccess = AccessReadOk(syntheticGrants(roles: ['pastor']));
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'nav-/access');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('my-role-pastor')), findsOneWidget);
+
+      // Revoked on staff web; the app returns to the foreground.
+      h.grants.myAccess = AccessReadOk(syntheticGrants(revision: 3));
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('my-role-pastor')), findsNothing);
+      expect(find.byKey(const Key('no-roles')), findsOneWidget);
+      expect(h.auth.signOuts, 0);
+      // No Admin grant screen on mobile (staff web only).
+      expect(find.byKey(const Key('nav-/admin/grants')), findsNothing);
+    },
+  );
+
   testWidgets('an account switch drops the protected state', (tester) async {
     final h = await pumpMobile(tester, location: '/fixture');
     await tester.enterText(find.byKey(const Key('intent-key-field')), 'k');

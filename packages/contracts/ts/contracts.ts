@@ -62,7 +62,13 @@ export const ERROR_CODES = [
   "unavailable",
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
-/** Every field error code a server path may return (mirrors app.contract_field_error_codes). */
+/**
+ * Core field error codes of the shape checks (mirrors app.contract_field_error_codes).
+ * Not exhaustive: in contract v1 a field error code is any lower_snake_case token
+ * (isFieldErrorCode), and commands return their own specific codes (last_admin, reauthenticate,
+ * held, ...). A client maps a code it does not know to a generic field notice; it never rejects
+ * the envelope for it.
+ */
 export const FIELD_ERROR_CODES = [
   "required",
   "invalid",
@@ -76,7 +82,13 @@ export const FIELD_ERROR_CODES = [
   "scale_exceeded",
   "gate_closed",
 ] as const;
-export type FieldErrorCode = (typeof FIELD_ERROR_CODES)[number];
+/** A core code, or any other lower_snake_case code a command returns (open vocabulary). */
+export type FieldErrorCode = (typeof FIELD_ERROR_CODES)[number] | (string & {});
+const FIELD_ERROR_CODE_RE = /^[a-z][a-z0-9_]{0,62}$/;
+/** Whether code is a well-formed v1 field error code: ^[a-z][a-z0-9_]{0,62}$. */
+export function isFieldErrorCode(code: string): boolean {
+  return FIELD_ERROR_CODE_RE.test(code);
+}
 export type CommandRequest = {
   version: 1;
   command: string;
@@ -187,7 +199,7 @@ function fieldErrorsError(v: Value): string | null {
   return isObject(v) &&
     Object.keys(v).every((k) => {
       const code = v[k];
-      return typeof code === "string" && (FIELD_ERROR_CODES as readonly string[]).includes(code);
+      return typeof code === "string" && isFieldErrorCode(code);
     })
     ? null
     : "invalid";

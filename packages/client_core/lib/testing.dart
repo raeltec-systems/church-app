@@ -899,6 +899,11 @@ class ClientTestHarness {
   final recoveryEmail = FakeRecoveryEmail();
   final credentials = FakeCredentialReview();
 
+  /// Replaces [gateway] in [overrides] when set, so a screen test can run
+  /// the real adapter (for example SupabaseCommandGateway over a mock HTTP
+  /// client answering with a recorded server envelope).
+  CommandGateway? commandGateway;
+
   /// [configured] false leaves the unconfigured defaults for the gateway and
   /// the platform status (as a build without `--dart-define`s).
   List<Override> overrides({bool configured = true}) => [
@@ -915,7 +920,7 @@ class ClientTestHarness {
       passwordRecoveryGatewayProvider.overrideWithValue(recovery),
       recoveryEmailRepositoryProvider.overrideWithValue(recoveryEmail),
       credentialReviewRepositoryProvider.overrideWithValue(credentials),
-      commandGatewayProvider.overrideWithValue(gateway),
+      commandGatewayProvider.overrideWithValue(commandGateway ?? gateway),
       platformStatusRepositoryProvider.overrideWithValue(FakePlatformStatus()),
     ],
   ];

@@ -9,3 +9,5 @@ synthetic users left: 0
 # Note C4: the server answers conflict {"hold_id": "password_reset_required"}; the shared v1 contract's
 # field-error vocabulary does not list domain codes, so the Dart client maps it to an unknown outcome
 # (pre-existing contract gap that also affects 2.5/2.7 domain codes; reported to the coordinator).
+# Fixed 2026-10-07 (fix-field-error-vocabulary.md): v1 field error codes are an open vocabulary; C4 restored and re-run:
+PASS C4 a lost-device hold is not released before the member resets the password: release=refused:conflict{"hold_id":"password_reset_required"} hold_still_open=true still_in_review=true

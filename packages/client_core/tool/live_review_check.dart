@@ -80,9 +80,8 @@ Future<void> main(List<String> args) async {
 
   // Staff web: the Admin signs in with phone + password.
   final staff = client();
-  final adminIn = await SupabaseAccountAuthGateway(
-    staff,
-  ).signIn(phoneE164: adminPhone, password: password);
+  final adminIn = await SupabaseAccountAuthGateway(staff)
+      .signIn(phoneE164: adminPhone, password: password);
   final review = SupabaseReviewRepository(staff);
   final adminCommands = SupabaseCommandGateway(staff);
   check('L1 Admin signs in (phone)', adminIn is AuthSucceeded, '$adminIn');
@@ -148,7 +147,9 @@ Future<void> main(List<String> args) async {
       : 0;
   check(
     'L5 queue shows the staff-only duplicate hint; search finds the record',
-    entry != null && (hint?.signals.contains('same_name') ?? false) && found == 1,
+    entry != null &&
+        (hint?.signals.contains('same_name') ?? false) &&
+        found == 1,
     'signals ${hint?.signals}, found $found',
   );
 
@@ -177,9 +178,8 @@ Future<void> main(List<String> args) async {
 
   await Future<void>.delayed(const Duration(milliseconds: 6500));
   final fresh = client();
-  await SupabaseAccountAuthGateway(
-    fresh,
-  ).signIn(phoneE164: phone, password: password);
+  await SupabaseAccountAuthGateway(fresh)
+      .signIn(phoneE164: phone, password: password);
   final after = await SupabaseMemberAccessRepository(fresh).fetchMySummary();
   final status = await SupabaseMembershipRepository(fresh).fetchMyApplication();
   check(

@@ -49,7 +49,10 @@ enum RejectReason {
 enum DetailRequest {
   fullName('full_name'),
   cellChoice('cell_choice'),
-  visitChurchOffice('visit_church_office');
+  visitChurchOffice('visit_church_office'),
+
+  /// The account carries an unverified email: confirm it or remove it.
+  recoveryEmail('recovery_email');
 
   const DetailRequest(this.wire);
   final String wire;
@@ -65,6 +68,7 @@ enum DetailRequest {
     fullName => 'Full name',
     cellChoice => 'Cell group answer',
     visitChurchOffice => 'Visit the church office',
+    recoveryEmail => 'Confirm their email or remove it',
   };
 }
 

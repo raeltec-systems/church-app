@@ -37,6 +37,9 @@ enum ReviewNotice {
   /// Separation of duty: not for the Admin's own record or account.
   selfAction,
 
+  /// Unlinking would remove the church's last usable Admin.
+  lastAdmin,
+
   /// No account holds that phone username, or the item is gone.
   notFound,
   invalid,
@@ -407,6 +410,8 @@ class MembershipReviewController extends Notifier<ReviewState> {
       ErrorCode.validationFailed when f['member_id'] == 'held' =>
         ReviewNotice.memberHeld,
       ErrorCode.validationFailed => ReviewNotice.invalid,
+      ErrorCode.forbidden when f['member_id'] == 'last_admin' =>
+        ReviewNotice.lastAdmin,
       ErrorCode.forbidden when f.values.contains('unsupported') =>
         ReviewNotice.selfAction,
       ErrorCode.forbidden => ReviewNotice.noLongerAdmin,
@@ -450,12 +455,16 @@ class MembershipReviewController extends Notifier<ReviewState> {
           noticeAction: action,
           fieldErrors: error.fieldErrors,
         );
-        if (error.code == ErrorCode.forbidden ||
-            error.code == ErrorCode.unauthenticated) {
+        // A business refusal (last Admin) says nothing about the caller's
+        // own access, so it does not re-read it.
+        if ((error.code == ErrorCode.forbidden ||
+                error.code == ErrorCode.unauthenticated) &&
+            notice != ReviewNotice.lastAdmin) {
           noteProtectedDenial(ref);
         }
         if (notice != ReviewNotice.invalid &&
-            notice != ReviewNotice.selfAction) {
+            notice != ReviewNotice.selfAction &&
+            notice != ReviewNotice.lastAdmin) {
           await _reload(epoch);
         }
       case CommandUnknownOutcome():

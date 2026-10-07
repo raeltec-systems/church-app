@@ -5,7 +5,9 @@
 //   * an Admin (staff web) approves one applicant as a new member: the applicant's session from
 //     before the approval is no longer trusted, a fresh sign-in reaches the new member;
 //   * a second applicant is linked to an EXISTING member whose earlier account was unlinked
-//     (lost phone): same member id, same grants and history, the old account has no access;
+//     (lost phone): same member id and record; the unlink ended the member's grants (audited
+//     as role_revoked), so the relinked account starts with NO roles; the old account has no
+//     access;
 //   * an Admin records an accountless member with a relative's labelled contact number; the
 //     relative signs up with that number and the same name: still no access, the Admin queue
 //     shows the member as a duplicate candidate, and the Admin rejects the relative (re-apply is
@@ -268,11 +270,14 @@ async function main() {
     const access2 = await rpc('identity_my_access', two.token);
     const oldSignIn = await signIn(old.phone, old.password);
     const oldFresh = await summary(oldSignIn.json?.access_token);
-    check('R22-link-existing-member-keeps-id-and-history', linked2.status === 200 && linked2.data?.member_id === two.member
-      && fresh2.status === 200 && fresh2.member_id === two.member && access2.json?.roles?.includes('lead_pastor')
+    check('R22-link-existing-member-keeps-id-no-grants', linked2.status === 200 && linked2.data?.member_id === two.member
+      && fresh2.status === 200 && fresh2.member_id === two.member && Array.isArray(access2.json?.roles)
+      && access2.json.roles.length === 0
+      && psql(`select count(*) from app.identity_access_audit where target_member_id = '${two.member}' and action = 'role_revoked'`) === '1'
       && oldFresh.status === 403 && oldFresh.detail === 'not_linked'
       && psql(`select count(*) from app.identity_members where display_name = '${two.name}'`) === '1',
-      { same_member: fresh2.member_id === two.member, roles_kept: access2.json?.roles, old_account_fresh_sign_in: oldFresh,
+      { same_member: fresh2.member_id === two.member, roles_after_relink: access2.json?.roles,
+        grants_ended_at_unlink: Number(psql(`select count(*) from app.identity_access_audit where target_member_id = '${two.member}' and action = 'role_revoked'`)), old_account_fresh_sign_in: oldFresh,
         people_with_that_name: Number(psql(`select count(*) from app.identity_members where display_name = '${two.name}'`)),
         audit: audit(`application_id = '${sent2.data?.application_id}'`) });
 

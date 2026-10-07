@@ -406,6 +406,15 @@ void main() {
         'member_id': _member,
         'reason': 'ownership_dispute',
       });
+      final reads = h.grants.myAccessCalls;
+      sent.refuse(
+        ErrorCode.forbidden,
+        fieldErrors: const {'member_id': 'last_admin'},
+      );
+      await settle(tester);
+      expect(byKey('review-notice-lastAdmin'), findsOneWidget);
+      expect(byKey('review-notice-noLongerAdmin'), findsNothing);
+      expect(h.grants.myAccessCalls, reads);
     });
 
     testWidgets('reclaim sends the normalised username and the check', (

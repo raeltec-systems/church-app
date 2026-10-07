@@ -285,7 +285,8 @@ Widget _readProblem<T>(AccessRead<T> r) => switch (r) {
       StatusTone.success,
       'Linked',
       '$who\'s account is linked to the existing member record; its member '
-          'ID and history are kept. They need to sign in again.',
+          'ID and history are kept, but no roles carry over. They need to sign '
+          'in again.',
     ),
     ReviewNotice.detailsRequested => (
       StatusTone.success,
@@ -338,12 +339,19 @@ Widget _readProblem<T>(AccessRead<T> r) => switch (r) {
       StatusTone.warning,
       'Email not verified',
       '$who\'s account has an email that is not verified, so it cannot be '
-          'approved into their sign-in details yet.',
+          'approved into their sign-in details yet. Ask for details: "Confirm '
+          'their email or remove it".',
     ),
     ReviewNotice.memberHeld => (
       StatusTone.warning,
       'Member on hold',
       'That member record is on hold and cannot be linked now.',
+    ),
+    ReviewNotice.lastAdmin => (
+      StatusTone.warning,
+      'The last Admin can\'t be unlinked',
+      'Unlinking $who would leave the church without a usable Admin. Grant '
+          'Admin to another member with access first.',
     ),
     ReviewNotice.selfAction => (
       StatusTone.warning,

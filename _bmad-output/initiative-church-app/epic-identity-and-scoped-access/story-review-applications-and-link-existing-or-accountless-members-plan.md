@@ -103,6 +103,17 @@ context:
 - Environment: the local stack was reset three times (`npx supabase db reset`); the phone switch was on only for the E2E, adapter check and regressions, then off. Every synthetic user and record created was removed.
 - Owner/parent steps: staging apply and repeat (including that `update auth.users` works for the migration owner there), the staff-web + Android demonstration. No owner-only setting blocks the build.
 
+- Review fixes (coordinator review, 2026-10-07; `20261007131500` edited in place, on no hosted project):
+  - Unlink ends every active grant through `app.identity_end_grant` (role_revoked/scope_revoked audit with the acting Admin and request id, scope_revoked dispatched), keeping the last-usable-Admin refusal; link-existing refuses `member_id: has_grants`; `identity_member_link_eligible` requires no active grant. E2E R22 now asserts no roles after relink.
+  - Reclaim revokes the holder's `auth.sessions` and `auth.refresh_tokens` in a NEW small migration `20261007131600_membership_review_reclaim_sessions.sql` (`create or replace` of the reclaim function only), so the main file holds no `delete from` text. This supersedes the earlier ban-only decision above. Owner pastes the small file after the main one.
+  - Reclaim requires `identity_applications_open()` and, while Q4 is unapproved, a fictional number; matches Auth phones with or without `+` (`conflict ambiguous` if both exist).
+  - `app.identity_undo_phone_reclaim(reclaim_id, operator)`: restricted operator, only while the number is free; unbans and restores the phone; recorded in `identity_membership_audit` (`phone_reclaim_undone`, new nullable-actor + `operator` columns with a CHECK). Not journalled in `ops_operator_actions`: no fitting action value, and widening needs the destructive retire-and-recreate.
+  - Approve/link refuse an account ever linked to a held member (`forbidden application_id not_applicant`).
+  - Email: header corrected (unconfirmed email refuses); new applicant-visible detail code `recovery_email`, mapped on mobile and offered on staff web.
+  - Client: `last_admin` → `ReviewNotice.lastAdmin`, no access re-read; widget test.
+  - `prior_not_approved` counts rejected and withdrawn; reapply trigger documented as covering every insert path.
+  - Verified: pgTAP 831/831 (review 107); `review.mjs` 18/18; client_core review + application widget tests 39 pass, analyze clean; `ci:migrations` 15 ordered, non-destructive; evidence scan clean.
+
 ## Verification
 
 **Commands:**

@@ -455,6 +455,8 @@ class _MembershipApplicationScreenState
               'full_name' => 'check your full name',
               'cell_choice' => 'check your cell group answer',
               'visit_church_office' => 'visit the church office',
+              'recovery_email' =>
+                'confirm the email on your account or remove it',
               _ => 'contact the church office',
             },
         ];

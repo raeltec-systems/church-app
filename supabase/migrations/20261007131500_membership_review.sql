@@ -27,11 +27,22 @@
 --         {phone_username, identity_check, reason?}   -> releases a phone username held by an
 --                                                        UNLINKED Auth account (F1)
 --   * Linking (approve or link) writes the approved binding: the applicant account's CURRENT Auth
---     phone, which must still equal the phone username it applied with, and its current email
---     only when Auth has it confirmed; binding history revision 1; and a session trust epoch at
+--     phone, which must still equal the phone username it applied with, and its current email.
+--     An UNCONFIRMED Auth email refuses the link (`validation_failed {"recovery_email":
+--     "unverified"}`); the Admin then asks for details with the applicant-visible code
+--     `recovery_email` ("confirm your email or remove it"). Binding history revision 1; a
+--     session trust epoch at
 --     the link (sessions_valid_after), so no session opened before the approval passes the
 --     predicate (sign in again). The 2.1 unique indexes keep one live link per member, per
---     account and per phone username; a violation is `conflict`.
+--     account and per phone username; a violation is `conflict`. An account that was ever
+--     linked to a member with an open hold is refused (`forbidden {"application_id":
+--     "not_applicant"}`, the 2.4 identity_applicant_outcome rule).
+--   * Grants never travel with an account link: unlinking ends every active grant of the
+--     member through the 2.3 end-grant path (role_revoked / scope_revoked audit rows with the
+--     acting Admin, scope_revoked dispatched), still refusing to remove the last usable Admin;
+--     link-existing refuses a member that holds any active grant. A relinked member starts with
+--     no grants; roles come back only through the audited 2.3 commands (lead_pastor only by the
+--     operator).
 --   * Separation of duty: an Admin cannot decide an application from their own account, link
 --     to or unlink their own member, or reclaim their own account's username. Unlinking the
 --     last usable Admin is refused.
@@ -42,17 +53,22 @@
 --   * Applicant's decided status: identity_application_json gains decision_reason (code),
 --     details_requested (field codes) and reapply_from. Re-applying after a rejection is a NEW
 --     application, allowed 7 days after the decision (app.identity_reapply_cooldown()); earlier
---     is `rate_limited`.
+--     is `rate_limited`. The guard is a BEFORE INSERT trigger, so it covers every insert path
+--     into app.identity_membership_applications, not only identity.submit_application. The
+--     queue's prior_not_approved counts the account's rejected and withdrawn requests.
 --   * Accountless members: provenance (who recorded them, consent basis, assisting member) and
 --     optional labelled contact routes. A contact route is NEVER an account lookup: no access
 --     path reads it, and it only feeds the Admin duplicate aid.
---   * Reclaim (F1, owner decision 2026-10-06): the Auth account holding the username must have
---     no live link (otherwise `conflict`: the Admin unlinks it first, explicitly). Identity then,
---     in the same transaction, clears that account's phone and bans it (100 years, GoTrue's
---     own ban form), and withdraws its open application. A banned account fails the predicate
---     (untrusted_session) on every existing session and GoTrue refuses its sign-in and token
---     refresh, so no session row needs deleting. Nothing is merged, deleted or linked; the
---     case is recorded.
+--   * Reclaim (F1, owner decision 2026-10-06): behind the personal-data gate; while Q4 is
+--     unapproved the number must be fictional. The Auth account holding the username (stored
+--     with or without '+') must have no live link (otherwise `conflict`: the Admin unlinks it
+--     first, explicitly). Identity then, in the same transaction, clears that account's phone,
+--     bans it (100 years, GoTrue's own ban form) and withdraws its open application. Revoking
+--     the holder's Auth sessions and refresh tokens is added by the follow-up migration
+--     20261007131600_membership_review_reclaim_sessions.sql (kept separate so this file holds
+--     no row-deleting statement for the hosted connector). Nothing is merged or linked; the
+--     case is recorded. The restricted operator can undo a reclaim with
+--     app.identity_undo_phone_reclaim(reclaim_id, operator) while the number is still free.
 --
 -- Personal data stays behind the 2.4 gate app.identity_applications_open(); while Q4 is
 -- unapproved, names must start with `SYNTHETIC ` and phone numbers must be fictional.
@@ -122,7 +138,11 @@ create table app.identity_phone_reclaims (
   actor_member_id uuid not null references app.identity_members (member_id),
   actor_account_id uuid not null,
   request_id uuid,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- Restricted-operator undo (app.identity_undo_phone_reclaim).
+  undone_at timestamptz,
+  undone_by text,
+  check ((undone_at is null) = (undone_by is null))
 );
 
 comment on table app.identity_phone_reclaims is
@@ -137,9 +157,11 @@ create table app.identity_membership_audit (
   action text not null check (action in (
     'application_approved', 'application_linked', 'application_details_requested',
     'application_rejected', 'application_withdrawn', 'member_created', 'account_unlinked',
-    'phone_username_reclaimed')),
-  actor_member_id uuid not null,
-  actor_account_id uuid not null,
+    'phone_username_reclaimed', 'phone_reclaim_undone')),
+  -- An Admin (member + account) or the restricted operator (undo only).
+  actor_member_id uuid,
+  actor_account_id uuid,
+  operator text,
   request_id uuid,
   application_id uuid,
   member_id uuid,
@@ -149,8 +171,12 @@ create table app.identity_membership_audit (
   identity_check text check (identity_check in ('established_relationship', 'in_person')),
   reason_code text check (reason_code ~ '^[a-z][a-z0-9_]{0,62}$'),
   requested_fields text[]
-    check (requested_fields <@ array['full_name', 'cell_choice', 'visit_church_office']),
-  revision_after bigint
+    check (requested_fields <@ array['full_name', 'cell_choice', 'visit_church_office',
+                                     'recovery_email']),
+  revision_after bigint,
+  check ((operator is null and actor_member_id is not null and actor_account_id is not null)
+         or (operator is not null and actor_member_id is null and actor_account_id is null
+             and action = 'phone_reclaim_undone'))
 );
 
 comment on table app.identity_membership_audit is
@@ -168,8 +194,9 @@ alter table app.identity_membership_applications
     check (decision_reason in ('identity_not_confirmed', 'not_known_to_church',
                                'contact_church_office')),
   add column details_requested text[]
-    check (details_requested is null or (cardinality(details_requested) between 1 and 3
-           and details_requested <@ array['full_name', 'cell_choice', 'visit_church_office']));
+    check (details_requested is null or (cardinality(details_requested) between 1 and 4
+           and details_requested <@ array['full_name', 'cell_choice', 'visit_church_office',
+                                          'recovery_email']));
 
 alter table app.identity_membership_applications
   -- Only an approved application names a member (the review commands always set both).
@@ -405,7 +432,8 @@ as $$
       on l.member_id = p_member_id and l.link_state <> 'ended';
 $$;
 
--- An approved member with no live link and no open hold may receive an account link.
+-- An approved member with no live link, no open hold and no active grant may receive an
+-- account link (grants never travel with a link).
 create function app.identity_member_link_eligible(p_member_id uuid)
 returns boolean
 language sql
@@ -417,7 +445,9 @@ as $$
      and not exists (select 1 from app.identity_account_links l
                       where l.member_id = p_member_id and l.link_state <> 'ended')
      and not exists (select 1 from app.identity_holds h
-                      where h.member_id = p_member_id and h.released_at is null);
+                      where h.member_id = p_member_id and h.released_at is null)
+     and not exists (select 1 from app.identity_grants g
+                      where g.member_id = p_member_id and g.revoked_at is null);
 $$;
 
 -- Name tokens for the staff duplicate aid: lower case, split on anything that is not a letter
@@ -556,8 +586,9 @@ end;
 $$;
 
 -- Links the applicant's account to p_member_id with the approved binding (current Auth phone,
--- which must equal the applied phone username; current email only when confirmed), binding
--- history revision 1 and a trust epoch now: only sessions created after this approval pass.
+-- which must equal the applied phone username; the current email, refused while unconfirmed),
+-- binding history revision 1 and a trust epoch now: only sessions created after this approval
+-- pass. An account ever linked to a member with an open hold is refused (2.4 applicant rule).
 create function app.identity_link_application_account(
   p_row app.identity_membership_applications,
   p_member_id uuid,
@@ -585,6 +616,11 @@ begin
      and (u.banned_until is null or u.banned_until <= now());
   if not found then
     perform app.cmd_fail('validation_failed', '{"application_id": "account_unavailable"}');
+  end if;
+  if exists (select 1 from app.identity_account_links l
+               join app.identity_holds h on h.member_id = l.member_id
+              where l.auth_user_id = p_row.auth_user_id and h.released_at is null) then
+    perform app.cmd_fail('forbidden', '{"application_id": "not_applicant"}');
   end if;
   if v_phone is distinct from p_row.phone_username then
     perform app.cmd_fail('validation_failed', '{"phone_username": "changed"}');
@@ -778,6 +814,12 @@ begin
               where h.member_id = v_member and h.released_at is null) then
     perform app.cmd_fail('validation_failed', '{"member_id": "held"}');
   end if;
+  -- Grants never travel with a link: a member still holding any grant is refused (unlinking
+  -- ends them; re-grant through the audited 2.3 commands after linking).
+  if exists (select 1 from app.identity_grants g
+              where g.member_id = v_member and g.revoked_at is null) then
+    perform app.cmd_fail('validation_failed', '{"member_id": "has_grants"}');
+  end if;
   v_link := app.identity_link_application_account(v_row, v_member, v_actor.member_id,
                                                   'application_linked');
   v_row := app.identity_decide_application(v_row, 'approved', 'approved', v_member, null, null,
@@ -809,10 +851,11 @@ begin
     v_errors := v_errors || '{"requested": "required"}';
   elsif jsonb_typeof(p_payload -> 'requested') <> 'array' then
     v_errors := v_errors || '{"requested": "invalid"}';
-  elsif jsonb_array_length(p_payload -> 'requested') not between 1 and 3
+  elsif jsonb_array_length(p_payload -> 'requested') not between 1 and 4
         or exists (select 1 from jsonb_array_elements(p_payload -> 'requested') e(v)
                     where jsonb_typeof(e.v) <> 'string'
-                       or e.v #>> '{}' not in ('full_name', 'cell_choice', 'visit_church_office')) then
+                       or e.v #>> '{}' not in ('full_name', 'cell_choice', 'visit_church_office',
+                                               'recovery_email')) then
     v_errors := v_errors || '{"requested": "invalid"}';
   else
     select array_agg(distinct e.v order by e.v) into v_requested
@@ -1007,6 +1050,7 @@ declare
   v_err text;
   v_member app.identity_members;
   v_link app.identity_account_links;
+  v_grant app.identity_grants;
   v_revision bigint;
 begin
   select a.* into v_actor from app.identity_command_actor(p_actor) a;
@@ -1052,6 +1096,16 @@ begin
      and app.identity_usable_admin_count(v_member.member_id) = 0 then
     perform app.cmd_fail('forbidden', '{"member_id": "last_admin"}');
   end if;
+  -- Grants never travel with a link: every active grant ends through the 2.3 path (role_revoked
+  -- / scope_revoked audit with this Admin, scope_revoked dispatched).
+  for v_grant in
+    select g.* from app.identity_grants g
+     where g.member_id = v_member.member_id and g.revoked_at is null
+     order by g.granted_at, g.grant_id
+       for update
+  loop
+    perform app.identity_end_grant(p_actor, v_actor.member_id, 'identity.unlink_account', v_grant);
+  end loop;
   update app.identity_account_links l
      set link_state = 'ended', ended_at = now(), updated_at = now()
    where l.link_id = v_link.link_id;
@@ -1107,12 +1161,23 @@ begin
           or p_payload ->> 'reason' not in ('registered_by_someone_else', 'number_reassigned')) then
     v_errors := v_errors || '{"reason": "invalid"}';
   end if;
+  if v_phone is not null and not app.policy_is_open('q4_personal_data')
+     and v_phone !~ '^\+120255501[0-9]{2}$' and v_phone !~ '^\+447700900[0-9]{3}$' then
+    v_errors := v_errors || '{"phone_username": "out_of_range"}';
+  end if;
   if v_errors <> '{}'::jsonb then
     perform app.cmd_fail('validation_failed', v_errors);
   end if;
-  -- Auth stores the phone as digits without '+'.
+  if not app.identity_applications_open() then
+    perform app.cmd_fail('unavailable', '{"policy": "gate_closed"}');
+  end if;
+  -- Auth normally stores the phone as digits without '+'; accept either form.
+  if (select count(*) from auth.users u
+       where u.phone in (ltrim(v_phone, '+'), v_phone)) > 1 then
+    perform app.cmd_fail('conflict', '{"phone_username": "ambiguous"}');
+  end if;
   select u.id into v_holder from auth.users u
-   where u.phone = ltrim(v_phone, '+')
+   where u.phone in (ltrim(v_phone, '+'), v_phone)
      for update;
   if not found then
     perform app.cmd_fail('not_found');
@@ -1164,6 +1229,53 @@ begin
                                'application_withdrawn', v_open.application_id is not null));
 end;
 $$;
+
+-- Restricted operator only (no grants): undoes a mistaken reclaim while the number is still
+-- free: unbans the released account and gives it the phone username back. The withdrawn
+-- application stays withdrawn (the person applies again). Recorded in Identity's audit as
+-- `phone_reclaim_undone` with the operator. Not journalled in app.ops_operator_actions: its
+-- action CHECK has no fitting value and widening it would need a destructive statement (the 2.3
+-- retire-and-recreate is reserved for a later owner-approved cleanup).
+create function app.identity_undo_phone_reclaim(p_reclaim_id uuid, p_operator text)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_case app.identity_phone_reclaims;
+begin
+  perform app.ops_require_operator(p_operator);
+  select r.* into v_case from app.identity_phone_reclaims r
+   where r.reclaim_id = p_reclaim_id
+     for update;
+  if not found then
+    raise exception using errcode = '22023', message = 'unknown reclaim case';
+  end if;
+  if v_case.undone_at is not null then
+    raise exception using errcode = '22023', message = 'the reclaim was already undone';
+  end if;
+  if exists (select 1 from auth.users u
+              where u.phone in (ltrim(v_case.phone_username, '+'), v_case.phone_username)) then
+    raise exception using errcode = '22023',
+      message = 'the phone username is in use again; it cannot be given back';
+  end if;
+  update auth.users u
+     set phone = ltrim(v_case.phone_username, '+'), phone_confirmed_at = now(),
+         banned_until = null, updated_at = now()
+   where u.id = v_case.released_account_id and u.deleted_at is null;
+  if not found then
+    raise exception using errcode = '22023', message = 'the released account no longer exists';
+  end if;
+  update app.identity_phone_reclaims r
+     set undone_at = now(), undone_by = p_operator
+   where r.reclaim_id = p_reclaim_id;
+  insert into app.identity_membership_audit (action, operator, target_account_id, reclaim_id)
+  values ('phone_reclaim_undone', p_operator, v_case.released_account_id, p_reclaim_id);
+end;
+$$;
+
+comment on function app.identity_undo_phone_reclaim(uuid, text) is
+  'Restricted operator only (no grants): undoes a phone-username reclaim while the number is free.';
 
 -- Replay seam: authority was already rechecked by the authorizer; the receipt must name a
 -- review aggregate that exists.
@@ -1354,7 +1466,7 @@ begin
                'submitted_at_cursor', a.submitted_at,
                'prior_not_approved', (select count(*) from app.identity_membership_applications p
                                        where p.auth_user_id = a.auth_user_id
-                                         and p.application_state = 'rejected'),
+                                         and p.application_state in ('rejected', 'withdrawn')),
                'own_account', a.auth_user_id = (app.identity_request_claims() ->> 'sub')::uuid,
                'candidates', app.identity_duplicate_candidates(a)) as obj
         from app.identity_membership_applications a
@@ -1492,6 +1604,7 @@ revoke all on function
   app.identity_create_member(uuid, bigint, jsonb),
   app.identity_unlink_account(uuid, bigint, jsonb),
   app.identity_reclaim_phone_username(uuid, bigint, jsonb),
+  app.identity_undo_phone_reclaim(uuid, text),
   app.identity_review_in_scope(uuid, text, uuid),
   app.identity_review_command(jsonb),
   api.identity_review_command(jsonb),

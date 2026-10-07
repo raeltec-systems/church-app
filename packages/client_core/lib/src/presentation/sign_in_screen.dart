@@ -17,7 +17,12 @@ class SignInScreen extends ConsumerStatefulWidget {
     super.key,
     this.createAccount = false,
     this.afterCreateAccount = ClientPaths.account,
+    this.assistedRecovery = false,
   });
+
+  /// Story 2.9 (mobile): the church help panel links to "I need help
+  /// accessing my account" (staff-assisted recovery on this device).
+  final bool assistedRecovery;
 
   /// Start in Create account mode.
   final bool createAccount;
@@ -341,8 +346,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                       ),
                       if (_helpOpen) ...[
                         const SizedBox(height: 12),
-                        const RequestStateBanner(
-                          key: Key('help-panel'),
+                        RequestStateBanner(
+                          key: const Key('help-panel'),
                           tone: StatusTone.info,
                           icon: Icons.support_agent_outlined,
                           title: 'Get help from the church',
@@ -351,6 +356,15 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                               'help with signing in. They will check who you '
                               'are in person. Staff never ask for, choose or '
                               'see your password, and no code is sent by SMS.',
+                          actions: [
+                            if (widget.assistedRecovery)
+                              BannerAction(
+                                'I need help accessing my account',
+                                () => context.go(ClientPaths.accountHelp),
+                                key: const Key('account-help-link'),
+                                primary: true,
+                              ),
+                          ],
                         ),
                       ],
                     ],

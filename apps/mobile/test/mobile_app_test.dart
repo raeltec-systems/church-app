@@ -50,6 +50,44 @@ void main() {
   setUp(FocusVisibility.instance.reset);
 
   testWidgets(
+    'story 2.9: I need help accessing my account, then a private password',
+    (tester) async {
+      final h = await pumpMobile(
+        tester,
+        size: const Size(390, 1600),
+        location: '/sign-in',
+      );
+      await tapKey(tester, 'church-help');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'account-help-link');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.enterText(
+        find.byKey(const Key('help-phone-field')),
+        '+447700900431',
+      );
+      await tapKey(tester, 'help-start');
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('ABCD 2345'), findsOneWidget);
+      final digest = h.assisted.requests.single.$2;
+      await tapKey(tester, 'help-check');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.enterText(
+        find.byKey(const Key('help-password')),
+        'Synthetic-mobile-1',
+      );
+      await tester.enterText(
+        find.byKey(const Key('help-password-confirm')),
+        'Synthetic-mobile-1',
+      );
+      await tapKey(tester, 'help-set-password');
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(h.assisted.redeems.single.$2.digest, digest);
+      expect(find.byKey(const Key('help-succeeded')), findsOneWidget);
+      expect(find.textContaining('arg_'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'story 2.8: a held session reaches only the generic help screen',
     (tester) async {
       final h = await pumpMobile(

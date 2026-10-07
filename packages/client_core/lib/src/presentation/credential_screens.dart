@@ -62,6 +62,7 @@ const accessReviewGatedPaths = <String>{
   ClientPaths.myCell,
   ClientPaths.adminRecoveryEmails,
   ClientPaths.adminCredentialReviews,
+  ClientPaths.adminAccountRecovery,
   ClientPaths.signInDetails,
 };
 

@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import 'access_screens.dart';
+import 'assisted_recovery_screens.dart';
 import 'account_screen.dart';
 import 'cell_screens.dart';
 import 'credential_screens.dart';
@@ -72,6 +73,12 @@ abstract final class ClientPaths {
 
   /// Story 2.8, staff web, Admin only: credential changes, reviews, holds.
   static const adminCredentialReviews = '/admin/credential-reviews';
+
+  /// Story 2.9 (mobile, signed out): "I need help accessing my account".
+  static const accountHelp = '/account-help';
+
+  /// Story 2.9, staff web, Admin only: staff-assisted recovery cases.
+  static const adminAccountRecovery = '/admin/account-recovery';
 }
 
 /// Story 2.7: the incoming Auth email link for this route, read once. Only
@@ -105,10 +112,15 @@ typedef ShellBuilder = Widget Function(
 /// [membershipRequests] turns on the applicant flow (story 2.4, mobile only):
 /// Create account continues to the membership request, and the account page
 /// links an account without member access to it. Staff web leaves it off.
+///
+/// [assistedRecovery] links the sign-in help to "I need help accessing my
+/// account" (story 2.9, mobile only: the member chooses the password on the
+/// phone that created the setup request).
 GoRouter buildClientRouter({
   required ShellBuilder shell,
   String initialLocation = ClientPaths.status,
   bool membershipRequests = false,
+  bool assistedRecovery = false,
 }) {
   final afterCreateAccount = membershipRequests
       ? ClientPaths.membership
@@ -211,9 +223,22 @@ GoRouter buildClientRouter({
         pageBuilder: (_, state) => page(state, const CredentialReviewScreen()),
       ),
       GoRoute(
+        path: ClientPaths.accountHelp,
+        pageBuilder: (_, state) => page(state, const AccountHelpScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.adminAccountRecovery,
+        pageBuilder: (_, state) => page(state, const RecoveryCasesScreen()),
+      ),
+      GoRoute(
         path: ClientPaths.signIn,
-        pageBuilder: (_, state) =>
-            page(state, SignInScreen(afterCreateAccount: afterCreateAccount)),
+        pageBuilder: (_, state) => page(
+          state,
+          SignInScreen(
+            afterCreateAccount: afterCreateAccount,
+            assistedRecovery: assistedRecovery,
+          ),
+        ),
       ),
       GoRoute(
         path: ClientPaths.createAccount,
@@ -222,6 +247,7 @@ GoRouter buildClientRouter({
           SignInScreen(
             createAccount: true,
             afterCreateAccount: afterCreateAccount,
+            assistedRecovery: assistedRecovery,
           ),
         ),
       ),

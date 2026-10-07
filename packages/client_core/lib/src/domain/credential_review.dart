@@ -64,7 +64,11 @@ enum CredentialChangeState {
 enum HoldReason {
   ownershipDispute('ownership_dispute'),
   securityConcern('security_concern'),
-  lostDevice('lost_device');
+  lostDevice('lost_device'),
+
+  /// Story 2.10: a login hold (kind `login`): every device signs out and the
+  /// account reaches only the help screen; membership, cell and duties stay.
+  loginDisabled('login_disabled');
 
   const HoldReason(this.wire);
   final String wire;
@@ -80,6 +84,9 @@ enum HoldReason {
     ownershipDispute => 'Ownership dispute accepted for review',
     securityConcern => 'Security concern',
     lostDevice => 'Lost or compromised device (signs out every device)',
+    loginDisabled =>
+      'Disable login for now (signs out every device; '
+          'membership, cell and duties stay)',
   };
 }
 
@@ -385,7 +392,10 @@ class HoldItem {
       displayName: json['display_name'] as String,
       memberRevision: json['member_revision'] as int,
       holdKind: json['hold_kind'] as String,
-      reason: HoldReason.fromWire(json['reason_code']),
+      // A login hold may come without a reason code (story 2.10).
+      reason:
+          HoldReason.fromWire(json['reason_code']) ??
+          (json['hold_kind'] == 'login' ? HoldReason.loginDisabled : null),
       ownMember: json['own_member'] as bool,
       isSynthetic: json['is_synthetic'] as bool,
     );

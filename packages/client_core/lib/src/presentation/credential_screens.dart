@@ -63,6 +63,7 @@ const accessReviewGatedPaths = <String>{
   ClientPaths.adminRecoveryEmails,
   ClientPaths.adminCredentialReviews,
   ClientPaths.adminAccountRecovery,
+  ClientPaths.adminMembershipLifecycle,
   ClientPaths.signInDetails,
 };
 
@@ -1347,6 +1348,12 @@ class _CredentialReviewScreenState
         StatusTone.danger,
         'Can\'t restore',
         'Another account now holds the approved number or address.',
+      ),
+      CredentialReviewNotice.lastAdmin => (
+        StatusTone.danger,
+        'Last Admin',
+        '$who is the church\'s last usable Admin. Give another member the '
+            'Admin role first.',
       ),
       CredentialReviewNotice.changedElsewhere => (
         StatusTone.info,

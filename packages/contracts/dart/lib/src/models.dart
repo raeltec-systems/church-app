@@ -192,7 +192,9 @@ enum LifecycleEventName {
   accountDeactivated('account_deactivated'),
   deletionRequested('deletion_requested'),
   cellTransferred('cell_transferred'),
-  sessionsRevoked('sessions_revoked');
+  sessionsRevoked('sessions_revoked'),
+  membershipDeactivated('membership_deactivated'),
+  membershipRestored('membership_restored');
 
   const LifecycleEventName(this.wireName);
   final String wireName;

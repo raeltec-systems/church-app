@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../application/account_controllers.dart';
+import '../application/membership_lifecycle_controllers.dart';
 import '../application/providers.dart';
+import '../domain/access_grants.dart' show AccessReadOk;
 import '../domain/member_access.dart';
 import 'shell_routing.dart' show ClientPaths;
 
@@ -290,6 +292,26 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
           ),
         );
       case MemberAccessDenied(:final denial):
+        // Story 2.10: an account whose church membership was deactivated is
+        // told so (never why), with the church contact, and is not sent to
+        // the membership request.
+        if (denial == MemberAccessDenial.notLinked) {
+          final status = ref.watch(myMembershipStatusProvider);
+          if (status case AccessReadOk(:final value) when value.deactivated) {
+            final contact = value.churchContact;
+            return RequestStateBanner(
+              key: const Key('membership-deactivated'),
+              tone: StatusTone.warning,
+              icon: Icons.person_off_outlined,
+              title: 'Church membership not active',
+              message:
+                  'Your church membership is not active at the moment, so '
+                  'member information is closed on every device. Signing in '
+                  'again does not change this. ${contact == null ? 'Please contact the church office' : 'Please contact the church: $contact'} '
+                  'if you have questions or want to return.',
+            );
+          }
+        }
         final (title, message, tone) = switch (denial) {
           MemberAccessDenial.signedOut => (
             'Not signed in',

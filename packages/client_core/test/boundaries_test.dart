@@ -27,6 +27,26 @@ void main() {
       path == 'lib/supabase_adapters.dart' ||
       path == 'lib/composition.dart';
 
+  // Lifecycle events are server-only (contracts runbook): additive event
+  // names stay contract v1 only while no client parses them. A client-visible
+  // consumer needs a new contract version first.
+  test('no client or app code consumes lifecycle events', () {
+    final consumer = RegExp(
+      r'LifecycleEvent|lifecycleEventNames|ContractKind\.lifecycleEvent|lifecycle_event',
+    );
+    final offenders = <String>[];
+    for (final dir in [
+      'lib',
+      '../../apps/mobile/lib',
+      '../../apps/staff/lib',
+    ]) {
+      for (final f in _dart(dir)) {
+        if (consumer.hasMatch(f.readAsStringSync())) offenders.add(f.path);
+      }
+    }
+    expect(offenders, isEmpty);
+  });
+
   test('only adapters and the composition root reach Supabase or adapters', () {
     final offenders = <String, List<String>>{};
     for (final f in _dart('lib')) {

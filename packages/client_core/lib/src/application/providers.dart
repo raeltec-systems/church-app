@@ -9,6 +9,7 @@ import '../domain/credential_review.dart';
 import '../domain/fixture_counter.dart';
 import '../domain/member_access.dart';
 import '../domain/membership_application.dart';
+import '../domain/membership_lifecycle.dart';
 import '../domain/membership_review.dart';
 import '../domain/password_recovery.dart';
 import '../domain/platform_status.dart';
@@ -87,6 +88,13 @@ final assistedRecoveryGatewayProvider = Provider<AssistedRecoveryGateway>(
 final recoveryCasesRepositoryProvider = Provider<RecoveryCasesRepository>(
   (ref) => const UnconfiguredRecoveryCasesRepository(),
 );
+
+/// Story 2.10: the account's own membership status and the Admin overview of
+/// deactivated members, login holds and pending handovers.
+final membershipLifecycleRepositoryProvider =
+    Provider<MembershipLifecycleRepository>(
+      (ref) => const UnconfiguredMembershipLifecycleRepository(),
+    );
 
 final requestIdsProvider = Provider<RequestIds>((ref) => SecureRequestIds());
 

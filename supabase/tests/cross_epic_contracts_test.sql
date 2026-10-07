@@ -84,8 +84,8 @@ select throws_ok($$select app.contract_check('nope', '{}')$$, '22023', 'unknown 
 select results_eq(
   $$select event from app.contract_lifecycle_events order by event$$,
   $$values ('access_hold_applied'::text), ('access_hold_released'), ('account_deactivated'),
-           ('cell_transferred'), ('deletion_requested'), ('scope_revoked'),
-           ('sessions_revoked')$$,
+           ('cell_transferred'), ('deletion_requested'), ('membership_deactivated'),
+           ('membership_restored'), ('scope_revoked'), ('sessions_revoked')$$,
   'the lifecycle event table is the v1 list the client mappings carry');
 select is(
   (select count(*)::int from app.contract_lifecycle_events e

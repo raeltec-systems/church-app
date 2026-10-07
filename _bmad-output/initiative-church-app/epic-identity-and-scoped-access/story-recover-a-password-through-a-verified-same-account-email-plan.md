@@ -3,7 +3,7 @@ title: 'Recover a password through a verified same-account email'
 type: 'feature'
 ticket: '7'
 created: '2026-10-07'
-status: 'in-progress'
+status: 'built'
 blocked_reason: ''
 baseline_revision: 'f967132c1b11489ec3f12a9b73083c8fcde627fe'
 route: 'full'
@@ -68,19 +68,56 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261007140000_recovery_email.sql` -- proposals and credential audit tables, redemption gate trigger, eligibility helper, member/Admin commands, `api.identity_recovery_email_command`, `api.identity_my_recovery_email`, `api.identity_admin_recovery_email_queue`, authorizer, grants.
-- [ ] `supabase/tests/recovery_email_test.sql` + allowlist in `command_foundation_test.sql`; `identity_api_smoke.sh` anon/unlinked checks.
-- [ ] `supabase/config.toml` -- mobile redirect entries.
-- [ ] `tools/identity-e2e/recovery.mjs` (+ `recovery.test.mjs`) -- the verify bullet against local GoTrue and Mailpit.
-- [ ] `packages/client_core` -- recovery domain and ports, Supabase adapters (isolated recovery client, recovery-email repository), controllers, Forgot password, recovery and email-confirmed screens, the member Recovery email screen, the Admin Recovery emails screen, routes, fakes, widget tests.
-- [ ] `apps/mobile` (deep-link intent filter, iOS URL type), `apps/staff` (Admin destination) + tests.
-- [ ] `docs/runbooks/identity-access.md`, `evidence-2.7/README.md`, CI wiring.
+- [x] `supabase/migrations/20261007140000_recovery_email.sql` -- proposals and credential audit tables, redemption gate trigger, eligibility helper, member/Admin commands, `api.identity_recovery_email_command`, `api.identity_my_recovery_email`, `api.identity_admin_recovery_email_queue`, authorizer, grants.
+- [x] `supabase/tests/recovery_email_test.sql` + allowlist in `command_foundation_test.sql`; `identity_api_smoke.sh` anon/unlinked checks.
+- [x] `supabase/config.toml` -- mobile redirect entries.
+- [x] `tools/identity-e2e/recovery.mjs` (+ `recovery.test.mjs`) -- the verify bullet against local GoTrue and Mailpit.
+- [x] `packages/client_core` -- recovery domain and ports, Supabase adapters (isolated recovery client, recovery-email repository), controllers, Forgot password, recovery and email-confirmed screens, the member Recovery email screen, the Admin Recovery emails screen, routes, fakes, widget tests.
+- [x] `apps/mobile` (deep-link intent filter, iOS URL type), `apps/staff` (Admin destination) + tests.
+- [x] `docs/runbooks/identity-access.md`, `evidence-2.7/README.md`, CI wiring.
 
 **Acceptance Criteria:**
 - Given the local stack, when `recovery.mjs` runs, then every matrix row passes against real GoTrue and Mailpit, and cleanup leaves no synthetic rows.
 - Given CI, when db:test, db:smoke, flutter analyze and flutter test run, then all pass.
 
 ## Implementation Notes
+
+- Built directly (no subagent tool in this session). Checkpoint 1 is pre-approved by the owner decisions. The plan is above the 1600-token guide because one Identity change spans the DB, two clients and evidence; it was kept whole, as in the epic's lane decision.
+- Files:
+  - Migration `supabase/migrations/20261007140000_recovery_email.sql`: one file, no `delete from`, non-destructive.
+    - New: the proposal and credential-audit tables, the `identity_email_link_gate` trigger on `auth.users`, the commands and reads.
+    - `create or replace` of `identity_authorize_command`, with every earlier command kept.
+  - pgTAP `supabase/tests/recovery_email_test.sql` (57), the allowlist in `command_foundation_test.sql` (+6), and `identity_api_smoke.sh` (+10 lines).
+  - `supabase/config.toml`: the two mobile redirect entries.
+  - E2E `tools/identity-e2e/recovery.mjs` (+ `recovery.test.mjs`); adapter check `tools/identity-e2e/live-recovery-check.sh` + `packages/client_core/tool/live_recovery_check.dart`.
+  - client_core:
+    - domain: `password_recovery.dart` (link allowlist, redirects, ports) and `recovery_email.dart`;
+    - adapters: `supabase_password_recovery_gateway.dart` (its own GoTrueClient), `recovery_verifier_storage*.dart` and `supabase_recovery_email_repository.dart`;
+    - `application/recovery_controllers.dart`;
+    - `presentation/recovery_screens.dart` (Forgot password, Set a new password, Email confirmed, Recovery email, Recovery emails) and `page_address_*.dart`;
+    - routes, the Forgot password link, the account-page links, fakes, the boundary test and tests (`password_recovery_test.dart` 25, `recovery_adapters_test.dart` 5).
+  - Apps:
+    - Android intent filter (scheme `zm.bickafue.mobile`, host `callback`, path prefix `/auth/`) and `flutter_deeplinking_enabled`; iOS URL type;
+    - the staff `Recovery emails` destination (Admin);
+    - tests.
+  - Docs: the runbook section, `evidence-2.7/README.md`, the CI evidence scan.
+- Spike before the plan (local GoTrue, with a temporary spy trigger that was removed): it confirmed the email-change, recovery, PKCE, magic-link and token-clearing behaviour recorded in the Code Map. It is the basis of the redemption trigger condition.
+- Decision (agent, under owner pre-approval): an allowed redemption records `email_link_redeemed` without moving the epoch or generation.
+  - Moving it there would end the sessions of Admins whose magic link is merely redeemed (2.3 E2E `G22`, which uses A's session afterwards).
+  - The password update that follows moves it through the 2.2 trigger.
+- Decision (agent, under owner pre-approval): forgot password returns the same acknowledgement for any server answer except a transport failure. This covers GoTrue's per-address `429`, which happens only for addresses it knows.
+- Decision (agent, under owner pre-approval): addresses are plain ASCII; internationalised addresses are refused as `invalid`.
+- Decision (agent, under owner pre-approval): the recovery verifier lives in secure storage on mobile and in `localStorage` on staff web, under its own prefix. The email link opens in a new tab, while the app session stays in the tab's store. The boundary test pins both stores.
+- Surprise: issuing a second reset from the same device replaces the PKCE verifier, so only the newest link works. The copy says so, and the adapter check uses a separate client for its unknown-address request.
+- Environment:
+  - The stack was restarted from this worktree with Mailpit (the `-x` list given) and reset several times.
+  - The phone switch was found off, was on only for the E2E, adapter and regression runs, and is off again.
+  - Every synthetic user, row, flow state and caught message was removed.
+- Owner and parent steps:
+  - staging apply of `20261007140000`;
+  - the staging redirect-allowlist PATCH (runbook, Hosted step 2);
+  - the staging demonstration with the owner inboxes (about 2 emails per hour on the built-in sender).
+  - None of these blocks the build.
 
 ## Plan Change Log
 
@@ -92,3 +129,18 @@ context:
 - `npx supabase db reset && npm run db:test && npm run db:smoke` -- expected: pass
 - `node tools/auth-harness/local-phone-auth.mjs on && node tools/identity-e2e/recovery.mjs --evidence …; node tools/auth-harness/local-phone-auth.mjs off` -- expected: all pass
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/mobile`, `apps/staff` -- expected: pass
+- Results (2026-10-07, local, each after a reset):
+  - Database: `db:test` 978/978 (recovery 57); `db:smoke` exit 0, 114 ok.
+  - Story E2E and adapters: `recovery.mjs` 17/17; adapter check L1–L5.
+  - Regressions: `run.mjs` 30/30, `grants.mjs` 18/18, `review.mjs` 18/18, `apply.mjs` 27/27, `cells.mjs` 13/13.
+  - Clients:
+    - client_core 248 tests, mobile 21, staff 19;
+    - analyze and format clean;
+    - staff `flutter build web` ok.
+  - CI checks:
+    - `ci:migrations --base ccr-93e730dd-89lbvg`: 17 migrations, ordered and non-destructive;
+    - `ci:secrets` clean;
+    - node tool tests 48/48;
+    - `scan-evidence` on evidence-2.7 and `tools/identity-e2e`: clean.
+  - Evidence: `evidence-2.7/README.md`.
+- Matrix audit: every I/O row has a passing pgTAP assertion and an E2E step. The non-Admin and self rows are covered by pgTAP and E2E `X14`; the stale sign-in row by pgTAP and a widget test.

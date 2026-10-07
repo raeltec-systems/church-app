@@ -109,9 +109,9 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           title: 'Check your email',
           message:
               'If this is the approved recovery email of an account, a reset '
-              'link is on its way. It works once and expires after an hour. '
-              'Nothing arrives? Check the address or get help from the church '
-              'office.',
+              'link is on its way. It works once, expires after an hour, and '
+              'only the newest link works. Nothing arrives? Check the address '
+              'or get help from the church office.',
           actions: [
             BannerAction(
               'Use another address',

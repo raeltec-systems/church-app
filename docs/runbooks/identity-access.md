@@ -474,3 +474,58 @@ The E2E uses `+44 7700 900260–900264` and removes everything it created, inclu
 ### Hosted (owner / parent session)
 
 Apply `20261007075946_cell_membership.sql` after `20261007131600`. Production keeps no cells until the church's real cell list is set up by an Admin after Q4 approval (entry 14); staging uses SYNTHETIC cells.
+
+## Recovery email and forgotten password (story 2.7)
+
+Migration: `supabase/migrations/20261007140000_recovery_email.sql` (no row deletions; one file).
+Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.7/`.
+
+### Adding a recovery email (same account, optional)
+
+1. The member opens **Recovery email** from **My membership** (mobile) and enters the address and their current password. The app signs in again with the account's own phone username (a fresh password sign-in; the server requires one at most 10 minutes old, `app.identity_recent_password_window()`).
+2. `identity.propose_recovery_email {email}` records a proposal (`app.identity_recovery_email_proposals`). It needs a granted session and is allowed only while the approved binding has no recovery email (replacing or removing one is the entry 8 credential review). At most 5 proposals per account per 24 hours; a new one supersedes the pending one.
+3. The app calls native `updateUser(email)` on the **same** Auth account. Auth emails a confirmation link (PKCE) that returns to the app's email-confirmed link. Auth sets the email only when the link is opened.
+4. From then until approval, the 2.2 detection keeps the account in **access review** (AD-3: an unapproved email change blocks private access). The member's own read `api.identity_my_recovery_email()` still answers (also while in review) and the app explains the wait.
+5. An Admin opens **Recovery emails** on staff web (`/admin/recovery-emails`), checks the member's identity and approves (`identity.approve_recovery_email {proposal_id, identity_check}`, expected = proposal revision). Approval records binding revision n+1 with the email (clearing the binding review), returns the link to `active` and moves the trust epoch: the member signs in again.
+   - Refused when the account does not hold the address confirmed (`validation_failed {"recovery_email": "unverified"}`), when anything else changed (phone, MFA factor, a non-phone/email identity, a delete or identity removal since the proposal: `conflict {"proposal_id": "other_changes"}`, handle it as an access review), for the Admin's own account (`forbidden {"proposal_id": "unsupported"}`) or a stale revision (`conflict`).
+   - `identity.reject_recovery_email {proposal_id, reason?}` (`identity_not_confirmed`, `contact_church_office`) records the decision only. A confirmed but rejected address keeps the account in review until the entry 8 credential review removes it.
+6. Audit: `app.identity_credential_audit` (`recovery_email_proposed`, `_superseded`, `_approved`, `_rejected`) with ids, codes and revisions only, never the address.
+
+While Q4 is unapproved only synthetic addresses are accepted: `@example.test`, `@example.com`, `.invalid`, and in staging only the owner-approved `israelmuyoba+<tag>@gmail.com` inboxes. Everything is behind `app.identity_applications_open()` and `app.identity_email_recovery_open()` (`q1_auth_recovery` approved, or a database marked local/staging; never a held restore).
+
+### Forgotten password
+
+- **Forgot password?** on the sign-in screen asks for the recovery email and always shows the same acknowledgement ("If this is the approved recovery email of an account, a reset link is on its way"). Only a connection failure is shown differently. GoTrue answers `/recover` with `200 {}` for unknown addresses; its per-address resend refusal is shown as the same acknowledgement.
+- **The reset gate.** GoTrue's `/recover` and magic-link routes stay publicly reachable, so the redemption itself is guarded: an `auth.users` trigger on recovery-token redemption (`identity_email_link_gate`; the token cleared with the password unchanged) refuses unless the account's live link is `active` with no binding review, the member is approved, the approved recovery email equals the current, **confirmed** Auth email, the Auth phone equals the approved phone, the account is not deleted or banned, and email recovery is open. A refused redemption fails GoTrue's verify, so no session exists; the app shows "This link can't be used". Holds and dormancy do **not** block the reset, and they stay in force. Allowed redemptions are recorded as the credential event `email_link_redeemed` (no epoch move).
+- **The link.** Allowlisted targets only: mobile `zm.bickafue.mobile://callback/auth/recovery` (Android intent filter for that scheme, host `callback`, path prefix `/auth/`; iOS URL type), staff web `<origin>/#/auth/recovery`. The router accepts only `/auth/recovery` and `/auth/email-confirmed` and reads only `code` and error parameters; on the web the one-time code is removed from the address bar. PKCE: the link works only on the device and browser that asked for it, and only the newest link works.
+- **The recovery session** is held by a separate Auth client (`SupabasePasswordRecoveryGateway`), never the app's session: in memory only, used for exactly one call (set the password), then signed out; leaving the screen also ends it. The server refuses it every private read (AMR `recovery`). Its verifier store is `RecoveryVerifierStorage` (mobile secure storage, staff web localStorage, own key prefix).
+- **After the reset** GoTrue signs out every other session and the 2.2 trigger moves the trust epoch, so every earlier session is refused; the app ends its own session too and asks for a fresh password sign-in (more than 5 s after the change). An open hold still answers `review_required`.
+
+### Local runs
+
+```bash
+npx supabase db reset                          # empty Admin roster
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/recovery.mjs --evidence <file>.jsonl
+FLUTTER_ROOT=/opt/sdk/flutter bash tools/identity-e2e/live-recovery-check.sh   # after another reset
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+Both read email from the stack's Mailpit (`http://127.0.0.1:54324`, part of `supabase start`; nothing leaves the machine), use `+44 7700 900280–900289` and `@example.test` addresses, and remove every user, proposal, audit row, flow state and caught message they create. `supabase/config.toml` lists the two mobile link targets in `additional_redirect_urls`.
+
+### Hosted (owner / parent session)
+
+1. Apply `20261007140000_recovery_email.sql` after `20261007131600` (parent session). It adds a trigger on `auth.users`, like the 2.2 migration.
+2. **Owner Auth setting (staging `tmurpotfluignacfueki`).** Add the mobile link targets to the redirect allowlist with the Management API (the dashboard's URL configuration page also works). `GET` the current value first and **append**, do not replace:
+
+   ```http
+   PATCH https://api.supabase.com/v1/projects/tmurpotfluignacfueki/config/auth
+   Authorization: Bearer <owner personal access token>
+   Content-Type: application/json
+
+   {"uri_allow_list": "<existing entries>,zm.bickafue.mobile://callback/auth/recovery,zm.bickafue.mobile://callback/auth/email-confirmed"}
+   ```
+
+   Staff web needs no entry while it is served from the same host as `site_url` (GoTrue allows any URL on the site URL's host); a staff web host on another domain needs `https://<host>/**` added the same way. No SMS setting is touched. Default email templates work (PKCE confirmation URLs).
+3. **Staging demonstration** with the owner-approved inboxes `israelmuyoba+<tag>@gmail.com` (the owner reads them; agents never send to them): add and confirm a recovery email on mobile, approve it on staff web, reset from the mobile link and from staff web, and repeat the neutral cases. Supabase's built-in email sender allows about 2 emails per hour, so spread the run or use custom SMTP (entry 14).
+4. **Production** (entry 14): `q1_auth_recovery` approval, production SMTP/sender/domain and the production redirect allowlist are owner gates. Until then email recovery stays closed there.

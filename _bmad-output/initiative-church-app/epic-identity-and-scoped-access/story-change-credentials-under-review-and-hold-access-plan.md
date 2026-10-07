@@ -3,7 +3,7 @@ title: 'Change credentials under review and hold access'
 type: 'feature'
 ticket: '8'
 created: '2026-10-07'
-status: 'built'
+status: 'done'
 blocked_reason: ''
 baseline_revision: '76f8b95c6edbfbe779b56fc484798be19c7daf6f'
 route: 'full'
@@ -125,3 +125,7 @@ context:
   - Node tool tests 50/50; `ci:migrations --base ccr-93e730dd-89lbvg` (19, ordered, non-destructive); `ci:secrets` clean; `scan-evidence` on evidence-2.8 and `tools/identity-e2e` clean.
 - Results after the review fixes (2026-10-07, local): `db:test` 1121/1121 (credential review 125); `db:smoke` exit 0 (121 ok, 224 fixture cases); `credentials.mjs` 15/15; regressions `run` 30, `grants` 18, `review` 18, `apply` 27, `cells` 13, `recovery` 20; live check C1–C4; client_core 274, staff 21, mobile 23, contracts Dart 244 and TS 227; analyze clean; node tool tests 50; `ci:migrations`, `ci:secrets`, `scan-evidence` clean.
 - Matrix audit: phone change (pgTAP + E2E C10 + live C1–C2 + widgets), email replace (pgTAP + C20–C21), remove (pgTAP + C22), hold (pgTAP + C30–C32), lost device (pgTAP + C40–C41 + live C3–C4), stolen-session (pgTAP + C50), self/non-Admin (pgTAP + C10/C30 + widgets): every row has a passing test.
+
+## Hosted verification
+
+Staging apply and full function parity: `evidence-2.8/staging-verify.md`. Owner paste of `20261007160100` and device/staff-web scenarios: `owner-consolidated-test.md`.

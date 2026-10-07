@@ -31,7 +31,7 @@ Field error codes are now an open, documented vocabulary in v1. Any value matchi
   - New valid cases: Identity `forbidden {"member_id": "last_admin"}`, a conflict carrying 9 Identity/Cells codes, and a code at the 63-character limit.
   - New invalid cases: codes that break the pattern (uppercase, hyphen, leading digit, empty, 64 characters).
   - Removed: the old `too_big` case, which is now valid.
-- **SQL:** migration `20261007160200_open_field_error_vocabulary.sql` changes only the `field_errors` clause of `app.contract_check`. pgTAP asserts that the real `release_hold` refusal is contract-valid.
+- **SQL:** migration `20261007120810_open_field_error_vocabulary.sql` changes only the `field_errors` clause of `app.contract_check`. pgTAP asserts that the real `release_hold` refusal is contract-valid.
 - **Dart and TS:** pattern check, plus `isFieldErrorCode` and unit tests.
 - **Real-gateway test:** `packages/client_core/test/adapters/real_gateway_refusals_test.dart` runs the real `SupabaseCommandGateway` over 10 recorded refusals, an unknown code, and a malformed code. It also includes Admin credential-review widget tests on the real gateway, where `passwordResetRequired` shows, and an unknown code falls back to `changedElsewhere`.
 - **Live checks:**

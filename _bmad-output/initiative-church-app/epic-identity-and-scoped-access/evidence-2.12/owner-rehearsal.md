@@ -10,7 +10,7 @@ Follow each runbook in `docs/runbooks/identity-support.md` as written. Write not
 
 ## Before you start
 
-- [ ] The parent session has applied `20261007190000_identity_admin_fallback.sql` to staging.
+- [ ] The parent session has applied `20261007193513_identity_admin_fallback.sql` to staging.
 - [ ] The consolidated-test settings 1-4 are done (`../owner-consolidated-test.md`).
 - [ ] Two synthetic Admins exist: A (`+1 202 555 0170`) and B (`+1 202 555 0171`), each signed in once with their own password. If not, do RB1 first: the operator seeds A, bootstraps A, then A grants B Admin in **Roles & access**.
 

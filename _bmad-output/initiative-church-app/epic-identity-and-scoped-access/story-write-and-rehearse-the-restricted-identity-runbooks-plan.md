@@ -3,7 +3,7 @@ title: 'Write and rehearse the restricted identity runbooks'
 type: 'feature'
 ticket: '12'
 created: '2026-10-07'
-status: 'built'
+status: 'done'
 baseline_revision: 'fb12fe8abaf032e4228db52b01441a9d1501c7dd'
 route: 'full'
 route_source: 'auto'
@@ -62,7 +62,7 @@ context: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261007190000_identity_admin_fallback.sql` -- table `app.identity_admin_fallbacks` (ids, codes, counts; RLS on, no client privileges) and `app.identity_admin_fallback_grant(member_id, identity_check, reason_code, operator) returns jsonb`; locks the admin role row like bootstrap -- the one missing operator path.
+- [x] `supabase/migrations/20261007193513_identity_admin_fallback.sql` -- table `app.identity_admin_fallbacks` (ids, codes, counts; RLS on, no client privileges) and `app.identity_admin_fallback_grant(member_id, identity_check, reason_code, operator) returns jsonb`; locks the admin role row like bootstrap -- the one missing operator path.
 - [x] `supabase/tests/identity_admin_fallback_test.sql` -- pgTAP for every matrix row on the fallback, privileges, no Auth write, audit and journal.
 - [x] `docs/runbooks/identity-support.md` -- runbooks: first-Admin setup, applications and linking (incl. reclaim), email recovery, staff-assisted recovery, holds and disputes (incl. credential review), deactivation and handover, deletion, last-Admin fallback; each with when, who, preconditions, steps, never, audit evidence, back out. `docs/runbooks/identity-access.md` -- link it and document the fallback command.
 - [x] `tools/identity-e2e/runbooks.mjs` + `runbooks.test.mjs` -- local rehearsal of each runbook (numbers `+44 7700 900700-900719`), leak scan over every staff/operator/worker output and the evidence file, Admin-only care/finance denial, fallback without credential shortcut; pure helpers unit-tested.
@@ -74,7 +74,7 @@ context: []
 
 ## Implementation Notes
 
-- Files: `supabase/migrations/20261007190000_identity_admin_fallback.sql`, `supabase/tests/identity_admin_fallback_test.sql` (32 assertions), `docs/runbooks/identity-support.md` (RB1-RB8), `docs/runbooks/identity-access.md` (link + fallback section), `tools/identity-e2e/runbooks.mjs` + `runbooks.test.mjs`, `.github/workflows/ci.yml` (evidence scan for 2.12), `evidence-2.12/`.
+- Files: `supabase/migrations/20261007193513_identity_admin_fallback.sql`, `supabase/tests/identity_admin_fallback_test.sql` (32 assertions), `docs/runbooks/identity-support.md` (RB1-RB8), `docs/runbooks/identity-access.md` (link + fallback section), `tools/identity-e2e/runbooks.mjs` + `runbooks.test.mjs`, `.github/workflows/ci.yml` (evidence scan for 2.12), `evidence-2.12/`.
 - The rehearsal reuses `findLeaks/newGrantSecret/digestOf` (assisted.mjs) and `pkcePair/codeFrom/redirectFacts` (recovery.mjs); it serves both Edge Functions in one `supabase functions serve --env-file` and runs the real deletion worker on the shared `.recovery-state/journal`.
 - The leak scan has a positive control (a planted password and request code are found) so a silent scanner cannot pass.
 - RB8 scenario: the only Admin is signed out everywhere and "forgot" the password; bootstrap refuses (one usable Admin on paper); the fallback grants Admin to an application-approved member with no Auth fact changed; the new Admin brings the old one back through RB4.

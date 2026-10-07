@@ -31,11 +31,15 @@ Run once, after 2.13, on staging (`tmurpotfluignacfueki`) with the staging APK a
   `SUPABASE_URL=https://tmurpotfluignacfueki.supabase.co SUPABASE_PUBLISHABLE_KEY=sb_publishable_B7rxJq4-D4PBNohOgz3qmg_SfbQWRSY IDENTITY_DELETION_CREDENTIAL_FILE=.ops-state/identity-deletion/staging.credential node tools/identity-deletion/worker.mjs run` (the journal defaults to `.recovery-state/journal`).
   Staff web's Deletions list should show both as completed; the member can no longer sign in, and their phone can register again.
 
+- **2.12 Support runbooks (your rehearsal as restricted operator):** follow `evidence-2.12/owner-rehearsal.md` with the runbooks in `docs/runbooks/identity-support.md`, numbers +1 202 555 0170-0179 only. It covers applications and linking, email and assisted recovery, holds and disputes, deactivation, deletion, and the last-Admin fallback (`app.identity_admin_fallback_grant`, second owner and case reference required). For item 8, ask me to run the Admin-only server check on staging.
+
 ## Reminders
 
 - Rotate the staging deletion-worker credential before 2026-11-06 (same way, `OPS_STATE_DIR=.ops-state/identity-deletion ... mint --env staging --force`, send the new fingerprint).
 - Rotate the staging assisted-recovery credential before 2026-11-06 (mint with `--force`, send the new fingerprint, update the Edge Function secret).
 
 ## Decisions for the owner at 2.14
+
+- Production has no path yet to link the FIRST real Admin: applications need an Admin to approve them and synthetic seeding refuses production. Needs a reviewed restricted-operator procedure (first-Admin runbook RB1 records it).
 
 - GoTrue `/recover` can reveal whether an email is registered through its rate-limit and timing replies (platform behaviour; the app itself stays neutral). Decide with the production email sender/SMTP settings.

@@ -35,7 +35,7 @@ All runs are LOCAL (Supabase CLI stack, GoTrue v2.197.0), on 2026-10-07, with sy
 
 ## Not run here (owner, staging)
 
-- The parent session applies `20261007190000_identity_admin_fallback.sql` to staging (no row deletions; no owner setting).
+- The parent session applies `20261007193513_identity_admin_fallback.sql` to staging (no row deletions; no owner setting).
 - Israel follows `owner-rehearsal.md` on staging.
 - Owner names stay `<named owner: fill at entry 14>`.
 - Production first-Admin linking has no path yet (RB1); it is an entry 14 decision.

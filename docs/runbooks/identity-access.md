@@ -253,7 +253,7 @@ select app.identity_bootstrap_admin('<member_id>', 'israel');
 
 ### Identity-checked last-Admin fallback (story 2.12, restricted operator)
 
-Migration: `supabase/migrations/20261007190000_identity_admin_fallback.sql` (no row deletions; one file). Runbook: [identity-support.md, RB8](identity-support.md#rb8-identity-checked-last-admin-fallback).
+Migration: `supabase/migrations/20261007193513_identity_admin_fallback.sql` (no row deletions; one file). Runbook: [identity-support.md, RB8](identity-support.md#rb8-identity-checked-last-admin-fallback).
 
 ```sql
 select app.identity_admin_fallback_grant('<member_id>', '<in_person|established_relationship>',

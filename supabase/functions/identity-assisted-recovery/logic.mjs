@@ -9,6 +9,13 @@ export const PASSWORD_MIN_BYTES = 8;
 /** bcrypt (GoTrue) uses at most 72 bytes; longer passwords are refused before the grant is used. */
 export const PASSWORD_MAX_BYTES = 72;
 export const MAX_BODY_BYTES = 4096;
+/** A Content-Length header that already announces more than MAX_BODY_BYTES (or is malformed). */
+export function declaredTooLarge(header) {
+  if (header === null || header === undefined) return false;
+  if (!/^[0-9]{1,15}$/.test(String(header).trim())) return true;
+  return Number(header) > MAX_BODY_BYTES;
+}
+
 export const ACTIONS = new Set(['request', 'status', 'redeem']);
 
 const KEYS = {

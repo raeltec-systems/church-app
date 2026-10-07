@@ -25,6 +25,7 @@
 import {
   MAX_BODY_BYTES,
   classifyAuthResult,
+  declaredTooLarge,
   digestHex,
   keyHeaders,
   parseBody,
@@ -62,6 +63,39 @@ async function timed(url: string, init: RequestInit): Promise<Response | null> {
     return null;
   } finally {
     clearTimeout(timer);
+  }
+}
+
+// The body as text, or null when it exceeds MAX_BODY_BYTES (reading stops there) or fails.
+async function readCapped(req: Request): Promise<string | null> {
+  if (!req.body) return '';
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_BODY_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } catch {
+    return null;
+  }
+  const bytes = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) {
+    bytes.set(c, at);
+    at += c.byteLength;
+  }
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return null;
   }
 }
 
@@ -123,10 +157,11 @@ Deno.serve(async (req: Request) => {
     note('any', 'not_configured');
     return reply(503, { outcome: 'unavailable' });
   }
-  const raw = await req.text().catch(() => '');
-  if (raw.length === 0 || new TextEncoder().encode(raw).length > MAX_BODY_BYTES) {
-    return reply(400, { outcome: 'invalid' });
-  }
+  // Refuse a declared oversize body first, then read at most MAX_BODY_BYTES: an unbounded body
+  // is never buffered.
+  if (declaredTooLarge(req.headers.get('content-length'))) return reply(413, { outcome: 'invalid' });
+  const raw = await readCapped(req);
+  if (raw === null || raw.length === 0) return reply(400, { outcome: 'invalid' });
   let parsed;
   try {
     parsed = parseBody(JSON.parse(raw));

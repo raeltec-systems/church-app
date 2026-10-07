@@ -6,7 +6,7 @@
 -- tools/identity-e2e/assisted.mjs. Every account and phone here is SYNTHETIC
 -- (+44 7700 900400-900429).
 begin;
-select plan(100);
+select plan(116);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000029' || lpad(n::text, 2, '0'))::uuid $$;
@@ -171,11 +171,14 @@ $$;
 -- Accounts: 1 Admin; 2 happy path; 3 reissue; 4 direct password change; 5 unlinked; 6 the
 -- member whose phone 7's grant is presented with; 7 cross-member; 8 uncertain then late, relink
 -- blocked, reconciled, recovered; 9 lost-device hold; 10 dispute hold; 11 obsolete at dispatch;
--- 12 Auth refused; 13 expired; 14 pre-dispatch session survives; 15 stuck; 16 replay/concurrent.
+-- 12 Auth refused; 13 expired; 14 pre-dispatch session survives; 15 stuck; 16 replay/concurrent;
+-- 17 cancel between begin and dispatch; 18 deactivated after begin; 19 deactivated during an open
+-- case; 20 binding revision moved after begin; 21 a session opened before the password change;
+-- 22 deactivated after dispatch; 23 case closed under a dispatched operation.
 insert into auth.users (id, aud, role, phone, phone_confirmed_at, encrypted_password)
 select pg_temp.u(n), 'authenticated', 'authenticated', ltrim(pg_temp.phone(n), '+'), now(), 'synthetic-2-9-initial'
-  from generate_series(1, 16) n;
-select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 16) n;
+  from generate_series(1, 23) n;
+select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 23) n;
 
 -- Structure and privileges ---------------------------------------------------------------------
 select ok(not exists (
@@ -211,7 +214,7 @@ select is((select count(*)::int from app.contract_boundary_violations()), 0, 'no
 select app.platform_set_environment('local', 'pgtap 2.9');
 create temp table m as
 select n, app.identity_seed_synthetic_link(pg_temp.u(n), 'SYNTHETIC 2.9 Member ' || n, 'pgtap 2.9') as member_id
-  from generate_series(1, 16) n;
+  from generate_series(1, 23) n;
 grant select on m to authenticated, anon;
 select app.identity_bootstrap_admin(pg_temp.mid(1), 'israel');
 select app.contract_register_lifecycle_hook('fixture', 'access_hold_applied', 'app.fixture_record_lifecycle(jsonb)'::regprocedure);
@@ -492,6 +495,77 @@ select is(pg_temp.dispatch((select v ->> 'operation_id' from r where k = 'begin1
   'a pending operation past the dispatch window can never be dispatched');
 select is((pg_temp.issue(16, pg_temp.request(16, 'b')) -> 'data' -> 'grant' ->> 'state'), 'issued',
   'so it no longer blocks a new grant');
+
+
+-- Review fix: cancel between begin and dispatch ----------------------------------------------------
+select pg_temp.ready(17, 'a');
+insert into r values ('begin17', pg_temp.begin_(17, 'a'));
+select is(pg_temp.cmd(pg_temp.c(1), 'identity.cancel_recovery_case', (pg_temp.kase(17)).revision,
+            jsonb_build_object('case_id', (pg_temp.kase(17)).case_id, 'reason', 'opened_in_error')) -> 'data' ->> 'case_state',
+  'cancelled', 'a case can be cancelled after begin consumed the grant (operation still pending)');
+select is((pg_temp.op(17)).op_state, 'obsolete', 'cancelling makes the pending operation obsolete');
+select is(pg_temp.dispatch((select v ->> 'operation_id' from r where k = 'begin17')) -> 'proceed', 'false'::jsonb,
+  'dispatch after a cancel is refused: no Auth call');
+select is((select encrypted_password from auth.users where id = pg_temp.u(17)) || '|' || pg_temp.open_holds(17),
+  'synthetic-2-9-initial|', 'no password was applied and no hold was placed');
+select is(pg_temp.complete((select v ->> 'operation_id' from r where k = 'begin17'), 'applied') ->> 'late', 'true',
+  'a completion for it is recorded as late only');
+
+-- Review fix: deactivation after begin -------------------------------------------------------------
+select pg_temp.ready(18, 'a');
+insert into r values ('begin18', pg_temp.begin_(18, 'a'));
+update app.identity_members set membership_state = 'deactivated' where member_id = pg_temp.mid(18);
+select is(pg_temp.dispatch((select v ->> 'operation_id' from r where k = 'begin18')) -> 'proceed', 'false'::jsonb,
+  'a member deactivated after begin: dispatch refused');
+select is((pg_temp.op(18)).op_state || '|' || (select encrypted_password from auth.users where id = pg_temp.u(18)),
+  'obsolete|synthetic-2-9-initial', 'obsolete, and no password applied');
+
+-- Review fix: deactivation during an open case ------------------------------------------------------
+select pg_temp.open_case(19);
+update app.identity_members set membership_state = 'deactivated' where member_id = pg_temp.mid(19);
+select is(pg_temp.issue(19, pg_temp.request(19, 'a')) -> 'field_errors', '{"case_id": "not_approved"}'::jsonb,
+  'no grant is issued for a deactivated member');
+
+-- Review fix: binding revision moved after begin ------------------------------------------------------
+select pg_temp.ready(20, 'a');
+insert into r values ('begin20', pg_temp.begin_(20, 'a'));
+select is((pg_temp.op(20)).binding_revision_at_begin, 1::bigint, 'begin records the binding revision');
+select app.identity_record_binding((pg_temp.op(20)).link_id, pg_temp.phone(20), null, 'pgtap', 'pgtap_rebind');
+select is(pg_temp.dispatch((select v ->> 'operation_id' from r where k = 'begin20')) -> 'proceed', 'false'::jsonb,
+  'a binding revision moved after begin: dispatch refused');
+
+-- Review fix: a session opened after dispatch but before the password change ------------------------
+select pg_temp.ready(21, 'a');
+insert into r values ('begin21', pg_temp.begin_(21, 'a'));
+select pg_temp.dispatch((select v ->> 'operation_id' from r where k = 'begin21'));
+delete from auth.sessions where user_id = pg_temp.u(21);
+select pg_temp.session(pg_temp.u(21), gen_random_uuid(), interval '0 seconds');
+update auth.users set encrypted_password = 'synthetic-2-9-after-session' where id = pg_temp.u(21);
+select is(pg_temp.complete((select v ->> 'operation_id' from r where k = 'begin21'), 'applied') ->> 'outcome', 'uncertain',
+  'a session created before the password change still alive: uncertain');
+select is(pg_temp.open_holds(21), 'assisted_reset_operation', 'and the account stays held');
+
+-- Review fix: deactivation after dispatch --------------------------------------------------------------
+select pg_temp.ready(22, 'a');
+insert into r values ('begin22', pg_temp.begin_(22, 'a'));
+select pg_temp.dispatch((select v ->> 'operation_id' from r where k = 'begin22'));
+update app.identity_members set membership_state = 'deactivated' where member_id = pg_temp.mid(22);
+select pg_temp.admin_apply(22);
+select is(pg_temp.complete((select v ->> 'operation_id' from r where k = 'begin22'), 'applied') ->> 'outcome', 'uncertain',
+  'a member deactivated while the Auth call ran: uncertain, never success');
+select is(pg_temp.open_holds(22), 'assisted_reset_operation', 'the hold is kept');
+
+-- Review fix: a case closed under a dispatched operation (defence in depth) ------------------------------
+select pg_temp.ready(23, 'a');
+insert into r values ('begin23', pg_temp.begin_(23, 'a'));
+select pg_temp.dispatch((select v ->> 'operation_id' from r where k = 'begin23'));
+update app.identity_recovery_cases set case_state = 'cancelled', outcome = 'cancelled', cancel_reason = 'opened_in_error',
+       closed_at = clock_timestamp() where member_id = pg_temp.mid(23);
+select pg_temp.admin_apply(23);
+select is(pg_temp.complete((select v ->> 'operation_id' from r where k = 'begin23'), 'applied') ->> 'outcome', 'uncertain',
+  'a cancelled case never gets success effects');
+select is(pg_temp.open_holds(23) || '|' || app.identity_member_reset_since((pg_temp.op(23)).link_id, '-infinity'),
+  'assisted_reset_operation|false', 'the hold is kept and no reset evidence is recorded');
 
 -- Admin read ---------------------------------------------------------------------------------------------
 insert into r values ('cases', substr(pg_temp.read(pg_temp.c(1), 'select api.identity_admin_recovery_cases()'), 4)::jsonb);

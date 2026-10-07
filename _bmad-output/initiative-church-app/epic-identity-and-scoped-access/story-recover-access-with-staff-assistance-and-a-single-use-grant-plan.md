@@ -99,6 +99,16 @@ context:
 
 ## Plan Change Log
 
+- 2026-10-07, independent review (coordinator; not a step-04 loop). Grant design found sound; two MEDIUM and three LOW findings, all patched in place in `20261007170000` (not on main or staging; still no `delete from`, ASCII only, `search_path` set).
+  - **MEDIUM (cancel race):** cancel could close a case whose operation was `pending` (grant consumed), and dispatch/complete never checked the case. Cancel now marks the case's pending operations `obsolete`; dispatch refuses unless the case is open and the grant is consumed by this operation; complete gives no success effects (own-hold release, reset evidence) for a closed case: it records `uncertain` and keeps the hold. pgTAP + E2E `A21`.
+  - **MEDIUM (partial, request flooding):** the per-number and overall count-then-insert is serialised with `pg_advisory_xact_lock` (number, then overall). E2E `A23` (12 concurrent requests, exactly 5 received). A per-client/IP limit needs edge infrastructure and the Q1 abuse policy: kept in deferred work as BEFORE PRODUCTION and stated in the runbook.
+  - **LOW (binding revision):** the operation stores `binding_revision_at_begin`; dispatch and complete compare it. Header and dispatch comments corrected. pgTAP.
+  - **LOW (pre-reset sessions):** completion treats any live session created before the password change (not only before dispatch) as uncertain. pgTAP.
+  - **LOW (body size):** the function refuses a declared `content-length` over 4096 (413) and reads the body with a byte cap; it never buffers an unbounded body. Node tests + E2E `A23`.
+  - **Tests:** deactivation after begin (dispatch refused), during an open case (no grant) and after dispatch (uncertain, hold kept): pgTAP + E2E `A22`.
+  - **Avoids:** a password applied after the office cancelled; success effects on a stale case or binding; a pre-reset session surviving as success; limits exceeded by concurrent calls; memory exhaustion by large bodies.
+  - **KEEP:** the device-held secret and digest-only storage, the system-route principal, the op-owned hold, the relink trigger.
+
 ## Review Triage Log
 
 ## Verification
@@ -114,3 +124,4 @@ context:
   - client_core 310 tests, mobile 24, staff 22; analyze clean; format clean; staff `flutter build web --no-web-resources-cdn` ok.
   - Node tool tests 63/63 (auth-harness, identity-e2e, function rules); `ci:migrations --base ccr-93e730dd-89lbvg` (21, ordered, non-destructive); `ci:secrets` clean; `scan-evidence` on evidence-2.9, `supabase/functions`, `tools/identity-e2e` clean.
 - Matrix audit: happy (pgTAP + A10 + R1-R4 + widgets), reissue (pgTAP + A11), direct change (pgTAP + A12), relink/unlink (pgTAP + A13/A16/A17), concurrent (A14), cross-member (pgTAP + A15 + widget mismatch notice), uncertain/late (pgTAP + A16 + widget reconcile), hold (pgTAP + A18), leakage (pgTAP + A20 + widgets): every row has a passing test.
+- Results after the review fixes (2026-10-07, local): `db:test` 1238/1238 (assisted recovery 116); `db:smoke` exit 0; `assisted.mjs` 15/15 (new `A21` cancel race, `A22` deactivation, `A23` concurrent request limit and 413 body cap); regressions `credentials` 15, `recovery` 20, `cells` 13, `review` 18, `grants` 18, `apply` 27, `run` 30; live checks assisted R1-R4, credentials, recovery, review, grants, application and adapter all pass; client_core 310 tests, analyze clean; node tool tests 65/65, policy tests 49/49; `ci:migrations` (21, non-destructive), `ci:secrets` and `scan-evidence` clean. Phone switch off again; no image pulled. The staging run stays a pending owner step.

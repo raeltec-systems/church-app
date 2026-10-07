@@ -137,6 +137,9 @@ async function main() {
     lost: { phone: '+447700900439' },
     disputed: { phone: '+447700900440' },
     expired: { phone: '+447700900441' },
+    cancelled: { phone: '+447700900442' },
+    deactivated: { phone: '+447700900443' },
+    flooded: { phone: '+447700900444' },
   };
   for (const [k, p] of Object.entries(people)) {
     if (!isFictionalAssistedPhone(p.phone)) throw new Error(`not fictional: ${p.phone}`);
@@ -267,7 +270,8 @@ async function main() {
     const openHolds = (p) => psql(`select coalesce(string_agg(coalesce(reason_code, reason), ',' order by placed_at), '')
                                      from app.identity_holds where member_id = '${p.member}' and released_at is null`);
 
-    const { admin, happy, reissue, direct, unlinked, concurrent, owner, victim, uncertain, lost, disputed, expired } = people;
+    const { admin, happy, reissue, direct, unlinked, concurrent, owner, victim, uncertain, lost, disputed, expired,
+      cancelled, deactivated, flooded } = people;
     await seeded(admin);
     psql(`select app.identity_bootstrap_admin('${admin.member}', 'israel')`);
     admin.token = (await signIn(admin.phone, admin.password)).json?.access_token;
@@ -462,6 +466,52 @@ async function main() {
     const expiredRedeem = await redeem(expired.phone, ge.secret, password());
     check('A19-expired-grant-fails', ge.issued.status === 200 && expiredStatus.outcome === 'closed' && expiredRedeem.outcome === 'rejected',
       { issue: ge.issued.status, status: expiredStatus.outcome, redeem: expiredRedeem.outcome });
+
+    // ------------------------------------------------------------------ review fixes
+    // Cancel between begin and dispatch: the operation is obsolete, no Auth call, old password works.
+    await seeded(cancelled);
+    const gk = await ready(cancelled);
+    const kBegun = await sys('identity.assisted_reset_begin', { phone_username: cancelled.phone, grant_digest: digestOf(gk.secret) });
+    const kc = await caseOf(cancelled);
+    const kCancel = await recCmd('identity.cancel_recovery_case', kc?.revision, { case_id: kc?.case_id, reason: 'opened_in_error' });
+    const kDispatch = await sys('identity.assisted_reset_dispatch', { operation_id: kBegun?.operation_id });
+    const kOld = await signIn(cancelled.phone, cancelled.password);
+    check('A21-cancel-between-begin-and-dispatch-fails-closed', kBegun?.accepted === true && kCancel.status === 200
+      && kCancel.data?.case_state === 'cancelled' && kDispatch?.proceed === false && kOld.status === 200
+      && openHolds(cancelled) === ''
+      && psql(`select op_state from app.identity_recovery_operations where member_id = '${cancelled.member}'`) === 'obsolete',
+      { begin: kBegun?.accepted, cancel: kCancel.data?.case_state, dispatch: kDispatch?.proceed,
+        old_password_still_works: kOld.status, holds: openHolds(cancelled) });
+
+    // Deactivation after begin: dispatch refused; deactivation during an open case: no grant.
+    await seeded(deactivated);
+    const gv = await ready(deactivated);
+    const vBegun = await sys('identity.assisted_reset_begin', { phone_username: deactivated.phone, grant_digest: digestOf(gv.secret) });
+    psql(`update app.identity_members set membership_state = 'deactivated' where member_id = '${deactivated.member}'`);
+    const vDispatch = await sys('identity.assisted_reset_dispatch', { operation_id: vBegun?.operation_id });
+    const vRequest = await deviceRequest(deactivated);
+    const vIssue = await issue(deactivated, vRequest.code);
+    const vOld = await signIn(deactivated.phone, deactivated.password);
+    check('A22-deactivation-fails-closed', vBegun?.accepted === true && vDispatch?.proceed === false
+      && vIssue.field_errors?.case_id === 'not_approved' && vOld.status === 200,
+      { begin: vBegun?.accepted, dispatch_after_deactivation: vDispatch?.proceed, issue_after_deactivation: vIssue.field_errors,
+        password_unchanged: vOld.status === 200 });
+
+    // Concurrent requests for one number cannot exceed the per-number limit (advisory locks).
+    const flood = await Promise.all(Array.from({ length: 12 }, () => {
+      const sec = newGrantSecret();
+      secrets.push(sec);
+      digests.push(digestOf(sec));
+      return fn({ action: 'request', phone_username: flooded.phone, grant_digest: digestOf(sec) });
+    }));
+    for (const f of flood) if (f.request_code) codes.push(f.request_code);
+    const big = await fetch(`${origin}${FN}`, { method: 'POST', headers: { apikey: key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'status', grant_digest: 'a'.repeat(64), pad: 'x'.repeat(5000) }) });
+    await big.body?.cancel();
+    check('A23-request-limits-hold-under-concurrency', flood.filter((f) => f.outcome === 'received').length === 5
+      && flood.filter((f) => f.outcome === 'rate_limited').length === 7 && big.status === 413,
+      { received: flood.filter((f) => f.outcome === 'received').length,
+        rate_limited: flood.filter((f) => f.outcome === 'rate_limited').length, oversize_body: big.status });
 
     // ------------------------------------------------------------------ no leakage anywhere
     const staffText = staffTexts.join('\n');

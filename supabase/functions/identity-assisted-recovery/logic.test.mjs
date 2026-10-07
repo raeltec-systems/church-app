@@ -7,6 +7,7 @@ import test from 'node:test';
 
 import {
   classifyAuthResult,
+  declaredTooLarge,
   digestHex,
   keyHeaders,
   leaks,
@@ -96,4 +97,20 @@ test('the function never logs or returns a body value', () => {
   assert.equal(logs.length, 1, 'one log call');
   assert.match(logs[0], /JSON\.stringify\(\{ fn: 'identity-assisted-recovery', action, outcome \}\)/);
   assert.doesNotMatch(src, /reply\([^)]*(password|grant_secret|grant_digest|auth_user_id|operation_id)/);
+});
+
+test('a declared body over 4096 bytes (or a malformed length) is refused before reading', () => {
+  assert.equal(declaredTooLarge(null), false);
+  assert.equal(declaredTooLarge('120'), false);
+  assert.equal(declaredTooLarge('4096'), false);
+  assert.equal(declaredTooLarge('4097'), true);
+  assert.equal(declaredTooLarge('-1'), true);
+  assert.equal(declaredTooLarge('1e9'), true);
+});
+
+test('the function caps the bytes it reads and never buffers the whole body first', () => {
+  const src = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /req\.(text|json|arrayBuffer|blob|formData)\(/);
+  assert.match(src, /declaredTooLarge\(req\.headers\.get\('content-length'\)\)/);
+  assert.match(src, /total > MAX_BODY_BYTES/);
 });

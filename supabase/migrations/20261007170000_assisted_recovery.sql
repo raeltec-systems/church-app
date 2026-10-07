@@ -14,20 +14,26 @@
 --     `identity_assisted_recovery`, in fenced steps:
 --       begin     under the link lock: validate the grant and the current case/link/binding/
 --                 generation, consume the grant, record ONE pending operation (one unresolved
---                 operation per account and per member);
---       dispatch  the generation must be unchanged; place the operation's own security hold
---                 (password_reset_required_since), count the sessions; only then does the
---                 function call Auth Admin;
---       complete  succeeded only with exactly one `password` change since dispatch, generation +1
---                 and no session from before dispatch alive (Auth Admin password update signs
---                 out every session, 1.3 finding): the operation's own hold is released and the
---                 evidence is recorded that identity_member_reset_since and
+--                 operation per account and per member) with the generation and the approved
+--                 binding revision it began for;
+--       dispatch  the case must still be open, the grant consumed by this operation, and the
+--                 generation and binding revision those recorded at begin; place the
+--                 operation's own security hold (password_reset_required_since), count the
+--                 sessions; only then does the function call Auth Admin;
+--       complete  succeeded only with exactly one `password` change since dispatch, generation +1,
+--                 the same binding revision, the case still open, the link still recoverable and
+--                 no session created before the password change still alive (Auth Admin
+--                 password update signs out every session, 1.3 finding): the operation's own hold
+--                 is released and the evidence is recorded that identity_member_reset_since and
 --                 identity_password_unreviewed now accept. Auth refused and nothing changed:
 --                 failed (own hold released). Anything else: uncertain, and the hold stays.
 --     A late completion is recorded and changes nothing. A pending operation older than 60 s can
 --     no longer be dispatched (obsolete); a dispatched one older than 120 s is `stuck` and treated
---     as uncertain. An Admin reconciles an uncertain/stuck operation: every session is revoked and
---     the hold stays until the member's next successful reset (and an Admin's release).
+--     as uncertain. Cancelling a case makes its pending operation obsolete. An Admin reconciles
+--     an uncertain/stuck operation: every session is revoked and the hold stays until the
+--     member's next successful reset (and an Admin's release).
+--   * Requests are rate limited per number and overall; the count-then-insert is serialised
+--     with transaction advisory locks.
 --   * A grant presented with another phone username is burned. A new account link for the
 --     account or member is refused while an operation is unresolved (unlinking stays possible).
 --   * A reset never clears a pre-existing hold (2.8): a lost-device or unreviewed-password hold
@@ -395,6 +401,7 @@ create table app.identity_recovery_operations (
   link_id uuid not null references app.identity_account_links (link_id),
   auth_user_id uuid not null,
   generation_at_begin bigint not null,
+  binding_revision_at_begin bigint not null,
   op_state text not null default 'pending' check (op_state in (
     'pending', 'dispatched', 'succeeded', 'failed', 'uncertain', 'obsolete', 'reconciled')),
   system_principal_id uuid not null,
@@ -820,6 +827,17 @@ begin
     v_refusal := 'unavailable';
   elsif not app.identity_phone_username_permitted(v_phone) then
     v_refusal := 'unsupported';
+  end if;
+  if v_refusal is null then
+    -- Serialise count-then-insert so concurrent calls cannot exceed the limits: one lock per
+    -- number, then one for the overall count (always in this order).
+    perform pg_catalog.pg_advisory_xact_lock(
+      pg_catalog.hashtextextended('identity_recovery_request:' || v_phone, 0));
+    perform pg_catalog.pg_advisory_xact_lock(
+      pg_catalog.hashtextextended('identity_recovery_request:all', 0));
+  end if;
+  if v_refusal is not null then
+    null;
   elsif (select count(*) from app.identity_recovery_requests r
           where r.claimed_phone = v_phone
             and r.requested_at > clock_timestamp() - interval '1 hour')
@@ -976,9 +994,10 @@ begin
    where g.grant_id = v_grant.grant_id;
   insert into app.identity_recovery_operations (grant_id, case_id, member_id, link_id,
                                                 auth_user_id, generation_at_begin,
-                                                system_principal_id)
+                                                binding_revision_at_begin, system_principal_id)
   values (v_grant.grant_id, v_grant.case_id, v_grant.member_id, v_grant.link_id,
-          v_grant.auth_user_id, v_link.credential_generation, p_principal)
+          v_grant.auth_user_id, v_link.credential_generation, v_link.binding_revision,
+          p_principal)
   returning * into v_op;
   perform app.identity_recovery_audit_add('operation_begun', null, null, p_principal, p_request,
     v_op.member_id, v_op.case_id, v_op.grant_id, v_op.operation_id, null);
@@ -987,10 +1006,12 @@ begin
 end;
 $$;
 
--- identity.assisted_reset_dispatch {operation_id}: the fence before the external call. The
--- generation, link and binding must be unchanged since begin; the operation's own security hold
--- (password reset required) is placed and the sessions are counted. Only `proceed: true` lets
--- the function call Auth Admin.
+-- identity.assisted_reset_dispatch {operation_id}: the fence before the external call. The case
+-- must still be open and its grant consumed by THIS operation; the credential generation and the
+-- approved binding revision must equal those recorded at begin; the link must still be live,
+-- active and recoverable (approved member, no binding review, approved phone, no non-security
+-- hold). Then the operation's own security hold (password reset required) is placed and the
+-- sessions are counted. Only `proceed: true` lets the function call Auth Admin.
 create function app.identity_sys_reset_dispatch(p_principal uuid, p_request uuid, p_payload jsonb)
 returns jsonb
 language plpgsql
@@ -999,6 +1020,8 @@ as $$
 declare
   v_op app.identity_recovery_operations;
   v_link app.identity_account_links;
+  v_case app.identity_recovery_cases;
+  v_grant app.identity_recovery_grants;
   v_hold app.identity_holds;
   v_reason text;
   v_revision bigint;
@@ -1012,12 +1035,21 @@ begin
    where l.link_id = v_op.link_id for update;
   select o.* into v_op from app.identity_recovery_operations o
    where o.operation_id = v_op.operation_id for update;
+  select c.* into v_case from app.identity_recovery_cases c where c.case_id = v_op.case_id;
+  select g.* into v_grant from app.identity_recovery_grants g where g.grant_id = v_op.grant_id;
   if v_op.op_state <> 'pending' then
     v_reason := 'not_pending';
   elsif v_op.begun_at <= clock_timestamp() - app.identity_recovery_dispatch_window() then
     v_reason := 'too_late';
+  elsif v_case.case_state is distinct from 'open' then
+    v_reason := 'case_closed';
+  elsif v_grant.grant_state is distinct from 'consumed'
+        or v_grant.end_reason is distinct from 'redeemed' then
+    v_reason := 'grant_not_consumed';
   elsif v_link.credential_generation <> v_op.generation_at_begin then
     v_reason := 'generation_moved';
+  elsif v_link.binding_revision <> v_op.binding_revision_at_begin then
+    v_reason := 'binding_moved';
   else
     v_reason := app.identity_recovery_link_problem(v_link);
   end if;
@@ -1073,7 +1105,8 @@ declare
   v_result text := p_payload ->> 'auth_result';
   v_changes integer;
   v_event app.identity_credential_events;
-  v_pre_dispatch_live boolean;
+  v_case app.identity_recovery_cases;
+  v_pre_reset_live boolean;
   v_state text;
   v_revision bigint;
 begin
@@ -1102,17 +1135,27 @@ begin
      and e.source in ('auth_users', 'auth_identities', 'auth_mfa_factors')
    order by e.event_id
    limit 1;
-  v_pre_dispatch_live := exists (
+  select c.* into v_case from app.identity_recovery_cases c where c.case_id = v_op.case_id;
+  -- Every session created before the password change (not only before dispatch) must be gone:
+  -- Auth Admin's update signs them all out. One still live means the outcome is uncertain.
+  v_pre_reset_live := exists (
     select 1 from auth.sessions s
-     where s.user_id = v_op.auth_user_id and s.created_at <= v_op.dispatched_at
+     where s.user_id = v_op.auth_user_id
+       and s.created_at <= greatest(v_op.dispatched_at, coalesce(v_event.at, clock_timestamp()))
        and (s.not_after is null or s.not_after > now()));
 
+  -- Success effects (own hold released, reset evidence) only for the case, link and binding the
+  -- operation began for; a cancelled case, a moved binding revision or a link that is no longer
+  -- recoverable (for example a deactivated member) keeps the account held as uncertain.
   if v_result = 'applied' and v_changes = 1 and v_event.kinds = array['password']
      and v_link.credential_generation = v_op.generation_at_begin + 1
-     and v_link.link_state <> 'ended' and not v_pre_dispatch_live
+     and v_link.binding_revision = v_op.binding_revision_at_begin
+     and v_case.case_state = 'open'
+     and app.identity_recovery_link_problem(v_link) is null
+     and not v_pre_reset_live
      and v_op.dispatched_at > clock_timestamp() - app.identity_recovery_stuck_after() then
     v_state := 'succeeded';
-  elsif v_result = 'rejected' and v_changes = 0
+  elsif v_result = 'rejected' and v_changes = 0 and v_case.case_state = 'open'
         and v_link.credential_generation = v_op.generation_at_begin then
     v_state := 'failed';
   else
@@ -1530,6 +1573,10 @@ begin
               where o.case_id = v_case.case_id and o.op_state in ('dispatched', 'uncertain')) then
     perform app.cmd_fail('conflict', '{"case_id": "recovery_unresolved"}', v_case.revision);
   end if;
+  -- A grant consumed by begin but not yet dispatched: its operation can never be dispatched now.
+  update app.identity_recovery_operations o
+     set op_state = 'obsolete', completed_at = clock_timestamp()
+   where o.case_id = v_case.case_id and o.op_state = 'pending';
   perform app.identity_recovery_end_grants(v_case.auth_user_id, 'cancelled', 'case_cancelled',
     v_actor.member_id, v_actor.account_id, null, v_request);
   update app.identity_recovery_cases c

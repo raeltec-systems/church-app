@@ -303,6 +303,26 @@ code=$(api_call identity_credential_command "$HOLD_BODY")
 [[ "$code:$(jq -r .code "$WORK/out")" == "200:forbidden" ]] \
   && ok "an applicant cannot place a hold (forbidden envelope)" || bad "place hold as applicant: $code $(cat "$WORK/out")"
 
+# Story 2.9: the assisted-recovery command and read need a session; an applicant reaches neither.
+# The fenced steps exist only on the system route: the publishable key alone is unauthenticated.
+for fn in identity_recovery_command identity_admin_recovery_cases; do
+  code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/rest/v1/rpc/$fn" \
+    -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Profile: api' -H 'Content-Type: application/json' -d '{}')
+  expect "signed-out client cannot call $fn" 401 "$code" "$(cat "$WORK/out")"
+done
+code=$(api_call identity_admin_recovery_cases '{}')
+[[ "$code:$(jq -r .details "$WORK/out")" == "403:not_linked" ]] \
+  && ok "an applicant cannot read recovery cases (403 not_linked)" || bad "recovery cases as applicant: $code $(cat "$WORK/out")"
+CASE_BODY="{\"version\":1,\"command\":\"identity.open_recovery_case\",\"request_id\":\"$(uuid)\",\"expected_revision\":null,\"payload\":{\"member_id\":\"$(uuid)\",\"identity_check\":\"in_person\",\"evidence\":[\"photo_id\"]}}"
+code=$(api_call identity_recovery_command "$CASE_BODY")
+[[ "$code:$(jq -r .code "$WORK/out")" == "200:forbidden" ]] \
+  && ok "an applicant cannot open a recovery case (forbidden envelope)" || bad "open case as applicant: $code $(cat "$WORK/out")"
+BEGIN_BODY="{\"version\":1,\"command\":\"identity.assisted_reset_begin\",\"request_id\":\"$(uuid)\",\"payload\":{\"phone_username\":\"+12025550199\",\"grant_digest\":\"$(printf 'a%.0s' $(seq 64))\"}}"
+code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/rest/v1/rpc/system_command" \
+  -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Profile: api' -H 'Content-Type: application/json' -d "$BEGIN_BODY")
+[[ "$code:$(jq -r .code "$WORK/out")" == "200:unauthenticated" ]] \
+  && ok "a grant step without the system credential is unauthenticated" || bad "begin without credential: $code $(cat "$WORK/out")"
+
 # No SMS configuration exists on this stack.
 sms=$(curl -s "$API_URL/auth/v1/settings" -H "apikey: $PUBLISHABLE_KEY" | jq -r '.sms_provider // ""')
 [[ -z "$sms" ]] && ok "no SMS provider configured" || bad "sms_provider is '$sms'"

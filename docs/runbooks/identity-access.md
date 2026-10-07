@@ -654,3 +654,77 @@ The live check drives the real client adapters with `+44 7700 900357–900359`. 
    - Each command deletes rows of one account in `auth.sessions`, `auth.refresh_tokens`, `auth.mfa_factors` and `auth.identities`.
    - Confirm on staging that the migration owner may delete from those tables. Until this file is applied, approvals, lost-device holds, restore and accept answer `unavailable`.
 3. **No Auth setting changes:** `double_confirm_changes` stays on, and no SMS setting is touched.
+
+## Staff-assisted recovery with a single-use grant (story 2.9)
+
+Migration: `supabase/migrations/20261007170000_assisted_recovery.sql` (no row deletions; one file; session revocation reuses `app.identity_revoke_auth_sessions` from `20261007160100`). Edge Function: `supabase/functions/identity-assisted-recovery/` (`index.ts`, pure rules in `logic.mjs`). Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.9/`.
+
+For a member without a usable approved recovery email (AD-20, I9, AC-06). It is the 1.3 proven mechanism, owned by Identity.
+
+### How it works
+
+1. **The member's phone** (mobile, signed out): **Sign in → Get church help → I need help accessing my account** (`/account-help`). The member enters their phone username. The app creates a random grant secret (`arg_` + 32 bytes) **in memory only** and sends only its sha256 **digest** with the number to the Edge Function. The answer is neutral (it never says whether the number has an account) and carries an 8-character **request code** (no 0/O/1/I). The code is not a secret: it only finds the request. Requests expire after 30 minutes; at most 5 per number per hour and 60 per 10 minutes overall.
+2. **The church office** (staff web, Admin, **Account recovery**, `/admin/account-recovery`): checks who the member is in person, finds the member, and records the identity check (`in_person`, `established_relationship`) and the evidence seen (`photo_id`, `known_in_person`, `church_records`, `leader_confirmation`) with `identity.open_recovery_case`. Then types the code from the member's phone: `identity.issue_recovery_grant`. The grant lives 15 minutes, is single use, and is bound to the case, member, account, link, approved binding revision, credential generation and purpose. A new grant supersedes every earlier grant of the account. A code from another number is refused (`conflict {"request_code": "mismatch"}`).
+3. **The member's phone**: **The office is done: continue** (status `ready`), then the member chooses a password (8 to 72 bytes, checked on the phone and in the function before the grant is used). The function applies it with Auth Admin. Every older session ends; the member signs in again with the new password.
+
+Staff never see, choose or send a password, the secret or its digest. The Admin read and the command answers carry none of them, nor the request code.
+
+### The fenced external operation
+
+The Edge Function is the **only** holder of Auth Admin power (the platform's `SUPABASE_SERVICE_ROLE_KEY`). It reaches the database **only** through the 1.9 system route (`api.system_command`) with a credential of the purpose `identity_assisted_recovery`. That principal is allowlisted for exactly five commands:
+
+| Step | System command | Effect |
+|---|---|---|
+| request | `identity.assisted_recovery_request {phone_username, grant_digest}` | stores the request (digest only) |
+| status | `identity.assisted_recovery_status {grant_digest}` | `waiting`, `ready` or `closed` |
+| begin | `identity.assisted_reset_begin {phone_username, grant_digest}` | Under the link lock, checks: the grant is issued, unexpired and for this phone; the case is open; the link is live and active with no binding review; the binding revision and **generation are unchanged**; the Auth phone is the approved one; no open hold other than a `security` hold; no unresolved operation. Then consumes the grant and records ONE pending operation (one unresolved per account and per member). A wrong phone **burns** the grant. |
+| dispatch | `identity.assisted_reset_dispatch {operation_id}` | The generation must still be the one at begin (otherwise `obsolete`, and no Auth call). Places the operation's **own security hold** (`password_reset_required_since`) and counts the sessions. |
+| complete | `identity.assisted_reset_complete {operation_id, auth_result}` | `succeeded` only with exactly one `password` change since dispatch, generation +1 and no session from before dispatch alive: the own hold is released and the case completed. Auth refused and nothing changed: `failed` (own hold released; issue a new grant). Anything else: `uncertain` (the hold stays). A late or repeated completion is recorded and changes nothing. |
+
+- A pending operation older than 60 s can never be dispatched. A dispatched one not completed within 120 s is shown as `stuck` and treated as uncertain.
+- **Uncertain or stuck**: the account stays held. No new grant, no cancellation and **no new account link** (for that account or member) until an Admin reconciles with `identity.reconcile_recovery_operation {case_id, identity_check}`: every Auth session is revoked and the operation's hold stays. The member then gets a new grant. After that reset succeeds, an Admin releases the hold in **Access reviews** (`identity.release_hold`).
+- **Relinking is blocked** while an operation is unresolved (`conflict {"member_id": "recovery_unresolved"}`, from a trigger on new links, so every path). Unlinking stays possible: security denial is never blocked.
+- **Holds**: a reset never clears a hold. A `lost_device` or unreviewed-password hold (2.8) becomes releasable after a successful assisted reset: `identity_member_reset_since` and `identity_password_unreviewed` (replaced here) count a succeeded operation as the member's own reset. A dispute (`access_review`) hold refuses recovery (`disputed`).
+- Lifecycle hooks: `access_hold_applied` at dispatch; `access_hold_released` and `sessions_revoked` at success; `sessions_revoked` at reconciliation.
+- Audit: `app.identity_recovery_audit` (Admin or system principal; ids and codes only). Every system step is also in `app.sys_audit`.
+- Gate: `app.identity_assisted_recovery_open()` is email recovery's Q1 gate (`q1_auth_recovery`, which names the assisted procedure) or a local/staging database, plus the personal-data gate, and never a held restore. In production the system route also needs `ops_system_access`.
+
+### Commands and read (Admin)
+
+`POST /rest/v1/rpc/identity_recovery_command` (`Content-Profile: api`, 1.4 envelope), by an Admin other than the member:
+
+| Command | `expected_revision` | Payload |
+|---|---|---|
+| `identity.open_recovery_case` | null | `{member_id, identity_check, evidence[]}` |
+| `identity.issue_recovery_grant` | case revision | `{case_id, request_code}` |
+| `identity.cancel_recovery_case` | case revision | `{case_id, reason}` (`identity_not_confirmed`, `member_withdrew`, `opened_in_error`) |
+| `identity.reconcile_recovery_operation` | case revision | `{case_id, identity_check}` |
+
+Refusals (field errors): on `member_id`/`case_id`: `open_case`, `not_linked`, `access_review`, `disputed`, `phone_changed`, `account_unavailable`, `not_approved`, `recovery_unresolved`, `closed`, `nothing_to_reconcile`, `unsupported` (own account); on `request_code`: `unknown`, `mismatch`.
+
+`api.identity_admin_recovery_cases()` returns the open cases and those closed in the last 7 days, with the grant state (`issued`, `expired`, `consumed`, `superseded`, `burned`, `cancelled`), the operation state (`pending`, `dispatched`, `stuck`, `succeeded`, `failed`, `uncertain`, `obsolete`, `reconciled`) and `accepting`.
+
+### Local runs
+
+```bash
+npx supabase db reset                          # empty Admin roster
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/assisted.mjs --evidence <file>.jsonl              # serves the function itself
+npx supabase db reset
+FLUTTER_ROOT=/opt/sdk/flutter bash tools/identity-e2e/live-assisted-check.sh   # real client adapters
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+Both scripts mint a fresh local system credential (only the digest is registered) and serve the function with `supabase functions serve --env-file <0600 temp file>` (this needs the `edge-runtime` image). Afterwards they revoke the credential, disable the principal and remove every synthetic row; the content-free `app.sys_audit` rows stay. The E2E uses `+44 7700 900430–900441`, the live check `+44 7700 900458–900459`. The uncertain and late rows drive the function's own fenced steps through the system route; the function has no fault-injection code.
+
+### Hosted (parent session / owner)
+
+1. **Parent session:** apply `20261007170000_assisted_recovery.sql` to staging. It replaces the 1.9 kernel `app.sys_execute` (same signature; the probe is unchanged) and adds a trigger on `app.identity_account_links`.
+2. **Owner (restricted operator): the staging system credential.** Keep it apart from the probe's credential.
+   1. Run `OPS_STATE_DIR=.ops-state/identity-assisted-recovery node tools/ops/system-credential.mjs mint --env staging`. It prints the digest only; the token stays in that gitignored folder, mode 0600.
+   2. In the staging SQL editor (or the connector), run `select app.sys_create_principal('identity-assisted-recovery', 'identity_assisted_recovery', 'israel');`, then `select app.sys_register_credential('<principal_id from above>', '<digest>', 'assisted recovery staging', interval '30 days', 'israel');`.
+   3. Dashboard → project `tmurpotfluignacfueki` → **Edge Functions → Secrets** → **Add new secret**: name `IDENTITY_RECOVERY_SYSTEM_CREDENTIAL`, value = the contents of `.ops-state/identity-assisted-recovery/staging.credential`. CLI alternative: `npx supabase secrets set --project-ref tmurpotfluignacfueki --env-file <file with that one line>`. Never paste it into the repo or a chat.
+   4. Rotate before 30 days: mint with `--force`, register the new digest, update the secret, then run `select app.sys_revoke_credential('<old credential_id>', 'israel');`.
+3. **Deploy the function** (owner or parent): `npx supabase functions deploy identity-assisted-recovery --project-ref tmurpotfluignacfueki --no-verify-jwt`. The connector's `deploy_edge_function` with `verify_jwt: false` and the files `index.ts` and `logic.mjs` works too. `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are provided by the platform; nothing else is set. If the project's legacy API keys are disabled, those two key variables are empty and the function answers `unavailable` (fail closed); re-enable them, or extend the function to read the new-format keys.
+4. **Staging adversarial run** (still to do): repeat the `assisted.mjs` matrix against staging Auth with synthetic fictional numbers (phone sign-in is already enabled there without SMS), plus the device and staff-web demonstration.
+5. **Production** (entry 14): the Q1 assisted-recovery procedure and named reviewers; the `q1_auth_recovery`, `q4_personal_data` and `ops_system_access` approvals; the production credential and secret.

@@ -1,0 +1,6 @@
+PASS R1 the phone asks for help with the digest only: request=RecoveryRequestReceived status=waiting
+PASS R2 an Admin opens a case and issues the setup for the code: open=confirmed issue=confirmed grant=issued
+PASS R3 the member sets the password once on the phone: status=ready redeem=succeeded replay=rejected
+PASS R4 fresh password sign-in is required and granted: old_session=untrustedSession old_password=AuthFailed new_password=AuthSucceeded read=granted
+ALL PASS
+synthetic users left: 0

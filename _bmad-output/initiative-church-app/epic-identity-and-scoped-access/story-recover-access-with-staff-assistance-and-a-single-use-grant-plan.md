@@ -3,7 +3,7 @@ title: 'Recover access with staff assistance and a single-use grant'
 type: 'feature'
 ticket: '9'
 created: '2026-10-07'
-status: 'in-progress'
+status: 'built'
 blocked_reason: ''
 baseline_revision: 'eb7d20128c935c577948c570c6203bde3c033d7c'
 route: 'full'
@@ -68,18 +68,34 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261007170000_assisted_recovery.sql` -- tables, sys registry + kernel, system handlers, Admin commands, read, relink trigger, replaced helpers, grants.
-- [ ] `supabase/functions/identity-assisted-recovery/{index.ts,logic.mjs,logic.test.mjs}`, `supabase/config.toml` -- the function.
-- [ ] `supabase/tests/assisted_recovery_test.sql`, allowlist, smoke -- pgTAP for the matrix and privileges.
-- [ ] `tools/identity-e2e/assisted.mjs` (+ test) -- the verify bullet against local GoTrue, PostgREST and the served function; log/response leak scan.
-- [ ] `packages/client_core` + apps -- domain, adapter, controllers, mobile help route and password setup, staff case screens, fakes, widget tests.
-- [ ] `docs/runbooks/identity-access.md`, `system-access-and-operations.md`, `evidence-2.9/README.md`, CI.
+- [x] `supabase/migrations/20261007170000_assisted_recovery.sql` -- tables, sys registry + kernel, system handlers, Admin commands, read, relink trigger, replaced helpers, grants.
+- [x] `supabase/functions/identity-assisted-recovery/{index.ts,logic.mjs,logic.test.mjs}`, `supabase/config.toml` -- the function.
+- [x] `supabase/tests/assisted_recovery_test.sql`, allowlist, smoke -- pgTAP for the matrix and privileges.
+- [x] `tools/identity-e2e/assisted.mjs` (+ test) -- the verify bullet against local GoTrue, PostgREST and the served function; log/response leak scan.
+- [x] `packages/client_core` + apps -- domain, adapter, controllers, mobile help route and password setup, staff case screens, fakes, widget tests.
+- [x] `docs/runbooks/identity-access.md`, `system-access-and-operations.md`, `evidence-2.9/README.md`, CI.
 
 **Acceptance Criteria:**
 - Given the local stack and the served function, when `assisted.mjs` runs, then every matrix row passes and no synthetic rows remain.
 - Given CI, when db:test, db:smoke, node tests, flutter analyze and test run, then all pass.
 
 ## Implementation Notes
+
+- Built directly (no subagent tool in this session); checkpoint 1 pre-approved by the owner decisions. The plan is above the 1600-token guide because one Identity change spans the DB, an Edge Function, two clients and evidence; kept whole, as 2.7 and 2.8 were.
+- Files:
+  - `supabase/migrations/20261007170000_assisted_recovery.sql` (no `delete from`, ASCII only): `sys_command_kinds` gains `payload_check`/`handler` (text signatures resolved with `to_regprocedure`; reg* columns block pg_upgrade) and `app.sys_execute` is replaced to dispatch registered owner handlers (probe path unchanged); tables `identity_recovery_requests`, `_cases`, `_grants`, `_operations`, `_audit`; five system handlers; four Admin commands on `api.identity_recovery_command`; `api.identity_admin_recovery_cases`; relink guard trigger; `identity_member_reset_since` and `identity_password_unreviewed` replaced; `identity_authorize_command` replaced (every earlier command kept).
+  - `supabase/functions/identity-assisted-recovery/{index.ts,logic.mjs,logic.test.mjs}`; `supabase/config.toml` (`verify_jwt = false` for this function).
+  - Tests: `supabase/tests/assisted_recovery_test.sql` (100); allowlists in `command_foundation_test.sql` and `system_access_test.sql`; `identity_api_smoke.sh` (+6).
+  - E2E `tools/identity-e2e/assisted.mjs` (+ `.test.mjs`); live adapter check `tools/identity-e2e/live-assisted-check.sh` + `packages/client_core/tool/live_assisted_recovery_check.dart`.
+  - client_core: `domain/assisted_recovery.dart` (device-held `GrantSecret`, outcomes, case model), `adapters/supabase_assisted_recovery.dart` (function client with the publishable key only, never a user token; Admin read), `application/assisted_recovery_controllers.dart`, `presentation/assisted_recovery_screens.dart`, routes `/account-help` and `/admin/account-recovery` (gated), sign-in help link, providers, composition, fakes, `crypto` dependency (already transitive); `test/identity/assisted_recovery_test.dart` (22).
+  - Apps: mobile router `assistedRecovery: true` + flow test; staff `Account recovery` destination (Admin) + test.
+  - Docs: identity-access runbook section, system-access runbook allowlist/purpose, `evidence-2.9/`, CI (function tests and evidence scan), two deferred-work entries.
+- Decision (agent, under owner pre-approval): the request code is a non-secret 8-character lookup key shown on the member's phone; staff type it to bind the request. Staff answers never carry it back, nor the digest.
+- Decision (agent, under owner pre-approval): an assisted operation places its own security hold at dispatch and the database releases only that hold on success or a clean Auth refusal; a stuck or uncertain operation keeps it until a later successful reset and an Admin's release (2.8 `password_reset_required` machinery).
+- Decision (agent, under owner pre-approval): requests and grants are allowed under `security` holds (the exit for lost-device and unreviewed-password holds) and refused under `access_review` (dispute) and `login` holds.
+- Decision (agent, under owner pre-approval): the device's function client sends the publishable key only, so a stale user session never travels with the grant.
+- Environment: the stack was reset several times; the phone switch was found off, was on only for the E2E and live check, and is off again. `supabase functions serve` used the existing edge-runtime image (no pull). Every synthetic row was removed; each run's system credential is revoked and its principal disabled (append-only operator journal).
+- Owner and parent steps (none blocks the build): parent applies `20261007170000` to staging; owner mints and registers the staging credential and sets the `IDENTITY_RECOVERY_SYSTEM_CREDENTIAL` Edge Function secret; the function is deployed with `--no-verify-jwt`; then the staging adversarial run. Exact steps: runbook "Hosted (parent session / owner)".
 
 ## Plan Change Log
 
@@ -92,3 +108,9 @@ context:
 - `node tools/auth-harness/local-phone-auth.mjs on && node tools/identity-e2e/assisted.mjs --evidence …; node tools/auth-harness/local-phone-auth.mjs off` -- expected: all pass
 - `node --test supabase/functions/identity-assisted-recovery/*.test.mjs tools/identity-e2e/*.test.mjs` -- expected: pass
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/mobile`, `apps/staff` -- expected: pass
+- Results (2026-10-07, local):
+  - `db:test` 1222/1222 (assisted recovery 100); `db:smoke` exit 0.
+  - `assisted.mjs` 12/12 (`evidence-2.9/assisted-e2e.jsonl`); live adapter check R1-R4 (`evidence-2.9/live-adapter-check.txt`).
+  - client_core 310 tests, mobile 24, staff 22; analyze clean; format clean; staff `flutter build web --no-web-resources-cdn` ok.
+  - Node tool tests 63/63 (auth-harness, identity-e2e, function rules); `ci:migrations --base ccr-93e730dd-89lbvg` (21, ordered, non-destructive); `ci:secrets` clean; `scan-evidence` on evidence-2.9, `supabase/functions`, `tools/identity-e2e` clean.
+- Matrix audit: happy (pgTAP + A10 + R1-R4 + widgets), reissue (pgTAP + A11), direct change (pgTAP + A12), relink/unlink (pgTAP + A13/A16/A17), concurrent (A14), cross-member (pgTAP + A15 + widget mismatch notice), uncertain/late (pgTAP + A16 + widget reconcile), hold (pgTAP + A18), leakage (pgTAP + A20 + widgets): every row has a passing test.

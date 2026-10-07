@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/access_grants.dart';
 import '../domain/account_auth.dart';
+import '../domain/assisted_recovery.dart';
 import '../domain/cell_membership.dart';
 import '../domain/commands.dart';
 import '../domain/credential_review.dart';
@@ -75,6 +76,16 @@ final recoveryEmailRepositoryProvider = Provider<RecoveryEmailRepository>(
 /// review queue.
 final credentialReviewRepositoryProvider = Provider<CredentialReviewRepository>(
   (ref) => const UnconfiguredCredentialReviewRepository(),
+);
+
+/// Story 2.9: the member device's assisted-recovery service (no session).
+final assistedRecoveryGatewayProvider = Provider<AssistedRecoveryGateway>(
+  (ref) => const UnconfiguredAssistedRecoveryGateway(),
+);
+
+/// Story 2.9: the Admin's assisted-recovery cases.
+final recoveryCasesRepositoryProvider = Provider<RecoveryCasesRepository>(
+  (ref) => const UnconfiguredRecoveryCasesRepository(),
 );
 
 final requestIdsProvider = Provider<RequestIds>((ref) => SecureRequestIds());

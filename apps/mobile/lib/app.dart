@@ -63,6 +63,8 @@ class _MobileAppState extends State<MobileApp> {
     initialLocation: widget.initialLocation,
     // Story 2.4: a new account continues to the membership request.
     membershipRequests: true,
+    // Story 2.9: sign-in help links to staff-assisted recovery on this phone.
+    assistedRecovery: true,
     shell: (location, focusSelectedNav, child) => MobileShell(
       location: location,
       focusSelectedNav: focusSelectedNav,

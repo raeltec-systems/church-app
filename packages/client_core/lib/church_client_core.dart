@@ -3,6 +3,7 @@
 library;
 
 export 'src/application/access_controllers.dart';
+export 'src/application/assisted_recovery_controllers.dart';
 export 'src/application/account_controllers.dart';
 export 'src/application/cell_controllers.dart';
 export 'src/application/credential_controllers.dart';
@@ -13,6 +14,7 @@ export 'src/application/providers.dart';
 export 'src/application/recovery_controllers.dart';
 export 'src/domain/access_grants.dart';
 export 'src/domain/account_auth.dart';
+export 'src/domain/assisted_recovery.dart';
 export 'src/domain/cell_membership.dart';
 export 'src/domain/commands.dart';
 export 'src/domain/credential_review.dart';
@@ -27,6 +29,7 @@ export 'src/domain/recovery_email.dart';
 export 'src/domain/session.dart';
 export 'src/presentation/access_screens.dart';
 export 'src/presentation/account_screen.dart';
+export 'src/presentation/assisted_recovery_screens.dart';
 export 'src/presentation/cell_screens.dart';
 export 'src/presentation/credential_screens.dart';
 export 'src/presentation/fixture_command_screen.dart';

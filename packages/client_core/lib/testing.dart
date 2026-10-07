@@ -12,6 +12,7 @@ import 'src/domain/platform_status.dart';
 
 import 'src/domain/access_grants.dart';
 import 'src/domain/account_auth.dart';
+import 'src/domain/assisted_recovery.dart';
 import 'src/domain/cell_membership.dart';
 import 'src/domain/commands.dart';
 import 'src/domain/credential_review.dart';
@@ -881,6 +882,108 @@ Map<String, Object?> holdItemData({
   'is_synthetic': true,
 };
 
+/// [AssistedRecoveryGateway] answered by the test (story 2.9). Records what
+/// the device sent so a test can check that only a digest left before the
+/// password step.
+class FakeAssistedRecovery implements AssistedRecoveryGateway {
+  RecoveryRequestOutcome requestAnswer = RecoveryRequestReceived(
+    'ABCD2345',
+    DateTime.utc(2026, 10, 7, 12, 30),
+  );
+  RecoveryStatusOutcome statusAnswer = const RecoveryStatus(
+    RecoveryGrantState.ready,
+    null,
+  );
+  RedeemOutcome redeemAnswer = RedeemOutcome.succeeded;
+  final List<(String, String)> requests = [];
+  final List<String> statusDigests = [];
+  final List<(String, GrantSecret, String)> redeems = [];
+
+  @override
+  Future<RecoveryRequestOutcome> request(String phone, String digest) async {
+    requests.add((phone, digest));
+    return requestAnswer;
+  }
+
+  @override
+  Future<RecoveryStatusOutcome> status(String digest) async {
+    statusDigests.add(digest);
+    return statusAnswer;
+  }
+
+  @override
+  Future<RedeemOutcome> redeem(
+    String phone,
+    GrantSecret secret,
+    String password,
+  ) async {
+    redeems.add((phone, secret, password));
+    return redeemAnswer;
+  }
+}
+
+/// [RecoveryCasesRepository] answered by the test (story 2.9).
+class FakeRecoveryCases implements RecoveryCasesRepository {
+  AccessRead<RecoveryCases> cases = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  int calls = 0;
+
+  @override
+  Future<AccessRead<RecoveryCases>> fetchCases() async {
+    calls++;
+    return cases;
+  }
+}
+
+/// The wire form of one recovery case as the Admin read sends it (2.9).
+Map<String, Object?> recoveryCaseData({
+  String caseId = '29292929-2929-4929-8929-292929292929',
+  String name = 'SYNTHETIC Ruth Mwale',
+  String state = 'open',
+  String? grantState,
+  String? operationState,
+  String? linkProblem,
+  bool held = false,
+  bool ownMember = false,
+}) => {
+  'case_id': caseId,
+  'revision': 2,
+  'member_id': '39393939-3939-4939-8939-393939393939',
+  'display_name': name,
+  'member_revision': 4,
+  'case_state': state,
+  'identity_check': 'in_person',
+  'evidence': ['known_in_person', 'photo_id'],
+  'opened_at': '2026-10-07T10:00:00Z',
+  'opened_by_me': true,
+  'closed_at': null,
+  'outcome': state == 'completed' ? 'reset_completed' : null,
+  'cancel_reason': null,
+  'account': 'app_account',
+  'link_problem': linkProblem,
+  'held': held,
+  'grant': grantState == null
+      ? null
+      : {
+          'grant_id': '49494949-4949-4949-8949-494949494949',
+          'state': grantState,
+          'issued_at': '2026-10-07T10:05:00Z',
+          'expires_at': '2026-10-07T10:20:00Z',
+          'end_reason': null,
+        },
+  'operation': operationState == null
+      ? null
+      : {
+          'operation_id': '59595959-5959-4959-8959-595959595959',
+          'state': operationState,
+          'begun_at': '2026-10-07T10:06:00Z',
+          'completed_at': null,
+        },
+  'is_synthetic': true,
+  'own_member': ownMember,
+};
+
 /// The fakes and provider overrides an app or screen test runs against.
 class ClientTestHarness {
   ClientTestHarness({String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'})
@@ -898,6 +1001,8 @@ class ClientTestHarness {
   final recovery = FakePasswordRecovery();
   final recoveryEmail = FakeRecoveryEmail();
   final credentials = FakeCredentialReview();
+  final assisted = FakeAssistedRecovery();
+  final recoveryCases = FakeRecoveryCases();
 
   /// Replaces [gateway] in [overrides] when set, so a screen test can run
   /// the real adapter (for example SupabaseCommandGateway over a mock HTTP
@@ -920,6 +1025,8 @@ class ClientTestHarness {
       passwordRecoveryGatewayProvider.overrideWithValue(recovery),
       recoveryEmailRepositoryProvider.overrideWithValue(recoveryEmail),
       credentialReviewRepositoryProvider.overrideWithValue(credentials),
+      assistedRecoveryGatewayProvider.overrideWithValue(assisted),
+      recoveryCasesRepositoryProvider.overrideWithValue(recoveryCases),
       commandGatewayProvider.overrideWithValue(commandGateway ?? gateway),
       platformStatusRepositoryProvider.overrideWithValue(FakePlatformStatus()),
     ],

@@ -382,6 +382,51 @@ void main() {
   );
 
   testWidgets(
+    'story 2.9: Admins see Account recovery; the cases are the server answer',
+    (tester) async {
+      final h = await pumpStaff(tester, location: '/fixture');
+      expect(
+        find.byKey(const Key('nav-/admin/account-recovery')),
+        findsNothing,
+      );
+      expect(
+        staffDestinationsFor(null),
+        isNot(contains(staffAccountRecoveryDestination)),
+      );
+      h.grants.myAccess = AccessReadOk(syntheticGrants(roles: ['admin']));
+      h.recoveryCases.cases = AccessReadOk(
+        RecoveryCases.fromJson({
+          'cases': [
+            recoveryCaseData(grantState: 'issued'),
+            recoveryCaseData(
+              caseId: '30303030-3030-4030-8030-303030303030',
+              name: 'SYNTHETIC Peter Zulu',
+              operationState: 'uncertain',
+            ),
+          ],
+          'accepting': true,
+        }),
+      );
+      await tapKey(tester, 'nav-/status');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'nav-/admin/account-recovery');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('SYNTHETIC Ruth Mwale'), findsOneWidget);
+      expect(find.text('SYNTHETIC Peter Zulu'), findsOneWidget);
+      expect(
+        find.byKey(
+          const Key('recovery-reconcile-30303030-3030-4030-8030-303030303030'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('arg_'), findsNothing);
+      expect(h.recoveryCases.calls, greaterThanOrEqualTo(1));
+    },
+  );
+
+  testWidgets(
     'story 2.8: a held session on staff web sees only the help screen',
     (tester) async {
       final h = await pumpStaff(tester, location: '/fixture');

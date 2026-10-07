@@ -3,6 +3,8 @@
 Architecture: AD-3, AD-4, AD-13, AD-20. Migration: `supabase/migrations/20261006215842_identity_live_access.sql`.
 Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.1/`.
 
+This file holds the per-story mechanics. The restricted support runbooks that staff and the operator follow (applications and linking, email and staff-assisted recovery, holds and disputes, deactivation and handover, deletion, first-Admin setup and the last-Admin fallback) are in [identity-support.md](identity-support.md) (story 2.12).
+
 ## What exists
 
 - **Identity records** (non-exposed `app` schema, RLS on, no client privileges):
@@ -248,6 +250,23 @@ select app.identity_bootstrap_admin('<member_id>', 'israel');
 - The church-setting approval and the lead-pastor designation are journalled there too.
 - The 1.9 journal table was retired by rename (`app.ops_retired_operator_actions_v0`, rows copied, privileges revoked) and recreated with a wider action list, because widening its CHECK needs a DROP. Drop the retired table in a later owner-approved cleanup.
 - Staging uses synthetic Admins. Naming the first real Admin is the production gate at entry 14.
+
+### Identity-checked last-Admin fallback (story 2.12, restricted operator)
+
+Migration: `supabase/migrations/20261007190000_identity_admin_fallback.sql` (no row deletions; one file). Runbook: [identity-support.md, RB8](identity-support.md#rb8-identity-checked-last-admin-fallback).
+
+```sql
+select app.identity_admin_fallback_grant('<member_id>', '<in_person|established_relationship>',
+                                         '<no_usable_admin|admins_unreachable>', 'israel');
+```
+
+- **Why it exists.** "Usable" means "passes every non-session condition", so a sole Admin who forgot the password without a recovery email, or who left without being deactivated, still counts. The bootstrap then refuses, and every Admin-side exit (2.9, 2.8, 2.10) needs another Admin.
+- **The reason must match the real state.** `no_usable_admin` is accepted only while `app.identity_usable_admin_count()` is 0, and `admins_unreachable` only while it is above 0. The reason, the identity check and the count are recorded.
+- **Eligible member.** The member must be approved, with a live link whose account passes `app.identity_account_standing` (`ok`) and is not dormant, must not be under deletion, and must not already hold Admin. It locks the admin role row like the bootstrap and every deletion route.
+- **No Auth row is written.** The command creates no password, session, token or link. The member signs in with their own password; the role applies to their next protected call.
+- **Audit.** `identity_access_audit` `admin_bootstrapped` (actor `operator`), a row in `app.identity_admin_fallbacks`, and `ops_operator_actions` `admin_bootstrapped`. The existing action values are reused, because widening those CHECKs needs a DROP.
+- **Tests.** pgTAP `supabase/tests/identity_admin_fallback_test.sql`; local rehearsal `tools/identity-e2e/runbooks.mjs` (`R60`-`R62`).
+- **Hosted.** The parent session applies the migration to staging after `20261007175000`. It needs no owner setting.
 
 ### Clients
 

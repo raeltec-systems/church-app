@@ -3,7 +3,7 @@ title: 'Confirm and transfer primary cell membership'
 type: 'feature'
 ticket: '6'
 created: '2026-10-07'
-status: 'built'
+status: 'done'
 baseline_revision: 'a16094ac8b8e18b67f979f55cb950b077d42b5c2'
 route: 'full'
 route_source: 'auto'
@@ -66,7 +66,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261007140000_cell_membership.sql` -- tables (member states, requests, memberships, audit, fixture lifecycle calls), scope kinds, authorizer, commands, reads, private fixture read, privileges.
+- [x] `supabase/migrations/20261007075946_cell_membership.sql` -- tables (member states, requests, memberships, audit, fixture lifecycle calls), scope kinds, authorizer, commands, reads, private fixture read, privileges.
 - [x] `supabase/tests/cell_membership_test.sql`, allowlist, smoke checks.
 - [x] `tools/identity-e2e/cells.mjs` (+ test) -- proves the verify bullet.
 - [x] client_core domain/adapter/controllers/screens/routes/fakes + tests; staff and mobile destinations + tests.
@@ -80,7 +80,7 @@ context:
 
 - Built directly (no subagent tool in this session). Checkpoint 1 pre-approved by the owner decisions; the plan is above the 1600-token guide because one Cells owner change spans DB, two clients and evidence (kept whole, as the epic's lane decision does).
 - Files:
-  - Migration `supabase/migrations/20261007140000_cell_membership.sql` (single file, no `delete from`, non-destructive: new tables, one `update` of the `cell_transferred` emitter, scope-kind and authorizer registrations).
+  - Migration `supabase/migrations/20261007075946_cell_membership.sql` (single file, no `delete from`, non-destructive: new tables, one `update` of the `cell_transferred` emitter, scope-kind and authorizer registrations).
   - pgTAP `supabase/tests/cell_membership_test.sql` (88); allowlist in `command_foundation_test.sql` (+10); `identity_grants_test.sql` authorizer/scope-kind assertions narrowed to their own module (Cells now registers its own); `identity_api_smoke.sh` (+10 checks).
   - E2E `tools/identity-e2e/cells.mjs` (+ `cells.test.mjs`).
   - client_core: `domain/cell_membership.dart`, `adapters/supabase_cells_repository.dart`, `application/cell_controllers.dart` (generic `CellsController<T>` + Admin/leader/my-cell controllers), `presentation/cell_screens.dart` (`CellAdminScreen`, `CellLeaderScreen`, `MyCellScreen`), routes `/admin/cells`, `/cells/leader`, `/my-cell`, `cellsRepositoryProvider`, composition, fakes (`FakeCells`, `adminCellData`, `adminCellRequestData`, `cellMemberRowData`, `myCellData`), tests `test/identity/cell_membership_test.dart` (15).
@@ -92,7 +92,7 @@ context:
 - Surprise: the command kernel runs handlers inside a subtransaction, so a hook's `pg_current_xact_id()` differs from the rows' `xmin`. The E2E proves "same transaction" by equal `xmin` of the hook row and both membership rows plus equal transaction start time; pgTAP proves atomicity with a failing hook.
 - Environment: the local stack was reset three times; the phone switch was on only for the E2E and the regressions (`run`, `apply`, `review`, `grants`), then off as found. Every synthetic user and record created was removed.
 - Owner/parent steps: apply the migration to staging after `20261007131600` and repeat the E2E-equivalent demo on staging (staff web + Android). No owner-only setting blocks the build.
-- Review fixes (coordinator review, 2026-10-07; `20261007140000` edited in place, on no hosted project):
+- Review fixes (coordinator review, 2026-10-07; `20261007075946` edited in place, on no hosted project):
   - Admin cancellation recorded as `cancelled_by_admin` (request and audit; reason CHECK widened in the same file); member cancellation stays `member_withdrew`; pgTAP +2; Dart `CellDeclineReason.cancelledByAdmin`.
   - Mobile My cell keeps the chooser read (`MyCellView.options` is an `AccessRead`); a failure shows the read-problem banner with **Try again**, never "No other cells are listed"; widget test.
   - `cell_transferred`: migration updates the event description; fixture case name (and regenerated `fixtures.g.dart`) and runbook say `identity_revision` carries the member's Cells revision and that a v2 payload with `from_cell_id`/`to_cell_id` is needed before any real owner hooks it.
@@ -111,3 +111,7 @@ context:
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/staff`, `apps/mobile` -- pass
 - Results (2026-10-07, local, after a reset): `db:test` 919/919 (cells 88); `db:smoke` all ok (105); `cells.mjs` 13/13; regressions `run.mjs` 30/30, `apply.mjs` 27/27, `review.mjs` 18/18, `grants.mjs` 18/18; client_core 215, staff 18, mobile 20 tests, analyze and format clean; staff `flutter build web` ok; `ci:migrations --base ccr-93e730dd-89lbvg` 16 ordered, non-destructive; `ci:secrets`, `scan-evidence`, node tool tests (44), `ci:policy-test`, `contracts:test` clean. Evidence: `evidence-2.6/README.md`.
 - Matrix audit: every I/O row has a passing pgTAP assertion; Setup, Confirm join, Transfer and Follow-up also have E2E steps (C10–C40).
+
+## Hosted verification
+
+Staging apply, parity check and API checks: `evidence-2.6/staging-verify.md`. Owner device and staff-web check: consolidated test at the end of the epic.

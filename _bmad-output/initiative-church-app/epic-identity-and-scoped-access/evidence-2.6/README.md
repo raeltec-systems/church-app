@@ -1,6 +1,6 @@
 # Evidence: story 2.6 — confirm and transfer primary cell membership
 
-**Run:** 2026-10-07, on the LOCAL stack only (Supabase CLI 2.119.0), after `npx supabase db reset` with every migration up to `20261007140000_cell_membership.sql`. Phone sign-up used the local-only phone switch (`tools/auth-harness/local-phone-auth.mjs on`/`off`): no SMS provider, hook, test OTP or SMS MFA; the E2E confirms `sms_provider` is empty. The switch was turned off afterwards.
+**Run:** 2026-10-07, on the LOCAL stack only (Supabase CLI 2.119.0), after `npx supabase db reset` with every migration up to `20261007075946_cell_membership.sql`. Phone sign-up used the local-only phone switch (`tools/auth-harness/local-phone-auth.mjs on`/`off`): no SMS provider, hook, test OTP or SMS MFA; the E2E confirms `sms_provider` is empty. The switch was turned off afterwards.
 
 **Data:** every record is SYNTHETIC.
 - Phone numbers: `+1 202 555 0120–0139` (pgTAP), `+44 7700 900260–900264` (E2E).

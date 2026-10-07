@@ -413,7 +413,7 @@ Both use fictional numbers (`+1 202 555 0188–0199`) and remove every user, app
 
 ## Cells: setup, confirmation and transfer (story 2.6)
 
-Migration: `supabase/migrations/20261007140000_cell_membership.sql` (no row deletions; one file).
+Migration: `supabase/migrations/20261007075946_cell_membership.sql` (no row deletions; one file).
 Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.6/`.
 
 ### Model (Cells owns it)
@@ -473,4 +473,4 @@ The E2E uses `+44 7700 900260–900264` and removes everything it created, inclu
 
 ### Hosted (owner / parent session)
 
-Apply `20261007140000_cell_membership.sql` after `20261007131600`. Production keeps no cells until the church's real cell list is set up by an Admin after Q4 approval (entry 14); staging uses SYNTHETIC cells.
+Apply `20261007075946_cell_membership.sql` after `20261007131600`. Production keeps no cells until the church's real cell list is set up by an Admin after Q4 approval (entry 14); staging uses SYNTHETIC cells.

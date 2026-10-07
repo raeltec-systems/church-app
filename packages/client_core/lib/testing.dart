@@ -12,6 +12,7 @@ import 'src/domain/platform_status.dart';
 
 import 'src/domain/access_grants.dart';
 import 'src/domain/account_auth.dart';
+import 'src/domain/cell_membership.dart';
 import 'src/domain/commands.dart';
 import 'src/domain/member_access.dart';
 import 'src/domain/membership_application.dart';
@@ -467,6 +468,122 @@ Map<String, Object?> memberRecordData({
   'contact_routes': routes,
 };
 
+/// [CellsRepository] answered by the test (story 2.6). Each field answers
+/// every read at once; the counters record how often each was asked.
+class FakeCells implements CellsRepository {
+  AccessRead<MyCell> mine = const AccessReadDenied(AccessDenial.notLinked);
+  AccessRead<LeaderQueue> leader = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  AccessRead<CellAdminOverview> admin = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  int mineCalls = 0;
+  int leaderCalls = 0;
+  int adminCalls = 0;
+
+  @override
+  Future<AccessRead<MyCell>> fetchMyCell() async {
+    mineCalls++;
+    return mine;
+  }
+
+  @override
+  Future<AccessRead<LeaderQueue>> fetchLeaderQueue() async {
+    leaderCalls++;
+    return leader;
+  }
+
+  @override
+  Future<AccessRead<CellAdminOverview>> fetchAdminOverview() async {
+    adminCalls++;
+    return admin;
+  }
+}
+
+/// The wire form of a synthetic cell as the Admin sees it (story 2.6).
+Map<String, Object?> adminCellData({
+  String id = '77777777-7777-4777-8777-777777777777',
+  String name = 'SYNTHETIC Cell X',
+  int revision = 1,
+  bool listed = true,
+  int? signupRevision = 1,
+  List<Map<String, Object?>> leaders = const [],
+  List<Map<String, Object?>> assistants = const [],
+}) => {
+  'cell_id': id,
+  'name': name,
+  'broad_area': 'SYNTHETIC North',
+  'signup_label': '$name label',
+  'listed': listed,
+  'signup_revision': signupRevision,
+  'cell_state': 'active',
+  'is_synthetic': true,
+  'revision': revision,
+  'leaders': leaders,
+  'assistants': assistants,
+  'member_count': 0,
+};
+
+/// The wire form of an open request in the Admin overview (story 2.6).
+Map<String, Object?> adminCellRequestData({
+  String id = '88888888-8888-4888-8888-888888888888',
+  String memberId = '66666666-6666-4666-8666-666666666666',
+  String choice = 'cell',
+  String? requestedCellId = '77777777-7777-4777-8777-777777777777',
+  String state = 'pending',
+  int memberRevision = 2,
+  bool ownRecord = false,
+}) => {
+  'request_id': id,
+  'member_id': memberId,
+  'display_name': 'SYNTHETIC Ruth Mwale',
+  'kind': 'join',
+  'origin': 'application',
+  'choice': choice,
+  'state': state,
+  'requested_cell_id': requestedCellId,
+  'requested_cell_name': requestedCellId == null ? null : 'SYNTHETIC Cell X',
+  'current_cell_id': null,
+  'current_cell_name': null,
+  'reason': null,
+  'follow_up': requestedCellId == null || state == 'referred',
+  'member_revision': memberRevision,
+  'own_record': ownRecord,
+  'created_at': '2026-10-07T12:00:00.000000Z',
+};
+
+/// The wire form of an approved member row in the Admin overview.
+Map<String, Object?> cellMemberRowData({
+  String id = '99999999-9999-4999-8999-999999999999',
+  String name = 'SYNTHETIC Leader Lydia',
+  int grantsRevision = 3,
+  int cellRevision = 1,
+  String? cellId,
+}) => {
+  'member_id': id,
+  'display_name': name,
+  'account': 'app_account',
+  'grants_revision': grantsRevision,
+  'cell_revision': cellRevision,
+  'cell_id': cellId,
+  'open_request_id': null,
+};
+
+/// The wire form of the member's own cell (story 2.6).
+Map<String, Object?> myCellData({
+  int revision = 1,
+  Map<String, Object?>? primary,
+  Map<String, Object?>? openRequest,
+  Map<String, Object?>? lastDecision,
+}) => {
+  'member_id': '22222222-2222-4222-8222-222222222222',
+  'revision': revision,
+  'primary': primary,
+  'open_request': openRequest,
+  'last_decision': lastDecision,
+};
+
 /// The fakes and provider overrides an app or screen test runs against.
 class ClientTestHarness {
   ClientTestHarness({String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'})
@@ -480,6 +597,7 @@ class ClientTestHarness {
   final grants = FakeGrants();
   final membership = FakeMembership();
   final review = FakeReview();
+  final cells = FakeCells();
 
   /// [configured] false leaves the unconfigured defaults for the gateway and
   /// the platform status (as a build without `--dart-define`s).
@@ -493,6 +611,7 @@ class ClientTestHarness {
       grantsRepositoryProvider.overrideWithValue(grants),
       membershipRepositoryProvider.overrideWithValue(membership),
       reviewRepositoryProvider.overrideWithValue(review),
+      cellsRepositoryProvider.overrideWithValue(cells),
       commandGatewayProvider.overrideWithValue(gateway),
       platformStatusRepositoryProvider.overrideWithValue(FakePlatformStatus()),
     ],

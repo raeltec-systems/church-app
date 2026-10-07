@@ -27,10 +27,19 @@ const mobileAccessDestination = (
   icon: Icons.badge_outlined,
 );
 
+/// Story 2.6: shown while the server grants the caller member access; the
+/// member's own cell and a request to join or change cell.
+const mobileCellDestination = (
+  path: ClientPaths.myCell,
+  label: 'My cell',
+  icon: Icons.groups_outlined,
+);
+
 /// The tabs for the caller's current grants (presentation only).
 List<MobileDestination> mobileDestinationsFor(MemberGrants? grants) => [
   ...mobileDestinations,
   if (grants != null) mobileAccessDestination,
+  if (grants != null) mobileCellDestination,
 ];
 
 class MobileApp extends StatefulWidget {

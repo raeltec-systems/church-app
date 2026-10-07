@@ -134,6 +134,40 @@ void main() {
   );
 
   testWidgets(
+    'story 2.6: My cell follows member access and shows the confirmed cell '
+    'separately from church membership',
+    (tester) async {
+      final h = await pumpMobile(tester, size: const Size(390, 1400));
+      expect(find.byKey(const Key('nav-/my-cell')), findsNothing);
+      h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.cells.mine = AccessReadOk(
+        MyCell.fromJson(
+          myCellData(
+            primary: {
+              'membership_id': '88888888-8888-4888-8888-888888888888',
+              'cell_id': syntheticCellOptions.first.cellId,
+              'label': 'SYNTHETIC Riverside',
+              'broad_area': 'SYNTHETIC North side',
+              'since': '2026-10-07T12:00:00.000000Z',
+            },
+          ),
+        ),
+      );
+      await tapKey(tester, 'nav-/account');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tapKey(tester, 'nav-/my-cell');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.text('SYNTHETIC Riverside'), findsOneWidget);
+      expect(find.text('Confirmed'), findsOneWidget);
+      expect(find.byKey(const Key('nav-/admin/cells')), findsNothing);
+    },
+  );
+
+  testWidgets(
     'story 2.2: refresh and resume keep the session; a session the server no '
     'longer trusts is ended and its state cleared',
     (tester) async {

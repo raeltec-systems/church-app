@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/access_grants.dart';
 import '../domain/account_auth.dart';
+import '../domain/cell_membership.dart';
 import '../domain/commands.dart';
 import '../domain/fixture_counter.dart';
 import '../domain/member_access.dart';
@@ -50,6 +51,11 @@ final membershipRepositoryProvider = Provider<MembershipRepository>(
 /// Story 2.5: the Admin's application queue and member search.
 final reviewRepositoryProvider = Provider<ReviewRepository>(
   (ref) => const UnconfiguredReviewRepository(),
+);
+
+/// Story 2.6: the member's cell, the leader queue and the Admin overview.
+final cellsRepositoryProvider = Provider<CellsRepository>(
+  (ref) => const UnconfiguredCellsRepository(),
 );
 
 final requestIdsProvider = Provider<RequestIds>((ref) => SecureRequestIds());

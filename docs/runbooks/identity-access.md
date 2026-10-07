@@ -410,3 +410,67 @@ node tools/auth-harness/local-phone-auth.mjs off
 ```
 
 Both use fictional numbers (`+1 202 555 0188–0199`) and remove every user, application, member, link, grant, audit row and receipt they create. The bootstrap they perform leaves append-only operator-journal rows (as 2.3's E2E does), so reset before re-running `identity_grants_test.sql`.
+
+## Cells: setup, confirmation and transfer (story 2.6)
+
+Migration: `supabase/migrations/20261007140000_cell_membership.sql` (no row deletions; one file).
+Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.6/`.
+
+### Model (Cells owns it)
+
+- **Cells** (`app.cells_cells`, sign-up projection `app.cells_signup_options` from 2.4): an Admin creates and edits them. Applicants only ever see the sign-up label and broad area.
+- **Leaders and assistants are Identity scope grants**: Cells registers the scope kinds `cell_leader` and `cell_assistant` (scope id = cell id). Give or remove them with the 2.3 commands `identity.grant_scope` / `identity.revoke_scope` (audited in `app.identity_access_audit`, immediate effect). Leaders confirm requests for their cell; assistants have the cell's private access but do not confirm.
+- **Requests** (`app.cells_membership_requests`): `join` or `change`, from an approved application (Cells creates it the first time a Cells read or command runs after the approval, once per application, only for a member with no Cells history), from the member, or from an Admin on a member's behalf. One open request per member. A request grants nothing.
+- **Confirmed membership** (`app.cells_memberships`): zero or one current primary cell per member (partial unique index), with start/end dates; ended rows are kept as history.
+- **Per-member revision** (`app.cells_member_states`): the `expected_revision` of every request command for that member.
+- **Audit** (`app.cells_membership_audit`): ids, codes, revisions, the actor and the capacity they acted in (`admin`, `cell_leader`, `member`). No names, labels or numbers.
+- **Cell-private access rule** for later owners: `app.cells_member_has_private_access(member_id, cell_id)` = a current primary membership in the cell, or a leader/assistant scope for it. Use it only with the member the live-access predicate returned. The Admin role alone gives none. `api.cells_private_fixture_read(cell_id)` is its SYNTHETIC fixture surface.
+- Personal-data gate: every Cells command and read needs `app.identity_applications_open()`; while Q4 is unapproved, cell names, labels and areas must start `SYNTHETIC `.
+
+### Commands (`POST /rest/v1/rpc/cells_command`, `Content-Profile: api`)
+
+The `cells` authorizer is registered in the 2.3 authorizer registry (namespace = module). It needs a live member session (`unauthenticated` otherwise) and share-locks the actor's Admin and cell-scope grants; each handler checks the capacity.
+
+| Command | Who | `expected_revision` | Payload |
+|---|---|---|---|
+| `cells.create_cell` | Admin | null | `{name, signup_label, broad_area, listed?, sort_order?}` |
+| `cells.update_cell` | Admin | cell revision | `{cell_id, name?, signup_label?, broad_area?, listed?}` |
+| `cells.request_change` | the member; an Admin for any member (`member_id`) | member's Cells revision | `{cell_id, cell_revision (the sign-up option revision), member_id?}` |
+| `cells.confirm_request` | the leader of the requested cell, or an Admin | member's Cells revision | `{request_id, cell_id?}` (`cell_id`: Admin only; required for a request without a cell) |
+| `cells.decline_request` | the leader (refers it to the Admin follow-up queue) or an Admin (final) | member's Cells revision | `{request_id, reason?}`; `reason` ∈ `not_in_this_cell`, `not_known_to_leader`, `member_withdrew`, `no_cell_for_now` |
+| `cells.cancel_request` | the member (own request) or an Admin | member's Cells revision | `{request_id}`; recorded as `member_withdrew` (member) or `cancelled_by_admin` (Admin) |
+
+- Nobody confirms or declines their own membership (`forbidden {"member_id": "unsupported"}`); a member cannot request for someone else.
+- A change to the current cell is `validation_failed {"cell_id": "current"}`; a second open request is `conflict {"member_id": "open_request"}`; a decided request is `conflict {"request_id": "decided"}`.
+- **Transfer**: confirming a request of a member who already has a primary cell ends the old membership (`transferred`) and starts the new one in the same transaction, then dispatches the contract v1 lifecycle event `cell_transferred` to every hook registered with `app.contract_register_lifecycle_hook`; Cells is now its emitter. A failing hook rolls the transfer back. Church membership, account links and grants are not touched.
+- **`cell_transferred` payload (contract v1).** In this event `identity_revision` carries the member's **Cells** revision after the move (`app.cells_member_states.revision`), not an Identity revision; the field keeps its v1 name. The v1 payload has no cell ids. **Before any real owner (duties, chat, follow-ups, programmes) registers a hook for it, a contract v2 payload with `from_cell_id` and `to_cell_id` is needed** (a contract version change: SQL `app.contract_check`, the shared fixtures and the Dart/TypeScript mappings). Nothing real is registered today; only the SYNTHETIC fixture hook is, by tests and the local E2E.
+- `app.fixture_record_lifecycle(jsonb)` is a SYNTHETIC hook. The migration does **not** register it; tests and the local E2E register it and remove it again.
+
+### Reads
+
+| Endpoint | Who | Returns |
+|---|---|---|
+| `api.cells_my_cell()` | a member with live access | `{member_id, revision, primary {cell_id, label, broad_area, since}, open_request, last_decision}` |
+| `api.cells_leader_queue()` | holders of a `cell_leader` or `cell_assistant` scope (`403 not_granted` otherwise) | each cell they serve with its roster; leaders also get the cell's pending requests |
+| `api.cells_admin_overview()` | Admin | cells with leaders/assistants and their grant revisions, every open request (`follow_up` = no cell chosen or referred by a leader), approved members with their cell and revisions (at most 500) |
+
+### Clients
+
+- **Staff web.** **Cells** (`/admin/cells`, Admin): follow-up queue, requests waiting for a leader, cells with their leaders/assistants (give or remove the role), list/hide for sign-up, add a cell, and request a cell for a member (for example one without a login). **My cell group** (`/cells/leader`, shown while the caller holds a cell scope): requests to confirm or pass to the office, and the roster.
+- **Mobile.** **My cell** (`/my-cell`, shown with member access): the confirmed cell (separately from church membership), the open request with **Cancel**, and **Ask to join/change cell** from the safe chooser.
+- Unknown outcomes are checked again under the same request id; a refused or denied answer re-reads the caller's access.
+
+### Local runs
+
+```bash
+npx supabase db reset                          # empty Admin roster
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/cells.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The E2E uses `+44 7700 900260–900264` and removes everything it created, including its hook registration.
+
+### Hosted (owner / parent session)
+
+Apply `20261007140000_cell_membership.sql` after `20261007131600`. Production keeps no cells until the church's real cell list is set up by an Admin after Q4 approval (entry 14); staging uses SYNTHETIC cells.

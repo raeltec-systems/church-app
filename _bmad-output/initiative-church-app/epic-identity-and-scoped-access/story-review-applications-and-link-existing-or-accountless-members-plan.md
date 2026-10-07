@@ -3,7 +3,7 @@ title: 'Review applications and link existing or accountless members'
 type: 'feature'
 ticket: '5'
 created: '2026-10-07'
-status: 'built'
+status: 'done'
 baseline_revision: '10de24412f96617b2e1fc7efde2527dd8b837dc8'
 route: 'full'
 route_source: 'auto'
@@ -135,3 +135,7 @@ context:
 | email binding comment vs code; applicant not told | low | patch | header says bind-if-confirmed, code refuses |
 | last_admin refusal shown as "no longer Admin" | low | patch | _refusal maps forbidden generically |
 | prior_not_approved ignores withdrawn; trigger scope undocumented | low | patch | cooldown counts rejected only |
+
+## Hosted verification
+
+Staging apply, parity check, reclaim check and the owner's Android demonstration: `evidence-2.5/staging-verify.md`.

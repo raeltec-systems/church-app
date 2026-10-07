@@ -32,4 +32,5 @@ Synthetic data only. Fictional numbers only (+1 202 555 01xx). No passwords or t
 
 ## Device demo
 
-Pending: applicant +12025550152 sees the approval on the staging APK (v5) after a fresh sign-in.
+2026-10-07, owner's Android phone, staging APK v5: applicant +12025550152, approved by the Admin, was asked to sign in again
+(the pre-approval session is no longer trusted) and then saw My membership as **Approved**.

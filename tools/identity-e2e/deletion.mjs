@@ -28,21 +28,20 @@
 // Usage: node tools/identity-e2e/deletion.mjs [--evidence <file.jsonl>]
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { amrMethods, dbContainer, EPOCH_WAIT_MS, localHttp, localKey, password, runMain, sleep, startRun } from './harness.mjs';
 import { LocalSegmentJournal, validateEntry, verifyJournal } from '../recovery/journal.mjs';
 import { requestCode } from './lifecycle.mjs';
-import { amrMethods, assertLocalOrigin, redact } from './run.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const FN = '/functions/v1/identity-deletion';
 const ISOLATED = 'bic-deletion-isolated';
 const NAME_PREFIX = 'SYNTHETIC 2.11 E2E';
 const OPERATOR = 'israel';
-const EPOCH_WAIT_MS = 6500; // the 2.2 trust-epoch margin is 5 s
 
 /** The reserved fictional numbers this run uses (+44 7700 900620-900639). */
 export function isFictionalDeletionPhone(phone) {
@@ -57,19 +56,6 @@ export function opaqueEntryProblems(entry, forbidden = []) {
   return problems;
 }
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-function localKey() {
-  const env = execFileSync('npx', ['supabase', 'status', '-o', 'env'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  const url = /^API_URL="([^"]+)"/m.exec(env)?.[1];
-  const key = /^PUBLISHABLE_KEY="([^"]+)"/m.exec(env)?.[1];
-  const secret = /^SECRET_KEY="([^"]+)"/m.exec(env)?.[1];
-  const service = /^SERVICE_ROLE_KEY="([^"]+)"/m.exec(env)?.[1];
-  if (!url || !key || !secret || !service) throw new Error('local stack is not running');
-  return { origin: assertLocalOrigin(url), key, secret, service };
-}
-
-const dbContainer = () => execFileSync('docker', ['ps', '--filter', 'name=supabase_db_', '--format', '{{.Names}}'], { encoding: 'utf8' }).trim().split('\n')[0];
 function psqlIn(container, db, sql) {
   return execFileSync('docker', ['exec', '-i', container, 'psql', '-U', 'postgres', '-d', db, '-X', '-qtA', '-v', 'ON_ERROR_STOP=1'],
     { input: sql, encoding: 'utf8', maxBuffer: 256 << 20 }).trim();
@@ -82,32 +68,10 @@ const jsonLiteral = (v) => {
 };
 
 async function main() {
-  const evidenceIdx = process.argv.indexOf('--evidence');
-  const evidence = evidenceIdx > 0 ? process.argv[evidenceIdx + 1] : null;
-  if (evidence) writeFileSync(evidence, '');
-  const { origin, key, secret, service } = localKey();
-  const results = [];
-  const log = (step, data) => {
-    const line = { step, target: 'LOCAL', at: new Date().toISOString(), ...redact(data) };
-    if (evidence) appendFileSync(evidence, JSON.stringify(line) + '\n');
-    console.log(JSON.stringify(line));
-  };
-  const check = (step, ok, data) => {
-    results.push({ step, ok });
-    log(step, { verdict: ok ? 'pass' : 'FAIL', ...data });
-  };
-  async function http(method, path, { token, body, profile, admin, headers: extra } = {}) {
-    const headers = { apikey: admin ? secret : key, 'Content-Type': 'application/json', ...(extra ?? {}) };
-    if (admin) headers.Authorization = `Bearer ${service}`;
-    else if (token) headers.Authorization = `Bearer ${token}`;
-    if (profile) headers[method === 'GET' ? 'Accept-Profile' : 'Content-Profile'] = profile;
-    const res = await fetch(`${origin}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
-    const text = await res.text();
-    let json = null;
-    try { json = text ? JSON.parse(text) : null; } catch { /* non-JSON */ }
-    return { status: res.status, json };
-  }
-  const password = () => `Synthetic-${randomBytes(12).toString('base64url')}`;
+  const { log, check, finish } = startRun();
+  const keys = localKey();
+  const { origin, key } = keys;
+  const http = localHttp(keys);
   const signIn = (phone, pw) => http('POST', '/auth/v1/token?grant_type=password', { body: { phone, password: pw } });
   const refresh = (rt) => http('POST', '/auth/v1/token?grant_type=refresh_token', { body: { refresh_token: rt } });
   const rpc = (fn, token, body = {}) => http('POST', `/rest/v1/rpc/${fn}`, { token, body, profile: 'api' });
@@ -697,17 +661,7 @@ async function main() {
     log('D100-cleanup', { users_left: Number(left), credential_revoked: true, principal_disabled: true, isolated_removed: isolated,
       unmarked: marked, journal_and_acks_kept: 'append-only' });
   }
-  const failed = results.filter((r) => !r.ok);
-  console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
-  if (failed.length) {
-    console.log(`FAILED: ${failed.map((f) => f.step).join(', ')}`);
-    process.exitCode = 1;
-  }
+  finish();
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main().catch((e) => {
-    console.error(e.message);
-    process.exitCode = 1;
-  });
-}
+runMain(import.meta.url, main);

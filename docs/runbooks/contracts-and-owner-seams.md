@@ -39,7 +39,15 @@ Migration: `supabase/migrations/20261003134340_cross_epic_contracts.sql`.
 - **Prefixes.** Every `app` table, view, sequence and function name starts with its owning module's prefix, as listed in `app.contract_module_prefixes`. A new owner adds its module and prefix in its first migration.
 - **Dependencies.** `app.contract_module_dependencies` holds the allowed edges, copied from the architecture's dependency diagram.
 - **Exceptions.** `app.contract_dependency_exceptions` names single functions that may reach outside their module's edges. Today there is only one: `app.cmd_authorize(uuid,text)` reaches `fixture`, until the identity epic replaces it.
-- **Retired functions.** `app.contract_retired_functions` lists the exact retired functions (three from story 1.4). Any other `retired_*` name is unowned. Retire an object by revoking all privileges and renaming it, then add its exact signature to that list. Drops wait for a cleanup the owner approves.
+- **Retired functions.** `app.contract_retired_functions` lists the exact retired functions (three from story 1.4). Any other `retired_*` name is unowned. Retire an object by revoking all privileges and renaming it, then add its exact signature to that list and a row to the ledger below. Drops wait for a cleanup the owner approves.
+- **Retired-object ledger.** Every retired object waiting for an owner-approved drop. pgTAP `supabase/tests/retired_objects_ledger_test.sql` pins this exact set and that no client role holds any privilege on it. A new retirement adds its rows here and there; an approved drop removes them from both.
+
+  | Object (with its index and sequence) | Kind | Retired by | Why | Before dropping |
+  |---|---|---|---|---|
+  | `app.retired_fixture_counter_command_v0(...)`, `api.retired_fixture_counter_command_v0(...)`, `app.retired_cmd_execute_v0(...)` | functions | 1.4 | typed entry points superseded by the jsonb envelope | remove from `app.contract_retired_functions` |
+  | `app.ops_retired_operator_actions_v0` (`_pkey`, `_id_seq`) | table | 2.3 | operator journal CHECK widened (rows copied) | none |
+  | `app.ops_retired_operator_actions_v1` (`_pkey`, `_id_seq`) | table | 2.12 | operator journal CHECK widened (rows copied) | none |
+  | `app.identity_retired_access_audit_v0` (`_pkey`, `_target`, `_event_id_seq`) | table | 2.12 | access audit CHECK widened (rows copied) | take it out of the deletion retention rules ([identity-access.md](identity-access.md)) |
 - **Guards.** pgTAP fails when any of these returns rows:
   - `app.contract_unowned_objects()`
   - `app.contract_unpinned_functions()`: every `app`/`api` function must set `search_path = ''`, so every reference is schema-qualified and visible to the guard

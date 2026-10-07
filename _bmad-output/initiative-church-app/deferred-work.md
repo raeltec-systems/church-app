@@ -50,3 +50,7 @@
 - source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-delete-a-member-fully-through-a-resumable-workflow-plan.md`
   summary: Real owners (device registrations, Duties, Chat, Directory, Prayer, Storage objects) must register deletion hooks (app.identity_register_deletion_hook) before they activate, and Q4 must approve identity_deletion_retention (what is erased or anonymised, and journal/backup retention) before production erasure runs; production also needs a scheduled worker and its credential.
   evidence: 2.11 erases Identity and Cells data and proves owner hooks only with the SYNTHETIC fixture hook; production requests deny access but erasure waits on the closed gate by design.
+
+- source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-refactor-sweep-plan.md`
+  summary: Minimise personal data in stored command receipts: recovery-email (2.7) command results keep the email, phone or name in `result`, and 2.5 outcomes follow the same pattern, and replays return that stored answer; store only what a replay needs (ids, states, codes).
+  evidence: 2.7 review triage routed it to the 2.13 refactor sweep; 2.13 kept it out because shrinking stored results changes replay answers and the receipts already written (behaviour, not cleanup). Needs its own entry, ideally with Q4 retention.

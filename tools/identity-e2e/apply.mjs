@@ -19,12 +19,9 @@
 // synthetic cells it seeded are removed at the end.
 //
 // Usage: node tools/identity-e2e/apply.mjs [--evidence <file.jsonl>]
-import { execFileSync } from 'node:child_process';
-import { randomBytes, randomUUID } from 'node:crypto';
-import { appendFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
 
-import { amrMethods, assertLocalOrigin, redact } from './run.mjs';
+import { amrMethods, localHttp, localKey, password, psql, runMain, startRun } from './harness.mjs';
 
 /** The reserved fictional numbers this run uses. */
 export function isFictionalApplyPhone(phone) {
@@ -43,45 +40,10 @@ export function unsafeOptionKeys(options) {
 const SEEDED_CELLS = ['00000000-0000-4000-c000-00000000c241', '00000000-0000-4000-c000-00000000c242',
   '00000000-0000-4000-c000-00000000c243'];
 
-function localKey() {
-  const env = execFileSync('npx', ['supabase', 'status', '-o', 'env'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  const url = /^API_URL="([^"]+)"/m.exec(env)?.[1];
-  const key = /^PUBLISHABLE_KEY="([^"]+)"/m.exec(env)?.[1];
-  if (!url || !key) throw new Error('local stack is not running');
-  return { origin: assertLocalOrigin(url), key };
-}
-
-function psql(sql) {
-  const name = execFileSync('docker', ['ps', '--filter', 'name=supabase_db_', '--format', '{{.Names}}'], { encoding: 'utf8' }).trim().split('\n')[0];
-  return execFileSync('docker', ['exec', '-i', name, 'psql', '-U', 'postgres', '-X', '-qtA', '-v', 'ON_ERROR_STOP=1', '-c', sql], { encoding: 'utf8' }).trim();
-}
-
 async function main() {
-  const evidenceIdx = process.argv.indexOf('--evidence');
-  const evidence = evidenceIdx > 0 ? process.argv[evidenceIdx + 1] : null;
-  if (evidence) writeFileSync(evidence, '');
-  const { origin, key } = localKey();
-  const results = [];
-  const log = (step, data) => {
-    const line = { step, target: 'LOCAL', at: new Date().toISOString(), ...redact(data) };
-    if (evidence) appendFileSync(evidence, JSON.stringify(line) + '\n');
-    console.log(JSON.stringify(line));
-  };
-  const check = (step, ok, data) => {
-    results.push({ step, ok });
-    log(step, { verdict: ok ? 'pass' : 'FAIL', ...data });
-  };
-  async function http(method, path, { token, body, profile } = {}) {
-    const headers = { apikey: key, 'Content-Type': 'application/json' };
-    if (token) headers.Authorization = `Bearer ${token}`;
-    if (profile) headers[method === 'GET' ? 'Accept-Profile' : 'Content-Profile'] = profile;
-    const res = await fetch(`${origin}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
-    const text = await res.text();
-    let json = null;
-    try { json = text ? JSON.parse(text) : null; } catch { /* non-JSON */ }
-    return { status: res.status, json };
-  }
-  const password = () => `Synthetic-${randomBytes(12).toString('base64url')}`;
+  const { log, check, finish } = startRun();
+  const keys = localKey({ admin: false });
+  const http = localHttp(keys);
   const signUp = (phone, pw) => http('POST', '/auth/v1/signup', { body: { phone, password: pw } });
   const signIn = (phone, pw) => http('POST', '/auth/v1/token?grant_type=password', { body: { phone, password: pw } });
   const rpc = (fn, token, body = {}) => http('POST', `/rest/v1/rpc/${fn}`, { token, body, profile: 'api' });
@@ -261,17 +223,7 @@ async function main() {
     }
     log('A99-cleanup', { applicant_users_left: Number(left), unmarked: marked, cells_removed: preexistingCells === 0 });
   }
-  const failed = results.filter((r) => !r.ok);
-  console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
-  if (failed.length) {
-    console.log(`FAILED: ${failed.map((f) => f.step).join(', ')}`);
-    process.exitCode = 1;
-  }
+  finish();
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main().catch((e) => {
-    console.error(e.message);
-    process.exitCode = 1;
-  });
-}
+runMain(import.meta.url, main);

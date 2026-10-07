@@ -4,13 +4,13 @@ import 'package:http/http.dart' as http;
 import 'package:supabase/supabase.dart';
 
 import '../domain/access_grants.dart';
-import 'supabase_member_access_repository.dart' show isJwtRejection;
 
 /// One protected `api` read: `POST /rest/v1/rpc/<function>` with
 /// `Content-Profile: api`. The server decides; this only maps the answer.
 /// Like the member summary (story 2.2), a JWT that PostgREST itself rejects
 /// is refreshed once and asked again; only the server's answer is a denial.
-/// Shared by the grant (2.3) and applicant (2.4) repositories.
+/// Shared by the member summary (2.2), grant (2.3) and applicant (2.4)
+/// repositories.
 class SupabaseApiReader {
   SupabaseApiReader(this._client, {this.timeout = const Duration(seconds: 10)});
 
@@ -19,7 +19,7 @@ class SupabaseApiReader {
 
   Future<AccessRead<T>> read<T>(
     String function,
-    Map<String, Object?> params,
+    Map<String, Object?>? params,
     T Function(Object?) parse,
   ) async {
     if (_client.auth.currentSession == null) {
@@ -49,7 +49,7 @@ class SupabaseApiReader {
 
   Future<(AccessRead<T>?, PostgrestException?)> _once<T>(
     String function,
-    Map<String, Object?> params,
+    Map<String, Object?>? params,
     T Function(Object?) parse,
   ) async {
     final Object? body;
@@ -107,3 +107,7 @@ AccessDenial? accessDenialFor(String? code, String message, Object? details) {
   }
   return null;
 }
+
+/// PostgREST rejected the JWT itself (expired / invalid), before the
+/// live-access predicate ran.
+bool isJwtRejection(String? code) => code == 'PGRST301' || code == 'PGRST303';

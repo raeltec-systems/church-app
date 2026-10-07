@@ -30,20 +30,18 @@
 // Usage: node tools/identity-e2e/runbooks.mjs [--evidence <file.jsonl>]
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { amrMethods, EPOCH_WAIT_MS, localHttp, localKey, password as newPassword, psql, RESEND_WAIT_MS, runMain, sleep, startRun } from './harness.mjs';
 import { digestOf, findLeaks, newGrantSecret } from './assisted.mjs';
 import { MAILPIT, MOBILE_EMAIL_CONFIRMED, MOBILE_RECOVERY, codeFrom, pkcePair, redirectFacts } from './recovery.mjs';
-import { amrMethods, assertLocalOrigin, redact } from './run.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const NAME_PREFIX = 'SYNTHETIC 2.12 RB';
 const OPERATOR = 'israel';
-const EPOCH_WAIT_MS = 6500; // the 2.2 trust-epoch margin is 5 s
-const RESEND_WAIT_MS = 1200; // local max_frequency is 1 s per address
 const ASSISTED_FN = '/functions/v1/identity-assisted-recovery';
 const DELETION_FN = '/functions/v1/identity-deletion';
 
@@ -73,40 +71,13 @@ export function changedAuthFacts(before, after) {
   return AUTH_FACTS.filter((k) => JSON.stringify(before?.[k] ?? null) !== JSON.stringify(after?.[k] ?? null));
 }
 
-function localKey() {
-  const env = execFileSync('npx', ['supabase', 'status', '-o', 'env'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  const url = /^API_URL="([^"]+)"/m.exec(env)?.[1];
-  const key = /^PUBLISHABLE_KEY="([^"]+)"/m.exec(env)?.[1];
-  const secret = /^SECRET_KEY="([^"]+)"/m.exec(env)?.[1];
-  const service = /^SERVICE_ROLE_KEY="([^"]+)"/m.exec(env)?.[1];
-  if (!url || !key || !secret || !service) throw new Error('local stack is not running');
-  return { origin: assertLocalOrigin(url), key, secret, service };
-}
-
-function psqlRaw(sql) {
-  const name = execFileSync('docker', ['ps', '--filter', 'name=supabase_db_', '--format', '{{.Names}}'], { encoding: 'utf8' }).trim().split('\n')[0];
-  return execFileSync('docker', ['exec', '-i', name, 'psql', '-U', 'postgres', '-X', '-qtA', '-v', 'ON_ERROR_STOP=1', '-c', sql],
-    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-}
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const psqlRaw = (sql) => psql(sql, { captureStderr: true });
 
 async function main() {
-  const evidenceIdx = process.argv.indexOf('--evidence');
-  const evidence = evidenceIdx > 0 ? process.argv[evidenceIdx + 1] : null;
-  if (evidence) writeFileSync(evidence, '');
-  const { origin, key, secret, service } = localKey();
+  const { evidence, log, check, results, finish } = startRun();
+  const keys = localKey();
+  const { origin, key } = keys;
   const startedAt = new Date().toISOString();
-  const results = [];
-  const log = (step, data) => {
-    const line = { step, target: 'LOCAL', at: new Date().toISOString(), ...redact(data) };
-    if (evidence) appendFileSync(evidence, JSON.stringify(line) + '\n');
-    console.log(JSON.stringify(line));
-  };
-  const check = (step, ok, data) => {
-    results.push({ step, ok });
-    log(step, { verdict: ok ? 'pass' : 'FAIL', ...data });
-  };
 
   // What each party saw, for the leak scan.
   const staffTokens = new Set(); // sessions of support staff (Admins)
@@ -116,7 +87,6 @@ async function main() {
   const codes = []; // request codes: the member reads one out; staff answers never echo it
   const keep = (...v) => { for (const x of v) if (typeof x === 'string' && x) secrets.push(x); return v[0]; };
 
-  const psql = (sql) => psqlRaw(sql);
   const operator = (sql) => { const out = psqlRaw(sql); operatorTexts.push(out); return out; };
   const operatorTry = (sql) => {
     try { return { ok: true, out: operator(sql) }; } catch (e) {
@@ -126,20 +96,11 @@ async function main() {
     }
   };
 
-  async function http(method, path, { token, body, profile, admin, xff } = {}) {
-    const headers = { apikey: admin ? secret : key, 'Content-Type': 'application/json' };
-    if (admin) headers.Authorization = `Bearer ${service}`;
-    else if (token) headers.Authorization = `Bearer ${token}`;
-    if (profile) headers[method === 'GET' ? 'Accept-Profile' : 'Content-Profile'] = profile;
-    if (xff !== undefined) headers['X-Forwarded-For'] = xff;
-    const res = await fetch(`${origin}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined, redirect: 'manual' });
-    const text = await res.text();
-    if (token && staffTokens.has(token)) staffTexts.push(text);
-    let json = null;
-    try { json = text ? JSON.parse(text) : null; } catch { /* non-JSON */ }
-    return { status: res.status, json, location: res.headers.get('location') };
-  }
-  const password = () => keep(`Synthetic-${randomBytes(12).toString('base64url')}`);
+  const http = localHttp(keys, {
+    redirect: 'manual',
+    onText: (text, { token }) => { if (token && staffTokens.has(token)) staffTexts.push(text); },
+  });
+  const password = () => keep(newPassword());
   const signUp = (phone, pw) => http('POST', '/auth/v1/signup', { body: { phone, password: pw } });
   const signInRaw = (phone, pw) => http('POST', '/auth/v1/token?grant_type=password', { body: { phone, password: pw } });
   // A sign-in on the person's own device. Member tokens are secrets; staff tokens are tracked.
@@ -797,17 +758,7 @@ async function main() {
     results.push({ step: 'R101-evidence-is-content-free', ok: leaks.length === 0 });
     log('R101-evidence-is-content-free', { verdict: leaks.length === 0 ? 'pass' : 'FAIL', leaks: leaks.length });
   }
-  const failed = results.filter((r) => !r.ok);
-  console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
-  if (failed.length) {
-    console.log(`FAILED: ${failed.map((f) => f.step).join(', ')}`);
-    process.exitCode = 1;
-  }
+  finish();
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main().catch((e) => {
-    console.error(e.message);
-    process.exitCode = 1;
-  });
-}
+runMain(import.meta.url, main);

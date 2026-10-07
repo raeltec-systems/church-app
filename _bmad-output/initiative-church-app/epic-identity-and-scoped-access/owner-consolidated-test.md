@@ -12,7 +12,7 @@ Run once, after 2.13, on staging (`tmurpotfluignacfueki`) with the staging APK a
 
 3. **DONE 2026-10-07 (verified identical to local, recorded as 20261007175000).** Paste in the staging SQL Editor (2.11). Same way, `supabase/migrations/20261007175000_member_deletion_rows.sql`. It lets a deletion erase the member's rows; until then deletions stop at "unavailable" and erase nothing.
 
-4. **Deletion worker credential (2.11).** In your local clone (the same place you ran the 2.9 command), run
+4. **DONE 2026-10-07 (principal identity-deletion-worker, credential ea86f6b3-..., expires 2026-11-06).** Deletion worker credential (2.11). In your local clone (the same place you ran the 2.9 command), run
    `OPS_STATE_DIR=.ops-state/identity-deletion node tools/ops/system-credential.mjs mint --env staging`
    and send me only the fingerprint (digest) it prints. I register it. The token stays in that folder; the worker reads it from `IDENTITY_DELETION_CREDENTIAL_FILE=.ops-state/identity-deletion/staging.credential`.
 
@@ -33,6 +33,7 @@ Run once, after 2.13, on staging (`tmurpotfluignacfueki`) with the staging APK a
 
 ## Reminders
 
+- Rotate the staging deletion-worker credential before 2026-11-06 (same way, `OPS_STATE_DIR=.ops-state/identity-deletion ... mint --env staging --force`, send the new fingerprint).
 - Rotate the staging assisted-recovery credential before 2026-11-06 (mint with `--force`, send the new fingerprint, update the Edge Function secret).
 
 ## Decisions for the owner at 2.14

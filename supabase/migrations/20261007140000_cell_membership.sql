@@ -75,7 +75,8 @@ create table app.cells_membership_requests (
   decided_by_account uuid,
   decided_as text check (decided_as in ('admin', 'cell_leader', 'member')),
   decision_reason text check (decision_reason in ('not_in_this_cell', 'not_known_to_leader',
-                                                  'member_withdrew', 'no_cell_for_now')),
+                                                  'member_withdrew', 'no_cell_for_now',
+                                                  'cancelled_by_admin')),
   resulting_membership_id uuid,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -181,8 +182,16 @@ revoke all on table app.cells_member_states, app.cells_membership_requests, app.
 revoke all on sequence app.cells_membership_audit_event_id_seq, app.fixture_lifecycle_calls_call_id_seq
   from public, anon, authenticated, service_role;
 
--- Cells emits cell_transferred (contract v1 stub list, 1.5).
-update app.contract_lifecycle_events set emitter_module = 'cells' where event = 'cell_transferred';
+-- Cells emits cell_transferred (contract v1 stub list, 1.5). In this event `identity_revision`
+-- carries the member's Cells revision (app.cells_member_states) after the move, not an Identity
+-- revision. The v1 payload has no cell ids: a v2 payload with from_cell_id / to_cell_id is needed
+-- before any real owner (duties, chat, follow-ups, programmes) registers a hook for it.
+update app.contract_lifecycle_events
+   set emitter_module = 'cells',
+       description = 'Confirmed primary cell membership moved to another cell. identity_revision '
+                     'carries the member''s Cells revision; v2 (from_cell_id, to_cell_id) is '
+                     'needed before a real owner hooks it'
+ where event = 'cell_transferred';
 
 -- ---------------------------------------------------------------------------------------------
 -- Scope kinds: cell leader and assistant (Identity grant model, 2.3)
@@ -926,12 +935,17 @@ begin
   update app.cells_membership_requests r
      set request_state = 'cancelled', decided_at = now(), updated_at = now(),
          decided_by_member = v_actor.member_id, decided_by_account = v_actor.account_id,
-         decided_as = v_capacity, decision_reason = 'member_withdrew'
+         decided_as = v_capacity,
+         decision_reason = case v_capacity when 'admin' then 'cancelled_by_admin'
+                                           else 'member_withdrew' end
    where r.request_id = v_request.request_id;
   v_revision := app.cells_bump_member(v_request.member_id);
   perform app.cells_audit('request_cancelled', v_actor.member_id, v_actor.account_id, v_capacity, 'cells.cancel_request',
                           v_request.member_id, v_request.requested_cell_id, null,
-                          v_request.request_id, null, 'member_withdrew', v_revision);
+                          v_request.request_id, null,
+                          case v_capacity when 'admin' then 'cancelled_by_admin'
+                                          else 'member_withdrew' end,
+                          v_revision);
   return app.cells_member_outcome(v_request.member_id);
 end;
 $$;

@@ -498,6 +498,36 @@ void main() {
       expect(sent.wire['payload'], {'request_id': _request});
     });
 
+    testWidgets(
+      'a failed cell list shows the error and retries, not "no cells"',
+      (tester) async {
+        final h = await pumpAt(
+          tester,
+          ClientPaths.myCell,
+          setUp: (h) {
+            h.cells.mine = AccessReadOk(MyCell.fromJson(myCellData()));
+            h.membership.options = const AccessReadFailed(unreachable: true);
+          },
+        );
+        expect(byKey('my-cell-current'), findsOneWidget);
+        expect(byKey('my-cell-options-problem'), findsOneWidget);
+        expect(find.text('No connection'), findsOneWidget);
+        expect(byKey('my-cell-no-options'), findsNothing);
+        expect(find.text('No other cells are listed right now.'), findsNothing);
+        expect(enabled(tester, 'my-cell-send'), isFalse);
+        final reads = h.cells.mineCalls;
+        h.membership.options = AccessReadOk(syntheticCellOptions);
+        await tapKey(tester, 'my-cell-options-retry');
+        await settle(tester);
+        expect(h.cells.mineCalls, reads + 1);
+        expect(byKey('my-cell-options-problem'), findsNothing);
+        expect(
+          byKey('my-cell-option-${syntheticCellOptions.first.cellId}'),
+          findsOneWidget,
+        );
+      },
+    );
+
     testWidgets('signing out drops the cell', (tester) async {
       final h = await pumpAt(
         tester,

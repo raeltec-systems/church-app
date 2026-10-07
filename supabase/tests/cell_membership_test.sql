@@ -6,7 +6,7 @@
 -- sign-up: tools/identity-e2e/cells.mjs. Every account, phone and name here is SYNTHETIC
 -- (fictional range +1 202 555 0120-0139).
 begin;
-select plan(88);
+select plan(90);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000026' || lpad(n::text, 2, '0'))::uuid $$;
@@ -407,6 +407,19 @@ select is(pg_temp.cells(pg_temp.c(7), 'cells.cancel_request', pg_temp.rev(8),
 select is(pg_temp.cells(pg_temp.c(8), 'cells.cancel_request', pg_temp.rev(8),
   jsonb_build_object('request_id', (pg_temp.req(8)).request_id)) #>> '{data,last_decision,state}',
   'cancelled', 'the member cancels their own request');
+select is((pg_temp.req(8)).decision_reason || '|' || (select a.reason_code from app.cells_membership_audit a
+            where a.membership_request_id = (pg_temp.req(8)).request_id and a.action = 'request_cancelled'),
+  'member_withdrew|member_withdrew', 'a member''s cancellation is recorded as withdrawn');
+select pg_temp.cells(pg_temp.c(8), 'cells.request_change', pg_temp.rev(8),
+  jsonb_build_object('cell_id', pg_temp.x(), 'cell_revision', app.cells_option_revision(pg_temp.x())));
+create temp table admin_cancel as select (pg_temp.req(8)).request_id as id,
+  pg_temp.cells(pg_temp.c(1), 'cells.cancel_request', pg_temp.rev(8),
+    jsonb_build_object('request_id', (pg_temp.req(8)).request_id)) as r;
+select is((select r.decision_reason from app.cells_membership_requests r, admin_cancel c where r.request_id = c.id)
+          || '|' || (select a.reason_code || ':' || a.actor_capacity from app.cells_membership_audit a, admin_cancel c
+                      where a.membership_request_id = c.id and a.action = 'request_cancelled'),
+  'cancelled_by_admin|cancelled_by_admin:admin',
+  'an Admin''s cancellation is recorded as cancelled by an Admin, not as the member withdrawing');
 select is(pg_temp.cells(pg_temp.c(3), 'cells.request_change', pg_temp.rev(3),
   jsonb_build_object('cell_id', pg_temp.x(), 'cell_revision', app.cells_option_revision(pg_temp.x()))) #>> '{data,open_request,kind}',
   'join', 'a leader asks to join their own cell');

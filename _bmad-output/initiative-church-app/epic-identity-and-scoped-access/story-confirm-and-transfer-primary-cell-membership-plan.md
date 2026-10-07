@@ -92,6 +92,13 @@ context:
 - Surprise: the command kernel runs handlers inside a subtransaction, so a hook's `pg_current_xact_id()` differs from the rows' `xmin`. The E2E proves "same transaction" by equal `xmin` of the hook row and both membership rows plus equal transaction start time; pgTAP proves atomicity with a failing hook.
 - Environment: the local stack was reset three times; the phone switch was on only for the E2E and the regressions (`run`, `apply`, `review`, `grants`), then off as found. Every synthetic user and record created was removed.
 - Owner/parent steps: apply the migration to staging after `20261007131600` and repeat the E2E-equivalent demo on staging (staff web + Android). No owner-only setting blocks the build.
+- Review fixes (coordinator review, 2026-10-07; `20261007140000` edited in place, on no hosted project):
+  - Admin cancellation recorded as `cancelled_by_admin` (request and audit; reason CHECK widened in the same file); member cancellation stays `member_withdrew`; pgTAP +2; Dart `CellDeclineReason.cancelledByAdmin`.
+  - Mobile My cell keeps the chooser read (`MyCellView.options` is an `AccessRead`); a failure shows the read-problem banner with **Try again**, never "No other cells are listed"; widget test.
+  - `cell_transferred`: migration updates the event description; fixture case name (and regenerated `fixtures.g.dart`) and runbook say `identity_revision` carries the member's Cells revision and that a v2 payload with `from_cell_id`/`to_cell_id` is needed before any real owner hooks it.
+  - Evidence README: the staff-web UI path is covered by widget tests plus the API E2E and is driven for real in the owner's consolidated staging test.
+  - Re-run: `db:test` 921/921 (cells 90); `db:smoke` ok; `cells.mjs` 13/13; client_core 216, staff 18, mobile 20, analyze clean; contracts dart 243 and ts 226 pass.
+
 ## Plan Change Log
 
 ## Review Triage Log

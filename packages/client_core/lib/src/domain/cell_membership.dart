@@ -30,7 +30,10 @@ enum CellDeclineReason {
   notInThisCell('not_in_this_cell'),
   notKnownToLeader('not_known_to_leader'),
   memberWithdrew('member_withdrew'),
-  noCellForNow('no_cell_for_now');
+  noCellForNow('no_cell_for_now'),
+
+  /// Recorded when an Admin (not the member) cancels a request.
+  cancelledByAdmin('cancelled_by_admin');
 
   const CellDeclineReason(this.wire);
   final String wire;
@@ -47,6 +50,7 @@ enum CellDeclineReason {
     notKnownToLeader => 'Not known to the leader',
     memberWithdrew => 'Withdrawn',
     noCellForNow => 'No cell for now',
+    cancelledByAdmin => 'Cancelled by the church office',
   };
 }
 

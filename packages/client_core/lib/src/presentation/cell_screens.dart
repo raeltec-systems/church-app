@@ -1051,9 +1051,12 @@ class _MyCellBodyState extends ConsumerState<_MyCellBody> {
     final ctl = ref.read(myCellProvider.notifier);
     final open = cell.openRequest;
     final primary = cell.primary;
-    final choices = widget.view.options
-        .where((o) => o.cellId != primary?.cellId)
-        .toList();
+    final optionsRead = widget.view.options;
+    final choices = switch (optionsRead) {
+      AccessReadOk(:final value) =>
+        value.where((o) => o.cellId != primary?.cellId).toList(),
+      _ => const <CellOption>[],
+    };
     CellOption? picked;
     for (final o in choices) {
       if (o.cellId == _optionId) picked = o;
@@ -1137,8 +1140,30 @@ class _MyCellBodyState extends ConsumerState<_MyCellBody> {
                   context,
                   primary == null ? 'Ask to join a cell' : 'Ask to change cell',
                 ),
-                if (choices.isEmpty)
-                  const Text('No other cells are listed right now.')
+                if (optionsRead is! AccessReadOk<List<CellOption>>) ...[
+                  // The chooser read failed or was refused: say so, never
+                  // pretend that no cells are listed.
+                  KeyedSubtree(
+                    key: const Key('my-cell-options-problem'),
+                    child: _readProblem(
+                      optionsRead,
+                      'The cell list is not available to you.',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  FocusRing(
+                    child: OutlinedButton.icon(
+                      key: const Key('my-cell-options-retry'),
+                      onPressed: widget.busy ? null : ctl.reload,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Try again'),
+                    ),
+                  ),
+                ] else if (choices.isEmpty)
+                  const Text(
+                    'No other cells are listed right now.',
+                    key: Key('my-cell-no-options'),
+                  )
                 else
                   RadioGroup<String>(
                     groupValue: _optionId,

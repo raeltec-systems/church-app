@@ -8,15 +8,17 @@
 - The E2E removed every user, application, member, link, grant, cell, request, membership, audit row, receipt and its hook registration (`users_left: 0`, `hooks_left: 0`; the cells tables were empty afterwards). The Admin bootstrap leaves an append-only operator-journal row, as 2.3's and 2.5's E2E do.
 - No hosted project was changed.
 
+**Review fixes (2026-10-07):** an Admin cancellation is recorded as `cancelled_by_admin` (pgTAP); the mobile My cell screen shows the cell-list read failure with a retry instead of "no cells listed" (widget test); the `cell_transferred` contract description, fixture name and runbook say that `identity_revision` carries the member's Cells revision and that a v2 payload with `from_cell_id`/`to_cell_id` is needed before any real owner hooks it. All files here were re-run after the fixes.
+
 ## Results
 
 | File | What it shows | Result |
 |---|---|---|
-| `local-pgtap.txt` | `npm run db:test`: the whole suite, including the new `cell_membership_test.sql` (88), the updated `command_foundation_test.sql` allowlist and two `identity_grants_test.sql` assertions narrowed to their own module | 919/919 pass |
+| `local-pgtap.txt` | `npm run db:test`: the whole suite, including the new `cell_membership_test.sql` (90), the updated `command_foundation_test.sql` allowlist and two `identity_grants_test.sql` assertions narrowed to their own module | 921/921 pass |
 | `local-api-smoke.txt` | `npm run db:smoke` with the CLI's default config (phone off), including the new cells checks (signed-out 401, applicant 403 `not_linked`, applicant cannot create a cell) | all ok (105) |
 | `cells-e2e.jsonl` | `node tools/identity-e2e/cells.mjs`: real GoTrue phone sign-in and the real Data API | 13/13 pass |
 
-Regressions on the same stack: `run.mjs` 30/30, `apply.mjs` 27/27, `review.mjs` 18/18, `grants.mjs` 18/18. Flutter: client_core 215 tests, staff 18, mobile 20, `flutter analyze` and `dart format` clean, staff `flutter build web` ok. `ci:migrations --base ccr-93e730dd-89lbvg` ordered and non-destructive; `ci:secrets`, `scan-evidence` and the node tool tests (44) clean.
+Regressions on the same stack: `run.mjs` 30/30, `apply.mjs` 27/27, `review.mjs` 18/18, `grants.mjs` 18/18. Flutter: client_core 216 tests, staff 18, mobile 20, `flutter analyze` and `dart format` clean, staff `flutter build web` ok. `ci:migrations --base ccr-93e730dd-89lbvg` ordered and non-destructive; `ci:secrets`, `scan-evidence` and the node tool tests (44) clean.
 
 ### The ticket's `verify`, step by step
 
@@ -29,6 +31,8 @@ Regressions on the same stack: `run.mjs` 30/30, `apply.mjs` 27/27, `review.mjs` 
 | The **new one opens** | C32: Y's surface answers `200`. |
 | A fixture **transfer hook ran in the same transaction** | C33: the SYNTHETIC `app.fixture_record_lifecycle` hook, registered for `cell_transferred` for this run only, ran once, with the member's new Cells revision; its own row's `xmin` equals the `xmin` of both the new and the ended membership rows, and its time equals the membership's start (same transaction). pgTAP: a failing hook makes the confirmation `unavailable` and rolls everything back (still in X, request still pending); a replay runs no hook again. |
 | **Church membership is unchanged** | C34: the member summary keeps the member id and `approved`; the Identity member revision and the grant-set revision are unchanged across the transfer. pgTAP: member row, grants revision and account link identical before and after. |
+
+**Staff-web UI path:** covered by the widget tests (`cell_membership_test.dart`, `staff_app_test.dart`) plus the API E2E above. It is driven for real in the owner's consolidated staging test at the end of the epic.
 
 ### Also covered
 

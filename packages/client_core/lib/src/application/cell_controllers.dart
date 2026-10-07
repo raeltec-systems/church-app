@@ -396,11 +396,12 @@ final cellLeaderProvider =
       CellLeaderController.new,
     );
 
-/// The member's own cell with the safe chooser's options.
+/// The member's own cell with the safe chooser's options. [options] keeps
+/// the chooser read as answered, so a failure is shown, never an empty list.
 class MyCellView {
   const MyCellView({required this.cell, required this.options});
   final MyCell cell;
-  final List<CellOption> options;
+  final AccessRead<List<CellOption>> options;
 }
 
 /// Mobile: the member's confirmed cell, their open request and a change
@@ -422,15 +423,7 @@ class MyCellController extends CellsController<MyCellView> {
     final options = await ref
         .read(membershipRepositoryProvider)
         .fetchCellOptions();
-    return AccessReadOk(
-      MyCellView(
-        cell: mine.value,
-        options: switch (options) {
-          AccessReadOk(:final value) => value,
-          _ => const [],
-        },
-      ),
-    );
+    return AccessReadOk(MyCellView(cell: mine.value, options: options));
   }
 
   Future<void> requestChange(MyCell cell, CellOption option) => send(

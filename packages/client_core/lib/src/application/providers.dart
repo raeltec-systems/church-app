@@ -4,6 +4,7 @@ import '../domain/access_grants.dart';
 import '../domain/account_auth.dart';
 import '../domain/cell_membership.dart';
 import '../domain/commands.dart';
+import '../domain/credential_review.dart';
 import '../domain/fixture_counter.dart';
 import '../domain/member_access.dart';
 import '../domain/membership_application.dart';
@@ -68,6 +69,12 @@ final passwordRecoveryGatewayProvider = Provider<PasswordRecoveryGateway>(
 /// Story 2.7: the member's recovery email and the Admin approval queue.
 final recoveryEmailRepositoryProvider = Provider<RecoveryEmailRepository>(
   (ref) => const UnconfiguredRecoveryEmailRepository(),
+);
+
+/// Story 2.8: the member's own sign-in details and the Admin credential
+/// review queue.
+final credentialReviewRepositoryProvider = Provider<CredentialReviewRepository>(
+  (ref) => const UnconfiguredCredentialReviewRepository(),
 );
 
 final requestIdsProvider = Provider<RequestIds>((ref) => SecureRequestIds());

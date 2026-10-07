@@ -699,15 +699,16 @@ class _RecoveryEmailScreenState extends ConsumerState<RecoveryEmailScreen> {
     if (p != null && p.state == ProposalState.pending) {
       final busy = ref.watch(myRecoveryEmailProvider.select((s) => s.busy));
       return [
-        p.verified
+        p.verified != false
             ? RequestStateBanner(
                 key: const Key('recovery-email-awaiting-approval'),
                 tone: StatusTone.info,
                 icon: Icons.hourglass_top_outlined,
                 title: 'Waiting for church approval',
                 message:
-                    '${p.email} is confirmed. Your member access waits until '
-                    'the church approves it; then sign in again.',
+                    '${p.email ?? 'Your recovery email'} is confirmed or '
+                    'waiting. Your member access waits until the church '
+                    'approves it; then sign in again.',
               )
             : RequestStateBanner(
                 key: const Key('recovery-email-check-inbox'),
@@ -715,7 +716,7 @@ class _RecoveryEmailScreenState extends ConsumerState<RecoveryEmailScreen> {
                 icon: Icons.mark_email_unread_outlined,
                 title: 'Confirm your email',
                 message:
-                    'Open the link we sent to ${p.email} on this device. Not '
+                    'Open the link we sent to ${p.email ?? 'your address'} on this device. Not '
                     'there? Add it again below to send a new link.',
               ),
         const SizedBox(height: 12),
@@ -742,7 +743,7 @@ class _RecoveryEmailScreenState extends ConsumerState<RecoveryEmailScreen> {
           icon: Icons.info_outline,
           title: 'Not approved',
           message: [
-            '${p.email} was not approved as your recovery email.',
+            '${p.email ?? 'The address'} was not approved as your recovery email.',
             if (p.decisionReason != null) '${p.decisionReason!.label}.',
             'Contact the church office.',
           ].join(' '),
@@ -951,7 +952,9 @@ class _RecoveryEmailReviewScreenState
     final id = item.proposal.proposalId;
     final check = _checks[id];
     final canApprove =
-        item.proposal.verified && !item.otherChanges && !item.ownAccount;
+        item.proposal.verified == true &&
+        !item.otherChanges &&
+        !item.ownAccount;
     // A Material card, so the radio tiles paint their ink on the card.
     return Material(
       key: Key('recovery-review-$id'),
@@ -974,17 +977,17 @@ class _RecoveryEmailReviewScreenState
             ),
             const SizedBox(height: 4),
             Text('Sign-in username: ${item.phoneUsername}'),
-            Text('Proposed recovery email: ${item.proposal.email}'),
+            Text('Proposed recovery email: ${item.proposal.email ?? ''}'),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
                 StatusLabel(
-                  label: item.proposal.verified
+                  label: item.proposal.verified == true
                       ? 'Confirmed by the member'
                       : 'Not confirmed yet',
-                  tone: item.proposal.verified
+                  tone: item.proposal.verified == true
                       ? StatusTone.success
                       : StatusTone.warning,
                 ),

@@ -14,6 +14,7 @@ import 'src/domain/access_grants.dart';
 import 'src/domain/account_auth.dart';
 import 'src/domain/cell_membership.dart';
 import 'src/domain/commands.dart';
+import 'src/domain/credential_review.dart';
 import 'src/domain/member_access.dart';
 import 'src/domain/membership_application.dart';
 import 'src/domain/membership_review.dart';
@@ -719,6 +720,167 @@ Map<String, Object?> recoveryReviewItemData({
   'is_synthetic': true,
 };
 
+/// [CredentialReviewRepository] answered by the test (story 2.8).
+class FakeCredentialReview implements CredentialReviewRepository {
+  AccessRead<MyCredentials> mine = AccessReadOk(
+    MyCredentials.fromJson(myCredentialsData()),
+  );
+  AccessRead<CredentialQueue> queue = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  int mineCalls = 0;
+  int queueCalls = 0;
+
+  @override
+  Future<AccessRead<MyCredentials>> fetchMine() async {
+    mineCalls++;
+    return mine;
+  }
+
+  @override
+  Future<AccessRead<CredentialQueue>> fetchQueue() async {
+    queueCalls++;
+    return queue;
+  }
+}
+
+/// The wire form of the member's own sign-in details (story 2.8).
+Map<String, Object?> myCredentialsData({
+  String access = 'granted',
+  String phone = '+447700900331',
+  String? email,
+  Map<String, Object?>? pendingChange,
+  Map<String, Object?>? lastChange,
+  Map<String, Object?>? pendingRecoveryEmail,
+  bool canRequest = true,
+  String? churchContact,
+}) => access == 'review_required'
+    // In review the server sends only access, the church contact and the
+    // member's own pending request id/revision/kind/state.
+    ? {
+        'access': access,
+        'church_contact': churchContact,
+        'pending_change': pendingChange == null
+            ? null
+            : {
+                for (final k in [
+                  'change_id',
+                  'revision',
+                  'change_kind',
+                  'state',
+                ])
+                  k: pendingChange[k],
+              },
+        'pending_recovery_email': pendingRecoveryEmail == null
+            ? null
+            : {
+                for (final k in ['proposal_id', 'revision', 'state'])
+                  k: pendingRecoveryEmail[k],
+              },
+      }
+    : {
+        'access': access,
+        'phone_username': phone,
+        'recovery_email': email,
+        'pending_change': pendingChange,
+        'last_change': lastChange,
+        'pending_recovery_email': pendingRecoveryEmail,
+        'can_request': canRequest,
+        'church_contact': churchContact,
+        'recent_sign_in_minutes': 10,
+      };
+
+/// The wire form of one credential change (story 2.8).
+Map<String, Object?> credentialChangeData({
+  String id = '88888888-8888-4888-8888-888888888888',
+  int revision = 1,
+  String kind = 'phone_username',
+  String state = 'pending',
+  String? phone = '+447700900340',
+  String? email,
+  bool? verified,
+  String? decisionReason,
+}) => {
+  'change_id': id,
+  'revision': revision,
+  'change_kind': kind,
+  'phone_username': ?phone,
+  'email': ?email,
+  'state': state,
+  'verified': ?verified,
+  'requested_at': '2026-10-07T10:00:00Z',
+  'decision_reason': ?decisionReason,
+};
+
+/// The wire form of the Admin credential queue (story 2.8).
+Map<String, Object?> credentialQueueData({
+  List<Map<String, Object?>> changes = const [],
+  List<Map<String, Object?>> reviews = const [],
+  List<Map<String, Object?>> holds = const [],
+}) => {'changes': changes, 'reviews': reviews, 'holds': holds};
+
+Map<String, Object?> credentialChangeItemData({
+  Map<String, Object?>? change,
+  String name = 'SYNTHETIC Grace Phiri',
+  bool phoneAvailable = true,
+  bool otherChanges = false,
+  bool ownAccount = false,
+}) {
+  final c = change ?? credentialChangeData();
+  return {
+    ...c,
+    'member_id': '99999999-9999-4999-8999-999999999999',
+    'display_name': name,
+    'member_revision': 3,
+    'current_phone_username': '+447700900331',
+    'has_recovery_email': false,
+    'access_review': false,
+    if (c['change_kind'] == 'phone_username') 'phone_available': phoneAvailable,
+    'other_changes': otherChanges,
+    'own_account': ownAccount,
+    'is_synthetic': true,
+  };
+}
+
+Map<String, Object?> accessReviewItemData({
+  String memberId = 'abababab-abab-4bab-8bab-abababababab',
+  String name = 'SYNTHETIC John Banda',
+  bool extraFactors = false,
+  List<String> changeKinds = const ['email'],
+}) => {
+  'member_id': memberId,
+  'display_name': name,
+  'member_revision': 4,
+  'link_state': 'review_required',
+  'binding_review': true,
+  'phone_username': '+447700900336',
+  'recovery_email': null,
+  'auth_phone_username': '+447700900336',
+  'auth_email': 'synthetic-thief@example.test',
+  'auth_email_confirmed': true,
+  'extra_factors': extraFactors,
+  'change_kinds': changeKinds,
+  'own_account': false,
+  'is_synthetic': true,
+};
+
+Map<String, Object?> holdItemData({
+  String holdId = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd',
+  String name = 'SYNTHETIC Mary Tembo',
+  String reason = 'ownership_dispute',
+  bool ownMember = false,
+}) => {
+  'hold_id': holdId,
+  'member_id': 'efefefef-efef-4fef-8fef-efefefefefef',
+  'display_name': name,
+  'member_revision': 2,
+  'hold_kind': reason == 'ownership_dispute' ? 'access_review' : 'security',
+  'reason_code': reason,
+  'placed_at': '2026-10-07T10:00:00Z',
+  'own_member': ownMember,
+  'is_synthetic': true,
+};
+
 /// The fakes and provider overrides an app or screen test runs against.
 class ClientTestHarness {
   ClientTestHarness({String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'})
@@ -735,6 +897,7 @@ class ClientTestHarness {
   final cells = FakeCells();
   final recovery = FakePasswordRecovery();
   final recoveryEmail = FakeRecoveryEmail();
+  final credentials = FakeCredentialReview();
 
   /// [configured] false leaves the unconfigured defaults for the gateway and
   /// the platform status (as a build without `--dart-define`s).
@@ -751,6 +914,7 @@ class ClientTestHarness {
       cellsRepositoryProvider.overrideWithValue(cells),
       passwordRecoveryGatewayProvider.overrideWithValue(recovery),
       recoveryEmailRepositoryProvider.overrideWithValue(recoveryEmail),
+      credentialReviewRepositoryProvider.overrideWithValue(credentials),
       commandGatewayProvider.overrideWithValue(gateway),
       platformStatusRepositoryProvider.overrideWithValue(FakePlatformStatus()),
     ],

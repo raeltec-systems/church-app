@@ -12,6 +12,7 @@
 # Story 2.3 adds: the grant command and grant reads refuse signed-out and unlinked callers.
 # Story 2.4 adds: the application command and applicant reads (signed-out and unlinked callers).
 # Story 2.5 adds: the Admin review command and reads refuse signed-out and applicant callers.
+# Story 2.8 adds: the credential-review command and reads refuse signed-out and applicant callers.
 # Usage: npm run db:smoke   (needs curl, jq and psql; SYNTHETIC users and data only)
 set -euo pipefail
 
@@ -280,6 +281,27 @@ code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/auth/v1/recove
   -H 'Content-Type: application/json' -d "{\"email\":\"nobody-$(uuid | cut -c1-8)@example.test\"}")
 [[ "$code:$(cat "$WORK/out")" == "200:{}" ]] && ok "forgot password for an unknown address is neutral (200 {})" \
   || bad "recover unknown: $code $(cat "$WORK/out")"
+
+# Story 2.8: the credential-review command and reads need a session; an applicant (no member link)
+# reaches none of them, cannot request a credential change and cannot place a hold.
+for fn in identity_credential_command identity_my_credentials identity_admin_credential_queue; do
+  code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/rest/v1/rpc/$fn" \
+    -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Profile: api' -H 'Content-Type: application/json' -d '{}')
+  expect "signed-out client cannot call $fn" 401 "$code" "$(cat "$WORK/out")"
+done
+for fn in identity_my_credentials identity_admin_credential_queue; do
+  code=$(api_call "$fn" '{}')
+  [[ "$code:$(jq -r .details "$WORK/out")" == "403:not_linked" ]] \
+    && ok "an applicant cannot call $fn (403 not_linked)" || bad "$fn as applicant: $code $(cat "$WORK/out")"
+done
+CHANGE_BODY="{\"version\":1,\"command\":\"identity.request_credential_change\",\"request_id\":\"$(uuid)\",\"expected_revision\":null,\"payload\":{\"change_kind\":\"phone_username\",\"phone_username\":\"+12025550199\"}}"
+code=$(api_call identity_credential_command "$CHANGE_BODY")
+[[ "$code:$(jq -r .code "$WORK/out")" == "200:forbidden" ]] \
+  && ok "an applicant cannot request a credential change (forbidden envelope)" || bad "request change as applicant: $code $(cat "$WORK/out")"
+HOLD_BODY="{\"version\":1,\"command\":\"identity.place_hold\",\"request_id\":\"$(uuid)\",\"expected_revision\":1,\"payload\":{\"member_id\":\"$(uuid)\",\"reason_code\":\"security_concern\"}}"
+code=$(api_call identity_credential_command "$HOLD_BODY")
+[[ "$code:$(jq -r .code "$WORK/out")" == "200:forbidden" ]] \
+  && ok "an applicant cannot place a hold (forbidden envelope)" || bad "place hold as applicant: $code $(cat "$WORK/out")"
 
 # No SMS configuration exists on this stack.
 sms=$(curl -s "$API_URL/auth/v1/settings" -H "apikey: $PUBLISHABLE_KEY" | jq -r '.sms_provider // ""')

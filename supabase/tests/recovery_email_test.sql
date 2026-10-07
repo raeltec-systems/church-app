@@ -222,8 +222,8 @@ select pg_temp.verify_email(2, 'synthetic-2-7-2@example.test');
 select is(pg_temp.read(pg_temp.c(2), 'select api.identity_my_member_summary()'),
   'PT403|forbidden|review_required',
   'a verified but unapproved email keeps private access in review (AD-3)');
-select is(pg_temp.readj(pg_temp.c(2), 'select api.identity_my_recovery_email()') #>> '{proposal,verified}',
-  'true', 'the member still reads their own proposal, now verified');
+select is(pg_temp.readj(pg_temp.c(2), 'select api.identity_my_recovery_email()') #>> '{proposal,state}',
+  'pending', 'the member still reads their own pending proposal (story 2.8: id and state only while in review)');
 select is(pg_temp.readj(pg_temp.c(2), 'select api.identity_my_recovery_email()') ->> 'access',
   'review_required', 'and is told the account waits for review');
 select is(pg_temp.propose(pg_temp.fresh(2), 'synthetic-2-7-other@example.test') ->> 'code', 'forbidden',

@@ -69,7 +69,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261007160000_credential_review.sql` -- tables (changes, review audit), hold columns, release-epoch trigger, 2.7 proposal guard, commands, authorizer, reads, grants; session/factor helpers as fail-closed stubs.
+- [x] `supabase/migrations/20261007111436_credential_review.sql` -- tables (changes, review audit), hold columns, release-epoch trigger, 2.7 proposal guard, commands, authorizer, reads, grants; session/factor helpers as fail-closed stubs.
 - [x] `supabase/migrations/20261007160100_credential_review_auth_rows.sql` -- the stubs replaced with the Auth row deletions only.
 - [x] `supabase/tests/credential_review_test.sql`, allowlist, `identity_api_smoke.sh`.
 - [x] `tools/identity-e2e/credentials.mjs` (+ `.test.mjs`) -- the verify bullet against local GoTrue, PostgREST and Mailpit.
@@ -84,7 +84,7 @@ context:
 
 - Built directly (no subagent tool in this session); checkpoint 1 pre-approved by the owner decisions. The plan is above the 1600-token guide because one Identity change spans the DB, two clients and evidence; kept whole, as 2.7 was.
 - Files:
-  - `supabase/migrations/20261007160000_credential_review.sql` (no `delete from`): `identity_credential_changes`, `identity_credential_review_audit`, hold columns, release-epoch trigger, 2.7 proposal guard trigger, member/Admin commands, `api.identity_credential_command`, `api.identity_my_credentials`, `api.identity_admin_credential_queue`, `identity_authorize_command` replaced (every earlier command kept), 2.7 `identity_recovery_email_other_changes` replaced to tolerate email identities of previously approved/reviewed addresses; fail-closed stubs `identity_revoke_auth_sessions` / `identity_remove_auth_extras`.
+  - `supabase/migrations/20261007111436_credential_review.sql` (no `delete from`): `identity_credential_changes`, `identity_credential_review_audit`, hold columns, release-epoch trigger, 2.7 proposal guard trigger, member/Admin commands, `api.identity_credential_command`, `api.identity_my_credentials`, `api.identity_admin_credential_queue`, `identity_authorize_command` replaced (every earlier command kept), 2.7 `identity_recovery_email_other_changes` replaced to tolerate email identities of previously approved/reviewed addresses; fail-closed stubs `identity_revoke_auth_sessions` / `identity_remove_auth_extras`.
   - `supabase/migrations/20261007160100_credential_review_auth_rows.sql`: the two helpers with the Auth row deletions only.
   - Tests: `supabase/tests/credential_review_test.sql` (102); allowlist in `command_foundation_test.sql`; `identity_session_trust_test.sql` expectation (a release is now an event); `identity_api_smoke.sh` (+7).
   - E2E `tools/identity-e2e/credentials.mjs` (+ `.test.mjs`); live adapter check `tools/identity-e2e/live-credentials-check.sh` + `packages/client_core/tool/live_credentials_check.dart`.
@@ -95,12 +95,12 @@ context:
 - Decision (agent, under owner pre-approval): restore/accept also revoke every Auth session (the thief's included) besides moving the epoch; approve of any change revokes sessions too.
 - Surprise: the sandbox disk filled up (ext4 reserved blocks) and hung the first flutter run; removed the unused excluded Docker images (studio, logflare; re-pullable) to continue.
 - Environment: the stack was reset several times from this worktree; the phone switch was found off, on only for the E2E and live check, and is off again; every synthetic row, hook registration and caught message was removed.
-- Owner and parent steps: staging apply of `20261007160000` (parent); `20261007160100` by hand (owner) — until then approvals, lost-device holds, restore and accept answer `unavailable` on staging. No Auth setting change. None blocks the build.
+- Owner and parent steps: staging apply of `20261007111436` (parent); `20261007160100` by hand (owner) — until then approvals, lost-device holds, restore and accept answer `unavailable` on staging. No Auth setting change. None blocks the build.
 - Known residual risk (deferred-work): a stolen live session can still change the password via `PUT /user`; exits are the approved-email reset, staff-assisted recovery (entry 9) and a lost-device hold.
 
 ## Plan Change Log
 
-- 2026-10-07, independent review (coordinator; not a step-04 loop). One HIGH, three MEDIUM, five LOW findings; all patched in place in `20261007160000` (both 2.8 files are on neither main nor staging; still no `delete from` in the main file, ASCII only).
+- 2026-10-07, independent review (coordinator; not a step-04 loop). One HIGH, three MEDIUM, five LOW findings; all patched in place in `20261007111436` (both 2.8 files are on neither main nor staging; still no `delete from` in the main file, ASCII only).
   - **HIGH (takeover):** restore and the reverts left a reset link usable. New `app.identity_neutralise_auth_links`: recovery (overwritten with an unusable value, never cleared, so the 2.7 gate does not fire), confirmation, reauthentication and change tokens, in `auth.users` and `auth.one_time_tokens`. Called by approve, restore, accept, the replacement request and both reverts; the 2.7 `identity_revert_recovery_email` is replaced here by `create or replace`.
   - **MEDIUM 1 (fail-closed rule):** a password change since the last binding approval that was not preceded by the member's own email-link redemption is "unreviewed" (`app.identity_password_unreviewed`). Restore then keeps (or places) a security hold with `password_reset_required_since`; accept is refused `password_unreviewed`. A lost-device hold sets the same field. Such holds are released only after a member's own reset after that time (`app.identity_member_reset_since`: redemption then a new password), else `conflict {"hold_id": "password_reset_required"}`. Members without an approved email wait for entry 9.
   - **MEDIUM 2:** approve and accept refuse `conflict {"member_id": "held"}` while any hold is open; restore stays allowed.

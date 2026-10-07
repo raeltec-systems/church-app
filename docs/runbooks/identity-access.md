@@ -544,7 +544,7 @@ Both read email from the stack's Mailpit (`http://127.0.0.1:54324`, part of `sup
 
 ## Credential changes, holds and credential review (story 2.8)
 
-Migrations: `supabase/migrations/20261007160000_credential_review.sql` (no row deletions) and the small follow-up `20261007160100_credential_review_auth_rows.sql`. The follow-up holds the Auth row deletions (the sessions, refresh tokens, MFA factors and identities of one account); the owner applies it by hand after the main file, as with `20261007131600`. Until it is applied, every command that revokes sessions or removes factors answers `unavailable`, because the main file installs fail-closed stubs.
+Migrations: `supabase/migrations/20261007111436_credential_review.sql` (no row deletions) and the small follow-up `20261007160100_credential_review_auth_rows.sql`. The follow-up holds the Auth row deletions (the sessions, refresh tokens, MFA factors and identities of one account); the owner applies it by hand after the main file, as with `20261007131600`. Until it is applied, every command that revokes sessions or removes factors answers `unavailable`, because the main file installs fail-closed stubs.
 Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.8/`.
 
 ### What never clears a hold or approves a binding
@@ -552,7 +552,7 @@ Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/ev
 - A hold is released only by `identity.release_hold`, by another Admin, after an identity check.
 - A binding changes only through an Admin decision that records a new `binding_revision`.
 - None of these does either: a direct Auth change (native `PUT /user`, the Auth Admin API, SQL), a public forgot-password request, a sign-in, a reset or an email verification. The 2.2 detection records a direct change and keeps the account in review; holds and dormancy stay in force through a reset (2.7).
-- **Old links die with the change.** Whenever Identity removes or restores an address or phone (an approval, a restore or accept, a replacement request, and the 2.8 and 2.7 reverts), every outstanding Auth link of the account becomes unusable: reset and magic links, confirmations, reauthentication nonces and email/phone change tokens, in `auth.users` and `auth.one_time_tokens`. A reset link issued before a restore or a reject can never be redeemed after it (pgTAP; E2E `C70`). The 2.7 revert was replaced in `20261007160000` to do this too.
+- **Old links die with the change.** Whenever Identity removes or restores an address or phone (an approval, a restore or accept, a replacement request, and the 2.8 and 2.7 reverts), every outstanding Auth link of the account becomes unusable: reset and magic links, confirmations, reauthentication nonces and email/phone change tokens, in `auth.users` and `auth.one_time_tokens`. A reset link issued before a restore or a reject can never be redeemed after it (pgTAP; E2E `C70`). The 2.7 revert was replaced in `20261007111436` to do this too.
 - **Held accounts change nothing.** While any hold is open, approving a change and accepting credentials are refused (`conflict {"member_id": "held"}`), and the member cannot withdraw a request (2.7 or 2.8: `forbidden`). Restore stays possible.
 
 ### Reviewed sign-in detail changes (member request, Admin decision)
@@ -647,7 +647,7 @@ The live check drives the real client adapters with `+44 7700 900357–900359`. 
 
 ### Hosted (owner / parent session)
 
-1. **Parent session:** apply `20261007160000_credential_review.sql`.
+1. **Parent session:** apply `20261007111436_credential_review.sql`.
    - It adds a trigger on `app.identity_holds` and one on `app.identity_recovery_email_proposals`.
    - Like 2.5 and 2.7, it writes `auth.users`, `auth.identities` and `auth.one_time_tokens` rows only inside Admin and member commands.
 2. **Owner, by hand:** apply `20261007160100_credential_review_auth_rows.sql`.

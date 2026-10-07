@@ -1,6 +1,6 @@
 -- Story 2.8 follow-up: the Auth ROW deletions of the credential review.
 --
--- Replaces the two fail-closed stubs of 20261007160000_credential_review.sql with their bodies:
+-- Replaces the two fail-closed stubs of 20261007111436_credential_review.sql with their bodies:
 --   * app.identity_revoke_auth_sessions(account): the account's auth.refresh_tokens and
 --     auth.sessions (refresh tokens and AMR claims of a session cascade with it), as GoTrue's
 --     global logout does. Used by an approved credential change, a lost-device hold, and the
@@ -9,7 +9,7 @@
 --     identities of providers other than phone/email, and email identities of any address other
 --     than the approved one. Used by the restore credential review only.
 -- Kept in its own small file because the hosted connector cannot get approval for a migration
--- containing row deletions; the owner applies this file by hand after 20261007160000. Until it
+-- containing row deletions; the owner applies this file by hand after 20261007111436. Until it
 -- is applied every command that needs these helpers answers `unavailable` (fail closed). It
 -- deletes Auth rows of ONE account only, inside an Admin command; it changes no schema object.
 --

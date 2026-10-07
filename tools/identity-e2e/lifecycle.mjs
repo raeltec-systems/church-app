@@ -390,8 +390,11 @@ async function main() {
     ]);
     const outcomes = [aOnB, bOnA].map((r) => (r.status === 200 && !r.code ? 'ok' : r.code));
     const usable = Number(psql(`select app.identity_usable_admin_count()`));
+    // The loser is refused either by the last-Admin rule (`forbidden`, when it reads before the
+    // winner commits) or because the winner's deactivation already ended its own session
+    // (`unauthenticated`, when the winner commits first). Both are fail-closed refusals.
     check('L40-concurrent-deactivation-of-the-last-two-admins', outcomes.filter((o) => o === 'ok').length === 1
-      && outcomes.filter((o) => o === 'forbidden').length === 1 && usable === 1,
+      && outcomes.filter((o) => o === 'forbidden' || o === 'unauthenticated').length === 1 && usable === 1,
       { outcomes: outcomes.sort(), usable_admins_after: usable });
 
     const sms = (await http('GET', '/auth/v1/settings')).json?.sms_provider ?? null;

@@ -762,7 +762,8 @@ Three different things, with different effects (I10, AD-14):
 
 ### Refusals
 
-- **Last usable Admin.** Deactivating, or putting a login hold on, a member who holds Admin when no other usable Admin would remain is `forbidden {"member_id": "last_admin"}`. For a deactivation it is checked before the self check, so a sole Admin trying to deactivate themselves is told exactly that. A security hold (2.8) is never blocked by this: security denial comes first, and the operator bootstrap is the way back.
+- **Last usable Admin.** Deactivating a member who holds Admin when no other usable Admin would remain is `forbidden {"member_id": "last_admin"}`. It is checked before the self check, so a sole Admin trying to deactivate themselves is told exactly that; two Admins deactivating each other at the same moment are serialised by the `identity` authorizer, so exactly one succeeds (E2E `L40`). The same check on a login hold is defence in depth: through the command the acting Admin is itself a usable Admin and cannot hold their own record, so it cannot normally trigger. A security hold (2.8) is never blocked by this: security denial comes first, and the operator bootstrap is the way back.
+- **Lock order.** Deactivation, restoration and `identity.place_hold` lock the member's live link before the member row, the same order as the 2.9 dispatch and completion steps, so they cannot deadlock with an assisted reset.
 - **Last responsible person.** Before anything is written, Identity asks every registered owner handover hook what the member is responsible for. When an owner reports `last_responsible`, the deactivation is `conflict {"member_id": "handover_required"}` and nothing changes. Hand it over in that owner's own workflow, then deactivate.
 - `conflict {"member_id": "not_approved"}` (deactivating or login-holding someone who is not approved), `conflict {"member_id": "not_deactivated"}` (restoring an approved member), `conflict {"reason_code": "already_held"}`.
 - A raising owner lifecycle hook, a missing handler or a malformed handover answer rolls the whole command back (`unavailable`, nothing changed).
@@ -788,7 +789,9 @@ select app.identity_resolve_handover_obligation('duties', '<obligation_id>', 'ha
 | `api.identity_admin_membership_lifecycle()` | Admin | `deactivated` (members with `reason_code`, `account`, `pending_obligations`, `own_member`), `login_holds`, `handovers` (pending obligations with the member's current state) |
 | `api.identity_my_membership_status()` | any trusted own session | `{deactivated, church_contact}` only: never a reason, an actor or an obligation |
 
-Audit: `app.identity_membership_lifecycle` (actor, reason or identity check, revision, counts of revoked sessions, ended grants and recovery grants, obsolete operations and recorded obligations). Login holds are in `app.identity_credential_review_audit` (`hold_placed`, reason `login_disabled`). A login hold is stored with `reason = 'login_disabled'` and a null `reason_code`, because the 2.8 CHECK cannot be widened without a DROP.
+Audit: `app.identity_membership_lifecycle` (actor, reason or identity check, revision, counts of revoked sessions, ended grants and recovery grants, obsolete operations and recorded obligations). Login holds are in `app.identity_credential_review_audit` (`hold_placed` and `hold_released`, reason `login_disabled`). A login hold is stored with `reason = 'login_disabled'` and a null `reason_code`, because the 2.8 CHECK cannot be widened without a DROP; `app.identity_hold_reason_code(hold)` reports it, and the 2.8 release audit, holds view and `api.identity_admin_credential_queue` were replaced in place to use it.
+
+A restoration may be done by any other Admin, including the one who deactivated the member (as with a 2.8 hold release); the identity check is what makes it reviewed.
 
 ### Clients
 
@@ -804,9 +807,9 @@ node tools/identity-e2e/lifecycle.mjs --evidence <file>.jsonl
 node tools/auth-harness/local-phone-auth.mjs off
 ```
 
-The E2E uses `+44 7700 900520–900529`, registers the SYNTHETIC fixture lifecycle and handover hooks and removes them again, and removes every user, member, grant, hold, cell, recovery row, obligation and audit row it created.
+The E2E uses `+44 7700 900520–900529` (step `L40` races the last two Admins deactivating each other), registers the SYNTHETIC fixture lifecycle and handover hooks and removes them again, and removes every user, member, grant, hold, cell, recovery row, obligation and audit row it created.
 
 ### Hosted (parent session / owner)
 
-1. **Parent session:** apply `20261007170000_membership_lifecycle.sql` to staging after `20261007140729`. It replaces `app.identity_place_hold`, `app.identity_lock_reviewed_member`, `app.identity_member_holds_json` and `app.identity_authorize_command` in place (same signatures and privileges) and adds two contract v1 lifecycle events.
+1. **Parent session:** apply `20261007170000_membership_lifecycle.sql` to staging after `20261007140729`. It replaces `app.identity_place_hold`, `app.identity_lock_reviewed_member`, `app.identity_member_holds_json`, `app.identity_release_hold`, `app.identity_admin_credential_queue` and `app.identity_authorize_command` in place (same signatures and privileges; the queue's EXECUTE for `authenticated` is re-granted) and adds two lifecycle events, additive within v1 under the server-only rule (`contracts-and-owner-seams.md`).
 2. **Production** (entry 14): nothing new to approve; deactivation works only behind the same gates as the rest of Identity.

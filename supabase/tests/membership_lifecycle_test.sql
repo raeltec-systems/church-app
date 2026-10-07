@@ -5,7 +5,7 @@
 -- through real GoTrue: tools/identity-e2e/lifecycle.mjs. Every account here is SYNTHETIC
 -- (+44 7700 900500-900519).
 begin;
-select plan(76);
+select plan(86);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000210' || lpad(n::text, 2, '0'))::uuid $$;
@@ -128,11 +128,12 @@ $$ select count(*)::int from auth.sessions where user_id = pg_temp.u(n) $$;
 -- Accounts: 1 Admin A; 2 Admin B; 3 login hold (cell, fixture duty, two devices); 4 deactivated
 -- and restored (grants, two devices, fixture duty, an issued recovery grant); 5 sole responsible
 -- for a fixture duty; 6 (no account) accountless member; 7 uncertain recovery operation;
--- 8 pending recovery operation; 9 a raising owner hook; 10 a malformed handover hook.
+-- 8 pending recovery operation; 9 a raising owner hook; 10 a malformed handover hook;
+-- 11 a dispatched assisted reset completed after the deactivation.
 insert into auth.users (id, aud, role, phone, phone_confirmed_at)
 select pg_temp.u(n), 'authenticated', 'authenticated', ltrim(pg_temp.phone(n), '+'), now()
-  from generate_series(1, 10) n where n <> 6;
-select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 10) n where n <> 6;
+  from generate_series(1, 11) n where n <> 6;
+select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 11) n where n <> 6;
 select pg_temp.session(pg_temp.u(n), pg_temp.s2(n)) from (values (3), (4)) x(n);
 
 -- Structure and privileges ---------------------------------------------------------------------
@@ -178,7 +179,7 @@ select throws_ok($$select app.identity_register_handover_hook('fixture', 'app.fi
 select app.platform_set_environment('local', 'pgtap 2.10');
 create temp table m as
 select n, app.identity_seed_synthetic_link(pg_temp.u(n), 'SYNTHETIC 2.10 Member ' || n, 'pgtap 2.10') as member_id
-  from generate_series(1, 10) n where n <> 6;
+  from generate_series(1, 11) n where n <> 6;
 with ins as (insert into app.identity_members (display_name, membership_state, is_synthetic)
              values ('SYNTHETIC 2.10 Accountless', 'approved', true) returning member_id)
 insert into m select 6, member_id from ins;
@@ -188,6 +189,8 @@ select pg_temp.grant(2, '{"role": "admin"}');
 select pg_temp.grant(4, '{"role": "pastor"}');
 insert into app.fixture_scope_targets (scope_kind, scope_id) values ('fixture_care', '00000000-0000-4000-b000-000000021001');
 select pg_temp.grant(4, '{"scope_kind": "fixture_care", "scope_id": "00000000-0000-4000-b000-000000021001"}');
+select pg_temp.grant(9, '{"role": "pastor"}');
+select pg_temp.grant(10, '{"role": "pastor"}');
 select app.contract_register_lifecycle_hook('fixture', e, 'app.fixture_record_lifecycle(jsonb)'::regprocedure)
   from unnest(array['access_hold_applied', 'sessions_revoked', 'scope_revoked', 'membership_deactivated',
                     'membership_restored']) e;
@@ -244,17 +247,26 @@ select is((select count(*)::int from app.identity_credential_review_audit
   'the login hold is audited with its code');
 select is(jsonb_array_length(pg_temp.readj(pg_temp.c(1), 'select api.identity_admin_membership_lifecycle()') -> 'login_holds'), 1,
   'the Admin lifecycle read lists the login hold');
+select is(pg_temp.readj(pg_temp.c(1), 'select api.identity_admin_credential_queue()') -> 'holds' -> 0 ->> 'reason_code',
+  'login_disabled', 'the 2.8 Admin queue names the login hold');
 select is(pg_temp.call(pg_temp.c(1), 'identity_credential_command', 'identity.release_hold', pg_temp.mrev(3),
             jsonb_build_object('member_id', pg_temp.mid(3), 'identity_check', 'in_person',
               'hold_id', (select hold_id from app.identity_holds where member_id = pg_temp.mid(3) and released_at is null))) -> 'data' -> 'holds',
   '[]'::jsonb, 'the 2.8 release lifts the login hold');
 select is(pg_temp.summary(pg_temp.fresh(3)), 'ok', 'after release a fresh sign-in is granted');
+select is((select reason_code from app.identity_credential_review_audit
+            where member_id = pg_temp.mid(3) and action = 'hold_released'),
+  'login_disabled', 'the 2.8 release audit names the login hold');
 
 -- Last usable Admin ------------------------------------------------------------------------------
 select is(pg_temp.err(pg_temp.deactivate(1)), 'forbidden {"member_id": "unsupported"}',
   'an Admin cannot deactivate their own membership while another Admin remains');
+select ok(not app.identity_is_last_admin(pg_temp.mid(1)) and not app.identity_is_last_admin(pg_temp.mid(2)),
+  'with two usable Admins neither is the last');
+select ok(not app.identity_is_last_admin(pg_temp.mid(3)), 'a member without Admin is never the last Admin');
 select pg_temp.hold(2, 'security_concern');
 select ok(app.identity_is_last_admin(pg_temp.mid(1)), 'with B held, A is the last usable Admin');
+select ok(not app.identity_is_last_admin(pg_temp.mid(2)), 'B (held, not usable) is not counted as the last usable Admin');
 select is(pg_temp.err(pg_temp.deactivate(1)), 'forbidden {"member_id": "last_admin"}',
   'removing the last usable Admin is refused');
 select is(pg_temp.state(1), 'approved', 'and nothing changed');
@@ -380,15 +392,37 @@ $$;
 create function app.fixture_bad_handover(p_event jsonb) returns jsonb language sql set search_path = '' as $$
   select '{"obligations": [{"kind": "Bad Kind", "subject_id": "x", "last_responsible": "yes"}]}'::jsonb
 $$;
+-- An issued recovery grant for member 9 (must survive the failed deactivation).
+insert into app.identity_recovery_requests (request_code, claimed_phone, grant_digest, request_state, expires_at, bound_at)
+values ('DDDDDDDD', pg_temp.phone(9), repeat('d', 64), 'bound', now() + interval '30 minutes', now());
+insert into app.identity_recovery_cases (member_id, link_id, auth_user_id, identity_check, evidence, opened_by_member,
+                                         opened_by_account, is_synthetic)
+select pg_temp.mid(9), l.link_id, l.auth_user_id, 'in_person', array['photo_id'], pg_temp.mid(1), pg_temp.u(1), true
+  from app.identity_account_links l where l.member_id = pg_temp.mid(9) and l.link_state <> 'ended';
+insert into app.identity_recovery_grants (case_id, recovery_request_id, member_id, link_id, auth_user_id, binding_revision,
+                                          credential_generation, issued_by_member, issued_by_account, expires_at)
+select c.case_id, (select recovery_request_id from app.identity_recovery_requests where request_code = 'DDDDDDDD'),
+       c.member_id, c.link_id, c.auth_user_id, l.binding_revision, l.credential_generation, pg_temp.mid(1), pg_temp.u(1),
+       now() + interval '15 minutes'
+  from app.identity_recovery_cases c join app.identity_account_links l on l.link_id = c.link_id
+ where c.member_id = pg_temp.mid(9);
+create function pg_temp.untouched(n int) returns text language sql as $$
+  select pg_temp.state(n) || '|' || pg_temp.live_sessions(n)
+         || '|' || (select count(*) from app.identity_grants where member_id = pg_temp.mid(n) and revoked_at is null)
+         || '|' || coalesce((select string_agg(grant_state, ',') from app.identity_recovery_grants where member_id = pg_temp.mid(n)), '-')
+         || '|' || (select link_state from app.identity_account_links where member_id = pg_temp.mid(n) and link_state <> 'ended')
+         || '|' || (select count(*) from app.identity_handover_obligations where member_id = pg_temp.mid(n))
+$$;
 update app.contract_lifecycle_hooks set handler = 'app.fixture_fail_lifecycle(jsonb)'
  where event = 'membership_deactivated' and module = 'fixture';
 select is(pg_temp.err(pg_temp.deactivate(9)), 'unavailable {}', 'a raising owner lifecycle hook fails the deactivation');
-select is(pg_temp.state(9) || '|' || pg_temp.live_sessions(9), 'approved|1', 'and nothing changed (one transaction)');
+select is(pg_temp.untouched(9), 'approved|1|1|issued|active|0',
+  'and nothing changed (one transaction): state, session, grant, recovery grant, link, obligations');
 update app.contract_lifecycle_hooks set handler = 'app.fixture_record_lifecycle(jsonb)'
  where event = 'membership_deactivated' and module = 'fixture';
 update app.identity_handover_hooks set handler = 'app.fixture_bad_handover(jsonb)' where module = 'fixture';
 select is(pg_temp.err(pg_temp.deactivate(10)), 'unavailable {}', 'a malformed handover answer fails closed');
-select is(pg_temp.state(10) || '|' || pg_temp.live_sessions(10), 'approved|1', 'and nothing changed');
+select is(pg_temp.untouched(10), 'approved|1|1|-|active|0', 'and nothing changed');
 update app.identity_handover_hooks set handler = 'app.fixture_report_handover(jsonb)' where module = 'fixture';
 
 -- Reads ------------------------------------------------------------------------------------------
@@ -423,6 +457,47 @@ select ok(app.identity_resolve_handover_obligation('fixture',
           and not app.identity_resolve_handover_obligation('cells',
             (select obligation_id from app.identity_handover_obligations where member_id = pg_temp.mid(5)), 'handed_over'),
   'only the owning module resolves its obligation');
+
+-- A dispatched assisted reset (2.9) completed after the deactivation stays uncertain ------------
+insert into app.identity_holds (member_id, hold_kind, reason, placed_by, password_reset_required_since)
+values (pg_temp.mid(11), 'security', 'assisted_reset', 'system:pgtap', now());
+with c as (
+  insert into app.identity_recovery_cases (member_id, link_id, auth_user_id, identity_check, evidence, opened_by_member,
+                                           opened_by_account, is_synthetic)
+  select pg_temp.mid(11), l.link_id, l.auth_user_id, 'in_person', array['photo_id'], pg_temp.mid(1), pg_temp.u(1), true
+    from app.identity_account_links l where l.member_id = pg_temp.mid(11) and l.link_state <> 'ended'
+  returning *), rq as (
+  insert into app.identity_recovery_requests (request_code, claimed_phone, grant_digest, request_state, expires_at, bound_at)
+  values ('EEEEEEEE', pg_temp.phone(11), repeat('e', 64), 'bound', now() + interval '1 hour', now()) returning *), g as (
+  insert into app.identity_recovery_grants (case_id, recovery_request_id, member_id, link_id, auth_user_id, binding_revision,
+                                            credential_generation, grant_state, issued_by_member, issued_by_account,
+                                            expires_at, ended_at, end_reason)
+  select c.case_id, rq.recovery_request_id, c.member_id, c.link_id, c.auth_user_id, l.binding_revision,
+         l.credential_generation, 'consumed', pg_temp.mid(1), pg_temp.u(1), now() + interval '15 minutes', now(), 'redeemed'
+    from c, rq, app.identity_account_links l where l.link_id = c.link_id
+  returning *)
+insert into app.identity_recovery_operations (grant_id, case_id, member_id, link_id, auth_user_id, generation_at_begin,
+                                              binding_revision_at_begin, op_state, system_principal_id, dispatched_at,
+                                              event_floor, sessions_at_dispatch, hold_id)
+select g.grant_id, g.case_id, g.member_id, g.link_id, g.auth_user_id, g.credential_generation, g.binding_revision,
+       'dispatched', gen_random_uuid(), clock_timestamp(),
+       coalesce((select max(event_id) from app.identity_credential_events), 0), 1,
+       (select hold_id from app.identity_holds where member_id = pg_temp.mid(11) and released_at is null)
+  from g;
+select is(pg_temp.deactivate(11) -> 'data' ->> 'membership_state', 'deactivated',
+  'a member with a dispatched assisted reset is deactivated');
+select is((select op_state from app.identity_recovery_operations where member_id = pg_temp.mid(11)), 'dispatched',
+  'a dispatched operation is not touched by the deactivation');
+-- Auth Admin applies the password (the 2.2 trigger records it), then the function completes.
+update auth.users set encrypted_password = 'synthetic-2-10-changed' where id = pg_temp.u(11);
+select is(app.identity_sys_reset_complete(gen_random_uuid(), gen_random_uuid(),
+            jsonb_build_object('operation_id', (select operation_id from app.identity_recovery_operations
+                                                 where member_id = pg_temp.mid(11)),
+                               'auth_result', 'applied')) -> 'data' ->> 'outcome',
+  'uncertain', 'completion after the deactivation is uncertain (the link is no longer recoverable)');
+select is((select count(*)::int from app.identity_holds where member_id = pg_temp.mid(11) and released_at is null), 1,
+  'the operation''s hold is kept');
+select is(pg_temp.summary(pg_temp.fresh(11)), 'PT403|forbidden|not_linked', 'and access is still denied');
 
 select * from finish();
 rollback;

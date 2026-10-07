@@ -13,7 +13,8 @@
 //   * the last responsible person for an owner's work cannot be deactivated until it is handed
 //     over;
 //   * a reviewed restoration by another Admin lets only a fresh sign-in in, with no grants
-//     restored and the handover still pending.
+//     restored and the handover still pending;
+//   * the last two Admins deactivating each other at the same time: exactly one succeeds.
 //
 // Needs the local phone switch: `node tools/auth-harness/local-phone-auth.mjs on` (no SMS
 // provider, hook, test OTP or SMS MFA), then `off` afterwards, and a database with no usable
@@ -379,6 +380,19 @@ async function main() {
       { without_identity_check: noCheck.code, restore: restored.data?.membership_state,
         session_from_deactivation: duringDeactivation.status, fresh_sign_in: backSummary.status,
         roles_after: backAccess?.roles ?? null, handover_still_pending: stillPending });
+
+    // ------------------------------------- the last two Admins deactivate each other at once
+    // Two concurrent sessions (separate PostgREST transactions): the identity authorizer
+    // serialises Admin commands, so exactly one succeeds and one usable Admin remains.
+    const [aOnB, bOnA] = await Promise.all([
+      lifecycle(admin.token, 'identity.deactivate_membership', admin2, { reason_code: 'church_decision' }),
+      lifecycle(admin2.token, 'identity.deactivate_membership', admin, { reason_code: 'church_decision' }),
+    ]);
+    const outcomes = [aOnB, bOnA].map((r) => (r.status === 200 && !r.code ? 'ok' : r.code));
+    const usable = Number(psql(`select app.identity_usable_admin_count()`));
+    check('L40-concurrent-deactivation-of-the-last-two-admins', outcomes.filter((o) => o === 'ok').length === 1
+      && outcomes.filter((o) => o === 'forbidden').length === 1 && usable === 1,
+      { outcomes: outcomes.sort(), usable_admins_after: usable });
 
     const sms = (await http('GET', '/auth/v1/settings')).json?.sms_provider ?? null;
     check('L99-no-sms', !sms, { sms_provider: sms });

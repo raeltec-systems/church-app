@@ -38,6 +38,7 @@ context:
 - Decision (agent, under owner pre-approval): `identity.restore_membership {member_id, identity_check}` by another Admin: `approved` again, link back to `active` (or `review_required` with a pending binding review), epoch moves (fresh sign-in), grants NOT restored, obligations stay pending, `membership_restored` dispatched.
 - Decision (agent, under owner pre-approval): contract v1 gains `membership_deactivated` and `membership_restored` (SQL list, shared fixture, Dart, TS), following 2.8's `sessions_revoked` precedent; `account_deactivated` stays the unlink event.
 - Decision (agent, under owner pre-approval): owner handover hooks: `app.identity_register_handover_hook(module, handler)`; handler `(jsonb lifecycle event) -> jsonb {"obligations": [{"kind", "subject_id", "last_responsible"}]}`, called in lock order; a malformed answer or missing handler raises (fail closed). Owners resolve with `app.identity_resolve_handover_obligation(module, obligation_id)`. Only SYNTHETIC fixture hooks (`app.fixture_report_handover`, `app.fixture_duties`) exist, registered only by tests/E2E.
+- Decision (agent, under owner pre-approval): additive lifecycle events stay v1 (server-only consumers); 2.8 `sessions_revoked` and 2.10 `membership_deactivated`/`membership_restored` are covered.
 - Decision (agent, under owner pre-approval): reads `api.identity_admin_membership_lifecycle()` (Admin: deactivated members with obligations, open login holds) and `api.identity_my_membership_status()` (trusted own session: `{deactivated, church_contact}`).
 
 **Never:** full deletion (entry 11); restoring grants automatically; clearing a hold, an uncertain recovery operation or an obligation by deactivation or restore; blocking security holds (2.8) by handover; SMS; hosted applies.
@@ -97,6 +98,15 @@ context:
 
 ## Plan Change Log
 
+- 2026-10-07, independent review (coordinator; not a step-04 loop). No HIGH; one MEDIUM, four LOW; all patched in place in `20261007170000` (still no `delete from`, ASCII only, `search_path` set, nothing to anon).
+  - **MEDIUM (contract rule):** the contracts runbook said a new lifecycle event needs a new version. Amended: event names are additive within v1 while every consumer is a server-side registered hook; removing/renaming one or adding the first client-visible consumer needs a new version. Frozen-block decision recorded. New `client_core` boundary test fails if client or app code consumes lifecycle events (the shared Dart/TS packages carry the list for fixture parity only).
+  - **LOW (deadlock):** deactivation, restoration and `place_hold` (replaced, latest 2.8 body) now lock the live link before the member (`app.identity_lock_payload_member_link`), the 2.9 order.
+  - **LOW (login hold reason):** `identity_release_hold` (audit) and `identity_admin_credential_queue` replaced in place with their latest 2.8 bodies using `identity_hold_reason_code`; the queue's EXECUTE re-granted. pgTAP asserts both name `login_disabled`.
+  - **LOW (last Admin):** the login-hold check is described as defence in depth (migration and runbook); `identity_is_last_admin` tested directly (two usable Admins, non-Admin, held Admin).
+  - **LOW (tests):** E2E `L40` (the last two Admins deactivate each other in parallel: exactly one succeeds); pgTAP: dispatched assisted reset completed after deactivation is `uncertain`, hold kept, access denied; atomicity tests also assert grants, recovery grant state, `link_state` and obligations unchanged.
+  - **Accepted:** restoring by the same Admin who deactivated (matches the ticket and the 2.8 release pattern; the identity check makes it reviewed).
+  - **KEEP:** the handover-hook preflight, the one-transaction deactivation, the 2.9 recovery rules.
+
 ## Review Triage Log
 
 ## Verification
@@ -111,4 +121,5 @@ context:
   - `lifecycle.mjs` 8/8 (`evidence-2.10/lifecycle-e2e.jsonl`); regressions `run` 30, `grants` 18, `apply` 27, `review` 18, `cells` 13, `recovery` 20, `credentials` 15, `assisted` 16.
   - client_core 326 tests, staff 24, mobile 26; analyze clean in all three; format clean; staff `flutter build web --no-web-resources-cdn` ok; contracts Dart 255 and TS pass.
   - Node tool tests 71/71, policy tests 49/49; `ci:migrations --base ccr-93e730dd-89lbvg` (22, non-destructive); `ci:secrets` clean; `scan-evidence` on evidence-2.10 and `tools/identity-e2e` clean.
+- Results after the review fixes (2026-10-07, local): `db:test` 1330/1330 (membership lifecycle 86) after a fresh reset; `db:smoke` exit 0; `lifecycle.mjs` 9/9 (new `L40`); regressions `run` 30, `grants` 18, `apply` 27, `review` 18, `cells` 13, `recovery` 20, `credentials` 15, `assisted` 16; client_core 327, staff 24, mobile 26, analyze and format clean; contracts Dart 255, TS 238; node tool tests 71, policy 49; `ci:migrations` (22, non-destructive), `ci:secrets`, `scan-evidence` clean. Phone switch off again.
 - Matrix audit: login hold (pgTAP + E2E L10/L11 + widgets), deactivate (pgTAP + L20 + widgets), last responsible (pgTAP + L21 + widget notice), last Admin (pgTAP + L01 + widget notice), restore (pgTAP + L30 + widget), uncertain recovery (pgTAP): every row has a passing test.

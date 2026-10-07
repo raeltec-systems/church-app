@@ -8,8 +8,11 @@
 --     account stays held (generic help screen) until identity.release_hold. Membership, account
 --     link, grants, cell membership and every owner's facts are untouched. The 2.8 reason_code
 --     CHECK cannot be widened without a DROP, so a login hold stores `reason = 'login_disabled'`
---     with reason_code null; reads report it as reason code `login_disabled`. A login hold on the
---     last usable Admin is refused (`forbidden {"member_id": "last_admin"}`).
+--     with reason_code null; reads (the 2.8 queue, release audit and holds view, replaced here)
+--     report it as reason code `login_disabled`. Defence in depth: a login hold on the last usable
+--     Admin is refused (`forbidden {"member_id": "last_admin"}`); through the command it cannot
+--     normally trigger, because the acting Admin is itself usable and cannot hold their own
+--     record, but it guards any later caller and races with holds placed outside the command.
 --   * Church deactivation (Admin, expected = member revision):
 --       identity.deactivate_membership {member_id, reason_code}
 --         reason_code: member_request, moved_away, church_decision
@@ -38,6 +41,13 @@
 --   * Reads: api.identity_admin_membership_lifecycle() (Admin: deactivated members, open login
 --     holds, pending handovers) and api.identity_my_membership_status() (a trusted own session:
 --     whether the linked membership is deactivated, and the church contact).
+--
+-- Lock order (review fix): deactivation, restoration and place_hold lock the member's live link
+-- BEFORE the member row, the same order as the 2.9 dispatch/complete steps (link -> operation
+-- -> member), so the two paths cannot deadlock.
+--
+-- Contract: lifecycle event names are additive within v1 while every consumer is a server-side
+-- registered hook (docs/runbooks/contracts-and-owner-seams.md).
 --
 -- No destructive statements and no row deletions; Auth sessions are revoked through
 -- app.identity_revoke_auth_sessions (20261007160100). No client table privileges.
@@ -318,6 +328,23 @@ as $$
     'data', app.identity_lifecycle_member_json(p_member_id));
 $$;
 
+-- Locks the live account link of the payload's member first (lock order link -> member, as in
+-- the 2.9 recovery steps). A malformed member_id locks nothing; validation reports it later.
+create function app.identity_lock_payload_member_link(p_payload jsonb)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if jsonb_typeof(p_payload) = 'object'
+     and app.contract_uuid_error(p_payload -> 'member_id') is null then
+    perform 1 from app.identity_account_links l
+     where l.member_id = (p_payload ->> 'member_id')::uuid and l.link_state <> 'ended'
+       for update;
+  end if;
+end;
+$$;
+
 -- Validates {member_id, <p_field>} and locks the member (not_found otherwise). The revision and
 -- the self check are the caller's, so the last-Admin answer can come first.
 create function app.identity_lock_lifecycle_member(
@@ -456,6 +483,7 @@ declare
   v_request uuid := app.cmd_current_request_id(p_actor, 'identity.place_hold');
 begin
   select a.* into v_actor from app.identity_command_actor(p_actor) a;
+  perform app.identity_lock_payload_member_link(p_payload);
   v_member := app.identity_lock_reviewed_member(p_payload, array['member_id', 'reason_code'],
     false, p_expected_revision, v_actor.member_id);
   v_reason := p_payload ->> 'reason_code';
@@ -468,8 +496,10 @@ begin
                 and app.identity_hold_reason_code(h) = v_reason) then
     perform app.cmd_fail('conflict', '{"reason_code": "already_held"}', v_member.revision);
   end if;
-  -- An administrative login hold never locks the church out (a security hold still may: the
-  -- operator bootstrap is the way back, 2.3).
+  -- Defence in depth: an administrative login hold never locks the church out. Through this
+  -- command the acting Admin is itself usable (and cannot hold their own record), so this
+  -- guards later callers. A security hold is never blocked: the operator bootstrap (2.3) is the
+  -- way back.
   if v_login and app.identity_is_last_admin(v_member.member_id) then
     perform app.cmd_fail('forbidden', '{"member_id": "last_admin"}');
   end if;
@@ -532,6 +562,151 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------------------------------
+-- 2.8 reads and audit that name a hold's reason, replaced in place (latest bodies, same
+-- signatures and privileges) so a login hold shows as `login_disabled`
+-- ---------------------------------------------------------------------------------------------
+
+-- identity.release_hold {member_id, hold_id, identity_check}: the 2.8 body; the audit records
+-- the login hold's reason code.
+create or replace function app.identity_release_hold(
+  p_actor uuid,
+  p_expected_revision bigint,
+  p_payload jsonb
+) returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_actor record;
+  v_member app.identity_members;
+  v_hold app.identity_holds;
+  v_revision bigint;
+  v_request uuid := app.cmd_current_request_id(p_actor, 'identity.release_hold');
+begin
+  select a.* into v_actor from app.identity_command_actor(p_actor) a;
+  v_member := app.identity_lock_reviewed_member(p_payload,
+    array['member_id', 'hold_id', 'identity_check'], true, p_expected_revision, v_actor.member_id);
+  select h.* into v_hold from app.identity_holds h
+   where h.hold_id = (p_payload ->> 'hold_id')::uuid and h.member_id = v_member.member_id
+     for update;
+  if not found then
+    perform app.cmd_fail('not_found');
+  end if;
+  if v_hold.released_at is not null then
+    perform app.cmd_fail('conflict', '{"hold_id": "released"}', v_member.revision);
+  end if;
+  -- Fail closed: a hold that needs a password reset stays until the member reset the password
+  -- themselves (an approved-email link redemption followed by a new password) after it was set.
+  if v_hold.password_reset_required_since is not null
+     and not coalesce(app.identity_member_reset_since(
+           (select l.link_id from app.identity_account_links l
+             where l.member_id = v_member.member_id and l.link_state <> 'ended'),
+           v_hold.password_reset_required_since), false) then
+    perform app.cmd_fail('conflict', '{"hold_id": "password_reset_required"}', v_member.revision);
+  end if;
+  update app.identity_holds h
+     set released_at = now(), released_by = 'admin:' || v_actor.member_id::text,
+         released_by_member = v_actor.member_id, released_by_account = v_actor.account_id,
+         release_identity_check = p_payload ->> 'identity_check'
+   where h.hold_id = v_hold.hold_id
+  returning * into v_hold;
+  v_revision := app.identity_bump_member(v_member.member_id);
+  perform app.identity_review_audit_add('hold_released', v_actor.member_id, v_actor.account_id,
+    v_request, v_member.member_id,
+    (select l.link_id from app.identity_account_links l
+      where l.member_id = v_member.member_id and l.link_state <> 'ended'),
+    null, v_hold, app.identity_hold_reason_code(v_hold), v_hold.release_identity_check, null,
+    v_revision, null);
+  perform app.identity_dispatch_lifecycle('access_hold_released', v_member.member_id, v_revision);
+  return app.identity_member_holds_outcome(v_member.member_id);
+end;
+$$;
+
+-- Admin only: the 2.8 queue body; a hold's reason code includes `login_disabled`.
+create or replace function app.identity_admin_credential_queue()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_actor_member uuid;
+  v_link_id uuid;
+  v_changes jsonb;
+  v_reviews jsonb;
+  v_holds jsonb;
+begin
+  select g.member_id, g.link_id into v_actor_member, v_link_id
+    from app.identity_require_grant('admin', null, null) g;
+  select coalesce(jsonb_agg(app.identity_credential_change_admin_json(x)
+                            || jsonb_build_object('member_revision', m.revision)
+                            order by x.requested_at, x.change_id), '[]'::jsonb)
+    into v_changes
+    from (select c.* from app.identity_credential_changes c
+           where c.change_state = 'pending'
+           order by c.requested_at, c.change_id
+           limit 100) x
+    join app.identity_members m on m.member_id = x.member_id;
+  select coalesce(jsonb_agg(y.obj order by y.updated_at, y.member_id), '[]'::jsonb)
+    into v_reviews
+    from (
+      select l.updated_at, m.member_id, jsonb_build_object(
+               'member_id', m.member_id,
+               'display_name', m.display_name,
+               'member_revision', m.revision,
+               'link_state', l.link_state,
+               'binding_review', l.binding_review_required,
+               'phone_username', l.approved_phone,
+               'recovery_email', l.approved_recovery_email,
+               'auth_phone_username', app.identity_auth_phone(l.auth_user_id),
+               'auth_email', (select lower(nullif(btrim(u.email), '')) from auth.users u
+                               where u.id = l.auth_user_id),
+               'auth_email_confirmed', (select u.email_confirmed_at is not null from auth.users u
+                                         where u.id = l.auth_user_id),
+               'extra_factors', app.identity_auth_has_extras(l.auth_user_id),
+               'change_kinds', coalesce((
+                 select jsonb_agg(distinct k order by k)
+                   from app.identity_credential_events e, unnest(e.kinds) k
+                  where e.link_id = l.link_id and e.binding_review and e.source like 'auth\_%'
+                    and e.at >= (select max(h.approved_at) from app.identity_binding_history h
+                                  where h.link_id = l.link_id)), '[]'::jsonb),
+               'own_account', l.auth_user_id
+                              = nullif(app.identity_request_claims() ->> 'sub', '')::uuid,
+               'is_synthetic', m.is_synthetic) as obj
+        from app.identity_account_links l
+        join app.identity_members m on m.member_id = l.member_id
+       where l.link_state in ('active', 'review_required')
+         and (l.binding_review_required or l.link_state = 'review_required')
+         and not exists (select 1 from app.identity_credential_changes c
+                          where c.link_id = l.link_id and c.change_state = 'pending')
+         and not exists (select 1 from app.identity_recovery_email_proposals p
+                          where p.link_id = l.link_id and p.proposal_state = 'pending')
+       order by l.updated_at, m.member_id
+       limit 100) y;
+  select coalesce(jsonb_agg(z.obj order by z.placed_at, z.hold_id), '[]'::jsonb)
+    into v_holds
+    from (
+      select h.placed_at, h.hold_id, jsonb_build_object(
+               'hold_id', h.hold_id,
+               'member_id', m.member_id,
+               'display_name', m.display_name,
+               'member_revision', m.revision,
+               'hold_kind', h.hold_kind,
+               'reason_code', app.identity_hold_reason_code(h),
+               'placed_at', h.placed_at,
+               'own_member', m.member_id = v_actor_member,
+               'is_synthetic', m.is_synthetic) as obj
+        from app.identity_holds h
+        join app.identity_members m on m.member_id = h.member_id
+       where h.released_at is null
+       order by h.placed_at, h.hold_id
+       limit 200) z;
+  perform app.identity_record_activity(v_link_id);
+  return jsonb_build_object('changes', v_changes, 'reviews', v_reviews, 'holds', v_holds);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------------------------
 -- Church deactivation and reviewed restoration
 -- ---------------------------------------------------------------------------------------------
 
@@ -563,6 +738,7 @@ declare
   v_request uuid := app.cmd_current_request_id(p_actor, 'identity.deactivate_membership');
 begin
   select a.* into v_actor from app.identity_command_actor(p_actor) a;
+  perform app.identity_lock_payload_member_link(p_payload);
   v_member := app.identity_lock_lifecycle_member(p_payload, 'reason_code');
   -- The church is never left without a usable Admin (first, so a sole Admin learns why).
   if app.identity_is_last_admin(v_member.member_id) then
@@ -687,6 +863,7 @@ declare
   v_request uuid := app.cmd_current_request_id(p_actor, 'identity.restore_membership');
 begin
   select a.* into v_actor from app.identity_command_actor(p_actor) a;
+  perform app.identity_lock_payload_member_link(p_payload);
   v_member := app.identity_lock_lifecycle_member(p_payload, 'identity_check');
   if v_member.member_id = v_actor.member_id then
     perform app.cmd_fail('forbidden', '{"member_id": "unsupported"}');
@@ -965,6 +1142,9 @@ revoke all on function
   app.identity_lock_reviewed_member(jsonb, text[], boolean, bigint, uuid),
   app.identity_place_hold(uuid, bigint, jsonb),
   app.identity_member_holds_json(uuid),
+  app.identity_lock_payload_member_link(jsonb),
+  app.identity_release_hold(uuid, bigint, jsonb),
+  app.identity_admin_credential_queue(),
   app.identity_deactivate_membership(uuid, bigint, jsonb),
   app.identity_restore_membership(uuid, bigint, jsonb),
   app.identity_lifecycle_in_scope(uuid, text, uuid),
@@ -977,6 +1157,8 @@ revoke all on function
   api.identity_my_membership_status()
   from public, anon, authenticated, service_role;
 
+-- Re-granted: the revoke list above touches the 2.8 queue's definer entry point.
+grant execute on function app.identity_admin_credential_queue() to authenticated;
 grant execute on function app.identity_lifecycle_command(jsonb) to authenticated;
 grant execute on function api.identity_lifecycle_command(jsonb) to authenticated;
 grant execute on function app.identity_admin_membership_lifecycle() to authenticated;

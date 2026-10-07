@@ -8,7 +8,7 @@ All runs are LOCAL (Supabase CLI stack, GoTrue v2.197.0), on 2026-10-07, with sy
 
 | File | What it shows |
 |---|---|
-| `lifecycle-e2e.jsonl` | `tools/identity-e2e/lifecycle.mjs`: 8/8 checks through real GoTrue (phone/password sign-in, refresh) and PostgREST. Statuses, codes, counts and booleans only. |
+| `lifecycle-e2e.jsonl` | `tools/identity-e2e/lifecycle.mjs`: 9/9 checks through real GoTrue (phone/password sign-in, refresh) and PostgREST. Statuses, codes, counts and booleans only. |
 
 ## The verify bullet, row by row
 
@@ -21,6 +21,8 @@ All runs are LOCAL (Supabase CLI stack, GoTrue v2.197.0), on 2026-10-07, with sy
 | Deactivation records handover obligations | E2E `L20`: the registered SYNTHETIC handover hook's duty is listed as a pending handover in the Admin read; owner lifecycle hooks heard `scope_revoked`, `membership_deactivated`, `sessions_revoked` in the same transaction. pgTAP: a raising owner hook or a malformed handover answer rolls everything back |
 | Deactivation invalidates a pending grant | E2E `L20`: a staff-assisted recovery grant issued through the Admin API is `cancelled` after the deactivation. pgTAP: `cancelled/stale`; a pending operation becomes `obsolete`; an uncertain one keeps its hold (2.9 rules) |
 | Removing the last Admin is refused | E2E `L01`: the sole Admin's deactivation answers `forbidden {"member_id": "last_admin"}`. pgTAP: with the other Admin held, the same refusal, nothing changed. Widgets: its own notice |
+| Concurrent removal of the last two Admins (review fix) | E2E `L40`: the two Admins deactivate each other in parallel requests; exactly one succeeds, the other is `forbidden`, one usable Admin remains |
+| Atomicity and 2.9 after deactivation (review fixes) | pgTAP: after a raising owner hook or a malformed handover answer the state, sessions, grants, issued recovery grant, `link_state` and obligations are unchanged; a dispatched assisted reset completed after the deactivation is `uncertain`, keeps its hold and access stays denied |
 | Last responsible staff member | E2E `L21`: a sole-responsible fixture duty refuses the deactivation (`handover_required`, nothing written); after the owner's handover it succeeds |
 | Reviewed restoration | E2E `L30`: needs an identity check; a session opened during the deactivation stays dead; a fresh sign-in is granted; no role comes back; the handover stays pending. pgTAP likewise, and only the owning module resolves its obligation |
 

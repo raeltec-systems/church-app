@@ -489,7 +489,7 @@ begin
     errors := errors || jsonb_build_object(p_key, 'required');
     value := null;
   elsif length(value) > 80 or value ~ '[[:cntrl:]]'
-        or value ~ '[­​-‏‪-‮⁠-⁤⁦-⁯﻿]'
+        or value ~ '[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\ufeff]'
         or (not app.policy_is_open('q4_personal_data') and value !~ '^SYNTHETIC ') then
     errors := errors || jsonb_build_object(p_key, 'invalid');
     value := null;

@@ -93,8 +93,14 @@ select results_eq(
            ('environment'), ('id'), ('initiating_member_id'), ('occurred_at'), ('outcome'),
            ('reason'), ('request_id'), ('system_principal_id')$$,
   'the audit row has only ids, enums and timestamps (no payload, token, digest or free text)');
-select results_eq($$select command from app.sys_command_kinds$$,
-  $$values ('system.synthetic_probe'::text)$$, 'exactly one command is allowlisted');
+select results_eq($$select command, purpose from app.sys_command_kinds order by 1$$,
+  $$values ('identity.assisted_recovery_request'::text, 'identity_assisted_recovery'::text),
+           ('identity.assisted_recovery_status', 'identity_assisted_recovery'),
+           ('identity.assisted_reset_begin', 'identity_assisted_recovery'),
+           ('identity.assisted_reset_complete', 'identity_assisted_recovery'),
+           ('identity.assisted_reset_dispatch', 'identity_assisted_recovery'),
+           ('system.synthetic_probe', 'synthetic_probe')$$,
+  'the allowlist is the synthetic probe plus the story 2.9 assisted-recovery commands (their own purpose)');
 
 -- Operators, gates and alert status ------------------------------------------------------------
 select results_eq($$select operator from app.ops_operators where active$$,

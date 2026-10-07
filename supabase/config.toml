@@ -396,6 +396,14 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Story 2.9: staff-assisted recovery. A member in recovery has no session, so the single-use
+# grant authenticates the call (not the gateway JWT check). Its system credential is the Edge
+# Function secret IDENTITY_RECOVERY_SYSTEM_CREDENTIAL (never in the repo); see
+# docs/runbooks/identity-access.md.
+[functions.identity-assisted-recovery]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

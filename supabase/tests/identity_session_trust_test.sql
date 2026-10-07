@@ -306,7 +306,8 @@ select is(pg_temp.read(pg_temp.claims(pg_temp.u(7), pg_temp.s(7))), 'PT401|unaut
   'released hold: sessions from before the hold stay dead');
 select pg_temp.fresh(pg_temp.u(7), pg_temp.s(71));
 select is(pg_temp.read(pg_temp.claims(pg_temp.u(7), pg_temp.s(71))), 'ok', 'fresh sign-in after release: granted');
-select is(pg_temp.events(pg_temp.u(7)), 'identity_holds:hold_security:epoch', 'the hold is recorded');
+select is(pg_temp.events(pg_temp.u(7)), 'identity_holds:hold_security:epoch, identity_holds:hold_released:epoch',
+  'the hold and its release are recorded (story 2.8: a release also moves the epoch)');
 
 -- Relink after an ended link -------------------------------------------------------------------
 update app.identity_account_links set link_state = 'ended', ended_at = now() where auth_user_id = pg_temp.u(3);

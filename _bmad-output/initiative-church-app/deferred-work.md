@@ -50,7 +50,3 @@
 - source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-delete-a-member-fully-through-a-resumable-workflow-plan.md`
   summary: Real owners (device registrations, Duties, Chat, Directory, Prayer, Storage objects) must register deletion hooks (app.identity_register_deletion_hook) before they activate, and Q4 must approve identity_deletion_retention (what is erased or anonymised, and journal/backup retention) before production erasure runs; production also needs a scheduled worker and its credential.
   evidence: 2.11 erases Identity and Cells data and proves owner hooks only with the SYNTHETIC fixture hook; production requests deny access but erasure waits on the closed gate by design.
-
-- source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-delete-a-member-fully-through-a-resumable-workflow-plan.md`
-  summary: tools/identity-e2e/lifecycle.mjs step L40 (the last two Admins deactivate each other in parallel) expects ok + forbidden but this environment answers ok + unauthenticated, with or without the 2.11 migrations; make the check accept either refusal (the property is "exactly one succeeds and one usable Admin remains").
-  evidence: 2.11 regression runs: lifecycle 8/9, L40 identical on the baseline schema (2.11 migrations moved aside); the second request's session check runs after the first transaction revoked its sessions.

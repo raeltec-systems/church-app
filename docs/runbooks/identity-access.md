@@ -829,19 +829,20 @@ Full deletion is the fourth lifecycle effect (I10, AD-14), distinct from a login
 
 Refusals (field errors):
 
-- `forbidden {"member_id": "last_admin"}`: the church's last usable Admin (checked first).
+- `forbidden {"member_id": "last_admin"}`: the church's last usable Admin (checked first). Every deletion route first locks the Admin role rows (`select ... from app.identity_roles where role = 'admin' for update`), so two Admins deleting themselves at the same moment cannot both pass the check: one usable Admin always remains.
 - `forbidden {"member_id": "unsupported"}`: an Admin's own record on the staff route.
 - `forbidden {"session": "reauthenticate"}`: in the app, the password sign-in is not recent.
 - `conflict {"member_id": "deletion_requested"}`: already being deleted.
 - `conflict {"member_id": "member_can_use_app"}`: the staff route for a member with working app access. They ask in the app; if they cannot, place a login hold first.
+- `conflict {"member_id": "second_admin_required"}`: the staff route for a member who has a live account link, when the login hold or the deactivation was placed by the same Admin who now asks for the deletion. Two Admins are needed: one places the hold (or deactivates), a DIFFERENT one deletes. A member whose link is in review, or who never had a working account, needs no second Admin.
 - `validation_failed {"confirm": ...}`.
 - A member without member access (applicant, in review, deactivated) gets `forbidden` in the app and is helped on the staff route.
 
 What the request does, in the same transaction:
 
 - An approved member is deactivated first with the 2.10 effects: every grant ends (2.3 path), issued recovery grants end, a pending recovery operation becomes obsolete, a `membership_deactivated` lifecycle row (reason `member_request`) is written, and handover obligations reported by owner handover hooks are recorded `pending`. A last-responsible obligation never refuses a deletion: security denial comes first, and erasure waits for the handover instead.
-- The live account link ends (the trust epoch moves), every Auth session of the account is revoked, and the Auth user is **banned** (`banned_until` = now + 100 years). From this step on a password sign-in fails at Auth (`user_banned`) and every old token is refused.
-- The access-denied tombstone `app.identity_deletions` (member id, account id until completion, origin, identity check) and its ordered steps `app.identity_deletion_steps` are recorded.
+- Every Auth account the member ever linked is recorded in `app.identity_deletion_accounts` (earliest first; ended links and applications included, not only the live one). The live link ends (the trust epoch moves), every Auth session of every recorded account is revoked, and every recorded Auth user is **banned** (`banned_until` = now + 100 years). From this step on a password sign-in fails at Auth (`user_banned`) and every old token is refused.
+- The access-denied tombstone `app.identity_deletions` (member id, origin, identity check, whether there was a login), its accounts and its ordered steps `app.identity_deletion_steps` are recorded.
 - Lifecycle events: `membership_deactivated` (when it applied), `deletion_requested`, `sessions_revoked`.
 - From then on, a link of that member can never become live again (trigger `identity_link_deletion_guard`, every path), `identity.restore_membership` refuses it (`deletion_requested`), and the 2.10 overview lists the member under deletions, not among restorable deactivations.
 
@@ -851,15 +852,15 @@ What the request does, in the same transaction:
 |---|---|---|---|
 | 1 | `journal_access_revoked` | the worker appends `access_revoked {subject: member}` to the recovery journal; the database acknowledges it | — |
 | 2 | `journal_manifest_member` | `deletion_manifest {subject: member, object: identity-member/<member>}` | — |
-| 3 | `journal_manifest_account`* | `deletion_manifest {subject: member, object: auth-user/<account>}` | — |
-| 4 | `auth_account`* | Edge Function `identity-deletion`: Auth Admin `DELETE /admin/users/<id>`. The database counts it done only when the Auth user and its identities are absent | retention gate |
-| 5 | `erase_identity` | the member's Identity personal rows (links, binding history, credential events, recovery-email proposals, credential changes, recovery requests/cases/grants/operations, holds, contact routes, provenance, applications and their events, phone reclaims), every receipt that mentions the member or the account, and the account's Auth audit-log entries. The member row becomes the tombstone (`Deleted member`, deactivated) | retention gate, pending handovers |
+| 3 | `journal_manifest_account`* | `deletion_manifest {subject: member, object: auth-user/<account>}`, once per recorded account | — |
+| 4 | `auth_account`* | Edge Function `identity-deletion`: Auth Admin `DELETE /admin/users/<id>`, once per recorded account, in order. The database counts an account done only when its Auth user, identities, sessions, refresh tokens, one-time tokens and MFA factors are absent | retention gate |
+| 5 | `erase_identity` | first the ids of the member's records are noted (`app.identity_deletion_aggregates`: applications, credential changes, recovery-email proposals, recovery cases, grants and requests, phone reclaims, links). Then the member's Identity personal rows tied to the member, its accounts or those ids (never matched by phone number): links, binding history, credential events, proposals, credential changes, recovery requests/cases/grants/operations, holds, contact routes, provenance, applications and their events, phone reclaims. Receipts: `app.cmd_receipts` rows whose actor is one of the accounts or whose `aggregate_id` is one of those ids (or the member or the deletion) are deleted; other actors' receipts that mention the member or an account have those ids replaced by the nil UUID (cmd and sys receipts). The accounts' `auth.audit_log_entries` (by `actor_id` or `traits.user_id`) go too. The member row becomes the tombstone (`Deleted member`, deactivated) | retention gate, pending handovers |
 | 6 | `erase_owners` | every registered owner deletion hook (`erase`), Cells included (memberships, requests, member state; the account id in Cells' kept records becomes the nil UUID) | retention gate, pending handovers |
-| 7 | `anonymise` | the deleted account id in Identity's kept records becomes the nil UUID (FIXTURE rules, `app.identity_deletion_retention_rules`) | retention gate, pending handovers |
-| 8 | `verify` | checks EVERY store: the Auth user and its identities, every Identity personal table and the tombstone, receipts, each owner hook (`check`), and the kept records. Anything left reopens the step that left it | — |
+| 7 | `anonymise` | every deleted account id in Identity's kept records becomes the nil UUID (FIXTURE rules, `app.identity_deletion_retention_rules`) | retention gate, pending handovers |
+| 8 | `verify` | checks EVERY store with the same matching as the erase: per account the Auth user, identities, sessions, refresh tokens, one-time tokens, MFA factors and audit-log entries; every Identity personal table (recovery requests, binding history, credential and application events included) and the tombstone; `cmd_receipts` by actor and by aggregate; any `cmd_receipts` or `sys_receipts` still naming the member or an account; each owner hook (`check`); and the kept records. Anything left reopens the step that left it | — |
 | 9 | `journal_completed_member` | `deletion_completed {object: identity-member/<member>}` | — |
-| 10 | `journal_completed_account`* | `deletion_completed {object: auth-user/<account>}` | — |
-| 11 | `complete` | a final receipt sweep; the account id is cleared from the tombstone; `member_deleted` is dispatched | — |
+| 10 | `journal_completed_account`* | `deletion_completed {object: auth-user/<account>}`, once per recorded account | — |
+| 11 | `complete` | a final sweep after the Auth step (receipts, and the Auth audit-log entries Auth wrote while deleting, `user_deleted` included); the account ids are cleared from the deletion's records; `member_deleted` is dispatched | — |
 
 \* Only when the member had a login.
 
@@ -868,11 +869,12 @@ What the request does, in the same transaction:
 - Every step also waits while a restore is held (`restore_held`).
 - Audit: `app.identity_deletion_audit` (ids and codes). Every system call is also in `app.sys_audit`.
 
-System commands, allowlisted for the purpose `identity_deletion` only:
+Seven system commands, allowlisted for the purpose `identity_deletion` only:
 
 - `identity.deletion_queue {limit?}`: the open deletions and their next action.
 - `identity.deletion_next {deletion_id}`: the next action and, for a journal step, the exact entry fields.
-- `identity.deletion_journal_ack {deletion_id, step, entry}`: the database checks the entry is exactly the expected one and records it through `app.rcv_apply_journal_entry_as`. The same entry again is a no-op; any other is `entry_mismatch`.
+- `identity.deletion_journal_ack {deletion_id, step, entry}`: the database checks the entry is exactly the expected one AND that it continues the acknowledged chain: `seq` = the highest acknowledged seq + 1 and `prev_hash` = that entry's hash, and `hash` is the entry's own canonical hash (`app.rcv_entry_hash`). Then it records it through `app.rcv_apply_journal_entry_as`. The same entry again is a no-op. Refusals: `entry_mismatch`, `journal_gap` (a later or skipped seq), `journal_chain_broken` (wrong `prev_hash`), `entry_invalid` (wrong hash).
+- `identity.deletion_journal_catch_up {entry}`: acknowledges an entry another writer appended to the journal before the deletion's next one (same chain rules). The worker reads `journal_head` from `deletion_next` and catches up every entry after it first.
 - `identity.deletion_auth_begin {deletion_id}`: the fence. It returns the account id only when that step is next and nothing blocks it.
 - `identity.deletion_auth_complete {deletion_id, auth_result}`.
 - `identity.deletion_advance {deletion_id}`: runs the next database-local step.
@@ -905,6 +907,8 @@ A missing handler or an answer of another shape raises: the step is retried and 
   - Responses and logs carry outcome codes only. The 2.9 function and its credential are untouched (separate purpose).
 
 ### Journal and restore replay
+
+**Residual trust in the acknowledgement.** The database cannot read the journal; it only accepts entries that continue the chain it has acknowledged. So an entry that was never appended, or one further ahead, cannot be acknowledged out of order. A holder of the worker's credential could still acknowledge a fabricated, well-formed next entry that is not in the journal. That cannot erase anything early in a way a restore misses: the next restore compares the journal with the acknowledgements, reports `journal_mismatch`, and stays held (fails closed) until an operator reconciles it. The credential is therefore kept as tightly as the 1.9 rules require (restricted operator, 30-day rotation).
 
 The journal entries hold opaque UUIDs only (the member id, the account id, the buckets `identity-member` and `auth-user`): no name, number, address or reason. The worker uses the same independent 1.10 journal as everything else (locally `.recovery-state/journal` by default).
 
@@ -948,12 +952,12 @@ node tools/auth-harness/local-phone-auth.mjs off
 
 1. **Parent session:** apply `20261007171500_member_deletion.sql` to staging after `20261007160100`. It contains no row deletion.
    - It replaces in place (same signatures and privileges): `app.rcv_apply_journal_entry` (it now delegates to `app.rcv_apply_journal_entry_as`), `app.identity_restore_membership`, `app.identity_admin_membership_lifecycle` (its EXECUTE for `authenticated` is re-granted) and `app.identity_authorize_command`.
-   - It adds a trigger on `app.identity_account_links`, the gate `identity_deletion_retention` (fixture only), the event `member_deleted` (additive within v1, server-side consumers only) and six system commands of the new purpose `identity_deletion`.
+   - It adds a trigger on `app.identity_account_links`, the gate `identity_deletion_retention` (fixture only), the event `member_deleted` (additive within v1, server-side consumers only) seven system commands of the new purpose `identity_deletion`, and the helpers `app.rcv_canonical(jsonb)` and `app.rcv_entry_hash(jsonb)` (the canonical journal hash, computed in SQL for the chain check).
    - Like 2.7, it writes `auth.users` (`banned_until`) only inside the request command.
-2. **Owner, by hand (SQL editor):** apply `20261007171600_member_deletion_rows.sql`. It replaces three stubs; until then the erase steps answer `unavailable` and nothing is erased (requests and every denial already work). For ONE member it deletes:
-   - Identity rows;
-   - `app.cmd_receipts` and `app.sys_receipts` rows that mention the member or the account;
-   - `auth.audit_log_entries` rows of the account;
+2. **Owner, by hand (SQL editor):** apply `20261007171600_member_deletion_rows.sql`. It replaces three stubs (`app.identity_deletion_purge_rows(deletion_id)`, `app.identity_deletion_purge_auth_user(uuid)`, `app.cells_deletion_purge_rows(uuid)`); until then the erase steps answer `unavailable` and nothing is erased (requests and every denial already work). For ONE deletion it deletes:
+   - Identity rows tied to the member, its recorded accounts or the recorded ids of its records (never by phone);
+   - `app.cmd_receipts` rows of the member's accounts, or whose aggregate is one of the member's records (other actors' receipts are only redacted, in the main migration);
+   - `auth.audit_log_entries` rows of the accounts (by `actor_id` or `traits.user_id`);
    - restore replay only, while a restore is held: the restored `auth.users` and `auth.identities` rows.
 
    Confirm on staging that the migration owner may delete from `auth.audit_log_entries`. If not, the erase step answers `unavailable` (fail closed) and the owner decides.

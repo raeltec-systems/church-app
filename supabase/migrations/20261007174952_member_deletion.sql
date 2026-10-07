@@ -38,7 +38,7 @@
 --     replay hooks. Identity's hook acts only while a restore is held: it denies access again,
 --     re-creates the workflow, and on a `deletion_completed` entry erases and verifies inline
 --     (raising, so the restore stays held, if anything remains).
---   * Row deletions live ONLY in 20261007171600_member_deletion_rows.sql (applied by hand on
+--   * Row deletions live ONLY in 20261007175000_member_deletion_rows.sql (applied by hand on
 --     hosted projects). Until then the three row-deleting functions below are stubs that answer
 --     `unavailable`, so erasure fails closed; the request and every denial work without it.
 --
@@ -233,7 +233,7 @@ revoke all on sequence app.identity_deletion_audit_event_id_seq
   from public, anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------------------------
--- The row-deleting functions: fail-closed stubs, replaced by 20261007171600 (applied by hand)
+-- The row-deleting functions: fail-closed stubs, replaced by 20261007175000 (applied by hand)
 -- ---------------------------------------------------------------------------------------------
 
 -- Identity personal rows of the deletion's member and accounts (only rows tied to them), the

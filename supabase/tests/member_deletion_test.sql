@@ -602,7 +602,7 @@ select pg_temp.call(pg_temp.c(1), 'identity_credential_command', 'identity.place
 select is(pg_temp.staff(5, pg_temp.c(2)) -> 'data' ->> 'deletion_state', 'requested', 'the request works without the row-deletion migration');
 select is(pg_temp.work(pg_temp.del(5), 4), 'stopped_before:erase_identity', 'journal and Auth steps run');
 select is(pg_temp.sys('identity.deletion_advance', jsonb_build_object('deletion_id', pg_temp.del(5))) ->> 'code',
-  'unavailable', 'erasure answers unavailable until 20261007171600 is applied');
+  'unavailable', 'erasure answers unavailable until 20261007175000 is applied');
 select is((select step_state from app.identity_deletion_steps where deletion_id = pg_temp.del(5) and step = 'erase_identity'),
   'pending', 'the step stays pending (retried after the file is applied)');
 update app.rcv_recovery_state set state = 'restored_held', restore_id = gen_random_uuid(), updated_by = 'pgtap';

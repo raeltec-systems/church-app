@@ -1,8 +1,8 @@
 -- Story 2.11 follow-up: the ROW deletions of a full member deletion.
 --
--- Replaces the three fail-closed stubs of 20261007171500_member_deletion.sql with their bodies.
+-- Replaces the three fail-closed stubs of 20261007174952_member_deletion.sql with their bodies.
 -- Kept in its own small file because the hosted connector cannot get approval for a migration
--- containing row deletions; the owner applies this file by hand after 20261007171500. Until it
+-- containing row deletions; the owner applies this file by hand after 20261007174952. Until it
 -- is applied the erase steps (and restore replay of a completed deletion) answer `unavailable`
 -- and nothing is erased (fail closed); requests and every access denial work without it.
 -- It changes no schema object. Same signatures and privileges (re-revoked below).

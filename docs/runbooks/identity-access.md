@@ -816,7 +816,7 @@ The E2E uses `+44 7700 900520–900529` (step `L40` races the last two Admins de
 
 ## Full member deletion through a resumable workflow (story 2.11)
 
-Migrations: `supabase/migrations/20261007171500_member_deletion.sql` (no row deletions) and `supabase/migrations/20261007171600_member_deletion_rows.sql` (ONLY the three functions that delete rows; applied by hand on hosted projects). Edge Function: `supabase/functions/identity-deletion/`. Worker: `tools/identity-deletion/worker.mjs`. Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.11/`.
+Migrations: `supabase/migrations/20261007174952_member_deletion.sql` (no row deletions) and `supabase/migrations/20261007175000_member_deletion_rows.sql` (ONLY the three functions that delete rows; applied by hand on hosted projects). Edge Function: `supabase/functions/identity-deletion/`. Worker: `tools/identity-deletion/worker.mjs`. Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.11/`.
 
 Full deletion is the fourth lifecycle effect (I10, AD-14), distinct from a login hold, a church deactivation and a restoration (story 2.10): access ends for good at once, then the data is erased step by step, and nothing comes back from a backup.
 
@@ -950,11 +950,11 @@ node tools/auth-harness/local-phone-auth.mjs off
 
 ### Hosted (parent session / owner)
 
-1. **Parent session:** apply `20261007171500_member_deletion.sql` to staging after `20261007160100`. It contains no row deletion.
+1. **Parent session:** apply `20261007174952_member_deletion.sql` to staging after `20261007160100`. It contains no row deletion.
    - It replaces in place (same signatures and privileges): `app.rcv_apply_journal_entry` (it now delegates to `app.rcv_apply_journal_entry_as`), `app.identity_restore_membership`, `app.identity_admin_membership_lifecycle` (its EXECUTE for `authenticated` is re-granted) and `app.identity_authorize_command`.
    - It adds a trigger on `app.identity_account_links`, the gate `identity_deletion_retention` (fixture only), the event `member_deleted` (additive within v1, server-side consumers only) seven system commands of the new purpose `identity_deletion`, and the helpers `app.rcv_canonical(jsonb)` and `app.rcv_entry_hash(jsonb)` (the canonical journal hash, computed in SQL for the chain check).
    - Like 2.7, it writes `auth.users` (`banned_until`) only inside the request command.
-2. **Owner, by hand (SQL editor):** apply `20261007171600_member_deletion_rows.sql`. It replaces three stubs (`app.identity_deletion_purge_rows(deletion_id)`, `app.identity_deletion_purge_auth_user(uuid)`, `app.cells_deletion_purge_rows(uuid)`); until then the erase steps answer `unavailable` and nothing is erased (requests and every denial already work). For ONE deletion it deletes:
+2. **Owner, by hand (SQL editor):** apply `20261007175000_member_deletion_rows.sql`. It replaces three stubs (`app.identity_deletion_purge_rows(deletion_id)`, `app.identity_deletion_purge_auth_user(uuid)`, `app.cells_deletion_purge_rows(uuid)`); until then the erase steps answer `unavailable` and nothing is erased (requests and every denial already work). For ONE deletion it deletes:
    - Identity rows tied to the member, its recorded accounts or the recorded ids of its records (never by phone);
    - `app.cmd_receipts` rows of the member's accounts, or whose aggregate is one of the member's records (other actors' receipts are only redacted, in the main migration);
    - `auth.audit_log_entries` rows of the accounts (by `actor_id` or `traits.user_id`);

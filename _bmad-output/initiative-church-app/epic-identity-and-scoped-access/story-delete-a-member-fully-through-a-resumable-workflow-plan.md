@@ -3,7 +3,7 @@ title: 'Delete a member fully through a resumable workflow'
 type: 'feature'
 ticket: '11'
 created: '2026-10-07'
-status: 'built'
+status: 'done'
 blocked_reason: ''
 baseline_revision: 'd709ab907759eaf7a8d2c8e0aee117c922dcf985'
 route: 'full'
@@ -74,8 +74,8 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261007171500_member_deletion.sql` -- gate, events, tables, fixture rules, hooks registries, rcv split + replay, request commands, system commands, replay hook, reads, replaced functions, stubs, grants.
-- [x] `supabase/migrations/20261007171600_member_deletion_rows.sql` -- the three deleting functions only.
+- [x] `supabase/migrations/20261007174952_member_deletion.sql` -- gate, events, tables, fixture rules, hooks registries, rcv split + replay, request commands, system commands, replay hook, reads, replaced functions, stubs, grants.
+- [x] `supabase/migrations/20261007175000_member_deletion_rows.sql` -- the three deleting functions only.
 - [x] `supabase/functions/identity-deletion/{index.ts,logic.mjs,logic.test.mjs}`, `supabase/config.toml`.
 - [x] `tools/identity-deletion/{worker.mjs,worker.test.mjs}` -- the resumable worker.
 - [x] contracts -- `member_deleted` (see Plan Change Log).
@@ -92,8 +92,8 @@ context:
 
 - Built directly (no subagent tool in this session); checkpoint 1 pre-approved by the owner decisions. Above the 1600-token guide for the same reason as 2.7-2.10: one Identity change spans the database, a worker, an Edge Function, two clients and evidence.
 - Files:
-  - `supabase/migrations/20261007171500_member_deletion.sql` (no row-deletion statement, ASCII only, every function pins `search_path`, nothing granted to anon): gate `identity_deletion_retention` (labelled fixture), event `member_deleted`, tables `identity_deletions` (tombstone), `identity_deletion_steps`, `identity_deletion_audit`, `identity_deletion_hooks`, `identity_deletion_retention_rules` (FIXTURE), `rcv_replay_hooks`; three fail-closed stubs; deletion and replay hook registries; Cells hook `cells_erase_member` (registered) and SYNTHETIC `fixture_erase_member`; `rcv_apply_journal_entry_as` + `rcv_apply_journal_entry` delegating (same signature/privileges); request commands on `api.identity_deletion_command`; six system commands of purpose `identity_deletion`; replay hook `identity_rcv_replay` (registered); read `api.identity_admin_deletions`; link guard trigger; replaced in place with their latest bodies: `identity_restore_membership`, `identity_admin_membership_lifecycle` (EXECUTE re-granted), `identity_authorize_command` (every earlier command kept).
-  - `supabase/migrations/20261007171600_member_deletion_rows.sql`: ONLY `identity_deletion_purge_rows`, `identity_deletion_purge_auth_user` (restore-held only), `cells_deletion_purge_rows`.
+  - `supabase/migrations/20261007174952_member_deletion.sql` (no row-deletion statement, ASCII only, every function pins `search_path`, nothing granted to anon): gate `identity_deletion_retention` (labelled fixture), event `member_deleted`, tables `identity_deletions` (tombstone), `identity_deletion_steps`, `identity_deletion_audit`, `identity_deletion_hooks`, `identity_deletion_retention_rules` (FIXTURE), `rcv_replay_hooks`; three fail-closed stubs; deletion and replay hook registries; Cells hook `cells_erase_member` (registered) and SYNTHETIC `fixture_erase_member`; `rcv_apply_journal_entry_as` + `rcv_apply_journal_entry` delegating (same signature/privileges); request commands on `api.identity_deletion_command`; six system commands of purpose `identity_deletion`; replay hook `identity_rcv_replay` (registered); read `api.identity_admin_deletions`; link guard trigger; replaced in place with their latest bodies: `identity_restore_membership`, `identity_admin_membership_lifecycle` (EXECUTE re-granted), `identity_authorize_command` (every earlier command kept).
+  - `supabase/migrations/20261007175000_member_deletion_rows.sql`: ONLY `identity_deletion_purge_rows`, `identity_deletion_purge_auth_user` (restore-held only), `cells_deletion_purge_rows`.
   - `supabase/functions/identity-deletion/{index.ts,logic.mjs,logic.test.mjs}`; `supabase/config.toml` (`verify_jwt = false`).
   - `tools/identity-deletion/{worker.mjs,worker.test.mjs}`.
   - Contracts: `member_deleted` in `fixtures/v1/lifecycle_event.json`, Dart `models.dart`/`check.dart` + regenerated `fixtures.g.dart`, TS `contracts.ts`.
@@ -112,13 +112,13 @@ context:
 - Decision (agent, under owner pre-approval; review MEDIUM 5): a journal acknowledgement must continue the acknowledged chain: `seq` = max acknowledged + 1, `prev_hash` = that entry's hash, `hash` = the canonical hash recomputed in SQL (`app.rcv_canonical`, `app.rcv_entry_hash`). Refusals `journal_gap`, `journal_chain_broken`, `entry_invalid`. A seventh system command `identity.deletion_journal_catch_up {entry}` acknowledges entries other writers appended first. Residual trust (documented in the runbook): a credential holder could ack a fabricated well-formed next entry; the next restore then reports `journal_mismatch` and stays held (fails closed).
 - Decision (agent, under owner pre-approval; review MEDIUM 7): verify covers recovery requests, binding history, credential events, application events, sys receipts, cmd receipts (by actor and by aggregate), and per account the Auth user, identities, sessions, refresh tokens, one-time tokens, MFA factors and audit-log entries.
 - Environment: the stack was reset several times from this worktree; the phone switch was found off, was on only for the E2E runs and is off again; no image pulled (edge-runtime and postgres images reused); the isolated restore container and the edge-runtime container were removed; every synthetic row removed except append-only journal segments and their acknowledgements (gitignored `.recovery-state/journal`).
-- Owner and parent steps (none blocks the build; exact steps in the runbook "Hosted (parent session / owner)"): parent applies `20261007171500`; owner hand-applies `20261007171600` (and confirms `auth.audit_log_entries` deletion rights); deploy `identity-deletion` with `--no-verify-jwt` (no secret); owner mints and registers the `identity_deletion` credential for the worker; staging worker run with the Drive-mirrored journal.
+- Owner and parent steps (none blocks the build; exact steps in the runbook "Hosted (parent session / owner)"): parent applies `20261007174952`; owner hand-applies `20261007175000` (and confirms `auth.audit_log_entries` deletion rights); deploy `identity-deletion` with `--no-verify-jwt` (no secret); owner mints and registers the `identity_deletion` credential for the worker; staging worker run with the Drive-mirrored journal.
 
 ## Plan Change Log
 
 - 2026-10-07, during implementation (agent, under owner pre-approval; not a step-04 loop). The frozen decision said contract v1 "gains `member_deletion_requested` and `member_deleted`". Investigation found `deletion_requested` ("Full deletion started: access-denied tombstone recorded") already in v1, unused; the request dispatches it instead of adding a duplicate name, and only `member_deleted` is added. Avoids two event names for one fact. KEEP: additive server-only rule.
 
-- 2026-10-07, after the independent review (coordinator request; agent, under owner pre-approval). Two HIGH (receipts not purged by aggregate; last-Admin check racy), five MEDIUM (Auth audit after the Auth step, earlier accounts, unchained journal acks, one Admin could hold and delete, verify gaps) and three LOW findings (phone matching, other actors' receipts deleted, replay ban only for the live link) fixed in place in `20261007171500` and `20261007171600` (hosted rules kept: row deletions only in the second file; replaced functions keep signature and privileges). `identity_deletion_purge_rows` now takes the deletion id. The worker catches up foreign journal entries. pgTAP 93 -> 105; E2E 11 -> 12 checks (real-flow seeding of every store, Auth deletes through the Edge Function, Auth tables scanned, concurrent last-Admin self-deletion). The coordinator's L40 fix (151ee2f) was merged; its deferred entry was removed. KEEP: the original step order and fail-closed stubs.
+- 2026-10-07, after the independent review (coordinator request; agent, under owner pre-approval). Two HIGH (receipts not purged by aggregate; last-Admin check racy), five MEDIUM (Auth audit after the Auth step, earlier accounts, unchained journal acks, one Admin could hold and delete, verify gaps) and three LOW findings (phone matching, other actors' receipts deleted, replay ban only for the live link) fixed in place in `20261007174952` and `20261007175000` (hosted rules kept: row deletions only in the second file; replaced functions keep signature and privileges). `identity_deletion_purge_rows` now takes the deletion id. The worker catches up foreign journal entries. pgTAP 93 -> 105; E2E 11 -> 12 checks (real-flow seeding of every store, Auth deletes through the Edge Function, Auth tables scanned, concurrent last-Admin self-deletion). The coordinator's L40 fix (151ee2f) was merged; its deferred entry was removed. KEEP: the original step order and fail-closed stubs.
 
 ## Review Triage Log
 

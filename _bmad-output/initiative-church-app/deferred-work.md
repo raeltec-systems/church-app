@@ -40,7 +40,7 @@
   evidence: every case ran locally (8/8, pgTAP 76); no owner-only step is needed for staging.
 
 - source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-delete-a-member-fully-through-a-resumable-workflow-plan.md`
-  summary: Run the story 2.11 deletion matrix (tools/identity-e2e/deletion.mjs cases) on staging after the parent applies 20261007171500, the owner hand-applies 20261007171600_member_deletion_rows.sql (and confirms the migration owner may delete auth.audit_log_entries rows), the identity-deletion function is deployed and the owner registers the worker's identity_deletion credential; mirror the journal segments to the restricted Drive folder.
+  summary: Run the story 2.11 deletion matrix (tools/identity-e2e/deletion.mjs cases) on staging after the parent applies 20261007174952, the owner hand-applies 20261007175000_member_deletion_rows.sql (and confirms the migration owner may delete auth.audit_log_entries rows), the identity-deletion function is deployed and the owner registers the worker's identity_deletion credential; mirror the journal segments to the restricted Drive folder.
   evidence: every case ran locally (E2E 11/11, pgTAP 91); staging needs a hand-applied row-deletion file and a credential only the owner may handle.
 
 - source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-delete-a-member-fully-through-a-resumable-workflow-plan.md`

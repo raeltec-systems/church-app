@@ -8,7 +8,9 @@ import '../domain/fixture_counter.dart';
 import '../domain/member_access.dart';
 import '../domain/membership_application.dart';
 import '../domain/membership_review.dart';
+import '../domain/password_recovery.dart';
 import '../domain/platform_status.dart';
+import '../domain/recovery_email.dart';
 import '../domain/session.dart';
 
 /// Ports. Each app's composition root overrides these with adapters; tests
@@ -56,6 +58,16 @@ final reviewRepositoryProvider = Provider<ReviewRepository>(
 /// Story 2.6: the member's cell, the leader queue and the Admin overview.
 final cellsRepositoryProvider = Provider<CellsRepository>(
   (ref) => const UnconfiguredCellsRepository(),
+);
+
+/// Story 2.7: the isolated forgotten-password route (its own Auth client).
+final passwordRecoveryGatewayProvider = Provider<PasswordRecoveryGateway>(
+  (ref) => const UnconfiguredPasswordRecoveryGateway(),
+);
+
+/// Story 2.7: the member's recovery email and the Admin approval queue.
+final recoveryEmailRepositoryProvider = Provider<RecoveryEmailRepository>(
+  (ref) => const UnconfiguredRecoveryEmailRepository(),
 );
 
 final requestIdsProvider = Provider<RequestIds>((ref) => SecureRequestIds());

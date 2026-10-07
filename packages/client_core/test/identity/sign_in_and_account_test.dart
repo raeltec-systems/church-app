@@ -237,12 +237,22 @@ void main() {
 
     testWidgets('help routes explain staff help without SMS', (tester) async {
       await pumpAt(tester, ClientPaths.signIn);
-      await tapKey(tester, 'forgot-password');
+      await tapKey(tester, 'church-help');
       expect(byKey('help-panel'), findsOneWidget);
       expect(
         find.textContaining('never ask for, choose or see your password'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('forgot password opens the recovery-email reset (2.7)', (
+      tester,
+    ) async {
+      await pumpAt(tester, ClientPaths.signIn);
+      await tapKey(tester, 'forgot-password');
+      await settleShort(tester);
+      expect(byKey('send-reset-link'), findsOneWidget);
+      expect(byKey('recovery-church-help'), findsOneWidget);
     });
   });
 

@@ -8,6 +8,8 @@ export 'src/adapters/supabase_command_gateway.dart';
 export 'src/adapters/supabase_grants_repository.dart';
 export 'src/adapters/supabase_member_access_repository.dart';
 export 'src/adapters/supabase_membership_repository.dart';
+export 'src/adapters/supabase_password_recovery_gateway.dart';
 export 'src/adapters/supabase_platform_status_repository.dart';
+export 'src/adapters/supabase_recovery_email_repository.dart';
 export 'src/adapters/supabase_review_repository.dart';
 export 'src/adapters/supabase_session_repository.dart';

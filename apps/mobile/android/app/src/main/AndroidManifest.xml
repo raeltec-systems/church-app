@@ -26,6 +26,21 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Story 2.7: Auth email links (password reset, recovery-email
+                 confirmation) return to the app through its own scheme, only
+                 under zm.bickafue.mobile://callback/auth/. The app accepts only
+                 /auth/recovery and /auth/email-confirmed and reads only the
+                 one-time PKCE code, useless without this app's verifier. -->
+            <meta-data android:name="flutter_deeplinking_enabled" android:value="true" />
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="zm.bickafue.mobile"
+                    android:host="callback"
+                    android:pathPrefix="/auth/"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

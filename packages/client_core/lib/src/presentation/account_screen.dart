@@ -16,11 +16,19 @@ import 'shell_routing.dart' show ClientPaths;
 /// again), the summary is asked for again before it is relied on (AD-13); the
 /// server re-checks the session each time.
 class AccountScreen extends ConsumerStatefulWidget {
-  const AccountScreen({super.key, this.linkMembershipRequest = false});
+  const AccountScreen({
+    super.key,
+    this.linkMembershipRequest = false,
+    this.linkRecoveryEmail = false,
+  });
 
   /// Story 2.4 (mobile): an account without member access links to its own
   /// membership request.
   final bool linkMembershipRequest;
+
+  /// Story 2.7 (mobile): a member links to their own recovery email (also
+  /// while access waits for its approval).
+  final bool linkRecoveryEmail;
 
   @override
   ConsumerState<AccountScreen> createState() => _AccountScreenState();
@@ -252,6 +260,17 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                           'church staff will help you in person.',
                 style: ChurchType.secondary.copyWith(color: c.muted),
               ),
+              if (widget.linkRecoveryEmail) ...[
+                const SizedBox(height: 12),
+                FocusRing(
+                  child: OutlinedButton.icon(
+                    key: const Key('go-recovery-email'),
+                    onPressed: () => context.go(ClientPaths.recoveryEmail),
+                    icon: const Icon(Icons.alternate_email_outlined),
+                    label: const Text('Recovery email'),
+                  ),
+                ),
+              ],
             ],
           ),
         );
@@ -302,6 +321,15 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                 () => context.go(ClientPaths.membership),
                 key: const Key('go-membership-request'),
                 primary: true,
+              ),
+            // Story 2.7: a verified recovery email waiting for approval puts
+            // access in review; the member can see why.
+            if (denial == MemberAccessDenial.reviewRequired &&
+                widget.linkRecoveryEmail)
+              BannerAction(
+                'Recovery email',
+                () => context.go(ClientPaths.recoveryEmail),
+                key: const Key('review-go-recovery-email'),
               ),
           ],
         );

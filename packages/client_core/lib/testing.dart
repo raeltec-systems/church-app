@@ -17,6 +17,8 @@ import 'src/domain/commands.dart';
 import 'src/domain/member_access.dart';
 import 'src/domain/membership_application.dart';
 import 'src/domain/membership_review.dart';
+import 'src/domain/password_recovery.dart';
+import 'src/domain/recovery_email.dart';
 import 'src/domain/fixture_counter.dart';
 import 'src/domain/session.dart';
 
@@ -584,6 +586,139 @@ Map<String, Object?> myCellData({
   'last_decision': lastDecision,
 };
 
+/// [PasswordRecoveryGateway] answered by the test (story 2.7). Records every
+/// call; the recovery session it pretends to hold is only "open" between a
+/// ready [openLink] and [setNewPassword] or [discard].
+class FakePasswordRecovery implements PasswordRecoveryGateway {
+  ResetRequestOutcome resetAnswer = ResetRequestOutcome.sent;
+  RecoveryLinkOutcome linkAnswer = RecoveryLinkOutcome.ready;
+  SetPasswordOutcome setAnswer = const PasswordSet();
+  final List<String> resetEmails = [];
+  final List<String> openedCodes = [];
+  final List<String> passwordsSet = [];
+  int discards = 0;
+  bool sessionOpen = false;
+
+  @override
+  Future<ResetRequestOutcome> requestReset(String email) async {
+    resetEmails.add(email);
+    return resetAnswer;
+  }
+
+  @override
+  Future<RecoveryLinkOutcome> openLink(String code) async {
+    openedCodes.add(code);
+    sessionOpen = linkAnswer == RecoveryLinkOutcome.ready;
+    return linkAnswer;
+  }
+
+  @override
+  Future<SetPasswordOutcome> setNewPassword(String password) async {
+    passwordsSet.add(password);
+    if (setAnswer is PasswordSet) sessionOpen = false;
+    return setAnswer;
+  }
+
+  @override
+  Future<void> discard() async {
+    discards++;
+    sessionOpen = false;
+  }
+}
+
+/// [RecoveryEmailRepository] answered by the test (story 2.7).
+class FakeRecoveryEmail implements RecoveryEmailRepository {
+  AccessRead<MyRecoveryEmail> mine = AccessReadOk(
+    MyRecoveryEmail.fromJson(myRecoveryEmailData()),
+  );
+  AccessRead<RecoveryEmailQueue> queue = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  AuthOutcome passwordAnswer = const AuthSucceeded(
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  );
+  EmailVerificationRequest verificationAnswer = EmailVerificationRequest.sent;
+  int mineCalls = 0;
+  int queueCalls = 0;
+  final List<String> passwordsChecked = [];
+  final List<String> verificationsRequested = [];
+
+  @override
+  Future<AccessRead<MyRecoveryEmail>> fetchMine() async {
+    mineCalls++;
+    return mine;
+  }
+
+  @override
+  Future<AccessRead<RecoveryEmailQueue>> fetchQueue() async {
+    queueCalls++;
+    return queue;
+  }
+
+  @override
+  Future<AuthOutcome> confirmPassword(String password) async {
+    passwordsChecked.add(password);
+    return passwordAnswer;
+  }
+
+  @override
+  Future<EmailVerificationRequest> requestVerification(String email) async {
+    verificationsRequested.add(email);
+    return verificationAnswer;
+  }
+}
+
+/// The wire form of the member's own recovery-email state (story 2.7).
+Map<String, Object?> myRecoveryEmailData({
+  String access = 'granted',
+  String? approvedEmail,
+  Map<String, Object?>? proposal,
+  bool canPropose = true,
+}) => {
+  'access': access,
+  'approved_email': approvedEmail,
+  'proposal': proposal,
+  'can_propose': canPropose,
+  'recent_sign_in_minutes': 10,
+};
+
+/// The wire form of one recovery-email proposal (story 2.7).
+Map<String, Object?> recoveryProposalData({
+  String id = '77777777-7777-4777-8777-777777777777',
+  int revision = 1,
+  String email = 'synthetic-member@example.test',
+  String state = 'pending',
+  bool verified = false,
+  String? decisionReason,
+}) => {
+  'proposal_id': id,
+  'revision': revision,
+  'email': email,
+  'state': state,
+  'verified': verified,
+  'proposed_at': '2026-10-07T10:00:00Z',
+  'decision_reason': ?decisionReason,
+};
+
+/// The wire form of one Admin queue item (story 2.7).
+Map<String, Object?> recoveryReviewItemData({
+  String id = '77777777-7777-4777-8777-777777777777',
+  int revision = 1,
+  String name = 'SYNTHETIC Ruth Mwale',
+  bool verified = true,
+  bool otherChanges = false,
+  bool ownAccount = false,
+}) => {
+  ...recoveryProposalData(id: id, revision: revision, verified: verified),
+  'member_id': '66666666-6666-4666-8666-666666666666',
+  'display_name': name,
+  'phone_username': '+447700900281',
+  'access_review': verified,
+  'other_changes': otherChanges,
+  'own_account': ownAccount,
+  'is_synthetic': true,
+};
+
 /// The fakes and provider overrides an app or screen test runs against.
 class ClientTestHarness {
   ClientTestHarness({String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'})
@@ -598,6 +733,8 @@ class ClientTestHarness {
   final membership = FakeMembership();
   final review = FakeReview();
   final cells = FakeCells();
+  final recovery = FakePasswordRecovery();
+  final recoveryEmail = FakeRecoveryEmail();
 
   /// [configured] false leaves the unconfigured defaults for the gateway and
   /// the platform status (as a build without `--dart-define`s).
@@ -612,6 +749,8 @@ class ClientTestHarness {
       membershipRepositoryProvider.overrideWithValue(membership),
       reviewRepositoryProvider.overrideWithValue(review),
       cellsRepositoryProvider.overrideWithValue(cells),
+      passwordRecoveryGatewayProvider.overrideWithValue(recovery),
+      recoveryEmailRepositoryProvider.overrideWithValue(recoveryEmail),
       commandGatewayProvider.overrideWithValue(gateway),
       platformStatusRepositoryProvider.overrideWithValue(FakePlatformStatus()),
     ],

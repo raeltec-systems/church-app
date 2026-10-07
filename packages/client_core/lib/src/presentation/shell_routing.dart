@@ -7,8 +7,13 @@ import 'account_screen.dart';
 import 'cell_screens.dart';
 import 'fixture_command_screen.dart';
 import 'membership_application_screen.dart';
+import '../domain/password_recovery.dart';
 import 'membership_review_screen.dart';
+import 'page_address_stub.dart'
+    if (dart.library.js_interop) 'page_address_web.dart'
+    as page_address;
 import 'platform_status_screen.dart';
+import 'recovery_screens.dart';
 import 'sign_in_screen.dart';
 
 /// Destinations shared by both shells. Which ones a shell shows follows the
@@ -44,6 +49,31 @@ abstract final class ClientPaths {
 
   /// The member's own cell and change request (story 2.6, mobile).
   static const myCell = '/my-cell';
+
+  /// Story 2.7: forgot password (neutral acknowledgement).
+  static const forgotPassword = '/forgot-password';
+
+  /// Story 2.7: the allowlisted Auth email link targets.
+  static final authRecovery = AuthLinkKind.recovery.path;
+  static final authEmailConfirmed = AuthLinkKind.emailConfirmed.path;
+
+  /// Story 2.7: the member's own recovery email (mobile).
+  static const recoveryEmail = '/recovery-email';
+
+  /// Story 2.7, staff web, Admin only: recovery email approvals.
+  static const adminRecoveryEmails = '/admin/recovery-emails';
+}
+
+/// Story 2.7: the incoming Auth email link for this route, read once. Only
+/// the allowlisted paths and their `code`/error parameters are read; on the
+/// web the one-time code is then removed from the address bar and history.
+AuthLink? _authLink(GoRouterState state) {
+  final link = parseAuthLink(
+    state.uri,
+    page: page_address.currentPageAddress(),
+  );
+  page_address.dropPageQuery();
+  return link;
 }
 
 /// `extra` of a navigation started from a shell tab by the keyboard: the
@@ -94,7 +124,10 @@ GoRouter buildClientRouter({
         path: ClientPaths.account,
         pageBuilder: (_, state) => page(
           state,
-          AccountScreen(linkMembershipRequest: membershipRequests),
+          AccountScreen(
+            linkMembershipRequest: membershipRequests,
+            linkRecoveryEmail: membershipRequests,
+          ),
         ),
       ),
       GoRoute(
@@ -125,6 +158,29 @@ GoRouter buildClientRouter({
         path: ClientPaths.membership,
         pageBuilder: (_, state) =>
             page(state, const MembershipApplicationScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.forgotPassword,
+        pageBuilder: (_, state) => page(state, const ForgotPasswordScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.authRecovery,
+        pageBuilder: (_, state) =>
+            page(state, RecoveryLinkScreen(link: _authLink(state))),
+      ),
+      GoRoute(
+        path: ClientPaths.authEmailConfirmed,
+        pageBuilder: (_, state) =>
+            page(state, EmailConfirmedScreen(link: _authLink(state))),
+      ),
+      GoRoute(
+        path: ClientPaths.recoveryEmail,
+        pageBuilder: (_, state) => page(state, const RecoveryEmailScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.adminRecoveryEmails,
+        pageBuilder: (_, state) =>
+            page(state, const RecoveryEmailReviewScreen()),
       ),
       GoRoute(
         path: ClientPaths.signIn,

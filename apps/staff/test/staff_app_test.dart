@@ -323,6 +323,31 @@ void main() {
     },
   );
 
+  testWidgets('Admins see Recovery emails; the queue is the server answer', (
+    tester,
+  ) async {
+    final h = await pumpStaff(tester, location: '/fixture');
+    expect(find.byKey(const Key('nav-/admin/recovery-emails')), findsNothing);
+    expect(
+      staffDestinationsFor(null),
+      isNot(contains(staffRecoveryEmailsDestination)),
+    );
+    h.grants.myAccess = AccessReadOk(syntheticGrants(roles: ['admin']));
+    h.recoveryEmail.queue = AccessReadOk(
+      RecoveryEmailQueue.fromJson({
+        'proposals': [recoveryReviewItemData()],
+      }),
+    );
+    await tapKey(tester, 'nav-/status');
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tapKey(tester, 'nav-/admin/recovery-emails');
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('SYNTHETIC Ruth Mwale'), findsOneWidget);
+    expect(h.recoveryEmail.queueCalls, greaterThanOrEqualTo(1));
+  });
+
   testWidgets('an account switch drops the protected state', (tester) async {
     final h = await pumpStaff(tester, location: '/fixture');
     await tester.enterText(find.byKey(const Key('intent-key-field')), 'k');

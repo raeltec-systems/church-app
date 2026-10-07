@@ -50,6 +50,27 @@ void main() {
   setUp(FocusVisibility.instance.reset);
 
   testWidgets(
+    'story 2.7: the recovery deep link opens a set-password form only, and '
+    'the Android manifest accepts only the app scheme under /auth/',
+    (tester) async {
+      final h = await pumpMobile(
+        tester,
+        size: const Size(390, 1400),
+        location: '/auth/recovery?code=0b5c1a2e-3f4d-4e5f-8a9b-0c1d2e3f4a5b',
+      );
+      expect(h.recovery.openedCodes, ['0b5c1a2e-3f4d-4e5f-8a9b-0c1d2e3f4a5b']);
+      expect(find.byKey(const Key('new-password-field')), findsOneWidget);
+      expect(find.byKey(const Key('member-summary')), findsNothing);
+      final manifest = File('android/app/src/main/AndroidManifest.xml')
+          .readAsStringSync();
+      expect(manifest, contains('android:scheme="zm.bickafue.mobile"'));
+      expect(manifest, contains('android:host="callback"'));
+      expect(manifest, contains('android:pathPrefix="/auth/"'));
+      expect(manifest, isNot(contains('android:scheme="http')));
+    },
+  );
+
+  testWidgets(
     'story 2.5: the applicant sees the church decision, separately from the '
     'cell, and no staff review data',
     (tester) async {

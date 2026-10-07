@@ -147,9 +147,12 @@ async function main() {
     replace: { phone: '+447700900332', name: `${NAME_PREFIX} Replace`, email: mail('replace'), next: mail('replace-new') },
     remove: { phone: '+447700900333', name: `${NAME_PREFIX} Remove`, email: mail('remove') },
     held: { phone: '+447700900334', name: `${NAME_PREFIX} Held`, email: mail('held'), direct: '+447700900341' },
-    lost: { phone: '+447700900335', name: `${NAME_PREFIX} Lost` },
+    lost: { phone: '+447700900335', name: `${NAME_PREFIX} Lost`, email: mail('lost') },
     stolen: { phone: '+447700900336', name: `${NAME_PREFIX} Stolen`, thief: mail('thief') },
     other: { phone: '+447700900337', name: `${NAME_PREFIX} Other`, email: mail('other'), direct: '+447700900342' },
+    pw: { phone: '+447700900338', name: `${NAME_PREFIX} Password`, email: mail('pw') },
+    link: { phone: '+447700900339', name: `${NAME_PREFIX} Link`, email: mail('link'), direct: '+447700900343' },
+    rej: { phone: '+447700900344', name: `${NAME_PREFIX} Reject`, email: mail('rej'), next: mail('rej-new') },
   };
   for (const p of Object.values(people)) {
     for (const n of [p.phone, p.next, p.direct].filter((x) => x?.startsWith('+'))) {
@@ -160,8 +163,9 @@ async function main() {
   const digits = [...new Set(Object.values(people).flatMap((p) => [p.phone, p.next, p.direct])
     .filter((x) => x?.startsWith('+')).map((x) => `'${x.slice(1)}'`))].join(',');
   const addresses = Object.values(people).flatMap((p) => [p.email, p.next, p.thief]).filter((x) => x?.includes('@'));
+  // (pw, link and rej also receive reset mail; their addresses are in the list above.)
   const unhook = () => psql(`delete from app.contract_lifecycle_hooks where module = 'fixture'
-                               and event in ('access_hold_applied', 'access_hold_released')`);
+                               and event in ('access_hold_applied', 'access_hold_released', 'sessions_revoked')`);
   const cleanup = () => {
     const ids = [...users].map((u) => `'${u}'`);
     const byUser = ids.length ? `u.id in (${ids.join(',')}) or ` : '';
@@ -240,12 +244,31 @@ async function main() {
   if (Number(psql(`select app.identity_usable_admin_count()`)) !== 0) {
     throw new Error('the local database already has a usable Admin; run `npx supabase db reset` first');
   }
-  if (Number(psql(`select count(*) from app.contract_lifecycle_hooks where module = 'fixture' and event like 'access_hold_%'`)) !== 0) {
+  if (Number(psql(`select count(*) from app.contract_lifecycle_hooks where module = 'fixture'
+                    and event in ('access_hold_applied', 'access_hold_released', 'sessions_revoked')`)) !== 0) {
     throw new Error('a fixture hold hook is already registered');
   }
 
   try {
-    const { admin, phone, replace, remove, held, lost, stolen, other } = people;
+    const { admin, phone, replace, remove, held, lost, stolen, other, pw, link, rej } = people;
+    psql(`select app.contract_register_lifecycle_hook('fixture', 'access_hold_applied', 'app.fixture_record_lifecycle(jsonb)'::regprocedure);
+          select app.contract_register_lifecycle_hook('fixture', 'access_hold_released', 'app.fixture_record_lifecycle(jsonb)'::regprocedure);
+          select app.contract_register_lifecycle_hook('fixture', 'sessions_revoked', 'app.fixture_record_lifecycle(jsonb)'::regprocedure);`);
+    const calls = (p) => psql(`select coalesce(string_agg(event, ',' order by call_id), '') from app.fixture_lifecycle_calls where member_id = '${p.member}'`);
+    // A member's own reset through the approved email (PKCE, mobile link), then a new password.
+    const ownReset = async (p) => {
+      const pk = pkcePair();
+      await sleep(RESEND_WAIT_MS);
+      const at = Date.now();
+      await recover(p.email, MOBILE_RECOVERY, pk);
+      const m = await mailTo(p.email, at);
+      const opened = await openLink(m?.link);
+      const ex = await exchange(codeFrom(opened.location), pk.verifier);
+      const next = password();
+      const set = await http('PUT', '/auth/v1/user', { token: ex.json?.access_token, body: { password: next } });
+      if (set.status === 200) p.password = next;
+      return { exchange: ex.status, set_password: set.status };
+    };
     const seeded = async (p, { email } = {}) => {
       p.password = password();
       const created = await http('POST', '/auth/v1/admin/users', { admin: true, body: {
@@ -290,11 +313,13 @@ async function main() {
       && before.status === 200 && memberApproves.code === 'forbidden' && item?.phone_available === true
       && approved.status === 200 && approved.data?.state === 'approved'
       && oldSession.status === 401 && oldRefresh.status >= 400 && oldNumber.status === 400
-      && newNumber.status === 200 && after.status === 200 && (await usernameOf(newNumber.json?.access_token)) === phone.next,
+      && newNumber.status === 200 && after.status === 200 && (await usernameOf(newNumber.json?.access_token)) === phone.next
+      && calls(phone) === 'sessions_revoked',
       { request: asked.data?.state, access_until_approved: before.status, member_approves: memberApproves.code,
         queue_item: { phone_available: item?.phone_available, other_changes: item?.other_changes },
         approve: approved.data?.state, older_session: oldSession, older_refresh: oldRefresh.status,
         old_number_sign_in: oldNumber.status, new_number_sign_in: newNumber.status, new_number_summary: after.status,
+        lifecycle_hook_calls: calls(phone),
         sms_sent: false });
 
     // --------------------------------------------------- recovery email replaced under review
@@ -360,8 +385,6 @@ async function main() {
         auth_email_cleared: authRow(remove).endsWith('||false'), fresh_sign_in: dAfter, reset_mail: Boolean(dReset) });
 
     // -------------------------------------- hold: ownership dispute, nothing but release clears it
-    psql(`select app.contract_register_lifecycle_hook('fixture', 'access_hold_applied', 'app.fixture_record_lifecycle(jsonb)'::regprocedure);
-          select app.contract_register_lifecycle_hook('fixture', 'access_hold_released', 'app.fixture_record_lifecycle(jsonb)'::regprocedure);`);
     await seeded(held, { email: held.email });
     const memberHolds = await onMember('identity.place_hold', remove, { reason_code: 'security_concern' }, held.token);
     const selfHold = await onMember('identity.place_hold', admin, { reason_code: 'security_concern' });
@@ -410,37 +433,42 @@ async function main() {
     await sleep(EPOCH_WAIT_MS);
     held.token = (await signIn(held.phone, held.password)).json?.access_token;
     const restored = await summary(held.token);
-    const heldCalls = psql(`select coalesce(string_agg(event, ',' order by call_id), '') from app.fixture_lifecycle_calls where member_id = '${held.member}'`);
+    const heldCalls = calls(held);
     check('C32-release-needs-check-binding-only-by-review', releaseNoCheck.code === 'validation_failed' && release.status === 200
       && afterRelease.status === 403 && afterRelease.detail === 'review_required' && restore.status === 200
-      && directAfterRestore.status === 400 && restored.status === 200 && heldCalls === 'access_hold_applied,access_hold_released',
+      && directAfterRestore.status === 400 && restored.status === 200
+      && heldCalls === 'access_hold_applied,access_hold_released,sessions_revoked',
       { release_without_check: releaseNoCheck.code, release: release.status, after_release_still_review: afterRelease,
         restore: restore.status, direct_number_after_restore: directAfterRestore.status, approved_number: restored,
         lifecycle_hook_calls: heldCalls });
 
     // ----------------------------------------------------------------------- lost device
-    await seeded(lost);
+    await seeded(lost, { email: lost.email });
     const deviceB = await signIn(lost.phone, lost.password);
     const lostHold = await onMember('identity.place_hold', lost, { reason_code: 'lost_device' });
     const aSummary = await summary(lost.token);
     const bRefresh = await refresh(deviceB.json?.refresh_token);
-    const lostCalls = psql(`select coalesce(string_agg(event, ',' order by call_id), '') from app.fixture_lifecycle_calls where member_id = '${lost.member}'`);
+    const lostCalls = calls(lost);
     const sameTx = psql(`select count(distinct xact_id) = 1 from app.fixture_lifecycle_calls where member_id = '${lost.member}'`);
     const newDevice = await signIn(lost.phone, lost.password);
     const newDeviceSummary = await summary(newDevice.json?.access_token);
     check('C40-lost-device-revokes-sessions-and-calls-hook', lostHold.status === 200 && lostHold.data?.holds?.[0]?.hold_kind === 'security'
-      && aSummary.status === 401 && bRefresh.status >= 400 && lostCalls === 'access_hold_applied' && sameTx === 't'
+      && aSummary.status === 401 && bRefresh.status >= 400 && lostCalls === 'access_hold_applied,sessions_revoked' && sameTx === 't'
       && newDeviceSummary.status === 403 && newDeviceSummary.detail === 'review_required',
       { hold: lostHold.data?.holds?.[0]?.hold_kind, device_a: aSummary, device_b_refresh: bRefresh.status,
         lifecycle_hook_calls: lostCalls, sessions_revoked: Number(psql(`select sessions_revoked from app.identity_holds where member_id = '${lost.member}'`)),
         new_device_during_hold: newDeviceSummary });
+    const releaseFirst = await onMember('identity.release_hold', lost, { hold_id: lostHold.data?.holds?.[0]?.hold_id, identity_check: 'established_relationship' });
+    const lostReset = await ownReset(lost);
     const lostRelease = await onMember('identity.release_hold', lost, { hold_id: lostHold.data?.holds?.[0]?.hold_id, identity_check: 'established_relationship' });
     await sleep(EPOCH_WAIT_MS);
     const holdTimeSession = await summary(newDevice.json?.access_token);
     lost.token = (await signIn(lost.phone, lost.password)).json?.access_token;
     const lostAfter = await summary(lost.token);
-    check('C41-release-after-lost-device', lostRelease.status === 200 && holdTimeSession.status === 401 && lostAfter.status === 200,
-      { release: lostRelease.status, session_opened_during_hold: holdTimeSession, fresh_sign_in: lostAfter });
+    check('C41-release-only-after-the-members-own-reset', releaseFirst.field_errors?.hold_id === 'password_reset_required'
+      && lostReset.set_password === 200 && lostRelease.status === 200 && holdTimeSession.status === 401 && lostAfter.status === 200,
+      { release_before_reset: releaseFirst.field_errors, own_reset: lostReset, release: lostRelease.status,
+        session_opened_during_hold: holdTimeSession, fresh_sign_in: lostAfter });
 
     // --------------------------------------- stolen-session email change (2.7 carried risk)
     await seeded(stolen);
@@ -488,6 +516,61 @@ async function main() {
       && oAfter.has_recovery_email === false,
       { approve_email: oApprove.field_errors, restore_while_pending: oRestoreWhilePending.field_errors, reject: oReject.data?.state,
         accept: oAccept.status, accepted_number_sign_in: oSignIn.status, summary: oAfter.status });
+
+    // ------------------------- a password changed by a stolen session: restore keeps a hold
+    await seeded(pw, { email: pw.email });
+    const thief = await signIn(pw.phone, pw.password);
+    const thiefPw = await http('PUT', '/auth/v1/user', { token: thief.json?.access_token, body: { password: password() } });
+    const memberLocked = await signIn(pw.phone, pw.password);
+    const pwAccept = await onMember('identity.accept_credentials', pw, { identity_check: 'in_person' });
+    const pwRestore = await onMember('identity.restore_credentials', pw, { identity_check: 'in_person' });
+    const thiefRefresh2 = await refresh(thief.json?.refresh_token);
+    const pwReleaseFirst = await onMember('identity.release_hold', pw, { hold_id: pwRestore.data?.holds?.[0]?.hold_id, identity_check: 'in_person' });
+    const pwReset = await ownReset(pw);
+    await sleep(EPOCH_WAIT_MS);
+    const pwHeld = await summary((await signIn(pw.phone, pw.password)).json?.access_token);
+    const pwRelease = await onMember('identity.release_hold', pw, { hold_id: pwRestore.data?.holds?.[0]?.hold_id, identity_check: 'in_person' });
+    await sleep(EPOCH_WAIT_MS);
+    const pwAfter = await summary((await signIn(pw.phone, pw.password)).json?.access_token);
+    check('C51-stolen-session-password-change-keeps-a-hold-until-the-members-reset', thiefPw.status === 200
+      && memberLocked.status === 400 && pwAccept.field_errors?.member_id === 'password_unreviewed'
+      && pwRestore.status === 200 && pwRestore.data?.holds?.[0]?.reason_code === 'security_concern' && thiefRefresh2.status >= 400
+      && pwReleaseFirst.field_errors?.hold_id === 'password_reset_required' && pwReset.set_password === 200
+      && pwHeld.status === 403 && pwHeld.detail === 'review_required' && pwRelease.status === 200 && pwAfter.status === 200,
+      { thief_password_change: thiefPw.status, member_old_password: memberLocked.status, accept: pwAccept.field_errors,
+        restore_hold: pwRestore.data?.holds?.[0]?.reason_code, thief_refresh: thiefRefresh2.status,
+        release_before_reset: pwReleaseFirst.field_errors, own_reset: pwReset, held_after_reset: pwHeld,
+        release: pwRelease.status, fresh_sign_in: pwAfter });
+
+    // ------------------- a reset link issued before a restore or a reject is never redeemable
+    await seeded(link, { email: link.email });
+    const pkLink = pkcePair();
+    await sleep(RESEND_WAIT_MS);
+    const linkAt = Date.now();
+    await recover(link.email, MOBILE_RECOVERY, pkLink);
+    const linkMail = await mailTo(link.email, linkAt);
+    await http('PUT', `/auth/v1/admin/users/${link.user}`, { admin: true, body: { phone: link.direct, phone_confirm: true } });
+    const linkRestore = await onMember('identity.restore_credentials', link, { identity_check: 'in_person' });
+    const linkOpen = redirectFacts((await openLink(linkMail?.link)).location);
+
+    await seeded(rej, { email: rej.email });
+    const pkRej = pkcePair();
+    await sleep(RESEND_WAIT_MS);
+    const rejAt = Date.now();
+    await recover(rej.email, MOBILE_RECOVERY, pkRej);
+    const rejMail = await mailTo(rej.email, rejAt);
+    const rAskRej = await credCmd(rej.token, 'identity.request_credential_change', null, { change_kind: 'recovery_email_replace', email: rej.next });
+    const rejNewAt = Date.now();
+    await http('PUT', `/auth/v1/user?redirect_to=${encodeURIComponent(MOBILE_EMAIL_CONFIRMED)}`, { token: rej.token, body: { email: rej.next } });
+    await openLink((await mailTo(rej.next, rejNewAt))?.link);
+    const rejDecision = await credCmd(admin.token, 'identity.reject_credential_change', rAskRej.revision, { change_id: rAskRej.data?.change_id });
+    const rejBack = authRow(rej).endsWith('|true');
+    const rejOpen = redirectFacts((await openLink(rejMail?.link)).location);
+    check('C70-reset-links-issued-before-restore-or-reject-are-dead', Boolean(linkMail?.link) && linkRestore.status === 200
+      && !linkOpen.has_code && Boolean(rejMail?.link) && rejDecision.status === 200 && rejBack && !rejOpen.has_code,
+      { restore: linkRestore.status, link_after_restore: { has_code: linkOpen.has_code, error_code: linkOpen.error_code },
+        reject: rejDecision.data?.state, approved_address_back: rejBack,
+        link_after_reject: { has_code: rejOpen.has_code, error_code: rejOpen.error_code } });
 
     const leftHolds = Number(psql(`select count(*) from app.identity_holds h join app.identity_members m using (member_id)
                                    where m.display_name like '${NAME_PREFIX}%' and h.released_at is null`));

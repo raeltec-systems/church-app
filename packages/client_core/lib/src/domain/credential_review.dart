@@ -161,11 +161,14 @@ class MyCredentials {
     final access = json['access'];
     final phone = json['phone_username'];
     final email = json['recovery_email'];
-    final canRequest = json['can_request'];
+    final canRequest = json['can_request'] ?? false;
     final contact = json['church_contact'];
-    final minutes = json['recent_sign_in_minutes'];
+    final minutes = json['recent_sign_in_minutes'] ?? 10;
+    // While in review the read carries only access, the church contact and
+    // the member's own pending request (id, revision, kind, state).
     if ((access != 'granted' && access != 'review_required') ||
-        phone is! String ||
+        (phone != null && phone is! String) ||
+        (access == 'granted' && phone == null) ||
         (email != null && email is! String) ||
         canRequest is! bool ||
         (contact != null && contact is! String) ||
@@ -177,7 +180,7 @@ class MyCredentials {
     final proposal = json['pending_recovery_email'];
     return MyCredentials(
       inReview: access == 'review_required',
-      phoneUsername: phone,
+      phoneUsername: phone as String?,
       recoveryEmail: email as String?,
       pendingChange: pending == null
           ? null
@@ -194,7 +197,9 @@ class MyCredentials {
 
   /// Access waits for a church check. Why is never said.
   final bool inReview;
-  final String phoneUsername;
+
+  /// The approved username; null while in review (not sent then).
+  final String? phoneUsername;
   final String? recoveryEmail;
   final CredentialChange? pendingChange;
   final CredentialChange? lastChange;

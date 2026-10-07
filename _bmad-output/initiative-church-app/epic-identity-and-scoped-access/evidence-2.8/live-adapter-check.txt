@@ -1,8 +1,11 @@
 # FLUTTER_ROOT=/opt/sdk/flutter bash tools/identity-e2e/live-credentials-check.sh
-# LOCAL stack (GoTrue v2.197.0), local phone switch on, 2026-10-07; SYNTHETIC +44 7700 900357-900359
-== adapters: a reviewed username change, a lost-device hold and its release
+# LOCAL stack (GoTrue v2.197.0), local phone switch on, 2026-10-07 (after the review fixes); SYNTHETIC +44 7700 900357-900359
+== adapters: a reviewed username change and a lost-device hold that waits for the member's reset
 PASS C1 the member asks for a new username; it waits for review: password=AuthSucceeded request=confirmed pending=true access=granted
 PASS C2 approved and applied; the old session is revoked; the new number signs in: approve=confirmed earlier=untrustedSession old_number=AuthFailed new_number=granted
 PASS C3 lost device: sessions revoked; a new sign-in sees only access review: hold=confirmed revoked_session=untrustedSession help_read_in_review=true my_access=reviewRequired
-PASS C4 released after an identity check; a fresh sign-in is granted: release=confirmed hold_time_session=untrustedSession fresh=granted
+PASS C4 a lost-device hold is not released before the member resets the password: release=CommandUnknownOutcome hold_still_open=true still_in_review=true
 synthetic users left: 0
+# Note C4: the server answers conflict {"hold_id": "password_reset_required"}; the shared v1 contract's
+# field-error vocabulary does not list domain codes, so the Dart client maps it to an unknown outcome
+# (pre-existing contract gap that also affects 2.5/2.7 domain codes; reported to the coordinator).

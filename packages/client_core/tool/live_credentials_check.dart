@@ -10,8 +10,8 @@
 //   C3 the Admin places a lost-device hold: the session is revoked; a new
 //      sign-in sees only access review (the help screen's own read answers
 //      `review_required` with no reason);
-//   C4 the Admin releases it after an identity check; a fresh sign-in is
-//      granted.
+//   C4 releasing it is refused until the member resets the password
+//      themselves (a lost-device hold always needs the member's own reset).
 //
 //   dart run tool/live_credentials_check.dart <env-file> <admin-phone> <member-phone> <new-phone>
 //
@@ -221,7 +221,7 @@ Future<void> main(List<String> args) async {
         'my_access=${myAccess is AccessReadDenied<MemberGrants> ? myAccess.denial.name : 'ok'}',
   );
 
-  // C4: another Admin releases it after an identity check.
+  // C4: the release waits for the member's own password reset.
   final queue2 = await SupabaseCredentialReviewRepository(staff).fetchQueue();
   final hold = queue2 is AccessReadOk<CredentialQueue>
       ? queue2.value.holds.where((h) => h.memberId == memberId).firstOrNull
@@ -241,20 +241,25 @@ Future<void> main(List<String> args) async {
             },
           ),
         );
-  await Future<void>.delayed(wait);
-  final duringHold = await SupabaseMemberAccessRepository(device)
-      .fetchMySummary();
-  final fresh = await signedIn(newPhone);
-  final s4 = await SupabaseMemberAccessRepository(fresh).fetchMySummary();
+  final stillHeld = await SupabaseCredentialReviewRepository(device)
+      .fetchMine();
+  final queue3 = await SupabaseCredentialReviewRepository(staff).fetchQueue();
+  final holdOpen =
+      queue3 is AccessReadOk<CredentialQueue> &&
+      queue3.value.holds.any((h) => h.holdId == hold?.holdId);
+  // The server answers conflict {"hold_id": "password_reset_required"}. The
+  // shared v1 contract does not list domain field-error codes, so the Dart
+  // client maps that answer to an unknown outcome (a pre-existing contract
+  // gap, reported separately); the release itself must not have happened.
   check(
-    'C4 released after an identity check; a fresh sign-in is granted',
+    'C4 a lost-device hold is not released before the member resets the password',
     hold?.reason == HoldReason.lostDevice &&
-        released is CommandConfirmed &&
-        duringHold is MemberAccessDenied &&
-        duringHold.denial == MemberAccessDenial.untrustedSession &&
-        s4 is MemberAccessGranted,
-    'release=${outcome(released)} hold_time_session=${access(duringHold)} '
-        'fresh=${access(s4)}',
+        released is! CommandConfirmed &&
+        holdOpen &&
+        stillHeld is AccessReadOk<MyCredentials> &&
+        stillHeld.value.inReview,
+    'release=${outcome(released)} hold_still_open=$holdOpen '
+        'still_in_review=${stillHeld is AccessReadOk<MyCredentials> && stillHeld.value.inReview}',
   );
   exit(ok ? 0 : 1);
 }

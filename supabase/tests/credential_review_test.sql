@@ -5,7 +5,7 @@
 -- queue. HTTP evidence through real GoTrue: tools/identity-e2e/credentials.mjs. Every account,
 -- phone and email here is SYNTHETIC (+44 7700 900300-900329, @example.test).
 begin;
-select plan(102);
+select plan(125);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000028' || lpad(n::text, 2, '0'))::uuid $$;
@@ -150,13 +150,15 @@ $$;
 -- replaced (approved); 5 email replacement withdrawn; 6 email removed; 7 disputed (hold), direct
 -- changes and reset during the hold, restored; 8 lost device; 9 stolen-session email change,
 -- restored; 10 MFA factor, restored; 11 phone changed in Auth, accepted; 12 unlinked account;
--- 13 requests a number someone else takes; 14 unlinked holder of a number; 15 old sign-in.
+-- 13 requests a number someone else takes; 14 unlinked holder of a number; 15 old sign-in;
+-- 16 reset link issued before a restore; 17 reset link before a 2.7 reject; 18 password changed
+-- by a "thief" before a restore.
 insert into auth.users (id, aud, role, phone, phone_confirmed_at)
 select pg_temp.u(n), 'authenticated', 'authenticated', ltrim(pg_temp.phone(n), '+'), now()
-  from generate_series(1, 15) n;
+  from generate_series(1, 18) n;
 update auth.users u set email = pg_temp.mail(x.n), email_confirmed_at = now()
-  from (values (4), (5), (6), (7)) x(n) where u.id = pg_temp.u(x.n);
-select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 15) n where n <> 15;
+  from (values (4), (5), (6), (7), (8), (16), (18)) x(n) where u.id = pg_temp.u(x.n);
+select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 18) n where n <> 15;
 select pg_temp.session(pg_temp.u(15), pg_temp.s(15), 'password', interval '1 hour', interval '20 minutes');
 
 -- Structure and privileges ---------------------------------------------------------------------
@@ -203,11 +205,60 @@ select ok(exists (select 1 from pg_trigger t where t.tgrelid = 'app.identity_hol
 select app.platform_set_environment('local', 'pgtap 2.8');
 create temp table m as
 select n, app.identity_seed_synthetic_link(pg_temp.u(n), 'SYNTHETIC 2.8 Member ' || n, 'pgtap 2.8') as member_id
-  from generate_series(1, 15) n where n not in (12, 14);
+  from generate_series(1, 18) n where n not in (12, 14);
 grant select on m to authenticated;
 select app.identity_bootstrap_admin(pg_temp.mid(1), 'israel');
 select app.contract_register_lifecycle_hook('fixture', 'access_hold_applied', 'app.fixture_record_lifecycle(jsonb)'::regprocedure);
 select app.contract_register_lifecycle_hook('fixture', 'access_hold_released', 'app.fixture_record_lifecycle(jsonb)'::regprocedure);
+select app.contract_register_lifecycle_hook('fixture', 'sessions_revoked', 'app.fixture_record_lifecycle(jsonb)'::regprocedure);
+create function app.fixture_fail_lifecycle(p_event jsonb) returns void language plpgsql set search_path = '' as $$
+begin
+  raise exception 'SYNTHETIC failing device-registration hook';
+end;
+$$;
+create function pg_temp.hook(p_event text, p_handler text) returns void language sql as $$
+  update app.contract_lifecycle_hooks set handler = p_handler where event = p_event and module = 'fixture'
+$$;
+create function pg_temp.calls(n int) returns text language sql as $$
+  select coalesce(string_agg(event, ',' order by call_id), '') from app.fixture_lifecycle_calls
+   where member_id = pg_temp.mid(n)
+$$;
+-- A reset (or magic) link GoTrue issued: the token on the user and in one_time_tokens.
+create function pg_temp.issue_reset(n int) returns void language sql as $$
+  update auth.users set recovery_token = 'synthetic-2-8-rt-' || n, recovery_sent_at = now()
+   where id = pg_temp.u(n);
+  insert into auth.one_time_tokens (id, user_id, token_type, token_hash, relates_to)
+  values (gen_random_uuid(), pg_temp.u(n), 'recovery_token', 'synthetic-2-8-rt-' || n, 'synthetic');
+$$;
+-- Redeeming THAT link: GoTrue finds the user by the token and clears it (the 2.7 gate fires).
+create function pg_temp.redeem_issued(n int) returns text language plpgsql as $$
+declare
+  v_rows int;
+begin
+  update auth.users set recovery_token = '' where id = pg_temp.u(n)
+     and recovery_token = 'synthetic-2-8-rt-' || n;
+  get diagnostics v_rows = row_count;
+  return case when v_rows = 0 then 'no such link' else 'redeemed' end
+         || '|' || (select count(*) from auth.one_time_tokens
+                     where user_id = pg_temp.u(n) and token_hash = 'synthetic-2-8-rt-' || n);
+exception when others then
+  return sqlstate || '|' || sqlerrm;
+end;
+$$;
+create function pg_temp.rcmd(p_claims jsonb, p_command text, p_expected bigint, p_payload jsonb)
+returns jsonb language plpgsql as $$
+declare
+  r jsonb;
+begin
+  perform set_config('request.jwt.claims', p_claims::text, true);
+  set local role authenticated;
+  select api.identity_recovery_email_command(jsonb_build_object(
+           'version', 1, 'command', p_command, 'request_id', gen_random_uuid(),
+           'expected_revision', p_expected, 'payload', p_payload)) into r;
+  reset role;
+  return r;
+end;
+$$;
 
 -- Requesting a change (member) ------------------------------------------------------------------
 select is(pg_temp.request(pg_temp.c(15), jsonb_build_object('change_kind', 'phone_username',
@@ -276,18 +327,28 @@ select is((select row(a.identity_check, a.binding_revision_after, a.sessions_rev
              from app.identity_credential_review_audit a
             where a.action = 'credential_change_approved' and a.member_id = pg_temp.mid(2)),
   '(in_person,2,1,phone_username)', 'the approval is audited with the check and the revoked sessions');
+select is(pg_temp.calls(2), 'sessions_revoked', 'device-registration owners hear of the revoked sessions (same transaction)');
 
--- Rejected, withdrawn, taken, self ----------------------------------------------------------------
+-- Rejected, withdrawn, taken, self, held -----------------------------------------------------------
 select pg_temp.request(pg_temp.c(3), jsonb_build_object('change_kind', 'phone_username', 'phone_username', pg_temp.phone(21)));
+select pg_temp.on_member('identity.place_hold', 3, '{"reason_code": "ownership_dispute"}');
+select is(pg_temp.decide('identity.approve_credential_change', 3, '{"identity_check": "in_person"}') -> 'field_errors',
+  '{"member_id": "held"}'::jsonb, 'no change is approved while a hold is open');
+select is(pg_temp.on_member('identity.accept_credentials', 3, '{"identity_check": "in_person"}') -> 'field_errors',
+  '{"member_id": "held"}'::jsonb, 'nor are current credentials accepted');
+select is(pg_temp.cmd(pg_temp.c(3), 'identity.withdraw_credential_change', (pg_temp.change(3)).revision,
+            jsonb_build_object('change_id', (pg_temp.change(3)).change_id)) ->> 'code',
+  'forbidden', 'and the member cannot withdraw while held');
+select pg_temp.on_member('identity.release_hold', 3, jsonb_build_object('hold_id', (pg_temp.open_hold(3)).hold_id, 'identity_check', 'in_person'));
 select is(pg_temp.decide('identity.reject_credential_change', 3, '{"reason": "contact_church_office"}') #>> '{data,state}',
   'rejected', 'an Admin rejects a change');
-select is(pg_temp.auth_row(3) || '|' || pg_temp.summary(pg_temp.c(3)), '(447700900303,"",f)|ok',
+select is(pg_temp.auth_row(3) || '|' || pg_temp.summary(pg_temp.fresh(3)), '(447700900303,"",f)|ok',
   'a rejected username change leaves Auth and access as they were');
-select pg_temp.request(pg_temp.c(3), jsonb_build_object('change_kind', 'phone_username', 'phone_username', pg_temp.phone(21)));
+select pg_temp.request(pg_temp.fresh(3), jsonb_build_object('change_kind', 'phone_username', 'phone_username', pg_temp.phone(21)));
 select is(pg_temp.cmd(pg_temp.fresh(2), 'identity.withdraw_credential_change', (pg_temp.change(3)).revision,
             jsonb_build_object('change_id', (pg_temp.change(3)).change_id)) ->> 'code',
   'not_found', 'another account''s change is not found');
-select is(pg_temp.cmd(pg_temp.c(3), 'identity.withdraw_credential_change', (pg_temp.change(3)).revision,
+select is(pg_temp.cmd(pg_temp.fresh(3), 'identity.withdraw_credential_change', (pg_temp.change(3)).revision,
             jsonb_build_object('change_id', (pg_temp.change(3)).change_id)) #>> '{data,state}',
   'withdrawn', 'the member withdraws their own pending change');
 select pg_temp.request(pg_temp.c(13), jsonb_build_object('change_kind', 'phone_username', 'phone_username', pg_temp.phone(22)));
@@ -310,13 +371,13 @@ select is(pg_temp.request(pg_temp.c(4), jsonb_build_object('change_kind', 'recov
 select is(pg_temp.auth_row(4) || '|' || pg_temp.summary(pg_temp.c(4)), '(447700900304,"",f)|PT403|forbidden|review_required',
   'the old address leaves Auth at once and the account waits in access review');
 select is(pg_temp.readj(pg_temp.c(4), 'select api.identity_my_credentials()')
-            - 'recent_sign_in_minutes' #- '{pending_change,change_id}' #- '{pending_change,requested_at}',
-  '{"access": "review_required", "can_request": false, "last_change": null, "church_contact": null,
-    "phone_username": "+447700900304", "recovery_email": "synthetic-2-8-4@example.test",
-    "pending_recovery_email": null,
-    "pending_change": {"email": "synthetic-2-8-4-new@example.test", "state": "pending", "revision": 1,
-                       "verified": false, "change_kind": "recovery_email_replace"}}'::jsonb,
-  'the member reads their own pending change while in review (generic access, no reason)');
+            #- '{pending_change,change_id}',
+  '{"access": "review_required", "church_contact": null, "pending_recovery_email": null,
+    "pending_change": {"state": "pending", "revision": 1, "change_kind": "recovery_email_replace"}}'::jsonb,
+  'in review the own read carries only access, the contact and the own request id/state (no phone, no address, no reason)');
+select is(pg_temp.readj(pg_temp.c(4), 'select api.identity_my_recovery_email()') - 'recent_sign_in_minutes',
+  '{"access": "review_required", "proposal": null, "can_propose": false, "approved_email": null}'::jsonb,
+  'the 2.7 own read carries no approved address while in review either');
 select is(pg_temp.decide('identity.approve_credential_change', 4, '{"identity_check": "in_person"}') -> 'field_errors',
   '{"recovery_email": "unverified"}'::jsonb, 'an unconfirmed new address cannot be approved');
 update auth.users set email = 'synthetic-2-8-4-new@example.test', email_confirmed_at = now() where id = pg_temp.u(4);
@@ -333,6 +394,7 @@ select is(pg_temp.summary(pg_temp.fresh(4)) || '|' || pg_temp.redeem(pg_temp.u(4
   'a fresh sign-in is granted, and the new address can reset the password');
 
 -- Replacement withdrawn: the approved address returns ----------------------------------------------
+select pg_temp.issue_reset(5);
 select pg_temp.request(pg_temp.c(5), jsonb_build_object('change_kind', 'recovery_email_replace', 'email', 'synthetic-2-8-5-new@example.test'));
 update auth.users set email_change = 'synthetic-2-8-5-new@example.test', email_change_token_new = 'synthetic-2-8-tok-5',
                       email_change_sent_at = now() where id = pg_temp.u(5);
@@ -345,6 +407,8 @@ select is((select row(l.binding_revision, l.link_state, l.binding_review_require
              from app.identity_account_links l where l.link_id = (pg_temp.link(5)).link_id)
           || '|' || pg_temp.summary(pg_temp.fresh(5)),
   '(2,active,f)|ok', 'the review is lifted with a new binding revision; a fresh sign-in is granted');
+select is(pg_temp.redeem_issued(5), 'no such link|0',
+  'a reset link issued before the replacement can never be redeemed after the revert');
 
 -- Recovery email removed ---------------------------------------------------------------------------
 select pg_temp.request(pg_temp.c(6), '{"change_kind": "recovery_email_remove"}');
@@ -414,19 +478,37 @@ select is(pg_temp.summary(pg_temp.fresh(7)), 'ok', 'a fresh sign-in is granted')
 
 -- Lost device -----------------------------------------------------------------------------------------
 select pg_temp.session(pg_temp.u(8), gen_random_uuid());
+insert into auth.refresh_tokens (token, user_id, session_id, revoked)
+values ('synthetic-2-8-refresh-8', pg_temp.u(8)::text, pg_temp.s(8), false);
+select pg_temp.hook('sessions_revoked', 'app.fixture_fail_lifecycle(jsonb)');
+select is(pg_temp.on_member('identity.place_hold', 8, '{"reason_code": "lost_device"}') ->> 'code', 'unavailable',
+  'a raising device-registration hook fails the lost-device hold');
+select is((select count(*)::int from app.identity_holds where member_id = pg_temp.mid(8))
+          || '|' || (select count(*)::int from auth.sessions where user_id = pg_temp.u(8)),
+  '0|2', 'and rolls it back: no hold, sessions intact');
+select pg_temp.hook('sessions_revoked', 'app.fixture_record_lifecycle(jsonb)');
 select is(pg_temp.on_member('identity.place_hold', 8, '{"reason_code": "lost_device"}') #>> '{data,holds,0,hold_kind}',
   'security', 'a lost device is a security hold');
 select is((select count(*)::int from auth.sessions where user_id = pg_temp.u(8)) || '|' || (pg_temp.open_hold(8)).sessions_revoked
+          || '|' || (select count(*)::int from auth.refresh_tokens where user_id = pg_temp.u(8)::text)
           || '|' || pg_temp.summary(pg_temp.c(8)),
-  '0|2|PT401|unauthenticated|untrusted_session', 'every session of the account is revoked at once');
-select is((select string_agg(event || ':' || (xact_id = pg_current_xact_id())::text, ',') from app.fixture_lifecycle_calls
-            where member_id = pg_temp.mid(8)), 'access_hold_applied:true',
-  'the device-registration hook ran in the same transaction');
+  '0|2|0|PT401|unauthenticated|untrusted_session', 'every session and refresh token of the account is revoked at once');
+select is((select string_agg(event || ':' || (xact_id = pg_current_xact_id())::text, ',' order by call_id) from app.fixture_lifecycle_calls
+            where member_id = pg_temp.mid(8)), 'access_hold_applied:true,sessions_revoked:true',
+  'the device-registration hooks ran in the same transaction');
 create temp table new_device as select pg_temp.now_session(8) as claims;
 grant select on new_device to authenticated;
 select is(pg_temp.summary((select claims from new_device)), 'PT403|forbidden|review_required',
   'a new sign-in during the hold reaches only access review');
-select pg_temp.on_member('identity.release_hold', 8, jsonb_build_object('hold_id', (pg_temp.open_hold(8)).hold_id, 'identity_check', 'established_relationship'));
+select is(pg_temp.on_member('identity.release_hold', 8, jsonb_build_object('hold_id', (pg_temp.open_hold(8)).hold_id,
+            'identity_check', 'established_relationship')) -> 'field_errors',
+  '{"hold_id": "password_reset_required"}'::jsonb, 'a lost-device hold stays until the member resets the password');
+-- The member resets through the approved email (holds do not block the reset), then a new password.
+select pg_temp.redeem(pg_temp.u(8)) is not null as redeemed;
+update auth.users set encrypted_password = 'synthetic-2-8-member-8-hash' where id = pg_temp.u(8);
+select is(pg_temp.on_member('identity.release_hold', 8, jsonb_build_object('hold_id', (pg_temp.open_hold(8)).hold_id,
+            'identity_check', 'established_relationship')) #>> '{data,account}',
+  'app_account', 'after the member''s own reset another Admin releases it');
 select is(pg_temp.summary((select claims from new_device)) || '|' || pg_temp.summary(pg_temp.fresh(8)),
   'PT401|unauthenticated|untrusted_session|ok', 'after release the hold-time session must sign in again; a fresh one is granted');
 select is((select string_agg(action || ':' || coalesce(reason_code, '-') || ':' || coalesce(sessions_revoked::text, '-'), ',' order by event_id)
@@ -459,7 +541,14 @@ insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, c
 values (gen_random_uuid(), pg_temp.u(10), 'synthetic', 'totp', 'unverified', now(), now());
 select is(pg_temp.on_member('identity.accept_credentials', 10, '{"identity_check": "in_person"}') -> 'field_errors',
   '{"member_id": "unsupported_factors"}'::jsonb, 'an MFA factor cannot be accepted into the binding');
+select pg_temp.hook('sessions_revoked', 'app.fixture_fail_lifecycle(jsonb)');
+select is(pg_temp.on_member('identity.restore_credentials', 10, '{"identity_check": "in_person"}') ->> 'code',
+  'unavailable', 'a raising hook fails the restore');
+select is((select count(*)::int from auth.mfa_factors where user_id = pg_temp.u(10)) || '|' || (pg_temp.link(10)).binding_revision,
+  '1|1', 'and rolls it back: the factor and the binding are unchanged');
+select pg_temp.hook('sessions_revoked', 'app.fixture_record_lifecycle(jsonb)');
 select pg_temp.on_member('identity.restore_credentials', 10, '{"identity_check": "in_person"}');
+select is(pg_temp.calls(10), 'sessions_revoked', 'a restore tells device-registration owners');
 select is((select count(*)::int from auth.mfa_factors where user_id = pg_temp.u(10)) || '|' || pg_temp.summary(pg_temp.fresh(10)),
   '0|ok', 'restore removes the factor and lifts the review');
 
@@ -475,23 +564,72 @@ select is((pg_temp.link(11)).approved_phone || '|' || pg_temp.summary(pg_temp.fr
 select is((select reason from app.identity_binding_history where link_id = (pg_temp.link(11)).link_id order by binding_revision desc limit 1),
   'credentials_accepted', 'binding history records the acceptance');
 
+-- A reset link issued before a restore or a 2.7 reject is never redeemable after it ------------------------------
+select pg_temp.issue_reset(16);
+update auth.users set phone = ltrim(pg_temp.phone(26), '+') where id = pg_temp.u(16);
+select pg_temp.on_member('identity.restore_credentials', 16, '{"identity_check": "in_person"}');
+select is(pg_temp.auth_row(16) || '|' || pg_temp.redeem_issued(16),
+  '(447700900316,synthetic-2-8-16@example.test,t)|no such link|0',
+  'after a restore the earlier reset link is unusable (users and one_time_tokens)');
+select pg_temp.rcmd(pg_temp.fresh(17), 'identity.propose_recovery_email', null,
+  '{"email": "synthetic-2-8-17@example.test"}');
+update auth.users set email = 'synthetic-2-8-17@example.test', email_confirmed_at = now() where id = pg_temp.u(17);
+select pg_temp.issue_reset(17);
+select is(pg_temp.rcmd(pg_temp.c(1), 'identity.reject_recovery_email',
+            (select revision from app.identity_recovery_email_proposals where auth_user_id = pg_temp.u(17)),
+            jsonb_build_object('proposal_id', (select proposal_id from app.identity_recovery_email_proposals
+                                                where auth_user_id = pg_temp.u(17)))) #>> '{data,state}',
+  'rejected', 'an Admin rejects a verified 2.7 address');
+select is(pg_temp.redeem_issued(17), 'no such link|0', 'and a reset link issued before it is unusable');
+
+-- A password changed without the member's own reset keeps the account held after a restore -----------------------
+update auth.users set encrypted_password = 'synthetic-2-8-thief-hash' where id = pg_temp.u(18);
+update auth.users set email = 'synthetic-2-8-18-thief@example.test' where id = pg_temp.u(18);
+select is(pg_temp.on_member('identity.accept_credentials', 18, '{"identity_check": "in_person"}') -> 'field_errors',
+  '{"member_id": "password_unreviewed"}'::jsonb, 'a possibly stolen password is never accepted with the account');
+select is(pg_temp.on_member('identity.restore_credentials', 18, '{"identity_check": "in_person"}') #>> '{data,holds,0,reason_code}',
+  'security_concern', 'restore puts the approved details back but keeps a security hold');
+select is(pg_temp.summary(pg_temp.fresh(18)) || '|' || pg_temp.calls(18), 'PT403|forbidden|review_required|sessions_revoked,access_hold_applied',
+  'so a fresh sign-in (possibly the thief''s) sees only access review');
+select is(pg_temp.on_member('identity.release_hold', 18, jsonb_build_object('hold_id', (pg_temp.open_hold(18)).hold_id,
+            'identity_check', 'in_person')) -> 'field_errors',
+  '{"hold_id": "password_reset_required"}'::jsonb, 'until the member resets the password the hold stays');
+select pg_temp.redeem(pg_temp.u(18)) is not null as redeemed;
+update auth.users set encrypted_password = 'synthetic-2-8-member-18-hash' where id = pg_temp.u(18);
+select pg_temp.on_member('identity.release_hold', 18, jsonb_build_object('hold_id', (pg_temp.open_hold(18)).hold_id, 'identity_check', 'in_person'));
+select is(pg_temp.summary(pg_temp.fresh(18)), 'ok', 'after the member''s reset and the release, access is open');
+
 -- Reads -------------------------------------------------------------------------------------------------------
-select is(pg_temp.read(pg_temp.c(3), 'select api.identity_admin_credential_queue()'),
+select is(pg_temp.read(pg_temp.fresh(3), 'select api.identity_admin_credential_queue()'),
   'PT403|forbidden|not_granted', 'a member cannot read the Admin queue');
 select is(pg_temp.read(pg_temp.c(12), 'select api.identity_my_credentials()'),
   'PT403|forbidden|not_linked', 'an unlinked account has no credentials read');
-select is(pg_temp.readj(pg_temp.c(3), 'select api.identity_my_credentials()') - 'recent_sign_in_minutes' - 'last_change',
+select is(pg_temp.readj(pg_temp.fresh(3), 'select api.identity_my_credentials()') - 'recent_sign_in_minutes' - 'last_change',
   '{"access": "granted", "can_request": true, "church_contact": null, "pending_change": null,
     "phone_username": "+447700900303", "recovery_email": null, "pending_recovery_email": null}'::jsonb,
   'a granted member reads their own sign-in details');
 select is((select string_agg(action, ',' order by event_id) from app.identity_credential_review_audit where member_id = pg_temp.mid(3)),
-  'credential_change_requested,credential_change_rejected,credential_change_requested,credential_change_withdrawn',
+  'credential_change_requested,hold_placed,hold_released,credential_change_rejected,credential_change_requested,credential_change_withdrawn',
   'requests and decisions are audited');
 select is((select count(*)::int from app.identity_credential_review_audit a
             where a.action like 'credential_change%' and a.member_id = pg_temp.mid(5)
               and a.action = 'credential_change_reverted'), 1, 'the revert is audited');
 select is(pg_temp.readj(pg_temp.c(1), 'select api.identity_admin_credential_queue()') -> 'holds', '[]'::jsonb,
   'no open hold is left');
+
+-- Before 20261007160100 is applied the Auth row helpers are fail-closed stubs ---------------------------------
+select pg_temp.request(pg_temp.fresh(3), jsonb_build_object('change_kind', 'phone_username', 'phone_username', pg_temp.phone(27)));
+create or replace function app.identity_revoke_auth_sessions(p_auth_user_id uuid)
+returns integer language plpgsql set search_path = '' as $$
+begin
+  raise exception using errcode = '0A000',
+    message = 'identity Auth row helpers are not installed (20261007160100)';
+end;
+$$;
+select is(pg_temp.decide('identity.approve_credential_change', 3, '{"identity_check": "in_person"}') - 'request_id' - 'message',
+  '{"code": "unavailable", "field_errors": {}}'::jsonb, 'with the stub an approval answers unavailable');
+select is((pg_temp.change(3)).change_state || '|' || pg_temp.auth_row(3), 'pending|(447700900303,"",f)',
+  'and changes nothing');
 
 select * from finish();
 rollback;

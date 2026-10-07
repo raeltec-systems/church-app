@@ -629,6 +629,38 @@ void main() {
       });
     });
 
+    testWidgets('a release before the member\'s own reset is explained', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.adminCredentialReviews,
+        setUp: (h) => h.credentials.queue = queueWith(
+          holds: [holdItemData(reason: 'lost_device')],
+          changes: [credentialChangeItemData()],
+        ),
+      );
+      await tapKey(tester, 'credential-review-hold-$_hold-check-in_person');
+      await tapKey(tester, 'credential-hold-release-$_hold');
+      h.gateway.sent.last.refuse(
+        ErrorCode.conflict,
+        fieldErrors: const {'hold_id': 'password_reset_required'},
+      );
+      await settle(tester);
+      expect(
+        byKey('credential-review-notice-passwordResetRequired'),
+        findsOneWidget,
+      );
+      await tapKey(tester, 'credential-review-$_change-check-in_person');
+      await tapKey(tester, 'credential-change-approve-$_change');
+      h.gateway.sent.last.refuse(
+        ErrorCode.conflict,
+        fieldErrors: const {'member_id': 'held'},
+      );
+      await settle(tester);
+      expect(byKey('credential-review-notice-held'), findsOneWidget);
+    });
+
     testWidgets('the Admin\'s own hold is for another Admin', (tester) async {
       await pumpAt(
         tester,

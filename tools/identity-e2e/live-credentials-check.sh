@@ -3,7 +3,7 @@
 # against the LOCAL stack: a member asks for a new phone username (password re-check, credential
 # command), a staff-web Admin approves it from the credential queue (applied to Auth server-side,
 # no SMS), then places a lost-device hold (every session revoked, the help screen's own read
-# answers review) and releases it after an identity check. Creates the Admin (+44 7700 900359,
+# answers review) and is refused its release until the member resets the password. Creates the Admin (+44 7700 900359,
 # linked by the restricted operator and bootstrapped) and the member (+44 7700 900358, linked; new
 # number +44 7700 900357), then removes everything. LOCAL only; needs
 # `node tools/auth-harness/local-phone-auth.mjs on` and an empty Admin roster (fresh
@@ -67,6 +67,6 @@ MA=$(sql "select app.identity_seed_synthetic_link('$UA', 'SYNTHETIC 2.8 Live Adm
 sql "select app.identity_bootstrap_admin('$MA', 'israel')" >/dev/null
 UM=$(create "$PHONE")
 sql "select app.identity_seed_synthetic_link('$UM', 'SYNTHETIC 2.8 Live Member', 'live-credentials-2.8')" >/dev/null
-echo "== adapters: a reviewed username change, a lost-device hold and its release"
+echo "== adapters: a reviewed username change and a lost-device hold that waits for the member's reset"
 cd packages/client_core
 dart run tool/live_credentials_check.dart "$ENV_FILE" "$ADMIN_PHONE" "$PHONE" "$NEW_PHONE"

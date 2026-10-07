@@ -25,8 +25,8 @@
 --                                                         security_concern, lost_device -> security
 --       identity.release_hold  {member_id, hold_id, identity_check}
 --     A hold denies every session (2.1/2.2). lost_device also revokes every Auth session of the
---     account. Placing dispatches the contract v1 lifecycle event access_hold_applied (device-
---     registration owners hook it; no new event is added), releasing dispatches
+--     account. Placing dispatches the contract v1 lifecycle event access_hold_applied (and
+--     sessions_revoked when sessions were revoked), releasing dispatches
 --     access_hold_released and moves the trust epoch, so sessions opened during the hold sign in
 --     again. Nobody places or releases a hold on their own member record.
 --   * Credential review of a detected direct Auth change (2.2) or 2.7 `other_changes`:
@@ -46,6 +46,28 @@
 -- Direct Auth changes, /recover, login, reset and email verification never clear a hold or
 -- approve a binding: holds are released only by identity.release_hold, and a binding changes
 -- only through an Admin decision that records a new binding_revision.
+--
+-- Review fixes (story 2.8 independent review):
+--   * Every time Identity removes or restores an address or phone (approve, restore, accept, a
+--     replacement request, the 2.8 and 2.7 reverts) every outstanding Auth link of the account
+--     is made unusable: recovery/magic, confirmation, reauthentication and change tokens, in
+--     auth.users and auth.one_time_tokens (identity_neutralise_auth_links). The 2.7 revert is
+--     replaced here (create or replace) to do the same.
+--   * Unreviewed password (fail closed): a password change since the last binding approval that
+--     was not preceded by the member's own email-link redemption may be a thief's. Restore then
+--     keeps (or places) a security hold with password_reset_required_since; accept is refused
+--     (`password_unreviewed`). A lost-device hold has the same requirement. Such a hold is
+--     released only after the member's own reset (redemption, then a new password) after it was
+--     set (`conflict {"hold_id": "password_reset_required"}` otherwise).
+--   * Approve and accept are refused while any hold is open (`conflict {"member_id": "held"}`);
+--     restore stays possible. A member's withdrawal (2.7 or 2.8) is refused while held.
+--   * Contract v1 lifecycle event `sessions_revoked` (new): dispatched with every session
+--     revocation (approved change, restore, accept, lost-device hold) in the same transaction.
+--   * While held or in review the member's own reads (identity_my_credentials and the 2.7
+--     identity_my_recovery_email, replaced here) carry only the generic access, the church
+--     contact and the caller's own pending request id/revision/state.
+--   * accept_credentials needs identity_email_recovery_open() to bind an email; a phone username
+--     is also taken by another account's pending phone_change.
 --
 -- Auth ROW deletions (sessions, refresh tokens, MFA factors, identities) are not in this file:
 -- app.identity_revoke_auth_sessions and app.identity_remove_auth_extras are fail-closed stubs
@@ -144,7 +166,16 @@ alter table app.identity_holds
   add column released_by_account uuid,
   add column release_identity_check text
     check (release_identity_check in ('established_relationship', 'in_person')),
-  add column sessions_revoked integer;
+  add column sessions_revoked integer,
+  -- Set: released only after the member reset the password themselves AFTER this time (a lost
+  -- device; a restore after an unreviewed password change).
+  add column password_reset_required_since timestamptz;
+
+-- Contract v1 lifecycle event for device-registration owners: every Auth session of the
+-- member's account was revoked (an approved change, a restore or accept, a lost-device hold).
+insert into app.contract_lifecycle_events (event, description) values
+  ('sessions_revoked',
+   'Every Auth session of the member''s account was revoked; registrations bound to them end');
 
 alter table app.identity_credential_changes enable row level security;
 alter table app.identity_credential_review_audit enable row level security;
@@ -292,7 +323,9 @@ stable
 set search_path = ''
 as $$
   select exists (select 1 from auth.users u
-                  where u.phone in (ltrim(p_phone, '+'), p_phone) and u.id <> p_auth_user_id)
+                  where u.id <> p_auth_user_id
+                    and (u.phone in (ltrim(p_phone, '+'), p_phone)
+                         or coalesce(u.phone_change, '') in (ltrim(p_phone, '+'), p_phone)))
       or exists (select 1 from app.identity_account_links l
                   where l.approved_phone = p_phone and l.link_state <> 'ended'
                     and l.auth_user_id <> p_auth_user_id);
@@ -320,6 +353,101 @@ as $$
   update auth.one_time_tokens t
      set token_hash = 'revoked-' || gen_random_uuid()::text, updated_at = now()
    where t.user_id = p_auth_user_id and t.token_type::text = any (p_types);
+$$;
+
+-- Makes every outstanding Auth email/phone link of the account unusable: recovery and magic
+-- links, signup/email confirmations, reauthentication nonces and email/phone change tokens,
+-- in auth.users and in auth.one_time_tokens. Used whenever Identity removes or restores an
+-- address or phone, so a link issued before the change can never be redeemed after it.
+-- A pending recovery token is overwritten with an unusable value (never cleared to ''): a
+-- cleared token is what the 2.7 redemption gate treats as a redemption.
+create function app.identity_neutralise_auth_links(p_auth_user_id uuid)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+begin
+  update auth.users u
+     set recovery_token = case when coalesce(u.recovery_token, '') = '' then u.recovery_token
+                               else 'revoked-' || gen_random_uuid()::text end,
+         recovery_sent_at = null,
+         confirmation_token = '', confirmation_sent_at = null,
+         reauthentication_token = '', reauthentication_sent_at = null,
+         email_change = '', email_change_token_new = '', email_change_token_current = '',
+         email_change_confirm_status = 0, email_change_sent_at = null,
+         phone_change = '', phone_change_token = '', phone_change_sent_at = null
+   where u.id = p_auth_user_id;
+  perform app.identity_neutralise_auth_tokens(p_auth_user_id,
+    array['recovery_token', 'confirmation_token', 'reauthentication_token',
+          'email_change_token_new', 'email_change_token_current', 'phone_change_token']);
+end;
+$$;
+
+-- A member-initiated password reset since p_since: a 2.7 email-link redemption followed by a
+-- password change. (Staff-assisted recovery, entry 9, must record its own equivalent.)
+create function app.identity_member_reset_since(p_link_id uuid, p_since timestamptz)
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select exists (
+    select 1
+      from app.identity_credential_events r
+      join app.identity_credential_events p
+        on p.link_id = r.link_id and p.at >= r.at and 'password' = any (p.kinds)
+     where r.link_id = p_link_id
+       and r.at >= p_since
+       and 'email_link_redeemed' = any (r.kinds));
+$$;
+
+-- Fail closed: the latest password change since the last binding approval was NOT preceded by
+-- a member's own email-link redemption (after the password change before it). Such a password
+-- may have been set by whoever held a stolen session.
+create function app.identity_password_unreviewed(p_link_id uuid)
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  with approval as (
+    select coalesce(max(h.approved_at), '-infinity'::timestamptz) as at
+      from app.identity_binding_history h where h.link_id = p_link_id
+  ), latest as (
+    select max(e.at) as at from app.identity_credential_events e, approval a
+     where e.link_id = p_link_id and 'password' = any (e.kinds) and e.at >= a.at
+  ), previous as (
+    select coalesce(max(e.at), '-infinity'::timestamptz) as at
+      from app.identity_credential_events e, latest l
+     where e.link_id = p_link_id and 'password' = any (e.kinds) and e.at < l.at
+  )
+  select l.at is not null
+     and not exists (
+       select 1 from app.identity_credential_events r, previous pr
+        where r.link_id = p_link_id and 'email_link_redeemed' = any (r.kinds)
+          and r.at > pr.at and r.at <= l.at)
+    from latest l;
+$$;
+
+create function app.identity_dispatch_lifecycle(p_event text, p_member_id uuid, p_revision bigint)
+returns void
+language sql
+set search_path = ''
+as $$
+  select app.contract_dispatch_lifecycle(jsonb_build_object(
+    'event', p_event, 'member_id', p_member_id, 'occurred_at', app.cmd_utc(now()),
+    'identity_revision', p_revision));
+$$;
+
+-- An open hold on the member.
+create function app.identity_member_held(p_member_id uuid)
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select exists (select 1 from app.identity_holds h
+                  where h.member_id = p_member_id and h.released_at is null);
 $$;
 
 -- Records binding revision n+1 with these values (clears the 2.2 binding review), returns the
@@ -604,8 +732,7 @@ begin
          email_change_sent_at = case when lower(coalesce(u.email_change, '')) = p_row.new_email
                                      then null else u.email_change_sent_at end
    where u.id = p_row.auth_user_id;
-  perform app.identity_neutralise_auth_tokens(p_row.auth_user_id,
-    array['email_change_token_new', 'email_change_token_current']);
+  perform app.identity_neutralise_auth_links(p_row.auth_user_id);
   select l.* into v_link from app.identity_account_links l where l.link_id = p_row.link_id;
   if v_other or not v_link.binding_review_required
      or v_link.link_state not in ('active', 'review_required')
@@ -763,8 +890,7 @@ begin
            email_change_token_new = '', email_change_token_current = '',
            email_change_confirm_status = 0, email_change_sent_at = null
      where u.id = p_actor;
-    perform app.identity_neutralise_auth_tokens(p_actor,
-      array['email_change_token_new', 'email_change_token_current']);
+    perform app.identity_neutralise_auth_links(p_actor);
   end if;
   return app.identity_credential_change_outcome(v_row.change_id, false);
 end;
@@ -926,6 +1052,10 @@ begin
                     and (u.banned_until is null or u.banned_until <= now())) then
     perform app.cmd_fail('conflict', '{"change_id": "stale"}', v_row.revision);
   end if;
+  if app.identity_member_held(v_row.member_id) then
+    -- A held account changes nothing until the hold is released (restore stays possible).
+    perform app.cmd_fail('conflict', '{"member_id": "held"}', v_row.revision);
+  end if;
   if v_row.change_kind = 'recovery_email_replace'
      and not app.identity_credential_change_verified(v_row) then
     perform app.cmd_fail('validation_failed', '{"recovery_email": "unverified"}');
@@ -951,16 +1081,14 @@ begin
        set identity_data = i.identity_data || jsonb_build_object('phone', ltrim(v_row.new_phone, '+')),
            updated_at = now()
      where i.user_id = v_row.auth_user_id and i.provider = 'phone';
-    perform app.identity_neutralise_auth_tokens(v_row.auth_user_id, array['phone_change_token']);
   elsif v_row.change_kind = 'recovery_email_remove' then
     update auth.users u
-       set email = null, email_confirmed_at = null, email_change = '',
-           email_change_token_new = '', email_change_token_current = '',
-           email_change_confirm_status = 0, email_change_sent_at = null
+       set email = null, email_confirmed_at = null
      where u.id = v_row.auth_user_id;
-    perform app.identity_neutralise_auth_tokens(v_row.auth_user_id,
-      array['email_change_token_new', 'email_change_token_current']);
   end if;
+  -- No link issued before the change (reset, magic link, confirmation, reauthentication,
+  -- email or phone change) can be redeemed after it.
+  perform app.identity_neutralise_auth_links(v_row.auth_user_id);
 
   v_link := app.identity_record_binding(v_link.link_id,
     case when v_row.change_kind = 'phone_username' then v_row.new_phone else v_link.approved_phone end,
@@ -971,8 +1099,11 @@ begin
     case v_row.change_kind when 'phone_username' then 'phone_username_changed'
                            when 'recovery_email_replace' then 'recovery_email_replaced'
                            else 'recovery_email_removed' end);
-  -- Obsolete sessions end now on every device (the epoch above already denies them).
+  -- Obsolete sessions end now on every device (the epoch above already denies them), and
+  -- device-registration owners hear of it in this transaction.
   v_sessions := app.identity_revoke_auth_sessions(v_row.auth_user_id);
+  perform app.identity_dispatch_lifecycle('sessions_revoked', v_row.member_id,
+    app.identity_bump_member(v_row.member_id));
 
   update app.identity_credential_changes c
      set change_state = 'approved', revision = c.revision + 1, decided_at = now(),
@@ -1130,11 +1261,14 @@ begin
      for update;
   -- The 2.2 hold trigger moves the trust epoch of the live link.
   insert into app.identity_holds (member_id, hold_kind, reason, placed_by, reason_code,
-                                  placed_by_member, placed_by_account)
+                                  placed_by_member, placed_by_account,
+                                  password_reset_required_since)
   values (v_member.member_id,
           case when v_reason = 'ownership_dispute' then 'access_review' else 'security' end,
           v_reason, 'admin:' || v_actor.member_id::text, v_reason, v_actor.member_id,
-          v_actor.account_id)
+          v_actor.account_id,
+          -- Whoever has the device may know the password: the member resets it before release.
+          case when v_reason = 'lost_device' then clock_timestamp() end)
   returning * into v_hold;
   if v_reason = 'lost_device' and v_link.link_id is not null then
     -- Lost or compromised device: every Auth session of the account ends now.
@@ -1147,11 +1281,10 @@ begin
     v_request, v_member.member_id, v_link.link_id, null, v_hold, v_reason, null, null,
     v_revision, v_sessions);
   -- Registered owner hooks (for example device registrations) run in this transaction.
-  perform app.contract_dispatch_lifecycle(jsonb_build_object(
-    'event', 'access_hold_applied',
-    'member_id', v_member.member_id,
-    'occurred_at', app.cmd_utc(now()),
-    'identity_revision', v_revision));
+  perform app.identity_dispatch_lifecycle('access_hold_applied', v_member.member_id, v_revision);
+  if v_sessions is not null then
+    perform app.identity_dispatch_lifecycle('sessions_revoked', v_member.member_id, v_revision);
+  end if;
   return app.identity_member_holds_outcome(v_member.member_id);
 end;
 $$;
@@ -1185,6 +1318,15 @@ begin
   if v_hold.released_at is not null then
     perform app.cmd_fail('conflict', '{"hold_id": "released"}', v_member.revision);
   end if;
+  -- Fail closed: a hold that needs a password reset stays until the member reset the password
+  -- themselves (an approved-email link redemption followed by a new password) after it was set.
+  if v_hold.password_reset_required_since is not null
+     and not coalesce(app.identity_member_reset_since(
+           (select l.link_id from app.identity_account_links l
+             where l.member_id = v_member.member_id and l.link_state <> 'ended'),
+           v_hold.password_reset_required_since), false) then
+    perform app.cmd_fail('conflict', '{"hold_id": "password_reset_required"}', v_member.revision);
+  end if;
   update app.identity_holds h
      set released_at = now(), released_by = 'admin:' || v_actor.member_id::text,
          released_by_member = v_actor.member_id, released_by_account = v_actor.account_id,
@@ -1197,11 +1339,7 @@ begin
     (select l.link_id from app.identity_account_links l
       where l.member_id = v_member.member_id and l.link_state <> 'ended'),
     null, v_hold, v_hold.reason_code, v_hold.release_identity_check, null, v_revision, null);
-  perform app.contract_dispatch_lifecycle(jsonb_build_object(
-    'event', 'access_hold_released',
-    'member_id', v_member.member_id,
-    'occurred_at', app.cmd_utc(now()),
-    'identity_revision', v_revision));
+  perform app.identity_dispatch_lifecycle('access_hold_released', v_member.member_id, v_revision);
   return app.identity_member_holds_outcome(v_member.member_id);
 end;
 $$;
@@ -1250,6 +1388,8 @@ declare
   v_actor record;
   v_member app.identity_members;
   v_link app.identity_account_links;
+  v_hold app.identity_holds;
+  v_unreviewed boolean;
   v_sessions integer;
   v_revision bigint;
   v_request uuid := app.cmd_current_request_id(p_actor, 'identity.restore_credentials');
@@ -1280,8 +1420,7 @@ begin
            when lower(nullif(btrim(coalesce(u.email, '')), '')) = v_link.approved_recovery_email
              then coalesce(u.email_confirmed_at, now())
            else now() end,
-         email_change = '', email_change_token_new = '', email_change_token_current = '',
-         email_change_confirm_status = 0, email_change_sent_at = null
+         email_change_confirm_status = 0
    where u.id = v_link.auth_user_id;
   update auth.identities i
      set identity_data = i.identity_data
@@ -1289,9 +1428,12 @@ begin
          updated_at = now()
    where i.user_id = v_link.auth_user_id and i.provider = 'phone'
      and i.identity_data ->> 'phone' is distinct from ltrim(v_link.approved_phone, '+');
-  perform app.identity_neutralise_auth_tokens(v_link.auth_user_id,
-    array['email_change_token_new', 'email_change_token_current', 'phone_change_token']);
+  -- No link issued before the restore (a reset link to the approved address included) can be
+  -- redeemed after it.
+  perform app.identity_neutralise_auth_links(v_link.auth_user_id);
   perform app.identity_remove_auth_extras(v_link.auth_user_id, v_link.approved_recovery_email);
+  -- Judged before the new binding revision (which starts a new approval period).
+  v_unreviewed := app.identity_password_unreviewed(v_link.link_id);
   v_sessions := app.identity_revoke_auth_sessions(v_link.auth_user_id);
   v_link := app.identity_record_binding(v_link.link_id, v_link.approved_phone,
     v_link.approved_recovery_email, 'admin:' || v_actor.member_id::text, 'credentials_restored');
@@ -1299,6 +1441,33 @@ begin
   perform app.identity_review_audit_add('credentials_restored', v_actor.member_id,
     v_actor.account_id, v_request, v_member.member_id, v_link.link_id, null, null, null,
     p_payload ->> 'identity_check', v_link.binding_revision, v_revision, v_sessions);
+  perform app.identity_dispatch_lifecycle('sessions_revoked', v_member.member_id, v_revision);
+  -- A password changed since the last approval without the member's own reset may be the
+  -- thief's: access stays held until the member resets it (fail closed).
+  if v_unreviewed and not exists (
+       select 1 from app.identity_holds h
+        where h.member_id = v_member.member_id and h.released_at is null
+          and h.password_reset_required_since is not null) then
+    update app.identity_holds h
+       set password_reset_required_since = clock_timestamp()
+     where h.member_id = v_member.member_id and h.released_at is null
+       and h.reason_code = 'security_concern'
+    returning * into v_hold;
+    if v_hold.hold_id is null then
+      insert into app.identity_holds (member_id, hold_kind, reason, placed_by, reason_code,
+                                      placed_by_member, placed_by_account,
+                                      password_reset_required_since)
+      values (v_member.member_id, 'security', 'security_concern',
+              'admin:' || v_actor.member_id::text, 'security_concern', v_actor.member_id,
+              v_actor.account_id, clock_timestamp())
+      returning * into v_hold;
+    end if;
+    v_revision := app.identity_bump_member(v_member.member_id);
+    perform app.identity_review_audit_add('hold_placed', v_actor.member_id, v_actor.account_id,
+      v_request, v_member.member_id, v_link.link_id, null, v_hold, 'password_unreviewed', null,
+      null, v_revision, null);
+    perform app.identity_dispatch_lifecycle('access_hold_applied', v_member.member_id, v_revision);
+  end if;
   return app.identity_member_holds_outcome(v_member.member_id);
 end;
 $$;
@@ -1328,12 +1497,19 @@ begin
   select a.* into v_actor from app.identity_command_actor(p_actor) a;
   v_member := app.identity_lock_reviewed_member(p_payload, array['member_id', 'identity_check'],
     true, p_expected_revision, v_actor.member_id);
+  if app.identity_member_held(v_member.member_id) then
+    perform app.cmd_fail('conflict', '{"member_id": "held"}', v_member.revision);
+  end if;
   v_link := app.identity_lock_review_link(v_member);
   if v_link.auth_user_id = v_actor.account_id then
     perform app.cmd_fail('forbidden', '{"member_id": "unsupported"}');
   end if;
   if not app.identity_applications_open() then
     perform app.cmd_fail('unavailable', '{"policy": "gate_closed"}');
+  end if;
+  -- A password that may be a thief's is never accepted with the account: restore instead.
+  if app.identity_password_unreviewed(v_link.link_id) then
+    perform app.cmd_fail('conflict', '{"member_id": "password_unreviewed"}', v_member.revision);
   end if;
   if app.identity_auth_has_extras(v_link.auth_user_id) then
     perform app.cmd_fail('conflict', '{"member_id": "unsupported_factors"}', v_member.revision);
@@ -1352,14 +1528,10 @@ begin
           or v_email !~ '^[a-z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-z0-9-]+(\.[a-z0-9-]+)+$') then
     perform app.cmd_fail('conflict', '{"member_id": "email_unverified"}', v_member.revision);
   end if;
-  perform app.identity_neutralise_auth_tokens(v_link.auth_user_id,
-    array['email_change_token_new', 'email_change_token_current', 'phone_change_token']);
-  update auth.users u
-     set email_change = '', email_change_token_new = '', email_change_token_current = '',
-         email_change_confirm_status = 0, email_change_sent_at = null,
-         phone_change = '', phone_change_token = '', phone_change_sent_at = null
-   where u.id = v_link.auth_user_id
-     and (coalesce(u.email_change, '') <> '' or coalesce(u.phone_change, '') <> '');
+  if v_email is not null and not app.identity_email_recovery_open() then
+    perform app.cmd_fail('unavailable', '{"policy": "gate_closed"}');
+  end if;
+  perform app.identity_neutralise_auth_links(v_link.auth_user_id);
   v_sessions := app.identity_revoke_auth_sessions(v_link.auth_user_id);
   v_link := app.identity_record_binding(v_link.link_id, v_phone, v_email,
     'admin:' || v_actor.member_id::text, 'credentials_accepted');
@@ -1367,6 +1539,7 @@ begin
   perform app.identity_review_audit_add('credentials_accepted', v_actor.member_id,
     v_actor.account_id, v_request, v_member.member_id, v_link.link_id, null, null, null,
     p_payload ->> 'identity_check', v_link.binding_revision, v_revision, v_sessions);
+  perform app.identity_dispatch_lifecycle('sessions_revoked', v_member.member_id, v_revision);
   return app.identity_member_holds_outcome(v_member.member_id);
 end;
 $$;
@@ -1421,6 +1594,141 @@ as $$
               and e.at >= p_row.proposed_at
               and e.kinds && array['phone', 'soft_deleted', 'user_deleted', 'identity_removed',
                                    'identity_moved', 'mfa_added', 'mfa_changed', 'mfa_removed']);
+$$;
+
+-- ---------------------------------------------------------------------------------------------
+-- 2.7 functions replaced (same signatures and privileges)
+-- ---------------------------------------------------------------------------------------------
+
+-- The 2.7 revert (reject/withdraw of a recovery-email proposal), unchanged except that every
+-- outstanding Auth link of the account is made unusable too (identity_neutralise_auth_links):
+-- a reset link to an address issued before the revert can never be redeemed after it.
+create or replace function app.identity_revert_recovery_email(
+  p_row app.identity_recovery_email_proposals,
+  p_by text
+) returns boolean
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_link app.identity_account_links;
+  v_other boolean;
+begin
+  select l.* into v_link from app.identity_account_links l where l.link_id = p_row.link_id
+     for update;
+  if v_link.link_state = 'ended' or v_link.auth_user_id <> p_row.auth_user_id then
+    return false;
+  end if;
+  v_other := app.identity_recovery_email_other_changes(p_row);
+  update auth.users u
+     set email = case when lower(nullif(btrim(u.email), '')) = p_row.email
+                      then v_link.approved_recovery_email else u.email end,
+         email_confirmed_at = case when lower(nullif(btrim(u.email), '')) = p_row.email
+                                        and v_link.approved_recovery_email is null
+                                   then null else u.email_confirmed_at end,
+         email_change = case when lower(coalesce(u.email_change, '')) = p_row.email
+                             then '' else u.email_change end,
+         email_change_token_new = case when lower(coalesce(u.email_change, '')) = p_row.email
+                                       then '' else u.email_change_token_new end,
+         email_change_token_current = case when lower(coalesce(u.email_change, '')) = p_row.email
+                                           then '' else u.email_change_token_current end,
+         email_change_confirm_status = case when lower(coalesce(u.email_change, '')) = p_row.email
+                                            then 0 else u.email_change_confirm_status end,
+         email_change_sent_at = case when lower(coalesce(u.email_change, '')) = p_row.email
+                                     then null else u.email_change_sent_at end
+   where u.id = p_row.auth_user_id
+     and (lower(nullif(btrim(u.email), '')) = p_row.email
+          or lower(coalesce(u.email_change, '')) = p_row.email);
+  perform app.identity_neutralise_auth_links(p_row.auth_user_id);
+  select l.* into v_link from app.identity_account_links l where l.link_id = p_row.link_id;
+  if v_other or not v_link.binding_review_required
+     or v_link.link_state not in ('active', 'review_required') then
+    return false;
+  end if;
+  update app.identity_account_links l
+     set binding_revision = l.binding_revision + 1,
+         link_state = 'active',
+         sessions_valid_after = greatest(coalesce(l.sessions_valid_after, '-infinity'),
+                                         clock_timestamp()),
+         updated_at = now()
+   where l.link_id = v_link.link_id
+  returning l.* into v_link;
+  insert into app.identity_binding_history (link_id, binding_revision, approved_phone,
+                                            approved_recovery_email, approved_by, reason)
+  values (v_link.link_id, v_link.binding_revision, v_link.approved_phone,
+          v_link.approved_recovery_email, p_by, 'recovery_email_reverted');
+  return true;
+end;
+$$;
+
+-- A member's withdrawal (2.7 recovery email, 2.8 credential change): a trusted password session
+-- of a linked account, also while access waits in review, but never while a hold is open (a
+-- held account changes nothing on the member's say-so).
+create or replace function app.identity_authorize_member_withdraw_command(p_request jsonb)
+returns boolean
+language plpgsql
+set search_path = ''
+as $$
+declare
+  r record;
+begin
+  select e.* into r from app.identity_access_evaluate() e;
+  if r.outcome in ('unauthenticated', 'untrusted_session') then
+    perform app.cmd_fail('unauthenticated');
+  end if;
+  return r.outcome in ('granted', 'review_required') and r.link_id is not null
+     and not app.identity_member_held(r.member_id);
+end;
+$$;
+
+-- The member's own 2.7 recovery-email read. While in review or held it now returns only the
+-- generic state and the caller's own pending proposal id/revision/state (no addresses).
+create or replace function app.identity_my_recovery_email()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  r record;
+  v_link app.identity_account_links;
+  v_latest app.identity_recovery_email_proposals;
+begin
+  select e.* into r from app.identity_access_evaluate() e;
+  if r.outcome in ('unauthenticated', 'untrusted_session') then
+    raise exception using errcode = 'PT401', message = 'unauthenticated', detail = r.outcome;
+  elsif r.outcome = 'unavailable' then
+    raise exception using errcode = 'PT403', message = 'unavailable', detail = r.outcome;
+  elsif r.outcome not in ('granted', 'review_required') or r.link_id is null then
+    raise exception using errcode = 'PT403', message = 'forbidden', detail = r.outcome;
+  end if;
+  select l.* into v_link from app.identity_account_links l where l.link_id = r.link_id;
+  select p.* into v_latest from app.identity_recovery_email_proposals p
+   where p.link_id = v_link.link_id
+   order by p.proposed_at desc, p.proposal_id
+   limit 1;
+  if r.outcome <> 'granted' then
+    return jsonb_build_object(
+      'access', r.outcome,
+      'approved_email', null,
+      'proposal', case when v_latest.proposal_id is null or v_latest.proposal_state <> 'pending'
+                       then null
+                       else jsonb_build_object('proposal_id', v_latest.proposal_id,
+                                               'revision', v_latest.revision,
+                                               'state', v_latest.proposal_state) end,
+      'can_propose', false,
+      'recent_sign_in_minutes', extract(epoch from app.identity_recent_password_window())::int / 60);
+  end if;
+  perform app.identity_record_activity(v_link.link_id);
+  return jsonb_build_object(
+    'access', r.outcome,
+    'approved_email', v_link.approved_recovery_email,
+    'proposal', case when v_latest.proposal_id is null then null
+                     else app.identity_recovery_email_member_json(v_latest) end,
+    'can_propose', v_link.approved_recovery_email is null
+                   and app.identity_applications_open() and app.identity_email_recovery_open(),
+    'recent_sign_in_minutes', extract(epoch from app.identity_recent_password_window())::int / 60);
+end;
 $$;
 
 -- ---------------------------------------------------------------------------------------------
@@ -1584,9 +1892,23 @@ begin
    limit 1;
   select p.* into v_proposal from app.identity_recovery_email_proposals p
    where p.link_id = v_link.link_id and p.proposal_state = 'pending';
-  if r.outcome = 'granted' then
-    perform app.identity_record_activity(v_link.link_id);
+  if r.outcome <> 'granted' then
+    -- In review or held: only the generic state, the church contact and the caller's own
+    -- pending request (id, revision, kind, state). No approved phone or address, no reason.
+    return jsonb_build_object(
+      'access', r.outcome,
+      'church_contact', app.identity_church_setting('operational_contact') ->> 'route',
+      'pending_change', case when v_pending.change_id is null then null
+                             else jsonb_build_object('change_id', v_pending.change_id,
+                                                     'revision', v_pending.revision,
+                                                     'change_kind', v_pending.change_kind,
+                                                     'state', v_pending.change_state) end,
+      'pending_recovery_email', case when v_proposal.proposal_id is null then null
+                                     else jsonb_build_object('proposal_id', v_proposal.proposal_id,
+                                                             'revision', v_proposal.revision,
+                                                             'state', v_proposal.proposal_state) end);
   end if;
+  perform app.identity_record_activity(v_link.link_id);
   return jsonb_build_object(
     'access', r.outcome,
     'phone_username', v_link.approved_phone,
@@ -1730,6 +2052,13 @@ revoke all on function
   app.identity_phone_username_taken(text, uuid),
   app.identity_email_taken(text, uuid),
   app.identity_neutralise_auth_tokens(uuid, text[]),
+  app.identity_neutralise_auth_links(uuid),
+  app.identity_member_reset_since(uuid, timestamptz),
+  app.identity_password_unreviewed(uuid),
+  app.identity_dispatch_lifecycle(text, uuid, bigint),
+  app.identity_member_held(uuid),
+  app.identity_revert_recovery_email(app.identity_recovery_email_proposals, text),
+  app.identity_authorize_member_withdraw_command(jsonb),
   app.identity_record_binding(uuid, text, text, text, text),
   app.identity_bump_member(uuid),
   app.identity_review_audit_add(text, uuid, uuid, uuid, uuid, uuid,
@@ -1761,6 +2090,7 @@ revoke all on function
   app.identity_authorize_command(jsonb),
   app.identity_my_credentials(),
   api.identity_my_credentials(),
+  app.identity_my_recovery_email(),
   app.identity_admin_credential_queue(),
   api.identity_admin_credential_queue()
   from public, anon, authenticated, service_role;
@@ -1770,4 +2100,6 @@ grant execute on function api.identity_credential_command(jsonb) to authenticate
 grant execute on function app.identity_my_credentials() to authenticated;
 grant execute on function api.identity_my_credentials() to authenticated;
 grant execute on function app.identity_admin_credential_queue() to authenticated;
+-- Re-granted after the 2.7 replacement above (the revoke list includes it).
+grant execute on function app.identity_my_recovery_email() to authenticated;
 grant execute on function api.identity_admin_credential_queue() to authenticated;

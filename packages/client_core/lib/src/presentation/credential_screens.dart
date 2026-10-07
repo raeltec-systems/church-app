@@ -250,6 +250,7 @@ class AccessReviewScreen extends ConsumerWidget {
           title: '${_kindTitle(change.kind)}: waiting for the church',
           message:
               change.kind == CredentialChangeKind.recoveryEmailReplace &&
+                  change.email != null &&
                   change.verified != true
               ? 'Open the confirmation link we sent to ${change.email}. Then '
                     'the church checks it.'
@@ -273,9 +274,13 @@ class AccessReviewScreen extends ConsumerWidget {
           tone: StatusTone.info,
           icon: Icons.hourglass_top_outlined,
           title: 'Recovery email: waiting for the church',
-          message: proposal.verified
-              ? '${proposal.email} is confirmed and waits for approval.'
-              : 'Open the confirmation link we sent to ${proposal.email}.',
+          message: switch ((proposal.email, proposal.verified)) {
+            (final String email, true) =>
+              '$email is confirmed and waits for approval.',
+            (final String email, _) =>
+              'Open the confirmation link we sent to $email.',
+            _ => 'The church checks it before it becomes your recovery email.',
+          },
           actions: [
             BannerAction(
               'Withdraw this email',
@@ -563,7 +568,7 @@ class _SignInDetailsScreenState extends ConsumerState<SignInDetailsScreen> {
       final mine = result.value;
       children.addAll([
         Text(
-          'Sign-in username: ${mine.phoneUsername}',
+          'Sign-in username: ${mine.phoneUsername ?? ''}',
           key: const Key('sign-in-details-username'),
         ),
         const SizedBox(height: 4),
@@ -1317,6 +1322,25 @@ class _CredentialReviewScreenState
         StatusTone.info,
         'Already on hold',
         '$who already has this hold.',
+      ),
+      CredentialReviewNotice.held => (
+        StatusTone.warning,
+        'On hold',
+        'Release the hold first. Restoring the approved details is still '
+            'possible.',
+      ),
+      CredentialReviewNotice.passwordResetRequired => (
+        StatusTone.warning,
+        'Password reset needed first',
+        '$who must reset the password themselves (recovery email or staff-'
+            'assisted recovery) before this hold can be released.',
+      ),
+      CredentialReviewNotice.passwordUnreviewed => (
+        StatusTone.danger,
+        'Password may not be the member\'s',
+        'The password changed without the member\'s own reset. Restore the '
+            'approved details instead; the account stays on hold until the '
+            'member resets the password.',
       ),
       CredentialReviewNotice.restoreBlocked => (
         StatusTone.danger,

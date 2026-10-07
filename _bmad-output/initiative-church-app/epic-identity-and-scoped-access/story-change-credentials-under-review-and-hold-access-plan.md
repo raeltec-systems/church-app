@@ -100,6 +100,16 @@ context:
 
 ## Plan Change Log
 
+- 2026-10-07, independent review (coordinator; not a step-04 loop). One HIGH, three MEDIUM, five LOW findings; all patched in place in `20261007160000` (both 2.8 files are on neither main nor staging; still no `delete from` in the main file, ASCII only).
+  - **HIGH (takeover):** restore and the reverts left a reset link usable. New `app.identity_neutralise_auth_links`: recovery (overwritten with an unusable value, never cleared, so the 2.7 gate does not fire), confirmation, reauthentication and change tokens, in `auth.users` and `auth.one_time_tokens`. Called by approve, restore, accept, the replacement request and both reverts; the 2.7 `identity_revert_recovery_email` is replaced here by `create or replace`.
+  - **MEDIUM 1 (fail-closed rule):** a password change since the last binding approval that was not preceded by the member's own email-link redemption is "unreviewed" (`app.identity_password_unreviewed`). Restore then keeps (or places) a security hold with `password_reset_required_since`; accept is refused `password_unreviewed`. A lost-device hold sets the same field. Such holds are released only after a member's own reset after that time (`app.identity_member_reset_since`: redemption then a new password), else `conflict {"hold_id": "password_reset_required"}`. Members without an approved email wait for entry 9.
+  - **MEDIUM 2:** approve and accept refuse `conflict {"member_id": "held"}` while any hold is open; restore stays allowed.
+  - **MEDIUM 3:** a new contract v1 lifecycle event `sessions_revoked` (SQL list, shared fixture, Dart enum and list, TypeScript list, cross-epic test) is dispatched with every session revocation in the same transaction. This supersedes the frozen-block decision "no new contract event" at the reviewer's instruction (which allowed "a dedicated event if cleaner"). Tests prove a raising hook rolls back the lost-device hold and the restore; the change-approval path dispatches the same way.
+  - **LOW:** (a) held/in-review own reads (`identity_my_credentials`, 2.7 `identity_my_recovery_email` replaced) carry only access, contact and the own pending request id/revision/state; (b) withdraw (2.7 and 2.8) refused while held, via the replaced 2.7 withdraw authorizer; (c) accept needs `identity_email_recovery_open()` to bind an email; (d) a phone username is also taken by another account's pending `phone_change`; (e) pgTAP for the fail-closed stub path and for refresh tokens revoked on lost device.
+  - **Avoids:** a pre-restore reset link reopening a hijacked account; a thief's password surviving a restore or a lost-device release; changes applied to held accounts; device registrations outliving revoked sessions; reviewed accounts leaking their approved details.
+  - **KEEP:** the reviewed-change flow, the server-side Auth writes, the release epoch, the generic help screen.
+  - **Found, not changed (reported):** the shared v1 contract allows only 11 field-error codes, so the real Dart client turns refusals with domain codes (2.5/2.7/2.8) into unknown outcomes.
+
 ## Review Triage Log
 
 ## Verification
@@ -113,4 +123,5 @@ context:
   - `credentials.mjs` 13/13; live adapter check C1–C4.
   - client_core 273 tests, staff 21, mobile 23; analyze clean in all three; format clean; staff `flutter build web --no-web-resources-cdn` ok.
   - Node tool tests 50/50; `ci:migrations --base ccr-93e730dd-89lbvg` (19, ordered, non-destructive); `ci:secrets` clean; `scan-evidence` on evidence-2.8 and `tools/identity-e2e` clean.
+- Results after the review fixes (2026-10-07, local): `db:test` 1121/1121 (credential review 125); `db:smoke` exit 0 (121 ok, 224 fixture cases); `credentials.mjs` 15/15; regressions `run` 30, `grants` 18, `review` 18, `apply` 27, `cells` 13, `recovery` 20; live check C1–C4; client_core 274, staff 21, mobile 23, contracts Dart 244 and TS 227; analyze clean; node tool tests 50; `ci:migrations`, `ci:secrets`, `scan-evidence` clean.
 - Matrix audit: phone change (pgTAP + E2E C10 + live C1–C2 + widgets), email replace (pgTAP + C20–C21), remove (pgTAP + C22), hold (pgTAP + C30–C32), lost device (pgTAP + C40–C41 + live C3–C4), stolen-session (pgTAP + C50), self/non-Admin (pgTAP + C10/C30 + widgets): every row has a passing test.

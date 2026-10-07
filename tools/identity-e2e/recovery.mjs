@@ -322,7 +322,9 @@ async function main() {
     const s1 = await summary(member.token);
     const r1 = await myRecovery(member.token);
     check('X13-verified-email-waits-for-approval', confirmFacts.base === MOBILE_EMAIL_CONFIRMED && opened.status === 303
-      && s1.status === 403 && s1.detail === 'review_required' && r1.status === 200 && r1.access === 'review_required' && r1.verified === true,
+      && s1.status === 403 && s1.detail === 'review_required' && r1.status === 200 && r1.access === 'review_required'
+      // Story 2.8: in review the own read carries only the proposal's id and state.
+      && r1.state === 'pending' && r1.verified === null && r1.has_approved_email === false,
       { mail: mailFacts(confirmMail), redirect: confirmFacts, summary: s1, recovery: r1 });
 
     const queue = (await rpc('identity_admin_recovery_email_queue', admin.token)).json?.proposals ?? [];

@@ -754,17 +754,41 @@ Map<String, Object?> myCredentialsData({
   Map<String, Object?>? pendingRecoveryEmail,
   bool canRequest = true,
   String? churchContact,
-}) => {
-  'access': access,
-  'phone_username': phone,
-  'recovery_email': email,
-  'pending_change': pendingChange,
-  'last_change': lastChange,
-  'pending_recovery_email': pendingRecoveryEmail,
-  'can_request': canRequest,
-  'church_contact': churchContact,
-  'recent_sign_in_minutes': 10,
-};
+}) => access == 'review_required'
+    // In review the server sends only access, the church contact and the
+    // member's own pending request id/revision/kind/state.
+    ? {
+        'access': access,
+        'church_contact': churchContact,
+        'pending_change': pendingChange == null
+            ? null
+            : {
+                for (final k in [
+                  'change_id',
+                  'revision',
+                  'change_kind',
+                  'state',
+                ])
+                  k: pendingChange[k],
+              },
+        'pending_recovery_email': pendingRecoveryEmail == null
+            ? null
+            : {
+                for (final k in ['proposal_id', 'revision', 'state'])
+                  k: pendingRecoveryEmail[k],
+              },
+      }
+    : {
+        'access': access,
+        'phone_username': phone,
+        'recovery_email': email,
+        'pending_change': pendingChange,
+        'last_change': lastChange,
+        'pending_recovery_email': pendingRecoveryEmail,
+        'can_request': canRequest,
+        'church_contact': churchContact,
+        'recent_sign_in_minutes': 10,
+      };
 
 /// The wire form of one credential change (story 2.8).
 Map<String, Object?> credentialChangeData({

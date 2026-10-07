@@ -71,19 +71,21 @@ class RecoveryEmailProposal {
     final revision = json['revision'];
     final email = json['email'];
     final verified = json['verified'];
+    // While the account is in review the member's own read carries only the
+    // proposal's id, revision and state (story 2.8): no address.
     if (id is! String ||
         revision is! int ||
         revision < 1 ||
-        email is! String ||
-        verified is! bool) {
+        (email != null && email is! String) ||
+        (verified != null && verified is! bool)) {
       throw const FormatException('unexpected proposal shape');
     }
     return RecoveryEmailProposal(
       proposalId: id,
       revision: revision,
-      email: email,
+      email: email as String?,
       state: ProposalState.fromWire(json['state']),
-      verified: verified,
+      verified: verified as bool?,
       decisionReason: RecoveryEmailRejectReason.fromWire(
         json['decision_reason'],
       ),
@@ -92,11 +94,14 @@ class RecoveryEmailProposal {
 
   final String proposalId;
   final int revision;
-  final String email;
+
+  /// Null while the account is in review (the read then carries no address).
+  final String? email;
   final ProposalState state;
 
-  /// The account holds this email, confirmed through its link.
-  final bool verified;
+  /// The account holds this email, confirmed through its link. Null while the
+  /// account is in review.
+  final bool? verified;
   final RecoveryEmailRejectReason? decisionReason;
 }
 

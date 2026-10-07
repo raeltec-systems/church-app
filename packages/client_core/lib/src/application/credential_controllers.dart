@@ -351,6 +351,15 @@ enum CredentialReviewNotice {
   notAcceptable,
   alreadyHeld,
 
+  /// The member is on hold: release the hold first (restore stays possible).
+  held,
+
+  /// The hold stays until the member resets the password themselves.
+  passwordResetRequired,
+
+  /// The password may have been set by someone else: restore instead.
+  passwordUnreviewed,
+
   /// The approved number or address is held by another account now.
   restoreBlocked,
   changedElsewhere,
@@ -574,6 +583,12 @@ class CredentialReviewController extends Notifier<CredentialReviewState> {
         CredentialReviewNotice.restoreBlocked,
       ErrorCode.conflict when f['reason_code'] == 'already_held' =>
         CredentialReviewNotice.alreadyHeld,
+      ErrorCode.conflict when f['member_id'] == 'held' =>
+        CredentialReviewNotice.held,
+      ErrorCode.conflict when f['hold_id'] == 'password_reset_required' =>
+        CredentialReviewNotice.passwordResetRequired,
+      ErrorCode.conflict when f['member_id'] == 'password_unreviewed' =>
+        CredentialReviewNotice.passwordUnreviewed,
       ErrorCode.conflict => CredentialReviewNotice.changedElsewhere,
       ErrorCode.validationFailed when f['recovery_email'] == 'unverified' =>
         CredentialReviewNotice.unverified,

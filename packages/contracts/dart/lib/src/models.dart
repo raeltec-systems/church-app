@@ -191,7 +191,8 @@ enum LifecycleEventName {
   scopeRevoked('scope_revoked'),
   accountDeactivated('account_deactivated'),
   deletionRequested('deletion_requested'),
-  cellTransferred('cell_transferred');
+  cellTransferred('cell_transferred'),
+  sessionsRevoked('sessions_revoked');
 
   const LifecycleEventName(this.wireName);
   final String wireName;

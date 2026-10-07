@@ -17,5 +17,5 @@ Connecting to local database...
 /home/user/church-app/.claude/worktrees/agent-a61ae0b281aaecb47/supabase/tests/recovery_journal_test.sql ......... ok
 /home/user/church-app/.claude/worktrees/agent-a61ae0b281aaecb47/supabase/tests/system_access_test.sql ............ ok
 All tests successful.
-Files=13, Tests=1098,  5 wallclock secs ( 0.23 usr  0.04 sys +  0.22 cusr  0.17 csys =  0.66 CPU)
+Files=13, Tests=1121,  6 wallclock secs ( 0.23 usr  0.06 sys +  0.20 cusr  0.21 csys =  0.70 CPU)
 Result: PASS

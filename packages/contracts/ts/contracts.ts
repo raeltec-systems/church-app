@@ -41,6 +41,7 @@ export const LIFECYCLE_EVENTS = [
   "account_deactivated",
   "deletion_requested",
   "cell_transferred",
+  "sessions_revoked",
 ] as const;
 export type LifecycleEventName = (typeof LIFECYCLE_EVENTS)[number];
 export type LifecycleEvent = {

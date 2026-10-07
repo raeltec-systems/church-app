@@ -552,6 +552,8 @@ Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/ev
 - A hold is released only by `identity.release_hold`, by another Admin, after an identity check.
 - A binding changes only through an Admin decision that records a new `binding_revision`.
 - None of these does either: a direct Auth change (native `PUT /user`, the Auth Admin API, SQL), a public forgot-password request, a sign-in, a reset or an email verification. The 2.2 detection records a direct change and keeps the account in review; holds and dormancy stay in force through a reset (2.7).
+- **Old links die with the change.** Whenever Identity removes or restores an address or phone (an approval, a restore or accept, a replacement request, and the 2.8 and 2.7 reverts), every outstanding Auth link of the account becomes unusable: reset and magic links, confirmations, reauthentication nonces and email/phone change tokens, in `auth.users` and `auth.one_time_tokens`. A reset link issued before a restore or a reject can never be redeemed after it (pgTAP; E2E `C70`). The 2.7 revert was replaced in `20261007160000` to do this too.
+- **Held accounts change nothing.** While any hold is open, approving a change and accepting credentials are refused (`conflict {"member_id": "held"}`), and the member cannot withdraw a request (2.7 or 2.8: `forbidden`). Restore stays possible.
 
 ### Reviewed sign-in detail changes (member request, Admin decision)
 
@@ -560,7 +562,7 @@ Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/ev
 | Command | Who | `expected_revision` | Payload |
 |---|---|---|---|
 | `identity.request_credential_change` | the member (granted session, password sign-in at most 10 minutes old) | null | `{change_kind: "phone_username", phone_username}`, `{change_kind: "recovery_email_replace", email}` or `{change_kind: "recovery_email_remove"}` |
-| `identity.withdraw_credential_change` | the member (also while in review) | change revision | `{change_id}` |
+| `identity.withdraw_credential_change` | the member (also while in review; not while held) | change revision | `{change_id}` |
 | `identity.approve_credential_change` | Admin, not for their own account | change revision | `{change_id, identity_check}` |
 | `identity.reject_credential_change` | Admin, not for their own account | change revision | `{change_id, reason?}` (`identity_not_confirmed`, `contact_church_office`) |
 
@@ -583,12 +585,15 @@ Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/ev
 | Command | `expected_revision` | Payload | Effect |
 |---|---|---|---|
 | `identity.place_hold` | member revision | `{member_id, reason_code}` | `ownership_dispute` → kind `access_review`; `security_concern` → `security`; `lost_device` → `security`, **and every Auth session of the account is revoked** |
-| `identity.release_hold` | member revision | `{member_id, hold_id, identity_check}` | Released by another Admin. Moves the trust epoch, so sessions opened during the hold sign in again |
+| `identity.release_hold` | member revision | `{member_id, hold_id, identity_check}` | Released by another Admin. Moves the trust epoch, so sessions opened during the hold sign in again. A hold that needs a password reset (below) is refused with `conflict {"hold_id": "password_reset_required"}` until the member reset it |
 
 - An Admin cannot hold or release their own member record (`forbidden {"member_id": "unsupported"}`). The same open reason twice is `conflict {"reason_code": "already_held"}`.
 - A held session still works, but only for the generic help screen: every protected read answers `review_required`. A revoked session is refused outright (`untrusted_session`), and the clients end it.
-- **Lifecycle hooks.** Placing dispatches the contract v1 event `access_hold_applied`; releasing dispatches `access_hold_released`. Both run in the same transaction, with `identity_revision` set to the member revision.
-  - Device-registration owners (the inbox epic) register on `access_hold_applied` to remove push registrations. No new event was added.
+- **Password reset rule (fail closed).** Whoever has a lost device, or held a stolen session, may know or have set the password.
+  - A `lost_device` hold, and the security hold a restore places after an unreviewed password change (below), record `password_reset_required_since`.
+  - Such a hold is released only after the member's own reset after that time: a 2.7 email-link redemption (approved address only) followed by a new password. Without an approved recovery email that reset is staff-assisted recovery (entry 9), which must record the same evidence; until then the hold stays.
+- **Lifecycle hooks.** Placing dispatches the contract v1 event `access_hold_applied`; releasing dispatches `access_hold_released`. Every session revocation (an approved change, a restore, an accept, a lost-device hold) dispatches the new v1 event `sessions_revoked`. All run in the same transaction, with `identity_revision` set to the member revision, and a raising hook rolls the whole command back.
+  - Device-registration owners (the inbox epic) register on `sessions_revoked` (and `access_hold_applied`) to remove push registrations. `sessions_revoked` was added to the v1 event list in SQL, the shared fixtures and the Dart and TypeScript mappings.
   - Today only the SYNTHETIC `app.fixture_record_lifecycle` is ever registered for these events, by the tests and the E2E, which remove it again.
 - Audit: `app.identity_credential_review_audit` (`hold_placed`, `hold_released`, with the reason code and the number of revoked sessions).
 
@@ -601,14 +606,15 @@ For a detected direct Auth change (2.2), a 2.7 `other_changes` case or a stolen-
 | `identity.restore_credentials` | member revision | `{member_id, identity_check}` | Auth returns to the approved binding: phone, email (confirmed) and change tokens. MFA factors, identities of other providers and email identities of other addresses are deleted. Every session is revoked. Binding n+1 (`credentials_restored`) |
 | `identity.accept_credentials` | member revision | `{member_id, identity_check}` | The current Auth phone and confirmed email become binding n+1 (`credentials_accepted`), and every session is revoked. Refused with an MFA factor or foreign identity (`unsupported_factors`), an unpermitted or taken number (`phone_unsupported`), or an unconfirmed or unpermitted email (`email_unverified`) |
 
-- Both refuse while a change or 2.7 proposal is pending (`conflict {"member_id": "pending_change"}`; decide it first), and for the Admin's own account.
+- Both refuse while a change or 2.7 proposal is pending (`conflict {"member_id": "pending_change"}`; decide it first), and for the Admin's own account. Accept also refuses while held (`held`) and, to bind an email, when email recovery is closed.
 - Restore refuses when another account now holds the approved number or address (`phone_taken`, `email_taken`).
+- **Unreviewed password.** If the password changed since the last binding approval and the latest change was not preceded by the member's own email-link redemption, it may be a thief's. Accept is then refused (`password_unreviewed`). Restore still restores the approved details and revokes every session, but keeps the account on a security hold (`password_reset_required_since`) until the member resets the password themselves (E2E `C51`).
 
 ### Reads
 
 | Endpoint | Who | Returns |
 |---|---|---|
-| `api.identity_my_credentials()` | the member (granted or in review) | `{access, phone_username, recovery_email, pending_change, last_change, pending_recovery_email, can_request, church_contact, recent_sign_in_minutes}`. `access` is only `granted` or `review_required`: it never says why. `church_contact` is the Q1 `operational_contact` church setting, or null while unset. |
+| `api.identity_my_credentials()` | the member (granted or in review) | Granted: `{access, phone_username, recovery_email, pending_change, last_change, pending_recovery_email, can_request, church_contact, recent_sign_in_minutes}`. Held or in review: only `{access, church_contact, pending_change {change_id, revision, change_kind, state}, pending_recovery_email {proposal_id, revision, state}}`, no phone or address. `access` is only `granted` or `review_required`: it never says why. `church_contact` is the Q1 `operational_contact` church setting, or null while unset. The 2.7 `api.identity_my_recovery_email()` likewise returns no address while in review. |
 | `api.identity_admin_credential_queue()` | Admin | `changes` (pending, with `verified`, `phone_available`, `other_changes`, `own_account`); `reviews` (accounts in review with no pending request: approved and current Auth values, `extra_factors`, the recorded `change_kinds`); `holds` (open, with the reason code) |
 
 ### Clients

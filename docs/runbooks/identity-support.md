@@ -68,8 +68,8 @@ Every runbook action is recorded with ids, codes and revisions only: no names, n
 | Table | Records |
 |---|---|
 | `app.identity_membership_audit` | application decisions, member records, unlinks, reclaims and reclaim undos |
-| `app.identity_access_audit` | role and scope grants and revocations, the first-Admin bootstrap and the RB8 fallback (`admin_bootstrapped`, actor `operator`) |
-| `app.identity_admin_fallbacks` | RB8: reason, identity check, usable Admins before |
+| `app.identity_access_audit` | role and scope grants and revocations, the first-Admin bootstrap (`admin_bootstrapped`) and the RB8 fallback (`admin_fallback_granted`), both with actor `operator` |
+| `app.identity_admin_fallbacks` | RB8: reason, identity check, usable Admins before, the confirming owner and the case reference |
 | `app.identity_credential_audit` | recovery-email proposals and decisions (2.7) |
 | `app.identity_credential_review_audit` | sign-in detail changes, holds, restore and accept (2.8, 2.10 login holds) |
 | `app.identity_recovery_audit` | staff-assisted recovery cases, grants and operations (2.9) |
@@ -355,12 +355,14 @@ In the second case the bootstrap is refused, because the server still counts tha
 
 - **Both named recovery owners** together: `<named owner: fill at entry 14>` and `<named owner: fill at entry 14>`. They confirm that no Admin can act, choose the member who becomes Admin, and check that person's identity.
 - **The restricted operator** runs the command. The operator may be one of the owners, but not the member who receives the role.
+- **Two different people, always.** The command records a second named owner (`confirming_owner`, a short identifier such as `owner-two`) and refuses when it is empty or is the operator. The operator alone can never use RB8.
 
 **Preconditions:**
 
-- The chosen member is an existing, approved member who already uses the app: an account linked through an identity-checked approval or link (RB2), not on hold, not in review, not dormant, not being deleted, and not already an Admin.
+- The chosen member is an existing, approved member who already uses the app: an account linked through an identity-checked approval or link (RB2), not on hold, not in review, not banned, not dormant, not deactivated, not being deleted, and not already an Admin.
+- The chosen member holds **no scope grant** (care, finance, prayer, cell leader or assistant, or any other). A member with a scope is refused: choose someone else, or have the scope removed in its own module first.
 - The member has signed in with their own password recently enough not to be dormant.
-- The owners have written a restricted case note: the date, "RB8", the member id, the reason code, the identity check code, the two owners and the operator. No phone numbers or passwords.
+- The owners have written a restricted case note with a **case reference** (letters, digits and `._:/-`, no spaces, for example `RB8-2026-10-07-01`): the date, "RB8", the member id, the reason code, the identity check code, the two owners and the operator. No phone numbers or passwords.
 
 **Steps:**
 
@@ -370,21 +372,24 @@ In the second case the bootstrap is refused, because the server still counts tha
 
    ```sql
    select app.identity_admin_fallback_grant('<member_id>', '<in_person|established_relationship>',
-                                            '<no_usable_admin|admins_unreachable>', 'israel');
+                                            '<no_usable_admin|admins_unreachable>',
+                                            '<confirming owner identifier>', '<case reference>', 'israel');
    ```
 
    It returns `{fallback_id, grant_id, member_id, reason_code, usable_admins_before, revision}`, nothing else. It is refused (no row written) when:
    - the reason does not match the real Admin state;
    - the identity check is missing or unknown;
-   - the member is not eligible;
+   - the confirming owner is missing or is the operator, or the case reference is missing or not a reference;
+   - the member is not eligible (including holding any scope);
    - the caller is not a restricted operator.
-4. The member signs in on staff web with **their own** phone and password. Nobody else touches their credentials. **Roles & access** appears.
-5. The new Admin helps the unreachable Admin(s) back through the normal runbooks:
+4. The role applies at once, to the member's next protected call, like any `identity.grant_role`: a session the member already has gains Admin, and nothing moves their sign-in epoch. If they are not signed in, they sign in on staff web with **their own** phone and password. Nobody else touches their credentials. **Roles & access** appears.
+5. Every Admin sees the label **Admin by operator fallback** on that member in **Roles & access** (`admin_via_fallback` in the read) for as long as the grant lasts. An Admin who did not expect it raises it with the named owners at once.
+6. The new Admin helps the unreachable Admin(s) back through the normal runbooks:
    - forgot password: RB4, with the old Admin present;
    - lost phone: RB5 `lost_device`, then RB4;
    - left the church: RB6, with handover;
    - in review: RB5.
-6. When at least two Admins can act again, decide whether the fallback Admin keeps the role. If not, another Admin removes it in **Roles & access**.
+7. When at least two Admins can act again, decide whether the fallback Admin keeps the role. If not, another Admin removes it in **Roles & access**.
 
 **Never:**
 
@@ -394,9 +399,10 @@ In the second case the bootstrap is refused, because the server still counts tha
 
 **Audit evidence:**
 
-- `identity_access_audit` `admin_bootstrapped` (actor `operator`, the member, the grant);
-- `identity_admin_fallbacks` (reason, identity check, usable Admins before);
-- `ops_operator_actions` `admin_bootstrapped` with the grant id;
+- `identity_access_audit` `admin_fallback_granted` (actor `operator`, the member, the grant), distinct from the first-Admin `admin_bootstrapped`;
+- `identity_admin_fallbacks` (reason, identity check, usable Admins before, operator, confirming owner, case reference);
+- `ops_operator_actions` `admin_fallback_granted` with the grant id;
+- the `admin_via_fallback` flag in Roles & access;
 - the owners' restricted case note.
 
 **Back out:** another Admin removes the role with `identity.revoke_role` in **Roles & access** (audited as `role_revoked`). The last usable Admin cannot be removed.
@@ -418,6 +424,6 @@ It follows RB1 to RB8 through the same calls as staff web, mobile and the operat
 
 - that no staff answer, operator output, worker output, function log or evidence line contains a password, a grant secret or digest, a request code, an email link or its code, a PKCE verifier, a member token or a system credential (with a positive control);
 - that Admin-only support accounts get `403 not_granted` from the care, finance and cell-private fixtures;
-- that RB8 restores Admin access with no Auth change and no session minted, and that the unreachable Admin comes back through RB4.
+- that RB8 needs a second owner, restores Admin access with no Auth change and no session minted, is flagged in Roles & access, and that the unreachable Admin comes back through RB4.
 
 The owner's staging rehearsal is `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.12/owner-rehearsal.md`.

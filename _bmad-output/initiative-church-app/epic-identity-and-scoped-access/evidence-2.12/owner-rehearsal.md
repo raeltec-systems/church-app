@@ -33,7 +33,7 @@ Follow each runbook in `docs/runbooks/identity-support.md` as written. Write not
 7. [ ] **RB8, last-Admin fallback.**
    1. A removes B's Admin role, then signs out everywhere. Pretend A forgot the password.
    2. Operator: `select app.identity_usable_admin_count();` returns `1`. `select app.identity_bootstrap_admin('<member id of 0172>', 'israel');` is refused.
-   3. Case note: date, RB8, `0172`'s member id, `admins_unreachable`, `in_person`, owners, operator.
+   3. Case note with a case reference such as `RB8-2026-10-xx-01`: date, RB8, `0172`'s member id, `admins_unreachable`, `in_person`, both owners, operator. Pick a short identifier for the second (stand-in) owner, for example `owner-two`; it must not be `israel`.
    4. Before the command, run this in the SQL editor and keep the result on screen. It shows a fingerprint, not the password:
 
       ```sql
@@ -43,9 +43,9 @@ Follow each runbook in `docs/runbooks/identity-support.md` as written. Write not
         from auth.users u where phone = '12025550172';
       ```
 
-   5. Operator: `select app.identity_admin_fallback_grant('<member id of 0172>', 'in_person', 'admins_unreachable', 'israel');`. It returns ids and codes only.
+   5. Operator: `select app.identity_admin_fallback_grant('<member id of 0172>', 'in_person', 'admins_unreachable', 'owner-two', '<case reference>', 'israel');`. It returns ids and codes only. Try it once with `'israel'` as the confirming owner first: it must be refused.
    6. Run the same query again. Every column must be unchanged.
-   7. `0172` signs in on staff web with **their own** password and sees **Roles & access**.
+   7. `0172` already has Admin on their next call; if they are not signed in, they sign in on staff web with **their own** password. **Roles & access** shows them with the label **Admin by operator fallback**.
    8. `0172` helps A back with RB4 (A's phone shows the code; A chooses the new password on the phone). A signs in and is Admin again.
 8. [ ] **Admin only.** Signed in on staff web as an Admin-only account (B before step 7, or `0172` after it), the menu shows no care, finance, prayer or cell-private destination. Ask the assistant to run the server check against staging and confirm `403 not_granted` for that account. It is the `fixture_scoped_read` and `cells_private_fixture_read` check from `tools/identity-e2e/runbooks.mjs` R02/R62.
 
@@ -57,4 +57,9 @@ Follow each runbook in `docs/runbooks/identity-support.md` as written. Write not
 
 ## Clean up
 
-Delete the synthetic records the usual way: ask the assistant, using the cleanup of `tools/identity-e2e/runbooks.mjs`. Then confirm with `select count(*) from auth.users where phone between '12025550170' and '12025550179';`, which must return `0`.
+Only through the product, never with SQL:
+
+- For each synthetic member you want gone, use RB7. The member deletes their own account on mobile (**Account, Delete my account**), or an Admin uses **Member deletions** on staff web for one who cannot (after another Admin's login hold or deactivation).
+- Then run the deletion worker once (consolidated test, 2.11 command). **Member deletions** shows each one completed, and those numbers can register again.
+- Keep at least one synthetic Admin: the last usable Admin cannot be deleted.
+- Anything you do not delete this way may simply stay on staging. Staging records are synthetic, and leftovers are harmless.

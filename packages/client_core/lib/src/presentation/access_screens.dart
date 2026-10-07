@@ -465,6 +465,12 @@ class _GrantAdminScreenState extends ConsumerState<GrantAdminScreen> {
                 ),
               ),
               StatusLabel(label: accountLabel, tone: accountTone),
+              if (m.adminViaFallback)
+                const StatusLabel(
+                  key: Key('admin-via-fallback'),
+                  label: 'Admin by operator fallback',
+                  tone: StatusTone.warning,
+                ),
               if (m.isSynthetic)
                 const StatusLabel(
                   label: 'Synthetic test record',

@@ -108,7 +108,35 @@ void main() {
         'scope_kinds': ['fixture_care'],
       });
       expect(roster.members.single.account, AccountStanding.noLogin);
+      expect(roster.members.single.adminViaFallback, isFalse);
       expect(roster.roles.single.available, isFalse);
+      final fallback = RosterMember.fromJson({
+        'member_id': _member,
+        'display_name': 'SYNTHETIC Fallback Admin',
+        'is_synthetic': true,
+        'account': 'app_account',
+        'admin_via_fallback': true,
+        'grants': {
+          'member_id': _member,
+          'revision': 2,
+          'roles': ['admin'],
+          'scopes': [],
+        },
+      });
+      expect(fallback.adminViaFallback, isTrue);
+      expect(
+        fallback
+            .withGrants(
+              MemberGrants.fromJson({
+                'member_id': _member,
+                'revision': 3,
+                'roles': [],
+                'scopes': [],
+              }),
+            )
+            .adminViaFallback,
+        isFalse,
+      );
       expect(
         () => GrantRoster.fromJson({
           'members': [

@@ -78,11 +78,24 @@ context: []
 - The rehearsal reuses `findLeaks/newGrantSecret/digestOf` (assisted.mjs) and `pkcePair/codeFrom/redirectFacts` (recovery.mjs); it serves both Edge Functions in one `supabase functions serve --env-file` and runs the real deletion worker on the shared `.recovery-state/journal`.
 - The leak scan has a positive control (a planted password and request code are found) so a silent scanner cannot pass.
 - RB8 scenario: the only Admin is signed out everywhere and "forgot" the password; bootstrap refuses (one usable Admin on paper); the fallback grants Admin to an application-approved member with no Auth fact changed; the new Admin brings the old one back through RB4.
-- No Flutter change; the live-*-check.sh adapter checks were not rerun (no client code touched).
+- Review fix: a parsed `admin_via_fallback` flag and a Roles & access label in `packages/client_core` (analyze and test pass for client_core and apps/staff); the live adapter checks were not rerun.
 
 ## Plan Change Log
 
+- Review pass 1 changed the design (coordinator's renegotiation of the frozen intent):
+  - The fallback takes `confirming_owner` and `case_reference`.
+  - It audits with `admin_fallback_granted` instead of reusing `admin_bootstrapped`, which superseded the earlier "reuse the action values" decision and needed the retire-and-recreate of `identity_access_audit` and `ops_operator_actions`.
+  - It refuses scope holders.
+  - It is flagged in Roles & access.
+
 ## Review Triage Log
+
+- Independent review (coordinator), 5 findings, all patched:
+  1. (medium) The owner cleanup pointed at SQL purges. Now RB7 through the product only, and leftovers may stay on staging.
+  2. (medium) The fallback relied on one operator's claim. Now it requires and stores `confirming_owner` (distinct from the operator) and `case_reference`, and records the distinct action `admin_fallback_granted`. `identity_access_audit` and `ops_operator_actions` were retired and recreated with wider CHECKs; the retired audit was added to the deletion retention rules. Roles & access shows `admin_via_fallback`, with a staff web label. No lifecycle event: it needs a contract version change.
+  3. (low) Refuse a target holding any scope grant; added to RB8.
+  4. (low) RB8 now says existing sessions gain Admin at once; the epoch is not moved.
+  5. (low) pgTAP messages pinned; added deactivated and banned cases.
 
 ## Design Notes
 

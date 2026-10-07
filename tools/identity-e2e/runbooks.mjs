@@ -679,15 +679,18 @@ async function main() {
     const nobodyElse = await envelope('identity_recovery_command', applicant.token, 'identity.open_recovery_case', null,
       { member_id: admin.member, identity_check: 'in_person', evidence: ['photo_id'] });
     const bootstrapRefused = operatorTry(`select app.identity_bootstrap_admin('${applicant.member}', '${OPERATOR}')`);
-    const wrongReason = operatorTry(`select app.identity_admin_fallback_grant('${applicant.member}', 'in_person', 'no_usable_admin', '${OPERATOR}')`);
-    const unknownMember = operatorTry(`select app.identity_admin_fallback_grant('${randomUUID()}', 'in_person', 'admins_unreachable', '${OPERATOR}')`);
-    const noCheckGiven = operatorTry(`select app.identity_admin_fallback_grant('${applicant.member}', null, 'admins_unreachable', '${OPERATOR}')`);
+    const wrongReason = operatorTry(`select app.identity_admin_fallback_grant('${applicant.member}', 'in_person', 'no_usable_admin', 'owner-two', 'RB8-rehearsal-${run}', '${OPERATOR}')`);
+    const unknownMember = operatorTry(`select app.identity_admin_fallback_grant('${randomUUID()}', 'in_person', 'admins_unreachable', 'owner-two', 'RB8-rehearsal-${run}', '${OPERATOR}')`);
+    const noCheckGiven = operatorTry(`select app.identity_admin_fallback_grant('${applicant.member}', null, 'admins_unreachable', 'owner-two', 'RB8-rehearsal-${run}', '${OPERATOR}')`);
+    const selfConfirmed = operatorTry(`select app.identity_admin_fallback_grant('${applicant.member}', 'in_person', 'admins_unreachable', '${OPERATOR}', 'RB8-rehearsal-${run}', '${OPERATOR}')`);
     check('R60-dead-end-without-the-fallback', ok(stepDown) && signedOut.status === 204 && wrongPw.status === 400 && usable === 1
-      && nobodyElse.code === 'forbidden' && !bootstrapRefused.ok && !wrongReason.ok && !unknownMember.ok && !noCheckGiven.ok,
+      && nobodyElse.code === 'forbidden' && !bootstrapRefused.ok && !wrongReason.ok && !unknownMember.ok && !noCheckGiven.ok
+      && !selfConfirmed.ok && /different person/.test(selfConfirmed.error ?? ''),
       { second_admin_stepped_down: stepDown.code ?? 'ok', admin_a_signed_out: signedOut.status, admin_a_cannot_sign_in: wrongPw.status,
         usable_admins_on_paper: usable, member_opens_case_for_admin_a: nobodyElse.code,
         bootstrap: bootstrapRefused.ok ? 'granted' : 'refused', fallback_with_wrong_reason: wrongReason.ok ? 'granted' : 'refused',
-        fallback_unknown_member: unknownMember.ok ? 'granted' : 'refused', fallback_without_identity_check: noCheckGiven.ok ? 'granted' : 'refused' });
+        fallback_unknown_member: unknownMember.ok ? 'granted' : 'refused', fallback_without_identity_check: noCheckGiven.ok ? 'granted' : 'refused',
+        fallback_confirmed_by_the_operator_alone: selfConfirmed.ok ? 'granted' : 'refused' });
 
     // The named owners check the applicant's identity in person; the operator then runs the
     // fallback for that existing, linked member. Nothing about the applicant's Auth row changes.
@@ -700,7 +703,7 @@ async function main() {
       'mfa_factors', (select count(*) from auth.mfa_factors f where f.user_id = u.id))
       from auth.users u where u.id = '${applicant.user}'`));
     const authBefore = authFacts();
-    const fallback = operatorTry(`select app.identity_admin_fallback_grant('${applicant.member}', 'in_person', 'admins_unreachable', '${OPERATOR}')`);
+    const fallback = operatorTry(`select app.identity_admin_fallback_grant('${applicant.member}', 'in_person', 'admins_unreachable', 'owner-two', 'RB8-rehearsal-${run}', '${OPERATOR}')`);
     const authAfter = authFacts();
     const fallbackOut = fallback.ok ? JSON.parse(fallback.out) : {};
     const outputKeys = Object.keys(fallbackOut).sort();
@@ -708,16 +711,17 @@ async function main() {
     const newAdmin = await signIn(applicant, { staff: true });
     const newAdminRoles = await roles(newAdmin.token);
     const fallbackAudit = JSON.parse(psqlRaw(`select json_build_object(
-      'access_audit', (select count(*) from app.identity_access_audit where action = 'admin_bootstrapped' and actor_kind = 'operator'
+      'access_audit', (select count(*) from app.identity_access_audit where action = 'admin_fallback_granted' and actor_kind = 'operator'
                          and operator = '${OPERATOR}' and target_member_id = '${applicant.member}'),
-      'fallback_rows', (select json_agg(reason_code || ':' || identity_check || ':' || usable_admins_before) from app.identity_admin_fallbacks
+      'fallback_rows', (select json_agg(reason_code || ':' || identity_check || ':' || usable_admins_before || ':' || confirming_owner
+                         || ':' || (case_reference = 'RB8-rehearsal-${run}')) from app.identity_admin_fallbacks
                          where target_member_id = '${applicant.member}'),
-      'journal', (select count(*) from app.ops_operator_actions where action = 'admin_bootstrapped' and target_id = '${fallbackOut.grant_id ?? randomUUID()}'))`));
+      'journal', (select count(*) from app.ops_operator_actions where action = 'admin_fallback_granted' and target_id = '${fallbackOut.grant_id ?? randomUUID()}'))`));
     check('R61-fallback-grants-admin-without-a-credential-shortcut', fallback.ok
       && outputKeys.join() === 'fallback_id,grant_id,member_id,reason_code,revision,usable_admins_before'
       && changedAuthFacts(authBefore, authAfter).length === 0 && applicantOldSession?.includes('admin')
       && newAdmin.status === 200 && amrMethods(newAdmin.token).includes('password') && newAdminRoles?.includes('admin')
-      && fallbackAudit.access_audit === 1 && JSON.stringify(fallbackAudit.fallback_rows) === '["admins_unreachable:in_person:1"]'
+      && fallbackAudit.access_audit === 1 && JSON.stringify(fallbackAudit.fallback_rows) === '["admins_unreachable:in_person:1:owner-two:true"]'
       && fallbackAudit.journal === 1,
       { fallback: fallback.ok ? 'granted' : fallback.error, output_keys: outputKeys,
         auth_facts_changed_by_operator: changedAuthFacts(authBefore, authAfter),
@@ -739,12 +743,16 @@ async function main() {
     const aBack = await fresh(admin, { staff: true });
     const aRoles = await roles(aBack.token);
     const fallbackReads = await privateReads(newAdmin.token);
+    const roster = (await rpc('identity_admin_member_grants', aBack.token)).json?.members ?? [];
+    const flagged = Object.fromEntries(roster.filter((m) => [admin.member, applicant.member].includes(m.member_id))
+      .map((m) => [m.member_id === admin.member ? 'admin_a' : 'fallback_admin', m.admin_via_fallback]));
     check('R62-unreachable-admin-restored-through-assisted-recovery', aReq.outcome === 'received' && ok(aCase) && ok(aGrant)
       && aRedeem.outcome === 'succeeded' && aBack.status === 200 && aRoles?.includes('admin')
-      && Number(psqlRaw(`select app.identity_usable_admin_count()`)) === 2 && deniedAll(fallbackReads),
+      && Number(psqlRaw(`select app.identity_usable_admin_count()`)) === 2 && deniedAll(fallbackReads)
+      && flagged.fallback_admin === true && flagged.admin_a === false,
       { request: aReq.outcome, case: aCase.code ?? 'ok', grant_state: aGrant.data?.grant?.state ?? aGrant.code, redeem: aRedeem.outcome,
         admin_a_fresh_sign_in: aBack.status, admin_a_roles: aRoles, usable_admins_after: Number(psqlRaw(`select app.identity_usable_admin_count()`)),
-        fallback_admin_private_reads: shape(fallbackReads) });
+        fallback_admin_private_reads: shape(fallbackReads), roles_and_access_shows_fallback: flagged });
 
     // ===================================================================== the leak scan
     const staffText = staffTexts.join('\n');

@@ -265,3 +265,64 @@ FLUTTER_ROOT=/opt/sdk/flutter bash tools/identity-e2e/live-grants-check.sh
 ```
 
 Both sign in through the verified email alias of synthetic phone accounts, so the CLI phone gate stays off. Both clean up every user, link, member, grant, audit row and fixture target they create.
+
+## Membership applications and the safe cell choice (story 2.4)
+
+Migration: `supabase/migrations/20261007042111_membership_applications.sql`.
+
+### Model
+
+- **Application (Identity).** `app.identity_membership_applications` holds one applicant account's request: the full name, the phone username as submitted (unverified), the privacy-notice version and the cell choice (`cell`, `not_sure` or `not_in_cell`).
+  - Each account has at most one open request (`submitted` or `needs_details`).
+  - `app.identity_application_events` records ids, revisions, events and changed field **names** only.
+  - The state CHECKs already list the later review states (`needs_details`, `approved`, `rejected`, `withdrawn`) for entry 5, because widening a CHECK would need a destructive statement.
+- **Applying grants nothing.** It creates no member, account link, grant, scope or cell membership. The applicant keeps getting `not_linked` from the live-access predicate on every member surface.
+- **Cells (first records).** `app.cells_cells` holds the cell records. `app.cells_signup_options` is the separately persisted safe projection (AD-5): a label and a broad area, plus listing metadata. Nothing else about a cell, such as leaders, members, addresses, phones, chat or reports, reaches an applicant.
+- **Cell check without a Cells dependency.** Cells registers the 1.5 source type `cells_signup_option` with the check hook `app.cells_signup_option_check`. Identity validates a chosen cell through `app.contract_check_source`, so the Identity module still depends on nothing but platform. A chosen option must be listed here and must still be at the chosen revision. Otherwise the result is `validation_failed {"cell_id": "invalid"}` and the client reloads the list.
+- **Personal-data gate (Q4).** Applications are accepted only in one of two cases:
+  - `q4_personal_data` is approved; or
+  - the database is marked local or staging and is not a held restore. Here the applicant's phone username must also be in a reserved fictional range (`+1 202 555 0100–0199`, `+44 7700 900000–900999`).
+
+  Otherwise commands answer `unavailable {"policy": "gate_closed"}` and the read reports `accepting_applications: false`.
+- **Privacy notice.** The notice is a labelled DRAFT (`draft-2026-10-07`), and the clients bundle its text. The church approves the wording under Q4. A new version needs a new migration and a new client text.
+
+### Commands (1.4 envelope) and reads
+
+| Endpoint | Who | What |
+|---|---|---|
+| `api.identity_application_command` `identity.submit_application` | trusted password session whose predicate outcome is `not_linked` | `expected_revision` null; payload `{full_name, cell_choice {choice, cell_id?, cell_revision?}, privacy_notice_version}`. A second open request gets `conflict` + `current_revision`. |
+| `api.identity_application_command` `identity.correct_application` | same | `expected_revision` = the application revision; payload `{application_id, full_name?, cell_choice?}`. A stale revision or a decided request gets `conflict`. Another account's id gets `not_found`. Answering `needs_details` returns the request to `submitted`. |
+| `api.identity_my_application()` | applicant (`not_linked`) or member (`granted`) | The caller's own request (open first, else latest), the privacy notice and `accepting_applications`. |
+| `api.cells_signup_options()` | applicant or member | `{options: [{cell_id, label, broad_area, revision}]}`. SYNTHETIC options are listed only in local/staging. |
+
+- The registered `identity` command authorizer now dispatches. Application commands need the `not_linked` outcome: members and accounts in access review get `forbidden`, and untrusted sessions get `unauthenticated`. The grant branch is the 2.3 body unchanged.
+- No payload can set a membership or cell status. Unknown fields are refused as `unknown_field`.
+
+### Cells until entry 6 (restricted operator)
+
+```sql
+select app.cells_seed_synthetic_cells('<operator>');   -- local/staging only; idempotent
+```
+
+The function seeds three SYNTHETIC cells and options (`…c241`–`…c243`). It refuses an unmarked or production database. Production has no cells until Admin cell setup (entry 6) and the church's real cell list, which is an owner gate. Until then the chooser offers only **I'm not sure** and **I'm not in a cell yet**.
+
+### Clients
+
+- **Mobile.**
+  - After Create account, the app opens **Join the church** (`/membership`). The form asks for the full name and **Which cell group do you belong to?** The choices are the listed cells (label and broad area), **I'm not sure** and **I'm not in a cell yet**.
+  - The form also shows the draft privacy notice, and a note that email is optional and that staff will help in person without a recovery email.
+  - The status card shows **Church approval** and **Cell group** as separate states, and offers **Correct my request** while the church has not decided.
+  - When the outcome is unknown, Check again resends the same request id.
+  - The Account page's "No member access yet" state links to the request.
+- **Staff web.** Sign-in and Create account stay as before and continue to the account page. The route exists, but staff web has no entry point to it.
+
+### Local runs
+
+```bash
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/apply.mjs --evidence <file>.jsonl
+FLUTTER_ROOT=/opt/sdk/flutter bash tools/identity-e2e/live-application-check.sh
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+Both scripts sign up real phone accounts without email, using fictional numbers. They seed the SYNTHETIC cells when none exist and remove every user, application, event, receipt and seeded cell they created.

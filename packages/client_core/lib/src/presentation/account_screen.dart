@@ -16,7 +16,11 @@ import 'shell_routing.dart' show ClientPaths;
 /// again), the summary is asked for again before it is relied on (AD-13); the
 /// server re-checks the session each time.
 class AccountScreen extends ConsumerStatefulWidget {
-  const AccountScreen({super.key});
+  const AccountScreen({super.key, this.linkMembershipRequest = false});
+
+  /// Story 2.4 (mobile): an account without member access links to its own
+  /// membership request.
+  final bool linkMembershipRequest;
 
   @override
   ConsumerState<AccountScreen> createState() => _AccountScreenState();
@@ -289,6 +293,17 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
           icon: Icons.lock_outline,
           title: title,
           message: message,
+          actions: [
+            // Story 2.4: an applicant reaches only their own request.
+            if (denial == MemberAccessDenial.notLinked &&
+                widget.linkMembershipRequest)
+              BannerAction(
+                'My membership request',
+                () => context.go(ClientPaths.membership),
+                key: const Key('go-membership-request'),
+                primary: true,
+              ),
+          ],
         );
       case MemberAccessFailed(:final unreachable):
         return RequestStateBanner(

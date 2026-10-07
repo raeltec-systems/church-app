@@ -13,10 +13,18 @@ import 'shell_routing.dart' show ClientPaths;
 /// and staff web (design contract "Phone signup and sign-in"). No SMS: no
 /// Send code, code entry or resend timer. Errors are generic.
 class SignInScreen extends ConsumerStatefulWidget {
-  const SignInScreen({super.key, this.createAccount = false});
+  const SignInScreen({
+    super.key,
+    this.createAccount = false,
+    this.afterCreateAccount = ClientPaths.account,
+  });
 
   /// Start in Create account mode.
   final bool createAccount;
+
+  /// Where a new account continues (mobile: the membership request, story
+  /// 2.4). A sign-in always continues to the account page.
+  final String afterCreateAccount;
 
   @override
   ConsumerState<SignInScreen> createState() => _SignInScreenState();
@@ -109,7 +117,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         // The password leaves memory as soon as it is no longer needed.
         _password.clear();
         ref.read(signInControllerProvider.notifier).reset();
-        context.go(ClientPaths.account);
+        context.go(
+          next.createdAccount ? widget.afterCreateAccount : ClientPaths.account,
+        );
         return;
       }
       if (next.phase == SignInPhase.failed && next.failure != null) {

@@ -1,0 +1,29 @@
+{"step":"A00-precondition","target":"LOCAL","at":"2026-10-07T04:30:15.642Z","settings":{"phone":true,"phone_autoconfirm":true,"sms_provider":""},"leftover_users_removed":"0","seeded_options":3}
+{"step":"A01-chooser-needs-sign-in","target":"LOCAL","at":"2026-10-07T04:30:15.810Z","verdict":"pass","status":401,"code":"42501","detail":null}
+{"step":"A10-one-phone-signup-no-email","target":"LOCAL","at":"2026-10-07T04:30:15.949Z","verdict":"pass","status":200,"amr":["password"],"has_email":false}
+{"step":"A11-one-chooser-safe-projection","target":"LOCAL","at":"2026-10-07T04:30:15.972Z","verdict":"pass","status":200,"count":3,"keys":["broad_area","cell_id","label","revision"],"labels":["SYNTHETIC Riverside","SYNTHETIC Hilltop","SYNTHETIC Market"]}
+{"step":"A12-one-no-application-yet","target":"LOCAL","at":"2026-10-07T04:30:15.978Z","verdict":"pass","status":200,"application":null,"notice":{"draft":true,"version":"draft-2026-10-07"}}
+{"step":"A13-one-applies-cell","target":"LOCAL","at":"2026-10-07T04:30:15.989Z","verdict":"pass","status":200,"church_status":"awaiting_approval","cell_status":"requested","choice":"cell","revision":1,"application_state":"submitted"}
+{"step":"A14-one-reads-own-status","target":"LOCAL","at":"2026-10-07T04:30:15.996Z","verdict":"pass","status":200,"church_status":"awaiting_approval","cell_status":"requested","choice":"cell","revision":1,"application_state":"submitted"}
+{"step":"A10-two-phone-signup-no-email","target":"LOCAL","at":"2026-10-07T04:30:16.143Z","verdict":"pass","status":200,"amr":["password"],"has_email":false}
+{"step":"A11-two-chooser-safe-projection","target":"LOCAL","at":"2026-10-07T04:30:16.165Z","verdict":"pass","status":200,"count":3,"keys":["broad_area","cell_id","label","revision"],"labels":["SYNTHETIC Riverside","SYNTHETIC Hilltop","SYNTHETIC Market"]}
+{"step":"A12-two-no-application-yet","target":"LOCAL","at":"2026-10-07T04:30:16.172Z","verdict":"pass","status":200,"application":null,"notice":{"draft":true,"version":"draft-2026-10-07"}}
+{"step":"A13-two-applies-not_sure","target":"LOCAL","at":"2026-10-07T04:30:16.180Z","verdict":"pass","status":200,"church_status":"awaiting_approval","cell_status":"follow_up","choice":"not_sure","revision":1,"application_state":"submitted"}
+{"step":"A14-two-reads-own-status","target":"LOCAL","at":"2026-10-07T04:30:16.186Z","verdict":"pass","status":200,"church_status":"awaiting_approval","cell_status":"follow_up","choice":"not_sure","revision":1,"application_state":"submitted"}
+{"step":"A10-three-phone-signup-no-email","target":"LOCAL","at":"2026-10-07T04:30:16.331Z","verdict":"pass","status":200,"amr":["password"],"has_email":false}
+{"step":"A11-three-chooser-safe-projection","target":"LOCAL","at":"2026-10-07T04:30:16.356Z","verdict":"pass","status":200,"count":3,"keys":["broad_area","cell_id","label","revision"],"labels":["SYNTHETIC Riverside","SYNTHETIC Hilltop","SYNTHETIC Market"]}
+{"step":"A12-three-no-application-yet","target":"LOCAL","at":"2026-10-07T04:30:16.361Z","verdict":"pass","status":200,"application":null,"notice":{"draft":true,"version":"draft-2026-10-07"}}
+{"step":"A13-three-applies-not_in_cell","target":"LOCAL","at":"2026-10-07T04:30:16.368Z","verdict":"pass","status":200,"church_status":"awaiting_approval","cell_status":"follow_up","choice":"not_in_cell","revision":1,"application_state":"submitted"}
+{"step":"A14-three-reads-own-status","target":"LOCAL","at":"2026-10-07T04:30:16.373Z","verdict":"pass","status":200,"church_status":"awaiting_approval","cell_status":"follow_up","choice":"not_in_cell","revision":1,"application_state":"submitted"}
+{"step":"A20-correct-request","target":"LOCAL","at":"2026-10-07T04:30:16.379Z","verdict":"pass","status":200,"church_status":"awaiting_approval","cell_status":"follow_up","choice":"not_in_cell","revision":2,"application_state":"submitted"}
+{"step":"A21-stale-revision-conflict","target":"LOCAL","at":"2026-10-07T04:30:16.385Z","verdict":"pass","code":"conflict","current_revision":2}
+{"step":"A22-replay-and-reused-request-id","target":"LOCAL","at":"2026-10-07T04:30:16.395Z","verdict":"pass","replay_revision":2,"reused":"conflict"}
+{"step":"A23-cannot-set-membership-or-cell-status","target":"LOCAL","at":"2026-10-07T04:30:16.401Z","verdict":"pass","code":"validation_failed","field_errors":{"payload":"required","cell_status":"unknown_field","application_state":"unknown_field"}}
+{"step":"A24-one-open-application","target":"LOCAL","at":"2026-10-07T04:30:16.408Z","verdict":"pass","code":"conflict","current_revision":1}
+{"step":"A30-duplicate-username-no-overwrite","target":"LOCAL","at":"2026-10-07T04:30:17.050Z","verdict":"pass","duplicate":{"status":422,"code":"user_already_exists","msg":"User already registered"},"duplicate_password_sign_in":400,"original_sign_in":200,"same_account":true,"accounts_for_number":1,"application_revision":2}
+{"step":"A40-pending-no-member-surfaces","target":"LOCAL","at":"2026-10-07T04:30:17.068Z","verdict":"pass","summary":{"status":403,"code":"PT403","detail":"not_linked"},"access":{"status":403,"code":"PT403","detail":"not_linked"},"roster":{"status":403,"code":"PT403","detail":"not_linked"},"scoped":{"status":403,"code":"PT403","detail":"not_linked"}}
+{"step":"A41-pending-no-direct-tables","target":"LOCAL","at":"2026-10-07T04:30:17.073Z","verdict":"pass","statuses":[406,406,404,404]}
+{"step":"A42-each-applicant-sees-only-their-own","target":"LOCAL","at":"2026-10-07T04:30:17.082Z","verdict":"pass","distinct_applications":3}
+{"step":"A43-applying-grants-nothing","target":"LOCAL","at":"2026-10-07T04:30:17.372Z","verdict":"pass","members_links_grants_before":"0/0/0","after":"0/0/0","applicant_links":0}
+{"step":"A44-no-email-collected","target":"LOCAL","at":"2026-10-07T04:30:17.535Z","verdict":"pass","applicant_emails":0}
+{"step":"A99-cleanup","target":"LOCAL","at":"2026-10-07T04:30:18.018Z","applicant_users_left":0,"unmarked":true,"cells_removed":true}

@@ -14,6 +14,7 @@ import 'src/domain/access_grants.dart';
 import 'src/domain/account_auth.dart';
 import 'src/domain/commands.dart';
 import 'src/domain/member_access.dart';
+import 'src/domain/membership_application.dart';
 import 'src/domain/fixture_counter.dart';
 import 'src/domain/session.dart';
 
@@ -312,6 +313,86 @@ GrantRoster syntheticRoster({
   next: null,
 );
 
+/// [MembershipRepository] answered by the test (story 2.4). [mine] and
+/// [options] answer every read at once; [calls] counts my-application reads.
+class FakeMembership implements MembershipRepository {
+  AccessRead<MyApplication> mine = const AccessReadOk(
+    MyApplication(
+      application: null,
+      privacyNotice: PrivacyNotice(version: 'draft-2026-10-07', draft: true),
+      accepting: true,
+    ),
+  );
+  AccessRead<List<CellOption>> options = AccessReadOk(syntheticCellOptions);
+  int calls = 0;
+
+  @override
+  Future<AccessRead<MyApplication>> fetchMyApplication() async {
+    calls++;
+    return mine;
+  }
+
+  @override
+  Future<AccessRead<List<CellOption>>> fetchCellOptions() async => options;
+}
+
+/// The SYNTHETIC sign-up options of the local seed.
+const syntheticCellOptions = <CellOption>[
+  CellOption(
+    cellId: '00000000-0000-4000-c000-00000000c241',
+    label: 'SYNTHETIC Riverside',
+    broadArea: 'SYNTHETIC North side',
+    revision: 1,
+  ),
+  CellOption(
+    cellId: '00000000-0000-4000-c000-00000000c242',
+    label: 'SYNTHETIC Hilltop',
+    broadArea: 'SYNTHETIC East side',
+    revision: 1,
+  ),
+];
+
+/// The wire form of a synthetic application (a command's success `data`).
+Map<String, Object?> applicationData({
+  String id = '44444444-4444-4444-8444-444444444444',
+  int revision = 1,
+  String churchStatus = 'awaiting_approval',
+  String name = 'SYNTHETIC Applicant',
+  Map<String, Object?> cellChoice = const {
+    'choice': 'cell',
+    'cell_id': '00000000-0000-4000-c000-00000000c241',
+    'cell_revision': 1,
+  },
+}) => {
+  'application_id': id,
+  'revision': revision,
+  'application_state': churchStatus == 'details_requested'
+      ? 'needs_details'
+      : 'submitted',
+  'church_status': churchStatus,
+  'full_name': name,
+  'phone_username': '+12025550181',
+  'cell_choice': cellChoice,
+  'cell_status': cellChoice['choice'] == 'cell' ? 'requested' : 'follow_up',
+  'privacy_notice_version': 'draft-2026-10-07',
+  'is_synthetic': true,
+  'submitted_at': '2026-10-07T04:30:00.000000Z',
+  'updated_at': '2026-10-07T04:30:00.000000Z',
+};
+
+/// A my-application answer holding [applicationData].
+AccessRead<MyApplication> myApplicationWith(Map<String, Object?> data) =>
+    AccessReadOk(
+      MyApplication(
+        application: MembershipApplication.fromJson(data),
+        privacyNotice: const PrivacyNotice(
+          version: 'draft-2026-10-07',
+          draft: true,
+        ),
+        accepting: true,
+      ),
+    );
+
 /// The fakes and provider overrides an app or screen test runs against.
 class ClientTestHarness {
   ClientTestHarness({String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'})
@@ -323,6 +404,7 @@ class ClientTestHarness {
   late final auth = FakeAccountAuth(session);
   final memberAccess = FakeMemberAccess();
   final grants = FakeGrants();
+  final membership = FakeMembership();
 
   /// [configured] false leaves the unconfigured defaults for the gateway and
   /// the platform status (as a build without `--dart-define`s).
@@ -334,6 +416,7 @@ class ClientTestHarness {
       accountAuthGatewayProvider.overrideWithValue(auth),
       memberAccessRepositoryProvider.overrideWithValue(memberAccess),
       grantsRepositoryProvider.overrideWithValue(grants),
+      membershipRepositoryProvider.overrideWithValue(membership),
       commandGatewayProvider.overrideWithValue(gateway),
       platformStatusRepositoryProvider.overrideWithValue(FakePlatformStatus()),
     ],

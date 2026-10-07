@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'access_screens.dart';
 import 'account_screen.dart';
 import 'fixture_command_screen.dart';
+import 'membership_application_screen.dart';
 import 'platform_status_screen.dart';
 import 'sign_in_screen.dart';
 
@@ -25,6 +26,9 @@ abstract final class ClientPaths {
 
   /// Staff web, Admin only: grant and remove roles (story 2.3).
   static const adminGrants = '/admin/grants';
+
+  /// The applicant's own membership request and its status (story 2.4).
+  static const membership = '/membership';
 }
 
 /// `extra` of a navigation started from a shell tab by the keyboard: the
@@ -42,10 +46,18 @@ typedef ShellBuilder = Widget Function(
 
 /// One navigator, no nested shell navigator: a nested navigator's focus scope
 /// would confine keyboard traversal to the page and skip the navigation.
+///
+/// [membershipRequests] turns on the applicant flow (story 2.4, mobile only):
+/// Create account continues to the membership request, and the account page
+/// links an account without member access to it. Staff web leaves it off.
 GoRouter buildClientRouter({
   required ShellBuilder shell,
   String initialLocation = ClientPaths.status,
+  bool membershipRequests = false,
 }) {
+  final afterCreateAccount = membershipRequests
+      ? ClientPaths.membership
+      : ClientPaths.account;
   Page<void> page(GoRouterState state, Widget screen) => NoTransitionPage(
     key: state.pageKey,
     child: shell(state.uri.path, state.extra is NavFocusRequest, screen),
@@ -65,7 +77,10 @@ GoRouter buildClientRouter({
       ),
       GoRoute(
         path: ClientPaths.account,
-        pageBuilder: (_, state) => page(state, const AccountScreen()),
+        pageBuilder: (_, state) => page(
+          state,
+          AccountScreen(linkMembershipRequest: membershipRequests),
+        ),
       ),
       GoRoute(
         path: ClientPaths.access,
@@ -76,13 +91,24 @@ GoRouter buildClientRouter({
         pageBuilder: (_, state) => page(state, const GrantAdminScreen()),
       ),
       GoRoute(
+        path: ClientPaths.membership,
+        pageBuilder: (_, state) =>
+            page(state, const MembershipApplicationScreen()),
+      ),
+      GoRoute(
         path: ClientPaths.signIn,
-        pageBuilder: (_, state) => page(state, const SignInScreen()),
+        pageBuilder: (_, state) =>
+            page(state, SignInScreen(afterCreateAccount: afterCreateAccount)),
       ),
       GoRoute(
         path: ClientPaths.createAccount,
-        pageBuilder: (_, state) =>
-            page(state, const SignInScreen(createAccount: true)),
+        pageBuilder: (_, state) => page(
+          state,
+          SignInScreen(
+            createAccount: true,
+            afterCreateAccount: afterCreateAccount,
+          ),
+        ),
       ),
     ],
   );

@@ -10,6 +10,7 @@
 # in through the verified-email alias of a phone account (AD-20: same account, same predicate).
 # Phone sign-in itself is exercised by tools/identity-e2e with `node tools/auth-harness/local-phone-auth.mjs on`.
 # Story 2.3 adds: the grant command and grant reads refuse signed-out and unlinked callers.
+# Story 2.4 adds: the application command and applicant reads (signed-out and unlinked callers).
 # Usage: npm run db:smoke   (needs curl, jq and psql; SYNTHETIC users and data only)
 set -euo pipefail
 
@@ -30,6 +31,10 @@ expect() { # name expected actual [body]
 cleanup() {
   for id in "${USERS[@]:-}"; do
     [[ -z "$id" ]] && continue
+    sql "delete from app.identity_application_events e using app.identity_membership_applications a
+          where e.application_id = a.application_id and a.auth_user_id = '$id';
+         delete from app.identity_membership_applications where auth_user_id = '$id';
+         delete from app.cmd_receipts where actor_id = '$id';" >/dev/null || true
     sql "delete from app.identity_binding_history h using app.identity_account_links l
           where h.link_id = l.link_id and l.auth_user_id = '$id';
          delete from app.identity_credential_events e using app.identity_account_links l
@@ -172,6 +177,34 @@ code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/rest/v1/rpc/id
   -H 'Content-Type: application/json' -d "$GRANT_BODY")
 [[ "$code:$(jq -r .code "$WORK/out")" == "200:forbidden" ]] \
   && ok "an unlinked account cannot grant roles (forbidden envelope)" || bad "grant as unlinked: $code $(cat "$WORK/out")"
+
+# Story 2.4: the application command and applicant reads need a session; an unlinked account
+# reads only its own (empty) application and the safe chooser; applying grants no access.
+for fn in identity_application_command identity_my_application cells_signup_options; do
+  code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/rest/v1/rpc/$fn" \
+    -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Profile: api' -H 'Content-Type: application/json' -d '{}')
+  expect "signed-out client cannot call $fn" 401 "$code" "$(cat "$WORK/out")"
+done
+api_call() { # fn body
+  curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/rest/v1/rpc/$1" \
+    -H "apikey: $PUBLISHABLE_KEY" -H "Authorization: Bearer $T5" -H 'Content-Profile: api' \
+    -H 'Content-Type: application/json' -d "$2"
+}
+code=$(api_call identity_my_application '{}')
+[[ "$code:$(jq -c '[.application, .privacy_notice.draft]' "$WORK/out")" == '200:[null,true]' ]] \
+  && ok "an unlinked account reads its own (empty) application and the draft notice" \
+  || bad "my_application as unlinked: $code $(cat "$WORK/out")"
+code=$(api_call cells_signup_options '{}')
+[[ "$code:$(jq -c '[(.options | type), ([.options[] | keys[]] | unique - ["broad_area","cell_id","label","revision"])]' "$WORK/out")" == '200:["array",[]]' ]] \
+  && ok "the cell chooser returns only label, broad area, id and revision" \
+  || bad "cells_signup_options: $code $(cat "$WORK/out")"
+APPLY_BODY="{\"version\":1,\"command\":\"identity.submit_application\",\"request_id\":\"$(uuid)\",\"expected_revision\":null,\"payload\":{\"full_name\":\"SYNTHETIC Smoke\",\"cell_choice\":{\"choice\":\"not_sure\"},\"privacy_notice_version\":\"draft-2026-10-07\"}}"
+code=$(api_call identity_application_command "$APPLY_BODY")
+[[ "$code:$(jq -c '[.data.church_status, .data.cell_status, .revision]' "$WORK/out")" == '200:["awaiting_approval","follow_up",1]' ]] \
+  && ok "an unlinked phone account applies (awaiting approval, cell follow-up)" || bad "apply: $code $(cat "$WORK/out")"
+code=$(api_call identity_my_access '{}')
+[[ "$code:$(jq -r .details "$WORK/out")" == "403:not_linked" ]] \
+  && ok "applying grants nothing: still no member access (403 not_linked)" || bad "access after applying: $code $(cat "$WORK/out")"
 
 # No SMS configuration exists on this stack.
 sms=$(curl -s "$API_URL/auth/v1/settings" -H "apikey: $PUBLISHABLE_KEY" | jq -r '.sms_provider // ""')

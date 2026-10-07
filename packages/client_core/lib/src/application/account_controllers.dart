@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/account_auth.dart';
 import '../domain/member_access.dart';
 import 'access_controllers.dart';
+import 'application_controllers.dart';
 import 'providers.dart';
 
 enum SignInPhase { idle, pending, failed, succeeded }
@@ -48,6 +49,7 @@ class SignInController extends Notifier<SignInState> {
       // A new session, even for the same account, gets a fresh server
       // decision: drop any earlier answer (for example a stale denial).
       ref.invalidate(memberSummaryControllerProvider);
+      ref.invalidate(membershipApplicationProvider);
     }
     state = switch (outcome) {
       AuthSucceeded() => SignInState(

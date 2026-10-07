@@ -146,6 +146,64 @@ void main() {
     },
   );
 
+  testWidgets(
+    'story 2.4: Create account -> membership request -> separate church and '
+    'cell status; still no member access',
+    (tester) async {
+      final h = await pumpMobile(tester, size: const Size(390, 1400));
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      h.memberAccess.answer(
+        const MemberAccessDenied(MemberAccessDenial.signedOut),
+      );
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'sign-out');
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'go-create-account');
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('phone-field')),
+        '+1 202 555 0182',
+      );
+      await tester.enterText(
+        find.byKey(const Key('password-field')),
+        'Synthetic-pw-2',
+      );
+      await tapKey(tester, 'submit-button');
+      expect(h.auth.last.createAccount, isTrue);
+      h.auth.succeed('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+      await tester.pumpAndSettle();
+
+      expect(find.text('Join the church'), findsWidgets);
+      expect(
+        find.byKey(const Key('nav-/access')),
+        findsNothing,
+        reason: 'an applicant has no access destination',
+      );
+      await tester.enterText(
+        find.byKey(const Key('full-name-field')),
+        'SYNTHETIC Applicant Two',
+      );
+      await tapKey(tester, 'cell-choice-not_in_cell');
+      await tapKey(tester, 'send-application');
+      final sent = h.gateway.sent.single;
+      expect(sent.wire['command'], 'identity.submit_application');
+      sent.confirm(
+        applicationData(
+          name: 'SYNTHETIC Applicant Two',
+          cellChoice: const {'choice': 'not_in_cell'},
+        ),
+        1,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Awaiting church approval'), findsOneWidget);
+      expect(
+        find.text('Cell: not in a cell yet. The church will follow up.'),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('unconfigured build explains itself and does not send commands', (
     tester,
   ) async {

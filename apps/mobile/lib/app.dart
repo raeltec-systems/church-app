@@ -52,6 +52,8 @@ class MobileApp extends StatefulWidget {
 class _MobileAppState extends State<MobileApp> {
   late final GoRouter _router = buildClientRouter(
     initialLocation: widget.initialLocation,
+    // Story 2.4: a new account continues to the membership request.
+    membershipRequests: true,
     shell: (location, focusSelectedNav, child) => MobileShell(
       location: location,
       focusSelectedNav: focusSelectedNav,

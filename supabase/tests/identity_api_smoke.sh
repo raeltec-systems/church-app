@@ -13,6 +13,7 @@
 # Story 2.4 adds: the application command and applicant reads (signed-out and unlinked callers).
 # Story 2.5 adds: the Admin review command and reads refuse signed-out and applicant callers.
 # Story 2.8 adds: the credential-review command and reads refuse signed-out and applicant callers.
+# Story 2.10 adds: the lifecycle command and reads refuse signed-out and applicant callers.
 # Usage: npm run db:smoke   (needs curl, jq and psql; SYNTHETIC users and data only)
 set -euo pipefail
 
@@ -322,6 +323,24 @@ code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/rest/v1/rpc/sy
   -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Profile: api' -H 'Content-Type: application/json' -d "$BEGIN_BODY")
 [[ "$code:$(jq -r .code "$WORK/out")" == "200:unauthenticated" ]] \
   && ok "a grant step without the system credential is unauthenticated" || bad "begin without credential: $code $(cat "$WORK/out")"
+
+# Story 2.10: the lifecycle command and reads need a session; an applicant may read only its own
+# (not deactivated) membership status.
+for fn in identity_lifecycle_command identity_admin_membership_lifecycle identity_my_membership_status; do
+  code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/rest/v1/rpc/$fn" \
+    -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Profile: api' -H 'Content-Type: application/json' -d '{}')
+  expect "signed-out client cannot call $fn" 401 "$code" "$(cat "$WORK/out")"
+done
+code=$(api_call identity_admin_membership_lifecycle '{}')
+[[ "$code:$(jq -r .details "$WORK/out")" == "403:not_linked" ]] \
+  && ok "an applicant cannot read the membership lifecycle (403 not_linked)" || bad "lifecycle read as applicant: $code $(cat "$WORK/out")"
+code=$(api_call identity_my_membership_status '{}')
+[[ "$code:$(jq -c . "$WORK/out")" == '200:{"deactivated":false,"church_contact":null}' ]] \
+  && ok "an applicant's own membership status is not deactivated" || bad "own status as applicant: $code $(cat "$WORK/out")"
+DEACT_BODY="{\"version\":1,\"command\":\"identity.deactivate_membership\",\"request_id\":\"$(uuid)\",\"expected_revision\":1,\"payload\":{\"member_id\":\"$(uuid)\",\"reason_code\":\"church_decision\"}}"
+code=$(api_call identity_lifecycle_command "$DEACT_BODY")
+[[ "$code:$(jq -r .code "$WORK/out")" == "200:forbidden" ]] \
+  && ok "an applicant cannot deactivate a membership (forbidden envelope)" || bad "deactivate as applicant: $code $(cat "$WORK/out")"
 
 # No SMS configuration exists on this stack.
 sms=$(curl -s "$API_URL/auth/v1/settings" -H "apikey: $PUBLISHABLE_KEY" | jq -r '.sms_provider // ""')

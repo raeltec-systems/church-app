@@ -115,6 +115,8 @@ jobs:
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.8
       - name: Story 2.9 evidence and the assisted-recovery function hold no credentials
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.9 supabase/functions
+      - name: Story 2.10 evidence holds no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.10
 
   flutter:
     name: flutter (analyze, test, web build)

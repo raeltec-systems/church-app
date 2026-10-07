@@ -86,6 +86,9 @@ Future<List<Override>> compositionOverrides(AppConfig config) async {
     credentialReviewRepositoryProvider.overrideWithValue(
       SupabaseCredentialReviewRepository(client),
     ),
+    membershipLifecycleRepositoryProvider.overrideWithValue(
+      SupabaseMembershipLifecycleRepository(client),
+    ),
     recoveryCasesRepositoryProvider.overrideWithValue(
       SupabaseRecoveryCasesRepository(client),
     ),

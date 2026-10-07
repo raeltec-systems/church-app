@@ -362,6 +362,9 @@ enum CredentialReviewNotice {
 
   /// The approved number or address is held by another account now.
   restoreBlocked,
+
+  /// Story 2.10: the last usable Admin cannot be put on a login hold.
+  lastAdmin,
   changedElsewhere,
   selfAction,
   noLongerAdmin,
@@ -593,6 +596,8 @@ class CredentialReviewController extends Notifier<CredentialReviewState> {
       ErrorCode.validationFailed when f['recovery_email'] == 'unverified' =>
         CredentialReviewNotice.unverified,
       ErrorCode.validationFailed => CredentialReviewNotice.invalid,
+      ErrorCode.forbidden when f['member_id'] == 'last_admin' =>
+        CredentialReviewNotice.lastAdmin,
       ErrorCode.forbidden when f.values.contains('unsupported') =>
         CredentialReviewNotice.selfAction,
       ErrorCode.forbidden => CredentialReviewNotice.noLongerAdmin,
@@ -637,7 +642,8 @@ class CredentialReviewController extends Notifier<CredentialReviewState> {
         }
         reload =
             notice != CredentialReviewNotice.invalid &&
-            notice != CredentialReviewNotice.selfAction;
+            notice != CredentialReviewNotice.selfAction &&
+            notice != CredentialReviewNotice.lastAdmin;
       case CommandUnknownOutcome():
         notice = CredentialReviewNotice.unconfirmed;
         unconfirmed = request;

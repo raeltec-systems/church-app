@@ -300,6 +300,64 @@ void main() {
   );
 
   testWidgets(
+    'story 2.10: a deactivated membership is shown as not active (no request '
+    'link)',
+    (tester) async {
+      final h = await pumpMobile(tester, size: const Size(390, 1400));
+      await tapKey(tester, 'nav-/account');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      h.lifecycle.status = const AccessReadOk(
+        MyMembershipStatus(deactivated: true),
+      );
+      h.memberAccess.answer(
+        const MemberAccessDenied(MemberAccessDenial.notLinked),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('membership-deactivated')), findsOneWidget);
+      expect(
+        find.textContaining('Please contact the church office'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('go-membership-request')), findsNothing);
+      // The session itself stays (the member can sign out); nothing private.
+      expect(h.auth.signOuts, 0);
+      expect(find.text('SYNTHETIC Member One'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'story 2.10: a login hold reaches only the generic help screen (never a '
+    'reason), and not the deactivated state',
+    (tester) async {
+      final h = await pumpMobile(
+        tester,
+        size: const Size(390, 1400),
+        location: '/fixture',
+      );
+      // A login hold is a hold: the server answers review_required.
+      h.grants.myAccess = const AccessReadDenied(AccessDenial.reviewRequired);
+      h.memberAccess.next = const MemberAccessDenied(
+        MemberAccessDenial.reviewRequired,
+      );
+      h.credentials.mine = AccessReadOk(
+        MyCredentials.fromJson(
+          myCredentialsData(access: 'review_required', canRequest: false),
+        ),
+      );
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('access-review-required')), findsOneWidget);
+      expect(find.byKey(const Key('membership-deactivated')), findsNothing);
+      expect(find.textContaining('login_disabled'), findsNothing);
+      expect(find.byKey(const Key('member-summary')), findsNothing);
+      expect(h.lifecycle.statusCalls, 0);
+    },
+  );
+
+  testWidgets(
     'story 2.2: refresh and resume keep the session; a session the server no '
     'longer trusts is ended and its state cleared',
     (tester) async {

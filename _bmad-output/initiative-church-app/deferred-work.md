@@ -30,3 +30,11 @@
 - source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-recover-access-with-staff-assistance-and-a-single-use-grant-plan.md`
   summary: Cloudflare/WAF optional - an edge rule in front of the assisted-recovery function (and a retention job for app.identity_recovery_client_attempts rows). The per-client limit itself is done (owner decision 2026-10-07: per-IP limit in the function (10/IP/10 min), church cap 120/10 min, per-number 5/h).
   evidence: the function keys the limit on the first x-forwarded-for hop; if staging shows the gateway appends to a client-sent header, a WAF rule closes that gap.
+
+- source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-hold-deactivate-and-restore-membership-with-handover-obligat-plan.md`
+  summary: Real owners (Duties, Follow-ups, Offerings custody, Chat, Directory, device registrations) must register their handover hooks (`app.identity_register_handover_hook`) and `membership_deactivated` / `sessions_revoked` lifecycle hooks before their modules activate; Cells may want one for the last leader of a cell.
+  evidence: story 2.10 delivers the Identity side and proves ordering and atomicity only with the SYNTHETIC fixture hooks; a deactivated member's confirmed cell membership is kept (facts), and no Cells hook exists yet.
+
+- source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-hold-deactivate-and-restore-membership-with-handover-obligat-plan.md`
+  summary: Run the story 2.10 matrix (tools/identity-e2e/lifecycle.mjs cases) and the staff web/mobile demonstration on staging once the parent applies 20261007170000.
+  evidence: every case ran locally (8/8, pgTAP 76); no owner-only step is needed for staging.

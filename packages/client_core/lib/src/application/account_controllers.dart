@@ -4,6 +4,7 @@ import '../domain/account_auth.dart';
 import '../domain/member_access.dart';
 import 'access_controllers.dart';
 import 'application_controllers.dart';
+import 'membership_lifecycle_controllers.dart' show myMembershipStatusProvider;
 import 'providers.dart';
 
 enum SignInPhase { idle, pending, failed, succeeded }
@@ -119,6 +120,11 @@ class MemberSummaryController extends Notifier<MemberSummaryState> {
       return;
     }
     state = MemberSummaryState(result: result);
+    if (result is MemberAccessDenied &&
+        result.denial == MemberAccessDenial.notLinked) {
+      // Story 2.10: ask again whether the membership is deactivated.
+      ref.invalidate(myMembershipStatusProvider);
+    }
     if (result is MemberAccessDenied &&
         result.denial != MemberAccessDenial.signedOut) {
       noteProtectedDenial(ref);

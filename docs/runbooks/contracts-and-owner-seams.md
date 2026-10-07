@@ -66,6 +66,10 @@ A registration is refused (SQLSTATE `PCTR1`) when:
 
 Identity calls `app.contract_dispatch_lifecycle(event)` in lock order: domain owners, then follow-ups, then notifications. If any hook fails, the whole lifecycle change rolls back, and so does a registered hook whose function no longer exists.
 
+Lifecycle events (contract v1): `access_hold_applied`, `access_hold_released`, `scope_revoked`, `account_deactivated` (an account unlinked), `deletion_requested`, `cell_transferred` (emitted by Cells), `sessions_revoked` (story 2.8), and `membership_deactivated` / `membership_restored` (story 2.10, added to v1 as 2.8 did: fixtures, Dart and TypeScript mappings).
+
+**Handover hooks (story 2.10).** An owner whose work must be handed over when a membership is deactivated also registers a read-only handover hook with Identity: `select app.identity_register_handover_hook('<module>', 'app.<prefix>_report_handover(jsonb)'::regprocedure);`. It returns `{"obligations": [{"kind", "subject_id", "last_responsible"}]}`; `last_responsible` refuses the deactivation until the work is handed over. The owner resolves recorded obligations with `app.identity_resolve_handover_obligation('<module>', '<obligation_id>', 'handed_over' | 'no_longer_needed')`. See `identity-access.md`, story 2.10.
+
 ## Policy gates and environment
 
 - **Gates are closed by default.** `app.policy_gates` lists `q1_auth_recovery`, `q2_church_time`, `q4_personal_data`, `q9_money`, `q12_operations`, `private_access` and `outbound_sending`. Every gate starts `unresolved`.

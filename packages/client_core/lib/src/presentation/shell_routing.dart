@@ -9,6 +9,7 @@ import 'cell_screens.dart';
 import 'credential_screens.dart';
 import 'fixture_command_screen.dart';
 import 'membership_application_screen.dart';
+import 'membership_lifecycle_screen.dart';
 import '../domain/password_recovery.dart';
 import 'membership_review_screen.dart';
 import 'page_address_stub.dart'
@@ -79,6 +80,10 @@ abstract final class ClientPaths {
 
   /// Story 2.9, staff web, Admin only: staff-assisted recovery cases.
   static const adminAccountRecovery = '/admin/account-recovery';
+
+  /// Story 2.10, staff web, Admin only: login holds, church deactivation,
+  /// reviewed restoration and pending handovers.
+  static const adminMembershipLifecycle = '/admin/membership-status';
 }
 
 /// Story 2.7: the incoming Auth email link for this route, read once. Only
@@ -229,6 +234,11 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.adminAccountRecovery,
         pageBuilder: (_, state) => page(state, const RecoveryCasesScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.adminMembershipLifecycle,
+        pageBuilder: (_, state) =>
+            page(state, const MembershipLifecycleScreen()),
       ),
       GoRoute(
         path: ClientPaths.signIn,

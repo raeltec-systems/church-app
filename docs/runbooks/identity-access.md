@@ -737,3 +737,76 @@ Both scripts mint a fresh local system credential (only the digest is registered
 3. **Deploy the function** (owner or parent): `npx supabase functions deploy identity-assisted-recovery --project-ref tmurpotfluignacfueki --no-verify-jwt`. The connector's `deploy_edge_function` with `verify_jwt: false` and the files `index.ts` and `logic.mjs` works too. `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are provided by the platform; nothing else is set. If the project's legacy API keys are disabled, those two key variables are empty and the function answers `unavailable` (fail closed); re-enable them, or extend the function to read the new-format keys.
 4. **Staging adversarial run** (still to do): repeat the `assisted.mjs` matrix against staging Auth with synthetic fictional numbers (phone sign-in is already enabled there without SMS), plus the device and staff-web demonstration. Include the per-client check: from one network, the 11th request within 10 minutes answers `rate_limited`, and a request with a forged `x-forwarded-for` first hop does not escape it (if it does, the gateway appends to the header: record it and add the optional WAF rule).
 5. **Production** (entry 14): the Q1 assisted-recovery procedure and named reviewers; the `q1_auth_recovery`, `q4_personal_data` and `ops_system_access` approvals; the production credential and secret.
+
+## Login hold, church deactivation and reviewed restoration (story 2.10)
+
+Migration: `supabase/migrations/20261007170000_membership_lifecycle.sql` (no row deletions; one file; sessions are revoked through `app.identity_revoke_auth_sessions` from `20261007160100`). Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.10/`.
+
+Three different things, with different effects (I10, AD-14):
+
+| | Login hold | Church deactivation | Reviewed restoration |
+|---|---|---|---|
+| Command | `identity.place_hold {member_id, reason_code: "login_disabled"}` (the 2.8 command, `api.identity_credential_command`) | `identity.deactivate_membership {member_id, reason_code}` | `identity.restore_membership {member_id, identity_check}` |
+| Membership | stays `approved` | `deactivated` | `approved` again |
+| Sessions | every Auth session of the account revoked | every Auth session revoked | the link's trust epoch moves: only a fresh sign-in works |
+| A fresh sign-in sees | the generic help screen (`review_required`) | "Church membership not active" (`not_linked` + own status) | the member's data again |
+| Grants | kept (unusable while held) | every grant ends (2.3 path, audited, `scope_revoked`) | NOT restored: give roles again with the audited 2.3 commands |
+| Account link | kept | kept, `suspended` | back to `active` (or `review_required` while a binding review is pending) |
+| Cell membership, owners' duty facts, history | kept | kept (owners act through their hooks) | kept |
+| Recovery (2.9) | refused while held (`disputed`) | issued grants end (`cancelled`, `stale`); a pending operation becomes `obsolete`; a dispatched or uncertain one keeps its hold | nothing reopens |
+| Handover obligations | none | recorded from owner handover hooks | stay pending until their owner resolves them |
+| Lifecycle events | `access_hold_applied`, `sessions_revoked` | `membership_deactivated`, `sessions_revoked` (and `scope_revoked` per grant) | `membership_restored` |
+| Undo | `identity.release_hold` by another Admin after an identity check | restoration | deactivation |
+
+`reason_code` for a deactivation: `member_request`, `moved_away`, `church_decision`. Every command expects the member revision and goes through the registered `identity` authorizer (an Admin whose session passes the predicate). Nobody holds, deactivates or restores their own record (`forbidden {"member_id": "unsupported"}`).
+
+### Refusals
+
+- **Last usable Admin.** Deactivating, or putting a login hold on, a member who holds Admin when no other usable Admin would remain is `forbidden {"member_id": "last_admin"}`. For a deactivation it is checked before the self check, so a sole Admin trying to deactivate themselves is told exactly that. A security hold (2.8) is never blocked by this: security denial comes first, and the operator bootstrap is the way back.
+- **Last responsible person.** Before anything is written, Identity asks every registered owner handover hook what the member is responsible for. When an owner reports `last_responsible`, the deactivation is `conflict {"member_id": "handover_required"}` and nothing changes. Hand it over in that owner's own workflow, then deactivate.
+- `conflict {"member_id": "not_approved"}` (deactivating or login-holding someone who is not approved), `conflict {"member_id": "not_deactivated"}` (restoring an approved member), `conflict {"reason_code": "already_held"}`.
+- A raising owner lifecycle hook, a missing handler or a malformed handover answer rolls the whole command back (`unavailable`, nothing changed).
+
+### Owner handover hooks (for later owners: duties, follow-ups, custody, chat, directory)
+
+```sql
+-- In the owner's own migration. Handler: (jsonb lifecycle event) returns jsonb
+--   {"obligations": [{"kind": "<lower_snake>", "subject_id": "<uuid>", "last_responsible": <bool>}]}
+select app.identity_register_handover_hook('duties', 'app.duties_report_handover(jsonb)'::regprocedure);
+-- When the work was handed over in the owner's workflow:
+select app.identity_resolve_handover_obligation('duties', '<obligation_id>', 'handed_over');  -- or 'no_longer_needed'
+```
+
+- The hook must be read-only: it runs before Identity decides. Owners make their own changes (flag, cancel, reroute) in a lifecycle hook on `membership_deactivated`, which runs in the same transaction after the deactivation.
+- Obligations hold the owner, a kind and an opaque subject id only (`app.identity_handover_obligations`). They survive a restoration.
+- Today only the SYNTHETIC `app.fixture_report_handover` (over `app.fixture_duties`) exists; tests and the E2E register it and remove it again.
+
+### Reads
+
+| Endpoint | Who | Returns |
+|---|---|---|
+| `api.identity_admin_membership_lifecycle()` | Admin | `deactivated` (members with `reason_code`, `account`, `pending_obligations`, `own_member`), `login_holds`, `handovers` (pending obligations with the member's current state) |
+| `api.identity_my_membership_status()` | any trusted own session | `{deactivated, church_contact}` only: never a reason, an actor or an obligation |
+
+Audit: `app.identity_membership_lifecycle` (actor, reason or identity check, revision, counts of revoked sessions, ended grants and recovery grants, obsolete operations and recorded obligations). Login holds are in `app.identity_credential_review_audit` (`hold_placed`, reason `login_disabled`). A login hold is stored with `reason = 'login_disabled'` and a null `reason_code`, because the 2.8 CHECK cannot be widened without a DROP.
+
+### Clients
+
+- **Staff web: Membership status** (`/admin/membership-status`, Admin): deactivated memberships with **Restore membership** (identity check), login holds with **Release login hold** (identity check), pending handovers (resolved in the owning section), and **Find a member** with **Disable login (hold)** and **Deactivate membership** (reason). **Access reviews** also offers the login hold and lists it.
+- **Both clients, account page:** a deactivated membership shows **Church membership not active** with the church contact and no membership-request link. A login hold shows the generic **Access review required** help screen (2.8).
+
+### Local runs
+
+```bash
+npx supabase db reset                          # empty Admin roster
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/lifecycle.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The E2E uses `+44 7700 900520–900529`, registers the SYNTHETIC fixture lifecycle and handover hooks and removes them again, and removes every user, member, grant, hold, cell, recovery row, obligation and audit row it created.
+
+### Hosted (parent session / owner)
+
+1. **Parent session:** apply `20261007170000_membership_lifecycle.sql` to staging after `20261007140729`. It replaces `app.identity_place_hold`, `app.identity_lock_reviewed_member`, `app.identity_member_holds_json` and `app.identity_authorize_command` in place (same signatures and privileges) and adds two contract v1 lifecycle events.
+2. **Production** (entry 14): nothing new to approve; deactivation works only behind the same gates as the rest of Identity.

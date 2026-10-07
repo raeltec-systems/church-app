@@ -18,6 +18,7 @@ import 'src/domain/commands.dart';
 import 'src/domain/credential_review.dart';
 import 'src/domain/member_access.dart';
 import 'src/domain/membership_application.dart';
+import 'src/domain/membership_lifecycle.dart';
 import 'src/domain/membership_review.dart';
 import 'src/domain/password_recovery.dart';
 import 'src/domain/recovery_email.dart';
@@ -984,6 +985,94 @@ Map<String, Object?> recoveryCaseData({
   'own_member': ownMember,
 };
 
+/// [MembershipLifecycleRepository] answered by the test (story 2.10).
+class FakeMembershipLifecycle implements MembershipLifecycleRepository {
+  AccessRead<MyMembershipStatus> status = const AccessReadOk(
+    MyMembershipStatus(deactivated: false),
+  );
+  AccessRead<MembershipLifecycleOverview> overview = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  int statusCalls = 0;
+  int overviewCalls = 0;
+
+  @override
+  Future<AccessRead<MyMembershipStatus>> fetchMyStatus() async {
+    statusCalls++;
+    return status;
+  }
+
+  @override
+  Future<AccessRead<MembershipLifecycleOverview>> fetchOverview() async {
+    overviewCalls++;
+    return overview;
+  }
+}
+
+/// The wire form of the Admin lifecycle overview (story 2.10).
+Map<String, Object?> membershipLifecycleData({
+  List<Map<String, Object?>> deactivated = const [],
+  List<Map<String, Object?>> loginHolds = const [],
+  List<Map<String, Object?>> handovers = const [],
+}) => {
+  'deactivated': deactivated,
+  'login_holds': loginHolds,
+  'handovers': handovers,
+};
+
+Map<String, Object?> deactivatedMemberData({
+  String id = '81818181-8181-4181-8181-818181818181',
+  String name = 'SYNTHETIC Esther Banda',
+  int revision = 4,
+  String account = 'access_review',
+  int pendingObligations = 1,
+  String reason = 'member_request',
+  bool ownMember = false,
+}) => {
+  'member_id': id,
+  'display_name': name,
+  'membership_state': 'deactivated',
+  'revision': revision,
+  'account': account,
+  'is_synthetic': true,
+  'pending_obligations': pendingObligations,
+  'deactivated_at': '2026-10-07T10:00:00Z',
+  'reason_code': reason,
+  'own_member': ownMember,
+};
+
+Map<String, Object?> loginHoldData({
+  String holdId = '82828282-8282-4282-8282-828282828282',
+  String memberId = '83838383-8383-4383-8383-838383838383',
+  String name = 'SYNTHETIC Moses Phiri',
+  int revision = 3,
+  bool ownMember = false,
+}) => {
+  'hold_id': holdId,
+  'member_id': memberId,
+  'display_name': name,
+  'member_revision': revision,
+  'placed_at': '2026-10-07T09:00:00Z',
+  'own_member': ownMember,
+  'is_synthetic': true,
+};
+
+Map<String, Object?> handoverData({
+  String id = '84848484-8484-4484-8484-848484848484',
+  String memberId = '81818181-8181-4181-8181-818181818181',
+  String name = 'SYNTHETIC Esther Banda',
+  String state = 'deactivated',
+  String kind = 'fixture_door_duty',
+}) => {
+  'obligation_id': id,
+  'member_id': memberId,
+  'display_name': name,
+  'membership_state': state,
+  'owner_module': 'fixture',
+  'obligation_kind': kind,
+  'recorded_at': '2026-10-07T10:00:00Z',
+};
+
 /// The fakes and provider overrides an app or screen test runs against.
 class ClientTestHarness {
   ClientTestHarness({String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'})
@@ -1003,6 +1092,7 @@ class ClientTestHarness {
   final credentials = FakeCredentialReview();
   final assisted = FakeAssistedRecovery();
   final recoveryCases = FakeRecoveryCases();
+  final lifecycle = FakeMembershipLifecycle();
 
   /// Replaces [gateway] in [overrides] when set, so a screen test can run
   /// the real adapter (for example SupabaseCommandGateway over a mock HTTP
@@ -1027,6 +1117,7 @@ class ClientTestHarness {
       credentialReviewRepositoryProvider.overrideWithValue(credentials),
       assistedRecoveryGatewayProvider.overrideWithValue(assisted),
       recoveryCasesRepositoryProvider.overrideWithValue(recoveryCases),
+      membershipLifecycleRepositoryProvider.overrideWithValue(lifecycle),
       commandGatewayProvider.overrideWithValue(commandGateway ?? gateway),
       platformStatusRepositoryProvider.overrideWithValue(FakePlatformStatus()),
     ],

@@ -427,6 +427,69 @@ void main() {
   );
 
   testWidgets(
+    'story 2.10: Admins see Membership status; deactivated members, login '
+    'holds and handovers are the server answer',
+    (tester) async {
+      final h = await pumpStaff(tester, location: '/fixture');
+      expect(
+        find.byKey(const Key('nav-/admin/membership-status')),
+        findsNothing,
+      );
+      expect(
+        staffDestinationsFor(null),
+        isNot(contains(staffMembershipLifecycleDestination)),
+      );
+      h.grants.myAccess = AccessReadOk(syntheticGrants(roles: ['admin']));
+      h.lifecycle.overview = AccessReadOk(
+        MembershipLifecycleOverview.fromJson(
+          membershipLifecycleData(
+            deactivated: [deactivatedMemberData()],
+            loginHolds: [loginHoldData()],
+            handovers: [handoverData()],
+          ),
+        ),
+      );
+      await tapKey(tester, 'nav-/status');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'nav-/admin/membership-status');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('SYNTHETIC Esther Banda'), findsWidgets);
+      expect(find.text('SYNTHETIC Moses Phiri'), findsOneWidget);
+      expect(
+        find.byKey(
+          const Key('lifecycle-restore-81818181-8181-4181-8181-818181818181'),
+        ),
+        findsOneWidget,
+      );
+      expect(h.lifecycle.overviewCalls, greaterThanOrEqualTo(1));
+    },
+  );
+
+  testWidgets(
+    'story 2.10: a deactivated membership on staff web says so after sign-in',
+    (tester) async {
+      final h = await pumpStaff(tester, location: '/fixture');
+      await tapKey(tester, 'nav-/account');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      h.lifecycle.status = const AccessReadOk(
+        MyMembershipStatus(deactivated: true),
+      );
+      h.memberAccess.answer(
+        const MemberAccessDenied(MemberAccessDenial.notLinked),
+      );
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('membership-deactivated')), findsOneWidget);
+      expect(find.text('Church membership not active'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'story 2.8: a held session on staff web sees only the help screen',
     (tester) async {
       final h = await pumpStaff(tester, location: '/fixture');

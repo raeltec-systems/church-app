@@ -24,3 +24,19 @@ Constraints that still hold:
 ## 2026-10-06 — story 1.3 frozen-block amendment
 
 - Approved: Supabase Auth Admin password update signs out all sessions; the recovery function relies on it and verifies it in the database (uncertain outcome if any pre-reset session survives).
+
+## Owner decisions 2026-10-07 (identity 2.7–2.9 abuse and secrets)
+
+Options prepared by an independent advisor; the owner picked the recommended option each time.
+
+1. **Help-request flooding (2.9, Q1 abuse controls for this endpoint).** Per-client limit inside the
+   `identity-assisted-recovery` function: 10 requests per client IP per 10 minutes (salted hash only, never
+   the raw IP; unknown IP shares one bucket). Church-wide cap raised to 120 per 10 minutes; per phone number
+   stays 5 per hour. Cloudflare/WAF in front is optional, not required.
+2. **Email-existence leak through Supabase `/recover` (2.7).** Use the church's own email sender (custom
+   SMTP, e.g. Resend) with a Supabase send-email hook so reset answers and timing are the same whether or not
+   an address is registered. This also settles the production email-sender choice. The owner creates the
+   sender account and sets its credentials; the assistant builds the hook.
+3. **Staging system credential for assisted recovery (2.9).** Set up now. The owner mints it, sets the Edge
+   Function secret and rotates it every 30 days (calendar reminder at day 25); the assistant never sees it,
+   registers only the digest, deploys the function and runs the adversarial suite on staging.

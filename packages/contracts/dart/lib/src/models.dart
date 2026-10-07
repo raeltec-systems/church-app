@@ -354,6 +354,10 @@ class CommandError extends CommandResponse {
   final String? requestId;
   final ErrorCode code;
   final String message;
+
+  /// Field path -> field error code. Codes are an open v1 vocabulary: besides the core codes
+  /// ([fieldErrorCodeNames]) a command may return its own (`last_admin`, `held`, ...). Read the
+  /// codes you know; treat any other as a generic notice for that field under [code].
   final Map<String, String> fieldErrors;
 
   /// Present only where the caller may read it (conflicts).

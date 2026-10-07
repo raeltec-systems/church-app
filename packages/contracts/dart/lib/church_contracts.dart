@@ -14,6 +14,7 @@ export 'src/check.dart'
         errorCodeNames,
         fieldErrorCodeNames,
         integerIn,
+        isFieldErrorCode,
         lifecycleEventNames,
         maxRevision,
         require;

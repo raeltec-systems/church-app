@@ -113,4 +113,30 @@ void main() {
     expect(integerIn(jsonDecode('1e300'), 1, maxRevision), isFalse);
     expect(integerIn(jsonDecode('9007199254740992'), 1, maxRevision), isFalse);
   });
+
+  test('field error codes are an open lower_snake_case vocabulary', () {
+    for (final code in fieldErrorCodeNames) {
+      expect(isFieldErrorCode(code), isTrue, reason: code);
+    }
+    for (final code in ['last_admin', 'reauthenticate', 'password_reset_required', 'held']) {
+      expect(isFieldErrorCode(code), isTrue, reason: code);
+    }
+    for (final code in ['', 'Held', 'too-big', '9lives', 'a' * 64]) {
+      expect(isFieldErrorCode(code), isFalse, reason: code);
+    }
+  });
+
+  test('an identity refusal with a command-specific code decodes as its top-level error', () {
+    final r = CommandResponse.fromJson({
+      'request_id': '00000000-0000-4000-8000-000000000001',
+      'code': 'forbidden',
+      'message': 'You are not allowed to do this.',
+      'field_errors': {'member_id': 'last_admin'},
+    });
+    expect(r, isA<CommandError>());
+    final e = r as CommandError;
+    expect(e.code, ErrorCode.forbidden);
+    expect(e.message, 'You are not allowed to do this.');
+    expect(e.fieldErrors, {'member_id': 'last_admin'});
+  });
 }

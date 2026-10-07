@@ -21,11 +21,14 @@ Migration: `supabase/migrations/20261003134340_cross_epic_contracts.sql`.
   - UUIDs must be lowercase.
   - Money is an unsigned decimal string. Whether an amount may be negative belongs to the owner's own rules.
   - Zones are canonical IANA `Area/Location` names, or `UTC`.
-- **Changing the contract.** Every change needs a new contract version: adding, removing or renaming a field, a kind, a lifecycle event or an error code, and loosening or tightening any rule. This follows from strict objects, because a client of the old version rejects an unknown key. Add the fixtures first, then make all three implementations pass them. Older supported clients keep the old version.
-- **Field error codes.** These are the only codes a server path may return, and clients validate against this list:
-  - `required`, `invalid`, `unknown_field`, `must_be_object`
-  - `unsupported`, `must_be_null`, `out_of_range`
-  - `unknown`, `unregistered`, `scale_exceeded`, `gate_closed`
+- **Changing the contract.** Every change needs a new contract version: adding, removing or renaming a field, a kind, a lifecycle event or an error code, and loosening or tightening any rule. The one exception is a new field error code, because that vocabulary is open (below). This follows from strict objects, because a client of the old version rejects an unknown key. Add the fixtures first, then make all three implementations pass them. Older supported clients keep the old version.
+- **Field error codes** are an open, documented vocabulary: any lower_snake_case token (`^[a-z][a-z0-9_]{0,62}$`) is a valid code, so adding a command-specific code needs no new contract version. A value of another shape still makes the envelope invalid. (Fixed after story 2.8: the list below used to be closed, and the clients read every Identity/Cells refusal with a specific code as an unknown outcome. See `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/fix-field-error-vocabulary.md`.)
+  - Core codes of the shape checks (`app.contract_field_error_codes()`, Dart `fieldErrorCodeNames`, TS `FIELD_ERROR_CODES`):
+    - `required`, `invalid`, `unknown_field`, `must_be_object`
+    - `unsupported`, `must_be_null`, `out_of_range`
+    - `unknown`, `unregistered`, `scale_exceeded`, `gate_closed`
+  - Command-specific codes are documented with their command in `docs/runbooks/identity-access.md` (for example `last_admin`, `reauthenticate`, `held`, `password_reset_required`, `stale`, `other_changes`, `open_request`, `current`, `decided`).
+  - Clients map the codes they know to specific notices. Any other code falls back to the notice for the envelope's top-level `code`, with its `message`. A well-formed error envelope is never an unknown outcome because of its field error codes.
 - **Client vs server checks.** Clients check shape only. Only the server checks:
   - registration membership (`app.contract_check_source`, `app.contract_reminder_key`)
   - that an IANA zone exists (`app.contract_require('zoned_local', …)`)

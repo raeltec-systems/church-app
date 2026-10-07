@@ -51,7 +51,12 @@ const List<String> errorCodeNames = [
   'unavailable',
 ];
 
-/// Every field error code a server path may return (mirrors app.contract_field_error_codes).
+/// Core field error codes of the shape checks (mirrors app.contract_field_error_codes).
+///
+/// Not exhaustive: in contract v1 a field error code is any lower_snake_case token
+/// ([isFieldErrorCode]), and commands return their own specific codes (`last_admin`,
+/// `reauthenticate`, `held`, ...). A client maps a code it does not know to a generic field
+/// notice; it never rejects the envelope for it.
 const List<String> fieldErrorCodeNames = [
   'required',
   'invalid',
@@ -146,9 +151,12 @@ _Rule _dateTime(RegExp re) => (v) {
 final _Rule _instantError = _dateTime(_instant);
 final _Rule _localError = _dateTime(_local);
 
+/// Whether [code] is a well-formed v1 field error code: `^[a-z][a-z0-9_]{0,62}$`.
+bool isFieldErrorCode(String code) => _token.hasMatch(code);
+
 String? _fieldErrorsError(Object? v) {
   if (v == null) return 'required';
-  return v is Map && v.values.every((x) => x is String && fieldErrorCodeNames.contains(x))
+  return v is Map && v.values.every((x) => x is String && isFieldErrorCode(x))
       ? null
       : 'invalid';
 }

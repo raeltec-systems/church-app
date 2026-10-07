@@ -192,7 +192,10 @@ Future<void> main(List<String> args) async {
     landed?.kind == AuthLinkKind.emailConfirmed &&
         mine1 is AccessReadOk<MyRecoveryEmail> &&
         mine1.value.inReview &&
-        mine1.value.proposal?.verified == true,
+        // In review the own read is generic (2.8 review fix): the pending
+        // proposal without its address or `verified`. L3's approval proves
+        // the address was confirmed (the server refuses an unverified one).
+        mine1.value.proposal?.state == ProposalState.pending,
     'link=${landed?.kind.name} in_review=${mine1 is AccessReadOk<MyRecoveryEmail> && mine1.value.inReview}',
   );
 

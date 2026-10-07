@@ -5,7 +5,7 @@
 -- queue. HTTP evidence through real GoTrue: tools/identity-e2e/credentials.mjs. Every account,
 -- phone and email here is SYNTHETIC (+44 7700 900300-900329, @example.test).
 begin;
-select plan(125);
+select plan(126);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000028' || lpad(n::text, 2, '0'))::uuid $$;
@@ -503,6 +503,11 @@ select is(pg_temp.summary((select claims from new_device)), 'PT403|forbidden|rev
 select is(pg_temp.on_member('identity.release_hold', 8, jsonb_build_object('hold_id', (pg_temp.open_hold(8)).hold_id,
             'identity_check', 'established_relationship')) -> 'field_errors',
   '{"hold_id": "password_reset_required"}'::jsonb, 'a lost-device hold stays until the member resets the password');
+select is(app.contract_check('command_response', pg_temp.on_member('identity.release_hold', 8,
+            jsonb_build_object('hold_id', (pg_temp.open_hold(8)).hold_id,
+                               'identity_check', 'established_relationship'))),
+  '{"valid": true, "field_errors": {}}'::jsonb,
+  'that refusal, with its command-specific field error code, is a contract-valid v1 envelope');
 -- The member resets through the approved email (holds do not block the reset), then a new password.
 select pg_temp.redeem(pg_temp.u(8)) is not null as redeemed;
 update auth.users set encrypted_password = 'synthetic-2-8-member-8-hash' where id = pg_temp.u(8);

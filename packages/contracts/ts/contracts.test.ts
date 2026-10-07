@@ -4,7 +4,8 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  check, decode, encode, ContractViolation, LIFECYCLE_EVENTS, type Kind,
+  check, decode, encode, ContractViolation, FIELD_ERROR_CODES, LIFECYCLE_EVENTS,
+  isCommandError, isFieldErrorCode, type Kind,
 } from "./contracts.ts";
 
 const dir = join(import.meta.dirname, "..", "fixtures", "v1");
@@ -44,4 +45,27 @@ test("the lifecycle event list equals the valid lifecycle fixtures", () => {
 
 test("unknown kind is a programming error", () => {
   assert.throws(() => check("nope" as Kind, {}));
+});
+
+test("field error codes are an open lower_snake_case vocabulary", () => {
+  for (const code of FIELD_ERROR_CODES) assert.ok(isFieldErrorCode(code), code);
+  for (const code of ["last_admin", "reauthenticate", "password_reset_required", "held"]) {
+    assert.ok(isFieldErrorCode(code), code);
+  }
+  for (const code of ["", "Held", "too-big", "9lives", "a".repeat(64)]) {
+    assert.ok(!isFieldErrorCode(code), code);
+  }
+});
+
+test("an identity refusal with a command-specific code decodes as its top-level error", () => {
+  const r = decode("command_response", {
+    request_id: "00000000-0000-4000-8000-000000000001",
+    code: "forbidden",
+    message: "You are not allowed to do this.",
+    field_errors: { member_id: "last_admin" },
+  });
+  assert.ok(isCommandError(r));
+  assert.equal(r.code, "forbidden");
+  assert.equal(r.message, "You are not allowed to do this.");
+  assert.deepEqual(r.field_errors, { member_id: "last_admin" });
 });

@@ -19,6 +19,7 @@
 // links both accounts and removes everything afterwards. The password comes
 // from LIVE_CHECK_PASSWORD. Publishable key only; prints outcomes, never
 // tokens, passwords, numbers or addresses.
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:church_client_core/src/domain/access_grants.dart';
@@ -97,7 +98,8 @@ Future<void> main(List<String> args) async {
   };
   String outcome(CommandOutcome? o) => switch (o) {
     CommandConfirmed() => 'confirmed',
-    CommandRefused(:final error) => 'refused:${error.code.wireName}',
+    CommandRefused(:final error) =>
+      'refused:${error.code.wireName}${error.fieldErrors.isEmpty ? '' : jsonEncode(error.fieldErrors)}',
     null => 'not_sent',
     _ => o.runtimeType.toString(),
   };
@@ -247,14 +249,16 @@ Future<void> main(List<String> args) async {
   final holdOpen =
       queue3 is AccessReadOk<CredentialQueue> &&
       queue3.value.holds.any((h) => h.holdId == hold?.holdId);
-  // The server answers conflict {"hold_id": "password_reset_required"}. The
-  // shared v1 contract does not list domain field-error codes, so the Dart
-  // client maps that answer to an unknown outcome (a pre-existing contract
-  // gap, reported separately); the release itself must not have happened.
+  // The server answers conflict {"hold_id": "password_reset_required"}; the
+  // real gateway must read it as that definite refusal (v1 field error codes
+  // are an open vocabulary), not as an unknown outcome.
   check(
     'C4 a lost-device hold is not released before the member resets the password',
     hold?.reason == HoldReason.lostDevice &&
-        released is! CommandConfirmed &&
+        released is CommandRefused &&
+        released.error.code == ErrorCode.conflict &&
+        released.error.message.isNotEmpty &&
+        released.error.fieldErrors['hold_id'] == 'password_reset_required' &&
         holdOpen &&
         stillHeld is AccessReadOk<MyCredentials> &&
         stillHeld.value.inReview,

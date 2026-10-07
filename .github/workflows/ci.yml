@@ -121,6 +121,8 @@ jobs:
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.11 tools/identity-deletion supabase/functions
       - name: Story 2.12 evidence and the support runbooks hold no credentials
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.12 docs/runbooks/identity-support.md
+      - name: Story 2.14 staging evidence, the staging suite and the production package hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.14 tools/identity-e2e docs/runbooks/production-promotion-identity.md
 
   flutter:
     name: flutter (analyze, test, web build)

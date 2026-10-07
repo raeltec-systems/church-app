@@ -54,3 +54,15 @@
 - source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-refactor-sweep-plan.md`
   summary: Minimise personal data in stored command receipts: recovery-email (2.7) command results keep the email, phone or name in `result`, and 2.5 outcomes follow the same pattern, and replays return that stored answer; store only what a replay needs (ids, states, codes).
   evidence: 2.7 review triage routed it to the 2.13 refactor sweep; 2.13 kept it out because shrinking stored results changes replay answers and the receipts already written (behaviour, not cleanup). Needs its own entry, ideally with Q4 retention.
+
+- source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-verify-identity-end-to-end-and-promote-it-to-production-plan.md`
+  summary: Build the Supabase send-email hook (owner decision 2026-10-07 #2) that sends Auth emails through the church's own sender so `/recover` answers and timing are identical for registered and unknown addresses; deploy and test it on staging before `q1_auth_recovery` is approved in production.
+  evidence: 2.14 found it not built; production email recovery stays fail-closed (gate G1/G2 in docs/runbooks/production-promotion-identity.md) until the owner creates the sender account and the hook exists.
+
+- source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-verify-identity-end-to-end-and-promote-it-to-production-plan.md`
+  summary: Add a reviewed restricted-operator procedure for the first real production Admin (approve exactly one application while no usable Admin exists, owner identity check, two-person record, then bootstrap), and an operator function or migration path to approve the `dormancy_days` Identity setting.
+  evidence: 2.14 promotion package, gates G3 and G8: production has no path to either today, so it stays fail-closed; the owner chooses the first-Admin option.
+
+- source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-verify-identity-end-to-end-and-promote-it-to-production-plan.md`
+  summary: Add an Edge Function deploy step (identity-assisted-recovery, identity-deletion) to `.github/workflows/promote.yml` between the database and client steps.
+  evidence: the 1.8 workflow predates Edge Functions ("add their deploy step between steps 4 and 6"); 2.14's production package deploys them by hand.

@@ -92,7 +92,7 @@ Every runbook action is recorded with ids, codes and revisions only: no names, n
 - Identity's migrations are applied, and `tools/ci/verify-hosted.sql` passes.
 - The first Admin has their own approved member record with a live, usable account link:
   - **staging:** they create an account on mobile (**Account, Create account**) with a fictional number and their own password, and the operator links it with `app.identity_seed_synthetic_link` (SYNTHETIC names only; [identity-access.md, story 2.1](identity-access.md#seeding-a-synthetic-approved-member-restricted-operator-only));
-  - **production:** there is no path yet. Applications need an Admin to approve them, and the synthetic seeding refuses production. Naming and linking the first real Admin is an entry 14 decision and needs a reviewed operator procedure that approves that one application after the owner's identity check. Do not improvise it with SQL.
+  - **production:** there is no path yet. Applications need an Admin to approve them, and the synthetic seeding refuses production. Naming and linking the first real Admin is an entry 14 decision and needs a reviewed operator procedure that approves that one application after the owner's identity check. Do not improvise it with SQL. The options are set out for the owner in [production-promotion-identity.md](production-promotion-identity.md#open-question-for-the-owner-the-first-real-admin-from-212-rb1).
 
 **Steps:**
 

@@ -18,6 +18,9 @@ Run once, after 2.13, on staging (`tmurpotfluignacfueki`) with the staging APK a
 - **2.8 Credential changes and holds:** on mobile, request a new phone username in the fictional range (+1 202 555 01xx); approve it as Admin on staff web and sign in with the new number. As Admin, place a hold on a synthetic member: their app shows only the generic "Access review required" screen; release it (another Admin is needed, so use the Admin account on the other member). Place a lost-device hold: every session ends; it can be released only after the member resets the password from the recovery email.
 - **Refusal messages (contract fix):** refusals such as "last Admin" or "password reset needed first" show their own message, not "unknown outcome".
 
+- **2.9 Staff-assisted recovery:** (after the staging system credential is set) on mobile tap "I need help accessing my account" as a synthetic member, give the 8-character code to the Admin, who opens a recovery case on staff web and issues the grant; set a new password on the phone and sign in fresh.
+- **2.10 Hold, deactivate, restore:** as Admin on staff web, place a login hold on a synthetic member (their app shows the help screen; release it), deactivate them (their app shows "Church membership not active"), then restore them (they sign in fresh; roles are not restored).
+
 ## Decisions for the owner at 2.14
 
 - GoTrue `/recover` can reveal whether an email is registered through its rate-limit and timing replies (platform behaviour; the app itself stays neutral). Decide with the production email sender/SMTP settings.

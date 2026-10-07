@@ -36,5 +36,5 @@
   evidence: story 2.10 delivers the Identity side and proves ordering and atomicity only with the SYNTHETIC fixture hooks; a deactivated member's confirmed cell membership is kept (facts), and no Cells hook exists yet.
 
 - source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-hold-deactivate-and-restore-membership-with-handover-obligat-plan.md`
-  summary: Run the story 2.10 matrix (tools/identity-e2e/lifecycle.mjs cases) and the staff web/mobile demonstration on staging once the parent applies 20261007170000.
+  summary: Run the story 2.10 matrix (tools/identity-e2e/lifecycle.mjs cases) and the staff web/mobile demonstration on staging once the parent applies 20261007151523 (applied 2026-10-07).
   evidence: every case ran locally (8/8, pgTAP 76); no owner-only step is needed for staging.

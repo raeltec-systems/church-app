@@ -32,4 +32,4 @@ All runs are LOCAL (Supabase CLI stack, GoTrue v2.197.0), on 2026-10-07, with sy
 
 ## Not run here (staging)
 
-- The parent session applies `20261007170000` to staging; then the E2E matrix can be repeated against staging Auth with synthetic numbers, and the staff web and mobile demonstration run.
+- The parent session applies `20261007151523` to staging; then the E2E matrix can be repeated against staging Auth with synthetic numbers, and the staff web and mobile demonstration run.

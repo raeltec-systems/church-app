@@ -740,7 +740,7 @@ Both scripts mint a fresh local system credential (only the digest is registered
 
 ## Login hold, church deactivation and reviewed restoration (story 2.10)
 
-Migration: `supabase/migrations/20261007170000_membership_lifecycle.sql` (no row deletions; one file; sessions are revoked through `app.identity_revoke_auth_sessions` from `20261007160100`). Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.10/`.
+Migration: `supabase/migrations/20261007151523_membership_lifecycle.sql` (no row deletions; one file; sessions are revoked through `app.identity_revoke_auth_sessions` from `20261007160100`). Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.10/`.
 
 Three different things, with different effects (I10, AD-14):
 
@@ -811,5 +811,5 @@ The E2E uses `+44 7700 900520–900529` (step `L40` races the last two Admins de
 
 ### Hosted (parent session / owner)
 
-1. **Parent session:** apply `20261007170000_membership_lifecycle.sql` to staging after `20261007140729`. It replaces `app.identity_place_hold`, `app.identity_lock_reviewed_member`, `app.identity_member_holds_json`, `app.identity_release_hold`, `app.identity_admin_credential_queue` and `app.identity_authorize_command` in place (same signatures and privileges; the queue's EXECUTE for `authenticated` is re-granted) and adds two lifecycle events, additive within v1 under the server-only rule (`contracts-and-owner-seams.md`).
+1. **Parent session:** apply `20261007151523_membership_lifecycle.sql` to staging after `20261007140729`. It replaces `app.identity_place_hold`, `app.identity_lock_reviewed_member`, `app.identity_member_holds_json`, `app.identity_release_hold`, `app.identity_admin_credential_queue` and `app.identity_authorize_command` in place (same signatures and privileges; the queue's EXECUTE for `authenticated` is re-granted) and adds two lifecycle events, additive within v1 under the server-only rule (`contracts-and-owner-seams.md`).
 2. **Production** (entry 14): nothing new to approve; deactivation works only behind the same gates as the rest of Identity.

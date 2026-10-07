@@ -3,7 +3,7 @@ title: 'Hold, deactivate and restore membership with handover obligations'
 type: 'feature'
 ticket: '10'
 created: '2026-10-07'
-status: 'built'
+status: 'done'
 blocked_reason: ''
 baseline_revision: '011ff888a7d6e9fee61d0cc4e09b2bf2ccae8d47'
 route: 'full'
@@ -70,7 +70,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261007170000_membership_lifecycle.sql` -- tables (lifecycle audit, obligations, handover hooks, fixture duties), events, hook registry, replaced hold functions, commands, reads, authorizer, grants.
+- [x] `supabase/migrations/20261007151523_membership_lifecycle.sql` -- tables (lifecycle audit, obligations, handover hooks, fixture duties), events, hook registry, replaced hold functions, commands, reads, authorizer, grants.
 - [x] contracts (fixtures, Dart, TS, cross-epic test) -- the two new v1 events.
 - [x] `supabase/tests/membership_lifecycle_test.sql`, allowlist, smoke -- the matrix and privileges.
 - [x] `tools/identity-e2e/lifecycle.mjs` (+ test) -- the verify bullet against local GoTrue/PostgREST.
@@ -85,7 +85,7 @@ context:
 
 - Built directly (no subagent tool in this session); checkpoint 1 pre-approved by the owner decisions. Above the 1600-token guide for the same reason as 2.7-2.9: one Identity change spans the DB, contracts, two clients and evidence.
 - Files:
-  - `supabase/migrations/20261007170000_membership_lifecycle.sql` (no `delete from`, ASCII only, every function pins `search_path`, nothing granted to anon): events, `identity_membership_lifecycle`, `identity_handover_hooks`, `identity_handover_obligations`, SYNTHETIC `fixture_duties` + `fixture_report_handover`; `identity_register_handover_hook`, `identity_collect_handover`, `identity_resolve_handover_obligation`, `identity_is_last_admin`, `identity_hold_reason_code`; replaced in place (same signatures, privileges re-revoked): `identity_lock_reviewed_member`, `identity_place_hold`, `identity_member_holds_json`, `identity_authorize_command` (every earlier command kept); commands on `api.identity_lifecycle_command`; reads `api.identity_admin_membership_lifecycle`, `api.identity_my_membership_status`.
+  - `supabase/migrations/20261007151523_membership_lifecycle.sql` (no `delete from`, ASCII only, every function pins `search_path`, nothing granted to anon): events, `identity_membership_lifecycle`, `identity_handover_hooks`, `identity_handover_obligations`, SYNTHETIC `fixture_duties` + `fixture_report_handover`; `identity_register_handover_hook`, `identity_collect_handover`, `identity_resolve_handover_obligation`, `identity_is_last_admin`, `identity_hold_reason_code`; replaced in place (same signatures, privileges re-revoked): `identity_lock_reviewed_member`, `identity_place_hold`, `identity_member_holds_json`, `identity_authorize_command` (every earlier command kept); commands on `api.identity_lifecycle_command`; reads `api.identity_admin_membership_lifecycle`, `api.identity_my_membership_status`.
   - Contracts: `fixtures/v1/lifecycle_event.json`, Dart `models.dart`/`check.dart` + regenerated `fixtures.g.dart`, TS `contracts.ts`, `cross_epic_contracts_test.sql`.
   - Tests: `supabase/tests/membership_lifecycle_test.sql` (76), allowlist in `command_foundation_test.sql`, `identity_api_smoke.sh` (+6); E2E `tools/identity-e2e/lifecycle.mjs` (+ `.test.mjs`).
   - client_core: `domain/membership_lifecycle.dart`, `adapters/supabase_membership_lifecycle_repository.dart`, `application/membership_lifecycle_controllers.dart`, `presentation/membership_lifecycle_screen.dart`, `HoldReason.loginDisabled` (+ kind fallback), `CredentialReviewNotice.lastAdmin`, route `/admin/membership-status` (gated), deactivated state on the account page, provider, composition, exports, fakes; `test/identity/membership_lifecycle_test.dart` (15). Apps: staff `Membership status` destination (Admin) + 2 tests; mobile 2 tests.
@@ -94,11 +94,11 @@ context:
 - Decision (agent, under owner pre-approval): open recovery cases are left open at deactivation (their grants end; the 2.9 cancel reasons have no fitting value and widening the CHECK needs a DROP); a grant cannot be issued while the member is not approved (2.9 `not_approved`).
 - Decision (agent, under owner pre-approval): pending 2.7/2.8 credential requests are left pending (approval already requires an approved member); Cells memberships and requests are kept as facts.
 - Environment: the stack was reset from this worktree; the phone switch was found off, on only for the E2E runs, and is off again; no image pulled; every synthetic row and hook registration was removed.
-- Owner and parent steps: parent applies `20261007170000` to staging. No owner-only step.
+- Owner and parent steps: parent applies `20261007151523` to staging. No owner-only step.
 
 ## Plan Change Log
 
-- 2026-10-07, independent review (coordinator; not a step-04 loop). No HIGH; one MEDIUM, four LOW; all patched in place in `20261007170000` (still no `delete from`, ASCII only, `search_path` set, nothing to anon).
+- 2026-10-07, independent review (coordinator; not a step-04 loop). No HIGH; one MEDIUM, four LOW; all patched in place in `20261007151523` (still no `delete from`, ASCII only, `search_path` set, nothing to anon).
   - **MEDIUM (contract rule):** the contracts runbook said a new lifecycle event needs a new version. Amended: event names are additive within v1 while every consumer is a server-side registered hook; removing/renaming one or adding the first client-visible consumer needs a new version. Frozen-block decision recorded. New `client_core` boundary test fails if client or app code consumes lifecycle events (the shared Dart/TS packages carry the list for fixture parity only).
   - **LOW (deadlock):** deactivation, restoration and `place_hold` (replaced, latest 2.8 body) now lock the live link before the member (`app.identity_lock_payload_member_link`), the 2.9 order.
   - **LOW (login hold reason):** `identity_release_hold` (audit) and `identity_admin_credential_queue` replaced in place with their latest 2.8 bodies using `identity_hold_reason_code`; the queue's EXECUTE re-granted. pgTAP asserts both name `login_disabled`.
@@ -123,3 +123,7 @@ context:
   - Node tool tests 71/71, policy tests 49/49; `ci:migrations --base ccr-93e730dd-89lbvg` (22, non-destructive); `ci:secrets` clean; `scan-evidence` on evidence-2.10 and `tools/identity-e2e` clean.
 - Results after the review fixes (2026-10-07, local): `db:test` 1330/1330 (membership lifecycle 86) after a fresh reset; `db:smoke` exit 0; `lifecycle.mjs` 9/9 (new `L40`); regressions `run` 30, `grants` 18, `apply` 27, `review` 18, `cells` 13, `recovery` 20, `credentials` 15, `assisted` 16; client_core 327, staff 24, mobile 26, analyze and format clean; contracts Dart 255, TS 238; node tool tests 71, policy 49; `ci:migrations` (22, non-destructive), `ci:secrets`, `scan-evidence` clean. Phone switch off again.
 - Matrix audit: login hold (pgTAP + E2E L10/L11 + widgets), deactivate (pgTAP + L20 + widgets), last responsible (pgTAP + L21 + widget notice), last Admin (pgTAP + L01 + widget notice), restore (pgTAP + L30 + widget), uncertain recovery (pgTAP): every row has a passing test.
+
+## Hosted verification
+
+Staging apply, parity and API checks: `evidence-2.10/staging-verify.md`. Device and staff-web scenarios: `owner-consolidated-test.md`.

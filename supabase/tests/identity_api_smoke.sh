@@ -251,6 +251,36 @@ code=$(api_call cells_command "$CELL_BODY")
 [[ "$code:$(jq -r .code "$WORK/out")" == "200:forbidden" ]] \
   && ok "an applicant cannot create a cell (forbidden envelope)" || bad "create_cell as applicant: $code $(cat "$WORK/out")"
 
+# Story 2.7: the recovery-email command and reads need a session; an applicant (no member link)
+# reaches none of them; the reset gate refuses a recovery or magic link for an account whose
+# email is not an approved recovery email (no session is created); /recover is neutral.
+for fn in identity_recovery_email_command identity_my_recovery_email identity_admin_recovery_email_queue; do
+  code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/rest/v1/rpc/$fn" \
+    -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Profile: api' -H 'Content-Type: application/json' -d '{}')
+  expect "signed-out client cannot call $fn" 401 "$code" "$(cat "$WORK/out")"
+done
+for fn in identity_my_recovery_email identity_admin_recovery_email_queue; do
+  code=$(api_call "$fn" '{}')
+  [[ "$code:$(jq -r .details "$WORK/out")" == "403:not_linked" ]] \
+    && ok "an applicant cannot call $fn (403 not_linked)" || bad "$fn as applicant: $code $(cat "$WORK/out")"
+done
+PROPOSE_BODY="{\"version\":1,\"command\":\"identity.propose_recovery_email\",\"request_id\":\"$(uuid)\",\"expected_revision\":null,\"payload\":{\"email\":\"smoke-$(uuid | cut -c1-8)@example.test\"}}"
+code=$(api_call identity_recovery_email_command "$PROPOSE_BODY")
+[[ "$code:$(jq -r .code "$WORK/out")" == "200:forbidden" ]] \
+  && ok "an applicant cannot propose a recovery email (forbidden envelope)" || bad "propose as applicant: $code $(cat "$WORK/out")"
+for type in recovery magiclink; do
+  H=$(admin POST /admin/generate_link "{\"type\":\"$type\",\"email\":\"$E2\"}" | jq -r .hashed_token)
+  code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/auth/v1/verify" -H "apikey: $PUBLISHABLE_KEY" \
+    -H 'Content-Type: application/json' -d "{\"type\":\"$type\",\"token_hash\":\"$H\"}")
+  [[ "$code" != 200 && "$(jq -r '.access_token // "none"' "$WORK/out")" == none ]] \
+    && ok "a $type link for an email that is not an approved recovery email gives no session ($code)" \
+    || bad "$type link for an unapproved email: $code $(cat "$WORK/out")"
+done
+code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/auth/v1/recover" -H "apikey: $PUBLISHABLE_KEY" \
+  -H 'Content-Type: application/json' -d "{\"email\":\"nobody-$(uuid | cut -c1-8)@example.test\"}")
+[[ "$code:$(cat "$WORK/out")" == "200:{}" ]] && ok "forgot password for an unknown address is neutral (200 {})" \
+  || bad "recover unknown: $code $(cat "$WORK/out")"
+
 # No SMS configuration exists on this stack.
 sms=$(curl -s "$API_URL/auth/v1/settings" -H "apikey: $PUBLISHABLE_KEY" | jq -r '.sms_provider // ""')
 [[ -z "$sms" ]] && ok "no SMS provider configured" || bad "sms_provider is '$sms'"

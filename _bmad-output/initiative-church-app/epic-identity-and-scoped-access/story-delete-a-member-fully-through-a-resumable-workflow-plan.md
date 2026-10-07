@@ -3,7 +3,7 @@ title: 'Delete a member fully through a resumable workflow'
 type: 'feature'
 ticket: '11'
 created: '2026-10-07'
-status: 'in-progress'
+status: 'built'
 blocked_reason: ''
 baseline_revision: 'd709ab907759eaf7a8d2c8e0aee117c922dcf985'
 route: 'full'
@@ -74,15 +74,15 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261007171500_member_deletion.sql` -- gate, events, tables, fixture rules, hooks registries, rcv split + replay, request commands, system commands, replay hook, reads, replaced functions, stubs, grants.
-- [ ] `supabase/migrations/20261007171600_member_deletion_rows.sql` -- the three deleting functions only.
-- [ ] `supabase/functions/identity-deletion/{index.ts,logic.mjs,logic.test.mjs}`, `supabase/config.toml`.
-- [ ] `tools/identity-deletion/{worker.mjs,worker.test.mjs}` -- the resumable worker.
-- [ ] contracts -- two events.
-- [ ] `supabase/tests/member_deletion_test.sql`, allowlists, smoke.
-- [ ] `tools/identity-e2e/deletion.mjs` (+ test) -- verify bullet incl. interrupt/resume and isolated restore.
-- [ ] `packages/client_core` + apps -- mobile request, staff deletion screen, fakes, widget tests.
-- [ ] docs (identity-access, contracts, system-access, backup-and-restore), `evidence-2.11/README.md`, CI.
+- [x] `supabase/migrations/20261007171500_member_deletion.sql` -- gate, events, tables, fixture rules, hooks registries, rcv split + replay, request commands, system commands, replay hook, reads, replaced functions, stubs, grants.
+- [x] `supabase/migrations/20261007171600_member_deletion_rows.sql` -- the three deleting functions only.
+- [x] `supabase/functions/identity-deletion/{index.ts,logic.mjs,logic.test.mjs}`, `supabase/config.toml`.
+- [x] `tools/identity-deletion/{worker.mjs,worker.test.mjs}` -- the resumable worker.
+- [x] contracts -- `member_deleted` (see Plan Change Log).
+- [x] `supabase/tests/member_deletion_test.sql`, allowlists, smoke.
+- [x] `tools/identity-e2e/deletion.mjs` (+ test) -- verify bullet incl. interrupt/resume and isolated restore.
+- [x] `packages/client_core` + apps -- mobile request, staff deletion screen, fakes, widget tests.
+- [x] docs (identity-access, contracts, system-access, backup-and-restore), `evidence-2.11/README.md`, CI.
 
 **Acceptance Criteria:**
 - Given the local stack, the phone switch on and the served function, when `deletion.mjs` runs, then every matrix row passes and only append-only journal entries and their acks remain.
@@ -90,7 +90,27 @@ context:
 
 ## Implementation Notes
 
+- Built directly (no subagent tool in this session); checkpoint 1 pre-approved by the owner decisions. Above the 1600-token guide for the same reason as 2.7-2.10: one Identity change spans the database, a worker, an Edge Function, two clients and evidence.
+- Files:
+  - `supabase/migrations/20261007171500_member_deletion.sql` (no row-deletion statement, ASCII only, every function pins `search_path`, nothing granted to anon): gate `identity_deletion_retention` (labelled fixture), event `member_deleted`, tables `identity_deletions` (tombstone), `identity_deletion_steps`, `identity_deletion_audit`, `identity_deletion_hooks`, `identity_deletion_retention_rules` (FIXTURE), `rcv_replay_hooks`; three fail-closed stubs; deletion and replay hook registries; Cells hook `cells_erase_member` (registered) and SYNTHETIC `fixture_erase_member`; `rcv_apply_journal_entry_as` + `rcv_apply_journal_entry` delegating (same signature/privileges); request commands on `api.identity_deletion_command`; six system commands of purpose `identity_deletion`; replay hook `identity_rcv_replay` (registered); read `api.identity_admin_deletions`; link guard trigger; replaced in place with their latest bodies: `identity_restore_membership`, `identity_admin_membership_lifecycle` (EXECUTE re-granted), `identity_authorize_command` (every earlier command kept).
+  - `supabase/migrations/20261007171600_member_deletion_rows.sql`: ONLY `identity_deletion_purge_rows`, `identity_deletion_purge_auth_user` (restore-held only), `cells_deletion_purge_rows`.
+  - `supabase/functions/identity-deletion/{index.ts,logic.mjs,logic.test.mjs}`; `supabase/config.toml` (`verify_jwt = false`).
+  - `tools/identity-deletion/{worker.mjs,worker.test.mjs}`.
+  - Contracts: `member_deleted` in `fixtures/v1/lifecycle_event.json`, Dart `models.dart`/`check.dart` + regenerated `fixtures.g.dart`, TS `contracts.ts`.
+  - Tests: `supabase/tests/member_deletion_test.sql` (93); allowlists in `command_foundation_test.sql`, `system_access_test.sql`, `cross_epic_contracts_test.sql`; `identity_api_smoke.sh` (+6); E2E `tools/identity-e2e/deletion.mjs` (+ `.test.mjs`).
+  - client_core: `domain/member_deletion.dart`, `adapters/supabase_member_deletion_repository.dart`, `application/member_deletion_controllers.dart`, `presentation/member_deletion_screens.dart` (mobile `DeleteAccountScreen`, staff `MemberDeletionScreen`), routes `/delete-account` and `/admin/member-deletions` (gated), account-page link, provider, composition, exports, fakes; `test/identity/member_deletion_test.dart` (18). Apps: staff `Member deletions` destination (Admin) + 2 tests; mobile 1 test.
+  - Docs/CI: `identity-access.md` section, `contracts-and-owner-seams.md` (events, deletion and replay hooks, gates), `system-access-and-operations.md` (purpose), `backup-and-restore.md` (replay), `evidence-2.11/`, CI node tests and evidence scan, four deferred-work entries.
+- Decision (agent, under owner pre-approval): the in-app request also needs a recent password sign-in (`forbidden {"session": "reauthenticate"}`, the 2.7 check); the mobile screen confirms the password first, as 2.8 does for credential changes.
+- Decision (agent, under owner pre-approval): the staff route refuses a member with working app access (`conflict {"member_id": "member_can_use_app"}`): an Admin cannot delete someone who could ask themselves; a login hold first makes the route available when the member cannot use the app.
+- Decision (agent, under owner pre-approval): the Auth account step does not wait for handovers (security denial first); only erase steps do. Every destructive step also waits while a restore is held.
+- Decision (agent, under owner pre-approval): retained facts keep the tombstone member id (correction links); the deleted account id becomes the nil UUID; receipts (`cmd_receipts`, `sys_receipts`) mentioning the member or account and the account's GoTrue `audit_log_entries` are deleted; `rcv_journal_acks` keep the opaque ids by design (journal mirror).
+- Decision (agent, under owner pre-approval): restore replay erases inline only on `deletion_completed` entries (a manifest alone re-creates the workflow and denies), so a restore never erases more than the live system had; the restored Auth row is deleted by SQL only while a restore is held.
+- Environment: the stack was reset several times from this worktree; the phone switch was found off, was on only for the E2E runs and is off again; no image pulled (edge-runtime and postgres images reused); the isolated restore container and the edge-runtime container were removed; every synthetic row removed except append-only journal segments and their acknowledgements (gitignored `.recovery-state/journal`).
+- Owner and parent steps (none blocks the build; exact steps in the runbook "Hosted (parent session / owner)"): parent applies `20261007171500`; owner hand-applies `20261007171600` (and confirms `auth.audit_log_entries` deletion rights); deploy `identity-deletion` with `--no-verify-jwt` (no secret); owner mints and registers the `identity_deletion` credential for the worker; staging worker run with the Drive-mirrored journal.
+
 ## Plan Change Log
+
+- 2026-10-07, during implementation (agent, under owner pre-approval; not a step-04 loop). The frozen decision said contract v1 "gains `member_deletion_requested` and `member_deleted`". Investigation found `deletion_requested` ("Full deletion started: access-denied tombstone recorded") already in v1, unused; the request dispatches it instead of adding a duplicate name, and only `member_deleted` is added. Avoids two event names for one fact. KEEP: additive server-only rule.
 
 ## Review Triage Log
 
@@ -101,3 +121,9 @@ context:
 - `node tools/auth-harness/local-phone-auth.mjs on && node tools/identity-e2e/deletion.mjs --evidence …; node tools/auth-harness/local-phone-auth.mjs off` -- expected: all pass
 - regressions `lifecycle`, `assisted`, `credentials`, `recovery`, `cells`, `review`, `grants`, `apply`, `run` -- expected: pass
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/mobile`, `apps/staff`; contracts Dart/TS; node tool tests -- expected: pass
+- Results (2026-10-07, local, after a fresh reset each):
+  - `db:test` 1423/1423 (member deletion 93); `db:smoke` exit 0 (138 ok); `recovery:rehearse` all six scenarios, no problems.
+  - `deletion.mjs` 11/11 (`evidence-2.11/deletion-e2e.jsonl`); regressions `run` 30, `grants` 18, `apply` 27, `review` 18, `cells` 13, `recovery` 20, `credentials` 15, `assisted` 16, `lifecycle` 8/9 (`L40` fails identically on the baseline schema: pre-existing, deferred).
+  - client_core 345 tests, mobile 27, staff 26; analyze clean in all three; format applied; staff `flutter build web --no-web-resources-cdn` ok; contracts Dart 256, TS 239.
+  - Node tool tests (auth-harness, identity-e2e, functions, identity-deletion) pass; policy tests 49/49; `ci:migrations --base ccr-93e730dd-89lbvg` (24, non-destructive); `ci:secrets` clean; `scan-evidence` on evidence-2.11, `tools/identity-deletion`, `supabase/functions`, `tools/identity-e2e` clean.
+- Matrix audit: in-app (pgTAP + D10/D13 + widgets), staff (pgTAP + D20 + widgets), interrupt (pgTAP + D11/D12/D13 + worker tests), handover (pgTAP wait then completion), last Admin/repeat (pgTAP + D01), restore (pgTAP replay + replay failure keeps the hold + D40; incomplete journals: 1.10 rehearsal scenarios): every row has a passing test.

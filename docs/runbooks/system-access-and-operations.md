@@ -28,7 +28,7 @@ The payload may also carry `{"sequence": <integer 1..2147483647>}`.
 | Environment-bound | The credential's prefix must equal the database marker (`app.platform_current_environment()`; unmarked = production). Its stored row must also belong to that environment. A credential stops working when the database is re-marked. |
 | User sessions refused | An `authenticated` JWT, or any JWT carrying `sub`, gets `forbidden`, even with a valid credential. A forged JWT is rejected by PostgREST (401). `service_role` holds no grant. |
 | No forged actor | The actor is built from the credential's principal and the envelope `request_id` (job id). `initiating_member_id` is always null. Extra envelope or payload keys (`actor`, `system_principal_id`, `member_id`, `role`, …) give `validation_failed` / `unknown_field`. Headers such as `x-system-principal` are ignored. |
-| Allowlist | `system.synthetic_probe`, plus (story 2.9) the five `identity.assisted_*` commands of the purpose `identity_assisted_recovery` (see `identity-access.md`). A command must be in `app.sys_command_kinds`, granted to the principal by purpose, **and** executable by the kernel: the probe, or a registered owner handler (`payload_check` and `handler` signatures, resolved with `to_regprocedure`; owners answer refusals as data). Anything else gets `forbidden`. |
+| Allowlist | `system.synthetic_probe`, plus (story 2.9) the five `identity.assisted_*` commands of the purpose `identity_assisted_recovery` and (story 2.11) the six `identity.deletion_*` commands of the purpose `identity_deletion` (see `identity-access.md`). A command must be in `app.sys_command_kinds`, granted to the principal by purpose, **and** executable by the kernel: the probe, or a registered owner handler (`payload_check` and `handler` signatures, resolved with `to_regprocedure`; owners answer refusals as data). Anything else gets `forbidden`. |
 | Idempotent | Same principal, command and `request_id` returns the stored result. A changed payload gets `conflict`. |
 | Production gate | In production (or an unmarked database), the route also needs the owner-approved `ops_system_access` gate; otherwise `unavailable` with `{"policy": "gate_closed"}`. |
 | Audited | Every call that reaches the database writes one `app.sys_audit` row: environment, caller role, principal id, credential id, allowlisted command (else null), request id, outcome, error code and reason code. No payload, token, digest, address or free text. |
@@ -46,7 +46,7 @@ Each procedure takes the operator name, checks it against `app.ops_operators`, a
 
 | Procedure | Effect |
 |---|---|
-| `app.sys_create_principal(name, purpose, operator)` | Creates a principal in this database's environment, granted every command of its purpose. Purposes: `synthetic_probe`, and `identity_assisted_recovery` (story 2.9, used only by the Edge Function `identity-assisted-recovery`). |
+| `app.sys_create_principal(name, purpose, operator)` | Creates a principal in this database's environment, granted every command of its purpose. Purposes: `synthetic_probe`, `identity_assisted_recovery` (story 2.9, used only by the Edge Function `identity-assisted-recovery`) and `identity_deletion` (story 2.11, held only by the deletion worker `tools/identity-deletion/worker.mjs`; the Edge Function `identity-deletion` forwards it and holds none). |
 | `app.sys_register_credential(principal_id, digest, label, ttl, operator)` | Registers a credential digest. The TTL is between 1 minute and 30 days. |
 | `app.sys_revoke_credential(credential_id, operator)` | Revokes a credential immediately. |
 | `app.sys_disable_principal(principal_id, operator)` | Disables a principal and revokes every unrevoked credential it has. Each revocation is recorded as an operator action. |
@@ -89,7 +89,7 @@ Never print, paste, log or commit a credential. The secret scanner (`tools/ci/se
 
 5. **Compromise:** revoke at once, or disable the principal. Then check `app.ops_health_snapshot()` and the `sys_audit` rows for that `credential_id`.
 
-A future worker (scheduler, notification or deletion) gets its own principal purpose, its own command kinds and its own credential. Purposes are never shared (AD-19). Adding one needs a reviewed migration that extends `app.sys_command_kinds` and the kernel dispatch. Adding one is a later story.
+A future worker (scheduler or notification) gets its own principal purpose, its own command kinds and its own credential. Purposes are never shared (AD-19). Adding one needs a reviewed migration that registers its commands in `app.sys_command_kinds` (payload check and handler, story 2.9 registry). The deletion worker (story 2.11, purpose `identity_deletion`) is the first such worker; its staging credential steps are in `identity-access.md`, story 2.11.
 
 ## Support and deploy checks
 

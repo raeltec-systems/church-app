@@ -66,16 +66,20 @@ A registration is refused (SQLSTATE `PCTR1`) when:
 
 Identity calls `app.contract_dispatch_lifecycle(event)` in lock order: domain owners, then follow-ups, then notifications. If any hook fails, the whole lifecycle change rolls back, and so does a registered hook whose function no longer exists.
 
-Lifecycle events (contract v1): `access_hold_applied`, `access_hold_released`, `scope_revoked`, `account_deactivated` (an account unlinked), `deletion_requested`, `cell_transferred` (emitted by Cells), `sessions_revoked` (story 2.8), and `membership_deactivated` / `membership_restored` (story 2.10). The last three were added within v1 under the additive server-only rule above (fixtures, Dart and TypeScript mappings updated for parity).
+Lifecycle events (contract v1): `access_hold_applied`, `access_hold_released`, `scope_revoked`, `account_deactivated` (an account unlinked), `deletion_requested` (dispatched from story 2.11), `cell_transferred` (emitted by Cells), `sessions_revoked` (story 2.8), `membership_deactivated` / `membership_restored` (story 2.10) and `member_deleted` (story 2.11). The last four were added within v1 under the additive server-only rule above (fixtures, Dart and TypeScript mappings updated for parity).
 
 **Handover hooks (story 2.10).** An owner whose work must be handed over when a membership is deactivated also registers a read-only handover hook with Identity: `select app.identity_register_handover_hook('<module>', 'app.<prefix>_report_handover(jsonb)'::regprocedure);`. It returns `{"obligations": [{"kind", "subject_id", "last_responsible"}]}`; `last_responsible` refuses the deactivation until the work is handed over. The owner resolves recorded obligations with `app.identity_resolve_handover_obligation('<module>', '<obligation_id>', 'handed_over' | 'no_longer_needed')`. See `identity-access.md`, story 2.10.
 
+**Deletion hooks (story 2.11).** An owner that keeps personal data of a member registers a deletion hook before it activates: `select app.identity_register_deletion_hook('<module>', 'app.<prefix>_erase_member(jsonb)'::regprocedure);`. The handler gets `{member_id, account_id, deletion_id, phase}`; `phase` `erase` removes or anonymises the owner's personal data of that member (idempotent; Storage objects through the Storage API) and `check` only counts what is left; both answer `{"remaining": <int>}`. A full deletion completes only when every hook answers 0. Cells registers `app.cells_erase_member`. A deletion also records the member's handover obligations (2.10 hooks); erasure waits until they are resolved. See `identity-access.md`, story 2.11.
+
+**Journal replay hooks (story 2.11, platform).** `app.rcv_apply_journal_entry` (1.10) calls every hook registered with `app.rcv_register_replay_hook('<module>', 'app.<prefix>_rcv_replay(jsonb)'::regprocedure)` with `{entry, restoring}` after recording the entry. A hook re-applies its own deny-only effects only while a restore is held (`restoring` true), and raises when it cannot, which keeps the restore held. Identity registers `app.identity_rcv_replay`.
+
 ## Policy gates and environment
 
-- **Gates are closed by default.** `app.policy_gates` lists `q1_auth_recovery`, `q2_church_time`, `q4_personal_data`, `q9_money`, `q12_operations`, `private_access` and `outbound_sending`. Every gate starts `unresolved`.
+- **Gates are closed by default.** `app.policy_gates` lists `q1_auth_recovery`, `q2_church_time`, `q4_personal_data`, `q9_money`, `q12_operations`, `private_access` and `outbound_sending`, plus `ops_alert_destination` and `ops_system_access` (story 1.9) and `identity_deletion_retention` (story 2.11, Q4: what a full deletion erases or anonymises). Every gate starts `unresolved`.
 - **Reading a gate.** `app.policy_effective(gate)` raises the kernel's `unavailable` with `{"policy": "gate_closed"}`, which names no internal gate, unless one of these holds:
   - the gate is approved, or
-  - the environment is marked `local` or `staging` and the gate has a labelled fixture. Only Q2 (`UTC`) and Q9 (`XTS`, scale 2) have fixtures.
+  - the environment is marked `local` or `staging` and the gate has a labelled fixture. Only Q2 (`UTC`), Q9 (`XTS`, scale 2) and the Q4 deletion retention (`identity_deletion_retention`, labelled `TEST FIXTURE - Q4 retention and backup periods unapproved`) have fixtures.
 - **Environment marker.** `app.platform_environment`, with every change recorded in `app.platform_environment_history`:
   - **Nothing sets it automatically**: no seed and no migration writes it. A database with no marker behaves as **production**.
   - To use fixture policy on a local database, run `select app.platform_set_environment('local', '<you>');`.

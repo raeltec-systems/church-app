@@ -7,7 +7,7 @@
 -- Function and an isolated restore: tools/identity-e2e/deletion.mjs. Every account here is
 -- SYNTHETIC (+44 7700 900600-900619).
 begin;
-select plan(91);
+select plan(93);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000211' || lpad(n::text, 2, '0'))::uuid $$;
@@ -475,6 +475,13 @@ select is(pg_temp.sys('identity.deletion_advance', jsonb_build_object('deletion_
   'unavailable', 'erasure answers unavailable until 20261007171600 is applied');
 select is((select step_state from app.identity_deletion_steps where deletion_id = pg_temp.del(5) and step = 'erase_identity'),
   'pending', 'the step stays pending (retried after the file is applied)');
+update app.rcv_recovery_state set state = 'restored_held', restore_id = gen_random_uuid(), updated_by = 'pgtap';
+select throws_ok(format($$select app.rcv_apply_journal_entry(%L, 'israel')$$,
+  pg_temp.entry(jsonb_build_object('kind', 'deletion_completed',
+    'object', jsonb_build_object('bucket', 'identity-member', 'object_id', pg_temp.mid(5))))),
+  NULL, NULL, 'a replay that cannot erase fails, so reconciliation cannot complete');
+select ok(app.rcv_serving_hold() and (select display_name from app.identity_members where member_id = pg_temp.mid(5)) <> 'Deleted member',
+  'the restore stays held and nothing was half-applied');
 
 select * from finish();
 rollback;

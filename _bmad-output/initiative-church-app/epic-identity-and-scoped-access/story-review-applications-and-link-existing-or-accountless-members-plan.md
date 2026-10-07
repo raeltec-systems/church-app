@@ -7,8 +7,8 @@ status: 'built'
 baseline_revision: '10de24412f96617b2e1fc7efde2527dd8b837dc8'
 route: 'full'
 route_source: 'auto'
-review: ''
-review_source: ''
+review: 'quick'
+review_source: 'pinned'
 lenses_ran: []
 review_loop_iteration: 0
 context:
@@ -122,3 +122,16 @@ context:
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/mobile`, `apps/staff` -- expected: pass
 - Results (2026-10-07, local, after a reset): `db:test` 815/815 (review 91); `db:smoke` all ok (95); `review.mjs` 18/18; adapter check L1–L7; regressions `run.mjs` 30/30, `grants.mjs` 18/18, `apply.mjs` 27/27; client_core 200, mobile 19, staff 17 tests, analyze and format clean; staff `flutter build web` ok; `ci:migrations --base ccr-93e730dd-89lbvg` ordered and non-destructive; `ci:secrets`, `scan-evidence` and node tool tests (41) clean. Evidence: `evidence-2.5/README.md`.
 - Matrix audit: every I/O row has a passing pgTAP assertion and, except self-actions and the 7-day boundary (pgTAP only), an E2E step.
+
+## Review Triage Log
+
+| Finding | Verdict | Route | Evidence |
+|---|---|---|---|
+| link-existing hands the member's roles (incl. admin/lead_pastor) to a new account without audit | high | patch | unlink keeps grants; R22 asserts lead_pastor carried over |
+| reclaim does not revoke sessions (frozen intent) | medium | patch | only banned_until set |
+| reclaim not behind personal-data gate / fictional check | medium | patch | other review commands check identity_applications_open |
+| reclaim has no undo; '+'-prefixed phones missed | medium | patch | runbook-only undo; phone match without '+' |
+| approve-as-new ignores holds on previously linked members | medium | patch | 2.4 applicant rule checks ever-linked holds |
+| email binding comment vs code; applicant not told | low | patch | header says bind-if-confirmed, code refuses |
+| last_admin refusal shown as "no longer Admin" | low | patch | _refusal maps forbidden generically |
+| prior_not_approved ignores withdrawn; trigger scope undocumented | low | patch | cooldown counts rejected only |

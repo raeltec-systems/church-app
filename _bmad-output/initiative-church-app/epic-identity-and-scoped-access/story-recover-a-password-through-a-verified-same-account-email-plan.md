@@ -3,7 +3,7 @@ title: 'Recover a password through a verified same-account email'
 type: 'feature'
 ticket: '7'
 created: '2026-10-07'
-status: 'built'
+status: 'done'
 blocked_reason: ''
 baseline_revision: 'f967132c1b11489ec3f12a9b73083c8fcde627fe'
 route: 'full'
@@ -68,7 +68,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261007140000_recovery_email.sql` -- proposals and credential audit tables, redemption gate trigger, eligibility helper, member/Admin commands, `api.identity_recovery_email_command`, `api.identity_my_recovery_email`, `api.identity_admin_recovery_email_queue`, authorizer, grants.
+- [x] `supabase/migrations/20261007093323_recovery_email.sql` -- proposals and credential audit tables, redemption gate trigger, eligibility helper, member/Admin commands, `api.identity_recovery_email_command`, `api.identity_my_recovery_email`, `api.identity_admin_recovery_email_queue`, authorizer, grants.
 - [x] `supabase/tests/recovery_email_test.sql` + allowlist in `command_foundation_test.sql`; `identity_api_smoke.sh` anon/unlinked checks.
 - [x] `supabase/config.toml` -- mobile redirect entries.
 - [x] `tools/identity-e2e/recovery.mjs` (+ `recovery.test.mjs`) -- the verify bullet against local GoTrue and Mailpit.
@@ -84,7 +84,7 @@ context:
 
 - Built directly (no subagent tool in this session). Checkpoint 1 is pre-approved by the owner decisions. The plan is above the 1600-token guide because one Identity change spans the DB, two clients and evidence; it was kept whole, as in the epic's lane decision.
 - Files:
-  - Migration `supabase/migrations/20261007140000_recovery_email.sql`: one file, no `delete from`, non-destructive.
+  - Migration `supabase/migrations/20261007093323_recovery_email.sql`: one file, no `delete from`, non-destructive.
     - New: the proposal and credential-audit tables, the `identity_email_link_gate` trigger on `auth.users`, the commands and reads.
     - `create or replace` of `identity_authorize_command`, with every earlier command kept.
   - pgTAP `supabase/tests/recovery_email_test.sql` (57), the allowlist in `command_foundation_test.sql` (+6), and `identity_api_smoke.sh` (+10 lines).
@@ -114,7 +114,7 @@ context:
   - The phone switch was found off, was on only for the E2E, adapter and regression runs, and is off again.
   - Every synthetic user, row, flow state and caught message was removed.
 - Owner and parent steps:
-  - staging apply of `20261007140000`;
+  - staging apply of `20261007093323`;
   - the staging redirect-allowlist PATCH (runbook, Hosted step 2);
   - the staging demonstration with the owner inboxes (about 2 emails per hour on the built-in sender).
   - None of these blocks the build.
@@ -129,7 +129,7 @@ context:
     - The email-confirmed page showed success without a code.
     - Enumeration through GoTrue `/recover`.
   - **Amended:**
-    - `20261007140000` was edited in place (not on main or staging), still without `delete from`, DROP or TRUNCATE:
+    - `20261007093323` was edited in place (not on main or staging), still without `delete from`, DROP or TRUNCATE:
       - `app.identity_revert_recovery_email` is called by reject and by the new member command `identity.withdraw_recovery_email`, which works from the review state;
       - recency at approval;
       - the `withdrawn` state and the `_withdrawn`/`_reverted` audit actions;
@@ -173,3 +173,7 @@ context:
     - `scan-evidence` on evidence-2.7 and `tools/identity-e2e`: clean.
   - Evidence: `evidence-2.7/README.md`.
 - Matrix audit: every I/O row has a passing pgTAP assertion and an E2E step. The non-Admin and self rows are covered by pgTAP and E2E `X14`; the stale sign-in row by pgTAP and a widget test.
+
+## Hosted verification
+
+Staging apply, parity and API checks: `evidence-2.7/staging-verify.md`. Email flows on staging with the owner inboxes: `owner-consolidated-test.md`.

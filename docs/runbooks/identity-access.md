@@ -477,7 +477,7 @@ Apply `20261007075946_cell_membership.sql` after `20261007131600`. Production ke
 
 ## Recovery email and forgotten password (story 2.7)
 
-Migration: `supabase/migrations/20261007140000_recovery_email.sql` (no row deletions; one file).
+Migration: `supabase/migrations/20261007093323_recovery_email.sql` (no row deletions; one file).
 Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.7/`.
 
 ### Adding a recovery email (same account, optional)
@@ -527,7 +527,7 @@ Both read email from the stack's Mailpit (`http://127.0.0.1:54324`, part of `sup
 
 ### Hosted (owner / parent session)
 
-1. Apply `20261007140000_recovery_email.sql` after `20261007131600` (parent session). It adds a trigger on `auth.users`, like the 2.2 migration.
+1. Apply `20261007093323_recovery_email.sql` (applied to staging as this version) (parent session). It adds a trigger on `auth.users`, like the 2.2 migration.
 2. **Owner Auth setting (staging `tmurpotfluignacfueki`).** Add the mobile link targets to the redirect allowlist with the Management API (the dashboard's URL configuration page also works). `GET` the current value first and **append**, do not replace:
 
    ```http

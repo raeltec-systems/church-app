@@ -72,7 +72,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261007042111_membership_applications.sql` -- Cells tables, projection, seed, check hook, registration and `api.cells_signup_options`; Identity applications, events, the authorizer dispatch, the two commands, `api.identity_application_command` and `api.identity_my_application`; grants.
+- [x] `supabase/migrations/20261007050512_membership_applications.sql` -- Cells tables, projection, seed, check hook, registration and `api.cells_signup_options`; Identity applications, events, the authorizer dispatch, the two commands, `api.identity_application_command` and `api.identity_my_application`; grants.
 - [x] `supabase/tests/membership_applications_test.sql` -- pgTAP for the matrix, privileges, gates and guards; update the allowlist in `command_foundation_test.sql`.
 - [x] `supabase/tests/identity_api_smoke.sh` -- anon is denied the new functions.
 - [x] `tools/identity-e2e/apply.mjs` (+ test) -- real phone sign-up for each choice, correction, duplicate username, projection keys, pending denials, cleanup, redacted JSONL.
@@ -87,7 +87,7 @@ context:
 ## Implementation Notes
 
 - Built directly, because this session has no subagent tool. Files:
-  - Migration: `20261007042111_membership_applications.sql`.
+  - Migration: `20261007050512_membership_applications.sql`.
   - Database tests: pgTAP `membership_applications_test.sql` (72); allowlist in `command_foundation_test.sql` (+6 client-executable functions); `identity_api_smoke.sh` (+7 checks, and its cleanup now removes applications, events and receipts).
   - E2E tools: `tools/identity-e2e/apply.mjs` (+ `apply.test.mjs`), `live-application-check.sh` and `packages/client_core/tool/live_application_check.dart`.
   - client_core:

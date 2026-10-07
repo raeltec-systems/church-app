@@ -268,7 +268,7 @@ Both sign in through the verified email alias of synthetic phone accounts, so th
 
 ## Membership applications and the safe cell choice (story 2.4)
 
-Migration: `supabase/migrations/20261007042111_membership_applications.sql`.
+Migration: `supabase/migrations/20261007050512_membership_applications.sql`.
 
 ### Model
 

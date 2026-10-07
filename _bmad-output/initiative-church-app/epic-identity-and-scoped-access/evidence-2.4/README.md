@@ -1,6 +1,6 @@
 # Evidence: story 2.4 — register and apply for membership with a safe cell choice
 
-**Run:** 2026-10-07, on the LOCAL stack only (Supabase CLI 2.119.0), after `npx supabase db reset` with every migration up to `20261007042111_membership_applications.sql`. Phone sign-up used the local-only phone switch (`tools/auth-harness/local-phone-auth.mjs on`/`off`): no SMS provider, hook, test OTP or SMS MFA, and the E2E confirms `sms_provider` is empty.
+**Run:** 2026-10-07, on the LOCAL stack only (Supabase CLI 2.119.0), after `npx supabase db reset` with every migration up to `20261007050512_membership_applications.sql`. Phone sign-up used the local-only phone switch (`tools/auth-harness/local-phone-auth.mjs on`/`off`): no SMS provider, hook, test OTP or SMS MFA, and the E2E confirms `sms_provider` is empty.
 
 **Data:** every record is SYNTHETIC.
 - Phone numbers come only from `+1 202 555 0141–0149` (pgTAP), `+1 202 555 0181–0183` and `+44 7700 900181` (E2E and adapters). pgTAP also uses `+999…`, an unassigned ITU code, only to prove the fictional-range fence.
@@ -48,7 +48,7 @@ The real Dart adapters are `SupabaseAccountAuthGateway`, `SupabaseMembershipRepo
 
 ## Not done here (owner or parent)
 
-- **Staging apply** of `20261007042111_membership_applications.sql` to `bic-kafue-platform-test`, then `select app.cells_seed_synthetic_cells('<operator>')` on staging. Hosted apply was out of scope for this build.
+- **Staging apply** of `20261007050512_membership_applications.sql` to `bic-kafue-platform-test`, then `select app.cells_seed_synthetic_cells('<operator>')` on staging. Hosted apply was out of scope for this build.
 - **The owner's device demonstration** on Android: Create account, then Join the church with each choice, then Correct.
 - **Owner gates, all left fail-closed:**
   - the church's real cell list and sign-up labels (entry 6 Admin cell setup; production lists no cells until then);

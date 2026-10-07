@@ -50,6 +50,79 @@ void main() {
   setUp(FocusVisibility.instance.reset);
 
   testWidgets(
+    'story 2.8: a held session reaches only the generic help screen',
+    (tester) async {
+      final h = await pumpMobile(
+        tester,
+        size: const Size(390, 1400),
+        location: '/fixture',
+      );
+      h.grants.myAccess = const AccessReadDenied(AccessDenial.reviewRequired);
+      h.memberAccess.next = const MemberAccessDenied(
+        MemberAccessDenial.reviewRequired,
+      );
+      h.credentials.mine = AccessReadOk(
+        MyCredentials.fromJson(
+          myCredentialsData(
+            access: 'review_required',
+            canRequest: false,
+            pendingChange: credentialChangeData(),
+          ),
+        ),
+      );
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('access-review-required')), findsOneWidget);
+      expect(
+        find.byKey(const Key('access-review-pending-change')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('member-summary')), findsNothing);
+      expect(find.byKey(const Key('nav-/my-cell')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'story 2.8: sign-in details from the account page; a new username goes '
+    'to church review, never by SMS',
+    (tester) async {
+      final h = await pumpMobile(
+        tester,
+        size: const Size(390, 1600),
+        location: '/fixture',
+      );
+      h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.memberAccess.next = MemberAccessGranted(syntheticMemberSummary());
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'go-sign-in-details');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'change-kind-phone_username');
+      await tester.enterText(
+        find.byKey(const Key('new-phone-username-field')),
+        '+44 7700 900340',
+      );
+      await tester.enterText(
+        find.byKey(const Key('change-current-password-field')),
+        'Synthetic-pw',
+      );
+      await tapKey(tester, 'send-credential-change');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      final sent = h.gateway.sent.single;
+      expect(sent.function, 'identity_credential_command');
+      expect(sent.wire['payload'], {
+        'change_kind': 'phone_username',
+        'phone_username': '+447700900340',
+      });
+      expect(h.auth.sent, isEmpty);
+    },
+  );
+
+  testWidgets(
     'story 2.7: the recovery deep link opens a set-password form only, and '
     'the Android manifest accepts only the app scheme under /auth/',
     (tester) async {

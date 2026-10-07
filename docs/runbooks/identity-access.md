@@ -506,7 +506,7 @@ While Q4 is unapproved only synthetic addresses are accepted: `@example.test`, `
 ### Known and accepted risks
 
 - **Enumeration through GoTrue (accepted platform risk; owner decision at entry 14).** The apps' answer is neutral, but GoTrue's `/recover` is directly callable with the publishable key, and its per-address resend refusal (`429`) and its timing reveal which addresses Auth holds. No wrapper is built. The owner decides at entry 14, together with the Q1 sender/SMTP and Auth rate-limit settings.
-- **Stolen-session lockout (carried to entry 8).** A stolen live session can call GoTrue's `PUT /user` directly to change the email or the password. Private access never follows (binding review, trust epoch), but the real member can be locked out of password sign-in. The exits are the withdraw/reject revert above and staff-assisted recovery; credential-change review and reauthentication rules are entry 8.
+- **Stolen-session lockout (resolved by story 2.8).** A stolen live session can call GoTrue's `PUT /user` directly to change the email or the password. Private access never follows an email change (binding review, trust epoch). Story 2.8 gives the exits: an Admin places a hold (`security_concern`, or `lost_device`, which signs out every device) and restores the approved sign-in details (`identity.restore_credentials`: the unapproved address leaves Auth, and every session, the thief's included, is revoked). A password the thief changed is reset through the approved recovery email (which `double_confirm_changes` keeps out of a thief's reach) or through staff-assisted recovery (entry 9). See [Credential changes, holds and credential review (story 2.8)](#credential-changes-holds-and-credential-review-story-28).
 - **Version-dependent gate.** The reset gate relies on GoTrue v2.197.0 redeeming a link with `UPDATE auth.users SET recovery_token = ''` and the password unchanged. `tools/ci/verify-hosted.sql` fails promotion when the Auth schema is not the proven one (`20260831180000`), when the columns are missing, or when the trigger is absent; after an Auth upgrade, run the canary below and the recovery E2E before adding the new schema version there.
 
 ### Reset-gate canary (part of the consolidated staging test)
@@ -541,3 +541,110 @@ Both read email from the stack's Mailpit (`http://127.0.0.1:54324`, part of `sup
    Staff web needs no entry while it is served from the same host as `site_url` (GoTrue allows any URL on the site URL's host); a staff web host on another domain needs `https://<host>/**` added the same way. No SMS setting is touched. Default email templates work (PKCE confirmation URLs).
 3. **Staging demonstration** (includes the reset-gate canary above) with the owner-approved inboxes `israelmuyoba+<tag>@gmail.com` (the owner reads them; agents never send to them): add and confirm a recovery email on mobile, approve it on staff web, reset from the mobile link and from staff web, and repeat the neutral cases. Supabase's built-in email sender allows about 2 emails per hour, so spread the run or use custom SMTP (entry 14).
 4. **Production** (entry 14): `q1_auth_recovery` approval, production SMTP/sender/domain and the production redirect allowlist are owner gates. Until then email recovery stays closed there.
+
+## Credential changes, holds and credential review (story 2.8)
+
+Migrations: `supabase/migrations/20261007160000_credential_review.sql` (no row deletions) and the small follow-up `20261007160100_credential_review_auth_rows.sql`. The follow-up holds the Auth row deletions (the sessions, refresh tokens, MFA factors and identities of one account); the owner applies it by hand after the main file, as with `20261007131600`. Until it is applied, every command that revokes sessions or removes factors answers `unavailable`, because the main file installs fail-closed stubs.
+Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.8/`.
+
+### What never clears a hold or approves a binding
+
+- A hold is released only by `identity.release_hold`, by another Admin, after an identity check.
+- A binding changes only through an Admin decision that records a new `binding_revision`.
+- None of these does either: a direct Auth change (native `PUT /user`, the Auth Admin API, SQL), a public forgot-password request, a sign-in, a reset or an email verification. The 2.2 detection records a direct change and keeps the account in review; holds and dormancy stay in force through a reset (2.7).
+
+### Reviewed sign-in detail changes (member request, Admin decision)
+
+`POST /rest/v1/rpc/identity_credential_command` (`Content-Profile: api`, 1.4 envelope):
+
+| Command | Who | `expected_revision` | Payload |
+|---|---|---|---|
+| `identity.request_credential_change` | the member (granted session, password sign-in at most 10 minutes old) | null | `{change_kind: "phone_username", phone_username}`, `{change_kind: "recovery_email_replace", email}` or `{change_kind: "recovery_email_remove"}` |
+| `identity.withdraw_credential_change` | the member (also while in review) | change revision | `{change_id}` |
+| `identity.approve_credential_change` | Admin, not for their own account | change revision | `{change_id, identity_check}` |
+| `identity.reject_credential_change` | Admin, not for their own account | change revision | `{change_id, reason?}` (`identity_not_confirmed`, `contact_church_office`) |
+
+- **Limits.** One pending change or 2.7 proposal per account: a second request is `conflict {"change_id": "pending"}`, and a 2.7 proposal beside a pending change is `conflict {"email": "pending_change"}`. At most 5 requests per 24 hours. While Q4 is unapproved, numbers must be fictional (`out_of_range`) and addresses synthetic (`unsupported`).
+- **Phone username.**
+  - The request leaves Auth and access as they are.
+  - A number held by another account is `conflict {"phone_username": "unavailable"}` for the member and `conflict {"phone_username": "taken"}` at approval. Nothing is overwritten or merged; the 2.5 reclaim is the separate, identity-checked route.
+  - On approval Identity writes the new phone to `auth.users` server-side, with `phone_confirmed_at`; the phone identity's data follows. **No SMS and no OTP.** It records binding revision n+1 (`phone_username_changed`), returns the link to `active`, moves the trust epoch and revokes every Auth session of the account.
+  - The member then signs in with the new number and the same password.
+- **Recovery email replacement.**
+  - `double_confirm_changes` stays on, so the old address is never required. The request removes the old address from Auth at once, and the account waits in access review, as a 2.7 addition does.
+  - The app then calls native `updateUser(new)` on the same account; Auth sends one confirmation link, to the new address.
+  - Only a confirmed new address can be approved; otherwise `validation_failed {"recovery_email": "unverified"}`. Approval records binding n+1 (`recovery_email_replaced`) and revokes every session.
+  - Reject or withdraw puts the approved address back, confirmed, unless another account took it meanwhile. The review is lifted with a new binding revision when nothing else changed.
+- **Recovery email removal.** The address keeps working until approval. Approval clears it, with its change tokens, from Auth and from the binding (`recovery_email_removed`).
+- **Other changes.** If anything else changed on the account, approval is `conflict {"change_id": "other_changes"}`. That covers another Auth phone or email, an MFA factor, a foreign identity, or a recorded phone, delete, identity or MFA change since the request. Reject the request, then use the credential review below.
+
+### Holds (Admin)
+
+| Command | `expected_revision` | Payload | Effect |
+|---|---|---|---|
+| `identity.place_hold` | member revision | `{member_id, reason_code}` | `ownership_dispute` → kind `access_review`; `security_concern` → `security`; `lost_device` → `security`, **and every Auth session of the account is revoked** |
+| `identity.release_hold` | member revision | `{member_id, hold_id, identity_check}` | Released by another Admin. Moves the trust epoch, so sessions opened during the hold sign in again |
+
+- An Admin cannot hold or release their own member record (`forbidden {"member_id": "unsupported"}`). The same open reason twice is `conflict {"reason_code": "already_held"}`.
+- A held session still works, but only for the generic help screen: every protected read answers `review_required`. A revoked session is refused outright (`untrusted_session`), and the clients end it.
+- **Lifecycle hooks.** Placing dispatches the contract v1 event `access_hold_applied`; releasing dispatches `access_hold_released`. Both run in the same transaction, with `identity_revision` set to the member revision.
+  - Device-registration owners (the inbox epic) register on `access_hold_applied` to remove push registrations. No new event was added.
+  - Today only the SYNTHETIC `app.fixture_record_lifecycle` is ever registered for these events, by the tests and the E2E, which remove it again.
+- Audit: `app.identity_credential_review_audit` (`hold_placed`, `hold_released`, with the reason code and the number of revoked sessions).
+
+### Credential review of an account in access review (Admin)
+
+For a detected direct Auth change (2.2), a 2.7 `other_changes` case or a stolen-session lockout:
+
+| Command | `expected_revision` | Payload | Effect |
+|---|---|---|---|
+| `identity.restore_credentials` | member revision | `{member_id, identity_check}` | Auth returns to the approved binding: phone, email (confirmed) and change tokens. MFA factors, identities of other providers and email identities of other addresses are deleted. Every session is revoked. Binding n+1 (`credentials_restored`) |
+| `identity.accept_credentials` | member revision | `{member_id, identity_check}` | The current Auth phone and confirmed email become binding n+1 (`credentials_accepted`), and every session is revoked. Refused with an MFA factor or foreign identity (`unsupported_factors`), an unpermitted or taken number (`phone_unsupported`), or an unconfirmed or unpermitted email (`email_unverified`) |
+
+- Both refuse while a change or 2.7 proposal is pending (`conflict {"member_id": "pending_change"}`; decide it first), and for the Admin's own account.
+- Restore refuses when another account now holds the approved number or address (`phone_taken`, `email_taken`).
+
+### Reads
+
+| Endpoint | Who | Returns |
+|---|---|---|
+| `api.identity_my_credentials()` | the member (granted or in review) | `{access, phone_username, recovery_email, pending_change, last_change, pending_recovery_email, can_request, church_contact, recent_sign_in_minutes}`. `access` is only `granted` or `review_required`: it never says why. `church_contact` is the Q1 `operational_contact` church setting, or null while unset. |
+| `api.identity_admin_credential_queue()` | Admin | `changes` (pending, with `verified`, `phone_available`, `other_changes`, `own_account`); `reviews` (accounts in review with no pending request: approved and current Auth values, `extra_factors`, the recorded `change_kinds`); `holds` (open, with the reason code) |
+
+### Clients
+
+- **Both clients: "Access review required".**
+  - While the server answers `review_required` for `api.identity_my_access`, the shells show the generic help screen (`/access-review`) in place of every private destination: account, access, cells, the Admin screens and sign-in details.
+  - The screen says a church check is needed, and that signing in again, a reset or an email confirmation does not finish it. It shows the church contact (or "contact the church office") and the member's own current request with **Withdraw**, and offers **Check again** and **Sign out**.
+  - It never states a reason.
+- **Mobile: Sign-in details** (`/sign-in-details`, from My membership).
+  - It shows the approved username and recovery email, and the pending request.
+  - **Ask for a change** offers a new phone number username, a new recovery email, or removing the recovery email. Each needs the current password (a fresh password sign-in on the same account).
+  - After a replacement request, Auth sends the confirmation link to the new address.
+- **Staff web: Access reviews** (`/admin/credential-reviews`, Admin).
+  - Requested changes: approve and apply after an identity check, or don't approve, with a reason.
+  - Accounts in access review: restore or accept after an identity check.
+  - Holds: release after an identity check.
+  - **Place a hold** on a member found by name or contact number.
+
+### Local runs
+
+```bash
+npx supabase db reset                          # empty Admin roster
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/credentials.mjs --evidence <file>.jsonl
+FLUTTER_ROOT=/opt/sdk/flutter bash tools/identity-e2e/live-credentials-check.sh   # after another reset
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The live check drives the real client adapters with `+44 7700 900357–900359`. The E2E uses `+44 7700 900330–900349` and `@example.test` addresses, and reads mail from the stack's Mailpit. It registers the SYNTHETIC fixture hold hooks and removes them again. It removes every user, change, hold, audit row, flow state and caught message it creates.
+
+### Hosted (owner / parent session)
+
+1. **Parent session:** apply `20261007160000_credential_review.sql`.
+   - It adds a trigger on `app.identity_holds` and one on `app.identity_recovery_email_proposals`.
+   - Like 2.5 and 2.7, it writes `auth.users`, `auth.identities` and `auth.one_time_tokens` rows only inside Admin and member commands.
+2. **Owner, by hand:** apply `20261007160100_credential_review_auth_rows.sql`.
+   - Each command deletes rows of one account in `auth.sessions`, `auth.refresh_tokens`, `auth.mfa_factors` and `auth.identities`.
+   - Confirm on staging that the migration owner may delete from those tables. Until this file is applied, approvals, lost-device holds, restore and accept answer `unavailable`.
+3. **No Auth setting changes:** `double_confirm_changes` stays on, and no SMS setting is touched.

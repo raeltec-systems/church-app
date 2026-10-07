@@ -1,0 +1,21 @@
+
+> db:test
+> supabase test db
+
+Connecting to local database...
+/home/user/church-app/.claude/worktrees/agent-a61ae0b281aaecb47/supabase/tests/cell_membership_test.sql .......... ok
+/home/user/church-app/.claude/worktrees/agent-a61ae0b281aaecb47/supabase/tests/command_foundation_test.sql ....... ok
+/home/user/church-app/.claude/worktrees/agent-a61ae0b281aaecb47/supabase/tests/credential_review_test.sql ........ ok
+/home/user/church-app/.claude/worktrees/agent-a61ae0b281aaecb47/supabase/tests/cross_epic_contracts_test.sql ..... ok
+/home/user/church-app/.claude/worktrees/agent-a61ae0b281aaecb47/supabase/tests/identity_grants_test.sql .......... ok
+/home/user/church-app/.claude/worktrees/agent-a61ae0b281aaecb47/supabase/tests/identity_live_access_test.sql ..... ok
+/home/user/church-app/.claude/worktrees/agent-a61ae0b281aaecb47/supabase/tests/identity_session_trust_test.sql ... ok
+/home/user/church-app/.claude/worktrees/agent-a61ae0b281aaecb47/supabase/tests/membership_applications_test.sql .. ok
+/home/user/church-app/.claude/worktrees/agent-a61ae0b281aaecb47/supabase/tests/membership_review_test.sql ........ ok
+/home/user/church-app/.claude/worktrees/agent-a61ae0b281aaecb47/supabase/tests/platform_status_test.sql .......... ok
+/home/user/church-app/.claude/worktrees/agent-a61ae0b281aaecb47/supabase/tests/recovery_email_test.sql ........... ok
+/home/user/church-app/.claude/worktrees/agent-a61ae0b281aaecb47/supabase/tests/recovery_journal_test.sql ......... ok
+/home/user/church-app/.claude/worktrees/agent-a61ae0b281aaecb47/supabase/tests/system_access_test.sql ............ ok
+All tests successful.
+Files=13, Tests=1098,  5 wallclock secs ( 0.23 usr  0.04 sys +  0.22 cusr  0.17 csys =  0.66 CPU)
+Result: PASS

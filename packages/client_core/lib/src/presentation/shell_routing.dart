@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'access_screens.dart';
 import 'account_screen.dart';
 import 'cell_screens.dart';
+import 'credential_screens.dart';
 import 'fixture_command_screen.dart';
 import 'membership_application_screen.dart';
 import '../domain/password_recovery.dart';
@@ -62,6 +63,15 @@ abstract final class ClientPaths {
 
   /// Story 2.7, staff web, Admin only: recovery email approvals.
   static const adminRecoveryEmails = '/admin/recovery-emails';
+
+  /// Story 2.8: the generic "Access review required" help screen.
+  static const accessReview = '/access-review';
+
+  /// Story 2.8 (mobile): the member's sign-in details and reviewed changes.
+  static const signInDetails = '/sign-in-details';
+
+  /// Story 2.8, staff web, Admin only: credential changes, reviews, holds.
+  static const adminCredentialReviews = '/admin/credential-reviews';
 }
 
 /// Story 2.7: the incoming Auth email link for this route, read once. Only
@@ -103,9 +113,15 @@ GoRouter buildClientRouter({
   final afterCreateAccount = membershipRequests
       ? ClientPaths.membership
       : ClientPaths.account;
+  // Story 2.8: while the server says this session's access is in review,
+  // private destinations show only the generic help screen.
   Page<void> page(GoRouterState state, Widget screen) => NoTransitionPage(
     key: state.pageKey,
-    child: shell(state.uri.path, state.extra is NavFocusRequest, screen),
+    child: shell(
+      state.uri.path,
+      state.extra is NavFocusRequest,
+      AccessReviewGate(path: state.uri.path, child: screen),
+    ),
   );
   return GoRouter(
     initialLocation: initialLocation,
@@ -181,6 +197,18 @@ GoRouter buildClientRouter({
         path: ClientPaths.adminRecoveryEmails,
         pageBuilder: (_, state) =>
             page(state, const RecoveryEmailReviewScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.accessReview,
+        pageBuilder: (_, state) => page(state, const AccessReviewScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.signInDetails,
+        pageBuilder: (_, state) => page(state, const SignInDetailsScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.adminCredentialReviews,
+        pageBuilder: (_, state) => page(state, const CredentialReviewScreen()),
       ),
       GoRoute(
         path: ClientPaths.signIn,

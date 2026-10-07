@@ -83,6 +83,9 @@ Future<List<Override>> compositionOverrides(AppConfig config) async {
     recoveryEmailRepositoryProvider.overrideWithValue(
       SupabaseRecoveryEmailRepository(client, redirects: redirects),
     ),
+    credentialReviewRepositoryProvider.overrideWithValue(
+      SupabaseCredentialReviewRepository(client),
+    ),
     passwordRecoveryGatewayProvider.overrideWithValue(
       SupabasePasswordRecoveryGateway(
         supabaseUrl: config.supabaseUrl,

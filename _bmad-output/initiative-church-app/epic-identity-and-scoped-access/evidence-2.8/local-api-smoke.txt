@@ -1,0 +1,10 @@
+ok   - no api relation named identity_holds (404)
+ok   - signed-out client cannot call identity_credential_command (401)
+ok   - signed-out client cannot call identity_my_credentials (401)
+ok   - signed-out client cannot call identity_admin_credential_queue (401)
+ok   - an applicant cannot call identity_my_credentials (403 not_linked)
+ok   - an applicant cannot call identity_admin_credential_queue (403 not_linked)
+ok   - an applicant cannot request a credential change (forbidden envelope)
+ok   - an applicant cannot place a hold (forbidden envelope)
+ok   - no SMS provider configured
+# npm run db:smoke: exit 0, 121 ok lines, 0 FAIL (phone provider off, CLI default config)

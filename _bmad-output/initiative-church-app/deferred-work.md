@@ -18,3 +18,11 @@
 - source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-enforce-live-session-trust-across-alternate-auth-routes-plan.md`
   summary: Run the 2.2 session-persistence path (flutter_secure_storage Keystore/Keychain restore after app restart) on a real Android/iOS device or emulator, and repeat the 2.2 alternate-route checks on hosted staging after the owner promotes 20261006220500_identity_session_trust.
   evidence: 2.2 closed the 2.1 persistence deferral with platform-secured storage, verified by widget tests, the plugin mock and the live SDK restore path only; no device toolchain here and staging promotion is owner-gated.
+
+- source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-change-credentials-under-review-and-hold-access-plan.md`
+  summary: A dedicated lifecycle event for session revocation without a hold (an approved username change, a restore or accept, entry 10 deactivation) so device-registration owners can remove push registrations then too; today they hook `access_hold_applied` (a lost-device hold always holds).
+  evidence: story 2.8 reused the contract v1 events because a new event is a contract version change (SQL list, shared fixtures, Dart and TypeScript mappings) owned by the platform contracts; no device-registration owner exists yet (inbox epic).
+
+- source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-change-credentials-under-review-and-hold-access-plan.md`
+  summary: A stolen live session can still change the PASSWORD through GoTrue `PUT /user` (`secure_password_change` is off and its reauthentication nonce would need SMS for phone users); the thief can then sign in until the member reports it.
+  evidence: story 2.8 resolves the email-change lockout (double confirmation keeps the approved address, restore + lost-device hold revoke every session); the member's exits for a changed password are the approved-email reset and staff-assisted recovery (entry 9). A server-side password-change gate needs an owner decision on GoTrue settings.

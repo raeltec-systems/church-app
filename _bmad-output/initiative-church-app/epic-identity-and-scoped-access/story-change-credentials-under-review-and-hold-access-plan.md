@@ -3,7 +3,7 @@ title: 'Change credentials under review and hold access'
 type: 'feature'
 ticket: '8'
 created: '2026-10-07'
-status: 'in-progress'
+status: 'built'
 blocked_reason: ''
 baseline_revision: '76f8b95c6edbfbe779b56fc484798be19c7daf6f'
 route: 'full'
@@ -69,18 +69,34 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261007160000_credential_review.sql` -- tables (changes, review audit), hold columns, release-epoch trigger, 2.7 proposal guard, commands, authorizer, reads, grants; session/factor helpers as fail-closed stubs.
-- [ ] `supabase/migrations/20261007160100_credential_review_auth_rows.sql` -- the stubs replaced with the Auth row deletions only.
-- [ ] `supabase/tests/credential_review_test.sql`, allowlist, `identity_api_smoke.sh`.
-- [ ] `tools/identity-e2e/credentials.mjs` (+ `.test.mjs`) -- the verify bullet against local GoTrue, PostgREST and Mailpit.
-- [ ] `packages/client_core` -- domain, adapter, controllers, help/sign-in-details/Admin screens, routes, review gate, fakes, tests; `apps/mobile`, `apps/staff` destinations and tests.
-- [ ] `docs/runbooks/identity-access.md`, `evidence-2.8/README.md`, CI evidence scan, deferred-work entry.
+- [x] `supabase/migrations/20261007160000_credential_review.sql` -- tables (changes, review audit), hold columns, release-epoch trigger, 2.7 proposal guard, commands, authorizer, reads, grants; session/factor helpers as fail-closed stubs.
+- [x] `supabase/migrations/20261007160100_credential_review_auth_rows.sql` -- the stubs replaced with the Auth row deletions only.
+- [x] `supabase/tests/credential_review_test.sql`, allowlist, `identity_api_smoke.sh`.
+- [x] `tools/identity-e2e/credentials.mjs` (+ `.test.mjs`) -- the verify bullet against local GoTrue, PostgREST and Mailpit.
+- [x] `packages/client_core` -- domain, adapter, controllers, help/sign-in-details/Admin screens, routes, review gate, fakes, tests; `apps/mobile`, `apps/staff` destinations and tests.
+- [x] `docs/runbooks/identity-access.md`, `evidence-2.8/README.md`, CI evidence scan, deferred-work entry.
 
 **Acceptance Criteria:**
 - Given the local stack, when `credentials.mjs` runs, then every matrix row passes against real GoTrue and leaves no synthetic rows.
 - Given CI, when db:test, db:smoke, node tests, flutter analyze and test run, then all pass.
 
 ## Implementation Notes
+
+- Built directly (no subagent tool in this session); checkpoint 1 pre-approved by the owner decisions. The plan is above the 1600-token guide because one Identity change spans the DB, two clients and evidence; kept whole, as 2.7 was.
+- Files:
+  - `supabase/migrations/20261007160000_credential_review.sql` (no `delete from`): `identity_credential_changes`, `identity_credential_review_audit`, hold columns, release-epoch trigger, 2.7 proposal guard trigger, member/Admin commands, `api.identity_credential_command`, `api.identity_my_credentials`, `api.identity_admin_credential_queue`, `identity_authorize_command` replaced (every earlier command kept), 2.7 `identity_recovery_email_other_changes` replaced to tolerate email identities of previously approved/reviewed addresses; fail-closed stubs `identity_revoke_auth_sessions` / `identity_remove_auth_extras`.
+  - `supabase/migrations/20261007160100_credential_review_auth_rows.sql`: the two helpers with the Auth row deletions only.
+  - Tests: `supabase/tests/credential_review_test.sql` (102); allowlist in `command_foundation_test.sql`; `identity_session_trust_test.sql` expectation (a release is now an event); `identity_api_smoke.sh` (+7).
+  - E2E `tools/identity-e2e/credentials.mjs` (+ `.test.mjs`); live adapter check `tools/identity-e2e/live-credentials-check.sh` + `packages/client_core/tool/live_credentials_check.dart`.
+  - client_core: `domain/credential_review.dart`, `adapters/supabase_credential_review_repository.dart`, `application/credential_controllers.dart`, `presentation/credential_screens.dart` (help screen, `AccessReviewGate`, sign-in details, Admin screen), routes and gate in `shell_routing.dart`, links in `account_screen.dart`, provider, composition, exports, fakes; `test/identity/credential_review_test.dart` (23).
+  - Apps: staff `Access reviews` destination (Admin); mobile and staff shell tests.
+  - Docs: runbook section (and the 2.7 carried-risk line), `evidence-2.8/`, CI evidence scan, two deferred-work entries.
+- Decision (agent, under owner pre-approval): the help screen answers only `granted`/`review_required` and the church contact from the unset-by-default Q1 `operational_contact` setting; no reason is ever sent to the member.
+- Decision (agent, under owner pre-approval): restore/accept also revoke every Auth session (the thief's included) besides moving the epoch; approve of any change revokes sessions too.
+- Surprise: the sandbox disk filled up (ext4 reserved blocks) and hung the first flutter run; removed the unused excluded Docker images (studio, logflare; re-pullable) to continue.
+- Environment: the stack was reset several times from this worktree; the phone switch was found off, on only for the E2E and live check, and is off again; every synthetic row, hook registration and caught message was removed.
+- Owner and parent steps: staging apply of `20261007160000` (parent); `20261007160100` by hand (owner) — until then approvals, lost-device holds, restore and accept answer `unavailable` on staging. No Auth setting change. None blocks the build.
+- Known residual risk (deferred-work): a stolen live session can still change the password via `PUT /user`; exits are the approved-email reset, staff-assisted recovery (entry 9) and a lost-device hold.
 
 ## Plan Change Log
 
@@ -92,3 +108,9 @@ context:
 - `npx supabase db reset && npm run db:test && npm run db:smoke` -- expected: pass
 - `node tools/auth-harness/local-phone-auth.mjs on && node tools/identity-e2e/credentials.mjs --evidence …; node tools/auth-harness/local-phone-auth.mjs off` -- expected: all pass
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/mobile`, `apps/staff` -- expected: pass
+- Results (2026-10-07, local):
+  - `db:test` 1098/1098 (credential review 102); `db:smoke` exit 0, 121 ok.
+  - `credentials.mjs` 13/13; live adapter check C1–C4.
+  - client_core 273 tests, staff 21, mobile 23; analyze clean in all three; format clean; staff `flutter build web --no-web-resources-cdn` ok.
+  - Node tool tests 50/50; `ci:migrations --base ccr-93e730dd-89lbvg` (19, ordered, non-destructive); `ci:secrets` clean; `scan-evidence` on evidence-2.8 and `tools/identity-e2e` clean.
+- Matrix audit: phone change (pgTAP + E2E C10 + live C1–C2 + widgets), email replace (pgTAP + C20–C21), remove (pgTAP + C22), hold (pgTAP + C30–C32), lost device (pgTAP + C40–C41 + live C3–C4), stolen-session (pgTAP + C50), self/non-Admin (pgTAP + C10/C30 + widgets): every row has a passing test.

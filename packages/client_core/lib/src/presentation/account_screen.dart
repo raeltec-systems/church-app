@@ -262,13 +262,28 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
               ),
               if (widget.linkRecoveryEmail) ...[
                 const SizedBox(height: 12),
-                FocusRing(
-                  child: OutlinedButton.icon(
-                    key: const Key('go-recovery-email'),
-                    onPressed: () => context.go(ClientPaths.recoveryEmail),
-                    icon: const Icon(Icons.alternate_email_outlined),
-                    label: const Text('Recovery email'),
-                  ),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    FocusRing(
+                      child: OutlinedButton.icon(
+                        key: const Key('go-recovery-email'),
+                        onPressed: () => context.go(ClientPaths.recoveryEmail),
+                        icon: const Icon(Icons.alternate_email_outlined),
+                        label: const Text('Recovery email'),
+                      ),
+                    ),
+                    // Story 2.8: reviewed username and recovery-email changes.
+                    FocusRing(
+                      child: OutlinedButton.icon(
+                        key: const Key('go-sign-in-details'),
+                        onPressed: () => context.go(ClientPaths.signInDetails),
+                        icon: const Icon(Icons.manage_accounts_outlined),
+                        label: const Text('Sign-in details'),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ],
@@ -320,6 +335,15 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                 'My membership request',
                 () => context.go(ClientPaths.membership),
                 key: const Key('go-membership-request'),
+                primary: true,
+              ),
+            // Story 2.8: the generic help screen (church contact and the
+            // member's own current request).
+            if (denial == MemberAccessDenial.reviewRequired)
+              BannerAction(
+                'Get help',
+                () => context.go(ClientPaths.accessReview),
+                key: const Key('go-access-review'),
                 primary: true,
               ),
             // Story 2.7: a verified recovery email waiting for approval puts

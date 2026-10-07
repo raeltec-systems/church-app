@@ -348,6 +348,62 @@ void main() {
     expect(h.recoveryEmail.queueCalls, greaterThanOrEqualTo(1));
   });
 
+  testWidgets(
+    'story 2.8: Admins see Access reviews; the queue is the server answer',
+    (tester) async {
+      final h = await pumpStaff(tester, location: '/fixture');
+      expect(
+        find.byKey(const Key('nav-/admin/credential-reviews')),
+        findsNothing,
+      );
+      expect(
+        staffDestinationsFor(null),
+        isNot(contains(staffCredentialReviewsDestination)),
+      );
+      h.grants.myAccess = AccessReadOk(syntheticGrants(roles: ['admin']));
+      h.credentials.queue = AccessReadOk(
+        CredentialQueue.fromJson(
+          credentialQueueData(
+            changes: [credentialChangeItemData()],
+            holds: [holdItemData()],
+          ),
+        ),
+      );
+      await tapKey(tester, 'nav-/status');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'nav-/admin/credential-reviews');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('SYNTHETIC Grace Phiri'), findsOneWidget);
+      expect(find.text('SYNTHETIC Mary Tembo'), findsOneWidget);
+      expect(h.credentials.queueCalls, greaterThanOrEqualTo(1));
+    },
+  );
+
+  testWidgets(
+    'story 2.8: a held session on staff web sees only the help screen',
+    (tester) async {
+      final h = await pumpStaff(tester, location: '/fixture');
+      h.grants.myAccess = const AccessReadDenied(AccessDenial.reviewRequired);
+      h.memberAccess.next = const MemberAccessDenied(
+        MemberAccessDenial.reviewRequired,
+      );
+      h.credentials.mine = AccessReadOk(
+        MyCredentials.fromJson(
+          myCredentialsData(access: 'review_required', canRequest: false),
+        ),
+      );
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('access-review-required')), findsOneWidget);
+      expect(find.byKey(const Key('member-summary')), findsNothing);
+      expect(find.byKey(const Key('nav-/admin/members')), findsNothing);
+      expect(find.byKey(const Key('nav-/access')), findsNothing);
+    },
+  );
+
   testWidgets('an account switch drops the protected state', (tester) async {
     final h = await pumpStaff(tester, location: '/fixture');
     await tester.enterText(find.byKey(const Key('intent-key-field')), 'k');

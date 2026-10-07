@@ -23,19 +23,28 @@ function fakeDb({ waitAt = null } = {}) {
     ['journal_completed_account', 'journal', { kind: 'deletion_completed', object: { bucket: 'auth-user', object_id: A } }],
     ['complete', 'advance'],
   ];
-  const db = { i: 0, acks: [], authDone: false, calls: [] };
+  const db = { i: 0, acks: [], authDone: false, calls: [], head: { seq: 0, hash: '0'.repeat(64) }, caught: [] };
+  const chained = (entry) => entry.seq === db.head.seq + 1 && entry.prev_hash === db.head.hash;
   db.sys = async (command, payload) => {
     db.calls.push(command);
     const step = plan[db.i];
     if (command === 'identity.deletion_next') {
       if (!step) return { next: { action: 'done' } };
       if (waitAt === step[0]) return { next: { step: step[0], action: 'wait', reason: 'handover_pending' } };
-      return { next: { step: step[0], action: step[1], ...(step[2] ? { entry: step[2] } : {}) } };
+      return { next: { step: step[0], action: step[1], ...(step[2] ? { entry: step[2], journal_head: db.head } : {}) } };
+    }
+    if (command === 'identity.deletion_journal_catch_up') {
+      if (!chained(payload.entry)) return { acked: false, reason: 'journal_gap' };
+      db.head = { seq: payload.entry.seq, hash: payload.entry.hash };
+      db.caught.push(payload.entry.kind);
+      return { acked: true, seq: payload.entry.seq };
     }
     if (command === 'identity.deletion_journal_ack') {
       assert.equal(payload.step, step[0]);
       if (!sameEntry(payload.entry, step[2])) return { acked: false, reason: 'entry_mismatch' };
+      if (!chained(payload.entry)) return { acked: false, reason: 'journal_gap' };
       assert.deepEqual(validateEntry(payload.entry), []);
+      db.head = { seq: payload.entry.seq, hash: payload.entry.hash };
       db.acks.push(payload.entry.seq);
       db.i++;
       return { acked: true, seq: payload.entry.seq };
@@ -87,6 +96,22 @@ test('interrupted after an append and before its ack: the resumed run acks the e
   }
 });
 
+test('entries other writers appended after the database head are caught up first, in order', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'deletion-worker-'));
+  try {
+    const db = fakeDb();
+    const journal = new LocalSegmentJournal(dir);
+    await journal.append({ kind: 'checkpoint' });
+    await journal.append({ kind: 'seal', cutoff: new Date(Date.now() - 1000).toISOString() });
+    const r = await runDeletion({ deletionId: D, sys: db.sys, journal, auth: db.auth });
+    assert.equal(r.result, 'done');
+    assert.deepEqual(db.caught, ['checkpoint', 'seal']);
+    assert.deepEqual(db.acks, [3, 4, 5, 6, 7]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('a waiting step stops the run with its reason; a refused ack stops it as failed', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'deletion-worker-'));
   try {
@@ -111,7 +136,8 @@ test('only opaque journal fields are accepted from the database', () => {
   assert.throws(() => checkEntryFields({ kind: 'deletion_manifest', subject: M, object: { bucket: 'photos', object_id: M } }), /object/);
   assert.throws(() => checkEntryFields({ kind: 'seal' }), /unexpected journal kind/);
   assert.throws(() => checkEntryFields({ kind: 'access_revoked', subject: '+447700900601' }), /uuid/);
-  assert.equal(findJournaled([{ kind: 'access_revoked', subject: A }], { kind: 'access_revoked', subject: M }), null);
+  assert.equal(findJournaled([{ kind: 'access_revoked', subject: A, seq: 1 }], { kind: 'access_revoked', subject: M }), null);
+  assert.equal(findJournaled([{ kind: 'access_revoked', subject: M, seq: 1 }], { kind: 'access_revoked', subject: M }, 1), null);
 });
 
 test('the clients send the credential only as a header and never a service key', async () => {

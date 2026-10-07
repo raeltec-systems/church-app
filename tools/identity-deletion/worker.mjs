@@ -8,7 +8,9 @@
 // `identity-deletion` (the only holder of Auth Admin power) to delete the Auth user. It holds no
 // service-role key. Every step is idempotent: stop it anywhere (Ctrl-C, a crash, --max-steps) and
 // run it again; a journal entry appended but not yet acknowledged is found and acknowledged
-// instead of being appended twice.
+// instead of being appended twice. The database acknowledges journal entries only in chain order
+// (seq = its head + 1, chained hash, canonical hash), so entries other writers appended after its
+// head are acknowledged first (identity.deletion_journal_catch_up).
 //
 // Usage:
 //   node tools/identity-deletion/worker.mjs run [--deletion <uuid>] [--max-steps <n>]
@@ -45,9 +47,9 @@ export function sameEntry(entry, fields) {
   return a.bucket === b.bucket && a.object_id === b.object_id;
 }
 
-/** The entry already in the journal for these fields (appended before an interruption), if any. */
-export function findJournaled(entries, fields) {
-  return (entries ?? []).find((e) => sameEntry(e, fields)) ?? null;
+/** The entry already in the journal after `afterSeq` for these fields (appended before an interruption), if any. */
+export function findJournaled(entries, fields, afterSeq = 0) {
+  return (entries ?? []).find((e) => e && e.seq > afterSeq && sameEntry(e, fields)) ?? null;
 }
 
 /** Only opaque fields may go to the journal; refuses anything else the database might send. */
@@ -83,7 +85,19 @@ export async function runDeletion({ deletionId, sys, journal, auth, maxSteps = 5
     let outcome;
     if (next.action === 'journal') {
       const fields = checkEntryFields(next.entry);
-      const existing = findJournaled(await journal.list(), fields);
+      // The database acknowledges entries only in chain order after its head: first acknowledge
+      // what other writers appended since (catch-up), stopping at an entry of ours appended
+      // before an interruption; only then append a new one.
+      const head = next.journal_head ?? { seq: 0 };
+      const after = ((await journal.list()) ?? []).filter((e) => e && e.seq > head.seq);
+      let existing = null;
+      for (const e of after) {
+        if (sameEntry(e, fields)) { existing = e; break; }
+        const caught = await sys('identity.deletion_journal_catch_up', { entry: e });
+        steps.push(log({ deletion_id: deletionId, step: next.step, action: 'catch_up', seq: e.seq,
+          outcome: caught?.acked ? 'acked' : `refused_${caught?.reason ?? 'unknown'}` }));
+        if (!caught?.acked) return { deletion_id: deletionId, result: `failed:${caught?.reason ?? 'unknown'}`, steps };
+      }
       const entry = existing ?? await journal.append(fields);
       const ack = await sys('identity.deletion_journal_ack', { deletion_id: deletionId, step: next.step, entry });
       outcome = ack?.acked ? (existing ? 'acked_existing' : 'journaled') : `refused_${ack?.reason ?? 'unknown'}`;

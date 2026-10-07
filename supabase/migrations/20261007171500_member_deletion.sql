@@ -19,7 +19,10 @@
 --       erase_owners (registered owner deletion hooks, Cells included), anonymise, verify,
 --       journal_completed_member, journal_completed_account*, complete   (* with a login)
 --     Every step records its state, attempts and outcome code and is idempotent; the worker can
---     be stopped anywhere and resumed. Journal entries hold opaque UUIDs only and are written to
+--     be stopped anywhere and resumed. Every account the member ever linked is recorded, journaled
+--     and deleted. A journal acknowledgement must continue this database's acknowledged chain
+--     (seq = head + 1, prev_hash = the head's hash, canonical hash); entries other writers
+--     appended are acknowledged first (identity.deletion_journal_catch_up). Journal entries hold opaque UUIDs only and are written to
 --     the independent 1.10 journal BEFORE any destructive step; the database acknowledges each
 --     one after checking it is exactly the expected entry. Erasure waits while a handover is
 --     pending, and every destructive step waits while the Q4 retention gate
@@ -66,7 +69,6 @@ insert into app.policy_gates (gate, decision_ref, description, fixture_value) va
 create table app.identity_deletions (
   deletion_id uuid primary key default gen_random_uuid(),
   member_id uuid not null unique references app.identity_members (member_id),
-  auth_user_id uuid,
   had_account boolean not null,
   origin text not null check (origin in ('member_request', 'staff_request', 'journal_replay')),
   deletion_state text not null default 'requested'
@@ -78,13 +80,47 @@ create table app.identity_deletions (
   revision bigint not null default 1 check (revision >= 1),
   is_synthetic boolean not null,
   check ((deletion_state = 'completed') = (completed_at is not null)),
-  check (deletion_state = 'completed' or not had_account or auth_user_id is not null),
   check ((origin = 'staff_request') = (identity_check is not null))
 );
 
 comment on table app.identity_deletions is
   'owner: identity. Access-denied tombstones of full member deletions (AD-14): ids, codes and '
-  'times only; the account id is cleared at completion.';
+  'times only.';
+
+-- Every Auth account the member ever linked (live or ended links, and the accounts of the
+-- member's applications), with its journal entries and the Auth step. The account ids are
+-- cleared at completion; the journal keeps them as opaque ids.
+create table app.identity_deletion_accounts (
+  deletion_id uuid not null references app.identity_deletions (deletion_id),
+  account_no smallint not null check (account_no >= 1),
+  auth_user_id uuid,
+  manifest_seq bigint,
+  manifest_hash text check (manifest_hash is null or manifest_hash ~ '^[0-9a-f]{64}$'),
+  auth_done boolean not null default false,
+  auth_outcome text check (auth_outcome is null or auth_outcome ~ '^[a-z][a-z0-9_]{0,62}$'),
+  auth_attempts integer not null default 0 check (auth_attempts >= 0),
+  completed_seq bigint,
+  completed_hash text check (completed_hash is null or completed_hash ~ '^[0-9a-f]{64}$'),
+  primary key (deletion_id, account_no),
+  unique (deletion_id, auth_user_id)
+);
+
+comment on table app.identity_deletion_accounts is
+  'owner: identity. The Auth accounts a deletion removes (opaque ids, cleared at completion).';
+
+-- The opaque ids of the member's erased records (applications, credential changes, proposals,
+-- recovery requests/cases/grants, reclaims, links), recorded before erasure so verification and
+-- the receipt purge can still find what referred to them.
+create table app.identity_deletion_aggregates (
+  deletion_id uuid not null references app.identity_deletions (deletion_id),
+  kind text not null check (kind in ('application', 'credential_change', 'recovery_email_proposal',
+    'recovery_case', 'recovery_grant', 'recovery_request', 'phone_reclaim', 'link')),
+  aggregate_id uuid not null,
+  primary key (deletion_id, aggregate_id)
+);
+
+comment on table app.identity_deletion_aggregates is
+  'owner: identity. Opaque ids of a deleted member''s erased records (verification only).';
 
 create table app.identity_deletion_steps (
   deletion_id uuid not null references app.identity_deletions (deletion_id),
@@ -185,6 +221,10 @@ alter table app.identity_deletion_steps enable row level security;
 alter table app.identity_deletion_audit enable row level security;
 alter table app.identity_deletion_hooks enable row level security;
 alter table app.identity_deletion_retention_rules enable row level security;
+alter table app.identity_deletion_accounts enable row level security;
+alter table app.identity_deletion_aggregates enable row level security;
+revoke all on table app.identity_deletion_accounts, app.identity_deletion_aggregates
+  from public, anon, authenticated, service_role;
 revoke all on table app.identity_deletions, app.identity_deletion_steps,
                     app.identity_deletion_audit, app.identity_deletion_hooks,
                     app.identity_deletion_retention_rules
@@ -196,9 +236,10 @@ revoke all on sequence app.identity_deletion_audit_event_id_seq
 -- The row-deleting functions: fail-closed stubs, replaced by 20261007171600 (applied by hand)
 -- ---------------------------------------------------------------------------------------------
 
--- Identity personal rows of the member (and the account), receipts that mention them and the
--- account's Auth audit-log entries. Returns the number of rows removed.
-create function app.identity_deletion_purge_rows(p_member_id uuid, p_auth_user_id uuid)
+-- Identity personal rows of the deletion's member and accounts (only rows tied to them), the
+-- receipts of the member's accounts and of the member's records, and the accounts' Auth
+-- audit-log entries. Returns the number of rows removed.
+create function app.identity_deletion_purge_rows(p_deletion_id uuid)
 returns integer
 language plpgsql
 set search_path = ''
@@ -543,6 +584,34 @@ begin
 end;
 $$;
 
+-- Canonical JSON exactly as tools/recovery/journal.mjs builds it (object keys sorted, no
+-- whitespace) and the entry hash sha256(canonical(entry without hash)).
+create function app.rcv_canonical(p_value jsonb)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case jsonb_typeof(p_value)
+    when 'object' then '{' || coalesce((
+      select string_agg(to_jsonb(k.key)::text || ':' || app.rcv_canonical(p_value -> k.key), ','
+                        order by k.key collate "C")
+        from jsonb_object_keys(p_value) as k (key)), '') || '}'
+    when 'array' then '[' || coalesce((
+      select string_agg(app.rcv_canonical(e.value), ',' order by e.ord)
+        from jsonb_array_elements(p_value) with ordinality as e (value, ord)), '') || ']'
+    else p_value::text end;
+$$;
+
+create function app.rcv_entry_hash(p_entry jsonb)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select encode(sha256(convert_to(app.rcv_canonical(p_entry - 'hash'), 'UTF8')), 'hex');
+$$;
+
 -- The 1.10 operator procedure: same signature and privileges; now delegates.
 create or replace function app.rcv_apply_journal_entry(p_entry jsonb, p_operator text)
 returns jsonb
@@ -605,7 +674,6 @@ as $$
    limit 1;
 $$;
 
--- The exact journal entry fields a journal step must carry (opaque ids only).
 create function app.identity_deletion_expected_entry(p_deletion app.identity_deletions, p_step text)
 returns jsonb
 language sql
@@ -618,15 +686,23 @@ as $$
     when 'journal_manifest_member' then jsonb_build_object(
       'kind', 'deletion_manifest', 'subject', p_deletion.member_id,
       'object', jsonb_build_object('bucket', 'identity-member', 'object_id', p_deletion.member_id))
-    when 'journal_manifest_account' then jsonb_build_object(
-      'kind', 'deletion_manifest', 'subject', p_deletion.member_id,
-      'object', jsonb_build_object('bucket', 'auth-user', 'object_id', p_deletion.auth_user_id))
+    when 'journal_manifest_account' then (
+      select jsonb_build_object(
+               'kind', 'deletion_manifest', 'subject', p_deletion.member_id,
+               'object', jsonb_build_object('bucket', 'auth-user', 'object_id', a.auth_user_id))
+        from app.identity_deletion_accounts a
+       where a.deletion_id = p_deletion.deletion_id and a.manifest_seq is null
+       order by a.account_no limit 1)
     when 'journal_completed_member' then jsonb_build_object(
       'kind', 'deletion_completed',
       'object', jsonb_build_object('bucket', 'identity-member', 'object_id', p_deletion.member_id))
-    when 'journal_completed_account' then jsonb_build_object(
-      'kind', 'deletion_completed',
-      'object', jsonb_build_object('bucket', 'auth-user', 'object_id', p_deletion.auth_user_id))
+    when 'journal_completed_account' then (
+      select jsonb_build_object(
+               'kind', 'deletion_completed',
+               'object', jsonb_build_object('bucket', 'auth-user', 'object_id', a.auth_user_id))
+        from app.identity_deletion_accounts a
+       where a.deletion_id = p_deletion.deletion_id and a.completed_seq is null
+       order by a.account_no limit 1)
   end;
 $$;
 
@@ -648,8 +724,6 @@ as $$
   end;
 $$;
 
--- What the worker should do next: {deletion_id, deletion_state, next: {step, action, entry?,
--- reason?}}. Actions: journal, auth, advance, wait, done.
 create function app.identity_deletion_describe(p_deletion_id uuid)
 returns jsonb
 language plpgsql
@@ -680,8 +754,11 @@ begin
     if v_block is not null then
       v_next := v_next || jsonb_build_object('reason', v_block);
     elsif v_step.step like 'journal\_%' then
-      v_next := v_next || jsonb_build_object('entry',
-        app.identity_deletion_expected_entry(v_del, v_step.step));
+      -- The entry to journal, and the head this database acknowledged: the worker first
+      -- acknowledges any journal entries after it (identity.deletion_journal_catch_up).
+      v_next := v_next || jsonb_build_object(
+        'entry', app.identity_deletion_expected_entry(v_del, v_step.step),
+        'journal_head', app.identity_deletion_journal_head());
     end if;
   end if;
   return jsonb_build_object('found', true, 'deletion_id', v_del.deletion_id,
@@ -724,6 +801,8 @@ begin
 end;
 $$;
 
+-- Rows of one Auth account in every Auth table that holds them (sessions, refresh tokens,
+-- one-time tokens, factors and identities cascade with the user in GoTrue; each is checked).
 create function app.identity_deletion_auth_present(p_auth_user_id uuid)
 returns boolean
 language plpgsql
@@ -732,17 +811,105 @@ set search_path = ''
 as $$
 declare
   v_present boolean := false;
+  v_check record;
 begin
-  if p_auth_user_id is null or pg_catalog.to_regclass('auth.users') is null then
+  if p_auth_user_id is null then
     return false;
   end if;
-  execute 'select exists (select 1 from auth.users u where u.id = $1)' into v_present
-    using p_auth_user_id;
-  if not v_present and pg_catalog.to_regclass('auth.identities') is not null then
-    execute 'select exists (select 1 from auth.identities i where i.user_id = $1)' into v_present
-      using p_auth_user_id;
+  for v_check in
+    select x.tbl, x.sql from (values
+      ('auth.users', 'select exists (select 1 from auth.users t where t.id = $1)'),
+      ('auth.identities', 'select exists (select 1 from auth.identities t where t.user_id = $1)'),
+      ('auth.sessions', 'select exists (select 1 from auth.sessions t where t.user_id = $1)'),
+      ('auth.refresh_tokens', 'select exists (select 1 from auth.refresh_tokens t where t.user_id = $1::text)'),
+      ('auth.one_time_tokens', 'select exists (select 1 from auth.one_time_tokens t where t.user_id = $1)'),
+      ('auth.mfa_factors', 'select exists (select 1 from auth.mfa_factors t where t.user_id = $1)'))
+      as x (tbl, sql)
+  loop
+    if pg_catalog.to_regclass(v_check.tbl) is not null then
+      begin
+        execute v_check.sql into v_present using p_auth_user_id;
+      exception when undefined_column or undefined_table then
+        v_present := false;
+      end;
+      if v_present then
+        return true;
+      end if;
+    end if;
+  end loop;
+  return false;
+end;
+$$;
+
+-- The account's Auth audit-log entries (as actor, or as the subject of an admin action).
+create function app.identity_deletion_auth_audit_present(p_auth_user_id uuid)
+returns boolean
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  v_present boolean := false;
+begin
+  if p_auth_user_id is null or pg_catalog.to_regclass('auth.audit_log_entries') is null then
+    return false;
   end if;
+  execute 'select exists (select 1 from auth.audit_log_entries e
+                           where e.payload ->> ''actor_id'' = $1
+                              or e.payload -> ''traits'' ->> ''user_id'' = $1)'
+    into v_present using p_auth_user_id::text;
   return v_present;
+end;
+$$;
+
+-- The deletion's recorded accounts (in order; empty after completion).
+create function app.identity_deletion_account_ids(p_deletion_id uuid)
+returns uuid[]
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce(array_agg(a.auth_user_id order by a.account_no), '{}'::uuid[])
+    from app.identity_deletion_accounts a
+   where a.deletion_id = p_deletion_id and a.auth_user_id is not null;
+$$;
+
+-- The head of this database's journal acknowledgements: {seq, hash} (0 and the genesis hash).
+create function app.identity_deletion_journal_head()
+returns jsonb
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce((select jsonb_build_object('seq', a.seq, 'hash', a.entry_hash)
+                     from app.rcv_journal_acks a order by a.seq desc limit 1),
+                  jsonb_build_object('seq', 0, 'hash', repeat('0', 64)));
+$$;
+
+-- Why a journal entry cannot be acknowledged next (null when it can): the chain must continue
+-- this database's acknowledgements exactly (seq = head + 1, prev_hash = the head's hash) and the
+-- entry's hash must be the canonical hash of its fields. The caller holds the chain lock.
+create function app.identity_deletion_chain_problem(p_entry jsonb)
+returns text
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  v_head jsonb := app.identity_deletion_journal_head();
+begin
+  if jsonb_typeof(p_entry -> 'seq') is distinct from 'number'
+     or (p_entry ->> 'seq') !~ '^[1-9][0-9]{0,15}$'
+     or (p_entry ->> 'seq')::bigint <> (v_head ->> 'seq')::bigint + 1 then
+    return 'journal_gap';
+  end if;
+  if (p_entry ->> 'prev_hash') is distinct from (v_head ->> 'hash') then
+    return 'journal_chain_broken';
+  end if;
+  if (p_entry ->> 'hash') is distinct from app.rcv_entry_hash(p_entry) then
+    return 'entry_invalid';
+  end if;
+  return null;
 end;
 $$;
 
@@ -750,14 +917,45 @@ $$;
 -- The deletion steps (shared by the worker and restore replay)
 -- ---------------------------------------------------------------------------------------------
 
--- erase_identity: personal rows (row-deletion file) and the tombstone.
+-- erase_identity: record the opaque ids of the member's records, then the personal rows
+-- (row-deletion file), the receipt redaction and the tombstone.
 create function app.identity_deletion_erase_identity(p_deletion app.identity_deletions)
 returns void
 language plpgsql
 set search_path = ''
 as $$
+declare
+  v_accounts uuid[] := app.identity_deletion_account_ids(p_deletion.deletion_id);
+  v_links uuid[];
+  v_apps uuid[];
 begin
-  perform app.identity_deletion_purge_rows(p_deletion.member_id, p_deletion.auth_user_id);
+  v_links := array(select l.link_id from app.identity_account_links l
+                    where l.member_id = p_deletion.member_id or l.auth_user_id = any (v_accounts));
+  v_apps := array(select a.application_id from app.identity_membership_applications a
+                   where a.member_id = p_deletion.member_id or a.auth_user_id = any (v_accounts));
+  insert into app.identity_deletion_aggregates (deletion_id, kind, aggregate_id)
+  select p_deletion.deletion_id, x.kind, x.id
+    from (
+      select 'link'::text as kind, unnest(v_links) as id
+      union all select 'application', unnest(v_apps)
+      union all select 'credential_change', c.change_id from app.identity_credential_changes c
+                 where c.member_id = p_deletion.member_id or c.link_id = any (v_links)
+      union all select 'recovery_email_proposal', p.proposal_id
+                  from app.identity_recovery_email_proposals p
+                 where p.member_id = p_deletion.member_id or p.link_id = any (v_links)
+      union all select 'recovery_case', c.case_id from app.identity_recovery_cases c
+                 where c.member_id = p_deletion.member_id or c.link_id = any (v_links)
+      union all select 'recovery_grant', g.grant_id from app.identity_recovery_grants g
+                 where g.member_id = p_deletion.member_id or g.link_id = any (v_links)
+      union all select 'recovery_request', g.recovery_request_id from app.identity_recovery_grants g
+                 where g.member_id = p_deletion.member_id or g.link_id = any (v_links)
+      union all select 'phone_reclaim', r.reclaim_id from app.identity_phone_reclaims r
+                 where r.released_account_id = any (v_accounts)
+                    or r.withdrawn_application_id = any (v_apps)) x
+   where x.id is not null
+  on conflict do nothing;
+  perform app.identity_deletion_purge_rows(p_deletion.deletion_id);
+  perform app.identity_deletion_redact_receipts(p_deletion);
   update app.identity_members m
      set display_name = app.identity_deletion_placeholder(), membership_state = 'deactivated',
          revision = m.revision + 1, updated_at = now()
@@ -767,24 +965,30 @@ begin
 end;
 $$;
 
--- anonymise: the deleted account id in Identity's retained facts (FIXTURE rules, Q4).
-create function app.identity_deletion_anonymise(p_deletion app.identity_deletions)
+-- Other actors' receipts that mention the member or one of its accounts keep working for
+-- idempotent replay, with those ids replaced by the nil UUID (the member's own receipts and the
+-- receipts of the member's records are deleted by the row-deletion file).
+create function app.identity_deletion_redact_receipts(p_deletion app.identity_deletions)
 returns integer
 language plpgsql
 set search_path = ''
 as $$
 declare
-  v_rule app.identity_deletion_retention_rules;
-  v_count integer := 0;
+  v_id uuid;
   v_n integer;
+  v_count integer := 0;
+  v_nil constant text := '00000000-0000-0000-0000-000000000000';
 begin
-  if p_deletion.auth_user_id is null then
-    return 0;
-  end if;
-  for v_rule in select x.* from app.identity_deletion_retention_rules x order by x.table_name, x.column_name loop
-    execute format('update app.%I set %I = %L::uuid where %I = $1', v_rule.table_name, v_rule.column_name,
-                   '00000000-0000-0000-0000-000000000000', v_rule.column_name)
-      using p_deletion.auth_user_id;
+  for v_id in
+    select x from unnest(array[p_deletion.member_id]
+                         || app.identity_deletion_account_ids(p_deletion.deletion_id)) x
+  loop
+    update app.cmd_receipts r set result = replace(r.result::text, v_id::text, v_nil)::jsonb
+     where strpos(r.result::text, v_id::text) > 0;
+    get diagnostics v_n = row_count;
+    v_count := v_count + v_n;
+    update app.sys_receipts r set result = replace(r.result::text, v_id::text, v_nil)::jsonb
+     where strpos(r.result::text, v_id::text) > 0;
     get diagnostics v_n = row_count;
     v_count := v_count + v_n;
   end loop;
@@ -792,7 +996,36 @@ begin
 end;
 $$;
 
--- Every store, checked; returns the codes of the stores that still hold something.
+-- anonymise: every deleted account id in Identity's retained facts (FIXTURE rules, Q4).
+create function app.identity_deletion_anonymise(p_deletion app.identity_deletions)
+returns integer
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_rule app.identity_deletion_retention_rules;
+  v_account uuid;
+  v_count integer := 0;
+  v_n integer;
+begin
+  foreach v_account in array app.identity_deletion_account_ids(p_deletion.deletion_id) loop
+    for v_rule in select x.* from app.identity_deletion_retention_rules x
+                   order by x.table_name, x.column_name loop
+      execute format('update app.%I set %I = %L::uuid where %I = $1', v_rule.table_name,
+                     v_rule.column_name, '00000000-0000-0000-0000-000000000000',
+                     v_rule.column_name)
+        using v_account;
+      get diagnostics v_n = row_count;
+      v_count := v_count + v_n;
+    end loop;
+  end loop;
+  return v_count;
+end;
+$$;
+
+-- Every store, checked; returns the codes of the stores that still hold something:
+-- auth_account (an Auth row of any recorded account), identity (any Identity personal row, the
+-- tombstone, Auth audit entries or receipts), owner_<module>, retained_facts.
 create function app.identity_deletion_remaining(p_deletion app.identity_deletions, p_with_auth boolean)
 returns text[]
 language plpgsql
@@ -800,51 +1033,102 @@ set search_path = ''
 as $$
 declare
   m uuid := p_deletion.member_id;
-  a uuid := p_deletion.auth_user_id;
+  v_accounts uuid[] := app.identity_deletion_account_ids(p_deletion.deletion_id);
+  v_aggs uuid[];
+  v_links uuid[];
   v_left text[] := '{}';
   v_rule record;
+  v_account uuid;
+  v_id uuid;
   v_n bigint;
   v_owner jsonb;
+  v_identity boolean := false;
 begin
-  if p_with_auth and app.identity_deletion_auth_present(a) then
-    v_left := v_left || 'auth_account'::text;
-  end if;
-  if exists (select 1 from app.identity_account_links l where l.member_id = m or l.auth_user_id = a)
-     or exists (select 1 from app.identity_holds h where h.member_id = m)
-     or exists (select 1 from app.identity_contact_routes c where c.member_id = m)
-     or exists (select 1 from app.identity_member_provenance p where p.member_id = m)
-     or exists (select 1 from app.identity_membership_applications x
-                 where x.member_id = m or x.auth_user_id = a)
-     or exists (select 1 from app.identity_recovery_cases c where c.member_id = m)
-     or exists (select 1 from app.identity_recovery_grants g where g.member_id = m)
-     or exists (select 1 from app.identity_recovery_operations o where o.member_id = m)
-     or exists (select 1 from app.identity_credential_changes c where c.member_id = m)
-     or exists (select 1 from app.identity_recovery_email_proposals p where p.member_id = m)
-     or exists (select 1 from app.identity_phone_reclaims r where r.released_account_id = a)
-     or exists (select 1 from app.cmd_receipts r where r.actor_id = a)
-     or not exists (select 1 from app.identity_members x
-                     where x.member_id = m and x.display_name = app.identity_deletion_placeholder()
-                       and x.membership_state = 'deactivated') then
-    v_left := v_left || 'identity'::text;
-  end if;
-  for v_owner in
-    select x.value from jsonb_array_elements(
-      app.identity_call_deletion_hooks(m, a, p_deletion.deletion_id, 'check')) x
-  loop
-    if (v_owner ->> 'remaining')::integer > 0 then
-      v_left := v_left || ('owner_' || (v_owner ->> 'module'))::text;
-    end if;
-  end loop;
-  if a is not null then
-    for v_rule in select x.* from app.identity_deletion_retention_rules x loop
-      execute format('select count(*) from app.%I where %I = $1', v_rule.table_name, v_rule.column_name)
-        into v_n using a;
-      if v_n > 0 then
-        v_left := v_left || 'retained_facts'::text;
+  v_aggs := array(select g.aggregate_id from app.identity_deletion_aggregates g
+                   where g.deletion_id = p_deletion.deletion_id);
+  v_links := array(select g.aggregate_id from app.identity_deletion_aggregates g
+                    where g.deletion_id = p_deletion.deletion_id and g.kind = 'link');
+  if p_with_auth then
+    foreach v_account in array v_accounts loop
+      if app.identity_deletion_auth_present(v_account) then
+        v_left := v_left || 'auth_account'::text;
         exit;
       end if;
     end loop;
   end if;
+  foreach v_account in array v_accounts loop
+    if app.identity_deletion_auth_audit_present(v_account) then
+      v_identity := true;
+    end if;
+  end loop;
+  if v_identity
+     or exists (select 1 from app.identity_account_links l
+                 where l.member_id = m or l.auth_user_id = any (v_accounts) or l.link_id = any (v_links))
+     or exists (select 1 from app.identity_binding_history h where h.link_id = any (v_links))
+     or exists (select 1 from app.identity_credential_events e where e.link_id = any (v_links))
+     or exists (select 1 from app.identity_holds h where h.member_id = m)
+     or exists (select 1 from app.identity_contact_routes c where c.member_id = m)
+     or exists (select 1 from app.identity_member_provenance p where p.member_id = m)
+     or exists (select 1 from app.identity_membership_applications x
+                 where x.member_id = m or x.auth_user_id = any (v_accounts)
+                    or x.application_id = any (v_aggs))
+     or exists (select 1 from app.identity_application_events e where e.application_id = any (v_aggs))
+     or exists (select 1 from app.identity_recovery_cases c
+                 where c.member_id = m or c.case_id = any (v_aggs))
+     or exists (select 1 from app.identity_recovery_grants g
+                 where g.member_id = m or g.grant_id = any (v_aggs))
+     or exists (select 1 from app.identity_recovery_operations o where o.member_id = m)
+     or exists (select 1 from app.identity_recovery_requests r
+                 where r.recovery_request_id = any (v_aggs))
+     or exists (select 1 from app.identity_credential_changes c
+                 where c.member_id = m or c.change_id = any (v_aggs))
+     or exists (select 1 from app.identity_recovery_email_proposals p
+                 where p.member_id = m or p.proposal_id = any (v_aggs))
+     or exists (select 1 from app.identity_phone_reclaims r
+                 where r.released_account_id = any (v_accounts) or r.reclaim_id = any (v_aggs))
+     or exists (select 1 from app.cmd_receipts r
+                 where r.actor_id = any (v_accounts)
+                    or r.aggregate_id = any (v_aggs || array[m, p_deletion.deletion_id]))
+     or not exists (select 1 from app.identity_members x
+                     where x.member_id = m and x.display_name = app.identity_deletion_placeholder()
+                       and x.membership_state = 'deactivated') then
+    v_identity := true;
+  end if;
+  if not v_identity then
+    foreach v_id in array (array[m] || v_accounts) loop
+      if exists (select 1 from app.cmd_receipts r where strpos(r.result::text, v_id::text) > 0)
+         or exists (select 1 from app.sys_receipts r where strpos(r.result::text, v_id::text) > 0) then
+        v_identity := true;
+        exit;
+      end if;
+    end loop;
+  end if;
+  if v_identity then
+    v_left := v_left || 'identity'::text;
+  end if;
+  foreach v_account in array coalesce(nullif(v_accounts, '{}'::uuid[]), array[null::uuid]) loop
+    for v_owner in
+      select x.value from jsonb_array_elements(app.identity_call_deletion_hooks(
+        m, v_account, p_deletion.deletion_id, 'check')) x
+    loop
+      if (v_owner ->> 'remaining')::integer > 0
+         and not (('owner_' || (v_owner ->> 'module')) = any (v_left)) then
+        v_left := v_left || ('owner_' || (v_owner ->> 'module'))::text;
+      end if;
+    end loop;
+  end loop;
+  <<rules>>
+  foreach v_account in array v_accounts loop
+    for v_rule in select x.* from app.identity_deletion_retention_rules x loop
+      execute format('select count(*) from app.%I where %I = $1', v_rule.table_name,
+                     v_rule.column_name)
+        into v_n using v_account;
+      if v_n > 0 then
+        v_left := v_left || 'retained_facts'::text;
+        exit rules;
+      end if;
+    end loop;
+  end loop;
   return v_left;
 end;
 $$;
@@ -867,11 +1151,14 @@ begin
                 and s.step_state <> 'done') then
     return false;
   end if;
-  -- Final sweep of receipts written while the last steps ran (idempotent).
-  perform app.identity_deletion_purge_rows(p_deletion.member_id, p_deletion.auth_user_id);
+  -- Final sweep (idempotent): receipts written while the last steps ran, and every Auth
+  -- audit-log entry of the accounts (including the `user_deleted` entry of the Auth step).
+  perform app.identity_deletion_purge_rows(p_deletion.deletion_id);
+  perform app.identity_deletion_redact_receipts(p_deletion);
+  update app.identity_deletion_accounts a set auth_user_id = null
+   where a.deletion_id = p_deletion.deletion_id;
   update app.identity_deletions d
-     set deletion_state = 'completed', completed_at = clock_timestamp(), auth_user_id = null,
-         revision = d.revision + 1
+     set deletion_state = 'completed', completed_at = clock_timestamp(), revision = d.revision + 1
    where d.deletion_id = p_deletion.deletion_id and d.deletion_state <> 'completed';
   perform app.identity_deletion_mark(p_deletion.deletion_id, 'complete', 'done', 'completed', true);
   perform app.identity_deletion_audit_add('deletion_completed', p_actor_kind, null, p_principal,
@@ -895,14 +1182,23 @@ as $$
 declare
   v_owners jsonb;
   v_left text[];
+  v_account uuid;
+  v_bad boolean := false;
 begin
   if p_step = 'erase_identity' then
     perform app.identity_deletion_erase_identity(p_deletion);
   elsif p_step = 'erase_owners' then
-    v_owners := app.identity_call_deletion_hooks(p_deletion.member_id, p_deletion.auth_user_id,
-                                                 p_deletion.deletion_id, 'erase');
-    if exists (select 1 from jsonb_array_elements(v_owners) x
-                where (x.value ->> 'remaining')::integer > 0) then
+    -- Each owner hook erases for the member and for every recorded account.
+    foreach v_account in array coalesce(nullif(app.identity_deletion_account_ids(p_deletion.deletion_id),
+                                               '{}'::uuid[]), array[null::uuid]) loop
+      v_owners := app.identity_call_deletion_hooks(p_deletion.member_id, v_account,
+                                                   p_deletion.deletion_id, 'erase');
+      if exists (select 1 from jsonb_array_elements(v_owners) x
+                  where (x.value ->> 'remaining')::integer > 0) then
+        v_bad := true;
+      end if;
+    end loop;
+    if v_bad then
       perform app.identity_deletion_mark(p_deletion.deletion_id, p_step, 'failed',
                                          'owner_incomplete', true);
       perform app.identity_deletion_audit_add('step_failed', p_actor_kind, null, p_principal,
@@ -918,6 +1214,9 @@ begin
                                          'incomplete', true);
       -- Reopen the step that left something behind; it runs again next.
       if 'auth_account' = any (v_left) then
+        update app.identity_deletion_accounts a set auth_done = false
+         where a.deletion_id = p_deletion.deletion_id
+           and app.identity_deletion_auth_present(a.auth_user_id);
         perform app.identity_deletion_mark(p_deletion.deletion_id, 'auth_account', 'pending',
                                            'reopened');
       end if;
@@ -958,8 +1257,8 @@ $$;
 -- The request (both routes)
 -- ---------------------------------------------------------------------------------------------
 
--- Records the access-denied tombstone. The caller has locked the live link and the member and
--- checked the actor; this checks the deletion-specific refusals.
+-- Records the access-denied tombstone. The caller has locked the Admin role row, the live link
+-- and the member, and checked the actor; this checks the deletion-specific refusals.
 create function app.identity_deletion_open(
   p_member app.identity_members,
   p_actor_member uuid,
@@ -977,10 +1276,13 @@ declare
   v_grant app.identity_grants;
   v_op app.identity_recovery_operations;
   v_del app.identity_deletions;
+  v_accounts uuid[];
+  v_account uuid;
   v_event jsonb;
   v_obligations jsonb;
   v_was_approved boolean := p_member.membership_state = 'approved';
   v_sessions integer;
+  v_n integer;
   v_grants integer := 0;
   v_recovery_grants integer := 0;
   v_operations integer := 0;
@@ -988,6 +1290,8 @@ declare
   v_lifecycle bigint;
   v_revision bigint;
 begin
+  -- Serialises every last-Admin decision (the 2.3 Admin branch takes the same lock first).
+  perform 1 from app.identity_roles ro where ro.role = 'admin' for update;
   if exists (select 1 from app.identity_deletions d where d.member_id = p_member.member_id) then
     perform app.cmd_fail('conflict', '{"member_id": "deletion_requested"}', p_member.revision);
   end if;
@@ -1015,13 +1319,24 @@ begin
     v_grants := v_grants + 1;
   end loop;
 
+  -- Every Auth account the member ever linked (live or ended links) or applied with.
+  v_accounts := array(
+    select x.auth_user_id from (
+      select l.auth_user_id, l.created_at from app.identity_account_links l
+       where l.member_id = p_member.member_id
+      union all
+      select a.auth_user_id, a.submitted_at from app.identity_membership_applications a
+       where a.member_id = p_member.member_id) x
+     group by x.auth_user_id
+     order by min(x.created_at), x.auth_user_id);
+
   select l.* into v_link from app.identity_account_links l
    where l.member_id = p_member.member_id and l.link_state <> 'ended'
      for update;
-  if v_link.link_id is not null then
-    v_recovery_grants := app.identity_recovery_end_grants(v_link.auth_user_id, 'cancelled', 'stale',
-      p_actor_member, p_actor_account, null, v_request);
-  end if;
+  foreach v_account in array v_accounts loop
+    v_recovery_grants := v_recovery_grants + app.identity_recovery_end_grants(v_account,
+      'cancelled', 'stale', p_actor_member, p_actor_account, null, v_request);
+  end loop;
   for v_op in
     update app.identity_recovery_operations o
        set op_state = 'obsolete', completed_at = clock_timestamp()
@@ -1034,15 +1349,20 @@ begin
       'member_deleted');
   end loop;
 
-  -- Access ends for good: the link ends (trust epoch moves), every session goes, and the Auth
-  -- user is banned so a password sign-in fails at Auth from this step on.
+  -- Access ends for good: the live link ends (trust epoch moves), every session of every account
+  -- goes, and every account is banned so a password sign-in fails at Auth from this step on.
   if v_link.link_id is not null then
     update app.identity_account_links l
        set link_state = 'ended', ended_at = clock_timestamp(), updated_at = now()
      where l.link_id = v_link.link_id;
-    v_sessions := app.identity_revoke_auth_sessions(v_link.auth_user_id);
-    perform app.identity_deletion_ban(v_link.auth_user_id);
   end if;
+  foreach v_account in array v_accounts loop
+    v_n := app.identity_revoke_auth_sessions(v_account);
+    if v_account = v_link.auth_user_id then
+      v_sessions := v_n;
+    end if;
+    perform app.identity_deletion_ban(v_account);
+  end loop;
 
   update app.identity_members m
      set membership_state = 'deactivated', revision = m.revision + 1, updated_at = now()
@@ -1070,11 +1390,14 @@ begin
      where e.event_id = v_lifecycle;
   end if;
 
-  insert into app.identity_deletions (member_id, auth_user_id, had_account, origin,
-                                      requested_by_member, identity_check, is_synthetic)
-  values (p_member.member_id, v_link.auth_user_id, v_link.link_id is not null, p_origin,
-          p_actor_member, p_identity_check, p_member.is_synthetic)
+  insert into app.identity_deletions (member_id, had_account, origin, requested_by_member,
+                                      identity_check, is_synthetic)
+  values (p_member.member_id, cardinality(v_accounts) > 0, p_origin, p_actor_member,
+          p_identity_check, p_member.is_synthetic)
   returning * into v_del;
+  insert into app.identity_deletion_accounts (deletion_id, account_no, auth_user_id)
+  select v_del.deletion_id, x.n::smallint, x.id
+    from unnest(v_accounts) with ordinality as x (id, n);
   insert into app.identity_deletion_steps (deletion_id, step, ordinal)
   select v_del.deletion_id, s.step, s.ordinal
     from app.identity_deletion_step_plan(v_del.had_account) s;
@@ -1142,8 +1465,6 @@ as $$
    where d.deletion_id = p_deletion_id;
 $$;
 
--- identity.request_my_deletion {confirm: "delete_my_account"}; expected_revision null. A
--- granted own session (the authorizer checked it) with a recent password sign-in.
 create function app.identity_request_my_deletion(
   p_actor uuid,
   p_expected_revision bigint,
@@ -1158,6 +1479,9 @@ declare
   v_member app.identity_members;
   v_del app.identity_deletions;
 begin
+  -- Lock order of every Admin decision: the Admin role row first (last-Admin rule), then the
+  -- live link, then the member.
+  perform 1 from app.identity_roles ro where ro.role = 'admin' for update;
   select e.* into r from app.identity_access_evaluate() e;
   if r.outcome <> 'granted' or r.link_id is null then
     perform app.cmd_fail('forbidden');
@@ -1178,7 +1502,6 @@ begin
   if not app.identity_session_recent_password() then
     perform app.cmd_fail('forbidden', '{"session": "reauthenticate"}');
   end if;
-  -- Lock order: the live link, then the member.
   perform 1 from app.identity_account_links l where l.link_id = r.link_id for update;
   select m.* into v_member from app.identity_members m where m.member_id = r.member_id for update;
   v_del := app.identity_deletion_open(v_member, v_member.member_id, p_actor,
@@ -1187,9 +1510,9 @@ begin
 end;
 $$;
 
--- identity.request_member_deletion {member_id, identity_check}; expected = member revision. For a
--- member who cannot use the app (no login, or access already held, in review or deactivated);
--- a member with working app access requests it in the app.
+-- Two-person rule (Decision, story 2.11): for a member who has an account link, the hold or the
+-- deactivation that makes the app unusable must come from someone other than the requesting
+-- Admin (another Admin, the member's own Auth change in review, or the system).
 create function app.identity_request_member_deletion(
   p_actor uuid,
   p_expected_revision bigint,
@@ -1201,7 +1524,9 @@ as $$
 declare
   v_actor record;
   v_member app.identity_members;
+  v_link app.identity_account_links;
   v_del app.identity_deletions;
+  v_nil constant uuid := '00000000-0000-0000-0000-000000000000';
 begin
   select a.* into v_actor from app.identity_command_actor(p_actor) a;
   perform app.identity_lock_payload_member_link(p_payload);
@@ -1221,6 +1546,20 @@ begin
   if v_member.membership_state = 'approved'
      and app.identity_member_account_label(v_member.member_id) = 'app_account' then
     perform app.cmd_fail('conflict', '{"member_id": "member_can_use_app"}', v_member.revision);
+  end if;
+  select l.* into v_link from app.identity_account_links l
+   where l.member_id = v_member.member_id and l.link_state <> 'ended';
+  if v_link.link_id is not null
+     and not (
+       (v_member.membership_state = 'deactivated'
+        and coalesce((select e.actor_member_id from app.identity_membership_lifecycle e
+                       where e.member_id = v_member.member_id and e.action = 'membership_deactivated'
+                       order by e.event_id desc limit 1), v_nil) <> v_actor.member_id)
+       or exists (select 1 from app.identity_holds h
+                   where h.member_id = v_member.member_id and h.released_at is null
+                     and coalesce(h.placed_by_member, v_nil) <> v_actor.member_id)
+       or v_link.link_state = 'review_required' or v_link.binding_review_required) then
+    perform app.cmd_fail('conflict', '{"member_id": "second_admin_required"}', v_member.revision);
   end if;
   v_del := app.identity_deletion_open(v_member, v_actor.member_id, v_actor.account_id,
                                       'identity.request_member_deletion', 'staff_request',
@@ -1502,6 +1841,7 @@ begin
   v_keys := case p_command
     when 'identity.deletion_queue' then array['limit']
     when 'identity.deletion_journal_ack' then array['deletion_id', 'step', 'entry']
+    when 'identity.deletion_journal_catch_up' then array['entry']
     when 'identity.deletion_auth_complete' then array['deletion_id', 'auth_result']
     else array['deletion_id'] end;
   v_errors := app.contract_unknown_keys(p_payload, v_keys);
@@ -1540,6 +1880,10 @@ begin
   return v_errors;
 end;
 $$;
+
+create function app.identity_deletion_check_journal_catch_up(p_payload jsonb) returns jsonb
+language sql stable set search_path = '' as $$
+  select app.identity_deletion_payload_check('identity.deletion_journal_catch_up', p_payload) $$;
 
 create function app.identity_deletion_check_queue(p_payload jsonb) returns jsonb
 language sql stable set search_path = '' as $$
@@ -1611,8 +1955,9 @@ as $$
 $$;
 
 -- identity.deletion_journal_ack {deletion_id, step, entry}: the worker appended `entry` to the
--- independent journal for `step`; the database checks it is exactly the expected entry and
--- acknowledges it (app.rcv_apply_journal_entry_as). Idempotent for the same entry.
+-- independent journal for `step`. The database acknowledges it only when it is exactly the
+-- expected entry AND it continues this database's acknowledged chain (seq = head + 1, prev_hash =
+-- the head's hash) with its canonical hash. Idempotent for the same entry.
 create function app.identity_sys_deletion_journal_ack(p_principal uuid, p_request uuid,
                                                       p_payload jsonb)
 returns jsonb
@@ -1626,32 +1971,46 @@ declare
   v_entry jsonb := p_payload -> 'entry';
   v_expected jsonb;
   v_reason text;
+  v_account_step boolean;
+  v_account smallint;
 begin
   v_del := app.identity_deletion_lock((p_payload ->> 'deletion_id')::uuid);
   if v_del.deletion_id is null then
     return jsonb_build_object('data', jsonb_build_object('acked', false, 'reason', 'not_found'));
   end if;
+  perform pg_advisory_xact_lock(hashtext('app.rcv_journal_acks chain'));
   select s.* into v_step from app.identity_deletion_steps s
    where s.deletion_id = v_del.deletion_id and s.step = p_payload ->> 'step';
   if v_step.step is null then
     return jsonb_build_object('data', jsonb_build_object('acked', false, 'reason', 'no_such_step'));
   end if;
+  v_account_step := v_step.step in ('journal_manifest_account', 'journal_completed_account');
+  -- The same entry again: an idempotent no-op.
+  if exists (select 1 from app.rcv_journal_acks a
+              where a.seq = (v_entry ->> 'seq')::numeric and a.entry_hash = v_entry ->> 'hash')
+     and (v_step.journal_hash = v_entry ->> 'hash'
+          or exists (select 1 from app.identity_deletion_accounts a
+                      where a.deletion_id = v_del.deletion_id
+                        and v_entry ->> 'hash' in (a.manifest_hash, a.completed_hash))) then
+    return jsonb_build_object('data', jsonb_build_object('acked', true, 'reason', 'already_done'));
+  end if;
   if v_step.step_state = 'done' then
-    return jsonb_build_object('data', jsonb_build_object(
-      'acked', v_step.journal_hash = v_entry ->> 'hash'
-               and v_step.journal_seq = (v_entry ->> 'seq')::numeric,
-      'reason', 'already_done'));
+    return jsonb_build_object('data', jsonb_build_object('acked', false, 'reason', 'already_done'));
   end if;
   v_next := app.identity_deletion_next_step(v_del.deletion_id);
   if v_next.step is distinct from v_step.step then
     return jsonb_build_object('data', jsonb_build_object('acked', false, 'reason', 'not_next'));
   end if;
   v_expected := app.identity_deletion_expected_entry(v_del, v_step.step);
-  if v_entry ->> 'kind' is distinct from v_expected ->> 'kind'
+  if v_expected is null
+     or v_entry ->> 'kind' is distinct from v_expected ->> 'kind'
      or (v_entry -> 'subject') is distinct from (v_expected -> 'subject')
      or (v_entry -> 'object') is distinct from (v_expected -> 'object') then
     v_reason := 'entry_mismatch';
   else
+    v_reason := app.identity_deletion_chain_problem(v_entry);
+  end if;
+  if v_reason is null then
     begin
       perform app.rcv_apply_journal_entry_as(v_entry, 'system:' || p_principal::text);
     exception when sqlstate '22023' then
@@ -1665,11 +2024,34 @@ begin
       v_del.deletion_id, v_step.step, v_reason);
     return jsonb_build_object('data', jsonb_build_object('acked', false, 'reason', v_reason));
   end if;
-  update app.identity_deletion_steps s
-     set step_state = 'done', outcome = 'journaled', attempts = s.attempts + 1,
-         journal_seq = (v_entry ->> 'seq')::bigint, journal_hash = v_entry ->> 'hash',
-         updated_at = clock_timestamp()
-   where s.deletion_id = v_del.deletion_id and s.step = v_step.step;
+  if v_account_step then
+    select a.account_no into v_account from app.identity_deletion_accounts a
+     where a.deletion_id = v_del.deletion_id
+       and a.auth_user_id = (v_entry -> 'object' ->> 'object_id')::uuid;
+    if v_step.step = 'journal_manifest_account' then
+      update app.identity_deletion_accounts a
+         set manifest_seq = (v_entry ->> 'seq')::bigint, manifest_hash = v_entry ->> 'hash'
+       where a.deletion_id = v_del.deletion_id and a.account_no = v_account;
+    else
+      update app.identity_deletion_accounts a
+         set completed_seq = (v_entry ->> 'seq')::bigint, completed_hash = v_entry ->> 'hash'
+       where a.deletion_id = v_del.deletion_id and a.account_no = v_account;
+    end if;
+  end if;
+  if v_account_step and app.identity_deletion_expected_entry(v_del, v_step.step) is not null then
+    -- More accounts to journal for this step.
+    update app.identity_deletion_steps s
+       set step_state = 'pending', outcome = 'journaled', attempts = s.attempts + 1,
+           journal_seq = (v_entry ->> 'seq')::bigint, journal_hash = v_entry ->> 'hash',
+           updated_at = clock_timestamp()
+     where s.deletion_id = v_del.deletion_id and s.step = v_step.step;
+  else
+    update app.identity_deletion_steps s
+       set step_state = 'done', outcome = 'journaled', attempts = s.attempts + 1,
+           journal_seq = (v_entry ->> 'seq')::bigint, journal_hash = v_entry ->> 'hash',
+           updated_at = clock_timestamp()
+     where s.deletion_id = v_del.deletion_id and s.step = v_step.step;
+  end if;
   perform app.identity_deletion_audit_add('step_done', 'system', null, p_principal, p_request,
     v_del.deletion_id, v_step.step, 'journaled');
   return jsonb_build_object('data', jsonb_build_object('acked', true,
@@ -1677,8 +2059,48 @@ begin
 end;
 $$;
 
--- identity.deletion_auth_begin {deletion_id}: the fence before the Auth Admin call. Only when
--- the account step is next and nothing blocks it does the Edge Function get the account id.
+-- identity.deletion_journal_catch_up {entry}: acknowledges one journal entry that other writers
+-- appended after this database's head (for example a seal or another deletion), under the same
+-- chain rules, so the worker's own entries can continue the chain. Deny-only entries; the
+-- registered replay hooks do nothing outside a held restore.
+create function app.identity_sys_deletion_journal_catch_up(p_principal uuid, p_request uuid,
+                                                           p_payload jsonb)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_entry jsonb := p_payload -> 'entry';
+  v_reason text;
+begin
+  perform pg_advisory_xact_lock(hashtext('app.rcv_journal_acks chain'));
+  if jsonb_typeof(v_entry -> 'seq') = 'number' and (v_entry ->> 'seq') ~ '^[1-9][0-9]{0,15}$'
+     and (v_entry ->> 'seq')::bigint <= ((app.identity_deletion_journal_head()) ->> 'seq')::bigint then
+    return jsonb_build_object('data', jsonb_build_object(
+      'acked', exists (select 1 from app.rcv_journal_acks a
+                        where a.seq = (v_entry ->> 'seq')::bigint
+                          and a.entry_hash = v_entry ->> 'hash'),
+      'reason', 'already_applied'));
+  end if;
+  v_reason := app.identity_deletion_chain_problem(v_entry);
+  if v_reason is null then
+    begin
+      perform app.rcv_apply_journal_entry_as(v_entry, 'system:' || p_principal::text);
+    exception when sqlstate '22023' then
+      v_reason := 'entry_invalid';
+    end;
+  end if;
+  if v_reason is not null then
+    return jsonb_build_object('data', jsonb_build_object('acked', false, 'reason', v_reason));
+  end if;
+  return jsonb_build_object('data', jsonb_build_object('acked', true,
+    'seq', (v_entry ->> 'seq')::bigint));
+end;
+$$;
+
+-- identity.deletion_auth_begin {deletion_id}: the fence before one Auth Admin call. Only when the
+-- account step is next and nothing blocks it does the Edge Function get an account id: the first
+-- recorded account not yet done.
 create function app.identity_sys_deletion_auth_begin(p_principal uuid, p_request uuid,
                                                      p_payload jsonb)
 returns jsonb
@@ -1689,6 +2111,7 @@ declare
   v_del app.identity_deletions;
   v_next app.identity_deletion_steps;
   v_block text;
+  v_account app.identity_deletion_accounts;
 begin
   v_del := app.identity_deletion_lock((p_payload ->> 'deletion_id')::uuid);
   if v_del.deletion_id is null then
@@ -1707,18 +2130,28 @@ begin
     end if;
     return jsonb_build_object('data', jsonb_build_object('proceed', false, 'reason', v_block));
   end if;
+  select a.* into v_account from app.identity_deletion_accounts a
+   where a.deletion_id = v_del.deletion_id and not a.auth_done
+   order by a.account_no limit 1 for update;
+  if v_account.auth_user_id is null then
+    perform app.identity_deletion_mark(v_del.deletion_id, 'auth_account', 'done', 'deleted');
+    return jsonb_build_object('data', jsonb_build_object('proceed', false, 'reason', 'not_next'));
+  end if;
+  update app.identity_deletion_accounts a
+     set auth_attempts = a.auth_attempts + 1, auth_outcome = 'dispatched'
+   where a.deletion_id = v_del.deletion_id and a.account_no = v_account.account_no;
   perform app.identity_deletion_mark(v_del.deletion_id, 'auth_account', 'pending', 'dispatched',
                                      true);
   -- The account must not be usable meanwhile (idempotent).
-  perform app.identity_deletion_ban(v_del.auth_user_id);
+  perform app.identity_deletion_ban(v_account.auth_user_id);
   return jsonb_build_object('data', jsonb_build_object('proceed', true,
-                                                       'auth_user_id', v_del.auth_user_id));
+                                                       'auth_user_id', v_account.auth_user_id));
 end;
 $$;
 
--- identity.deletion_auth_complete {deletion_id, auth_result}: done only when the Auth user and
--- its identities are absent, whatever the function claims; otherwise the attempt is recorded and
--- the step is retried.
+-- identity.deletion_auth_complete {deletion_id, auth_result}: the account of the last fence is
+-- done only when none of its Auth rows remain, whatever the function claims; otherwise the
+-- attempt is recorded and the step is retried. The step is done when every account is.
 create function app.identity_sys_deletion_auth_complete(p_principal uuid, p_request uuid,
                                                         p_payload jsonb)
 returns jsonb
@@ -1728,7 +2161,9 @@ as $$
 declare
   v_del app.identity_deletions;
   v_next app.identity_deletion_steps;
+  v_account app.identity_deletion_accounts;
   v_result text := p_payload ->> 'auth_result';
+  v_outcome text;
 begin
   v_del := app.identity_deletion_lock((p_payload ->> 'deletion_id')::uuid);
   if v_del.deletion_id is null then
@@ -1741,18 +2176,30 @@ begin
                          where s.deletion_id = v_del.deletion_id and s.step = 'auth_account'
                            and s.step_state = 'done') then 'done' else 'not_next' end));
   end if;
-  if not app.identity_deletion_auth_present(v_del.auth_user_id) then
-    perform app.identity_deletion_mark(v_del.deletion_id, 'auth_account', 'done',
-      case when v_result = 'deleted' then 'deleted' else 'absent' end);
-    perform app.identity_deletion_audit_add('step_done', 'system', null, p_principal, p_request,
-      v_del.deletion_id, 'auth_account', case when v_result = 'deleted' then 'deleted' else 'absent' end);
-    return jsonb_build_object('data', jsonb_build_object('outcome', 'done'));
+  select a.* into v_account from app.identity_deletion_accounts a
+   where a.deletion_id = v_del.deletion_id and not a.auth_done
+   order by a.account_no limit 1 for update;
+  if app.identity_deletion_auth_present(v_account.auth_user_id) then
+    update app.identity_deletion_accounts a set auth_outcome = 'auth_' || v_result
+     where a.deletion_id = v_del.deletion_id and a.account_no = v_account.account_no;
+    perform app.identity_deletion_mark(v_del.deletion_id, 'auth_account', 'failed',
+                                       'auth_' || v_result);
+    perform app.identity_deletion_audit_add('step_failed', 'system', null, p_principal, p_request,
+      v_del.deletion_id, 'auth_account', 'auth_' || v_result);
+    return jsonb_build_object('data', jsonb_build_object('outcome', 'retry'));
   end if;
-  perform app.identity_deletion_mark(v_del.deletion_id, 'auth_account', 'failed',
-                                     'auth_' || v_result);
-  perform app.identity_deletion_audit_add('step_failed', 'system', null, p_principal, p_request,
-    v_del.deletion_id, 'auth_account', 'auth_' || v_result);
-  return jsonb_build_object('data', jsonb_build_object('outcome', 'retry'));
+  v_outcome := case when v_result = 'deleted' then 'deleted' else 'absent' end;
+  update app.identity_deletion_accounts a set auth_done = true, auth_outcome = v_outcome
+   where a.deletion_id = v_del.deletion_id and a.account_no = v_account.account_no;
+  if exists (select 1 from app.identity_deletion_accounts a
+              where a.deletion_id = v_del.deletion_id and not a.auth_done) then
+    perform app.identity_deletion_mark(v_del.deletion_id, 'auth_account', 'pending', v_outcome);
+  else
+    perform app.identity_deletion_mark(v_del.deletion_id, 'auth_account', 'done', v_outcome);
+  end if;
+  perform app.identity_deletion_audit_add('step_done', 'system', null, p_principal, p_request,
+    v_del.deletion_id, 'auth_account', v_outcome);
+  return jsonb_build_object('data', jsonb_build_object('outcome', 'done'));
 end;
 $$;
 
@@ -1808,6 +2255,10 @@ insert into app.sys_command_kinds (command, purpose, description, payload_check,
    'Story 2.11: acknowledge a journal entry the worker appended to the recovery journal',
    'app.identity_deletion_check_journal_ack(jsonb)',
    'app.identity_sys_deletion_journal_ack(uuid, uuid, jsonb)'),
+  ('identity.deletion_journal_catch_up', 'identity_deletion',
+   'Story 2.11: acknowledge a journal entry another writer appended after this database''s head',
+   'app.identity_deletion_check_journal_catch_up(jsonb)',
+   'app.identity_sys_deletion_journal_catch_up(uuid, uuid, jsonb)'),
   ('identity.deletion_auth_begin', 'identity_deletion',
    'Story 2.11: fence before the Auth Admin account deletion',
    'app.identity_deletion_check_auth_begin(jsonb)',
@@ -1825,9 +2276,11 @@ insert into app.sys_command_kinds (command, purpose, description, payload_check,
 -- Restore replay (Identity's replay hook)
 -- ---------------------------------------------------------------------------------------------
 
--- Denies access again on a restored snapshot (sessions were wiped by the restore hold).
+-- Denies access again on a restored snapshot (sessions were wiped by the restore hold): every
+-- live link ends, grants end, the membership is deactivated and every account of the member (all
+-- links, recorded accounts) is banned.
 create function app.identity_deletion_deny_restored(p_member_id uuid)
-returns uuid
+returns void
 language plpgsql
 set search_path = ''
 as $$
@@ -1836,20 +2289,26 @@ declare
 begin
   update app.identity_account_links l
      set link_state = 'ended', ended_at = coalesce(l.ended_at, clock_timestamp()), updated_at = now()
-   where l.member_id = p_member_id and l.link_state <> 'ended'
-  returning l.auth_user_id into v_account;
+   where l.member_id = p_member_id and l.link_state <> 'ended';
   update app.identity_grants g set revoked_at = now()
    where g.member_id = p_member_id and g.revoked_at is null;
   update app.identity_members m
      set membership_state = 'deactivated', revision = m.revision + 1, updated_at = now()
    where m.member_id = p_member_id and m.membership_state <> 'deactivated';
-  perform app.identity_deletion_ban(v_account);
-  return v_account;
+  for v_account in
+    select l.auth_user_id from app.identity_account_links l where l.member_id = p_member_id
+    union
+    select a.auth_user_id from app.identity_deletion_accounts a
+      join app.identity_deletions d on d.deletion_id = a.deletion_id
+     where d.member_id = p_member_id and a.auth_user_id is not null
+  loop
+    perform app.identity_deletion_ban(v_account);
+  end loop;
 end;
 $$;
 
 -- The deletion of a member on a restored snapshot: the snapshot's own, or one re-created from
--- the journal (the snapshot predates the request).
+-- the journal (the snapshot predates the request) with every account the member ever linked.
 create function app.identity_deletion_ensure_replayed(p_member_id uuid)
 returns app.identity_deletions
 language plpgsql
@@ -1858,7 +2317,7 @@ as $$
 declare
   v_del app.identity_deletions;
   v_member app.identity_members;
-  v_account uuid;
+  v_accounts uuid[];
 begin
   select d.* into v_del from app.identity_deletions d where d.member_id = p_member_id for update;
   if found then
@@ -1869,12 +2328,21 @@ begin
   if not found then
     return null;
   end if;
-  select l.auth_user_id into v_account from app.identity_account_links l
-   where l.member_id = p_member_id and l.link_state <> 'ended';
+  v_accounts := array(
+    select x.auth_user_id from (
+      select l.auth_user_id, l.created_at from app.identity_account_links l
+       where l.member_id = p_member_id
+      union all
+      select a.auth_user_id, a.submitted_at from app.identity_membership_applications a
+       where a.member_id = p_member_id) x
+     group by x.auth_user_id
+     order by min(x.created_at), x.auth_user_id);
   perform app.identity_deletion_deny_restored(p_member_id);
-  insert into app.identity_deletions (member_id, auth_user_id, had_account, origin, is_synthetic)
-  values (p_member_id, v_account, v_account is not null, 'journal_replay', v_member.is_synthetic)
+  insert into app.identity_deletions (member_id, had_account, origin, is_synthetic)
+  values (p_member_id, cardinality(v_accounts) > 0, 'journal_replay', v_member.is_synthetic)
   returning * into v_del;
+  insert into app.identity_deletion_accounts (deletion_id, account_no, auth_user_id)
+  select v_del.deletion_id, x.n::smallint, x.id from unnest(v_accounts) with ordinality as x (id, n);
   insert into app.identity_deletion_steps (deletion_id, step, ordinal)
   select v_del.deletion_id, s.step, s.ordinal
     from app.identity_deletion_step_plan(v_del.had_account) s;
@@ -1899,7 +2367,8 @@ $$;
 -- Replay hook (registered with the 1.10 journal): acts only while a restore is held.
 --   access_revoked{subject}: a member with a deletion is denied again; any other member gets a
 --     security hold for revalidation.
---   deletion_manifest identity-member / auth-user: the workflow exists again and access is denied.
+--   deletion_manifest identity-member / auth-user: the workflow (and the account) exists again
+--     and access is denied.
 --   deletion_completed identity-member: erase, owners, anonymise and verify inline.
 --   deletion_completed auth-user: the restored Auth user row is removed and verified absent.
 -- Anything left behind raises, so the restore stays held.
@@ -1917,6 +2386,8 @@ declare
   v_del app.identity_deletions;
   v_left text[];
   v_step text;
+  v_no smallint;
+  v_account uuid;
 begin
   if coalesce((p_input ->> 'restoring')::boolean, false) is not true then
     return '{}'::jsonb;
@@ -1949,43 +2420,62 @@ begin
     end if;
     if v_kind = 'deletion_manifest' then
       perform app.identity_deletion_mark_journaled(v_del, 'journal_manifest_member', v_entry);
-      -- The access step precedes the manifest in the journal; mark it too when it was acked here.
-      return '{}'::jsonb;
+    else
+      perform app.identity_deletion_erase_identity(v_del);
+      foreach v_account in array coalesce(nullif(app.identity_deletion_account_ids(v_del.deletion_id),
+                                                 '{}'::uuid[]), array[null::uuid]) loop
+        if exists (select 1 from jsonb_array_elements(app.identity_call_deletion_hooks(
+                     v_del.member_id, v_account, v_del.deletion_id, 'erase')) x
+                    where (x.value ->> 'remaining')::integer > 0) then
+          raise exception using errcode = '22023', message = 'replay left owner data behind';
+        end if;
+      end loop;
+      perform app.identity_deletion_anonymise(v_del);
+      v_left := app.identity_deletion_remaining(v_del, false);
+      if cardinality(v_left) > 0 then
+        raise exception using errcode = '22023',
+          message = 'replay left data behind: ' || array_to_string(v_left, ',');
+      end if;
+      foreach v_step in array array['erase_identity', 'erase_owners', 'anonymise', 'verify'] loop
+        perform app.identity_deletion_mark(v_del.deletion_id, v_step, 'done', 'replayed');
+      end loop;
+      perform app.identity_deletion_mark_journaled(v_del, 'journal_completed_member', v_entry);
     end if;
-    perform app.identity_deletion_erase_identity(v_del);
-    if exists (select 1 from jsonb_array_elements(app.identity_call_deletion_hooks(
-                 v_del.member_id, v_del.auth_user_id, v_del.deletion_id, 'erase')) x
-                where (x.value ->> 'remaining')::integer > 0) then
-      raise exception using errcode = '22023', message = 'replay left owner data behind';
-    end if;
-    perform app.identity_deletion_anonymise(v_del);
-    v_left := app.identity_deletion_remaining(v_del, false);
-    if cardinality(v_left) > 0 then
-      raise exception using errcode = '22023',
-        message = 'replay left data behind: ' || array_to_string(v_left, ',');
-    end if;
-    foreach v_step in array array['erase_identity', 'erase_owners', 'anonymise', 'verify'] loop
-      perform app.identity_deletion_mark(v_del.deletion_id, v_step, 'done', 'replayed');
-    end loop;
-    perform app.identity_deletion_mark_journaled(v_del, 'journal_completed_member', v_entry);
   else
-    -- auth-user: the deletion of the member that owned the account, when the snapshot has one.
+    -- auth-user: the deletion that recorded this account, or the subject's deletion (manifest).
     select d.* into v_del from app.identity_deletions d
-     where d.auth_user_id = v_object or (v_subject is not null and d.member_id = v_subject)
-     order by d.requested_at limit 1;
-    if v_del.deletion_id is not null and v_del.auth_user_id is null and v_kind = 'deletion_manifest'
-       and v_del.deletion_state <> 'completed' then
-      update app.identity_deletions d set auth_user_id = v_object, had_account = true
-       where d.deletion_id = v_del.deletion_id
-      returning * into v_del;
-      insert into app.identity_deletion_steps (deletion_id, step, ordinal)
-      select v_del.deletion_id, s.step, s.ordinal from app.identity_deletion_step_plan(true) s
-      on conflict do nothing;
+      join app.identity_deletion_accounts a on a.deletion_id = d.deletion_id
+     where a.auth_user_id = v_object
+     limit 1;
+    if v_del.deletion_id is null and v_subject is not null then
+      select d.* into v_del from app.identity_deletions d where d.member_id = v_subject;
+    end if;
+    if v_del.deletion_id is not null and v_del.deletion_state <> 'completed'
+       and not exists (select 1 from app.identity_deletion_accounts a
+                        where a.deletion_id = v_del.deletion_id and a.auth_user_id = v_object) then
+      insert into app.identity_deletion_accounts (deletion_id, account_no, auth_user_id)
+      select v_del.deletion_id, coalesce(max(a.account_no), 0) + 1, v_object
+        from app.identity_deletion_accounts a where a.deletion_id = v_del.deletion_id;
+      if not v_del.had_account then
+        update app.identity_deletions d set had_account = true
+         where d.deletion_id = v_del.deletion_id returning * into v_del;
+        insert into app.identity_deletion_steps (deletion_id, step, ordinal)
+        select v_del.deletion_id, s.step, s.ordinal from app.identity_deletion_step_plan(true) s
+        on conflict do nothing;
+      end if;
     end if;
     perform app.identity_deletion_ban(v_object);
+    select a.account_no into v_no from app.identity_deletion_accounts a
+     where a.deletion_id = v_del.deletion_id and a.auth_user_id = v_object;
     if v_kind = 'deletion_manifest' then
-      if v_del.deletion_id is not null then
-        perform app.identity_deletion_mark_journaled(v_del, 'journal_manifest_account', v_entry);
+      if v_no is not null then
+        update app.identity_deletion_accounts a
+           set manifest_seq = (v_entry ->> 'seq')::bigint, manifest_hash = v_entry ->> 'hash'
+         where a.deletion_id = v_del.deletion_id and a.account_no = v_no;
+        if not exists (select 1 from app.identity_deletion_accounts a
+                        where a.deletion_id = v_del.deletion_id and a.manifest_seq is null) then
+          perform app.identity_deletion_mark_journaled(v_del, 'journal_manifest_account', v_entry);
+        end if;
       end if;
       return '{}'::jsonb;
     end if;
@@ -1993,9 +2483,19 @@ begin
     if app.identity_deletion_auth_present(v_object) then
       raise exception using errcode = '22023', message = 'replay left the Auth user behind';
     end if;
-    if v_del.deletion_id is not null then
-      perform app.identity_deletion_mark(v_del.deletion_id, 'auth_account', 'done', 'replayed');
-      perform app.identity_deletion_mark_journaled(v_del, 'journal_completed_account', v_entry);
+    if v_no is not null then
+      update app.identity_deletion_accounts a
+         set auth_done = true, auth_outcome = 'replayed',
+             completed_seq = (v_entry ->> 'seq')::bigint, completed_hash = v_entry ->> 'hash'
+       where a.deletion_id = v_del.deletion_id and a.account_no = v_no;
+      if not exists (select 1 from app.identity_deletion_accounts a
+                      where a.deletion_id = v_del.deletion_id and not a.auth_done) then
+        perform app.identity_deletion_mark(v_del.deletion_id, 'auth_account', 'done', 'replayed');
+      end if;
+      if not exists (select 1 from app.identity_deletion_accounts a
+                      where a.deletion_id = v_del.deletion_id and a.completed_seq is null) then
+        perform app.identity_deletion_mark_journaled(v_del, 'journal_completed_account', v_entry);
+      end if;
     end if;
   end if;
   if v_del.deletion_id is not null then
@@ -2003,14 +2503,12 @@ begin
     update app.identity_deletion_steps s
        set step_state = 'done', outcome = 'replayed', updated_at = clock_timestamp()
      where s.deletion_id = v_del.deletion_id and s.step_state <> 'done'
-       and s.step in ('journal_access_revoked', 'journal_manifest_member', 'journal_manifest_account')
-       and exists (select 1 from app.rcv_journal_acks a
-                    where a.subject_id = v_del.member_id
-                      and a.kind = case when s.step = 'journal_access_revoked' then 'access_revoked'
-                                        else 'deletion_manifest' end
-                      and (s.step = 'journal_access_revoked'
-                           or a.object_id = case when s.step = 'journal_manifest_member'
-                                                 then v_del.member_id else v_del.auth_user_id end));
+       and ((s.step = 'journal_access_revoked'
+             and exists (select 1 from app.rcv_journal_acks a
+                          where a.kind = 'access_revoked' and a.subject_id = v_del.member_id))
+         or (s.step = 'journal_manifest_member'
+             and exists (select 1 from app.rcv_journal_acks a
+                          where a.kind = 'deletion_manifest' and a.object_id = v_del.member_id)));
     select d.* into v_del from app.identity_deletions d where d.deletion_id = v_del.deletion_id;
     perform app.identity_deletion_finish(v_del, 'recovery', null, null);
   end if;
@@ -2083,7 +2581,16 @@ comment on function api.identity_admin_deletions() is
 -- ---------------------------------------------------------------------------------------------
 
 revoke all on function
-  app.identity_deletion_purge_rows(uuid, uuid),
+  app.identity_deletion_purge_rows(uuid),
+  app.rcv_canonical(jsonb),
+  app.rcv_entry_hash(jsonb),
+  app.identity_deletion_auth_audit_present(uuid),
+  app.identity_deletion_account_ids(uuid),
+  app.identity_deletion_journal_head(),
+  app.identity_deletion_chain_problem(jsonb),
+  app.identity_deletion_redact_receipts(app.identity_deletions),
+  app.identity_deletion_check_journal_catch_up(jsonb),
+  app.identity_sys_deletion_journal_catch_up(uuid, uuid, jsonb),
   app.identity_deletion_purge_auth_user(uuid),
   app.cells_deletion_purge_rows(uuid),
   app.identity_register_deletion_hook(text, regprocedure),

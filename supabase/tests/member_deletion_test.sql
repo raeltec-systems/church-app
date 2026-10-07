@@ -7,7 +7,7 @@
 -- Function and an isolated restore: tools/identity-e2e/deletion.mjs. Every account here is
 -- SYNTHETIC (+44 7700 900600-900619).
 begin;
-select plan(93);
+select plan(105);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000211' || lpad(n::text, 2, '0'))::uuid $$;
@@ -125,17 +125,20 @@ begin
   return r;
 end;
 $$;
--- A journal entry as tools/recovery/journal.mjs builds it (synthetic hashes; the database does
--- not see the chain, the restore verifies it).
-create sequence pg_temp.jseq start 9100;
-create function pg_temp.entry(p_fields jsonb) returns jsonb language plpgsql as $$
+-- A journal entry as tools/recovery/journal.mjs builds it: the next seq after this database's
+-- acknowledged head, chained to the head's hash, with the canonical hash. p_skip > 0 builds a
+-- later (gapped) entry; p_prev overrides the previous hash.
+create function pg_temp.entry(p_fields jsonb, p_skip int default 0, p_prev text default null)
+returns jsonb language plpgsql as $$
 declare
-  v_seq bigint := nextval('pg_temp.jseq');
+  v_head jsonb := app.identity_deletion_journal_head();
+  v_entry jsonb;
 begin
-  return jsonb_build_object('v', 1, 'journal', 'bic-kafue-recovery-SYNTHETIC', 'seq', v_seq,
-    'at', to_char(clock_timestamp() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
-    'prev_hash', repeat('0', 64), 'hash', encode(sha256(convert_to(v_seq::text || p_fields::text, 'UTF8')), 'hex'))
-    || p_fields;
+  v_entry := jsonb_build_object('v', 1, 'journal', 'bic-kafue-recovery-SYNTHETIC',
+    'seq', (v_head ->> 'seq')::bigint + 1 + p_skip,
+    'at', to_char(clock_timestamp() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+    'prev_hash', coalesce(p_prev, v_head ->> 'hash')) || p_fields;
+  return v_entry || jsonb_build_object('hash', app.rcv_entry_hash(v_entry));
 end;
 $$;
 -- The worker loop: at most p_max actions; returns the last next-action (`done`, `wait:<reason>`,
@@ -195,7 +198,7 @@ select ok(not has_function_privilege('anon', 'api.identity_deletion_command(json
           and has_function_privilege('authenticated', 'api.identity_admin_membership_lifecycle()', 'EXECUTE')
           and not exists (
             select 1 from unnest(array[
-              'app.identity_deletion_purge_rows(uuid, uuid)', 'app.identity_deletion_purge_auth_user(uuid)',
+              'app.identity_deletion_purge_rows(uuid)', 'app.identity_deletion_purge_auth_user(uuid)',
               'app.cells_deletion_purge_rows(uuid)', 'app.rcv_apply_journal_entry_as(jsonb, text)',
               'app.rcv_apply_journal_entry(jsonb, text)', 'app.rcv_register_replay_hook(text, regprocedure)',
               'app.identity_rcv_replay(jsonb)', 'app.cells_erase_member(jsonb)',
@@ -256,8 +259,12 @@ select app.sys_register_credential((select v from t_ids where k = 'probe'),
 select is((select array_agg(command order by command) from app.sys_principal_commands
             where principal_id = (select v from t_ids where k = 'principal')),
   array['identity.deletion_advance', 'identity.deletion_auth_begin', 'identity.deletion_auth_complete',
-        'identity.deletion_journal_ack', 'identity.deletion_next', 'identity.deletion_queue'],
-  'the deletion principal holds exactly its own six commands');
+        'identity.deletion_journal_ack', 'identity.deletion_journal_catch_up', 'identity.deletion_next',
+        'identity.deletion_queue'],
+  'the deletion principal holds exactly its own seven commands');
+select is(app.rcv_entry_hash('{"v": 1, "seq": 2, "kind": "checkpoint", "hash": "x", "o": {"b": 1, "a": [true, null, "s"]}}'),
+  encode(sha256(convert_to('{"kind":"checkpoint","o":{"a":[true,null,"s"],"b":1},"seq":2,"v":1}', 'UTF8')), 'hex'),
+  'the entry hash is sha256 of the canonical JSON the journal tool writes');
 select is(pg_temp.sys('identity.deletion_queue', '{}', pg_temp.token('P')) ->> 'code', 'forbidden',
   'a principal of another purpose cannot run a deletion step');
 
@@ -295,18 +302,97 @@ update app.cells_membership_requests r
    set request_state = 'confirmed', decided_at = now(), decided_as = 'admin',
        resulting_membership_id = (select membership_id from app.cells_memberships where member_id = pg_temp.mid(3))
  where r.member_id = pg_temp.mid(3);
+-- Every Identity store of member 3: an earlier account (13) with an ended link and its approved
+-- application (and its event), a reclaim of that account's number, a recovery request, case and
+-- grant, a recovery-email proposal, a credential change, Admin receipts naming the member's
+-- records, Auth audit entries and a one-time token.
+insert into auth.users (id, aud, role, phone, phone_confirmed_at)
+values (pg_temp.u(13), 'authenticated', 'authenticated', '447700900613', now());
+insert into app.identity_account_links (member_id, auth_user_id, link_state, approved_phone, approved_by,
+                                        approved_at, ended_at, created_at)
+values (pg_temp.mid(3), pg_temp.u(13), 'ended', '+447700900613', 'pgtap', now() - interval '2 days',
+        now() - interval '1 day', now() - interval '2 days');
+create temp table seeded (k text primary key, v uuid);
+grant select on seeded to anon, authenticated;
+with a as (
+  insert into app.identity_membership_applications (auth_user_id, phone_username, full_name, cell_choice,
+    privacy_notice_version, is_synthetic, application_state, decided_at, member_id, submitted_at)
+  values (pg_temp.u(13), '+447700900613', 'SYNTHETIC 2.11 Applicant Name', 'not_sure', 'draft-2026-10-07', true,
+          'approved', now(), pg_temp.mid(3), now() - interval '3 days')
+  returning application_id)
+insert into seeded select 'application', application_id from a;
+insert into app.identity_application_events (application_id, revision, event, actor_auth_user_id, changed_fields)
+values ((select v from seeded where k = 'application'), 1, 'submitted', pg_temp.u(13), '{}');
+with r as (
+  insert into app.identity_phone_reclaims (phone_username, released_account_id, identity_check,
+                                           actor_member_id, actor_account_id)
+  values ('+447700900613', pg_temp.u(13), 'in_person', pg_temp.mid(1), pg_temp.u(1)) returning reclaim_id)
+insert into seeded select 'reclaim', reclaim_id from r;
+with q as (
+  insert into app.identity_recovery_requests (request_code, claimed_phone, grant_digest, expires_at)
+  values ('SYNTHDEL', pg_temp.phone(3), repeat('d', 64), now() + interval '30 minutes')
+  returning recovery_request_id)
+insert into seeded select 'request', recovery_request_id from q;
+with c as (
+  insert into app.identity_recovery_cases (member_id, link_id, auth_user_id, identity_check, evidence,
+                                           opened_by_member, opened_by_account, is_synthetic)
+  select pg_temp.mid(3), l.link_id, pg_temp.u(3), 'in_person', '{photo_id}', pg_temp.mid(1), pg_temp.u(1), true
+    from app.identity_account_links l where l.member_id = pg_temp.mid(3) and l.link_state = 'active'
+  returning case_id)
+insert into seeded select 'case', case_id from c;
+with g as (
+  insert into app.identity_recovery_grants (case_id, recovery_request_id, member_id, link_id, auth_user_id,
+    binding_revision, credential_generation, issued_by_member, issued_by_account, expires_at)
+  select (select v from seeded where k = 'case'), (select v from seeded where k = 'request'), pg_temp.mid(3),
+         l.link_id, pg_temp.u(3), l.binding_revision, l.credential_generation, pg_temp.mid(1), pg_temp.u(1),
+         now() + interval '15 minutes'
+    from app.identity_account_links l where l.member_id = pg_temp.mid(3) and l.link_state = 'active'
+  returning grant_id)
+insert into seeded select 'grant', grant_id from g;
+with p as (
+  insert into app.identity_recovery_email_proposals (link_id, member_id, auth_user_id, email, is_synthetic)
+  select l.link_id, pg_temp.mid(3), pg_temp.u(3), 'synthetic-2-11@example.test', true
+    from app.identity_account_links l where l.member_id = pg_temp.mid(3) and l.link_state = 'active'
+  returning proposal_id)
+insert into seeded select 'proposal', proposal_id from p;
+with c as (
+  insert into app.identity_credential_changes (link_id, member_id, auth_user_id, change_kind, new_phone, is_synthetic)
+  select l.link_id, pg_temp.mid(3), pg_temp.u(3), 'phone_username', '+447700900614', true
+    from app.identity_account_links l where l.member_id = pg_temp.mid(3) and l.link_state = 'active'
+  returning change_id)
+insert into seeded select 'change', change_id from c;
+-- An Admin's receipt for the member's application names the applicant (member_id null), and an
+-- Admin's receipt about something else mentions the member's id in its result.
+insert into app.cmd_receipts (actor_id, command, request_id, payload_hash, aggregate_type, aggregate_id, result)
+values (pg_temp.u(1), 'identity.reject_application', gen_random_uuid(), '\x00', 'identity_membership_application',
+        (select v from seeded where k = 'application'),
+        '{"data": {"member_id": null, "full_name": "SYNTHETIC 2.11 Applicant Name", "phone_username": "+447700900613"}}'),
+       (pg_temp.u(1), 'identity.grant_role', '00000000-0000-4000-a000-000000021199', '\x00', 'fixture_counter',
+        gen_random_uuid(), jsonb_build_object('data', jsonb_build_object('mentions', pg_temp.mid(3))));
+insert into auth.audit_log_entries (id, payload, created_at)
+values (gen_random_uuid(), jsonb_build_object('actor_id', pg_temp.u(3), 'action', 'login',
+                                              'actor_username', '447700900603'), now()),
+       (gen_random_uuid(), jsonb_build_object('actor_id', pg_temp.u(1), 'action', 'user_modified',
+                                              'traits', jsonb_build_object('user_id', pg_temp.u(13))), now());
+insert into auth.one_time_tokens (id, user_id, token_type, token_hash, relates_to)
+values (gen_random_uuid(), pg_temp.u(3), 'email_change_token_new', 'synthetic-2-11-token', 'synthetic-2-11@example.test');
 select is(pg_temp.summary(pg_temp.c(3)) || '|' || pg_temp.summary(pg_temp.c2(3)), 'ok|ok', 'member 3 is granted on both devices');
 create temp table r3 as select pg_temp.mine(3) as r;
 select is((select r -> 'data' ->> 'deletion_state' from r3) || '|' || (select r -> 'data' ->> 'signed_out' from r3)
           || '|' || (select (r -> 'data' ? 'display_name')::text from r3),
   'requested|true|false', 'the member is told the deletion started and the account is signed out (no name echoed)');
 select is((select count(*)::int from auth.sessions where user_id = pg_temp.u(3)), 0, 'every Auth session of the account is revoked');
-select ok((select banned_until > now() + interval '99 years' from auth.users where id = pg_temp.u(3)),
-  'the Auth user is banned: a password sign-in fails at Auth from this step');
+select ok((select bool_and(banned_until > now() + interval '99 years') from auth.users where id in (pg_temp.u(3), pg_temp.u(13))),
+  'every account the member ever linked is banned: a password sign-in fails at Auth from this step');
+select is((select array_agg(auth_user_id order by account_no) from app.identity_deletion_accounts where deletion_id = pg_temp.del(3)),
+  array[pg_temp.u(13), pg_temp.u(3)], 'the earlier account and the current one are both recorded');
+-- A factor added afterwards (it must go with the account too).
+insert into auth.mfa_factors (id, user_id, factor_type, status, created_at, updated_at)
+values (gen_random_uuid(), pg_temp.u(13), 'totp', 'unverified', now(), now());
 select is(pg_temp.summary(pg_temp.c(3)) || ' / ' || pg_temp.summary(pg_temp.c2(3)),
   'PT401|unauthenticated|untrusted_session / PT401|unauthenticated|untrusted_session',
   'both devices are denied at once');
-select is((select link_state from app.identity_account_links where member_id = pg_temp.mid(3)), 'ended',
+select is((select string_agg(distinct link_state, ',') from app.identity_account_links where member_id = pg_temp.mid(3)), 'ended',
   'the account link ended');
 select is((select membership_state from app.identity_members where member_id = pg_temp.mid(3)), 'deactivated',
   'the membership is deactivated');
@@ -355,8 +441,21 @@ select is((select seq::text || '|' || kind || '|' || subject_id::text from app.r
             where entry_hash = (select e ->> 'hash' from e1)),
   ((select e ->> 'seq' from e1) || '|access_revoked|' || pg_temp.mid(3)::text),
   'the journal acknowledgement holds the opaque subject only');
-select is(pg_temp.work(pg_temp.del(3), 2), 'stopped_before:auth_account', 'interrupted after the two manifest entries');
-select is((select count(*)::int from app.identity_account_links where member_id = pg_temp.mid(3)), 1,
+create temp table nx as select pg_temp.sys('identity.deletion_next', jsonb_build_object('deletion_id', pg_temp.del(3))) -> 'data' -> 'next' -> 'entry' as f;
+select is(pg_temp.sys('identity.deletion_journal_ack', jsonb_build_object('deletion_id', pg_temp.del(3),
+            'step', 'journal_manifest_member', 'entry', pg_temp.entry((select f from nx), 1))) -> 'data' ->> 'reason',
+  'journal_gap', 'an entry that skips a seq (a future entry) cannot be acknowledged');
+select is(pg_temp.sys('identity.deletion_journal_ack', jsonb_build_object('deletion_id', pg_temp.del(3),
+            'step', 'journal_manifest_member', 'entry', pg_temp.entry((select f from nx), 0, repeat('e', 64)))) -> 'data' ->> 'reason',
+  'journal_chain_broken', 'an entry that does not chain to the acknowledged head is refused');
+select is(pg_temp.sys('identity.deletion_journal_ack', jsonb_build_object('deletion_id', pg_temp.del(3),
+            'step', 'journal_manifest_member', 'entry', pg_temp.entry((select f from nx)) || '{"hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}')) -> 'data' ->> 'reason',
+  'entry_invalid', 'an entry whose hash is not the canonical hash of its fields is refused');
+select is((pg_temp.sys('identity.deletion_journal_catch_up', jsonb_build_object('entry',
+            pg_temp.entry('{"kind": "checkpoint"}'))) -> 'data') - 'actor' - 'seq',
+  '{"acked": true}'::jsonb, 'an entry another writer appended (a checkpoint) is caught up under the same chain rules');
+select is(pg_temp.work(pg_temp.del(3), 3), 'stopped_before:auth_account', 'interrupted after the member and both account manifest entries');
+select is((select count(*)::int from app.identity_account_links where member_id = pg_temp.mid(3)), 2,
   'nothing was erased yet');
 update app.policy_gates set fixture_value = null where gate = 'identity_deletion_retention';
 select is(pg_temp.work(pg_temp.del(3)), 'wait:policy_gate_closed', 'destructive steps wait while the Q4 retention gate is closed');
@@ -366,8 +465,8 @@ select is(pg_temp.sys('identity.deletion_auth_complete', jsonb_build_object('del
             -> 'data' ->> 'outcome', 'retry', 'the Auth step is done only when the Auth user is gone');
 select is((select step_state || '|' || outcome from app.identity_deletion_steps where deletion_id = pg_temp.del(3) and step = 'auth_account'),
   'failed|auth_unknown', 'the failed Auth attempt is recorded');
-select is(pg_temp.work(pg_temp.del(3), 3), 'stopped_before:anonymise', 'interrupted again after the Auth and erase steps');
-select is((select count(*)::int from auth.users where id = pg_temp.u(3)), 0, 'the Auth user is gone');
+select is(pg_temp.work(pg_temp.del(3), 4), 'stopped_before:anonymise', 'interrupted again after both Auth accounts and the erase steps');
+select is((select count(*)::int from auth.users where id in (pg_temp.u(3), pg_temp.u(13))), 0, 'both Auth users are gone');
 select is((select display_name from app.identity_members where member_id = pg_temp.mid(3)), 'Deleted member',
   'only the tombstone remains of the member record');
 select is((select count(*)::int from app.cells_memberships where member_id = pg_temp.mid(3))
@@ -375,12 +474,40 @@ select is((select count(*)::int from app.cells_memberships where member_id = pg_
           + (select count(*)::int from app.cells_member_states where member_id = pg_temp.mid(3)), 0,
   'the Cells hook erased the member''s cell data');
 select is(pg_temp.work(pg_temp.del(3)), 'done', 'resumed: the worker finishes');
-select is((select deletion_state || '|' || coalesce(auth_user_id::text, 'null') from app.identity_deletions where member_id = pg_temp.mid(3)),
-  'completed|null', 'completed; the account id is not kept');
+select is((select deletion_state from app.identity_deletions where member_id = pg_temp.mid(3))
+          || '|' || (select count(auth_user_id) from app.identity_deletion_accounts where deletion_id = pg_temp.del(3)),
+  'completed|0', 'completed; the account ids are not kept');
 select is((select string_agg(distinct step_state, ',') from app.identity_deletion_steps where deletion_id = pg_temp.del(3)), 'done',
   'every step is done');
-select is((select attempts || '|' || outcome from app.identity_deletion_steps where deletion_id = pg_temp.del(3) and step = 'auth_account'), '1|deleted',
-  'the Auth step records its dispatched attempt and outcome');
+select is((select attempts || '|' || outcome from app.identity_deletion_steps where deletion_id = pg_temp.del(3) and step = 'auth_account'), '2|deleted',
+  'the Auth step records one dispatched attempt per account and its outcome');
+select is((select string_agg(auth_outcome || ':' || auth_attempts, ',' order by account_no) from app.identity_deletion_accounts
+            where deletion_id = pg_temp.del(3)), 'deleted:1,deleted:1', 'each account records its own Auth attempt');
+select is((select count(*)::int from app.identity_account_links where member_id = pg_temp.mid(3) or auth_user_id in (pg_temp.u(3), pg_temp.u(13)))
+          + (select count(*)::int from app.identity_binding_history h where not exists (select 1 from app.identity_account_links l where l.link_id = h.link_id))
+          + (select count(*)::int from app.identity_credential_events e where not exists (select 1 from app.identity_account_links l where l.link_id = e.link_id))
+          + (select count(*)::int from app.identity_membership_applications where application_id = (select v from seeded where k = 'application'))
+          + (select count(*)::int from app.identity_application_events where application_id = (select v from seeded where k = 'application'))
+          + (select count(*)::int from app.identity_phone_reclaims where reclaim_id = (select v from seeded where k = 'reclaim'))
+          + (select count(*)::int from app.identity_recovery_requests where recovery_request_id = (select v from seeded where k = 'request'))
+          + (select count(*)::int from app.identity_recovery_cases where case_id = (select v from seeded where k = 'case'))
+          + (select count(*)::int from app.identity_recovery_grants where grant_id = (select v from seeded where k = 'grant'))
+          + (select count(*)::int from app.identity_recovery_email_proposals where proposal_id = (select v from seeded where k = 'proposal'))
+          + (select count(*)::int from app.identity_credential_changes where change_id = (select v from seeded where k = 'change'))
+          + (select count(*)::int from app.identity_holds where member_id = pg_temp.mid(3)), 0,
+  'every Identity store of the member and both accounts is empty (links, binding history, credential events, application and events, reclaim, recovery request/case/grant, proposal, change, holds)');
+select is((select count(*)::int from auth.audit_log_entries
+            where payload ->> 'actor_id' in (pg_temp.u(3)::text, pg_temp.u(13)::text)
+               or payload -> 'traits' ->> 'user_id' in (pg_temp.u(3)::text, pg_temp.u(13)::text))
+          + (select count(*)::int from auth.one_time_tokens where user_id in (pg_temp.u(3), pg_temp.u(13)))
+          + (select count(*)::int from auth.mfa_factors where user_id in (pg_temp.u(3), pg_temp.u(13)))
+          + (select count(*)::int from auth.identities where user_id in (pg_temp.u(3), pg_temp.u(13)))
+          + (select count(*)::int from auth.refresh_tokens where user_id in (pg_temp.u(3)::text, pg_temp.u(13)::text)), 0,
+  'every Auth store of both accounts is empty (audit entries, one-time tokens, factors, identities, refresh tokens)');
+select is((select count(*)::int from app.cmd_receipts where aggregate_id = (select v from seeded where k = 'application')), 0,
+  'the Admin receipt naming the applicant is purged with the member''s application');
+select is((select (result -> 'data' ->> 'mentions') from app.cmd_receipts where request_id = '00000000-0000-4000-a000-000000021199'),
+  '00000000-0000-0000-0000-000000000000', 'another actor''s receipt that mentions the member is kept for replay, with the id redacted');
 select is(pg_temp.calls(3), 'membership_deactivated,deletion_requested,sessions_revoked,member_deleted',
   'owners heard member_deleted at completion');
 select is(app.identity_deletion_remaining((select d from app.identity_deletions d where d.member_id = pg_temp.mid(3)), true), '{}'::text[],
@@ -389,7 +516,7 @@ select is((select count(*)::int from app.identity_access_audit where actor_accou
   'retained facts no longer hold the deleted account id');
 select ok((select count(*) from app.identity_access_audit where target_member_id = pg_temp.mid(3)) > 0,
   'retained facts keep the tombstone id (correction links)');
-select is((select count(*)::int from app.cmd_receipts r where r.actor_id = pg_temp.u(3) or r.result::text like '%' || pg_temp.mid(3)::text || '%')
+select is((select count(*)::int from app.cmd_receipts r where r.actor_id in (pg_temp.u(3), pg_temp.u(13)) or r.result::text like '%' || pg_temp.mid(3)::text || '%')
           + (select count(*)::int from app.sys_receipts r where r.result::text like '%' || pg_temp.mid(3)::text || '%'
                                                          or r.result::text like '%' || pg_temp.u(3)::text || '%'), 0,
   'no receipt mentions the member or the account');
@@ -410,7 +537,10 @@ select is((select count(*)::int from app.identity_contact_routes where member_id
 select pg_temp.call(pg_temp.c(1), 'identity_credential_command', 'identity.place_hold', pg_temp.mrev(6),
                     jsonb_build_object('member_id', pg_temp.mid(6), 'reason_code', 'login_disabled'));
 insert into app.fixture_duties (member_id, duty_kind) values (pg_temp.mid(6), 'fixture_door_duty');
-select is(pg_temp.staff(6) -> 'data' ->> 'pending_obligations', '1', 'a held member can be deleted by staff; the handover is recorded');
+select is(pg_temp.err(pg_temp.staff(6)), 'conflict {"member_id": "second_admin_required"}',
+  'the Admin who held the login cannot also delete the member (two-person rule)');
+select is(pg_temp.staff(6, pg_temp.c(2)) -> 'data' ->> 'pending_obligations', '1',
+  'another Admin can delete a held member on the staff route; the handover is recorded');
 select is(pg_temp.work(pg_temp.del(6)), 'wait:handover_pending', 'erasure waits for the handover (the account is already gone)');
 select is((select count(*)::int from auth.users where id = pg_temp.u(6)), 0, 'the Auth account was not kept waiting');
 select app.identity_resolve_handover_obligation('fixture',
@@ -460,7 +590,7 @@ select ok(app.rcv_serving_hold() and not app.policy_is_open('private_access'),
 
 -- Fail closed without the row-deletion migration ----------------------------------------------------
 update app.rcv_recovery_state set state = 'live', restore_id = null, updated_by = 'pgtap';
-create or replace function app.identity_deletion_purge_rows(p_member_id uuid, p_auth_user_id uuid)
+create or replace function app.identity_deletion_purge_rows(p_deletion_id uuid)
 returns integer language plpgsql set search_path = '' as $$
 begin
   perform app.cmd_fail('unavailable', '{"deletion": "rows_migration_missing"}');
@@ -469,7 +599,7 @@ end;
 $$;
 select pg_temp.call(pg_temp.c(1), 'identity_credential_command', 'identity.place_hold', pg_temp.mrev(5),
                     jsonb_build_object('member_id', pg_temp.mid(5), 'reason_code', 'login_disabled'));
-select is(pg_temp.staff(5) -> 'data' ->> 'deletion_state', 'requested', 'the request works without the row-deletion migration');
+select is(pg_temp.staff(5, pg_temp.c(2)) -> 'data' ->> 'deletion_state', 'requested', 'the request works without the row-deletion migration');
 select is(pg_temp.work(pg_temp.del(5), 4), 'stopped_before:erase_identity', 'journal and Auth steps run');
 select is(pg_temp.sys('identity.deletion_advance', jsonb_build_object('deletion_id', pg_temp.del(5))) ->> 'code',
   'unavailable', 'erasure answers unavailable until 20261007171600 is applied');

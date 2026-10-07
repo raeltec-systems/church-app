@@ -34,6 +34,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { LocalSegmentJournal, validateEntry, verifyJournal } from '../recovery/journal.mjs';
+import { requestCode } from './lifecycle.mjs';
 import { amrMethods, assertLocalOrigin, redact } from './run.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -41,6 +42,7 @@ const FN = '/functions/v1/identity-deletion';
 const ISOLATED = 'bic-deletion-isolated';
 const NAME_PREFIX = 'SYNTHETIC 2.11 E2E';
 const OPERATOR = 'israel';
+const EPOCH_WAIT_MS = 6500; // the 2.2 trust-epoch margin is 5 s
 
 /** The reserved fictional numbers this run uses (+44 7700 900620-900639). */
 export function isFictionalDeletionPhone(phone) {
@@ -117,7 +119,9 @@ async function main() {
   const people = {
     admin: { phone: '+447700900620', name: `${NAME_PREFIX} Admin A` },
     admin2: { phone: '+447700900621', name: `${NAME_PREFIX} Admin B` },
-    leaving: { phone: '+447700900622', name: `${NAME_PREFIX} Leaving` },
+    leaving: { phone: '+447700900622', name: `${NAME_PREFIX} Leaving`, email: 'synthetic-2-11-leaving@example.test' },
+    leavingOld: { phone: '+447700900627', name: `${NAME_PREFIX} Leaving` },
+    leavingNext: { phone: '+447700900626', name: `${NAME_PREFIX} Leaving` },
     app: { phone: '+447700900623', name: `${NAME_PREFIX} App user` },
     restored: { phone: '+447700900624', name: `${NAME_PREFIX} Restored` },
     accountless: { phone: '+447700900625', name: `${NAME_PREFIX} Accountless` },
@@ -147,12 +151,28 @@ async function main() {
       select d.deletion_id from app.identity_deletions d where d.member_id in (select member_id from gone_members);
     delete from app.identity_deletion_audit a where a.deletion_id in (select deletion_id from gone_deletions);
     delete from app.identity_deletion_steps s where s.deletion_id in (select deletion_id from gone_deletions);
+    delete from app.identity_deletion_accounts a where a.deletion_id in (select deletion_id from gone_deletions);
+    delete from app.identity_deletion_aggregates a where a.deletion_id in (select deletion_id from gone_deletions);
     delete from app.identity_deletions d where d.deletion_id in (select deletion_id from gone_deletions);
     delete from app.fixture_lifecycle_calls c where c.member_id in (select member_id from gone_members);
     delete from app.fixture_duties d where d.member_id in (select member_id from gone_members);
     delete from app.identity_handover_obligations o where o.member_id in (select member_id from gone_members);
     delete from app.identity_membership_lifecycle e
      where e.member_id in (select member_id from gone_members) or e.actor_member_id in (select member_id from gone_members);
+    delete from app.identity_recovery_operations o where o.member_id in (select member_id from gone_members);
+    delete from app.identity_member_provenance p
+     where p.member_id in (select member_id from gone_members) or p.recorded_by_member in (select member_id from gone_members);
+    delete from app.identity_recovery_grants g where g.member_id in (select member_id from gone_members);
+    delete from app.identity_recovery_cases c where c.member_id in (select member_id from gone_members);
+    delete from app.identity_credential_changes c where c.member_id in (select member_id from gone_members);
+    delete from app.identity_recovery_email_proposals p where p.member_id in (select member_id from gone_members);
+    delete from app.identity_phone_reclaims r where r.released_account_id in (select id from gone_users)
+       or r.actor_member_id in (select member_id from gone_members);
+    delete from app.identity_application_events e using app.identity_membership_applications a
+     where e.application_id = a.application_id and (a.member_id in (select member_id from gone_members) or a.auth_user_id in (select id from gone_users));
+    delete from app.identity_membership_applications a
+     where a.member_id in (select member_id from gone_members) or a.auth_user_id in (select id from gone_users);
+    delete from app.identity_recovery_requests r where r.claimed_phone in (${Object.values(people).map((p) => `'${p.phone}'`).join(',')});
     delete from app.identity_recovery_audit a
      where a.member_id in (select member_id from gone_members) or a.actor_member_id in (select member_id from gone_members);
     delete from app.identity_membership_audit a
@@ -289,10 +309,16 @@ async function main() {
       const cx = await envelope('cells_command', adminToken, 'cells.create_cell', null,
         { name: `${NAME_PREFIX} ${label}`, signup_label: `${NAME_PREFIX} ${label}`, broad_area: 'SYNTHETIC North' });
       const option = ((await rpc('cells_signup_options', adminToken)).json?.options ?? []).find((o) => o.cell_id === cx.data?.cell_id);
-      const asked = await envelope('cells_command', adminToken, 'cells.request_change', 1,
-        { cell_id: cx.data?.cell_id, cell_revision: option?.revision, member_id: p.member });
+      // An application's "not sure" choice is already an open request (the Admin follow-up
+      // queue): the Admin names the cell. Otherwise the Admin asks for one and confirms it.
+      const follow = ((await rpc('cells_admin_overview', adminToken)).json?.requests ?? []).find((r) => r.member_id === p.member);
+      let asked = { revision: follow?.member_revision, data: { open_request: { request_id: follow?.request_id } } };
+      if (!follow) {
+        asked = await envelope('cells_command', adminToken, 'cells.request_change', 1,
+          { cell_id: cx.data?.cell_id, cell_revision: option?.revision, member_id: p.member });
+      }
       const confirmed = await envelope('cells_command', adminToken, 'cells.confirm_request', asked.revision,
-        { request_id: asked.data?.open_request?.request_id });
+        { request_id: asked.data?.open_request?.request_id, ...(follow ? { cell_id: cx.data?.cell_id } : {}) });
       return Boolean(confirmed.data?.primary);
     };
 
@@ -311,11 +337,70 @@ async function main() {
     admin2.token = (await signIn(admin2.phone, admin2.password)).json?.access_token;
 
     // ------------------------------------------- in-app deletion: denied from the first step
-    await seeded(leaving);
-    const l0 = await rpc('identity_my_access', (await signIn(leaving.phone, leaving.password)).json?.access_token);
+    // The member's history, through the real flows: an earlier account (linked, then unlinked as
+    // lost, its number reclaimed), a new account that applies and is linked to the same member,
+    // a staff-assisted recovery case and grant, a withdrawn sign-in change, a recovery-email
+    // proposal with Auth's pending email change, a confirmed cell, a role.
+    const old = people.leavingOld;
+    old.password = password();
+    const oldUser = await http('POST', '/auth/v1/admin/users', { admin: true, body: { phone: old.phone, phone_confirm: true, password: old.password } });
+    old.user = oldUser.json?.id;
+    users.add(old.user);
+    leaving.member = psql(`select app.identity_seed_synthetic_link('${old.user}', '${leaving.name}', 'identity-deletion-e2e')`);
+    members.add(leaving.member);
+    const unlinked = await envelope('identity_review_command', admin.token, 'identity.unlink_account', memberRev(leaving),
+      { member_id: leaving.member, reason: 'account_lost' });
+    const reclaimed = await envelope('identity_review_command', admin.token, 'identity.reclaim_phone_username', null,
+      { phone_username: old.phone, identity_check: 'in_person', reason: 'registered_by_someone_else' });
+    leaving.password = password();
+    const up = await http('POST', '/auth/v1/signup', { body: { phone: leaving.phone, password: leaving.password } });
+    leaving.user = up.json?.user?.id;
+    users.add(leaving.user);
+    const applied = await envelope('identity_application_command', up.json?.access_token, 'identity.submit_application', null,
+      { full_name: leaving.name, cell_choice: { choice: 'not_sure' }, privacy_notice_version: 'draft-2026-10-07' });
+    const linked = await envelope('identity_review_command', admin.token, 'identity.link_application', applied.revision,
+      { application_id: applied.data?.application_id, member_id: leaving.member, identity_check: 'in_person' });
+    await sleep(EPOCH_WAIT_MS);
+    leaving.token = (await signIn(leaving.phone, leaving.password)).json?.access_token;
+    const l0 = await rpc('identity_my_access', leaving.token);
     const pastor = await envelope('identity_grant_command', admin.token, 'identity.grant_role', l0.json?.revision,
       { member_id: leaving.member, role: 'pastor' });
+    const code = requestCode();
+    psql(`insert into app.identity_recovery_requests (request_code, claimed_phone, grant_digest, expires_at)
+          values ('${code}', '${leaving.phone}', '${createHash('sha256').update(randomBytes(32)).digest('hex')}', now() + interval '30 minutes')`);
+    const opened = await envelope('identity_recovery_command', admin.token, 'identity.open_recovery_case', null,
+      { member_id: leaving.member, identity_check: 'in_person', evidence: ['photo_id'] });
+    const issued = await envelope('identity_recovery_command', admin.token, 'identity.issue_recovery_grant', opened.revision,
+      { case_id: opened.data?.case_id, request_code: code });
+    const change = await envelope('identity_credential_command', leaving.token, 'identity.request_credential_change', null,
+      { change_kind: 'phone_username', phone_username: people.leavingNext.phone });
+    const withdrawn = await envelope('identity_credential_command', leaving.token, 'identity.withdraw_credential_change', change.revision,
+      { change_id: change.data?.change_id });
+    const proposed = await envelope('identity_recovery_email_command', leaving.token, 'identity.propose_recovery_email', null,
+      { email: leaving.email });
+    const emailChange = await http('PUT', '/auth/v1/user', { token: leaving.token, body: { email: leaving.email } });
     const hasCell = await giveCell(admin.token, leaving, 'North cell');
+    const seededStores = JSON.parse(psql(`select json_build_object(
+      'links', (select count(*) from app.identity_account_links where member_id = '${leaving.member}'),
+      'applications', (select count(*) from app.identity_membership_applications where member_id = '${leaving.member}'),
+      'application_events', (select count(*) from app.identity_application_events e join app.identity_membership_applications a using (application_id) where a.member_id = '${leaving.member}'),
+      'binding_history', (select count(*) from app.identity_binding_history h join app.identity_account_links l using (link_id) where l.member_id = '${leaving.member}'),
+      'credential_events', (select count(*) from app.identity_credential_events e join app.identity_account_links l using (link_id) where l.member_id = '${leaving.member}'),
+      'reclaims', (select count(*) from app.identity_phone_reclaims where released_account_id = '${old.user}'),
+      'recovery_requests', (select count(*) from app.identity_recovery_requests where request_code = '${code}'),
+      'recovery_cases', (select count(*) from app.identity_recovery_cases where member_id = '${leaving.member}'),
+      'recovery_grants', (select count(*) from app.identity_recovery_grants where member_id = '${leaving.member}'),
+      'credential_changes', (select count(*) from app.identity_credential_changes where member_id = '${leaving.member}'),
+      'proposals', (select count(*) from app.identity_recovery_email_proposals where member_id = '${leaving.member}'),
+      'one_time_tokens', (select count(*) from auth.one_time_tokens where user_id = '${leaving.user}'),
+      'admin_receipts', (select count(*) from app.cmd_receipts where actor_id = '${admin.user}' and result::text like '%${NAME_PREFIX} Leaving%'))`));
+    // GoTrue's own audit log is not written on this stack; a SYNTHETIC entry stands in for one.
+    const auditWritten = Number(psql(`select count(*) from auth.audit_log_entries where payload ->> 'actor_id' in ('${leaving.user}', '${old.user}')`));
+    if (auditWritten === 0) {
+      psql(`insert into auth.audit_log_entries (id, payload, created_at)
+            values (gen_random_uuid(), json_build_object('actor_id', '${leaving.user}', 'action', 'login', 'actor_username', '${leaving.phone.slice(1)}'), now()),
+                   (gen_random_uuid(), json_build_object('actor_id', '${admin.user}', 'action', 'user_modified', 'traits', json_build_object('user_id', '${old.user}', 'user_phone', '${old.phone.slice(1)}')), now())`);
+    }
     const mobile = (await signIn(leaving.phone, leaving.password)).json;
     const web = (await signIn(leaving.phone, leaving.password)).json;
     const before = [await summary(mobile?.access_token), await summary(web?.access_token)];
@@ -324,13 +409,30 @@ async function main() {
     const devices = [];
     for (const d of [mobile, web]) devices.push({ summary: await summary(d?.access_token), refresh: (await refresh(d?.refresh_token)).status });
     const freshTry = await signIn(leaving.phone, leaving.password);
-    check('D10-in-app-request-denies-at-once', pastor.status === 200 && hasCell && before.every((s) => s === 200)
-      && requested.status === 200 && requested.data?.deletion_state === 'requested' && requested.data?.signed_out === true
+    const accounts = JSON.parse(psql(`select coalesce(json_agg(auth_user_id order by account_no), '[]') from app.identity_deletion_accounts where deletion_id = '${leaving.deletion}'`));
+    // A factor added to the earlier account afterwards must go with it too.
+    psql(`insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, secret, created_at, updated_at)
+          values (gen_random_uuid(), '${old.user}', 'synthetic', 'totp', 'unverified', 'JBSWY3DPEHPK3PXP', now(), now())`);
+    const ok = (r) => r?.status === 200 && !r.code;
+    check('D10-in-app-request-denies-at-once', ok(unlinked) && reclaimed.data?.released === true
+      && ok(linked) && linked.data?.member_id === leaving.member && ok(pastor)
+      && ok(issued) && ok(change) && ok(withdrawn) && ok(proposed)
+      && emailChange.status === 200 && hasCell
+      && Object.values(seededStores).every((n) => n > 0)
+      && before.every((s) => s === 200)
+      && ok(requested) && requested.data?.deletion_state === 'requested' && requested.data?.signed_out === true
       && !('display_name' in (requested.data ?? {}))
       && devices.every((d) => d.summary === 401 && d.refresh >= 400)
-      && freshTry.status >= 400 && !freshTry.json?.access_token,
-      { cell_confirmed: hasCell, devices_before: before, request: requested.data?.deletion_state, devices_after: devices,
-        password_sign_in: { status: freshTry.status, error_code: freshTry.json?.error_code ?? null } });
+      && freshTry.status >= 400 && !freshTry.json?.access_token
+      && accounts.length === 2 && accounts[0] === old.user && accounts[1] === leaving.user,
+      { flows: { unlinked: ok(unlinked), released: reclaimed.data?.released ?? reclaimed.code ?? null, linked: ok(linked),
+          linked_member: linked.data?.member_id === leaving.member, pastor: ok(pastor), grant_issued: ok(issued),
+          change: ok(change), withdrawn: ok(withdrawn), proposed: ok(proposed), auth_email_change: emailChange.status,
+          cell: hasCell, signed_out: requested.data?.signed_out ?? null },
+        seeded_through_real_flows: seededStores, auth_audit_written_by_gotrue: auditWritten > 0,
+        devices_before: before, request: requested.data?.deletion_state, devices_after: devices,
+        password_sign_in: { status: freshTry.status, error_code: freshTry.json?.error_code ?? null },
+        accounts_recorded: accounts.length, earlier_account_first: accounts[0] === old.user });
 
     // ------------------------------------------------------- the worker, interrupted and resumed
     const first = worker(['--deletion', leaving.deletion, '--max-steps', '2']);
@@ -345,7 +447,8 @@ async function main() {
         journal_steps: [afterFirst.journal_access_revoked?.state, afterFirst.journal_manifest_member?.state],
         erased_yet: personal(leaving) === 0, password_sign_in: stillDenied.status });
 
-    // A crash right after the next append and before its acknowledgement.
+    // A crash right after the next append (the earlier account's manifest entry) and before its
+    // acknowledgement.
     const next = (await sys('identity.deletion_next', { deletion_id: leaving.deletion }))?.next;
     const orphan = await journal.append(next.entry);
     const countBefore = ((await journal.list()) ?? []).length;
@@ -353,36 +456,62 @@ async function main() {
     const down = worker(['--deletion', leaving.deletion, '--function-url', 'http://127.0.0.1:9/functions/v1/identity-deletion']);
     const afterDown = steps(leaving.deletion);
     const countAfter = ((await journal.list()) ?? []).length;
-    const acked = down.lines.find((l) => l.step === 'journal_manifest_account');
+    const acked = down.lines.filter((l) => l.step === 'journal_manifest_account');
     check('D12-resume-acks-the-appended-entry-and-survives-an-unreachable-function', next?.step === 'journal_manifest_account'
-      && acked?.outcome === 'acked_existing' && acked?.seq === orphan.seq && countAfter === countBefore
+      && next?.entry?.object?.object_id === old.user
+      && acked[0]?.outcome === 'acked_existing' && acked[0]?.seq === orphan.seq
+      && acked[1]?.outcome === 'journaled' && countAfter === countBefore + 1
       && down.result?.result === 'failed:auth_unreachable' && afterDown.auth_account?.state === 'pending'
-      && (await http('GET', `/auth/v1/admin/users/${leaving.user}`, { admin: true })).status === 200,
-      { appended_before_crash: orphan.kind, resumed_outcome: acked?.outcome, journal_grew_by: countAfter - countBefore,
+      && (await http('GET', `/auth/v1/admin/users/${leaving.user}`, { admin: true })).status === 200
+      && (await http('GET', `/auth/v1/admin/users/${old.user}`, { admin: true })).status === 200,
+      { appended_before_crash: orphan.kind, resumed: acked.map((a) => a.outcome), journal_grew_by: countAfter - countBefore,
         result: down.result?.result, auth_step: afterDown.auth_account });
 
-    // The Auth user goes away before the step is recorded (as after a crash right after the Auth
-    // Admin call); the resumed worker retries the step, which is now a no-op that is recorded.
-    const gone = await http('DELETE', `/auth/v1/admin/users/${leaving.user}`, { admin: true });
+    // Resumed: the Edge Function deletes both Auth users through Auth Admin.
     const finish = worker(['--deletion', leaving.deletion]);
     const done = steps(leaving.deletion);
     const del = JSON.parse(psql(`select row_to_json(d) from app.identity_deletions d where deletion_id = '${leaving.deletion}'`));
-    check('D13-resumed-to-completion-after-every-store-is-checked', gone.status === 200 && finish.result?.result === 'done'
-      && Object.values(done).every((s) => s.state === 'done') && done.auth_account?.outcome === 'absent'
-      && done.auth_account?.attempts === 1 && done.verify?.outcome === 'verified'
-      && del.deletion_state === 'completed' && del.auth_user_id === null && personal(leaving) === 0
+    const accountRows = JSON.parse(psql(`select json_agg(json_build_object('kept', auth_user_id is not null, 'auth', auth_outcome, 'attempts', auth_attempts) order by account_no)
+      from app.identity_deletion_accounts where deletion_id = '${leaving.deletion}'`));
+    const authLeft = Number(psql(`select (select count(*) from auth.users where id in ('${leaving.user}', '${old.user}'))
+      + (select count(*) from auth.identities where user_id in ('${leaving.user}', '${old.user}'))
+      + (select count(*) from auth.sessions where user_id in ('${leaving.user}', '${old.user}'))
+      + (select count(*) from auth.refresh_tokens where user_id in ('${leaving.user}', '${old.user}'))
+      + (select count(*) from auth.one_time_tokens where user_id in ('${leaving.user}', '${old.user}'))
+      + (select count(*) from auth.mfa_factors where user_id in ('${leaving.user}', '${old.user}'))
+      + (select count(*) from auth.audit_log_entries where payload ->> 'actor_id' in ('${leaving.user}', '${old.user}')
+           or payload -> 'traits' ->> 'user_id' in ('${leaving.user}', '${old.user}'))`));
+    const identityLeft = JSON.parse(psql(`select json_build_object(
+      'links', (select count(*) from app.identity_account_links where member_id = '${leaving.member}' or auth_user_id in ('${leaving.user}', '${old.user}')),
+      'applications', (select count(*) from app.identity_membership_applications where member_id = '${leaving.member}' or auth_user_id in ('${leaving.user}', '${old.user}')),
+      'application_events', (select count(*) from app.identity_application_events where actor_auth_user_id in ('${leaving.user}', '${old.user}')),
+      'reclaims', (select count(*) from app.identity_phone_reclaims where released_account_id = '${old.user}'),
+      'recovery_requests', (select count(*) from app.identity_recovery_requests where request_code = '${code}'),
+      'recovery', (select count(*) from app.identity_recovery_cases where member_id = '${leaving.member}')
+                  + (select count(*) from app.identity_recovery_grants where member_id = '${leaving.member}'),
+      'changes_and_proposals', (select count(*) from app.identity_credential_changes where member_id = '${leaving.member}')
+                  + (select count(*) from app.identity_recovery_email_proposals where member_id = '${leaving.member}'),
+      'receipts', (select count(*) from app.cmd_receipts where actor_id in ('${leaving.user}', '${old.user}')
+                     or aggregate_id = '${leaving.member}' or result::text like '%${NAME_PREFIX} Leaving%'))`));
+    check('D13-resumed-to-completion-after-every-store-is-checked', finish.result?.result === 'done'
+      && Object.values(done).every((s) => s.state === 'done') && done.auth_account?.outcome === 'deleted'
+      && done.auth_account?.attempts === 2 && done.verify?.outcome === 'verified'
+      && accountRows.every((a) => !a.kept && a.auth === 'deleted' && a.attempts === 1)
+      && del.deletion_state === 'completed' && personal(leaving) === 0 && authLeft === 0
+      && Object.values(identityLeft).every((n) => n === 0)
       && psql(`select membership_state || '|' || display_name from app.identity_members where member_id = '${leaving.member}'`) === 'deactivated|Deleted member'
       && psql(`select coalesce(string_agg(event, ',' order by call_id), '') from app.fixture_lifecycle_calls where member_id = '${leaving.member}'`)
          .endsWith('member_deleted'),
       { result: finish.result?.result, steps: Object.fromEntries(Object.entries(done).map(([k, v]) => [k, `${v.state}/${v.attempts}/${v.outcome}`])),
-        account_kept: del.auth_user_id !== null, personal_rows_left: personal(leaving) });
+        accounts: accountRows, auth_rows_left: authLeft, identity_rows_left: identityLeft, personal_rows_left: personal(leaving) });
     const afterSignIn = await signIn(leaving.phone, leaving.password);
     const again = worker(['--deletion', leaving.deletion]);
     const queue = (await sys('identity.deletion_queue', {}))?.deletions ?? [];
     check('D14-idempotent-after-completion', afterSignIn.status >= 400 && !afterSignIn.json?.access_token
       && again.result?.result === 'done' && again.lines.filter((l) => l.action).length === 0
       && !queue.some((q) => q.deletion_id === leaving.deletion)
-      && (await http('GET', `/auth/v1/admin/users/${leaving.user}`, { admin: true })).status === 404,
+      && (await http('GET', `/auth/v1/admin/users/${leaving.user}`, { admin: true })).status === 404
+      && (await http('GET', `/auth/v1/admin/users/${old.user}`, { admin: true })).status === 404,
       { password_sign_in: afterSignIn.status, second_run: again.result?.result, actions: again.lines.filter((l) => l.action).length,
         in_queue: queue.some((q) => q.deletion_id === leaving.deletion) });
 
@@ -411,14 +540,16 @@ async function main() {
 
     // ------------------------------------------- the journal holds only opaque identifiers
     const entries = (await journal.list()) ?? [];
-    const ours = entries.filter((e) => [leaving.member, accountless.member, leaving.user].includes(e.subject ?? e.object?.object_id)
-      || [leaving.member, accountless.member, leaving.user].includes(e.object?.object_id));
-    const forbidden = [leaving.phone, leaving.phone.slice(1), accountless.phone, leaving.name, accountless.name, NAME_PREFIX];
+    const ids = [leaving.member, accountless.member, leaving.user, people.leavingOld.user];
+    const ours = entries.filter((e) => ids.includes(e.subject) || ids.includes(e.object?.object_id));
+    const forbidden = [leaving.phone, leaving.phone.slice(1), people.leavingOld.phone, people.leavingOld.phone.slice(1),
+      accountless.phone, leaving.email, leaving.name, accountless.name, NAME_PREFIX];
     const acks = JSON.parse(psql(`select coalesce(json_agg(json_build_object('seq', seq, 'hash', entry_hash) order by seq), '[]') from app.rcv_journal_acks`));
     const ackMismatch = acks.filter((a) => entries[a.seq - 1]?.hash !== a.hash).length;
-    check('D30-journal-holds-only-opaque-identifiers', ours.length === 8
+    check('D30-journal-holds-only-opaque-identifiers', ours.length === 10
       && ours.every((e) => opaqueEntryProblems(e, forbidden).length === 0) && ackMismatch === 0
-      && ours.filter((e) => e.kind === 'deletion_completed').length === 3,
+      && ours.filter((e) => e.kind === 'deletion_completed').length === 4
+      && ours.filter((e) => e.object?.bucket === 'auth-user').length === 4,
       { entries: ours.map((e) => e.kind), problems: ours.reduce((n, e) => n + opaqueEntryProblems(e, forbidden).length, 0),
         acknowledged: acks.length, acks_not_in_journal: ackMismatch });
 
@@ -517,17 +648,35 @@ async function main() {
           deletion: after.deletion, auth_row: after.auth_row } });
 
     // ------------------------------------------------------------------ no leakage anywhere
-    const logLeaks = [leaving.phone, leaving.phone.slice(1), credential, leaving.user].filter((v) => serveLog.includes(v)).length;
-    const auditLeak = Number(psql(`select count(*) from (
-        select row_to_json(a)::text t from app.identity_deletion_audit a
-        union all select row_to_json(s)::text from app.identity_deletion_steps s
-        union all select row_to_json(r)::text from app.sys_receipts r
-        union all select row_to_json(r)::text from app.cmd_receipts r) x
-       where t like '%${leaving.user}%' or t like '%${restored.user}%' or t like '%${NAME_PREFIX} Leaving%'`));
-    check('D50-no-account-id-name-or-credential-left-behind', logLeaks === 0 && auditLeak === 0
+    const logLeaks = [leaving.phone, leaving.phone.slice(1), old.phone.slice(1), credential, leaving.user, old.user]
+      .filter((v) => serveLog.includes(v)).length;
+    // Every table of the app and auth schemas: no number, address or name of the deleted member,
+    // and no deleted account id outside the journal acknowledgements (opaque, by design).
+    const personalRe = [leaving.phone.slice(1), old.phone.slice(1), people.leavingNext.phone.slice(1), leaving.email,
+      `${NAME_PREFIX} Leaving`, `${NAME_PREFIX} Restored`, restored.phone.slice(1)].join('|');
+    const idRe = [leaving.user, old.user, restored.user].join('|');
+    const tables = psql(`select string_agg(format('%I.%I', table_schema, table_name), ' ') from information_schema.tables
+      where table_schema in ('app', 'auth') and table_type = 'BASE TABLE'`).split(' ');
+    const hits = psql(tables.map((t) => `select '${t}' as t, count(*) as n from ${t} x where x::text ~ '${personalRe}'
+        ${t === 'app.rcv_journal_acks' ? '' : `or x::text ~ '${idRe}'`}`).join(' union all ')
+      .replace(/^/, 'select coalesce(string_agg(t || \':\' || n, \',\'), \'\') from (') + ') y where n > 0');
+    check('D50-no-number-address-name-or-account-id-left-anywhere', logLeaks === 0 && hits === ''
       && serveLog.includes('"fn":"identity-deletion"'),
-      { function_log_leaks: logLeaks, rows_mentioning_deleted_accounts: auditLeak,
+      { function_log_leaks: logLeaks, tables_scanned: tables.length, tables_with_leftovers: hits || 'none',
         function_log_lines: (serveLog.match(/"fn":"identity-deletion"/g) ?? []).length });
+
+    // ------------------------------- the last two Admins delete themselves at the same moment
+    // Two concurrent in-app requests (separate PostgREST transactions): the Admin role lock
+    // serialises them, so exactly one succeeds and one usable Admin remains.
+    const tA = (await signIn(admin.phone, admin.password)).json?.access_token;
+    const tB = (await signIn(admin2.phone, admin2.password)).json?.access_token;
+    const usableBefore = Number(psql(`select app.identity_usable_admin_count()`));
+    const [selfA, selfB] = await Promise.all([mine(tA), mine(tB)]);
+    const outcomes = [selfA, selfB].map((r) => (r.status === 200 && !r.code ? 'ok' : `${r.code}:${r.field_errors?.member_id ?? ''}`));
+    const usableAfter = Number(psql(`select app.identity_usable_admin_count()`));
+    check('D60-concurrent-self-deletion-of-the-last-two-admins', usableBefore === 2
+      && outcomes.filter((o) => o === 'ok').length === 1 && outcomes.includes('forbidden:last_admin') && usableAfter === 1,
+      { usable_before: usableBefore, outcomes: outcomes.sort(), usable_after: usableAfter });
 
     const sms = (await http('GET', '/auth/v1/settings')).json?.sms_provider ?? null;
     check('D99-no-sms', !sms, { sms_provider: sms });

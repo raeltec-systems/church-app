@@ -103,6 +103,7 @@ select results_eq($$select command, purpose from app.sys_command_kinds order by 
            ('identity.deletion_auth_begin', 'identity_deletion'),
            ('identity.deletion_auth_complete', 'identity_deletion'),
            ('identity.deletion_journal_ack', 'identity_deletion'),
+           ('identity.deletion_journal_catch_up', 'identity_deletion'),
            ('identity.deletion_next', 'identity_deletion'),
            ('identity.deletion_queue', 'identity_deletion'),
            ('system.synthetic_probe', 'synthetic_probe')$$,

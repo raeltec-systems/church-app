@@ -62,6 +62,6 @@
 
 ## Not done here (owner or parent)
 
-- **Staging apply** of `20261007131500_membership_review.sql` to `bic-kafue-platform-test`, then a hosted repeat of the review flow. Check on staging that the reclaim's `update auth.users` succeeds for the migration owner (locally `postgres` has UPDATE on `auth.users`; the 2.2 triggers already rely on privileges on that table).
+- **Staging apply** of `20261007063340_membership_review.sql` to `bic-kafue-platform-test`, then a hosted repeat of the review flow. Check on staging that the reclaim's `update auth.users` succeeds for the migration owner (locally `postgres` has UPDATE on `auth.users`; the 2.2 triggers already rely on privileges on that table).
 - **The owner's demonstration**: on staff web an Admin approves, links and reclaims; on Android the applicant sees the decision and signs in again after approval.
 - Owner gates stay fail-closed: `q4_personal_data` (production refuses review commands that store personal data as `unavailable`), the real first Admin (entry 14).

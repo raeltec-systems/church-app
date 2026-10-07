@@ -1,10 +1,10 @@
 -- Story 2.5 follow-up: the phone-username reclaim also REVOKES the holder's Auth sessions.
 --
--- Replaces app.identity_reclaim_phone_username (20261007131500_membership_review.sql) with the
+-- Replaces app.identity_reclaim_phone_username (20261007063340_membership_review.sql) with the
 -- same body plus two row deletions: the holder's auth.refresh_tokens and auth.sessions (refresh
 -- tokens and AMR claims of a session cascade with it). Kept in its own small file because the
 -- hosted connector cannot get approval for a migration containing row deletions; the owner
--- applies this file by hand after 20261007131500. It deletes Auth session ROWS of one account
+-- applies this file by hand after 20261007063340. It deletes Auth session ROWS of one account
 -- only, inside the Admin command; it changes no schema object.
 --
 -- Same signature and privileges (re-revoked below); nothing becomes client-executable.

@@ -334,7 +334,7 @@ Both scripts sign up real phone accounts without email, using fictional numbers.
 
 ## Membership review, linking, accountless members and reclaim (story 2.5)
 
-Migrations: `supabase/migrations/20261007131500_membership_review.sql` and the small follow-up `20261007131600_membership_review_reclaim_sessions.sql` (the reclaim's session revocation; it contains row deletions, so the owner applies it by hand after the main file).
+Migrations: `supabase/migrations/20261007063340_membership_review.sql` and the small follow-up `20261007131600_membership_review_reclaim_sessions.sql` (the reclaim's session revocation; it contains row deletions, so the owner applies it by hand after the main file).
 Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.5/`.
 
 ### Who may do what

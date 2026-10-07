@@ -71,7 +71,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261007131500_membership_review.sql` -- provenance, contact routes, review/audit/reclaim tables, application decision columns, the seven commands, `api.identity_review_command`, `api.identity_admin_application_queue`, `api.identity_admin_member_search`, replaced json/correction/authorizer, re-apply trigger, grants.
+- [x] `supabase/migrations/20261007063340_membership_review.sql` -- provenance, contact routes, review/audit/reclaim tables, application decision columns, the seven commands, `api.identity_review_command`, `api.identity_admin_application_queue`, `api.identity_admin_member_search`, replaced json/correction/authorizer, re-apply trigger, grants.
 - [x] `supabase/tests/membership_review_test.sql` + allowlist -- matrix, privileges, audit content-freedom.
 - [x] `supabase/tests/identity_api_smoke.sh` -- anon denied on new functions.
 - [x] `tools/identity-e2e/review.mjs` (+ test) -- real phone sign-up, approve, link to accountless member, ask/reject/re-apply, reclaim, shared contact, cleanup.
@@ -87,7 +87,7 @@ context:
 
 - Built directly (no subagent tool in this session). Checkpoint 1 pre-approved by the owner decisions; the plan is above the 1600-token guide because one Identity owner change spans DB, two clients and evidence (kept whole, as the epic's lane decision does).
 - Files:
-  - Migration `supabase/migrations/20261007131500_membership_review.sql` (version renamed from the planned `…120000` to sort after the integration branch head; non-destructive: new tables, added columns/constraints, `create or replace` of `identity_application_json`, `identity_correct_application` and `identity_authorize_command`).
+  - Migration `supabase/migrations/20261007063340_membership_review.sql` (version renamed from the planned `…120000` to sort after the integration branch head; non-destructive: new tables, added columns/constraints, `create or replace` of `identity_application_json`, `identity_correct_application` and `identity_authorize_command`).
   - pgTAP `supabase/tests/membership_review_test.sql` (91); allowlist in `command_foundation_test.sql` (+6 pairs); `identity_api_smoke.sh` (+7 checks).
   - E2E `tools/identity-e2e/review.mjs` (+ `review.test.mjs`), adapter check `tools/identity-e2e/live-review-check.sh` + `packages/client_core/tool/live_review_check.dart`.
   - client_core: `domain/membership_review.dart`, `adapters/supabase_review_repository.dart`, `application/review_controllers.dart`, `presentation/membership_review_screen.dart`, route `/admin/members`, `reviewRepositoryProvider`, composition, decision fields on `MembershipApplication`, mobile decision/re-apply on `membership_application_screen.dart`, fakes (`FakeReview`, `reviewApplicationData`, `memberRecordData`), tests `test/identity/membership_review_test.dart` (18).
@@ -103,7 +103,7 @@ context:
 - Environment: the local stack was reset three times (`npx supabase db reset`); the phone switch was on only for the E2E, adapter check and regressions, then off. Every synthetic user and record created was removed.
 - Owner/parent steps: staging apply and repeat (including that `update auth.users` works for the migration owner there), the staff-web + Android demonstration. No owner-only setting blocks the build.
 
-- Review fixes (coordinator review, 2026-10-07; `20261007131500` edited in place, on no hosted project):
+- Review fixes (coordinator review, 2026-10-07; `20261007063340` edited in place, on no hosted project):
   - Unlink ends every active grant through `app.identity_end_grant` (role_revoked/scope_revoked audit with the acting Admin and request id, scope_revoked dispatched), keeping the last-usable-Admin refusal; link-existing refuses `member_id: has_grants`; `identity_member_link_eligible` requires no active grant. E2E R22 now asserts no roles after relink.
   - Reclaim revokes the holder's `auth.sessions` and `auth.refresh_tokens` in a NEW small migration `20261007131600_membership_review_reclaim_sessions.sql` (`create or replace` of the reclaim function only), so the main file holds no `delete from` text. This supersedes the earlier ban-only decision above. Owner pastes the small file after the main one.
   - Reclaim requires `identity_applications_open()` and, while Q4 is unapproved, a fictional number; matches Auth phones with or without `+` (`conflict ambiguous` if both exist).

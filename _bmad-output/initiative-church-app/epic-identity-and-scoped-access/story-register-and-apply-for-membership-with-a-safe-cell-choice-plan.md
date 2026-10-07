@@ -7,8 +7,8 @@ status: 'built'
 baseline_revision: '9775471ca2a73d6a032af78008695d3cbc0a5db9'
 route: 'full'
 route_source: 'auto'
-review: ''
-review_source: ''
+review: 'quick'
+review_source: 'pinned'
 lenses_ran: []
 review_loop_iteration: 0
 context:

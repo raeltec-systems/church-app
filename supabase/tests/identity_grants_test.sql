@@ -454,7 +454,7 @@ select is((select string_agg(distinct k, ',' order by k)
              from pg_temp.read(pg_temp.c(1), 'select api.identity_admin_member_grants()') v,
                   jsonb_array_elements(substr(v, 4)::jsonb -> 'members') e,
                   jsonb_object_keys(e) k),
-  'account,display_name,grants,is_synthetic,member_id',
+  'account,admin_via_fallback,display_name,grants,is_synthetic,member_id',
   'member rows carry only basic administration fields (no care, finance or contact data)');
 select is((select e ->> 'account'
              from pg_temp.read(pg_temp.c(1), 'select api.identity_admin_member_grants()') v,

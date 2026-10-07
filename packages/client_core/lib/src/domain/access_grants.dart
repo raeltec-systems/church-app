@@ -113,6 +113,7 @@ class RosterMember {
     required this.isSynthetic,
     required this.account,
     required this.grants,
+    this.adminViaFallback = false,
   });
 
   factory RosterMember.fromJson(Object? json) {
@@ -144,6 +145,7 @@ class RosterMember {
       isSynthetic: synthetic,
       account: account,
       grants: grants,
+      adminViaFallback: json['admin_via_fallback'] == true,
     );
   }
 
@@ -153,12 +155,17 @@ class RosterMember {
   final AccountStanding account;
   final MemberGrants grants;
 
+  /// The member's active Admin grant came from the restricted operator's
+  /// identity-checked last-Admin fallback (story 2.12), not from an Admin.
+  final bool adminViaFallback;
+
   RosterMember withGrants(MemberGrants g) => RosterMember(
     memberId: memberId,
     displayName: displayName,
     isSynthetic: isSynthetic,
     account: account,
     grants: g,
+    adminViaFallback: adminViaFallback && g.roles.contains(ChurchRoles.admin),
   );
 }
 

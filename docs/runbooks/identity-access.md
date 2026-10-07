@@ -3,6 +3,8 @@
 Architecture: AD-3, AD-4, AD-13, AD-20. Migration: `supabase/migrations/20261006215842_identity_live_access.sql`.
 Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.1/`.
 
+This file holds the per-story mechanics. The restricted support runbooks that staff and the operator follow (applications and linking, email and staff-assisted recovery, holds and disputes, deactivation and handover, deletion, first-Admin setup and the last-Admin fallback) are in [identity-support.md](identity-support.md) (story 2.12).
+
 ## What exists
 
 - **Identity records** (non-exposed `app` schema, RLS on, no client privileges):
@@ -248,6 +250,29 @@ select app.identity_bootstrap_admin('<member_id>', 'israel');
 - The church-setting approval and the lead-pastor designation are journalled there too.
 - The 1.9 journal table was retired by rename (`app.ops_retired_operator_actions_v0`, rows copied, privileges revoked) and recreated with a wider action list, because widening its CHECK needs a DROP. Drop the retired table in a later owner-approved cleanup.
 - Staging uses synthetic Admins. Naming the first real Admin is the production gate at entry 14.
+
+### Identity-checked last-Admin fallback (story 2.12, restricted operator)
+
+Migration: `supabase/migrations/20261007190000_identity_admin_fallback.sql` (no row deletions; one file). Runbook: [identity-support.md, RB8](identity-support.md#rb8-identity-checked-last-admin-fallback).
+
+```sql
+select app.identity_admin_fallback_grant('<member_id>', '<in_person|established_relationship>',
+                                         '<no_usable_admin|admins_unreachable>',
+                                         '<confirming owner identifier>', '<case reference>', 'israel');
+```
+
+- **Why it exists.** "Usable" means "passes every non-session condition", so a sole Admin who forgot the password without a recovery email, or who left without being deactivated, still counts. The bootstrap then refuses, and every Admin-side exit (2.9, 2.8, 2.10) needs another Admin.
+- **Two people.** `confirming_owner` (lowercase identifier, 2-40 characters) must differ from the operator, and `case_reference` (letters, digits and `._:/-`, 3-64 characters) ties the grant to the owners' restricted case note. Both are stored.
+- **The reason must match the real state.** `no_usable_admin` is accepted only while `app.identity_usable_admin_count()` is 0, and `admins_unreachable` only while it is above 0.
+- **Eligible member.** The member must be approved and have a live link whose account passes `app.identity_account_standing` (`ok`: not banned, held or in review) and is not dormant. They must not be under deletion, must hold no active scope grant, and must not already hold Admin. Each refusal has its own message (pgTAP pins them). It locks the admin role row like the bootstrap and every deletion route.
+- **No Auth row is written.** The command creates no password, session, token or link. Like `identity.grant_role`, the role applies to the member's next protected call, including a session they already have; the trust epoch does not move.
+- **Audit.** `identity_access_audit` and `ops_operator_actions` get the distinct action `admin_fallback_granted`, and `app.identity_admin_fallbacks` holds the reason, the identity check, the count, both owners and the case reference.
+  - Both action lists are inline CHECKs, so each table was retired by rename (`app.identity_retired_access_audit_v0`, `app.ops_retired_operator_actions_v1`; rows copied, privileges revoked) and recreated with a wider list.
+  - The retired access audit is in the deletion retention rules.
+  - Drop both retired tables in a later owner-approved cleanup.
+- **Visible to every Admin.** `api.identity_admin_member_grants` carries `admin_via_fallback` per member (replaced in place, same signature and privileges), and staff web **Roles & access** labels the member **Admin by operator fallback**. No lifecycle event is emitted: a new v1 event needs a contract change in SQL, the shared fixtures and the Dart and TypeScript mappings. Add one when a consumer needs it.
+- **Tests.** pgTAP `supabase/tests/identity_admin_fallback_test.sql`; local rehearsal `tools/identity-e2e/runbooks.mjs` (`R60`-`R62`).
+- **Hosted.** The parent session applies the migration to staging after `20261007175000`. It needs no owner setting.
 
 ### Clients
 

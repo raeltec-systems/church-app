@@ -34,4 +34,4 @@ All runs are LOCAL (Supabase CLI stack, GoTrue v2.197.0, edge-runtime v1.77.1), 
 
 ## Not run here (staging)
 
-- The same matrix against staging Auth needs the parent's apply of `20261007170000`, the owner's staging credential and Edge Function secret, and the function deployment (runbook "Hosted"). Then repeat the `assisted.mjs` cases with synthetic numbers on staging.
+- The same matrix against staging Auth needs the parent's apply of `20261007140729`, the owner's staging credential and Edge Function secret, and the function deployment (runbook "Hosted"). Then repeat the `assisted.mjs` cases with synthetic numbers on staging.

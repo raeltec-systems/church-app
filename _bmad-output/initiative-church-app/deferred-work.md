@@ -24,7 +24,7 @@
   evidence: story 2.8 resolves the email-change lockout (double confirmation keeps the approved address, restore + lost-device hold revoke every session) and, after its review, keeps a restored account on a security hold until the member's own reset when the password changed unreviewed; members without an approved recovery email then wait for staff-assisted recovery (entry 9), which must record reset evidence that identity_member_reset_since accepts. A server-side password-change gate needs an owner decision on GoTrue settings.
 
 - source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-recover-access-with-staff-assistance-and-a-single-use-grant-plan.md`
-  summary: Run the story 2.9 adversarial matrix (tools/identity-e2e/assisted.mjs cases) against staging Auth once the parent applies 20261007170000 and the owner registers the staging system credential, sets the IDENTITY_RECOVERY_SYSTEM_CREDENTIAL Edge Function secret and the function is deployed.
+  summary: Run the story 2.9 adversarial matrix (tools/identity-e2e/assisted.mjs cases) against staging Auth once the parent applies 20261007140729 and the owner registers the staging system credential, sets the IDENTITY_RECOVERY_SYSTEM_CREDENTIAL Edge Function secret and the function is deployed.
   evidence: 2.9 ran every case locally (12/12, live adapter check R1-R4); staging needs a secret only the owner may handle.
 
 - source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-recover-access-with-staff-assistance-and-a-single-use-grant-plan.md`

@@ -657,7 +657,7 @@ The live check drives the real client adapters with `+44 7700 900357–900359`. 
 
 ## Staff-assisted recovery with a single-use grant (story 2.9)
 
-Migration: `supabase/migrations/20261007170000_assisted_recovery.sql` (no row deletions; one file; session revocation reuses `app.identity_revoke_auth_sessions` from `20261007160100`). Edge Function: `supabase/functions/identity-assisted-recovery/` (`index.ts`, pure rules in `logic.mjs`). Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.9/`.
+Migration: `supabase/migrations/20261007140729_assisted_recovery.sql` (no row deletions; one file; session revocation reuses `app.identity_revoke_auth_sessions` from `20261007160100`). Edge Function: `supabase/functions/identity-assisted-recovery/` (`index.ts`, pure rules in `logic.mjs`). Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.9/`.
 
 For a member without a usable approved recovery email (AD-20, I9, AC-06). It is the 1.3 proven mechanism, owned by Identity.
 
@@ -728,7 +728,7 @@ Both scripts mint a fresh local system credential (only the digest is registered
 
 ### Hosted (parent session / owner)
 
-1. **Parent session:** apply `20261007170000_assisted_recovery.sql` to staging. It replaces the 1.9 kernel `app.sys_execute` (same signature; the probe is unchanged) and adds a trigger on `app.identity_account_links`.
+1. **Parent session:** apply `20261007140729_assisted_recovery.sql` to staging. It replaces the 1.9 kernel `app.sys_execute` (same signature; the probe is unchanged) and adds a trigger on `app.identity_account_links`.
 2. **Owner (restricted operator): the staging system credential.** Keep it apart from the probe's credential.
    1. Run `OPS_STATE_DIR=.ops-state/identity-assisted-recovery node tools/ops/system-credential.mjs mint --env staging`. It prints the digest only; the token stays in that gitignored folder, mode 0600.
    2. In the staging SQL editor (or the connector), run `select app.sys_create_principal('identity-assisted-recovery', 'identity_assisted_recovery', 'israel');`, then `select app.sys_register_credential('<principal_id from above>', '<digest>', 'assisted recovery staging', interval '30 days', 'israel');`.

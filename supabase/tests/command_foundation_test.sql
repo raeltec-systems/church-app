@@ -46,7 +46,9 @@ select results_eq(
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname in ('app', 'api') and has_function_privilege('authenticated', p.oid, 'EXECUTE')
      order by 1$$,
-  $$values ('api.cells_signup_options'::text collate "C"), ('api.fixture_counter_command'),
+  $$values ('api.cells_admin_overview'::text collate "C"), ('api.cells_command'),
+           ('api.cells_leader_queue'), ('api.cells_my_cell'), ('api.cells_private_fixture_read'),
+           ('api.cells_signup_options'), ('api.fixture_counter_command'),
            ('api.fixture_scoped_read'),
            ('api.identity_admin_application_queue'),
            ('api.identity_admin_member_grants'), ('api.identity_admin_member_search'),
@@ -54,7 +56,9 @@ select results_eq(
            ('api.identity_grant_command'),
            ('api.identity_my_access'), ('api.identity_my_application'),
            ('api.identity_my_member_summary'), ('api.identity_review_command'),
-           ('api.system_command'), ('app.cells_signup_options'), ('app.fixture_counter_command'),
+           ('api.system_command'), ('app.cells_admin_overview'), ('app.cells_command'),
+           ('app.cells_leader_queue'), ('app.cells_my_cell'), ('app.cells_private_fixture_read'),
+           ('app.cells_signup_options'), ('app.fixture_counter_command'),
            ('app.fixture_scoped_read'),
            ('app.identity_admin_application_queue'),
            ('app.identity_admin_member_grants'), ('app.identity_admin_member_search'),
@@ -63,7 +67,7 @@ select results_eq(
            ('app.identity_my_access'), ('app.identity_my_application'),
            ('app.identity_my_member_summary'), ('app.identity_review_command'),
            ('app.sys_command')$$,
-  'authenticated can execute only the command wrappers, the live-access-checked identity reads (stories 2.1, 2.3), the applicant reads and command (2.4), the Admin review command and reads (2.5), the synthetic scoped fixture read (2.3) and their definer entry points (the system route refuses sessions)'
+  'authenticated can execute only the command wrappers, the live-access-checked identity reads (stories 2.1, 2.3), the applicant reads and command (2.4), the Admin review command and reads (2.5), the cells command and reads (2.6), the synthetic scoped (2.3) and cell-private (2.6) fixture reads and their definer entry points (the system route refuses sessions)'
 );
 select is_definer('app', 'fixture_counter_command',
   array['jsonb'], 'the app entry point is SECURITY DEFINER');

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import 'access_screens.dart';
 import 'account_screen.dart';
+import 'cell_screens.dart';
 import 'fixture_command_screen.dart';
 import 'membership_application_screen.dart';
 import 'membership_review_screen.dart';
@@ -34,6 +35,15 @@ abstract final class ClientPaths {
   /// Staff web, Admin only: applications, member records, unlinking and
   /// phone-username reclaim (story 2.5).
   static const adminMembers = '/admin/members';
+
+  /// Staff web, Admin only: cells, leaders, requests and follow-up (2.6).
+  static const adminCells = '/admin/cells';
+
+  /// Staff web, cell leaders and assistants: their cell and its requests.
+  static const cellLeader = '/cells/leader';
+
+  /// The member's own cell and change request (story 2.6, mobile).
+  static const myCell = '/my-cell';
 }
 
 /// `extra` of a navigation started from a shell tab by the keyboard: the
@@ -98,6 +108,18 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.adminMembers,
         pageBuilder: (_, state) => page(state, const MembershipReviewScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.adminCells,
+        pageBuilder: (_, state) => page(state, const CellAdminScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.cellLeader,
+        pageBuilder: (_, state) => page(state, const CellLeaderScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.myCell,
+        pageBuilder: (_, state) => page(state, const MyCellScreen()),
       ),
       GoRoute(
         path: ClientPaths.membership,

@@ -259,6 +259,70 @@ void main() {
     },
   );
 
+  testWidgets(
+    'story 2.6: Cells follows the Admin grant and My cell group follows a '
+    'cell scope',
+    (tester) async {
+      final h = await pumpStaff(tester);
+      expect(find.byKey(const Key('nav-/admin/cells')), findsNothing);
+      expect(find.byKey(const Key('nav-/cells/leader')), findsNothing);
+      h.grants.myAccess = AccessReadOk(
+        syntheticGrants(
+          scopes: const [
+            ScopeGrant(
+              scopeKind: 'cell_leader',
+              scopeId: '77777777-7777-4777-8777-777777777777',
+            ),
+          ],
+        ),
+      );
+      h.cells.leader = AccessReadOk(
+        LeaderQueue.fromJson({
+          'cells': [
+            {
+              'cell_id': '77777777-7777-4777-8777-777777777777',
+              'name': 'SYNTHETIC Cell X',
+              'broad_area': 'SYNTHETIC North',
+              'role': 'leader',
+              'members': const [],
+              'requests': const [],
+            },
+          ],
+        }),
+      );
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('nav-/admin/cells')), findsNothing);
+      await tapKey(tester, 'nav-/cells/leader');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('SYNTHETIC Cell X'), findsOneWidget);
+
+      // An Admin who leads no cell sees Cells, not My cell group.
+      h.grants.myAccess = AccessReadOk(syntheticGrants(roles: ['admin']));
+      h.cells.admin = AccessReadOk(
+        CellAdminOverview.fromJson({
+          'cells': [adminCellData()],
+          'requests': const [],
+          'members': const [],
+        }),
+      );
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('nav-/cells/leader')), findsNothing);
+      await tapKey(tester, 'nav-/admin/cells');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('SYNTHETIC Cell X'), findsOneWidget);
+      expect(
+        staffDestinationsFor(null),
+        isNot(contains(staffCellsDestination)),
+      );
+    },
+  );
+
   testWidgets('an account switch drops the protected state', (tester) async {
     final h = await pumpStaff(tester, location: '/fixture');
     await tester.enterText(find.byKey(const Key('intent-key-field')), 'k');

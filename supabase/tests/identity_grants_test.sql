@@ -161,12 +161,12 @@ select ok(not has_function_privilege('anon', 'api.identity_grant_command(jsonb)'
 select results_eq($$select role from app.identity_roles order by sort_order$$,
   $$values ('admin'), ('pastor'), ('media'), ('lead_pastor')$$,
   'church-wide roles: admin, pastor, media, lead_pastor (held independently)');
-select results_eq($$select namespace || ':' || handler from app.cmd_authorizers$$,
+select results_eq($$select namespace || ':' || handler from app.cmd_authorizers where namespace = 'identity'$$,
   $$values ('identity:app.identity_authorize_command(jsonb)')$$,
   'identity commands are authorised by the Identity authorizer');
-select results_eq($$select scope_kind || ':' || module from app.identity_scope_kinds order by 1$$,
+select results_eq($$select scope_kind || ':' || module from app.identity_scope_kinds where module <> 'cells' order by 1$$,
   $$values ('fixture_care:fixture'), ('fixture_finance:fixture')$$,
-  'only the SYNTHETIC fixture scope kinds are registered by this story');
+  'only the SYNTHETIC fixture scope kinds are registered by this story (Cells adds its own in 2.6)');
 select ok(not exists (select 1 from app.contract_boundary_violations())
           and not exists (select 1 from app.contract_unowned_objects())
           and not exists (select 1 from app.contract_unpinned_functions()),

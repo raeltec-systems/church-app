@@ -43,12 +43,28 @@ const staffMembersDestination = (
   icon: Icons.how_to_reg_outlined,
 );
 
+/// Story 2.6: shown while the server's current answer includes Admin.
+const staffCellsDestination = (
+  path: ClientPaths.adminCells,
+  label: 'Cells',
+  icon: Icons.groups_outlined,
+);
+
+/// Story 2.6: shown while the caller leads or assists a cell.
+const staffCellLeaderDestination = (
+  path: ClientPaths.cellLeader,
+  label: 'My cell group',
+  icon: Icons.diversity_3_outlined,
+);
+
 /// The sidebar for the caller's current grants. Presentation only: hiding an
 /// entry is not a control, and every screen's data is checked by the server.
 List<StaffDestination> staffDestinationsFor(MemberGrants? grants) => [
   ...staffDestinations,
   if (grants != null) staffAccessDestination,
+  if (servesACell(grants)) staffCellLeaderDestination,
   if (grants?.isAdmin ?? false) staffMembersDestination,
+  if (grants?.isAdmin ?? false) staffCellsDestination,
   if (grants?.isAdmin ?? false) staffAdminDestination,
 ];
 

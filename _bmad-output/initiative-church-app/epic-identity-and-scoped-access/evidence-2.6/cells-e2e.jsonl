@@ -1,0 +1,15 @@
+{"step":"C00-precondition","target":"LOCAL","at":"2026-10-07T07:35:42.692Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"C01-admin-signed-in-by-phone","target":"LOCAL","at":"2026-10-07T07:35:44.441Z","verdict":"pass","amr":["password"],"roles":["admin"]}
+{"step":"C10-admin-creates-cells","target":"LOCAL","at":"2026-10-07T07:35:44.519Z","verdict":"pass","non_admin":"forbidden","created":[1,1],"listed":true}
+{"step":"C11-leaders-are-scope-grants","target":"LOCAL","at":"2026-10-07T07:35:44.598Z","verdict":"pass","grant_x":2,"grant_y":2,"leader_x_scopes":["cell_leader"]}
+{"step":"C20-church-approval-is-not-cell-confirmation","target":"LOCAL","at":"2026-10-07T07:35:51.498Z","verdict":"pass","chooser_lists_x":true,"church_status":"approved","primary":null,"open_request":{"state":"pending","kind":"join","origin":"application"}}
+{"step":"C21-leader-sees-request-for-own-cell-only","target":"LOCAL","at":"2026-10-07T07:35:51.523Z","verdict":"pass","leader_x_request":"join","leader_y_sees_it":0,"private_x_before":{"status":403,"detail":"not_granted"}}
+{"step":"C22-leader-confirms-cell","target":"LOCAL","at":"2026-10-07T07:35:51.558Z","verdict":"pass","other_leader":"forbidden","primary_is_x":true,"private_x":200,"private_y":403}
+{"step":"C30-member-requests-change","target":"LOCAL","at":"2026-10-07T07:35:51.597Z","verdict":"pass","kind":"change","still_in_x":true,"private_y_while_requested":403}
+{"step":"C31-new-leader-confirms-transfer","target":"LOCAL","at":"2026-10-07T07:35:52.339Z","verdict":"pass","old_cell_leader":"forbidden","primary_is_y":true,"revision":4}
+{"step":"C32-one-primary-old-denied-new-opens","target":"LOCAL","at":"2026-10-07T07:35:52.340Z","verdict":"pass","primary_is_y":true,"current_primary_rows":1,"old_membership":"transferred","private_x_same_session":{"status":403,"detail":"not_granted"},"private_y":200}
+{"step":"C33-transfer-hook-ran-in-same-transaction","target":"LOCAL","at":"2026-10-07T07:35:52.487Z","verdict":"pass","calls":1,"event":"cell_transferred","hook_revision":4,"cells_revision":4,"same_transaction_as_new_row":true,"same_transaction_as_ended_row":true,"same_transaction_start_time":true}
+{"step":"C34-church-membership-unchanged","target":"LOCAL","at":"2026-10-07T07:35:52.668Z","verdict":"pass","member_id_kept":true,"membership_state":"approved","member_revision_kept":true,"grants_revision_kept":true}
+{"step":"C40-admin-follow-up-queue","target":"LOCAL","at":"2026-10-07T07:35:52.886Z","verdict":"pass","follow_up":true,"choice":"not_sure","any_leader_sees_it":false,"leader_reads_overview":{"status":403,"code":"PT403","detail":"not_granted"},"admin_resolved_into_x":true}
+{"step":"C50-audit-content-free","target":"LOCAL","at":"2026-10-07T07:35:53.230Z","verdict":"pass","leaked_values":0,"actions":"cell_created,membership_started,membership_transferred,request_confirmed,request_opened"}
+{"step":"C99-cleanup","target":"LOCAL","at":"2026-10-07T07:35:53.795Z","users_left":0,"unmarked":true,"hooks_left":0}

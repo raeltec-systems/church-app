@@ -73,5 +73,6 @@ Future<List<Override>> compositionOverrides(AppConfig config) async {
     reviewRepositoryProvider.overrideWithValue(
       SupabaseReviewRepository(client),
     ),
+    cellsRepositoryProvider.overrideWithValue(SupabaseCellsRepository(client)),
   ];
 }

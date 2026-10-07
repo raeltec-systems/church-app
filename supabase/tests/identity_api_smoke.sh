@@ -229,6 +229,28 @@ code=$(api_call identity_my_access '{}')
 [[ "$code:$(jq -r .details "$WORK/out")" == "403:not_linked" ]] \
   && ok "still no member access after the refused approval" || bad "access after self-approve: $code $(cat "$WORK/out")"
 
+# Story 2.6: the cells command and reads need a session; an applicant (no member access) reaches
+# none of them, and a cells command from it is refused.
+for fn in cells_command cells_my_cell cells_leader_queue cells_admin_overview cells_private_fixture_read; do
+  body='{}'
+  [[ "$fn" == cells_private_fixture_read ]] && body="{\"cell_id\":\"$(uuid)\"}"
+  code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/rest/v1/rpc/$fn" \
+    -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Profile: api' -H 'Content-Type: application/json' -d "$body")
+  expect "signed-out client cannot call $fn" 401 "$code" "$(cat "$WORK/out")"
+done
+for fn in cells_my_cell cells_leader_queue cells_admin_overview; do
+  code=$(api_call "$fn" '{}')
+  [[ "$code:$(jq -r .details "$WORK/out")" == "403:not_linked" ]] \
+    && ok "an applicant cannot call $fn (403 not_linked)" || bad "$fn as applicant: $code $(cat "$WORK/out")"
+done
+code=$(api_call cells_private_fixture_read "{\"cell_id\":\"$(uuid)\"}")
+[[ "$code:$(jq -r .details "$WORK/out")" == "403:not_linked" ]] \
+  && ok "an applicant reaches no cell-private surface (403 not_linked)" || bad "cell-private as applicant: $code $(cat "$WORK/out")"
+CELL_BODY="{\"version\":1,\"command\":\"cells.create_cell\",\"request_id\":\"$(uuid)\",\"expected_revision\":null,\"payload\":{\"name\":\"SYNTHETIC Smoke\",\"signup_label\":\"SYNTHETIC Smoke\",\"broad_area\":\"SYNTHETIC Smoke\"}}"
+code=$(api_call cells_command "$CELL_BODY")
+[[ "$code:$(jq -r .code "$WORK/out")" == "200:forbidden" ]] \
+  && ok "an applicant cannot create a cell (forbidden envelope)" || bad "create_cell as applicant: $code $(cat "$WORK/out")"
+
 # No SMS configuration exists on this stack.
 sms=$(curl -s "$API_URL/auth/v1/settings" -H "apikey: $PUBLISHABLE_KEY" | jq -r '.sms_provider // ""')
 [[ -z "$sms" ]] && ok "no SMS provider configured" || bad "sms_provider is '$sms'"

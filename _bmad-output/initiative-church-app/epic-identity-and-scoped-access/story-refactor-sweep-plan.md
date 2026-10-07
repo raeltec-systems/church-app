@@ -3,7 +3,7 @@ title: 'Refactor sweep'
 type: 'refactor'
 ticket: '13'
 created: '2026-10-07'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '1fff4a71f9a2e9087bd008ae47c50d5dd76cfb66'
 route: 'full'
 route_source: 'auto'
@@ -88,3 +88,11 @@ Decision (agent, under owner pre-approval): the 2.7 triage item "receipts keep e
 **Commands:**
 - `bash /tmp/claude-0/-home-user-church-app/53f9d846-6f17-5fcb-9db8-59c7e3ac6bf0/scratchpad/verify-2.13.sh after` -- expected: identical to `v213-before/summary.txt` except new test counts.
 - `git diff --stat 1fff4a71f9a2e9087bd008ae47c50d5dd76cfb66 -- supabase/migrations packages/contracts` -- expected: empty.
+
+**Results (2026-10-07, local stack, after the change):**
+- 11 identity E2Es, reset before each: run 30, grants 18, apply 27/27, review 18/18, cells 13/13, recovery 20/20, credentials 15/15, assisted 16/16, lifecycle 9/9, deletion 12/12, runbooks 16/16 -- identical to the 2.12 baseline runs.
+- pgTAP 18 files / 1487 tests PASS (baseline 17 / 1482; +5 ledger tests; mutation check: an unlisted `retired` table or a client grant makes it fail). db:smoke ok=138 notok=0; recovery:rehearse 0.
+- contracts:test 239/239 (fixtures unchanged); ci:policy-test 49; node unit 90 (baseline 87, +3 harness tests); ci:migrations 0; ci:secrets 0; scan-evidence clean for every evidence folder.
+- flutter analyze clean and tests pass: client_core 348 (baseline 345, +3 mapping tests), staff 26, mobile 27.
+- `git diff --stat 1fff4a7 -- supabase/migrations packages/contracts`: empty.
+

@@ -321,7 +321,12 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                           FocusRing(
                             child: TextButton(
                               key: const Key('forgot-password'),
-                              onPressed: () => setState(() => _helpOpen = true),
+                              // Story 2.7: reset through the approved
+                              // recovery email (neutral answer).
+                              onPressed: pending
+                                  ? null
+                                  : () =>
+                                        context.go(ClientPaths.forgotPassword),
                               child: const Text('Forgot password?'),
                             ),
                           ),

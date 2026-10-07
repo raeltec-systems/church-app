@@ -91,10 +91,17 @@ void main() {
     'lib/src/adapters/auth_session_storage_tab_web.dart',
   };
 
+  // Story 2.7: the isolated recovery client's one-time PKCE verifier store.
+  const recoveryVerifierFiles = {
+    'lib/src/adapters/recovery_verifier_storage.dart',
+    'lib/src/adapters/recovery_verifier_storage_web.dart',
+  };
+
   test('no client persistence API anywhere else in the package', () {
     final offenders = [
       for (final f in _dart('lib'))
         if (!authSessionStorageFiles.contains(f.path.replaceAll(r'\\', '/')) &&
+            !recoveryVerifierFiles.contains(f.path.replaceAll(r'\\', '/')) &&
             f.path.replaceAll(r'\\', '/') != 'lib/composition.dart' &&
             _persistence.hasMatch(f.readAsStringSync()))
           f.path,
@@ -119,6 +126,21 @@ void main() {
       composition,
       contains('localStorage: AuthSessionStorage.forPlatform()'),
     );
+  });
+
+  test('the recovery verifier store holds only the PKCE verifier', () {
+    for (final path in recoveryVerifierFiles) {
+      final source = File(path).readAsStringSync();
+      expect(source, isNot(contains('/domain/')), reason: path);
+      expect(source, isNot(contains('/application/')), reason: path);
+      expect(source, isNot(contains('sessionStorage')), reason: path);
+    }
+    final store = File(recoveryVerifierFiles.first).readAsStringSync();
+    expect(
+      store,
+      contains("recoveryVerifierKeyPrefix = 'bic-kafue.recovery.'"),
+    );
+    expect(store, isNot(contains('authSessionStorageKey')));
   });
 
   test(

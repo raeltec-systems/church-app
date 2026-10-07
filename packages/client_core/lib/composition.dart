@@ -3,11 +3,14 @@
 /// `lib/main.dart` imports this library.
 library;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'src/adapters/auth_session_storage.dart';
+import 'src/adapters/recovery_verifier_storage.dart';
 import 'src/application/providers.dart';
+import 'src/domain/password_recovery.dart';
 import 'supabase_adapters.dart';
 
 export 'package:flutter_riverpod/misc.dart' show Override;
@@ -50,6 +53,9 @@ Future<List<Override>> compositionOverrides(AppConfig config) async {
     ),
   );
   final client = supabase.client;
+  // Story 2.7: Auth email links return to this app only through the
+  // allowlisted targets (mobile URL scheme; staff web's own origin).
+  final redirects = kIsWeb ? AuthRedirects.web(Uri.base) : AuthRedirects.mobile;
   return [
     platformStatusRepositoryProvider.overrideWithValue(
       SupabasePlatformStatusRepository(client),
@@ -74,5 +80,16 @@ Future<List<Override>> compositionOverrides(AppConfig config) async {
       SupabaseReviewRepository(client),
     ),
     cellsRepositoryProvider.overrideWithValue(SupabaseCellsRepository(client)),
+    recoveryEmailRepositoryProvider.overrideWithValue(
+      SupabaseRecoveryEmailRepository(client, redirects: redirects),
+    ),
+    passwordRecoveryGatewayProvider.overrideWithValue(
+      SupabasePasswordRecoveryGateway(
+        supabaseUrl: config.supabaseUrl,
+        publishableKey: config.publishableKey,
+        redirects: redirects,
+        verifierStorage: RecoveryVerifierStorage(),
+      ),
+    ),
   ];
 }

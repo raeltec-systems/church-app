@@ -43,6 +43,13 @@ const staffMembersDestination = (
   icon: Icons.how_to_reg_outlined,
 );
 
+/// Story 2.7: shown while the server's current answer includes Admin.
+const staffRecoveryEmailsDestination = (
+  path: ClientPaths.adminRecoveryEmails,
+  label: 'Recovery emails',
+  icon: Icons.mark_email_read_outlined,
+);
+
 /// Story 2.6: shown while the server's current answer includes Admin.
 const staffCellsDestination = (
   path: ClientPaths.adminCells,
@@ -64,6 +71,7 @@ List<StaffDestination> staffDestinationsFor(MemberGrants? grants) => [
   if (grants != null) staffAccessDestination,
   if (servesACell(grants)) staffCellLeaderDestination,
   if (grants?.isAdmin ?? false) staffMembersDestination,
+  if (grants?.isAdmin ?? false) staffRecoveryEmailsDestination,
   if (grants?.isAdmin ?? false) staffCellsDestination,
   if (grants?.isAdmin ?? false) staffAdminDestination,
 ];

@@ -1,0 +1,11 @@
+ok   - signed-out client cannot call identity_recovery_email_command (401)
+ok   - signed-out client cannot call identity_my_recovery_email (401)
+ok   - signed-out client cannot call identity_admin_recovery_email_queue (401)
+ok   - an applicant cannot call identity_my_recovery_email (403 not_linked)
+ok   - an applicant cannot call identity_admin_recovery_email_queue (403 not_linked)
+ok   - an applicant cannot propose a recovery email (forbidden envelope)
+ok   - a recovery link for an email that is not an approved recovery email gives no session (500)
+ok   - a magiclink link for an email that is not an approved recovery email gives no session (500)
+ok   - forgot password for an unknown address is neutral (200 {})
+ok   - no SMS provider configured
+db:smoke exit 0; 114 ok lines, 0 FAIL (2026-10-07, local, phone provider off; rerun after the review fixes)

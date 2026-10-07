@@ -52,12 +52,14 @@ select results_eq(
            ('api.fixture_scoped_read'),
            ('api.identity_admin_application_queue'),
            ('api.identity_admin_credential_queue'),
+           ('api.identity_admin_deletions'),
            ('api.identity_admin_member_grants'), ('api.identity_admin_member_search'),
            ('api.identity_admin_membership_lifecycle'),
            ('api.identity_admin_recovery_cases'),
            ('api.identity_admin_recovery_email_queue'),
            ('api.identity_application_command'),
            ('api.identity_credential_command'),
+           ('api.identity_deletion_command'),
            ('api.identity_grant_command'), ('api.identity_lifecycle_command'),
            ('api.identity_my_access'), ('api.identity_my_application'),
            ('api.identity_my_credentials'),
@@ -71,12 +73,14 @@ select results_eq(
            ('app.fixture_scoped_read'),
            ('app.identity_admin_application_queue'),
            ('app.identity_admin_credential_queue'),
+           ('app.identity_admin_deletions'),
            ('app.identity_admin_member_grants'), ('app.identity_admin_member_search'),
            ('app.identity_admin_membership_lifecycle'),
            ('app.identity_admin_recovery_cases'),
            ('app.identity_admin_recovery_email_queue'),
            ('app.identity_application_command'),
            ('app.identity_credential_command'),
+           ('app.identity_deletion_command'),
            ('app.identity_grant_command'), ('app.identity_lifecycle_command'),
            ('app.identity_my_access'), ('app.identity_my_application'),
            ('app.identity_my_credentials'),
@@ -85,7 +89,7 @@ select results_eq(
            ('app.identity_recovery_command'),
            ('app.identity_recovery_email_command'), ('app.identity_review_command'),
            ('app.sys_command')$$,
-  'authenticated can execute only the command wrappers, the live-access-checked identity reads (stories 2.1, 2.3), the applicant reads and command (2.4), the Admin review command and reads (2.5), the recovery-email command and reads (2.7), the credential-review command and reads (2.8), the assisted-recovery command and read (2.9), the lifecycle command and reads (2.10), the cells command and reads (2.6), the synthetic scoped (2.3) and cell-private (2.6) fixture reads and their definer entry points (the system route refuses sessions)'
+  'authenticated can execute only the command wrappers, the live-access-checked identity reads (stories 2.1, 2.3), the applicant reads and command (2.4), the Admin review command and reads (2.5), the recovery-email command and reads (2.7), the credential-review command and reads (2.8), the assisted-recovery command and read (2.9), the lifecycle command and reads (2.10), the deletion command and read (2.11), the cells command and reads (2.6), the synthetic scoped (2.3) and cell-private (2.6) fixture reads and their definer entry points (the system route refuses sessions)'
 );
 select is_definer('app', 'fixture_counter_command',
   array['jsonb'], 'the app entry point is SECURITY DEFINER');

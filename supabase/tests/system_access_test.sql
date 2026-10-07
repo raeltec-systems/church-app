@@ -99,8 +99,14 @@ select results_eq($$select command, purpose from app.sys_command_kinds order by 
            ('identity.assisted_reset_begin', 'identity_assisted_recovery'),
            ('identity.assisted_reset_complete', 'identity_assisted_recovery'),
            ('identity.assisted_reset_dispatch', 'identity_assisted_recovery'),
+           ('identity.deletion_advance', 'identity_deletion'),
+           ('identity.deletion_auth_begin', 'identity_deletion'),
+           ('identity.deletion_auth_complete', 'identity_deletion'),
+           ('identity.deletion_journal_ack', 'identity_deletion'),
+           ('identity.deletion_next', 'identity_deletion'),
+           ('identity.deletion_queue', 'identity_deletion'),
            ('system.synthetic_probe', 'synthetic_probe')$$,
-  'the allowlist is the synthetic probe plus the story 2.9 assisted-recovery commands (their own purpose)');
+  'the allowlist is the synthetic probe plus the story 2.9 assisted-recovery and 2.11 deletion commands (each their own purpose)');
 
 -- Operators, gates and alert status ------------------------------------------------------------
 select results_eq($$select operator from app.ops_operators where active$$,

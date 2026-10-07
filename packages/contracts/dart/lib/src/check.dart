@@ -41,6 +41,7 @@ const List<String> lifecycleEventNames = [
   'sessions_revoked',
   'membership_deactivated',
   'membership_restored',
+  'member_deleted',
 ];
 
 const List<String> errorCodeNames = [

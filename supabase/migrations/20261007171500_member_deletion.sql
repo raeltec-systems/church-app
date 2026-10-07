@@ -859,6 +859,9 @@ as $$
 declare
   v_revision bigint;
 begin
+  if p_deletion.deletion_state = 'completed' then
+    return true;  -- already completed (a replay of its entries changes nothing more)
+  end if;
   if exists (select 1 from app.identity_deletion_steps s
               where s.deletion_id = p_deletion.deletion_id and s.step <> 'complete'
                 and s.step_state <> 'done') then

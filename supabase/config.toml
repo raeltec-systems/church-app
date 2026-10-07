@@ -404,6 +404,12 @@ deno_version = 2
 enabled = true
 verify_jwt = false
 
+# Story 2.11: the Auth Admin step of a member deletion. The caller is the deletion worker, which
+# authenticates with its own system credential (forwarded to the system route), not a JWT.
+[functions.identity-deletion]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

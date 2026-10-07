@@ -11,6 +11,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 typedef Harness = ClientTestHarness;
 
@@ -47,6 +48,30 @@ Future<void> tapKey(WidgetTester tester, String key) async {
 void main() {
   // Each test starts as a fresh app: no input seen yet.
   setUp(FocusVisibility.instance.reset);
+
+  testWidgets(
+    'story 2.5: the applicant sees the church decision, separately from the '
+    'cell, and no staff review data',
+    (tester) async {
+      final h = await pumpMobile(tester, size: const Size(390, 1400));
+      h.membership.mine = myApplicationWith({
+        ...applicationData(),
+        'application_state': 'rejected',
+        'church_status': 'not_approved',
+        'decision_reason': 'not_known_to_church',
+        'reapply_from': '2026-01-01T00:00:00.000000Z',
+      });
+      GoRouter.of(tester.element(find.byType(Scaffold).first))
+          .go('/membership');
+      await tester.pumpAndSettle();
+      expect(find.text('Not approved'), findsOneWidget);
+      expect(find.byKey(const Key('cell-status')), findsOneWidget);
+      expect(find.text('The church does not know you yet.'), findsOneWidget);
+      expect(find.byKey(const Key('reapply')), findsOneWidget);
+      expect(find.textContaining('Possible existing'), findsNothing);
+      expect(find.byKey(const Key('nav-/admin/members')), findsNothing);
+    },
+  );
 
   testWidgets('tracer read shows in the shell; bottom tabs are named', (
     tester,

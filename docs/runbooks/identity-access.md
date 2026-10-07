@@ -286,7 +286,7 @@ Migration: `supabase/migrations/20261007050512_membership_applications.sql`.
 - **Name rules.** Every Unicode whitespace run collapses to one space and the ends are trimmed. Unicode control and format characters (Cc/Cf, including bidi overrides such as U+202E) are refused on `full_name`.
 - **Abuse limit.** At most 10 corrections per application per rolling 24 hours (`app.identity_application_correction_limit()`); beyond that the answer is `rate_limited`.
   - Deferred: sign-up rate limits are Supabase Auth's own settings (Q1 owner configuration).
-  - Deferred: re-applying after a rejection is decided with review in entry 5.
+  - Re-applying after a rejection was decided in entry 5: see [Re-applying after a rejection](#re-applying-after-a-rejection).
 - **Nested field errors** use dotted paths: `cell_choice.choice`, `cell_choice.cell_id`, `cell_choice.cell_revision`, and `cell_choice.<unknown key>` for each unknown key.
 - **Privacy notice.** The notice is a labelled DRAFT (`draft-2026-10-07`), and the clients bundle its text. The church approves the wording under Q4. A new version needs a new migration and a new client text.
 
@@ -331,3 +331,81 @@ node tools/auth-harness/local-phone-auth.mjs off
 ```
 
 Both scripts sign up real phone accounts without email, using fictional numbers. They seed the SYNTHETIC cells when none exist and remove every user, application, event, receipt and seeded cell they created.
+
+## Membership review, linking, accountless members and reclaim (story 2.5)
+
+Migration: `supabase/migrations/20261007131500_membership_review.sql`.
+Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.5/`.
+
+### Who may do what
+
+Every command and read below needs a live Admin: the session passes `app.identity_access_evaluate()` and the member holds Admin now. Commands go through the registered `identity` authorizer (the 2.3 Admin branch, serialised on the admin catalogue row); the reads call `app.identity_require_grant('admin')`. Applicants and members get `forbidden`, untrusted sessions `unauthenticated`.
+
+Separation of duty: an Admin cannot decide an application sent from their own account, link an account to their own member record, unlink their own account, or reclaim their own username (`forbidden`, field error `unsupported`).
+
+### Commands (`POST /rest/v1/rpc/identity_review_command`, `Content-Profile: api`)
+
+| Command | `expected_revision` | Payload | Effect |
+|---|---|---|---|
+| `identity.approve_application` | application revision | `{application_id, identity_check}` | New approved member (name from the request), provenance `application`, link to the applicant's account |
+| `identity.link_application` | application revision | `{application_id, member_id, identity_check}` | The applicant's account joins an EXISTING approved member with no live link and no hold; member id, record, grants and history are kept |
+| `identity.request_application_details` | application revision | `{application_id, requested[], identity_check?}` | `needs_details`; `requested` ⊆ `full_name`, `cell_choice`, `visit_church_office` |
+| `identity.reject_application` | application revision | `{application_id, reason?, identity_check?}` | `rejected`; `reason` ∈ `identity_not_confirmed`, `not_known_to_church`, `contact_church_office` |
+| `identity.create_member` | null | `{full_name, consent_basis, assisted_by_member_id?, contact_route?{phone, belongs_to, holder_label?}}` | Approved member WITHOUT a login; provenance `admin_record`; `consent_basis` ∈ `in_person`, `leader_assisted` |
+| `identity.unlink_account` | member revision | `{member_id, reason}` | Ends the live link; member, history and grants kept; `account_deactivated` dispatched to owner hooks |
+| `identity.reclaim_phone_username` | null | `{phone_username, identity_check, reason?}` | Releases a username held by an UNLINKED account (see below) |
+
+- `identity_check` ∈ `established_relationship`, `in_person`. Approve and link require it.
+- **The link.** Approve and link bind the applicant account's **current** Auth phone (which must still equal the phone username it applied with, otherwise `validation_failed {"phone_username": "changed"}`) and its current email only when Auth has it confirmed (an unconfirmed email is `validation_failed {"recovery_email": "unverified"}`). They write binding history revision 1 (`application_approved` / `application_linked`) and set the link's trust epoch at the approval, so **the applicant must sign in again**: the session they applied with is `untrusted_session`, and a sign-in more than 5 s later is granted.
+- **One live link** per member, per account and per phone username: a second is `conflict` with field error `linked` (`member_id`, `application_id` or `phone_username`). Unlink first, explicitly.
+- **Nothing is automatic.** A matching name, phone username or contact route never links, merges, approves or discloses anything. A shared contact number gives no access.
+- **Last Admin.** Unlinking an Admin's account is refused when no other usable Admin would remain (defence in depth: the acting Admin always counts, so the bootstrap remains the recovery path).
+
+### Reclaiming a phone username (F1)
+
+Someone may register a person's number first (for example through the `/otp` path of finding F1). After checking the claimant's identity, an Admin sends `identity.reclaim_phone_username`:
+
+- If the account holding the number has a **live member link**, the answer is `conflict {"phone_username": "linked"}`: that is a dispute about a member. Unlink that account explicitly (reason `ownership_dispute` or `phone_reclaim`) and then reclaim.
+- Otherwise, in one transaction, Identity clears the holder's Auth phone, bans it (100 years, GoTrue's own ban form), withdraws its open application and records a reclaim case (`app.identity_phone_reclaims`). The holder's Auth row is kept, never merged or deleted. A banned account fails the predicate on every existing session and GoTrue refuses its sign-in and refresh.
+- The person the number belongs to can then create an account with it and apply; the Admin approves or links as usual.
+- To undo a mistaken reclaim, the restricted operator unbans the Auth user and restores its phone from the case record through Auth Admin.
+
+This is the one place Identity writes `auth.users` from SQL (phone, phone confirmation, ban); the 2.2 credential triggers ignore it because the holder has no live link. Hosted: confirm on staging that the migration owner may update `auth.users` (the 2.2 triggers already needed privileges on that table).
+
+### Reads
+
+| Endpoint | Returns |
+|---|---|
+| `api.identity_admin_application_queue(after_submitted_at, after_application_id)` | Open applications, oldest first, 25 per page. Each has the applicant's request, `prior_not_approved` (earlier rejected requests from the account), `own_account` and staff-only `candidates`: approved members with `signals` (`same_name`, `similar_name`, `contact_route_phone`, `linked_phone_username`), `account` and `link_eligible`. |
+| `api.identity_admin_member_search(query, after_display_name, after_member_id)` | Approved members (with or without a login) by name or contact number (literal match), 25 per page, with `account`, `link_eligible`, `origin`, `revision` and labelled `contact_routes`. |
+
+The applicant's own read (`api.identity_my_application`) gains `decision_reason`, `details_requested` and `reapply_from` (each only when it applies). It never carries candidates, member ids or reviewer data.
+
+### Re-applying after a rejection
+
+A rejected account may send a **new** application 7 days after the decision (`app.identity_reapply_cooldown()`); earlier it gets `rate_limited`. The rejected request stays in history, and the queue shows Admin how many earlier requests were not approved.
+
+### Audit
+
+`app.identity_membership_audit` records every decision, record, unlink and reclaim with ids, codes and revisions only (`application_approved`, `application_linked`, `application_details_requested`, `application_rejected`, `application_withdrawn`, `member_created`, `account_unlinked`, `phone_username_reclaimed`). Application events also get the decision (`approved`, `details_requested`, `rejected`, `withdrawn`) with the Admin's account as actor.
+
+### Clients
+
+- **Staff web.** Admins see **Members & applications** (`/admin/members`) in the sidebar while the server's current answer includes Admin.
+  - **Applications**: each request with the unverified sign-in username, the cell answer (confirmation is separate, entry 6), earlier requests not approved, staff-only possible existing records with their signals, an identity-check choice, and **Approve as a new member**, **Link existing** (to a candidate or a searched record), **Ask for details** and **Reject** (optional reason). Approve and link stay disabled until an identity check is chosen; the Admin's own request is shown as one another Admin must decide.
+  - **All members**: search, account state (App account, No login, Access review), labelled contact routes, **Unlink account** with a reason, and **Add member record (no login)** with consent basis and an optional contact number and whose it is.
+  - **Reclaim a username**: number, identity check, optional reason.
+  - Unknown outcomes are checked again under the same request id; any refused or denied answer re-reads the Admin's access.
+- **Mobile.** The request status shows the church decision separately from the cell: details requested (what was asked), not approved (reason and when a new request can be sent, then **Send a new request**), approved.
+
+### Local runs
+
+```bash
+npx supabase db reset                          # empty Admin roster
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/review.mjs --evidence <file>.jsonl
+FLUTTER_ROOT=/opt/sdk/flutter bash tools/identity-e2e/live-review-check.sh
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+Both use fictional numbers (`+1 202 555 0188–0199`) and remove every user, application, member, link, grant, audit row and receipt they create. The bootstrap they perform leaves append-only operator-journal rows (as 2.3's E2E does), so reset before re-running `identity_grants_test.sql`.

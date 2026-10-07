@@ -36,11 +36,19 @@ const staffAdminDestination = (
   icon: Icons.admin_panel_settings_outlined,
 );
 
+/// Story 2.5: shown while the server's current answer includes Admin.
+const staffMembersDestination = (
+  path: ClientPaths.adminMembers,
+  label: 'Members & applications',
+  icon: Icons.how_to_reg_outlined,
+);
+
 /// The sidebar for the caller's current grants. Presentation only: hiding an
 /// entry is not a control, and every screen's data is checked by the server.
 List<StaffDestination> staffDestinationsFor(MemberGrants? grants) => [
   ...staffDestinations,
   if (grants != null) staffAccessDestination,
+  if (grants?.isAdmin ?? false) staffMembersDestination,
   if (grants?.isAdmin ?? false) staffAdminDestination,
 ];
 

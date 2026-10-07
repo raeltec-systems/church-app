@@ -34,6 +34,9 @@ class _MembershipApplicationScreenState
   /// The radio value: a cell id, [_notSure] or [_notInCell].
   String? _choice;
   bool _editing = false;
+
+  /// Story 2.5: sending a NEW request after a rejection (cooldown passed).
+  bool _reapplying = false;
   String? _nameError;
   String? _choiceError;
 
@@ -120,7 +123,10 @@ class _MembershipApplicationScreenState
       if (notice == null || notice == prev?.notice) return;
       if (notice == ApplicationNotice.submitted ||
           notice == ApplicationNotice.corrected) {
-        setState(() => _editing = false);
+        setState(() {
+          _editing = false;
+          _reapplying = false;
+        });
       }
       final (title, message, _) = _noticeText(notice);
       announce(context, '$title. $message');
@@ -295,6 +301,7 @@ class _MembershipApplicationScreenState
         );
       case AccessReadOk(:final value):
         final app = value.application;
+        if (_reapplying) return _form(context, s, value, null);
         if (app != null && !_editing) {
           return _status(context, app, s.options);
         }
@@ -417,6 +424,7 @@ class _MembershipApplicationScreenState
             'status and public content.',
             style: ChurchType.secondary.copyWith(color: c.muted),
           ),
+          ..._decision(context, app),
           const SizedBox(height: 8),
           const _RecoveryEmailNote(),
           if (app.correctable) ...[
@@ -433,6 +441,83 @@ class _MembershipApplicationScreenState
         ],
       ),
     );
+  }
+
+  /// Story 2.5: what the church decided, as the applicant may see it (codes
+  /// mapped to church copy; never anything about other people).
+  List<Widget> _decision(BuildContext context, MembershipApplication app) {
+    final c = ChurchColors.of(context);
+    switch (app.churchStatus) {
+      case ChurchStatus.detailsRequested:
+        final asked = [
+          for (final d in app.detailsRequested)
+            switch (d) {
+              'full_name' => 'check your full name',
+              'cell_choice' => 'check your cell group answer',
+              'visit_church_office' => 'visit the church office',
+              _ => 'contact the church office',
+            },
+        ];
+        return [
+          const SizedBox(height: 12),
+          Text(
+            asked.isEmpty
+                ? 'The church asked for more details. Please contact the '
+                      'church office.'
+                : 'The church asked you to ${asked.join(', and ')}.',
+            key: const Key('application-details-requested'),
+          ),
+        ];
+      case ChurchStatus.notApproved:
+        final reason = switch (app.decisionReason) {
+          'identity_not_confirmed' =>
+            'The church could not confirm who you are yet.',
+          'not_known_to_church' => 'The church does not know you yet.',
+          'contact_church_office' => 'Please contact the church office.',
+          _ => null,
+        };
+        final from = app.reapplyFrom;
+        final now = DateTime.now();
+        return [
+          const SizedBox(height: 12),
+          if (reason != null)
+            Text(reason, key: const Key('application-decision-reason')),
+          Text(
+            'Talking to the church office is the quickest way forward.',
+            style: ChurchType.secondary.copyWith(color: c.muted),
+          ),
+          if (from != null && app.canReapplyAt(now)) ...[
+            const SizedBox(height: 12),
+            FocusRing(
+              child: OutlinedButton.icon(
+                key: const Key('reapply'),
+                onPressed: () {
+                  setState(() {
+                    _reapplying = true;
+                    _name.text = '';
+                    _choice = null;
+                    _noticeAccepted = false;
+                  });
+                  ref
+                      .read(membershipApplicationProvider.notifier)
+                      .dismissNotice();
+                },
+                icon: const Icon(Icons.replay),
+                label: const Text('Send a new request'),
+              ),
+            ),
+          ] else if (from != null)
+            Text(
+              'You can send a new request from '
+              '${MaterialLocalizations.of(context).formatMediumDate(from.toLocal())}.',
+              key: const Key('reapply-from'),
+            ),
+        ];
+      case ChurchStatus.approved:
+      case ChurchStatus.awaitingApproval:
+      case ChurchStatus.withdrawn:
+        return const [];
+    }
   }
 
   Widget _form(
@@ -627,13 +712,16 @@ class _MembershipApplicationScreenState
                 child: Text(existing == null ? 'Send request' : 'Save changes'),
               ),
             ),
-            if (existing != null)
+            if (existing != null || _reapplying)
               FocusRing(
                 child: OutlinedButton(
                   key: const Key('cancel-correction'),
                   onPressed: busy
                       ? null
-                      : () => setState(() => _editing = false),
+                      : () => setState(() {
+                          _editing = false;
+                          _reapplying = false;
+                        }),
                   child: const Text('Cancel'),
                 ),
               ),

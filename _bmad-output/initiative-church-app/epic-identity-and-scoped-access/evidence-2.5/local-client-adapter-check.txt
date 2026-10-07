@@ -1,0 +1,9 @@
+== adapters: staff-web Admin review queue, accountless record, link; applicant re-signs in
+PASS L1 Admin signs in (phone): Instance of 'AuthSucceeded'
+PASS L2 applicant signs up and applies: Instance of 'AuthSucceeded' / Instance of 'CommandConfirmed'
+PASS L3 the applicant cannot read the queue: Instance of 'AccessReadDenied<ReviewQueue>'
+PASS L4 Admin records an accountless member: AccountStanding.noLogin / admin_record
+PASS L5 queue shows the staff-only duplicate hint; search finds the record: signals [same_name], found 1
+PASS L6 link; the pre-approval session is refused: Instance of 'MemberAccessDenied' / Instance of 'CommandConfirmed' / Instance of 'MemberAccessDenied'
+PASS L7 fresh sign-in reaches the same member; status approved: same member
+synthetic users left: 0

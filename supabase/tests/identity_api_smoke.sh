@@ -11,6 +11,7 @@
 # Phone sign-in itself is exercised by tools/identity-e2e with `node tools/auth-harness/local-phone-auth.mjs on`.
 # Story 2.3 adds: the grant command and grant reads refuse signed-out and unlinked callers.
 # Story 2.4 adds: the application command and applicant reads (signed-out and unlinked callers).
+# Story 2.5 adds: the Admin review command and reads refuse signed-out and applicant callers.
 # Usage: npm run db:smoke   (needs curl, jq and psql; SYNTHETIC users and data only)
 set -euo pipefail
 
@@ -205,6 +206,28 @@ code=$(api_call identity_application_command "$APPLY_BODY")
 code=$(api_call identity_my_access '{}')
 [[ "$code:$(jq -r .details "$WORK/out")" == "403:not_linked" ]] \
   && ok "applying grants nothing: still no member access (403 not_linked)" || bad "access after applying: $code $(cat "$WORK/out")"
+
+# Story 2.5: the Admin review command and reads need a session and the Admin grant; the
+# applicant above can neither read the review queue nor decide its own application.
+for fn in identity_review_command identity_admin_application_queue identity_admin_member_search; do
+  code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/rest/v1/rpc/$fn" \
+    -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Profile: api' -H 'Content-Type: application/json' -d '{}')
+  expect "signed-out client cannot call $fn" 401 "$code" "$(cat "$WORK/out")"
+done
+for fn in identity_admin_application_queue identity_admin_member_search; do
+  code=$(api_call "$fn" '{}')
+  [[ "$code:$(jq -r .details "$WORK/out")" == "403:not_linked" ]] \
+    && ok "an applicant cannot call $fn (403 not_linked)" || bad "$fn as applicant: $code $(cat "$WORK/out")"
+done
+api_call identity_my_application '{}' >/dev/null
+APP_ID=$(jq -r .application.application_id "$WORK/out")
+REVIEW_BODY="{\"version\":1,\"command\":\"identity.approve_application\",\"request_id\":\"$(uuid)\",\"expected_revision\":1,\"payload\":{\"application_id\":\"$APP_ID\",\"identity_check\":\"in_person\"}}"
+code=$(api_call identity_review_command "$REVIEW_BODY")
+[[ "$code:$(jq -r .code "$WORK/out")" == "200:forbidden" ]] \
+  && ok "an applicant cannot approve its own application (forbidden envelope)" || bad "self-approve: $code $(cat "$WORK/out")"
+code=$(api_call identity_my_access '{}')
+[[ "$code:$(jq -r .details "$WORK/out")" == "403:not_linked" ]] \
+  && ok "still no member access after the refused approval" || bad "access after self-approve: $code $(cat "$WORK/out")"
 
 # No SMS configuration exists on this stack.
 sms=$(curl -s "$API_URL/auth/v1/settings" -H "apikey: $PUBLISHABLE_KEY" | jq -r '.sms_provider // ""')

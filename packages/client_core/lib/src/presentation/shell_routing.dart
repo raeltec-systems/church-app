@@ -6,6 +6,7 @@ import 'access_screens.dart';
 import 'account_screen.dart';
 import 'fixture_command_screen.dart';
 import 'membership_application_screen.dart';
+import 'membership_review_screen.dart';
 import 'platform_status_screen.dart';
 import 'sign_in_screen.dart';
 
@@ -29,6 +30,10 @@ abstract final class ClientPaths {
 
   /// The applicant's own membership request and its status (story 2.4).
   static const membership = '/membership';
+
+  /// Staff web, Admin only: applications, member records, unlinking and
+  /// phone-username reclaim (story 2.5).
+  static const adminMembers = '/admin/members';
 }
 
 /// `extra` of a navigation started from a shell tab by the keyboard: the
@@ -89,6 +94,10 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.adminGrants,
         pageBuilder: (_, state) => page(state, const GrantAdminScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.adminMembers,
+        pageBuilder: (_, state) => page(state, const MembershipReviewScreen()),
       ),
       GoRoute(
         path: ClientPaths.membership,

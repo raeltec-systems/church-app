@@ -231,6 +231,34 @@ void main() {
     },
   );
 
+  testWidgets(
+    'story 2.5: Members & applications follows the Admin grant and opens the '
+    'review queue',
+    (tester) async {
+      final h = await pumpStaff(tester);
+      expect(find.byKey(const Key('nav-/admin/members')), findsNothing);
+      h.grants.myAccess = AccessReadOk(syntheticGrants(roles: ['admin']));
+      h.review.queue = reviewQueueWith([reviewApplicationData()]);
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'nav-/admin/members');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('Members & applications'), findsWidgets);
+      expect(find.text('SYNTHETIC Ruth Mwale'), findsOneWidget);
+
+      // Admin removed elsewhere: the entry goes and the server's denial shows.
+      h.grants.myAccess = AccessReadOk(syntheticGrants(revision: 3));
+      h.review.queue = const AccessReadDenied(AccessDenial.notGranted);
+      await tapKey(tester, 'review-reload');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('SYNTHETIC Ruth Mwale'), findsNothing);
+      expect(find.byKey(const Key('nav-/admin/members')), findsNothing);
+    },
+  );
+
   testWidgets('an account switch drops the protected state', (tester) async {
     final h = await pumpStaff(tester, location: '/fixture');
     await tester.enterText(find.byKey(const Key('intent-key-field')), 'k');

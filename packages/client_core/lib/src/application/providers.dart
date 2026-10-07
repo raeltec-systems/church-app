@@ -6,6 +6,7 @@ import '../domain/commands.dart';
 import '../domain/fixture_counter.dart';
 import '../domain/member_access.dart';
 import '../domain/membership_application.dart';
+import '../domain/membership_review.dart';
 import '../domain/platform_status.dart';
 import '../domain/session.dart';
 
@@ -44,6 +45,11 @@ final grantsRepositoryProvider = Provider<GrantsRepository>(
 /// Story 2.4: the applicant's own membership request and the cell chooser.
 final membershipRepositoryProvider = Provider<MembershipRepository>(
   (ref) => const UnconfiguredMembershipRepository(),
+);
+
+/// Story 2.5: the Admin's application queue and member search.
+final reviewRepositoryProvider = Provider<ReviewRepository>(
+  (ref) => const UnconfiguredReviewRepository(),
 );
 
 final requestIdsProvider = Provider<RequestIds>((ref) => SecureRequestIds());

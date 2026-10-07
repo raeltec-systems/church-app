@@ -70,5 +70,8 @@ Future<List<Override>> compositionOverrides(AppConfig config) async {
     membershipRepositoryProvider.overrideWithValue(
       SupabaseMembershipRepository(client),
     ),
+    reviewRepositoryProvider.overrideWithValue(
+      SupabaseReviewRepository(client),
+    ),
   ];
 }

@@ -169,6 +169,9 @@ class MembershipApplication {
     required this.cellStatus,
     required this.privacyNoticeVersion,
     required this.isSynthetic,
+    this.decisionReason,
+    this.detailsRequested = const [],
+    this.reapplyFrom,
   });
 
   factory MembershipApplication.fromJson(Object? json) {
@@ -192,6 +195,18 @@ class MembershipApplication {
         synthetic is! bool) {
       throw const FormatException('unexpected application shape');
     }
+    // Story 2.5: the decision, as codes; each key is present only when it
+    // applies.
+    final reason = json['decision_reason'];
+    final requested = json['details_requested'];
+    final reapply = json['reapply_from'];
+    if ((reason != null && reason is! String) ||
+        (requested != null &&
+            (requested is! List || requested.any((r) => r is! String))) ||
+        (reapply != null &&
+            (reapply is! String || DateTime.tryParse(reapply) == null))) {
+      throw const FormatException('unexpected application decision');
+    }
     return MembershipApplication(
       applicationId: id,
       revision: revision,
@@ -207,6 +222,11 @@ class MembershipApplication {
       cellStatus: _enum(CellStatus.values, (e) => e.wire, json['cell_status']),
       privacyNoticeVersion: notice,
       isSynthetic: synthetic,
+      decisionReason: reason as String?,
+      detailsRequested: requested == null
+          ? const []
+          : List.unmodifiable((requested as List).cast<String>()),
+      reapplyFrom: reapply == null ? null : DateTime.parse(reapply as String),
     );
   }
 
@@ -222,6 +242,23 @@ class MembershipApplication {
   final CellStatus cellStatus;
   final String privacyNoticeVersion;
   final bool isSynthetic;
+
+  /// Why the church did not approve (a code), when it gave a reason.
+  final String? decisionReason;
+
+  /// What the church asked for while details are requested (codes:
+  /// `full_name`, `cell_choice`, `visit_church_office`).
+  final List<String> detailsRequested;
+
+  /// After a rejection: from when a new request may be sent.
+  final DateTime? reapplyFrom;
+
+  /// A new request may be sent instead of this decided one (the server
+  /// decides; this only shows or hides the action).
+  bool canReapplyAt(DateTime now) =>
+      churchStatus == ChurchStatus.notApproved &&
+      reapplyFrom != null &&
+      !now.isBefore(reapplyFrom!);
 
   /// The applicant may still correct it (the server decides; this only
   /// shows or hides the action).

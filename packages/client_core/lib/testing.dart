@@ -15,6 +15,7 @@ import 'src/domain/account_auth.dart';
 import 'src/domain/commands.dart';
 import 'src/domain/member_access.dart';
 import 'src/domain/membership_application.dart';
+import 'src/domain/membership_review.dart';
 import 'src/domain/fixture_counter.dart';
 import 'src/domain/session.dart';
 
@@ -393,6 +394,79 @@ AccessRead<MyApplication> myApplicationWith(Map<String, Object?> data) =>
       ),
     );
 
+/// [ReviewRepository] answered by the test (story 2.5). [queue] and
+/// [search] answer every read at once; the call lists record what was asked.
+class FakeReview implements ReviewRepository {
+  AccessRead<ReviewQueue> queue = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  AccessRead<MemberSearchPage> search = const AccessReadOk(
+    MemberSearchPage(members: [], next: null),
+  );
+  final List<QueueCursor?> queueCalls = [];
+  final List<String?> searchCalls = [];
+
+  @override
+  Future<AccessRead<ReviewQueue>> fetchQueue({QueueCursor? after}) async {
+    queueCalls.add(after);
+    return queue;
+  }
+
+  @override
+  Future<AccessRead<MemberSearchPage>> searchMembers(
+    String? query, {
+    MemberCursor? after,
+  }) async {
+    searchCalls.add(query);
+    return search;
+  }
+}
+
+/// The wire form of one Admin queue entry (story 2.5).
+Map<String, Object?> reviewApplicationData({
+  String id = '55555555-5555-4555-8555-555555555555',
+  int revision = 1,
+  String name = 'SYNTHETIC Ruth Mwale',
+  int priorNotApproved = 0,
+  bool ownAccount = false,
+  List<Map<String, Object?>> candidates = const [],
+}) => {
+  ...applicationData(id: id, revision: revision, name: name),
+  'cell_choice': const {
+    'choice': 'not_sure',
+    'cell_id': null,
+    'cell_revision': null,
+  },
+  'cell_status': 'follow_up',
+  'prior_not_approved': priorNotApproved,
+  'own_account': ownAccount,
+  'candidates': candidates,
+};
+
+/// A queue page with the given entries.
+AccessRead<ReviewQueue> reviewQueueWith(List<Map<String, Object?>> entries) =>
+    AccessReadOk(ReviewQueue.fromJson({'applications': entries, 'next': null}));
+
+/// The wire form of an Admin member record (story 2.5).
+Map<String, Object?> memberRecordData({
+  String id = '66666666-6666-4666-8666-666666666666',
+  String name = 'SYNTHETIC Ruth Mwale',
+  int revision = 1,
+  String account = 'no_login',
+  bool linkEligible = true,
+  List<Map<String, Object?>> routes = const [],
+}) => {
+  'member_id': id,
+  'display_name': name,
+  'membership_state': 'approved',
+  'revision': revision,
+  'is_synthetic': true,
+  'account': account,
+  'link_eligible': linkEligible,
+  'origin': 'admin_record',
+  'contact_routes': routes,
+};
+
 /// The fakes and provider overrides an app or screen test runs against.
 class ClientTestHarness {
   ClientTestHarness({String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'})
@@ -405,6 +479,7 @@ class ClientTestHarness {
   final memberAccess = FakeMemberAccess();
   final grants = FakeGrants();
   final membership = FakeMembership();
+  final review = FakeReview();
 
   /// [configured] false leaves the unconfigured defaults for the gateway and
   /// the platform status (as a build without `--dart-define`s).
@@ -417,6 +492,7 @@ class ClientTestHarness {
       memberAccessRepositoryProvider.overrideWithValue(memberAccess),
       grantsRepositoryProvider.overrideWithValue(grants),
       membershipRepositoryProvider.overrideWithValue(membership),
+      reviewRepositoryProvider.overrideWithValue(review),
       commandGatewayProvider.overrideWithValue(gateway),
       platformStatusRepositoryProvider.overrideWithValue(FakePlatformStatus()),
     ],

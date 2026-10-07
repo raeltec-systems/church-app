@@ -159,11 +159,25 @@ class MembershipApplicationController extends Notifier<ApplicationState> {
 
   /// Submits a new request, or corrects the open one. The payload carries
   /// only what the applicant may set: never a membership or cell status.
-  Future<void> send({required String fullName, required CellChoice choice}) {
+  ///
+  /// A new request is sent only when the applicant explicitly confirmed
+  /// reading the privacy notice ([noticeAccepted]) and this client has the
+  /// text of the server's notice version, so nobody accepts a notice they
+  /// were never shown.
+  Future<void> send({
+    required String fullName,
+    required CellChoice choice,
+    bool noticeAccepted = false,
+  }) {
     final mine = state.mine;
     if (mine == null || state.busy) return Future.value();
     final existing = mine.application;
     final correcting = existing != null && existing.correctable;
+    if (!correcting &&
+        (!noticeAccepted ||
+            !privacyNoticeTexts.containsKey(mine.privacyNotice.version))) {
+      return Future.value();
+    }
     final command = correcting
         ? ApplicationCommands.correct
         : ApplicationCommands.submit;
@@ -237,7 +251,7 @@ class MembershipApplicationController extends Notifier<ApplicationState> {
         final errors = error.fieldErrors;
         final notice = switch (error.code) {
           ErrorCode.validationFailed =>
-            errors.containsKey('cell_id') || errors.containsKey('cell_revision')
+            errors.keys.any((k) => k.startsWith('cell_choice.cell_'))
                 ? ApplicationNotice.cellListChanged
                 : ApplicationNotice.invalid,
           ErrorCode.conflict =>

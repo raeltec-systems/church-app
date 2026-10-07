@@ -1,13 +1,6 @@
 Connecting to local database...
-/home/user/church-app/.claude/worktrees/agent-a5530cd51ece5555d/supabase/tests/command_foundation_test.sql ....... ok
-/home/user/church-app/.claude/worktrees/agent-a5530cd51ece5555d/supabase/tests/cross_epic_contracts_test.sql ..... ok
-/home/user/church-app/.claude/worktrees/agent-a5530cd51ece5555d/supabase/tests/identity_grants_test.sql .......... ok
-/home/user/church-app/.claude/worktrees/agent-a5530cd51ece5555d/supabase/tests/identity_live_access_test.sql ..... ok
-/home/user/church-app/.claude/worktrees/agent-a5530cd51ece5555d/supabase/tests/identity_session_trust_test.sql ... ok
 /home/user/church-app/.claude/worktrees/agent-a5530cd51ece5555d/supabase/tests/membership_applications_test.sql .. ok
-/home/user/church-app/.claude/worktrees/agent-a5530cd51ece5555d/supabase/tests/platform_status_test.sql .......... ok
-/home/user/church-app/.claude/worktrees/agent-a5530cd51ece5555d/supabase/tests/recovery_journal_test.sql ......... ok
-/home/user/church-app/.claude/worktrees/agent-a5530cd51ece5555d/supabase/tests/system_access_test.sql ............ ok
+/home/user/church-app/.claude/worktrees/agent-a5530cd51ece5555d/supabase/tests/command_foundation_test.sql ....... ok
 All tests successful.
-Files=9, Tests=699,  1 wallclock secs ( 0.09 usr  0.03 sys +  0.11 cusr  0.11 csys =  0.34 CPU)
+Files=2, Tests=167,  0 wallclock secs ( 0.03 usr  0.01 sys +  0.03 cusr  0.02 csys =  0.09 CPU)
 Result: PASS

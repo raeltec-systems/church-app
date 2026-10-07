@@ -13,7 +13,7 @@
 
 | File | What it shows | Result |
 |---|---|---|
-| `local-pgtap.txt` | `npm run db:test`, including `membership_applications_test.sql` (72 assertions) and the updated EXECUTE allowlist | 699/699 pass |
+| `local-pgtap.txt` | After the review fixes, a targeted run of `membership_applications_test.sql` (97 assertions) and `command_foundation_test.sql` (the EXECUTE allowlist). Before the fixes, the full `npm run db:test` passed 699/699; the coordinator re-runs the full suite. | 167/167 pass |
 | `local-api-smoke.txt` | `npm run db:smoke`, including the new Data API checks | all ok |
 | `local-apply-e2e.jsonl` | `node tools/identity-e2e/apply.mjs`: real GoTrue phone sign-up and the real Data API | 27/27 pass |
 | `local-client-adapter-check.txt` | `tools/identity-e2e/live-application-check.sh`: the real Dart adapters | L1–L8 pass |
@@ -53,3 +53,23 @@ The real Dart adapters are `SupabaseAccountAuthGateway`, `SupabaseMembershipRepo
 - **Owner gates, all left fail-closed:**
   - the church's real cell list and sign-up labels (entry 6 Admin cell setup; production lists no cells until then);
   - the approved privacy-notice text and `q4_personal_data`; production refuses applications as `unavailable` until the owner approves.
+
+## Review fixes (2026-10-07)
+
+After the coordinator's review, the migration was edited in place; it is on no hosted project. pgTAP covers each fix:
+
+- **Name normalisation.**
+  - Every Unicode whitespace run collapses to one space and a regex trim removes the ends, so tab, newline, NBSP and ideographic-space edges no longer reach the table CHECK as `unavailable`.
+  - Unicode control (Cc) and format (Cf) characters are refused as `validation_failed` on `full_name`. That includes U+202E and zero-width characters.
+  - While Q4 is unapproved, the name must start with `SYNTHETIC `.
+- **Who is an applicant.** Only an account with no live link, and no open hold on any member it was ever linked to. Accounts linked to a pending, rejected or deactivated member, and an ended link with a held member, get `forbidden` with reason `not_applicant` on the command, the chooser and my-application.
+- **Chooser behind the personal-data gate.** A production database with Q4 closed lists nothing, even a non-synthetic cell. With Q4 approved, only the non-synthetic option is listed.
+- **Held restore fenced in every environment.** A production held restore stays closed even with Q4 approved.
+- **Correction cap.** 10 corrections per application per rolling 24 hours (`app.identity_application_correction_limit()`); the 11th gets `rate_limited`.
+- **Nested field errors use dotted paths:** `cell_choice.choice`, `cell_choice.cell_id`, `cell_choice.cell_revision`, and each unknown nested key on itself as `cell_choice.<key>`.
+- **Explicit privacy acceptance (client).**
+  - A new request needs the "I have read the privacy notice" checkbox, which is unchecked by default.
+  - When the app has no bundled text for the server's notice version, sending is disabled and the screen sends the applicant to the church office.
+  - Two new widget tests cover this; `membership_application_test.dart` has 21 tests, and the mobile "story 2.4" test passes.
+- **Re-runs after the fixes:** `local-apply-e2e.jsonl` 27/27, the adapter check L1–L8, and the identity smoke all pass.
+- **Deferred, not built:** sign-up rate limits are Supabase Auth's own settings (owner/Q1 configuration); re-applying after a rejection belongs to entry 5.

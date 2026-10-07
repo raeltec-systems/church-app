@@ -6,7 +6,7 @@
 -- phone and name here is SYNTHETIC (fictional range +1 202 555 0141-0149); +999 is an
 -- unassigned ITU country code used only to prove the non-fictional fence.
 begin;
-select plan(72);
+select plan(97);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000024' || lpad(n::text, 2, '0'))::uuid $$;
@@ -100,7 +100,10 @@ insert into auth.users (id, aud, role, email, email_confirmed_at)
 values (pg_temp.u(7), 'authenticated', 'authenticated', 'synthetic-2-4-nophone@example.test', now());
 insert into auth.users (id, aud, role, phone, phone_confirmed_at)
 values (pg_temp.u(8), 'authenticated', 'authenticated', '99900000248', now());
-select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 8) n;
+insert into auth.users (id, aud, role, phone, phone_confirmed_at)
+select pg_temp.u(n), 'authenticated', 'authenticated', '120255501' || (40 + n)::text, now()
+  from generate_series(9, 12) n;
+select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 12) n;
 select pg_temp.session(pg_temp.u(1), pg_temp.s(21), 'otp');
 
 -- Structure and privileges ---------------------------------------------------------------------
@@ -156,6 +159,22 @@ select app.identity_seed_synthetic_link(pg_temp.u(n), 'SYNTHETIC 2.4 Member ' ||
 insert into app.identity_holds (member_id, hold_kind, reason, placed_by)
 select l.member_id, 'security', 'SYNTHETIC hold', 'pgtap 2.4'
   from app.identity_account_links l where l.auth_user_id = pg_temp.u(6);
+-- Accounts that are not applicants: linked to a pending (9), rejected (10) or deactivated (11)
+-- member, or (12) an ended link whose member still has an open hold.
+create temp table odd_members as
+  with ins as (
+    insert into app.identity_members (display_name, membership_state, is_synthetic)
+    select 'SYNTHETIC 2.4 Odd ' || n, st, true
+      from (values (9, 'pending'), (10, 'rejected'), (11, 'deactivated'), (12, 'approved')) v(n, st)
+    returning member_id, display_name)
+  select (regexp_match(display_name, '([0-9]+)$'))[1]::int as n, member_id from ins;
+insert into app.identity_account_links (member_id, auth_user_id, link_state, approved_phone,
+                                        approved_by, ended_at)
+select o.member_id, pg_temp.u(o.n), case when o.n = 12 then 'ended' else 'active' end,
+       '+120255501' || (40 + o.n)::text, 'pgtap 2.4', case when o.n = 12 then now() end
+  from odd_members o;
+insert into app.identity_holds (member_id, hold_kind, reason, placed_by)
+select member_id, 'security', 'SYNTHETIC hold', 'pgtap 2.4' from odd_members where n = 12;
 create temp table before_counts as
   select (select count(*) from app.identity_members) members,
          (select count(*) from app.identity_account_links) links,
@@ -260,19 +279,19 @@ select is(pg_temp.cmd(pg_temp.c(8), 'identity.submit_application', null,
 select is(pg_temp.cmd(pg_temp.c(8), 'identity.submit_application', null,
             '{"full_name": "   ", "cell_choice": {"choice": "not_sure", "cell_id": "00000000-0000-4000-c000-00000000c241"}, "privacy_notice_version": "v0"}')
           -> 'field_errors',
-  '{"full_name": "required", "cell_id": "must_be_null", "privacy_notice_version": "invalid"}'::jsonb,
+  '{"full_name": "required", "cell_choice.cell_id": "must_be_null", "privacy_notice_version": "invalid"}'::jsonb,
   'every field error is reported at once');
 select is(pg_temp.cmd(pg_temp.c(8), 'identity.submit_application', null,
             '{"full_name": "SYNTHETIC X", "cell_choice": {"choice": "maybe"}, "privacy_notice_version": "draft-2026-10-07"}')
-          -> 'field_errors', '{"choice": "invalid"}'::jsonb, 'an unknown choice is invalid');
+          -> 'field_errors', '{"cell_choice.choice": "invalid"}'::jsonb, 'an unknown choice is invalid');
 update app.cells_signup_options set listed = false where cell_id = '00000000-0000-4000-c000-00000000c243';
-select is(pg_temp.submit(8, pg_temp.cell(3)) -> 'field_errors', '{"cell_id": "invalid"}'::jsonb,
+select is(pg_temp.submit(8, pg_temp.cell(3)) -> 'field_errors', '{"cell_choice.cell_id": "invalid"}'::jsonb,
   'an unlisted cell cannot be chosen');
 update app.cells_signup_options set revision = 2 where cell_id = '00000000-0000-4000-c000-00000000c242';
-select is(pg_temp.submit(8, pg_temp.cell(2, 1)) -> 'field_errors', '{"cell_id": "invalid"}'::jsonb,
+select is(pg_temp.submit(8, pg_temp.cell(2, 1)) -> 'field_errors', '{"cell_choice.cell_id": "invalid"}'::jsonb,
   'a stale option revision cannot be chosen (reload the list)');
 select is(pg_temp.submit(8, jsonb_build_object('choice', 'cell', 'cell_id', gen_random_uuid(), 'cell_revision', 1))
-          -> 'field_errors', '{"cell_id": "invalid"}'::jsonb, 'an unknown cell id cannot be chosen');
+          -> 'field_errors', '{"cell_choice.cell_id": "invalid"}'::jsonb, 'an unknown cell id cannot be chosen');
 select is(jsonb_array_length(pg_temp.readj(pg_temp.c(1), 'select api.cells_signup_options()') -> 'options'),
   2, 'the unlisted option leaves the chooser');
 
@@ -328,6 +347,62 @@ select ok((select members = (select count(*) from app.identity_members)
               and grants = (select count(*) from app.identity_grants) from before_counts),
   'corrections create no member, link or grant either');
 
+-- Not applicants: linked to a pending/rejected/deactivated member, or a held member -----------
+select is(pg_temp.submit(n, '{"choice": "not_sure"}') ->> 'code', 'forbidden',
+  'an account linked to a ' || st || ' member cannot apply')
+  from (values (9, 'pending'), (10, 'rejected'), (11, 'deactivated')) v(n, st);
+select is(pg_temp.submit(12, '{"choice": "not_sure"}') ->> 'code', 'forbidden',
+  'an account whose (ended-link) member has an open hold cannot apply');
+select is(pg_temp.read(pg_temp.c(n), 'select api.cells_signup_options()'),
+  'PT403|forbidden|not_applicant', 'account ' || n || ' (not an applicant) cannot read the chooser')
+  from generate_series(9, 12) n;
+select is(pg_temp.read(pg_temp.c(11), 'select api.identity_my_application()'),
+  'PT403|forbidden|not_applicant', 'a deactivated member''s account reads no application');
+
+-- Name normalisation ---------------------------------------------------------------------------
+select is(pg_temp.cmd(pg_temp.c(4), 'identity.correct_application',
+  (select revision from app.identity_membership_applications where auth_user_id = pg_temp.u(4)),
+  jsonb_build_object('application_id', (select application_id from app.identity_membership_applications where auth_user_id = pg_temp.u(4)),
+                     'full_name', E'\t SYNTHETIC\tTab\nNew Line 　\n')) #>> '{data,full_name}',
+  'SYNTHETIC Tab New Line', 'tab, newline and NBSP edges are trimmed and runs collapsed');
+select is(pg_temp.submit(8, '{"choice": "not_sure"}', E'SYNTHETIC ‮evil') -> 'field_errors',
+  '{"full_name": "invalid"}'::jsonb,
+  'a bidi override (U+202E) in the name is refused');
+select is(pg_temp.submit(8, '{"choice": "not_sure"}', E'SYNTHETIC zero​width') -> 'field_errors',
+  '{"full_name": "invalid"}'::jsonb, 'a zero-width format character is refused');
+select is(pg_temp.submit(8, '{"choice": "not_sure"}', E'  \t\n') -> 'field_errors',
+  '{"full_name": "required"}'::jsonb, 'a name of only whitespace is required, not a server error');
+select is(pg_temp.submit(8, '{"choice": "not_sure"}', 'Real Looking Name') -> 'field_errors',
+  '{"full_name": "invalid"}'::jsonb, 'local/staging: the name must start with SYNTHETIC');
+
+-- Nested field errors use dotted paths -----------------------------------------------------
+select is(pg_temp.submit(8, '{"choice": "not_sure", "leader": "x", "members": []}') -> 'field_errors',
+  '{"cell_choice.leader": "unknown_field", "cell_choice.members": "unknown_field"}'::jsonb,
+  'each unknown cell_choice key is reported on itself with its dotted path');
+select is(pg_temp.submit(8, '{"choice": "cell"}') -> 'field_errors',
+  '{"cell_choice.cell_id": "required", "cell_choice.cell_revision": "required"}'::jsonb,
+  'a chosen cell needs cell_choice.cell_id and cell_choice.cell_revision');
+select is(pg_temp.submit(8, '{}') -> 'field_errors',
+  '{"cell_choice.choice": "required"}'::jsonb, 'a missing choice is cell_choice.choice');
+
+-- Correction cap ---------------------------------------------------------------------------
+insert into app.identity_application_events (application_id, revision, event, actor_auth_user_id, changed_fields)
+select a.application_id, 1, 'corrected', a.auth_user_id, array['full_name']
+  from app.identity_membership_applications a, generate_series(1, 10)
+ where a.auth_user_id = pg_temp.u(2);
+select is(pg_temp.cmd(pg_temp.c(2), 'identity.correct_application', 1,
+  jsonb_build_object('application_id', (select application_id from app.identity_membership_applications where auth_user_id = pg_temp.u(2)),
+                     'full_name', 'SYNTHETIC Eleventh')) ->> 'code',
+  'rate_limited', 'the 11th correction within 24 hours is rate limited');
+update app.identity_application_events e set at = now() - interval '25 hours'
+  from app.identity_membership_applications a
+ where e.application_id = a.application_id and a.auth_user_id = pg_temp.u(2) and e.event = 'corrected';
+select is(pg_temp.cmd(pg_temp.c(2), 'identity.correct_application', 1,
+  jsonb_build_object('application_id', (select application_id from app.identity_membership_applications where auth_user_id = pg_temp.u(2)),
+                     'full_name', 'SYNTHETIC Eleventh')) ->> 'revision',
+  '2', 'corrections older than 24 hours no longer count');
+select is(app.identity_application_correction_limit(), 10, 'the correction limit is 10 per 24 hours');
+
 -- Dispatch keeps the grant branch and refuses cross-wiring --------------------------------------
 select is(pg_temp.cmd(pg_temp.c(4), 'identity.submit_application', null, '{}', gen_random_uuid(),
                       'api.identity_grant_command') -> 'field_errors',
@@ -347,6 +422,24 @@ select is(pg_temp.submit(8, '{"choice": "not_sure"}') - 'request_id' - 'message'
   'local + held restore: applications are unavailable');
 update app.rcv_recovery_state set state = 'live', restore_id = null, updated_by = 'pgtap 2.4';
 select ok(app.identity_applications_open(), 'live again: applications are open');
+
+-- Production: the chooser is gated too, and a held restore stays closed even with Q4 approved.
+select app.platform_set_environment('production', 'pgtap 2.4');
+insert into app.cells_cells (cell_id, name, broad_area, is_synthetic, created_by)
+values ('00000000-0000-4000-c000-00000000c249', 'Real Cell', 'Real area', false, 'pgtap');
+insert into app.cells_signup_options (cell_id, label, broad_area, is_synthetic)
+values ('00000000-0000-4000-c000-00000000c249', 'Real Cell', 'Real area', false);
+select is(pg_temp.readj(pg_temp.c(1), 'select api.cells_signup_options()'), '{"options": []}'::jsonb,
+  'production with q4 closed: even a non-synthetic cell is not listed');
+select app.policy_approve('q4_personal_data', '{"note": "pgtap only"}', 'pgtap', 'pgtap 2.4 rolled back');
+select ok(app.identity_applications_open(), 'production with q4 approved and live: open');
+select is(jsonb_array_length(pg_temp.readj(pg_temp.c(1), 'select api.cells_signup_options()') -> 'options'), 1,
+  'production with q4 approved: only the non-synthetic option is listed');
+update app.rcv_recovery_state set state = 'restored_held', restore_id = gen_random_uuid(),
+       updated_by = 'pgtap 2.4';
+select ok(not app.identity_applications_open(), 'production held restore: applications closed even with q4 approved');
+select is(pg_temp.readj(pg_temp.c(1), 'select api.cells_signup_options()'), '{"options": []}'::jsonb,
+  'production held restore: nothing is listed');
 
 select * from finish();
 rollback;

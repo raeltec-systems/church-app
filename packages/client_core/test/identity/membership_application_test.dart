@@ -58,9 +58,11 @@ Future<void> fillForm(
   WidgetTester tester, {
   String name = 'SYNTHETIC Applicant',
   required String choiceKey,
+  bool acceptNotice = true,
 }) async {
   await tester.enterText(byKey('full-name-field'), name);
   await tapKey(tester, choiceKey);
+  if (acceptNotice) await tapKey(tester, 'privacy-accept');
 }
 
 void main() {
@@ -229,6 +231,59 @@ void main() {
       expect(h.gateway.sent, isEmpty);
     });
 
+    testWidgets('the privacy notice must be explicitly accepted', (
+      tester,
+    ) async {
+      final h = await pumpAt(tester, ClientPaths.membership);
+      expect(
+        tester.widget<CheckboxListTile>(byKey('privacy-accept')).value,
+        isFalse,
+        reason: 'unchecked by default',
+      );
+      await fillForm(
+        tester,
+        choiceKey: 'cell-choice-not_sure',
+        acceptNotice: false,
+      );
+      await tapKey(tester, 'send-application');
+      expect(
+        find.text('Confirm that you have read the privacy notice.'),
+        findsOneWidget,
+      );
+      expect(h.gateway.sent, isEmpty);
+      await tapKey(tester, 'privacy-accept');
+      await tapKey(tester, 'send-application');
+      expect(h.gateway.sent, hasLength(1));
+    });
+
+    testWidgets('a notice version this app does not have: sending disabled', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.membership,
+        setUp: (h) => h.membership.mine = const AccessReadOk(
+          MyApplication(
+            application: null,
+            privacyNotice: PrivacyNotice(version: 'v-unknown-9', draft: false),
+            accepting: true,
+          ),
+        ),
+      );
+      expect(byKey('privacy-notice-missing'), findsOneWidget);
+      expect(byKey('privacy-accept'), findsNothing);
+      expect(
+        tester.widget<FilledButton>(byKey('send-application')).onPressed,
+        isNull,
+      );
+      await fillForm(
+        tester,
+        choiceKey: 'cell-choice-not_sure',
+        acceptNotice: false,
+      );
+      expect(h.gateway.sent, isEmpty);
+    });
+
     testWidgets('a cell no longer offered: the list reloads, choose again', (
       tester,
     ) async {
@@ -238,7 +293,7 @@ void main() {
       final calls = h.membership.calls;
       h.gateway.sent.single.refuse(
         ErrorCode.validationFailed,
-        fieldErrors: {'cell_id': 'invalid'},
+        fieldErrors: {'cell_choice.cell_id': 'invalid'},
       );
       await settleShort(tester);
       expect(find.text('The cell list changed'), findsOneWidget);

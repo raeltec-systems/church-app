@@ -185,6 +185,7 @@ void main() {
         'SYNTHETIC Applicant Two',
       );
       await tapKey(tester, 'cell-choice-not_in_cell');
+      await tapKey(tester, 'privacy-accept');
       await tapKey(tester, 'send-application');
       final sent = h.gateway.sent.single;
       expect(sent.wire['command'], 'identity.submit_application');

@@ -115,6 +115,19 @@ context:
 
   For the parent and owner: the staging apply, `select app.cells_seed_synthetic_cells('<operator>')` on staging, and the Android device demonstration.
 
+- Review fixes (coordinator review, 2026-10-07; migration edited in place because it is on no hosted project):
+  - **Name normalisation.** Collapse all Unicode whitespace, then a regex trim. Unicode Cc and Cf characters, including U+202E, are refused as `validation_failed full_name`. While Q4 is unapproved, the name must start with `SYNTHETIC `.
+  - **Applicant authorizer.** New `app.identity_applicant_outcome()`: an account with no live link and no open hold on any linked member. Linked-to-pending/rejected/deactivated and held accounts get `forbidden not_applicant` on the command, the chooser and my-application.
+  - **Chooser.** Returns nothing unless `app.identity_applications_open()`.
+  - **Held restore.** `app.identity_applications_open()` now refuses a held restore in every environment.
+  - **Correction cap.** `APPLICATION_CORRECTION_LIMIT` = 10 per application per rolling 24 hours gives `rate_limited`.
+  - **Dotted paths.** `cell_choice.*` field errors, each unknown nested key on itself. The contract runbook's only nested rule is "every unknown key is reported on itself", so the dotted path extends it to keys inside a payload object.
+  - **Client.** An explicit privacy-notice checkbox, unchecked by default, is required to send a new request; the controller refuses without it too. With no bundled text for the server's version, sending is disabled and the church-office message is shown. The controller and screen read the dotted keys.
+  - **Tests.** pgTAP 72 → 97; widget tests +2; the E2E and adapter check were re-run.
+- Deferred (not built, by direction):
+  - sign-up rate limits are Supabase Auth's settings (Q1 owner configuration);
+  - re-applying after a rejection belongs to entry 5.
+
 ## Verification
 
 **Commands:**
@@ -128,3 +141,16 @@ context:
   - Flutter tests: client_core 180, mobile 18, staff 16; analyze clean, format clean; staff web build and bundle scan clean.
   - `ci:migrations --base ccr-93e730dd-89lbvg`: ordered and non-destructive. `ci:secrets`, `ci:policy-test`, `env:check`, the node tool tests (39) and `scan-evidence` are clean.
   - Evidence: `evidence-2.4/README.md`.
+
+## Review Triage Log
+
+| Finding | Verdict | Route | Evidence |
+|---|---|---|---|
+| whitespace edges reach the table CHECK as `unavailable`; format characters (U+202E) accepted | medium | patch | identity_application_name used btrim and `\s` |
+| accounts linked to a pending/rejected/deactivated member, or held, could apply | high | patch | the authorizer accepted any `not_linked` outcome |
+| chooser not behind the personal-data gate | medium | patch | cells_signup_options ignored identity_applications_open |
+| held restore fenced only in local/staging | medium | patch | identity_applications_open |
+| privacy notice accepted implicitly | medium | patch | client send() had no explicit acceptance |
+| corrections unlimited | low | patch | no cap |
+| nested field errors not path-qualified | low | patch | cell_choice errors used bare keys |
+| local/staging fence checked the phone only | low | patch | name not required to be SYNTHETIC |

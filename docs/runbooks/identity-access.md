@@ -279,11 +279,15 @@ Migration: `supabase/migrations/20261007042111_membership_applications.sql`.
 - **Applying grants nothing.** It creates no member, account link, grant, scope or cell membership. The applicant keeps getting `not_linked` from the live-access predicate on every member surface.
 - **Cells (first records).** `app.cells_cells` holds the cell records. `app.cells_signup_options` is the separately persisted safe projection (AD-5): a label and a broad area, plus listing metadata. Nothing else about a cell, such as leaders, members, addresses, phones, chat or reports, reaches an applicant.
 - **Cell check without a Cells dependency.** Cells registers the 1.5 source type `cells_signup_option` with the check hook `app.cells_signup_option_check`. Identity validates a chosen cell through `app.contract_check_source`, so the Identity module still depends on nothing but platform. A chosen option must be listed here and must still be at the chosen revision. Otherwise the result is `validation_failed {"cell_id": "invalid"}` and the client reloads the list.
-- **Personal-data gate (Q4).** Applications are accepted only in one of two cases:
-  - `q4_personal_data` is approved; or
-  - the database is marked local or staging and is not a held restore. Here the applicant's phone username must also be in a reserved fictional range (`+1 202 555 0100–0199`, `+44 7700 900000–900999`).
-
-  Otherwise commands answer `unavailable {"policy": "gate_closed"}` and the read reports `accepting_applications: false`.
+- **Personal-data gate (Q4).** Applications and the chooser are open only when the database is not a held restore (in any environment) **and** either `q4_personal_data` is approved or the database is marked local or staging.
+  - While Q4 is unapproved, the applicant's phone username must be in a reserved fictional range (`+1 202 555 0100–0199`, `+44 7700 900000–900999`) and the full name must start with `SYNTHETIC `.
+  - When closed, commands answer `unavailable {"policy": "gate_closed"}`, the read reports `accepting_applications: false`, and the chooser lists nothing.
+- **Who is an applicant.** A trusted password session of an account with **no live account link** and **no open hold** on any member it was ever linked to (`app.identity_applicant_outcome()`). An account linked to a pending, rejected or deactivated member, or held, gets `forbidden` with reason `not_applicant`.
+- **Name rules.** Every Unicode whitespace run collapses to one space and the ends are trimmed. Unicode control and format characters (Cc/Cf, including bidi overrides such as U+202E) are refused on `full_name`.
+- **Abuse limit.** At most 10 corrections per application per rolling 24 hours (`app.identity_application_correction_limit()`); beyond that the answer is `rate_limited`.
+  - Deferred: sign-up rate limits are Supabase Auth's own settings (Q1 owner configuration).
+  - Deferred: re-applying after a rejection is decided with review in entry 5.
+- **Nested field errors** use dotted paths: `cell_choice.choice`, `cell_choice.cell_id`, `cell_choice.cell_revision`, and `cell_choice.<unknown key>` for each unknown key.
 - **Privacy notice.** The notice is a labelled DRAFT (`draft-2026-10-07`), and the clients bundle its text. The church approves the wording under Q4. A new version needs a new migration and a new client text.
 
 ### Commands (1.4 envelope) and reads
@@ -311,6 +315,7 @@ The function seeds three SYNTHETIC cells and options (`…c241`–`…c243`). It
 - **Mobile.**
   - After Create account, the app opens **Join the church** (`/membership`). The form asks for the full name and **Which cell group do you belong to?** The choices are the listed cells (label and broad area), **I'm not sure** and **I'm not in a cell yet**.
   - The form also shows the draft privacy notice, and a note that email is optional and that staff will help in person without a recovery email.
+  - A new request needs the explicit "I have read the privacy notice" checkbox (unchecked by default). If the app has no bundled text for the server's notice version, sending is disabled and the screen sends the applicant to the church office.
   - The status card shows **Church approval** and **Cell group** as separate states, and offers **Correct my request** while the church has not decided.
   - When the outcome is unknown, Check again resends the same request id.
   - The Account page's "No member access yet" state links to the request.

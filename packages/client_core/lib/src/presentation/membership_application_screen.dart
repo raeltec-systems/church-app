@@ -37,6 +37,10 @@ class _MembershipApplicationScreenState
   String? _nameError;
   String? _choiceError;
 
+  /// "I have read the privacy notice": unchecked until the applicant ticks it.
+  bool _noticeAccepted = false;
+  String? _noticeError;
+
   @override
   void initState() {
     super.initState();
@@ -73,7 +77,7 @@ class _MembershipApplicationScreenState
     ref.read(membershipApplicationProvider.notifier).dismissNotice();
   }
 
-  void _send(List<CellOption> options) {
+  void _send(List<CellOption> options, {required bool newRequest}) {
     final name = _name.text.trim().replaceAll(RegExp(r'\s+'), ' ');
     CellChoice? choice;
     if (_choice == _notSure) {
@@ -94,11 +98,14 @@ class _MembershipApplicationScreenState
           ? 'Use 120 characters or fewer.'
           : null;
       _choiceError = choice == null ? 'Choose one answer.' : null;
+      _noticeError = newRequest && !_noticeAccepted
+          ? 'Confirm that you have read the privacy notice.'
+          : null;
     });
-    if (_nameError != null || choice == null) return;
+    if (_nameError != null || choice == null || _noticeError != null) return;
     ref
         .read(membershipApplicationProvider.notifier)
-        .send(fullName: name, choice: choice);
+        .send(fullName: name, choice: choice, noticeAccepted: _noticeAccepted);
   }
 
   @override
@@ -443,7 +450,7 @@ class _MembershipApplicationScreenState
         (server.containsKey('full_name') ? 'Check your name.' : null);
     final choiceError =
         _choiceError ??
-        (server.containsKey('cell_id') || server.containsKey('choice')
+        (server.keys.any((k) => k.startsWith('cell_choice'))
             ? 'Choose again from the current list.'
             : null);
     final noticeText = privacyNoticeTexts[mine.privacyNotice.version];
@@ -569,6 +576,41 @@ class _MembershipApplicationScreenState
             ],
           ),
         ),
+        if (existing == null && noticeText == null)
+          const Padding(
+            padding: EdgeInsets.only(top: 12),
+            child: RequestStateBanner(
+              key: Key('privacy-notice-missing'),
+              tone: StatusTone.warning,
+              icon: Icons.info_outline,
+              title: 'Update the app or ask the church office',
+              message:
+                  'This app does not have the current privacy notice, so it '
+                  'cannot send a request. Please update the app or ask the '
+                  'church office for help.',
+            ),
+          ),
+        if (existing == null && noticeText != null) ...[
+          CheckboxListTile(
+            key: const Key('privacy-accept'),
+            value: _noticeAccepted,
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+            title: const Text('I have read the privacy notice'),
+            onChanged: busy
+                ? null
+                : (v) => setState(() {
+                    _noticeAccepted = v ?? false;
+                    _noticeError = null;
+                  }),
+          ),
+          if (_noticeError != null)
+            Text(
+              _noticeError!,
+              key: const Key('privacy-accept-error'),
+              style: ChurchType.secondary.copyWith(color: c.redFg),
+            ),
+        ],
         const SizedBox(height: 12),
         const _RecoveryEmailNote(),
         const SizedBox(height: ChurchGeometry.sectionGap),
@@ -579,7 +621,9 @@ class _MembershipApplicationScreenState
             FocusRing(
               child: FilledButton(
                 key: const Key('send-application'),
-                onPressed: busy ? null : () => _send(options),
+                onPressed: busy || (existing == null && noticeText == null)
+                    ? null
+                    : () => _send(options, newRequest: existing == null),
                 child: Text(existing == null ? 'Send request' : 'Save changes'),
               ),
             ),

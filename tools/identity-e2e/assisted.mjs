@@ -27,12 +27,11 @@
 // Usage: node tools/identity-e2e/assisted.mjs [--evidence <file.jsonl>]
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-import { amrMethods, assertLocalOrigin, redact } from './run.mjs';
+import { amrMethods, EPOCH_WAIT_MS, localHttp, localKey, password, psql as harnessPsql, runMain, sleep, startRun } from './harness.mjs';
 
 /** The reserved fictional numbers this run uses (+44 7700 900430-900449). */
 export function isFictionalAssistedPhone(phone) {
@@ -53,61 +52,22 @@ export function findLeaks(text, values) {
 }
 
 const NAME_PREFIX = 'SYNTHETIC 2.9 E2E';
-const EPOCH_WAIT_MS = 6500; // the 2.2 trust-epoch margin is 5 s
 const FN = '/functions/v1/identity-assisted-recovery';
 const CONTAINERS = ['supabase_auth_church-app', 'supabase_rest_church-app', 'supabase_kong_church-app',
   'supabase_db_church-app'];
 
-function localKey() {
-  const env = execFileSync('npx', ['supabase', 'status', '-o', 'env'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  const url = /^API_URL="([^"]+)"/m.exec(env)?.[1];
-  const key = /^PUBLISHABLE_KEY="([^"]+)"/m.exec(env)?.[1];
-  const secret = /^SECRET_KEY="([^"]+)"/m.exec(env)?.[1];
-  const service = /^SERVICE_ROLE_KEY="([^"]+)"/m.exec(env)?.[1];
-  if (!url || !key || !secret || !service) throw new Error('local stack is not running');
-  return { origin: assertLocalOrigin(url), key, secret, service };
-}
-
-function psql(sql) {
-  return execFileSync('docker', ['exec', '-i', 'supabase_db_church-app', 'psql', '-U', 'postgres', '-X', '-qtA',
-    '-v', 'ON_ERROR_STOP=1', '-c', sql], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
-}
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// psql's stderr rides on the thrown error (as before 2.13).
+const psql = (sql) => harnessPsql(sql, { captureStderr: true });
 
 async function main() {
-  const evidenceIdx = process.argv.indexOf('--evidence');
-  const evidence = evidenceIdx > 0 ? process.argv[evidenceIdx + 1] : null;
-  if (evidence) writeFileSync(evidence, '');
-  const { origin, key, secret, service } = localKey();
+  const { log, check, finish } = startRun();
+  const keys = localKey();
+  const { origin, key } = keys;
   const startedAt = new Date().toISOString();
-  const results = [];
-  const log = (step, data) => {
-    const line = { step, target: 'LOCAL', at: new Date().toISOString(), ...redact(data) };
-    if (evidence) appendFileSync(evidence, JSON.stringify(line) + '\n');
-    console.log(JSON.stringify(line));
-  };
-  const check = (step, ok, data) => {
-    results.push({ step, ok });
-    log(step, { verdict: ok ? 'pass' : 'FAIL', ...data });
-  };
   // Everything a staff member or a member device received, for the leak scan.
   const staffTexts = [];
   const deviceTexts = [];
-  async function http(method, path, { token, body, profile, admin, sink, xff } = {}) {
-    const headers = { apikey: admin ? secret : key, 'Content-Type': 'application/json' };
-    if (admin) headers.Authorization = `Bearer ${service}`;
-    else if (token) headers.Authorization = `Bearer ${token}`;
-    if (profile) headers[method === 'GET' ? 'Accept-Profile' : 'Content-Profile'] = profile;
-    if (xff !== undefined) headers['X-Forwarded-For'] = xff;
-    const res = await fetch(`${origin}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
-    const text = await res.text();
-    if (sink) sink.push(text);
-    let json = null;
-    try { json = text ? JSON.parse(text) : null; } catch { /* non-JSON */ }
-    return { status: res.status, json };
-  }
-  const password = () => `Synthetic-${randomBytes(12).toString('base64url')}`;
+  const http = localHttp(keys);
   const signIn = (phone, pw) => http('POST', '/auth/v1/token?grant_type=password', { body: { phone, password: pw } });
   const refresh = (rt) => http('POST', '/auth/v1/token?grant_type=refresh_token', { body: { refresh_token: rt } });
   const rpc = (fn, token, body = {}) => http('POST', `/rest/v1/rpc/${fn}`, { token, body, profile: 'api', sink: staffTexts });
@@ -585,12 +545,7 @@ async function main() {
     const left = cleanup();
     log('A99-cleanup', { users_left: Number(left), credential_revoked: true, principal_disabled: true });
   }
-  const failed = results.filter((r) => !r.ok);
-  console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
-  if (failed.length) {
-    console.log(`FAILED: ${failed.map((f) => f.step).join(', ')}`);
-    process.exitCode = 1;
-  }
+  finish();
 }
 
 // `docker logs` replays the container's stdout and stderr on the matching streams; read both.
@@ -599,9 +554,4 @@ function dockerLogs(since, container) {
   return `${r.stdout ?? ''}${r.stderr ?? ''}`;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main().catch((e) => {
-    console.error(e.message);
-    process.exitCode = 1;
-  });
-}
+runMain(import.meta.url, main);

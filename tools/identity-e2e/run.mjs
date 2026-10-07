@@ -17,91 +17,22 @@
 //
 // Usage: node tools/identity-e2e/run.mjs [--evidence <file.jsonl>]
 import { execFileSync } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
-import { appendFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-export const LOCAL_ORIGIN = 'http://127.0.0.1:54321';
+import { amrMethods, localHttp, localKey, password, psql, startRun } from './harness.mjs';
 
-/** Refuses anything but the exact local API origin. */
-export function assertLocalOrigin(url) {
-  const u = new URL(url);
-  if (u.origin !== LOCAL_ORIGIN || u.username || u.password) {
-    throw new Error(`refusing non-local target ${u.origin}`);
-  }
-  return u.origin;
-}
+// Moved to the shared harness in story 2.13; re-exported for existing importers.
+export { amrMethods, assertLocalOrigin, LOCAL_ORIGIN, redact } from './harness.mjs';
 
 /** Reserved fictional ranges used by this run. */
 export function isFictional(phone) {
   return /^\+1202555017[0-9]$/.test(phone) || /^\+44770090017[0-9]$/.test(phone);
 }
 
-/** AMR method names from a JWT payload, without keeping the token. */
-export function amrMethods(jwt) {
-  const part = String(jwt ?? '').split('.')[1];
-  if (!part) return [];
-  try {
-    const payload = JSON.parse(Buffer.from(part, 'base64url').toString('utf8'));
-    return Array.isArray(payload.amr) ? payload.amr.map((a) => a?.method) : [];
-  } catch {
-    return [];
-  }
-}
-
-const SECRET_KEYS = /^(access_token|refresh_token|password|token|apikey|authorization|hashed_token|token_hash|email_otp|action_link|email)$/i;
-/** Deep copy with secret-bearing keys redacted. */
-export function redact(value) {
-  if (Array.isArray(value)) return value.map(redact);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value).map(([k, v]) =>
-      [k, SECRET_KEYS.test(k) ? '[redacted]' : redact(v)]));
-  }
-  return value;
-}
-
-function localKey() {
-  const env = execFileSync('npx', ['supabase', 'status', '-o', 'env'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  const url = /^API_URL="([^"]+)"/m.exec(env)?.[1];
-  const key = /^PUBLISHABLE_KEY="([^"]+)"/m.exec(env)?.[1];
-  const secret = /^SECRET_KEY="([^"]+)"/m.exec(env)?.[1];
-  const service = /^SERVICE_ROLE_KEY="([^"]+)"/m.exec(env)?.[1];
-  if (!url || !key || !secret || !service) throw new Error('local stack is not running');
-  return { origin: assertLocalOrigin(url), key, secret, service };
-}
-
-function psql(sql) {
-  const name = execFileSync('docker', ['ps', '--filter', 'name=supabase_db_', '--format', '{{.Names}}'], { encoding: 'utf8' }).trim().split('\n')[0];
-  return execFileSync('docker', ['exec', '-i', name, 'psql', '-U', 'postgres', '-X', '-qtA', '-v', 'ON_ERROR_STOP=1', '-c', sql], { encoding: 'utf8' }).trim();
-}
-
 async function main() {
-  const evidenceIdx = process.argv.indexOf('--evidence');
-  const evidence = evidenceIdx > 0 ? process.argv[evidenceIdx + 1] : null;
-  if (evidence) writeFileSync(evidence, '');
-  const { origin, key, secret, service } = localKey();
-  const results = [];
-  const log = (step, data) => {
-    const line = { step, target: 'LOCAL', at: new Date().toISOString(), ...redact(data) };
-    if (evidence) appendFileSync(evidence, JSON.stringify(line) + '\n');
-    console.log(JSON.stringify(line));
-  };
-  const check = (step, ok, data) => {
-    results.push({ step, ok });
-    log(step, { verdict: ok ? 'pass' : 'FAIL', ...data });
-  };
-  async function http(method, path, { token, body, profile, admin } = {}) {
-    const headers = { apikey: admin ? secret : key, 'Content-Type': 'application/json' };
-    if (admin) headers.Authorization = `Bearer ${service}`;
-    else if (token) headers.Authorization = `Bearer ${token}`;
-    if (profile) headers[method === 'GET' ? 'Accept-Profile' : 'Content-Profile'] = profile;
-    const res = await fetch(`${origin}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
-    const text = await res.text();
-    let json = null;
-    try { json = text ? JSON.parse(text) : null; } catch { /* non-JSON */ }
-    return { status: res.status, json };
-  }
-  const password = () => `Synthetic-${randomBytes(12).toString('base64url')}`;
+  const { log, check, results } = startRun();
+  const keys = localKey();
+  const http = localHttp(keys);
   const signUp = (phone, pw) => http('POST', '/auth/v1/signup', { body: { phone, password: pw } });
   const signIn = (phone, pw) => http('POST', '/auth/v1/token?grant_type=password', { body: { phone, password: pw } });
   const read = (token) => http('POST', '/rest/v1/rpc/identity_my_member_summary', { token, body: {}, profile: 'api' });

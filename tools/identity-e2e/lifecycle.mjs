@@ -24,12 +24,9 @@
 // registrations.
 //
 // Usage: node tools/identity-e2e/lifecycle.mjs [--evidence <file.jsonl>]
-import { execFileSync } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { appendFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 
-import { amrMethods, assertLocalOrigin, redact } from './run.mjs';
+import { amrMethods, EPOCH_WAIT_MS, localHttp, localKey, password, psql, runMain, sleep, startRun } from './harness.mjs';
 
 /** The reserved fictional numbers this run uses (+44 7700 900520-900529). */
 export function isFictionalLifecyclePhone(phone) {
@@ -50,55 +47,14 @@ export function requestCode() {
 }
 
 const NAME_PREFIX = 'SYNTHETIC 2.10 E2E';
-const EPOCH_WAIT_MS = 6500; // the 2.2 trust-epoch margin is 5 s
-
-function localKey() {
-  const env = execFileSync('npx', ['supabase', 'status', '-o', 'env'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  const url = /^API_URL="([^"]+)"/m.exec(env)?.[1];
-  const key = /^PUBLISHABLE_KEY="([^"]+)"/m.exec(env)?.[1];
-  const secret = /^SECRET_KEY="([^"]+)"/m.exec(env)?.[1];
-  const service = /^SERVICE_ROLE_KEY="([^"]+)"/m.exec(env)?.[1];
-  if (!url || !key || !secret || !service) throw new Error('local stack is not running');
-  return { origin: assertLocalOrigin(url), key, secret, service };
-}
-
-function psql(sql) {
-  const name = execFileSync('docker', ['ps', '--filter', 'name=supabase_db_', '--format', '{{.Names}}'], { encoding: 'utf8' }).trim().split('\n')[0];
-  return execFileSync('docker', ['exec', '-i', name, 'psql', '-U', 'postgres', '-X', '-qtA', '-v', 'ON_ERROR_STOP=1', '-c', sql], { encoding: 'utf8' }).trim();
-}
-
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const LIFECYCLE_EVENTS = ['access_hold_applied', 'access_hold_released', 'sessions_revoked', 'scope_revoked',
   'membership_deactivated', 'membership_restored'];
 
 async function main() {
-  const evidenceIdx = process.argv.indexOf('--evidence');
-  const evidence = evidenceIdx > 0 ? process.argv[evidenceIdx + 1] : null;
-  if (evidence) writeFileSync(evidence, '');
-  const { origin, key, secret, service } = localKey();
-  const results = [];
-  const log = (step, data) => {
-    const line = { step, target: 'LOCAL', at: new Date().toISOString(), ...redact(data) };
-    if (evidence) appendFileSync(evidence, JSON.stringify(line) + '\n');
-    console.log(JSON.stringify(line));
-  };
-  const check = (step, ok, data) => {
-    results.push({ step, ok });
-    log(step, { verdict: ok ? 'pass' : 'FAIL', ...data });
-  };
-  async function http(method, path, { token, body, profile, admin } = {}) {
-    const headers = { apikey: admin ? secret : key, 'Content-Type': 'application/json' };
-    if (admin) headers.Authorization = `Bearer ${service}`;
-    else if (token) headers.Authorization = `Bearer ${token}`;
-    if (profile) headers[method === 'GET' ? 'Accept-Profile' : 'Content-Profile'] = profile;
-    const res = await fetch(`${origin}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
-    const text = await res.text();
-    let json = null;
-    try { json = text ? JSON.parse(text) : null; } catch { /* non-JSON */ }
-    return { status: res.status, json };
-  }
-  const password = () => `Synthetic-${randomBytes(12).toString('base64url')}`;
+  const { log, check, finish } = startRun();
+  const keys = localKey();
+  const http = localHttp(keys);
   const signIn = (phone, pw) => http('POST', '/auth/v1/token?grant_type=password', { body: { phone, password: pw } });
   const refresh = (rt) => http('POST', '/auth/v1/token?grant_type=refresh_token', { body: { refresh_token: rt } });
   const rpc = (fn, token, body = {}) => http('POST', `/rest/v1/rpc/${fn}`, { token, body, profile: 'api' });
@@ -408,17 +364,7 @@ async function main() {
     }
     log('L100-cleanup', { users_left: Number(left), unmarked: marked });
   }
-  const failed = results.filter((r) => !r.ok);
-  console.log(`\n${results.length - failed.length}/${results.length} checks passed`);
-  if (failed.length) {
-    console.log(`FAILED: ${failed.map((f) => f.step).join(', ')}`);
-    process.exitCode = 1;
-  }
+  finish();
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main().catch((e) => {
-    console.error(e.message);
-    process.exitCode = 1;
-  });
-}
+runMain(import.meta.url, main);

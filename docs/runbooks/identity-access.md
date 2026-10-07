@@ -248,7 +248,7 @@ select app.identity_bootstrap_admin('<member_id>', 'israel');
 - The member must be approved, with an active link and no binding review.
 - It is audited as `admin_bootstrapped` with the operator and journalled in `app.ops_operator_actions`.
 - The church-setting approval and the lead-pastor designation are journalled there too.
-- The 1.9 journal table was retired by rename (`app.ops_retired_operator_actions_v0`, rows copied, privileges revoked) and recreated with a wider action list, because widening its CHECK needs a DROP. Drop the retired table in a later owner-approved cleanup.
+- The 1.9 journal table was retired by rename (`app.ops_retired_operator_actions_v0`, rows copied, privileges revoked) and recreated with a wider action list, because widening its CHECK needs a DROP. Drop the retired table in a later owner-approved cleanup (see the [retired-object ledger](contracts-and-owner-seams.md#owner-registry-and-guards)).
 - Staging uses synthetic Admins. Naming the first real Admin is the production gate at entry 14.
 
 ### Identity-checked last-Admin fallback (story 2.12, restricted operator)
@@ -269,7 +269,7 @@ select app.identity_admin_fallback_grant('<member_id>', '<in_person|established_
 - **Audit.** `identity_access_audit` and `ops_operator_actions` get the distinct action `admin_fallback_granted`, and `app.identity_admin_fallbacks` holds the reason, the identity check, the count, both owners and the case reference.
   - Both action lists are inline CHECKs, so each table was retired by rename (`app.identity_retired_access_audit_v0`, `app.ops_retired_operator_actions_v1`; rows copied, privileges revoked) and recreated with a wider list.
   - The retired access audit is in the deletion retention rules.
-  - Drop both retired tables in a later owner-approved cleanup.
+  - Drop both retired tables in a later owner-approved cleanup (see the [retired-object ledger](contracts-and-owner-seams.md#owner-registry-and-guards)).
 - **Visible to every Admin.** `api.identity_admin_member_grants` carries `admin_via_fallback` per member (replaced in place, same signature and privileges), and staff web **Roles & access** labels the member **Admin by operator fallback**. No lifecycle event is emitted: a new v1 event needs a contract change in SQL, the shared fixtures and the Dart and TypeScript mappings. Add one when a consumer needs it.
 - **Tests.** pgTAP `supabase/tests/identity_admin_fallback_test.sql`; local rehearsal `tools/identity-e2e/runbooks.mjs` (`R60`-`R62`).
 - **Hosted.** The parent session applies the migration to staging after `20261007175000`. It needs no owner setting.

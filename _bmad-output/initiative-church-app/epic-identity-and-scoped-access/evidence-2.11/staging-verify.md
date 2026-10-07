@@ -7,7 +7,8 @@ Synthetic data only.
 | Version | Name | How applied |
 |---|---|---|
 | 20261007174952 | member_deletion | Supabase MCP `apply_migration` (local file renamed from 20261007171500) |
-| 20261007175000 | member_deletion_rows | **pending: owner paste** (renamed from 20261007171600 so it sorts after the main file) |
+| 20261007175000 | member_deletion_rows | owner paste in the SQL Editor, 2026-10-07; recorded in `schema_migrations` (renamed from 20261007171600) |
+| 20261007160100 | credential_review_auth_rows (2.8) | owner paste in the SQL Editor, 2026-10-07; recorded in `schema_migrations` |
 
 ## Function parity
 
@@ -46,3 +47,11 @@ The owner of the three purge functions (`postgres`) has DELETE on `auth.audit_lo
 The full deletion matrix runs on the local stack (`tools/identity-e2e/deletion.mjs` 12/12). On staging, the
 erase steps wait for the owner's paste and the worker for the owner's credential; both are in
 `owner-consolidated-test.md`.
+
+## After the owner's pastes
+
+The five pasted functions (`identity_deletion_purge_rows`, `identity_deletion_purge_auth_user`,
+`cells_deletion_purge_rows`, `identity_revoke_auth_sessions`, `identity_remove_auth_extras`) now have the
+same `md5(pg_get_functiondef)` on staging as local, and none is executable by `anon`, `authenticated` or
+`service_role`. Remaining known parity differences: `cells_text`, `identity_application_name` (escape
+transcription) and `identity_reclaim_phone_username` (pasted whitespace).

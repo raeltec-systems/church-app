@@ -8,9 +8,9 @@ Run once, after 2.13, on staging (`tmurpotfluignacfueki`) with the staging APK a
    `PATCH https://api.supabase.com/v1/projects/tmurpotfluignacfueki/config/auth` with
    `{"uri_allow_list":"<existing>,zm.bickafue.mobile://callback/auth/recovery,zm.bickafue.mobile://callback/auth/email-confirmed"}`.
 
-2. **Paste in the staging SQL Editor (2.8).** Open `supabase/migrations/20261007160100_credential_review_auth_rows.sql` on branch `ccr-93e730dd-89lbvg` on GitHub, click **Raw**, copy everything, paste it in a new query in the staging SQL Editor and run it. (It revokes sessions and removes extra sign-in factors for one account at a time; the connector cannot apply statements that delete rows.)
+2. **DONE 2026-10-07 (verified identical to local, recorded as 20261007160100).** Paste in the staging SQL Editor (2.8). Open `supabase/migrations/20261007160100_credential_review_auth_rows.sql` on branch `ccr-93e730dd-89lbvg` on GitHub, click **Raw**, copy everything, paste it in a new query in the staging SQL Editor and run it. (It revokes sessions and removes extra sign-in factors for one account at a time; the connector cannot apply statements that delete rows.)
 
-3. **Paste in the staging SQL Editor (2.11), after item 2.** Same way, `supabase/migrations/20261007175000_member_deletion_rows.sql`. It lets a deletion erase the member's rows; until then deletions stop at "unavailable" and erase nothing.
+3. **DONE 2026-10-07 (verified identical to local, recorded as 20261007175000).** Paste in the staging SQL Editor (2.11). Same way, `supabase/migrations/20261007175000_member_deletion_rows.sql`. It lets a deletion erase the member's rows; until then deletions stop at "unavailable" and erase nothing.
 
 4. **Deletion worker credential (2.11).** In your local clone (the same place you ran the 2.9 command), run
    `OPS_STATE_DIR=.ops-state/identity-deletion node tools/ops/system-credential.mjs mint --env staging`

@@ -7,6 +7,8 @@ import test from 'node:test';
 
 import {
   classifyAuthResult,
+  clientIp,
+  clientKey,
   declaredTooLarge,
   digestHex,
   keyHeaders,
@@ -113,4 +115,30 @@ test('the function caps the bytes it reads and never buffers the whole body firs
   assert.doesNotMatch(src, /req\.(text|json|arrayBuffer|blob|formData)\(/);
   assert.match(src, /declaredTooLarge\(req\.headers\.get\('content-length'\)\)/);
   assert.match(src, /total > MAX_BODY_BYTES/);
+});
+
+test('the client IP is the first x-forwarded-for hop, else unknown (null)', () => {
+  assert.equal(clientIp('203.0.113.7, 172.18.0.1'), '203.0.113.7');
+  assert.equal(clientIp(' 2001:DB8::1 , 10.0.0.1'), '2001:db8::1');
+  assert.equal(clientIp('203.0.113.007'), '203.0.113.7');
+  for (const bad of [null, undefined, '', 'not-an-ip, 172.18.0.1', '999.1.1.1', 'a'.repeat(50), 'unknown']) {
+    assert.equal(clientIp(bad), null, String(bad));
+  }
+});
+
+test('client keys are keyed hashes: same IP same key, other IP other key, one shared unknown key', async () => {
+  const secret = 'sysc_local_' + 'A'.repeat(43);
+  const a = await clientKey('203.0.113.7', secret);
+  assert.match(a, /^[0-9a-f]{64}$/);
+  assert.equal(await clientKey('203.0.113.7', secret), a);
+  assert.notEqual(await clientKey('203.0.113.8', secret), a);
+  assert.notEqual(await clientKey('203.0.113.7', secret + 'x'), a, 'keyed by the secret');
+  assert.equal(await clientKey(clientIp('garbage'), secret), await clientKey(clientIp(null), secret));
+  assert.notEqual(a, createHash('sha256').update('203.0.113.7').digest('hex'), 'not a plain hash of the IP');
+});
+
+test('the function never logs or returns the client IP', () => {
+  const src = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /note\([^)]*(client|forwarded)/i);
+  assert.doesNotMatch(src, /reply\([^)]*(client|forwarded)/i);
 });

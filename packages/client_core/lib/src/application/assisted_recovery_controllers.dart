@@ -206,6 +206,8 @@ class AccountHelpController extends Notifier<AccountHelpState> {
         _end(AccountHelpNotice.passwordRejected);
       case RedeemOutcome.uncertain:
         _end(AccountHelpNotice.uncertain);
+      case RedeemOutcome.rateLimited:
+        state = retry(AccountHelpNotice.rateLimited);
       case RedeemOutcome.unreachable:
         state = retry(AccountHelpNotice.redeemUnreachable);
       case RedeemOutcome.invalid:

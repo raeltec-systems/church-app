@@ -181,6 +181,7 @@ void main() {
         ('rejected', RedeemOutcome.rejected),
         ('password_rejected', RedeemOutcome.passwordRejected),
         ('uncertain', RedeemOutcome.uncertain),
+        ('rate_limited', RedeemOutcome.rateLimited),
         ('unavailable', RedeemOutcome.unavailable),
       ]) {
         final g = gateway((_) => {'outcome': wire});
@@ -344,6 +345,30 @@ void main() {
       await settle(tester);
       expect(byKey('help-notice-redeemUnreachable'), findsOneWidget);
       expect(byKey('help-set-password'), findsOneWidget);
+    });
+
+    testWidgets('a rate-limited password step keeps the setup and the form', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.accountHelp,
+        account: null,
+        setUp: (h) => h.assisted.redeemAnswer = RedeemOutcome.rateLimited,
+      );
+      await requestHelp(tester);
+      await tapKey(tester, 'help-check');
+      await settle(tester);
+      await tester.enterText(byKey('help-password'), 'Synthetic-new-pw-1');
+      await tester.enterText(
+        byKey('help-password-confirm'),
+        'Synthetic-new-pw-1',
+      );
+      await tapKey(tester, 'help-set-password');
+      await settle(tester);
+      expect(byKey('help-notice-rateLimited'), findsOneWidget);
+      expect(byKey('help-set-password'), findsOneWidget);
+      expect(h.assisted.redeems, hasLength(1));
     });
 
     testWidgets('a refused request says so and keeps the form', (tester) async {

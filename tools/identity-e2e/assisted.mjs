@@ -94,11 +94,12 @@ async function main() {
   // Everything a staff member or a member device received, for the leak scan.
   const staffTexts = [];
   const deviceTexts = [];
-  async function http(method, path, { token, body, profile, admin, sink } = {}) {
+  async function http(method, path, { token, body, profile, admin, sink, xff } = {}) {
     const headers = { apikey: admin ? secret : key, 'Content-Type': 'application/json' };
     if (admin) headers.Authorization = `Bearer ${service}`;
     else if (token) headers.Authorization = `Bearer ${token}`;
     if (profile) headers[method === 'GET' ? 'Accept-Profile' : 'Content-Profile'] = profile;
+    if (xff !== undefined) headers['X-Forwarded-For'] = xff;
     const res = await fetch(`${origin}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
     const text = await res.text();
     if (sink) sink.push(text);
@@ -118,8 +119,11 @@ async function main() {
     return { status: r.status, detail: r.json?.details ?? null };
   };
   // The member device: the real function, as the mobile adapter calls it (publishable key only).
-  const fn = async (body) => {
-    const r = await http('POST', FN, { body, sink: deviceTexts });
+  // Each member's phone is its own client (a TEST-NET-3 address derived from the number), so the
+  // per-client limit (10 attempts per 10 minutes) applies per person; tests override it.
+  const ipFor = (phone) => (phone ? `203.0.113.${Number(phone.slice(-3)) % 250}` : '192.0.2.1');
+  const fn = async (body, { xff } = {}) => {
+    const r = await http('POST', FN, { body, sink: deviceTexts, xff: xff ?? ipFor(body.phone_username) });
     return { status: r.status, ...(r.json ?? {}) };
   };
 
@@ -140,6 +144,11 @@ async function main() {
     cancelled: { phone: '+447700900442' },
     deactivated: { phone: '+447700900443' },
     flooded: { phone: '+447700900444' },
+    ipA: { phone: '+447700900445' },
+    ipB: { phone: '+447700900446' },
+    ipC: { phone: '+447700900447' },
+    unknownA: { phone: '+447700900448' },
+    unknownB: { phone: '+447700900449' },
   };
   for (const [k, p] of Object.entries(people)) {
     if (!isFictionalAssistedPhone(p.phone)) throw new Error(`not fictional: ${p.phone}`);
@@ -160,7 +169,8 @@ async function main() {
     delete from app.identity_recovery_grants g where g.member_id in (select member_id from gone_members);
     delete from app.identity_recovery_cases c where c.member_id in (select member_id from gone_members);
     delete from app.identity_recovery_requests r where r.claimed_phone in (${Object.values(people).map((p) => `'${p.phone}'`).join(',')});
-    delete from app.identity_recovery_audit a where a.member_id is null and a.action in ('request_received', 'request_refused')
+    delete from app.identity_recovery_client_attempts c where c.at >= '${startedAt}';
+    delete from app.identity_recovery_audit a where a.member_id is null and a.action in ('request_received', 'request_refused', 'grant_rejected')
        and a.occurred_at >= '${startedAt}';
     delete from app.identity_credential_review_audit a
      where a.member_id in (select member_id from gone_members) or a.actor_member_id in (select member_id from gone_members);
@@ -271,7 +281,7 @@ async function main() {
                                      from app.identity_holds where member_id = '${p.member}' and released_at is null`);
 
     const { admin, happy, reissue, direct, unlinked, concurrent, owner, victim, uncertain, lost, disputed, expired,
-      cancelled, deactivated, flooded } = people;
+      cancelled, deactivated, flooded, ipA, ipB, ipC, unknownA, unknownB } = people;
     await seeded(admin);
     psql(`select app.identity_bootstrap_admin('${admin.member}', 'israel')`);
     admin.token = (await signIn(admin.phone, admin.password)).json?.access_token;
@@ -380,7 +390,7 @@ async function main() {
     // ------------------------------------------------------------------ uncertain and late Auth result
     await seeded(uncertain);
     const gx = await ready(uncertain);
-    const begun = await sys('identity.assisted_reset_begin', { phone_username: uncertain.phone, grant_digest: digestOf(gx.secret) });
+    const begun = await sys('identity.assisted_reset_begin', { phone_username: uncertain.phone, grant_digest: digestOf(gx.secret), client_key: digestOf(`e2e-client-${uncertain.phone}`) });
     const dispatched = await sys('identity.assisted_reset_dispatch', { operation_id: begun?.operation_id });
     const lostAnswer = await sys('identity.assisted_reset_complete', { operation_id: begun?.operation_id, auth_result: 'unknown' });
     await sleep(EPOCH_WAIT_MS);
@@ -471,7 +481,7 @@ async function main() {
     // Cancel between begin and dispatch: the operation is obsolete, no Auth call, old password works.
     await seeded(cancelled);
     const gk = await ready(cancelled);
-    const kBegun = await sys('identity.assisted_reset_begin', { phone_username: cancelled.phone, grant_digest: digestOf(gk.secret) });
+    const kBegun = await sys('identity.assisted_reset_begin', { phone_username: cancelled.phone, grant_digest: digestOf(gk.secret), client_key: digestOf(`e2e-client-${cancelled.phone}`) });
     const kc = await caseOf(cancelled);
     const kCancel = await recCmd('identity.cancel_recovery_case', kc?.revision, { case_id: kc?.case_id, reason: 'opened_in_error' });
     const kDispatch = await sys('identity.assisted_reset_dispatch', { operation_id: kBegun?.operation_id });
@@ -486,7 +496,7 @@ async function main() {
     // Deactivation after begin: dispatch refused; deactivation during an open case: no grant.
     await seeded(deactivated);
     const gv = await ready(deactivated);
-    const vBegun = await sys('identity.assisted_reset_begin', { phone_username: deactivated.phone, grant_digest: digestOf(gv.secret) });
+    const vBegun = await sys('identity.assisted_reset_begin', { phone_username: deactivated.phone, grant_digest: digestOf(gv.secret), client_key: digestOf(`e2e-client-${deactivated.phone}`) });
     psql(`update app.identity_members set membership_state = 'deactivated' where member_id = '${deactivated.member}'`);
     const vDispatch = await sys('identity.assisted_reset_dispatch', { operation_id: vBegun?.operation_id });
     const vRequest = await deviceRequest(deactivated);
@@ -498,11 +508,13 @@ async function main() {
         password_unchanged: vOld.status === 200 });
 
     // Concurrent requests for one number cannot exceed the per-number limit (advisory locks).
+    let flood_ip = 10;
     const flood = await Promise.all(Array.from({ length: 12 }, () => {
       const sec = newGrantSecret();
       secrets.push(sec);
       digests.push(digestOf(sec));
-      return fn({ action: 'request', phone_username: flooded.phone, grant_digest: digestOf(sec) });
+      return fn({ action: 'request', phone_username: flooded.phone, grant_digest: digestOf(sec) },
+        { xff: `198.51.100.${flood_ip++}` });
     }));
     for (const f of flood) if (f.request_code) codes.push(f.request_code);
     const big = await fetch(`${origin}${FN}`, { method: 'POST', headers: { apikey: key, 'Content-Type': 'application/json' },
@@ -512,6 +524,36 @@ async function main() {
       && flood.filter((f) => f.outcome === 'rate_limited').length === 7 && big.status === 413,
       { received: flood.filter((f) => f.outcome === 'received').length,
         rate_limited: flood.filter((f) => f.outcome === 'rate_limited').length, oversize_body: big.status });
+
+    // Owner decision 2026-10-07: 10 request/redeem attempts per client IP per 10 minutes; a
+    // missing or unparseable address shares one `unknown` bucket.
+    const ask = async (p, xff) => {
+      const sec = newGrantSecret();
+      secrets.push(sec);
+      digests.push(digestOf(sec));
+      const r = await fn({ action: 'request', phone_username: p.phone, grant_digest: digestOf(sec) }, { xff });
+      if (r.request_code) codes.push(r.request_code);
+      return r.outcome;
+    };
+    const oneIp = '203.0.113.201';
+    const tenFromOneIp = [];
+    for (const p of [ipA, ipA, ipA, ipA, ipB, ipB, ipB, ipC, ipC, ipC]) tenFromOneIp.push(await ask(p, oneIp));
+    const eleventh = await ask(ipC, oneIp);
+    const otherIp = await ask(ipB, '203.0.113.202');
+    const redeemLimited = await fn({ action: 'redeem', phone_username: ipA.phone, grant_secret: newGrantSecret(),
+      password: 'Synthetic-limited-1' }, { xff: oneIp });
+    const unknownTen = [];
+    for (const [i, p] of [unknownA, unknownA, unknownA, unknownA, unknownA, unknownB, unknownB, unknownB, unknownB, unknownB].entries()) {
+      unknownTen.push(await ask(p, `not-an-ip-${i}`));
+    }
+    const unknownEleventh = await ask(ipA, 'still-not-an-ip');
+    check('A24-per-client-limit', tenFromOneIp.every((o) => o === 'received') && eleventh === 'rate_limited'
+      && otherIp === 'received' && redeemLimited.outcome === 'rate_limited'
+      && unknownTen.every((o) => o === 'received') && unknownEleventh === 'rate_limited',
+      { ten_from_one_ip: tenFromOneIp.filter((o) => o === 'received').length, eleventh_same_ip: eleventh,
+        different_ip: otherIp, redeem_from_limited_ip: redeemLimited.outcome,
+        unknown_bucket_ten: unknownTen.filter((o) => o === 'received').length, unknown_bucket_eleventh: unknownEleventh,
+        stored_client_keys_are_hashes: psql(`select bool_and(client_key ~ '^[0-9a-f]{64}$') from app.identity_recovery_client_attempts`) === 't' });
 
     // ------------------------------------------------------------------ no leakage anywhere
     const staffText = staffTexts.join('\n');

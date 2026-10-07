@@ -132,6 +132,7 @@ class SupabaseAssistedRecoveryGateway implements AssistedRecoveryGateway {
       'rejected' => RedeemOutcome.rejected,
       'password_rejected' => RedeemOutcome.passwordRejected,
       'uncertain' => RedeemOutcome.uncertain,
+      'rate_limited' => RedeemOutcome.rateLimited,
       _ => RedeemOutcome.unavailable,
     };
   }

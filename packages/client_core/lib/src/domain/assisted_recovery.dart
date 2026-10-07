@@ -113,6 +113,10 @@ enum RedeemOutcome {
   /// The change could not be confirmed. The account stays protected until
   /// the church office checks it.
   uncertain,
+
+  /// Too many attempts from this device or network: wait, then try again
+  /// (the setup was not used).
+  rateLimited,
   unavailable,
   unreachable,
   invalid,

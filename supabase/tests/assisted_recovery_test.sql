@@ -6,7 +6,7 @@
 -- tools/identity-e2e/assisted.mjs. Every account and phone here is SYNTHETIC
 -- (+44 7700 900400-900429).
 begin;
-select plan(116);
+select plan(122);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000029' || lpad(n::text, 2, '0'))::uuid $$;
@@ -111,14 +111,21 @@ $$;
 create function pg_temp.dg(n int, k text) returns text language sql as
 $$ select encode(sha256(convert_to('arg_synthetic_2_9_' || n || '_' || k, 'UTF8')), 'hex') $$;
 -- A member device's request: returns the request code.
-create function pg_temp.request(n int, k text, p_phone text default null) returns text language sql as $$
+-- The client key the function derives from a client IP (a keyed hash; here one per account n).
+create function pg_temp.ck(n int) returns text language sql as
+$$ select encode(sha256(convert_to('synthetic-2-9-client-' || n, 'UTF8')), 'hex') $$;
+create function pg_temp.request(n int, k text, p_phone text default null, p_client text default null)
+returns text language sql as $$
   select pg_temp.sys('identity.assisted_recovery_request',
-    jsonb_build_object('phone_username', coalesce(p_phone, pg_temp.phone(n)), 'grant_digest', pg_temp.dg(n, k)))
+    jsonb_build_object('phone_username', coalesce(p_phone, pg_temp.phone(n)), 'grant_digest', pg_temp.dg(n, k),
+                       'client_key', coalesce(p_client, pg_temp.ck(n))))
     -> 'data' ->> 'request_code'
 $$;
-create function pg_temp.begin_(n int, k text, p_phone text default null) returns jsonb language sql as $$
+create function pg_temp.begin_(n int, k text, p_phone text default null, p_client text default null)
+returns jsonb language sql as $$
   select pg_temp.sys('identity.assisted_reset_begin',
-    jsonb_build_object('phone_username', coalesce(p_phone, pg_temp.phone(n)), 'grant_digest', pg_temp.dg(n, k))) -> 'data'
+    jsonb_build_object('phone_username', coalesce(p_phone, pg_temp.phone(n)), 'grant_digest', pg_temp.dg(n, k),
+                       'client_key', coalesce(p_client, pg_temp.ck(n)))) -> 'data'
 $$;
 create function pg_temp.dispatch(p_op text) returns jsonb language sql as $$
   select pg_temp.sys('identity.assisted_reset_dispatch', jsonb_build_object('operation_id', p_op)) -> 'data'
@@ -238,7 +245,8 @@ select is((select array_agg(command order by command) from app.sys_principal_com
         'identity.assisted_reset_complete', 'identity.assisted_reset_dispatch'],
   'the assisted-recovery principal holds exactly its own five commands');
 select is(pg_temp.sys('identity.assisted_reset_begin',
-            jsonb_build_object('phone_username', pg_temp.phone(2), 'grant_digest', pg_temp.dg(2, 'a')), pg_temp.token('P')) ->> 'code',
+            jsonb_build_object('phone_username', pg_temp.phone(2), 'grant_digest', pg_temp.dg(2, 'a'),
+                               'client_key', pg_temp.ck(2)), pg_temp.token('P')) ->> 'code',
   'forbidden', 'a principal of another purpose cannot run a recovery step');
 select is(pg_temp.sys('system.synthetic_probe', '{}', pg_temp.token('R')) ->> 'code', 'forbidden',
   'the recovery principal cannot run the probe');
@@ -246,7 +254,7 @@ select is(pg_temp.sys('system.synthetic_probe', '{}', pg_temp.token('P')) -> 'da
   'the probe still works for its own principal');
 select is(pg_temp.sys('identity.assisted_reset_begin',
             jsonb_build_object('phone_username', '0977', 'grant_digest', 'XYZ', 'member_id', pg_temp.mid(2))) -> 'field_errors',
-  '{"grant_digest": "invalid", "member_id": "unknown_field", "phone_username": "invalid"}'::jsonb,
+  '{"client_key": "required", "grant_digest": "invalid", "member_id": "unknown_field", "phone_username": "invalid"}'::jsonb,
   'the payload is checked strictly by the owner check (no forged member)');
 select is(pg_temp.sys('identity.assisted_reset_complete',
             jsonb_build_object('operation_id', gen_random_uuid(), 'auth_result', 'maybe')) -> 'field_errors',
@@ -256,15 +264,17 @@ select is(pg_temp.sys('identity.assisted_reset_complete',
 create temp table r (k text primary key, v jsonb);
 grant all on r to anon, authenticated;
 insert into r values ('req_unknown', pg_temp.sys('identity.assisted_recovery_request',
-  jsonb_build_object('phone_username', '+447700900499', 'grant_digest', pg_temp.dg(99, 'a'))));
+  jsonb_build_object('phone_username', '+447700900499', 'grant_digest', pg_temp.dg(99, 'a'), 'client_key', pg_temp.ck(99))));
 select ok((select (v -> 'data' ->> 'accepted')::boolean and v -> 'data' ->> 'request_code' ~ '^[A-HJ-NP-Z2-9]{8}$'
              from r where k = 'req_unknown'),
   'a request for a number without an account is answered like any other (neutral)');
 select is((pg_temp.sys('identity.assisted_recovery_request',
-            jsonb_build_object('phone_username', '+260971234567', 'grant_digest', pg_temp.dg(98, 'a'))) -> 'data') - 'actor',
+            jsonb_build_object('phone_username', '+260971234567', 'grant_digest', pg_temp.dg(98, 'a'),
+                               'client_key', pg_temp.ck(98))) -> 'data') - 'actor',
   '{"accepted": false, "reason": "unsupported"}'::jsonb, 'a real-looking number is refused while Q4 is unapproved');
 select is((pg_temp.sys('identity.assisted_recovery_request',
-            jsonb_build_object('phone_username', '+447700900498', 'grant_digest', pg_temp.dg(99, 'a'))) -> 'data') - 'actor',
+            jsonb_build_object('phone_username', '+447700900498', 'grant_digest', pg_temp.dg(99, 'a'),
+                               'client_key', pg_temp.ck(98))) -> 'data') - 'actor',
   '{"accepted": false, "reason": "invalid"}'::jsonb, 'a digest is accepted once');
 select is((select count(*)::int from (select pg_temp.request(97, 'r' || i, '+447700900497') c
                                          from generate_series(1, 6) i) x where c is not null), 5,
@@ -273,6 +283,27 @@ select is(pg_temp.sys('identity.assisted_recovery_status', jsonb_build_object('g
   'waiting', 'status: waiting');
 select is((pg_temp.sys('identity.assisted_recovery_status', jsonb_build_object('grant_digest', pg_temp.dg(96, 'x'))) -> 'data') - 'actor',
   '{"state": "closed"}'::jsonb, 'status of an unknown digest: closed');
+
+
+-- Owner decision 2026-10-07: per-client limit (10 request + redeem attempts per 10 minutes) -----
+select is((select count(*)::int from (select pg_temp.request(96, 'c' || i, '+44770090049' || (i % 3), pg_temp.ck(96)) c
+                                         from generate_series(1, 10) i) x where c is not null), 10,
+  'ten requests from one client (three numbers) are accepted');
+select is((pg_temp.sys('identity.assisted_recovery_request',
+            jsonb_build_object('phone_username', '+447700900493', 'grant_digest', pg_temp.dg(96, 'c11'),
+                               'client_key', pg_temp.ck(96))) -> 'data') - 'actor',
+  '{"accepted": false, "reason": "rate_limited"}'::jsonb,
+  'the 11th attempt from the same client is limited, with the same neutral answer');
+select ok(pg_temp.request(95, 'c1', '+447700900493', pg_temp.ck(95)) is not null,
+  'a different client is not limited');
+select is(pg_temp.begin_(2, 'zz', pg_temp.phone(2), pg_temp.ck(96)) - 'actor',
+  '{"accepted": false, "reason": "rate_limited"}'::jsonb,
+  'redeem attempts count against the same client limit');
+select is((select count(*)::int from app.identity_recovery_client_attempts where client_key = pg_temp.ck(96)), 10,
+  'a limited attempt is not recorded; only the client key is stored, never an IP');
+select is((select array_agg(column_name::text order by column_name::text) from information_schema.columns
+            where table_schema = 'app' and table_name = 'identity_recovery_client_attempts'),
+  array['at', 'attempt_id', 'attempt_kind', 'client_key'], 'the attempt table holds the key, kind and time only');
 
 -- Admin: cases ----------------------------------------------------------------------------------
 select is(pg_temp.cmd(pg_temp.c(2), 'identity.open_recovery_case', null,

@@ -116,8 +116,8 @@ class _AccountHelpScreenState extends ConsumerState<AccountHelpScreen> {
   (StatusTone, String, String) _notice(AccountHelpNotice n) => switch (n) {
     AccountHelpNotice.rateLimited => (
       StatusTone.warning,
-      'Too many requests',
-      'Please wait an hour before asking again, or ask the church office.',
+      'Too many attempts',
+      'Please wait a while before trying again, or ask the church office.',
     ),
     AccountHelpNotice.refused => (
       StatusTone.warning,

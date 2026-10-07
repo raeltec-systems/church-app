@@ -16,7 +16,12 @@
 //   redeem  {phone_username, grant_secret, password}
 //        -> begin (consume grant) -> dispatch (fence, hold) -> Auth Admin password update
 //           -> complete (fenced)  => {outcome: succeeded | rejected | password_rejected |
-//                                     uncertain | unavailable}
+//                                     uncertain | rate_limited | unavailable}
+//
+// Per-client limit (owner decision 2026-10-07): request and redeem attempts are counted per
+// client key, an HMAC-SHA256 (keyed with this function's system credential) of the first
+// x-forwarded-for hop; no address, or one that does not parse, is the shared `unknown` key. The
+// raw IP never leaves the function and is never logged.
 //
 // The password is sent to Auth Admin only; the grant secret is hashed here and only its digest
 // reaches the database. Responses carry outcome codes only. Logs carry the action and outcome
@@ -25,6 +30,8 @@
 import {
   MAX_BODY_BYTES,
   classifyAuthResult,
+  clientIp,
+  clientKey,
   declaredTooLarge,
   digestHex,
   keyHeaders,
@@ -132,10 +139,11 @@ async function applyPassword(authUserId: string, password: string): Promise<stri
   return classifyAuthResult(res?.status ?? null);
 }
 
-async function redeem(body: Json): Promise<string> {
+async function redeem(body: Json, client: string): Promise<string> {
   const digest = await digestHex(body.grant_secret as string);
   const begun = await system('identity.assisted_reset_begin',
-    { phone_username: body.phone_username, grant_digest: digest });
+    { phone_username: body.phone_username, grant_digest: digest, client_key: client });
+  if (begun.reason === 'rate_limited') return 'rate_limited';
   if (begun.accepted !== true || typeof begun.operation_id !== 'string') return 'rejected';
   const operationId = begun.operation_id;
   const dispatched = await system('identity.assisted_reset_dispatch', { operation_id: operationId });
@@ -174,10 +182,13 @@ Deno.serve(async (req: Request) => {
   }
   const body = parsed.value as Json;
   const action = body.action as string;
+  // Per-client limit (owner decision 2026-10-07): keyed hash of the first x-forwarded-for hop;
+  // a missing or unparseable address shares the `unknown` bucket.
+  const client = await clientKey(clientIp(req.headers.get('x-forwarded-for')), SYSTEM_CREDENTIAL);
   try {
     if (action === 'request') {
       const data = await system('identity.assisted_recovery_request',
-        { phone_username: body.phone_username, grant_digest: body.grant_digest });
+        { phone_username: body.phone_username, grant_digest: body.grant_digest, client_key: client });
       const outcome = requestOutcome(data);
       note(action, outcome);
       return reply(200, outcome === 'received'
@@ -190,7 +201,7 @@ Deno.serve(async (req: Request) => {
       note(action, outcome);
       return reply(200, outcome === 'closed' ? { outcome } : { outcome, expires_at: data.expires_at });
     }
-    const outcome = await redeem(body);
+    const outcome = await redeem(body, client);
     note(action, outcome);
     return reply(200, { outcome });
   } catch (e) {

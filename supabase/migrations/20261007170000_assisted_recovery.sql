@@ -32,8 +32,10 @@
 --     as uncertain. Cancelling a case makes its pending operation obsolete. An Admin reconciles
 --     an uncertain/stuck operation: every session is revoked and the hold stays until the
 --     member's next successful reset (and an Admin's release).
---   * Requests are rate limited per number and overall; the count-then-insert is serialised
---     with transaction advisory locks.
+--   * Abuse limits (owner decision 2026-10-07): per client (keyed hash of the IP the function
+--     sees) 10 request and redeem attempts per 10 minutes, a shared `unknown` key when the IP is
+--     missing; per number 5 requests per hour; church-wide 120 requests per 10 minutes. Every
+--     count-then-insert is serialised with transaction advisory locks.
 --   * A grant presented with another phone username is burned. A new account link for the
 --     account or member is refused while an operation is unresolved (unlinking stays possible).
 --   * A reset never clears a pre-existing hold (2.8): a lost-device or unreviewed-password hold
@@ -472,15 +474,36 @@ comment on table app.identity_recovery_audit is
   'owner: identity. Attributed assisted-recovery events (AD-19: Admin or system principal): ids, '
   'codes and timestamps only.';
 
+-- Owner decision 2026-10-07: per-IP limit in the function (10/IP/10 min), church cap
+-- 120/10 min, per-number 5/h. One row per request or redeem attempt of a client. The client key
+-- is a keyed (salted) SHA-256 of the client IP computed in the Edge Function; the raw IP never
+-- reaches the database. A missing or unparseable IP is the shared `unknown` key (fail closed).
+create table app.identity_recovery_client_attempts (
+  attempt_id bigint generated always as identity primary key,
+  client_key text not null check (client_key ~ '^[0-9a-f]{64}$'),
+  attempt_kind text not null check (attempt_kind in ('request', 'redeem')),
+  at timestamptz not null default clock_timestamp()
+);
+
+create index identity_recovery_client_attempts_key
+  on app.identity_recovery_client_attempts (client_key, at);
+
+comment on table app.identity_recovery_client_attempts is
+  'owner: identity. Assisted-recovery request and redeem attempts per client (keyed hash of the '
+  'client IP, never the IP) for the per-client abuse limit.';
+
+alter table app.identity_recovery_client_attempts enable row level security;
 alter table app.identity_recovery_requests enable row level security;
 alter table app.identity_recovery_cases enable row level security;
 alter table app.identity_recovery_grants enable row level security;
 alter table app.identity_recovery_operations enable row level security;
 alter table app.identity_recovery_audit enable row level security;
 revoke all on table app.identity_recovery_requests, app.identity_recovery_cases,
-  app.identity_recovery_grants, app.identity_recovery_operations, app.identity_recovery_audit
+  app.identity_recovery_grants, app.identity_recovery_operations, app.identity_recovery_audit,
+  app.identity_recovery_client_attempts
   from public, anon, authenticated, service_role;
-revoke all on sequence app.identity_recovery_audit_event_id_seq
+revoke all on sequence app.identity_recovery_audit_event_id_seq,
+  app.identity_recovery_client_attempts_attempt_id_seq
   from public, anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------------------------
@@ -508,11 +531,37 @@ language sql immutable set search_path = '' as $$ select interval '60 seconds' $
 -- A dispatched operation not completed within this is `stuck` (treated as uncertain).
 create function app.identity_recovery_stuck_after() returns interval
 language sql immutable set search_path = '' as $$ select interval '120 seconds' $$;
--- Abuse limits on requests (Q1 values are owner policy; these are fail-closed defaults).
+-- Abuse limits. Owner decision 2026-10-07: per-IP limit in the function (10/IP/10 min), church
+-- cap 120/10 min, per-number 5/h.
 create function app.identity_recovery_requests_per_phone_hour() returns integer
 language sql immutable set search_path = '' as $$ select 5 $$;
 create function app.identity_recovery_requests_per_ten_minutes() returns integer
-language sql immutable set search_path = '' as $$ select 60 $$;
+language sql immutable set search_path = '' as $$ select 120 $$;
+create function app.identity_recovery_client_attempts_per_ten_minutes() returns integer
+language sql immutable set search_path = '' as $$ select 10 $$;
+
+-- The per-client limit for request and redeem attempts together: serialised per client key
+-- with a transaction advisory lock, counted over the last 10 minutes; an allowed attempt is
+-- recorded. Returns true when the client is limited (nothing is recorded then).
+create function app.identity_recovery_client_limited(p_client_key text, p_kind text)
+returns boolean
+language plpgsql
+set search_path = ''
+as $$
+begin
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('identity_recovery_client:' || p_client_key, 0));
+  if (select count(*) from app.identity_recovery_client_attempts a
+       where a.client_key = p_client_key
+         and a.at > clock_timestamp() - interval '10 minutes')
+     >= app.identity_recovery_client_attempts_per_ten_minutes() then
+    return true;
+  end if;
+  insert into app.identity_recovery_client_attempts (client_key, attempt_kind)
+  values (p_client_key, p_kind);
+  return false;
+end;
+$$;
 
 -- An unresolved operation of this account or member (a stale pending one no longer counts: it
 -- can never be dispatched).
@@ -753,9 +802,11 @@ declare
   v_err text;
 begin
   v_allowed := case p_command
-    when 'identity.assisted_recovery_request' then array['phone_username', 'grant_digest']
+    when 'identity.assisted_recovery_request' then array['phone_username', 'grant_digest',
+                                                         'client_key']
     when 'identity.assisted_recovery_status' then array['grant_digest']
-    when 'identity.assisted_reset_begin' then array['phone_username', 'grant_digest']
+    when 'identity.assisted_reset_begin' then array['phone_username', 'grant_digest',
+                                                    'client_key']
     when 'identity.assisted_reset_dispatch' then array['operation_id']
     when 'identity.assisted_reset_complete' then array['operation_id', 'auth_result']
   end;
@@ -774,6 +825,14 @@ begin
     elsif jsonb_typeof(p_payload -> 'grant_digest') <> 'string'
           or p_payload ->> 'grant_digest' !~ '^[0-9a-f]{64}$' then
       v_errors := v_errors || '{"grant_digest": "invalid"}';
+    end if;
+  end if;
+  if 'client_key' = any (v_allowed) then
+    if coalesce(jsonb_typeof(p_payload -> 'client_key'), 'null') = 'null' then
+      v_errors := v_errors || '{"client_key": "required"}';
+    elsif jsonb_typeof(p_payload -> 'client_key') <> 'string'
+          or p_payload ->> 'client_key' !~ '^[0-9a-f]{64}$' then
+      v_errors := v_errors || '{"client_key": "invalid"}';
     end if;
   end if;
   if 'operation_id' = any (v_allowed) then
@@ -823,7 +882,11 @@ declare
   v_refusal text;
   i integer := 0;
 begin
-  if not app.identity_assisted_recovery_open() then
+  -- Every attempt of a client counts against its per-client limit first (locks: client, then
+  -- number, then overall; always in this order).
+  if app.identity_recovery_client_limited(p_payload ->> 'client_key', 'request') then
+    v_refusal := 'rate_limited';
+  elsif not app.identity_assisted_recovery_open() then
     v_refusal := 'unavailable';
   elsif not app.identity_phone_username_permitted(v_phone) then
     v_refusal := 'unsupported';
@@ -925,6 +988,13 @@ declare
   v_reason text;
   v_end_state text;
 begin
+  -- The per-client limit comes first: a limited attempt never touches (or burns) a grant.
+  if app.identity_recovery_client_limited(p_payload ->> 'client_key', 'redeem') then
+    perform app.identity_recovery_audit_add('grant_rejected', null, null, p_principal, p_request,
+      null, null, null, null, 'rate_limited');
+    return jsonb_build_object('data', jsonb_build_object('accepted', false,
+                                                         'reason', 'rate_limited'));
+  end if;
   select g.* into v_grant
     from app.identity_recovery_requests r
     join app.identity_recovery_grants g on g.recovery_request_id = r.recovery_request_id
@@ -1809,6 +1879,8 @@ revoke all on function
   app.identity_recovery_stuck_after(),
   app.identity_recovery_requests_per_phone_hour(),
   app.identity_recovery_requests_per_ten_minutes(),
+  app.identity_recovery_client_attempts_per_ten_minutes(),
+  app.identity_recovery_client_limited(text, text),
   app.identity_recovery_unresolved(uuid, uuid),
   app.identity_recovery_expire_pending(uuid, uuid),
   app.identity_recovery_link_problem(app.identity_account_links),

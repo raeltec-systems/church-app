@@ -8,7 +8,7 @@ All runs are LOCAL (Supabase CLI stack, GoTrue v2.197.0, edge-runtime v1.77.1), 
 
 | File | What it shows |
 |---|---|
-| `assisted-e2e.jsonl` | `tools/identity-e2e/assisted.mjs`: 15/15 checks through real GoTrue, PostgREST, the system route and the served Edge Function. Statuses, codes and booleans only. |
+| `assisted-e2e.jsonl` | `tools/identity-e2e/assisted.mjs`: 16/16 checks through real GoTrue, PostgREST, the system route and the served Edge Function. Statuses, codes and booleans only. |
 | `live-adapter-check.txt` | `tools/identity-e2e/live-assisted-check.sh`: the REAL client adapters (`SupabaseAssistedRecoveryGateway` on the phone, `SupabaseCommandGateway` and `SupabaseRecoveryCasesRepository` on staff web, `SupabaseAccountAuthGateway`, `SupabaseMemberAccessRepository`), R1 to R4 pass. |
 
 ## The verify bullet, row by row
@@ -26,7 +26,8 @@ All runs are LOCAL (Supabase CLI stack, GoTrue v2.197.0, edge-runtime v1.77.1), 
 | Cancel between begin and dispatch (review fix) | E2E `A21`: the case is cancelled after begin; dispatch is refused, no password applied, the operation obsolete; pgTAP also covers a case closed under a dispatched operation (no success effects, hold kept) |
 | Deactivation (review fix) | E2E `A22`: deactivated after begin, dispatch refused; deactivated during an open case, no grant. pgTAP also covers deactivation after dispatch (uncertain, hold kept) |
 | Binding revision and pre-reset sessions (review fixes) | pgTAP: a binding revision moved after begin refuses dispatch; a session created after dispatch but before the password change keeps the outcome uncertain and the account held |
-| Request flooding and body size (review fixes) | E2E `A23`: 12 concurrent requests for one number, exactly 5 received (advisory locks); a 5 KB body is refused with 413. A per-client limit stays a before-production item |
+| Request flooding and body size (review fixes) | E2E `A23`: 12 concurrent requests for one number, exactly 5 received (advisory locks); a 5 KB body is refused with 413. The per-client limit is A24 |
+| Per-client limit (owner decision 2026-10-07) | E2E `A24`: 10 requests from one client address accepted, the 11th `rate_limited`; another address accepted; a redeem attempt from the limited address `rate_limited` (grant untouched); 10 requests with unparseable addresses accepted and the 11th limited (shared `unknown` bucket); only keyed hashes stored. pgTAP and node tests cover the same |
 | Holds stay | E2E `A18`: a lost-device hold survives the reset, and its release is allowed only after it; a dispute hold refuses recovery |
 | Expired grant | E2E `A19`; pgTAP |
 | No password or usable grant in staff screens, responses or logs | E2E `A20`: every password, grant secret and digest of the run was searched for in all staff answers, all device answers, the recovery tables and the system audit/receipts, and in the logs of the function, GoTrue, PostgREST, Kong and Postgres: 0 hits. Staff answers also hold no request code. Widget tests check that no `arg_` secret is ever shown |

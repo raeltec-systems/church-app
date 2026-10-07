@@ -70,7 +70,9 @@ export function localKey({ admin = true } = {}) {
 
 /** The local Supabase db container's name. */
 export function dbContainer() {
-  return execFileSync('docker', ['ps', '--filter', 'name=supabase_db_', '--format', '{{.Names}}'], { encoding: 'utf8' }).trim().split('\n')[0];
+  // Prefer this project's container (other Supabase projects may run on the same machine).
+  const names = execFileSync('docker', ['ps', '--filter', 'name=supabase_db_', '--format', '{{.Names}}'], { encoding: 'utf8' }).trim().split('\n');
+  return names.includes('supabase_db_church-app') ? 'supabase_db_church-app' : names[0];
 }
 
 /**

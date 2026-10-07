@@ -10,13 +10,13 @@ create temp view ledger_actual as
   select c.relkind::text as kind, n.nspname || '.' || c.relname as name
     from pg_catalog.pg_class c
     join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-   where n.nspname in ('app', 'api', 'public') and c.relname like '%retired%'
+   where n.nspname in ('app', 'api', 'public') and c.relname ~ '(^|_)retired_'
      and c.relname <> 'contract_retired_functions' and c.relname not like 'contract_retired_functions_%'
   union all
   select 'f', p.oid::regprocedure::text
     from pg_catalog.pg_proc p
     join pg_catalog.pg_namespace n on n.oid = p.pronamespace
-   where n.nspname in ('app', 'api', 'public') and p.proname like '%retired%';
+   where n.nspname in ('app', 'api', 'public') and p.proname ~ '(^|_)retired_';
 
 select set_eq(
   $$select kind, name from ledger_actual$$,

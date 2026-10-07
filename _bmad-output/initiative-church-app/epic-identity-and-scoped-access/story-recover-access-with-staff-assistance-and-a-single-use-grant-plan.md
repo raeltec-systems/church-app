@@ -3,7 +3,7 @@ title: 'Recover access with staff assistance and a single-use grant'
 type: 'feature'
 ticket: '9'
 created: '2026-10-07'
-status: 'built'
+status: 'done'
 blocked_reason: ''
 baseline_revision: 'eb7d20128c935c577948c570c6203bde3c033d7c'
 route: 'full'
@@ -129,3 +129,7 @@ context:
 - Matrix audit: happy (pgTAP + A10 + R1-R4 + widgets), reissue (pgTAP + A11), direct change (pgTAP + A12), relink/unlink (pgTAP + A13/A16/A17), concurrent (A14), cross-member (pgTAP + A15 + widget mismatch notice), uncertain/late (pgTAP + A16 + widget reconcile), hold (pgTAP + A18), leakage (pgTAP + A20 + widgets): every row has a passing test.
 - Results after the review fixes (2026-10-07, local): `db:test` 1238/1238 (assisted recovery 116); `db:smoke` exit 0; `assisted.mjs` 15/15 (new `A21` cancel race, `A22` deactivation, `A23` concurrent request limit and 413 body cap); regressions `credentials` 15, `recovery` 20, `cells` 13, `review` 18, `grants` 18, `apply` 27, `run` 30; live checks assisted R1-R4, credentials, recovery, review, grants, application and adapter all pass; client_core 310 tests, analyze clean; node tool tests 65/65, policy tests 49/49; `ci:migrations` (21, non-destructive), `ci:secrets` and `scan-evidence` clean. Phone switch off again; no image pulled. The staging run stays a pending owner step.
 - Results after the owner's abuse-policy decision (2026-10-07, local): `db:test` 1244/1244 (assisted recovery 122); `db:smoke` exit 0; `assisted.mjs` 16/16 (new `A24` per-client limit); regressions `credentials` 15, `recovery` 20, `cells` 13, `review` 18, `grants` 18, `apply` 27, `run` 30; all seven live checks pass (assisted R1-R4); client_core 311, mobile 24, staff 22 tests, analyze clean; node tool tests 68/68, policy tests 49/49; `ci:migrations`, `ci:secrets`, `scan-evidence` clean. Phone switch off again; no image pulled. The staging run stays a pending owner step.
+
+## Hosted verification
+
+Staging setup and the adversarial run against staging Auth: `evidence-2.9/staging-verify.md`.

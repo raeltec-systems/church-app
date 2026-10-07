@@ -1143,7 +1143,7 @@ as $$
 $$;
 
 -- identity.request_my_deletion {confirm: "delete_my_account"}; expected_revision null. A
--- granted own session (the authorizer checked it).
+-- granted own session (the authorizer checked it) with a recent password sign-in.
 create function app.identity_request_my_deletion(
   p_actor uuid,
   p_expected_revision bigint,
@@ -1173,6 +1173,10 @@ begin
   end if;
   if v_errors <> '{}'::jsonb then
     perform app.cmd_fail('validation_failed', v_errors);
+  end if;
+  -- A destructive request: the member confirms the password first (a recent password sign-in).
+  if not app.identity_session_recent_password() then
+    perform app.cmd_fail('forbidden', '{"session": "reauthenticate"}');
   end if;
   -- Lock order: the live link, then the member.
   perform 1 from app.identity_account_links l where l.link_id = r.link_id for update;

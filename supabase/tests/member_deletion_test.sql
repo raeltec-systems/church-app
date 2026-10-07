@@ -7,7 +7,7 @@
 -- Function and an isolated restore: tools/identity-e2e/deletion.mjs. Every account here is
 -- SYNTHETIC (+44 7700 900600-900619).
 begin;
-select plan(90);
+select plan(91);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000211' || lpad(n::text, 2, '0'))::uuid $$;
@@ -270,6 +270,11 @@ select is(pg_temp.err(pg_temp.mine(3, '{}')), 'validation_failed {"confirm": "re
   'the in-app request needs the confirmation');
 select is(pg_temp.err(pg_temp.mine(3, '{"confirm": "yes"}')), 'validation_failed {"confirm": "invalid"}',
   'only the exact confirmation counts');
+update auth.mfa_amr_claims set created_at = now() - interval '2 hours', updated_at = now() - interval '2 hours'
+ where session_id = pg_temp.s(3);
+select is(pg_temp.err(pg_temp.mine(3)), 'forbidden {"session": "reauthenticate"}',
+  'the in-app request needs a recent password sign-in');
+update auth.mfa_amr_claims set created_at = now(), updated_at = now() where session_id = pg_temp.s(3);
 select is(pg_temp.err(pg_temp.staff(5)), 'conflict {"member_id": "member_can_use_app"}',
   'staff cannot delete a member who can use the app (they request it there)');
 select is(pg_temp.err(pg_temp.staff(4, pg_temp.c(1), '{}')), 'validation_failed {"identity_check": "required"}',

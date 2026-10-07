@@ -285,6 +285,15 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                         label: const Text('Sign-in details'),
                       ),
                     ),
+                    // Story 2.11: the member deletes their own account.
+                    FocusRing(
+                      child: TextButton.icon(
+                        key: const Key('go-delete-account'),
+                        onPressed: () => context.go(ClientPaths.deleteAccount),
+                        icon: const Icon(Icons.person_remove_outlined),
+                        label: const Text('Delete my account'),
+                      ),
+                    ),
                   ],
                 ),
               ],

@@ -14,6 +14,8 @@
 # Story 2.5 adds: the Admin review command and reads refuse signed-out and applicant callers.
 # Story 2.8 adds: the credential-review command and reads refuse signed-out and applicant callers.
 # Story 2.10 adds: the lifecycle command and reads refuse signed-out and applicant callers.
+# Story 2.11 adds: the deletion command and read refuse signed-out and applicant callers, and the
+# deletion system steps refuse a caller without the system credential.
 # Usage: npm run db:smoke   (needs curl, jq and psql; SYNTHETIC users and data only)
 set -euo pipefail
 
@@ -341,6 +343,30 @@ DEACT_BODY="{\"version\":1,\"command\":\"identity.deactivate_membership\",\"requ
 code=$(api_call identity_lifecycle_command "$DEACT_BODY")
 [[ "$code:$(jq -r .code "$WORK/out")" == "200:forbidden" ]] \
   && ok "an applicant cannot deactivate a membership (forbidden envelope)" || bad "deactivate as applicant: $code $(cat "$WORK/out")"
+
+# Story 2.11: the deletion command and Admin read need a session; an applicant (no member access)
+# can neither request its own deletion nor anyone else's; the worker's steps need the credential.
+for fn in identity_deletion_command identity_admin_deletions; do
+  code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/rest/v1/rpc/$fn" \
+    -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Profile: api' -H 'Content-Type: application/json' -d '{}')
+  expect "signed-out client cannot call $fn" 401 "$code" "$(cat "$WORK/out")"
+done
+code=$(api_call identity_admin_deletions '{}')
+[[ "$code:$(jq -r .details "$WORK/out")" == "403:not_linked" ]] \
+  && ok "an applicant cannot read deletions (403 not_linked)" || bad "deletions read as applicant: $code $(cat "$WORK/out")"
+MINE_BODY="{\"version\":1,\"command\":\"identity.request_my_deletion\",\"request_id\":\"$(uuid)\",\"expected_revision\":null,\"payload\":{\"confirm\":\"delete_my_account\"}}"
+code=$(api_call identity_deletion_command "$MINE_BODY")
+[[ "$code:$(jq -r .code "$WORK/out")" == "200:forbidden" ]] \
+  && ok "an applicant without member access cannot request deletion (forbidden envelope)" || bad "own deletion as applicant: $code $(cat "$WORK/out")"
+STAFF_BODY="{\"version\":1,\"command\":\"identity.request_member_deletion\",\"request_id\":\"$(uuid)\",\"expected_revision\":1,\"payload\":{\"member_id\":\"$(uuid)\",\"identity_check\":\"in_person\"}}"
+code=$(api_call identity_deletion_command "$STAFF_BODY")
+[[ "$code:$(jq -r .code "$WORK/out")" == "200:forbidden" ]] \
+  && ok "an applicant cannot request a member's deletion (forbidden envelope)" || bad "staff deletion as applicant: $code $(cat "$WORK/out")"
+QUEUE_BODY="{\"version\":1,\"command\":\"identity.deletion_queue\",\"request_id\":\"$(uuid)\",\"payload\":{}}"
+code=$(curl -s -o "$WORK/out" -w '%{http_code}' -X POST "$API_URL/rest/v1/rpc/system_command" \
+  -H "apikey: $PUBLISHABLE_KEY" -H 'Content-Profile: api' -H 'Content-Type: application/json' -d "$QUEUE_BODY")
+[[ "$code:$(jq -r .code "$WORK/out")" == "200:unauthenticated" ]] \
+  && ok "a deletion step without the system credential is unauthenticated" || bad "deletion queue without credential: $code $(cat "$WORK/out")"
 
 # No SMS configuration exists on this stack.
 sms=$(curl -s "$API_URL/auth/v1/settings" -H "apikey: $PUBLISHABLE_KEY" | jq -r '.sms_provider // ""')

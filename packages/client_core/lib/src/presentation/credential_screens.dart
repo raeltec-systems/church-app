@@ -64,6 +64,7 @@ const accessReviewGatedPaths = <String>{
   ClientPaths.adminCredentialReviews,
   ClientPaths.adminAccountRecovery,
   ClientPaths.adminMembershipLifecycle,
+  ClientPaths.adminMemberDeletions,
   ClientPaths.signInDetails,
 };
 

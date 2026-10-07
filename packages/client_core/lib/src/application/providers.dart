@@ -8,6 +8,7 @@ import '../domain/commands.dart';
 import '../domain/credential_review.dart';
 import '../domain/fixture_counter.dart';
 import '../domain/member_access.dart';
+import '../domain/member_deletion.dart';
 import '../domain/membership_application.dart';
 import '../domain/membership_lifecycle.dart';
 import '../domain/membership_review.dart';
@@ -95,6 +96,11 @@ final membershipLifecycleRepositoryProvider =
     Provider<MembershipLifecycleRepository>(
       (ref) => const UnconfiguredMembershipLifecycleRepository(),
     );
+
+/// Story 2.11: the Admin's member deletions and their steps.
+final memberDeletionRepositoryProvider = Provider<MemberDeletionRepository>(
+  (ref) => const UnconfiguredMemberDeletionRepository(),
+);
 
 final requestIdsProvider = Provider<RequestIds>((ref) => SecureRequestIds());
 

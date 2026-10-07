@@ -3,7 +3,7 @@ title: 'Grant scoped roles with audited, immediate effect'
 type: 'feature'
 ticket: '3'
 created: '2026-10-06'
-status: 'built'
+status: 'done'
 baseline_revision: '77bf40f0e0f55b43fe6e8ab990761786a2af1eef'
 route: 'full'
 route_source: 'auto'
@@ -147,3 +147,7 @@ context:
 | access not re-read after every forbidden | low | patch | only GrantAdminController refreshes |
 | navigation during in-flight read dropped; stale `_again` | low | patch | AccessRefresher.initState skip |
 | stale roster shown on network failure | low | patch | copyWith keeps members |
+
+## Hosted verification
+
+Staging checks and the owner's Android demonstration: `evidence-2.3/staging-verify.md`.

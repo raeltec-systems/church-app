@@ -9,6 +9,7 @@ import 'cell_screens.dart';
 import 'credential_screens.dart';
 import 'fixture_command_screen.dart';
 import 'membership_application_screen.dart';
+import 'member_deletion_screens.dart';
 import 'membership_lifecycle_screen.dart';
 import '../domain/password_recovery.dart';
 import 'membership_review_screen.dart';
@@ -84,6 +85,13 @@ abstract final class ClientPaths {
   /// Story 2.10, staff web, Admin only: login holds, church deactivation,
   /// reviewed restoration and pending handovers.
   static const adminMembershipLifecycle = '/admin/membership-status';
+
+  /// Story 2.11 (mobile): the member deletes their own account.
+  static const deleteAccount = '/delete-account';
+
+  /// Story 2.11, staff web, Admin only: member deletions and the staff route
+  /// for members who cannot use the app.
+  static const adminMemberDeletions = '/admin/member-deletions';
 }
 
 /// Story 2.7: the incoming Auth email link for this route, read once. Only
@@ -239,6 +247,14 @@ GoRouter buildClientRouter({
         path: ClientPaths.adminMembershipLifecycle,
         pageBuilder: (_, state) =>
             page(state, const MembershipLifecycleScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.deleteAccount,
+        pageBuilder: (_, state) => page(state, const DeleteAccountScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.adminMemberDeletions,
+        pageBuilder: (_, state) => page(state, const MemberDeletionScreen()),
       ),
       GoRoute(
         path: ClientPaths.signIn,

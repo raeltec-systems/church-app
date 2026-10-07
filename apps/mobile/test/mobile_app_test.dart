@@ -300,6 +300,43 @@ void main() {
   );
 
   testWidgets(
+    'story 2.11: a member deletes their account from the account page; the '
+    'device is signed out',
+    (tester) async {
+      final h = await pumpMobile(tester, size: const Size(390, 1600));
+      h.memberAccess.next = MemberAccessGranted(syntheticMemberSummary());
+      await tapKey(tester, 'nav-/account');
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'go-delete-account');
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Deleting your account cannot be undone.'),
+        findsOneWidget,
+      );
+      await tapKey(tester, 'delete-understand');
+      await tester.enterText(
+        find.byKey(const Key('delete-password-field')),
+        'Synthetic-pw-1',
+      );
+      await tester.pump();
+      await tapKey(tester, 'delete-account-submit');
+      await tester.pumpAndSettle();
+      final sent = h.gateway.sent.single;
+      expect(sent.wire['command'], 'identity.request_my_deletion');
+      expect(sent.wire['payload'], {'confirm': 'delete_my_account'});
+      sent.confirm({
+        'deletion_id': '85858585-8585-4585-8585-858585858585',
+        'deletion_state': 'requested',
+        'signed_out': true,
+      }, 1);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('delete-requested')), findsOneWidget);
+      expect(h.auth.signOuts, 1);
+      expect(find.text('SYNTHETIC Member One'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'story 2.10: a deactivated membership is shown as not active (no request '
     'link)',
     (tester) async {

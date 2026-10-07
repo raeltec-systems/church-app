@@ -468,6 +468,59 @@ void main() {
   );
 
   testWidgets(
+    'story 2.11: Admins see Member deletions; deletions and their steps are '
+    'the server answer',
+    (tester) async {
+      final h = await pumpStaff(tester, location: '/fixture');
+      expect(
+        find.byKey(const Key('nav-/admin/member-deletions')),
+        findsNothing,
+      );
+      expect(
+        staffDestinationsFor(null),
+        isNot(contains(staffMemberDeletionsDestination)),
+      );
+      h.grants.myAccess = AccessReadOk(syntheticGrants(roles: ['admin']));
+      h.deletions.overview = AccessReadOk(
+        MemberDeletionOverview.fromJson(
+          memberDeletionOverviewData(
+            deletions: [memberDeletionData()],
+            deactivated: [deletionCandidateData()],
+          ),
+        ),
+      );
+      await tapKey(tester, 'nav-/status');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'nav-/admin/member-deletions');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('SYNTHETIC Grace Mwale'), findsOneWidget);
+      expect(find.text('SYNTHETIC Daniel Zulu'), findsOneWidget);
+      expect(
+        find.byKey(
+          const Key('deletion-request-87878787-8787-4787-8787-878787878787'),
+        ),
+        findsOneWidget,
+      );
+      expect(h.deletions.overviewCalls, greaterThanOrEqualTo(1));
+    },
+  );
+
+  testWidgets(
+    'story 2.11: a non-Admin opening Member deletions sees only the denial',
+    (tester) async {
+      final h = await pumpStaff(tester, location: '/admin/member-deletions');
+      expect(
+        find.byKey(const Key('deletions-denied-notGranted')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('deletion-search-field')), findsNothing);
+      expect(h.gateway.sent, isEmpty);
+    },
+  );
+
+  testWidgets(
     'story 2.10: a deactivated membership on staff web says so after sign-in',
     (tester) async {
       final h = await pumpStaff(tester, location: '/fixture');

@@ -169,7 +169,8 @@ const Map<String, String> embeddedFixtures = {
     {"name": "cell transferred (identity_revision carries the member's Cells revision; v2 adds from_cell_id/to_cell_id before real owners hook it)", "value": {"event": "cell_transferred", "member_id": "00000000-0000-4000-8000-000000000001", "occurred_at": "2026-10-03T12:00:00Z", "identity_revision": 12}},
     {"name": "sessions revoked (device registrations bound to them end)", "value": {"event": "sessions_revoked", "member_id": "00000000-0000-4000-8000-000000000001", "occurred_at": "2026-10-03T12:00:00Z", "identity_revision": 13}},
     {"name": "membership deactivated (handover obligations recorded)", "value": {"event": "membership_deactivated", "member_id": "00000000-0000-4000-8000-000000000001", "occurred_at": "2026-10-03T12:00:00Z", "identity_revision": 14}},
-    {"name": "membership restored after review", "value": {"event": "membership_restored", "member_id": "00000000-0000-4000-8000-000000000001", "occurred_at": "2026-10-03T12:00:00Z", "identity_revision": 15}}
+    {"name": "membership restored after review", "value": {"event": "membership_restored", "member_id": "00000000-0000-4000-8000-000000000001", "occurred_at": "2026-10-03T12:00:00Z", "identity_revision": 15}},
+    {"name": "member deleted (every store checked; only the tombstone remains)", "value": {"event": "member_deleted", "member_id": "00000000-0000-4000-8000-000000000001", "occurred_at": "2026-10-03T12:00:00Z", "identity_revision": 16}}
   ],
   "invalid": [
     {"name": "unregistered event", "value": {"event": "member_promoted", "member_id": "00000000-0000-4000-8000-000000000001", "occurred_at": "2026-10-03T12:00:00Z", "identity_revision": 1}, "field_errors": {"event": "invalid"}},

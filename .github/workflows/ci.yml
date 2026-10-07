@@ -94,7 +94,7 @@ jobs:
         with:
           node-version: 22
       - name: Harness helper tests (no network, no credentials)
-        run: node --test tools/auth-harness/*.test.mjs tools/identity-e2e/*.test.mjs supabase/functions/*/*.test.mjs
+        run: node --test tools/auth-harness/*.test.mjs tools/identity-e2e/*.test.mjs supabase/functions/*/*.test.mjs tools/identity-deletion/*.test.mjs
       - name: Evidence holds no tokens, keys, passwords, OTPs or link tokens
         run: bash tools/auth-harness/scan-evidence.sh
       - name: Story 2.1 evidence and identity E2E tool hold no credentials
@@ -117,6 +117,8 @@ jobs:
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.9 supabase/functions
       - name: Story 2.10 evidence holds no credentials
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.10
+      - name: Story 2.11 evidence, the deletion worker and the deletion function hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.11 tools/identity-deletion supabase/functions
 
   flutter:
     name: flutter (analyze, test, web build)

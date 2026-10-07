@@ -18,6 +18,7 @@ import 'src/domain/commands.dart';
 import 'src/domain/credential_review.dart';
 import 'src/domain/member_access.dart';
 import 'src/domain/membership_application.dart';
+import 'src/domain/member_deletion.dart';
 import 'src/domain/membership_lifecycle.dart';
 import 'src/domain/membership_review.dart';
 import 'src/domain/password_recovery.dart';
@@ -1073,6 +1074,110 @@ Map<String, Object?> handoverData({
   'recorded_at': '2026-10-07T10:00:00Z',
 };
 
+/// [MemberDeletionRepository] answered by the test (story 2.11).
+class FakeMemberDeletion implements MemberDeletionRepository {
+  AccessRead<MemberDeletionOverview> overview = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  int overviewCalls = 0;
+
+  @override
+  Future<AccessRead<MemberDeletionOverview>> fetchOverview() async {
+    overviewCalls++;
+    return overview;
+  }
+}
+
+/// The wire form of the Admin deletion read (story 2.11).
+Map<String, Object?> memberDeletionOverviewData({
+  List<Map<String, Object?>> deletions = const [],
+  List<Map<String, Object?>> deactivated = const [],
+  bool accepting = true,
+}) => {
+  'deletions': deletions,
+  'deactivated': deactivated,
+  'accepting': accepting,
+};
+
+const _deletionSteps = [
+  'journal_access_revoked',
+  'journal_manifest_member',
+  'journal_manifest_account',
+  'auth_account',
+  'erase_identity',
+  'erase_owners',
+  'anonymise',
+  'verify',
+  'journal_completed_member',
+  'journal_completed_account',
+  'complete',
+];
+
+Map<String, Object?> memberDeletionData({
+  String id = '85858585-8585-4585-8585-858585858585',
+  String memberId = '86868686-8686-4686-8686-868686868686',
+  String name = 'SYNTHETIC Grace Mwale',
+  String origin = 'member_request',
+  int done = 4,
+  bool hadAccount = true,
+  int pendingObligations = 0,
+  Map<String, Object?>? next,
+  int authAttempts = 1,
+}) {
+  final names = [
+    for (final s in _deletionSteps)
+      if (hadAccount || !s.endsWith('_account')) s,
+  ];
+  final steps = [
+    for (final (i, s) in names.indexed)
+      {
+        'step': s,
+        'state': i < done ? 'done' : 'pending',
+        'attempts': s == 'auth_account' ? authAttempts : (i < done ? 1 : 0),
+        'outcome': i < done ? 'done' : null,
+      },
+  ];
+  final completed = steps.every((s) => s['state'] == 'done');
+  return {
+    'deletion_id': id,
+    'member_id': memberId,
+    'display_name': completed ? 'Deleted member' : name,
+    'origin': origin,
+    'deletion_state': completed ? 'completed' : 'requested',
+    'had_account': hadAccount,
+    'requested_at': '2026-10-07T11:00:00Z',
+    'completed_at': completed ? '2026-10-07T11:05:00Z' : null,
+    'revision': 1,
+    'is_synthetic': true,
+    'pending_obligations': pendingObligations,
+    'steps': steps,
+    'next':
+        next ??
+        (completed
+            ? {'action': 'done'}
+            : {
+                'step': steps[done]['step'],
+                'action': 'advance',
+                'attempts': 0,
+              }),
+  };
+}
+
+Map<String, Object?> deletionCandidateData({
+  String id = '87878787-8787-4787-8787-878787878787',
+  String name = 'SYNTHETIC Daniel Zulu',
+  int revision = 5,
+  String account = 'access_review',
+  bool ownMember = false,
+}) => {
+  'member_id': id,
+  'display_name': name,
+  'revision': revision,
+  'account': account,
+  'own_member': ownMember,
+  'is_synthetic': true,
+};
+
 /// The fakes and provider overrides an app or screen test runs against.
 class ClientTestHarness {
   ClientTestHarness({String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'})
@@ -1093,6 +1198,7 @@ class ClientTestHarness {
   final assisted = FakeAssistedRecovery();
   final recoveryCases = FakeRecoveryCases();
   final lifecycle = FakeMembershipLifecycle();
+  final deletions = FakeMemberDeletion();
 
   /// Replaces [gateway] in [overrides] when set, so a screen test can run
   /// the real adapter (for example SupabaseCommandGateway over a mock HTTP
@@ -1118,6 +1224,7 @@ class ClientTestHarness {
       assistedRecoveryGatewayProvider.overrideWithValue(assisted),
       recoveryCasesRepositoryProvider.overrideWithValue(recoveryCases),
       membershipLifecycleRepositoryProvider.overrideWithValue(lifecycle),
+      memberDeletionRepositoryProvider.overrideWithValue(deletions),
       commandGatewayProvider.overrideWithValue(commandGateway ?? gateway),
       platformStatusRepositoryProvider.overrideWithValue(FakePlatformStatus()),
     ],

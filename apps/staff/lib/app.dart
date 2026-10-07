@@ -71,6 +71,13 @@ const staffMembershipLifecycleDestination = (
   icon: Icons.person_off_outlined,
 );
 
+/// Story 2.11: shown while the server's current answer includes Admin.
+const staffMemberDeletionsDestination = (
+  path: ClientPaths.adminMemberDeletions,
+  label: 'Member deletions',
+  icon: Icons.person_remove_outlined,
+);
+
 /// Story 2.6: shown while the server's current answer includes Admin.
 const staffCellsDestination = (
   path: ClientPaths.adminCells,
@@ -96,6 +103,7 @@ List<StaffDestination> staffDestinationsFor(MemberGrants? grants) => [
   if (grants?.isAdmin ?? false) staffCredentialReviewsDestination,
   if (grants?.isAdmin ?? false) staffAccountRecoveryDestination,
   if (grants?.isAdmin ?? false) staffMembershipLifecycleDestination,
+  if (grants?.isAdmin ?? false) staffMemberDeletionsDestination,
   if (grants?.isAdmin ?? false) staffCellsDestination,
   if (grants?.isAdmin ?? false) staffAdminDestination,
 ];

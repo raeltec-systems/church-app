@@ -44,6 +44,7 @@ export const LIFECYCLE_EVENTS = [
   "sessions_revoked",
   "membership_deactivated",
   "membership_restored",
+  "member_deleted",
 ] as const;
 export type LifecycleEventName = (typeof LIFECYCLE_EVENTS)[number];
 export type LifecycleEvent = {

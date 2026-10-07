@@ -9,6 +9,7 @@ export 'src/adapters/supabase_command_gateway.dart';
 export 'src/adapters/supabase_credential_review_repository.dart';
 export 'src/adapters/supabase_grants_repository.dart';
 export 'src/adapters/supabase_member_access_repository.dart';
+export 'src/adapters/supabase_member_deletion_repository.dart';
 export 'src/adapters/supabase_membership_lifecycle_repository.dart';
 export 'src/adapters/supabase_membership_repository.dart';
 export 'src/adapters/supabase_password_recovery_gateway.dart';

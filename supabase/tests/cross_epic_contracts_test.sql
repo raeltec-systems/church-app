@@ -84,7 +84,8 @@ select throws_ok($$select app.contract_check('nope', '{}')$$, '22023', 'unknown 
 select results_eq(
   $$select event from app.contract_lifecycle_events order by event$$,
   $$values ('access_hold_applied'::text), ('access_hold_released'), ('account_deactivated'),
-           ('cell_transferred'), ('deletion_requested'), ('membership_deactivated'),
+           ('cell_transferred'), ('deletion_requested'), ('member_deleted'),
+           ('membership_deactivated'),
            ('membership_restored'), ('scope_revoked'), ('sessions_revoked')$$,
   'the lifecycle event table is the v1 list the client mappings carry');
 select is(
@@ -315,8 +316,8 @@ select is((select count(*)::int from app.policy_gates where state = 'approved'),
   'no policy gate is approved by any migration');
 select results_eq(
   $$select gate from app.policy_gates where fixture_value is not null order by gate$$,
-  $$values ('q2_church_time'::text), ('q9_money')$$,
-  'only the Q2 and Q9 gates carry (labelled) test fixtures; access and sending have none');
+  $$values ('identity_deletion_retention'::text), ('q2_church_time'), ('q9_money')$$,
+  'only the Q2, Q9 and Q4 deletion-retention (2.11) gates carry (labelled) test fixtures; access and sending have none');
 select is(app.policy_effective('q2_church_time') ->> 'source', 'fixture',
   'local development reads the labelled fixture');
 select is(

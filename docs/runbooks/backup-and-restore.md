@@ -113,8 +113,8 @@ The journal in `.recovery-state/journal` is long-lived, because it is the indepe
    - Read the journal from its independent location and run `verifyJournal` with the cut-off and the database's acknowledgements (`seq` and `entry_hash` from `app.rcv_journal_acks`).
    - If it is not complete, run `app.rcv_record_refusal` and **stop**. Access and sending stay disabled until the owner has revalidated access.
    - If it is complete:
-     - apply every entry with `app.rcv_apply_journal_entry`;
-     - delete each named object from the restored store and verify it is absent;
+     - apply every entry with `app.rcv_apply_journal_entry`. Since story 2.11 this also runs the registered replay hooks while the restore is held: Identity denies access again for every `access_revoked` subject that is a member, re-creates a member deletion from its manifest, and on a `deletion_completed` entry erases and verifies that member's data (bucket `identity-member`) or removes the restored Auth user row (bucket `auth-user`) inline. These two buckets are database stores, not object-store paths: a hook that leaves anything behind fails the apply;
+     - delete each named object from the restored store and verify it is absent (for `identity-member` and `auth-user` the database already did this in the apply);
      - then run `app.rcv_complete_reconciliation`.
    - If any replay step fails, record the refusal and stop.
 7. **Verify.** `app.rcv_recovery_status()` should show `reconciled`, and `tools/ci/verify-hosted.sql` must pass before any client is pointed at the target.

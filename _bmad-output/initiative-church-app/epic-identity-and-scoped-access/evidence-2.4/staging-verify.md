@@ -16,3 +16,9 @@
 | `SYNTHETIC Plain Name` | accepted unchanged |
 
 If byte-identical source is wanted later, re-apply the function from the repo file through the promotion workflow (`supabase db push`), which sends the file verbatim.
+
+## Owner device demonstration (2026-10-07, Android release build against staging, commit a25ca29)
+
+Owner-reported: "All steps worked" — Create account `+1 202 555 0152` → Join the church (SYNTHETIC name, a SYNTHETIC cell, privacy-notice checkbox) → status card (awaiting approval / cell requested) → Correct my request → Account shows the request, no member content.
+
+Staging readback (read-only SQL): one application, phone `…0152`, name prefix `SYNTHETIC `, `cell_choice = cell`, state `submitted`, revision 2, `is_synthetic = true`; events `submitted:full_name,cell_choice,privacy_notice_version`, `corrected:cell_choice`; no account link and no grant for that account.

@@ -3,7 +3,7 @@ title: 'Register and apply for membership with a safe cell choice'
 type: 'feature'
 ticket: '4'
 created: '2026-10-07'
-status: 'built'
+status: 'done'
 baseline_revision: '9775471ca2a73d6a032af78008695d3cbc0a5db9'
 route: 'full'
 route_source: 'auto'
@@ -154,3 +154,7 @@ context:
 | corrections unlimited | low | patch | no cap |
 | nested field errors not path-qualified | low | patch | cell_choice errors used bare keys |
 | local/staging fence checked the phone only | low | patch | name not required to be SYNTHETIC |
+
+## Hosted verification
+
+Staging apply, parity check and the owner's Android demonstration: `evidence-2.4/staging-verify.md`.

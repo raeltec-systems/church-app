@@ -121,6 +121,34 @@ context:
 
 ## Plan Change Log
 
+- 2026-10-07, independent review (coordinator; not a step-04 loop). No takeover path was found; five findings.
+  - **Findings:**
+    - Lockout: a rejected or abandoned address left the account in review, with no exit.
+    - The reset gate is version-dependent and unchecked on hosted Auth.
+    - Approval did not check that the proposal came before the email change.
+    - The email-confirmed page showed success without a code.
+    - Enumeration through GoTrue `/recover`.
+  - **Amended:**
+    - `20261007140000` was edited in place (not on main or staging), still without `delete from`, DROP or TRUNCATE:
+      - `app.identity_revert_recovery_email` is called by reject and by the new member command `identity.withdraw_recovery_email`, which works from the review state;
+      - recency at approval;
+      - the `withdrawn` state and the `_withdrawn`/`_reverted` audit actions;
+      - leftover email identities of reverted addresses are tolerated.
+    - `tools/ci/verify-hosted.sql` gets the Auth schema, column and trigger assertion.
+    - Other files: the runbook (canary, accepted risks); the pgTAP lockout and recency tests; E2E `X35`–`X37`; the client withdraw action, the missing-code fix and widget tests.
+  - **Avoids:**
+    - a member stuck in review by their own or a rejected address;
+    - a confirmation click after rejection re-adding it;
+    - a silent gate bypass after a GoTrue upgrade.
+  - **KEEP:**
+    - the redemption gate;
+    - the isolated recovery client;
+    - the neutral in-app answers;
+    - review lifted only when nothing else changed.
+- Known risk carried to entry 8: a stolen live session can call GoTrue `PUT /user` directly to change the email or the password and lock the real member out of password sign-in. Private access never follows. The exits are withdraw/reject and staff-assisted recovery; reauthentication and credential-change review are entry 8.
+- Accepted platform risk, owner decision at entry 14 (with the Q1 sender/SMTP and Auth rate-limit settings): GoTrue `/recover` is directly callable with the publishable key, and its `429`/timing reveal known addresses. No wrapper is built; in-app answers stay neutral.
+- The proposal's 10-minute password check is advisory on its own: GoTrue's `updateUser(email)` does not re-check it. The binding still changes only through the Admin approval, which now also requires the email change to come after the proposal.
+
 ## Review Triage Log
 
 ## Verification
@@ -132,6 +160,7 @@ context:
 - Results (2026-10-07, local, each after a reset):
   - Database: `db:test` 978/978 (recovery 57); `db:smoke` exit 0, 114 ok.
   - Story E2E and adapters: `recovery.mjs` 17/17; adapter check L1–L5.
+  - After the review fixes: `db:test` 996/996 (recovery 75); `db:smoke` exit 0, 114 ok; `recovery.mjs` 20/20; adapter check L1–L5; `run` 30, `grants` 18, `review` 18, `apply` 27, `cells` 13 (all pass); client_core 250, mobile 21, staff 19; analyze clean; `ci:migrations`, `ci:secrets`, node tool tests (66) and the evidence scan clean.
   - Regressions: `run.mjs` 30/30, `grants.mjs` 18/18, `review.mjs` 18/18, `apply.mjs` 27/27, `cells.mjs` 13/13.
   - Clients:
     - client_core 248 tests, mobile 21, staff 19;

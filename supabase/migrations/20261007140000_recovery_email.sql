@@ -14,12 +14,17 @@
 --   * An Admin approves it into the credential binding after an identity check:
 --       identity.approve_recovery_email  expected = proposal revision  {proposal_id, identity_check}
 --       identity.reject_recovery_email   expected = proposal revision  {proposal_id, reason?}
+--     and the member may withdraw their own pending proposal, also while in review:
+--       identity.withdraw_recovery_email expected = proposal revision  {proposal_id}
 --     Approval records binding revision n+1 with the email (clearing the 2.2 binding review),
 --     returns the link to `active` and moves the trust epoch, so the member signs in again. It is
 --     refused unless the current Auth email equals the proposal and is confirmed, the Auth phone
 --     equals the approved phone, the account has no MFA factor and only phone/email identities,
 --     and no other binding change (phone, delete, identity removed/moved, MFA) happened since the
---     proposal. Reject records the decision only.
+--     proposal, or when the Auth email change came before the proposal (credential event time).
+--     Reject and withdraw return the account to its approved binding (the lockout exit): the
+--     proposed address leaves auth.users (pending or confirmed), its email-change tokens are
+--     cleared, and the review it caused is lifted with a new binding revision.
 --   * The reset gate: GoTrue's public /recover (and magic-link) routes stay reachable, so the
 --     redemption itself is guarded. An auth.users trigger on recovery-token redemption (the
 --     token cleared with the password unchanged; GoTrue v2.197.0 writes exactly that row update
@@ -58,7 +63,7 @@ create table app.identity_recovery_email_proposals (
     email = lower(email) and length(email) between 6 and 254
     and email ~ '^[a-z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-z0-9-]+(\.[a-z0-9-]+)+$'),
   proposal_state text not null default 'pending'
-    check (proposal_state in ('pending', 'approved', 'rejected', 'superseded')),
+    check (proposal_state in ('pending', 'approved', 'rejected', 'superseded', 'withdrawn')),
   revision bigint not null default 1 check (revision >= 1),
   is_synthetic boolean not null,
   proposed_request_id uuid,
@@ -93,7 +98,7 @@ create table app.identity_credential_audit (
   environment text not null default app.platform_current_environment(),
   action text not null check (action in (
     'recovery_email_proposed', 'recovery_email_superseded', 'recovery_email_approved',
-    'recovery_email_rejected')),
+    'recovery_email_rejected', 'recovery_email_withdrawn', 'recovery_email_reverted')),
   actor_member_id uuid not null,
   actor_account_id uuid not null,
   request_id uuid,
@@ -287,7 +292,14 @@ as $$
             where i.user_id = p_row.auth_user_id
               and (i.provider not in ('phone', 'email')
                    or (i.provider = 'email'
-                       and lower(coalesce(i.identity_data ->> 'email', '')) <> p_row.email)))
+                       and lower(coalesce(i.identity_data ->> 'email', '')) <> p_row.email
+                       -- Auth keeps the email identity of an address that was later
+                       -- rejected or withdrawn (and reverted); that is not a new change.
+                       and not exists (
+                         select 1 from app.identity_recovery_email_proposals q
+                          where q.link_id = p_row.link_id
+                            and q.proposal_state in ('rejected', 'withdrawn')
+                            and q.email = lower(coalesce(i.identity_data ->> 'email', ''))))))
       or exists (
            select 1 from app.identity_credential_events e
             where e.link_id = p_row.link_id
@@ -564,6 +576,14 @@ begin
   if not app.identity_recovery_email_verified(v_row) then
     perform app.cmd_fail('validation_failed', '{"recovery_email": "unverified"}');
   end if;
+  -- The proposal must come before the Auth email change (by the 2.2 credential event time):
+  -- an address confirmed before the member proposed it is not this flow. The proposal's own
+  -- recent-password check is otherwise advisory: GoTrue's updateUser does not re-check it.
+  if coalesce((select max(e.at) from app.identity_credential_events e
+                where e.link_id = v_row.link_id and 'email' = any (e.kinds)), '-infinity')
+     <= v_row.proposed_at then
+    perform app.cmd_fail('conflict', '{"proposal_id": "stale"}', v_row.revision);
+  end if;
   if app.identity_recovery_email_other_changes(v_row) then
     -- Anything beyond adding this email goes to the credential-change review (entry 8).
     perform app.cmd_fail('conflict', '{"proposal_id": "other_changes"}', v_row.revision);
@@ -599,8 +619,84 @@ begin
 end;
 $$;
 
--- identity.reject_recovery_email {proposal_id, reason?}: the decision only. A verified email
--- keeps the account in access review until the entry 8 credential review removes it.
+-- Returns the proposal's account to its approved binding: the lockout exit. The Identity owner
+-- runs it as the server-side principal for this one allowlisted effect, on behalf of the
+-- deciding Admin or the member. Both are audited separately: `recovery_email_rejected` or
+-- `_withdrawn` names the initiator; `recovery_email_reverted` records the executed effect. The
+-- Auth write is the same kind as the 2.5 reclaim's:
+--   * the proposed address leaves auth.users, whether pending (email_change) or confirmed but
+--     unapproved (email);
+--   * its email-change tokens are cleared, and the one_time_tokens rows are neutralised, so a
+--     confirmation link opened later changes nothing;
+--   * the review this change caused is lifted with a new binding revision (same phone, same
+--     approved email). The link returns to `active`, which also moves the trust epoch, so the
+--     member signs in again. When anything else changed (other_changes), the review stays for
+--     the entry 8 credential review.
+-- Returns true when the access review was lifted.
+create function app.identity_revert_recovery_email(
+  p_row app.identity_recovery_email_proposals,
+  p_by text
+) returns boolean
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_link app.identity_account_links;
+  v_other boolean;
+begin
+  select l.* into v_link from app.identity_account_links l where l.link_id = p_row.link_id
+     for update;
+  if v_link.link_state = 'ended' or v_link.auth_user_id <> p_row.auth_user_id then
+    return false;
+  end if;
+  v_other := app.identity_recovery_email_other_changes(p_row);
+  update auth.users u
+     set email = case when lower(nullif(btrim(u.email), '')) = p_row.email
+                      then v_link.approved_recovery_email else u.email end,
+         email_confirmed_at = case when lower(nullif(btrim(u.email), '')) = p_row.email
+                                        and v_link.approved_recovery_email is null
+                                   then null else u.email_confirmed_at end,
+         email_change = case when lower(coalesce(u.email_change, '')) = p_row.email
+                             then '' else u.email_change end,
+         email_change_token_new = case when lower(coalesce(u.email_change, '')) = p_row.email
+                                       then '' else u.email_change_token_new end,
+         email_change_token_current = case when lower(coalesce(u.email_change, '')) = p_row.email
+                                           then '' else u.email_change_token_current end,
+         email_change_confirm_status = case when lower(coalesce(u.email_change, '')) = p_row.email
+                                            then 0 else u.email_change_confirm_status end,
+         email_change_sent_at = case when lower(coalesce(u.email_change, '')) = p_row.email
+                                     then null else u.email_change_sent_at end
+   where u.id = p_row.auth_user_id
+     and (lower(nullif(btrim(u.email), '')) = p_row.email
+          or lower(coalesce(u.email_change, '')) = p_row.email);
+  -- GoTrue also looks email-change tokens up here: make any outstanding one unusable.
+  update auth.one_time_tokens t
+     set token_hash = 'revoked-' || gen_random_uuid()::text, updated_at = now()
+   where t.user_id = p_row.auth_user_id
+     and t.token_type in ('email_change_token_new', 'email_change_token_current');
+  select l.* into v_link from app.identity_account_links l where l.link_id = p_row.link_id;
+  if v_other or not v_link.binding_review_required
+     or v_link.link_state not in ('active', 'review_required') then
+    return false;
+  end if;
+  update app.identity_account_links l
+     set binding_revision = l.binding_revision + 1,
+         link_state = 'active',
+         sessions_valid_after = greatest(coalesce(l.sessions_valid_after, '-infinity'),
+                                         clock_timestamp()),
+         updated_at = now()
+   where l.link_id = v_link.link_id
+  returning l.* into v_link;
+  insert into app.identity_binding_history (link_id, binding_revision, approved_phone,
+                                            approved_recovery_email, approved_by, reason)
+  values (v_link.link_id, v_link.binding_revision, v_link.approved_phone,
+          v_link.approved_recovery_email, p_by, 'recovery_email_reverted');
+  return true;
+end;
+$$;
+
+-- identity.reject_recovery_email {proposal_id, reason?}: the decision, then the account back on
+-- its approved binding (app.identity_revert_recovery_email).
 create function app.identity_reject_recovery_email(
   p_actor uuid,
   p_expected_revision bigint,
@@ -625,7 +721,70 @@ begin
   returning p.* into v_row;
   perform app.identity_credential_audit_add('recovery_email_rejected', v_actor.member_id,
     v_actor.account_id, v_request, v_row, null, v_row.decision_reason, null);
+  if app.identity_revert_recovery_email(v_row, 'admin:' || v_actor.member_id::text) then
+    perform app.identity_credential_audit_add('recovery_email_reverted', v_actor.member_id,
+      v_actor.account_id, v_request, v_row, null, null,
+      (select l.binding_revision from app.identity_account_links l where l.link_id = v_row.link_id));
+  end if;
   return app.identity_recovery_email_outcome(v_row.proposal_id, true);
+end;
+$$;
+
+-- identity.withdraw_recovery_email {proposal_id} (expected = proposal revision): the member's
+-- own pending proposal only, also while the account waits in review (the lockout exit). The
+-- account returns to its approved binding (app.identity_revert_recovery_email).
+create function app.identity_withdraw_recovery_email(
+  p_actor uuid,
+  p_expected_revision bigint,
+  p_payload jsonb
+) returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  r record;
+  v_errors jsonb;
+  v_err text;
+  v_row app.identity_recovery_email_proposals;
+  v_request uuid := app.cmd_current_request_id(p_actor, 'identity.withdraw_recovery_email');
+begin
+  select e.* into r from app.identity_access_evaluate() e;
+  if r.outcome not in ('granted', 'review_required') or r.link_id is null then
+    perform app.cmd_fail('forbidden');
+  end if;
+  if jsonb_typeof(p_payload) is distinct from 'object' then
+    perform app.cmd_fail('validation_failed', '{"payload": "must_be_object"}');
+  end if;
+  v_errors := app.contract_unknown_keys(p_payload, array['proposal_id']);
+  v_err := app.contract_uuid_error(p_payload -> 'proposal_id');
+  if v_err is not null then
+    v_errors := v_errors || jsonb_build_object('proposal_id', v_err);
+  end if;
+  if v_errors <> '{}'::jsonb then
+    perform app.cmd_fail('validation_failed', v_errors);
+  end if;
+  select p.* into v_row from app.identity_recovery_email_proposals p
+   where p.proposal_id = (p_payload ->> 'proposal_id')::uuid
+     for update;
+  -- Another account's proposal is indistinguishable from a missing one.
+  if not found or v_row.auth_user_id <> p_actor or v_row.link_id <> r.link_id then
+    perform app.cmd_fail('not_found');
+  end if;
+  if v_row.proposal_state <> 'pending' or v_row.revision <> p_expected_revision then
+    perform app.cmd_fail('conflict', null, v_row.revision);
+  end if;
+  update app.identity_recovery_email_proposals p
+     set proposal_state = 'withdrawn', revision = p.revision + 1, decided_at = now()
+   where p.proposal_id = v_row.proposal_id
+  returning p.* into v_row;
+  perform app.identity_credential_audit_add('recovery_email_withdrawn', v_row.member_id, p_actor,
+    v_request, v_row, null, null, null);
+  if app.identity_revert_recovery_email(v_row, 'member:' || v_row.member_id::text) then
+    perform app.identity_credential_audit_add('recovery_email_reverted', v_row.member_id, p_actor,
+      v_request, v_row, null, null,
+      (select l.binding_revision from app.identity_account_links l where l.link_id = v_row.link_id));
+  end if;
+  return app.identity_recovery_email_outcome(v_row.proposal_id, false);
 end;
 $$;
 
@@ -666,6 +825,8 @@ begin
         then 'app.identity_approve_recovery_email(uuid, bigint, jsonb)'::regprocedure
       when 'identity.reject_recovery_email'
         then 'app.identity_reject_recovery_email(uuid, bigint, jsonb)'::regprocedure
+      when 'identity.withdraw_recovery_email'
+        then 'app.identity_withdraw_recovery_email(uuid, bigint, jsonb)'::regprocedure
     end,
     'app.identity_recovery_email_in_scope(uuid, text, uuid)'::regprocedure,
     v_command is distinct from 'identity.propose_recovery_email'
@@ -706,8 +867,27 @@ begin
 end;
 $$;
 
+-- Withdrawing one's own proposal: a trusted password session of a linked account, also while
+-- access waits in review (granted or review_required), so the member is never stuck.
+create function app.identity_authorize_member_withdraw_command(p_request jsonb)
+returns boolean
+language plpgsql
+set search_path = ''
+as $$
+declare
+  r record;
+begin
+  select e.* into r from app.identity_access_evaluate() e;
+  if r.outcome in ('unauthenticated', 'untrusted_session') then
+    perform app.cmd_fail('unauthenticated');
+  end if;
+  return r.outcome in ('granted', 'review_required') and r.link_id is not null;
+end;
+$$;
+
 -- The registered `identity` authorizer: application commands keep the 2.4 applicant check, the
--- member recovery-email proposal needs a granted session, and the grant, review (2.5) and
+-- member recovery-email proposal needs a granted session, the withdrawal a linked trusted
+-- session (also in review), and the grant, review (2.5) and
 -- recovery-email decision commands share the 2.3 Admin branch unchanged.
 create or replace function app.identity_authorize_command(p_request jsonb)
 returns boolean
@@ -723,6 +903,9 @@ begin
   end if;
   if coalesce(p_request ->> 'command', '') = 'identity.propose_recovery_email' then
     return app.identity_authorize_member_credential_command(p_request);
+  end if;
+  if coalesce(p_request ->> 'command', '') = 'identity.withdraw_recovery_email' then
+    return app.identity_authorize_member_withdraw_command(p_request);
   end if;
   if coalesce(p_request ->> 'command', '') not in (
        'identity.grant_role', 'identity.revoke_role', 'identity.grant_scope',
@@ -864,6 +1047,9 @@ revoke all on function
   app.identity_lock_recovery_email_proposal(jsonb, text[], boolean, bigint, uuid),
   app.identity_approve_recovery_email(uuid, bigint, jsonb),
   app.identity_reject_recovery_email(uuid, bigint, jsonb),
+  app.identity_revert_recovery_email(app.identity_recovery_email_proposals, text),
+  app.identity_withdraw_recovery_email(uuid, bigint, jsonb),
+  app.identity_authorize_member_withdraw_command(jsonb),
   app.identity_recovery_email_in_scope(uuid, text, uuid),
   app.identity_recovery_email_command(jsonb),
   api.identity_recovery_email_command(jsonb),

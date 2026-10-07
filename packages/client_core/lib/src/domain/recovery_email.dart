@@ -11,19 +11,24 @@ abstract final class RecoveryEmailCommands {
   static const propose = 'identity.propose_recovery_email';
   static const approve = 'identity.approve_recovery_email';
   static const reject = 'identity.reject_recovery_email';
+
+  /// The member's own pending proposal, also while access waits in review.
+  static const withdraw = 'identity.withdraw_recovery_email';
 }
 
 enum ProposalState {
   pending,
   approved,
   rejected,
-  superseded;
+  superseded,
+  withdrawn;
 
   static ProposalState fromWire(Object? v) => switch (v) {
     'pending' => pending,
     'approved' => approved,
     'rejected' => rejected,
     'superseded' => superseded,
+    'withdrawn' => withdrawn,
     _ => throw const FormatException('unknown proposal state'),
   };
 }

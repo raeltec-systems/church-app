@@ -8,4 +8,4 @@ ok   - a recovery link for an email that is not an approved recovery email gives
 ok   - a magiclink link for an email that is not an approved recovery email gives no session (500)
 ok   - forgot password for an unknown address is neutral (200 {})
 ok   - no SMS provider configured
-db:smoke exit 0; 114 ok lines, 0 FAIL (2026-10-07, local, phone provider off)
+db:smoke exit 0; 114 ok lines, 0 FAIL (2026-10-07, local, phone provider off; rerun after the review fixes)

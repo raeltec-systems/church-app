@@ -5,7 +5,7 @@
 -- evidence through real GoTrue and Mailpit: tools/identity-e2e/recovery.mjs. Every account,
 -- phone and email here is SYNTHETIC (+44 7700 900270-900289, @example.test).
 begin;
-select plan(57);
+select plan(75);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000027' || lpad(n::text, 2, '0'))::uuid $$;
@@ -122,14 +122,15 @@ $$;
 -- account with a confirmed email, 5 member with an approved email, 6 held member with an
 -- approved email, 7 member whose phone changes, 8 member who adds an MFA factor, 9 member whose
 -- email is never verified, 10 member whose approved email Auth holds unconfirmed, 11 banned member
--- with an approved email.
+-- with an approved email, 12 member who withdraws a verified email, 13 member whose verified email
+-- is rejected, 14 member whose Auth email change predates the proposal.
 insert into auth.users (id, aud, role, phone, phone_confirmed_at)
 select pg_temp.u(n), 'authenticated', 'authenticated', ltrim(pg_temp.phone(n), '+'), now()
-  from generate_series(1, 11) n;
+  from generate_series(1, 14) n;
 update auth.users u set email = pg_temp.mail(x.n), email_confirmed_at = now()
   from (values (4), (5), (6), (11)) x(n) where u.id = pg_temp.u(x.n);
 update auth.users set email = pg_temp.mail(10) where id = pg_temp.u(10);
-select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 11) n where n <> 3;
+select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 14) n where n <> 3;
 select pg_temp.session(pg_temp.u(3), pg_temp.s(3), 'password', interval '1 hour', interval '20 minutes');
 
 -- Structure and privileges ---------------------------------------------------------------------
@@ -168,7 +169,7 @@ select ok(exists (select 1 from pg_trigger t where t.tgrelid = 'auth.users'::reg
 select app.platform_set_environment('local', 'pgtap 2.7');
 create temp table m as
 select n, app.identity_seed_synthetic_link(pg_temp.u(n), 'SYNTHETIC 2.7 Member ' || n, 'pgtap 2.7') as member_id
-  from generate_series(1, 11) n where n <> 4;
+  from generate_series(1, 14) n where n <> 4;
 select app.identity_bootstrap_admin((select member_id from m where n = 1), 'israel');
 insert into app.identity_holds (member_id, hold_kind, reason, placed_by)
 select member_id, 'security', 'SYNTHETIC hold', 'pgtap 2.7' from m where n = 6;
@@ -300,6 +301,13 @@ select is(pg_temp.cmd(pg_temp.c(1), 'identity.approve_recovery_email', (pg_temp.
                                'identity_check', 'in_person')) -> 'field_errors',
   '{"proposal_id": "other_changes"}'::jsonb, 'an MFA factor added since the proposal is refused too');
 select pg_temp.propose(pg_temp.c(9), 'synthetic-2-7-9@example.test');
+-- What GoTrue's updateUser(email) leaves until the link is opened.
+update auth.users set email_change = 'synthetic-2-7-9@example.test', email_change_token_new = 'synthetic-2-7-tok-9',
+                      email_change_sent_at = now(), email_change_confirm_status = 0
+ where id = pg_temp.u(9);
+insert into auth.one_time_tokens (id, user_id, token_type, token_hash, relates_to)
+values (gen_random_uuid(), pg_temp.u(9), 'email_change_token_new', 'synthetic-2-7-tok-9',
+        'synthetic-2-7-9@example.test');
 select is(pg_temp.cmd(pg_temp.c(1), 'identity.approve_recovery_email', (pg_temp.pending(9)).revision,
             jsonb_build_object('proposal_id', (pg_temp.pending(9)).proposal_id,
                                'identity_check', 'in_person')) -> 'field_errors',
@@ -316,6 +324,77 @@ select is(pg_temp.readj(pg_temp.c(9), 'select api.identity_my_recovery_email()')
 select is((select reason_code from app.identity_credential_audit
             where action = 'recovery_email_rejected' and member_id = (select member_id from m where n = 9)),
   'contact_church_office', 'the rejection is audited by code');
+
+select is((select row(coalesce(email, ''), email_change, email_change_token_new, email_change_sent_at is null)::text
+             from auth.users where id = pg_temp.u(9)),
+  '("","","",t)', 'rejecting an unverified email clears the pending Auth email change');
+select ok(not exists (select 1 from auth.one_time_tokens t where t.user_id = pg_temp.u(9)
+                       and t.token_hash = 'synthetic-2-7-tok-9'),
+  'its emailed confirmation token can no longer be found (a later click changes nothing)');
+select is(pg_temp.readj(pg_temp.fresh(9), 'select api.identity_my_member_summary()') ->> 'has_recovery_email',
+  'false', 'the account keeps member access on its approved binding');
+
+-- Lockout exit: reject a verified email, withdraw one's own -----------------------------------
+select pg_temp.propose(pg_temp.c(13), 'synthetic-2-7-13@example.test');
+select pg_temp.verify_email(13, 'synthetic-2-7-13@example.test');
+select is(pg_temp.read(pg_temp.c(13), 'select api.identity_my_member_summary()'),
+  'PT403|forbidden|review_required', 'a verified unapproved email puts member 13 in review');
+select is(pg_temp.cmd(pg_temp.c(1), 'identity.reject_recovery_email', (pg_temp.pending(13)).revision,
+            jsonb_build_object('proposal_id', (pg_temp.pending(13)).proposal_id)) #>> '{data,state}',
+  'rejected', 'the Admin rejects the verified email');
+select is((select row(coalesce(u.email, ''), u.email_confirmed_at is null, l.link_state, l.binding_review_required,
+                      l.binding_revision, l.approved_recovery_email is null)::text
+             from auth.users u join app.identity_account_links l on l.auth_user_id = u.id
+            where u.id = pg_temp.u(13) and l.link_state <> 'ended'),
+  '("",t,active,f,2,t)', 'the account returns to its approved binding and the review is lifted');
+select is(pg_temp.read(pg_temp.c(13), 'select api.identity_my_member_summary()'),
+  'PT401|unauthenticated|untrusted_session', 'earlier sessions must still sign in again');
+select is(pg_temp.readj(pg_temp.fresh(13), 'select api.identity_my_member_summary()') ->> 'has_recovery_email',
+  'false', 'a fresh sign-in is granted after the rejection');
+select is((select array_agg(action order by event_id) from app.identity_credential_audit
+            where member_id = (select member_id from m where n = 13)),
+  array['recovery_email_proposed', 'recovery_email_rejected', 'recovery_email_reverted'],
+  'the rejection and the revert are audited');
+
+select pg_temp.propose(pg_temp.c(12), 'synthetic-2-7-12@example.test');
+select pg_temp.verify_email(12, 'synthetic-2-7-12@example.test');
+select is(pg_temp.cmd(pg_temp.c(12), 'identity.withdraw_recovery_email', (pg_temp.pending(13)).revision,
+            jsonb_build_object('proposal_id', (pg_temp.pending(13)).proposal_id)) ->> 'code',
+  'not_found', 'a member cannot withdraw another account''s proposal');
+select is(pg_temp.cmd(pg_temp.fresh(12, 'otp'), 'identity.withdraw_recovery_email', (pg_temp.pending(12)).revision,
+            jsonb_build_object('proposal_id', (pg_temp.pending(12)).proposal_id)) ->> 'code',
+  'unauthenticated', 'an email-link session cannot withdraw');
+select is(pg_temp.cmd(pg_temp.c(12), 'identity.withdraw_recovery_email', (pg_temp.pending(12)).revision,
+            jsonb_build_object('proposal_id', (pg_temp.pending(12)).proposal_id)) #>> '{data,state}',
+  'withdrawn', 'the member withdraws their own verified email while access is in review');
+select is((select row(coalesce(u.email, ''), l.link_state, l.binding_review_required)::text
+             from auth.users u join app.identity_account_links l on l.auth_user_id = u.id
+            where u.id = pg_temp.u(12) and l.link_state <> 'ended'),
+  '("",active,f)', 'withdrawing returns the account to its approved binding');
+select is(pg_temp.readj(pg_temp.fresh(12), 'select api.identity_my_member_summary()') ->> 'has_recovery_email',
+  'false', 'and a fresh sign-in is granted');
+select is((select array_agg(action order by event_id) from app.identity_credential_audit
+            where member_id = (select member_id from m where n = 12)),
+  array['recovery_email_proposed', 'recovery_email_withdrawn', 'recovery_email_reverted'],
+  'the withdrawal is audited without content');
+select is(pg_temp.cmd(pg_temp.c(1), 'identity.reject_recovery_email', (pg_temp.pending(7)).revision,
+            jsonb_build_object('proposal_id', (pg_temp.pending(7)).proposal_id)) #>> '{data,state}',
+  'rejected', 'a proposal with other changes can be rejected');
+select is((select row(coalesce(u.email, ''), l.link_state, l.binding_review_required)::text
+             from auth.users u join app.identity_account_links l on l.auth_user_id = u.id
+            where u.id = pg_temp.u(7) and l.link_state <> 'ended'),
+  '("",review_required,t)', 'its email is removed but the other change keeps the review (entry 8)');
+
+-- Recency: the Auth email change must come after the proposal ----------------------------------
+select pg_temp.propose(pg_temp.c(14), 'synthetic-2-7-14@example.test');
+select pg_temp.verify_email(14, 'synthetic-2-7-14@example.test');
+update app.identity_credential_events e set at = (pg_temp.pending(14)).proposed_at - interval '1 minute'
+  from app.identity_account_links l
+ where e.link_id = l.link_id and l.auth_user_id = pg_temp.u(14) and 'email' = any (e.kinds);
+select is(pg_temp.cmd(pg_temp.c(1), 'identity.approve_recovery_email', (pg_temp.pending(14)).revision,
+            jsonb_build_object('proposal_id', (pg_temp.pending(14)).proposal_id,
+                               'identity_check', 'in_person')) -> 'field_errors',
+  '{"proposal_id": "stale"}'::jsonb, 'an email change older than the proposal is not approved');
 
 -- The reset gate on recovery-link redemption ------------------------------------------------------
 create temp table epoch5 as select sessions_valid_after from app.identity_account_links where auth_user_id = pg_temp.u(5);

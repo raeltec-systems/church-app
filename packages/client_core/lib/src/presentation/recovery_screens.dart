@@ -449,7 +449,10 @@ class EmailConfirmedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final failed = link == null || link!.errorCode != null;
+    // Only a link carrying a code (and no error) reached the server's
+    // confirmation; anything else is shown as failed.
+    final failed =
+        link == null || link!.errorCode != null || link!.code == null;
     return _page(context, 'Recovery email', [
       if (failed)
         const RequestStateBanner(
@@ -694,6 +697,7 @@ class _RecoveryEmailScreenState extends ConsumerState<RecoveryEmailScreen> {
       ];
     }
     if (p != null && p.state == ProposalState.pending) {
+      final busy = ref.watch(myRecoveryEmailProvider.select((s) => s.busy));
       return [
         p.verified
             ? RequestStateBanner(
@@ -714,6 +718,20 @@ class _RecoveryEmailScreenState extends ConsumerState<RecoveryEmailScreen> {
                     'Open the link we sent to ${p.email} on this device. Not '
                     'there? Add it again below to send a new link.',
               ),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FocusRing(
+            child: OutlinedButton(
+              key: const Key('withdraw-recovery-email'),
+              onPressed: busy
+                  ? null
+                  : () =>
+                        ref.read(myRecoveryEmailProvider.notifier).withdraw(p),
+              child: const Text('Withdraw this email'),
+            ),
+          ),
+        ),
       ];
     }
     if (p != null && p.state == ProposalState.rejected) {
@@ -751,6 +769,12 @@ class _RecoveryEmailScreenState extends ConsumerState<RecoveryEmailScreen> {
         'Check your inbox',
         'Open the confirmation link on this device. After that, the church '
             'checks and approves the address.',
+      ),
+      RecoveryEmailNotice.withdrawn => (
+        StatusTone.success,
+        'Email withdrawn',
+        'Your account is back on its approved sign-in details. If you are '
+            'asked, sign in again.',
       ),
       RecoveryEmailNotice.wrongPassword => (
         StatusTone.danger,
@@ -1077,7 +1101,8 @@ class _RecoveryEmailReviewScreenState
       RecoveryReviewNotice.rejected => (
         StatusTone.info,
         'Not approved',
-        '$who is told to contact the church office.',
+        '$who is told to contact the church office. Their account is back '
+            'on its approved sign-in details.',
       ),
       RecoveryReviewNotice.unverified => (
         StatusTone.warning,

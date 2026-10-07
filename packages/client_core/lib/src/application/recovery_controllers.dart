@@ -10,6 +10,7 @@ import '../domain/membership_review.dart' show IdentityCheck;
 import '../domain/password_recovery.dart';
 import '../domain/recovery_email.dart';
 import 'access_controllers.dart' show noteProtectedDenial;
+import 'account_controllers.dart' show memberSummaryControllerProvider;
 import 'providers.dart';
 
 // ---------------------------------------------------------------------------
@@ -152,6 +153,9 @@ enum RecoveryEmailNotice {
   /// Proposed and the confirmation link was sent to the new address.
   checkInbox,
 
+  /// Withdrawn: the account is back on its approved sign-in details.
+  withdrawn,
+
   /// The current password was not right.
   wrongPassword,
 
@@ -284,6 +288,23 @@ class MyRecoveryEmailController extends Notifier<MyRecoveryEmailState> {
     );
   }
 
+  /// Withdraws the member's own pending proposal (also while access waits
+  /// in review): the account returns to its approved sign-in details.
+  Future<void> withdraw(RecoveryEmailProposal proposal) async {
+    if (state.busy) return;
+    final epoch = _epoch;
+    state = state.copyWith(busy: true, clearNotice: true);
+    await _propose(
+      epoch,
+      CommandRequest(
+        command: RecoveryEmailCommands.withdraw,
+        requestId: ref.read(requestIdsProvider).next(),
+        expectedRevision: Optional.of(proposal.revision),
+        payload: {'proposal_id': proposal.proposalId},
+      ),
+    );
+  }
+
   /// Resends an unconfirmed proposal unchanged (same request id and body).
   Future<void> checkAgain() async {
     final u = state.unconfirmed;
@@ -299,6 +320,17 @@ class MyRecoveryEmailController extends Notifier<MyRecoveryEmailState> {
         .send(RecoveryEmailCommands.function, request);
     if (!_current(epoch)) return;
     switch (outcome) {
+      case CommandConfirmed()
+          when request.command == RecoveryEmailCommands.withdraw:
+        state = state.copyWith(
+          busy: false,
+          clearUnconfirmed: true,
+          notice: RecoveryEmailNotice.withdrawn,
+        );
+        // Lifting the review moved the trust epoch: the summary is asked
+        // again, and an untrusted answer ends this session (sign in again).
+        ref.invalidate(memberSummaryControllerProvider);
+        await _load(epoch);
       case CommandConfirmed():
         final sent = await ref
             .read(recoveryEmailRepositoryProvider)

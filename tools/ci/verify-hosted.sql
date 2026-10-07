@@ -49,3 +49,46 @@ begin
   raise notice 'verify-hosted: % marker confirmed; private_access and outbound_sending closed; alerting disabled; no recovery hold', v_actual;
 end;
 $$;
+
+-- Story 2.7: the email-recovery reset gate (trigger identity_email_link_gate) depends on how
+-- GoTrue redeems a recovery or magic link: `UPDATE auth.users SET recovery_token = ''` with the
+-- password unchanged. That was proven against GoTrue v2.197.0, whose Auth schema ends at
+-- migration 20260831180000. A different Auth schema means a GoTrue that has not been proven:
+-- fail loudly, re-run the redemption canary (docs/runbooks/identity-access.md, "Reset-gate
+-- canary") and the recovery E2E, then add the version here. The columns and the trigger the
+-- gate relies on are asserted as well. Skipped until the 2.7 migration is applied.
+do $$
+declare
+  c_proven constant text[] := array['20260831180000'];  -- GoTrue v2.197.0
+  v_auth_schema text;
+  v_missing text[];
+begin
+  if to_regprocedure('app.identity_on_auth_email_link_redeemed()') is null then
+    raise notice 'verify-hosted: story 2.7 reset gate not applied; Auth version check skipped';
+    return;
+  end if;
+  select max(m.version) into v_auth_schema from auth.schema_migrations m;
+  if v_auth_schema is null or not (v_auth_schema = any (c_proven)) then
+    raise exception 'verify-hosted: Auth schema % is not one the 2.7 reset gate was proven against (%); run the reset-gate canary and the recovery E2E before allowing it',
+      coalesce(v_auth_schema, 'unknown'), array_to_string(c_proven, ', ');
+  end if;
+  select array_agg(x.t || '.' || x.c) into v_missing
+    from (values ('users', 'recovery_token'), ('users', 'encrypted_password'),
+                 ('users', 'email_change'), ('users', 'email_change_token_new'),
+                 ('users', 'email_change_token_current'), ('users', 'email_change_confirm_status'),
+                 ('one_time_tokens', 'token_type'), ('one_time_tokens', 'token_hash')) x(t, c)
+   where not exists (select 1 from information_schema.columns ic
+                      where ic.table_schema = 'auth' and ic.table_name = x.t and ic.column_name = x.c);
+  if v_missing is not null then
+    raise exception 'verify-hosted: Auth columns the 2.7 reset gate relies on are missing: %', v_missing;
+  end if;
+  if not exists (
+       select 1 from pg_catalog.pg_trigger t
+        where t.tgrelid = 'auth.users'::regclass and t.tgname = 'identity_email_link_gate'
+          and t.tgenabled = 'O'
+          and t.tgfoid = 'app.identity_on_auth_email_link_redeemed()'::regprocedure) then
+    raise exception 'verify-hosted: the 2.7 reset gate trigger identity_email_link_gate is missing or disabled';
+  end if;
+  raise notice 'verify-hosted: 2.7 reset gate present on proven Auth schema %', v_auth_schema;
+end;
+$$;

@@ -315,6 +315,13 @@ void main() {
       expect(h.session.currentAccountId, isNull);
     });
 
+    testWidgets('a link without a code is shown as failed', (tester) async {
+      final h = await pumpAt(tester, ClientPaths.authEmailConfirmed);
+      expect(byKey('email-confirm-failed'), findsOneWidget);
+      expect(byKey('email-confirmed'), findsNothing);
+      expect(h.recovery.openedCodes, isEmpty);
+    });
+
     testWidgets('an expired confirmation says so', (tester) async {
       await pumpAt(
         tester,
@@ -436,6 +443,42 @@ void main() {
       );
       expect(byKey('recovery-email-awaiting-approval'), findsOneWidget);
       expect(byKey('add-recovery-email'), findsNothing);
+    });
+
+    testWidgets('withdraw works from the review state (lockout exit)', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.recoveryEmail,
+        setUp: (h) => h.recoveryEmail.mine = AccessReadOk(
+          MyRecoveryEmail.fromJson(
+            myRecoveryEmailData(
+              access: 'review_required',
+              canPropose: false,
+              proposal: recoveryProposalData(verified: true, revision: 2),
+            ),
+          ),
+        ),
+      );
+      await tapKey(tester, 'withdraw-recovery-email');
+      final sent = h.gateway.sent.single;
+      expect(sent.wire['command'], 'identity.withdraw_recovery_email');
+      expect(sent.wire['expected_revision'], 2);
+      expect(sent.wire['payload'], {'proposal_id': _proposal});
+      h.recoveryEmail.mine = AccessReadOk(
+        MyRecoveryEmail.fromJson(
+          myRecoveryEmailData(
+            proposal: recoveryProposalData(state: 'withdrawn', revision: 3),
+          ),
+        ),
+      );
+      sent.confirm(recoveryProposalData(state: 'withdrawn', revision: 3), 3);
+      await settle(tester);
+      expect(byKey('recovery-email-notice-withdrawn'), findsOneWidget);
+      expect(byKey('recovery-email-none'), findsOneWidget);
+      expect(byKey('add-recovery-email'), findsOneWidget);
+      expect(h.recoveryEmail.verificationsRequested, isEmpty);
     });
 
     testWidgets('approved and rejected states', (tester) async {

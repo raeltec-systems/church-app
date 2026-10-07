@@ -1,3 +1,3 @@
 supabase/tests/recovery_email_test.sql ........... ok
-Files=12, Tests=978,  4 wallclock secs ( 0.22 usr  0.02 sys +  0.19 cusr  0.18 csys =  0.61 CPU)
+Files=12, Tests=996,  4 wallclock secs ( 0.20 usr  0.02 sys +  0.20 cusr  0.13 csys =  0.55 CPU)
 Result: PASS

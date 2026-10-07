@@ -177,6 +177,8 @@ async function main() {
     other: { phone: '+447700900282', name: `${NAME_PREFIX} Unapproved`, email: mail('unapproved') },
     changer: { phone: '+447700900283', name: `${NAME_PREFIX} Changer`, email: mail('changer'), changed: mail('changed') },
     held: { phone: '+447700900284', name: `${NAME_PREFIX} Held`, email: mail('held') },
+    late: { phone: '+447700900285', name: `${NAME_PREFIX} Late Click`, email: mail('late') },
+    rejected: { phone: '+447700900286', name: `${NAME_PREFIX} Rejected`, email: mail('rejected') },
   };
   for (const p of Object.values(people)) if (!isFictionalRecoveryPhone(p.phone)) throw new Error(`not fictional: ${p.phone}`);
   const users = new Set();
@@ -257,7 +259,7 @@ async function main() {
   }
 
   try {
-    const { admin, member, other, changer, held } = people;
+    const { admin, member, other, changer, held, late, rejected } = people;
     const seeded = async (p, { email } = {}) => {
       p.password = password();
       const created = await http('POST', '/auth/v1/admin/users', { admin: true, body: {
@@ -503,6 +505,55 @@ async function main() {
     check('X33-hold-stays-in-force-after-reset', rh.status === 200 && setHeld.status === 200 && heldFresh.status === 200
       && sHeld.status === 403 && sHeld.detail === 'review_required' && holdOpen === '1',
       { exchange: rh.status, set_password: setHeld.status, fresh_sign_in: heldFresh.status, summary: sHeld, open_holds: Number(holdOpen) });
+
+    // ------------------------------------------------------------- lockout exits (review fix)
+    const authEmail = (user) => psql(`select coalesce(email, '') || '|' || coalesce(email_change, '') from auth.users where id = '${user}'`);
+    const pendingOf = async (token) => (await rpc('identity_my_recovery_email', token)).json?.proposal;
+
+    // The member withdraws their own verified email from the review state.
+    const inReview = await summary(other.token);
+    const otherProposal = await pendingOf(other.token);
+    const withdrawn = await recoveryCmd(other.token, 'identity.withdraw_recovery_email', otherProposal?.revision,
+      { proposal_id: otherProposal?.proposal_id });
+    await sleep(EPOCH_WAIT_MS);
+    const otherFresh = await summary((await signIn(other.phone, other.password)).json?.access_token);
+    check('X35-member-withdraws-from-review', inReview.status === 403 && inReview.detail === 'review_required'
+      && withdrawn.status === 200 && withdrawn.data?.state === 'withdrawn' && authEmail(other.user) === '|'
+      && otherFresh.status === 200 && otherFresh.has_recovery_email === false,
+      { before: inReview, withdraw: withdrawn.data?.state, auth_email_cleared: authEmail(other.user) === '|', fresh_sign_in: otherFresh });
+
+    // An Admin rejects a verified email: the account is back on its approved binding.
+    await seeded(rejected);
+    rejected.token = (await signIn(rejected.phone, rejected.password)).json?.access_token;
+    await recoveryCmd(rejected.token, 'identity.propose_recovery_email', null, { email: rejected.email });
+    const rejectedAt = Date.now();
+    await http('PUT', `/auth/v1/user?redirect_to=${encodeURIComponent(MOBILE_EMAIL_CONFIRMED)}`, { token: rejected.token, body: { email: rejected.email } });
+    await openLink((await mailTo(rejected.email, rejectedAt))?.link);
+    const rq = (await rpc('identity_admin_recovery_email_queue', admin.token)).json?.proposals?.find((p) => p.member_id === rejected.member);
+    const rejectVerified = await recoveryCmd(admin.token, 'identity.reject_recovery_email', rq?.revision,
+      { proposal_id: rq?.proposal_id, reason: 'contact_church_office' });
+    await sleep(EPOCH_WAIT_MS);
+    const rejectedFresh = await summary((await signIn(rejected.phone, rejected.password)).json?.access_token);
+    check('X36-reject-verified-returns-to-approved-binding', rq?.verified === true && rejectVerified.status === 200
+      && rejectVerified.data?.state === 'rejected' && authEmail(rejected.user) === '|' && rejectedFresh.status === 200,
+      { verified_before: rq?.verified, reject: rejectVerified.data?.state, auth_email_cleared: authEmail(rejected.user) === '|', fresh_sign_in: rejectedFresh });
+
+    // Rejected before the member opens the confirmation link: the later click changes nothing.
+    await seeded(late);
+    late.token = (await signIn(late.phone, late.password)).json?.access_token;
+    await recoveryCmd(late.token, 'identity.propose_recovery_email', null, { email: late.email });
+    const lateAt = Date.now();
+    await http('PUT', `/auth/v1/user?redirect_to=${encodeURIComponent(MOBILE_EMAIL_CONFIRMED)}`, { token: late.token, body: { email: late.email } });
+    const lateMail = await mailTo(late.email, lateAt);
+    const lq = (await rpc('identity_admin_recovery_email_queue', admin.token)).json?.proposals?.find((p) => p.member_id === late.member);
+    const rejectUnverified = await recoveryCmd(admin.token, 'identity.reject_recovery_email', lq?.revision, { proposal_id: lq?.proposal_id });
+    const lateOpen = await openLink(lateMail?.link);
+    const lateFacts = redirectFacts(lateOpen.location);
+    const lateSummary = await summary(late.token);
+    check('X37-confirmation-link-after-reject-changes-nothing', lq?.verified === false && rejectUnverified.status === 200
+      && authEmail(late.user) === '|' && !lateFacts.has_code && lateSummary.status === 200,
+      { verified_before: lq?.verified, reject: rejectUnverified.data?.state, link_redirect: lateFacts,
+        auth_email_still_empty: authEmail(late.user) === '|', session_still_granted: lateSummary.status });
 
     const sms = (await http('GET', '/auth/v1/settings')).json?.sms_provider ?? null;
     check('X34-no-sms', !sms, { sms_provider: sms });

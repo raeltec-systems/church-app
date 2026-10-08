@@ -92,6 +92,7 @@ Future<List<Override>> compositionOverrides(AppConfig config) async {
     memberDeletionRepositoryProvider.overrideWithValue(
       SupabaseMemberDeletionRepository(client),
     ),
+    inboxRepositoryProvider.overrideWithValue(SupabaseInboxRepository(client)),
     recoveryCasesRepositoryProvider.overrideWithValue(
       SupabaseRecoveryCasesRepository(client),
     ),

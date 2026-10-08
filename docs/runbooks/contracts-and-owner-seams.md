@@ -82,6 +82,30 @@ Lifecycle events (contract v1): `access_hold_applied`, `access_hold_released`, `
 
 **Journal replay hooks (story 2.11, platform).** `app.rcv_apply_journal_entry` (1.10) calls every hook registered with `app.rcv_register_replay_hook('<module>', 'app.<prefix>_rcv_replay(jsonb)'::regprocedure)` with `{entry, restoring}` after recording the entry. A hook re-applies its own deny-only effects only while a restore is held (`restoring` true), and raises when it cannot, which keeps the restore held. Identity registers `app.identity_rcv_replay`.
 
+## Notifications owner operations (story 3.1)
+
+Call these inside your own command's transaction, after locking and changing your source. Notifications is last in the AD-2 lock order. Your module needs a dependency edge to `notifications`: every domain owner, Duties and Follow-ups already has one. Neither function is client-executable. The full runbook is [notifications.md](notifications.md).
+
+```sql
+-- Enqueue one reminder (contract v1 `notification_key`). Validates the key, the registered
+-- reminder kind, your source's CURRENT revision through your check hook, and the Q2 gate
+-- (fixture in local/staging, closed in production -> unavailable, so your command rolls back).
+-- Answers {job_id, job_state, created}; the same logical key again changes nothing (a cancelled
+-- job is never revived).
+select app.notifications_enqueue(jsonb_build_object(
+  'source_type', 'cells_meeting', 'source_id', <id>, 'source_revision', <new revision>,
+  'recipient_member_id', <member_id>, 'reminder_kind', 'report_due',
+  'scheduled_at', app.cmd_utc(<instant>)));
+-- Cancel your source's pending jobs (optionally one recipient or one kind). Answers {cancelled}.
+select app.notifications_cancel(jsonb_build_object(
+  'source_type', 'cells_meeting', 'source_id', <id>, 'reason', 'source_cancelled'));
+```
+
+- A revision change makes older pending jobs `obsolete` at the worker's recheck. Still cancel them explicitly when your transition makes them pointless.
+- The worker delivers a job only while your check hook answers `current: true` for the job's revision.
+- `app.contract_reminder_key` (1.5) stays the validation-only seam; `notifications_enqueue` calls it.
+- The SYNTHETIC `fixture_reminder` source (owner `fixture`, kind `fixture_due`, edge `fixture -> notifications`) is the reference consumer.
+
 ## Policy gates and environment
 
 - **Gates are closed by default.** `app.policy_gates` lists `q1_auth_recovery`, `q2_church_time`, `q4_personal_data`, `q9_money`, `q12_operations`, `private_access` and `outbound_sending`, plus `ops_alert_destination` and `ops_system_access` (story 1.9) and `identity_deletion_retention` (story 2.11, Q4: what a full deletion erases or anonymises). Every gate starts `unresolved`.

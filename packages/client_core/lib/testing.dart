@@ -24,6 +24,7 @@ import 'src/domain/membership_review.dart';
 import 'src/domain/password_recovery.dart';
 import 'src/domain/recovery_email.dart';
 import 'src/domain/fixture_counter.dart';
+import 'src/domain/inbox.dart';
 import 'src/domain/session.dart';
 
 /// One command the fake gateway received; complete it to answer.
@@ -1178,6 +1179,38 @@ Map<String, Object?> deletionCandidateData({
   'is_synthetic': true,
 };
 
+/// [InboxRepository] answered by the test (story 3.1).
+class FakeInbox implements InboxRepository {
+  AccessRead<Inbox> inbox = const AccessReadOk(Inbox(items: []));
+
+  /// The answer for an older page, by its cursor's item id.
+  final olderPages = <String, AccessRead<Inbox>>{};
+  final afters = <InboxCursor?>[];
+  int calls = 0;
+
+  @override
+  Future<AccessRead<Inbox>> fetchMyInbox({InboxCursor? after}) async {
+    calls++;
+    afters.add(after);
+    if (after == null) return inbox;
+    return olderPages[after.afterItemId] ??
+        const AccessReadFailed(unreachable: false);
+  }
+}
+
+/// The wire form of one inbox item (story 3.1).
+Map<String, Object?> inboxItemData({
+  String id = '31313131-3131-4131-8131-313131313131',
+  String kind = 'fixture_due',
+  String dueAt = '2026-10-08T07:00:00.000000Z',
+  String deliveredAt = '2026-10-08T07:00:05.000000Z',
+}) => {
+  'item_id': id,
+  'reminder_kind': kind,
+  'due_at': dueAt,
+  'delivered_at': deliveredAt,
+};
+
 /// The fakes and provider overrides an app or screen test runs against.
 class ClientTestHarness {
   ClientTestHarness({String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'})
@@ -1199,6 +1232,7 @@ class ClientTestHarness {
   final recoveryCases = FakeRecoveryCases();
   final lifecycle = FakeMembershipLifecycle();
   final deletions = FakeMemberDeletion();
+  final inbox = FakeInbox();
 
   /// Replaces [gateway] in [overrides] when set, so a screen test can run
   /// the real adapter (for example SupabaseCommandGateway over a mock HTTP
@@ -1225,6 +1259,7 @@ class ClientTestHarness {
       recoveryCasesRepositoryProvider.overrideWithValue(recoveryCases),
       membershipLifecycleRepositoryProvider.overrideWithValue(lifecycle),
       memberDeletionRepositoryProvider.overrideWithValue(deletions),
+      inboxRepositoryProvider.overrideWithValue(inbox),
       commandGatewayProvider.overrideWithValue(commandGateway ?? gateway),
       platformStatusRepositoryProvider.overrideWithValue(FakePlatformStatus()),
     ],

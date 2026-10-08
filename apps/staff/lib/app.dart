@@ -29,6 +29,14 @@ const staffAccessDestination = (
   icon: Icons.badge_outlined,
 );
 
+/// Story 3.1: shown while the server grants the caller member access; the
+/// durable inbox (browser push is not needed: the inbox holds every reminder).
+const staffInboxDestination = (
+  path: ClientPaths.inbox,
+  label: 'Inbox',
+  icon: Icons.inbox_outlined,
+);
+
 /// Story 2.3: shown while the server's current answer includes Admin.
 const staffAdminDestination = (
   path: ClientPaths.adminGrants,
@@ -96,6 +104,7 @@ const staffCellLeaderDestination = (
 /// entry is not a control, and every screen's data is checked by the server.
 List<StaffDestination> staffDestinationsFor(MemberGrants? grants) => [
   ...staffDestinations,
+  if (grants != null) staffInboxDestination,
   if (grants != null) staffAccessDestination,
   if (servesACell(grants)) staffCellLeaderDestination,
   if (grants?.isAdmin ?? false) staffMembersDestination,

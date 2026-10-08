@@ -550,6 +550,7 @@ void main() {
     (tester) async {
       final h = await pumpMobile(tester);
       expect(find.byKey(const Key('nav-/access')), findsNothing);
+      expect(find.byKey(const Key('nav-/inbox')), findsNothing);
 
       h.grants.myAccess = AccessReadOk(syntheticGrants(roles: ['pastor']));
       await tapKey(tester, 'nav-/account');
@@ -754,4 +755,31 @@ void main() {
       expect(boundaryViolations('lib/app.dart', src), isNotEmpty, reason: src);
     }
   });
+  testWidgets(
+    'story 3.1: a member opens the Inbox and sees the server\'s item; '
+    'signing out drops it',
+    (tester) async {
+      final h = await pumpMobile(tester);
+      expect(find.byKey(const Key('nav-/inbox')), findsNothing);
+      h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.inbox.inbox = AccessReadOk(
+        Inbox.fromJson({
+          'items': [inboxItemData()],
+        }),
+      );
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'nav-/inbox');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('SYNTHETIC test reminder'), findsOneWidget);
+      expect(h.inbox.calls, greaterThanOrEqualTo(1));
+
+      h.session.switchTo(null);
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('SYNTHETIC test reminder'), findsNothing);
+    },
+  );
 }

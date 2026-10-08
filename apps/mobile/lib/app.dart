@@ -35,9 +35,18 @@ const mobileCellDestination = (
   icon: Icons.groups_outlined,
 );
 
+/// Story 3.1: shown while the server grants the caller member access; the
+/// member's durable inbox (it holds every reminder, push or not).
+const mobileInboxDestination = (
+  path: ClientPaths.inbox,
+  label: 'Inbox',
+  icon: Icons.inbox_outlined,
+);
+
 /// The tabs for the caller's current grants (presentation only).
 List<MobileDestination> mobileDestinationsFor(MemberGrants? grants) => [
   ...mobileDestinations,
+  if (grants != null) mobileInboxDestination,
   if (grants != null) mobileAccessDestination,
   if (grants != null) mobileCellDestination,
 ];

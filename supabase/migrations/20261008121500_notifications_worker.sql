@@ -1,0 +1,818 @@
+-- Story 3.4: claim, recheck and retry jobs with a leased and fenced worker (AD-8, AD-17, AD-19;
+-- epic 3 requirement N4). Builds on 20261008073631_notifications_inbox.sql,
+-- 20261008090057_notifications_source_contracts.sql and 20261008102121_notifications_scheduling.sql.
+--
+--   * Central worker policy `app.notifications_worker_settings` (one row, operator-set through
+--     app.notifications_configure_worker): lease length, batch size, attempt limit, backoff
+--     (base doubling to a maximum) and the default expiry of a job without its own `expires_at`.
+--   * Two system commands of the purpose `notifications_worker` (1.9 system route):
+--       notifications.claim {limit?}   ends expired pending jobs (`obsolete`, `expired`), then
+--                                      leases a bounded batch of due jobs (`for update skip
+--                                      locked`), reclaiming leases that have expired. Each lease
+--                                      takes a fresh fencing token from one monotonic sequence.
+--                                      Answers the opaque {job_id, lease_token} pairs and counts.
+--       notifications.attempt {job_id, lease_token}
+--                                      fences (the token must be the job's current one and the
+--                                      lease still live), then rechecks expiry, the source and
+--                                      revision, actionability, the approved schedule, the
+--                                      source's view of the recipient and the recipient's
+--                                      membership before writing the one inbox item. A recheck
+--                                      that raises is a transient failure: the lease is released
+--                                      and the job backs off; at the attempt limit it ends
+--                                      `obsolete` (`attempts_exhausted`). Every attempt is one
+--                                      content-free row in `app.notifications_attempts`.
+--     `job_state` keeps its story 3.1 values; the new `finish_reason` says why a job ended.
+--   * `notifications.deliver_due` (story 3.1) becomes claim + attempt in one transaction, with
+--     the same rules and the same five counts.
+--   * Scheduler: the Cron job runs app.notifications_scheduler_tick(), which reads the worker's
+--     credential from Supabase Vault (secret `notifications_worker_credential`, set by the owner)
+--     and posts to the Edge Function `notifications-worker` (URL in the settings) with pg_net.
+--     The Cron command text holds no secret. Operator functions create the one named job of
+--     this environment (app.notifications_scheduler_enable), remove it
+--     (app.notifications_scheduler_disable) and report it (app.notifications_scheduler_status).
+--     Nothing here creates a schedule. Production needs ops_system_access, q2_church_time and
+--     q12_operations before a tick or an enable does anything.
+--   * SYNTHETIC: `fixture_reminder_sources.check_fault_until` (set by SQL only) makes the
+--     fixture's reminder check raise until that instant, to show a transient failure.
+--
+-- No destructive statements and no row deletions. No anon grant. ASCII only.
+
+create extension if not exists pg_net with schema extensions;
+create extension if not exists pg_cron with schema pg_catalog;
+
+-- ---------------------------------------------------------------------------------------------
+-- Central worker policy (owner: notifications)
+-- ---------------------------------------------------------------------------------------------
+
+create table app.notifications_worker_settings (
+  singleton boolean primary key default true check (singleton),
+  lease_seconds integer not null default 120 check (lease_seconds between 5 and 900),
+  batch_max integer not null default 25 check (batch_max between 1 and 100),
+  max_attempts integer not null default 5 check (max_attempts between 1 and 20),
+  backoff_base_seconds integer not null default 60 check (backoff_base_seconds between 1 and 3600),
+  backoff_max_seconds integer not null default 3600 check (backoff_max_seconds between 1 and 86400),
+  default_ttl_seconds integer not null default 604800
+    check (default_ttl_seconds between 3600 and 7776000),
+  -- Not a secret: the Edge Function URL the scheduler tick posts to.
+  worker_url text check (worker_url ~ '^https?://[A-Za-z0-9._:-]+/functions/v1/notifications-worker$'),
+  updated_by text references app.ops_operators (operator),
+  updated_at timestamptz not null default clock_timestamp(),
+  check (backoff_max_seconds >= backoff_base_seconds)
+);
+
+insert into app.notifications_worker_settings (singleton) values (true);
+
+comment on table app.notifications_worker_settings is
+  'owner: notifications. Central lease, batch, retry, backoff and default-expiry policy of the '
+  'notification worker (AD-8), and the Edge worker URL. Operator-set only.';
+
+-- Last scheduler tick (one row; content-free).
+create table app.notifications_scheduler_state (
+  singleton boolean primary key default true check (singleton),
+  last_tick_at timestamptz,
+  last_tick_outcome text check (last_tick_outcome ~ '^[a-z][a-z0-9_]{0,62}$'),
+  ticks bigint not null default 0 check (ticks >= 0)
+);
+
+insert into app.notifications_scheduler_state (singleton) values (true);
+
+comment on table app.notifications_scheduler_state is
+  'owner: notifications. The last scheduler tick and its outcome code (content-free).';
+
+-- ---------------------------------------------------------------------------------------------
+-- Leases, finish reasons, attempts and runs
+-- ---------------------------------------------------------------------------------------------
+
+create sequence app.notifications_lease_token_seq as bigint minvalue 1 no cycle;
+
+-- The lease fields record the job's LAST lease; it is live while the job is pending and
+-- lease_expires_at is in the future. A finished or failed attempt ends the lease at once.
+alter table app.notifications_jobs
+  add column lease_token bigint check (lease_token >= 1),
+  add column lease_principal uuid,
+  add column lease_request uuid,
+  add column lease_expires_at timestamptz,
+  add column finish_reason text check (finish_reason ~ '^[a-z][a-z0-9_]{0,62}$'),
+  add check ((lease_token is null) = (lease_expires_at is null)
+             and (lease_token is null) = (lease_principal is null)
+             and (lease_token is null) = (lease_request is null));
+
+create index notifications_jobs_leased on app.notifications_jobs (lease_expires_at)
+  where job_state = 'pending' and lease_expires_at is not null;
+
+-- Outcomes: delivered, cancelled (the source cancelled it after the claim), finished (already
+-- ended), fenced (stale token or lost lease; nothing changed), expired, obsolete, ineligible,
+-- failed (transient; will retry), exhausted (attempt limit reached). Entry 6 adds push outcomes.
+create table app.notifications_attempts (
+  attempt_id uuid primary key default gen_random_uuid(),
+  job_id uuid not null references app.notifications_jobs (job_id),
+  channel text not null default 'inbox' check (channel ~ '^[a-z][a-z0-9_]{0,62}$'),
+  lease_token bigint,
+  principal_id uuid not null,
+  request_id uuid not null,
+  attempted_at timestamptz not null default clock_timestamp(),
+  outcome text not null check (outcome ~ '^[a-z][a-z0-9_]{0,62}$'),
+  finish_reason text check (finish_reason ~ '^[a-z][a-z0-9_]{0,62}$'),
+  error_sqlstate text check (error_sqlstate ~ '^[0-9A-Z]{5}$')
+);
+
+create index notifications_attempts_job on app.notifications_attempts (job_id, attempted_at);
+create index notifications_attempts_at on app.notifications_attempts (attempted_at);
+
+comment on table app.notifications_attempts is
+  'owner: notifications. One content-free row per worker attempt (AD-8): job, fencing token, '
+  'principal, request, outcome code and SQLSTATE only.';
+
+create table app.notifications_worker_runs (
+  principal_id uuid not null,
+  request_id uuid not null,
+  via text not null check (via in ('claim', 'deliver_due')),
+  started_at timestamptz not null default clock_timestamp(),
+  claimed integer not null check (claimed >= 0),
+  reclaimed integer not null check (reclaimed >= 0),
+  expired integer not null check (expired >= 0),
+  primary key (principal_id, request_id)
+);
+
+create index notifications_worker_runs_started on app.notifications_worker_runs (started_at);
+
+comment on table app.notifications_worker_runs is
+  'owner: notifications. One row per worker claim (counts only), for scheduler health.';
+
+-- ---------------------------------------------------------------------------------------------
+-- Policy helpers
+-- ---------------------------------------------------------------------------------------------
+
+create function app.notifications_worker_config()
+returns app.notifications_worker_settings
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  v app.notifications_worker_settings;
+begin
+  select s.* into v from app.notifications_worker_settings s where s.singleton;
+  if not found then
+    raise exception using errcode = 'P0001', message = 'notifications worker settings are missing';
+  end if;
+  return v;
+end;
+$$;
+
+-- Seconds a job waits after its n-th failure: base * 2^(n-1), at most the maximum.
+create function app.notifications_backoff_seconds(p_failures integer,
+                                                  p_settings app.notifications_worker_settings)
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when coalesce(p_failures, 0) <= 0 then 0
+              else least(p_settings.backoff_max_seconds::numeric,
+                         p_settings.backoff_base_seconds * power(2::numeric, least(p_failures - 1, 30)))::integer
+         end;
+$$;
+
+-- When a job stops being useful: its own expires_at, else scheduled_at plus the default ttl.
+create function app.notifications_job_expiry(p_job app.notifications_jobs,
+                                             p_settings app.notifications_worker_settings)
+returns timestamptz
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce(p_job.expires_at,
+                  p_job.scheduled_at + make_interval(secs => p_settings.default_ttl_seconds));
+$$;
+
+-- Operator only: change the worker policy. p_changes holds any of lease_seconds, batch_max,
+-- max_attempts, backoff_base_seconds, backoff_max_seconds, default_ttl_seconds (integers) and
+-- worker_url (string or null). Unknown keys or wrong types are refused; the table checks bound
+-- the values. Returns the settings.
+create function app.notifications_configure_worker(p_changes jsonb, p_operator text)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_errors jsonb;
+  v app.notifications_worker_settings;
+  k text;
+begin
+  perform app.ops_require_operator(p_operator);
+  if jsonb_typeof(p_changes) is distinct from 'object' then
+    raise exception using errcode = '22023', message = 'changes must be a JSON object';
+  end if;
+  v_errors := '{}'::jsonb;
+  for k in select jsonb_object_keys(p_changes) loop
+    if k in ('lease_seconds', 'batch_max', 'max_attempts', 'backoff_base_seconds',
+             'backoff_max_seconds', 'default_ttl_seconds') then
+      if not app.contract_integer_in(p_changes -> k, 1, 7776000) then
+        v_errors := v_errors || jsonb_build_object(k, 'invalid');
+      end if;
+    elsif k = 'worker_url' then
+      if jsonb_typeof(p_changes -> k) not in ('string', 'null') then
+        v_errors := v_errors || jsonb_build_object(k, 'invalid');
+      end if;
+    else
+      v_errors := v_errors || jsonb_build_object(k, 'unknown_field');
+    end if;
+  end loop;
+  if v_errors <> '{}'::jsonb then
+    raise exception using errcode = '22023', message = 'invalid worker settings',
+      detail = v_errors::text;
+  end if;
+  update app.notifications_worker_settings s
+     set lease_seconds = coalesce((p_changes ->> 'lease_seconds')::integer, s.lease_seconds),
+         batch_max = coalesce((p_changes ->> 'batch_max')::integer, s.batch_max),
+         max_attempts = coalesce((p_changes ->> 'max_attempts')::integer, s.max_attempts),
+         backoff_base_seconds = coalesce((p_changes ->> 'backoff_base_seconds')::integer,
+                                         s.backoff_base_seconds),
+         backoff_max_seconds = coalesce((p_changes ->> 'backoff_max_seconds')::integer,
+                                        s.backoff_max_seconds),
+         default_ttl_seconds = coalesce((p_changes ->> 'default_ttl_seconds')::integer,
+                                        s.default_ttl_seconds),
+         worker_url = case when p_changes ? 'worker_url' then p_changes ->> 'worker_url'
+                           else s.worker_url end,
+         updated_by = p_operator,
+         updated_at = clock_timestamp()
+   where s.singleton
+  returning * into v;
+  return to_jsonb(v) - 'singleton';
+end;
+$$;
+
+-- ---------------------------------------------------------------------------------------------
+-- Claim
+-- ---------------------------------------------------------------------------------------------
+
+-- Ends a job (never pending again) and ends its lease.
+create function app.notifications_finish_job(p_job_id uuid, p_state text, p_reason text,
+                                             p_principal uuid, p_request uuid)
+returns void
+language sql
+set search_path = ''
+as $$
+  update app.notifications_jobs j
+     set job_state = p_state, finish_reason = p_reason, finished_at = clock_timestamp(),
+         processed_by_principal = p_principal, processed_request_id = p_request,
+         lease_expires_at = case when j.lease_expires_at is null then null
+                                 else least(j.lease_expires_at, now()) end
+   where j.job_id = p_job_id and j.job_state = 'pending';
+$$;
+
+-- Expires obsolete pending jobs (not under a live lease), then leases up to p_limit due jobs:
+-- fewest failures first, then oldest; a job still backing off after a failure, or under a live
+-- lease, is skipped; rows another worker holds are skipped. A lease that has expired is
+-- reclaimed with a new, higher fencing token. Returns {jobs: [{job_id, lease_token}], claimed,
+-- reclaimed, expired, lease_seconds}.
+create function app.notifications_claim(p_principal uuid, p_request uuid, p_limit integer,
+                                        p_via text)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_settings app.notifications_worker_settings := app.notifications_worker_config();
+  v_job app.notifications_jobs;
+  v_token bigint;
+  v_jobs jsonb := '[]'::jsonb;
+  v_claimed integer := 0;
+  v_reclaimed integer := 0;
+  v_expired integer := 0;
+begin
+  for v_job in
+    select j.* from app.notifications_jobs j
+     where j.job_state = 'pending'
+       and app.notifications_job_expiry(j, v_settings) <= now()
+       and (j.lease_expires_at is null or j.lease_expires_at <= now())
+     order by j.scheduled_at, j.job_id
+     limit 500
+     for update skip locked
+  loop
+    perform app.notifications_finish_job(v_job.job_id, 'obsolete', 'expired', p_principal, p_request);
+    v_expired := v_expired + 1;
+  end loop;
+
+  for v_job in
+    select j.* from app.notifications_jobs j
+     where j.job_state = 'pending' and j.scheduled_at <= now()
+       and (j.lease_expires_at is null or j.lease_expires_at <= now())
+       and (j.last_failed_at is null
+            or j.last_failed_at <= now() - make_interval(
+                 secs => app.notifications_backoff_seconds(j.failed_attempts, v_settings)))
+     order by j.failed_attempts, j.scheduled_at, j.job_id
+     limit greatest(p_limit, 0)
+     for update skip locked
+  loop
+    v_token := nextval('app.notifications_lease_token_seq');
+    if v_job.lease_token is not null then
+      v_reclaimed := v_reclaimed + 1;
+    end if;
+    update app.notifications_jobs j
+       set lease_token = v_token, lease_principal = p_principal, lease_request = p_request,
+           lease_expires_at = now() + make_interval(secs => v_settings.lease_seconds)
+     where j.job_id = v_job.job_id;
+    v_jobs := v_jobs || jsonb_build_object('job_id', v_job.job_id, 'lease_token', v_token);
+    v_claimed := v_claimed + 1;
+  end loop;
+
+  insert into app.notifications_worker_runs (principal_id, request_id, via, claimed, reclaimed, expired)
+  values (p_principal, p_request, p_via, v_claimed, v_reclaimed, v_expired)
+  on conflict do nothing;
+  return jsonb_build_object('jobs', v_jobs, 'claimed', v_claimed, 'reclaimed', v_reclaimed,
+                            'expired', v_expired, 'lease_seconds', v_settings.lease_seconds);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------------------------
+-- Attempt
+-- ---------------------------------------------------------------------------------------------
+
+-- One attempt on a leased job with its fencing token. Order of checks: the token must be the
+-- job's current one and held by this principal (else `fenced`); a job that already ended answers
+-- `cancelled` or `finished`; a lease that has expired is `fenced` (another worker may reclaim
+-- it); past its expiry the job ends `expired`. Then, in a subtransaction: the reminder contract
+-- (none: obsolete `no_contract`), current source and revision (obsolete `source_changed`),
+-- actionability (obsolete `not_actionable`), the approved schedule (obsolete `schedule_changed`
+-- when it ended, went stale, moved revision, cancelled the kind, or the member responded to a
+-- response reminder), the source's view of the recipient (ineligible `recipient_ineligible`) and
+-- the recipient's membership (ineligible `membership_inactive`); then the one inbox item
+-- (`delivered`). Anything raised there is transient: the job keeps pending, records the failure
+-- and backs off (`failed`), or ends obsolete `attempts_exhausted` at the attempt limit
+-- (`exhausted`). Every attempt on an existing job writes one attempts row.
+-- Returns {outcome, finish_reason?}.
+create function app.notifications_attempt(p_principal uuid, p_request uuid, p_job_id uuid,
+                                          p_token bigint)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_settings app.notifications_worker_settings := app.notifications_worker_config();
+  v_job app.notifications_jobs;
+  v_state jsonb;
+  v_schedule app.notifications_schedules;
+  v_member_state text;
+  v_outcome text;
+  v_reason text;
+  v_sqlstate text;
+begin
+  select j.* into v_job from app.notifications_jobs j where j.job_id = p_job_id for update;
+  if not found then
+    return '{"outcome": "not_found"}'::jsonb;
+  end if;
+
+  if v_job.lease_token is distinct from p_token or v_job.lease_principal is distinct from p_principal then
+    v_outcome := 'fenced';
+  elsif v_job.job_state <> 'pending' then
+    v_outcome := case when v_job.job_state = 'cancelled' then 'cancelled' else 'finished' end;
+    v_reason := coalesce(v_job.finish_reason, v_job.cancel_reason);
+  elsif v_job.lease_expires_at <= now() then
+    v_outcome := 'fenced';
+  elsif app.notifications_job_expiry(v_job, v_settings) <= now() then
+    v_outcome := 'expired';
+    v_reason := 'expired';
+    perform app.notifications_finish_job(v_job.job_id, 'obsolete', v_reason, p_principal, p_request);
+  else
+    begin
+      if not exists (select 1 from app.contract_reminder_contracts c
+                      where c.source_type = v_job.source_type
+                        and c.reminder_kind = v_job.reminder_kind) then
+        v_outcome := 'obsolete';
+        v_reason := 'no_contract';
+      else
+        v_state := app.contract_check_reminder(app.notifications_job_key(v_job));
+        if not (v_state ->> 'current')::boolean then
+          v_outcome := 'obsolete';
+          v_reason := 'source_changed';
+        elsif not (v_state ->> 'actionable')::boolean then
+          v_outcome := 'obsolete';
+          v_reason := 'not_actionable';
+        end if;
+      end if;
+      if v_outcome is null and v_job.schedule_id is not null then
+        select s.* into v_schedule from app.notifications_schedules s
+         where s.schedule_id = v_job.schedule_id;
+        if v_schedule.schedule_state is distinct from 'active'
+           or v_schedule.source_revision <> v_job.source_revision
+           or v_job.reminder_kind = any (v_schedule.cancelled_kinds)
+           or (coalesce((v_schedule.intent ->> 'responded')::boolean, false)
+               and v_job.reminder_kind = any (app.notifications_response_kinds(v_schedule.kinds))) then
+          v_outcome := 'obsolete';
+          v_reason := 'schedule_changed';
+        end if;
+      end if;
+      if v_outcome is null then
+        -- Read only (no lock): AD-2 orders Identity before Notifications. Entry 5 routes held
+        -- and accountless recipients; until then only an approved member gets an item.
+        select m.membership_state into v_member_state
+          from app.identity_members m where m.member_id = v_job.recipient_member_id;
+        if not (v_state ->> 'recipient_eligible')::boolean then
+          v_outcome := 'ineligible';
+          v_reason := 'recipient_ineligible';
+        elsif v_member_state is distinct from 'approved' then
+          v_outcome := 'ineligible';
+          v_reason := 'membership_inactive';
+        end if;
+      end if;
+      if v_outcome is null then
+        insert into app.notifications_inbox_items (job_id, recipient_member_id, reminder_kind,
+                                                   due_at, delivered_by_principal)
+        values (v_job.job_id, v_job.recipient_member_id, v_job.reminder_kind, v_job.scheduled_at,
+                p_principal)
+        on conflict (job_id) do nothing;
+        v_outcome := 'delivered';
+        v_reason := 'delivered';
+        perform app.notifications_finish_job(v_job.job_id, 'delivered', v_reason, p_principal, p_request);
+      else
+        perform app.notifications_finish_job(v_job.job_id,
+          case when v_outcome = 'ineligible' then 'ineligible' else 'obsolete' end,
+          v_reason, p_principal, p_request);
+      end if;
+    exception when others then
+      v_sqlstate := sqlstate;
+      -- Content-free diagnostics (no ids), like the command kernel.
+      raise log 'notifications.attempt recheck failed: sqlstate %', v_sqlstate;
+      v_outcome := null;
+      v_reason := null;
+    end;
+    if v_sqlstate is not null then
+      update app.notifications_jobs j
+         set failed_attempts = j.failed_attempts + 1, last_failed_at = clock_timestamp(),
+             lease_expires_at = least(j.lease_expires_at, now())
+       where j.job_id = v_job.job_id;
+      if v_job.failed_attempts + 1 >= v_settings.max_attempts then
+        v_outcome := 'exhausted';
+        v_reason := 'attempts_exhausted';
+        perform app.notifications_finish_job(v_job.job_id, 'obsolete', v_reason, p_principal, p_request);
+      else
+        v_outcome := 'failed';
+      end if;
+    end if;
+  end if;
+
+  insert into app.notifications_attempts (job_id, lease_token, principal_id, request_id, outcome,
+                                          finish_reason, error_sqlstate)
+  values (v_job.job_id, p_token, p_principal, p_request, v_outcome,
+          case when v_outcome in ('fenced', 'failed') then null else v_reason end, v_sqlstate);
+  return jsonb_strip_nulls(jsonb_build_object('outcome', v_outcome, 'finish_reason',
+    case when v_outcome in ('fenced', 'failed') then null else v_reason end));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------------------------
+-- System commands (purpose notifications_worker)
+-- ---------------------------------------------------------------------------------------------
+
+-- Payload of notifications.attempt: {job_id: uuid, lease_token: integer >= 1}.
+create function app.notifications_check_attempt(p_payload jsonb)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select coalesce((select jsonb_object_agg(k, 'unknown_field') from jsonb_object_keys(p_payload) k
+                    where k not in ('job_id', 'lease_token')), '{}'::jsonb)
+      || jsonb_strip_nulls(jsonb_build_object(
+           'job_id', app.contract_uuid_error(p_payload -> 'job_id'),
+           'lease_token', case when app.contract_integer_in(p_payload -> 'lease_token', 1, 9007199254740991)
+                               then null else 'invalid' end));
+$$;
+
+-- notifications.claim {limit?: 1..100}: at most the central batch_max.
+create function app.notifications_sys_claim(p_principal uuid, p_request uuid, p_payload jsonb)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_settings app.notifications_worker_settings := app.notifications_worker_config();
+begin
+  return jsonb_build_object('data', app.notifications_claim(
+    p_principal, p_request,
+    least(coalesce((p_payload ->> 'limit')::numeric::integer, v_settings.batch_max), v_settings.batch_max),
+    'claim'));
+end;
+$$;
+
+create function app.notifications_sys_attempt(p_principal uuid, p_request uuid, p_payload jsonb)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+begin
+  return jsonb_build_object('data', app.notifications_attempt(
+    p_principal, p_request, (p_payload ->> 'job_id')::uuid,
+    (p_payload ->> 'lease_token')::numeric::bigint));
+end;
+$$;
+
+-- notifications.deliver_due (story 3.1) is now claim + attempt in one transaction: the same
+-- leases, rechecks, retries and expiry, answering the same five counts (claimed counts the jobs
+-- it leased plus those it expired; obsolete includes expired and exhausted ones).
+create or replace function app.notifications_sys_deliver_due(p_principal uuid, p_request uuid, p_payload jsonb)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_claim jsonb;
+  v_entry jsonb;
+  v_outcome text;
+  v_delivered integer := 0;
+  v_obsolete integer := 0;
+  v_ineligible integer := 0;
+  v_failed integer := 0;
+begin
+  v_claim := app.notifications_claim(p_principal, p_request,
+                                     coalesce((p_payload ->> 'limit')::numeric::integer, 50),
+                                     'deliver_due');
+  v_obsolete := (v_claim ->> 'expired')::integer;
+  for v_entry in select e from jsonb_array_elements(v_claim -> 'jobs') e loop
+    v_outcome := app.notifications_attempt(p_principal, p_request, (v_entry ->> 'job_id')::uuid,
+                                           (v_entry ->> 'lease_token')::bigint) ->> 'outcome';
+    case v_outcome
+      when 'delivered' then v_delivered := v_delivered + 1;
+      when 'ineligible' then v_ineligible := v_ineligible + 1;
+      when 'failed' then v_failed := v_failed + 1;
+      else v_obsolete := v_obsolete + 1;
+    end case;
+  end loop;
+  return jsonb_build_object('data', jsonb_build_object(
+    'claimed', (v_claim ->> 'claimed')::integer + (v_claim ->> 'expired')::integer,
+    'delivered', v_delivered, 'obsolete', v_obsolete, 'ineligible', v_ineligible,
+    'failed', v_failed));
+end;
+$$;
+
+insert into app.sys_command_kinds (command, purpose, description, payload_check, handler) values
+  ('notifications.claim', 'notifications_worker',
+   'Story 3.4: expire obsolete jobs and lease a bounded batch of due jobs with fencing tokens',
+   'app.notifications_check_deliver_due(jsonb)',
+   'app.notifications_sys_claim(uuid, uuid, jsonb)'),
+  ('notifications.attempt', 'notifications_worker',
+   'Story 3.4: recheck one leased job under its fencing token and record the attempt',
+   'app.notifications_check_attempt(jsonb)',
+   'app.notifications_sys_attempt(uuid, uuid, jsonb)');
+
+-- Principals get their purpose's commands when they are created; existing notification workers
+-- (staging since story 3.1) get the two new commands here.
+insert into app.sys_principal_commands (principal_id, command)
+select p.principal_id, k.command
+  from app.sys_principals p
+ cross join (values ('notifications.claim'), ('notifications.attempt')) as k (command)
+ where p.purpose = 'notifications_worker' and p.disabled_at is null
+on conflict do nothing;
+
+-- ---------------------------------------------------------------------------------------------
+-- Scheduler (pg_cron + pg_net -> Edge Function notifications-worker)
+-- ---------------------------------------------------------------------------------------------
+
+-- Production needs the system route, Q2 and Q12 gates; local and staging use fixtures.
+create function app.notifications_scheduler_allowed()
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select app.platform_current_environment() in ('local', 'staging')
+      or (app.policy_is_open('ops_system_access') and app.policy_is_open('q2_church_time')
+          and app.policy_is_open('q12_operations'));
+$$;
+
+create function app.notifications_scheduler_note(p_outcome text)
+returns jsonb
+language sql
+set search_path = ''
+as $$
+  update app.notifications_scheduler_state s
+     set last_tick_at = clock_timestamp(), last_tick_outcome = p_outcome, ticks = s.ticks + 1
+   where s.singleton;
+  select jsonb_build_object('tick', p_outcome);
+$$;
+
+-- Run by the Cron job only (no grants). Posts {"action": "run"} to the Edge worker with the
+-- credential read from Vault at this moment; the credential is never stored elsewhere, returned
+-- or logged. Answers {tick: sent | not_configured | gate_closed}.
+create function app.notifications_scheduler_tick()
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_settings app.notifications_worker_settings := app.notifications_worker_config();
+  v_credential text;
+begin
+  if not app.notifications_scheduler_allowed() then
+    raise log 'notifications scheduler tick: gate_closed';
+    return app.notifications_scheduler_note('gate_closed');
+  end if;
+  if v_settings.worker_url is null
+     or pg_catalog.to_regclass('vault.decrypted_secrets') is null
+     or pg_catalog.to_regprocedure('net.http_post(text, jsonb, jsonb, jsonb, integer)') is null then
+    raise log 'notifications scheduler tick: not_configured';
+    return app.notifications_scheduler_note('not_configured');
+  end if;
+  execute 'select s.decrypted_secret from vault.decrypted_secrets s where s.name = $1 limit 1'
+    into v_credential using 'notifications_worker_credential';
+  if v_credential is null
+     or v_credential !~ ('^sysc_' || app.platform_current_environment() || '_[A-Za-z0-9_-]{43}$') then
+    v_credential := null;
+    raise log 'notifications scheduler tick: not_configured';
+    return app.notifications_scheduler_note('not_configured');
+  end if;
+  execute 'select net.http_post(url := $1, body := $2, params := ''{}''::jsonb, headers := $3, '
+          'timeout_milliseconds := $4)'
+    using v_settings.worker_url, '{"action": "run"}'::jsonb,
+          jsonb_build_object('content-type', 'application/json', 'x-system-credential', v_credential),
+          55000;
+  v_credential := null;
+  return app.notifications_scheduler_note('sent');
+end;
+$$;
+
+-- Operator only: (re)create this environment's ONE scheduler job `notifications-worker`.
+-- p_every is '1 minute' (cron '* * * * *') or '<n> seconds' with n from 1 to 59 (pg_cron
+-- interval syntax). Refused when another Cron job already runs the tick, when pg_cron is
+-- missing, or in production before the gates are approved.
+create function app.notifications_scheduler_enable(p_operator text, p_every text default '1 minute')
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_schedule text;
+  v_others integer;
+begin
+  perform app.ops_require_operator(p_operator);
+  if not app.notifications_scheduler_allowed() then
+    raise exception using errcode = '42501',
+      message = 'scheduler gates are closed (ops_system_access, q2_church_time, q12_operations)';
+  end if;
+  if pg_catalog.to_regnamespace('cron') is null then
+    raise exception using errcode = '55000', message = 'pg_cron is not installed';
+  end if;
+  if p_every = '1 minute' then
+    v_schedule := '* * * * *';
+  elsif p_every ~ '^([1-9]|[1-5][0-9]) seconds$' then
+    v_schedule := p_every;
+  else
+    raise exception using errcode = '22023', message = 'every must be ''1 minute'' or ''<1-59> seconds''';
+  end if;
+  execute 'select count(*) from cron.job j where j.jobname is distinct from $1 '
+          'and j.command like $2'
+    into v_others using 'notifications-worker', '%notifications_scheduler_tick%';
+  if v_others > 0 then
+    raise exception using errcode = '55000',
+      message = 'another Cron job already runs the notification scheduler';
+  end if;
+  execute 'select cron.schedule($1, $2, $3)'
+    using 'notifications-worker', v_schedule, 'select app.notifications_scheduler_tick()';
+  return app.notifications_scheduler_status();
+end;
+$$;
+
+-- Operator only: remove this environment's scheduler job (no error when there is none).
+create function app.notifications_scheduler_disable(p_operator text)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_exists boolean;
+begin
+  perform app.ops_require_operator(p_operator);
+  if pg_catalog.to_regnamespace('cron') is not null then
+    execute 'select exists (select 1 from cron.job j where j.jobname = $1)'
+      into v_exists using 'notifications-worker';
+    if v_exists then
+      execute 'select cron.unschedule($1)' using 'notifications-worker';
+    end if;
+  end if;
+  return app.notifications_scheduler_status();
+end;
+$$;
+
+-- Operator only: content-free scheduler and worker health (counts and timestamps).
+create function app.notifications_scheduler_status()
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_settings app.notifications_worker_settings := app.notifications_worker_config();
+  v_state app.notifications_scheduler_state;
+  v_jobs integer := 0;
+  v_schedule text;
+  v_active boolean;
+  v_cron jsonb := '{}'::jsonb;
+begin
+  select s.* into v_state from app.notifications_scheduler_state s where s.singleton;
+  if pg_catalog.to_regnamespace('cron') is not null then
+    execute 'select count(*) from cron.job j where j.command like $1'
+      into v_jobs using '%notifications_scheduler_tick%';
+    execute 'select j.schedule, j.active from cron.job j where j.jobname = $1'
+      into v_schedule, v_active using 'notifications-worker';
+    execute 'select coalesce(jsonb_object_agg(d.status, d.n), ''{}''::jsonb) from ('
+            'select r.status, count(*) as n from cron.job_run_details r join cron.job j '
+            'on j.jobid = r.jobid where j.jobname = $1 and r.start_time >= now() - interval ''24 hours'' '
+            'group by r.status) d'
+      into v_cron using 'notifications-worker';
+  end if;
+  return jsonb_build_object(
+    'environment', app.platform_current_environment(),
+    'allowed', app.notifications_scheduler_allowed(),
+    'scheduler_jobs', v_jobs,
+    'schedule', v_schedule,
+    'active', v_active,
+    'cron_runs_24h', v_cron,
+    'worker_url_set', v_settings.worker_url is not null,
+    'last_tick_at', case when v_state.last_tick_at is not null then app.cmd_utc(v_state.last_tick_at) end,
+    'last_tick_outcome', v_state.last_tick_outcome,
+    'last_claim_at', (select app.cmd_utc(max(r.started_at)) from app.notifications_worker_runs r),
+    'claims_24h', (select count(*) from app.notifications_worker_runs r
+                    where r.started_at >= now() - interval '24 hours'),
+    'due_pending', (select count(*) from app.notifications_jobs j
+                     where j.job_state = 'pending' and j.scheduled_at <= now()),
+    'leased', (select count(*) from app.notifications_jobs j
+                where j.job_state = 'pending' and j.lease_expires_at > now()),
+    'attempts_24h', coalesce((select jsonb_object_agg(a.outcome, a.n) from (
+        select t.outcome, count(*) as n from app.notifications_attempts t
+         where t.attempted_at >= now() - interval '24 hours' group by t.outcome) a), '{}'::jsonb),
+    'settings', to_jsonb(v_settings) - 'singleton' - 'worker_url' - 'updated_by');
+end;
+$$;
+
+-- ---------------------------------------------------------------------------------------------
+-- SYNTHETIC transient failure on fixture_reminder (owner: fixture)
+-- ---------------------------------------------------------------------------------------------
+
+alter table app.fixture_reminder_sources add column check_fault_until timestamptz;
+
+-- As in story 3.2, but the check raises while check_fault_until is in the future (set by SQL
+-- only, to demonstrate a transient owner failure and the worker's retry).
+create or replace function app.fixture_reminder_open_check(p_key jsonb)
+returns jsonb
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  v_row app.fixture_reminder_sources;
+begin
+  select s.* into v_row from app.fixture_reminder_sources s
+   where s.source_id = (p_key ->> 'source_id')::uuid;
+  if not found then
+    return '{"current": false, "revision": null, "actionable": false, "recipient_eligible": false}'::jsonb;
+  end if;
+  if v_row.check_fault_until is not null and v_row.check_fault_until > now() then
+    raise exception using errcode = 'P0001', message = 'SYNTHETIC transient check fault';
+  end if;
+  return jsonb_build_object(
+    'current', v_row.source_state = 'active'
+               and v_row.revision = (p_key ->> 'source_revision')::numeric::bigint,
+    'revision', v_row.revision,
+    'actionable', v_row.source_state = 'active'
+                  and (v_row.expires_at is null or v_row.expires_at > now()),
+    'recipient_eligible', v_row.member_id = (p_key ->> 'recipient_member_id')::uuid
+                          and not v_row.recipient_revoked);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------------------------
+-- Privileges: nothing here is client-executable
+-- ---------------------------------------------------------------------------------------------
+
+alter table app.notifications_worker_settings enable row level security;
+alter table app.notifications_scheduler_state enable row level security;
+alter table app.notifications_attempts enable row level security;
+alter table app.notifications_worker_runs enable row level security;
+revoke all on table app.notifications_worker_settings, app.notifications_scheduler_state,
+                    app.notifications_attempts, app.notifications_worker_runs
+  from public, anon, authenticated, service_role;
+revoke all on sequence app.notifications_lease_token_seq from public, anon, authenticated, service_role;
+
+revoke all on function
+  app.notifications_worker_config(),
+  app.notifications_backoff_seconds(integer, app.notifications_worker_settings),
+  app.notifications_job_expiry(app.notifications_jobs, app.notifications_worker_settings),
+  app.notifications_configure_worker(jsonb, text),
+  app.notifications_finish_job(uuid, text, text, uuid, uuid),
+  app.notifications_claim(uuid, uuid, integer, text),
+  app.notifications_attempt(uuid, uuid, uuid, bigint),
+  app.notifications_check_attempt(jsonb),
+  app.notifications_sys_claim(uuid, uuid, jsonb),
+  app.notifications_sys_attempt(uuid, uuid, jsonb),
+  app.notifications_sys_deliver_due(uuid, uuid, jsonb),
+  app.notifications_scheduler_allowed(),
+  app.notifications_scheduler_note(text),
+  app.notifications_scheduler_tick(),
+  app.notifications_scheduler_enable(text, text),
+  app.notifications_scheduler_disable(text),
+  app.notifications_scheduler_status(),
+  app.fixture_reminder_open_check(jsonb)
+  from public, anon, authenticated, service_role;
+
+notify pgrst, 'reload schema';

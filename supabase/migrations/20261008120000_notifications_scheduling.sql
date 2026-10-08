@@ -809,8 +809,8 @@ $$;
 -- the schedule that are not in the new plan are cancelled `rescheduled` when they lie in the
 -- future or belong to an older source revision (a due job at the current revision is left for
 -- the worker). A member's pending snooze survives unless the source revision moved. Each plan
--- entry is enqueued once; a future entry whose job was earlier cancelled `rescheduled` is
--- reinstated. Nothing at or before now() is enqueued, except the one `respond_now` of a fresh
+-- entry is enqueued once (a pending job already in the plan takes the current policy version
+-- and expiry); a future entry whose job was earlier cancelled `rescheduled` is reinstated. Nothing at or before now() is enqueued, except the one `respond_now` of a fresh
 -- short-notice plan per source revision. Returns counts.
 create function app.notifications_apply_schedule(p_schedule_id uuid, p_policy jsonb, p_fresh boolean)
 returns jsonb
@@ -877,6 +877,13 @@ begin
       (v_plan ->> 'expires_at')::timestamptz, v_row.schedule_id, null);
     if (v_job ->> 'created')::boolean then
       v_enqueued := v_enqueued + 1;
+    elsif v_job ->> 'job_state' = 'pending' then
+      -- Still in the plan: it now applies this policy version and expiry.
+      update app.notifications_jobs j
+         set policy_version = (p_policy ->> 'version')::integer,
+             policy_source = p_policy ->> 'source', policy_digest = p_policy ->> 'digest',
+             expires_at = (v_plan ->> 'expires_at')::timestamptz, schedule_id = v_row.schedule_id
+       where j.job_id = (v_job ->> 'job_id')::uuid;
     elsif v_job ->> 'job_state' = 'cancelled' and v_job ->> 'cancel_reason' = 'rescheduled'
           and (v_entry ->> 'scheduled_at')::timestamptz > now() then
       update app.notifications_jobs j

@@ -144,12 +144,41 @@ Migration: `supabase/migrations/20261008090057_notifications_source_contracts.sq
 
 **Contract version.** This fits wire contract v1. Registration is server-side SQL; the check's input is the v1 `notification_key`; the open answer is a Notifications read projection, not a shared kind. Fixture cases in `notification_key.json` and `source_ref.json` pin that a private field (`body`, `recipient_phone`, `title`, `link`, `note`) is `unknown_field` in SQL, Dart and TypeScript.
 
+## Reminder schedules: consumer guide (story 3.3)
+
+Use the shared scheduling calculation instead of computing `scheduled_at` yourself whenever a reminder follows church time: duty and programme responses, visit proposals, follow-up tasks. The policy value and the operator steps are in [notifications.md](notifications.md#story-33-church-time-reminder-schedules).
+
+1. **Register** your reminder kinds and their reminder contracts as in the guide above (one kind per purpose, for example `duties_response` and `duties_upcoming`).
+2. **Call `app.notifications_set_schedule`** inside your command, once per recipient, after your own write:
+
+   ```sql
+   perform app.notifications_set_schedule(jsonb_build_object(
+     'source_type', '<your source type>', 'source_id', <id>, 'source_revision', <current revision>,
+     'recipient_member_id', <member>, 'schedule_type', 'response',          -- or 'task'
+     'intent', jsonb_build_object('assigned_at', app.cmd_utc(now()), 'starts_at', app.cmd_utc(<start>),
+                                  'response_deadline', <creator deadline instant or null>,
+                                  'reminders', <creator specs or null>, 'responded', false),
+     'kinds', '{"response_deadline": "<kind>", "starts_at": "<kind>"}'::jsonb,
+     'fresh', true));                                -- false when you only re-plan
+   ```
+
+   - `response` intent: `assigned_at`, `starts_at` (the reporting time if there is one), optional `response_deadline` (the creator's; refused after the start), `expires_at` (default: the start), `responded`, `reminders`.
+   - `task` intent: `due_at`, `task_state` (`open`, `in_progress`, `waiting`), `review_at` (required while waiting, refused otherwise), `expires_at`, `reminders`.
+   - `reminders`: absent or null takes the policy default for the type; `[]` means none; otherwise up to `max_reminders` specs `{"anchor": "response_deadline"|"starts_at"|"deadline", "before"|"after": "<n> minutes|hours|days"}`.
+   - Pass instants only (UTC RFC3339). Never pass text: unknown intent keys are refused.
+   - The answer carries the computed `plan`: `response_deadline`, `deadline_source`, `band`, `short_notice` and `entries` (`scheduled_at`, church-local `local`, merged `anchors`). On `short_notice`, alert your leader to make direct contact. The member gets one `respond_now` reminder per source revision (your `response_deadline` kind unless `kinds.respond_now` names one).
+3. **On every change, call it again** with the new revision and intent. When the member answers, re-plan with `responded: true`: response reminders stop and start reminders stay. Jobs no longer in the plan are cancelled `rescheduled`; past-due work is never enqueued.
+4. **To stop everything** for a source or a recipient, call `app.notifications_cancel`. It also ends the schedule, so a later policy re-plan never revives it.
+5. **Recurring sources** compute each occurrence with `app.notifications_occurrences(app.notifications_policy(), rule, from, until)` (a church-local rule with exception dates) and schedule each occurrence as its own source.
+
+Refusals: `validation_failed` (shape, intent, or `{"kinds": "required"|"unregistered"|"invalid"}`), `conflict` (your source is not current at that revision), `unavailable {"policy": "gate_closed"}` (Q2 closed or not a valid scheduling policy). Nothing is written then, and your command rolls back with it.
+
 ## Policy gates and environment
 
 - **Gates are closed by default.** `app.policy_gates` lists `q1_auth_recovery`, `q2_church_time`, `q4_personal_data`, `q9_money`, `q12_operations`, `private_access` and `outbound_sending`, plus `ops_alert_destination` and `ops_system_access` (story 1.9) and `identity_deletion_retention` (story 2.11, Q4: what a full deletion erases or anonymises). Every gate starts `unresolved`.
 - **Reading a gate.** `app.policy_effective(gate)` raises the kernel's `unavailable` with `{"policy": "gate_closed"}`, which names no internal gate, unless one of these holds:
   - the gate is approved, or
-  - the environment is marked `local` or `staging` and the gate has a labelled fixture. Only Q2 (`UTC`), Q9 (`XTS`, scale 2) and the Q4 deletion retention (`identity_deletion_retention`, labelled `TEST FIXTURE - Q4 retention and backup periods unapproved`) have fixtures.
+  - the environment is marked `local` or `staging` and the gate has a labelled fixture. Only Q2 (Africa/Lusaka with the decided defaults since story 3.3; it was `UTC` before), Q9 (`XTS`, scale 2) and the Q4 deletion retention (`identity_deletion_retention`, labelled `TEST FIXTURE - Q4 retention and backup periods unapproved`) have fixtures.
 - **Environment marker.** `app.platform_environment`, with every change recorded in `app.platform_environment_history`:
   - **Nothing sets it automatically**: no seed and no migration writes it. A database with no marker behaves as **production**.
   - To use fixture policy on a local database, run `select app.platform_set_environment('local', '<you>');`.
@@ -159,5 +188,6 @@ Migration: `supabase/migrations/20261008090057_notifications_source_contracts.sq
 - **Approving a gate.** Only the owner approves, per environment, with an attributed note:
   `select app.policy_approve('q2_church_time', '{"zone": "<IANA zone>", ...}', '<owner name>', '<decision reference>');`
   - `q9_money` must look like `{"currencies": {"<ISO 4217 code>": <integer scale 0..6>}}`.
+  - `q2_church_time` must be a valid scheduling policy (story 3.3). Check the value first with `select app.notifications_policy_errors('<value>'::jsonb);` and expect `{}`. An approved value that fails the check closes scheduling (`unavailable`) instead of guessing. After approving, re-plan: `select app.notifications_replan_all('policy_changed');`.
   - A value that carries a `fixture_label` cannot be approved.
   - No client role can execute any of these functions.

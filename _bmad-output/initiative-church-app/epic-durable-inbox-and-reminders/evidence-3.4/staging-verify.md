@@ -19,3 +19,10 @@ Synthetic data only.
 Not done yet (owner steps in `../../milestone-2-owner-test.md`): mint and register the worker credential,
 set the two Edge secrets; then the parent runs one manual tick and `app.notifications_scheduler_enable('israel')`.
 The schedule stays off until then, so nothing calls the function every minute while it cannot work.
+
+## Worker activation (2026-10-08, after the owner's steps)
+
+- Owner minted the staging notifications-worker credential; the parent registered digest `88f9f20c...` (principal `notifications-worker`, purpose `notifications_worker`, credential `2d20a4d8-...`, expires 2026-11-07).
+- Owner set the Edge secrets `NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL` and `NOTIFICATIONS_WORKER_TRIGGER` (values never seen by the agent).
+- `app.notifications_scheduler_tick()` -> `{"tick":"sent"}`; pg_net response 200 `{"claimed":1,"outcomes":{"delivered":1},"push":{"state":"not_configured",...}}` (one waiting synthetic job delivered).
+- `app.notifications_scheduler_enable('israel')` -> `active: true`, `schedule: "* * * * *"`, `scheduler_jobs: 1`.

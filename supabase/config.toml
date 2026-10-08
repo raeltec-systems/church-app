@@ -410,6 +410,13 @@ verify_jwt = false
 enabled = true
 verify_jwt = false
 
+# Story 3.4: the Cron-triggered notification worker. The scheduler tick (pg_cron + pg_net) posts
+# with the worker's system credential from Supabase Vault, which the function forwards to the
+# system route (purpose notifications_worker); it holds no credential and needs no JWT.
+[functions.notifications-worker]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

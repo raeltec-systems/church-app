@@ -1,10 +1,12 @@
 import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../application/inbox_controllers.dart';
 import '../domain/access_grants.dart';
 import '../domain/inbox.dart';
+import 'shell_routing.dart';
 
 /// Story 3.1: the member's durable inbox on both clients. Items stay here
 /// whether or not push is allowed; the list is read from the server each time
@@ -56,7 +58,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         ),
       );
     } else if (inbox == null) {
-      children.add(_problem(s.result!));
+      children.add(_problem(s.result!, 'inbox'));
     } else if (inbox.items.isEmpty) {
       children.add(
         const RequestStateBanner(
@@ -153,10 +155,14 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   }
 }
 
-Widget _problem(AccessRead<Inbox> r) => switch (r) {
+Widget _problem<T>(
+  AccessRead<T> r,
+  String keyPrefix, {
+  String failedTitle = 'Couldn\'t load your inbox',
+}) => switch (r) {
   AccessReadOk() => const SizedBox.shrink(),
   AccessReadDenied(:final denial) => RequestStateBanner(
-    key: Key('inbox-denied-${denial.name}'),
+    key: Key('$keyPrefix-denied-${denial.name}'),
     tone: switch (denial) {
       AccessDenial.untrustedSession ||
       AccessDenial.reviewRequired => StatusTone.warning,
@@ -186,10 +192,10 @@ Widget _problem(AccessRead<Inbox> r) => switch (r) {
     },
   ),
   AccessReadFailed(:final unreachable) => RequestStateBanner(
-    key: const Key('inbox-failed'),
+    key: Key('$keyPrefix-failed'),
     tone: StatusTone.danger,
     icon: unreachable ? Icons.cloud_off_outlined : Icons.error_outline,
-    title: unreachable ? 'No connection' : 'Couldn\'t load your inbox',
+    title: unreachable ? 'No connection' : failedTitle,
     message: unreachable
         ? 'We couldn\'t reach the church server. Nothing is shown until it '
               'answers; your reminders are kept there.'
@@ -214,38 +220,244 @@ class _InboxTile extends StatelessWidget {
 
     return Semantics(
       container: true,
-      child: DecoratedBox(
-        key: Key('inbox-item-${item.itemId}'),
-        decoration: BoxDecoration(
-          color: c.surface,
-          border: Border.all(color: c.line),
-          borderRadius: BorderRadius.circular(12),
+      button: true,
+      child: InkWell(
+        key: Key('open-inbox-item-${item.itemId}'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => context.push(ClientPaths.inboxItem(item.itemId)),
+        child: DecoratedBox(
+          key: Key('inbox-item-${item.itemId}'),
+          decoration: BoxDecoration(
+            color: c.surface,
+            border: Border.all(color: c.line),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.notifications_outlined, color: c.muted),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.title,
+                        style: ChurchType.cardTitle.copyWith(color: c.ink),
+                      ),
+                      if (item.body != null) ...[
+                        const SizedBox(height: 4),
+                        Text(item.body!),
+                      ],
+                      const SizedBox(height: 4),
+                      Text('Due ${when(item.dueAt)}'),
+                      Text(
+                        'Arrived ${when(item.deliveredAt)}',
+                        style: ChurchType.secondary.copyWith(color: c.muted),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: c.muted),
+              ],
+            ),
+          ),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.notifications_outlined, color: c.muted),
-              const SizedBox(width: 12),
-              Expanded(
+      ),
+    );
+  }
+}
+
+/// Story 3.2: one opened inbox item (`/inbox/:itemId`). Each open asks the
+/// server, which re-reads the item's source now: a current item offers its
+/// authorised destination, anything else is the generic "out of date" state
+/// with no detail about the source.
+class InboxItemScreen extends ConsumerStatefulWidget {
+  const InboxItemScreen({
+    super.key,
+    required this.itemId,
+    this.knownTarget = ClientPaths.isKnownDeepLink,
+  });
+
+  final String itemId;
+
+  /// Whether this build has a screen for a server-provided target.
+  final bool Function(String target) knownTarget;
+
+  @override
+  ConsumerState<InboxItemScreen> createState() => _InboxItemScreenState();
+}
+
+class _InboxItemScreenState extends ConsumerState<InboxItemScreen> {
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _refresh);
+  }
+
+  void _refresh() {
+    if (!mounted) return;
+    ref.read(inboxItemProvider(widget.itemId).notifier).refresh();
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final layout = ChurchLayout.of(context);
+    final l10n = MaterialLocalizations.of(context);
+    String when(DateTime at) {
+      final local = at.toLocal();
+      return '${l10n.formatMediumDate(local)} '
+          '${l10n.formatTimeOfDay(TimeOfDay.fromDateTime(local))}';
+    }
+
+    final s = ref.watch(inboxItemProvider(widget.itemId));
+    final opened = s.opened;
+    final item = opened?.item;
+    final children = <Widget>[];
+    if (s.result == null) {
+      children.add(
+        const RequestStateBanner(
+          key: Key('inbox-item-loading'),
+          tone: StatusTone.info,
+          busy: true,
+          title: 'Checking this reminder…',
+          message: 'The server checks it again every time you open it.',
+        ),
+      );
+    } else if (opened == null) {
+      children.add(
+        _problem(
+          s.result!,
+          'inbox-item',
+          failedTitle: 'Couldn\'t open this reminder',
+        ),
+      );
+    } else if (opened.state == InboxItemState.notFound || item == null) {
+      children.add(
+        const RequestStateBanner(
+          key: Key('inbox-item-not-found'),
+          tone: StatusTone.neutral,
+          icon: Icons.search_off,
+          title: 'This reminder isn\'t available',
+          message:
+              'It may have been removed, or it belongs to another account.',
+        ),
+      );
+    } else {
+      children.addAll([
+        Semantics(
+          header: true,
+          child: Text(
+            item.title,
+            key: const Key('inbox-item-title'),
+            style: ChurchType.cardTitle.copyWith(color: c.ink),
+          ),
+        ),
+        if (item.body != null) ...[
+          const SizedBox(height: 8),
+          Text(item.body!, key: const Key('inbox-item-body')),
+        ],
+        const SizedBox(height: 8),
+        Text('Due ${when(item.dueAt)}'),
+        Text(
+          'Arrived ${when(item.deliveredAt)}',
+          style: ChurchType.secondary.copyWith(color: c.muted),
+        ),
+        const SizedBox(height: 16),
+      ]);
+      final target = opened.target;
+      if (opened.state == InboxItemState.superseded) {
+        children.add(
+          const RequestStateBanner(
+            key: Key('inbox-item-superseded'),
+            tone: StatusTone.warning,
+            icon: Icons.update,
+            title: 'This reminder is out of date',
+            message:
+                'What it was about has changed, ended or is no longer '
+                'available to you. There is nothing to do here.',
+          ),
+        );
+      } else if (target != null && widget.knownTarget(target)) {
+        children.add(
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FocusRing(
+              child: FilledButton.icon(
+                key: const Key('inbox-item-open-target'),
+                onPressed: () => context.go(target),
+                icon: const Icon(Icons.arrow_forward),
+                label: const Text('Open'),
+              ),
+            ),
+          ),
+        );
+      } else {
+        children.add(
+          const RequestStateBanner(
+            key: Key('inbox-item-later-version'),
+            tone: StatusTone.info,
+            icon: Icons.info_outline,
+            title: 'Still current',
+            message:
+                'The screen this reminder leads to is not in this version '
+                'of the app yet.',
+          ),
+        );
+      }
+    }
+    children.addAll([
+      const SizedBox(height: ChurchGeometry.sectionGap),
+      Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          FocusRing(
+            child: OutlinedButton.icon(
+              key: const Key('refresh-inbox-item'),
+              onPressed: s.loading ? null : _refresh,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Check again'),
+            ),
+          ),
+          FocusRing(
+            child: OutlinedButton.icon(
+              key: const Key('back-to-inbox'),
+              onPressed: () => context.go(ClientPaths.inbox),
+              icon: const Icon(Icons.inbox_outlined),
+              label: const Text('Back to inbox'),
+            ),
+          ),
+        ],
+      ),
+    ]);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Reminder')),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: layout.pagePadding,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
+              child: DefaultTextStyle.merge(
+                style: layout.body.copyWith(color: c.ink),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      style: ChurchType.cardTitle.copyWith(color: c.ink),
-                    ),
-                    const SizedBox(height: 4),
-                    Text('Due ${when(item.dueAt)}'),
-                    Text(
-                      'Arrived ${when(item.deliveredAt)}',
-                      style: ChurchType.secondary.copyWith(color: c.muted),
-                    ),
-                  ],
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: children,
                 ),
               ),
-            ],
+            ),
           ),
         ),
       ),

@@ -1196,6 +1196,17 @@ class FakeInbox implements InboxRepository {
     return olderPages[after.afterItemId] ??
         const AccessReadFailed(unreachable: false);
   }
+
+  /// Story 3.2: the answer for opening an item, by its id (default: not
+  /// found).
+  final opened = <String, AccessRead<OpenedInboxItem>>{};
+  final openedIds = <String>[];
+
+  @override
+  Future<AccessRead<OpenedInboxItem>> openItem(String itemId) async {
+    openedIds.add(itemId);
+    return opened[itemId] ?? const AccessReadOk(OpenedInboxItem.notFound());
+  }
 }
 
 /// The wire form of one inbox item (story 3.1).
@@ -1204,12 +1215,23 @@ Map<String, Object?> inboxItemData({
   String kind = 'fixture_due',
   String dueAt = '2026-10-08T07:00:00.000000Z',
   String deliveredAt = '2026-10-08T07:00:05.000000Z',
+  String? title = 'SYNTHETIC test reminder',
+  String? body = 'A test reminder is waiting for you.',
 }) => {
   'item_id': id,
   'reminder_kind': kind,
   'due_at': dueAt,
   'delivered_at': deliveredAt,
+  'title': ?title,
+  'body': ?body,
 };
+
+/// The wire form of an opened inbox item (story 3.2).
+Map<String, Object?> openedItemData({
+  String id = '31313131-3131-4131-8131-313131313131',
+  String state = 'current',
+  String? target = '/fixture/reminders/41414141-4141-4141-8141-414141414141',
+}) => {...inboxItemData(id: id), 'state': state, 'target': target};
 
 /// The fakes and provider overrides an app or screen test runs against.
 class ClientTestHarness {

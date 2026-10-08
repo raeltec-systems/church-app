@@ -125,6 +125,8 @@ jobs:
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.14 tools/identity-e2e docs/runbooks/production-promotion-identity.md
       - name: Story 3.1 evidence, the notification worker and its runbook hold no credentials
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.1 tools/notifications docs/runbooks/notifications.md
+      - name: Story 3.2 evidence and the owner seams guide hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.2 docs/runbooks/contracts-and-owner-seams.md
 
   flutter:
     name: flutter (analyze, test, web build)

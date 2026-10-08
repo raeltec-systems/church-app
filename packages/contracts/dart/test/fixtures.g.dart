@@ -250,7 +250,9 @@ const Map<String, String> embeddedFixtures = {
   "invalid": [
     {"name": "everything missing", "value": {}, "field_errors": {"source_type": "required", "source_id": "required", "source_revision": "required", "recipient_member_id": "required", "reminder_kind": "required", "scheduled_at": "required"}},
     {"name": "local time without zone", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 3, "recipient_member_id": "00000000-0000-4000-8000-000000000002", "reminder_kind": "fixture_nudge", "scheduled_at": "2026-10-04T07:00:00"}, "field_errors": {"scheduled_at": "invalid"}},
-    {"name": "account is not a recipient member", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 3, "recipient_auth_user_id": "00000000-0000-4000-8000-000000000002", "reminder_kind": "fixture_nudge", "scheduled_at": "2026-10-04T07:00:00Z"}, "field_errors": {"recipient_member_id": "required", "recipient_auth_user_id": "unknown_field"}}
+    {"name": "account is not a recipient member", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 3, "recipient_auth_user_id": "00000000-0000-4000-8000-000000000002", "reminder_kind": "fixture_nudge", "scheduled_at": "2026-10-04T07:00:00Z"}, "field_errors": {"recipient_member_id": "required", "recipient_auth_user_id": "unknown_field"}},
+    {"name": "private body and contact never ride on a key (story 3.2)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 3, "recipient_member_id": "00000000-0000-4000-8000-000000000002", "reminder_kind": "fixture_nudge", "scheduled_at": "2026-10-04T07:00:00Z", "body": "x", "recipient_phone": "x"}, "field_errors": {"body": "unknown_field", "recipient_phone": "unknown_field"}},
+    {"name": "notification text and link are registered, never sent with a key (story 3.2)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 3, "recipient_member_id": "00000000-0000-4000-8000-000000000002", "reminder_kind": "fixture_nudge", "scheduled_at": "2026-10-04T07:00:00Z", "title": "x", "link": "/x"}, "field_errors": {"title": "unknown_field", "link": "unknown_field"}}
   ]
 }
 ''',
@@ -284,7 +286,8 @@ const Map<String, String> embeddedFixtures = {
     {"name": "beyond JS-safe written as exponent (1e16)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1e16}, "field_errors": {"source_revision": "invalid"}},
     {"name": "prototype-named key constructor", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "constructor": "x"}, "field_errors": {"constructor": "unknown_field"}},
     {"name": "prototype-named key __proto__", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "__proto__": "x"}, "field_errors": {"__proto__": "unknown_field"}},
-    {"name": "prototype-named key toString", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "toString": "x"}, "field_errors": {"toString": "unknown_field"}}
+    {"name": "prototype-named key toString", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "toString": "x"}, "field_errors": {"toString": "unknown_field"}},
+    {"name": "source content never rides on a reference (story 3.2)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "title": "x", "note": "x"}, "field_errors": {"title": "unknown_field", "note": "unknown_field"}}
   ]
 }
 ''',

@@ -88,15 +88,24 @@ Map<String, Object?> _session() => {
 
 void main() {
   group('inbox mapping', () {
-    test('an item carries its kind and UTC times only', () {
+    test('an item carries its kind, registered text and UTC times only', () {
       final inbox = Inbox.fromJson({
-        'items': [inboxItemData(), inboxItemData(id: _other, kind: 'other')],
+        'items': [
+          inboxItemData(title: 'Registered title'),
+          inboxItemData(id: _other, kind: 'other', title: null, body: null),
+        ],
       });
       expect(inbox.items, hasLength(2));
       expect(inbox.items.first.itemId, _item);
-      expect(inbox.items.first.title, 'SYNTHETIC test reminder');
+      expect(inbox.items.first.title, 'Registered title');
+      expect(inbox.items.first.body, 'A test reminder is waiting for you.');
       expect(inbox.items.last.title, 'Reminder');
+      expect(inbox.items.last.body, isNull);
       expect(inbox.items.first.dueAt, DateTime.utc(2026, 10, 8, 7));
+      expect(
+        () => InboxItem.fromJson({...inboxItemData(), 'title': 7}),
+        throwsFormatException,
+      );
     });
 
     test('a page carries the cursor of the next older page', () {

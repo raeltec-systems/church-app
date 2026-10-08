@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 
 import {
   A23_NUMBERS, COMMANDS, CRED_NUMBERS, LIMIT_NUMBERS, PERSONAS, POOL, PRINCIPALS, READS, STAGING_ORIGIN,
-  assertPublishableKey, assertStagingOrigin, assertStateOutsideRepo, expectCommand, expectRead,
+  assertPublishableKey, assertStagingOrigin, assertStateOutsideRepo, expectCommand, expectRead, repoRoots,
   isSuiteFictional, makePacer, probeEnvelope, redactEvidence, renderSummary,
 } from './staging-suite.mjs';
 
@@ -33,6 +36,12 @@ test('the state file must be outside the repository; keys must be publishable', 
   assert.throws(() => assertStateOutsideRepo('tools/identity-e2e/state.json'), /inside the repository/);
   assert.throws(() => assertStateOutsideRepo(''), /required/);
   assert.ok(assertStateOutsideRepo('/tmp/elsewhere/state.json'));
+  // Paths are compared by their real path, against every root (the main worktree too).
+  const dir = mkdtempSync(join(tmpdir(), 'suite-root-'));
+  symlinkSync(dir, `${dir}-link`);
+  assert.throws(() => assertStateOutsideRepo(`${dir}-link/state.json`, ['/elsewhere', dir]), /inside the repository/);
+  assert.throws(() => assertStateOutsideRepo(`${dir}/sub/new/state.json`, [dir]), /inside the repository/);
+  assert.ok(repoRoots().length >= 1);
   assert.ok(assertPublishableKey('sb_publishable_abcDEF-123_x'));
   assert.throws(() => assertPublishableKey('sb_secret_abc'), /publishable/);
   assert.throws(() => assertPublishableKey('eyJhbGciOiJIUzI1NiJ9.e30.x'), /publishable/);

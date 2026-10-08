@@ -36,8 +36,9 @@
 //   node tools/identity-e2e/staging-suite.mjs [--phases setup,matrix,flows,security,recovery]
 //        [--evidence <file.jsonl>] [--summary <file.md>] [--origin <url>]
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { appendFileSync, existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, resolve, sep } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { appendFileSync, existsSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
+import { basename, dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { EPOCH_WAIT_MS, amrMethods, sleep } from './harness.mjs';
@@ -60,12 +61,32 @@ export function isSuiteFictional(phone) {
   return /^\+120255501\d\d$/.test(phone);
 }
 
-/** The persona state (with passwords) must never be inside the repository. */
-export function assertStateOutsideRepo(path, repoRoot = REPO_ROOT) {
-  if (!path) throw new Error('STAGING_SUITE_STATE is required (a file outside the repository)');
+/** Real path of a file that may not exist yet (its nearest existing ancestor is resolved). */
+export function realPathOf(path) {
   const abs = resolve(path);
-  const root = resolve(repoRoot);
-  if (abs === root || abs.startsWith(root + sep)) throw new Error('refusing a state file inside the repository');
+  if (existsSync(abs)) return realpathSync(abs);
+  const parent = dirname(abs);
+  return parent === abs ? abs : resolve(realPathOf(parent), basename(abs));
+}
+
+/** This checkout's top level and, for a linked worktree, the main worktree's top level. */
+export function repoRoots(repoRoot = REPO_ROOT) {
+  const roots = [realPathOf(repoRoot)];
+  try {
+    const common = execFileSync('git', ['-C', repoRoot, 'rev-parse', '--path-format=absolute', '--git-common-dir'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    if (common) roots.push(realPathOf(dirname(common)));
+  } catch { /* not a checkout: the current tree is the only root */ }
+  return [...new Set(roots)];
+}
+
+/** The persona state (with passwords) must never be inside the repository or its main worktree. */
+export function assertStateOutsideRepo(path, roots = repoRoots()) {
+  if (!path) throw new Error('STAGING_SUITE_STATE is required (a file outside the repository)');
+  const abs = realPathOf(path);
+  for (const root of (Array.isArray(roots) ? roots : [roots]).map(realPathOf)) {
+    if (abs === root || abs.startsWith(root + sep)) throw new Error('refusing a state file inside the repository');
+  }
   return abs;
 }
 
@@ -955,9 +976,9 @@ async function main() {
     const lrel = await credCmd(await tokenOf(adm2), 'identity.release_hold', lh.revision, { member_id: life.member, hold_id: lh.data?.holds?.[0]?.hold_id, identity_check: 'in_person' });
     const lback = await summary(await freshAfterEpoch(life));
     check('L10-login-hold-revokes-both-devices', lh.status === 200 && lh.data?.holds?.[0]?.reason_code === 'login_disabled'
-      && devA.status === 401 && devB.status >= 400 && lfresh.status === 403 && lfresh.detail === 'review_required'
+      && devA.status === 401 && devB.status === 400 && lfresh.status === 403 && lfresh.detail === 'review_required'
       && lstatus?.deactivated === false && lrel.status === 200 && lback.status === 200,
-      { hold: lh.data?.holds?.[0]?.reason_code ?? lh.code, device_a: devA.status, device_b_refresh: devB.status, fresh_sign_in: lfresh,
+      { hold: lh.data?.holds?.[0]?.reason_code ?? lh.code, device_a: devA.status, device_b_refresh: devB.status, device_b_refresh_error: devB.json?.error_code, fresh_sign_in: lfresh,
         deactivated: lstatus?.deactivated, release: outcomeOf(lrel), after_release: lback.status });
 
     const lr0 = await grantsRow(life.member);
@@ -1002,10 +1023,11 @@ async function main() {
       ? await lifecycleCmd(await tokenOf(adm2), 'identity.restore_membership', restoreStale.current_revision, { member_id: sub.member, identity_check: 'in_person' })
       : restoreStale;
     check('D10-member-requests-own-deletion-access-ends', canUse.code === 'conflict' && canUse.field_errors?.member_id === 'member_can_use_app'
-      && own.status === 200 && !own.code && afterOwn.status === 401 && afterRefresh.status >= 400 && afterSignIn.status === 400
+      && own.status === 200 && !own.code && afterOwn.status === 401 && afterRefresh.status === 400 && afterSignIn.status === 400
+      && afterSignIn.json?.error_code === 'user_banned'
       && Boolean(myDel) && restoreDeleted.field_errors?.member_id === 'deletion_requested',
       { staff_route_while_member_can_use_app: outcomeOf(canUse), request: outcomeOf(own), same_session_after: afterOwn.status,
-        refresh_after: afterRefresh.status, password_sign_in_after: afterSignIn.status, sign_in_error: afterSignIn.json?.error_code,
+        refresh_after: afterRefresh.status, refresh_error: afterRefresh.json?.error_code, password_sign_in_after: afterSignIn.status, sign_in_error: afterSignIn.json?.error_code,
         listed_for_admin: Boolean(myDel), deletion_steps: myDel?.steps?.map((s) => `${s.step}:${s.state}`), restore_attempt: outcomeOf(restoreDeleted) });
 
     const lh2 = await credCmd(await adminToken(), 'identity.place_hold', await memberRevision(link.member), { member_id: link.member, reason_code: 'login_disabled' });
@@ -1015,7 +1037,7 @@ async function main() {
       { member_id: link.member, identity_check: 'in_person' });
     const linkSignIn = await signIn(link.phone, link.pw);
     check('D11-staff-route-needs-a-second-admin', lh2.status === 200 && sameAdmin.code === 'conflict' && sameAdmin.field_errors?.member_id === 'second_admin_required'
-      && second.status === 200 && !second.code && linkSignIn.status === 400,
+      && second.status === 200 && !second.code && linkSignIn.status === 400 && linkSignIn.json?.error_code === 'user_banned',
       { hold: outcomeOf(lh2), same_admin: outcomeOf(sameAdmin), second_admin: outcomeOf(second), sign_in_after: linkSignIn.status });
     ownerSteps.push('Deletion erasure: run the deletion worker on staging (`tools/identity-deletion/worker.mjs run`, owner credential) and check that both suite deletions complete; the suite proves only the request and its denial of access.');
   }
@@ -1028,14 +1050,16 @@ async function main() {
     check('X10-generic-credential-errors', wrong.status === 400 && unknown.status === 400
       && wrong.json?.error_code === unknown.json?.error_code, { wrong_password: [wrong.status, wrong.json?.error_code], unknown_number: [unknown.status, unknown.json?.error_code] });
     const dup = await signUp(alt.phone, newPassword());
-    check('X11-duplicate-username-refused', dup.status >= 400 && !dup.json?.access_token, { status: dup.status, error: dup.json?.error_code });
+    check('X11-duplicate-username-refused', dup.status === 422 && dup.json?.error_code === 'user_already_exists' && !dup.json?.access_token, { status: dup.status, error: dup.json?.error_code });
     const nopw = await authCall('/auth/v1/signup', { phone: UNKNOWN_NUMBER });
     const anonymous = await authCall('/auth/v1/signup', {});
-    check('X12-passwordless-and-anonymous-sign-up-refused', nopw.status >= 400 && !nopw.json?.access_token && anonymous.status >= 400 && !anonymous.json?.access_token,
+    check('X12-passwordless-and-anonymous-sign-up-refused', nopw.status === 400 && nopw.json?.error_code === 'validation_failed' && !nopw.json?.access_token
+      && anonymous.status === 422 && anonymous.json?.error_code === 'anonymous_provider_disabled' && !anonymous.json?.access_token,
       { passwordless: [nopw.status, nopw.json?.error_code], anonymous: [anonymous.status, anonymous.json?.error_code] });
     const otp = await http('POST', '/auth/v1/otp', { body: { phone: alt.phone, create_user: false } });
     const altOk = await read('identity_my_member_summary', await tokenOf(alt, { fresh: true }));
-    check('X13-phone-otp-no-sms-no-session', otp.status >= 400 && !otp.json?.access_token && altOk.status === 200,
+    // No SMS provider: GoTrue fails the send with 500 unexpected_failure and issues nothing.
+    check('X13-phone-otp-no-sms-no-session', otp.status === 500 && otp.json?.error_code === 'unexpected_failure' && !otp.json?.access_token && altOk.status === 200,
       { otp: [otp.status, otp.json?.error_code ?? otp.json?.msg], member_access_unchanged: altOk.status });
     const tblApp = await http('GET', '/rest/v1/identity_members?select=member_id', { token: alt.token, profile: 'app' });
     const tblApi = await http('GET', '/rest/v1/identity_members?select=member_id', { token: alt.token, profile: 'api' });
@@ -1073,7 +1097,7 @@ async function main() {
     const thiefAfter = await read('identity_my_member_summary', thief?.access_token);
     const directNumberAfter = await signIn(DIRECT_PHONE_TARGET, alt.pw);
     const approvedAfter = await read('identity_my_member_summary', await freshAfterEpoch(alt));
-    check('X18-direct-phone-change-review-then-restore', direct.status === 200 && changingSession.status !== 200
+    check('X18-direct-phone-change-review-then-restore', direct.status === 200 && changingSession.status === 403 && changingSession.detail === 'review_required'
       && oldNumberAfter.status === 400 && thiefRead.status === 403 && thiefRead.detail === 'review_required'
       && thiefCreds?.access === 'review_required' && !('phone_username' in (thiefCreds ?? {}))
       && rc.status === 200 && !rc.code && thiefAfter.status === 401 && directNumberAfter.status === 400 && approvedAfter.status === 200,
@@ -1109,8 +1133,8 @@ async function main() {
     const g1r = await read('identity_my_member_summary', g1?.access_token);
     const g2r = await read('identity_my_member_summary', g2?.access_token);
     const g2f = await refresh(g2?.refresh_token);
-    check('X20-global-sign-out-revokes-all', go.status === 204 && g1r.status === 401 && g2r.status === 401 && g2f.status >= 400,
-      { logout: go.status, session_1: g1r.status, session_2: g2r.status, refresh_2: g2f.status });
+    check('X20-global-sign-out-revokes-all', go.status === 204 && g1r.status === 401 && g2r.status === 401 && g2f.status === 400 && g2f.json?.error_code === 'refresh_token_not_found',
+      { logout: go.status, session_1: g1r.status, session_2: g2r.status, refresh_2: g2f.status, refresh_2_error: g2f.json?.error_code });
     ownerSteps.push('Entry 2 cases that need email or Auth Admin power (local E2E `run.mjs` E32-E36, E40, E43, E44: magic-link, email-OTP and recovery sessions, direct email change, ban/unban, dormancy fixture) stay local-only or in the owner email run.');
   }
 

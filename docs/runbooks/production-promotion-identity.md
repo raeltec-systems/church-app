@@ -18,6 +18,8 @@ shows every workflow deployed but **visibly disabled** wherever its gate is not 
 gate is either approved by the owner (a recorded decision) or left closed, and a closed gate
 fails closed:
 
+- public sign-up stays **closed** (`disable_signup: true`, gate G11) until `q4_personal_data` is
+  approved, so no real phone number is collected and no Auth account exists before then;
 - the release gate `private_access` and `outbound_sending` stay **closed** in milestone 1
   (`tools/ci/verify-hosted.sql` refuses a promotion while either is open);
 - with no approved `dormancy_days` row, the live-access predicate answers `unavailable` to every
@@ -46,33 +48,12 @@ lead-pastor designation, deletion retention) are honoured only in databases mark
 3. The owner has decided every gate in the table below as **approve** or **leave closed**, in
    writing (the decision note text is used in the SQL below).
 
-### 2. Auth settings (owner, Management API; the dashboard refuses the phone settings)
+### 2. Database first (promotion workflow, reviewer approval)
 
-The identity workflows sign in with a phone-number username and a password **without SMS**. The
-environments runbook step C3 ("keep the Phone provider off") predates identity; for identity the
-production Auth settings are the same as on staging (owner decision 2026-10-06):
+The identity migrations (and their `auth.users` triggers) must exist **before** the phone provider
+is switched on in step 3, so that no Auth row can ever be created without the identity triggers
+watching it.
 
-```http
-PATCH https://api.supabase.com/v1/projects/<production ref>/config/auth
-Authorization: Bearer <owner personal access token>
-Content-Type: application/json
-
-{"external_phone_enabled": true, "sms_autoconfirm": true, "hook_send_sms_enabled": false,
- "mfa_phone_enroll_enabled": false, "mfa_phone_verify_enabled": false,
- "external_anonymous_users_enabled": false, "double_confirm_changes": true}
-```
-
-- No `sms_provider`, no SMS credential, no `sms_test_otp`. Check with `GET` on the same URL and
-  `GET https://<production ref>.supabase.co/auth/v1/settings` (`external.phone: true`,
-  `phone_autoconfirm: true`).
-- `site_url`: the production staff web origin. `uri_allow_list`: append (never replace)
-  `zm.bickafue.mobile://callback/auth/recovery,zm.bickafue.mobile://callback/auth/email-confirmed`
-  and, if staff web is on another host than `site_url`, `https://<staff host>/**`.
-- Password policy and Auth rate limits: set only the values the owner approved for gate G3/G4
-  (below); otherwise leave Supabase's defaults (the clients already require 8-72 bytes).
-- Email: leave the built-in sender until gate G1 is approved. With G1 closed no flow needs email.
-
-### 3. Database (promotion workflow, reviewer approval)
 
 Run **promote** with target `staging`, then with target `production` (environments runbook,
 "Promotion"). The production run applies every migration with `supabase db push` from the files
@@ -94,6 +75,38 @@ select has_table_privilege('postgres', 'auth.sessions', 'delete'),
        has_table_privilege('postgres', 'auth.audit_log_entries', 'delete'),
        has_table_privilege('postgres', 'auth.users', 'delete');   -- all true
 ```
+
+### 3. Auth settings, with public sign-up closed (owner, Management API; the dashboard refuses the phone settings)
+
+The identity workflows sign in with a phone-number username and a password **without SMS**. The
+environments runbook step C3 ("keep the Phone provider off") predates identity; for identity the
+production Auth settings are the staging ones (owner decision 2026-10-06) **plus `disable_signup:
+true`**: while `q4_personal_data` is unapproved, nobody may create an account in production, so
+no real phone number is collected before the privacy and youth/contact decisions (gate G11).
+
+```http
+PATCH https://api.supabase.com/v1/projects/<production ref>/config/auth
+Authorization: Bearer <owner personal access token>
+Content-Type: application/json
+
+{"disable_signup": true,
+ "external_phone_enabled": true, "sms_autoconfirm": true, "hook_send_sms_enabled": false,
+ "mfa_phone_enroll_enabled": false, "mfa_phone_verify_enabled": false,
+ "external_anonymous_users_enabled": false, "double_confirm_changes": true}
+```
+
+- Keep `disable_signup: true` until gate G11 is approved; every later `PATCH` of this config must
+  keep it (always `GET` first and send it back unchanged).
+- No `sms_provider`, no SMS credential, no `sms_test_otp`. Check with `GET` on the same URL
+  (`disable_signup: true`, `sms_provider` empty or null, no SMS credential fields set,
+  `sms_test_otp` empty) and `GET https://<production ref>.supabase.co/auth/v1/settings`
+  (`disable_signup: true`, `external.phone: true`, `phone_autoconfirm: true`).
+- `site_url`: the production staff web origin. `uri_allow_list`: append (never replace)
+  `zm.bickafue.mobile://callback/auth/recovery,zm.bickafue.mobile://callback/auth/email-confirmed`
+  and, if staff web is on another host than `site_url`, `https://<staff host>/**`.
+- Password policy and Auth rate limits: set only the values the owner approved for gate G3/G4
+  (below); otherwise leave Supabase's defaults (the clients already require 8-72 bytes).
+- Email: leave the built-in sender until gate G1 is approved. With G1 closed no flow needs email.
 
 ### 4. Edge Functions (owner or parent session; the promote workflow has no function step yet)
 
@@ -130,6 +143,7 @@ that this table does not name.**
 | G8 | First real Admin (Q1 approval owners) | **Open question below.** | No usable Admin: no staff screen works; nothing can be approved. |
 | G9 | `private_access` / `outbound_sending` (release) | Not in milestone 1: a later release epic changes `verify-hosted.sql` and `tools/env/environments.mjs` together. | Closed; promotions verify it. |
 | G10 | Church settings: `operational_contact` (Q1), `lead_pastor_designation` (Q4) | `select app.identity_approve_church_setting('operational_contact', '{"route": "<church office route>"}', 'israel', '<note>');`; the lead pastor only after Q4 (`app.identity_designate_lead_pastor`). | Help screens say "contact the church office"; the lead-pastor role cannot be assigned or used. |
+| G11 | Public sign-up (`disable_signup`, tied to G5/Q4) | Only after G5 is approved (and G8's first-Admin procedure is decided, since the first Admin also needs an account): `GET` the Auth config, then `PATCH` it with `disable_signup: false` and every other field unchanged. | `disable_signup: true`: `POST /auth/v1/signup` is refused (`422`, `signup_disabled`) and **Create account** fails generically on both clients; nobody can register a number. |
 
 ### 7. Verify that production shows the gates disabled (read-only, SQL editor)
 
@@ -152,17 +166,18 @@ Then through the public API with the production publishable key (no account need
   a `status` action for a made-up digest (64 zeros) answers `503 {"outcome": "unavailable"}`
   (no credential / G7 closed).
 - `POST /rest/v1/rpc/identity_my_member_summary` without a session answers 401.
-- `POST /auth/v1/otp {"phone": "+12025550199"}` must not send anything (no SMS provider). Do not
-  run it against a real number.
+- `GET /auth/v1/settings` shows `disable_signup: true` (G11 closed) and `external.phone: true`; the
+  Management API `GET .../config/auth` shows an empty `sms_provider` and no SMS credential. Nothing
+  that could send an SMS is called (no `/otp` probe in production).
+- `POST /auth/v1/signup` with a fictional number (`+12025550199`) and a throwaway password answers
+  `422` with `signup_disabled` and creates no user (G11 closed).
 
-And on the clients (owner, production builds): the mobile app opens, **Create account** works
-only once G5 is decided (until then the account would reach "No member access yet" and
-**Join the church** shows that applications are closed); staff web shows the sign-in page and,
-with no Admin, no Admin destinations.
+And on the clients (owner, production builds): the mobile app opens and **Create account** fails
+(sign-up closed, G11); staff web shows the sign-in page and, with no Admin, no Admin destinations.
 
 Record the outputs in `evidence-2.14/production-verify.md` (never personal data, keys or tokens).
 
-### Staging gate (before step 3)
+### Staging gate (before step 2)
 
 ```sh
 STAGING_PUBLISHABLE_KEY=<staging sb_publishable_ key> \

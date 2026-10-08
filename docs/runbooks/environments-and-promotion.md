@@ -186,7 +186,7 @@ and add `NETLIFY_AUTH_TOKEN` / `NETLIFY_SITE_ID`.
    - Set *Exposed schemas* to `api` only (remove `public` and `graphql_public`).
    - Set *Extra search path* to `api`.
 3. In **Authentication → Sign In / Providers**:
-   - Keep **Phone** provider off until the identity workflows are promoted. Identity signs in with a phone username and password **without SMS**, so its promotion turns the phone provider on with `sms_autoconfirm` through the Management API (the exact call is in [production-promotion-identity.md](production-promotion-identity.md), step 2).
+   - Keep **Phone** provider off until the identity workflows are promoted. Identity signs in with a phone username and password **without SMS**, so its promotion turns the phone provider on with `sms_autoconfirm`, **after** its migrations and with public sign-up closed (`disable_signup: true`) until the Q4 gate is approved, through the Management API (the exact call is in [production-promotion-identity.md](production-promotion-identity.md), step 3).
    - Configure no SMS provider, no Send SMS hook, no test OTPs and no phone MFA.
 4. Fill in the `production` GitHub environment (step A2).
 5. Run **promote** with target `staging` and check that it is green. Then run **promote** with target `production` and approve the deployment when GitHub asks. The first run marks the database `production`, which is terminal. It verifies that `private_access` and `outbound_sending` are closed.

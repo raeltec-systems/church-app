@@ -205,6 +205,7 @@ Every runbook action is recorded with ids, codes and revisions only: no names, n
 
 **Steps:**
 
+0. **Lost or stolen device: hold first.** If the member's phone (or any device with a signed-in session) was lost or stolen, place a `lost_device` hold (RB5, **Access reviews → Place a hold**) **before** opening the case. The hold revokes every session at once. Without it, whoever holds the device can change the password through Auth with the live session (a direct password change makes any outstanding grant fail) and so win the race against the member. The hold is released (by a Second Admin) only after the member's own reset in step 5 (step 6).
 1. Member, on their own phone, signed out: **Sign in, Get church help, I need help accessing my account**. They enter their phone number. The phone shows an 8-character request code.
 2. Support Admin, **Account recovery** (`/admin/account-recovery`): find the member, choose the identity check and the evidence seen, and **open a case**.
 3. The member reads the code from their screen. Type it and **issue the grant**. It lasts 15 minutes and works once.

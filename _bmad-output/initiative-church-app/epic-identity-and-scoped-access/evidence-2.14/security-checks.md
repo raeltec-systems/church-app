@@ -1,9 +1,16 @@
-# Story 2.14: independent security checks on staging (entries 2 and 9)
+# Story 2.14: security checks on staging (entries 2 and 9): builder's rerun and the independent rerun
 
 The epic asks for the alternate-route (entry 2) and stale-grant / reset-race (entry 9) cases to be
-repeated by an independent check before production. They were rerun **against staging Auth and
-the deployed `identity-assisted-recovery` function**, through the public API with the publishable
-key only, by `tools/identity-e2e/staging-suite.mjs` (phases `security` and `recovery`). Results:
+repeated by an independent check before production. This file holds two staging reruns:
+
+1. **The builder's staging rerun** (the 2.14 builder, not independent): every case below marked
+   *ran*, against staging Auth and the deployed `identity-assisted-recovery` function, through the
+   public API with the publishable key only, by `tools/identity-e2e/staging-suite.mjs` (phases
+   `security` and `recovery`).
+2. **The independent rerun** by the separate 2.14 reviewer with its own script and its own
+   synthetic accounts: see "Independent rerun" at the end.
+
+Builder's rerun results: Results:
 `staging-suite.jsonl` (step ids below), summarised in `staging-suite-summary.md`.
 
 The suite holds no owner secret: no service-role or secret key, no system credential, no SQL. So
@@ -64,3 +71,30 @@ The permission matrix (`M-*` lines, 14 principals x 21 reads and 43 commands) re
 that a grant or revocation applies on the next call (G10), that Admin and combined-role members
 reach no care or finance fixture (`fixture_scoped_read_*` 403 `not_granted` for every role), and
 that the system route refuses every user session.
+
+## Independent rerun (separate reviewer, 2026-10-08 00:32-00:48 UTC)
+
+Evidence: `independent-rerun.jsonl` (copied unchanged from the reviewer's run; scanned clean with
+`tools/auth-harness/scan-evidence.sh`; its state file with passwords was not copied). Same
+constraints: staging only, publishable key only, synthetic accounts, fictional numbers, no owner
+secret. **13/13 cases pass** (`I01` setup plus 12 security cases):
+
+| Step | Case | Result |
+|---|---|---|
+| I01 | Synthetic member: not linked before approval, pre-approval session untrusted after it, fresh password session granted | pass |
+| E2-00 | Password session trusted (AMR `password`) | pass |
+| E2-01 | Phone `/otp`: 500 `unexpected_failure`, no session, access unchanged | pass |
+| E2-02 | `/verify` with SMS code, magic-link and recovery hashes: 403 `otp_expired`, no session | pass |
+| E2-03 | Other grant routes refused, no session: PKCE 404 `flow_state_not_found`, bogus refresh 400, anonymous 422 `anonymous_provider_disabled`, SSO 404 `saml_provider_disabled` | pass |
+| E2-04 | `/reauthenticate`: no SMS, nothing changes | pass |
+| E2-05 | Tampered session claims (swapped `session_id`, `alg: none`): 401 | pass |
+| E2-06 | Direct phone change: review on every session, Admin restore | pass |
+| E2-07 | Password change: old and refreshed sessions untrusted | pass |
+| E2-08 | Global sign-out: other session 401, refresh `refresh_token_not_found` | pass |
+| E9-01 | Issue on a stale case revision is `conflict`; after issue a direct password change makes the redemption `rejected` and the grant status `closed`; the member's own password still works | pass |
+| E9-02 | Reissue supersedes the first grant; three concurrent redemptions: exactly one succeeds | pass |
+| E9-03 | Reset race: a stale session changes the password while a grant is outstanding; the redemption is `rejected`, the stale session is then 401, the grant's password never works, the account stays usable with the password actually set | pass |
+
+Not rerun independently: A13 (unlink), A15 (cross-member burn), A22 (deactivation), A23/A24
+(limits), and every case that needs a secret (system credential, Auth Admin, email, SQL: A16,
+A17, A19, A21, E32-E36, E40, E43, E44). Those rest on the builder's rerun above and the local E2Es.

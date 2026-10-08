@@ -4,7 +4,7 @@ type: 'chore'
 ticket: '14'
 created: '2026-10-07'
 status: 'blocked'
-blocked_reason: 'Staging evidence complete and verified; production promotion waits on owner-only items: (1) create the production Supabase project and GitHub production environment; (2) the production SMTP sender account (and the send-email hook, deferred) before q1_auth_recovery; (3) name the first real Admin and choose the first-Admin procedure (no production path exists yet); (4) decide each Q1/Q4 gate (dormancy, password/abuse policy, q4_personal_data, identity_deletion_retention, ops_system_access) as approve or leave fail-closed; (5) witness the mobile/staff-web demonstration (evidence-2.14/owner-demonstration.md); plus the email run and deletion-worker run in owner-consolidated-test.md.'
+blocked_reason: 'Staging evidence is complete (builder staging run 45/45, matrix 896/896) and the external check is done (independent rerun by the separate reviewer, 13/13, evidence-2.14/independent-rerun.jsonl). Production waits on OWNER items: (1) create the production Supabase project and GitHub production environment; (2) the production SMTP sender account; (3) name the first real Admin and choose the first-Admin procedure; (4) decide each Q1/Q4 gate (dormancy, password/abuse policy, q4_personal_data with public sign-up G11, identity_deletion_retention, ops_system_access) as approve or leave fail-closed; (5) witness the mobile/staff-web demonstration (evidence-2.14/owner-demonstration.md); plus the email run and deletion-worker run in owner-consolidated-test.md. DEVELOPMENT prerequisites before the matching gates can open (deferred-work): an operator path to approve dormancy_days (G3); the reviewed first-Admin procedure (G8); the send-email hook (G1/G2); an Edge Function deploy step in promote.yml.'
 baseline_revision: 'aca0241196bee6cedb930bc3b7448e6f52851f5e'
 route: 'full'
 route_source: 'auto'
@@ -84,6 +84,7 @@ Decision (agent, under owner pre-approval): an observed platform behaviour that 
 - Production package `docs/runbooks/production-promotion-identity.md` (linked from environments-and-promotion.md C3/C8 and identity-support.md RB1). Found while writing it: no operator path to approve `dormancy_days`, no first-real-Admin path, no function deploy step in `promote.yml`, send-email hook not built: all recorded as gates and deferred-work entries; production stays fail-closed.
 - CI: scan-evidence step for evidence-2.14, the suite and the production package.
 - No change under `apps/`, `packages/`, `supabase/`.
+- Independent review fixes (2026-10-08): production package reordered (migrations before Auth settings; `disable_signup: true` kept until the new gate G11, tied to G5/q4; no `/otp` probe in production, settings and `sms_provider` checks instead); the builder's staging run relabelled and the reviewer's independent rerun (13/13) added as `evidence-2.14/independent-rerun.jsonl`; X11-X13, X18, X20, L10, D10/D11 assert the exact status and error code seen on staging (not rerun on staging; existing evidence untouched); the state-file guard compares real paths against this worktree and the main worktree; RB4 says to place a `lost_device` hold first for a lost or stolen device.
 
 ## Plan Change Log
 

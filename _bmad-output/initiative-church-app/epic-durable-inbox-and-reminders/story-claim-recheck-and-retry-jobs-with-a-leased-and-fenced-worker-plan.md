@@ -3,7 +3,7 @@ title: 'Claim, recheck and retry jobs with a leased and fenced worker'
 type: 'feature'
 ticket: '4'
 created: '2026-10-08'
-status: 'in-progress'
+status: 'built'
 baseline_revision: 'fc3444679f5b4144ee6db50110d7332344032df3'
 route: 'full'
 route_source: 'auto'
@@ -66,18 +66,30 @@ Decision (agent, under owner pre-approval): the SYNTHETIC fixture gains `check_f
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/<ts>_notifications_worker.sql` -- extensions, settings, job columns, attempts, runs, token sequence, claim/attempt (internal + handlers + checks + registrations + grants to existing principals), deliver_due rewrite, fixture fault, scheduler tick/enable/disable/status, privileges.
-- [ ] `supabase/tests/notifications_worker_test.sql` -- the matrix, settings validation, scheduler refusals, privileges; pin updates in existing tests.
-- [ ] `supabase/functions/notifications-worker/{index.ts,logic.mjs,logic.test.mjs}`, `supabase/config.toml` -- the Edge worker.
-- [ ] `tools/identity-e2e/worker.mjs` + `.test.mjs` -- local HTTP E2E incl. Edge and a real pg_cron run.
-- [ ] `.github/workflows/ci.yml` -- new node tests if not covered by globs.
-- [ ] `docs/runbooks/notifications.md`, `system-access-and-operations.md` -- worker, settings, parent deploy/schedule steps, owner Vault/credential steps, rotation, staging demo.
+- [x] `supabase/migrations/<ts>_notifications_worker.sql` -- extensions, settings, job columns, attempts, runs, token sequence, claim/attempt (internal + handlers + checks + registrations + grants to existing principals), deliver_due rewrite, fixture fault, scheduler tick/enable/disable/status, privileges.
+- [x] `supabase/tests/notifications_worker_test.sql` -- the matrix, settings validation, scheduler refusals, privileges; pin updates in existing tests.
+- [x] `supabase/functions/notifications-worker/{index.ts,logic.mjs,logic.test.mjs}`, `supabase/config.toml` -- the Edge worker.
+- [x] `tools/identity-e2e/worker.mjs` + `.test.mjs` -- local HTTP E2E incl. Edge and a real pg_cron run.
+- [x] `.github/workflows/ci.yml` -- new node tests if not covered by globs.
+- [x] `docs/runbooks/notifications.md`, `system-access-and-operations.md` -- worker, settings, parent deploy/schedule steps, owner Vault/credential steps, rotation, staging demo.
 
 **Acceptance Criteria:**
 - Given a reset local stack, when db:test, db:smoke, every E2E, contracts and tool tests, scan-secrets and check-migrations run, then all pass.
 - Given the guards, when pgTAP runs, then no unowned, unpinned or boundary-violating objects exist.
 
 ## Implementation Notes
+
+- Implemented directly (no subagent tool in this run). Files: migration `supabase/migrations/20261008121500_notifications_worker.sql`; pgTAP `supabase/tests/notifications_worker_test.sql` (83); pins updated in `system_access_test.sql` (allowlist) and `notifications_inbox_test.sql` (worker principal now holds three commands); Edge Function `supabase/functions/notifications-worker/{index.ts,logic.mjs,logic.test.mjs}` + `config.toml`; E2E `tools/identity-e2e/worker.mjs` (+ test); CI evidence scan step; runbooks `notifications.md` (Story 3.4 section, cross-references) and `system-access-and-operations.md`; evidence `evidence-3.4/`.
+- The retry counter reuses the 3.1 `failed_attempts`/`last_failed_at` columns and the backoff is computed from them (base 60 s doubling to 3600 s = the 3.1 curve), so the 3.1 pgTAP cases that age `last_failed_at` stay valid; no `next_attempt_at` column.
+- `deliver_due` keeps its exact five-key answer (claimed includes jobs it expired; obsolete includes expired and exhausted), so 3.1-3.3 tests and `tools/notifications/worker.mjs` are unchanged.
+- Lease fields record the last lease; "live" = pending and `lease_expires_at > now()`. Finishing or failing ends the lease (`least(lease_expires_at, now())`), keeping the token for the fence.
+- The schedule recheck mirrors the 3.3 snooze rules (ended/stale, revision moved, kind cancelled, responded response kind).
+- The Edge Function forwards the caller's credential exactly like `identity-deletion`; the run loop lives in `logic.mjs` with the system call injected, so Node tests cover claim/attempt ordering, the deadline, uncertain answers and malformed claims.
+- The tick reads Vault and calls `net.http_post` by dynamic SQL, so the function exists even where pg_net is missing (answers `not_configured`). The enable refuses a second Cron job running the tick (one scheduler per environment).
+- Staging check (read-only, 2026-10-08): `pg_cron` and `pg_net` not installed, `supabase_vault` 0.3.1 installed; the migration enables both.
+- Surprise: in pgTAP a SQL helper that runs a command and selects its job in one statement sees no row (snapshot); helpers that need the new job are plpgsql.
+- Matrix audit: racing claims (pgTAP sequential leases + E2E W10 concurrent HTTP claims), killed mid-lease/reclaim/higher token/stale token/lapsed own lease (pgTAP, E2E W20/W21), cancelled after claim (pgTAP, W30), revised after enqueue (pgTAP, W31), revoked grant and inactive membership (pgTAP, W32), schedule changed (pgTAP), expired at claim and at attempt incl. default ttl (pgTAP, W33), transient failure/backoff/exhausted (pgTAP, W40), Edge auth 401/403 (W02) and batch run (W50), Cron with the app closed (W60), tick not_configured/gate_closed/sent and single scheduler (pgTAP). All ran and passed.
+- Owner/staging steps remaining (not blocking `built`): parent applies the migration and runs `verify-hosted.sql`, deploys `notifications-worker` (MCP `deploy_edge_function`, `verify_jwt: false`), sets `worker_url`; owner mints/registers a staging credential and stores it as Vault secret `notifications_worker_credential` (Dashboard); parent runs one tick, then `app.notifications_scheduler_enable('israel')`; owner runs the app-closed demonstration (runbook `notifications.md`, Story 3.4, Hosted staging steps 1-8). Credential rotation every 30 days at most.
 
 ## Plan Change Log
 

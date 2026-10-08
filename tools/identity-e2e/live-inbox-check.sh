@@ -38,6 +38,8 @@ CRED_ID=$(sql "select app.sys_register_credential('$PRINCIPAL', '$DIGEST', 'live
 cleanup() {
   sql "create temp table gone as select l.member_id from app.identity_account_links l join auth.users u on u.id = l.auth_user_id where $OURS;
        delete from app.notifications_inbox_items x using gone g where x.recipient_member_id = g.member_id;
+       delete from app.notifications_attempts a using app.notifications_jobs x, gone g
+        where a.job_id = x.job_id and x.recipient_member_id = g.member_id;
        delete from app.notifications_jobs x using gone g where x.recipient_member_id = g.member_id;
        delete from app.fixture_reminder_sources x using gone g where x.member_id = g.member_id;
        delete from app.identity_access_audit a using gone g where a.target_member_id = g.member_id or a.actor_member_id = g.member_id;

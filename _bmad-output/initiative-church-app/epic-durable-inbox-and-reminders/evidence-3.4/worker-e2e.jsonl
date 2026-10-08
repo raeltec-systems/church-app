@@ -1,0 +1,17 @@
+{"step":"W00-precondition","target":"LOCAL","at":"2026-10-08T10:58:09.743Z","leftover_users_removed":"0","scheduler_reset":true,"reset":true}
+{"step":"W01-member-signed-in-by-phone","target":"LOCAL","at":"2026-10-08T10:58:13.986Z","verdict":"pass","amr":["password"]}
+{"step":"W02-edge-refuses-without-the-worker-credential","target":"LOCAL","at":"2026-10-08T10:58:14.066Z","verdict":"pass","none":401,"malformed":401,"other_purpose":403,"unknown":403}
+{"step":"W10-racing-claims-are-disjoint","target":"LOCAL","at":"2026-10-08T10:58:15.509Z","verdict":"pass","claimed":[3,1],"disjoint":true,"outcomes":["delivered","delivered","delivered","delivered"],"items":4}
+{"step":"W20-killed-worker-reclaimed-and-fenced","target":"LOCAL","at":"2026-10-08T10:58:22.510Z","verdict":"pass","reclaimed":1,"higher_token":true,"late":"fenced","winner":"delivered","attempts":"fenced,delivered","items":1}
+{"step":"W21-stale-token-fenced","target":"LOCAL","at":"2026-10-08T10:58:22.642Z","verdict":"pass","outcome":"fenced"}
+{"step":"W30-cancelled-after-claim-never-dispatched","target":"LOCAL","at":"2026-10-08T10:58:24.072Z","verdict":"pass","outcome":"cancelled","state":"cancelled|source_cancelled","items":0}
+{"step":"W31-revised-after-enqueue-obsolete","target":"LOCAL","at":"2026-10-08T10:58:24.464Z","verdict":"pass","outcome":"obsolete","state":"obsolete|source_changed"}
+{"step":"W32-revoked-grant-ineligible","target":"LOCAL","at":"2026-10-08T10:58:24.815Z","verdict":"pass","outcome":"ineligible","state":"ineligible|recipient_ineligible"}
+{"step":"W33-expired-jobs-end-expired","target":"LOCAL","at":"2026-10-08T10:58:25.881Z","verdict":"pass","at_attempt":"expired","at_claim":{"expired":1,"claimed":0},"states":["obsolete|expired","obsolete|expired"]}
+{"step":"W34-one-attempt-row-each","target":"LOCAL","at":"2026-10-08T10:58:26.852Z","verdict":"pass","attempts":["cancelled","obsolete","ineligible","expired"]}
+{"step":"W40-transient-failure-retried-with-backoff","target":"LOCAL","at":"2026-10-08T10:58:27.887Z","verdict":"pass","first":"failed","claimed_while_backing_off":0,"retry":"delivered","attempts":"failed,delivered"}
+{"step":"W50-edge-worker-runs-a-batch","target":"LOCAL","at":"2026-10-08T10:58:28.620Z","verdict":"pass","status":200,"counts":{"claimed":2,"reclaimed":0,"expired":0,"outcomes":{"delivered":2},"uncertain":0,"deferred":0}}
+{"step":"W60-cron-runs-the-worker-with-the-app-closed","target":"LOCAL","at":"2026-10-08T10:58:35.897Z","verdict":"pass","scheduler_jobs":1,"schedule":"5 seconds","delivered":true,"last_tick_outcome":"sent","cron_runs":{"succeeded":1},"command_has_secret":false}
+{"step":"W61-scheduler-removed","target":"LOCAL","at":"2026-10-08T10:58:36.026Z","verdict":"pass","scheduler_jobs":0}
+{"step":"W70-edge-and-status-content-free","target":"LOCAL","at":"2026-10-08T10:58:36.026Z","verdict":"pass","leaked_in_responses":0,"leaked_in_function_log":0,"function_log_lines":7}
+{"step":"W99-cleanup","target":"LOCAL","at":"2026-10-08T10:58:40.758Z","users_left":0,"credentials_revoked":3,"principals_disabled":3,"unmarked":true,"jobs_left":0,"attempts_left":0,"cron_jobs_left":0,"vault_secret_left":0}

@@ -79,6 +79,8 @@ async function main() {
     create temp table gone_members as
       select m.member_id from app.identity_members m where m.display_name like '${NAME_PREFIX}%';
     delete from app.notifications_inbox_items i where i.recipient_member_id in (select member_id from gone_members);
+    delete from app.notifications_attempts a using app.notifications_jobs j
+     where a.job_id = j.job_id and j.recipient_member_id in (select member_id from gone_members);
     delete from app.notifications_jobs j where j.recipient_member_id in (select member_id from gone_members);
     delete from app.fixture_reminder_sources s where s.member_id in (select member_id from gone_members);
     delete from app.identity_access_audit a

@@ -65,17 +65,25 @@ Decision (agent, under owner pre-approval): the SYNTHETIC fixture gains an Admin
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/<ts>_notifications_routing.sql` -- route registry + register fn; needs, tokens, settings, push jobs; routing fn; attempt and enqueue replacement; lifecycle + deletion hooks and stubs; device/settings commands, authorizer, read; fixture route, `reminder_create_for`, erase extension, registrations; privileges.
-- [ ] `supabase/migrations/<ts+>_notifications_routing_rows.sql` -- the purge bodies only.
-- [ ] `supabase/tests/notifications_routing_test.sql` + pin updates in existing tests -- the matrix, privileges, guards.
-- [ ] `tools/identity-e2e/routing.mjs` + `.test.mjs`, `deletion.mjs` adjustment, e2e list -- API E2E of the verify line.
-- [ ] `docs/runbooks/notifications.md`, `contracts-and-owner-seams.md`, `identity-access.md` (hook list) -- routing, consumer guide, owner `_rows` step.
+- [x] `supabase/migrations/<ts>_notifications_routing.sql` -- route registry + register fn; needs, tokens, settings, push jobs; routing fn; attempt and enqueue replacement; lifecycle + deletion hooks and stubs; device/settings commands, authorizer, read; fixture route, `reminder_create_for`, erase extension, registrations; privileges.
+- [x] `supabase/migrations/<ts+>_notifications_routing_rows.sql` -- the purge bodies only.
+- [x] `supabase/tests/notifications_routing_test.sql` + pin updates in existing tests -- the matrix, privileges, guards.
+- [x] `tools/identity-e2e/routing.mjs` + `.test.mjs`, `deletion.mjs` adjustment, e2e list -- API E2E of the verify line.
+- [x] `docs/runbooks/notifications.md`, `contracts-and-owner-seams.md`, `identity-access.md` (hook list) -- routing, consumer guide, owner `_rows` step.
 
 **Acceptance Criteria:**
 - Given a reset local stack, when db:test, db:smoke, every E2E, contracts and tool tests, scan-secrets and check-migrations run, then all pass.
 - Given a member deletion run through Identity's hooks, when the `check` phase runs, then Notifications and the fixture answer `remaining: 0`.
 
 ## Implementation Notes
+
+- Implemented directly (no subagent tool in this run). Files: migrations `supabase/migrations/20261008143000_notifications_routing.sql` (no `delete from`; stubs `app.notifications_deletion_purge_rows(uuid, uuid)` and `app.fixture_deletion_purge_rows(uuid)` answer `unavailable`) and `supabase/migrations/20261008143100_notifications_routing_rows.sql` (the two bodies only); pgTAP `supabase/tests/notifications_routing_test.sql` (100); E2E `tools/identity-e2e/routing.mjs` (+ test, 18 checks); runbooks `notifications.md` (Story 3.5 section, earlier limits updated), `contracts-and-owner-seams.md` (direct-contact route guide, deletion hooks), `identity-access.md` (hook lists); CI evidence scan step; evidence `evidence-3.5/`.
+- Pins updated in existing tests: `command_foundation_test.sql` (authenticated may execute `api/app.notifications_command` and `notifications_my_push_settings`), `notifications_scheduling_test.sql` (member 1 gets an account so the snooze case still has an item; client-executable allowlist), `notifications_worker_test.sql` (a deactivated recipient now ends `direct_contact`, not `membership_inactive`), `cross_epic_contracts_test.sql` (removes Notifications' real hooks inside the test before registering its synthetic ones), `member_deletion_test.sql` and `tools/identity-e2e/deletion.mjs` (the fixture deletion hook is registered by migration and stays registered).
+- Routing uses `app.identity_account_standing(auth_user_id)` (the predicate's account half): `ok` = member route; anything else with a live link = direct contact. Dormancy is not part of routing (documented).
+- Postgres regex repetition bounds stop at 255, so the token shape is a character class plus a length check (found by the first pgTAP run).
+- Deletion: `deletion_requested` also cancels the member's pending jobs and ends schedules, and enqueue refuses a tombstone, so a completed deletion cannot be refilled; the hook's `erase` nulls snooze links (an update) before the purge.
+- Matrix audit (all ran and passed): active linked with token and push on/off and without token, held (real hold command), link in review, deactivated (real command), accountless, relative's contact (relative is an active member with a device), no route (`unrouted`), raising route (transient, retried), deleted (`member_deleted`), never approved (`membership_inactive`), the five lifecycle events (hold and deactivation and lost-device hold through real commands, others dispatched), deletion hook erase/check incl. cells and fixture, stub `unavailable`, device and settings commands incl. foreign `not_found`, unregistered category, held `forbidden`, stale revisions: `notifications_routing_test.sql`; the API path of the verify line (enqueue for four recipients, routing, relative, hold, lost-device sessions revoked, own deletion request, deletion check zero): `routing.mjs`.
+- Owner/staging steps remaining (not blocking `built`): parent applies `20261008143000` and runs `verify-hosted.sql`; owner pastes `20261008143100_notifications_routing_rows.sql` in the staging SQL editor (until then staging deletions wait at `erase_owners`); owner demonstration (runbook `notifications.md`, Story 3.5, Hosted staging). No Edge Function redeploy needed.
 
 ## Plan Change Log
 

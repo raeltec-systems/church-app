@@ -619,7 +619,7 @@ Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/ev
   - Such a hold is released only after the member's own reset after that time: a 2.7 email-link redemption (approved address only) followed by a new password. Without an approved recovery email that reset is staff-assisted recovery (entry 9), which must record the same evidence; until then the hold stays.
 - **Lifecycle hooks.** Placing dispatches the contract v1 event `access_hold_applied`; releasing dispatches `access_hold_released`. Every session revocation (an approved change, a restore, an accept, a lost-device hold) dispatches the new v1 event `sessions_revoked`. All run in the same transaction, with `identity_revision` set to the member revision, and a raising hook rolls the whole command back.
   - Device-registration owners (the inbox epic) register on `sessions_revoked` (and `access_hold_applied`) to remove push registrations. `sessions_revoked` was added to the v1 event list in SQL, the shared fixtures and the Dart and TypeScript mappings.
-  - Today only the SYNTHETIC `app.fixture_record_lifecycle` is ever registered for these events, by the tests and the E2E, which remove it again.
+  - Since story 3.5 Notifications registers `app.notifications_on_member_lifecycle` on `sessions_revoked`, `access_hold_applied`, `membership_deactivated`, `account_deactivated` and `deletion_requested` (tokens retired, member-push jobs cancelled; see `notifications.md`, Story 3.5). The SYNTHETIC `app.fixture_record_lifecycle` is registered only by the tests and the E2E, which remove it again.
 - Audit: `app.identity_credential_review_audit` (`hold_placed`, `hold_released`, with the reason code and the number of revoked sessions).
 
 ### Credential review of an account in access review (Admin)
@@ -917,7 +917,7 @@ Seven system commands, allowlisted for the purpose `identity_deletion` only:
 select app.identity_register_deletion_hook('chat', 'app.chat_erase_member(jsonb)'::regprocedure);
 ```
 
-A missing handler or an answer of another shape raises: the step is retried and nothing completes. Today Cells (`app.cells_erase_member`) and the SYNTHETIC `app.fixture_erase_member` (tests and E2E only) exist.
+A missing handler or an answer of another shape raises: the step is retried and nothing completes. Today Cells (`app.cells_erase_member`), Notifications (`app.notifications_erase_member`, story 3.5) and the SYNTHETIC `app.fixture_erase_member` exist; since story 3.5 the fixture hook is registered by migration (it also erases the SYNTHETIC reminder sources), and the tests and the E2E keep it registered.
 
 ### The worker and the Edge Function
 

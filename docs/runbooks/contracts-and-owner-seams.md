@@ -79,7 +79,7 @@ Lifecycle events (contract v1): `access_hold_applied`, `access_hold_released`, `
 
 **Handover hooks (story 2.10).** An owner whose work must be handed over when a membership is deactivated also registers a read-only handover hook with Identity: `select app.identity_register_handover_hook('<module>', 'app.<prefix>_report_handover(jsonb)'::regprocedure);`. It returns `{"obligations": [{"kind", "subject_id", "last_responsible"}]}`; `last_responsible` refuses the deactivation until the work is handed over. The owner resolves recorded obligations with `app.identity_resolve_handover_obligation('<module>', '<obligation_id>', 'handed_over' | 'no_longer_needed')`. See `identity-access.md`, story 2.10.
 
-**Deletion hooks (story 2.11).** An owner that keeps personal data of a member registers a deletion hook before it activates: `select app.identity_register_deletion_hook('<module>', 'app.<prefix>_erase_member(jsonb)'::regprocedure);`. The handler gets `{member_id, account_id, deletion_id, phase}`, once for every Auth account the member ever linked (`account_id` null for a member who never had one); `phase` `erase` removes or anonymises the owner's personal data of that member (idempotent; Storage objects through the Storage API) and `check` only counts what is left; both answer `{"remaining": <int>}`. A full deletion completes only when every hook answers 0. Cells registers `app.cells_erase_member`. A deletion also records the member's handover obligations (2.10 hooks); erasure waits until they are resolved. See `identity-access.md`, story 2.11.
+**Deletion hooks (story 2.11).** An owner that keeps personal data of a member registers a deletion hook before it activates: `select app.identity_register_deletion_hook('<module>', 'app.<prefix>_erase_member(jsonb)'::regprocedure);`. The handler gets `{member_id, account_id, deletion_id, phase}`, once for every Auth account the member ever linked (`account_id` null for a member who never had one); `phase` `erase` removes or anonymises the owner's personal data of that member (idempotent; Storage objects through the Storage API) and `check` only counts what is left; both answer `{"remaining": <int>}`. A full deletion completes only when every hook answers 0. Cells registers `app.cells_erase_member`; Notifications (story 3.5) registers `app.notifications_erase_member` and the SYNTHETIC fixture `app.fixture_erase_member`. Row deletions in a hook follow the hosted rule: a fail-closed stub in the main migration and the real body in a small `_rows` migration the owner applies by hand (2.11 and 3.5 are the examples). A deletion also records the member's handover obligations (2.10 hooks); erasure waits until they are resolved. See `identity-access.md`, story 2.11.
 
 **Journal replay hooks (story 2.11, platform).** `app.rcv_apply_journal_entry` (1.10) calls every hook registered with `app.rcv_register_replay_hook('<module>', 'app.<prefix>_rcv_replay(jsonb)'::regprocedure)` with `{entry, restoring}` after recording the entry. A hook re-applies its own deny-only effects only while a restore is held (`restoring` true), and raises when it cannot, which keeps the restore held. Identity registers `app.identity_rcv_replay`.
 
@@ -173,6 +173,24 @@ Use the shared scheduling calculation instead of computing `scheduled_at` yourse
 5. **Recurring sources** compute each occurrence with `app.notifications_occurrences(app.notifications_policy(), rule, from, until)` (a church-local rule with exception dates) and schedule each occurrence as its own source.
 
 Refusals: `validation_failed` (shape, intent, or `{"kinds": "required"|"unregistered"|"invalid"}`), `conflict` (your source is not current at that revision), `unavailable {"policy": "gate_closed"}` (Q2 closed or not a valid scheduling policy). Nothing is written then, and your command rolls back with it.
+
+## Direct-contact routes (story 3.5)
+
+Migration: `supabase/migrations/20261008143000_notifications_routing.sql`. Since story 3.5 the worker resolves each recipient through current Identity state. A held member, a member whose link is in review, an accountless member and a deactivated member get **no inbox item and no member-push job**: the reminder need goes to your **direct-contact route** instead (FR "Proposed duty reminder defaults": the responsible leader's **Needs direct contact** list). Register one per reminder contract in your own migration, after the contract:
+
+```sql
+-- Handler: (jsonb need) returns void, search_path = ''. The need is exactly
+-- {need_id, source_type, source_id, source_revision, recipient_member_id, reminder_kind, scheduled_at}.
+select app.contract_register_direct_contact_route(
+  'duties', 'duties_assignment', 'response_due', 'app.duties_record_contact_need(jsonb)'::regprocedure);
+```
+
+- Put the need on your own leader list, **idempotent on `need_id`** (the worker may retry). Do not lock your source aggregate in the handler (the worker already holds the job; your commands lock the source first, then call Notifications), so insert into a separate list table.
+- The need never says why (a hold is never disclosed) and never carries a contact route: a relative's or household number is never a notification destination. Your leader screen decides how to reach the member, and records the member's explicit answer as your own attributed direct-contact confirmation; a need is not contact.
+- A raising handler makes the attempt a transient failure: nothing is recorded and the job is retried with backoff. Without a registered route the need is still recorded in Notifications, `unrouted` (finish reason `no_direct_contact_route`), for the reminder health view (entry 8).
+- Only the owner of the source type may register; the kind must have a reminder contract (PCTR1 otherwise). Registering again replaces the handler.
+- **Deleted members.** After a deletion request, `app.notifications_enqueue` and `app.notifications_set_schedule` refuse the member (`validation_failed {"recipient_member_id": "deleted"}`). Drop deleted members from your sources in your own `deletion_requested` lifecycle hook.
+- The SYNTHETIC `fixture_reminder` source is the worked example (`app.fixture_reminder_direct_contact` into `app.fixture_reminder_contact_needs`).
 
 ## Policy gates and environment
 

@@ -206,7 +206,7 @@ Nothing is scheduled in production until Israel approves `q2_church_time`:
 
 ## Story 3.4: the leased and fenced worker, Cron and the Edge Function
 
-Migration: `supabase/migrations/20261008121500_notifications_worker.sql` (one file; no row deletions, no destructive statements). Edge Function: `supabase/functions/notifications-worker/` (`index.ts`, `logic.mjs`; `verify_jwt = false` in `supabase/config.toml`). Tests: `supabase/tests/notifications_worker_test.sql` (110), `supabase/functions/notifications-worker/logic.test.mjs`, E2E `tools/identity-e2e/worker.mjs` (17 checks, including a real pg_cron run). Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.4/`.
+Migration: `supabase/migrations/20261008121248_notifications_worker.sql` (one file; no row deletions, no destructive statements). Edge Function: `supabase/functions/notifications-worker/` (`index.ts`, `logic.mjs`; `verify_jwt = false` in `supabase/config.toml`). Tests: `supabase/tests/notifications_worker_test.sql` (110), `supabase/functions/notifications-worker/logic.test.mjs`, E2E `tools/identity-e2e/worker.mjs` (17 checks, including a real pg_cron run). Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.4/`.
 
 ### How a job is worked
 
@@ -299,7 +299,7 @@ The E2E mints local credentials and registers only their digests. It generates t
 
 The agent deployed nothing and created no schedule. In order:
 
-1. **Parent session: the migration.** Apply `20261008121500_notifications_worker.sql` to staging (`tmurpotfluignacfueki`) after `20261008102121`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. There is no `_rows` file. The migration:
+1. **Parent session: the migration.** Apply `20261008121248_notifications_worker.sql` to staging (`tmurpotfluignacfueki`) after `20261008102121`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. There is no `_rows` file. The migration:
    - enables `pg_net` and `pg_cron` (neither was installed on staging on 2026-10-08);
    - retires `app.ops_operator_actions` by rename to `ops_retired_operator_actions_v2` (rows copied) and recreates it with the scheduler actions;
    - adds the worker policy, attempts, runs and scheduler-state tables, six job columns, the three commands and the operator functions. Any existing `notifications_worker` principal, such as the 3.1 staging one, gets the three commands at once;

@@ -5,10 +5,17 @@ Synthetic data only. Owner Q2 decisions: `owner-decisions-milestone-2.md`.
 
 ## Owner steps to do first
 
-1. **Reminder worker credential (3.1).** In your local clone run
+1. **Reminder worker credential (3.1, 3.4).** In your local clone run
    `OPS_STATE_DIR=.ops-state/notifications-worker node tools/ops/system-credential.mjs mint --env staging`
-   and send the assistant only the fingerprint it prints; the assistant registers it
-   (principal `notifications-worker`, purpose `notifications_worker`, 30 days).
+   (add `--force` if a staging credential already exists there) and send the assistant only the
+   fingerprint it prints; the assistant registers it (principal `notifications-worker`, 30 days).
+2. **Two Edge Function secrets (3.4).** Supabase dashboard, staging project, **Edge Functions >
+   Secrets**: add `NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL` = the contents of
+   `.ops-state/notifications-worker/staging.credential`, and `NOTIFICATIONS_WORKER_TRIGGER` = the
+   value of the Vault secret `notifications_worker_trigger` (**Project Settings > Vault > Secrets**,
+   reveal and copy; the assistant already created it). Do not paste either value into a chat.
+   Then tell the assistant "secrets set": it runs one test tick and switches on the every-minute
+   schedule.
 
 ## Scenarios
 
@@ -22,7 +29,16 @@ Synthetic data only. Owner Q2 decisions: `owner-decisions-milestone-2.md`.
   "Story 3.2", Hosted staging step 2) and open the same item again: it shows the generic "out of
   date" state with nothing about why. Inbox titles and texts never contain names, numbers or links.
 
+- **3.4 Reminders with the apps closed:** as a synthetic member create a test reminder due now,
+  close both apps; within about a minute the item is in **Inbox** on both clients with nobody
+  running anything. A test reminder whose check is made to fail for 3 minutes still arrives once the
+  fault ends (the assistant sets the fault). A cancelled one never arrives. Details:
+  `docs/runbooks/notifications.md`, story 3.4, Hosted staging step 7.
+
 ## Reminders
+
+- Rotate the staging notifications-worker credential at least every 30 days (mint with `--force`,
+  send the fingerprint, replace the Edge secret `NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL`).
 
 ## Decisions for the owner at the end of milestone 2
 

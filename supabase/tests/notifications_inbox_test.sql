@@ -176,8 +176,10 @@ select app.sys_register_credential((select v from t_ids where k = 'probe'),
   encode(sha256(convert_to(pg_temp.token('P'), 'UTF8')), 'hex'), 'pgtap probe 3.1', interval '1 hour', 'israel');
 select is((select array_agg(command order by command) from app.sys_principal_commands
             where principal_id = (select v from t_ids where k = 'worker')),
-  array['notifications.attempt', 'notifications.claim', 'notifications.deliver_due', 'notifications.release'],
-  'the worker principal holds exactly the worker commands (3.1 deliver step, 3.4 claim, attempt and release)');
+  array['notifications.attempt', 'notifications.claim', 'notifications.deliver_due',
+        'notifications.push_claim', 'notifications.push_prepare', 'notifications.push_record',
+        'notifications.push_release', 'notifications.release'],
+  'the worker principal holds exactly the worker commands (3.1 deliver step, 3.4 claim, attempt and release, 3.6 push)');
 
 -- Create a due reminder: source and job in one transaction --------------------------------------
 create temp table r (k text primary key, v jsonb);

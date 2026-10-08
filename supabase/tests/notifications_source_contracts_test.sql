@@ -317,7 +317,9 @@ select is(pg_temp.open(1, pg_temp.item((select v from src where k = 'current')))
   (select jsonb_build_object('item_id', i.item_id, 'reminder_kind', 'fixture_due',
             'title', 'SYNTHETIC test reminder', 'body', 'A test reminder is waiting for you.',
             'due_at', app.cmd_utc(i.due_at), 'delivered_at', app.cmd_utc(i.delivered_at),
-            'state', 'current', 'target', '/fixture/reminders/' || (select v from src where k = 'current'))
+            'state', 'current', 'target', '/fixture/reminders/' || (select v from src where k = 'current'),
+            -- Story 3.7: a current item also offers the policy's snooze choices.
+            'snooze_choices', '["1 hour", "24 hours", "2 days"]'::jsonb, 'snoozed_until', null)
      from app.notifications_inbox_items i where i.item_id = pg_temp.item((select v from src where k = 'current'))),
   'a current item opens with its generic text and the authorised target');
 select is(pg_temp.open(1, pg_temp.item((select v from src where k = k2))) ->> 'state', 'superseded',

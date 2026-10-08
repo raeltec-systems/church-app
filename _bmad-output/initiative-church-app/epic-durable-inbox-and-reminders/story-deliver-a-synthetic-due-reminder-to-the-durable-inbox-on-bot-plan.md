@@ -3,7 +3,7 @@ title: 'Deliver a synthetic due reminder to the durable inbox on both clients'
 type: 'feature'
 ticket: '1'
 created: '2026-10-08'
-status: 'built'
+status: 'done'
 baseline_revision: '04c8501d037ddcc56c965023589eb8889e46c7d8'
 route: 'full'
 route_source: 'auto'
@@ -27,7 +27,7 @@ context:
 
 ## Boundaries & Constraints
 
-**Always:** one job per logical key (`source_type, source_id, source_revision, recipient_member_id, reminder_kind, scheduled_at`) and one inbox item per job, enforced by unique indexes; enqueue validates through `app.contract_reminder_key` (registered kind, current source revision via the owner hook, Q2 gate open: fixture in local/staging, closed in production); jobs record `policy_source` and `policy_digest` (sha256 of the effective `q2_church_time` value); the worker rechecks the source through `app.contract_check_source` and the recipient's approved membership before writing an item; a cancelled, obsolete or future job never becomes an item; all `app` objects carry the `notifications_`/`fixture_` prefix, pin `search_path = ''`, revoke PUBLIC/anon/service_role; only `authenticated` executes the read and the fixture command; inbox read exposes no source id, revision or private text; protected client state stays in memory per account generation; migration is ASCII, non-destructive, no row deletions, version `20261008090000`.
+**Always:** one job per logical key (`source_type, source_id, source_revision, recipient_member_id, reminder_kind, scheduled_at`) and one inbox item per job, enforced by unique indexes; enqueue validates through `app.contract_reminder_key` (registered kind, current source revision via the owner hook, Q2 gate open: fixture in local/staging, closed in production); jobs record `policy_source` and `policy_digest` (sha256 of the effective `q2_church_time` value); the worker rechecks the source through `app.contract_check_source` and the recipient's approved membership before writing an item; a cancelled, obsolete or future job never becomes an item; all `app` objects carry the `notifications_`/`fixture_` prefix, pin `search_path = ''`, revoke PUBLIC/anon/service_role; only `authenticated` executes the read and the fixture command; inbox read exposes no source id, revision or private text; protected client state stays in memory per account generation; migration is ASCII, non-destructive, no row deletions, version `20261008073631`.
 
 **Never:** leases, fencing, attempts, retries, expiry, Cron or an Edge worker (entry 4); scheduling calculation (entry 3); source-contract text/deep links (entry 2); recipient routing for held/accountless members, device tokens, push, lifecycle or deletion hooks (entries 5-6); applying anything to staging or deploying functions; minting a non-local credential.
 
@@ -70,7 +70,7 @@ Decision (agent, under owner pre-approval): the tracer worker is an operator-run
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261008090000_notifications_inbox.sql` -- tables, enqueue/cancel, worker handler + payload check + command kind, read, fixture source/commands/authorizer, registrations, grants.
+- [x] `supabase/migrations/20261008073631_notifications_inbox.sql` -- tables, enqueue/cancel, worker handler + payload check + command kind, read, fixture source/commands/authorizer, registrations, grants.
 - [x] `supabase/tests/notifications_inbox_test.sql` -- pgTAP for the whole matrix, privileges, guards; `supabase/tests/system_access_test.sql` -- allowlist row.
 - [x] `tools/notifications/worker.mjs` + `worker.test.mjs` -- `run-once [--limit n]` over the system route, credential from env/file, content-free output.
 - [x] `tools/identity-e2e/inbox.mjs` + `inbox.test.mjs` -- local HTTP E2E through real GoTrue, PostgREST and the worker script; full cleanup.
@@ -86,7 +86,7 @@ Decision (agent, under owner pre-approval): the tracer worker is an operator-run
 
 ## Implementation Notes
 
-- Implemented directly (no subagent tool in this run). Files: migration `supabase/migrations/20261008090000_notifications_inbox.sql`; pgTAP `supabase/tests/notifications_inbox_test.sql` (52); allowlist/privilege pins updated in `system_access_test.sql` and `command_foundation_test.sql`; worker `tools/notifications/worker.mjs` (+ test); E2E `tools/identity-e2e/inbox.mjs` (+ test); live adapter check `tools/identity-e2e/live-inbox-check.sh` + `packages/client_core/tool/live_inbox_check.dart`; client_core `domain/inbox.dart`, `adapters/supabase_inbox_repository.dart`, `application/inbox_controllers.dart`, `presentation/inbox_screen.dart`, route `/inbox`, provider, composition, `FakeInbox`; Inbox destination in both apps; CI node tests + evidence scan; runbooks `notifications.md` (new), `contracts-and-owner-seams.md`, `system-access-and-operations.md`.
+- Implemented directly (no subagent tool in this run). Files: migration `supabase/migrations/20261008073631_notifications_inbox.sql`; pgTAP `supabase/tests/notifications_inbox_test.sql` (52); allowlist/privilege pins updated in `system_access_test.sql` and `command_foundation_test.sql`; worker `tools/notifications/worker.mjs` (+ test); E2E `tools/identity-e2e/inbox.mjs` (+ test); live adapter check `tools/identity-e2e/live-inbox-check.sh` + `packages/client_core/tool/live_inbox_check.dart`; client_core `domain/inbox.dart`, `adapters/supabase_inbox_repository.dart`, `application/inbox_controllers.dart`, `presentation/inbox_screen.dart`, route `/inbox`, provider, composition, `FakeInbox`; Inbox destination in both apps; CI node tests + evidence scan; runbooks `notifications.md` (new), `contracts-and-owner-seams.md`, `system-access-and-operations.md`.
 - Surprise: registering the `fixture` command authorizer took over the whole `fixture.*` namespace, which the 1.4 kernel test uses (`fixture.broken` with per-actor fixture grants). The authorizer now keeps the 1.4 per-actor `fixture_command_grants` check for every other `fixture.*` command, so prior behaviour is unchanged.
 - A non-SYNTHETIC member never reaches the fixture handler's SYNTHETIC check off production: the live-access predicate already refuses non-synthetic members while `private_access` is closed, so the command answers `forbidden` (pinned in pgTAP); the handler check stays as defence in depth.
 - Worker reads the recipient's membership without a lock (AD-2 orders Identity before Notifications and the step already holds the job row); the source check hook does not lock the source either, so a cancellation committing after the recheck can still leave a delivered item (the AD-8 accepted race; entry 2 re-reads on open).

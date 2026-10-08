@@ -4,7 +4,7 @@ Architecture: AD-1, AD-2, AD-8, AD-9, AD-19. Owner decisions: `_bmad-output/init
 
 ## Story 3.1: a synthetic due reminder reaches the durable inbox
 
-Migration: `supabase/migrations/20261008090000_notifications_inbox.sql` (one file; no row deletions, no destructive statements). Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.1/`.
+Migration: `supabase/migrations/20261008073631_notifications_inbox.sql` (one file; no row deletions, no destructive statements). Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.1/`.
 
 ### What exists
 
@@ -50,7 +50,7 @@ Each run mints its own local `notifications_worker` credential and registers onl
 
 ### Hosted staging (parent session, then the owner)
 
-1. **Parent session:** apply `20261008090000_notifications_inbox.sql` to staging (`tmurpotfluignacfueki`) after `20261007193513`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. The file has no row deletion, so there is no `_rows` file to paste. It adds:
+1. **Parent session:** apply `20261008073631_notifications_inbox.sql` to staging (`tmurpotfluignacfueki`) after `20261007193513`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. The file has no row deletion, so there is no `_rows` file to paste. It adds:
    - two Notifications tables and the SYNTHETIC `fixture_reminder_sources`;
    - the `fixture` command authorizer;
    - the dependency edge `fixture -> notifications`;

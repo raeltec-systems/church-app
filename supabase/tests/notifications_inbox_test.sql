@@ -222,8 +222,8 @@ select throws_ok($$insert into app.notifications_inbox_items (job_id, recipient_
                      from app.notifications_inbox_items i limit 1$$,
   '23505', null, 'a second item for the same job is impossible (duplicate or racing workers)');
 select is((select array_agg(k order by k) from jsonb_object_keys(pg_temp.items(1) -> 0) k),
-  array['delivered_at', 'due_at', 'item_id', 'reminder_kind'],
-  'the member reads the item: kind and times only');
+  array['body', 'delivered_at', 'due_at', 'item_id', 'reminder_kind', 'title'],
+  'the member reads the item: kind, registered generic text (3.2) and times only');
 select is(pg_temp.items(1) -> 0 ->> 'reminder_kind', 'fixture_due', 'the item is the fixture reminder');
 select is(pg_temp.items(2), '[]'::jsonb, 'another member sees nothing');
 select is(pg_temp.inbox('{"role": "authenticated"}'::jsonb), 'PT401|unauthenticated|unauthenticated',
@@ -288,6 +288,19 @@ end;
 $$;
 select app.contract_register_source_type('fixture', 'fixture_pgtap_flaky', 'app.fixture_pgtap_flaky_check(jsonb)'::regprocedure);
 select app.contract_register_reminder_kind('fixture', 'fixture_pgtap_flaky', 'fixture_due');
+-- Story 3.2: the worker rechecks through the reminder contract, so the flaky source registers one.
+create function app.fixture_pgtap_flaky_reminder(p_key jsonb) returns jsonb
+language plpgsql set search_path = '' as $$
+begin
+  if current_setting('pgtap.flaky', true) = 'on' then
+    raise exception 'flaky source owner';
+  end if;
+  return '{"current": true, "revision": 1, "actionable": true, "recipient_eligible": true}'::jsonb;
+end;
+$$;
+select app.contract_register_reminder_contract('fixture', 'fixture_pgtap_flaky', 'fixture_due',
+  'app.fixture_pgtap_flaky_reminder(jsonb)'::regprocedure,
+  '{"title": "SYNTHETIC flaky reminder", "body": "A flaky test reminder.", "link": "/fixture/flaky"}');
 select app.notifications_enqueue(jsonb_build_object(
   'source_type', 'fixture_pgtap_flaky', 'source_id', gen_random_uuid(), 'source_revision', 1,
   'recipient_member_id', (select member_id from m where n = 2), 'reminder_kind', 'fixture_due',

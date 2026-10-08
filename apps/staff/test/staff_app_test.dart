@@ -11,6 +11,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 
 typedef Harness = ClientTestHarness;
 
@@ -739,6 +740,100 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
       expect(find.text('SYNTHETIC test reminder'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'story 3.7: staff web shows markers, snooze and the same settings; a '
+    'signal re-reads the inbox',
+    (tester) async {
+      const item = '31313131-3131-4131-8131-313131313131';
+      final h = await pumpStaff(tester);
+      h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.inbox.inbox = AccessReadOk(
+        Inbox.fromJson({
+          'items': [inboxItemData(id: item, opened: true)],
+        }),
+      );
+      h.inbox.opened[item] = AccessReadOk(
+        OpenedInboxItem.fromJson(
+          openedItemData(
+            id: item,
+            snoozeChoices: const ['1 hour', '24 hours', '2 days'],
+          ),
+        ),
+      );
+      h.notificationSettings.settings = AccessReadOk(
+        NotificationSettings.fromJson({
+          'categories': [pushCategoryData()],
+        }),
+      );
+      Future<void> settle() async {
+        for (var i = 0; i < 4; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+      }
+
+      await tapKey(tester, 'nav-/account');
+      await settle();
+      await tapKey(tester, 'nav-/inbox');
+      await settle();
+      expect(find.byKey(const Key('inbox-item-opened-$item')), findsOneWidget);
+      final reads = h.inbox.calls;
+      h.signals.signal();
+      await settle();
+      expect(h.inbox.calls, reads + 1);
+
+      await tapKey(tester, 'open-inbox-item-$item');
+      await settle();
+      expect(find.byKey(const Key('snooze-1-hour')), findsOneWidget);
+      await tapKey(tester, 'back-to-inbox');
+      await settle();
+      await tapKey(tester, 'open-notification-settings');
+      await settle();
+      expect(
+        find.byKey(const Key('push-category-fixture_reminder-fixture_due')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'story 3.7: a signed-out link to an item returns to it after sign-in',
+    (tester) async {
+      const item = '31313131-3131-4131-8131-313131313131';
+      final h = await pumpStaff(tester);
+      h.session.switchTo(null);
+      await tester.pump(const Duration(milliseconds: 100));
+      h.inbox.opened[item] = AccessReadOk(
+        OpenedInboxItem.fromJson(openedItemData(id: item)),
+      );
+      final router = GoRouter.of(tester.element(find.byType(Scaffold).first));
+      router.go(ClientPaths.inboxItem(item));
+      for (var i = 0; i < 4; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(
+        find.byKey(const Key('inbox-item-denied-signedOut')),
+        findsOneWidget,
+      );
+      await tapKey(tester, 'inbox-item-sign-in');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.enterText(
+        find.byKey(const Key('phone-field')),
+        '+12025550101',
+      );
+      await tester.enterText(
+        find.byKey(const Key('password-field')),
+        'Synthetic-pw-1',
+      );
+      await tapKey(tester, 'submit-button');
+      h.auth.succeed('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+      for (var i = 0; i < 6; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('inbox-item-title')), findsOneWidget);
+      expect(h.inbox.openedIds, [item]);
     },
   );
 }

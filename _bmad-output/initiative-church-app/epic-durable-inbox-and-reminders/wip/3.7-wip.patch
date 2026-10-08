@@ -1,0 +1,1647 @@
+From 581ee7614e23046afe8d72b1e1d01e57ff417a93 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 8 Oct 2026 16:19:38 +0000
+Subject: [PATCH 1/2] feat(notifications): inbox markers, member snooze command
+ and per-account refresh signal (WIP 3.7)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CgoHioRT8VHAC5m3jYACyk
+---
+ ...n-settings-and-snooze-on-mobile-an-plan.md |  83 +++
+ ...1008181657_notifications_inbox_screens.sql | 661 ++++++++++++++++++
+ .../notifications_inbox_screens_test.sql      | 371 ++++++++++
+ supabase/tests/notifications_inbox_test.sql   |  10 +-
+ .../notifications_source_contracts_test.sql   |   4 +-
+ 5 files changed, 1123 insertions(+), 6 deletions(-)
+ create mode 100644 _bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/story-show-the-inbox-notification-settings-and-snooze-on-mobile-an-plan.md
+ create mode 100644 supabase/migrations/20261008181657_notifications_inbox_screens.sql
+ create mode 100644 supabase/tests/notifications_inbox_screens_test.sql
+
+diff --git a/_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/story-show-the-inbox-notification-settings-and-snooze-on-mobile-an-plan.md b/_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/story-show-the-inbox-notification-settings-and-snooze-on-mobile-an-plan.md
+new file mode 100644
+index 0000000..4ed5e29
+--- /dev/null
++++ b/_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/story-show-the-inbox-notification-settings-and-snooze-on-mobile-an-plan.md
+@@ -0,0 +1,83 @@
++---
++title: 'Show the inbox, notification settings and snooze on mobile and staff web'
++type: 'feature'
++ticket: '7'
++created: '2026-10-08'
++status: 'in-progress'
++baseline_revision: '5db8b266ebaaed7cc690a318df528e524b9642b0'
++route: 'full'
++route_source: 'auto'
++review: ''
++review_source: ''
++lenses_ran: []
++review_loop_iteration: 0
++context:
++  - '{project-root}/docs/runbooks/notifications.md'
++  - '{project-root}/docs/runbooks/client-shells.md'
++---
++
++<frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
++
++## Intent
++
++**Problem:** Members can list and open inbox items (3.1, 3.2), but cannot tell new from opened items, cannot snooze, have no push-settings screen, and an open inbox only re-reads on open, resume or **Check again** (N6).
++
++**Approach:** Extend the existing reads and `notifications_command` (no new client-executable function): opened/snoozed markers on items, `notifications.snooze_item` wrapping 3.3's `app.notifications_snooze_item`, and a server-published per-account Realtime broadcast with an empty payload. Shared `client_core` screens serve both clients: inbox markers, a snooze action, a notification-settings screen and signal-driven re-reads.
++
++**Decisions (agent, under owner pre-approval, 2026-10-08):**
++- Refresh signal = Realtime Broadcast from the database on a private per-account channel (see Design Notes). AD-5 requires channel authorisation, which on Supabase is an RLS SELECT policy on `realtime.messages`; adding that one policy is accepted as the narrow exception to "no custom objects in realtime" (no table, function or INSERT policy there), like Identity's triggers on `auth.users`. Clients also poll every 2 minutes while the inbox is open, so a project without Realtime still converges.
++- Unread/opened = whether the member opened the item in the app (server `opened_at`, set on first open). Labels "New" and "Opened"; no "delivered", "seen" or "read".
++- Snooze is a member command (`notifications.snooze_item`, `expected_revision` null; the item's revision bumps). A response is shown with SYNTHETIC fixture commands `fixture.reminder_schedule {starts_at}` and `fixture.reminder_respond {source_id}` (local/staging only) over the real 3.3 schedule path; the fixture check stops being actionable once responded.
++- Settings live at `/notification-settings`, linked from the Inbox on both clients; staff web shows the same categories (push reaches phones only; browser push is not used).
++
++## Boundaries & Constraints
++
++**Always:** server decides every state; markers say only what the app did ("New" = not opened in the app, "Opened" = opened in the app), never push delivery or reading; snooze choices come from the policy (1 hour, 24 hours, 2 days); a snooze is clamped to the source expiry and dies with a response, a cancellation or a revision; push off never removes in-app items; signal payload `{}` with event `inbox_changed` on topic `account:<own auth uid>`, published only to a recipient whose route is `member`, after commit; every signal, resume and reconnect causes a fresh authorised read; protected state memory-only per account generation (AD-13); hosted migration rules (no DROP/TRUNCATE/`delete from`, ASCII, search_path, no anon grants).
++
++**Never:** browser push; ids, text or source types in a signal payload; client INSERT on `realtime.messages`; new tables or functions in `realtime`; editing hand-pasted staging functions; staging changes or deployments.
++
++## I/O & Edge-Case Matrix
++
++| Scenario | Input / State | Expected Output / Behavior | Error Handling |
++|----------|--------------|---------------------------|----------------|
++| Open marks opened | first open of own item | `opened: true` in list; signal sent once | not own item: `not_found`, nothing marked |
++| Snooze | current item, `24 hours` | `{scheduled_at, clamped:false, expires_at}`; list shows snoozed until | unknown choice `validation_failed`; foreign `not_found` |
++| Snooze past expiry | `2 days`, source starts in 20 h | `clamped: true`, at the expiry; client says it could not be later | expired: `conflict {"item_id":"expired"}` |
++| Response / cancel | member responds or source cancelled | pending snooze cancelled (`responded` / source reason); `snoozed_until` null; open = out of date | snooze again: `conflict superseded` |
++| Push off | category off, new reminder | item in inbox, no push job | stale revision: `conflict`, Reload |
++| Signal | item delivered/opened/snoozed/snooze ended | one `inbox_changed` `{}` per account per transaction | Realtime absent: no error, clients still re-read on open/resume/poll |
++| Foreign channel | B joins `account:<A>` | join refused (RLS) | client keeps working without signals |
++
++</frozen-after-approval>
++
++## Code Map
++
++- `supabase/migrations/20261008073631_notifications_inbox.sql`, `20261008090057_notifications_source_contracts.sql` (`app.notifications_my_inbox`, `app.notifications_open_item`, fixture check/create/command), `20261008102121_notifications_scheduling.sql` (`app.notifications_snooze_item`, `set_schedule`, `snooze_at`), `20261008135811_notifications_routing.sql` (`notifications_command`, authorizer, in_scope, `notifications_recipient_route`, push settings, fixture command/authorizer) -- replace in place with identical signatures.
++- `packages/client_core/lib/src/{domain/inbox.dart,application/inbox_controllers.dart,presentation/inbox_screen.dart,adapters/supabase_inbox_repository.dart}`, `lib/testing.dart` (`FakeInbox`, `ClientTestHarness`), `lib/composition.dart`, `shell_routing.dart` (`ClientPaths`, `signInThen`/`continuationFrom` already return to `/inbox/<id>` after sign-in).
++- `apps/mobile/lib/app.dart`, `apps/staff/lib/app.dart` and their tests.
++- Tests asserting exact inbox key sets: `supabase/tests/notifications_inbox_test.sql:227`; superseded open key set stays unchanged.
++
++## Tasks & Acceptance
++
++**Execution:**
++- [ ] `supabase/migrations/20261008181657_notifications_inbox_screens.sql` -- inbox items gain `opened_at`, `revision`; list adds `opened`, `snoozed_until`; open marks opened and (current only) adds `snooze_choices`, `snoozed_until`; `notifications.snooze_item {item_id, choice}`; refresh publisher triggers + receive-only policy on `realtime.messages` (guarded); fixture `reminder_schedule`/`reminder_respond` and `fixture_response` contract -- N6 server parts.
++- [ ] `supabase/tests/notifications_inbox_screens_test.sql` (+ update `notifications_inbox_test.sql` key set) -- markers, snooze, clamp, response/cancel, push off, signal payload capture, privileges.
++- [ ] `tools/identity-e2e/inbox-screens.mjs` (+ `.test.mjs`) -- real GoTrue/PostgREST/Realtime: signal frame capture, foreign join refused, snooze/clamp/response/cancel, push off.
++- [ ] `client_core` domain/adapters/controllers/screens -- `InboxSignals` port + Supabase adapter, settings repository, snooze and push-category controllers, markers, settings screen, route `/notification-settings`; fakes in `testing.dart`; tests.
++- [ ] apps mobile/staff -- link to settings; app tests for both clients.
++- [ ] `docs/runbooks/notifications.md` -- story 3.7 section with owner checks.
++
++**Acceptance Criteria:**
++- Given a signed-out person opening `/inbox/<id>` on either client, when they sign in, then they land on that item and the server rechecks it.
++- Given an open inbox, when the server signals `inbox_changed`, then the list is re-read without user action.
++
++## Design Notes
++
++Refresh signal decision: Realtime Broadcast from the database on a private channel (works on hosted Supabase; spike confirmed locally). A SECURITY DEFINER publisher inserts `{topic: 'account:'||uid, event: 'inbox_changed', payload: '{}', private: true}` into `realtime.messages` (not `realtime.send`, which injects an `id` into the payload), once per account per transaction, inside a subtransaction that swallows failures (Realtime absent, no partition). One SELECT policy for `authenticated` (`extension = 'broadcast'` and topic = own `account:<uid>`), created only if `realtime.messages` exists; no INSERT policy, so clients cannot send. Fallback: clients re-read on open, resume, reconnect and every 2 minutes while the inbox is open.
++
++## Verification
++
++**Commands:**
++- `npx supabase db reset && npm run -s db:test && npm run -s db:smoke` -- all pass
++- `node tools/identity-e2e/inbox-screens.mjs --evidence <f>` (Realtime running) -- all checks pass; all E2Es in e2e-main.sh pass
++- `flutter analyze && flutter test` in `packages/client_core`, `apps/mobile`, `apps/staff`; `node --test tools/**/*.test.mjs`; `npm run -s contracts:test`; scan-secrets; check-migrations -- pass
+diff --git a/supabase/migrations/20261008181657_notifications_inbox_screens.sql b/supabase/migrations/20261008181657_notifications_inbox_screens.sql
+new file mode 100644
+index 0000000..584d49e
+--- /dev/null
++++ b/supabase/migrations/20261008181657_notifications_inbox_screens.sql
+@@ -0,0 +1,661 @@
++-- Story 3.7: the inbox, notification settings and snooze on mobile and staff web (AD-5, AD-8,
++-- AD-13; epic 3 requirements N6, N3).
++--
++--   * Inbox items record `opened_at` (the member opened the item in the app; set once, by
++--     `api.notifications_open_item`) and a `snooze_revision` (bumped by each snooze). Neither says
++--     anything about push delivery or reading.
++--   * `api.notifications_my_inbox` items gain `opened` and `snoozed_until` (the member's pending
++--     snooze of that item, or null). `api.notifications_open_item` marks the item opened and, for
++--     a current item only, adds `snooze_choices` (from the Q2 policy) and `snoozed_until`. The
++--     superseded and not-found answers are unchanged.
++--   * `notifications.snooze_item {item_id, choice}` (1.4 envelope, expected_revision null) on
++--     `api.notifications_command` wraps the 3.3 owner operation `app.notifications_snooze_item`
++--     for the signed-in member: only that member's copy moves, clamped to the source expiry.
++--   * Per-account generic refresh signal (AD-5): after an inbox item is added, opened or snoozed,
++--     or a snooze starts or ends, Notifications publishes ONE Realtime Broadcast message per
++--     account per transaction: topic `account:<auth user id>`, event `inbox_changed`, payload
++--     `{}` (no ids, no text, no source type), private. Only a recipient whose current route is
++--     `member` (approved, live link, standing ok) is signalled. Delivery is after commit; a
++--     rolled back change sends nothing. When Realtime is absent the publisher does nothing and
++--     never fails the caller. One receive-only RLS policy on `realtime.messages` lets an
++--     authenticated session read its own `account:<uid>` broadcast topic; there is no insert
++--     policy, so clients cannot send.
++--   * SYNTHETIC fixture (local/staging only): kind `fixture_reply` with a reminder contract and
++--     direct-contact route, `fixture.reminder_schedule {starts_at}` (a response schedule over the
++--     3.3 path) and `fixture.reminder_respond {source_id}` (the member answers: pending snoozes
++--     of the response reminder are cancelled `responded` and the reminder stops being
++--     actionable).
++--
++-- No destructive statements and no row deletions. No anon grant. No new client-executable
++-- function. ASCII only.
++
++-- ---------------------------------------------------------------------------------------------
++-- Inbox item markers
++-- ---------------------------------------------------------------------------------------------
++
++alter table app.notifications_inbox_items
++  add column opened_at timestamptz,
++  add column snooze_revision bigint not null default 1
++    check (snooze_revision between 1 and 9007199254740991);
++
++comment on column app.notifications_inbox_items.opened_at is
++  'Story 3.7: when the member first opened the item in the app. Never push delivery or reading.';
++comment on column app.notifications_inbox_items.snooze_revision is
++  'Story 3.7: bumped by each member snooze of the item (command envelope revision).';
++
++-- The member's pending snooze of an item (the earliest, there is at most one), or null.
++create function app.notifications_item_snoozed_until(p_item_id uuid)
++returns timestamptz
++language sql
++stable
++set search_path = ''
++as $$
++  select min(j.scheduled_at) from app.notifications_jobs j
++   where j.snoozed_from_item_id = p_item_id and j.job_state = 'pending';
++$$;
++
++-- As in 3.2, plus `opened` and `snoozed_until` per item.
++create or replace function app.notifications_my_inbox(p_after_delivered_at timestamptz, p_after_item_id uuid)
++returns jsonb
++language plpgsql
++security definer
++set search_path = ''
++as $$
++declare
++  v_member uuid;
++  v_link uuid;
++  v_rows jsonb;
++  v_next jsonb;
++begin
++  select a.member_id, a.link_id into v_member, v_link from app.identity_require_access() a;
++  if (p_after_delivered_at is null) <> (p_after_item_id is null) then
++    raise exception using errcode = '22023', message = 'validation_failed',
++      detail = 'after_delivered_at and after_item_id go together';
++  end if;
++  select coalesce(jsonb_agg(jsonb_build_object(
++           'item_id', x.item_id,
++           'reminder_kind', x.reminder_kind,
++           'title', x.title,
++           'body', x.body,
++           'due_at', app.cmd_utc(x.due_at),
++           'delivered_at', app.cmd_utc(x.delivered_at),
++           'opened', x.opened_at is not null,
++           'snoozed_until', case when x.snoozed_until is not null
++                                 then app.cmd_utc(x.snoozed_until) end)
++           order by x.delivered_at desc, x.item_id desc), '[]'::jsonb)
++    into v_rows
++    from (select i.item_id, i.reminder_kind, i.due_at, i.delivered_at, i.opened_at,
++                 app.notifications_item_snoozed_until(i.item_id) as snoozed_until,
++                 coalesce(c.title, 'Reminder') as title,
++                 coalesce(c.body, 'Something needs your attention.') as body
++            from app.notifications_inbox_items i
++            join app.notifications_jobs j on j.job_id = i.job_id
++            left join app.contract_reminder_contracts c
++              on c.source_type = j.source_type and c.reminder_kind = j.reminder_kind
++           where i.recipient_member_id = v_member
++             and (p_after_delivered_at is null
++                  or (i.delivered_at, i.item_id) < (p_after_delivered_at, p_after_item_id))
++           order by i.delivered_at desc, i.item_id desc
++           limit 51) x;
++  if jsonb_array_length(v_rows) > 50 then
++    v_rows := v_rows - 50;
++    v_next := jsonb_build_object('after_delivered_at', v_rows -> 49 -> 'delivered_at',
++                                 'after_item_id', v_rows -> 49 -> 'item_id');
++  end if;
++  perform app.identity_record_activity(v_link);
++  return jsonb_build_object('items', v_rows, 'next', v_next);
++end;
++$$;
++
++-- The snooze choices the policy offers now ([] when the policy is unavailable, for example the
++-- production gate is closed: no snooze is offered then).
++create function app.notifications_snooze_choices()
++returns jsonb
++language plpgsql
++stable
++set search_path = ''
++as $$
++begin
++  return coalesce(app.notifications_policy() -> 'value' -> 'snooze_choices', '[]'::jsonb);
++exception when others then
++  return '[]'::jsonb;
++end;
++$$;
++
++-- As in 3.2. Story 3.7: the first open marks the item opened; a current item also carries the
++-- policy's `snooze_choices` and the member's `snoozed_until`. Superseded and not-found answers
++-- are unchanged.
++create or replace function app.notifications_open_item(p_item_id uuid)
++returns jsonb
++language plpgsql
++security definer
++set search_path = ''
++as $$
++declare
++  v_member uuid;
++  v_link uuid;
++  v_item app.notifications_inbox_items;
++  v_job app.notifications_jobs;
++  v_contract app.contract_reminder_contracts;
++  v_check jsonb;
++  v_current boolean;
++  v_answer jsonb;
++  v_snoozed timestamptz;
++begin
++  select a.member_id, a.link_id into v_member, v_link from app.identity_require_access() a;
++  if p_item_id is null then
++    raise exception using errcode = '22023', message = 'validation_failed',
++      detail = 'item_id is required';
++  end if;
++  select i.* into v_item from app.notifications_inbox_items i
++   where i.item_id = p_item_id and i.recipient_member_id = v_member;
++  if not found then
++    perform app.identity_record_activity(v_link);
++    return '{"state": "not_found"}'::jsonb;
++  end if;
++  select j.* into v_job from app.notifications_jobs j where j.job_id = v_item.job_id;
++  select c.* into v_contract from app.contract_reminder_contracts c
++   where c.source_type = v_job.source_type and c.reminder_kind = v_job.reminder_kind;
++  if found then
++    begin
++      v_check := app.contract_check_reminder(app.notifications_job_key(v_job));
++    exception when others then
++      raise log 'notifications.open_item reminder check failed: sqlstate %', sqlstate;
++      raise exception using errcode = 'PT503', message = 'source_check_failed';
++    end;
++    v_current := (v_check ->> 'current')::boolean and (v_check ->> 'actionable')::boolean
++                 and (v_check ->> 'recipient_eligible')::boolean;
++  else
++    v_current := false;
++  end if;
++  -- Opened in the app (first time only, so a repeat open changes nothing and signals nothing).
++  update app.notifications_inbox_items i set opened_at = clock_timestamp()
++   where i.item_id = v_item.item_id and i.opened_at is null;
++  perform app.identity_record_activity(v_link);
++  v_answer := jsonb_build_object(
++    'item_id', v_item.item_id,
++    'reminder_kind', v_item.reminder_kind,
++    'title', coalesce(v_contract.title, 'Reminder'),
++    'body', coalesce(v_contract.body, 'Something needs your attention.'),
++    'due_at', app.cmd_utc(v_item.due_at),
++    'delivered_at', app.cmd_utc(v_item.delivered_at),
++    'state', case when v_current then 'current' else 'superseded' end,
++    'target', case when v_current
++                   then replace(v_contract.link, '{source_id}', v_job.source_id::text) end);
++  if v_current then
++    v_snoozed := app.notifications_item_snoozed_until(v_item.item_id);
++    v_answer := v_answer || jsonb_build_object(
++      'snooze_choices', app.notifications_snooze_choices(),
++      'snoozed_until', case when v_snoozed is not null then app.cmd_utc(v_snoozed) end);
++  end if;
++  return v_answer;
++end;
++$$;
++
++-- ---------------------------------------------------------------------------------------------
++-- notifications.snooze_item (member command)
++-- ---------------------------------------------------------------------------------------------
++
++-- notifications.snooze_item {item_id, choice} (expected_revision null): the signed-in member
++-- snoozes one of their items (story 3.3 rules: current source only, a choice from the policy,
++-- clamped to the expiry, replaces an earlier pending snooze of the item). Answers
++-- {item_id, scheduled_at, clamped, expires_at} at the item's new revision.
++create function app.notifications_item_snooze(p_actor uuid, p_expected bigint, p_payload jsonb)
++returns jsonb
++language plpgsql
++set search_path = ''
++as $$
++declare
++  v_member uuid;
++  v_errors jsonb;
++  v_item app.notifications_inbox_items;
++  v_at jsonb;
++begin
++  v_errors := jsonb_strip_nulls(jsonb_build_object(
++      'item_id', app.contract_uuid_error(p_payload -> 'item_id'),
++      'choice', case when jsonb_typeof(p_payload -> 'choice') is distinct from 'string'
++                     then 'required' end))
++    || coalesce((select jsonb_object_agg(k, 'unknown_field') from jsonb_object_keys(p_payload) k
++                  where k not in ('item_id', 'choice')), '{}'::jsonb);
++  if v_errors <> '{}'::jsonb then
++    perform app.cmd_fail('validation_failed', v_errors);
++  end if;
++  v_member := app.notifications_command_member();
++  select i.* into v_item from app.notifications_inbox_items i
++   where i.item_id = (p_payload ->> 'item_id')::uuid and i.recipient_member_id = v_member
++   for update;
++  if not found then
++    perform app.cmd_fail('not_found');
++  end if;
++  v_at := app.notifications_snooze_item(v_member, v_item.item_id, p_payload ->> 'choice');
++  update app.notifications_inbox_items i set snooze_revision = i.snooze_revision + 1
++   where i.item_id = v_item.item_id
++  returning * into v_item;
++  return jsonb_build_object('aggregate_type', 'notifications_inbox_item',
++                            'aggregate_id', v_item.item_id, 'revision', v_item.snooze_revision,
++                            'data', jsonb_build_object('item_id', v_item.item_id) || v_at);
++end;
++$$;
++
++-- As in 3.5, plus notifications.snooze_item.
++create or replace function app.notifications_authorize_command(p_request jsonb)
++returns boolean
++language plpgsql
++set search_path = ''
++as $$
++declare
++  r record;
++begin
++  if coalesce(p_request ->> 'command', '') not in ('notifications.register_device',
++                                                   'notifications.retire_device',
++                                                   'notifications.set_push_category',
++                                                   'notifications.snooze_item') then
++    return false;
++  end if;
++  select e.* into r from app.identity_evaluate_grant(null, null, null) e;
++  if r.outcome in ('unauthenticated', 'untrusted_session') then
++    perform app.cmd_fail('unauthenticated');
++  end if;
++  return r.outcome = 'granted';
++end;
++$$;
++
++-- As in 3.5, plus the caller's own inbox item.
++create or replace function app.notifications_command_in_scope(p_actor uuid, p_aggregate_type text,
++                                                              p_aggregate_id uuid)
++returns boolean
++language sql
++stable
++set search_path = ''
++as $$
++  select case p_aggregate_type
++    when 'notifications_device' then exists (
++      select 1 from app.notifications_device_tokens t
++       where t.device_id = p_aggregate_id and t.account_id = p_actor)
++    when 'notifications_push_setting' then exists (
++      select 1 from app.notifications_push_settings s
++       where s.setting_id = p_aggregate_id and s.account_id = p_actor)
++    when 'notifications_inbox_item' then exists (
++      select 1 from app.notifications_inbox_items i
++       where i.item_id = p_aggregate_id
++         and i.recipient_member_id = app.identity_current_member_id())
++    else false end;
++$$;
++
++create or replace function app.notifications_command(p_envelope jsonb)
++returns jsonb
++language plpgsql
++security definer
++set search_path = ''
++as $$
++declare
++  v_command text;
++begin
++  if jsonb_typeof(p_envelope) = 'object' and jsonb_typeof(p_envelope -> 'command') = 'string' then
++    v_command := p_envelope ->> 'command';
++  end if;
++  return app.cmd_execute(
++    p_envelope,
++    case v_command
++      when 'notifications.register_device'
++        then 'app.notifications_device_register(uuid, bigint, jsonb)'::regprocedure
++      when 'notifications.retire_device'
++        then 'app.notifications_device_retire(uuid, bigint, jsonb)'::regprocedure
++      when 'notifications.set_push_category'
++        then 'app.notifications_push_category_set(uuid, bigint, jsonb)'::regprocedure
++      when 'notifications.snooze_item'
++        then 'app.notifications_item_snooze(uuid, bigint, jsonb)'::regprocedure
++    end,
++    'app.notifications_command_in_scope(uuid, text, uuid)'::regprocedure,
++    case v_command
++      when 'notifications.retire_device' then true
++      when 'notifications.set_push_category'
++        then coalesce(jsonb_typeof(p_envelope -> 'expected_revision'), 'null') <> 'null'
++      else false end);
++end;
++$$;
++
++comment on function api.notifications_command(jsonb) is
++  'Stories 3.5 and 3.7: the signed-in member''s device tokens, push settings by category and '
++  'snooze (notifications.register_device {token, platform}, notifications.retire_device '
++  '{device_id}, notifications.set_push_category {source_type, reminder_kind, push_enabled}, '
++  'notifications.snooze_item {item_id, choice}).';
++
++-- ---------------------------------------------------------------------------------------------
++-- Per-account generic refresh signal (AD-5)
++-- ---------------------------------------------------------------------------------------------
++
++-- Publishes `inbox_changed` with an empty payload on the private topic `account:<auth uid>` of
++-- the member's CURRENT account, once per account per transaction, only while the member's route
++-- is `member`. Never raises: without Realtime (or a message partition) nothing is sent and the
++-- caller's change still commits; clients re-read on open, resume, reconnect and by polling.
++create function app.notifications_publish_refresh(p_member_id uuid)
++returns void
++language plpgsql
++security definer
++set search_path = ''
++as $$
++declare
++  v_account uuid;
++  v_sent text;
++begin
++  if p_member_id is null then
++    return;
++  end if;
++  select r.account_id into v_account from app.notifications_recipient_route(p_member_id) r
++   where r.route = 'member';
++  if v_account is null then
++    return;
++  end if;
++  v_sent := coalesce(current_setting('app.notifications_refreshed', true), '');
++  if position(v_account::text in v_sent) > 0 then
++    return;
++  end if;
++  perform set_config('app.notifications_refreshed', v_sent || v_account::text || ',', true);
++  if pg_catalog.to_regclass('realtime.messages') is null then
++    return;
++  end if;
++  begin
++    execute 'insert into realtime.messages (topic, extension, payload, event, private) '
++            'values ($1, ''broadcast'', ''{}''::jsonb, ''inbox_changed'', true)'
++      using 'account:' || v_account::text;
++  exception when others then
++    raise log 'notifications refresh signal not published: sqlstate %', sqlstate;
++  end;
++end;
++$$;
++
++comment on function app.notifications_publish_refresh(uuid) is
++  'Story 3.7 (AD-5): one content-free Realtime broadcast (topic account:<uid>, event '
++  'inbox_changed, payload {}) per account per transaction, to a currently routable member only.';
++
++create function app.notifications_inbox_item_signal()
++returns trigger
++language plpgsql
++set search_path = ''
++as $$
++begin
++  perform app.notifications_publish_refresh(new.recipient_member_id);
++  return null;
++end;
++$$;
++
++create trigger notifications_inbox_items_signal_insert
++  after insert on app.notifications_inbox_items
++  for each row execute function app.notifications_inbox_item_signal();
++
++create trigger notifications_inbox_items_signal_update
++  after update of opened_at, snooze_revision on app.notifications_inbox_items
++  for each row
++  when (old.opened_at is distinct from new.opened_at
++        or old.snooze_revision is distinct from new.snooze_revision)
++  execute function app.notifications_inbox_item_signal();
++
++-- A snooze job starting or ending changes what the inbox shows (snoozed until).
++create trigger notifications_jobs_snooze_signal_insert
++  after insert on app.notifications_jobs
++  for each row when (new.snoozed_from_item_id is not null)
++  execute function app.notifications_inbox_item_signal();
++
++create trigger notifications_jobs_snooze_signal_update
++  after update of job_state on app.notifications_jobs
++  for each row
++  when (new.snoozed_from_item_id is not null and old.job_state is distinct from new.job_state)
++  execute function app.notifications_inbox_item_signal();
++
++-- Receive-only channel authorisation: an authenticated session may read broadcasts on its own
++-- `account:<uid>` topic. Created only where Realtime's table exists; no insert policy.
++do $$
++begin
++  if pg_catalog.to_regclass('realtime.messages') is not null
++     and not exists (select 1 from pg_catalog.pg_policy p
++                      where p.polrelid = 'realtime.messages'::regclass
++                        and p.polname = 'notifications_account_refresh_receive') then
++    execute 'create policy notifications_account_refresh_receive on realtime.messages '
++            'for select to authenticated '
++            'using (realtime.messages.extension = ''broadcast'' '
++            'and (select realtime.topic()) = ''account:'' || (select auth.uid())::text)';
++  end if;
++end;
++$$;
++
++-- ---------------------------------------------------------------------------------------------
++-- SYNTHETIC fixture: a response reminder over the 3.3 schedule path (local/staging only)
++-- ---------------------------------------------------------------------------------------------
++
++alter table app.fixture_reminder_sources
++  add column responded_at timestamptz;
++
++select app.contract_register_reminder_kind('fixture', 'fixture_reminder', 'fixture_reply');
++
++-- As in 3.4 (including the SYNTHETIC check fault); a source the member has answered is no
++-- longer actionable.
++create or replace function app.fixture_reminder_open_check(p_key jsonb)
++returns jsonb
++language plpgsql
++stable
++set search_path = ''
++as $$
++declare
++  v_row app.fixture_reminder_sources;
++begin
++  select s.* into v_row from app.fixture_reminder_sources s
++   where s.source_id = (p_key ->> 'source_id')::uuid;
++  if not found then
++    return '{"current": false, "revision": null, "actionable": false, "recipient_eligible": false}'::jsonb;
++  end if;
++  if v_row.check_fault_until is not null and v_row.check_fault_until > now() then
++    raise exception using errcode = 'P0001', message = 'SYNTHETIC transient check fault';
++  end if;
++  return jsonb_build_object(
++    'current', v_row.source_state = 'active'
++               and v_row.revision = (p_key ->> 'source_revision')::numeric::bigint,
++    'revision', v_row.revision,
++    'actionable', v_row.source_state = 'active'
++                  and (v_row.expires_at is null or v_row.expires_at > now())
++                  and v_row.responded_at is null,
++    'recipient_eligible', v_row.member_id = (p_key ->> 'recipient_member_id')::uuid
++                          and not v_row.recipient_revoked);
++end;
++$$;
++
++select app.contract_register_reminder_contract(
++  'fixture', 'fixture_reminder', 'fixture_reply',
++  'app.fixture_reminder_open_check(jsonb)'::regprocedure,
++  '{"title": "SYNTHETIC reply reminder",
++    "body": "A test request is waiting for your answer.",
++    "link": "/fixture/reminders/{source_id}"}'::jsonb);
++
++select app.contract_register_direct_contact_route('fixture', 'fixture_reminder', 'fixture_reply',
++         'app.fixture_reminder_direct_contact(jsonb)'::regprocedure);
++
++-- The response schedule of a fixture reply source (assigned when created, starting at due_at).
++create function app.fixture_reminder_reply_schedule(p_row app.fixture_reminder_sources,
++                                                    p_fresh boolean)
++returns jsonb
++language sql
++set search_path = ''
++as $$
++  select app.notifications_set_schedule(jsonb_build_object(
++    'source_type', 'fixture_reminder', 'source_id', p_row.source_id,
++    'source_revision', p_row.revision, 'recipient_member_id', p_row.member_id,
++    'schedule_type', 'response',
++    'intent', jsonb_build_object('assigned_at', app.cmd_utc(p_row.created_at),
++                                 'starts_at', app.cmd_utc(p_row.due_at),
++                                 'responded', p_row.responded_at is not null),
++    'kinds', '{"response_deadline": "fixture_reply", "respond_now": "fixture_reply"}'::jsonb,
++    'fresh', p_fresh));
++$$;
++
++-- fixture.reminder_schedule {starts_at} (expected_revision null): a SYNTHETIC request for the
++-- caller's own member that starts (and expires) at starts_at, with a response schedule planned
++-- by the 3.3 calculation (short notice: one `respond_now` reminder due now).
++create function app.fixture_reminder_schedule(p_actor uuid, p_expected bigint, p_payload jsonb)
++returns jsonb
++language plpgsql
++set search_path = ''
++as $$
++declare
++  v_member uuid;
++  v_errors jsonb;
++  v_row app.fixture_reminder_sources;
++  v_schedule jsonb;
++begin
++  v_errors := jsonb_strip_nulls(jsonb_build_object(
++      'starts_at', app.contract_instant_error(p_payload -> 'starts_at')))
++    || coalesce((select jsonb_object_agg(k, 'unknown_field') from jsonb_object_keys(p_payload) k
++                  where k not in ('starts_at')), '{}'::jsonb);
++  if v_errors = '{}'::jsonb and (p_payload ->> 'starts_at')::timestamptz <= now() then
++    v_errors := '{"starts_at": "invalid"}'::jsonb;
++  end if;
++  if v_errors <> '{}'::jsonb then
++    perform app.cmd_fail('validation_failed', v_errors);
++  end if;
++  v_member := app.fixture_reminder_actor();
++  insert into app.fixture_reminder_sources (member_id, due_at, created_by_account, reminder_kind,
++                                            expires_at)
++  values (v_member, (p_payload ->> 'starts_at')::timestamptz, p_actor, 'fixture_reply',
++          (p_payload ->> 'starts_at')::timestamptz)
++  returning * into v_row;
++  v_schedule := app.fixture_reminder_reply_schedule(v_row, true);
++  return jsonb_build_object(
++    'aggregate_type', 'fixture_reminder', 'aggregate_id', v_row.source_id,
++    'revision', v_row.revision,
++    'data', app.fixture_reminder_json(v_row)
++            || jsonb_build_object('enqueued', (v_schedule ->> 'enqueued')::integer,
++                                  'response_deadline', v_schedule -> 'plan' -> 'response_deadline'));
++end;
++$$;
++
++-- fixture.reminder_respond {source_id} at the source revision: the member answers the request.
++-- The revision is kept; the schedule records `responded`, which cancels pending snoozes of the
++-- reply reminder (`responded`), and the reminder stops being actionable.
++create function app.fixture_reminder_respond(p_actor uuid, p_expected bigint, p_payload jsonb)
++returns jsonb
++language plpgsql
++set search_path = ''
++as $$
++declare
++  v_member uuid;
++  v_errors jsonb;
++  v_row app.fixture_reminder_sources;
++  v_schedule jsonb;
++begin
++  v_errors := jsonb_strip_nulls(jsonb_build_object(
++      'source_id', app.contract_uuid_error(p_payload -> 'source_id')))
++    || coalesce((select jsonb_object_agg(k, 'unknown_field') from jsonb_object_keys(p_payload) k
++                  where k not in ('source_id')), '{}'::jsonb);
++  if v_errors <> '{}'::jsonb then
++    perform app.cmd_fail('validation_failed', v_errors);
++  end if;
++  v_member := app.fixture_reminder_actor();
++  select s.* into v_row from app.fixture_reminder_sources s
++   where s.source_id = (p_payload ->> 'source_id')::uuid and s.member_id = v_member
++   for update;
++  if not found then
++    perform app.cmd_fail('not_found');
++  end if;
++  if p_expected is distinct from v_row.revision then
++    perform app.cmd_fail('conflict', null, v_row.revision);
++  end if;
++  if v_row.source_state <> 'active' then
++    perform app.cmd_fail('conflict', '{"source_id": "cancelled"}', v_row.revision);
++  end if;
++  if v_row.reminder_kind <> 'fixture_reply' then
++    perform app.cmd_fail('validation_failed', '{"source_id": "invalid"}');
++  end if;
++  if v_row.responded_at is not null then
++    perform app.cmd_fail('conflict', '{"source_id": "responded"}', v_row.revision);
++  end if;
++  update app.fixture_reminder_sources s set responded_at = clock_timestamp()
++   where s.source_id = v_row.source_id returning * into v_row;
++  v_schedule := app.fixture_reminder_reply_schedule(v_row, false);
++  return jsonb_build_object(
++    'aggregate_type', 'fixture_reminder', 'aggregate_id', v_row.source_id,
++    'revision', v_row.revision,
++    'data', app.fixture_reminder_json(v_row)
++            || jsonb_build_object('responded', true,
++                                  'cancelled_jobs', (v_schedule ->> 'cancelled')::integer));
++end;
++$$;
++
++-- As in 3.5, plus fixture.reminder_schedule and fixture.reminder_respond (live member session).
++create or replace function app.fixture_authorize_command(p_request jsonb)
++returns boolean
++language plpgsql
++set search_path = ''
++as $$
++declare
++  r record;
++begin
++  if coalesce(p_request ->> 'command', '') not in ('fixture.reminder_create',
++                                                   'fixture.reminder_cancel',
++                                                   'fixture.reminder_change',
++                                                   'fixture.reminder_create_for',
++                                                   'fixture.reminder_schedule',
++                                                   'fixture.reminder_respond') then
++    perform 1 from app.fixture_command_grants g
++     where g.actor_id = (p_request ->> 'actor')::uuid
++       and g.command = p_request ->> 'command'
++       and g.revoked_at is null
++       for share;
++    return found;
++  end if;
++  select e.* into r from app.identity_evaluate_grant(
++    case when p_request ->> 'command' = 'fixture.reminder_create_for' then 'admin' end, null, null) e;
++  if r.outcome in ('unauthenticated', 'untrusted_session') then
++    perform app.cmd_fail('unauthenticated');
++  end if;
++  return r.outcome = 'granted';
++end;
++$$;
++
++create or replace function app.fixture_reminder_command(p_envelope jsonb)
++returns jsonb
++language plpgsql
++security definer
++set search_path = ''
++as $$
++declare
++  v_command text;
++begin
++  if jsonb_typeof(p_envelope) = 'object' and jsonb_typeof(p_envelope -> 'command') = 'string' then
++    v_command := p_envelope ->> 'command';
++  end if;
++  return app.cmd_execute(
++    p_envelope,
++    case v_command
++      when 'fixture.reminder_create' then 'app.fixture_reminder_create(uuid, bigint, jsonb)'::regprocedure
++      when 'fixture.reminder_cancel' then 'app.fixture_reminder_cancel(uuid, bigint, jsonb)'::regprocedure
++      when 'fixture.reminder_change' then 'app.fixture_reminder_change(uuid, bigint, jsonb)'::regprocedure
++      when 'fixture.reminder_create_for' then 'app.fixture_reminder_create_for(uuid, bigint, jsonb)'::regprocedure
++      when 'fixture.reminder_schedule' then 'app.fixture_reminder_schedule(uuid, bigint, jsonb)'::regprocedure
++      when 'fixture.reminder_respond' then 'app.fixture_reminder_respond(uuid, bigint, jsonb)'::regprocedure
++    end,
++    'app.fixture_reminder_in_scope(uuid, text, uuid)'::regprocedure,
++    v_command not in ('fixture.reminder_create', 'fixture.reminder_create_for',
++                      'fixture.reminder_schedule'));
++end;
++$$;
++
++comment on function api.fixture_reminder_command(jsonb) is
++  'SYNTHETIC (stories 3.1, 3.2, 3.5, 3.7): a reminder source (fixture.reminder_create '
++  '{due_at, reminder_kind?}, fixture.reminder_cancel {source_id}, fixture.reminder_change '
++  '{source_id, change: revise|revoke|expire}, fixture.reminder_schedule {starts_at}, '
++  'fixture.reminder_respond {source_id}, and for an Admin fixture.reminder_create_for '
++  '{member_id, due_at}) through the 1.4 command envelope; local/staging only.';
++
++-- ---------------------------------------------------------------------------------------------
++-- Privileges: nothing new is client-executable (EXECUTE on the replaced entry points is kept)
++-- ---------------------------------------------------------------------------------------------
++
++revoke all on function
++  app.notifications_item_snoozed_until(uuid),
++  app.notifications_snooze_choices(),
++  app.notifications_item_snooze(uuid, bigint, jsonb),
++  app.notifications_publish_refresh(uuid),
++  app.notifications_inbox_item_signal(),
++  app.fixture_reminder_reply_schedule(app.fixture_reminder_sources, boolean),
++  app.fixture_reminder_schedule(uuid, bigint, jsonb),
++  app.fixture_reminder_respond(uuid, bigint, jsonb)
++  from public, anon, authenticated, service_role;
+diff --git a/supabase/tests/notifications_inbox_screens_test.sql b/supabase/tests/notifications_inbox_screens_test.sql
+new file mode 100644
+index 0000000..d837787
+--- /dev/null
++++ b/supabase/tests/notifications_inbox_screens_test.sql
+@@ -0,0 +1,371 @@
++-- The inbox screens' server contract (story 3.7; AD-5, AD-8, AD-13; epic 3 N6, N3): opened and
++-- snoozed markers, the member snooze command (choices from the policy, clamped to the source
++-- expiry, ended by a response or a cancellation), push off keeping in-app items, and the
++-- per-account generic refresh signal (Realtime broadcast with an empty payload, receive-only
++-- channel authorisation). The signal checks are skipped when this database has no Realtime
++-- message partition for today (they then run in tools/identity-e2e/inbox-screens.mjs against
++-- a running Realtime). Every account here is SYNTHETIC (+44 7700 900920-900929).
++begin;
++select plan(55);
++
++create function pg_temp.u(n int) returns uuid language sql as
++$$ select ('00000000-0000-4000-8000-0000000370' || lpad(n::text, 2, '0'))::uuid $$;
++create function pg_temp.s(n int) returns uuid language sql as
++$$ select ('00000000-0000-4000-9000-0000000370' || lpad(n::text, 2, '0'))::uuid $$;
++create function pg_temp.phone(n int) returns text language sql as
++$$ select '+447700900' || (920 + n)::text $$;
++create function pg_temp.c(n int) returns jsonb language sql as $$
++  select jsonb_build_object(
++    'sub', pg_temp.u(n), 'role', 'authenticated', 'aal', 'aal1', 'session_id', pg_temp.s(n),
++    'is_anonymous', false,
++    'amr', jsonb_build_array(jsonb_build_object('method', 'password', 'timestamp', 1790000000)))
++$$;
++create function pg_temp.session(p_user uuid, p_session uuid) returns uuid language sql as $$
++  insert into auth.sessions (id, user_id, aal, created_at)
++  values (p_session, p_user, 'aal1', clock_timestamp() - interval '1 hour');
++  insert into auth.mfa_amr_claims (id, session_id, created_at, updated_at, authentication_method)
++  values (gen_random_uuid(), p_session, now(), now(), 'password');
++  select p_session;
++$$;
++-- A command envelope as member n (expected_revision null unless given).
++create function pg_temp.cmd(n int, p_endpoint text, p_command text, p_payload jsonb,
++                            p_expected bigint default null) returns jsonb
++language plpgsql as $$
++declare
++  r jsonb;
++begin
++  perform set_config('request.jwt.claims', pg_temp.c(n)::text, true);
++  set local role authenticated;
++  execute format('select api.%I($1)', p_endpoint) into r using jsonb_build_object(
++    'version', 1, 'command', p_command, 'request_id', gen_random_uuid(),
++    'expected_revision', p_expected, 'payload', p_payload);
++  reset role;
++  return r;
++end;
++$$;
++-- A read as member n.
++create function pg_temp.read(n int, p_sql text) returns jsonb
++language plpgsql as $$
++declare
++  r jsonb;
++begin
++  perform set_config('request.jwt.claims', pg_temp.c(n)::text, true);
++  set local role authenticated;
++  execute p_sql into r;
++  reset role;
++  return r;
++end;
++$$;
++create function pg_temp.open(n int, p_item uuid) returns jsonb language sql as
++$$ select pg_temp.read(n, format('select api.notifications_open_item(%L::uuid)', p_item)) $$;
++create function pg_temp.listed(n int, p_item uuid) returns jsonb language sql as $$
++  select e from jsonb_array_elements(pg_temp.read(n, 'select api.notifications_my_inbox()') -> 'items') e
++   where (e ->> 'item_id')::uuid = p_item
++$$;
++create function pg_temp.snooze(n int, p_item uuid, p_choice text, p_expected bigint default null)
++returns jsonb language sql as $$
++  select pg_temp.cmd(n, 'notifications_command', 'notifications.snooze_item',
++                     jsonb_build_object('item_id', p_item, 'choice', p_choice), p_expected)
++$$;
++-- 'code {field_errors}' of an error envelope, or 'ok'.
++create function pg_temp.res(p jsonb) returns text language sql as $$
++  select case when p ? 'code' then (p ->> 'code') || ' ' || (p -> 'field_errors')::text else 'ok' end
++$$;
++create temp table m (n int primary key, member_id uuid);
++grant select on m to authenticated;
++create function pg_temp.mid(p_n int) returns uuid language plpgsql as
++$$ begin return (select member_id from m where n = p_n); end $$;
++create function pg_temp.deliver() returns jsonb language sql as
++$$ select app.notifications_sys_deliver_due(gen_random_uuid(), gen_random_uuid(), '{}') $$;
++create function pg_temp.item_of(p_source uuid) returns uuid language sql as $$
++  select i.item_id from app.notifications_inbox_items i join app.notifications_jobs j on j.job_id = i.job_id
++   where j.source_id = p_source and j.snoozed_from_item_id is null
++   order by i.delivered_at desc limit 1
++$$;
++create function pg_temp.snooze_jobs(p_item uuid) returns text language sql as $$
++  select coalesce(string_agg(job_state || ':' || coalesce(cancel_reason, '-'), ',' order by enqueued_at), '')
++    from app.notifications_jobs where snoozed_from_item_id = p_item
++$$;
++create temp table v (k text primary key, id uuid, j jsonb);
++
++-- Realtime: whether a broadcast row can be stored now (table and today's partition exist).
++create function pg_temp.rt() returns boolean language plpgsql as $$
++begin
++  if to_regclass('realtime.messages') is null then
++    return false;
++  end if;
++  begin
++    execute 'insert into realtime.messages (topic, extension, payload, event, private) '
++            'values (''pgtap-probe'', ''broadcast'', ''{}'', ''probe'', true)';
++    raise exception using errcode = 'P0001', message = 'probe ok';
++  exception when others then
++    return sqlerrm = 'probe ok';
++  end;
++end;
++$$;
++-- Broadcast rows for member n's account so far in this transaction.
++create function pg_temp.sig(n int) returns int language plpgsql as $$
++begin
++  if to_regclass('realtime.messages') is null then
++    return 0;
++  end if;
++  return (select count(*)::int from realtime.messages where topic = 'account:' || pg_temp.u(n)::text);
++end;
++$$;
++-- A new transaction as far as the per-transaction de-duplication is concerned.
++create function pg_temp.next_tx() returns void language sql as
++$$ select set_config('app.notifications_refreshed', '', true) $$;
++
++-- Accounts: 1 Admin; 2 member A; 3 member B. Member 4 has no account.
++insert into auth.users (id, aud, role, phone, phone_confirmed_at)
++select pg_temp.u(n), 'authenticated', 'authenticated', ltrim(pg_temp.phone(n), '+'), now()
++  from generate_series(1, 3) n;
++select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 3) n;
++select app.platform_set_environment('local', 'pgtap 3.7');
++insert into m select n, app.identity_seed_synthetic_link(pg_temp.u(n), 'SYNTHETIC 3.7 Member ' || n, 'pgtap 3.7')
++  from generate_series(1, 3) n;
++with ins as (insert into app.identity_members (display_name, membership_state, is_synthetic)
++             values ('SYNTHETIC 3.7 Accountless', 'approved', true) returning member_id)
++insert into m select 4, member_id from ins;
++select app.identity_bootstrap_admin(pg_temp.mid(1), 'israel');
++
++-- Structure and privileges --------------------------------------------------------------------
++select ok(not exists (
++  select 1 from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace
++   cross join unnest(array['anon', 'authenticated', 'service_role']) r
++   where n.nspname = 'app'
++     and p.proname in ('notifications_item_snoozed_until', 'notifications_snooze_choices',
++                       'notifications_item_snooze', 'notifications_publish_refresh',
++                       'notifications_inbox_item_signal', 'fixture_reminder_reply_schedule',
++                       'fixture_reminder_schedule', 'fixture_reminder_respond')
++     and has_function_privilege(r, p.oid, 'EXECUTE')),
++  'nothing new is client-executable (snooze goes through the existing member command)');
++select is((select count(*)::int from app.contract_unowned_objects()), 0, 'no unowned objects');
++select is((select count(*)::int from app.contract_unpinned_functions()), 0, 'every function is pinned');
++select is((select count(*)::int from app.contract_boundary_violations()), 0, 'no boundary violations');
++select is((select string_agg(tgname, ',' order by tgname) from pg_trigger
++            where tgrelid in ('app.notifications_inbox_items'::regclass, 'app.notifications_jobs'::regclass)
++              and tgname like '%signal%'),
++  'notifications_inbox_items_signal_insert,notifications_inbox_items_signal_update,notifications_jobs_snooze_signal_insert,notifications_jobs_snooze_signal_update',
++  'the inbox and snooze changes publish the refresh signal');
++select is((select count(*)::int from app.contract_reminder_contracts
++            where source_type = 'fixture_reminder' and reminder_kind = 'fixture_reply'
++              and title = 'SYNTHETIC reply reminder'), 1,
++  'the SYNTHETIC reply kind registers its generic contract');
++
++-- Opened marker -------------------------------------------------------------------------------
++insert into v (k, id) values ('src1', (pg_temp.cmd(2, 'fixture_reminder_command', 'fixture.reminder_create',
++  jsonb_build_object('due_at', app.cmd_utc(now() - interval '1 minute'))) -> 'data' ->> 'source_id')::uuid);
++select pg_temp.next_tx();
++select is(pg_temp.deliver() -> 'data' ->> 'delivered', '1', 'the worker delivers the reminder');
++insert into v (k, id) values ('item1', pg_temp.item_of((select id from v where k = 'src1')));
++select is(pg_temp.listed(2, (select id from v where k = 'item1')) - 'item_id' - 'due_at' - 'delivered_at',
++  '{"opened": false, "snoozed_until": null, "title": "SYNTHETIC test reminder", "body": "A test reminder is waiting for you.", "reminder_kind": "fixture_due"}'::jsonb,
++  'a new item is listed as not opened and not snoozed');
++select is(pg_temp.open(3, (select id from v where k = 'item1')), '{"state": "not_found"}'::jsonb,
++  'another member opening it learns nothing');
++select is((select opened_at from app.notifications_inbox_items where item_id = (select id from v where k = 'item1')),
++  null, '... and does not mark it opened');
++select pg_temp.next_tx();
++insert into v (k, j) values ('open1', pg_temp.open(2, (select id from v where k = 'item1')));
++select is((select j - 'item_id' - 'due_at' - 'delivered_at' - 'target' from v where k = 'open1'),
++  '{"state": "current", "title": "SYNTHETIC test reminder", "body": "A test reminder is waiting for you.", "reminder_kind": "fixture_due", "snooze_choices": ["1 hour", "24 hours", "2 days"], "snoozed_until": null}'::jsonb,
++  'a current item offers the policy''s snooze choices');
++select is(pg_temp.listed(2, (select id from v where k = 'item1')) ->> 'opened', 'true', 'opening marks it opened');
++insert into v (k, j) values ('opened_at', (select to_jsonb(opened_at) from app.notifications_inbox_items
++                                           where item_id = (select id from v where k = 'item1')));
++select pg_temp.open(2, (select id from v where k = 'item1'));
++select is((select to_jsonb(opened_at) from app.notifications_inbox_items where item_id = (select id from v where k = 'item1')),
++  (select j from v where k = 'opened_at'), 'a second open changes nothing');
++
++-- Snooze ---------------------------------------------------------------------------------------
++select is(pg_temp.res(pg_temp.snooze(3, (select id from v where k = 'item1'), '1 hour')), 'not_found {}',
++  'another member cannot snooze the item');
++select is(pg_temp.res(pg_temp.snooze(2, (select id from v where k = 'item1'), '3 hours')),
++  'validation_failed {"choice": "invalid"}', 'only a policy choice is accepted');
++select is(pg_temp.res(pg_temp.cmd(2, 'notifications_command', 'notifications.snooze_item',
++            jsonb_build_object('item_id', (select id from v where k = 'item1'), 'note', 'x'))),
++  'validation_failed {"note": "unknown_field", "choice": "required"}', 'the payload is strict');
++select is(pg_temp.res(pg_temp.snooze(2, (select id from v where k = 'item1'), '1 hour', 1)),
++  'validation_failed {"expected_revision": "must_be_null"}', 'a snooze carries no expected revision');
++select is(pg_temp.snooze_jobs((select id from v where k = 'item1')), '', 'the refusals wrote nothing');
++select pg_temp.next_tx();
++insert into v (k, j) values ('sz1', pg_temp.snooze(2, (select id from v where k = 'item1'), '24 hours'));
++select is((select (j -> 'data') - 'scheduled_at' || jsonb_build_object('revision', j -> 'revision') from v where k = 'sz1'),
++  jsonb_build_object('item_id', (select id from v where k = 'item1'), 'clamped', false, 'expires_at', null, 'revision', 2),
++  'the member snoozes the item for 24 hours (the item''s revision moves to 2)');
++select ok((select (j -> 'data' ->> 'scheduled_at')::timestamptz between now() + interval '23 hours 59 minutes'
++                                                                    and now() + interval '24 hours 1 minute'
++             from v where k = 'sz1'), 'it fires again in 24 hours');
++select is(pg_temp.snooze_jobs((select id from v where k = 'item1')), 'pending:-', 'one pending snooze job');
++select is(pg_temp.listed(2, (select id from v where k = 'item1')) ->> 'snoozed_until',
++  (select j -> 'data' ->> 'scheduled_at' from v where k = 'sz1'), 'the list shows when it comes back');
++select is(pg_temp.open(2, (select id from v where k = 'item1')) ->> 'snoozed_until',
++  (select j -> 'data' ->> 'scheduled_at' from v where k = 'sz1'), 'so does the opened item');
++select pg_temp.next_tx();
++insert into v (k, j) values ('sz2', pg_temp.snooze(2, (select id from v where k = 'item1'), '1 hour'));
++select is(pg_temp.snooze_jobs((select id from v where k = 'item1')), 'cancelled:snooze_replaced,pending:-',
++  'a new snooze replaces the earlier one');
++
++-- Cancellation ends the snooze ---------------------------------------------------------------
++select pg_temp.next_tx();
++select is(pg_temp.res(pg_temp.cmd(2, 'fixture_reminder_command', 'fixture.reminder_cancel',
++            jsonb_build_object('source_id', (select id from v where k = 'src1')), 1)), 'ok',
++  'the source is cancelled');
++select is(pg_temp.snooze_jobs((select id from v where k = 'item1')), 'cancelled:snooze_replaced,cancelled:source_cancelled',
++  'the pending snooze is cancelled with it');
++select is(pg_temp.listed(2, (select id from v where k = 'item1')) ->> 'snoozed_until', null, 'the list no longer shows a snooze');
++select is(pg_temp.open(2, (select id from v where k = 'item1')) ->> 'state', 'superseded', 'the item opens out of date');
++select is(pg_temp.res(pg_temp.snooze(2, (select id from v where k = 'item1'), '1 hour')),
++  'conflict {"item_id": "superseded"}', 'and cannot be snoozed again');
++
++-- Clamp to the expiry, then a response ends the snooze -----------------------------------------
++select is(pg_temp.res(pg_temp.cmd(2, 'fixture_reminder_command', 'fixture.reminder_schedule',
++            jsonb_build_object('starts_at', app.cmd_utc(now() - interval '1 hour')))),
++  'validation_failed {"starts_at": "invalid"}', 'a SYNTHETIC request must start in the future');
++insert into v (k, id, j) select 'src2', (r -> 'data' ->> 'source_id')::uuid, r
++  from pg_temp.cmd(2, 'fixture_reminder_command', 'fixture.reminder_schedule',
++                   jsonb_build_object('starts_at', app.cmd_utc(date_trunc('second', now()) + interval '20 hours'))) r;
++select is((select (j -> 'data' ->> 'enqueued')::int from v where k = 'src2'), 1,
++  'short notice: one respond-now reminder, planned by the 3.3 calculation');
++select is((select string_agg(reminder_kind || '|' || (scheduled_at <= now())::text || '|' || app.cmd_utc(expires_at), ',')
++             from app.notifications_jobs where source_id = (select id from v where k = 'src2')),
++  'fixture_reply|true|' || app.cmd_utc(date_trunc('second', now()) + interval '20 hours'),
++  'it is due now and expires when the request starts');
++select pg_temp.next_tx();
++select pg_temp.deliver();
++insert into v (k, id) values ('item2', pg_temp.item_of((select id from v where k = 'src2')));
++select isnt((select id from v where k = 'item2'), null, 'the reply reminder reached the inbox');
++select pg_temp.next_tx();
++insert into v (k, j) values ('sz3', pg_temp.snooze(2, (select id from v where k = 'item2'), '2 days'));
++select is((select (j -> 'data' ->> 'clamped')::boolean from v where k = 'sz3'), true,
++  'a 2-day snooze past the request''s start is clamped');
++select is((select j -> 'data' ->> 'scheduled_at' from v where k = 'sz3'),
++  app.cmd_utc(date_trunc('second', now()) + interval '20 hours'), '... to the expiry itself');
++select is((select j -> 'data' ->> 'expires_at' from v where k = 'sz3'),
++  app.cmd_utc(date_trunc('second', now()) + interval '20 hours'), 'the answer names the expiry');
++select is(pg_temp.res(pg_temp.cmd(3, 'fixture_reminder_command', 'fixture.reminder_respond',
++            jsonb_build_object('source_id', (select id from v where k = 'src2')), 1)), 'not_found {}',
++  'only the recipient answers their request');
++select pg_temp.next_tx();
++select is(pg_temp.res(pg_temp.cmd(2, 'fixture_reminder_command', 'fixture.reminder_respond',
++            jsonb_build_object('source_id', (select id from v where k = 'src2')), 1)), 'ok',
++  'the member responds');
++select is(pg_temp.snooze_jobs((select id from v where k = 'item2')), 'cancelled:responded',
++  'the response cancels the pending snooze');
++select is(pg_temp.listed(2, (select id from v where k = 'item2')) ->> 'snoozed_until', null,
++  'the list no longer shows a snooze');
++select is(pg_temp.open(2, (select id from v where k = 'item2')) - 'item_id' - 'due_at' - 'delivered_at',
++  '{"state": "superseded", "target": null, "title": "SYNTHETIC reply reminder", "body": "A test request is waiting for your answer.", "reminder_kind": "fixture_reply"}'::jsonb,
++  'the answered reminder opens out of date, with no snooze offered');
++select is(pg_temp.res(pg_temp.snooze(2, (select id from v where k = 'item2'), '1 hour')),
++  'conflict {"item_id": "superseded"}', 'and cannot be snoozed again');
++select is(pg_temp.res(pg_temp.cmd(2, 'fixture_reminder_command', 'fixture.reminder_respond',
++            jsonb_build_object('source_id', (select id from v where k = 'src2')), 1)),
++  'conflict {"source_id": "responded"}', 'a second response is refused');
++
++-- Push off keeps in-app items -----------------------------------------------------------------
++select pg_temp.cmd(2, 'notifications_command', 'notifications.register_device',
++  '{"token": "fcm-ssssssssssssssssssssssssssssssssssssssss:APA91b", "platform": "android"}');
++select is(pg_temp.res(pg_temp.cmd(2, 'notifications_command', 'notifications.set_push_category',
++            '{"source_type": "fixture_reminder", "reminder_kind": "fixture_due", "push_enabled": false}')), 'ok',
++  'the member turns push off for the category');
++insert into v (k, id) values ('src3', (pg_temp.cmd(2, 'fixture_reminder_command', 'fixture.reminder_create',
++  jsonb_build_object('due_at', app.cmd_utc(now() - interval '1 minute'))) -> 'data' ->> 'source_id')::uuid);
++select pg_temp.next_tx();
++select pg_temp.deliver();
++insert into v (k, id) values ('item3', pg_temp.item_of((select id from v where k = 'src3')));
++select is(pg_temp.listed(2, (select id from v where k = 'item3')) ->> 'opened', 'false',
++  'with push off the reminder is still in the inbox');
++select is((select count(*)::int from app.notifications_push_jobs where item_id = (select id from v where k = 'item3')), 0,
++  '... and no push is queued for it');
++
++-- The refresh signal ---------------------------------------------------------------------------
++create function pg_temp.total() returns int language plpgsql as $$
++begin
++  if to_regclass('realtime.messages') is null then
++    return 0;
++  end if;
++  return (select count(*)::int from realtime.messages);
++end;
++$$;
++select pg_temp.next_tx();
++insert into v (k, j) values ('total', to_jsonb(pg_temp.total()));
++select app.notifications_publish_refresh(pg_temp.mid(4));
++select is(pg_temp.total(), (select (j #>> '{}')::int from v where k = 'total'),
++  'an accountless member has no account to signal: nothing is published');
++select * from (select case when pg_temp.rt() then
++  is(pg_temp.sig(2), 9, 'one signal per changing transaction for A: delivery, first open, three snoozes, '
++                        'cancellation, response, push-off delivery and the reply delivery')
++  else skip('no Realtime message partition for today (covered by the E2E)', 1) end) x;
++select * from (select case when pg_temp.rt() then
++  is((select count(*)::int from realtime.messages where topic = 'account:' || pg_temp.u(2)::text
++        and (payload <> '{}'::jsonb or event <> 'inbox_changed' or not private or extension <> 'broadcast')), 0,
++     'every signal is a private broadcast `inbox_changed` with an empty payload (no ids, text or source type)')
++  else skip('no Realtime message partition for today (covered by the E2E)', 1) end) x;
++select * from (select case when pg_temp.rt() then
++  is(pg_temp.sig(3), 0, 'B''s failed open and snooze of A''s item signal nobody on B''s account')
++  else skip('no Realtime message partition for today (covered by the E2E)', 1) end) x;
++create function pg_temp.rolled_back() returns int language plpgsql as $$
++begin
++  perform pg_temp.next_tx();
++  begin
++    perform app.notifications_publish_refresh(pg_temp.mid(2));
++    raise exception 'roll back';
++  exception when others then
++    null;
++  end;
++  return pg_temp.sig(2);
++end;
++$$;
++select * from (select case when pg_temp.rt() then
++  is(pg_temp.rolled_back(), 9, 'a rolled back change publishes nothing')
++  else skip('no Realtime message partition for today (covered by the E2E)', 1) end) x;
++-- Channel authorisation: a session reads its own topic only; nobody may send.
++create function pg_temp.visible(n int, p_topic_of int) returns int language plpgsql as $$
++declare
++  r int;
++  v_topic text := 'account:' || pg_temp.u(p_topic_of)::text;
++begin
++  perform set_config('request.jwt.claims', pg_temp.c(n)::text, true);
++  perform set_config('realtime.topic', v_topic, true);
++  set local role authenticated;
++  select count(*)::int into r from realtime.messages where topic = v_topic;
++  reset role;
++  return r;
++end;
++$$;
++create function pg_temp.send_as(n int) returns text language plpgsql as $$
++declare
++  v_topic text := 'account:' || pg_temp.u(n)::text;
++begin
++  perform set_config('request.jwt.claims', pg_temp.c(n)::text, true);
++  perform set_config('realtime.topic', v_topic, true);
++  set local role authenticated;
++  insert into realtime.messages (topic, extension, payload, event, private)
++  values (v_topic, 'broadcast', '{}', 'inbox_changed', true);
++  reset role;
++  return 'sent';
++exception when others then
++  reset role;
++  return sqlstate;
++end;
++$$;
++select * from (select case when pg_temp.rt() then
++  is(pg_temp.visible(2, 2), 9, 'A''s session may read A''s own topic')
++  else skip('no Realtime message partition for today (covered by the E2E)', 1) end) x;
++select * from (select case when pg_temp.rt() then
++  is(pg_temp.visible(3, 2), 0, 'B''s session cannot read A''s topic')
++  else skip('no Realtime message partition for today (covered by the E2E)', 1) end) x;
++select * from (select case when to_regclass('realtime.messages') is not null then
++  is(pg_temp.send_as(2), '42501', 'a client cannot publish on its own topic (receive-only)')
++  else skip('Realtime is not installed here', 1) end) x;
++select * from (select case when to_regclass('realtime.messages') is not null then
++  is((select string_agg(polcmd::text || ':' || array_to_string(polroles::regrole[], '+'), ',')
++        from pg_policy where polrelid = 'realtime.messages'::regclass
++         and polname = 'notifications_account_refresh_receive'),
++     'r:authenticated', 'the one Notifications policy on realtime.messages is SELECT for authenticated')
++  else skip('Realtime is not installed here', 1) end) x;
++
++select * from finish();
++rollback;
+diff --git a/supabase/tests/notifications_inbox_test.sql b/supabase/tests/notifications_inbox_test.sql
+index e6ace8b..24beb26 100644
+--- a/supabase/tests/notifications_inbox_test.sql
++++ b/supabase/tests/notifications_inbox_test.sql
+@@ -144,9 +144,9 @@ select ok(exists (select 1 from app.contract_module_dependencies
+   'fixture may call notifications, never the reverse');
+ select is((select array_agg(column_name::text order by column_name::text) from information_schema.columns
+             where table_schema = 'app' and table_name = 'notifications_inbox_items'),
+-  array['delivered_at', 'delivered_by_principal', 'due_at', 'item_id', 'job_id', 'recipient_member_id',
+-        'reminder_kind'],
+-  'an inbox item holds ids, the kind and times only (no text, source id or revision)');
++  array['delivered_at', 'delivered_by_principal', 'due_at', 'item_id', 'job_id', 'opened_at',
++        'recipient_member_id', 'reminder_kind', 'snooze_revision'],
++  'an inbox item holds ids, the kind, times and the 3.7 opened/snooze markers only (no text, source id or source revision)');
+ 
+ -- Production (no marker): the Q2 gate is closed, nothing is enqueued -----------------------------
+ create temp table m (n int primary key, member_id uuid);
+@@ -225,8 +225,8 @@ select throws_ok($$insert into app.notifications_inbox_items (job_id, recipient_
+                      from app.notifications_inbox_items i limit 1$$,
+   '23505', null, 'a second item for the same job is impossible (duplicate or racing workers)');
+ select is((select array_agg(k order by k) from jsonb_object_keys(pg_temp.items(1) -> 0) k),
+-  array['body', 'delivered_at', 'due_at', 'item_id', 'reminder_kind', 'title'],
+-  'the member reads the item: kind, registered generic text (3.2) and times only');
++  array['body', 'delivered_at', 'due_at', 'item_id', 'opened', 'reminder_kind', 'snoozed_until', 'title'],
++  'the member reads the item: kind, registered generic text (3.2), times and the 3.7 markers only');
+ select is(pg_temp.items(1) -> 0 ->> 'reminder_kind', 'fixture_due', 'the item is the fixture reminder');
+ select is(pg_temp.items(2), '[]'::jsonb, 'another member sees nothing');
+ select is(pg_temp.inbox('{"role": "authenticated"}'::jsonb), 'PT401|unauthenticated|unauthenticated',
+diff --git a/supabase/tests/notifications_source_contracts_test.sql b/supabase/tests/notifications_source_contracts_test.sql
+index 293e409..fc928d6 100644
+--- a/supabase/tests/notifications_source_contracts_test.sql
++++ b/supabase/tests/notifications_source_contracts_test.sql
+@@ -317,7 +317,9 @@ select is(pg_temp.open(1, pg_temp.item((select v from src where k = 'current')))
+   (select jsonb_build_object('item_id', i.item_id, 'reminder_kind', 'fixture_due',
+             'title', 'SYNTHETIC test reminder', 'body', 'A test reminder is waiting for you.',
+             'due_at', app.cmd_utc(i.due_at), 'delivered_at', app.cmd_utc(i.delivered_at),
+-            'state', 'current', 'target', '/fixture/reminders/' || (select v from src where k = 'current'))
++            'state', 'current', 'target', '/fixture/reminders/' || (select v from src where k = 'current'),
++            -- Story 3.7: a current item also offers the policy's snooze choices.
++            'snooze_choices', '["1 hour", "24 hours", "2 days"]'::jsonb, 'snoozed_until', null)
+      from app.notifications_inbox_items i where i.item_id = pg_temp.item((select v from src where k = 'current'))),
+   'a current item opens with its generic text and the authorised target');
+ select is(pg_temp.open(1, pg_temp.item((select v from src where k = k2))) ->> 'state', 'superseded',
+-- 
+2.43.0
+
+
+From d2071326d789f1b10608edd4118e0e82e8406667 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 8 Oct 2026 16:24:44 +0000
+Subject: [PATCH 2/2] test(notifications): inbox screens E2E with Realtime
+ signal capture (WIP 3.7)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01CgoHioRT8VHAC5m3jYACyk
+---
+ .../evidence-3.7/inbox-screens-e2e.jsonl      |  14 +
+ tools/identity-e2e/inbox-screens.mjs          | 362 ++++++++++++++++++
+ tools/identity-e2e/inbox-screens.test.mjs     |  34 ++
+ 3 files changed, 410 insertions(+)
+ create mode 100644 _bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.7/inbox-screens-e2e.jsonl
+ create mode 100644 tools/identity-e2e/inbox-screens.mjs
+ create mode 100644 tools/identity-e2e/inbox-screens.test.mjs
+
+diff --git a/_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.7/inbox-screens-e2e.jsonl b/_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.7/inbox-screens-e2e.jsonl
+new file mode 100644
+index 0000000..7f7c17c
+--- /dev/null
++++ b/_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.7/inbox-screens-e2e.jsonl
+@@ -0,0 +1,14 @@
++{"step":"S00-precondition","target":"LOCAL","at":"2026-10-08T16:24:08.356Z","settings":{"phone":true,"sms_provider":""},"realtime":"running","leftover_users_removed":"0"}
++{"step":"S01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-08T16:24:09.393Z","verdict":"pass","amr":["password"]}
++{"step":"S10-only-the-account-joins-its-channel","target":"LOCAL","at":"2026-10-08T16:24:14.513Z","verdict":"pass","own_a":"ok","own_b":"ok","b_on_a":"error","signed_out_on_a":"error"}
++{"step":"S20-delivery-signals-generically","target":"LOCAL","at":"2026-10-08T16:24:15.155Z","verdict":"pass","delivered":1,"frames":1,"payloads":[{}],"frame_keys":["event","payload","ref","topic"],"inner_keys":["event","meta","payload","type"],"frames_to_b":0}
++{"step":"S21-new-item-not-opened","target":"LOCAL","at":"2026-10-08T16:24:15.166Z","verdict":"pass","opened":false,"snoozed_until":null}
++{"step":"S22-open-marks-opened-and-offers-choices","target":"LOCAL","at":"2026-10-08T16:24:15.671Z","verdict":"pass","by_b":{"state":"not_found"},"state":"current","choices":["1 hour","24 hours","2 days"],"opened":true,"frames":1}
++{"step":"S23-second-open-is-silent","target":"LOCAL","at":"2026-10-08T16:24:24.053Z","verdict":"pass","frames":0}
++{"step":"S30-member-snoozes-own-item","target":"LOCAL","at":"2026-10-08T16:24:24.888Z","verdict":"pass","foreign":"not_found","bad_choice":{"choice":"invalid"},"revision":2,"clamped":false,"listed_matches":true,"jobs":"pending:-","frames":1}
++{"step":"S31-cancellation-removes-the-snooze","target":"LOCAL","at":"2026-10-08T16:24:25.588Z","verdict":"pass","jobs":"cancelled:source_cancelled","snoozed_until":null,"state":"superseded","frames":1}
++{"step":"S40-snooze-clamped-to-the-start","target":"LOCAL","at":"2026-10-08T16:24:26.735Z","verdict":"pass","enqueued":1,"delivered":1,"clamped":true,"at_start":true,"frames":1}
++{"step":"S41-response-removes-the-snooze","target":"LOCAL","at":"2026-10-08T16:24:27.537Z","verdict":"pass","jobs":"cancelled:responded","snoozed_until":null,"state":"superseded","snooze_again":"conflict","frames":1}
++{"step":"S50-push-off-keeps-in-app-items","target":"LOCAL","at":"2026-10-08T16:24:28.011Z","verdict":"pass","device":"ok","setting_revision":1,"push_enabled":false,"categories":["fixture_due","fixture_reply"],"delivered":1,"in_inbox":true,"push_jobs":0}
++{"step":"S60-every-signal-is-content-free","target":"LOCAL","at":"2026-10-08T16:24:28.012Z","verdict":"pass","captured":7,"payloads":["{}"],"events":["inbox_changed"],"to_refused_sockets":0}
++{"step":"S99-cleanup","target":"LOCAL","at":"2026-10-08T16:24:28.753Z","users_left":0,"credential_revoked":true,"principal_disabled":true,"unmarked":true,"jobs_left":0,"items_left":0}
+diff --git a/tools/identity-e2e/inbox-screens.mjs b/tools/identity-e2e/inbox-screens.mjs
+new file mode 100644
+index 0000000..86744ab
+--- /dev/null
++++ b/tools/identity-e2e/inbox-screens.mjs
+@@ -0,0 +1,362 @@
++#!/usr/bin/env node
++// Story 3.7 end-to-end on the LOCAL stack: the inbox screens' server contract through real
++// GoTrue phone sign-in (no SMS), the real Data API (PostgREST), the real worker script and the
++// real Realtime service (private broadcast channels):
++//   * a member's session joins its own `account:<uid>` channel; another member's session and a
++//     signed-out socket are refused on it;
++//   * delivery, the first open, a snooze, a cancellation and a response each reach the open
++//     channel as `inbox_changed` with an EMPTY payload: the captured frames carry no item, source
++//     or member id, no text and no source type;
++//   * markers: a new item is listed not opened; opening marks it opened and offers the policy's
++//     snooze choices (1 hour, 24 hours, 2 days);
++//   * snooze: only the recipient may snooze; the list shows when it comes back; a source
++//     cancellation removes the snooze; a 2-day snooze of a request starting in 20 hours is
++//     clamped to the start; the member's response removes the snooze and the item opens out of
++//     date;
++//   * push off for a category keeps new reminders in the inbox and queues no push.
++//
++// Needs Realtime running (start the stack without `-x realtime`) and the local phone switch:
++// `node tools/auth-harness/local-phone-auth.mjs on`, then `off` afterwards. LOCAL only (exact
++// origin), SYNTHETIC fictional numbers +44 7700 900930-900939, synthetic device tokens.
++// Evidence is redacted JSONL: statuses, codes, states, counts, and the captured signal payloads
++// and frame keys; never tokens, passwords, numbers, ids or the credential. Every user, member,
++// link, reminder, schedule, job, item, device, setting, receipt and broadcast row it created is
++// removed; the run's credential is revoked and its principal disabled.
++//
++// Usage: node tools/identity-e2e/inbox-screens.mjs [--evidence <file.jsonl>]
++import { execFile } from 'node:child_process';
++import { createHash, randomBytes, randomUUID } from 'node:crypto';
++import { dirname, join, resolve } from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { promisify } from 'node:util';
++
++import { amrMethods, localHttp, localKey, password, psql, runMain, sleep, startRun } from './harness.mjs';
++
++const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
++const OPERATOR = 'israel';
++const NAME_PREFIX = 'SYNTHETIC 3.7 E2E';
++
++/** The reserved fictional numbers this run uses (+44 7700 900930-900939). */
++export function isFictionalScreensPhone(phone) {
++  return /^\+44770090093[0-9]$/.test(phone);
++}
++
++/**
++ * A captured refresh signal is generic when it is a broadcast `inbox_changed` whose payload is
++ * exactly `{}`, whose envelope holds only Realtime's own fields (`meta` carries at most
++ * Realtime's per-message `id`), and which contains none of the given private values (ids, text)
++ * anywhere but the topic. The topic is the subscriber's own `account:<uid>` channel name, which
++ * the subscriber chose; it must equal `ownTopic`.
++ */
++export function isGenericSignal(frame, privateValues, ownTopic) {
++  if (!frame || typeof frame !== 'object' || frame.event !== 'broadcast') return false;
++  if (ownTopic !== undefined && frame.topic !== `realtime:${ownTopic}`) return false;
++  const inner = frame.payload;
++  if (!inner || inner.event !== 'inbox_changed' || inner.type !== 'broadcast') return false;
++  if (!Object.keys(inner).every((k) => ['event', 'meta', 'payload', 'type'].includes(k))) return false;
++  if (inner.meta !== undefined && !Object.keys(inner.meta ?? {}).every((k) => k === 'id')) return false;
++  if (!inner.payload || typeof inner.payload !== 'object' || Array.isArray(inner.payload)
++      || Object.keys(inner.payload).length !== 0) return false;
++  const { topic: _topic, ...rest } = frame;
++  const text = JSON.stringify(rest);
++  return privateValues.every((v) => !v || !text.includes(String(v)));
++}
++
++/** One Realtime socket joined to a private topic; collects broadcast frames. */
++function channel(origin, key, topic, token) {
++  const url = `${origin.replace(/^http/, 'ws')}/realtime/v1/websocket?apikey=${encodeURIComponent(key)}&vsn=1.0.0`;
++  const ws = new WebSocket(url);
++  const frames = [];
++  let reply = null;
++  let ref = 1;
++  const heartbeat = setInterval(() => {
++    if (ws.readyState === 1) ws.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(++ref) }));
++  }, 20_000);
++  ws.onopen = () => ws.send(JSON.stringify({
++    topic: `realtime:${topic}`, event: 'phx_join', ref: '1', join_ref: '1',
++    payload: { config: { broadcast: { ack: false, self: false }, presence: { key: '' }, postgres_changes: [], private: true },
++               ...(token ? { access_token: token } : {}) } }));
++  ws.onmessage = (m) => {
++    let f;
++    try { f = JSON.parse(m.data); } catch { return; }
++    if (f.event === 'phx_reply' && f.ref === '1') reply = f.payload?.status ?? 'unknown';
++    if (f.event === 'broadcast') frames.push(f);
++  };
++  ws.onerror = () => { if (reply === null) reply = 'socket_error'; };
++  return {
++    frames,
++    joined: async (ms = 8000) => {
++      const until = Date.now() + ms;
++      while (reply === null && Date.now() < until) await sleep(100);
++      return reply ?? 'timeout';
++    },
++    close: () => { clearInterval(heartbeat); try { ws.close(); } catch { /* closed */ } },
++  };
++}
++
++/** Waits until `ch` holds more than `before` frames (or the time is up); returns the new ones. */
++async function newFrames(ch, before, ms = 8000) {
++  const until = Date.now() + ms;
++  while (ch.frames.length <= before && Date.now() < until) await sleep(100);
++  await sleep(300);
++  return ch.frames.slice(before);
++}
++
++async function main() {
++  const { log, check, finish } = startRun();
++  const keys = localKey();
++  const { origin, key } = keys;
++  const http = localHttp(keys);
++  const signIn = (phone, pw) => http('POST', '/auth/v1/token?grant_type=password', { body: { phone, password: pw } });
++  const rpc = (fn, token, body = {}) => http('POST', `/rest/v1/rpc/${fn}`, { token, body, profile: 'api' });
++  const envelope = (fn, token, cmd, expected, payload) =>
++    rpc(fn, token, { version: 1, command: cmd, request_id: randomUUID(), expected_revision: expected, payload })
++      .then((r) => ({ status: r.status, ...r.json }));
++  const reminder = (token, cmd, expected, payload) => envelope('fixture_reminder_command', token, cmd, expected, payload);
++  const notif = (token, cmd, expected, payload) => envelope('notifications_command', token, cmd, expected, payload);
++  const open = (token, itemId) => rpc('notifications_open_item', token, { item_id: itemId });
++  const listed = async (token, itemId) => ((await rpc('notifications_my_inbox', token)).json?.items ?? [])
++    .find((i) => i.item_id === itemId) ?? null;
++  const utc = (ms) => new Date(ms).toISOString();
++
++  const people = {
++    a: { phone: '+447700900930', name: `${NAME_PREFIX} Member A` },
++    b: { phone: '+447700900931', name: `${NAME_PREFIX} Member B` },
++  };
++  for (const p of Object.values(people)) if (!isFictionalScreensPhone(p.phone)) throw new Error(`not fictional: ${p.phone}`);
++  const users = new Set();
++  const digits = Object.values(people).map((p) => `'${p.phone.slice(1)}'`).join(',');
++  const cleanup = () => {
++    const ids = [...users].map((u) => `'${u}'`);
++    const byUser = ids.length ? `u.id in (${ids.join(',')}) or ` : '';
++    return psql(`
++    create temp table gone_users as select u.id from auth.users u where ${byUser} u.phone in (${digits});
++    create temp table gone_members as
++      select m.member_id from app.identity_members m where m.display_name like '${NAME_PREFIX}%';
++    delete from app.notifications_attempts a using app.notifications_jobs j
++     where a.job_id = j.job_id and j.recipient_member_id in (select member_id from gone_members);
++    delete from app.notifications_push_jobs p
++     where p.recipient_member_id in (select member_id from gone_members) or p.account_id in (select id from gone_users);
++    delete from app.notifications_direct_contact_needs n where n.recipient_member_id in (select member_id from gone_members);
++    update app.notifications_jobs j set snoozed_from_item_id = null
++     where j.recipient_member_id in (select member_id from gone_members);
++    delete from app.notifications_inbox_items i where i.recipient_member_id in (select member_id from gone_members);
++    delete from app.notifications_jobs j where j.recipient_member_id in (select member_id from gone_members);
++    delete from app.notifications_schedules s where s.recipient_member_id in (select member_id from gone_members);
++    delete from app.notifications_device_tokens t
++     where t.member_id in (select member_id from gone_members) or t.account_id in (select id from gone_users);
++    delete from app.notifications_push_settings s
++     where s.member_id in (select member_id from gone_members) or s.account_id in (select id from gone_users);
++    delete from app.fixture_reminder_contact_needs n where n.member_id in (select member_id from gone_members);
++    delete from app.fixture_reminder_sources s where s.member_id in (select member_id from gone_members);
++    delete from app.identity_access_audit a
++     where a.target_member_id in (select member_id from gone_members) or a.actor_member_id in (select member_id from gone_members);
++    delete from app.identity_grants g where g.member_id in (select member_id from gone_members);
++    delete from app.identity_grant_sets s where s.member_id in (select member_id from gone_members);
++    delete from app.identity_holds h where h.member_id in (select member_id from gone_members);
++    delete from app.identity_binding_history h using app.identity_account_links l
++     where h.link_id = l.link_id and (l.member_id in (select member_id from gone_members) or l.auth_user_id in (select id from gone_users));
++    delete from app.identity_credential_events e using app.identity_account_links l
++     where e.link_id = l.link_id and (l.member_id in (select member_id from gone_members) or l.auth_user_id in (select id from gone_users));
++    delete from app.identity_account_links l
++     where l.member_id in (select member_id from gone_members) or l.auth_user_id in (select id from gone_users);
++    delete from app.identity_members m where m.member_id in (select member_id from gone_members);
++    delete from app.cmd_receipts r where r.actor_id in (select id from gone_users);
++    delete from realtime.messages r where r.topic in (select 'account:' || id::text from gone_users);
++    delete from auth.users u where u.id in (select id from gone_users);
++    select count(*) from auth.users u where ${byUser} u.phone in (${digits});`);
++  };
++
++  const settings = await http('GET', '/auth/v1/settings');
++  if (settings.json?.external?.phone !== true) {
++    throw new Error('the local phone provider is off: run `node tools/auth-harness/local-phone-auth.mjs on` first');
++  }
++  // Realtime answers a join (here refused: no session) once it is up; a reset restarts it.
++  let probeReply = 'timeout';
++  for (let i = 0; i < 8 && (probeReply === 'socket_error' || probeReply === 'timeout'); i++) {
++    if (i) await sleep(4000);
++    const probe = channel(origin, key, `account:${randomUUID()}`, null);
++    probeReply = await probe.joined(5000);
++    probe.close();
++  }
++  if (probeReply === 'socket_error' || probeReply === 'timeout') {
++    throw new Error('Realtime is not running: start the local stack without `-x realtime`');
++  }
++  const marker = psql(`select coalesce((select environment from app.platform_environment), '')`);
++  let marked = false;
++  if (marker === '') {
++    psql(`select app.platform_set_environment('local', 'notifications-screens-e2e')`);
++    marked = true;
++  } else if (marker !== 'local') {
++    throw new Error(`local database is marked ${marker}`);
++  }
++  log('S00-precondition', {
++    settings: { phone: settings.json?.external?.phone, sms_provider: settings.json?.sms_provider ?? null },
++    realtime: 'running', leftover_users_removed: cleanup(),
++  });
++
++  const run = randomUUID().slice(0, 8);
++  const credential = `sysc_local_${randomBytes(32).toString('base64url')}`;
++  const principal = psql(`select app.sys_create_principal('notifications-worker-e2e-${run}', 'notifications_worker', '${OPERATOR}')`);
++  const credentialId = JSON.parse(psql(`select app.sys_register_credential('${principal}',
++    '${createHash('sha256').update(credential).digest('hex')}', 'screens e2e ${run}', interval '2 hours', '${OPERATOR}')`)).credential_id;
++  const worker = async () => {
++    try {
++      const { stdout } = await promisify(execFile)('node', [join(ROOT, 'tools/notifications/worker.mjs'), 'run-once'], {
++        encoding: 'utf8',
++        env: { PATH: process.env.PATH, SUPABASE_URL: origin, SUPABASE_PUBLISHABLE_KEY: key, NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL: credential } });
++      const line = stdout.split('\n').find((l) => l.startsWith('{'));
++      return { exit: 0, ...(line ? JSON.parse(line) : {}) };
++    } catch (e) {
++      return { exit: e.code ?? 1, error: String(e.stderr ?? '').trim().slice(-160) };
++    }
++  };
++  const itemOf = (sourceId) => psql(`select coalesce((select i.item_id::text from app.notifications_inbox_items i
++    join app.notifications_jobs j on j.job_id = i.job_id where j.source_id = '${sourceId}' and j.snoozed_from_item_id is null
++    order by i.delivered_at desc limit 1), '')`);
++  const snoozeJobs = (itemId) => psql(`select coalesce(string_agg(job_state || ':' || coalesce(cancel_reason, '-'), ','
++    order by enqueued_at), '') from app.notifications_jobs where snoozed_from_item_id = '${itemId}'`);
++  const sockets = [];
++
++  try {
++    const { a, b } = people;
++    for (const p of [a, b]) {
++      p.password = password();
++      const created = await http('POST', '/auth/v1/admin/users', { admin: true, body: { phone: p.phone, phone_confirm: true, password: p.password } });
++      p.user = created.json?.id;
++      users.add(p.user);
++      p.member = psql(`select app.identity_seed_synthetic_link('${p.user}', '${p.name}', 'notifications-screens-e2e')`);
++      p.token = (await signIn(p.phone, p.password)).json?.access_token;
++    }
++    check('S01-members-signed-in-by-phone', [a, b].every((p) => amrMethods(p.token).includes('password')),
++      { amr: amrMethods(a.token) });
++
++    // ------------------------------------------------------------ channel authorisation
++    const chA = channel(origin, key, `account:${a.user}`, a.token);
++    const chB = channel(origin, key, `account:${b.user}`, b.token);
++    const spy = channel(origin, key, `account:${a.user}`, b.token);
++    const anon = channel(origin, key, `account:${a.user}`, null);
++    sockets.push(chA, chB, spy, anon);
++    const joins = { own_a: await chA.joined(), own_b: await chB.joined(), b_on_a: await spy.joined(), signed_out_on_a: await anon.joined() };
++    check('S10-only-the-account-joins-its-channel', joins.own_a === 'ok' && joins.own_b === 'ok'
++      && joins.b_on_a === 'error' && joins.signed_out_on_a === 'error', joins);
++
++    const privateValues = () => [a.user, b.user, a.member, b.member, 'fixture', 'SYNTHETIC', 'reminder', 'waiting'];
++    const signals = [];
++    const expectSignal = async (step, action) => {
++      const before = chA.frames.length;
++      const beforeB = chB.frames.length;
++      const result = await action();
++      const got = await newFrames(chA, before);
++      signals.push(...got);
++      return { result, got, toB: chB.frames.length - beforeB };
++    };
++
++    // ------------------------------------------------------------ delivery, markers, open
++    const src1 = (await reminder(a.token, 'fixture.reminder_create', null, { due_at: utc(Date.now() - 60_000) })).data?.source_id;
++    const delivered = await expectSignal('deliver', worker);
++    const item1 = itemOf(src1);
++    const values1 = [...privateValues(), src1, item1];
++    check('S20-delivery-signals-generically', delivered.result.delivered === 1 && delivered.got.length >= 1
++      && delivered.got.every((f) => isGenericSignal(f, values1, `account:${a.user}`)) && delivered.toB === 0,
++      { delivered: delivered.result.delivered, frames: delivered.got.length, payloads: delivered.got.map((f) => f.payload?.payload),
++        frame_keys: Object.keys(delivered.got[0] ?? {}).sort(), inner_keys: Object.keys(delivered.got[0]?.payload ?? {}).sort(),
++        frames_to_b: delivered.toB });
++    const fresh = await listed(a.token, item1);
++    check('S21-new-item-not-opened', fresh?.opened === false && fresh?.snoozed_until === null,
++      { opened: fresh?.opened, snoozed_until: fresh?.snoozed_until });
++    const byB = await open(b.token, item1);
++    const opened = await expectSignal('open', () => open(a.token, item1));
++    const afterOpen = await listed(a.token, item1);
++    check('S22-open-marks-opened-and-offers-choices', JSON.stringify(byB.json) === '{"state":"not_found"}'
++      && opened.result.json?.state === 'current'
++      && JSON.stringify(opened.result.json?.snooze_choices) === '["1 hour","24 hours","2 days"]'
++      && afterOpen?.opened === true && opened.got.length >= 1 && opened.got.every((f) => isGenericSignal(f, values1, `account:${a.user}`)),
++      { by_b: byB.json, state: opened.result.json?.state, choices: opened.result.json?.snooze_choices, opened: afterOpen?.opened,
++        frames: opened.got.length });
++    const reopened = await expectSignal('reopen', () => open(a.token, item1));
++    check('S23-second-open-is-silent', reopened.result.json?.state === 'current' && reopened.got.length === 0,
++      { frames: reopened.got.length });
++
++    // ------------------------------------------------------------ snooze and cancellation
++    const foreign = await notif(b.token, 'notifications.snooze_item', null, { item_id: item1, choice: '1 hour' });
++    const badChoice = await notif(a.token, 'notifications.snooze_item', null, { item_id: item1, choice: '3 hours' });
++    const snoozed = await expectSignal('snooze', () => notif(a.token, 'notifications.snooze_item', null, { item_id: item1, choice: '24 hours' }));
++    const afterSnooze = await listed(a.token, item1);
++    check('S30-member-snoozes-own-item', foreign.code === 'not_found' && badChoice.code === 'validation_failed'
++      && badChoice.field_errors?.choice === 'invalid' && snoozed.result.revision === 2 && snoozed.result.data?.clamped === false
++      && afterSnooze?.snoozed_until === snoozed.result.data?.scheduled_at && snoozeJobs(item1) === 'pending:-'
++      && snoozed.got.length >= 1 && snoozed.got.every((f) => isGenericSignal(f, values1, `account:${a.user}`)),
++      { foreign: foreign.code, bad_choice: badChoice.field_errors, revision: snoozed.result.revision, clamped: snoozed.result.data?.clamped,
++        listed_matches: afterSnooze?.snoozed_until === snoozed.result.data?.scheduled_at, jobs: snoozeJobs(item1), frames: snoozed.got.length });
++    const cancelled = await expectSignal('cancel', () => reminder(a.token, 'fixture.reminder_cancel', 1, { source_id: src1 }));
++    const afterCancel = await listed(a.token, item1);
++    const openCancelled = await open(a.token, item1);
++    check('S31-cancellation-removes-the-snooze', cancelled.result.status === 200 && !cancelled.result.code
++      && snoozeJobs(item1) === 'cancelled:source_cancelled' && afterCancel?.snoozed_until === null
++      && openCancelled.json?.state === 'superseded' && cancelled.got.length >= 1,
++      { jobs: snoozeJobs(item1), snoozed_until: afterCancel?.snoozed_until, state: openCancelled.json?.state, frames: cancelled.got.length });
++
++    // ------------------------------------------------------------ clamp, then a response
++    const startsAt = Math.floor((Date.now() + 20 * 3600_000) / 1000) * 1000;
++    const scheduled = await reminder(a.token, 'fixture.reminder_schedule', null, { starts_at: utc(startsAt) });
++    const src2 = scheduled.data?.source_id;
++    const delivered2 = await expectSignal('deliver2', worker);
++    const item2 = itemOf(src2);
++    const clamp = await expectSignal('snooze2', () => notif(a.token, 'notifications.snooze_item', null, { item_id: item2, choice: '2 days' }));
++    check('S40-snooze-clamped-to-the-start', scheduled.data?.enqueued === 1 && delivered2.result.delivered === 1
++      && clamp.result.data?.clamped === true && Date.parse(clamp.result.data?.scheduled_at) === startsAt
++      && Date.parse(clamp.result.data?.expires_at) === startsAt && clamp.got.length >= 1,
++      { enqueued: scheduled.data?.enqueued, delivered: delivered2.result.delivered, clamped: clamp.result.data?.clamped,
++        at_start: Date.parse(clamp.result.data?.scheduled_at) === startsAt, frames: clamp.got.length });
++    const responded = await expectSignal('respond', () => reminder(a.token, 'fixture.reminder_respond', 1, { source_id: src2 }));
++    const afterResponse = await listed(a.token, item2);
++    const openResponded = await open(a.token, item2);
++    const again = await notif(a.token, 'notifications.snooze_item', null, { item_id: item2, choice: '1 hour' });
++    check('S41-response-removes-the-snooze', responded.result.status === 200 && !responded.result.code
++      && snoozeJobs(item2) === 'cancelled:responded' && afterResponse?.snoozed_until === null
++      && openResponded.json?.state === 'superseded' && !('snooze_choices' in (openResponded.json ?? {}))
++      && again.code === 'conflict' && again.field_errors?.item_id === 'superseded' && responded.got.length >= 1,
++      { jobs: snoozeJobs(item2), snoozed_until: afterResponse?.snoozed_until, state: openResponded.json?.state,
++        snooze_again: again.code, frames: responded.got.length });
++
++    // ------------------------------------------------------------ push off keeps the inbox
++    const device = await notif(a.token, 'notifications.register_device', null,
++      { token: `fcm-${'t'.repeat(40)}:APA91b`, platform: 'android' });
++    const off = await notif(a.token, 'notifications.set_push_category', null,
++      { source_type: 'fixture_reminder', reminder_kind: 'fixture_due', push_enabled: false });
++    const settingsRead = (await rpc('notifications_my_push_settings', a.token)).json;
++    const src3 = (await reminder(a.token, 'fixture.reminder_create', null, { due_at: utc(Date.now() - 60_000) })).data?.source_id;
++    const delivered3 = await worker();
++    const item3 = itemOf(src3);
++    const inInbox = await listed(a.token, item3);
++    const pushJobs = Number(psql(`select count(*) from app.notifications_push_jobs where item_id = '${item3 || randomUUID()}'`));
++    const category = (settingsRead?.categories ?? []).find((c) => c.reminder_kind === 'fixture_due');
++    check('S50-push-off-keeps-in-app-items', device.status === 200 && !device.code && off.revision === 1
++      && category?.push_enabled === false && delivered3.delivered === 1 && inInbox !== null && pushJobs === 0,
++      { device: device.code ?? 'ok', setting_revision: off.revision, push_enabled: category?.push_enabled,
++        categories: (settingsRead?.categories ?? []).map((c) => c.reminder_kind), delivered: delivered3.delivered,
++        in_inbox: inInbox !== null, push_jobs: pushJobs });
++
++    // ------------------------------------------------------------ every captured signal
++    const everything = [...privateValues(), src1, src2, src3, item1, item2, item3];
++    check('S60-every-signal-is-content-free', signals.length >= 6 && signals.every((f) => isGenericSignal(f, everything, `account:${a.user}`))
++      && spy.frames.length === 0 && anon.frames.length === 0,
++      { captured: signals.length, payloads: [...new Set(signals.map((f) => JSON.stringify(f.payload?.payload)))],
++        events: [...new Set(signals.map((f) => f.payload?.event))], to_refused_sockets: spy.frames.length + anon.frames.length });
++  } finally {
++    for (const s of sockets) s.close();
++    const left = cleanup();
++    psql(`select app.sys_revoke_credential('${credentialId}', '${OPERATOR}'); select app.sys_disable_principal('${principal}', '${OPERATOR}');`);
++    if (marked) {
++      psql(`delete from app.platform_environment where set_by = 'notifications-screens-e2e';
++            delete from app.platform_environment_history where set_by = 'notifications-screens-e2e';`);
++    }
++    log('S99-cleanup', { users_left: Number(left), credential_revoked: true, principal_disabled: true, unmarked: marked,
++      jobs_left: Number(psql(`select count(*) from app.notifications_jobs`)),
++      items_left: Number(psql(`select count(*) from app.notifications_inbox_items`)) });
++  }
++  finish();
++}
++
++runMain(import.meta.url, main);
+diff --git a/tools/identity-e2e/inbox-screens.test.mjs b/tools/identity-e2e/inbox-screens.test.mjs
+new file mode 100644
+index 0000000..258f75d
+--- /dev/null
++++ b/tools/identity-e2e/inbox-screens.test.mjs
+@@ -0,0 +1,34 @@
++import assert from 'node:assert/strict';
++import { test } from 'node:test';
++
++import { isFictionalScreensPhone, isGenericSignal } from './inbox-screens.mjs';
++
++const own = 'account:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
++const frame = (inner = {}, topic = `realtime:${own}`) => ({
++  ref: null, event: 'broadcast', topic,
++  payload: { event: 'inbox_changed', type: 'broadcast', meta: { id: '18a9f7ec-f6d6-487c-a74c-51725353aa91' }, payload: {}, ...inner },
++});
++
++test('only the reserved fictional numbers of this run are accepted', () => {
++  for (const p of ['+447700900930', '+447700900939']) assert.equal(isFictionalScreensPhone(p), true);
++  for (const p of ['+447700900929', '+447700900940', '447700900930']) assert.equal(isFictionalScreensPhone(p), false);
++});
++
++test('a signal is generic only as an empty inbox_changed broadcast on the own topic', () => {
++  assert.equal(isGenericSignal(frame(), ['item-1'], own), true);
++  assert.equal(isGenericSignal(frame({ meta: undefined }), [], own), true);
++  assert.equal(isGenericSignal(frame({ payload: { item_id: 'item-1' } }), [], own), false);
++  assert.equal(isGenericSignal(frame({ payload: { kind: 'fixture_due' } }), [], own), false);
++  assert.equal(isGenericSignal(frame({ payload: [] }), [], own), false);
++  assert.equal(isGenericSignal(frame({ event: 'item_changed' }), [], own), false);
++  assert.equal(isGenericSignal(frame({ meta: { id: 'x', source: 'fixture_reminder' } }), [], own), false);
++  assert.equal(isGenericSignal(frame({ extra: 'x' }), [], own), false);
++  assert.equal(isGenericSignal(frame({}, 'realtime:account:someone-else'), [], own), false);
++  assert.equal(isGenericSignal({ ...frame(), event: 'presence_state' }, [], own), false);
++  assert.equal(isGenericSignal(null, [], own), false);
++});
++
++test('a private value anywhere but the own topic fails the check', () => {
++  assert.equal(isGenericSignal(frame(), ['aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'], own), true, 'the topic is the subscriber\'s own');
++  assert.equal(isGenericSignal(frame({ meta: { id: 'item-1' } }), ['item-1'], own), false);
++});
+-- 
+2.43.0
+

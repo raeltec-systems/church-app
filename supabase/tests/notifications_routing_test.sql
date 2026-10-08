@@ -403,7 +403,7 @@ select is((select (r ->> 'remaining')::int from jsonb_array_elements(
              app.identity_call_deletion_hooks(pg_temp.mid(9), pg_temp.u(9), gen_random_uuid(), 'check')) r
             where r ->> 'module' = 'notifications') > 0, true, 'before erasure the check counts notification rows');
 -- Fail closed while the rows file is missing (simulated in this transaction): the installed body
--- (from 20261008143100) is saved, replaced by the main migration's stub, and restored verbatim.
+-- (from 20261008135900) is saved, replaced by the main migration's stub, and restored verbatim.
 create temp table saved_def as
   select pg_catalog.pg_get_functiondef('app.notifications_deletion_purge_rows(uuid, uuid)'::regprocedure) as d;
 select ok((select d from saved_def) like '%delete from app.notifications_jobs%',

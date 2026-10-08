@@ -30,7 +30,7 @@
 --     needs, push jobs, tokens, settings). The SYNTHETIC fixture's deletion hook now also covers
 --     `fixture_reminder_sources` and the fixture's direct-contact needs and is registered here.
 --     The row deletions are fail-closed stubs here (`unavailable`), replaced by the small
---     follow-up `20261008143100_notifications_routing_rows.sql` (applied by hand on hosted
+--     follow-up `20261008135900_notifications_routing_rows.sql` (applied by hand on hosted
 --     projects, as 2.11's rows file).
 --   * Enqueue and set_schedule skip a recipient with a deletion tombstone (no raise, nothing
 --     written: {created: false, refused: "member_deleted"}), so nothing recreates their data and
@@ -688,7 +688,7 @@ select app.contract_register_lifecycle_hook('notifications', e,
 -- ---------------------------------------------------------------------------------------------
 
 -- The member's notification rows (and every row of the account): replaced by
--- 20261008143100_notifications_routing_rows.sql. Returns the number of rows removed.
+-- 20261008135900_notifications_routing_rows.sql. Returns the number of rows removed.
 create function app.notifications_deletion_purge_rows(p_member_id uuid, p_account_id uuid)
 returns integer
 language plpgsql
@@ -1253,7 +1253,7 @@ comment on function api.fixture_reminder_command(jsonb) is
   '{member_id, due_at}) through the 1.4 command envelope; local/staging only.';
 
 -- The fixture's reminder rows of the member (sources and contact needs): replaced by
--- 20261008143100_notifications_routing_rows.sql. Returns the number of rows removed.
+-- 20261008135900_notifications_routing_rows.sql. Returns the number of rows removed.
 create function app.fixture_deletion_purge_rows(p_member_id uuid)
 returns integer
 language plpgsql

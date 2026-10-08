@@ -1,9 +1,9 @@
 -- Story 3.5 follow-up: the ROW deletions of a full member deletion for Notifications and the
 -- SYNTHETIC fixture reminder source.
 --
--- Replaces the two fail-closed stubs of 20261008143000_notifications_routing.sql with their
+-- Replaces the two fail-closed stubs of 20261008135811_notifications_routing.sql with their
 -- bodies. Kept in its own small file because the hosted connector cannot get approval for a
--- migration containing row deletions; the owner applies this file by hand after 20261008143000.
+-- migration containing row deletions; the owner applies this file by hand after 20261008135811.
 -- Until it is applied the `erase_owners` deletion step answers `unavailable` and nothing is
 -- erased (fail closed). It changes no schema object. Same signatures and privileges (re-revoked
 -- below).

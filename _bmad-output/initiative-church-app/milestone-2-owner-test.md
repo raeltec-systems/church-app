@@ -17,6 +17,10 @@ Synthetic data only. Owner Q2 decisions: `owner-decisions-milestone-2.md`.
    Then tell the assistant "secrets set": it runs one test tick and switches on the every-minute
    schedule.
 
+3. **Paste in the staging SQL Editor (3.5).** `supabase/migrations/20261008135900_notifications_routing_rows.sql`
+   (the assistant can paste it here in chat for you). Until then a staging member deletion pauses at
+   its erase step and erases nothing.
+
 ## Scenarios
 
 - **3.1 Inbox:** as a synthetic member on mobile and staff web, create a test reminder due in a
@@ -34,6 +38,12 @@ Synthetic data only. Owner Q2 decisions: `owner-decisions-milestone-2.md`.
   running anything. A test reminder whose check is made to fail for 3 minutes still arrives once the
   fault ends (the assistant sets the fault). A cancelled one never arrives. Details:
   `docs/runbooks/notifications.md`, story 3.4, Hosted staging step 7.
+
+- **3.5 Routing:** a reminder for a held member, a deactivated member and a member with no login
+  never reaches them; it appears instead on the source's "Needs direct contact" list (test source:
+  ask the assistant to show it). A member's push on/off per category (once 3.7 adds the screen) never
+  removes in-app items. Deleting a member (after the rows paste) leaves none of their reminders,
+  devices or settings.
 
 ## Reminders
 

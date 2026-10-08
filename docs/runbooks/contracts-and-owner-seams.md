@@ -176,7 +176,7 @@ Refusals: `validation_failed` (shape, intent, or `{"kinds": "required"|"unregist
 
 ## Direct-contact routes (story 3.5)
 
-Migration: `supabase/migrations/20261008143000_notifications_routing.sql`. Since story 3.5 the worker resolves each recipient through current Identity state. A held member, a member whose link is in review, an accountless member and a deactivated member get **no inbox item and no member-push job**: the reminder need goes to your **direct-contact route** instead (FR "Proposed duty reminder defaults": the responsible leader's **Needs direct contact** list). Register one per reminder contract in your own migration, after the contract:
+Migration: `supabase/migrations/20261008135811_notifications_routing.sql`. Since story 3.5 the worker resolves each recipient through current Identity state. A held member, a member whose link is in review, an accountless member and a deactivated member get **no inbox item and no member-push job**: the reminder need goes to your **direct-contact route** instead (FR "Proposed duty reminder defaults": the responsible leader's **Needs direct contact** list). Register one per reminder contract in your own migration, after the contract:
 
 ```sql
 -- Handler: (jsonb need) returns void, search_path = ''. The need is exactly

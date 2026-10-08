@@ -343,7 +343,7 @@ Nothing. The tick and the enable refuse production until `ops_system_access`, `q
 
 ## Story 3.5: recipients routed by current access; work retired on lifecycle events
 
-Migrations: `supabase/migrations/20261008143000_notifications_routing.sql` (no row deletions; fail-closed stubs) and `supabase/migrations/20261008143100_notifications_routing_rows.sql` (ONLY the two functions that delete rows; applied by hand on hosted projects, like 2.11's rows file). Tests: `supabase/tests/notifications_routing_test.sql` (105), E2E `tools/identity-e2e/routing.mjs` (18 checks). Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.5/`.
+Migrations: `supabase/migrations/20261008135811_notifications_routing.sql` (no row deletions; fail-closed stubs) and `supabase/migrations/20261008135900_notifications_routing_rows.sql` (ONLY the two functions that delete rows; applied by hand on hosted projects, like 2.11's rows file). Tests: `supabase/tests/notifications_routing_test.sql` (105), E2E `tools/identity-e2e/routing.mjs` (18 checks). Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.5/`.
 
 ### Routing (at the worker's attempt, after the source and schedule rechecks)
 
@@ -382,7 +382,7 @@ The source's `recipient_eligible` false still ends the job `ineligible` (`recipi
 - Enqueue and `app.notifications_set_schedule` **skip** a recipient with a deletion tombstone: nothing is written (no job, no schedule written or reactivated) and they answer `{created: false, refused: "member_deleted"}` (enqueue, `job_id` and `job_state` null) or `{schedule_id: null, refused: "member_deleted", ...}` (schedule). They do not raise, so one deleted member never rolls back a source's multi-recipient command. Source owners still drop deleted members through their own lifecycle hooks.
 - **Lock order (AD-2).** The worker's attempt and `notifications.register_device` take `FOR KEY SHARE` on the member row before any Notifications lock, and the `deletion_requested` hook skips jobs another transaction holds (`for update skip locked`; the attempt then routes them `member_deleted`), so a deletion, hold or deactivation cannot deadlock with the worker.
 - `app.notifications_erase_member` (Identity deletion hook): `erase` removes the member's jobs, their attempts, inbox items, schedules, needs and push jobs, and the account's tokens, settings and push jobs; `check` counts what is left. The fixture deletion hook (`app.fixture_erase_member`, now registered by migration) also erases the member's `fixture_reminder_sources` and `fixture_reminder_contact_needs`, and anonymises the account on reminders the member created for others.
-- **Fail closed:** until `20261008143100_notifications_routing_rows.sql` is applied, the two purge functions answer `unavailable` and Identity's `erase_owners` step waits (retried). Requests and every access denial work without it.
+- **Fail closed:** until `20261008135900_notifications_routing_rows.sql` is applied, the two purge functions answer `unavailable` and Identity's `erase_owners` step waits (retried). Requests and every access denial work without it.
 
 ### SYNTHETIC fixture additions
 
@@ -402,12 +402,12 @@ Fictional numbers: pgTAP `+44 7700 900880-900888` (the 3.3 suite borrows `900889
 
 ### Hosted staging (parent session, then the owner)
 
-1. **Parent session:** apply `20261008143000_notifications_routing.sql` to staging after `20261008121248`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. It contains no row deletion. It:
+1. **Parent session:** apply `20261008135811_notifications_routing.sql` to staging after `20261008121248`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. It contains no row deletion. It:
    - replaces in place (same signatures and privileges): `app.notifications_attempt`, `app.notifications_enqueue_job`, `app.notifications_set_schedule`, `app.fixture_authorize_command`, `app.fixture_reminder_in_scope`, `app.fixture_reminder_command` (EXECUTE for `authenticated` re-granted) and `app.fixture_erase_member`;
    - adds the direct-contact route registry, four Notifications tables (needs, device tokens, push settings, push jobs) and the fixture's `fixture_reminder_contact_needs`;
    - registers Notifications' five lifecycle hooks, its deletion hook, the fixture deletion hook (if absent) and the `notifications` command authorizer;
    - grants `authenticated` EXECUTE on `api.notifications_command(jsonb)` and `api.notifications_my_push_settings()` (and their `app` entry points) only.
-2. **Owner, by hand (staging SQL editor):** apply `20261008143100_notifications_routing_rows.sql`. It replaces two stubs (`app.notifications_deletion_purge_rows(uuid, uuid)`, `app.fixture_deletion_purge_rows(uuid)`). Until then a staging deletion waits at `erase_owners` (`unavailable`) and nothing is erased.
+2. **Owner, by hand (staging SQL editor):** apply `20261008135900_notifications_routing_rows.sql`. It replaces two stubs (`app.notifications_deletion_purge_rows(uuid, uuid)`, `app.fixture_deletion_purge_rows(uuid)`). Until then a staging deletion waits at `erase_owners` (`unavailable`) and nothing is erased.
 3. **No Edge Function change.** The worker's outcomes are unchanged, so `notifications-worker` needs no redeploy.
 4. **Demonstration** (owner, synthetic members only): repeat `tools/identity-e2e/routing.mjs`'s steps against staging with seeded SYNTHETIC members. An Admin places a hold on one member, deactivates another and records an accountless member with a relative's number, then runs `fixture.reminder_create_for` for an active, the held, the deactivated and the accountless member, and the worker once (`"delivered":1, "ineligible":3`). Check in SQL: one inbox item (the active member), three `routed` rows in `app.notifications_direct_contact_needs` and three in `app.fixture_reminder_contact_needs`, nothing for the relative. Then a lost-device hold on a member with a pending push job (device registered through `notifications.register_device` with a synthetic token) shows the token retired and the push job `cancelled`. Clean up as in story 3.1, step 7, plus the new tables.
 5. **Production:** nothing new to approve. The fixture command refuses production; routing, tokens and settings work behind the same gates as the rest (Q2 for enqueue, the live-access predicate for members).

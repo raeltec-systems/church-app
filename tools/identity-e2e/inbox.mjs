@@ -194,6 +194,11 @@ async function main() {
       && notLinked.status === 403 && notLinked.detail === 'not_linked',
       { member_b: bBefore.items?.length, signed_out: nobody.status, unlinked: { status: notLinked.status, detail: notLinked.detail } });
 
+    const page = (await rpc('notifications_my_inbox', a.token)).json;
+    const half = await rpc('notifications_my_inbox', a.token, { after_item_id: itemA });
+    check('I31-paging-cursor', page?.next === null && Array.isArray(page?.items) && half.status === 400,
+      { next: page?.next ?? null, half_cursor: half.status });
+
     // ------------------------------------------------------------ cancelled and future reminders
     const toCancel = await reminder(a.token, 'fixture.reminder_create', null, { due_at: utc(Date.now() - 30_000) });
     const cancelled = await reminder(a.token, 'fixture.reminder_cancel', toCancel.revision, { source_id: toCancel.data?.source_id });

@@ -16,6 +16,9 @@ class SupabaseInboxRepository implements InboxRepository {
   final SupabaseApiReader _reader;
 
   @override
-  Future<AccessRead<Inbox>> fetchMyInbox() =>
-      _reader.read('notifications_my_inbox', const {}, Inbox.fromJson);
+  Future<AccessRead<Inbox>> fetchMyInbox({InboxCursor? after}) => _reader.read(
+    'notifications_my_inbox',
+    after?.toParams() ?? const {},
+    Inbox.fromJson,
+  );
 }

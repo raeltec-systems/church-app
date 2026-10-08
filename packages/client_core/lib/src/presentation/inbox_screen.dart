@@ -64,7 +64,8 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           tone: StatusTone.neutral,
           icon: Icons.inbox_outlined,
           title: 'Nothing waiting for you',
-          message: 'Reminders for you appear here, even when notifications '
+          message:
+              'Reminders for you appear here, even when notifications '
               'are turned off on this device.',
         ),
       );
@@ -75,7 +76,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           child: Text(
             inbox.items.length == 1
                 ? '1 reminder'
-                : '${inbox.items.length} reminders',
+                : '${inbox.items.length}${inbox.next == null ? '' : '+'} reminders',
             key: const Key('inbox-count'),
             style: ChurchType.cardTitle.copyWith(color: c.ink),
           ),
@@ -83,6 +84,36 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       );
       for (final item in inbox.items) {
         children.addAll([const SizedBox(height: 12), _InboxTile(item: item)]);
+      }
+      if (s.olderFailed) {
+        children.addAll([
+          const SizedBox(height: 12),
+          const RequestStateBanner(
+            key: Key('inbox-older-failed'),
+            tone: StatusTone.danger,
+            icon: Icons.error_outline,
+            title: 'Couldn\'t load older reminders',
+            message: 'The reminders above are unchanged. Try again.',
+          ),
+        ]);
+      }
+      if (inbox.next != null) {
+        children.addAll([
+          const SizedBox(height: 12),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FocusRing(
+              child: OutlinedButton.icon(
+                key: const Key('inbox-older'),
+                onPressed: s.loading
+                    ? null
+                    : () => ref.read(inboxProvider.notifier).loadOlder(),
+                icon: const Icon(Icons.expand_more),
+                label: const Text('Show older reminders'),
+              ),
+            ),
+          ),
+        ]);
       }
     }
     children.addAll([

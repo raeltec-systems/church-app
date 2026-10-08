@@ -53,29 +53,67 @@ class InboxItem {
   };
 }
 
-/// The caller's newest items (at most 50), newest first.
+/// The keyset position after which the next (older) page starts.
+class InboxCursor {
+  const InboxCursor({
+    required this.afterDeliveredAt,
+    required this.afterItemId,
+  });
+
+  factory InboxCursor.fromJson(Object? json) {
+    if (json is! Map ||
+        json['after_delivered_at'] is! String ||
+        json['after_item_id'] is! String) {
+      throw const FormatException('unexpected inbox cursor');
+    }
+    return InboxCursor(
+      afterDeliveredAt: json['after_delivered_at'] as String,
+      afterItemId: json['after_item_id'] as String,
+    );
+  }
+
+  /// The server's exact wire instant (microseconds kept).
+  final String afterDeliveredAt;
+  final String afterItemId;
+
+  Map<String, Object?> toParams() => {
+    'after_delivered_at': afterDeliveredAt,
+    'after_item_id': afterItemId,
+  };
+}
+
+/// One page of the caller's items (at most 50), newest first, and the
+/// cursor of the next older page (null on the last page).
 class Inbox {
-  const Inbox({required this.items});
+  const Inbox({required this.items, this.next});
 
   factory Inbox.fromJson(Object? json) {
     if (json is! Map || json['items'] is! List) {
       throw const FormatException('unexpected inbox');
     }
+    final next = json['next'];
     return Inbox(
-      items: List.unmodifiable(
-        (json['items'] as List).map(InboxItem.fromJson),
-      ),
+      items: List.unmodifiable((json['items'] as List).map(InboxItem.fromJson)),
+      next: next == null ? null : InboxCursor.fromJson(next),
     );
   }
 
   final List<InboxItem> items;
+  final InboxCursor? next;
+
+  /// This page followed by an older one.
+  Inbox append(Inbox older) => Inbox(
+    items: List.unmodifiable([...items, ...older.items]),
+    next: older.next,
+  );
 }
 
 /// Application port for the inbox read. Never throws; a fresh request every
 /// call.
 abstract interface class InboxRepository {
-  /// The caller's own inbox (`api.notifications_my_inbox`).
-  Future<AccessRead<Inbox>> fetchMyInbox();
+  /// The caller's own inbox (`api.notifications_my_inbox`): the newest
+  /// page, or the page after [after].
+  Future<AccessRead<Inbox>> fetchMyInbox({InboxCursor? after});
 }
 
 /// A build without backend configuration: nothing to show.
@@ -83,6 +121,6 @@ class UnconfiguredInboxRepository implements InboxRepository {
   const UnconfiguredInboxRepository();
 
   @override
-  Future<AccessRead<Inbox>> fetchMyInbox() async =>
+  Future<AccessRead<Inbox>> fetchMyInbox({InboxCursor? after}) async =>
       const AccessReadDenied(AccessDenial.unavailable);
 }

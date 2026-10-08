@@ -4,7 +4,7 @@
 -- live-access predicate. HTTP evidence through real GoTrue: tools/identity-e2e/inbox.mjs. Every
 -- account here is SYNTHETIC (+44 7700 900800-900809).
 begin;
-select plan(52);
+select plan(62);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000310' || lpad(n::text, 2, '0'))::uuid $$;
@@ -110,9 +110,9 @@ select ok(not exists (
    cross join unnest(array['SELECT', 'INSERT', 'UPDATE', 'DELETE']) p
    where has_table_privilege(r, t, p)),
   'no client role has any privilege on the new tables');
-select ok(not has_function_privilege('anon', 'api.notifications_my_inbox()', 'EXECUTE')
+select ok(not has_function_privilege('anon', 'api.notifications_my_inbox(timestamptz, uuid)', 'EXECUTE')
           and not has_function_privilege('anon', 'api.fixture_reminder_command(jsonb)', 'EXECUTE')
-          and has_function_privilege('authenticated', 'api.notifications_my_inbox()', 'EXECUTE')
+          and has_function_privilege('authenticated', 'api.notifications_my_inbox(timestamptz, uuid)', 'EXECUTE')
           and has_function_privilege('authenticated', 'api.fixture_reminder_command(jsonb)', 'EXECUTE'),
   'signed-out callers execute nothing new; authenticated sessions reach only the read and the fixture command');
 select ok(not exists (
@@ -276,7 +276,7 @@ select is(pg_temp.job_state(((select v -> 'data' ->> 'source_id' from r where k 
   'the future job stays pending');
 select is(pg_temp.item_count(), 1, 'none of them became an item');
 
--- A recheck that raises leaves the job pending; the next run delivers it ----------------------------
+-- A recheck that raises leaves the job pending and backs off; it never blocks later jobs -------
 create function app.fixture_pgtap_flaky_check(p_source jsonb) returns jsonb
 language plpgsql set search_path = '' as $$
 begin
@@ -295,11 +295,49 @@ select app.notifications_enqueue(jsonb_build_object(
 select set_config('pgtap.flaky', 'on', true);
 select is(pg_temp.run(), '{"claimed": 1, "delivered": 0, "obsolete": 0, "ineligible": 0, "failed": 1}'::jsonb,
   'a raising recheck is counted failed and its work rolled back');
-select is((select job_state from app.notifications_jobs where source_type = 'fixture_pgtap_flaky'), 'pending',
-  'the job stays pending for the next run');
+select is((select job_state || '|' || failed_attempts || '|' || (last_failed_at is not null)::text
+             from app.notifications_jobs where source_type = 'fixture_pgtap_flaky'),
+  'pending|1|true', 'the job stays pending with its failure recorded');
+insert into r values ('later', pg_temp.create_due(2, now() - interval '30 seconds'));
+select is((pg_temp.sys('{"limit": 1}') -> 'data') - 'actor'::text,
+  '{"claimed": 1, "delivered": 1, "obsolete": 0, "ineligible": 0, "failed": 0}'::jsonb,
+  'a failing job backs off: a later due job is delivered even with limit 1');
+select is(pg_temp.job_state(((select v -> 'data' ->> 'source_id' from r where k = 'later'))::uuid), 'delivered',
+  'the later job is the one delivered');
 select set_config('pgtap.flaky', 'off', true);
-select is(pg_temp.run() ->> 'delivered', '1', 'the next run delivers it');
-select is(jsonb_array_length(pg_temp.items(2)), 1, 'member 2 now sees their own single item');
+select is(pg_temp.run() ->> 'claimed', '0', 'while backing off the failed job is not retried');
+update app.notifications_jobs set last_failed_at = now() - interval '2 minutes'
+ where source_type = 'fixture_pgtap_flaky';
+select is(pg_temp.run() ->> 'delivered', '1', 'after its backoff the next run delivers it');
+select is(jsonb_array_length(pg_temp.items(2)), 2, 'member 2 sees exactly their own two items');
+
+-- Keyset paging of the inbox ------------------------------------------------------------------
+select app.notifications_enqueue(jsonb_build_object(
+  'source_type', 'fixture_pgtap_flaky', 'source_id', gen_random_uuid(), 'source_revision', 1,
+  'recipient_member_id', (select member_id from m where n = 1), 'reminder_kind', 'fixture_due',
+  'scheduled_at', app.cmd_utc(now() - interval '1 minute')))
+  from generate_series(1, 50);
+select is(pg_temp.sys('{"limit": 100}') -> 'data' ->> 'delivered', '50', 'fifty more items for member 1');
+create function pg_temp.page(p_after jsonb) returns jsonb language plpgsql as $$
+declare
+  r jsonb;
+begin
+  perform set_config('request.jwt.claims', pg_temp.c(1)::text, true);
+  set local role authenticated;
+  select api.notifications_my_inbox((p_after ->> 'after_delivered_at')::timestamptz,
+                                    (p_after ->> 'after_item_id')::uuid) into r;
+  reset role;
+  return r;
+end;
+$$;
+insert into r values ('page1', pg_temp.page(null));
+insert into r values ('page2', pg_temp.page((select v -> 'next' from r where k = 'page1')));
+select is((select jsonb_array_length(v -> 'items') || '|' || (v -> 'next' is not null and v -> 'next' <> 'null')::text
+             from r where k = 'page1'), '50|true', 'the first page holds 50 items and a cursor');
+select is((select jsonb_array_length(v -> 'items') || '|' || coalesce(v ->> 'next', 'null') from r where k = 'page2'),
+  '1|null', 'the second page holds the rest and no cursor');
+select is((select count(distinct e ->> 'item_id')::int from r, jsonb_array_elements(v -> 'items') e
+            where k in ('page1', 'page2')), 51, 'the pages neither overlap nor skip an item');
 
 -- Command refusals ------------------------------------------------------------------------------
 select is(pg_temp.cmd(pg_temp.c(1), 'fixture.reminder_create', null, '{"due_at": "tomorrow", "note": "x"}') -> 'field_errors',
@@ -309,7 +347,24 @@ select is(pg_temp.cmd('{"role": "authenticated"}'::jsonb, 'fixture.reminder_crea
   'unauthenticated', 'no session, no command');
 update app.identity_members set is_synthetic = false where member_id = (select member_id from m where n = 2);
 select is(pg_temp.create_due(2) ->> 'code', 'forbidden',
-  'a member who is not SYNTHETIC cannot create fixture reminders');
+  'a member who is not SYNTHETIC cannot create fixture reminders (refused by the live-access gate here)');
+-- With private access open, a non-SYNTHETIC member passes the live-access predicate, so the
+-- fixture handler's own SYNTHETIC check is what refuses.
+select app.policy_approve('private_access', '{"serve": true}', 'pgtap', 'pgtap 3.1 only, rolled back');
+select is(pg_temp.create_due(2) -> 'field_errors', '{"member_id": "unsupported"}'::jsonb,
+  'the fixture handler itself refuses a member who is not SYNTHETIC');
+
+-- Production: the fixture command is refused and writes nothing --------------------------------
+create temp table counts as
+  select (select count(*) from app.fixture_reminder_sources) s, (select count(*) from app.notifications_jobs) j;
+select app.platform_set_environment('production', 'pgtap 3.1');
+update app.policy_gates set state = 'unresolved', approved_value = null, approved_by = null,
+       approved_at = null, approval_note = null
+ where gate = 'private_access';
+select is(pg_temp.create_due(1) ->> 'code', 'forbidden',
+  'production: the fixture command is refused (forbidden: no member access is served without the Q1 settings and release gates)');
+select is((select count(*) from app.fixture_reminder_sources) || '|' || (select count(*) from app.notifications_jobs),
+  (select s || '|' || j from counts), 'production: no source and no job written');
 
 select * from finish();
 rollback;

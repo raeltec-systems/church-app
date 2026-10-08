@@ -8,10 +8,17 @@ import 'providers.dart';
 /// The caller's inbox as last answered by the server for the CURRENT account
 /// generation.
 class InboxState {
-  const InboxState({this.loading = false, this.result});
+  const InboxState({
+    this.loading = false,
+    this.result,
+    this.olderFailed = false,
+  });
 
   final bool loading;
   final AccessRead<Inbox>? result;
+
+  /// The last request for an older page got no usable answer.
+  final bool olderFailed;
 
   Inbox? get inbox => switch (result) {
     AccessReadOk(:final value) => value,
@@ -48,6 +55,35 @@ class InboxController extends Notifier<InboxState> {
       return;
     }
     await _load(ref.read(accountGenerationProvider));
+  }
+
+  /// Appends the next older page. Any other answer keeps what is shown and
+  /// reports it; a denial is handled like a fresh read.
+  Future<void> loadOlder() async {
+    final current = state.inbox;
+    final after = current?.next;
+    if (state.loading || current == null || after == null) return;
+    final generation = ref.read(accountGenerationProvider);
+    state = InboxState(loading: true, result: state.result);
+    final result = await ref
+        .read(inboxRepositoryProvider)
+        .fetchMyInbox(after: after);
+    if (!ref.mounted || ref.read(accountGenerationProvider) != generation) {
+      return;
+    }
+    switch (result) {
+      case AccessReadOk(:final value):
+        state = InboxState(result: AccessReadOk(current.append(value)));
+      case AccessReadDenied():
+        state = InboxState(result: result);
+        if (result.denial == AccessDenial.untrustedSession) {
+          await ref.read(accountProvider.notifier).endUntrustedSession();
+        } else {
+          noteProtectedDenial(ref);
+        }
+      case AccessReadFailed():
+        state = InboxState(result: state.result, olderFailed: true);
+    }
   }
 
   Future<void> _load(int generation) async {

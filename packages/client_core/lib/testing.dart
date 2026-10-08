@@ -1182,12 +1182,19 @@ Map<String, Object?> deletionCandidateData({
 /// [InboxRepository] answered by the test (story 3.1).
 class FakeInbox implements InboxRepository {
   AccessRead<Inbox> inbox = const AccessReadOk(Inbox(items: []));
+
+  /// The answer for an older page, by its cursor's item id.
+  final olderPages = <String, AccessRead<Inbox>>{};
+  final afters = <InboxCursor?>[];
   int calls = 0;
 
   @override
-  Future<AccessRead<Inbox>> fetchMyInbox() async {
+  Future<AccessRead<Inbox>> fetchMyInbox({InboxCursor? after}) async {
     calls++;
-    return inbox;
+    afters.add(after);
+    if (after == null) return inbox;
+    return olderPages[after.afterItemId] ??
+        const AccessReadFailed(unreachable: false);
   }
 }
 

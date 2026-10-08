@@ -20,8 +20,12 @@
 --     source ends the job `obsolete`, a recipient who is no longer an approved member ends it
 --     `ineligible` (entry 5 adds the real routing), and a cancelled or future job is never
 --     touched. No leases, attempts, retries or expiry yet (entry 4).
---   * Read `api.notifications_my_inbox()` behind the live-access predicate (2.1): the caller's own
---     items only, with no source id, revision or text.
+--   * Read `api.notifications_my_inbox(after_delivered_at?, after_item_id?)` behind the
+--     live-access predicate (2.1): the caller's own items only, newest first in pages of 50 with a
+--     keyset cursor, with no source id, revision or text.
+--   * A job whose recheck raises stays pending, records failed_attempts/last_failed_at (and a
+--     content-free `raise log`) and backs off min(2^(failures-1), 60) minutes, so it never blocks
+--     later due jobs; entry 4 replaces this with attempts, leases and the central retry policy.
 --   * SYNTHETIC source `fixture_reminder` (owner: fixture) with self-only 1.4-envelope commands
 --     `fixture.reminder_create {due_at}` and `fixture.reminder_cancel {source_id}` through
 --     `api.fixture_reminder_command`; local/staging and SYNTHETIC members only. The fixture module
@@ -51,6 +55,11 @@ create table app.notifications_jobs (
   cancel_reason text check (cancel_reason ~ '^[a-z][a-z0-9_]{0,62}$'),
   processed_by_principal uuid,
   processed_request_id uuid,
+  -- Minimal failure bookkeeping (entry 4 adds attempts, leases and the retry policy): a job whose
+  -- recheck raised is skipped for min(2^(failures-1), 60) minutes so it cannot block later jobs.
+  failed_attempts integer not null default 0 check (failed_attempts >= 0),
+  last_failed_at timestamptz,
+  check ((failed_attempts = 0) = (last_failed_at is null)),
   foreign key (source_type, reminder_kind)
     references app.contract_reminder_kinds (source_type, reminder_kind),
   check ((job_state = 'pending') = (finished_at is null)),
@@ -213,9 +222,11 @@ as $$
               then '{"limit": "out_of_range"}'::jsonb else '{}'::jsonb end;
 $$;
 
--- Claims due pending jobs (oldest first, skipping rows another worker holds) and turns each into
--- exactly one inbox item after rechecking the source (owner hook) and the recipient. A job whose
--- recheck raises stays pending and is counted `failed` (its subtransaction is rolled back).
+-- Claims due pending jobs (fewest failures first, then oldest, skipping rows another worker
+-- holds and jobs still backing off after a failure) and turns each into exactly one inbox item
+-- after rechecking the source (owner hook) and the recipient. A job whose recheck raises stays
+-- pending, is counted `failed` (its subtransaction is rolled back) and backs off
+-- min(2^(failures-1), 60) minutes, so a poison job never blocks later due jobs.
 -- Answers counts only: no member, source or job ids.
 create function app.notifications_sys_deliver_due(p_principal uuid, p_request uuid, p_payload jsonb)
 returns jsonb
@@ -236,7 +247,10 @@ begin
   for v_job in
     select j.* from app.notifications_jobs j
      where j.job_state = 'pending' and j.scheduled_at <= now()
-     order by j.scheduled_at, j.job_id
+       and (j.last_failed_at is null
+            or j.last_failed_at <= now() - interval '1 minute'
+                                          * least(power(2, j.failed_attempts - 1), 60))
+     order by j.failed_attempts, j.scheduled_at, j.job_id
      limit v_limit
      for update skip locked
   loop
@@ -276,6 +290,11 @@ begin
        where j.job_id = v_job.job_id;
       v_delivered := v_delivered + 1;
     exception when others then
+      -- Content-free diagnostics (no ids), like the command kernel.
+      raise log 'notifications.deliver_due job recheck failed: sqlstate %', sqlstate;
+      update app.notifications_jobs j
+         set failed_attempts = j.failed_attempts + 1, last_failed_at = clock_timestamp()
+       where j.job_id = v_job.job_id;
       v_failed := v_failed + 1;
     end;
   end loop;
@@ -295,8 +314,10 @@ insert into app.sys_command_kinds (command, purpose, description, payload_check,
 -- Read: the signed-in member's own inbox
 -- ---------------------------------------------------------------------------------------------
 
--- Newest first, at most 50 items. Behind the live-access predicate (401/403 like the 2.1 read).
-create function app.notifications_my_inbox()
+-- Newest first, pages of 50 with a keyset cursor (delivered_at, item_id): pass both `after_*`
+-- values from the previous page's `next`, or neither. Behind the live-access predicate (401/403
+-- like the 2.1 read); a half cursor is 400.
+create function app.notifications_my_inbox(p_after_delivered_at timestamptz, p_after_item_id uuid)
 returns jsonb
 language plpgsql
 security definer
@@ -305,38 +326,52 @@ as $$
 declare
   v_member uuid;
   v_link uuid;
-  v_items jsonb;
+  v_rows jsonb;
+  v_next jsonb;
 begin
   select a.member_id, a.link_id into v_member, v_link from app.identity_require_access() a;
+  if (p_after_delivered_at is null) <> (p_after_item_id is null) then
+    raise exception using errcode = '22023', message = 'validation_failed',
+      detail = 'after_delivered_at and after_item_id go together';
+  end if;
   select coalesce(jsonb_agg(jsonb_build_object(
            'item_id', x.item_id,
            'reminder_kind', x.reminder_kind,
            'due_at', app.cmd_utc(x.due_at),
            'delivered_at', app.cmd_utc(x.delivered_at))
            order by x.delivered_at desc, x.item_id desc), '[]'::jsonb)
-    into v_items
+    into v_rows
     from (select i.item_id, i.reminder_kind, i.due_at, i.delivered_at
             from app.notifications_inbox_items i
            where i.recipient_member_id = v_member
+             and (p_after_delivered_at is null
+                  or (i.delivered_at, i.item_id) < (p_after_delivered_at, p_after_item_id))
            order by i.delivered_at desc, i.item_id desc
-           limit 50) x;
+           limit 51) x;
+  if jsonb_array_length(v_rows) > 50 then
+    v_rows := v_rows - 50;
+    v_next := jsonb_build_object('after_delivered_at', v_rows -> 49 -> 'delivered_at',
+                                 'after_item_id', v_rows -> 49 -> 'item_id');
+  end if;
   perform app.identity_record_activity(v_link);
-  return jsonb_build_object('items', v_items);
+  return jsonb_build_object('items', v_rows, 'next', v_next);
 end;
 $$;
 
-create function api.notifications_my_inbox()
+create function api.notifications_my_inbox(after_delivered_at timestamptz default null,
+                                           after_item_id uuid default null)
 returns jsonb
 language sql
 security invoker
 set search_path = ''
 as $$
-  select app.notifications_my_inbox();
+  select app.notifications_my_inbox(after_delivered_at, after_item_id);
 $$;
 
-comment on function api.notifications_my_inbox() is
-  'Story 3.1: the signed-in member''s durable inbox (newest 50), behind the live-access '
-  'predicate. POST /rest/v1/rpc/notifications_my_inbox with Content-Profile: api.';
+comment on function api.notifications_my_inbox(timestamptz, uuid) is
+  'Story 3.1: the signed-in member''s durable inbox, newest first in pages of 50 (keyset cursor '
+  '`next`), behind the live-access predicate. POST /rest/v1/rpc/notifications_my_inbox with '
+  'Content-Profile: api.';
 
 -- ---------------------------------------------------------------------------------------------
 -- SYNTHETIC source: fixture_reminder (owner: fixture)
@@ -605,8 +640,8 @@ revoke all on function
   app.notifications_cancel(jsonb),
   app.notifications_check_deliver_due(jsonb),
   app.notifications_sys_deliver_due(uuid, uuid, jsonb),
-  app.notifications_my_inbox(),
-  api.notifications_my_inbox(),
+  app.notifications_my_inbox(timestamptz, uuid),
+  api.notifications_my_inbox(timestamptz, uuid),
   app.fixture_reminder_check(jsonb),
   app.fixture_reminder_actor(),
   app.fixture_reminder_json(app.fixture_reminder_sources),
@@ -618,8 +653,8 @@ revoke all on function
   api.fixture_reminder_command(jsonb)
   from public, anon, authenticated, service_role;
 
-grant execute on function app.notifications_my_inbox() to authenticated;
-grant execute on function api.notifications_my_inbox() to authenticated;
+grant execute on function app.notifications_my_inbox(timestamptz, uuid) to authenticated;
+grant execute on function api.notifications_my_inbox(timestamptz, uuid) to authenticated;
 grant execute on function app.fixture_reminder_command(jsonb) to authenticated;
 grant execute on function api.fixture_reminder_command(jsonb) to authenticated;
 

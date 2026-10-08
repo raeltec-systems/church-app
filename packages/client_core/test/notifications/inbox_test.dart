@@ -99,6 +99,28 @@ void main() {
       expect(inbox.items.first.dueAt, DateTime.utc(2026, 10, 8, 7));
     });
 
+    test('a page carries the cursor of the next older page', () {
+      final page = Inbox.fromJson({
+        'items': [inboxItemData()],
+        'next': {
+          'after_delivered_at': '2026-10-08T07:00:05.123456Z',
+          'after_item_id': _item,
+        },
+      });
+      expect(page.next?.toParams(), {
+        'after_delivered_at': '2026-10-08T07:00:05.123456Z',
+        'after_item_id': _item,
+      });
+      expect(Inbox.fromJson({'items': [], 'next': null}).next, isNull);
+      expect(
+        () => Inbox.fromJson({
+          'items': [],
+          'next': {'after_item_id': _item},
+        }),
+        throwsFormatException,
+      );
+    });
+
     test('anything else is a format error', () {
       expect(() => Inbox.fromJson({'items': 'x'}), throwsFormatException);
       expect(() => Inbox.fromJson([]), throwsFormatException);
@@ -168,11 +190,68 @@ void main() {
     ) async {
       await pumpInbox(
         tester,
-        setUp: (h) =>
-            h.inbox.inbox = const AccessReadFailed(unreachable: true),
+        setUp: (h) => h.inbox.inbox = const AccessReadFailed(unreachable: true),
       );
       expect(byKey('inbox-failed'), findsOneWidget);
       expect(find.text('No connection'), findsOneWidget);
+    });
+
+    testWidgets('Show older appends the next page from the server cursor', (
+      tester,
+    ) async {
+      const cursor = {
+        'after_delivered_at': '2026-10-08T07:00:05.123456Z',
+        'after_item_id': _item,
+      };
+      final h = await pumpInbox(
+        tester,
+        setUp: (h) {
+          h.inbox.inbox = AccessReadOk(
+            Inbox.fromJson({
+              'items': [inboxItemData()],
+              'next': cursor,
+            }),
+          );
+          h.inbox.olderPages[_item] = AccessReadOk(
+            Inbox.fromJson({
+              'items': [inboxItemData(id: _other)],
+              'next': null,
+            }),
+          );
+        },
+      );
+      expect(byKey('inbox-older'), findsOneWidget);
+      await tester.ensureVisible(byKey('inbox-older'));
+      await tester.tap(byKey('inbox-older'));
+      await settle(tester);
+      expect(
+        h.inbox.afters.last?.afterDeliveredAt,
+        cursor['after_delivered_at'],
+      );
+      expect(byKey('inbox-item-$_item'), findsOneWidget);
+      expect(byKey('inbox-item-$_other'), findsOneWidget);
+      expect(byKey('inbox-older'), findsNothing);
+    });
+
+    testWidgets('a failed older page keeps what is shown', (tester) async {
+      final h = await pumpInbox(
+        tester,
+        setUp: (h) => h.inbox.inbox = AccessReadOk(
+          Inbox.fromJson({
+            'items': [inboxItemData()],
+            'next': {
+              'after_delivered_at': '2026-10-08T07:00:05.000000Z',
+              'after_item_id': _other,
+            },
+          }),
+        ),
+      );
+      await tester.ensureVisible(byKey('inbox-older'));
+      await tester.tap(byKey('inbox-older'));
+      await settle(tester);
+      expect(h.inbox.afters.last?.afterItemId, _other);
+      expect(byKey('inbox-item-$_item'), findsOneWidget);
+      expect(byKey('inbox-older-failed'), findsOneWidget);
     });
 
     testWidgets('signing out drops the items at once', (tester) async {
@@ -276,6 +355,17 @@ void main() {
       expect(rpc.method, 'POST');
       expect(rpc.url.path, '/rest/v1/rpc/notifications_my_inbox');
       expect(rpc.headers['Content-Profile'], 'api');
+
+      await SupabaseInboxRepository(client).fetchMyInbox(
+        after: const InboxCursor(
+          afterDeliveredAt: '2026-10-08T07:00:05.123456Z',
+          afterItemId: _item,
+        ),
+      );
+      expect(jsonDecode(sent.last.body), {
+        'after_delivered_at': '2026-10-08T07:00:05.123456Z',
+        'after_item_id': _item,
+      });
     });
 
     test('the live-access denial maps to the caller\'s reason', () async {

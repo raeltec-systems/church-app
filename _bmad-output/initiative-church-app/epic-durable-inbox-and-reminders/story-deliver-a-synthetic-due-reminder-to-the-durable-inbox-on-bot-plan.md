@@ -81,7 +81,7 @@ Decision (agent, under owner pre-approval): the tracer worker is an operator-run
 
 **Acceptance Criteria:**
 - Given the local stack after `db reset`, when `db:test`, `db:smoke`, every identity E2E, `inbox.mjs`, contracts and tool tests, flutter analyze/test run, then all pass.
-- Given a production-marked database, when a fixture reminder is created, then nothing is written and the answer is `unavailable`.
+- Given a production-marked database, when a fixture reminder is created, then nothing is written and the answer is `forbidden` (no member access is served there yet); a direct `app.notifications_enqueue` there answers `unavailable {"policy":"gate_closed"}`.
 - Given the boundary guards, when pgTAP runs, then no unowned objects, unpinned functions or boundary violations exist.
 
 ## Implementation Notes
@@ -91,6 +91,7 @@ Decision (agent, under owner pre-approval): the tracer worker is an operator-run
 - A non-SYNTHETIC member never reaches the fixture handler's SYNTHETIC check off production: the live-access predicate already refuses non-synthetic members while `private_access` is closed, so the command answers `forbidden` (pinned in pgTAP); the handler check stays as defence in depth.
 - Worker reads the recipient's membership without a lock (AD-2 orders Identity before Notifications and the step already holds the job row); the source check hook does not lock the source either, so a cancellation committing after the recheck can still leave a delivered item (the AD-8 accepted race; entry 2 re-reads on open).
 - Matrix audit: create/replay/conflict, worker once/twice, per-job failure, duplicate item and re-enqueue, cancel/stale cancel/foreign cancel, stale source, ineligible recipient, future job, other member/signed out, production gate and wrong principal are covered by pgTAP; create, replay, worker, racing workers, cancel, future, other member/unlinked/signed out by `inbox.mjs`; both clients' reads by `live-inbox-check.sh` and the Flutter tests.
+- Review fixes (coordinator, independent review of 3.1): failing jobs now record `failed_attempts`/`last_failed_at`, log a content-free SQLSTATE and back off min(2^(n-1), 60) minutes, ordered by failures, so a poison job cannot starve later jobs (pgTAP proves a later job is delivered with limit 1); pgTAP covers the fixture command in production (`forbidden`, nothing written) and the handler's own SYNTHETIC check (private_access opened inside the test transaction); the inbox read has a keyset cursor (`next`, pages of 50) with **Show older reminders** on both clients; the runbook names every table that keeps member ids until the entry 5 deletion hook.
 - Owner/staging steps remaining (not blocking `built`): apply the migration to staging and run `verify-hosted.sql` (parent session); the owner mints and registers the staging `notifications_worker` credential (runbook `notifications.md`, Hosted staging step 2) and runs the staging demonstration (step 3) on mobile and staff web.
 
 ## Plan Change Log

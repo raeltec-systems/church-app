@@ -1,0 +1,14 @@
+{"step":"S00-precondition","target":"LOCAL","at":"2026-10-08T16:24:08.356Z","settings":{"phone":true,"sms_provider":""},"realtime":"running","leftover_users_removed":"0"}
+{"step":"S01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-08T16:24:09.393Z","verdict":"pass","amr":["password"]}
+{"step":"S10-only-the-account-joins-its-channel","target":"LOCAL","at":"2026-10-08T16:24:14.513Z","verdict":"pass","own_a":"ok","own_b":"ok","b_on_a":"error","signed_out_on_a":"error"}
+{"step":"S20-delivery-signals-generically","target":"LOCAL","at":"2026-10-08T16:24:15.155Z","verdict":"pass","delivered":1,"frames":1,"payloads":[{}],"frame_keys":["event","payload","ref","topic"],"inner_keys":["event","meta","payload","type"],"frames_to_b":0}
+{"step":"S21-new-item-not-opened","target":"LOCAL","at":"2026-10-08T16:24:15.166Z","verdict":"pass","opened":false,"snoozed_until":null}
+{"step":"S22-open-marks-opened-and-offers-choices","target":"LOCAL","at":"2026-10-08T16:24:15.671Z","verdict":"pass","by_b":{"state":"not_found"},"state":"current","choices":["1 hour","24 hours","2 days"],"opened":true,"frames":1}
+{"step":"S23-second-open-is-silent","target":"LOCAL","at":"2026-10-08T16:24:24.053Z","verdict":"pass","frames":0}
+{"step":"S30-member-snoozes-own-item","target":"LOCAL","at":"2026-10-08T16:24:24.888Z","verdict":"pass","foreign":"not_found","bad_choice":{"choice":"invalid"},"revision":2,"clamped":false,"listed_matches":true,"jobs":"pending:-","frames":1}
+{"step":"S31-cancellation-removes-the-snooze","target":"LOCAL","at":"2026-10-08T16:24:25.588Z","verdict":"pass","jobs":"cancelled:source_cancelled","snoozed_until":null,"state":"superseded","frames":1}
+{"step":"S40-snooze-clamped-to-the-start","target":"LOCAL","at":"2026-10-08T16:24:26.735Z","verdict":"pass","enqueued":1,"delivered":1,"clamped":true,"at_start":true,"frames":1}
+{"step":"S41-response-removes-the-snooze","target":"LOCAL","at":"2026-10-08T16:24:27.537Z","verdict":"pass","jobs":"cancelled:responded","snoozed_until":null,"state":"superseded","snooze_again":"conflict","frames":1}
+{"step":"S50-push-off-keeps-in-app-items","target":"LOCAL","at":"2026-10-08T16:24:28.011Z","verdict":"pass","device":"ok","setting_revision":1,"push_enabled":false,"categories":["fixture_due","fixture_reply"],"delivered":1,"in_inbox":true,"push_jobs":0}
+{"step":"S60-every-signal-is-content-free","target":"LOCAL","at":"2026-10-08T16:24:28.012Z","verdict":"pass","captured":7,"payloads":["{}"],"events":["inbox_changed"],"to_refused_sockets":0}
+{"step":"S99-cleanup","target":"LOCAL","at":"2026-10-08T16:24:28.753Z","users_left":0,"credential_revoked":true,"principal_disabled":true,"unmarked":true,"jobs_left":0,"items_left":0}

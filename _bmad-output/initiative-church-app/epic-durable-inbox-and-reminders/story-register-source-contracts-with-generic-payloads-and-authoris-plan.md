@@ -3,7 +3,7 @@ title: 'Register source contracts with generic payloads and authorised deep link
 type: 'feature'
 ticket: '2'
 created: '2026-10-08'
-status: 'built'
+status: 'done'
 baseline_revision: '18f0ea955e406e89e72e30b89ce882ee32e2ef19'
 route: 'full'
 route_source: 'auto'
@@ -74,7 +74,7 @@ Decision (agent, under owner pre-approval): SYNTHETIC adapters are a `fixture.re
 
 ## Implementation Notes
 
-- Implemented directly (no subagent tool in this run). Files: migration `supabase/migrations/20261008074412_notifications_source_contracts.sql`; pgTAP `supabase/tests/notifications_source_contracts_test.sql` (60); pins updated in `command_foundation_test.sql` (new authenticated function) and `notifications_inbox_test.sql` (inbox item keys now include title/body; the flaky source registers a reminder contract); fixtures `notification_key.json` (+2), `source_ref.json` (+1) and regenerated `packages/contracts/dart/test/fixtures.g.dart`; E2E `tools/identity-e2e/source-contracts.mjs` (+ test); live adapter check extended (L9/L10); client_core `domain/inbox.dart` (`OpenedInboxItem`, `InboxItemState`, `isInAppPath`, registered title/body), adapter `openItem`, `InboxItemController` (autoDispose family), `InboxItemScreen`, route `/inbox/:itemId`, `ClientPaths.inboxItem`/`deepLinkTargets`, tappable tiles, `FakeInbox.opened`, `openedItemData`, `test/notifications/inbox_item_test.dart`; runbooks `contracts-and-owner-seams.md` (consumer guide) and `notifications.md` (3.2 section, staging steps); evidence `evidence-3.2/`; CI evidence scan step.
+- Implemented directly (no subagent tool in this run). Files: migration `supabase/migrations/20261008090057_notifications_source_contracts.sql`; pgTAP `supabase/tests/notifications_source_contracts_test.sql` (60); pins updated in `command_foundation_test.sql` (new authenticated function) and `notifications_inbox_test.sql` (inbox item keys now include title/body; the flaky source registers a reminder contract); fixtures `notification_key.json` (+2), `source_ref.json` (+1) and regenerated `packages/contracts/dart/test/fixtures.g.dart`; E2E `tools/identity-e2e/source-contracts.mjs` (+ test); live adapter check extended (L9/L10); client_core `domain/inbox.dart` (`OpenedInboxItem`, `InboxItemState`, `isInAppPath`, registered title/body), adapter `openItem`, `InboxItemController` (autoDispose family), `InboxItemScreen`, route `/inbox/:itemId`, `ClientPaths.inboxItem`/`deepLinkTargets`, tappable tiles, `FakeInbox.opened`, `openedItemData`, `test/notifications/inbox_item_test.dart`; runbooks `contracts-and-owner-seams.md` (consumer guide) and `notifications.md` (3.2 section, staging steps); evidence `evidence-3.2/`; CI evidence scan step.
 - Surprise: plpgsql reads an `IF` condition up to the first `THEN`, so a `CASE ... THEN` inside it broke the migration; the length bound moved to a variable.
 - The worker now rechecks through the reminder contract (small `create or replace`); entry 4 still owns leases, attempts and retry policy.
 - Apps were not changed: the item screen comes from the shared router. On `/inbox/<id>` no navigation destination is highlighted (apps compare `location == path`); entry 7 can refine that with the inbox screens.

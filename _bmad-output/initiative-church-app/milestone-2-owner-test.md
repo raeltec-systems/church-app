@@ -17,6 +17,10 @@ Synthetic data only. Owner Q2 decisions: `owner-decisions-milestone-2.md`.
   (`SUPABASE_URL=https://tmurpotfluignacfueki.supabase.co SUPABASE_PUBLISHABLE_KEY=sb_publishable_B7rxJq4-D4PBNohOgz3qmg_SfbQWRSY NOTIFICATIONS_WORKER_CREDENTIAL_FILE=.ops-state/notifications-worker/staging.credential node tools/notifications/worker.mjs run-once`;
   exact flags in `docs/runbooks/notifications.md`, "Hosted staging"), and see exactly one item in
   **Inbox** on both clients. A cancelled reminder never appears.
+- **3.2 Opening a reminder:** tap an inbox item while it is current: it shows "Still current".
+  Then change the test reminder (revise, expire or revoke, per `docs/runbooks/notifications.md`
+  "Story 3.2", Hosted staging step 2) and open the same item again: it shows the generic "out of
+  date" state with nothing about why. Inbox titles and texts never contain names, numbers or links.
 
 ## Reminders
 

@@ -109,7 +109,7 @@ select app.notifications_cancel(jsonb_build_object(
 
 ## Reminder contracts: consumer guide (story 3.2)
 
-Migration: `supabase/migrations/20261008074412_notifications_source_contracts.sql`. Duties, Cells, Follow-ups and every later reminder owner follow these steps in their **own** migration, before their first enqueue. The SYNTHETIC `fixture_reminder` source in that migration is the worked example.
+Migration: `supabase/migrations/20261008090057_notifications_source_contracts.sql`. Duties, Cells, Follow-ups and every later reminder owner follow these steps in their **own** migration, before their first enqueue. The SYNTHETIC `fixture_reminder` source in that migration is the worked example.
 
 1. **Register the source type, its purposes and its reminder kinds** (story 1.5, above): `contract_register_source_type`, `contract_register_purpose`, `contract_register_reminder_kind`.
 2. **Write the reminder check.** It is an `app.<prefix>_...(jsonb) returns jsonb` function with `set search_path = ''` (usually `stable`, no locks). It receives the job's contract v1 `notification_key` (`source_type, source_id, source_revision, recipient_member_id, reminder_kind, scheduled_at`) and answers **exactly** these four keys:

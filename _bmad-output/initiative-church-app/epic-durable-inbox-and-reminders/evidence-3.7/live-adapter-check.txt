@@ -1,0 +1,22 @@
+# Story 3.7 live adapter check (LOCAL, 2026-10-08): tools/identity-e2e/live-inbox-check.sh
+# Real Dart adapters: SupabaseInboxRepository, SupabaseCommandGateway, SupabaseInboxSignals (private
+# Realtime channel account:<uid>) and SupabaseNotificationSettingsRepository. L1 (empty inbox) also
+# passed; it printed on the build-hooks line. Outcomes only.
+PASS L2 synthetic source command (command gateway): CommandConfirmed
+PASS L3 worker run through the system route: exit 0
+PASS L4 mobile client shows the one item: fixture_due
+PASS L5 staff web client shows the same single item: fixture_due
+PASS L6 member B sees nothing:
+PASS L7 a signed-out client sees nothing: denied:signedOut
+PASS L9 staff web opens the item: current, with its target: current:target
+PASS L10 member B opening it learns nothing: notFound
+PASS L11 the opened item is listed as opened (never as delivered): opened true
+PASS L12 each member joins their own private channel: joined 1/1
+PASS L13 a delivery signals A's open inbox, and not B's: signals 1/0
+PASS L14 the re-read shows the new item as not opened: items 2, opened false
+PASS L15 opening offers the policy snooze choices: 1 hour|24 hours|2 days
+PASS L16 the member snoozes their item; the list shows until when: clamped false, signals 2
+PASS L17 member B cannot snooze A's item: not_found
+PASS L18 notification settings list the registered categories: fixture_due,fixture_reply
+PASS L8 signing out on staff web drops access there: denied:signedOut
+synthetic users left: 0

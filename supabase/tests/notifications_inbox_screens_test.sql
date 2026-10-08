@@ -6,7 +6,7 @@
 -- message partition for today (they then run in tools/identity-e2e/inbox-screens.mjs against
 -- a running Realtime). Every account here is SYNTHETIC (+44 7700 900920-900929).
 begin;
-select plan(55);
+select plan(57);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000370' || lpad(n::text, 2, '0'))::uuid $$;
@@ -264,6 +264,18 @@ select is(pg_temp.res(pg_temp.cmd(2, 'fixture_reminder_command', 'fixture.remind
             jsonb_build_object('source_id', (select id from v where k = 'src2')), 1)),
   'conflict {"source_id": "responded"}', 'a second response is refused');
 
+-- An expired reminder cannot be snoozed through the member command ------------------------------
+insert into v (k, id) values ('srcx', (pg_temp.cmd(2, 'fixture_reminder_command', 'fixture.reminder_create',
+  jsonb_build_object('due_at', app.cmd_utc(now() - interval '1 minute'))) -> 'data' ->> 'source_id')::uuid);
+select pg_temp.next_tx();
+select pg_temp.deliver();
+insert into v (k, id) values ('itemx', pg_temp.item_of((select id from v where k = 'srcx')));
+update app.notifications_jobs j set expires_at = now() - interval '1 second'
+ where j.job_id = (select i.job_id from app.notifications_inbox_items i where i.item_id = (select id from v where k = 'itemx'));
+select is(pg_temp.res(pg_temp.snooze(2, (select id from v where k = 'itemx'), '1 hour')),
+  'conflict {"item_id": "expired"}', 'a reminder past its expiry cannot be snoozed');
+select is(pg_temp.snooze_jobs((select id from v where k = 'itemx')), '', '... and nothing was written');
+
 -- Push off keeps in-app items -----------------------------------------------------------------
 select pg_temp.cmd(2, 'notifications_command', 'notifications.register_device',
   '{"token": "fcm-ssssssssssssssssssssssssssssssssssssssss:APA91b", "platform": "android"}');
@@ -295,7 +307,7 @@ select app.notifications_publish_refresh(pg_temp.mid(4));
 select is(pg_temp.total(), (select (j #>> '{}')::int from v where k = 'total'),
   'an accountless member has no account to signal: nothing is published');
 select * from (select case when pg_temp.rt() then
-  is(pg_temp.sig(2), 9, 'one signal per changing transaction for A: delivery, first open, three snoozes, '
+  is(pg_temp.sig(2), 10, 'one signal per changing transaction for A: two deliveries, first open, three snoozes, '
                         'cancellation, response, push-off delivery and the reply delivery')
   else skip('no Realtime message partition for today (covered by the E2E)', 1) end) x;
 select * from (select case when pg_temp.rt() then
@@ -319,7 +331,7 @@ begin
 end;
 $$;
 select * from (select case when pg_temp.rt() then
-  is(pg_temp.rolled_back(), 9, 'a rolled back change publishes nothing')
+  is(pg_temp.rolled_back(), 10, 'a rolled back change publishes nothing')
   else skip('no Realtime message partition for today (covered by the E2E)', 1) end) x;
 -- Channel authorisation: a session reads its own topic only; nobody may send.
 create function pg_temp.visible(n int, p_topic_of int) returns int language plpgsql as $$
@@ -352,7 +364,7 @@ exception when others then
 end;
 $$;
 select * from (select case when pg_temp.rt() then
-  is(pg_temp.visible(2, 2), 9, 'A''s session may read A''s own topic')
+  is(pg_temp.visible(2, 2), 10, 'A''s session may read A''s own topic')
   else skip('no Realtime message partition for today (covered by the E2E)', 1) end) x;
 select * from (select case when pg_temp.rt() then
   is(pg_temp.visible(3, 2), 0, 'B''s session cannot read A''s topic')

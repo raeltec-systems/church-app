@@ -117,3 +117,89 @@ Fictional numbers: pgTAP `+44 7700 900830-900839`, E2E `900840-900849`.
    6. As B, `POST /rest/v1/rpc/notifications_open_item {"item_id": "<A's first item>"}` answers `{"state": "not_found"}`; signed out it answers 401.
    7. Clean up as in story 3.1, step 7.
 3. **Production:** nothing. Reminder contracts carry no policy; enqueue stays closed there until `q2_church_time` is approved.
+
+## Story 3.3: church-time reminder schedules
+
+Migration: `supabase/migrations/20261008120000_notifications_scheduling.sql` (one file; no row deletions, no destructive statements). Tests: `supabase/tests/notifications_scheduling_test.sql` (96, table-driven). Source owners follow the consumer guide in [contracts-and-owner-seams.md](contracts-and-owner-seams.md#reminder-schedules-consumer-guide-story-33).
+
+### The policy value (`q2_church_time`)
+
+All tunables live in the value; nothing is a code constant. Local and staging use this labelled TEST FIXTURE: the agent's reading of the owner's Q2 decisions of 2026-10-08, not approved church policy.
+
+```json
+{"policy_version": 1, "zone": "Africa/Lusaka", "quiet_hours": null,
+ "deadline_bands": [{"min_lead": "30 days", "before_start": "14 days"},
+                    {"min_lead": "72 hours", "before_start": "48 hours"},
+                    {"min_lead": "0 minutes", "before_start": "24 hours"}],
+ "default_reminders": {"response": [{"anchor": "response_deadline", "before": "24 hours"},
+                                    {"anchor": "response_deadline", "before": "0 minutes"}],
+                       "task": [{"anchor": "deadline", "before": "0 minutes"}]},
+ "merge_window": "30 minutes", "snooze_choices": ["1 hour", "24 hours", "2 days"],
+ "max_reminders": 6, "max_offset": "90 days"}
+```
+
+- **Limits**: `merge_window` is at most 1 day and every band's `before_start` at most `max_offset`.
+- **Durations** are `<n> minute(s)|hour(s)|day(s)` with n from 0 to 9999. Whole days move on the church-local calendar (the same local time on another date). Hours and minutes are absolute. Africa/Lusaka is UTC+2 all year.
+- **`policy_version`** is a positive integer. Jobs and schedules record it, with the source (`fixture` or `approved`) and the sha256 digest of the value. Give every changed value a higher version.
+- **No quiet hours** (owner decision). `quiet_hours` must be present and `null`; a window is refused.
+- `app.notifications_policy_errors(value)` returns the field errors of a value (`{}` = valid). Scheduling uses `app.notifications_policy()`. It fails closed with `unavailable {"policy": "gate_closed"}` when the gate is closed (production until approval) or the value is invalid. The server log then records only `q2_church_time is not a valid scheduling policy (source ...)`.
+
+### The calculation
+
+- **Response deadline** (`app.notifications_response_deadline`). The creator's deadline is used as given and refused after the start (`{"response_deadline": "after_start"}`). Otherwise the first band whose `min_lead` fits (start minus assignment) gives start minus `before_start`, never later than the start. With the fixture that means: 30 days or more ahead, 14 days before; 72 hours to 30 days, 48 hours before (so at least 24 hours to respond); more than 24 hours, 24 hours before; otherwise **short notice**. A deadline at or before now is short notice: the effective deadline is now. The answer is never later than the start, even when the start has passed.
+- **Plan** (`app.notifications_plan`). It computes the entries from the creator's reminder specs, or from the policy default for the schedule type. Then:
+  - entries at or before now are skipped (passed offsets);
+  - a fresh short-notice response schedule gets one `respond_now` entry now, once per source revision;
+  - entries after `expires_at` are dropped (the default expiry of a response is its start);
+  - entries inside `merge_window` of a group's first entry are merged into that one entry, which lists every anchor;
+  - a responded assignment has no response-deadline reminders;
+  - a Waiting task uses its `review_at` as its deadline.
+- **Occurrences** (`app.notifications_occurrences`): a church-local rule `{local_start, every: day|week|month, interval?, exceptions?: [local dates]}` over a window of at most 400 days. A month end clamps from the first date (31 Jan, 28/29 Feb, 31 Mar). The walk starts just before the window however old the rule is; more than 1000 steps is `validation_failed {"window": "out_of_range"}`, never a silent empty list.
+- **Snooze** (`app.notifications_snooze_at`): now plus a choice listed in the policy, clamped to the expiry. An expired reminder is refused.
+
+### Schedules and reconciliation
+
+- `app.notifications_schedules` (RLS on, no client privileges): one row per source and recipient. It holds the intent (instants, booleans, enums and reminder specs, no text), the reminder kind per anchor, the last plan and the policy version. States: `active`, `ended` (`app.notifications_cancel` without a kind ended it; with a kind the schedule stays active and records the kind in `cancelled_kinds` until the next revision), `stale` (the source moved past the revision before a re-plan).
+- `app.notifications_set_schedule` (source owners, inside their command) stores the intent and reconciles that source and recipient's jobs in the same transaction:
+  - a pending job no longer in the plan is cancelled `rescheduled` when it is in the future or belongs to an older revision; a due job at the current revision is left for the worker;
+  - a member's pending snooze survives unless the revision moved (then `source_revised`);
+  - each entry is enqueued once; a future job cancelled `rescheduled` earlier is reinstated, not duplicated;
+  - a merge already sent stays sent: an entry within the merge window after a job of this schedule that is already due or delivered is not enqueued again (`covered`);
+  - kinds the source cancelled at this revision are not planned again, and once the intent says `responded`, pending snoozes of response kinds are cancelled (`responded`);
+  - nothing at or before now is enqueued, except the one `respond_now`.
+- Jobs now record `policy_version`, `expires_at`, `schedule_id` and `snoozed_from_item_id`.
+- `app.notifications_snooze_item(member, item, choice)` defers one delivered item for its recipient only. Entry 7 wraps it for the signed-in member. Refusals: `not_found` (not the member's item), `validation_failed {"choice": "invalid"}`, `conflict {"item_id": "superseded"}` (the source moved, was cancelled or no longer admits the member; the schedule ended; the kind was cancelled; or it is a response reminder and the member has responded) and `conflict {"item_id": "expired"}`. A new snooze replaces the item's pending one (`snooze_replaced`).
+- **Policy change.** `app.notifications_replan_all(reason)` is operator only. It re-plans every active schedule under the current policy in one transaction and answers counts only: `{policy_version, replanned, stale, failed, enqueued, cancelled}`. Future jobs move. Past-due work is never enqueued, and no second `respond_now` is sent. A schedule whose source moved becomes `stale`; its source re-plans it on its next change. Platform functions may not call Notifications, so `policy_approve` cannot trigger the re-plan: run it right after every approval or fixture change.
+
+### Known limits
+
+- The deletion hook (entry 5) must also cover `app.notifications_schedules.recipient_member_id`, alongside the tables listed under story 3.1.
+- The worker (entry 4) does not yet end a job past its `expires_at`. Until then, an expired job that is still pending is rechecked through its source contract as before.
+- Q12 must set the reminder-lateness tolerance before release.
+
+### Local runs
+
+```bash
+npx supabase db reset
+npm run -s db:test          # supabase/tests/notifications_scheduling_test.sql (96)
+```
+
+### Hosted staging (parent session)
+
+1. Apply `20261008120000_notifications_scheduling.sql` to staging after `20261008090057`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. There is no `_rows` file. The migration:
+   - replaces the `q2_church_time` fixture value (UTC to Africa/Lusaka, version 1);
+   - adds `notifications_schedules` and four nullable columns on `notifications_jobs`;
+   - replaces the bodies of `notifications_enqueue` and `notifications_cancel`, with no privilege change;
+   - adds no client grant.
+2. Check the fixture: `select app.notifications_policy_errors(fixture_value) from app.policy_gates where gate = 'q2_church_time';` answers `{}`.
+3. Run the calculation once as a smoke check, for example `select app.notifications_plan(app.notifications_policy(), 'response', '{"assigned_at": "2026-10-01T08:00:00Z", "starts_at": "2026-11-15T07:00:00Z"}', '2026-10-01T08:00:00Z', true);`. Expect `band` 1, `response_deadline` `2026-11-01T07:00:00.000000Z` and two entries at local 09:00.
+4. Re-plan any existing schedules (none yet on staging): `select app.notifications_replan_all('policy_changed');` answers `"replanned": 0`.
+
+### Production (owner, entry 10)
+
+Nothing is scheduled in production until Israel approves `q2_church_time`:
+
+1. Decide the values: confirm or adjust the bands, the default reminders, the merge window and the snooze choices above. Drop `fixture_label` and set `policy_version` to 1.
+2. Check the value: `select app.notifications_policy_errors('<value>'::jsonb);` must answer `{}`.
+3. Approve it: `select app.policy_approve('q2_church_time', '<value>'::jsonb, 'Israel Muyoba', 'Q2 owner decision <date>');`.
+4. Re-plan: `select app.notifications_replan_all('policy_changed');`.

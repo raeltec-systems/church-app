@@ -32,7 +32,7 @@ Migration: `supabase/migrations/20261008073631_notifications_inbox.sql` (one fil
 - Enqueue needs the Q2 gate: the labelled fixture in `local` and `staging` (`q2_church_time`; entry 3 moves it to Africa/Lusaka). In production, enqueue answers `unavailable` until the owner approves `q2_church_time`. The system route there also needs `ops_system_access`.
 - Until entry 5, the worker delivers only to an `approved` member. Anyone else ends `ineligible` and gets no item (fail closed). Holds, accountless members, the direct-contact route, device tokens and push all arrive later.
 - **No deletion hook yet.** After a full deletion these rows keep the member's ids until entry 5 registers the deletion hooks: `app.notifications_jobs.recipient_member_id`, `app.notifications_inbox_items.recipient_member_id`, and the SYNTHETIC `app.fixture_reminder_sources` (`member_id`, `created_by_account`). Entry 5 registers `app.notifications_erase_member`; the fixture source gets a fixture deletion hook (or is cleaned up with the fixture) at the same time. Only synthetic data exists off production, and production scheduling is gated, so this cannot affect real data before entry 5.
-- A cancellation that commits after the worker's recheck cannot retract the item (AD-8). Entry 2 makes opening an item re-read the source and show a superseded state.
+- A cancellation that commits after the worker's recheck cannot retract the item (AD-8). Since story 3.2, opening the item re-reads the source and shows the generic superseded state (below).
 
 ### Local runs
 
@@ -70,3 +70,50 @@ Each run mints its own local `notifications_worker` credential and registers onl
    6. As B: **Inbox** is empty. Signed out: the Inbox entry is gone, and `POST /rest/v1/rpc/notifications_my_inbox` with the publishable key only answers 401.
    7. Clean up the synthetic rows: inbox items, jobs and fixture sources of A and B, then the members as in `identity-access.md`. Revoke the credential afterwards if the run is finished: `select app.sys_revoke_credential('<credential_id>', 'israel');`.
 4. **Production:** nothing in this story. Production scheduling waits for the owner's `q2_church_time` approval (entry 10) and `ops_system_access`. The fixture command refuses production by itself.
+
+## Story 3.2: source contracts, generic text and authorised deep links
+
+Migration: `supabase/migrations/20261008074412_notifications_source_contracts.sql` (one file; no row deletions, no destructive statements). Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.2/`. The owner-facing steps for a new source are the consumer guide in [contracts-and-owner-seams.md](contracts-and-owner-seams.md#reminder-contracts-consumer-guide-story-32).
+
+### What exists
+
+- **Reminder contracts** (`app.contract_reminder_contracts`, platform registry, no client privileges): per source type and reminder kind, the owner's reminder check, fixed generic `title` and `body`, and a deep-link `link` template. Registered only with `app.contract_register_reminder_contract` in the owner's migration. `app.contract_check_reminder(notification_key)` calls the check and refuses any answer other than exactly `{current, revision, actionable, recipient_eligible}`.
+- **Enqueue** now also refuses an unregistered source type, a kind without a contract and any extra key on the notification key (`unknown_field`), before anything is written.
+- **Worker** (`notifications.deliver_due`) rechecks through the contract: not current or not actionable ends the job `obsolete`; a recipient the source no longer admits, or who is no longer an approved member, ends it `ineligible`. The answer is still counts only.
+- **Inbox read** items now carry the registered generic `title` and `body`: `{item_id, reminder_kind, title, body, due_at, delivered_at}`.
+- **Open** `POST /rest/v1/rpc/notifications_open_item` with body `{"item_id": "<uuid>"}` (`Content-Profile: api`), behind the live-access predicate (401/403 like the other reads; a missing id is 400). It re-reads the source now and answers one of:
+  - `{item_id, reminder_kind, title, body, due_at, delivered_at, state: "current", target: "/<route>/<source id>"}` when the check says current, actionable and recipient eligible;
+  - the same fields with `state: "superseded"` and `target: null` otherwise (stale revision, cancelled, revoked scope, expired, or no contract), with no reason and no source content;
+  - `{"state": "not_found"}` for an id that is not one of the caller's items.
+
+  A check that raises makes the open fail (500, content-free) rather than guess a state. It records member activity.
+- **SYNTHETIC adapters** on `fixture_reminder` (`POST /rest/v1/rpc/fixture_reminder_command`, local/staging, SYNTHETIC members only):
+  - `fixture.reminder_create {due_at, reminder_kind?}`: the optional kind lets the API show that an unregistered kind is refused (`validation_failed {"reminder_kind": "unregistered"}`, nothing written).
+  - `fixture.reminder_change {source_id, change}` at the current revision: `revise` (revision + 1, older pending jobs cancelled `source_revised`, a job enqueued at the new revision), `revoke` (the recipient's SYNTHETIC scope is revoked, revision kept, pending jobs cancelled `scope_revoked`) or `expire` (expires now, revision kept, pending jobs cancelled `source_expired`). With the existing `fixture.reminder_cancel` these give the five cases: current, stale revision, cancelled, revoked scope and expired.
+- **Clients** (mobile and staff web, shared `client_core`): tapping an inbox item opens `/inbox/<item id>`, which asks the server every time it opens, on **Check again** and on return to the foreground. A current item shows **Open** when this build knows the target route (`ClientPaths.deepLinkTargets`; empty until Duties adds its screen), otherwise "Still current". A superseded item shows "This reminder is out of date" and nothing else. Nothing is stored beyond the screen and the account generation.
+
+### Local runs
+
+```bash
+npx supabase db reset
+npm run -s db:test                       # supabase/tests/notifications_source_contracts_test.sql (60)
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/source-contracts.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+FLUTTER_ROOT=/opt/sdk/flutter bash tools/identity-e2e/live-inbox-check.sh   # now also opens the item
+```
+
+Fictional numbers: pgTAP `+44 7700 900830-900839`, E2E `900840-900849`.
+
+### Hosted staging (parent session, then the owner)
+
+1. **Parent session:** apply `20261008074412_notifications_source_contracts.sql` to staging after `20261008073631`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. No `_rows` file. It adds the `contract_reminder_contracts` registry (one row: `fixture_reminder`/`fixture_due`), three columns on the SYNTHETIC `fixture_reminder_sources`, and a grant for `authenticated` on `api.notifications_open_item(uuid)` only. It replaces the enqueue, worker and inbox-read bodies; no privilege on them changes.
+2. **Owner demonstration** (synthetic members A and B and the worker credential from story 3.1; clients built against staging as in 3.1):
+   1. As A, create five reminders due now (`fixture.reminder_create {"due_at": "<now>"}`) and run the worker once: `"delivered":5`. Mobile **Inbox** shows five **SYNTHETIC test reminder** items with the text "A test reminder is waiting for you.".
+   2. Change four of them with A's token (each at `expected_revision` 1): `fixture.reminder_change {"source_id": "<2nd>", "change": "revise"}`, `fixture.reminder_cancel {"source_id": "<3rd>"}`, `fixture.reminder_change {"source_id": "<4th>", "change": "revoke"}`, `fixture.reminder_change {"source_id": "<5th>", "change": "expire"}`.
+   3. On mobile and on staff web, open each item. The first shows **Still current**; the other four show **This reminder is out of date** and nothing about the source.
+   4. Run the worker again: `"delivered":1` (the revised reminder). Its new item opens as **Still current**.
+   5. Through the API, `fixture.reminder_create {"due_at": "<now>", "reminder_kind": "fixture_unknown"}` answers `validation_failed {"reminder_kind": "unregistered"}`, and `{"due_at": "<now>", "body": "x"}` answers `{"body": "unknown_field"}`.
+   6. As B, `POST /rest/v1/rpc/notifications_open_item {"item_id": "<A's first item>"}` answers `{"state": "not_found"}`; signed out it answers 401.
+   7. Clean up as in story 3.1, step 7.
+3. **Production:** nothing. Reminder contracts carry no policy; enqueue stays closed there until `q2_church_time` is approved.

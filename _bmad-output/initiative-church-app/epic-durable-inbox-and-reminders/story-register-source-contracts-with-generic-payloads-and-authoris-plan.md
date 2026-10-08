@@ -3,7 +3,7 @@ title: 'Register source contracts with generic payloads and authorised deep link
 type: 'feature'
 ticket: '2'
 created: '2026-10-08'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '18f0ea955e406e89e72e30b89ce882ee32e2ef19'
 route: 'full'
 route_source: 'auto'
@@ -61,18 +61,26 @@ Decision (agent, under owner pre-approval): SYNTHETIC adapters are a `fixture.re
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/<ts>_notifications_source_contracts.sql` -- registry table + register function + `contract_check_reminder`; enqueue/worker/inbox-read updates; `notifications_open_item` + api wrapper; fixture columns, open check, `reminder_change`, contract registration; grants.
-- [ ] `supabase/tests/notifications_source_contracts_test.sql` -- matrix, registration refusals, privileges, guards.
-- [ ] `packages/contracts/fixtures/v1/*.json` + Dart embed regen -- private-field cases.
-- [ ] `tools/identity-e2e/source-contracts.mjs` + `.test.mjs` -- HTTP E2E over the five adapters.
-- [ ] `packages/client_core` -- `InboxItem` title/body from server, `InboxOpened` + `openItem`, controller, `InboxItemScreen`, route `/inbox/:itemId`, tile tap, fakes + tests.
-- [ ] `docs/runbooks/contracts-and-owner-seams.md`, `notifications.md` -- consumer guide and staging steps; `.github/workflows/ci.yml` if new tests need wiring.
+- [x] `supabase/migrations/<ts>_notifications_source_contracts.sql` -- registry table + register function + `contract_check_reminder`; enqueue/worker/inbox-read updates; `notifications_open_item` + api wrapper; fixture columns, open check, `reminder_change`, contract registration; grants.
+- [x] `supabase/tests/notifications_source_contracts_test.sql` -- matrix, registration refusals, privileges, guards.
+- [x] `packages/contracts/fixtures/v1/*.json` + Dart embed regen -- private-field cases.
+- [x] `tools/identity-e2e/source-contracts.mjs` + `.test.mjs` -- HTTP E2E over the five adapters.
+- [x] `packages/client_core` -- `InboxItem` title/body from server, `InboxOpened` + `openItem`, controller, `InboxItemScreen`, route `/inbox/:itemId`, tile tap, fakes + tests.
+- [x] `docs/runbooks/contracts-and-owner-seams.md`, `notifications.md` -- consumer guide and staging steps; `.github/workflows/ci.yml` if new tests need wiring.
 
 **Acceptance Criteria:**
 - Given a reset local stack, when db:test, db:smoke, every identity E2E, the new E2E, contracts tests, tool tests and flutter analyze/test run, then all pass.
 - Given the guards, when pgTAP runs, then no unowned, unpinned or boundary-violating objects exist.
 
 ## Implementation Notes
+
+- Implemented directly (no subagent tool in this run). Files: migration `supabase/migrations/20261008074412_notifications_source_contracts.sql`; pgTAP `supabase/tests/notifications_source_contracts_test.sql` (60); pins updated in `command_foundation_test.sql` (new authenticated function) and `notifications_inbox_test.sql` (inbox item keys now include title/body; the flaky source registers a reminder contract); fixtures `notification_key.json` (+2), `source_ref.json` (+1) and regenerated `packages/contracts/dart/test/fixtures.g.dart`; E2E `tools/identity-e2e/source-contracts.mjs` (+ test); live adapter check extended (L9/L10); client_core `domain/inbox.dart` (`OpenedInboxItem`, `InboxItemState`, `isInAppPath`, registered title/body), adapter `openItem`, `InboxItemController` (autoDispose family), `InboxItemScreen`, route `/inbox/:itemId`, `ClientPaths.inboxItem`/`deepLinkTargets`, tappable tiles, `FakeInbox.opened`, `openedItemData`, `test/notifications/inbox_item_test.dart`; runbooks `contracts-and-owner-seams.md` (consumer guide) and `notifications.md` (3.2 section, staging steps); evidence `evidence-3.2/`; CI evidence scan step.
+- Surprise: plpgsql reads an `IF` condition up to the first `THEN`, so a `CASE ... THEN` inside it broke the migration; the length bound moved to a variable.
+- The worker now rechecks through the reminder contract (small `create or replace`); entry 4 still owns leases, attempts and retry policy.
+- Apps were not changed: the item screen comes from the shared router. On `/inbox/<id>` no navigation destination is highlighted (apps compare `location == path`); entry 7 can refine that with the inbox screens.
+- `ClientPaths.deepLinkTargets` is empty, so a current fixture item shows "Still current" with no Open button; the Open path is proven with an injected matcher in the widget test.
+- Matrix audit: register/refusals, enqueue unregistered/private field, open current/stale/cancelled/revoked/expired, foreign/unknown/signed out, malformed hook answers, worker obsolete/ineligible are in pgTAP; unregistered kind, private field, the five adapters, generic superseded and foreign/signed-out open in `source-contracts.mjs`; real adapters open current/not_found in the live check; client mapping and states in `inbox_item_test.dart`.
+- Owner/staging steps remaining (not blocking `built`): parent applies the migration to staging and runs `verify-hosted.sql`; owner runs the demonstration in `notifications.md` (Story 3.2, Hosted staging step 2).
 
 ## Plan Change Log
 

@@ -105,6 +105,44 @@ select app.notifications_cancel(jsonb_build_object(
 - The worker delivers a job only while your check hook answers `current: true` for the job's revision.
 - `app.contract_reminder_key` (1.5) stays the validation-only seam; `notifications_enqueue` calls it.
 - The SYNTHETIC `fixture_reminder` source (owner `fixture`, kind `fixture_due`, edge `fixture -> notifications`) is the reference consumer.
+- Since story 3.2, enqueue also refuses a source type that is not registered (`{"source_type": "unregistered"}`) and a kind without a reminder contract (`{"reminder_kind": "unregistered"}`). Register the contract below first.
+
+## Reminder contracts: consumer guide (story 3.2)
+
+Migration: `supabase/migrations/20261008074412_notifications_source_contracts.sql`. Duties, Cells, Follow-ups and every later reminder owner follow these steps in their **own** migration, before their first enqueue. The SYNTHETIC `fixture_reminder` source in that migration is the worked example.
+
+1. **Register the source type, its purposes and its reminder kinds** (story 1.5, above): `contract_register_source_type`, `contract_register_purpose`, `contract_register_reminder_kind`.
+2. **Write the reminder check.** It is an `app.<prefix>_...(jsonb) returns jsonb` function with `set search_path = ''` (usually `stable`, no locks). It receives the job's contract v1 `notification_key` (`source_type, source_id, source_revision, recipient_member_id, reminder_kind, scheduled_at`) and answers **exactly** these four keys:
+
+   | Key | Meaning |
+   |---|---|
+   | `current` | The source exists, is live and is still at `source_revision`. |
+   | `revision` | The source's current revision, or `null` when it is gone. Must equal `source_revision` when `current` is true. |
+   | `actionable` | The reminder still asks for something now: not answered, not expired, not past its usefulness. |
+   | `recipient_eligible` | The recipient may still see this source (their scope, role or assignment is unchanged). Identity's own live-access predicate is checked by Notifications separately. |
+
+   Any other key, a wrong type, a missing `revision` or a `current` that names another revision is refused at call time (PCTR1). That is the guard that keeps source content out of Notifications: never add a body, a name or a note to the answer.
+3. **Register the reminder contract** for each kind:
+
+   ```sql
+   select app.contract_register_reminder_contract(
+     'duties', 'duties_assignment', 'response_due',
+     'app.duties_assignment_reminder_check(jsonb)'::regprocedure,
+     '{"title": "Duty response needed",
+       "body": "Please accept or decline your duty.",
+       "link": "/duties/assignments/{source_id}"}'::jsonb);
+   ```
+
+   - `title` (1-60 characters) and `body` (1-160) are **fixed generic text**: no placeholders, no `{ } < > @ \`, no links (`http`, `www.`) and no runs of 7 or more digits (phone numbers). They appear in the inbox and, from entry 6, on lock screens. Never put prayer text, names, phone numbers, care or finance details here (functional requirements, Reminder reliability).
+   - `link` is a relative client route: lower-case segments, at most one whole `{source_id}` segment, no scheme, host, query or fragment. Notifications fills in `{source_id}` only when the opened item is `current`.
+   - The object takes exactly these three keys. A refused registration raises PCTR1 and names the fields, for example `{"body": "not_generic"}`.
+   - Registering again from the owner's later migration replaces the contract (text, link or check). Only the module that owns the source type may register.
+4. **Enqueue and cancel** with `app.notifications_enqueue` and `app.notifications_cancel` inside your command, as above. Cancel pending jobs when your transition makes them pointless (`source_revised`, `scope_revoked`, `source_expired`, ...); the worker also rechecks through your contract and ends a job `obsolete` (not current, or not actionable) or `ineligible` (recipient no longer admitted).
+5. **Add the client route.** Add your screen's route to the client router, then add its pattern to `ClientPaths.deepLinkTargets` (`packages/client_core/lib/src/presentation/shell_routing.dart`). Until then the opened item shows "Still current" without an **Open** button. Your screen must still do its own authorised read: the target is a pointer, not a grant (AD-5).
+
+**What a member sees when they open an item** (`api.notifications_open_item`, see [notifications.md](notifications.md)): `current` with your generic text and the resolved target only when your check answers `current`, `actionable` and `recipient_eligible`. Otherwise they see the generic `superseded` state: your generic text, no target, and no reason. Revoked, cancelled, expired and stale items look alike on purpose.
+
+**Contract version.** This fits wire contract v1. Registration is server-side SQL; the check's input is the v1 `notification_key`; the open answer is a Notifications read projection, not a shared kind. Fixture cases in `notification_key.json` and `source_ref.json` pin that a private field (`body`, `recipient_phone`, `title`, `link`, `note`) is `unknown_field` in SQL, Dart and TypeScript.
 
 ## Policy gates and environment
 

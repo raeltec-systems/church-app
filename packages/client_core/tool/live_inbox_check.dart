@@ -2,7 +2,8 @@
 // SupabaseInboxRepository) against a running LOCAL stack. Member A runs the
 // synthetic source command, the real worker script turns the due job into an
 // inbox item, and two clients of A (mobile and staff web) read the same single
-// item, while member B and a signed-out client see nothing.
+// item, while member B and a signed-out client see nothing. Story 3.2: the
+// staff client opens the item (current, with its target) and B cannot.
 //
 //   dart run tool/live_inbox_check.dart <env-file> <member-a-email> <member-b-email>
 //
@@ -36,7 +37,8 @@ Future<void> main(List<String> args) async {
   final url = env['API_URL'];
   final key = env['PUBLISHABLE_KEY'];
   final password = Platform.environment['LIVE_CHECK_PASSWORD'];
-  final credential = Platform.environment['NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL'];
+  final credential =
+      Platform.environment['NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL'];
   if (url != 'http://127.0.0.1:54321' ||
       key == null ||
       password == null ||
@@ -83,7 +85,11 @@ Future<void> main(List<String> args) async {
       : const [];
 
   final before = await SupabaseInboxRepository(mobileA).fetchMyInbox();
-  report('L1 member A starts with an empty inbox', items(before) == '', items(before));
+  report(
+    'L1 member A starts with an empty inbox',
+    items(before) == '',
+    items(before),
+  );
 
   final created = await SupabaseCommandGateway(mobileA).send(
     'fixture_reminder_command',
@@ -104,14 +110,15 @@ Future<void> main(List<String> args) async {
     created.runtimeType,
   );
 
-  final worker = await Process.run('node', [
-    '../../tools/notifications/worker.mjs',
-    'run-once',
-  ], environment: {
-    'SUPABASE_URL': url!,
-    'SUPABASE_PUBLISHABLE_KEY': key,
-    'NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL': credential,
-  });
+  final worker = await Process.run(
+    'node',
+    ['../../tools/notifications/worker.mjs', 'run-once'],
+    environment: {
+      'SUPABASE_URL': url!,
+      'SUPABASE_PUBLISHABLE_KEY': key,
+      'NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL': credential,
+    },
+  );
   report(
     'L3 worker run through the system route',
     worker.exitCode == 0 && '${worker.stdout}'.contains('"delivered":1'),
@@ -140,6 +147,29 @@ Future<void> main(List<String> args) async {
     'L7 a signed-out client sees nothing',
     items(nobody) == 'denied:signedOut',
     items(nobody),
+  );
+
+  // Story 3.2: opening the item re-reads its source on the server.
+  String opened(AccessRead<OpenedInboxItem> r) => switch (r) {
+    AccessReadOk(:final value) =>
+      '${value.state.name}${value.target == null ? '' : ':target'}',
+    AccessReadDenied(:final denial) => 'denied:${denial.name}',
+    AccessReadFailed() => 'failed',
+  };
+  final itemId = ids(onMobile).firstOrNull ?? '';
+  final openA = await SupabaseInboxRepository(staffA).openItem(itemId);
+  report(
+    'L9 staff web opens the item: current, with its target',
+    opened(openA) == 'current:target' &&
+        openA is AccessReadOk<OpenedInboxItem> &&
+        openA.value.item?.title == 'SYNTHETIC test reminder',
+    opened(openA),
+  );
+  final openB = await SupabaseInboxRepository(mobileB).openItem(itemId);
+  report(
+    'L10 member B opening it learns nothing',
+    opened(openB) == 'notFound',
+    opened(openB),
   );
 
   await staffA.auth.signOut();

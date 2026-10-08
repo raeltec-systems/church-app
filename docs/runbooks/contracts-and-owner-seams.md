@@ -47,6 +47,7 @@ Migration: `supabase/migrations/20261003134340_cross_epic_contracts.sql`.
   | `app.retired_fixture_counter_command_v0(...)`, `api.retired_fixture_counter_command_v0(...)`, `app.retired_cmd_execute_v0(...)` | functions | 1.4 | typed entry points superseded by the jsonb envelope | remove from `app.contract_retired_functions` |
   | `app.ops_retired_operator_actions_v0` (`_pkey`, `_id_seq`) | table | 2.3 | operator journal CHECK widened (rows copied) | none |
   | `app.ops_retired_operator_actions_v1` (`_pkey`, `_id_seq`) | table | 2.12 | operator journal CHECK widened (rows copied) | none |
+  | `app.ops_retired_operator_actions_v2` (`_pkey`, `_id_seq`) | table | 3.4 | operator journal CHECK widened for the notification scheduler actions (rows copied) | none |
   | `app.identity_retired_access_audit_v0` (`_pkey`, `_target`, `_event_id_seq`) | table | 2.12 | access audit CHECK widened (rows copied) | take it out of the deletion retention rules ([identity-access.md](identity-access.md)) |
 - **Guards.** pgTAP fails when any of these returns rows:
   - `app.contract_unowned_objects()`

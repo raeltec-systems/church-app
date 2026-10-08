@@ -174,9 +174,10 @@ select app.sys_register_credential((select v from t_ids where k = 'worker'),
 insert into t_ids values ('probe', app.sys_create_principal('pgtap-probe-31', 'synthetic_probe', 'israel'));
 select app.sys_register_credential((select v from t_ids where k = 'probe'),
   encode(sha256(convert_to(pg_temp.token('P'), 'UTF8')), 'hex'), 'pgtap probe 3.1', interval '1 hour', 'israel');
-select is((select array_agg(command) from app.sys_principal_commands
+select is((select array_agg(command order by command) from app.sys_principal_commands
             where principal_id = (select v from t_ids where k = 'worker')),
-  array['notifications.deliver_due'], 'the worker principal holds exactly the deliver step');
+  array['notifications.attempt', 'notifications.claim', 'notifications.deliver_due', 'notifications.release'],
+  'the worker principal holds exactly the worker commands (3.1 deliver step, 3.4 claim, attempt and release)');
 
 -- Create a due reminder: source and job in one transaction --------------------------------------
 create temp table r (k text primary key, v jsonb);
@@ -330,6 +331,8 @@ select app.notifications_enqueue(jsonb_build_object(
   'recipient_member_id', (select member_id from m where n = 1), 'reminder_kind', 'fixture_due',
   'scheduled_at', app.cmd_utc(now() - interval '1 minute')))
   from generate_series(1, 50);
+-- Story 3.4: the step leases at most the central batch_max (default 25).
+select app.notifications_configure_worker('{"batch_max": 100}', 'israel');
 select is(pg_temp.sys('{"limit": 100}') -> 'data' ->> 'delivered', '50', 'fifty more items for member 1');
 create function pg_temp.page(p_after jsonb) returns jsonb language plpgsql as $$
 declare

@@ -106,9 +106,12 @@ select results_eq($$select command, purpose from app.sys_command_kinds order by 
            ('identity.deletion_journal_catch_up', 'identity_deletion'),
            ('identity.deletion_next', 'identity_deletion'),
            ('identity.deletion_queue', 'identity_deletion'),
+           ('notifications.attempt', 'notifications_worker'),
+           ('notifications.claim', 'notifications_worker'),
            ('notifications.deliver_due', 'notifications_worker'),
+           ('notifications.release', 'notifications_worker'),
            ('system.synthetic_probe', 'synthetic_probe')$$,
-  'the allowlist is the synthetic probe plus the story 2.9 assisted-recovery, 2.11 deletion and 3.1 notification worker commands (each their own purpose)');
+  'the allowlist is the synthetic probe plus the story 2.9 assisted-recovery, 2.11 deletion and 3.1/3.4 notification worker commands (each their own purpose)');
 
 -- Operators, gates and alert status ------------------------------------------------------------
 select results_eq($$select operator from app.ops_operators where active$$,

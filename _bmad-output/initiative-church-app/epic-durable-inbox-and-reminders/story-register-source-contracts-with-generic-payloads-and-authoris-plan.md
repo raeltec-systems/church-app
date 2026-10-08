@@ -82,6 +82,8 @@ Decision (agent, under owner pre-approval): SYNTHETIC adapters are a `fixture.re
 - Matrix audit: register/refusals, enqueue unregistered/private field, open current/stale/cancelled/revoked/expired, foreign/unknown/signed out, malformed hook answers, worker obsolete/ineligible are in pgTAP; unregistered kind, private field, the five adapters, generic superseded and foreign/signed-out open in `source-contracts.mjs`; real adapters open current/not_found in the live check; client mapping and states in `inbox_item_test.dart`.
 - Owner/staging steps remaining (not blocking `built`): parent applies the migration to staging and runs `verify-hosted.sql`; owner runs the demonstration in `notifications.md` (Story 3.2, Hosted staging step 2).
 
+- Review fixes (coordinator, independent review of 3.2): `notifications_open_item` runs the owner check in a subtransaction and answers a fixed `PT503 source_check_failed` (SQLSTATE-only log), and the PCTR1 messages name no hook; the generic-text check requires printable ASCII, treats any short non-alphanumeric run as a digit separator and refuses domain shapes; the worker ends a job whose kind has no reminder contract `obsolete` at once; `fixture.reminder_change` has production and non-SYNTHETIC refusal tests; the item screen has its own failure title. pgTAP now 80 assertions.
+
 ## Plan Change Log
 
 ## Review Triage Log

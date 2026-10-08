@@ -276,6 +276,11 @@ void main() {
       await settle(tester);
       expect(h.inbox.openedIds, [_item, _item]);
       expect(byKey('inbox-item-failed'), findsOneWidget);
+      h.inbox.opened[_item] = const AccessReadFailed(unreachable: false);
+      await tester.tap(byKey('refresh-inbox-item'));
+      await settle(tester);
+      expect(find.text('Couldn\'t open this reminder'), findsOneWidget);
+      expect(find.text('Couldn\'t load your inbox'), findsNothing);
     });
 
     testWidgets('signing out drops the opened item at once', (tester) async {

@@ -9,7 +9,7 @@ Recorded 2026-10-08 on the local Supabase stack (synthetic data only). Hosted st
 
 Also run (all passing):
 
-- `npm run db:test`: 20 files, 1609 assertions, including `notifications_source_contracts_test.sql` (60) and the updated `notifications_inbox_test.sql`.
+- `npm run db:test`: 20 files, 1629 assertions, including `notifications_source_contracts_test.sql` (80, with the review fixes) and the updated `notifications_inbox_test.sql`.
 - `npm run db:smoke` (including `contract_fixtures_check.sh` with the new fixture cases).
 - Every `tools/identity-e2e` E2E (run, grants, apply, review, cells, recovery, credentials, assisted, lifecycle, deletion, runbooks, inbox, source-contracts), each after a reset.
 - `contracts:test` (TypeScript, 242), `dart test` and `dart test -p chrome` in `packages/contracts/dart`, `ci:policy-test` and the offline tool tests.

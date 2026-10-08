@@ -1,12 +1,12 @@
-{"step":"C00-precondition","target":"LOCAL","at":"2026-10-08T08:22:53.859Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
-{"step":"C01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-08T08:22:55.071Z","verdict":"pass","amr":["password"]}
-{"step":"C10-unregistered-kind-refused","target":"LOCAL","at":"2026-10-08T08:22:55.470Z","verdict":"pass","status":200,"code":"validation_failed","field_errors":{"reminder_kind":"unregistered"},"sources":0}
-{"step":"C11-private-field-rejected","target":"LOCAL","at":"2026-10-08T08:22:55.835Z","verdict":"pass","code":"validation_failed","field_errors":{"body":"unknown_field","recipient_phone":"unknown_field"},"sources":0}
-{"step":"C20-five-delivered","target":"LOCAL","at":"2026-10-08T08:22:56.060Z","verdict":"pass","worker":{"exit":0,"delivered":5},"items":5}
-{"step":"C21-generic-text-in-inbox","target":"LOCAL","at":"2026-10-08T08:22:56.060Z","verdict":"pass","titles":["SYNTHETIC test reminder"],"keys":["body","delivered_at","due_at","item_id","reminder_kind","title"]}
-{"step":"C30-sources-changed","target":"LOCAL","at":"2026-10-08T08:22:56.118Z","verdict":"pass","revisions":{"stale":2,"cancelled":2,"revoked":1,"expired":1}}
-{"step":"C40-current-opens-with-target","target":"LOCAL","at":"2026-10-08T08:22:56.371Z","verdict":"pass","status":200,"state":"current","target_kind":"/fixture/reminders"}
-{"step":"C41-superseded-is-generic","target":"LOCAL","at":"2026-10-08T08:22:57.092Z","verdict":"pass","stale":{"status":200,"generic":true,"state":"superseded"},"cancelled":{"status":200,"generic":true,"state":"superseded"},"revoked":{"status":200,"generic":true,"state":"superseded"},"expired":{"status":200,"generic":true,"state":"superseded"}}
-{"step":"C42-revised-source-opens-current","target":"LOCAL","at":"2026-10-08T08:22:57.372Z","verdict":"pass","worker":{"delivered":1},"state":"current"}
-{"step":"C50-others-cannot-open","target":"LOCAL","at":"2026-10-08T08:22:57.722Z","verdict":"pass","member_b":{"state":"not_found"},"signed_out":401}
-{"step":"C99-cleanup","target":"LOCAL","at":"2026-10-08T08:22:58.740Z","users_left":0,"credential_revoked":true,"principal_disabled":true,"unmarked":true,"jobs_left":0,"items_left":0}
+{"step":"C00-precondition","target":"LOCAL","at":"2026-10-08T08:36:21.428Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"C01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-08T08:36:22.600Z","verdict":"pass","amr":["password"]}
+{"step":"C10-unregistered-kind-refused","target":"LOCAL","at":"2026-10-08T08:36:22.976Z","verdict":"pass","status":200,"code":"validation_failed","field_errors":{"reminder_kind":"unregistered"},"sources":0}
+{"step":"C11-private-field-rejected","target":"LOCAL","at":"2026-10-08T08:36:23.291Z","verdict":"pass","code":"validation_failed","field_errors":{"body":"unknown_field","recipient_phone":"unknown_field"},"sources":0}
+{"step":"C20-five-delivered","target":"LOCAL","at":"2026-10-08T08:36:23.520Z","verdict":"pass","worker":{"exit":0,"delivered":5},"items":5}
+{"step":"C21-generic-text-in-inbox","target":"LOCAL","at":"2026-10-08T08:36:23.520Z","verdict":"pass","titles":["SYNTHETIC test reminder"],"keys":["body","delivered_at","due_at","item_id","reminder_kind","title"]}
+{"step":"C30-sources-changed","target":"LOCAL","at":"2026-10-08T08:36:23.562Z","verdict":"pass","revisions":{"stale":2,"cancelled":2,"revoked":1,"expired":1}}
+{"step":"C40-current-opens-with-target","target":"LOCAL","at":"2026-10-08T08:36:23.721Z","verdict":"pass","status":200,"state":"current","target_kind":"/fixture/reminders"}
+{"step":"C41-superseded-is-generic","target":"LOCAL","at":"2026-10-08T08:36:24.361Z","verdict":"pass","stale":{"status":200,"generic":true,"state":"superseded"},"cancelled":{"status":200,"generic":true,"state":"superseded"},"revoked":{"status":200,"generic":true,"state":"superseded"},"expired":{"status":200,"generic":true,"state":"superseded"}}
+{"step":"C42-revised-source-opens-current","target":"LOCAL","at":"2026-10-08T08:36:24.608Z","verdict":"pass","worker":{"delivered":1},"state":"current"}
+{"step":"C50-others-cannot-open","target":"LOCAL","at":"2026-10-08T08:36:24.962Z","verdict":"pass","member_b":{"state":"not_found"},"signed_out":401}
+{"step":"C99-cleanup","target":"LOCAL","at":"2026-10-08T08:36:25.747Z","users_left":0,"credential_revoked":true,"principal_disabled":true,"unmarked":true,"jobs_left":0,"items_left":0}

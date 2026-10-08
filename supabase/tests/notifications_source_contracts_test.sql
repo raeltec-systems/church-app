@@ -5,7 +5,7 @@
 -- through real GoTrue: tools/identity-e2e/source-contracts.mjs. Every account here is SYNTHETIC
 -- (+44 7700 900830-900839).
 begin;
-select plan(60);
+select plan(80);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000320' || lpad(n::text, 2, '0'))::uuid $$;
@@ -194,6 +194,23 @@ select is(app.contract_reminder_text_errors(
   'the text checks name every refused field');
 select is(app.contract_reminder_text_errors('[]'), '{"text": "must_be_object"}'::jsonb,
   'the text must be an object');
+-- Review fix: the generic-text check cannot be bypassed with look-alike or split characters.
+select is(app.contract_reminder_text_errors(jsonb_build_object('title', 'Test', 'body', t.v, 'link', '/x')) ->> 'body',
+  'not_generic', 'generic text refuses ' || t.label)
+  from (values
+    ('full-width digits', 'Call ' || repeat(chr(65296 + 9), 7)),
+    ('a full-width at sign', 'Write to a' || chr(65312) || 'b'),
+    ('a full-width https', chr(65352) || chr(65364) || chr(65364) || chr(65360) || chr(65363) || '://x'),
+    ('a zero-width space', 'Hello' || chr(8203) || 'there'),
+    ('a bidi override', 'Hello ' || chr(8238) || 'there'),
+    ('digits split by slashes', 'Call 0977/123/456 now'),
+    ('digits split by commas', 'Call 0977,123,456 now'),
+    ('digits split by underscores', 'Call 0977_123_456 now'),
+    ('digits split by double spaces', 'Call 0977  123  456 now'),
+    ('a bare domain', 'See example.com/x for more')) t (label, v);
+select is(app.contract_reminder_text_errors(
+    '{"title": "Duty response needed", "body": "Please accept or decline your duty by 10:00, e.g. today.", "link": "/duties/{source_id}"}'),
+  '{}'::jsonb, 'ordinary generic text still passes');
 select lives_ok($$select pg_temp.reg('fixture_pgtap_kind',
     '{"title": "First text", "body": "Test body.", "link": "/fixture/pgtap/{source_id}/detail"}')$$,
   'a valid contract registers');
@@ -345,6 +362,55 @@ select is(pg_temp.call('{"role": "authenticated"}'::jsonb,
 select is(split_part(pg_temp.call(pg_temp.c(1), 'select api.notifications_open_item(null)'), '|', 1), '22023',
   'an item id is required');
 
+-- Review fix: a raising or malformed owner check never reaches the member ------------------------
+create function app.fixture_pgtap_raising(p_key jsonb) returns jsonb
+language plpgsql stable set search_path = '' as $$
+begin
+  raise exception 'secret source value 0977123456 in app.fixture_pgtap_raising';
+end;
+$$;
+select app.contract_register_reminder_kind('fixture', 'fixture_reminder', 'fixture_pgtap_raising');
+select pg_temp.reg('fixture_pgtap_raising', '{"title": "Raising", "body": "Raising test.", "link": "/fixture/raising"}',
+                   'app.fixture_pgtap_raising(jsonb)');
+create function pg_temp.delivered_item(p_kind text) returns uuid
+language plpgsql as $$
+declare
+  v_job uuid;
+  v_item uuid;
+begin
+  insert into app.notifications_jobs (source_type, source_id, source_revision, recipient_member_id, reminder_kind,
+                                      scheduled_at, policy_source, policy_digest, job_state, finished_at,
+                                      processed_by_principal)
+  values ('fixture_reminder', '00000000-0000-4000-a000-000000032000', 1, (select member_id from m where n = 1),
+          p_kind, now() - interval '1 minute', 'fixture', repeat('0', 64), 'delivered', now(),
+          (select v from t_ids where k = 'worker'))
+  returning job_id into v_job;
+  insert into app.notifications_inbox_items (job_id, recipient_member_id, reminder_kind, due_at, delivered_by_principal)
+  values (v_job, (select member_id from m where n = 1), p_kind, now() - interval '1 minute', (select v from t_ids where k = 'worker'))
+  returning item_id into v_item;
+  return v_item;
+end;
+$$;
+select is(pg_temp.call(pg_temp.c(1), format('select api.notifications_open_item(%L::uuid)',
+            pg_temp.delivered_item('fixture_pgtap_raising'))),
+  'PT503|source_check_failed|', 'a raising check answers a fixed, content-free 503 (no error text, no hook name)');
+select set_config('pgtap.leak', 'extra', true);
+select is(pg_temp.call(pg_temp.c(1), format('select api.notifications_open_item(%L::uuid)',
+            pg_temp.delivered_item('fixture_pgtap_leaky'))),
+  'PT503|source_check_failed|', 'a malformed check answer is the same fixed 503');
+select throws_ok(format('select app.contract_check_reminder(%L)', pg_temp.key('{"reminder_kind": "fixture_pgtap_leaky"}')),
+  'PCTR1', 'reminder check returned a malformed result', 'the PCTR1 message names no hook');
+
+-- Review fix: a due job whose kind has no reminder contract ends obsolete, never retried ---------
+insert into app.notifications_jobs (source_type, source_id, source_revision, recipient_member_id, reminder_kind,
+                                    scheduled_at, policy_source, policy_digest)
+values ('fixture_reminder', '00000000-0000-4000-a000-000000032000', 1, (select member_id from m where n = 1),
+        'fixture_no_contract', now() - interval '1 minute', 'fixture', repeat('0', 64));
+select is(pg_temp.run(), '{"claimed": 1, "delivered": 0, "obsolete": 1, "ineligible": 0, "failed": 0}'::jsonb,
+  'a job without a reminder contract ends obsolete at once');
+select is((select job_state || '|' || failed_attempts from app.notifications_jobs where reminder_kind = 'fixture_no_contract'),
+  'obsolete|0', 'with no failure recorded and no retry');
+
 -- fixture.reminder_change refusals --------------------------------------------------------------
 insert into src values ('refusals', pg_temp.create_due(1, now() + interval '1 day'));
 select is(pg_temp.change(1, (select v from src where k = 'refusals'), 'delete') -> 'field_errors',
@@ -361,6 +427,25 @@ select is(pg_temp.change(1, (select v from src where k = 'cancelled'), 'revise',
   '{"source_id": "cancelled"}'::jsonb, 'a cancelled source cannot be changed');
 select is(pg_temp.change(1, (select v from src where k = 'refusals'), 'revise') ->> 'revision', '2',
   'the owner can revise its own active source');
+
+
+-- Review fix: fixture.reminder_change refuses non-SYNTHETIC members and production --------------
+update app.identity_members set is_synthetic = false where member_id = (select member_id from m where n = 2);
+select is(pg_temp.change(2, (select v from src where k = 'refusals'), 'revise', 2) ->> 'code', 'forbidden',
+  'a member who is not SYNTHETIC cannot change fixture reminders (refused by the live-access gate here)');
+select app.policy_approve('private_access', '{"serve": true}', 'pgtap', 'pgtap 3.2 only, rolled back');
+select is(pg_temp.change(2, (select v from src where k = 'refusals'), 'revise', 2) -> 'field_errors',
+  '{"member_id": "unsupported"}'::jsonb, 'the fixture handler itself refuses a member who is not SYNTHETIC');
+create temp table before_prod as select revision from app.fixture_reminder_sources
+ where source_id = (select v from src where k = 'refusals');
+select app.platform_set_environment('production', 'pgtap 3.2');
+update app.policy_gates set state = 'unresolved', approved_value = null, approved_by = null,
+       approved_at = null, approval_note = null
+ where gate = 'private_access';
+select is(pg_temp.change(1, (select v from src where k = 'refusals'), 'revise', 2) ->> 'code', 'forbidden',
+  'production: fixture.reminder_change is refused');
+select is((select revision from app.fixture_reminder_sources where source_id = (select v from src where k = 'refusals')),
+  (select revision from before_prod), 'production: the source is unchanged');
 
 select * from finish();
 rollback;

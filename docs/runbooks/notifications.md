@@ -79,14 +79,14 @@ Migration: `supabase/migrations/20261008074412_notifications_source_contracts.sq
 
 - **Reminder contracts** (`app.contract_reminder_contracts`, platform registry, no client privileges): per source type and reminder kind, the owner's reminder check, fixed generic `title` and `body`, and a deep-link `link` template. Registered only with `app.contract_register_reminder_contract` in the owner's migration. `app.contract_check_reminder(notification_key)` calls the check and refuses any answer other than exactly `{current, revision, actionable, recipient_eligible}`.
 - **Enqueue** now also refuses an unregistered source type, a kind without a contract and any extra key on the notification key (`unknown_field`), before anything is written.
-- **Worker** (`notifications.deliver_due`) rechecks through the contract: not current or not actionable ends the job `obsolete`; a recipient the source no longer admits, or who is no longer an approved member, ends it `ineligible`. The answer is still counts only.
+- **Worker** (`notifications.deliver_due`) rechecks through the contract: not current or not actionable ends the job `obsolete`; a recipient the source no longer admits, or who is no longer an approved member, ends it `ineligible`. A job whose kind has no reminder contract ends `obsolete` at once (never retried). The answer is still counts only.
 - **Inbox read** items now carry the registered generic `title` and `body`: `{item_id, reminder_kind, title, body, due_at, delivered_at}`.
 - **Open** `POST /rest/v1/rpc/notifications_open_item` with body `{"item_id": "<uuid>"}` (`Content-Profile: api`), behind the live-access predicate (401/403 like the other reads; a missing id is 400). It re-reads the source now and answers one of:
   - `{item_id, reminder_kind, title, body, due_at, delivered_at, state: "current", target: "/<route>/<source id>"}` when the check says current, actionable and recipient eligible;
   - the same fields with `state: "superseded"` and `target: null` otherwise (stale revision, cancelled, revoked scope, expired, or no contract), with no reason and no source content;
   - `{"state": "not_found"}` for an id that is not one of the caller's items.
 
-  A check that raises makes the open fail (500, content-free) rather than guess a state. It records member activity.
+  A check that raises or answers malformed makes the open fail with HTTP 503 and the fixed message `source_check_failed` (no detail, no hook name; the server log records only the SQLSTATE) rather than guess a state. It records member activity.
 - **SYNTHETIC adapters** on `fixture_reminder` (`POST /rest/v1/rpc/fixture_reminder_command`, local/staging, SYNTHETIC members only):
   - `fixture.reminder_create {due_at, reminder_kind?}`: the optional kind lets the API show that an unregistered kind is refused (`validation_failed {"reminder_kind": "unregistered"}`, nothing written).
   - `fixture.reminder_change {source_id, change}` at the current revision: `revise` (revision + 1, older pending jobs cancelled `source_revised`, a job enqueued at the new revision), `revoke` (the recipient's SYNTHETIC scope is revoked, revision kept, pending jobs cancelled `scope_revoked`) or `expire` (expires now, revision kept, pending jobs cancelled `source_expired`). With the existing `fixture.reminder_cancel` these give the five cases: current, stale revision, cancelled, revoked scope and expired.
@@ -96,7 +96,7 @@ Migration: `supabase/migrations/20261008074412_notifications_source_contracts.sq
 
 ```bash
 npx supabase db reset
-npm run -s db:test                       # supabase/tests/notifications_source_contracts_test.sql (60)
+npm run -s db:test                       # supabase/tests/notifications_source_contracts_test.sql (80)
 node tools/auth-harness/local-phone-auth.mjs on
 node tools/identity-e2e/source-contracts.mjs --evidence <file>.jsonl
 node tools/auth-harness/local-phone-auth.mjs off

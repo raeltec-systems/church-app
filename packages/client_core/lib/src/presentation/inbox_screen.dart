@@ -155,7 +155,11 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   }
 }
 
-Widget _problem<T>(AccessRead<T> r, String keyPrefix) => switch (r) {
+Widget _problem<T>(
+  AccessRead<T> r,
+  String keyPrefix, {
+  String failedTitle = 'Couldn\'t load your inbox',
+}) => switch (r) {
   AccessReadOk() => const SizedBox.shrink(),
   AccessReadDenied(:final denial) => RequestStateBanner(
     key: Key('$keyPrefix-denied-${denial.name}'),
@@ -191,7 +195,7 @@ Widget _problem<T>(AccessRead<T> r, String keyPrefix) => switch (r) {
     key: Key('$keyPrefix-failed'),
     tone: StatusTone.danger,
     icon: unreachable ? Icons.cloud_off_outlined : Icons.error_outline,
-    title: unreachable ? 'No connection' : 'Couldn\'t load your inbox',
+    title: unreachable ? 'No connection' : failedTitle,
     message: unreachable
         ? 'We couldn\'t reach the church server. Nothing is shown until it '
               'answers; your reminders are kept there.'
@@ -332,7 +336,13 @@ class _InboxItemScreenState extends ConsumerState<InboxItemScreen> {
         ),
       );
     } else if (opened == null) {
-      children.add(_problem(s.result!, 'inbox-item'));
+      children.add(
+        _problem(
+          s.result!,
+          'inbox-item',
+          failedTitle: 'Couldn\'t open this reminder',
+        ),
+      );
     } else if (opened.state == InboxItemState.notFound || item == null) {
       children.add(
         const RequestStateBanner(

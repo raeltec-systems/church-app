@@ -133,7 +133,7 @@ Migration: `supabase/migrations/20261008074412_notifications_source_contracts.sq
        "link": "/duties/assignments/{source_id}"}'::jsonb);
    ```
 
-   - `title` (1-60 characters) and `body` (1-160) are **fixed generic text**: no placeholders, no `{ } < > @ \`, no links (`http`, `www.`) and no runs of 7 or more digits (phone numbers). They appear in the inbox and, from entry 6, on lock screens. Never put prayer text, names, phone numbers, care or finance details here (functional requirements, Reminder reliability).
+   - `title` (1-60 characters) and `body` (1-160) are **fixed generic text**: printable ASCII only, no placeholders, no `{ } < > @ \`, no links (`http`, `www.`) or domain shapes (`word.org`), and no 7 or more digits split only by short runs of other characters (phone numbers). They appear in the inbox and, from entry 6, on lock screens. Never put prayer text, names, phone numbers, care or finance details here (functional requirements, Reminder reliability).
    - `link` is a relative client route: lower-case segments, at most one whole `{source_id}` segment, no scheme, host, query or fragment. Notifications fills in `{source_id}` only when the opened item is `current`.
    - The object takes exactly these three keys. A refused registration raises PCTR1 and names the fields, for example `{"body": "not_generic"}`.
    - Registering again from the owner's later migration replaces the contract (text, link or check). Only the module that owns the source type may register.

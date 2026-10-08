@@ -77,10 +77,11 @@ begin
     v_max := (case v_key when 'title' then 60 else 160 end);
     if v_value <> btrim(v_value) or length(v_value) = 0 or length(v_value) > v_max then
       v_errors := v_errors || jsonb_build_object(v_key, 'out_of_range');
-    elsif v_value ~ '[[:cntrl:]{}<>@]' or position(chr(92) in v_value) > 0
-          or v_value ~* '(https?:|www[.])'
-          or v_value ~ '([0-9][ ().-]?){7,}' then
-      -- Generic text only: no placeholders, markup, addresses, links or phone-like numbers.
+    elsif v_value !~ '^[ -~]+$' or v_value ~ '[{}<>@]' or position(chr(92) in v_value) > 0
+          or v_value ~* '(https?:|www[.])' or v_value ~* '[a-z0-9][.][a-z]{2,}'
+          or v_value ~ '([0-9][^A-Za-z0-9]{0,3}){7,}' then
+      -- Generic text only: printable ASCII, no placeholders, markup, addresses, links, domain
+      -- shapes or phone-like numbers (digits split by any short run of other characters).
       v_errors := v_errors || jsonb_build_object(v_key, 'not_generic');
     end if;
   end loop;
@@ -153,8 +154,8 @@ begin
   end if;
   v_proc := pg_catalog.to_regprocedure(v_hook);
   if v_proc is null then
-    raise exception using errcode = 'PCTR1',
-      message = format('registered reminder check %s is missing', v_hook);
+    raise log 'registered reminder check % is missing', v_hook;
+    raise exception using errcode = 'PCTR1', message = 'registered reminder check is missing';
   end if;
   execute format('select %s($1)', v_proc::regproc) into v_result using p_key;
   if jsonb_typeof(v_result) is distinct from 'object'
@@ -167,8 +168,8 @@ begin
      or app.contract_revision_error(v_result -> 'revision', true) is not null
      or ((v_result -> 'current') = 'true'::jsonb
          and (v_result ->> 'revision')::numeric is distinct from (p_key ->> 'source_revision')::numeric) then
-    raise exception using errcode = 'PCTR1',
-      message = format('reminder check %s returned a malformed result', v_hook);
+    raise log 'reminder check % returned a malformed result', v_hook;
+    raise exception using errcode = 'PCTR1', message = 'reminder check returned a malformed result';
   end if;
   return v_result;
 end;
@@ -276,7 +277,14 @@ begin
   loop
     v_claimed := v_claimed + 1;
     begin
-      v_state := app.contract_check_reminder(app.notifications_job_key(v_job));
+      -- A kind without a reminder contract can never be rechecked: end it, never retry it.
+      if not exists (select 1 from app.contract_reminder_contracts c
+                      where c.source_type = v_job.source_type
+                        and c.reminder_kind = v_job.reminder_kind) then
+        v_state := '{"current": false, "actionable": false}'::jsonb;
+      else
+        v_state := app.contract_check_reminder(app.notifications_job_key(v_job));
+      end if;
       if not ((v_state ->> 'current')::boolean and (v_state ->> 'actionable')::boolean) then
         update app.notifications_jobs j
            set job_state = 'obsolete', finished_at = clock_timestamp(),
@@ -410,7 +418,14 @@ begin
   select c.* into v_contract from app.contract_reminder_contracts c
    where c.source_type = v_job.source_type and c.reminder_kind = v_job.reminder_kind;
   if found then
-    v_check := app.contract_check_reminder(app.notifications_job_key(v_job));
+    -- The owner's check runs in a subtransaction: whatever it raises stays in the server log
+    -- (SQLSTATE only) and the member gets one fixed, content-free 503.
+    begin
+      v_check := app.contract_check_reminder(app.notifications_job_key(v_job));
+    exception when others then
+      raise log 'notifications.open_item reminder check failed: sqlstate %', sqlstate;
+      raise exception using errcode = 'PT503', message = 'source_check_failed';
+    end;
     v_current := (v_check ->> 'current')::boolean and (v_check ->> 'actionable')::boolean
                  and (v_check ->> 'recipient_eligible')::boolean;
   else

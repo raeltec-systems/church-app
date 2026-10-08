@@ -414,7 +414,7 @@ Fictional numbers: pgTAP `+44 7700 900880-900888` (the 3.3 suite borrows `900889
 
 ## Story 3.6: generic expiring push through FCM; invalid tokens retired
 
-Migration: `supabase/migrations/20261008151500_notifications_push.sql` (one file; no row deletions, no destructive statements, no rows file: push attempts live in `app.notifications_attempts`, which the 3.5 deletion hook already erases). Edge Function: `supabase/functions/notifications-worker/` now has three files, `index.ts`, `logic.mjs` and `fcm.mjs`. Tests: `supabase/tests/notifications_push_test.sql` (96), `supabase/functions/notifications-worker/fcm.test.mjs` and `push-run.test.mjs`, E2E `tools/identity-e2e/push.mjs` (12 checks against a fake FCM endpoint), client tests `packages/client_core/test/notifications/push_test.dart` and the mobile app test. Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.6/`.
+Migration: `supabase/migrations/20261008155801_notifications_push.sql` (one file; no row deletions, no destructive statements, no rows file: push attempts live in `app.notifications_attempts`, which the 3.5 deletion hook already erases). Edge Function: `supabase/functions/notifications-worker/` now has three files, `index.ts`, `logic.mjs` and `fcm.mjs`. Tests: `supabase/tests/notifications_push_test.sql` (96), `supabase/functions/notifications-worker/fcm.test.mjs` and `push-run.test.mjs`, E2E `tools/identity-e2e/push.mjs` (12 checks against a fake FCM endpoint), client tests `packages/client_core/test/notifications/push_test.dart` and the mobile app test. Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.6/`.
 
 **Push is off until the owner's steps below are done.** Nothing in the repository holds a Firebase project id, app id, API key, service account or APNs key, and the apps ship with the no-op push adapter. The durable inbox and the leaders' direct-contact routes carry every reminder meanwhile.
 
@@ -498,9 +498,9 @@ The E2E generates a throwaway RSA key pair and a Firebase-shaped service account
 
 ### Hosted staging (parent session, then the owner)
 
-The agent applied nothing, deployed nothing and holds no Firebase or Apple credential. In order:
+Steps 1 and 2 were done by the parent session on 2026-10-08 (evidence: `evidence-3.6/staging-verify.md`). The agent holds no Firebase or Apple credential. In order:
 
-1. **Parent session: the migration.** Apply `20261008151500_notifications_push.sql` to staging (`tmurpotfluignacfueki`) after `20261008135811`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. There is no rows file. The migration:
+1. **Parent session: the migration.** Apply `20261008155801_notifications_push.sql` to staging (`tmurpotfluignacfueki`) after `20261008135811`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. There is no rows file. The migration:
    - adds `app.sys_command_kinds.retain_result` and replaces the body of `app.sys_execute` (same signature and grants);
    - adds the `push_enabled` setting (off), the push-job lease columns, the attempt push columns and the four `notifications.push_*` commands, which the existing staging `notifications_worker` principal gets at once;
    - replaces `app.notifications_configure_worker` and `app.notifications_scheduler_status` in place;

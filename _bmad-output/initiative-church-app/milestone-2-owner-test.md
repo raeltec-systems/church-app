@@ -21,6 +21,16 @@ Synthetic data only. Owner Q2 decisions: `owner-decisions-milestone-2.md`.
    (the assistant can paste it here in chat for you). Until then a staging member deletion pauses at
    its erase step and erases nothing.
 
+4. **Phone push through Firebase (3.6, optional for the first pass).** Push is off until you do this;
+   the inbox carries every reminder meanwhile. Follow `docs/runbooks/notifications.md`, story 3.6,
+   "Hosted staging", steps 3 to 5: create a Firebase project (for example `bic-kafue-staging`) with
+   the Android app `zm.bickafue.bic_kafue_mobile` and the iOS app `zm.bickafue.bicKafueMobile`;
+   create the service account `bic-push-sender` with only the **Firebase Cloud Messaging API Admin**
+   role and put its JSON key in the staging Edge secret `NOTIFICATIONS_FCM_SERVICE_ACCOUNT` (never in
+   a chat); upload an APNs `.p8` key if you will test an iPhone. Then send the assistant only the
+   NON-secret app identifiers (project id, sender id, Android and iOS app ids, the API key from
+   `google-services.json`) so it can build the push-enabled app, and say "push ready".
+
 ## Scenarios
 
 - **3.1 Inbox:** as a synthetic member on mobile and staff web, create a test reminder due in a
@@ -44,6 +54,14 @@ Synthetic data only. Owner Q2 decisions: `owner-decisions-milestone-2.md`.
   ask the assistant to show it). A member's push on/off per category (once 3.7 adds the screen) never
   removes in-app items. Deleting a member (after the rows paste) leaves none of their reminders,
   devices or settings.
+
+- **3.6 Push (after owner step 4 and the push build):** signed in as a synthetic member on a real
+  Android phone with Google Play services (and an iPhone if you set up APNs), allow notifications
+  and close the app. A test reminder due now shows one phone notification with only the generic
+  title and text (no names, numbers or links); tapping it opens the item in **Inbox**. Uninstall the
+  app, trigger another reminder: the assistant shows the device token retired and the reminder still
+  in the inbox. Turning push off for the category (3.7 screen) stops phone notifications but not
+  inbox items.
 
 ## Reminders
 

@@ -3,7 +3,7 @@ title: 'Send generic expiring push through FCM and retire invalid tokens'
 type: 'feature'
 ticket: '6'
 created: '2026-10-08'
-status: 'built'
+status: 'done'
 baseline_revision: 'a52c3b89ec6fb7b5ec75ee1f57bda786852e6585'
 route: 'full'
 route_source: 'auto'
@@ -80,7 +80,7 @@ Decision (agent, under owner pre-approval): a device signing out retires its own
 ## Implementation Notes
 
 - Implemented directly (no subagent tool in this run). Files:
-  - Migration `supabase/migrations/20261008151500_notifications_push.sql`: no `delete from`, no rows file.
+  - Migration `supabase/migrations/20261008155801_notifications_push.sql`: no `delete from`, no rows file.
   - pgTAP `supabase/tests/notifications_push_test.sql` (96).
   - Pins updated in `notifications_worker_test.sql` (attempt columns, `push_enabled` default, status keys), `notifications_inbox_test.sql` (worker commands) and `system_access_test.sql` (allowlist).
   - Edge `supabase/functions/notifications-worker/fcm.mjs` (+ `fcm.test.mjs`), `logic.mjs` (`runPush`, parsers; + `push-run.test.mjs`) and `index.ts` (push stage after the inbox stage).
@@ -103,7 +103,7 @@ Decision (agent, under owner pre-approval): a device signing out retires its own
   - Client denied: `push_test.dart` and the mobile test; E2E P11 (server side).
   - Tap: `push_test.dart` (tap, launch tap, malformed id, signed out then sign-in then back) and the mobile test; E2E P50 (server re-check).
 - Owner/staging steps remaining (not blocking `built`), detailed in runbook `notifications.md`, Story 3.6, Hosted staging:
-  - parent: apply `20261008151500` + `verify-hosted.sql`; redeploy `notifications-worker` with `fcm.mjs`;
+  - parent: apply `20261008155801` + `verify-hosted.sql`; redeploy `notifications-worker` with `fcm.mjs`;
   - owner: Firebase project and apps; a `bic-push-sender` service account key as the Edge secret `NOTIFICATIONS_FCM_SERVICE_ACCOUNT`; the APNs key uploaded to Firebase;
   - follow-up builder ticket: the real `firebase_messaging` adapter with build-time app ids;
   - `push_enabled` on;
@@ -111,7 +111,7 @@ Decision (agent, under owner pre-approval): a device signing out retires its own
 
 ## Plan Change Log
 
-- 2026-10-08, independent review of 3.6 (coordinator; three mediums, four lows; the `sys_execute` change was judged safe). All patched in place in the unapplied migration `20261008151500` and the function.
+- 2026-10-08, independent review of 3.6 (coordinator; three mediums, four lows; the `sys_execute` change was judged safe). All patched in place in the unapplied migration `20261008155801` and the function.
   1. (medium) `SENDER_ID_MISMATCH` no longer retires a token. It is our configuration (another Firebase project): the sender throws `sender_mismatch`, nothing is recorded, the job is released unused and the run stops.
   2. (medium) An FcmError-only 400 `INVALID_ARGUMENT` whose message or details say the registration token is not valid retires the token. Any other `INVALID_ARGUMENT` (for example on `message.android.ttl`) stays `rejected` with the token kept. Fixtures are shaped like FCM's documented error bodies.
   3. (medium) Lease budget: sending stops 25 s before the lease ends (`lease_budget`); what was sent is recorded and the rest released. `push_record` retires `token_invalid` devices even when fenced (the push job is otherwise unchanged).

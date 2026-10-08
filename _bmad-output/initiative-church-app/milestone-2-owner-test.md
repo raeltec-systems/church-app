@@ -5,18 +5,8 @@ Synthetic data only. Owner Q2 decisions: `owner-decisions-milestone-2.md`.
 
 ## Owner steps to do first
 
-1. **Reminder worker credential (3.1, 3.4).** In your local clone run
-   `OPS_STATE_DIR=.ops-state/notifications-worker node tools/ops/system-credential.mjs mint --env staging`
-   (add `--force` if a staging credential already exists there) and send the assistant only the
-   fingerprint it prints; the assistant registers it (principal `notifications-worker`, 30 days).
-2. **Two Edge Function secrets (3.4).** Supabase dashboard, staging project, **Edge Functions >
-   Secrets**: add `NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL` = the contents of
-   `.ops-state/notifications-worker/staging.credential`, and `NOTIFICATIONS_WORKER_TRIGGER` = the
-   value of the Vault secret `notifications_worker_trigger` (**Project Settings > Vault > Secrets**,
-   reveal and copy; the assistant already created it). Do not paste either value into a chat.
-   Then tell the assistant "secrets set": it runs one test tick and switches on the every-minute
-   schedule.
-
+1. ~~Reminder worker credential (3.1, 3.4).~~ Done 2026-10-08 (registered, expires 2026-11-07).
+2. ~~Two Edge Function secrets (3.4).~~ Done 2026-10-08; the every-minute schedule is on and verified.
 3. ~~Paste in the staging SQL Editor (3.5).~~ Done 2026-10-08 (`20261008135900_notifications_routing_rows.sql`, verified).
 
 4. **Phone push through Firebase (3.6, optional for the first pass).** Push is off until you do this;

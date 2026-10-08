@@ -26,3 +26,4 @@ The schedule stays off until then, so nothing calls the function every minute wh
 - Owner set the Edge secrets `NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL` and `NOTIFICATIONS_WORKER_TRIGGER` (values never seen by the agent).
 - `app.notifications_scheduler_tick()` -> `{"tick":"sent"}`; pg_net response 200 `{"claimed":1,"outcomes":{"delivered":1},"push":{"state":"not_configured",...}}` (one waiting synthetic job delivered).
 - `app.notifications_scheduler_enable('israel')` -> `active: true`, `schedule: "* * * * *"`, `scheduler_jobs: 1`.
+- Scheduled runs confirmed: cron `succeeded: 2` (17:37:00 and 17:38:00 UTC), both pg_net responses 200, `last_claim_at` advancing.

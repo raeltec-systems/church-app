@@ -6,7 +6,7 @@
 -- evidence: tools/identity-e2e/worker.mjs. Every account here is SYNTHETIC
 -- (+44 7700 900860-900869).
 begin;
-select plan(83);
+select plan(110);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000340' || lpad(n::text, 2, '0'))::uuid $$;
@@ -120,6 +120,10 @@ select ok(not exists (
                              'app.notifications_attempt(uuid,uuid,uuid,bigint)',
                              'app.notifications_sys_claim(uuid,uuid,jsonb)',
                              'app.notifications_sys_attempt(uuid,uuid,jsonb)',
+                             'app.notifications_sys_release(uuid,uuid,jsonb)',
+                             'app.notifications_release(uuid,uuid,bigint)',
+                             'app.notifications_scheduler_new_trigger(text)',
+                             'app.notifications_worker_url_error(text)',
                              'app.notifications_configure_worker(jsonb,text)',
                              'app.notifications_scheduler_tick()',
                              'app.notifications_scheduler_enable(text,text)',
@@ -133,10 +137,11 @@ select is((select count(*)::int from app.contract_unowned_objects()), 0, 'no uno
 select is((select count(*)::int from app.contract_unpinned_functions()), 0, 'every function is pinned');
 select is((select count(*)::int from app.contract_boundary_violations()), 0, 'no boundary violations');
 select results_eq($$select command, purpose || '|' || payload_check || '|' || handler from app.sys_command_kinds
-                     where command in ('notifications.claim', 'notifications.attempt') order by 1$$,
+                     where command in ('notifications.claim', 'notifications.attempt', 'notifications.release') order by 1$$,
   $$values ('notifications.attempt'::text, 'notifications_worker|app.notifications_check_attempt(jsonb)|app.notifications_sys_attempt(uuid, uuid, jsonb)'::text),
-           ('notifications.claim', 'notifications_worker|app.notifications_check_deliver_due(jsonb)|app.notifications_sys_claim(uuid, uuid, jsonb)')$$,
-  'claim and attempt are commands of the notifications_worker purpose');
+           ('notifications.claim', 'notifications_worker|app.notifications_check_deliver_due(jsonb)|app.notifications_sys_claim(uuid, uuid, jsonb)'),
+           ('notifications.release', 'notifications_worker|app.notifications_check_attempt(jsonb)|app.notifications_sys_release(uuid, uuid, jsonb)')$$,
+  'claim, attempt and release are commands of the notifications_worker purpose');
 select is((select array_agg(column_name::text order by column_name::text) from information_schema.columns
             where table_schema = 'app' and table_name = 'notifications_attempts'),
   array['attempt_id', 'attempted_at', 'channel', 'error_sqlstate', 'finish_reason', 'job_id',
@@ -160,10 +165,22 @@ select throws_ok($$select app.notifications_configure_worker('{"lease": 60}', 'i
   '22023', 'invalid worker settings', 'an unknown key is refused');
 select throws_ok($$select app.notifications_configure_worker('{"lease_seconds": 2}', 'israel')$$,
   '23514', null, 'a value outside its bounds is refused');
-select throws_ok($$select app.notifications_configure_worker('{"worker_url": "https://evil.example/x"}', 'israel')$$,
-  '23514', null, 'a worker URL that is not the notifications-worker function is refused');
+select throws_ok($$select app.notifications_configure_worker('{"lease_seconds": 20}', 'israel')$$,
+  '23514', null, 'a lease shorter than 30 s (one call plus the margin) is refused');
+select throws_ok($$select app.notifications_configure_worker('{"worker_url": "https://evil.example/functions/v1/notifications-worker"}', 'israel')$$,
+  '22023', 'invalid worker settings', 'production: a worker URL that is not a supabase.co project function is refused');
+select throws_ok($$select app.notifications_configure_worker('{"worker_url": "http://abcdefghijklmnopqrst.supabase.co/functions/v1/notifications-worker"}', 'israel')$$,
+  '22023', 'invalid worker settings', 'production: plain http is refused');
 select is(app.notifications_configure_worker('{"max_attempts": 3}', 'israel') ->> 'max_attempts', '3',
   'a valid change is applied and attributed');
+select is((select string_agg(action || ':' || operator || ':' || coalesce(target_id::text, '-'), ',')
+             from app.ops_operator_actions where action = 'worker_policy_changed'),
+  'worker_policy_changed:israel:-', 'the policy change is recorded in the operator journal');
+select ok(not exists (select r.id from app.ops_retired_operator_actions_v2 r
+                      except select a.id from app.ops_operator_actions a)
+          and not has_table_privilege('authenticated', 'app.ops_retired_operator_actions_v2', 'SELECT')
+          and not has_table_privilege('service_role', 'app.ops_operator_actions', 'SELECT'),
+  'the retired journal rows were copied and neither journal is client-readable');
 
 -- Production (no marker): the scheduler stays off ------------------------------------------------
 select is(app.notifications_scheduler_tick(), '{"tick": "gate_closed"}'::jsonb,
@@ -239,8 +256,9 @@ select is(pg_temp.attempt('A', (select v from j where k = 'k'), pg_temp.tok((sel
 select is(pg_temp.st((select v from j where k = 'k')), 'pending|-', 'the fenced attempt changed nothing');
 select is(pg_temp.attempt('B', (select v from j where k = 'k'), pg_temp.tok((select v from cl where k = 'k2'), (select v from j where k = 'k'))) ->> 'outcome',
   'delivered', 'the reclaiming worker delivers');
-select is(pg_temp.outcomes((select v from j where k = 'k')), 'fenced,delivered',
-  'one logical outcome, both attempts recorded');
+select is(pg_temp.outcomes((select v from j where k = 'k')) || '|' || (select lapsed_attempts from app.notifications_jobs where job_id = (select v from j where k = 'k')),
+  'lapsed,fenced,delivered|1',
+  'one logical outcome; the lapsed lease is counted once, and every attempt is recorded');
 select is((select count(*)::int from app.notifications_inbox_items where job_id = (select v from j where k = 'k')), 1,
   'still one item');
 insert into j values ('lost', pg_temp.due(2));
@@ -359,6 +377,118 @@ select is(pg_temp.st((select v from j where k = 'poison')) || ';' || pg_temp.out
   'obsolete|attempts_exhausted;failed,failed,exhausted', 'it ends obsolete with every attempt recorded');
 select is((pg_temp.claim('A') ->> 'claimed')::int, 0, 'and is never claimed again');
 
+-- A worker that keeps crashing (or timing out) before it records an attempt ---------------------
+insert into j values ('crash', pg_temp.due(1));
+insert into cl values ('x1', pg_temp.claim('A'));
+select pg_temp.lapse((select v from j where k = 'crash'));
+insert into cl values ('x2', pg_temp.claim('A'));
+select pg_temp.lapse((select v from j where k = 'crash'));
+insert into cl values ('x3', pg_temp.claim('A'));
+select pg_temp.lapse((select v from j where k = 'crash'));
+insert into cl values ('x4', pg_temp.claim('A'));
+select is((select (v ->> 'reclaimed')::int || '|' || (v ->> 'claimed')::int from cl where k = 'x2'), '1|1',
+  'a lapsed lease without an attempt is counted and the job is leased again at once');
+select is(pg_temp.st((select v from j where k = 'crash')) || ';' || pg_temp.outcomes((select v from j where k = 'crash')),
+  'obsolete|attempts_exhausted;lapsed,lapsed,exhausted',
+  'lapses count toward the attempt limit: the job is given up instead of being reclaimed until it expires');
+select is((select (v ->> 'claimed')::int from cl where k = 'x4'), 0, 'the exhausted job is not leased again');
+
+-- A slow owner check cancelled by the statement timeout is a counted failure -------------------
+create function app.fixture_pgtap_slow_reminder(p_key jsonb) returns jsonb
+language plpgsql set search_path = '' as $$
+begin
+  if current_setting('pgtap.slow', true) = 'on' then
+    perform pg_catalog.pg_sleep(2);
+  end if;
+  return '{"current": true, "revision": 1, "actionable": true, "recipient_eligible": true}'::jsonb;
+end;
+$$;
+create function app.fixture_pgtap_slow_check(p_source jsonb) returns jsonb
+language sql set search_path = '' as $$ select '{"current": true, "revision": 1}'::jsonb $$;
+select app.contract_register_source_type('fixture', 'fixture_pgtap_slow', 'app.fixture_pgtap_slow_check(jsonb)'::regprocedure);
+select app.contract_register_reminder_kind('fixture', 'fixture_pgtap_slow', 'fixture_due');
+select app.contract_register_reminder_contract('fixture', 'fixture_pgtap_slow', 'fixture_due',
+  'app.fixture_pgtap_slow_reminder(jsonb)'::regprocedure,
+  '{"title": "SYNTHETIC slow reminder", "body": "A slow test reminder.", "link": "/fixture/slow"}');
+create function pg_temp.slow_job(p_due timestamptz) returns uuid language plpgsql as $$
+begin
+  return (app.notifications_enqueue(jsonb_build_object(
+    'source_type', 'fixture_pgtap_slow', 'source_id', gen_random_uuid(), 'source_revision', 1,
+    'recipient_member_id', (select member_id from m where n = 1), 'reminder_kind', 'fixture_due',
+    'scheduled_at', app.cmd_utc(p_due))) ->> 'job_id')::uuid;
+end;
+$$;
+insert into j values ('slow', pg_temp.slow_job(now() - interval '3 minutes'));
+insert into cl values ('w1', pg_temp.claim('A'));
+select set_config('pgtap.slow', 'on', true);
+set local statement_timeout = '500ms';
+select is(pg_temp.attempt('A', (select v from j where k = 'slow'), pg_temp.tok((select v from cl where k = 'w1'), (select v from j where k = 'slow'))),
+  '{"outcome": "failed"}'::jsonb, 'a recheck cancelled by the statement timeout is caught and counted as failed');
+set local statement_timeout = 0;
+select is((select job_state || '|' || failed_attempts || '|' || (select error_sqlstate from app.notifications_attempts a
+                                                                  where a.job_id = jj.job_id)
+             from app.notifications_jobs jj where jj.job_id = (select v from j where k = 'slow')),
+  'pending|1|57014', 'the job keeps pending with the failure (SQLSTATE 57014) recorded');
+insert into j values ('slow2', pg_temp.slow_job(now() - interval '10 minutes'));
+insert into j values ('after_slow', pg_temp.due(1));
+set local statement_timeout = '500ms';
+select is((pg_temp.sys('A', 'notifications.deliver_due') -> 'data') - 'actor'::text,
+  '{"claimed": 2, "delivered": 0, "obsolete": 0, "ineligible": 0, "failed": 1}'::jsonb,
+  'deliver_due counts the cancelled recheck and stops the batch');
+set local statement_timeout = 0;
+select is((select job_state || '|' || coalesce(lease_token::text, 'none') || '|' || failed_attempts
+             from app.notifications_jobs where job_id = (select v from j where k = 'after_slow')),
+  'pending|none|0', 'the rest of the batch is released unused (no attempt counted)');
+select set_config('pgtap.slow', 'off', true);
+select is((pg_temp.sys('A', 'notifications.deliver_due') -> 'data' ->> 'delivered')::int, 1,
+  'the next run delivers the released job');
+
+-- Release ----------------------------------------------------------------------------------------
+insert into j values ('rel', pg_temp.due(1));
+insert into cl values ('r1', pg_temp.claim('A'));
+select is(pg_temp.sys('B', 'notifications.release', jsonb_build_object('job_id', (select v from j where k = 'rel'),
+            'lease_token', pg_temp.tok((select v from cl where k = 'r1'), (select v from j where k = 'rel')))) -> 'data' ->> 'released',
+  'false', 'only the holder can release a lease');
+select is(pg_temp.sys('A', 'notifications.release', jsonb_build_object('job_id', (select v from j where k = 'rel'),
+            'lease_token', pg_temp.tok((select v from cl where k = 'r1'), (select v from j where k = 'rel')))) -> 'data' ->> 'released',
+  'true', 'the holder releases an unused lease');
+select is((pg_temp.claim('B') -> 'reclaimed')::int || '|' || coalesce(pg_temp.outcomes((select v from j where k = 'rel')), ''),
+  '0|', 'a released lease is not counted as a lapse and is leased again');
+
+-- Claimed, then the source re-plans or the member snoozes again -----------------------------------
+insert into j values ('plan_src', pg_temp.due(1, now() + interval '10 days'));
+create temp table sch (k text primary key, v jsonb);
+insert into sch values ('rev1', app.notifications_set_schedule(jsonb_build_object(
+  'source_type', 'fixture_reminder', 'source_id', pg_temp.source_of((select v from j where k = 'plan_src')),
+  'source_revision', 1, 'recipient_member_id', (select member_id from m where n = 1), 'schedule_type', 'task',
+  'intent', jsonb_build_object('due_at', app.cmd_utc(now() + interval '2 hours'), 'task_state', 'open'),
+  'kinds', '{"deadline": "fixture_due"}'::jsonb)));
+insert into j select 'planned', jj.job_id from app.notifications_jobs jj
+ where jj.source_id = pg_temp.source_of((select v from j where k = 'plan_src')) and jj.schedule_id is not null;
+update app.notifications_jobs set scheduled_at = now() - interval '1 minute' where job_id = (select v from j where k = 'planned');
+insert into cl values ('p1', pg_temp.claim('A'));
+update app.fixture_reminder_sources set revision = 2 where source_id = pg_temp.source_of((select v from j where k = 'plan_src'));
+insert into sch values ('rev2', app.notifications_set_schedule(jsonb_build_object(
+  'source_type', 'fixture_reminder', 'source_id', pg_temp.source_of((select v from j where k = 'plan_src')),
+  'source_revision', 2, 'recipient_member_id', (select member_id from m where n = 1), 'schedule_type', 'task',
+  'intent', jsonb_build_object('due_at', app.cmd_utc(now() + interval '3 hours'), 'task_state', 'open'),
+  'kinds', '{"deadline": "fixture_due"}'::jsonb)));
+select is(pg_temp.attempt('A', (select v from j where k = 'planned'), pg_temp.tok((select v from cl where k = 'p1'), (select v from j where k = 'planned'))) ->> 'outcome',
+  'cancelled', 'a leased job the source re-planned away (new revision) is never dispatched');
+select is((select count(*)::int from app.notifications_inbox_items where job_id = (select v from j where k = 'planned')), 0,
+  'and became no item');
+create temp table snz (k text primary key, v uuid);
+insert into snz select 'item', i.item_id from app.notifications_inbox_items i where i.job_id = (select v from j where k = 'flaky');
+select app.notifications_snooze_item((select member_id from m where n = 1), (select v from snz where k = 'item'), '1 hour');
+insert into j select 'snoozed', jj.job_id from app.notifications_jobs jj
+ where jj.snoozed_from_item_id = (select v from snz where k = 'item') and jj.job_state = 'pending';
+update app.notifications_jobs set scheduled_at = now() - interval '1 second' where job_id = (select v from j where k = 'snoozed');
+insert into cl values ('z1', pg_temp.claim('A'));
+select app.notifications_snooze_item((select member_id from m where n = 1), (select v from snz where k = 'item'), '24 hours');
+select is(pg_temp.attempt('A', (select v from j where k = 'snoozed'), pg_temp.tok((select v from cl where k = 'z1'), (select v from j where k = 'snoozed'))),
+  '{"outcome": "cancelled", "finish_reason": "snooze_replaced"}'::jsonb,
+  'a leased snooze the member replaced with a new snooze is never dispatched');
+
 -- deliver_due uses the same rules ----------------------------------------------------------------
 insert into j values ('dd', pg_temp.due(1));
 select is((pg_temp.sys('A', 'notifications.deliver_due') -> 'data') - 'actor'::text,
@@ -375,29 +505,48 @@ select is(app.notifications_scheduler_tick(), '{"tick": "not_configured"}'::json
 select app.notifications_configure_worker(
   '{"worker_url": "http://supabase_kong_church-app:8000/functions/v1/notifications-worker"}', 'israel');
 select is(app.notifications_scheduler_tick(), '{"tick": "not_configured"}'::jsonb,
-  'without the Vault credential the tick does nothing');
-select vault.create_secret(pg_temp.token('A'), 'notifications_worker_credential', 'pgtap 3.4');
+  'without the Vault trigger the tick does nothing');
+-- A system credential stored in Vault by mistake is never read by the tick.
+select vault.create_secret(pg_temp.token('A'), 'notifications_worker_credential', 'pgtap 3.4 decoy');
+select is(app.notifications_scheduler_tick(), '{"tick": "not_configured"}'::jsonb,
+  'a system credential in Vault is not a trigger');
+select is(app.notifications_scheduler_new_trigger('israel') - 'rotated_at', '{"trigger_set": true}'::jsonb,
+  'the operator generates the trigger into Vault; its value is not returned');
+create temp table trg as select decrypted_secret as v from vault.decrypted_secrets where name = 'notifications_worker_trigger';
+select app.notifications_scheduler_new_trigger('israel');
+select ok((select count(*) from vault.decrypted_secrets where name = 'notifications_worker_trigger') = 1
+          and (select decrypted_secret from vault.decrypted_secrets where name = 'notifications_worker_trigger') ~ '^nwt_[0-9a-f]{64}$'
+          and (select decrypted_secret from vault.decrypted_secrets where name = 'notifications_worker_trigger') <> (select v from trg),
+  'rotating replaces the one trigger with a new random value');
 select is(app.notifications_scheduler_tick(), '{"tick": "sent"}'::jsonb,
-  'with the URL and the Vault credential the tick posts to the Edge worker');
+  'with the URL and the trigger the tick posts to the Edge worker');
 select ok(exists (select 1 from net.http_request_queue q
                    where q.url = 'http://supabase_kong_church-app:8000/functions/v1/notifications-worker'
-                     and q.body = convert_to('{"action": "run"}', 'UTF8')),
-  'the post goes to the configured worker (pg_net queue, sent after commit)');
+                     and q.body = convert_to('{"action": "run"}', 'UTF8')
+                     and q.headers ->> 'x-worker-trigger' = (select decrypted_secret from vault.decrypted_secrets
+                                                              where name = 'notifications_worker_trigger')),
+  'the post goes to the configured worker with the trigger (pg_net queue, sent after commit)');
+select ok(not exists (select 1 from net.http_request_queue q
+                       where q.headers::text like '%sysc_%' or q.url like '%sysc_%'
+                          or convert_from(coalesce(q.body, ''::bytea), 'UTF8') like '%sysc_%'),
+  'the pg_net queue never holds a system credential');
 select throws_ok($$select app.notifications_scheduler_enable('mallory')$$, '42501', null,
   'only a restricted operator creates the scheduler');
 select throws_ok($$select app.notifications_scheduler_enable('israel', '5 minutes')$$, '22023', null,
   'the schedule must be one minute or a number of seconds');
+select throws_ok($$select app.notifications_scheduler_enable('israel', '10 seconds')$$, '22023', null,
+  'the schedule is at most every 15 seconds');
 select is((app.notifications_scheduler_enable('israel', '30 seconds') -> 'scheduler_jobs')::int, 1,
   'the scheduler is one named Cron job');
 select is(app.notifications_scheduler_enable('israel') - array['cron_runs_24h', 'last_tick_at', 'last_claim_at',
             'claims_24h', 'due_pending', 'leased', 'attempts_24h', 'settings'],
   '{"environment": "local", "allowed": true, "scheduler_jobs": 1, "schedule": "* * * * *", "active": true,
-    "worker_url_set": true, "last_tick_outcome": "sent"}'::jsonb,
+    "worker_url_set": true, "worker_url_valid": true, "trigger_set": true, "last_tick_outcome": "sent"}'::jsonb,
   'enabling again replaces it (still one job, now every minute)');
-select ok(not exists (select 1 from cron.job where command like '%sysc_%')
+select ok(not exists (select 1 from cron.job where command like '%sysc_%' or command like '%nwt_%')
           and not exists (select 1 from cron.job where jobname = 'notifications-worker'
                                                    and command <> 'select app.notifications_scheduler_tick()'),
-  'the Cron command holds no credential');
+  'the Cron command holds no credential and no trigger');
 select cron.schedule('pgtap-second-scheduler', '* * * * *', 'select app.notifications_scheduler_tick()');
 select throws_ok($$select app.notifications_scheduler_enable('israel')$$, '55000', null,
   'a second Cron job running the tick blocks the enable (one scheduler per environment)');
@@ -406,10 +555,25 @@ select is((app.notifications_scheduler_disable('israel') -> 'scheduler_jobs')::i
   'disable removes the job');
 select is((app.notifications_scheduler_disable('israel') -> 'scheduler_jobs')::int, 0,
   'disabling again is harmless');
-select ok((select (s -> 'attempts_24h' ->> 'delivered')::int >= 5 and (s ->> 'leased')::int >= 0
-                  and s::text not like '%sysc_%' and s::text not like '%' || (select member_id::text from m where n = 1) || '%'
+select is((select string_agg(action, ',' order by id) from app.ops_operator_actions
+            where action in ('scheduler_enabled', 'scheduler_disabled', 'scheduler_trigger_rotated')),
+  'scheduler_trigger_rotated,scheduler_trigger_rotated,scheduler_enabled,scheduler_enabled,scheduler_disabled',
+  'trigger rotations, enables and the one effective disable are recorded in the operator journal');
+select ok((select (s -> 'attempts_24h' ->> 'delivered')::int >= 5 and (s ->> 'leased')::int = 1
+                  and (s -> 'attempts_24h' ->> 'lapsed')::int = 4
+                  and s::text not like '%sysc_%' and s::text not like '%nwt_%'
+                  and s::text not like '%' || (select member_id::text from m where n = 1) || '%'
              from app.notifications_scheduler_status() s),
-  'the status is counts and times only');
+  'the status is counts and times only (one live lease, four lapses)');
+
+-- Staging pins the worker URL to its own project ---------------------------------------------------
+select app.platform_set_environment('staging', 'pgtap 3.4');
+select throws_ok($$select app.notifications_configure_worker('{"worker_url": "https://abcdefghijklmnopqrst.supabase.co/functions/v1/notifications-worker"}', 'israel')$$,
+  '22023', 'invalid worker settings', 'staging: another project''s function is refused');
+select is(app.notifications_scheduler_tick(), '{"tick": "not_configured"}'::jsonb,
+  'staging: the local URL left in the settings is not used');
+select is(app.notifications_configure_worker('{"worker_url": "https://tmurpotfluignacfueki.supabase.co/functions/v1/notifications-worker"}', 'israel') ->> 'worker_url',
+  'https://tmurpotfluignacfueki.supabase.co/functions/v1/notifications-worker', 'staging: its own project''s function is accepted');
 
 select * from finish();
 rollback;

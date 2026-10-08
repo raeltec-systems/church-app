@@ -4,10 +4,14 @@
 
 export const MAX_BODY_BYTES = 256;
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-/** A 1.9 system credential of the purpose notifications_worker. Never stored or logged here. */
+/** The worker's 1.9 system credential (Edge secret). Never logged or returned. */
 export const CREDENTIAL_RE = /^sysc_(local|staging|production)_[A-Za-z0-9_-]{43}$/;
+/** The scheduler's trigger token (Vault + Edge secret): it can only start one run. */
+export const TRIGGER_RE = /^nwt_[0-9a-f]{64}$/;
 /** Wall-clock budget of one run; the lease (from the claim) bounds it further. */
 export const RUN_BUDGET_MS = 50_000;
+/** Stop this long before the lease ends: one 10 s call plus a margin. */
+export const LEASE_MARGIN_MS = 15_000;
 /** Attempt outcomes the database may answer; anything else counts as `unexpected`. */
 export const OUTCOMES = ['delivered', 'cancelled', 'finished', 'fenced', 'expired', 'obsolete',
   'ineligible', 'failed', 'exhausted', 'not_found'];
@@ -27,9 +31,28 @@ export function parseBody(body) {
   return { ok: true, value: { action: 'run', ...(body.limit === undefined ? {} : { limit: body.limit }) } };
 }
 
-/** The caller's system credential header, or null when missing or malformed. */
-export function credentialFrom(header) {
-  return typeof header === 'string' && CREDENTIAL_RE.test(header) ? header : null;
+/** The function's own configuration: both secrets well-formed, else null (fail closed). */
+export function configFrom(env) {
+  const credential = env?.credential;
+  const trigger = env?.trigger;
+  if (typeof credential !== 'string' || !CREDENTIAL_RE.test(credential)) return null;
+  if (typeof trigger !== 'string' || !TRIGGER_RE.test(trigger)) return null;
+  return { credential, trigger };
+}
+
+/** Constant-time string equality (same length required; the loop never exits early). */
+export function constantTimeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const len = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < len; i++) diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  return diff === 0;
+}
+
+/** True only when the caller's `x-worker-trigger` header is the configured trigger. */
+export function triggerMatches(header, expected) {
+  if (typeof header !== 'string' || !TRIGGER_RE.test(header)) return false;
+  return constantTimeEqual(header, expected);
 }
 
 /** A Content-Length header that already announces more than MAX_BODY_BYTES (or is malformed). */
@@ -71,9 +94,9 @@ export function parseClaim(data) {
     lease_seconds: data.lease_seconds };
 }
 
-/** The deadline of a run: the budget, but never past the lease minus a safety margin. */
+/** The deadline of a run: the budget, but never later than the lease minus the margin. */
 export function runDeadline(startMs, leaseSeconds, budgetMs = RUN_BUDGET_MS) {
-  const leaseMs = Math.max(0, leaseSeconds * 1000 - 5_000);
+  const leaseMs = Math.max(0, leaseSeconds * 1000 - LEASE_MARGIN_MS);
   return startMs + Math.min(budgetMs, leaseMs);
 }
 
@@ -81,9 +104,10 @@ export function runDeadline(startMs, leaseSeconds, budgetMs = RUN_BUDGET_MS) {
  * One worker run: claim a batch, then attempt each leased job with its fencing token until the
  * deadline. `system(command, payload)` performs one system-route call and resolves to its `data`
  * or throws (a refusal or an unreachable route). A failed or uncertain attempt call is counted
- * `uncertain`: its lease lapses and a later run reclaims the job (the database fences the late
- * answer), so the logical outcome stays single. Jobs left when the deadline passes are counted
- * `deferred`. Returns counts only (no ids).
+ * `uncertain`: if it did not commit, its lease lapses and the next claim counts the lapse and
+ * reclaims the job (the database fences any late answer), so the logical outcome stays single.
+ * Jobs left when the deadline passes are released unused (`deferred`; no attempt counted).
+ * Returns counts only (no ids).
  */
 export async function runOnce({ system, limit, now = () => Date.now(), budgetMs = RUN_BUDGET_MS }) {
   const start = now();
@@ -94,7 +118,15 @@ export async function runOnce({ system, limit, now = () => Date.now(), budgetMs 
   let uncertain = 0;
   let deferred = 0;
   for (const job of claim.jobs) {
-    if (now() >= deadline) { deferred += 1; continue; }
+    if (now() >= deadline) {
+      deferred += 1;
+      try {
+        await system('notifications.release', { job_id: job.job_id, lease_token: job.lease_token });
+      } catch {
+        // The lease lapses instead; the next claim counts it.
+      }
+      continue;
+    }
     try {
       const data = await system('notifications.attempt', { job_id: job.job_id, lease_token: job.lease_token });
       const outcome = OUTCOMES.includes(data?.outcome) ? data.outcome : 'unexpected';

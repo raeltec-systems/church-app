@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { IN_NETWORK_URL, disjoint, isFictionalWorkerPhone, newCredential, tokenOf } from './worker.mjs';
+import { IN_NETWORK_URL, disjoint, isFictionalWorkerPhone, newCredential, newTrigger, tokenOf } from './worker.mjs';
+
+test('a wrong trigger is well-formed and random', () => {
+  assert.match(newTrigger(), /^nwt_[0-9a-f]{64}$/);
+  assert.notEqual(newTrigger(), newTrigger());
+});
 
 test('only the reserved fictional numbers of this run are accepted', () => {
   for (const p of ['+447700900870', '+447700900879']) assert.equal(isFictionalWorkerPhone(p), true);

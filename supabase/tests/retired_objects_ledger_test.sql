@@ -36,7 +36,11 @@ select set_eq(
     ('S', 'app.identity_retired_access_audit_v0_event_id_seq'),
     ('r', 'app.ops_retired_operator_actions_v1'),
     ('i', 'app.ops_retired_operator_actions_v1_pkey'),
-    ('S', 'app.ops_retired_operator_actions_v1_id_seq')$$,
+    ('S', 'app.ops_retired_operator_actions_v1_id_seq'),
+    -- story 3.4: operator journal before the scheduler actions
+    ('r', 'app.ops_retired_operator_actions_v2'),
+    ('i', 'app.ops_retired_operator_actions_v2_pkey'),
+    ('S', 'app.ops_retired_operator_actions_v2_id_seq')$$,
   'the retired objects are exactly the ledger in contracts-and-owner-seams.md'
 );
 

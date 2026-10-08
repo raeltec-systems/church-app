@@ -8,11 +8,12 @@
 //   * a job cancelled after the claim, a source revised after enqueue, a revoked recipient grant,
 //     an expired job (at the claim and at the attempt) and a transient failure each end in one
 //     logical outcome with every attempt recorded;
-//   * the Edge Function refuses a missing, malformed or other-purpose credential and runs a batch
-//     with the worker's credential;
-//   * pg_cron runs the worker with no client involved: the tick reads the credential from Vault
-//     and posts to the Edge Function with pg_net; the inbox item appears; the scheduler is one
-//     named job and is removed afterwards.
+//   * the Edge Function holds the worker credential as its own secret (env file here) and starts
+//     a run only for the scheduler trigger: no, malformed or wrong trigger, or a credential in
+//     its place, is 401 and starts nothing; a revoked worker credential is 403;
+//   * pg_cron runs the worker with no client involved: the tick reads the trigger from Vault and
+//     posts to the Edge Function with pg_net; the inbox item appears; the scheduler is one named
+//     job and is removed afterwards; no system credential is ever in the database.
 //
 // Needs the local phone switch (`node tools/auth-harness/local-phone-auth.mjs on`, then `off`),
 // the edge-runtime image and a reset database. LOCAL only (exact origin), SYNTHETIC fictional
@@ -25,6 +26,9 @@
 // Usage: node tools/identity-e2e/worker.mjs [--evidence <file.jsonl>]
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { amrMethods, localHttp, localKey, password, psql, runMain, sleep, startRun } from './harness.mjs';
 
@@ -55,6 +59,9 @@ export function disjoint(a, b) {
 /** A system credential of the local environment (only its digest is registered). */
 export const newCredential = () => `sysc_local_${randomBytes(32).toString('base64url')}`;
 
+/** A well-formed scheduler trigger that is not the configured one. */
+export const newTrigger = () => `nwt_${randomBytes(32).toString('hex')}`;
+
 async function main() {
   const { log, check, finish } = startRun();
   const keys = localKey();
@@ -76,9 +83,9 @@ async function main() {
     const json = await res.json().catch(() => null);
     return json?.data ?? { code: json?.code ?? `http_${res.status}` };
   };
-  const edge = async (credential, body = { action: 'run' }) => {
+  const edge = async (trigger, body = { action: 'run' }) => {
     const headers = { 'Content-Type': 'application/json' };
-    if (credential !== undefined) headers['x-system-credential'] = credential;
+    if (trigger !== undefined) headers['x-worker-trigger'] = trigger;
     const res = await fetch(`${origin}${FN}`, { method: 'POST', headers, body: JSON.stringify(body) });
     const text = await res.text();
     edgeOut.push(text);
@@ -122,7 +129,7 @@ async function main() {
   };
   const resetScheduler = () => psql(`
     select app.notifications_scheduler_disable('${OPERATOR}');
-    delete from vault.secrets where name = 'notifications_worker_credential';
+    delete from vault.secrets where name in ('notifications_worker_trigger', 'notifications_worker_credential');
     select app.notifications_configure_worker('${JSON.stringify(DEFAULT_POLICY)}', '${OPERATOR}');`);
 
   const settings = await http('GET', '/auth/v1/settings');
@@ -142,6 +149,7 @@ async function main() {
   const run = randomUUID().slice(0, 8);
   const principals = [];
   const credentials = [];
+  const revokedCredentials = new Set();
   const mint = (name, purpose) => {
     const credential = newCredential();
     const principal = psql(`select app.sys_create_principal('${name}-${run}', '${purpose}', '${OPERATOR}')`);
@@ -155,8 +163,15 @@ async function main() {
   const w2 = mint('notifications-worker-e2e-b', 'notifications_worker');
   const probe = mint('worker-e2e-probe', 'synthetic_probe');
 
+  // The scheduler trigger is generated into Vault by the operator function; like the owner, the
+  // run copies it (and the worker credential) into the function's secrets, here a 0600 env file.
+  psql(`select app.notifications_scheduler_new_trigger('${OPERATOR}')`);
+  const trigger = psql(`select decrypted_secret from vault.decrypted_secrets where name = 'notifications_worker_trigger'`);
+  const work = mkdtempSync(join(tmpdir(), 'worker-e2e-'));
+  const envFile = join(work, 'functions.env');
+  writeFileSync(envFile, `NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL=${w1}\nNOTIFICATIONS_WORKER_TRIGGER=${trigger}\n`, { mode: 0o600 });
   let serveLog = '';
-  const serve = spawn('npx', ['supabase', 'functions', 'serve'], { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+  const serve = spawn('npx', ['supabase', 'functions', 'serve', '--env-file', envFile], { stdio: ['ignore', 'pipe', 'pipe'], detached: true });
   serve.stdout.on('data', (d) => { serveLog += d; });
   serve.stderr.on('data', (d) => { serveLog += d; });
 
@@ -190,13 +205,17 @@ async function main() {
     };
 
     // ------------------------------------------------------------------ Edge authentication
-    const noCred = await edge(undefined);
-    const badCred = await edge('sysc_local_short');
-    const otherPurpose = await edge(probe);
-    const unknownCred = await edge(newCredential());
-    check('W02-edge-refuses-without-the-worker-credential', noCred.status === 401 && badCred.status === 401
-      && otherPurpose.status === 403 && unknownCred.status === 403,
-      { none: noCred.status, malformed: badCred.status, other_purpose: otherPurpose.status, unknown: unknownCred.status });
+    const runsBefore = Number(psql(`select count(*) from app.notifications_worker_runs`));
+    const noTrigger = await edge(undefined);
+    const malformed = await edge('nwt_short');
+    const wrong = await edge(newTrigger());
+    const credentialAsTrigger = await edge(w1);
+    const probeAsTrigger = await edge(probe);
+    const runsAfter = Number(psql(`select count(*) from app.notifications_worker_runs`));
+    check('W02-edge-runs-only-for-the-trigger', [noTrigger, malformed, wrong, credentialAsTrigger, probeAsTrigger]
+      .every((r) => r.status === 401) && runsAfter === runsBefore,
+      { none: noTrigger.status, malformed: malformed.status, wrong: wrong.status, credential: credentialAsTrigger.status,
+        other_credential: probeAsTrigger.status, claims_started: runsAfter - runsBefore });
 
     // ------------------------------------------------------------------ two workers, one batch
     const batch = [];
@@ -212,17 +231,16 @@ async function main() {
       { claimed: [c1.claimed, c2.claimed], disjoint: disjoint(c1, c2), outcomes: raced, items: racedItems });
 
     // ------------------------------------------------------------------ killed mid-lease
-    psql(`select app.notifications_configure_worker('{"lease_seconds": 5}', '${OPERATOR}')`);
+    // The lease is at least 30 s; the run lets it lapse by moving its end into the past.
     const k = await due();
     const k1 = await sys(w1, 'notifications.claim', {});
-    await sleep(6000);
+    psql(`update app.notifications_jobs set lease_expires_at = now() - interval '1 second' where job_id = '${k.job}'`);
     const k2 = await sys(w2, 'notifications.claim', {});
     const late = await sys(w1, 'notifications.attempt', { job_id: k.job, lease_token: tokenOf(k1, k.job) });
     const won = await sys(w2, 'notifications.attempt', { job_id: k.job, lease_token: tokenOf(k2, k.job) });
-    psql(`select app.notifications_configure_worker('{"lease_seconds": 120}', '${OPERATOR}')`);
     check('W20-killed-worker-reclaimed-and-fenced', k2.reclaimed === 1 && tokenOf(k2, k.job) > tokenOf(k1, k.job)
       && late.outcome === 'fenced' && won.outcome === 'delivered' && items(k.job) === 1
-      && outcomes(k.job) === 'fenced,delivered',
+      && outcomes(k.job) === 'lapsed,fenced,delivered',
       { reclaimed: k2.reclaimed, higher_token: tokenOf(k2, k.job) > tokenOf(k1, k.job), late: late.outcome, winner: won.outcome,
         attempts: outcomes(k.job), items: items(k.job) });
     const stale = await sys(w2, 'notifications.attempt', { job_id: k.job, lease_token: tokenOf(k1, k.job) });
@@ -276,18 +294,17 @@ async function main() {
     // ------------------------------------------------------------------ the Edge worker runs a batch
     const e1 = await due();
     const e2 = await due();
-    const ran = await edge(w1);
+    const ran = await edge(trigger);
     check('W50-edge-worker-runs-a-batch', ran.status === 200 && ran.json?.claimed === 2 && ran.json?.outcomes?.delivered === 2
       && items(e1.job) === 1 && items(e2.job) === 1 && ran.json?.uncertain === 0,
       { status: ran.status, counts: ran.json });
 
     // ------------------------------------------------------------------ pg_cron runs it, app closed
-    psql(`select app.notifications_configure_worker('{"worker_url": "${IN_NETWORK_URL}"}', '${OPERATOR}');
-          select vault.create_secret('${w1}', 'notifications_worker_credential', 'local worker e2e');`);
-    const enabled = JSON.parse(psql(`select app.notifications_scheduler_enable('${OPERATOR}', '5 seconds')`));
+    psql(`select app.notifications_configure_worker('{"worker_url": "${IN_NETWORK_URL}"}', '${OPERATOR}')`);
+    const enabled = JSON.parse(psql(`select app.notifications_scheduler_enable('${OPERATOR}', '15 seconds')`));
     const cronJob = await due(-1_000);
     let cronItems = 0;
-    const cronDeadline = Date.now() + 60_000;
+    const cronDeadline = Date.now() + 75_000;
     while (Date.now() < cronDeadline && cronItems === 0) {
       await sleep(2000);
       cronItems = items(cronJob.job);
@@ -301,9 +318,20 @@ async function main() {
         last_tick_outcome: status.last_tick_outcome, cron_runs: status.cron_runs_24h, command_has_secret: command.includes('sysc_') });
     const disabled = JSON.parse(psql(`select app.notifications_scheduler_disable('${OPERATOR}')`));
     check('W61-scheduler-removed', disabled.scheduler_jobs === 0, { scheduler_jobs: disabled.scheduler_jobs });
+    const credentialInDb = Number(psql(`select (select count(*) from net.http_request_queue q where q.headers::text like '%sysc_%')
+      + (select count(*) from vault.decrypted_secrets s where s.decrypted_secret like 'sysc_%')
+      + (select count(*) from cron.job j where j.command like '%sysc_%' or j.command like '%nwt_%')`));
+    check('W62-credential-never-in-the-database', credentialInDb === 0, { places_holding_a_credential: credentialInDb });
+
+    // ------------------------------------------------------------------ a revoked credential is refused
+    psql(`select app.sys_revoke_credential('${credentials[0]}', '${OPERATOR}')`);
+    revokedCredentials.add(credentials[0]);
+    const refused = await edge(trigger);
+    check('W63-revoked-worker-credential-refused', refused.status === 403 && refused.json?.outcome === 'refused',
+      { status: refused.status, outcome: refused.json?.outcome });
 
     // ------------------------------------------------------------------ content-free outputs
-    const secrets = [w1, w2, probe, a.member, a.user, a.phone.slice(1), batch[0].job, batch[0].source];
+    const secrets = [w1, w2, probe, trigger, a.member, a.user, a.phone.slice(1), batch[0].job, batch[0].source];
     const out = edgeOut.join('\n');
     const leakedOut = secrets.filter((v) => out.includes(v)).length;
     const leakedLog = secrets.filter((v) => serveLog.includes(v)).length;
@@ -317,9 +345,10 @@ async function main() {
     await sleep(3000);
     try { process.kill(-serve.pid, 'SIGKILL'); } catch { /* already gone */ }
     try { execFileSync('docker', ['rm', '-f', 'supabase_edge_runtime_church-app'], { stdio: 'ignore' }); } catch { /* not running */ }
+    rmSync(work, { recursive: true, force: true });
     resetScheduler();
     const left = cleanup();
-    for (const id of credentials) psql(`select app.sys_revoke_credential('${id}', '${OPERATOR}')`);
+    for (const id of credentials) if (!revokedCredentials.has(id)) psql(`select app.sys_revoke_credential('${id}', '${OPERATOR}')`);
     for (const p of principals) {
       psql(`select app.sys_disable_principal('${p}', '${OPERATOR}');
             delete from app.notifications_worker_runs where principal_id = '${p}';`);
@@ -332,7 +361,9 @@ async function main() {
       unmarked: marked, jobs_left: Number(psql(`select count(*) from app.notifications_jobs`)),
       attempts_left: Number(psql(`select count(*) from app.notifications_attempts`)),
       cron_jobs_left: Number(psql(`select count(*) from cron.job`)),
-      vault_secret_left: Number(psql(`select count(*) from vault.secrets where name = 'notifications_worker_credential'`)) });
+      vault_secrets_left: Number(psql(`select count(*) from vault.secrets
+        where name in ('notifications_worker_trigger', 'notifications_worker_credential')`)),
+      env_file_removed: true });
   }
   finish();
 }

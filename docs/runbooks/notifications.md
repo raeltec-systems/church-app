@@ -59,7 +59,7 @@ Each run mints its own local `notifications_worker` credential and registers onl
 2. **Owner (restricted operator): the worker's credential.** The agent never sees it.
    1. Run `OPS_STATE_DIR=.ops-state/notifications-worker node tools/ops/system-credential.mjs mint --env staging`. It prints the digest only. The token stays in that gitignored folder, mode 0600.
    2. In the staging SQL editor (or the connector), run `select app.sys_register_credential(app.sys_create_principal('notifications-worker', 'notifications_worker', 'israel'), '<digest>', 'notifications worker staging', interval '30 days', 'israel');`.
-   3. Keep the token only in the worker's environment, for example `NOTIFICATIONS_WORKER_CREDENTIAL_FILE=.ops-state/notifications-worker/staging.credential`. There is no Edge Function and no Edge secret in this story. Story 3.4 moves the credential into Supabase Vault for the Cron worker (see Story 3.4, Hosted staging). Rotate it before 30 days as described in `system-access-and-operations.md`.
+   3. Keep the token only in the worker's environment, for example `NOTIFICATIONS_WORKER_CREDENTIAL_FILE=.ops-state/notifications-worker/staging.credential`. There is no Edge Function and no Edge secret in this story. Story 3.4 makes the credential an Edge Function secret of the Cron worker; it never enters the database (see Story 3.4, Hosted staging). Rotate it before 30 days as described in `system-access-and-operations.md`.
 3. **Demonstration** (owner, synthetic members only). Use two seeded SYNTHETIC members A and B (`identity-access.md`, "Seeding a synthetic approved member") and clients built against staging (`--dart-define=SUPABASE_URL=https://tmurpotfluignacfueki.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=<staging publishable key>`).
    1. As A, run the synthetic source command once with A's access token (any HTTP client, or `tools/identity-e2e/inbox.mjs` adapted to the staging origin):
       `POST /rest/v1/rpc/fixture_reminder_command`, header `Content-Profile: api`, body `{"version":1,"command":"fixture.reminder_create","request_id":"<new uuid>","expected_revision":null,"payload":{"due_at":"<now, UTC RFC3339>"}}`.
@@ -206,28 +206,33 @@ Nothing is scheduled in production until Israel approves `q2_church_time`:
 
 ## Story 3.4: the leased and fenced worker, Cron and the Edge Function
 
-Migration: `supabase/migrations/20261008121500_notifications_worker.sql` (one file; no row deletions, no destructive statements). Edge Function: `supabase/functions/notifications-worker/` (`index.ts`, `logic.mjs`; `verify_jwt = false` in `supabase/config.toml`). Tests: `supabase/tests/notifications_worker_test.sql` (83), `supabase/functions/notifications-worker/logic.test.mjs`, E2E `tools/identity-e2e/worker.mjs` (15 checks, including a real pg_cron run). Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.4/`.
+Migration: `supabase/migrations/20261008121500_notifications_worker.sql` (one file; no row deletions, no destructive statements). Edge Function: `supabase/functions/notifications-worker/` (`index.ts`, `logic.mjs`; `verify_jwt = false` in `supabase/config.toml`). Tests: `supabase/tests/notifications_worker_test.sql` (110), `supabase/functions/notifications-worker/logic.test.mjs`, E2E `tools/identity-e2e/worker.mjs` (17 checks, including a real pg_cron run). Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.4/`.
 
 ### How a job is worked
 
 ```
 pg_cron (job "notifications-worker")
-  -> app.notifications_scheduler_tick()        reads Vault secret notifications_worker_credential
-  -> pg_net POST <worker_url> {"action":"run"}  header x-system-credential (never stored elsewhere)
-  -> Edge Function notifications-worker         forwards the credential; holds none of its own
-  -> system route notifications.claim           one batch, leases + fencing tokens
+  -> app.notifications_scheduler_tick()        reads the Vault TRIGGER notifications_worker_trigger
+  -> pg_net POST <worker_url> {"action":"run"}  header x-worker-trigger (starts one run, nothing else)
+  -> Edge Function notifications-worker         compares the trigger in constant time; holds the
+                                                worker's system credential as its own Edge secret
+  -> system route notifications.claim           count lapses, expire, lease one batch (fencing tokens)
   -> system route notifications.attempt x n     recheck, then one inbox item / retry / end
+  -> system route notifications.release         give back leases left at the run's deadline
 ```
 
+**Where the secrets live.** The worker's system credential (purpose `notifications_worker`) is only the Edge Function secret `NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL`, set by the owner; it never enters the database, pg_net, Cron or Vault. pg_net carries only the trigger, a random `nwt_<64 hex>` token. The trigger lives in Vault (`notifications_worker_trigger`) and in the Edge secret `NOTIFICATIONS_WORKER_TRIGGER`. While a request waits in `net.http_request_queue` its headers may be readable by other database roles; whoever reads the trigger can only start a run, and a run is idempotent (leases, fencing, one item per job), so an extra run is harmless. A missing or wrong trigger is 401 and starts nothing.
+
 - **Claim** (`notifications.claim {limit?: 1..100}`, at most `batch_max`):
-  - first it ends every pending job past its expiry that is not under a live lease (`obsolete`, `finish_reason` `expired`);
-  - then it leases due jobs, fewest failures first, then oldest. It skips rows another worker holds (`for update skip locked`), jobs under a live lease and jobs still backing off;
-  - each lease gets a new fencing token from one monotonic sequence and lasts `lease_seconds`. A lapsed lease (a worker that died) is reclaimed with a higher token (`reclaimed`);
-  - answer: `{jobs: [{job_id, lease_token}], claimed, reclaimed, expired, lease_seconds}`. Every claim writes one content-free row to `app.notifications_worker_runs`.
+  1. Every lapsed lease whose holder recorded no attempt (the worker crashed, timed out, or lost the answer of an attempt that rolled back) is counted once as a `lapsed` attempt and freed. Lapses count toward `max_attempts` together with failures; at the limit the job ends `obsolete` (`attempts_exhausted`, attempt `exhausted`). A lapse adds no backoff (the lease already delayed the job), so a killed worker's jobs are picked up at once. These are the `reclaimed` count.
+  2. Every pending job past its expiry and not under a live lease ends `obsolete` (`finish_reason` `expired`).
+  3. Due jobs are leased, fewest failures first, then oldest. Rows another worker holds (`for update skip locked`), jobs under a live lease and jobs still backing off are skipped. Each lease gets a new fencing token from one monotonic sequence and lasts `lease_seconds`.
+
+  Answer: `{jobs: [{job_id, lease_token}], claimed, reclaimed, expired, lease_seconds}`. Every claim writes one content-free row to `app.notifications_worker_runs`.
 - **Attempt** (`notifications.attempt {job_id, lease_token}`), in this order:
   1. The token must be the job's current one, held by this principal; otherwise `fenced` and nothing changes.
-  2. A job that already ended answers `cancelled` (the source cancelled it after the claim; it is never dispatched) or `finished`.
-  3. A lapsed lease is `fenced`; the next claim reclaims the job.
+  2. A job that already ended answers `cancelled` (the source cancelled, re-planned or replaced it after the claim; it is never dispatched) or `finished`.
+  3. A lapsed lease is `fenced`; the next claim counts the lapse and reclaims the job.
   4. Past its expiry: `expired` (job `obsolete`, `expired`).
   5. Rechecked now, first failing rule wins:
      - no reminder contract: `obsolete`, `no_contract`;
@@ -237,53 +242,58 @@ pg_cron (job "notifications-worker")
      - the source no longer admits the recipient: `ineligible`, `recipient_ineligible`;
      - the recipient is no longer an approved member: `ineligible`, `membership_inactive`;
      - otherwise the one inbox item: `delivered`.
-  6. If the recheck raises, the attempt is `failed`. The job stays pending, counts the failure, releases its lease and backs off `backoff_base_seconds * 2^(failures-1)`, at most `backoff_max_seconds`. At `max_attempts` it ends `obsolete` (`attempts_exhausted`) and the attempt is `exhausted`.
+  6. If the recheck raises, or a slow owner check is cancelled by the role's statement timeout (SQLSTATE `57014`, caught explicitly), the attempt is `failed`. The job stays pending, counts the failure, releases its lease and backs off `backoff_base_seconds * 2^(failures-1)`, at most `backoff_max_seconds`. When failures plus lapses reach `max_attempts` it ends `obsolete` (`attempts_exhausted`) and the attempt is `exhausted`.
 
   Every attempt on an existing job writes one row in `app.notifications_attempts`: job, token, principal, request, outcome, finish reason and SQLSTATE only. An unknown job answers `not_found`.
-- **One logical outcome.** The inbox item is unique per job, a stale or lapsed token never changes a job, and a cancelled job is never dispatched. If the Edge Function loses an answer, at most a lease is left to lapse: the next claim reclaims the job, and if the attempt had committed the job is already finished. Exactly-once external delivery is not promised (push arrives in entry 6).
-- **`job_state` keeps its 3.1 values**, because widening the CHECK would need DROP CONSTRAINT. `finish_reason` records why a job ended: `delivered`, `expired`, `attempts_exhausted`, `source_changed`, `not_actionable`, `schedule_changed`, `no_contract`, `recipient_ineligible` or `membership_inactive`. Cancelled jobs keep `cancel_reason`.
-- **`notifications.deliver_due`** (3.1) now runs claim + attempt in one transaction under the same rules and answers the same five counts. `tools/notifications/worker.mjs run-once` stays as the operator's manual fallback.
+- **Release** (`notifications.release {job_id, lease_token}`): the holder gives back a live lease it will not use. No attempt is counted.
+- **One logical outcome.** The inbox item is unique per job, a stale or lapsed token never changes a job, and a cancelled job is never dispatched. An uncertain answer leaves at most a lease to lapse: if the attempt committed, the job is finished; if not, the next claim counts the lapse and reclaims the job. Exactly-once external delivery is not promised (push arrives in entry 6).
+- **`job_state` keeps its 3.1 values**, because widening the CHECK would need DROP CONSTRAINT. `finish_reason` records why a job ended: `delivered`, `expired`, `attempts_exhausted`, `source_changed`, `not_actionable`, `schedule_changed`, `no_contract`, `recipient_ineligible` or `membership_inactive`. Cancelled jobs keep `cancel_reason` (for example `source_cancelled`, `rescheduled`, `snooze_replaced`).
+- **`notifications.deliver_due`** (3.1) now runs claim + attempt in one transaction under the same rules, for at most `batch_max` jobs, and answers the same five counts. After a statement-timeout cancel it releases the rest of its batch unused and stops. `tools/notifications/worker.mjs run-once` stays as the operator's manual fallback.
 
 ### Central worker policy (`app.notifications_worker_settings`)
 
 | Setting | Default | Bounds |
 |---|---|---|
-| `lease_seconds` | 120 | 5..900 |
+| `lease_seconds` | 120 | 30..900 (the worker stops 15 s before the lease ends: one 10 s call plus a margin) |
 | `batch_max` | 25 | 1..100 |
-| `max_attempts` | 5 | 1..20 |
+| `max_attempts` (failures plus lapses) | 5 | 1..20 |
 | `backoff_base_seconds` / `backoff_max_seconds` | 60 / 3600 (the 3.1 curve: 1, 2, 4 ... 60 minutes) | 1..3600 / 1..86400 |
 | `default_ttl_seconds` (expiry of a job without `expires_at`, counted from `scheduled_at`) | 604800 (7 days) | 3600..7776000 |
-| `worker_url` | null | `https://<host>/functions/v1/notifications-worker` |
+| `worker_url` | null | local: any `http(s)://<host>/functions/v1/notifications-worker`; staging: exactly `https://tmurpotfluignacfueki.supabase.co/functions/v1/notifications-worker`; production: an `https://<20-letter ref>.supabase.co/...` function (the ref is pinned at entry 10) |
 
-These are operator values, not church policy. Change them as the restricted operator, for example `select app.notifications_configure_worker('{"max_attempts": 4}', 'israel');`. Unknown keys and out-of-bound values are refused.
+These are operator values, not church policy. Change them as the restricted operator, for example `select app.notifications_configure_worker('{"max_attempts": 4}', 'israel');`. Unknown keys, out-of-bound values and a URL that is not this environment's function are refused. Each change is recorded in `app.ops_operator_actions` (`worker_policy_changed`). **Disable the scheduler before lowering `lease_seconds`** (a run in progress keeps the lease it was given), then enable it again.
 
 ### The Edge Function `notifications-worker`
 
-- Call: `POST /functions/v1/notifications-worker` with header `x-system-credential: <notifications_worker credential>` and body `{}` or `{"action": "run", "limit": 1..100}`.
-- It claims one batch and attempts each job until 50 seconds pass or the lease (minus 5 seconds) runs out. Jobs left are counted `deferred` and their leases lapse.
-- Answers: `200 {claimed, reclaimed, expired, outcomes: {...}, uncertain, deferred}`; `401` without a well-formed credential; `403` when the route refuses it (unknown, revoked, expired or another purpose); `400` for a bad body; `503` when the route is unreachable.
-- It uses only the platform-provided `SUPABASE_URL` and `SUPABASE_ANON_KEY`: no secret of its own and no service-role key. Its log lines carry counts and outcome codes only.
+- Call: `POST /functions/v1/notifications-worker` with header `x-worker-trigger: <trigger>` and body `{}` or `{"action": "run", "limit": 1..100}`.
+- Secrets (owner-set; never returned or logged): `NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL` (`sysc_<env>_...`) and `NOTIFICATIONS_WORKER_TRIGGER` (`nwt_<64 hex>`). If either is missing or malformed the function answers 503 and does nothing.
+- It claims one batch and attempts each job until 50 seconds pass or the lease minus 15 seconds runs out. It releases the jobs left (`deferred`).
+- One run at a time per instance (`409 busy`); concurrent instances are kept apart by the leases.
+- Answers: `200 {claimed, reclaimed, expired, outcomes: {...}, uncertain, deferred}`; `401` without the right trigger; `403` when the route refuses the credential (unknown, revoked, expired or another purpose); `409` busy; `400` for a bad body; `503` not configured or the route is unreachable.
+- It uses the platform-provided `SUPABASE_URL` and `SUPABASE_ANON_KEY` and no service-role key. Its log lines carry counts and outcome codes only.
 
 ### Scheduler (pg_cron + pg_net, operator only)
 
-- `app.notifications_scheduler_enable(operator, every default '1 minute')` creates or replaces this environment's ONE Cron job, `notifications-worker` (`every`: `1 minute` or `<1-59> seconds`). It refuses when another Cron job already runs the tick, when pg_cron is missing, and in production unless `ops_system_access`, `q2_church_time` and `q12_operations` are approved.
-- `app.notifications_scheduler_disable(operator)` removes it (harmless when absent).
-- `app.notifications_scheduler_status()` is content-free: environment, whether the gates allow scheduling, the number of scheduler jobs (must be 0 or 1), the schedule, Cron run results in 24 h, whether the URL is set, the last tick time and outcome (`sent`, `not_configured`, `gate_closed`), the last claim, claims in 24 h, due pending jobs, live leases, attempt outcomes in 24 h and the policy (without the URL).
-- The tick (`app.notifications_scheduler_tick()`) reads the credential from Vault at run time and sends it in a header with pg_net. The Cron command text is only `select app.notifications_scheduler_tick()`. pg_net keeps the outgoing request, with its headers, in `net.http_request_queue` only until it is sent; only the database owner can read it.
+- `app.notifications_scheduler_new_trigger(operator)` generates a new trigger into Vault (`notifications_worker_trigger`), replacing any earlier one. It never returns or logs the value. Recorded as `scheduler_trigger_rotated`.
+- `app.notifications_scheduler_enable(operator, every default '1 minute')` creates or replaces this environment's ONE Cron job, `notifications-worker` (`every`: `1 minute` or `<15-59> seconds`). It refuses when another Cron job already runs the tick, when pg_cron is missing, and in production unless `ops_system_access`, `q2_church_time` and `q12_operations` are approved. Recorded as `scheduler_enabled`.
+- `app.notifications_scheduler_disable(operator)` removes it (harmless when absent; recorded as `scheduler_disabled` when a job was removed).
+- `app.notifications_scheduler_status()` is content-free: environment, whether the gates allow scheduling, the number of scheduler jobs (must be 0 or 1), the schedule, Cron run results in 24 h, whether the URL is set and valid for this environment, whether the trigger is set, the last tick time and outcome (`sent`, `not_configured`, `gate_closed`), the last claim, claims in 24 h, due pending jobs, live leases, attempt outcomes in 24 h and the policy (without the URL).
+- The tick (`app.notifications_scheduler_tick()`) answers `not_configured` without a valid URL for this environment or a well-formed trigger. The Cron command text is only `select app.notifications_scheduler_tick()`.
+- **Cron history.** pg_cron keeps one `cron.job_run_details` row per run (1440 a day at one minute). Trim it as the database owner, for example weekly: `delete from cron.job_run_details where end_time < now() - interval '7 days';`. This story does not schedule that cleanup.
 - The migration enables the `pg_net` and `pg_cron` extensions. It creates no schedule.
 
 ### Local runs
 
 ```bash
 npx supabase db reset
-npm run -s db:test                       # supabase/tests/notifications_worker_test.sql (83)
+npm run -s db:test                       # supabase/tests/notifications_worker_test.sql (110)
 node --test supabase/functions/notifications-worker/logic.test.mjs tools/identity-e2e/worker.test.mjs
 node tools/auth-harness/local-phone-auth.mjs on
-node tools/identity-e2e/worker.mjs --evidence <file>.jsonl   # serves the function, runs pg_cron every 5 s
+node tools/identity-e2e/worker.mjs --evidence <file>.jsonl   # serves the function, runs pg_cron every 15 s
 node tools/auth-harness/local-phone-auth.mjs off
 ```
 
-The E2E mints local credentials and registers only their digests. It stores one as the local Vault secret for the Cron run, then removes it, the Cron job and every synthetic row, and restores the default policy. Fictional numbers: pgTAP `+44 7700 900860-900869`, E2E `900870-900879`.
+The E2E mints local credentials and registers only their digests. It generates the trigger with `app.notifications_scheduler_new_trigger`, writes the function's two secrets to a 0600 env file for `supabase functions serve --env-file` (removed afterwards), and removes the Vault trigger, the Cron job and every synthetic row, and restores the default policy. Fictional numbers: pgTAP `+44 7700 900860-900869`, E2E `900870-900879`.
 
 ### Hosted staging (parent session, then the owner)
 
@@ -291,34 +301,40 @@ The agent deployed nothing and created no schedule. In order:
 
 1. **Parent session: the migration.** Apply `20261008121500_notifications_worker.sql` to staging (`tmurpotfluignacfueki`) after `20261008102121`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. There is no `_rows` file. The migration:
    - enables `pg_net` and `pg_cron` (neither was installed on staging on 2026-10-08);
-   - adds the worker policy, attempts, runs and scheduler-state tables, five job columns, the two commands and the operator functions. Any existing `notifications_worker` principal, such as the 3.1 staging one, gets the two commands at once;
+   - retires `app.ops_operator_actions` by rename to `ops_retired_operator_actions_v2` (rows copied) and recreates it with the scheduler actions;
+   - adds the worker policy, attempts, runs and scheduler-state tables, six job columns, the three commands and the operator functions. Any existing `notifications_worker` principal, such as the 3.1 staging one, gets the three commands at once;
    - replaces the bodies of `notifications_sys_deliver_due` and `fixture_reminder_open_check`, and adds `fixture_reminder_sources.check_fault_until`;
    - adds no client grant.
 
    Check: `select app.notifications_scheduler_status();` answers `"scheduler_jobs": 0`.
-2. **Parent session: deploy the function.** Supabase MCP `deploy_edge_function` on `tmurpotfluignacfueki`: name `notifications-worker`, entrypoint `index.ts`, files `supabase/functions/notifications-worker/index.ts` and `logic.mjs`, `verify_jwt: false`. No Edge secret is needed. Check: `POST https://tmurpotfluignacfueki.supabase.co/functions/v1/notifications-worker` with body `{}` and no credential answers `401 {"outcome":"unauthenticated"}`.
-3. **Parent session: the URL** (not a secret): `select app.notifications_configure_worker('{"worker_url": "https://tmurpotfluignacfueki.supabase.co/functions/v1/notifications-worker"}', 'israel');`
-4. **Owner: the worker credential in Vault.** The agent and the parent never see it.
-   1. Use the 3.1 staging principal `notifications-worker` (it now also holds claim and attempt), or create one. Mint a new credential: `OPS_STATE_DIR=.ops-state/notifications-worker node tools/ops/system-credential.mjs mint --env staging --force`. It prints the digest only.
-   2. Register the digest in the SQL editor, or hand only the digest to the parent for MCP `execute_sql`: `select app.sys_register_credential((select principal_id from app.sys_principals where name = 'notifications-worker' and environment = 'staging'), '<digest>', 'notifications worker cron staging', interval '30 days', 'israel');`
-   3. Store the token in Vault: Dashboard, project `bic-kafue-platform-test`, **Project Settings > Vault > Secrets > Add new secret**. Name: `notifications_worker_credential`. Value: the contents of `.ops-state/notifications-worker/staging.credential`. Do not paste it into a chat, a ticket or the SQL editor history.
-   4. Revoke the 3.1 credential if nothing else uses it: `select app.sys_revoke_credential('<old credential_id>', 'israel');`
-5. **Parent session: one manual tick, then the schedule.**
-   1. Run `select app.notifications_scheduler_tick();` once. It answers `{"tick": "sent"}`; `not_configured` means the URL or the Vault secret is missing or malformed.
-   2. After a few seconds, `select app.notifications_scheduler_status();` shows `last_claim_at` set.
+2. **Parent session: deploy the function.** Supabase MCP `deploy_edge_function` on `tmurpotfluignacfueki`: name `notifications-worker`, entrypoint `index.ts`, files `supabase/functions/notifications-worker/index.ts` and `logic.mjs`, `verify_jwt: false`. Check: `POST https://tmurpotfluignacfueki.supabase.co/functions/v1/notifications-worker` with body `{}` answers `503 {"outcome":"unavailable"}` until the owner sets the secrets (step 5), then `401` without the trigger.
+3. **Parent session: the URL and the trigger.**
+   1. `select app.notifications_configure_worker('{"worker_url": "https://tmurpotfluignacfueki.supabase.co/functions/v1/notifications-worker"}', 'israel');`
+   2. `select app.notifications_scheduler_new_trigger('israel');` (answers `{"trigger_set": true, ...}`; the value is not shown).
+4. **Owner: the worker credential.** The agent and the parent never see it.
+   1. Use the 3.1 staging principal `notifications-worker` (it now also holds claim, attempt and release), or create one. Mint a new credential: `OPS_STATE_DIR=.ops-state/notifications-worker node tools/ops/system-credential.mjs mint --env staging --force`. It prints the digest only.
+   2. Register the digest in the SQL editor, or hand only the digest to the parent for MCP `execute_sql`: `select app.sys_register_credential((select principal_id from app.sys_principals where name = 'notifications-worker' and environment = 'staging'), '<digest>', 'notifications worker edge staging', interval '30 days', 'israel');`
+5. **Owner: the two Edge Function secrets.** Dashboard, project `bic-kafue-platform-test`, **Edge Functions > Secrets** (Project Settings > Edge Functions):
+   - `NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL` = the contents of `.ops-state/notifications-worker/staging.credential`;
+   - `NOTIFICATIONS_WORKER_TRIGGER` = the value of the Vault secret `notifications_worker_trigger` (**Project Settings > Vault > Secrets**, reveal and copy).
+
+   Do not paste either value into a chat, a ticket or the SQL editor. Then revoke the 3.1 credential if nothing else uses it: `select app.sys_revoke_credential('<old credential_id>', 'israel');`
+6. **Parent session: one manual tick, then the schedule.**
+   1. Run `select app.notifications_scheduler_tick();` once. It answers `{"tick": "sent"}`; `not_configured` means the URL or the trigger is missing.
+   2. After a few seconds, `select app.notifications_scheduler_status();` shows `last_claim_at` set. If it does not, the function answered 401 (the Edge trigger differs from Vault), 403 (credential not registered or revoked) or 503 (a secret is missing); `select status_code from net._http_response order by created desc limit 1;` shows which.
    3. Create the schedule: `select app.notifications_scheduler_enable('israel');` (every minute). `scheduler_jobs` must be 1.
-6. **Owner demonstration, with the apps closed.** Use synthetic member A and clients built against staging, as in 3.1.
+7. **Owner demonstration, with the apps closed.** Use synthetic member A and clients built against staging, as in 3.1.
    1. As A, create a reminder due now (`fixture.reminder_create {"due_at": "<now>"}`), then close both apps. Within about a minute, `app.notifications_scheduler_status()` shows a new claim and `attempts_24h.delivered` grows. Open mobile **Inbox**: one **SYNTHETIC test reminder** is there, and nobody ran a worker.
    2. Transient failure: create a reminder due in 2 minutes, then run `update app.fixture_reminder_sources set check_fault_until = now() + interval '3 minutes' where source_id = '<id>';`. The status shows `attempts_24h.failed`. Once the fault ends and the backoff passes (1, then 2 minutes), the item appears. `select outcome from app.notifications_attempts where job_id = (select job_id from app.notifications_jobs where source_id = '<id>') order by attempted_at;` lists `failed ... delivered`.
    3. Cancelled: create a reminder due in 3 minutes and cancel it (`fixture.reminder_cancel`). It never appears.
-   4. The two-worker, killed-worker and stale-token cases need control of timing. `tools/identity-e2e/worker.mjs` and the pgTAP suite prove them. To repeat them on staging, use the system route with two staging worker credentials exactly as that script does: shorten the lease with `select app.notifications_configure_worker('{"lease_seconds": 5}', 'israel');`, claim, wait it out, claim again, attempt with both tokens, then restore `lease_seconds` 120.
+   4. The two-worker, killed-worker, stale-token, timeout and lapse cases need control of timing. `tools/identity-e2e/worker.mjs` and the pgTAP suite prove them. To repeat them on staging, use the system route with two staging worker credentials as that script does (claim, move the lease end into the past with `update app.notifications_jobs set lease_expires_at = now() - interval '1 second' where job_id = '<id>';`, claim again, attempt with both tokens).
    5. Clean up as in story 3.1, step 7, deleting the `app.notifications_attempts` rows of those jobs first.
-7. **Rotation (owner, every 30 days at most).** Mint with `--force`, register the new digest, update the Vault secret's value in the Dashboard (same name), wait one tick, then revoke the old credential. If the credential expires, ticks still answer `sent`, but the function answers 403 and `last_claim_at` stops moving: rotate.
-8. **Stop the scheduler** (parent or owner): `select app.notifications_scheduler_disable('israel');`.
+8. **Rotation (owner, every 30 days at most).** Credential: mint with `--force`, register the new digest, replace the Edge secret `NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL`, wait one tick, then revoke the old credential. If it expires, ticks still answer `sent`, the function answers 403 and `last_claim_at` stops moving: rotate. Trigger (any time it may have leaked): `select app.notifications_scheduler_new_trigger('israel');`, then replace the Edge secret `NOTIFICATIONS_WORKER_TRIGGER` with the new Vault value; runs pause (401) between the two steps.
+9. **Stop the scheduler** (parent or owner): `select app.notifications_scheduler_disable('israel');`.
 
 ### Production
 
-Nothing. The tick and the enable refuse production until `ops_system_access`, `q2_church_time` and `q12_operations` are approved (entry 10). Production then needs its own principal, credential, Vault secret, function deploy and `worker_url`.
+Nothing. The tick and the enable refuse production until `ops_system_access`, `q2_church_time` and `q12_operations` are approved (entry 10). Production then needs its own principal, credential, Edge secrets, trigger, function deploy and `worker_url` (and the production ref pinned in `app.notifications_worker_url_error`).
 
 ### Known limits
 

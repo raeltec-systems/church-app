@@ -1,34 +1,46 @@
 // notifications-worker: the Cron-triggered notification worker (story 3.4; AD-8, AD-17, AD-19).
 //
-// The scheduler tick (app.notifications_scheduler_tick, run by pg_cron) posts here with the
-// worker's system credential, read from Supabase Vault at that moment. The function holds NO
-// credential of its own and no service-role key: it forwards the caller's `x-system-credential`
-// (purpose notifications_worker) to the 1.9 system route, so only a caller the database
-// authenticates gets anything done. All lease, fencing, recheck, retry and expiry rules live in
-// the database (notifications.claim / notifications.attempt); this function is transport.
+// The scheduler tick (app.notifications_scheduler_tick, run by pg_cron) posts here with a
+// low-value TRIGGER token read from Supabase Vault. The trigger only starts one run: it is
+// compared in constant time with this function's secret NOTIFICATIONS_WORKER_TRIGGER, and a
+// missing or wrong trigger is 401 with nothing done. The worker's system credential (purpose
+// notifications_worker) is this function's own secret NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL,
+// set by the owner; it never enters the database, pg_net or Cron. All lease, fencing, recheck,
+// retry and expiry rules live in the database (notifications.claim / attempt / release); a run
+// is idempotent, so an extra trigger is harmless. One run at a time per instance (409 busy);
+// concurrent instances are kept apart by the database's leases.
 //
-// Environment (platform-provided; never returned or logged): SUPABASE_URL, SUPABASE_ANON_KEY.
+// Environment (server-side only; never returned or logged):
+//   SUPABASE_URL, SUPABASE_ANON_KEY            provided by the platform
+//   NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL     sysc_<env>_... (owner-set Edge secret)
+//   NOTIFICATIONS_WORKER_TRIGGER               nwt_<64 hex> (the Vault trigger; owner-set Edge secret)
 //
-// POST {action?: "run", limit?: 1..100} with header x-system-credential
+// POST {action?: "run", limit?: 1..100} with header x-worker-trigger
 //   => 200 {claimed, reclaimed, expired, outcomes: {<outcome>: n}, uncertain, deferred}
-//      401 unauthenticated (no or malformed credential), 403 refused (the route refused it),
-//      400 invalid body, 503 unavailable.
+//      401 unauthenticated (no or wrong trigger), 403 refused (the route refused the credential),
+//      409 busy, 400 invalid body, 503 not configured or unavailable.
 //
-// Logs carry counts and outcome codes only: never a body, credential, token, job or member id.
+// Logs carry counts and outcome codes only: never a body, credential, trigger, job or member id.
 
 import {
   MAX_BODY_BYTES,
-  credentialFrom,
+  configFrom,
   declaredTooLarge,
   keyHeaders,
   parseBody,
   runOnce,
   systemEnvelope,
+  triggerMatches,
 } from './logic.mjs';
 
 const SUPABASE_URL = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/+$/, '');
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+const CONFIG = configFrom({
+  credential: Deno.env.get('NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL') ?? '',
+  trigger: Deno.env.get('NOTIFICATIONS_WORKER_TRIGGER') ?? '',
+});
 const CALL_TIMEOUT_MS = 10_000;
+let running = false;
 
 type Json = Record<string, unknown>;
 
@@ -61,7 +73,7 @@ async function timed(url: string, init: RequestInit): Promise<Response | null> {
   }
 }
 
-// One allowlisted system command with the caller's credential; refusals throw a coarse code.
+// One allowlisted system command with the worker's credential; refusals throw a coarse code.
 function systemWith(credential: string) {
   return async (command: string, payload: Json): Promise<Json> => {
     const res = await timed(`${SUPABASE_URL}/rest/v1/rpc/system_command`, {
@@ -90,12 +102,11 @@ function systemWith(credential: string) {
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return reply(405, { outcome: 'invalid' });
-  if (!SUPABASE_URL || !ANON_KEY) {
+  if (!SUPABASE_URL || !ANON_KEY || !CONFIG) {
     note({ outcome: 'not_configured' });
     return reply(503, { outcome: 'unavailable' });
   }
-  const credential = credentialFrom(req.headers.get('x-system-credential'));
-  if (!credential) {
+  if (!triggerMatches(req.headers.get('x-worker-trigger'), CONFIG.trigger)) {
     note({ outcome: 'unauthenticated' });
     return reply(401, { outcome: 'unauthenticated' });
   }
@@ -113,13 +124,20 @@ Deno.serve(async (req: Request) => {
     note({ outcome: parsed.error });
     return reply(400, { outcome: 'invalid', reason: parsed.error });
   }
+  if (running) {
+    note({ outcome: 'busy' });
+    return reply(409, { outcome: 'busy' });
+  }
+  running = true;
   try {
-    const counts = await runOnce({ system: systemWith(credential), limit: (parsed.value as Json).limit as number | undefined });
+    const counts = await runOnce({ system: systemWith(CONFIG.credential), limit: (parsed.value as Json).limit as number | undefined });
     note({ outcome: 'ran', ...counts });
     return reply(200, counts);
   } catch (e) {
     const code = e instanceof SystemRouteError ? e.code : 'unavailable';
     note({ outcome: code });
     return reply(code === 'refused' ? 403 : 503, { outcome: code });
+  } finally {
+    running = false;
   }
 });

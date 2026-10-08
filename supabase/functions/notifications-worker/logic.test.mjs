@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
-  credentialFrom,
+  configFrom,
+  constantTimeEqual,
   declaredTooLarge,
   keyHeaders,
   parseBody,
@@ -10,9 +11,12 @@ import {
   runDeadline,
   runOnce,
   systemEnvelope,
+  triggerMatches,
 } from './logic.mjs';
 
 const ID = (n) => `00000000-0000-4000-8000-0000000340${String(n).padStart(2, '0')}`;
+const TRIGGER = `nwt_${'ab'.repeat(32)}`;
+const CRED = `sysc_staging_${'A'.repeat(43)}`;
 const claimOf = (jobs, extra = {}) => ({
   jobs, claimed: jobs.length, reclaimed: 0, expired: 0, lease_seconds: 120, ...extra,
 });
@@ -30,13 +34,27 @@ test('the body is empty, {} or {action: run, limit?}', () => {
   assert.equal(parseBody({ action: 'run', member_id: ID(1) }).error, 'unknown_field');
 });
 
-test('the caller must present a well-formed system credential', () => {
-  const ok = `sysc_staging_${'A'.repeat(43)}`;
-  assert.equal(credentialFrom(ok), ok);
-  assert.equal(credentialFrom(null), null);
-  assert.equal(credentialFrom(`sysc_dev_${'A'.repeat(43)}`), null);
-  assert.equal(credentialFrom(`sysc_local_${'A'.repeat(42)}`), null);
-  assert.equal(credentialFrom(`Bearer sysc_local_${'A'.repeat(43)}`), null);
+test('the function needs both of its secrets well-formed (fail closed)', () => {
+  assert.deepEqual(configFrom({ credential: CRED, trigger: TRIGGER }), { credential: CRED, trigger: TRIGGER });
+  assert.equal(configFrom({ credential: '', trigger: TRIGGER }), null);
+  assert.equal(configFrom({ credential: CRED, trigger: '' }), null);
+  assert.equal(configFrom({ credential: `sysc_dev_${'A'.repeat(43)}`, trigger: TRIGGER }), null);
+  assert.equal(configFrom({ credential: CRED, trigger: CRED }), null, 'a credential is not a trigger');
+  assert.equal(configFrom(undefined), null);
+});
+
+test('only the configured trigger starts a run, compared in constant time', () => {
+  assert.equal(triggerMatches(TRIGGER, TRIGGER), true);
+  assert.equal(triggerMatches(`nwt_${'ab'.repeat(31)}ac`, TRIGGER), false);
+  assert.equal(triggerMatches(null, TRIGGER), false);
+  assert.equal(triggerMatches('', TRIGGER), false);
+  assert.equal(triggerMatches(CRED, TRIGGER), false);
+  assert.equal(triggerMatches(TRIGGER.toUpperCase(), TRIGGER), false);
+  assert.equal(constantTimeEqual('abc', 'abc'), true);
+  assert.equal(constantTimeEqual('abc', 'abd'), false);
+  assert.equal(constantTimeEqual('abc', 'abcd'), false);
+  assert.equal(constantTimeEqual('', ''), true);
+  assert.equal(constantTimeEqual(null, 'a'), false);
 });
 
 test('size, key headers and the envelope', () => {
@@ -60,10 +78,10 @@ test('a claim answer is checked strictly', () => {
   assert.equal(parseClaim(claimOf([{ job_id: ID(1), lease_token: 1 }], { claimed: 2 })), null);
 });
 
-test('the run deadline never outlives the lease', () => {
+test('the run deadline stops one call plus a margin before the lease ends', () => {
   assert.equal(runDeadline(0, 120), 50_000);
-  assert.equal(runDeadline(0, 20), 15_000);
-  assert.equal(runDeadline(0, 5), 0);
+  assert.equal(runDeadline(0, 30), 15_000);
+  assert.equal(runDeadline(0, 10), 0);
 });
 
 test('a run claims, then attempts each job with its own token, and reports counts only', async () => {
@@ -88,17 +106,23 @@ test('a run claims, then attempts each job with its own token, and reports count
   assert.ok(!JSON.stringify(result).includes(ID(1).slice(0, 20)));
 });
 
-test('jobs past the deadline are left for their leases to lapse', async () => {
+test('jobs past the deadline are released unused (a failed release just lapses)', async () => {
   let t = 0;
-  const system = async (command) => {
+  const calls = [];
+  const system = async (command, payload) => {
+    calls.push([command, payload?.job_id]);
     t += 20_000;
+    if (command === 'notifications.release' && payload.job_id === ID(4)) throw new Error('unreachable');
+    if (command === 'notifications.release') return { released: true };
     return command === 'notifications.claim'
-      ? claimOf([{ job_id: ID(1), lease_token: 1 }, { job_id: ID(2), lease_token: 2 }, { job_id: ID(3), lease_token: 3 }])
+      ? claimOf([{ job_id: ID(1), lease_token: 1 }, { job_id: ID(2), lease_token: 2 },
+        { job_id: ID(3), lease_token: 3 }, { job_id: ID(4), lease_token: 4 }])
       : { outcome: 'delivered' };
   };
   const result = await runOnce({ system, now: () => t });
   assert.deepEqual(result.outcomes, { delivered: 2 });
-  assert.equal(result.deferred, 1);
+  assert.equal(result.deferred, 2);
+  assert.deepEqual(calls.filter(([c]) => c === 'notifications.release').map(([, id]) => id), [ID(3), ID(4)]);
 });
 
 test('a refused or malformed claim fails the run', async () => {

@@ -1,6 +1,10 @@
+import 'dart:async';
+
+import 'package:church_contracts/church_contracts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/access_grants.dart';
+import '../domain/commands.dart';
 import '../domain/inbox.dart';
 import 'access_controllers.dart';
 import 'providers.dart';
@@ -188,3 +192,170 @@ final inboxItemProvider = NotifierProvider.autoDispose
     .family<InboxItemController, InboxItemOpenState, String>(
       InboxItemController.new,
     );
+
+/// How often an open inbox asks the server again when no signal arrives
+/// (Realtime unavailable, a missed signal, a blocked socket).
+const inboxPollInterval = Duration(minutes: 2);
+
+/// Story 3.7: keeps an OPEN inbox current. While watched (by the Inbox
+/// screen) it listens to the server's per-account generic signal and re-reads
+/// the inbox on each one (and on every (re)connect), and also re-reads every
+/// [inboxPollInterval]. The signal carries nothing: the authorised read
+/// decides what is shown. Dropped with the screen or the account generation.
+final inboxLiveProvider = Provider.autoDispose<void>((ref) {
+  final accountId = ref.watch(accountProvider.select((s) => s.accountId));
+  ref.watch(accountGenerationProvider);
+  if (accountId == null) return;
+  void refresh() {
+    if (ref.mounted) ref.read(inboxProvider.notifier).refresh();
+  }
+
+  final sub = ref
+      .watch(inboxSignalsProvider)
+      .changes(accountId)
+      .listen((_) => refresh(), onError: (Object _) {});
+  final timer = Timer.periodic(inboxPollInterval, (_) => refresh());
+  ref.onDispose(() {
+    timer.cancel();
+    unawaited(sub.cancel());
+  });
+});
+
+/// Where one snooze request stands.
+enum SnoozeStatus {
+  idle,
+  sending,
+
+  /// The server moved this member's reminder: see [SnoozeState.confirmed].
+  confirmed,
+
+  /// The reminder no longer needs the member (answered, changed, cancelled
+  /// or no longer theirs to see): nothing was snoozed.
+  outOfDate,
+
+  /// The reminder already stopped mattering: nothing was snoozed.
+  expired,
+
+  /// Not one of the caller's items (or no longer there).
+  notFound,
+
+  /// Any other refusal (policy unavailable, access changed): nothing applied.
+  refused,
+
+  /// No answer: the snooze may or may not have applied. **Try again**
+  /// resends the identical request and the server answers the stored
+  /// outcome.
+  unknown,
+
+  /// This build has no server: nothing was sent.
+  notSent,
+}
+
+class SnoozeState {
+  const SnoozeState(this.status, {this.choice, this.confirmed});
+
+  final SnoozeStatus status;
+
+  /// The choice of the last request.
+  final String? choice;
+  final SnoozeConfirmation? confirmed;
+}
+
+/// Story 3.7: the member snoozes one of their reminders
+/// (`notifications.snooze_item {item_id, choice}` on
+/// `api.notifications_command`). Only the server decides: it re-checks the
+/// source, applies the policy choice, clamps it to when the reminder stops
+/// mattering, and replaces an earlier snooze of the same item. A snooze dies
+/// on the server with a response, a cancellation or a change of its source.
+class SnoozeController extends Notifier<SnoozeState> {
+  SnoozeController(this.itemId);
+
+  final String itemId;
+  CommandRequest? _pending;
+
+  @override
+  SnoozeState build() {
+    ref.watch(accountGenerationProvider);
+    _pending = null;
+    return const SnoozeState(SnoozeStatus.idle);
+  }
+
+  /// Snoozes for [choice] (one of the opened item's policy choices).
+  Future<void> snooze(String choice) async {
+    if (state.status == SnoozeStatus.sending) return;
+    _pending = CommandRequest(
+      command: 'notifications.snooze_item',
+      requestId: ref.read(requestIdsProvider).next(),
+      payload: {'item_id': itemId, 'choice': choice},
+    );
+    await _send(choice);
+  }
+
+  /// After an unknown outcome: resends the identical request.
+  Future<void> retry() async {
+    if (state.status != SnoozeStatus.unknown || _pending == null) return;
+    await _send(state.choice);
+  }
+
+  Future<void> _send(String? choice) async {
+    final request = _pending!;
+    final generation = ref.read(accountGenerationProvider);
+    state = SnoozeState(SnoozeStatus.sending, choice: choice);
+    final outcome = await ref
+        .read(commandGatewayProvider)
+        .send('notifications_command', request);
+    if (!ref.mounted || ref.read(accountGenerationProvider) != generation) {
+      return;
+    }
+    switch (outcome) {
+      case CommandConfirmed(:final success):
+        SnoozeConfirmation? confirmed;
+        try {
+          confirmed = SnoozeConfirmation.fromJson(success.data);
+        } on FormatException {
+          confirmed = null;
+        }
+        if (confirmed == null) {
+          // An unusable answer is not success: ask the same request again.
+          state = SnoozeState(SnoozeStatus.unknown, choice: choice);
+          return;
+        }
+        _pending = null;
+        state = SnoozeState(
+          SnoozeStatus.confirmed,
+          choice: choice,
+          confirmed: confirmed,
+        );
+        _reread();
+      case CommandRefused(:final error):
+        _pending = null;
+        state = SnoozeState(switch (error.code) {
+          ErrorCode.conflict => switch (error.fieldErrors['item_id']) {
+            'expired' => SnoozeStatus.expired,
+            _ => SnoozeStatus.outOfDate,
+          },
+          ErrorCode.notFound => SnoozeStatus.notFound,
+          _ => SnoozeStatus.refused,
+        }, choice: choice);
+        if (error.code == ErrorCode.forbidden ||
+            error.code == ErrorCode.unauthenticated) {
+          noteProtectedDenial(ref);
+        }
+        _reread();
+      case CommandUnknownOutcome():
+        state = SnoozeState(SnoozeStatus.unknown, choice: choice);
+      case CommandNotSent():
+        _pending = null;
+        state = SnoozeState(SnoozeStatus.notSent, choice: choice);
+    }
+  }
+
+  /// The item and the list are read again: the server's answer is shown.
+  void _reread() {
+    unawaited(ref.read(inboxItemProvider(itemId).notifier).refresh());
+    unawaited(ref.read(inboxProvider.notifier).refresh());
+  }
+}
+
+final snoozeProvider = NotifierProvider.autoDispose
+    .family<SnoozeController, SnoozeState, String>(SnoozeController.new);

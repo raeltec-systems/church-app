@@ -17,9 +17,7 @@ Synthetic data only. Owner Q2 decisions: `owner-decisions-milestone-2.md`.
    Then tell the assistant "secrets set": it runs one test tick and switches on the every-minute
    schedule.
 
-3. **Paste in the staging SQL Editor (3.5).** `supabase/migrations/20261008135900_notifications_routing_rows.sql`
-   (the assistant can paste it here in chat for you). Until then a staging member deletion pauses at
-   its erase step and erases nothing.
+3. ~~Paste in the staging SQL Editor (3.5).~~ Done 2026-10-08 (`20261008135900_notifications_routing_rows.sql`, verified).
 
 4. **Phone push through Firebase (3.6, optional for the first pass).** Push is off until you do this;
    the inbox carries every reminder meanwhile. Follow `docs/runbooks/notifications.md`, story 3.6,

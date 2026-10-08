@@ -93,6 +93,10 @@ Future<List<Override>> compositionOverrides(AppConfig config) async {
       SupabaseMemberDeletionRepository(client),
     ),
     inboxRepositoryProvider.overrideWithValue(SupabaseInboxRepository(client)),
+    notificationSettingsRepositoryProvider.overrideWithValue(
+      SupabaseNotificationSettingsRepository(client),
+    ),
+    inboxSignalsProvider.overrideWithValue(SupabaseInboxSignals(client)),
     recoveryCasesRepositoryProvider.overrideWithValue(
       SupabaseRecoveryCasesRepository(client),
     ),

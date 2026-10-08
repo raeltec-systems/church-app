@@ -17,6 +17,8 @@ class InboxItem {
     required this.deliveredAt,
     this.registeredTitle,
     this.body,
+    this.opened,
+    this.snoozedUntil,
   });
 
   /// Maps the wire object; throws [FormatException] on any unexpected shape.
@@ -27,7 +29,9 @@ class InboxItem {
         json['due_at'] is! String ||
         json['delivered_at'] is! String ||
         (json['title'] != null && json['title'] is! String) ||
-        (json['body'] != null && json['body'] is! String)) {
+        (json['body'] != null && json['body'] is! String) ||
+        (json['opened'] != null && json['opened'] is! bool) ||
+        (json['snoozed_until'] != null && json['snoozed_until'] is! String)) {
       throw const FormatException('unexpected inbox item');
     }
     return InboxItem(
@@ -37,6 +41,10 @@ class InboxItem {
       deliveredAt: _utc(json['delivered_at']),
       registeredTitle: json['title'] as String?,
       body: json['body'] as String?,
+      opened: json['opened'] as bool?,
+      snoozedUntil: json['snoozed_until'] == null
+          ? null
+          : _utc(json['snoozed_until']),
     );
   }
 
@@ -53,11 +61,23 @@ class InboxItem {
   /// The generic body its source owner registered (story 3.2), if any.
   final String? body;
 
+  /// Story 3.7: whether the member has opened this item in the app (on any
+  /// device). It says nothing about push delivery or reading: "New" means
+  /// only "not opened in the app yet". Null from a server without markers
+  /// (no marker is shown then).
+  final bool? opened;
+
+  /// Story 3.7: when the member's snooze brings this reminder back, or null
+  /// when it is not snoozed (a response, cancellation or change of its
+  /// source ends a snooze on the server).
+  final DateTime? snoozedUntil;
+
   /// The registered title; a plain label for a server that sends none.
   String get title =>
       registeredTitle ??
       switch (reminderKind) {
         'fixture_due' => 'SYNTHETIC test reminder',
+        'fixture_reply' => 'SYNTHETIC reply reminder',
         _ => 'Reminder',
       };
 }
@@ -86,7 +106,12 @@ enum InboxItemState {
 
 /// Story 3.2: one item as `api.notifications_open_item` answered it.
 class OpenedInboxItem {
-  const OpenedInboxItem._(this.state, this.item, this.target);
+  const OpenedInboxItem._(
+    this.state,
+    this.item,
+    this.target, [
+    this.snoozeChoices = const [],
+  ]);
 
   const OpenedInboxItem.notFound()
     : this._(InboxItemState.notFound, null, null);
@@ -107,10 +132,17 @@ class OpenedInboxItem {
         if (target is! String || !isInAppPath(target)) {
           throw const FormatException('a current item needs an in-app target');
         }
+        final choices = json['snooze_choices'];
+        if (choices != null &&
+            (choices is! List ||
+                choices.any((c) => c is! String || !isSnoozeChoice(c)))) {
+          throw const FormatException('unexpected snooze choices');
+        }
         return OpenedInboxItem._(
           InboxItemState.current,
           InboxItem.fromJson(json),
           target,
+          List.unmodifiable((choices as List?)?.cast<String>() ?? const []),
         );
       case 'superseded':
         if (json['target'] != null) {
@@ -133,6 +165,47 @@ class OpenedInboxItem {
 
   /// The authorised in-app route of the source (current items only).
   final String? target;
+
+  /// Story 3.7: the snooze choices the church policy offers now (current
+  /// items only; empty when the policy offers none).
+  final List<String> snoozeChoices;
+}
+
+/// A policy snooze choice as the server names it (`1 hour`, `24 hours`,
+/// `2 days`): a count and a unit, sent back unchanged.
+bool isSnoozeChoice(String choice) =>
+    RegExp(r'^[1-9][0-9]{0,3} (minute|hour|day)s?$').hasMatch(choice);
+
+/// Story 3.7: what the server confirmed for `notifications.snooze_item`.
+class SnoozeConfirmation {
+  const SnoozeConfirmation({
+    required this.scheduledAt,
+    required this.clamped,
+    this.expiresAt,
+  });
+
+  /// Maps the success `data`; throws [FormatException] on any other shape.
+  factory SnoozeConfirmation.fromJson(Object? json) {
+    if (json is! Map ||
+        json['scheduled_at'] is! String ||
+        json['clamped'] is! bool ||
+        (json['expires_at'] != null && json['expires_at'] is! String)) {
+      throw const FormatException('unexpected snooze answer');
+    }
+    return SnoozeConfirmation(
+      scheduledAt: _utc(json['scheduled_at']),
+      clamped: json['clamped'] as bool,
+      expiresAt: json['expires_at'] == null ? null : _utc(json['expires_at']),
+    );
+  }
+
+  /// When the reminder comes back.
+  final DateTime scheduledAt;
+
+  /// The choice would have passed the time the reminder stops mattering, so
+  /// the server brings it back at [expiresAt] instead.
+  final bool clamped;
+  final DateTime? expiresAt;
 }
 
 /// A relative in-app path: lower-case segments only, no scheme, host, query

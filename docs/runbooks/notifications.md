@@ -560,3 +560,77 @@ Nothing yet. Production needs its own Firebase project and service account, its 
 - **Client wiring.** The real `firebase_messaging` adapter is step 6 above. Until then the apps register nothing.
 - **Sign-out elsewhere.** A device retires its own registration when the person signs out in the app. A session that ends any other way (expiry, revocation by `sessions_revoked`) is covered by the 3.5 lifecycle hooks only for the events they listen to. A plain session expiry leaves the token registered until the next sign-in on that phone; pushes stay generic and every open re-checks the session.
 - **Foreground display.** A notification arriving while the app is open is left to the SDK default; the inbox refreshes on resume. The settings screen (push categories) is entry 7, and the staff health view of the `push` status is entry 8.
+
+## Story 3.7: the inbox, notification settings and snooze on mobile and staff web
+
+Migration: `supabase/migrations/20261008181657_notifications_inbox_screens.sql` (one file; no row deletions, no destructive statements, no rows file). Tests: `supabase/tests/notifications_inbox_screens_test.sql`, E2E `tools/identity-e2e/inbox-screens.mjs` (real GoTrue, PostgREST, worker script and **Realtime**, with the captured signal frames), the live adapter check `tools/identity-e2e/live-inbox-check.sh` (steps L11-L18 drive the real Dart `SupabaseInboxSignals` on the private channel), client tests `packages/client_core/test/notifications/inbox_screens_test.dart` and both app tests. Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.7/`.
+
+### Server contract (additions)
+
+- **Markers.** `api.notifications_my_inbox` items gain `opened` (the member opened the item in the app, on any device; set once by `api.notifications_open_item`) and `snoozed_until` (the member's pending snooze of the item, or null). Neither says anything about push delivery or reading; the clients label them **New** and **Opened** only.
+- **Open.** `api.notifications_open_item` marks the item opened on the first open and, for a `current` item only, adds `snooze_choices` (from the Q2 policy; `[]` when the policy is unavailable, for example the production gate closed) and `snoozed_until`. The `superseded` and `not_found` answers are unchanged.
+- **Snooze.** `notifications.snooze_item {item_id, choice}` on `api.notifications_command` (`expected_revision` null). It wraps the 3.3 owner operation: current source only, a policy choice (`1 hour`, `24 hours`, `2 days`), clamped to the reminder's expiry, replaces an earlier pending snooze of the same item, and only this member's copy moves. Answer `{item_id, scheduled_at, clamped, expires_at}` at the item's new revision. Refusals: unknown choice `validation_failed {"choice": "invalid"}`, another member's item `not_found`, `conflict {"item_id": "superseded"}` (answered, cancelled, changed, or no longer theirs), `conflict {"item_id": "expired"}`. A response, cancellation or revision of the source cancels the pending snooze (`responded` or the source's reason) and the item then opens out of date.
+- **Refresh signal (AD-5).** After an inbox item is added, opened or snoozed, or a snooze job starts or ends, the database publishes ONE Realtime Broadcast per account per transaction: topic `account:<auth user id>`, event `inbox_changed`, payload `{}`, private. No ids, text or source type (captured in `evidence-3.7/inbox-screens-e2e.jsonl`, S20 and S60). Only a recipient whose current route is `member` is signalled; a rolled back change sends nothing; without Realtime nothing is sent and nothing fails. Channel authorisation is one receive-only RLS policy on `realtime.messages`, `notifications_account_refresh_receive` (`authenticated`, broadcast, own topic only); there is no insert policy, so clients cannot send. On hosted Supabase, `postgres` may create it through `supautils.policy_grants` (checked on staging 2026-10-08).
+- **SYNTHETIC categories stay out of production.** `app.notifications_category_offered(module)` hides the `fixture` module's categories outside `local` and `staging` (an unmarked database counts as production): `api.notifications_my_push_settings` does not list them and `notifications.set_push_category` answers `validation_failed {"reminder_kind": "unregistered"}` for them.
+- **SYNTHETIC fixture** (local/staging only): reminder kind `fixture_reply` (contract and direct-contact route), `fixture.reminder_schedule {starts_at}` (a request starting at `starts_at`, with a response schedule from the 3.3 calculation: short notice, one `respond_now` reminder due now, expiring at the start) and `fixture.reminder_respond {source_id}` at the source revision (the member answers).
+
+### Clients (shared `client_core`, both apps)
+
+- **Inbox** (`/inbox`, the **Inbox** tab once the server grants member access): **New** / **Opened** / **Snoozed until ...** labels; loading, empty, denial and failure states, each recoverable with **Check again**; pull to refresh. While it is open and the app is visible it re-reads on open, on resume, on every `inbox_changed` signal and on every (re)join of the channel (`SupabaseInboxSignals`, private channel), and every 2 minutes, so a missed signal or a project without Realtime still converges. In the background the channel is left and the poll stops; coming back re-reads. A re-read after **Show older reminders** puts the new first page in front of the older pages already shown (deduplicated); a change inside the older range shows after **Check again** from the top. A failed re-read keeps the list shown with **Couldn't check for new reminders**; it never blanks it.
+- **Reminder** (`/inbox/<id>`): a current item shows **Remind me later** with the policy's choices. The answer is shown as the server gave it: **Snoozed until ...**, clamped ("it comes back at that time instead"), **out of date**, **ended**, or **We don't know yet** with **Try again** (same `request_id`). Signed out, **Sign in** returns to the item (`/sign-in?then=/inbox/<id>`); the server checks it again.
+- **Notification settings** (`/notification-settings`, from the Inbox): one switch per registered category (`notifications.set_push_category` at the shown revision; a conflict reloads and says so). Every row says the Inbox keeps the reminders. Mobile says whether this phone is registered; staff web says the website shows no notifications (browser push is not used) and the settings apply to phones.
+- **SYNTHETIC test reminders** (`/fixture/reminders`, from the **Fixture** tab, **SYNTHETIC test reminders**): **Send me a test reminder** (due now), **Send me a test request (starts in 20 h)**, and on the last one **Answer it** / **Cancel it**. A test reminder's **Open** leads to `/fixture/reminders/<id>` with the same two actions. The server refuses all of it in production.
+
+### Local runs
+
+```bash
+npx supabase db reset
+npm run -s db:test                     # supabase/tests/notifications_inbox_screens_test.sql
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/inbox-screens.mjs --evidence <file>.jsonl   # needs Realtime running
+node tools/auth-harness/local-phone-auth.mjs off
+npx supabase db reset && FLUTTER_ROOT=/opt/sdk/flutter bash tools/identity-e2e/live-inbox-check.sh
+```
+
+Start the stack with Realtime (do not pass `-x realtime`). Fictional numbers: E2E `+44 7700 900930-900939`; live check `900820-900821` (shared with 3.1).
+
+### Hosted staging (parent session, then the owner)
+
+1. **Parent session: the migration.** Apply `20261008181657_notifications_inbox_screens.sql` to staging (`tmurpotfluignacfueki`) after `20261008155801`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. No rows file and no Edge Function change (the worker's outcomes are unchanged). It:
+   - adds `opened_at` and `snooze_revision` to `app.notifications_inbox_items`, and `responded_at` to `app.fixture_reminder_sources`;
+   - replaces in place (same signatures and grants): `app.notifications_my_inbox`, `app.notifications_open_item`, `app.notifications_authorize_command`, `app.notifications_command_in_scope`, `app.notifications_command`, `app.fixture_reminder_open_check`, `app.fixture_authorize_command`, `app.fixture_reminder_command`;
+   - adds the publisher, four triggers, the fixture `fixture_reply` contract and commands, and the receive-only policy on `realtime.messages`; no new client grant.
+
+   Checks: `select polname from pg_policy where polrelid = 'realtime.messages'::regclass;` lists `notifications_account_refresh_receive` (outside `local` the migration raises a WARNING if `realtime.messages` is missing; then the policy was not created, the signal cannot work and clients rely on polling); `select app.notifications_scheduler_status() ->> 'scheduler_jobs';` is `1` (the 3.4 Cron worker delivers within a minute).
+
+   **Realtime setting (owner, dashboard):** project **Realtime > Settings**, keep **Allow public access** OFF, so only private (RLS-checked) channels can be joined. If it were on, another client could still not read `account:<uid>` broadcasts (they are published `private`), but turning it off removes public channels as a class; the payload is `{}` either way, so nothing private would leak.
+
+   **Prerequisite seen on 2026-10-08:** staging had the worker URL and trigger set but `scheduler_jobs` 0 and no claim ever (`last_claim_at` null), so nothing delivers by itself yet. Before the phone check, finish story 3.4 Hosted staging steps 4-6 (owner: the worker credential and the two Edge Function secrets; parent: one manual tick, then `app.notifications_scheduler_enable('israel')`). Until then, deliver by hand after each **Send me a test ...**: `SUPABASE_URL=https://tmurpotfluignacfueki.supabase.co SUPABASE_PUBLISHABLE_KEY=<publishable key> NOTIFICATIONS_WORKER_CREDENTIAL_FILE=.ops-state/notifications-worker/staging.credential node tools/notifications/worker.mjs run-once` (expect `"delivered":1`).
+2. **Owner: builds against staging.** Publishable key only, from the dashboard (**Project Settings > API Keys**):
+   - Android phone: `cd apps/mobile && flutter build apk --debug --dart-define=SUPABASE_URL=https://tmurpotfluignacfueki.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=<staging publishable key>`, then `adb install -r build/app/outputs/flutter-apk/app-debug.apk` (or copy the APK to the phone).
+   - Staff web: `cd apps/staff && flutter build web --no-web-resources-cdn --dart-define=SUPABASE_URL=https://tmurpotfluignacfueki.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=<staging publishable key>`, served as in `client-shells.md`.
+   - Sign in on both as the same SYNTHETIC approved member (seeded as in `identity-access.md`), and keep a second SYNTHETIC member B for the isolation check.
+
+### Owner manual checks (phone and web, story 3.7)
+
+Use synthetic members only. Push to the phone needs the 3.6 Firebase steps; without them every check below still holds through the Inbox.
+
+1. **Reach it.** Phone: the **Inbox** tab is in the bottom bar after sign-in. Web: **Inbox** in the sidebar. Both show the same items.
+2. **Create test reminders.** Phone: **Fixture** tab > **SYNTHETIC test reminders** > **Send me a test reminder**. Within about a minute the phone's open Inbox shows **SYNTHETIC test reminder** labelled **New** without touching it (the signal), and so does the web Inbox. If it does not appear within 2 minutes, pull down (phone) or **Check again** (web): it must appear then (the fallback).
+3. **Open marks Opened, on both clients.** Tap the item on the phone: **Reminder** shows **Open**. Back in the Inbox it is **Opened**; the web Inbox shows **Opened** too within seconds (or after **Check again**). Nothing anywhere says delivered, seen or read.
+4. **Follow it.** **Open** leads to **SYNTHETIC test source**.
+5. **Snooze.** On the item, **Remind me later > 24 hours**: **Snoozed until <tomorrow, this time>**; the Inbox shows **Snoozed until ...**. Choose **1 hour** to replace it.
+6. **Clamp.** **Send me a test request (starts in 20 h)**; open **SYNTHETIC reply reminder** when it arrives and choose **2 days**: the answer says it comes back at the start time instead (about 20 hours from now), not in 2 days.
+7. **A response removes the snooze.** On that request, **Open > Answer it**. Back in the Inbox the **Snoozed until** label is gone; opening the reminder says **This reminder is out of date**. Repeat step 5 with a new test reminder and **Cancel it**: same result.
+8. **Push off keeps in-app items.** Inbox > **Notification settings**: turn **SYNTHETIC test reminder** off (**Saved**; "Still in your Inbox"). Send another test reminder: it appears in the Inbox (with push wired, no phone notification for it). Turn it on again. The web shows the same switches.
+9. **Deep link after sign-in.** On the web, copy the address of an opened reminder (`.../inbox/<id>`), sign out, paste it: **Not signed in** with **Sign in**; after signing in the same reminder opens and is checked again. As member B, the same address shows **This reminder isn't available**.
+10. **Signal payload (optional, web).** Browser developer tools > Network > WS > the `realtime/v1/websocket` connection > Messages: after step 2, the `broadcast` frame for `inbox_changed` has `"payload":{}` (Realtime may add a `meta.id` of its own) and no item id, text or source type.
+11. **Clean up** as in story 3.1, step 7, deleting snooze jobs first: `delete from app.notifications_jobs where snoozed_from_item_id in (select item_id from app.notifications_inbox_items where recipient_member_id in (<members>));` (after their attempts).
+
+Record the outcome per step in `evidence-3.7/owner-device-check.md` (pass/fail, device model, Android version, browser; no numbers, ids or keys).
+
+### Known limits
+
+- The signal is a hint: Realtime gives no delivery guarantee, so the clients poll every 2 minutes while the Inbox is open and re-read on resume and on every channel rejoin.
+- Push categories cover registered reminder kinds only; group mutes stay with the conditional chat epic. Staff web never shows notifications.
+- A snooze is offered only on a current item with policy choices. In production the choices stay empty until the owner approves `q2_church_time` (entry 10).

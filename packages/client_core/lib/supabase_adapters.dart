@@ -13,6 +13,7 @@ export 'src/adapters/supabase_member_access_repository.dart';
 export 'src/adapters/supabase_member_deletion_repository.dart';
 export 'src/adapters/supabase_membership_lifecycle_repository.dart';
 export 'src/adapters/supabase_membership_repository.dart';
+export 'src/adapters/supabase_notification_settings.dart';
 export 'src/adapters/supabase_password_recovery_gateway.dart';
 export 'src/adapters/supabase_platform_status_repository.dart';
 export 'src/adapters/supabase_recovery_email_repository.dart';

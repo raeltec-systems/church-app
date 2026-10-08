@@ -8,6 +8,8 @@ import 'account_screen.dart';
 import 'cell_screens.dart';
 import 'credential_screens.dart';
 import 'fixture_command_screen.dart';
+import 'fixture_reminder_screens.dart';
+import 'notification_settings_screen.dart';
 import 'inbox_screen.dart';
 import 'membership_application_screen.dart';
 import 'member_deletion_screens.dart';
@@ -100,10 +102,24 @@ abstract final class ClientPaths {
   /// Story 3.2: one opened inbox item, `/inbox/<item id>`.
   static String inboxItem(String itemId) => '$inbox/$itemId';
 
+  /// Story 3.7 (both clients): push on or off by reminder category.
+  static const notificationSettings = '/notification-settings';
+
+  /// Story 3.7, SYNTHETIC (local/staging only): test reminders for the
+  /// signed-in member, and one test source (`/fixture/reminders/<id>`, the
+  /// fixture contract's registered link).
+  static const fixtureReminders = '/fixture/reminders';
+  static String fixtureReminder(String sourceId) =>
+      '$fixtureReminders/$sourceId';
+
   /// Story 3.2: the server-provided deep-link targets this build has screens
   /// for. A source owner adds its route pattern here with its first screen;
   /// any other target is shown as current but not yet openable.
-  static final List<RegExp> deepLinkTargets = [];
+  static final List<RegExp> deepLinkTargets = [
+    RegExp(
+      r'^/fixture/reminders/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    ),
+  ];
 
   static bool isKnownDeepLink(String target) =>
       deepLinkTargets.any((p) => p.hasMatch(target));
@@ -189,6 +205,29 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.fixture,
         pageBuilder: (_, state) => page(state, const FixtureCommandScreen()),
+        routes: [
+          GoRoute(
+            path: 'reminders',
+            pageBuilder: (_, state) =>
+                page(state, const FixtureRemindersScreen()),
+            routes: [
+              GoRoute(
+                path: ':sourceId',
+                pageBuilder: (_, state) => page(
+                  state,
+                  FixtureRemindersScreen(
+                    sourceId: state.pathParameters['sourceId'],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      GoRoute(
+        path: ClientPaths.notificationSettings,
+        pageBuilder: (_, state) =>
+            page(state, const NotificationSettingsScreen()),
       ),
       GoRoute(
         path: ClientPaths.account,

@@ -144,9 +144,9 @@ select ok(exists (select 1 from app.contract_module_dependencies
   'fixture may call notifications, never the reverse');
 select is((select array_agg(column_name::text order by column_name::text) from information_schema.columns
             where table_schema = 'app' and table_name = 'notifications_inbox_items'),
-  array['delivered_at', 'delivered_by_principal', 'due_at', 'item_id', 'job_id', 'recipient_member_id',
-        'reminder_kind'],
-  'an inbox item holds ids, the kind and times only (no text, source id or revision)');
+  array['delivered_at', 'delivered_by_principal', 'due_at', 'item_id', 'job_id', 'opened_at',
+        'recipient_member_id', 'reminder_kind', 'snooze_revision'],
+  'an inbox item holds ids, the kind, times and the 3.7 opened/snooze markers only (no text, source id or source revision)');
 
 -- Production (no marker): the Q2 gate is closed, nothing is enqueued -----------------------------
 create temp table m (n int primary key, member_id uuid);
@@ -225,8 +225,8 @@ select throws_ok($$insert into app.notifications_inbox_items (job_id, recipient_
                      from app.notifications_inbox_items i limit 1$$,
   '23505', null, 'a second item for the same job is impossible (duplicate or racing workers)');
 select is((select array_agg(k order by k) from jsonb_object_keys(pg_temp.items(1) -> 0) k),
-  array['body', 'delivered_at', 'due_at', 'item_id', 'reminder_kind', 'title'],
-  'the member reads the item: kind, registered generic text (3.2) and times only');
+  array['body', 'delivered_at', 'due_at', 'item_id', 'opened', 'reminder_kind', 'snoozed_until', 'title'],
+  'the member reads the item: kind, registered generic text (3.2), times and the 3.7 markers only');
 select is(pg_temp.items(1) -> 0 ->> 'reminder_kind', 'fixture_due', 'the item is the fixture reminder');
 select is(pg_temp.items(2), '[]'::jsonb, 'another member sees nothing');
 select is(pg_temp.inbox('{"role": "authenticated"}'::jsonb), 'PT401|unauthenticated|unauthenticated',

@@ -25,6 +25,7 @@ import 'src/domain/password_recovery.dart';
 import 'src/domain/recovery_email.dart';
 import 'src/domain/fixture_counter.dart';
 import 'src/domain/inbox.dart';
+import 'src/domain/notification_settings.dart';
 import 'src/domain/push_messaging.dart';
 import 'src/domain/session.dart';
 
@@ -1189,11 +1190,17 @@ class FakeInbox implements InboxRepository {
   final afters = <InboxCursor?>[];
   int calls = 0;
 
+  /// Story 3.7: when set, an older-page read waits for it (a request in
+  /// flight).
+  Completer<void>? holdOlder;
+
   @override
   Future<AccessRead<Inbox>> fetchMyInbox({InboxCursor? after}) async {
     calls++;
     afters.add(after);
     if (after == null) return inbox;
+    final hold = holdOlder;
+    if (hold != null) await hold.future;
     return olderPages[after.afterItemId] ??
         const AccessReadFailed(unreachable: false);
   }
@@ -1209,6 +1216,60 @@ class FakeInbox implements InboxRepository {
     return opened[itemId] ?? const AccessReadOk(OpenedInboxItem.notFound());
   }
 }
+
+/// [NotificationSettingsRepository] answered by the test (story 3.7).
+class FakeNotificationSettings implements NotificationSettingsRepository {
+  AccessRead<NotificationSettings> settings = const AccessReadOk(
+    NotificationSettings(categories: []),
+  );
+  int calls = 0;
+
+  @override
+  Future<AccessRead<NotificationSettings>> fetchMySettings() async {
+    calls++;
+    return settings;
+  }
+}
+
+/// [InboxSignals] the test fires (story 3.7).
+class FakeInboxSignals implements InboxSignals {
+  final _controllers = <StreamController<void>>[];
+
+  /// The account ids subscribed so far, and how many are listening now.
+  final subscribed = <String>[];
+  int get listening => _controllers.where((c) => c.hasListener).length;
+
+  /// Sends one generic signal to every open subscription.
+  void signal() {
+    for (final c in _controllers) {
+      if (c.hasListener) c.add(null);
+    }
+  }
+
+  @override
+  Stream<void> changes(String accountId) {
+    subscribed.add(accountId);
+    late final StreamController<void> c;
+    c = StreamController<void>(onCancel: () => _controllers.remove(c));
+    _controllers.add(c);
+    return c.stream;
+  }
+}
+
+/// The wire form of one push category (story 3.5).
+Map<String, Object?> pushCategoryData({
+  String sourceType = 'fixture_reminder',
+  String kind = 'fixture_due',
+  String title = 'SYNTHETIC test reminder',
+  bool pushEnabled = true,
+  int? revision,
+}) => {
+  'source_type': sourceType,
+  'reminder_kind': kind,
+  'title': title,
+  'push_enabled': pushEnabled,
+  'revision': revision,
+};
 
 /// Story 3.6: a device push SDK the test drives (permission answers, tokens,
 /// token refreshes and notification taps).
@@ -1298,6 +1359,8 @@ Map<String, Object?> inboxItemData({
   String deliveredAt = '2026-10-08T07:00:05.000000Z',
   String? title = 'SYNTHETIC test reminder',
   String? body = 'A test reminder is waiting for you.',
+  bool? opened,
+  String? snoozedUntil,
 }) => {
   'item_id': id,
   'reminder_kind': kind,
@@ -1305,14 +1368,24 @@ Map<String, Object?> inboxItemData({
   'delivered_at': deliveredAt,
   'title': ?title,
   'body': ?body,
+  'opened': ?opened,
+  'snoozed_until': ?snoozedUntil,
 };
 
-/// The wire form of an opened inbox item (story 3.2).
+/// The wire form of an opened inbox item (story 3.2; snooze from 3.7).
 Map<String, Object?> openedItemData({
   String id = '31313131-3131-4131-8131-313131313131',
   String state = 'current',
   String? target = '/fixture/reminders/41414141-4141-4141-8141-414141414141',
-}) => {...inboxItemData(id: id), 'state': state, 'target': target};
+  List<String>? snoozeChoices,
+  String? snoozedUntil,
+}) => {
+  ...inboxItemData(id: id),
+  'state': state,
+  'target': target,
+  'snooze_choices': ?snoozeChoices,
+  'snoozed_until': ?snoozedUntil,
+};
 
 /// The fakes and provider overrides an app or screen test runs against.
 class ClientTestHarness {
@@ -1336,6 +1409,8 @@ class ClientTestHarness {
   final lifecycle = FakeMembershipLifecycle();
   final deletions = FakeMemberDeletion();
   final inbox = FakeInbox();
+  final notificationSettings = FakeNotificationSettings();
+  final signals = FakeInboxSignals();
 
   /// Story 3.6: the device push SDK (default: none, as every build today).
   PushMessaging push = const NoPushMessaging();
@@ -1367,6 +1442,10 @@ class ClientTestHarness {
       membershipLifecycleRepositoryProvider.overrideWithValue(lifecycle),
       memberDeletionRepositoryProvider.overrideWithValue(deletions),
       inboxRepositoryProvider.overrideWithValue(inbox),
+      notificationSettingsRepositoryProvider.overrideWithValue(
+        notificationSettings,
+      ),
+      inboxSignalsProvider.overrideWithValue(signals),
       commandGatewayProvider.overrideWithValue(commandGateway ?? gateway),
       platformStatusRepositoryProvider.overrideWithValue(FakePlatformStatus()),
     ],

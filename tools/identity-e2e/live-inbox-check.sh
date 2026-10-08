@@ -37,6 +37,14 @@ CRED_ID=$(sql "select app.sys_register_credential('$PRINCIPAL', '$DIGEST', 'live
 
 cleanup() {
   sql "create temp table gone as select l.member_id from app.identity_account_links l join auth.users u on u.id = l.auth_user_id where $OURS;
+       delete from app.notifications_attempts a using app.notifications_jobs x, gone g
+        where a.job_id = x.job_id and x.recipient_member_id = g.member_id and x.snoozed_from_item_id is not null;
+       delete from app.notifications_jobs x using gone g where x.recipient_member_id = g.member_id and x.snoozed_from_item_id is not null;
+       do \$\$ begin
+         if to_regclass('realtime.messages') is not null then
+           delete from realtime.messages m using auth.users u where m.topic = 'account:' || u.id::text and $OURS;
+         end if;
+       end \$\$;
        delete from app.notifications_inbox_items x using gone g where x.recipient_member_id = g.member_id;
        delete from app.notifications_attempts a using app.notifications_jobs x, gone g
         where a.job_id = x.job_id and x.recipient_member_id = g.member_id;

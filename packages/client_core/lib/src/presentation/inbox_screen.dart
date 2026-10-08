@@ -22,10 +22,27 @@ class InboxScreen extends ConsumerStatefulWidget {
 class _InboxScreenState extends ConsumerState<InboxScreen> {
   late final AppLifecycleListener _lifecycle;
 
+  /// Story 3.7: the signal channel and the poll ([inboxLiveProvider]) run
+  /// only while the app is visible; back in the foreground the inbox is read
+  /// again. Held as a manual subscription because a hidden app draws no
+  /// frames (a conditional watch in build would never be dropped).
+  ProviderSubscription<void>? _live;
+
   @override
   void initState() {
     super.initState();
-    _lifecycle = AppLifecycleListener(onResume: _refresh);
+    _live = ref.listenManual(inboxLiveProvider, (_, _) {});
+    _lifecycle = AppLifecycleListener(
+      onResume: _refresh,
+      onHide: () {
+        _live?.close();
+        _live = null;
+      },
+      onShow: () {
+        _live ??= ref.listenManual(inboxLiveProvider, (_, _) {});
+        _refresh();
+      },
+    );
     Future.microtask(_refresh);
   }
 
@@ -37,6 +54,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   @override
   void dispose() {
     _lifecycle.dispose();
+    _live?.close();
     super.dispose();
   }
 
@@ -72,6 +90,20 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         ),
       );
     } else {
+      if (s.refreshFailed) {
+        children.addAll([
+          const RequestStateBanner(
+            key: Key('inbox-refresh-failed'),
+            tone: StatusTone.warning,
+            icon: Icons.cloud_off_outlined,
+            title: 'Couldn\'t check for new reminders',
+            message:
+                'Showing the last list the server sent. Pull down or use '
+                'Check again.',
+          ),
+          const SizedBox(height: 12),
+        ]);
+      }
       children.add(
         Semantics(
           header: true,
@@ -120,31 +152,50 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
     }
     children.addAll([
       const SizedBox(height: ChurchGeometry.sectionGap),
-      Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: FocusRing(
-          child: OutlinedButton.icon(
-            key: const Key('refresh-inbox'),
-            onPressed: s.loading ? null : _refresh,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Check again'),
+      Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        children: [
+          FocusRing(
+            child: OutlinedButton.icon(
+              key: const Key('refresh-inbox'),
+              onPressed: s.loading ? null : _refresh,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Check again'),
+            ),
           ),
-        ),
+          // Story 3.7: push settings by category.
+          FocusRing(
+            child: OutlinedButton.icon(
+              key: const Key('open-notification-settings'),
+              onPressed: () => context.push(ClientPaths.notificationSettings),
+              icon: const Icon(Icons.notifications_active_outlined),
+              label: const Text('Notification settings'),
+            ),
+          ),
+        ],
       ),
     ]);
     return Scaffold(
       appBar: AppBar(title: const Text('Inbox')),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: layout.pagePadding,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
-              child: DefaultTextStyle.merge(
-                style: layout.body.copyWith(color: c.ink),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: children,
+        // Story 3.7: pull down to ask the server again (also on open, on
+        // resume, on the server's refresh signal and every 2 minutes).
+        child: RefreshIndicator(
+          key: const Key('inbox-pull-to-refresh'),
+          onRefresh: () => ref.read(inboxProvider.notifier).refresh(),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: layout.pagePadding,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
+                child: DefaultTextStyle.merge(
+                  style: layout.body.copyWith(color: c.ink),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: children,
+                  ),
                 ),
               ),
             ),
@@ -203,6 +254,177 @@ Widget _problem<T>(
   ),
 };
 
+/// Story 3.7: snooze one current reminder for a policy choice. Only this
+/// member's reminder moves; the server clamps it to when the reminder stops
+/// mattering and drops it when the member answers or the source changes.
+class _SnoozeSection extends ConsumerWidget {
+  const _SnoozeSection({
+    required this.itemId,
+    required this.choices,
+    required this.snoozedUntil,
+    required this.when,
+  });
+
+  final String itemId;
+  final List<String> choices;
+  final DateTime? snoozedUntil;
+  final String Function(DateTime) when;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ChurchColors.of(context);
+    final s = ref.watch(snoozeProvider(itemId));
+    final sending = s.status == SnoozeStatus.sending;
+    return Column(
+      key: const Key('inbox-item-snooze'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          header: true,
+          child: Text(
+            'Remind me later',
+            style: ChurchType.cardTitle.copyWith(color: c.ink),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          snoozedUntil == null
+              ? 'Only your reminder moves. It comes back here at the time '
+                    'you choose, unless you answer it first or it changes.'
+              : 'Snoozed until ${when(snoozedUntil!)}. Choose again to '
+                    'change it.',
+          key: Key(
+            snoozedUntil == null
+                ? 'inbox-item-not-snoozed'
+                : 'inbox-item-snoozed-until',
+          ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final choice in choices)
+              FocusRing(
+                child: OutlinedButton.icon(
+                  key: Key('snooze-${choice.replaceAll(' ', '-')}'),
+                  onPressed: sending
+                      ? null
+                      : () => ref
+                            .read(snoozeProvider(itemId).notifier)
+                            .snooze(choice),
+                  icon: const Icon(Icons.snooze),
+                  label: Text(choice),
+                ),
+              ),
+          ],
+        ),
+        if (s.status != SnoozeStatus.idle) ...[
+          const SizedBox(height: 12),
+          _snoozeBanner(
+            s,
+            when,
+            () => ref.read(snoozeProvider(itemId).notifier).retry(),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+Widget _snoozeBanner(
+  SnoozeState s,
+  String Function(DateTime) when,
+  VoidCallback retry,
+) {
+  final confirmed = s.confirmed;
+  return switch (s.status) {
+    SnoozeStatus.idle => const SizedBox.shrink(),
+    SnoozeStatus.sending => RequestStateBanner(
+      key: const Key('snooze-sending'),
+      tone: StatusTone.info,
+      busy: true,
+      title: 'Snoozing…',
+      message: 'Waiting for the server to confirm ${s.choice ?? ''}.',
+    ),
+    SnoozeStatus.confirmed when confirmed != null && confirmed.clamped =>
+      RequestStateBanner(
+        key: const Key('snooze-clamped'),
+        tone: StatusTone.warning,
+        icon: Icons.schedule,
+        title: 'Snoozed until ${when(confirmed.scheduledAt)}',
+        message:
+            'It could not wait ${s.choice ?? 'that long'}: this reminder '
+            'stops mattering then, so it comes back at that time instead.',
+      ),
+    SnoozeStatus.confirmed => RequestStateBanner(
+      key: const Key('snooze-confirmed'),
+      tone: StatusTone.success,
+      icon: Icons.check_circle_outline,
+      title: confirmed == null
+          ? 'Snoozed'
+          : 'Snoozed until ${when(confirmed.scheduledAt)}',
+      message:
+          'It comes back in your inbox then, unless you answer it first or '
+          'it changes.',
+    ),
+    SnoozeStatus.outOfDate => const RequestStateBanner(
+      key: Key('snooze-out-of-date'),
+      tone: StatusTone.warning,
+      icon: Icons.update,
+      title: 'This reminder is out of date',
+      message: 'Nothing was snoozed. There is nothing to do here.',
+    ),
+    SnoozeStatus.expired => const RequestStateBanner(
+      key: Key('snooze-expired'),
+      tone: StatusTone.warning,
+      icon: Icons.event_busy,
+      title: 'This reminder has ended',
+      message:
+          'Nothing was snoozed: what it was about has already started '
+          'or passed.',
+    ),
+    SnoozeStatus.notFound => const RequestStateBanner(
+      key: Key('snooze-not-found'),
+      tone: StatusTone.neutral,
+      icon: Icons.search_off,
+      title: 'This reminder isn\'t available',
+      message: 'Nothing was snoozed.',
+    ),
+    SnoozeStatus.refused => const RequestStateBanner(
+      key: Key('snooze-refused'),
+      tone: StatusTone.danger,
+      icon: Icons.error_outline,
+      title: 'Couldn\'t snooze',
+      message: 'The server did not accept it. Nothing was snoozed.',
+    ),
+    SnoozeStatus.unknown => RequestStateBanner(
+      key: const Key('snooze-unknown'),
+      tone: StatusTone.danger,
+      icon: Icons.help_outline,
+      title: 'We don\'t know yet if it was snoozed',
+      message:
+          'The server did not answer. Try again: it sends the same request '
+          'and the server tells us what happened.',
+      actions: [
+        BannerAction(
+          'Try again',
+          retry,
+          key: const Key('snooze-retry'),
+          primary: true,
+        ),
+      ],
+    ),
+    SnoozeStatus.notSent => const RequestStateBanner(
+      key: Key('snooze-not-sent'),
+      tone: StatusTone.neutral,
+      icon: Icons.cloud_off_outlined,
+      title: 'Not sent',
+      message: 'This build has no server configured.',
+    ),
+  };
+}
+
 class _InboxTile extends StatelessWidget {
   const _InboxTile({required this.item});
 
@@ -247,6 +469,36 @@ class _InboxTile extends StatelessWidget {
                         item.title,
                         style: ChurchType.cardTitle.copyWith(color: c.ink),
                       ),
+                      // Story 3.7: what the member did in the app, never
+                      // whether a push arrived or was read.
+                      if (item.opened != null || item.snoozedUntil != null) ...[
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 6,
+                          children: [
+                            if (item.opened == false)
+                              StatusLabel(
+                                key: Key('inbox-item-new-${item.itemId}'),
+                                label: 'New',
+                                tone: StatusTone.info,
+                              ),
+                            if (item.opened == true)
+                              StatusLabel(
+                                key: Key('inbox-item-opened-${item.itemId}'),
+                                label: 'Opened',
+                                tone: StatusTone.neutral,
+                              ),
+                            if (item.snoozedUntil != null)
+                              StatusLabel(
+                                key: Key('inbox-item-snoozed-${item.itemId}'),
+                                label:
+                                    'Snoozed until ${when(item.snoozedUntil!)}',
+                                tone: StatusTone.warning,
+                              ),
+                          ],
+                        ),
+                      ],
                       if (item.body != null) ...[
                         const SizedBox(height: 4),
                         Text(item.body!),
@@ -435,6 +687,32 @@ class _InboxItemScreenState extends ConsumerState<InboxItemScreen> {
                 'of the app yet.',
           ),
         );
+      }
+      if (opened.state == InboxItemState.current &&
+          opened.snoozeChoices.isNotEmpty) {
+        children.addAll([
+          const SizedBox(height: ChurchGeometry.sectionGap),
+          _SnoozeSection(
+            itemId: widget.itemId,
+            choices: opened.snoozeChoices,
+            snoozedUntil: item.snoozedUntil,
+            when: when,
+          ),
+        ]);
+      }
+    }
+    // Story 3.7: after a snooze the server's answer may say the reminder is
+    // out of date even when the last open still showed it current.
+    if (opened?.state != InboxItemState.current) {
+      final snooze = ref.watch(snoozeProvider(widget.itemId));
+      if (snooze.status
+          case SnoozeStatus.outOfDate ||
+              SnoozeStatus.expired ||
+              SnoozeStatus.notFound) {
+        children.addAll([
+          const SizedBox(height: 12),
+          _snoozeBanner(snooze, when, () {}),
+        ]);
       }
     }
     children.addAll([

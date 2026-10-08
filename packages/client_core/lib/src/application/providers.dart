@@ -13,6 +13,7 @@ import '../domain/member_deletion.dart';
 import '../domain/membership_application.dart';
 import '../domain/membership_lifecycle.dart';
 import '../domain/membership_review.dart';
+import '../domain/notification_settings.dart';
 import '../domain/password_recovery.dart';
 import '../domain/platform_status.dart';
 import '../domain/push_messaging.dart';
@@ -107,6 +108,17 @@ final memberDeletionRepositoryProvider = Provider<MemberDeletionRepository>(
 /// Story 3.1: the member's durable inbox.
 final inboxRepositoryProvider = Provider<InboxRepository>(
   (ref) => const UnconfiguredInboxRepository(),
+);
+
+/// Story 3.7: the member's notification settings by category.
+final notificationSettingsRepositoryProvider =
+    Provider<NotificationSettingsRepository>(
+      (ref) => const UnconfiguredNotificationSettingsRepository(),
+    );
+
+/// Story 3.7: the per-account generic inbox refresh signal.
+final inboxSignalsProvider = Provider<InboxSignals>(
+  (ref) => const NoInboxSignals(),
 );
 
 /// Story 3.6: the device push SDK. Off by default ([NoPushMessaging]); the

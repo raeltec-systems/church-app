@@ -222,8 +222,14 @@ void main() {
       await pumpAt(
         tester,
         ClientPaths.inboxItem(_item),
+        // Story 3.7 registered the SYNTHETIC fixture link; a future
+        // source's link is not in this build yet.
         setUp: (h) => h.inbox.opened[_item] = AccessReadOk(
-          OpenedInboxItem.fromJson(openedItemData()),
+          OpenedInboxItem.fromJson(
+            openedItemData(
+              target: '/duties/41414141-4141-4141-8141-414141414141',
+            ),
+          ),
         ),
       );
       expect(byKey('inbox-item-later-version'), findsOneWidget);

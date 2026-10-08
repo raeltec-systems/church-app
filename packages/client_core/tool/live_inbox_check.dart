@@ -18,9 +18,10 @@ import 'dart:io';
 import 'package:church_client_core/src/domain/access_grants.dart';
 import 'package:church_client_core/src/domain/commands.dart';
 import 'package:church_client_core/src/domain/inbox.dart';
+import 'package:church_client_core/src/domain/notification_settings.dart';
 import 'package:church_client_core/supabase_adapters.dart';
 import 'package:church_contracts/church_contracts.dart';
-import 'package:supabase/supabase.dart';
+import 'package:supabase/supabase.dart' hide ErrorCode;
 
 Future<void> main(List<String> args) async {
   if (args.length != 3) {
@@ -171,6 +172,157 @@ Future<void> main(List<String> args) async {
     opened(openB) == 'notFound',
     opened(openB),
   );
+
+  // Story 3.7: markers, the refresh signal, snooze and settings through the
+  // real adapters (SupabaseInboxSignals joins the private Realtime channel).
+  final listed = await SupabaseInboxRepository(mobileA).fetchMyInbox();
+  final firstItem = listed is AccessReadOk<Inbox>
+      ? listed.value.items.firstOrNull
+      : null;
+  report(
+    'L11 the opened item is listed as opened (never as delivered)',
+    firstItem?.opened == true && firstItem?.snoozedUntil == null,
+    'opened ${firstItem?.opened}',
+  );
+
+  final authA = mobileA.auth.currentUser!.id;
+  final authB = mobileB.auth.currentUser!.id;
+  var joinedA = 0, signalsA = 0, joinedB = 0, signalsB = 0;
+  final subA = SupabaseInboxSignals(mobileA).changes(authA).listen((_) {
+    if (joinedA == 0) {
+      joinedA++;
+    } else {
+      signalsA++;
+    }
+  });
+  final subB = SupabaseInboxSignals(mobileB).changes(authB).listen((_) {
+    if (joinedB == 0) {
+      joinedB++;
+    } else {
+      signalsB++;
+    }
+  });
+  Future<void> waitFor(bool Function() done, [int seconds = 10]) async {
+    final until = DateTime.now().add(Duration(seconds: seconds));
+    while (!done() && DateTime.now().isBefore(until)) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+  }
+
+  await waitFor(() => joinedA > 0 && joinedB > 0);
+  report(
+    'L12 each member joins their own private channel',
+    joinedA == 1 && joinedB == 1,
+    'joined $joinedA/$joinedB',
+  );
+
+  final second = await SupabaseCommandGateway(mobileA).send(
+    'fixture_reminder_command',
+    CommandRequest(
+      command: 'fixture.reminder_create',
+      requestId: SecureRequestIds().next(),
+      payload: {
+        'due_at': Instant.fromDateTime(
+          DateTime.now().toUtc().subtract(const Duration(minutes: 1)),
+        ).wire,
+      },
+    ),
+  );
+  final worker2 = await Process.run(
+    'node',
+    ['../../tools/notifications/worker.mjs', 'run-once'],
+    environment: {
+      'SUPABASE_URL': url,
+      'SUPABASE_PUBLISHABLE_KEY': key,
+      'NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL': credential,
+    },
+  );
+  await waitFor(() => signalsA > 0);
+  await Future<void>.delayed(const Duration(seconds: 1));
+  report(
+    'L13 a delivery signals A\'s open inbox, and not B\'s',
+    second is CommandConfirmed &&
+        '${worker2.stdout}'.contains('"delivered":1') &&
+        signalsA >= 1 &&
+        signalsB == 0,
+    'signals $signalsA/$signalsB',
+  );
+  final withNew = await SupabaseInboxRepository(mobileA).fetchMyInbox();
+  final newItem = withNew is AccessReadOk<Inbox>
+      ? withNew.value.items.firstOrNull
+      : null;
+  report(
+    'L14 the re-read shows the new item as not opened',
+    withNew is AccessReadOk<Inbox> &&
+        withNew.value.items.length == 2 &&
+        newItem?.opened == false,
+    'items ${ids(withNew).length}, opened ${newItem?.opened}',
+  );
+
+  final openNew = await SupabaseInboxRepository(mobileA)
+      .openItem(newItem?.itemId ?? '');
+  final choices = openNew is AccessReadOk<OpenedInboxItem>
+      ? openNew.value.snoozeChoices
+      : const <String>[];
+  report(
+    'L15 opening offers the policy snooze choices',
+    choices.join('|') == '1 hour|24 hours|2 days',
+    choices.join('|'),
+  );
+  final before15 = signalsA;
+  final snoozed = await SupabaseCommandGateway(mobileA).send(
+    'notifications_command',
+    CommandRequest(
+      command: 'notifications.snooze_item',
+      requestId: SecureRequestIds().next(),
+      payload: {'item_id': newItem?.itemId ?? '', 'choice': '24 hours'},
+    ),
+  );
+  SnoozeConfirmation? confirmation;
+  if (snoozed is CommandConfirmed) {
+    confirmation = SnoozeConfirmation.fromJson(snoozed.success.data);
+  }
+  await waitFor(() => signalsA > before15);
+  final afterSnooze = await SupabaseInboxRepository(mobileA).fetchMyInbox();
+  final snoozedItem = afterSnooze is AccessReadOk<Inbox>
+      ? afterSnooze.value.items
+            .where((i) => i.itemId == newItem?.itemId)
+            .firstOrNull
+      : null;
+  report(
+    'L16 the member snoozes their item; the list shows until when',
+    confirmation != null &&
+        !confirmation.clamped &&
+        snoozedItem?.snoozedUntil == confirmation.scheduledAt &&
+        signalsA > before15,
+    'clamped ${confirmation?.clamped}, signals ${signalsA - before15}',
+  );
+  final foreign = await SupabaseCommandGateway(mobileB).send(
+    'notifications_command',
+    CommandRequest(
+      command: 'notifications.snooze_item',
+      requestId: SecureRequestIds().next(),
+      payload: {'item_id': newItem?.itemId ?? '', 'choice': '1 hour'},
+    ),
+  );
+  report(
+    'L17 member B cannot snooze A\'s item',
+    foreign is CommandRefused && foreign.error.code == ErrorCode.notFound,
+    foreign is CommandRefused ? foreign.error.code.wireName : foreign,
+  );
+
+  final settings = await SupabaseNotificationSettingsRepository(mobileA)
+      .fetchMySettings();
+  report(
+    'L18 notification settings list the registered categories',
+    settings is AccessReadOk<NotificationSettings> &&
+        settings.value.categories.any((c) => c.reminderKind == 'fixture_due'),
+    settings is AccessReadOk<NotificationSettings>
+        ? settings.value.categories.map((c) => c.reminderKind).join(',')
+        : settings.runtimeType,
+  );
+  await subA.cancel();
+  await subB.cancel();
 
   await staffA.auth.signOut();
   final afterSignOut = await SupabaseInboxRepository(staffA).fetchMyInbox();

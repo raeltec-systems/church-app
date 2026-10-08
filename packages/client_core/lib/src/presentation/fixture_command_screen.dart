@@ -3,10 +3,12 @@ import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../application/fixture_counter_controller.dart';
 import '../application/providers.dart';
 import '../domain/fixture_counter.dart';
+import 'shell_routing.dart';
 
 /// Exercises the synthetic 1.4 `fixture_counter` command with honest
 /// pending, validation, conflict, unavailable, unknown-outcome, denied and
@@ -28,7 +30,22 @@ class FixtureCommandScreen extends ConsumerWidget {
           child: Center(
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
-              child: _FixtureForm(key: ValueKey('fixture-form-$generation')),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _FixtureForm(key: ValueKey('fixture-form-$generation')),
+                  const SizedBox(height: ChurchGeometry.sectionGap),
+                  // Story 3.7: SYNTHETIC test reminders (local/staging only).
+                  FocusRing(
+                    child: OutlinedButton(
+                      key: const Key('open-fixture-reminders'),
+                      onPressed: () =>
+                          context.push(ClientPaths.fixtureReminders),
+                      child: const Text('SYNTHETIC test reminders'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -818,4 +818,95 @@ void main() {
       expect(find.text('SYNTHETIC test reminder'), findsNothing);
     },
   );
+
+  testWidgets(
+    'story 3.7: from the Inbox tab a member opens, snoozes and follows an '
+    'item, and turns push off in notification settings',
+    (tester) async {
+      const item = '31313131-3131-4131-8131-313131313131';
+      final h = await pumpMobile(
+        tester,
+        setUp: (h) {
+          h.grants.myAccess = AccessReadOk(syntheticGrants());
+          h.inbox.inbox = AccessReadOk(
+            Inbox.fromJson({
+              'items': [inboxItemData(id: item, opened: false)],
+            }),
+          );
+          h.inbox.opened[item] = AccessReadOk(
+            OpenedInboxItem.fromJson(
+              openedItemData(
+                id: item,
+                snoozeChoices: const ['1 hour', '24 hours', '2 days'],
+              ),
+            ),
+          );
+          h.notificationSettings.settings = AccessReadOk(
+            NotificationSettings.fromJson({
+              'categories': [pushCategoryData()],
+            }),
+          );
+        },
+      );
+      Future<void> settle() async {
+        for (var i = 0; i < 4; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+      }
+
+      await settle();
+      await tapKey(tester, 'nav-/inbox');
+      await settle();
+      expect(find.byKey(const Key('inbox-item-new-$item')), findsOneWidget);
+      expect(h.signals.listening, 1, reason: 'the open inbox listens');
+
+      await tapKey(tester, 'open-inbox-item-$item');
+      await settle();
+      await tapKey(tester, 'snooze-24-hours');
+      final snooze = h.gateway.sent.lastWhere(
+        (s) => s.wire['command'] == 'notifications.snooze_item',
+      );
+      expect(snooze.wire['payload'], {'item_id': item, 'choice': '24 hours'});
+      snooze.confirm({
+        'item_id': item,
+        'scheduled_at': '2026-10-09T07:00:00Z',
+        'clamped': false,
+        'expires_at': null,
+      }, 2);
+      await settle();
+      expect(find.byKey(const Key('snooze-confirmed')), findsOneWidget);
+
+      await tapKey(tester, 'inbox-item-open-target');
+      await settle();
+      expect(find.byKey(const Key('fixture-reminder-source')), findsOneWidget);
+
+      await tapKey(tester, 'fixture-reminders-to-inbox');
+      await settle();
+      await tapKey(tester, 'open-notification-settings');
+      await settle();
+      await tapKey(tester, 'push-category-fixture_reminder-fixture_due');
+      final setting = h.gateway.sent.lastWhere(
+        (s) => s.wire['command'] == 'notifications.set_push_category',
+      );
+      expect((setting.wire['payload'] as Map)['push_enabled'], isFalse);
+      setting.confirm({'push_enabled': false}, 1);
+      await settle();
+      expect(find.byKey(const Key('push-setting-saved')), findsOneWidget);
+      expect(
+        find.byKey(const Key('notification-settings-device')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('story 3.7: the Fixture tab leads to the test reminders', (
+    tester,
+  ) async {
+    final h = await pumpMobile(tester, location: ClientPaths.fixture);
+    await tapKey(tester, 'open-fixture-reminders');
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+    await tapKey(tester, 'fixture-reminder-create-due');
+    expect(h.gateway.sent.last.wire['command'], 'fixture.reminder_create');
+  });
 }

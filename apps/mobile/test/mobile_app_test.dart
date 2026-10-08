@@ -22,6 +22,7 @@ Future<Harness> pumpMobile(
   double textScale = 1,
   String location = '/status',
   bool configured = true,
+  void Function(Harness h)? setUp,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -29,6 +30,7 @@ Future<Harness> pumpMobile(
   addTearDown(tester.view.reset);
   addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
   final h = ClientTestHarness();
+  setUp?.call(h);
   await tester.pumpWidget(
     ProviderScope(
       overrides: h.overrides(configured: configured),
@@ -48,6 +50,40 @@ Future<void> tapKey(WidgetTester tester, String key) async {
 void main() {
   // Each test starts as a fresh app: no input seen yet.
   setUp(FocusVisibility.instance.reset);
+
+  testWidgets(
+    'story 3.6: a tapped notification opens its inbox item; denied push registers nothing',
+    (tester) async {
+      const item = '31313131-3131-4131-8131-313131313131';
+      final push = FakePushMessaging(
+        deviceToken: 'synthetic-AAAAAAAAAAAAAAAAAAAAAAAA:APA91b',
+        answer: PushPermission.denied,
+      );
+      final h = await pumpMobile(
+        tester,
+        size: const Size(390, 1600),
+        setUp: (h) {
+          h.push = push;
+          h.grants.myAccess = AccessReadOk(syntheticGrants());
+          h.inbox.opened[item] = AccessReadOk(
+            OpenedInboxItem.fromJson({
+              ...inboxItemData(id: item),
+              'state': 'current',
+              'target':
+                  '/fixture/reminders/41414141-4141-4141-8141-414141414141',
+            }),
+          );
+        },
+      );
+      expect(push.requests, 1, reason: 'asked once member access is granted');
+      expect(h.gateway.sent, isEmpty, reason: 'denied: no token registered');
+      push.tap(item);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('inbox-item-title')), findsOneWidget);
+      expect(find.text('SYNTHETIC test reminder'), findsOneWidget);
+      expect(h.inbox.openedIds, [item]);
+    },
+  );
 
   testWidgets(
     'story 2.9: I need help accessing my account, then a private password',

@@ -246,7 +246,7 @@ pg_cron (job "notifications-worker")
 
   Every attempt on an existing job writes one row in `app.notifications_attempts`: job, token, principal, request, outcome, finish reason and SQLSTATE only. An unknown job answers `not_found`.
 - **Release** (`notifications.release {job_id, lease_token}`): the holder gives back a live lease it will not use. No attempt is counted.
-- **One logical outcome.** The inbox item is unique per job, a stale or lapsed token never changes a job, and a cancelled job is never dispatched. An uncertain answer leaves at most a lease to lapse: if the attempt committed, the job is finished; if not, the next claim counts the lapse and reclaims the job. Exactly-once external delivery is not promised (push arrives in entry 6).
+- **One logical outcome.** The inbox item is unique per job, a stale or lapsed token never changes a job, and a cancelled job is never dispatched. An uncertain answer leaves at most a lease to lapse: if the attempt committed, the job is finished; if not, the next claim counts the lapse and reclaims the job. Exactly-once external delivery is not promised (push: story 3.6).
 - **`job_state` keeps its 3.1 values**, because widening the CHECK would need DROP CONSTRAINT. `finish_reason` records why a job ended: `delivered`, `expired`, `attempts_exhausted`, `source_changed`, `not_actionable`, `schedule_changed`, `no_contract`, `recipient_ineligible` or `membership_inactive`. Cancelled jobs keep `cancel_reason` (for example `source_cancelled`, `rescheduled`, `snooze_replaced`).
 - **`notifications.deliver_due`** (3.1) now runs claim + attempt in one transaction under the same rules, for at most `batch_max` jobs, and answers the same five counts. After a statement-timeout cancel it releases the rest of its batch unused and stops. `tools/notifications/worker.mjs run-once` stays as the operator's manual fallback.
 
@@ -339,7 +339,7 @@ Nothing. The tick and the enable refuse production until `ops_system_access`, `q
 ### Known limits
 
 - Entry 5 routes held and accountless recipients and registers the deletion hook (done in story 3.5; the hook covers `app.notifications_attempts` through their jobs; `app.notifications_worker_runs` holds principal ids only, no member).
-- Entry 6 adds push attempts (`channel` `push`) and their outcomes. Entry 8 shows the status in the staff health view.
+- Story 3.6 adds push attempts (`channel` `push`) and their outcomes, and a `push` block in the status (`attempts_24h` now counts inbox attempts only). Entry 8 shows the status in the staff health view.
 
 ## Story 3.5: recipients routed by current access; work retired on lifecycle events
 
@@ -374,11 +374,11 @@ The source's `recipient_eligible` false still ends the job `ineligible` (`recipi
 | `notifications.retire_device` | device revision | `{device_id}` | Retires the caller's own device (`member_retired`); another account's device is `not_found`; a retired one is `conflict {"device_id": "retired"}`. |
 | `notifications.set_push_category` | null to create, the setting's revision to change | `{source_type, reminder_kind, push_enabled}` | Push on or off for one category (a reminder kind with a registered contract; otherwise `validation_failed {"reminder_kind": "unregistered"}`). No setting means on. Turning push off never removes in-app items. |
 
-`POST /rest/v1/rpc/notifications_my_push_settings` returns `{categories: [{source_type, reminder_kind, title, push_enabled, revision}], devices: [{device_id, platform, registered_at, refreshed_at, revision, retired}]}`. No answer or read ever carries a token. Tokens (`app.notifications_device_tokens`) and settings follow the account: member-push work is created only for the member's live linked account. The mobile registration call and push sending are entry 6; the settings screen is entry 7. Group mutes belong to the conditional chat epic.
+`POST /rest/v1/rpc/notifications_my_push_settings` returns `{categories: [{source_type, reminder_kind, title, push_enabled, revision}], devices: [{device_id, platform, registered_at, refreshed_at, revision, retired}]}`. No answer or read ever carries a token. Tokens (`app.notifications_device_tokens`) and settings follow the account: member-push work is created only for the member's live linked account. The mobile registration call and push sending are story 3.6 (below); the settings screen is entry 7. Group mutes belong to the conditional chat epic.
 
 ### Lifecycle and deletion hooks
 
-- `app.notifications_on_member_lifecycle` is registered for `sessions_revoked`, `access_hold_applied`, `membership_deactivated`, `account_deactivated` and `deletion_requested`. In Identity's transaction it retires the member's live tokens and cancels their pending member-push jobs, with the event name as the reason. `deletion_requested` also cancels the member's pending jobs and ends their active schedules (`member_deleted`). Inbox items stay (a held member sees them again after release). A released hold or a restoration re-registers nothing: the device registers again after sign-in (entry 6).
+- `app.notifications_on_member_lifecycle` is registered for `sessions_revoked`, `access_hold_applied`, `membership_deactivated`, `account_deactivated` and `deletion_requested`. In Identity's transaction it retires the member's live tokens and cancels their pending member-push jobs, with the event name as the reason. `deletion_requested` also cancels the member's pending jobs and ends their active schedules (`member_deleted`). Inbox items stay (a held member sees them again after release). A released hold or a restoration re-registers nothing: the device registers again after sign-in (story 3.6).
 - Enqueue and `app.notifications_set_schedule` **skip** a recipient with a deletion tombstone: nothing is written (no job, no schedule written or reactivated) and they answer `{created: false, refused: "member_deleted"}` (enqueue, `job_id` and `job_state` null) or `{schedule_id: null, refused: "member_deleted", ...}` (schedule). They do not raise, so one deleted member never rolls back a source's multi-recipient command. Source owners still drop deleted members through their own lifecycle hooks.
 - **Lock order (AD-2).** The worker's attempt and `notifications.register_device` take `FOR KEY SHARE` on the member row before any Notifications lock, and the `deletion_requested` hook skips jobs another transaction holds (`for update skip locked`; the attempt then routes them `member_deleted`), so a deletion, hold or deactivation cannot deadlock with the worker.
 - `app.notifications_erase_member` (Identity deletion hook): `erase` removes the member's jobs, their attempts, inbox items, schedules, needs and push jobs, and the account's tokens, settings and push jobs; `check` counts what is left. The fixture deletion hook (`app.fixture_erase_member`, now registered by migration) also erases the member's `fixture_reminder_sources` and `fixture_reminder_contact_needs`, and anonymises the account on reminders the member created for others.
@@ -411,3 +411,152 @@ Fictional numbers: pgTAP `+44 7700 900880-900888` (the 3.3 suite borrows `900889
 3. **No Edge Function change.** The worker's outcomes are unchanged, so `notifications-worker` needs no redeploy.
 4. **Demonstration** (owner, synthetic members only): repeat `tools/identity-e2e/routing.mjs`'s steps against staging with seeded SYNTHETIC members. An Admin places a hold on one member, deactivates another and records an accountless member with a relative's number, then runs `fixture.reminder_create_for` for an active, the held, the deactivated and the accountless member, and the worker once (`"delivered":1, "ineligible":3`). Check in SQL: one inbox item (the active member), three `routed` rows in `app.notifications_direct_contact_needs` and three in `app.fixture_reminder_contact_needs`, nothing for the relative. Then a lost-device hold on a member with a pending push job (device registered through `notifications.register_device` with a synthetic token) shows the token retired and the push job `cancelled`. Clean up as in story 3.1, step 7, plus the new tables.
 5. **Production:** nothing new to approve. The fixture command refuses production; routing, tokens and settings work behind the same gates as the rest (Q2 for enqueue, the live-access predicate for members).
+
+## Story 3.6: generic expiring push through FCM; invalid tokens retired
+
+Migration: `supabase/migrations/20261008151500_notifications_push.sql` (one file; no row deletions, no destructive statements, no rows file: push attempts live in `app.notifications_attempts`, which the 3.5 deletion hook already erases). Edge Function: `supabase/functions/notifications-worker/` now has three files, `index.ts`, `logic.mjs` and `fcm.mjs`. Tests: `supabase/tests/notifications_push_test.sql` (96), `supabase/functions/notifications-worker/fcm.test.mjs` and `push-run.test.mjs`, E2E `tools/identity-e2e/push.mjs` (12 checks against a fake FCM endpoint), client tests `packages/client_core/test/notifications/push_test.dart` and the mobile app test. Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.6/`.
+
+**Push is off until the owner's steps below are done.** Nothing in the repository holds a Firebase project id, app id, API key, service account or APNs key, and the apps ship with the no-op push adapter. The durable inbox and the leaders' direct-contact routes carry every reminder meanwhile.
+
+### How a push is sent
+
+```
+worker run (Cron -> Edge Function notifications-worker), after the inbox stage:
+  system route notifications.push_claim     count lapsed push leases, expire push jobs, and only
+                                            while push_enabled: lease a bounded batch
+  for each leased push job:
+    notifications.push_prepare              recheck NOW; answer a terminal outcome, or the generic
+                                            message and the live devices still owed
+    FCM HTTP v1 messages:send x device      OAuth2 access token from the service account (cached)
+    notifications.push_record               one attempt row per device answer; retire invalid
+                                            tokens; end the push job or retry it with backoff
+  notifications.push_release                give back leases left when the run stops early
+```
+
+- **Generic and expiring.** Every message is the reminder contract's fixed `title` and `body`, and `data: {"item_id": "<inbox item id>"}`, nothing else. The item id is also the stable notification id: Android `collapse_key` and notification `tag`, APNs `apns-collapse-id`. A retried or duplicated send therefore replaces the notification instead of adding one. The message expires with the push job: Android `ttl` and APNs `apns-expiration`, at most 28 days.
+- **Rechecked right before the provider call** (`push_prepare`); the first failing rule wins and the push job ends `obsolete` with that reason. The inbox item is untouched. The rules:
+  - past its expiry: `expired`;
+  - no reminder contract: `no_contract`;
+  - source not current at the job's revision: `source_changed`;
+  - not actionable: `not_actionable`;
+  - the source no longer admits the recipient: `recipient_ineligible`;
+  - the schedule ended, moved or cancelled the kind, or the member responded: `schedule_changed`;
+  - the member snoozed the item: `snoozed`;
+  - the member no longer routes to the same active linked account: `recipient_changed`;
+  - push turned off for the category: `push_disabled`;
+  - no live device left: `no_live_token`.
+
+  A raising owner check is transient. Identity's lifecycle hooks (story 3.5) still cancel pending push jobs at once.
+- **Provider answers** (`fcm.mjs`), one attempt row each in `app.notifications_attempts` (`channel` `push`, push job, device, HTTP status, FCM error code; never the token or the text):
+
+| FCM answer | Recorded | Effect |
+|---|---|---|
+| 200 | `accepted` | The provider accepted the message. This is never recorded as delivered, read, responded or consented. |
+| 404 `UNREGISTERED`; 400 `INVALID_ARGUMENT` that names the token (a `google.rpc.BadRequest` on the field `message.token`, or FCM's message "The registration token is not a valid FCM registration token") | `token_invalid` | The device is retired (`retire_reason` `provider_invalid`) and is not sent again. |
+| Any other 400 (a payload problem), any other 4xx | `rejected` | Not retried for that device, and the token is kept. A payload mistake can never retire every device. |
+| 429 / `QUOTA_EXCEEDED` | `transient` | Retried with backoff. The run stops sending and releases the rest of its batch. |
+| 5xx, network failure or timeout, APNs `THIRD_PARTY_AUTH_ERROR` | `transient` | Retried with backoff and the same notification id. A lost answer may have been accepted; the collapse id bounds the duplicate. After 3 such answers in one run the run stops sending (`stopped`: `provider_outage`) and releases the rest of its batch, so an outage does not use up every job's attempts. |
+| Our own configuration: OAuth refused or unreachable, 401 / 403 on our access token, 403 `SENDER_ID_MISMATCH` (the tokens belong to another Firebase project than the credential) | nothing | No attempt is counted and no token is retired. The job is released and the push stage stops (`stopped`: `oauth_refused`, `oauth_unreachable`, `provider_auth` or `sender_mismatch`). Check the Edge secret and the Firebase project. |
+
+- **Ending a push job** (`push_record`). When no device is owed any more, the job ends:
+  - `accepted` when at least one device accepted it;
+  - `failed` (`provider_rejected`) when every device rejected it;
+  - `obsolete` (`no_live_token`) when every token was invalid.
+
+  A transient answer counts a failure and backs off with the worker's central policy. Failures plus lapses reaching `max_attempts` end the job: `accepted` if some device accepted it, otherwise `failed`, both with finish reason `attempts_exhausted`. A retry sends only to the devices still owed.
+- **Leases and fencing** work as for jobs (story 3.4): the same token sequence and settings. The function stops sending 25 seconds before its lease ends (one provider call plus one record call plus a margin; `stopped`: `lease_budget`). It records what it sent and releases the rest, so another worker never re-sends under a newer lease while this one is still sending. A worker that dies after the provider call leaves a lease to lapse. The next claim counts it once (`lapsed`) and sends again with the same notification id. The dead worker's late record is `fenced` and changes nothing about the push job, but its `token_invalid` answers still retire those devices.
+- **No token at rest outside the token table.** `push_prepare`'s answer is the only one that carries device tokens. Its kind is registered with `retain_result = false`, so the kernel keeps only `{request_id, retained: false}` in `app.sys_receipts` and a replay is a `conflict`. Function logs, worker answers and the status carry counts and codes only.
+- **The switch** `push_enabled` (worker settings, default `false`). Turn it on or off as the restricted operator: `select app.notifications_configure_worker('{"push_enabled": true}', 'israel');`. With it off the claim leases nothing. With no service account secret the function makes an expire-only claim (`notifications.push_claim {"expire_only": true}`). Either way pending push jobs still expire and lapsed push leases are counted. The inbox is unaffected. It is also the kill switch.
+- **Status** (`app.notifications_scheduler_status()`): `push: {enabled, pending, leased, ended_24h, attempts_24h, tokens_retired_24h}`. The top-level `attempts_24h` counts inbox attempts only.
+- **Edge Function answer**: the 200 body gains `push`. It is `{claimed, reclaimed, expired, enabled, outcomes, sent, uncertain, deferred, stopped?}`, or `{state: "not_configured", reclaimed, expired}` without the FCM secret, or `{state: "unavailable"}`.
+
+### Clients (shared `client_core`, mobile)
+
+- **Port** `PushMessaging` (`lib/src/domain/push_messaging.dart`): permission, token, token refreshes, taps, launch tap and delete token. The default `NoPushMessaging` is what every build uses today.
+- **`PushRegistrationController`**:
+  - once the server grants member access, it asks the person once (the operating system dialog) and registers the token with `notifications.register_device`;
+  - it registers again when the provider refreshes the token;
+  - before **Sign out** it retires the device (`notifications.retire_device`, at most 5 s) and deletes the token at the provider.
+
+  A denial registers nothing, and every reminder is still in the inbox. The device id and revision are kept in memory only.
+- **`PushBridge`** (mobile app root): a tapped notification, or the one that launched the app, opens `/inbox/<item id>`. Only a well-formed id is accepted. That screen asks the server every time (story 3.2).
+  - Signed out, it offers **Sign in**. After sign-in the person returns to the item: `/sign-in?then=/inbox/<id>`, and `then` accepts nothing but an inbox item path.
+  - A superseded or foreign item shows nothing about the source.
+
+### Local runs
+
+```bash
+npx supabase db reset
+npm run -s db:test                     # supabase/tests/notifications_push_test.sql (96)
+node --test supabase/functions/notifications-worker/*.test.mjs tools/identity-e2e/push.test.mjs
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/push.mjs --evidence <file>.jsonl   # fake FCM + supabase functions serve
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The E2E generates a throwaway RSA key pair and a Firebase-shaped service account for the run (never stored) and starts a fake FCM endpoint on the host. The fake's OAuth endpoint verifies the RS256 assertion; its send endpoint answers per device token as scripted. The run points the function at the fake with `NOTIFICATIONS_FCM_TEST_ENDPOINT`, which the function honours only when `SUPABASE_URL` is plain http, so never on a hosted project. Fictional numbers: pgTAP `+44 7700 900900-900909`, E2E `900910-900919`. The installed AOSP emulator is not push evidence (no Google Play services).
+
+### Hosted staging (parent session, then the owner)
+
+The agent applied nothing, deployed nothing and holds no Firebase or Apple credential. In order:
+
+1. **Parent session: the migration.** Apply `20261008151500_notifications_push.sql` to staging (`tmurpotfluignacfueki`) after `20261008135811`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. There is no rows file. The migration:
+   - adds `app.sys_command_kinds.retain_result` and replaces the body of `app.sys_execute` (same signature and grants);
+   - adds the `push_enabled` setting (off), the push-job lease columns, the attempt push columns and the four `notifications.push_*` commands, which the existing staging `notifications_worker` principal gets at once;
+   - replaces `app.notifications_configure_worker` and `app.notifications_scheduler_status` in place;
+   - adds no client grant.
+
+   Check: `select app.notifications_scheduler_status() -> 'push';` answers `"enabled": false`.
+2. **Parent session: redeploy the function.** Supabase MCP `deploy_edge_function` on `tmurpotfluignacfueki`:
+   - name `notifications-worker`, entrypoint `index.ts`, `verify_jwt: false`;
+   - files `supabase/functions/notifications-worker/index.ts`, `logic.mjs` and **`fcm.mjs`** (new).
+
+   Until step 4 the answer's `push` is `{"state":"not_configured", ...}` (push jobs only expire) and inbox delivery is unchanged.
+3. **Owner: the Firebase project** ([Firebase console](https://console.firebase.google.com)):
+   1. **Add project**, for example `bic-kafue-staging`. Google Analytics is not needed. Use a separate project for production later.
+   2. **Project settings > General > Your apps > Add app > Android**: package name `zm.bickafue.bic_kafue_mobile`. Download `google-services.json` but **do not commit it**. Keep it in your password manager; the client follow-up below needs four values from it.
+   3. **Add app > Apple (iOS)**: bundle ID `zm.bickafue.bicKafueMobile`. Download `GoogleService-Info.plist` and keep it, also uncommitted.
+   4. **Project settings > Cloud Messaging**: check that **Firebase Cloud Messaging API (V1)** shows *Enabled*. The legacy API is not used.
+4. **Owner: the sending credential** (a narrowly scoped service account):
+   1. [Google Cloud console](https://console.cloud.google.com) for the same project: **IAM & Admin > Service Accounts > Create service account**, name `bic-push-sender`, role **Firebase Cloud Messaging API Admin** (`roles/firebasecloudmessaging.admin`) only. The default `firebase-adminsdk` account also works, but it holds far more rights.
+   2. On the new account: **Keys > Add key > Create new key > JSON**. A file downloads.
+   3. Supabase dashboard, project `bic-kafue-platform-test`: **Edge Functions > Secrets > Add new secret**, name `NOTIFICATIONS_FCM_SERVICE_ACCOUNT`, value = the whole JSON file, or its base64: `base64 -w0 key.json` (Linux) or `base64 -i key.json` (macOS). Or from your own terminal: `npx supabase secrets set --project-ref tmurpotfluignacfueki NOTIFICATIONS_FCM_SERVICE_ACCOUNT="$(base64 -w0 key.json)"`.
+   4. Delete the downloaded file. Never paste the key into a chat, a ticket, the SQL editor or the repository.
+   5. The next worker run answers `push: {"enabled": false, ...}` instead of `not_configured`.
+5. **Owner: iOS delivery (APNs)**. Needed only for iPhones; Android works without it.
+   1. [Apple Developer](https://developer.apple.com/account) > **Certificates, Identifiers & Profiles > Identifiers**: open `zm.bickafue.bicKafueMobile` (create it if missing) and tick **Push Notifications**.
+   2. **Keys > +**: name `BIC Kafue APNs`, tick **Apple Push Notifications service (APNs)**, then Continue and Register. Download the `.p8` file; it can be downloaded only once. Note the **Key ID** and your **Team ID** (top right of the page).
+   3. Firebase console > **Project settings > Cloud Messaging > Apple app configuration > APNs Authentication Key > Upload**: the `.p8`, Key ID and Team ID. Keep the `.p8` in your password manager.
+6. **Client follow-up** (a builder ticket; it needs only the non-secret app identifiers from step 3, passed at build time and never committed). Add pinned `firebase_core` and `firebase_messaging` to `apps/mobile` and write a `FirebasePushMessaging` adapter implementing `PushMessaging`:
+   - `Firebase.initializeApp(options: FirebaseOptions(...))` from `--dart-define`s: `FIREBASE_PROJECT_ID`, `FIREBASE_SENDER_ID`, `FIREBASE_API_KEY`, `FIREBASE_ANDROID_APP_ID` and `FIREBASE_IOS_APP_ID`. Their values come from `google-services.json` (`project_info.project_id`, `project_info.project_number`, `client[0].api_key[0].current_key`, `client[0].client_info.mobilesdk_app_id`) and `GoogleService-Info.plist` (`GOOGLE_APP_ID`). The adapter stays off when they are absent.
+   - Android: `POST_NOTIFICATIONS` in `AndroidManifest.xml` (Android 13+).
+   - iOS: the Push Notifications capability and `aps-environment` in `Runner.entitlements`, and Background Modes > Remote notifications.
+   - Override `pushMessagingProvider` in `apps/mobile/lib/main.dart`.
+
+   Until this lands no device registers and nothing is sent.
+7. **Parent or owner: turn push on for staging** once a device build exists: `select app.notifications_configure_worker('{"push_enabled": true}', 'israel');`.
+8. **Owner: the real-device check** (the ticket's verify line). Use a real Android phone with Google Play services, and an iPhone where available, with the build from step 6 signed in as a SYNTHETIC member. Allow notifications when asked.
+   1. Close the app (swipe it away). Create a reminder due now for that member (`fixture.reminder_create`, or an Admin's `fixture.reminder_create_for`). Within about a minute a notification shows **SYNTHETIC test reminder / A test reminder is waiting for you.** and nothing else.
+   2. Tap it: the app opens **Reminder** for that item, after sign-in if the session has ended, and shows **Still current**.
+   3. Denied push: on a second phone or member, deny notifications. A new reminder arrives in **Inbox** and no notification shows. `app.notifications_push_jobs` has no row for it.
+   4. Invalid token: uninstall the app on one registered phone, create a reminder and wait one run. `select retire_reason from app.notifications_device_tokens where member_id = '<member>' order by refreshed_at desc;` shows `provider_invalid` for that device. FCM may need some time to report an uninstalled app as unregistered.
+   5. Retry with the same notification id. FCM rarely answers a transient error on demand, so the retry itself is proven by the local E2E (`push.mjs` P30: a 503 and then acceptance, both carrying the same item id as collapse id) and by pgTAP. On staging:
+      - Airplane mode is not a provider failure. With the phone in airplane mode for a few minutes, FCM accepts the message and holds it; the phone shows ONE notification when it reconnects, and the attempt is `accepted` only.
+      - If `select outcome, provider_code from app.notifications_attempts where channel = 'push' and outcome = 'transient';` ever lists rows, each push job's next attempt follows after the backoff, and the phone still shows one notification.
+   6. Nothing shows as delivered or read: `select distinct outcome from app.notifications_attempts where channel = 'push';` lists only provider outcomes (`accepted`, `token_invalid`, `rejected`, `transient`, `lapsed`, ...).
+9. **Rotation** (service account key, at least yearly or when a person leaves):
+   1. Create a new JSON key on `bic-push-sender`.
+   2. Replace the Edge secret.
+   3. Wait for one run that shows `push.sent.accepted`.
+   4. Delete the old key under **Keys**.
+10. **Stop push** at any time: `push_enabled` false (above). For a full stop, also delete the Edge secret `NOTIFICATIONS_FCM_SERVICE_ACCOUNT`.
+
+### Production
+
+Nothing yet. Production needs its own Firebase project and service account, its own APNs upload (the same `.p8` may serve both), its own Edge secret, the client build with production identifiers, and `push_enabled` set by the owner after the entry 10 gates.
+
+### Known limits and follow-ups
+
+- **Client wiring.** The real `firebase_messaging` adapter is step 6 above. Until then the apps register nothing.
+- **Sign-out elsewhere.** A device retires its own registration when the person signs out in the app. A session that ends any other way (expiry, revocation by `sessions_revoked`) is covered by the 3.5 lifecycle hooks only for the events they listen to. A plain session expiry leaves the token registered until the next sign-in on that phone; pushes stay generic and every open re-checks the session.
+- **Foreground display.** A notification arriving while the app is open is left to the SDK default; the inbox refreshes on resume. The settings screen (push categories) is entry 7, and the staff health view of the `push` status is entry 8.

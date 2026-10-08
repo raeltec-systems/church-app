@@ -66,3 +66,11 @@
 - source_plan: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/story-verify-identity-end-to-end-and-promote-it-to-production-plan.md`
   summary: Add an Edge Function deploy step (identity-assisted-recovery, identity-deletion) to `.github/workflows/promote.yml` between the database and client steps.
   evidence: the 1.8 workflow predates Edge Functions ("add their deploy step between steps 4 and 6"); 2.14's production package deploys them by hand.
+
+- source_plan: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/story-send-generic-expiring-push-through-fcm-and-retire-invalid-to-plan.md`
+  summary: Add the real `firebase_messaging` adapter for `PushMessaging` in `apps/mobile` (pinned `firebase_core`/`firebase_messaging`, `FirebaseOptions` from `--dart-define`s, Android `POST_NOTIFICATIONS`, iOS Push Notifications capability, `aps-environment` and remote-notification background mode, override `pushMessagingProvider` in `main.dart`), then run the owner's real-device check.
+  evidence: 3.6 built the port, registration, tap handling and the server/Edge sender with a default-off no-op adapter; real wiring needs the owner's Firebase app identifiers and an APNs key (runbook notifications.md, Story 3.6, steps 3-8), which no agent holds.
+
+- source_plan: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/story-send-generic-expiring-push-through-fcm-and-retire-invalid-to-plan.md`
+  summary: Retire a device's push registration when its Auth session ends without an in-app sign-out (plain expiry or sign-out elsewhere), not only on the 3.5 lifecycle events.
+  evidence: 3.6 retires the registration before an in-app sign-out only; pushes stay generic and every open re-checks the session, so this is a privacy refinement, not a leak of content.

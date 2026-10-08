@@ -20,7 +20,20 @@
 //      401 unauthenticated (no or wrong trigger), 403 refused (the route refused the credential),
 //      409 busy, 400 invalid body, 503 not configured or unavailable.
 //
-// Logs carry counts and outcome codes only: never a body, credential, trigger, job or member id.
+// Story 3.6: after the inbox stage, the PUSH stage sends member-push jobs through FCM HTTP v1
+// (fcm.mjs), only when the owner's Firebase service account is set as the Edge secret
+// NOTIFICATIONS_FCM_SERVICE_ACCOUNT (the console JSON, or its base64) and the operator switch
+// push_enabled is on in the database. The database rechecks each push job right before the
+// provider call and records the provider's per-device answers (acceptance, never delivery).
+//   NOTIFICATIONS_FCM_SERVICE_ACCOUNT          owner-set Edge secret (optional; absent = push off)
+//   NOTIFICATIONS_FCM_TEST_ENDPOINT            LOCAL ONLY: a fake FCM origin for the E2E; ignored
+//                                              unless SUPABASE_URL is plain http (never hosted)
+// The 200 answer gains `push`: {claimed, reclaimed, expired, enabled, outcomes, sent, uncertain,
+// deferred, stopped?}, {state: "not_configured", reclaimed, expired} (no FCM credential: push
+// jobs only expire) or {state: "unavailable"}.
+//
+// Logs carry counts and outcome codes only: never a body, credential, trigger, job or member id,
+// device token, service-account field or notification text.
 
 import {
   MAX_BODY_BYTES,
@@ -29,9 +42,12 @@ import {
   keyHeaders,
   parseBody,
   runOnce,
+  expirePush,
+  runPush,
   systemEnvelope,
   triggerMatches,
 } from './logic.mjs';
+import { createFcmSender, fcmEndpoints, parseServiceAccount } from './fcm.mjs';
 
 const SUPABASE_URL = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/+$/, '');
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
@@ -40,6 +56,15 @@ const CONFIG = configFrom({
   trigger: Deno.env.get('NOTIFICATIONS_WORKER_TRIGGER') ?? '',
 });
 const CALL_TIMEOUT_MS = 10_000;
+const FCM_ACCOUNT = parseServiceAccount(Deno.env.get('NOTIFICATIONS_FCM_SERVICE_ACCOUNT') ?? '');
+const FCM_ENDPOINTS = FCM_ACCOUNT
+  ? fcmEndpoints({ projectId: FCM_ACCOUNT.projectId, supabaseUrl: SUPABASE_URL,
+    testEndpoint: Deno.env.get('NOTIFICATIONS_FCM_TEST_ENDPOINT') ?? '' })
+  : null;
+// One sender per instance, so the OAuth access token is reused across runs until it expires.
+const FCM_SENDER = FCM_ACCOUNT && FCM_ENDPOINTS
+  ? createFcmSender({ account: FCM_ACCOUNT, endpoints: FCM_ENDPOINTS, fetch: (url: string, init: RequestInit) => timedOrThrow(url, init) })
+  : null;
 let running = false;
 
 type Json = Record<string, unknown>;
@@ -71,6 +96,13 @@ async function timed(url: string, init: RequestInit): Promise<Response | null> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+// The provider transport: like timed(), but a failure rejects (the adapter maps it).
+async function timedOrThrow(url: string, init: RequestInit): Promise<Response> {
+  const res = await timed(url, init);
+  if (!res) throw new Error('unreachable');
+  return res;
 }
 
 // One allowlisted system command with the worker's credential; refusals throw a coarse code.
@@ -130,9 +162,21 @@ Deno.serve(async (req: Request) => {
   }
   running = true;
   try {
-    const counts = await runOnce({ system: systemWith(CONFIG.credential), limit: (parsed.value as Json).limit as number | undefined });
-    note({ outcome: 'ran', ...counts });
-    return reply(200, counts);
+    const system = systemWith(CONFIG.credential);
+    const limit = (parsed.value as Json).limit as number | undefined;
+    const started = Date.now();
+    const counts = await runOnce({ system, limit });
+    let push: Json;
+    try {
+      // Without the FCM credential pending push jobs still expire (nothing is leased or sent).
+      push = FCM_SENDER
+        ? await runPush({ system, sender: FCM_SENDER, limit, deadlineMs: started + 50_000 })
+        : await expirePush({ system });
+    } catch {
+      push = { state: 'unavailable' };
+    }
+    note({ outcome: 'ran', ...counts, push });
+    return reply(200, { ...counts, push });
   } catch (e) {
     const code = e instanceof SystemRouteError ? e.code : 'unavailable';
     note({ outcome: code });

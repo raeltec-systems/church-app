@@ -144,14 +144,15 @@ select results_eq($$select command, purpose || '|' || payload_check || '|' || ha
   'claim, attempt and release are commands of the notifications_worker purpose');
 select is((select array_agg(column_name::text order by column_name::text) from information_schema.columns
             where table_schema = 'app' and table_name = 'notifications_attempts'),
-  array['attempt_id', 'attempted_at', 'channel', 'error_sqlstate', 'finish_reason', 'job_id',
-        'lease_token', 'outcome', 'principal_id', 'request_id'],
-  'an attempt row holds ids, codes and times only');
+  array['attempt_id', 'attempted_at', 'channel', 'device_id', 'error_sqlstate', 'finish_reason', 'job_id',
+        'lease_token', 'outcome', 'principal_id', 'provider_code', 'provider_status', 'push_job_id',
+        'request_id'],
+  'an attempt row holds ids, codes and times only (story 3.6 adds the push job, device and provider codes)');
 select is((select to_jsonb(s) - 'updated_at' from app.notifications_worker_settings s),
   '{"singleton": true, "lease_seconds": 120, "batch_max": 25, "max_attempts": 5,
     "backoff_base_seconds": 60, "backoff_max_seconds": 3600, "default_ttl_seconds": 604800,
-    "worker_url": null, "updated_by": null}'::jsonb,
-  'the central worker policy has the decided defaults and no worker URL');
+    "worker_url": null, "updated_by": null, "push_enabled": false}'::jsonb,
+  'the central worker policy has the decided defaults, no worker URL and push off (3.6)');
 select is(array[app.notifications_backoff_seconds(0, s), app.notifications_backoff_seconds(1, s),
                 app.notifications_backoff_seconds(2, s), app.notifications_backoff_seconds(7, s),
                 app.notifications_backoff_seconds(40, s)],
@@ -539,7 +540,7 @@ select throws_ok($$select app.notifications_scheduler_enable('israel', '10 secon
 select is((app.notifications_scheduler_enable('israel', '30 seconds') -> 'scheduler_jobs')::int, 1,
   'the scheduler is one named Cron job');
 select is(app.notifications_scheduler_enable('israel') - array['cron_runs_24h', 'last_tick_at', 'last_claim_at',
-            'claims_24h', 'due_pending', 'leased', 'attempts_24h', 'settings'],
+            'claims_24h', 'due_pending', 'leased', 'attempts_24h', 'settings', 'push'],
   '{"environment": "local", "allowed": true, "scheduler_jobs": 1, "schedule": "* * * * *", "active": true,
     "worker_url_set": true, "worker_url_valid": true, "trigger_set": true, "last_tick_outcome": "sent"}'::jsonb,
   'enabling again replaces it (still one job, now every minute)');

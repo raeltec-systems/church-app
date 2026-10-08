@@ -18,6 +18,7 @@ class SignInScreen extends ConsumerStatefulWidget {
     this.createAccount = false,
     this.afterCreateAccount = ClientPaths.account,
     this.assistedRecovery = false,
+    this.continueTo,
   });
 
   /// Story 2.9 (mobile): the church help panel links to "I need help
@@ -28,8 +29,13 @@ class SignInScreen extends ConsumerStatefulWidget {
   final bool createAccount;
 
   /// Where a new account continues (mobile: the membership request, story
-  /// 2.4). A sign-in always continues to the account page.
+  /// 2.4). A sign-in continues to the account page, or to [continueTo].
   final String afterCreateAccount;
+
+  /// Story 3.6: where a sign-in continues instead of the account page (a
+  /// tapped notification's inbox item; see [ClientPaths.continuationFrom]).
+  /// The item screen asks the server again with the new session.
+  final String? continueTo;
 
   @override
   ConsumerState<SignInScreen> createState() => _SignInScreenState();
@@ -123,7 +129,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         _password.clear();
         ref.read(signInControllerProvider.notifier).reset();
         context.go(
-          next.createdAccount ? widget.afterCreateAccount : ClientPaths.account,
+          next.createdAccount
+              ? widget.afterCreateAccount
+              : (widget.continueTo ?? ClientPaths.account),
         );
         return;
       }

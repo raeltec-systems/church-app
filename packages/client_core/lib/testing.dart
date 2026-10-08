@@ -25,6 +25,7 @@ import 'src/domain/password_recovery.dart';
 import 'src/domain/recovery_email.dart';
 import 'src/domain/fixture_counter.dart';
 import 'src/domain/inbox.dart';
+import 'src/domain/push_messaging.dart';
 import 'src/domain/session.dart';
 
 /// One command the fake gateway received; complete it to answer.
@@ -1209,6 +1210,86 @@ class FakeInbox implements InboxRepository {
   }
 }
 
+/// Story 3.6: a device push SDK the test drives (permission answers, tokens,
+/// token refreshes and notification taps).
+class FakePushMessaging implements PushMessaging {
+  FakePushMessaging({
+    this.supported = true,
+    this.devicePlatform = PushPlatform.android,
+    this.current = PushPermission.notDetermined,
+    this.answer = PushPermission.granted,
+    this.deviceToken,
+    this.launchedBy,
+  });
+
+  final bool supported;
+  final PushPlatform devicePlatform;
+
+  /// The permission now, and the person's answer when asked.
+  PushPermission current;
+  PushPermission answer;
+
+  /// The device token (null = none available).
+  String? deviceToken;
+
+  /// The item id of the notification that launched the app.
+  String? launchedBy;
+
+  int requests = 0;
+  int deletes = 0;
+
+  /// The SDK's token deletion throws (sign-out must still proceed).
+  bool failDelete = false;
+  final _refreshes = StreamController<String>.broadcast();
+  final _taps = StreamController<String>.broadcast();
+
+  void refreshToken(String token) {
+    deviceToken = token;
+    _refreshes.add(token);
+  }
+
+  void tap(String itemId) => _taps.add(itemId);
+
+  @override
+  bool get isSupported => supported;
+
+  @override
+  PushPlatform? get platform => supported ? devicePlatform : null;
+
+  @override
+  Future<PushPermission> permission() async => current;
+
+  @override
+  Future<PushPermission> requestPermission() async {
+    requests++;
+    current = answer;
+    return answer;
+  }
+
+  @override
+  Future<String?> token() async => deviceToken;
+
+  @override
+  Stream<String> get tokenRefreshes => _refreshes.stream;
+
+  @override
+  Stream<String> get taps => _taps.stream;
+
+  @override
+  Future<String?> initialTap() async {
+    final id = launchedBy;
+    launchedBy = null;
+    return id;
+  }
+
+  @override
+  Future<void> deleteToken() async {
+    deletes++;
+    if (failDelete) throw StateError('SYNTHETIC push SDK failure');
+    deviceToken = null;
+  }
+}
+
 /// The wire form of one inbox item (story 3.1).
 Map<String, Object?> inboxItemData({
   String id = '31313131-3131-4131-8131-313131313131',
@@ -1256,6 +1337,9 @@ class ClientTestHarness {
   final deletions = FakeMemberDeletion();
   final inbox = FakeInbox();
 
+  /// Story 3.6: the device push SDK (default: none, as every build today).
+  PushMessaging push = const NoPushMessaging();
+
   /// Replaces [gateway] in [overrides] when set, so a screen test can run
   /// the real adapter (for example SupabaseCommandGateway over a mock HTTP
   /// client answering with a recorded server envelope).
@@ -1267,6 +1351,7 @@ class ClientTestHarness {
     sessionRepositoryProvider.overrideWithValue(session),
     fixtureCounterReaderProvider.overrideWithValue(reader),
     requestIdsProvider.overrideWithValue(SequentialRequestIds()),
+    pushMessagingProvider.overrideWithValue(push),
     if (configured) ...[
       accountAuthGatewayProvider.overrideWithValue(auth),
       memberAccessRepositoryProvider.overrideWithValue(memberAccess),

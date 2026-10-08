@@ -343,6 +343,26 @@ class _InboxItemScreenState extends ConsumerState<InboxItemScreen> {
           failedTitle: 'Couldn\'t open this reminder',
         ),
       );
+      // Story 3.6: a tapped notification may open this screen signed out;
+      // after sign-in the person returns here and the server checks again.
+      if (s.result case AccessReadDenied(denial: AccessDenial.signedOut)) {
+        children.addAll([
+          const SizedBox(height: 12),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FocusRing(
+              child: FilledButton.icon(
+                key: const Key('inbox-item-sign-in'),
+                onPressed: () => context.go(
+                  ClientPaths.signInThen(ClientPaths.inboxItem(widget.itemId)),
+                ),
+                icon: const Icon(Icons.login),
+                label: const Text('Sign in'),
+              ),
+            ),
+          ),
+        ]);
+      }
     } else if (opened.state == InboxItemState.notFound || item == null) {
       children.add(
         const RequestStateBanner(

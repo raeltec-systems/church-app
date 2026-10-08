@@ -23,7 +23,7 @@ The checks in `push-e2e.jsonl`:
 
 Also run (all passing):
 
-- `npm run db:test`: 24 files, 2031 assertions, including `notifications_push_test.sql` (91). It covers leases, prepare rechecks, provider answers, retirement, retry, exhaustion, lapses and fencing, the kernel's `retain_result` (no token in `app.sys_receipts`, replay = conflict), status and deletion.
+- `npm run db:test`: 24 files, 2036 assertions, including `notifications_push_test.sql` (96). It covers leases, prepare rechecks, provider answers, retirement, retry, exhaustion, lapses and fencing (a fenced record still retires invalid tokens), the expire-only claim, the kernel's `retain_result` (no token in `app.sys_receipts`, replay = conflict), status and deletion.
 - `npm run db:smoke`.
 - Every `tools/identity-e2e` E2E (run, grants, apply, review, cells, recovery, credentials, assisted, lifecycle, deletion, runbooks, inbox, source-contracts, worker, routing, push), each after a reset.
 - `contracts:test`; the offline tool and function tests (`node --test tools/*/*.test.mjs supabase/functions/*/*.test.mjs`, including `fcm.test.mjs` and `push-run.test.mjs`).

@@ -414,7 +414,7 @@ Fictional numbers: pgTAP `+44 7700 900880-900888` (the 3.3 suite borrows `900889
 
 ## Story 3.6: generic expiring push through FCM; invalid tokens retired
 
-Migration: `supabase/migrations/20261008151500_notifications_push.sql` (one file; no row deletions, no destructive statements, no rows file: push attempts live in `app.notifications_attempts`, which the 3.5 deletion hook already erases). Edge Function: `supabase/functions/notifications-worker/` now has three files, `index.ts`, `logic.mjs` and `fcm.mjs`. Tests: `supabase/tests/notifications_push_test.sql` (91), `supabase/functions/notifications-worker/fcm.test.mjs` and `push-run.test.mjs`, E2E `tools/identity-e2e/push.mjs` (12 checks against a fake FCM endpoint), client tests `packages/client_core/test/notifications/push_test.dart` and the mobile app test. Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.6/`.
+Migration: `supabase/migrations/20261008151500_notifications_push.sql` (one file; no row deletions, no destructive statements, no rows file: push attempts live in `app.notifications_attempts`, which the 3.5 deletion hook already erases). Edge Function: `supabase/functions/notifications-worker/` now has three files, `index.ts`, `logic.mjs` and `fcm.mjs`. Tests: `supabase/tests/notifications_push_test.sql` (96), `supabase/functions/notifications-worker/fcm.test.mjs` and `push-run.test.mjs`, E2E `tools/identity-e2e/push.mjs` (12 checks against a fake FCM endpoint), client tests `packages/client_core/test/notifications/push_test.dart` and the mobile app test. Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.6/`.
 
 **Push is off until the owner's steps below are done.** Nothing in the repository holds a Firebase project id, app id, API key, service account or APNs key, and the apps ship with the no-op push adapter. The durable inbox and the leaders' direct-contact routes carry every reminder meanwhile.
 
@@ -452,12 +452,11 @@ worker run (Cron -> Edge Function notifications-worker), after the inbox stage:
 | FCM answer | Recorded | Effect |
 |---|---|---|
 | 200 | `accepted` | The provider accepted the message. This is never recorded as delivered, read, responded or consented. |
-| 404 `UNREGISTERED`; 403 `SENDER_ID_MISMATCH`; 400 naming the field `message.token` | `token_invalid` | The device is retired (`retire_reason` `provider_invalid`) and is not sent again. |
-| Any other 400, any other 4xx | `rejected` | Not retried for that device, and the token is kept. A payload mistake can never retire every device. |
+| 404 `UNREGISTERED`; 400 `INVALID_ARGUMENT` that names the token (a `google.rpc.BadRequest` on the field `message.token`, or FCM's message "The registration token is not a valid FCM registration token") | `token_invalid` | The device is retired (`retire_reason` `provider_invalid`) and is not sent again. |
+| Any other 400 (a payload problem), any other 4xx | `rejected` | Not retried for that device, and the token is kept. A payload mistake can never retire every device. |
 | 429 / `QUOTA_EXCEEDED` | `transient` | Retried with backoff. The run stops sending and releases the rest of its batch. |
-| 5xx, network failure or timeout, APNs `THIRD_PARTY_AUTH_ERROR` | `transient` | Retried with backoff and the same notification id. A lost answer may have been accepted; the collapse id bounds the duplicate. |
-| 401 / 403 on our own access token | `transient` | The cached token is dropped and the run stops sending. |
-| OAuth token endpoint refuses or is unreachable | nothing | The job is released (no attempt counted) and the push stage stops (`stopped`: `oauth_refused` / `oauth_unreachable`). |
+| 5xx, network failure or timeout, APNs `THIRD_PARTY_AUTH_ERROR` | `transient` | Retried with backoff and the same notification id. A lost answer may have been accepted; the collapse id bounds the duplicate. After 3 such answers in one run the run stops sending (`stopped`: `provider_outage`) and releases the rest of its batch, so an outage does not use up every job's attempts. |
+| Our own configuration: OAuth refused or unreachable, 401 / 403 on our access token, 403 `SENDER_ID_MISMATCH` (the tokens belong to another Firebase project than the credential) | nothing | No attempt is counted and no token is retired. The job is released and the push stage stops (`stopped`: `oauth_refused`, `oauth_unreachable`, `provider_auth` or `sender_mismatch`). Check the Edge secret and the Firebase project. |
 
 - **Ending a push job** (`push_record`). When no device is owed any more, the job ends:
   - `accepted` when at least one device accepted it;
@@ -465,11 +464,11 @@ worker run (Cron -> Edge Function notifications-worker), after the inbox stage:
   - `obsolete` (`no_live_token`) when every token was invalid.
 
   A transient answer counts a failure and backs off with the worker's central policy. Failures plus lapses reaching `max_attempts` end the job: `accepted` if some device accepted it, otherwise `failed`, both with finish reason `attempts_exhausted`. A retry sends only to the devices still owed.
-- **Leases and fencing** work as for jobs (story 3.4): the same token sequence and settings. A worker that dies after the provider call leaves a lease to lapse. The next claim counts it once (`lapsed`) and sends again with the same notification id; the dead worker's late record is `fenced`.
+- **Leases and fencing** work as for jobs (story 3.4): the same token sequence and settings. The function stops sending 25 seconds before its lease ends (one provider call plus one record call plus a margin; `stopped`: `lease_budget`). It records what it sent and releases the rest, so another worker never re-sends under a newer lease while this one is still sending. A worker that dies after the provider call leaves a lease to lapse. The next claim counts it once (`lapsed`) and sends again with the same notification id. The dead worker's late record is `fenced` and changes nothing about the push job, but its `token_invalid` answers still retire those devices.
 - **No token at rest outside the token table.** `push_prepare`'s answer is the only one that carries device tokens. Its kind is registered with `retain_result = false`, so the kernel keeps only `{request_id, retained: false}` in `app.sys_receipts` and a replay is a `conflict`. Function logs, worker answers and the status carry counts and codes only.
-- **The switch** `push_enabled` (worker settings, default `false`). Turn it on or off as the restricted operator: `select app.notifications_configure_worker('{"push_enabled": true}', 'israel');`. With it off, or with no service account secret, the function claims no push job and pending push jobs expire. The inbox is unaffected. It is also the kill switch.
+- **The switch** `push_enabled` (worker settings, default `false`). Turn it on or off as the restricted operator: `select app.notifications_configure_worker('{"push_enabled": true}', 'israel');`. With it off the claim leases nothing. With no service account secret the function makes an expire-only claim (`notifications.push_claim {"expire_only": true}`). Either way pending push jobs still expire and lapsed push leases are counted. The inbox is unaffected. It is also the kill switch.
 - **Status** (`app.notifications_scheduler_status()`): `push: {enabled, pending, leased, ended_24h, attempts_24h, tokens_retired_24h}`. The top-level `attempts_24h` counts inbox attempts only.
-- **Edge Function answer**: the 200 body gains `push`. It is either `{claimed, reclaimed, expired, enabled, outcomes, sent, uncertain, deferred, stopped?}` or `{state: "not_configured" | "unavailable"}`.
+- **Edge Function answer**: the 200 body gains `push`. It is `{claimed, reclaimed, expired, enabled, outcomes, sent, uncertain, deferred, stopped?}`, or `{state: "not_configured", reclaimed, expired}` without the FCM secret, or `{state: "unavailable"}`.
 
 ### Clients (shared `client_core`, mobile)
 
@@ -488,7 +487,7 @@ worker run (Cron -> Edge Function notifications-worker), after the inbox stage:
 
 ```bash
 npx supabase db reset
-npm run -s db:test                     # supabase/tests/notifications_push_test.sql (91)
+npm run -s db:test                     # supabase/tests/notifications_push_test.sql (96)
 node --test supabase/functions/notifications-worker/*.test.mjs tools/identity-e2e/push.test.mjs
 node tools/auth-harness/local-phone-auth.mjs on
 node tools/identity-e2e/push.mjs --evidence <file>.jsonl   # fake FCM + supabase functions serve
@@ -512,7 +511,7 @@ The agent applied nothing, deployed nothing and holds no Firebase or Apple crede
    - name `notifications-worker`, entrypoint `index.ts`, `verify_jwt: false`;
    - files `supabase/functions/notifications-worker/index.ts`, `logic.mjs` and **`fcm.mjs`** (new).
 
-   Until step 4 the answer's `push` is `{"state":"not_configured"}` and inbox delivery is unchanged.
+   Until step 4 the answer's `push` is `{"state":"not_configured", ...}` (push jobs only expire) and inbox delivery is unchanged.
 3. **Owner: the Firebase project** ([Firebase console](https://console.firebase.google.com)):
    1. **Add project**, for example `bic-kafue-staging`. Google Analytics is not needed. Use a separate project for production later.
    2. **Project settings > General > Your apps > Add app > Android**: package name `zm.bickafue.bic_kafue_mobile`. Download `google-services.json` but **do not commit it**. Keep it in your password manager; the client follow-up below needs four values from it.

@@ -90,26 +90,43 @@ test('the message is generic: fixed text, the item id as data and stable notific
     'at most FCM\'s 28 days');
 });
 
-test('FCM answers are classified; only FCM\'s token codes retire a token', () => {
-  const c = (status, json) => { const r = classifyFcm(status, json); return `${r.result}|${r.code}|${r.stop}|${r.dropAuth}`; };
-  assert.equal(c(200, { name: 'projects/p/messages/1' }), 'accepted|null|false|false');
-  assert.equal(c(404, fcmError(404, 'UNREGISTERED')), 'token_invalid|UNREGISTERED|false|false');
-  assert.equal(c(403, fcmError(403, 'SENDER_ID_MISMATCH')), 'token_invalid|SENDER_ID_MISMATCH|false|false');
+// Error bodies shaped like FCM's documented v1 answers.
+const UNREGISTERED_BODY = { error: { code: 404, message: 'Requested entity was not found.', status: 'NOT_FOUND',
+  details: [{ '@type': 'type.googleapis.com/google.firebase.fcm.v1.FcmError', errorCode: 'UNREGISTERED' }] } };
+const BAD_TOKEN_BODY = { error: { code: 400, message: 'The registration token is not a valid FCM registration token',
+  status: 'INVALID_ARGUMENT',
+  details: [{ '@type': 'type.googleapis.com/google.firebase.fcm.v1.FcmError', errorCode: 'INVALID_ARGUMENT' }] } };
+const BAD_TTL_BODY = { error: { code: 400,
+  message: 'Invalid value at \'message.android.ttl\' (type.googleapis.com/google.protobuf.Duration), Field \'ttl\', Illegal duration format',
+  status: 'INVALID_ARGUMENT',
+  details: [{ '@type': 'type.googleapis.com/google.rpc.BadRequest',
+    fieldViolations: [{ field: 'message.android.ttl', description: 'Invalid value at \'message.android.ttl\'' }] }] } };
+const SENDER_BODY = { error: { code: 403, message: 'SenderId mismatch', status: 'PERMISSION_DENIED',
+  details: [{ '@type': 'type.googleapis.com/google.firebase.fcm.v1.FcmError', errorCode: 'SENDER_ID_MISMATCH' }] } };
+
+test('FCM answers are classified; only answers about the token retire it', () => {
+  const c = (status, json) => { const r = classifyFcm(status, json); return `${r.result}|${r.code}|${r.stop}|${r.fatal}`; };
+  assert.equal(c(200, { name: 'projects/p/messages/1' }), 'accepted|null|false|null');
+  assert.equal(c(404, UNREGISTERED_BODY), 'token_invalid|UNREGISTERED|false|null');
+  assert.equal(c(400, BAD_TOKEN_BODY), 'token_invalid|INVALID_ARGUMENT|false|null',
+    'FcmError INVALID_ARGUMENT saying the registration token is not valid retires it');
   assert.equal(c(400, fcmError(400, 'INVALID_ARGUMENT', [{ '@type': 'type.googleapis.com/google.rpc.BadRequest',
     fieldViolations: [{ field: 'message.token', description: 'Invalid registration token' }] }])),
-  'token_invalid|INVALID_ARGUMENT|false|false');
-  assert.equal(c(400, fcmError(400, 'INVALID_ARGUMENT', [{ '@type': 'type.googleapis.com/google.rpc.BadRequest',
-    fieldViolations: [{ field: 'message.android.ttl' }] }])), 'rejected|INVALID_ARGUMENT|false|false',
-  'a payload problem never retires the token');
-  assert.equal(c(404, { error: { status: 'NOT_FOUND' } }), 'rejected|NOT_FOUND|false|false', 'a wrong project retires nothing');
-  assert.equal(c(429, fcmError(429, 'QUOTA_EXCEEDED')), 'transient|QUOTA_EXCEEDED|true|false');
-  assert.equal(c(503, fcmError(503, 'UNAVAILABLE')), 'transient|UNAVAILABLE|false|false');
-  assert.equal(c(500, null), 'transient|INTERNAL|false|false');
-  assert.equal(c(401, fcmError(401, 'THIRD_PARTY_AUTH_ERROR')), 'transient|THIRD_PARTY_AUTH_ERROR|false|false',
-    'an APNs credential problem is ours, not the token\'s');
-  assert.equal(c(401, { error: { status: 'UNAUTHENTICATED' } }), 'transient|UNAUTHENTICATED|true|true');
-  assert.equal(c(403, { error: { status: 'PERMISSION_DENIED' } }), 'transient|PERMISSION_DENIED|true|true');
-  assert.equal(c(418, { error: { status: 'lower case' } }), 'rejected|OTHER|false|false');
+  'token_invalid|INVALID_ARGUMENT|false|null');
+  assert.equal(c(400, BAD_TTL_BODY), 'rejected|INVALID_ARGUMENT|false|null', 'a payload problem never retires the token');
+  assert.equal(c(400, fcmError(400, 'INVALID_ARGUMENT')), 'rejected|INVALID_ARGUMENT|false|null',
+    'an INVALID_ARGUMENT that does not name the token keeps it');
+  assert.equal(c(403, SENDER_BODY), 'null|SENDER_ID_MISMATCH|true|sender_mismatch',
+    'a sender mismatch is our configuration: no token is retired, the run stops');
+  assert.equal(c(404, { error: { status: 'NOT_FOUND' } }), 'rejected|NOT_FOUND|false|null', 'a wrong project retires nothing');
+  assert.equal(c(429, fcmError(429, 'QUOTA_EXCEEDED')), 'transient|QUOTA_EXCEEDED|true|null');
+  assert.equal(c(503, fcmError(503, 'UNAVAILABLE')), 'transient|UNAVAILABLE|false|null');
+  assert.equal(c(500, null), 'transient|INTERNAL|false|null');
+  assert.equal(c(401, fcmError(401, 'THIRD_PARTY_AUTH_ERROR')), 'transient|THIRD_PARTY_AUTH_ERROR|false|null',
+    'an APNs credential problem is retried for that device');
+  assert.equal(c(401, { error: { status: 'UNAUTHENTICATED' } }), 'null|UNAUTHENTICATED|true|provider_auth');
+  assert.equal(c(403, { error: { status: 'PERMISSION_DENIED' } }), 'null|PERMISSION_DENIED|true|provider_auth');
+  assert.equal(c(418, { error: { status: 'lower case' } }), 'rejected|OTHER|false|null');
 });
 
 function fakeTransport(script) {
@@ -141,11 +158,11 @@ test('the sender gets one access token, caches it and sends with it', async () =
   assert.deepEqual(JSON.parse(calls[1].init.body), buildMessage(target, MESSAGE));
 });
 
-test('provider failures: invalid token, quota, network, and our credential refused', async () => {
+test('provider failures: invalid token, quota, network, and our own configuration refused', async () => {
   const account = parseServiceAccount(JSON.stringify(ACCOUNT_JSON));
   const endpoints = fcmEndpoints({ projectId: account.projectId, supabaseUrl: 'https://x.supabase.co' });
-  const answers = [reply(404, fcmError(404, 'UNREGISTERED')), reply(429, fcmError(429, 'QUOTA_EXCEEDED')),
-    new Error('socket hang up'), reply(401, { error: { status: 'UNAUTHENTICATED' } })];
+  const answers = [reply(404, UNREGISTERED_BODY), reply(429, fcmError(429, 'QUOTA_EXCEEDED')),
+    new Error('socket hang up'), reply(401, { error: { status: 'UNAUTHENTICATED' } }), reply(403, SENDER_BODY)];
   let tokenCalls = 0;
   const { fetch } = fakeTransport((url) => {
     if (url === GOOGLE_TOKEN_URL) { tokenCalls += 1; return reply(200, { access_token: `ya29.t${tokenCalls}`, expires_in: 3600 }); }
@@ -157,9 +174,10 @@ test('provider failures: invalid token, quota, network, and our credential refus
   assert.deepEqual(await sender.send(target, MESSAGE), { result: 'transient', provider_status: 429, provider_code: 'QUOTA_EXCEEDED', stop: true });
   assert.deepEqual(await sender.send(target, MESSAGE), { result: 'transient', provider_code: 'NETWORK', stop: false },
     'a lost answer is transient: the provider may have accepted it');
-  assert.deepEqual(await sender.send(target, MESSAGE), { result: 'transient', provider_status: 401, provider_code: 'UNAUTHENTICATED', stop: true });
-  answers.push(reply(200, {}));
-  await sender.send(target, MESSAGE);
+  await assert.rejects(sender.send(target, MESSAGE), (e) => e instanceof ProviderUnavailable && e.code === 'provider_auth',
+    'our own access token refused: nothing to record for the device');
+  await assert.rejects(sender.send(target, MESSAGE), (e) => e instanceof ProviderUnavailable && e.code === 'sender_mismatch',
+    'a sender mismatch: nothing recorded, no token retired');
   assert.equal(tokenCalls, 2, 'a refused access token is dropped and fetched again');
 
   const refused = createFcmSender({ account, endpoints, fetch: async () => reply(400, { error: 'invalid_grant' }) });

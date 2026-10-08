@@ -4,7 +4,7 @@
 -- fake FCM endpoint in tools/identity-e2e/push.mjs. Every account here is SYNTHETIC
 -- (+44 7700 900900-900909); device tokens are synthetic.
 begin;
-select plan(91);
+select plan(96);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000360' || lpad(n::text, 2, '0'))::uuid $$;
@@ -240,7 +240,7 @@ insert into v (k, id) values ('allinv', pg_temp.pushed(4));
 select pg_temp.claim();
 select pg_temp.prep((select id from v where k = 'allinv'));
 select is(pg_temp.rec((select id from v where k = 'allinv'),
-            jsonb_build_array(pg_temp.res('e', 'token_invalid', 403, 'SENDER_ID_MISMATCH'))) ->> 'outcome',
+            jsonb_build_array(pg_temp.res('e', 'token_invalid', 400, 'INVALID_ARGUMENT'))) ->> 'outcome',
   'obsolete', 'the only token is invalid');
 select is(pg_temp.pst((select id from v where k = 'allinv')), 'obsolete|no_live_token', 'push job obsolete');
 select is((select count(*)::int from app.notifications_inbox_items where recipient_member_id = pg_temp.mid(4)), 1,
@@ -399,6 +399,17 @@ select is(app.notifications_push_release(pg_temp.w(1), (select id from v where k
   '{"released": true}'::jsonb, 'an unused lease is released');
 select is(pg_temp.outcomes((select id from v where k = 'fx')), '', 'releasing records no attempt');
 
+-- A fenced record still retires a token the provider declared invalid ------------------------------
+insert into v (k, id) values ('fr', pg_temp.pushed(3));
+select pg_temp.claim();
+select pg_temp.prep((select id from v where k = 'fr'));
+select is(pg_temp.rec((select id from v where k = 'fr'),
+            jsonb_build_array(pg_temp.res('d', 'token_invalid', 404, 'UNREGISTERED')), 2),
+  '{"outcome": "fenced", "recorded": 0, "retired": 1}'::jsonb,
+  'a record by a worker that does not hold the lease is fenced');
+select is(pg_temp.retired('d'), 'provider_invalid', 'but the dead token is retired anyway');
+select is(pg_temp.pst((select id from v where k = 'fr')), 'pending|-', 'and the push job is unchanged');
+
 -- Payload checks ----------------------------------------------------------------------------------
 select is(app.notifications_check_push('{"push_job_id": "x", "lease_token": 0, "token": "y"}'),
   '{"push_job_id": "invalid", "lease_token": "invalid", "token": "unknown_field"}'::jsonb,
@@ -429,6 +440,10 @@ insert into v (k, id) values ('w', app.sys_create_principal('pgtap-push-worker',
 select app.sys_register_credential((select id from v where k = 'w'),
   encode(sha256(convert_to(pg_temp.token('Q'), 'UTF8')), 'hex'), 'pgtap 3.6', interval '1 hour', 'israel');
 insert into v (k, id) values ('route', pg_temp.pushed(5));
+select is(pg_temp.sys('notifications.push_claim', '{"expire_only": true}', gen_random_uuid()) -> 'data' ->> 'claimed',
+  '0', 'an expire-only claim (no FCM credential) leases nothing');
+select is(pg_temp.sys('notifications.push_claim', '{"expire_only": "yes"}', gen_random_uuid()) -> 'field_errors',
+  '{"expire_only": "invalid"}'::jsonb, 'expire_only is a boolean');
 insert into v (k, j) values ('rc', pg_temp.sys('notifications.push_claim', '{}', gen_random_uuid()));
 select ok((select (j -> 'data' ->> 'claimed')::int from v where k = 'rc') >= 1
           and pg_temp.lease((select id from v where k = 'route')) is not null, 'the route claims the push job');
@@ -457,8 +472,8 @@ select is(pg_temp.sys('notifications.push_record',
 select is((select array_agg(k order by k) from jsonb_object_keys(app.notifications_scheduler_status() -> 'push') k),
   array['attempts_24h', 'enabled', 'ended_24h', 'leased', 'pending', 'tokens_retired_24h'],
   'the status has a push block');
-select is((app.notifications_scheduler_status() -> 'push' ->> 'tokens_retired_24h')::int, 2,
-  'two tokens retired on the provider''s answer');
+select is((app.notifications_scheduler_status() -> 'push' ->> 'tokens_retired_24h')::int, 3,
+  'three tokens retired on the provider''s answer');
 select ok((app.notifications_scheduler_status() -> 'push' -> 'attempts_24h' ->> 'accepted')::int >= 6
           and not (app.notifications_scheduler_status() -> 'attempts_24h' ? 'accepted'),
   'push outcomes are counted apart from inbox attempts');

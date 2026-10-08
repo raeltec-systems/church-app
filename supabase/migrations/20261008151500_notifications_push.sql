@@ -683,10 +683,11 @@ $$;
 
 -- p_results: [{device_id, result, provider_status?, provider_code?}] with result one of
 -- accepted (the provider accepted the message: never delivery or reading), token_invalid (the
--- provider says the token is unregistered or not ours: the device is retired
--- `provider_invalid`), rejected (refused for this device, token kept, not retried) and transient
+-- provider says the token is unregistered or not a valid registration token: the device is
+-- retired `provider_invalid`), rejected (refused for this device, token kept, not retried) and transient
 -- (quota, provider error, timeout: retried with backoff and the same notification id). A stale
--- token (`fenced`) records one row and changes nothing. Answers for devices that are not the push
+-- lease token (`fenced`) records one row and changes nothing about the push job; its
+-- token_invalid answers still retire those devices (a dead token is dead). Answers for devices that are not the push
 -- job's account and member are ignored. Then, while the push job is pending: nothing owed ->
 -- `accepted` (some device accepted), `failed` (`provider_rejected`) or `obsolete`
 -- (`no_live_token`); a transient answer -> `retry` with backoff (`exhausted` at max_attempts);
@@ -721,8 +722,17 @@ begin
     return '{"outcome": "not_found"}'::jsonb;
   end if;
   if v_push.lease_token is distinct from p_token or v_push.lease_principal is distinct from p_principal then
+    -- A stale holder changes nothing about the push job, but a token the provider declared
+    -- invalid is dead whoever asked: it is retired anyway (the push job's own devices only).
     perform app.notifications_push_attempt_row(v_push, p_token, p_principal, p_request, 'fenced', null, null);
-    return jsonb_build_object('outcome', 'fenced', 'recorded', 0, 'retired', 0);
+    update app.notifications_device_tokens t
+       set retired_at = clock_timestamp(), retire_reason = 'provider_invalid', revision = t.revision + 1
+     where t.account_id = v_push.account_id and t.member_id = v_push.recipient_member_id
+       and t.retired_at is null
+       and t.device_id in (select (e ->> 'device_id')::uuid from jsonb_array_elements(p_results) e
+                            where e ->> 'result' = 'token_invalid');
+    get diagnostics v_retired = row_count;
+    return jsonb_build_object('outcome', 'fenced', 'recorded', 0, 'retired', v_retired);
   end if;
 
   for v_r in select e from jsonb_array_elements(p_results) e loop
@@ -850,6 +860,18 @@ as $$
            end));
 $$;
 
+-- Payload of push_claim: {limit?: 1..100, expire_only?: boolean}.
+create function app.notifications_check_push_claim(p_payload jsonb)
+returns jsonb
+language sql
+immutable
+set search_path = ''
+as $$
+  select app.notifications_check_deliver_due(p_payload - 'expire_only')
+      || case when p_payload ? 'expire_only' and jsonb_typeof(p_payload -> 'expire_only') <> 'boolean'
+              then '{"expire_only": "invalid"}'::jsonb else '{}'::jsonb end;
+$$;
+
 create function app.notifications_sys_push_claim(p_principal uuid, p_request uuid, p_payload jsonb)
 returns jsonb
 language plpgsql
@@ -858,9 +880,13 @@ as $$
 declare
   v_settings app.notifications_worker_settings := app.notifications_worker_config();
 begin
+  -- {expire_only: true}: count lapses and expire, lease nothing (the Edge worker without an FCM
+  -- credential still keeps pending push jobs from outliving their expiry).
   return jsonb_build_object('data', app.notifications_push_claim(
     p_principal, p_request,
-    least(coalesce((p_payload ->> 'limit')::numeric::integer, v_settings.batch_max), v_settings.batch_max)));
+    case when coalesce((p_payload ->> 'expire_only')::boolean, false) then 0
+         else least(coalesce((p_payload ->> 'limit')::numeric::integer, v_settings.batch_max),
+                    v_settings.batch_max) end));
 end;
 $$;
 
@@ -901,8 +927,8 @@ $$;
 
 insert into app.sys_command_kinds (command, purpose, description, payload_check, handler, retain_result) values
   ('notifications.push_claim', 'notifications_worker',
-   'Story 3.6: count lapsed push leases, expire push jobs and (push_enabled) lease a bounded batch',
-   'app.notifications_check_deliver_due(jsonb)',
+   'Story 3.6: count lapsed push leases, expire push jobs and (push_enabled, not expire_only) lease a bounded batch',
+   'app.notifications_check_push_claim(jsonb)',
    'app.notifications_sys_push_claim(uuid, uuid, jsonb)', true),
   ('notifications.push_prepare', 'notifications_worker',
    'Story 3.6: recheck one leased push job and answer the generic message and its live targets (not retained)',
@@ -1085,6 +1111,7 @@ revoke all on function
   app.notifications_push_prepare(uuid, uuid, uuid, bigint),
   app.notifications_push_record(uuid, uuid, uuid, bigint, jsonb),
   app.notifications_check_push(jsonb),
+  app.notifications_check_push_claim(jsonb),
   app.notifications_push_result_error(jsonb),
   app.notifications_check_push_record(jsonb),
   app.notifications_sys_push_claim(uuid, uuid, jsonb),

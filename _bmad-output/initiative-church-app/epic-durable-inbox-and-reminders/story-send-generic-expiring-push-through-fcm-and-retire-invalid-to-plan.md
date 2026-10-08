@@ -81,7 +81,7 @@ Decision (agent, under owner pre-approval): a device signing out retires its own
 
 - Implemented directly (no subagent tool in this run). Files:
   - Migration `supabase/migrations/20261008151500_notifications_push.sql`: no `delete from`, no rows file.
-  - pgTAP `supabase/tests/notifications_push_test.sql` (91).
+  - pgTAP `supabase/tests/notifications_push_test.sql` (96).
   - Pins updated in `notifications_worker_test.sql` (attempt columns, `push_enabled` default, status keys), `notifications_inbox_test.sql` (worker commands) and `system_access_test.sql` (allowlist).
   - Edge `supabase/functions/notifications-worker/fcm.mjs` (+ `fcm.test.mjs`), `logic.mjs` (`runPush`, parsers; + `push-run.test.mjs`) and `index.ts` (push stage after the inbox stage).
   - E2E `tools/identity-e2e/push.mjs` (+ test, 12 checks, fake FCM).
@@ -110,6 +110,17 @@ Decision (agent, under owner pre-approval): a device signing out retires its own
   - owner: the real-device check.
 
 ## Plan Change Log
+
+- 2026-10-08, independent review of 3.6 (coordinator; three mediums, four lows; the `sys_execute` change was judged safe). All patched in place in the unapplied migration `20261008151500` and the function.
+  1. (medium) `SENDER_ID_MISMATCH` no longer retires a token. It is our configuration (another Firebase project): the sender throws `sender_mismatch`, nothing is recorded, the job is released unused and the run stops.
+  2. (medium) An FcmError-only 400 `INVALID_ARGUMENT` whose message or details say the registration token is not valid retires the token. Any other `INVALID_ARGUMENT` (for example on `message.android.ttl`) stays `rejected` with the token kept. Fixtures are shaped like FCM's documented error bodies.
+  3. (medium) Lease budget: sending stops 25 s before the lease ends (`lease_budget`); what was sent is recorded and the rest released. `push_record` retires `token_invalid` devices even when fenced (the push job is otherwise unchanged).
+  4. (low) Our own 401/403 releases the job unused (`provider_auth`) instead of counting a failure. Three transient 5xx or network answers in one run stop sending (`provider_outage`) and release the rest.
+  5. (low) Without the FCM secret the function makes an expire-only claim (`push_claim {expire_only: true}`, new payload check `app.notifications_check_push_claim`), so pending push jobs still expire. The runbook says so.
+  6. (low) `retireBeforeSignOut` catches every failure of the retire command and of the SDK's token deletion. Tested with a throwing SDK and a refused command.
+  7. (low) `push-run.test.mjs`: the refused claim throws a refusal and the test asserts only the claim was called. The push-off test asserts exactly one claim. New tests cover lease budget, outage, configuration errors and expire-only.
+
+  pgTAP 91 -> 96; function tests 22 -> 26.
 
 ## Review Triage Log
 

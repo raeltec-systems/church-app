@@ -147,16 +147,17 @@ class PushRegistrationController extends Notifier<PushRegistrationState> {
               ),
             )
             .timeout(_retireTimeout);
-      } on TimeoutException {
-        // The server keeps the row until the next lifecycle event; pushes
-        // stay generic and every open re-checks the session.
+      } catch (_) {
+        // Timeout or any failure: the server keeps the row until the next
+        // lifecycle event; pushes stay generic and every open re-checks the
+        // session. Sign-out always proceeds.
       }
     }
     if (push.isSupported) {
       try {
         await push.deleteToken().timeout(_retireTimeout);
-      } on TimeoutException {
-        // Nothing more to do.
+      } catch (_) {
+        // A failing or slow SDK never blocks sign-out.
       }
     }
     if (ref.mounted) {

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { deviceResult, parsePrepare, parsePushClaim, runPush } from './logic.mjs';
+import { deviceResult, expirePush, parsePrepare, parsePushClaim, runPush } from './logic.mjs';
 
 const ID = (n) => `00000000-0000-4000-8000-0000000360${String(n).padStart(2, '0')}`;
 const TOKEN = (c) => `fcm-${c.repeat(40)}:APA91b`;
@@ -85,20 +85,57 @@ test('quota stops sending: the rest of the batch is released unused', async () =
     [{ device_id: ID(11), result: 'transient', provider_status: 429, provider_code: 'QUOTA_EXCEEDED' }]);
 });
 
-test('OAuth refused: the job is released (no attempt counted) and the run stops', async () => {
-  const { calls, system } = fakeSystem({
-    'notifications.push_claim': claimOf([job(1), job(2)]),
-    'notifications.push_prepare': send([target(11, 'a')]),
-    'notifications.push_release': { released: true },
-  });
-  const err = Object.assign(new Error('oauth_refused'), { code: 'oauth_refused' });
-  const counts = await runPush({ system, sender: { send: async () => { throw err; } } });
-  assert.equal(counts.stopped, 'oauth_refused');
-  assert.equal(counts.deferred, 2);
-  assert.equal(calls.filter((c) => c.command === 'notifications.push_record').length, 0);
+test('our configuration refused (OAuth, own token, sender mismatch): released unused, the run stops', async () => {
+  for (const code of ['oauth_refused', 'provider_auth', 'sender_mismatch']) {
+    const { calls, system } = fakeSystem({
+      'notifications.push_claim': claimOf([job(1), job(2)]),
+      'notifications.push_prepare': send([target(11, 'a')]),
+      'notifications.push_release': { released: true },
+    });
+    const err = Object.assign(new Error(code), { code });
+    const counts = await runPush({ system, sender: { send: async () => { throw err; } } });
+    assert.equal(counts.stopped, code);
+    assert.equal(counts.deferred, 2);
+    assert.equal(calls.filter((c) => c.command === 'notifications.push_record').length, 0, 'no attempt, no retirement');
+    assert.deepEqual(calls.filter((c) => c.command === 'notifications.push_release').map((c) => c.payload), [job(1), job(2)]);
+  }
 });
 
-test('a lost system answer is uncertain; the deadline defers the rest; a refused claim fails the run', async () => {
+test('a provider outage stops the run after a few transient answers', async () => {
+  const { calls, system } = fakeSystem({
+    'notifications.push_claim': claimOf([job(1), job(2), job(3)]),
+    'notifications.push_prepare': send([target(11, 'a'), target(12, 'b')]),
+    'notifications.push_record': { outcome: 'retry' },
+    'notifications.push_release': { released: true },
+  });
+  let sends = 0;
+  const counts = await runPush({ system, sender: { send: async () => { sends += 1;
+    return { result: 'transient', provider_status: 503, provider_code: 'UNAVAILABLE', stop: false }; } } });
+  assert.equal(sends, 3);
+  assert.equal(counts.stopped, 'provider_outage');
+  assert.equal(counts.deferred, 1, 'the untouched job is released, its attempts not used up');
+  assert.equal(calls.filter((c) => c.command === 'notifications.push_record').length, 2, 'what was sent is recorded');
+});
+
+test('sends stop before the lease ends; what was sent is recorded under the lease', async () => {
+  let t = 0;
+  const { calls, system } = fakeSystem({
+    'notifications.push_claim': claimOf([job(1), job(2)], { lease_seconds: 60 }),
+    'notifications.push_prepare': send([target(11, 'a'), target(12, 'b'), target(13, 'c')]),
+    'notifications.push_record': { outcome: 'retry' },
+    'notifications.push_release': { released: true },
+  });
+  // Lease 60 s: sending stops 25 s before its end (35 s). Each send takes 20 s.
+  const counts = await runPush({ system, now: () => t, deadlineMs: 1e9,
+    sender: { send: async () => { t += 20_000; return { result: 'accepted', provider_status: 200 }; } } });
+  assert.equal(counts.sent.accepted, 2, 'sends at 0 and 20 s; none at 40 s');
+  assert.equal(counts.stopped, 'lease_budget');
+  assert.deepEqual(calls.find((c) => c.command === 'notifications.push_record').payload.results.map((r) => r.device_id),
+    [ID(11), ID(12)]);
+  assert.equal(counts.deferred, 1, 'the next job is released, not sent');
+});
+
+test('a lost system answer is uncertain; the deadline defers the rest', async () => {
   let t = 0;
   const { system } = fakeSystem({
     'notifications.push_claim': claimOf([job(1), job(2), job(3)]),
@@ -109,13 +146,27 @@ test('a lost system answer is uncertain; the deadline defers the rest; a refused
   const counts = await runPush({ system, sender: { send: async () => ({ result: 'accepted', provider_status: 200 }) },
     now: () => t });
   assert.deepEqual([counts.uncertain, counts.outcomes.accepted, counts.deferred], [1, 1, 1]);
-  const bad = fakeSystem({ 'notifications.push_claim': { code: 'forbidden' } });
-  await assert.rejects(runPush({ system: bad.system, sender: {} }), /unexpected_claim/);
 });
 
-test('push off: nothing is claimed, so nothing is sent', async () => {
+test('a refused claim fails the run before anything is sent', async () => {
+  const { calls, system } = fakeSystem({ 'notifications.push_claim': Object.assign(new Error('refused'), { code: 'refused' }) });
+  await assert.rejects(runPush({ system, sender: { send: async () => assert.fail('nothing to send') } }), /refused/);
+  assert.deepEqual(calls.map((c) => c.command), ['notifications.push_claim']);
+  const malformed = fakeSystem({ 'notifications.push_claim': { jobs: 'x' } });
+  await assert.rejects(runPush({ system: malformed.system, sender: {} }), /unexpected_claim/);
+});
+
+test('push off: the claim is made but leases nothing, so nothing is sent', async () => {
   const { calls, system } = fakeSystem({ 'notifications.push_claim': claimOf([], { push_enabled: false, expired: 2 }) });
   const counts = await runPush({ system, sender: { send: async () => assert.fail('nothing to send') } });
   assert.deepEqual(counts, { claimed: 0, reclaimed: 0, expired: 2, enabled: false, outcomes: {}, sent: {}, uncertain: 0, deferred: 0 });
-  assert.equal(calls.length, 1);
+  assert.deepEqual(calls, [{ command: 'notifications.push_claim', payload: {} }]);
+});
+
+test('no FCM credential: push jobs still expire (expire-only claim, nothing leased)', async () => {
+  const { calls, system } = fakeSystem({ 'notifications.push_claim': claimOf([], { expired: 3, reclaimed: 1 }) });
+  assert.deepEqual(await expirePush({ system }), { state: 'not_configured', reclaimed: 1, expired: 3 });
+  assert.deepEqual(calls, [{ command: 'notifications.push_claim', payload: { expire_only: true } }]);
+  const leased = fakeSystem({ 'notifications.push_claim': claimOf([job(1)]) });
+  await assert.rejects(expirePush({ system: leased.system }), /unexpected_claim/, 'an expire-only claim must lease nothing');
 });

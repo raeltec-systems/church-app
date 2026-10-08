@@ -134,44 +134,59 @@ export function fcmErrorCode(json) {
   return code && CODE_RE.test(code) ? code : null;
 }
 
-/** True when a 400 answer names the device token as the invalid field. */
-function tokenFieldInvalid(json) {
-  const details = Array.isArray(json?.error?.details) ? json.error.details : [];
-  return details.some((d) => Array.isArray(d?.fieldViolations)
-    && d.fieldViolations.some((v) => v?.field === 'message.token'));
+/**
+ * True when a 400 answer is about the device token: a google.rpc.BadRequest naming the field
+ * `message.token`, or FCM's INVALID_ARGUMENT whose message says the registration token is not
+ * valid ("The registration token is not a valid FCM registration token"). Our payload is fixed and
+ * generic, so any other INVALID_ARGUMENT is a payload problem and must never retire a token.
+ */
+function tokenInvalid(json) {
+  const error = json?.error;
+  const details = Array.isArray(error?.details) ? error.details : [];
+  if (details.some((d) => Array.isArray(d?.fieldViolations)
+      && d.fieldViolations.some((v) => v?.field === 'message.token'))) return true;
+  const texts = [error?.message, ...details.map((d) => d?.description), ...details.flatMap((d) =>
+    (Array.isArray(d?.fieldViolations) ? d.fieldViolations.map((v) => v?.description) : []))];
+  return texts.some((t) => typeof t === 'string' && /registration token/i.test(t)
+    && /(not a valid|invalid)/i.test(t));
 }
 
 /**
- * Classifies one FCM answer: {result, code, stop, dropAuth}. result is accepted, token_invalid
+ * Classifies one FCM answer: {result, code, stop, fatal}. result is accepted, token_invalid
  * (retire the token), rejected (refused for this device, not retried, token kept) or transient
- * (retried with backoff). stop ends the run's sending (quota, our own credential refused);
- * dropAuth forgets the cached access token.
+ * (retried with backoff); stop ends the run's sending (quota). fatal names OUR configuration
+ * problem (our access token refused, a sender/project mismatch): nothing is recorded for the
+ * device, no token is retired, the job is released unused and the run stops.
  */
 export function classifyFcm(status, json) {
-  if (status >= 200 && status < 300) return { result: 'accepted', code: null, stop: false, dropAuth: false };
+  if (status >= 200 && status < 300) return { result: 'accepted', code: null, stop: false, fatal: null };
   const code = fcmErrorCode(json);
   // Only FCM's own codes retire a token; a bare 404 (for example a wrong project) does not.
-  if (code === 'UNREGISTERED') return { result: 'token_invalid', code, stop: false, dropAuth: false };
-  if (code === 'SENDER_ID_MISMATCH') return { result: 'token_invalid', code, stop: false, dropAuth: false };
+  if (code === 'UNREGISTERED') return { result: 'token_invalid', code, stop: false, fatal: null };
+  // The token belongs to another Firebase project than our credential: our configuration is wrong
+  // (it would be so for every member's token), not the device's.
+  if (code === 'SENDER_ID_MISMATCH') return { result: null, code, stop: true, fatal: 'sender_mismatch' };
   if (status === 400) {
-    // Only an answer that names the token retires it: a payload mistake must never retire every device.
-    return tokenFieldInvalid(json)
-      ? { result: 'token_invalid', code: code ?? 'INVALID_ARGUMENT', stop: false, dropAuth: false }
-      : { result: 'rejected', code: code ?? 'INVALID_ARGUMENT', stop: false, dropAuth: false };
+    return tokenInvalid(json)
+      ? { result: 'token_invalid', code: code ?? 'INVALID_ARGUMENT', stop: false, fatal: null }
+      : { result: 'rejected', code: code ?? 'INVALID_ARGUMENT', stop: false, fatal: null };
   }
-  if (status === 429 || code === 'QUOTA_EXCEEDED') return { result: 'transient', code: code ?? 'QUOTA_EXCEEDED', stop: true, dropAuth: false };
-  if (code === 'THIRD_PARTY_AUTH_ERROR') return { result: 'transient', code, stop: false, dropAuth: false };
+  if (status === 429 || code === 'QUOTA_EXCEEDED') return { result: 'transient', code: code ?? 'QUOTA_EXCEEDED', stop: true, fatal: null };
+  if (code === 'THIRD_PARTY_AUTH_ERROR') return { result: 'transient', code, stop: false, fatal: null };
   if (status === 401 || status === 403) {
-    return { result: 'transient', code: code ?? (status === 401 ? 'UNAUTHENTICATED' : 'PERMISSION_DENIED'), stop: true, dropAuth: true };
+    return { result: null, code: code ?? (status === 401 ? 'UNAUTHENTICATED' : 'PERMISSION_DENIED'), stop: true,
+      fatal: 'provider_auth' };
   }
-  if (status >= 500) return { result: 'transient', code: code ?? (status === 503 ? 'UNAVAILABLE' : 'INTERNAL'), stop: false, dropAuth: false };
-  return { result: 'rejected', code: code ?? 'OTHER', stop: false, dropAuth: false };
+  if (status >= 500) return { result: 'transient', code: code ?? (status === 503 ? 'UNAVAILABLE' : 'INTERNAL'), stop: false, fatal: null };
+  return { result: 'rejected', code: code ?? 'OTHER', stop: false, fatal: null };
 }
 
 /**
  * The sender: send(target, message) -> {result, provider_status?, provider_code?, stop}. A network
  * failure or timeout is `transient` (the provider may or may not have accepted it; the stable
- * notification id bounds a duplicate). Throws ProviderUnavailable when no access token can be had.
+ * notification id bounds a duplicate). Throws ProviderUnavailable when no access token can be had
+ * (`oauth_refused`, `oauth_unreachable`) or the answer shows our own configuration is wrong
+ * (`provider_auth`, `sender_mismatch`): the caller releases the job unused and stops.
  * `fetch(url, init)` resolves to a Response or rejects; it is the only I/O.
  */
 export function createFcmSender({ account, endpoints, fetch, now = () => Date.now(), subtle = globalThis.crypto.subtle }) {
@@ -214,7 +229,10 @@ export function createFcmSender({ account, endpoints, fetch, now = () => Date.no
       }
       const json = await res.json().catch(() => null);
       const c = classifyFcm(res.status, json);
-      if (c.dropAuth) cached = null;
+      if (c.fatal) {
+        if (c.fatal === 'provider_auth') cached = null;
+        throw new ProviderUnavailable(c.fatal);
+      }
       const answer = { result: c.result, provider_status: res.status, stop: c.stop };
       if (c.code) answer.provider_code = c.code;
       return answer;

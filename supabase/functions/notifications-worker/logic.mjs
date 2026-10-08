@@ -213,24 +213,52 @@ export function deviceResult(target, answer) {
 }
 
 /**
+ * Push sends stop this long before the lease ends: one 10 s provider call plus one 10 s record
+ * call plus a margin, so what was sent is recorded under the worker's own lease.
+ */
+export const PUSH_LEASE_MARGIN_MS = 25_000;
+/** Transient provider answers (5xx, network) in one run after which sending stops. */
+export const PUSH_OUTAGE_LIMIT = 3;
+const STOP_CODE_RE = /^[a-z][a-z0-9_]{0,40}$/;
+
+/**
+ * Without an FCM credential the worker still lets pending push jobs expire (and counts lapsed
+ * push leases): push_claim with expire_only leases nothing. Returns counts only.
+ */
+export async function expirePush({ system }) {
+  const claim = parsePushClaim(await system('notifications.push_claim', { expire_only: true }));
+  if (!claim || claim.claimed !== 0) throw new Error('unexpected_claim');
+  return { state: 'not_configured', reclaimed: claim.reclaimed, expired: claim.expired };
+}
+
+/**
  * One push run: claim a batch of push jobs; for each, prepare (the database rechecks it now and
  * answers the generic message with the live targets), send to each target through `sender`,
  * then record the per-device answers. Provider acceptance is counted as `accepted`, never as
- * delivery. A quota answer or our own credential refused stops sending: the rest are released
- * unused. When the provider cannot be used at all (OAuth refused), the job is released and the
- * run stops (no attempt counted). A failed or uncertain system call is counted `uncertain`: the
- * lease lapses and the next claim counts it and sends again with the same notification id.
- * Returns counts only (no ids, tokens or text).
+ * delivery. Sending stops, and the rest of the batch is released unused, when:
+ *   * the provider answers quota (the job's answers are recorded first);
+ *   * the sender throws: our own configuration is wrong (OAuth refused or unreachable, our access
+ *     token refused, a sender/project mismatch). Nothing is recorded for that device and no token
+ *     is retired; a job with no answer yet is released (no attempt counted);
+ *   * PUSH_OUTAGE_LIMIT transient answers arrive in one run (a provider outage must not use up
+ *     every job's attempts);
+ *   * the lease is about to end (PUSH_LEASE_MARGIN_MS): what was sent is recorded, the rest
+ *     released, so another worker never re-sends under a newer lease while this one still sends.
+ * A failed or uncertain system call is counted `uncertain`: the lease lapses and the next claim
+ * counts it and sends again with the same notification id. Returns counts only (no ids, tokens
+ * or text).
  */
 export async function runPush({ system, sender, limit, now = () => Date.now(), deadlineMs }) {
   const start = now();
   const claim = parsePushClaim(await system('notifications.push_claim', limit === undefined ? {} : { limit }));
   if (!claim) throw new Error('unexpected_claim');
-  const deadline = Math.min(deadlineMs ?? start + RUN_BUDGET_MS, runDeadline(start, claim.lease_seconds));
+  const leaseEnd = start + claim.lease_seconds * 1000 - PUSH_LEASE_MARGIN_MS;
+  const deadline = Math.min(deadlineMs ?? start + RUN_BUDGET_MS, start + RUN_BUDGET_MS, leaseEnd);
   const outcomes = {};
   const sent = {};
   let uncertain = 0;
   let deferred = 0;
+  let outage = 0;
   let stopped = null;
   const count = (bag, key) => { bag[key] = (bag[key] ?? 0) + 1; };
   const release = async (job) => {
@@ -265,18 +293,27 @@ export async function runPush({ system, sender, limit, now = () => Date.now(), d
     }
     const results = [];
     for (const target of parsed.targets) {
+      if (now() >= deadline) {
+        stopped = 'lease_budget';
+        break;
+      }
       let answer;
       try {
         answer = await sender.send(target, parsed.message);
       } catch (e) {
-        stopped = ['oauth_refused', 'oauth_unreachable'].includes(e?.code) ? e.code : 'provider_unavailable';
+        stopped = typeof e?.code === 'string' && STOP_CODE_RE.test(e.code) ? e.code : 'provider_unavailable';
         break;
       }
       const r = deviceResult(target, answer);
       results.push(r);
       count(sent, r.result);
+      if (r.result === 'transient' && (r.provider_status === undefined || r.provider_status >= 500)) outage += 1;
       if (answer?.stop) {
         stopped = 'provider_stop';
+        break;
+      }
+      if (outage >= PUSH_OUTAGE_LIMIT) {
+        stopped = 'provider_outage';
         break;
       }
     }

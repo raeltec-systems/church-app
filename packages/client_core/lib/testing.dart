@@ -1237,6 +1237,9 @@ class FakePushMessaging implements PushMessaging {
 
   int requests = 0;
   int deletes = 0;
+
+  /// The SDK's token deletion throws (sign-out must still proceed).
+  bool failDelete = false;
   final _refreshes = StreamController<String>.broadcast();
   final _taps = StreamController<String>.broadcast();
 
@@ -1282,6 +1285,7 @@ class FakePushMessaging implements PushMessaging {
   @override
   Future<void> deleteToken() async {
     deletes++;
+    if (failDelete) throw StateError('SYNTHETIC push SDK failure');
     deviceToken = null;
   }
 }

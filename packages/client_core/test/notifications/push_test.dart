@@ -252,6 +252,29 @@ void main() {
         );
       },
     );
+    test('a failing SDK or command never blocks sign-out', () async {
+      final push = FakePushMessaging(
+        deviceToken: _token,
+        current: PushPermission.granted,
+      )..failDelete = true;
+      final h = ClientTestHarness()..push = push;
+      final c = containerFor(h);
+      final done = c.read(pushRegistrationProvider.notifier).sync();
+      await drain();
+      h.gateway.sent.single.confirm({'device_id': _device}, 1);
+      await done;
+      final retiring = c
+          .read(pushRegistrationProvider.notifier)
+          .retireBeforeSignOut();
+      await drain();
+      h.gateway.sent.last.refuse(ErrorCode.unavailable);
+      await retiring;
+      expect(push.deletes, 1);
+      expect(
+        c.read(pushRegistrationProvider).status,
+        PushRegistrationStatus.idle,
+      );
+    });
   });
 
   group('push tap and sign-in continuation', () {

@@ -29,7 +29,8 @@
 //   NOTIFICATIONS_FCM_TEST_ENDPOINT            LOCAL ONLY: a fake FCM origin for the E2E; ignored
 //                                              unless SUPABASE_URL is plain http (never hosted)
 // The 200 answer gains `push`: {claimed, reclaimed, expired, enabled, outcomes, sent, uncertain,
-// deferred, stopped?} or {state: "not_configured" | "unavailable"}.
+// deferred, stopped?}, {state: "not_configured", reclaimed, expired} (no FCM credential: push
+// jobs only expire) or {state: "unavailable"}.
 //
 // Logs carry counts and outcome codes only: never a body, credential, trigger, job or member id,
 // device token, service-account field or notification text.
@@ -41,6 +42,7 @@ import {
   keyHeaders,
   parseBody,
   runOnce,
+  expirePush,
   runPush,
   systemEnvelope,
   triggerMatches,
@@ -164,13 +166,14 @@ Deno.serve(async (req: Request) => {
     const limit = (parsed.value as Json).limit as number | undefined;
     const started = Date.now();
     const counts = await runOnce({ system, limit });
-    let push: Json = { state: 'not_configured' };
-    if (FCM_SENDER) {
-      try {
-        push = await runPush({ system, sender: FCM_SENDER, limit, deadlineMs: started + 50_000 });
-      } catch {
-        push = { state: 'unavailable' };
-      }
+    let push: Json;
+    try {
+      // Without the FCM credential pending push jobs still expire (nothing is leased or sent).
+      push = FCM_SENDER
+        ? await runPush({ system, sender: FCM_SENDER, limit, deadlineMs: started + 50_000 })
+        : await expirePush({ system });
+    } catch {
+      push = { state: 'unavailable' };
     }
     note({ outcome: 'ran', ...counts, push });
     return reply(200, { ...counts, push });

@@ -3,6 +3,8 @@
 /// inbox refresh signal. Free of widgets and SDKs.
 library;
 
+import 'dart:async';
+
 import 'access_grants.dart';
 
 /// Push on or off for one reminder category (a registered reminder kind).
@@ -102,6 +104,33 @@ abstract interface class InboxSignals {
   /// the channel (re)connects, since a signal may have been missed while it
   /// was down. Cancel the subscription to leave the channel.
   Stream<void> changes(String accountId);
+}
+
+/// [inner]'s signals plus [nudges] (for example a push received while the app
+/// is open). A nudge carries nothing; it only makes the inbox re-read.
+/// [nudges] must be a broadcast stream.
+class NudgedInboxSignals implements InboxSignals {
+  const NudgedInboxSignals(this.inner, this.nudges);
+
+  final InboxSignals inner;
+  final Stream<void> nudges;
+
+  @override
+  Stream<void> changes(String accountId) {
+    late final StreamController<void> out;
+    StreamSubscription<void>? a;
+    StreamSubscription<void>? b;
+    out = StreamController<void>(
+      onListen: () {
+        a = inner.changes(accountId).listen(out.add, onError: out.addError);
+        b = nudges.listen(out.add, onError: (Object _) {});
+      },
+      onCancel: () async {
+        await Future.wait([?a?.cancel(), ?b?.cancel()]);
+      },
+    );
+    return out.stream;
+  }
 }
 
 /// No signals (tests, unconfigured builds): polling and re-reads only.

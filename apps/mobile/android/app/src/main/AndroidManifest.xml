@@ -1,9 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Required to reach the Supabase API in release builds. -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Story 3.6: Android 13+ asks the person before showing notifications
+         (asked once the server grants member access). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="BIC Kafue"
-        android:name="${applicationName}"
+        android:name=".BicKafueApplication"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
@@ -42,6 +45,11 @@
                     android:pathPrefix="/auth/"/>
             </intent-filter>
         </activity>
+        <!-- Story 3.6: background reminders show on this channel (Android 8+);
+             BicKafueApplication creates it at every process start. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="reminders" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'src/adapters/auth_session_storage.dart';
 import 'src/adapters/recovery_verifier_storage.dart';
 import 'src/application/providers.dart';
+import 'src/domain/notification_settings.dart';
 import 'src/domain/password_recovery.dart';
 import 'supabase_adapters.dart';
 
@@ -36,7 +37,15 @@ class AppConfig {
 /// Provider overrides for [config]: the Supabase adapters when the build is
 /// configured, otherwise none (the screens then explain the missing
 /// configuration and commands are reported as not sent).
-Future<List<Override>> compositionOverrides(AppConfig config) async {
+///
+/// [inboxNudges] (mobile push, story 3.6 client follow-up) are extra
+/// content-free "re-read the inbox" events, merged into the inbox refresh
+/// signal: a push that arrives while the app is open only refreshes the
+/// inbox.
+Future<List<Override>> compositionOverrides(
+  AppConfig config, {
+  Stream<void>? inboxNudges,
+}) async {
   if (!config.isComplete) return const [];
   final supabase = await Supabase.initialize(
     url: config.supabaseUrl,
@@ -96,7 +105,11 @@ Future<List<Override>> compositionOverrides(AppConfig config) async {
     notificationSettingsRepositoryProvider.overrideWithValue(
       SupabaseNotificationSettingsRepository(client),
     ),
-    inboxSignalsProvider.overrideWithValue(SupabaseInboxSignals(client)),
+    inboxSignalsProvider.overrideWithValue(
+      inboxNudges == null
+          ? SupabaseInboxSignals(client)
+          : NudgedInboxSignals(SupabaseInboxSignals(client), inboxNudges),
+    ),
     recoveryCasesRepositoryProvider.overrideWithValue(
       SupabaseRecoveryCasesRepository(client),
     ),

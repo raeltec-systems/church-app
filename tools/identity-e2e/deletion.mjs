@@ -99,8 +99,8 @@ async function main() {
   const LIFECYCLE_EVENTS = ['membership_deactivated', 'deletion_requested', 'sessions_revoked', 'member_deleted', 'scope_revoked'];
   const unhook = () => psql(`
     delete from app.contract_lifecycle_hooks where module = 'fixture'
-       and event in (${LIFECYCLE_EVENTS.map((e) => `'${e}'`).join(',')});
-    delete from app.identity_deletion_hooks where module = 'fixture';`);
+       and event in (${LIFECYCLE_EVENTS.map((e) => `'${e}'`).join(',')});`);
+  // Since story 3.5 the fixture deletion hook is registered by migration and stays registered.
   const cleanup = () => {
     const ids = [...users].map((u) => `'${u}'`);
     const byUser = ids.length ? `u.id in (${ids.join(',')}) or ` : '';
@@ -245,7 +245,8 @@ async function main() {
       journal_entries_before: ((await journal.list()) ?? []).length });
 
     psql(`${LIFECYCLE_EVENTS.map((e) => `select app.contract_register_lifecycle_hook('fixture', '${e}', 'app.fixture_record_lifecycle(jsonb)'::regprocedure);`).join('\n')}
-          select app.identity_register_deletion_hook('fixture', 'app.fixture_erase_member(jsonb)'::regprocedure);`);
+          select app.identity_register_deletion_hook('fixture', 'app.fixture_erase_member(jsonb)'::regprocedure)
+           where not exists (select 1 from app.identity_deletion_hooks where module = 'fixture');`);
     const seeded = async (p) => {
       p.password = password();
       const created = await http('POST', '/auth/v1/admin/users', { admin: true, body: { phone: p.phone, phone_confirm: true, password: p.password } });

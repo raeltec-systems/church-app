@@ -198,6 +198,9 @@ drop view app.cells_fixture_view;
 drop table app.cells_fixture_rows;
 
 -- Lifecycle hooks -----------------------------------------------------------------------------
+-- Story 3.5 registers Notifications' real hooks; this test uses its own synthetic ones instead
+-- (rolled back with the test).
+delete from app.contract_lifecycle_hooks where module = 'notifications';
 create temp table hook_log (seq serial, module text, event text);
 
 create function app.cells_fixture_on_event(p jsonb) returns void language sql set search_path = '' as $$

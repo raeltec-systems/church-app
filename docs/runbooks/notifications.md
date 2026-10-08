@@ -30,8 +30,8 @@ Migration: `supabase/migrations/20261008073631_notifications_inbox.sql` (one fil
 ### Gates and known limits
 
 - Enqueue needs the Q2 gate: the labelled fixture in `local` and `staging` (`q2_church_time`; entry 3 moves it to Africa/Lusaka). In production, enqueue answers `unavailable` until the owner approves `q2_church_time`. The system route there also needs `ops_system_access`.
-- Until entry 5, the worker delivers only to an `approved` member. Anyone else ends `ineligible` and gets no item (fail closed). Holds, accountless members, the direct-contact route, device tokens and push all arrive later.
-- **No deletion hook yet.** After a full deletion these rows keep the member's ids until entry 5 registers the deletion hooks: `app.notifications_jobs.recipient_member_id`, `app.notifications_inbox_items.recipient_member_id`, and the SYNTHETIC `app.fixture_reminder_sources` (`member_id`, `created_by_account`). Entry 5 registers `app.notifications_erase_member`; the fixture source gets a fixture deletion hook (or is cleaned up with the fixture) at the same time. Only synthetic data exists off production, and production scheduling is gated, so this cannot affect real data before entry 5.
+- Until entry 5, the worker delivers only to an `approved` member. Anyone else ends `ineligible` and gets no item (fail closed). Since story 3.5 recipients are routed by current access (held, deactivated and accountless members go to the source's direct-contact route); see Story 3.5.
+- **Deletion hook: since story 3.5** (`app.notifications_erase_member`, and the fixture hook for its sources). Before 3.5, after a full deletion these rows kept the member's ids: `app.notifications_jobs.recipient_member_id`, `app.notifications_inbox_items.recipient_member_id`, and the SYNTHETIC `app.fixture_reminder_sources` (`member_id`, `created_by_account`). Entry 5 registers `app.notifications_erase_member`; the fixture source gets a fixture deletion hook (or is cleaned up with the fixture) at the same time. Only synthetic data exists off production, and production scheduling is gated, so this cannot affect real data before entry 5.
 - A cancellation that commits after the worker's recheck cannot retract the item (AD-8). Since story 3.2, opening the item re-reads the source and shows the generic superseded state (below).
 
 ### Local runs
@@ -240,8 +240,8 @@ pg_cron (job "notifications-worker")
      - not actionable: `obsolete`, `not_actionable`;
      - the schedule ended, went stale, moved revision or cancelled the kind, or the member responded to a response reminder: `obsolete`, `schedule_changed`;
      - the source no longer admits the recipient: `ineligible`, `recipient_ineligible`;
-     - the recipient is no longer an approved member: `ineligible`, `membership_inactive`;
-     - otherwise the one inbox item: `delivered`.
+     - the recipient is no longer an approved member: `ineligible`, `membership_inactive`; since story 3.5 the recipient is routed by current access instead (see Story 3.5: `direct_contact`, `no_direct_contact_route`, `member_deleted`, `membership_inactive`);
+     - otherwise the one inbox item: `delivered` (since story 3.5 with one pending member-push job when push is allowed).
   6. If the recheck raises, or a slow owner check is cancelled by the role's statement timeout (SQLSTATE `57014`, caught explicitly), the attempt is `failed`. The job stays pending, counts the failure, releases its lease and backs off `backoff_base_seconds * 2^(failures-1)`, at most `backoff_max_seconds`. When failures plus lapses reach `max_attempts` it ends `obsolete` (`attempts_exhausted`) and the attempt is `exhausted`.
 
   Every attempt on an existing job writes one row in `app.notifications_attempts`: job, token, principal, request, outcome, finish reason and SQLSTATE only. An unknown job answers `not_found`.
@@ -338,5 +338,76 @@ Nothing. The tick and the enable refuse production until `ops_system_access`, `q
 
 ### Known limits
 
-- Entry 5 routes held and accountless recipients and registers the deletion hook. It must also cover `app.notifications_attempts` (job ids only) and `app.notifications_worker_runs` (principal ids only).
+- Entry 5 routes held and accountless recipients and registers the deletion hook (done in story 3.5; the hook covers `app.notifications_attempts` through their jobs; `app.notifications_worker_runs` holds principal ids only, no member).
 - Entry 6 adds push attempts (`channel` `push`) and their outcomes. Entry 8 shows the status in the staff health view.
+
+## Story 3.5: recipients routed by current access; work retired on lifecycle events
+
+Migrations: `supabase/migrations/20261008143000_notifications_routing.sql` (no row deletions; fail-closed stubs) and `supabase/migrations/20261008143100_notifications_routing_rows.sql` (ONLY the two functions that delete rows; applied by hand on hosted projects, like 2.11's rows file). Tests: `supabase/tests/notifications_routing_test.sql` (105), E2E `tools/identity-e2e/routing.mjs` (18 checks). Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.5/`.
+
+### Routing (at the worker's attempt, after the source and schedule rechecks)
+
+The source's `recipient_eligible` false still ends the job `ineligible` (`recipient_ineligible`). Then the recipient is resolved through CURRENT Identity state (read without locks; AD-2 orders Identity first):
+
+| Recipient now | Inbox item | Member-push job | Direct-contact need | Job ends |
+|---|---|---|---|---|
+| approved, live link whose account standing is `ok` (active link, approved binding, no open hold, no review) | yes | one `pending` job when the account allows push for the category and has a live token for this member | no | `delivered` |
+| approved but held, link in review, or no live link (accountless) | no | no | yes | `ineligible`, `direct_contact` |
+| deactivated membership | no | no | yes | `ineligible`, `direct_contact` |
+| as above, but the source registered no direct-contact route for the kind | no | no | recorded `unrouted` | `ineligible`, `no_direct_contact_route` |
+| deletion tombstone | no | no | no | `ineligible`, `member_deleted` |
+| never approved (pending, rejected) | no | no | no | `ineligible`, `membership_inactive` |
+
+- **Needs** (`app.notifications_direct_contact_needs`): one per job, with the notification key, the due time, `route_state` (`routed` or `unrouted`) and the worker principal. Never a contact route: a relative's or household number (Identity contact routes) is never a destination, and the source owner chooses how to contact the member.
+- **The source's route.** Notifications hands `{need_id, source_type, source_id, source_revision, recipient_member_id, reminder_kind, scheduled_at}` to the handler registered with `app.contract_register_direct_contact_route` (consumer guide: [contracts-and-owner-seams.md](contracts-and-owner-seams.md#direct-contact-routes-story-35)). It does not say why, so a hold is never disclosed. A raising handler is transient: the attempt is `failed`, nothing is recorded, and the job is retried with backoff.
+- The job state keeps its 3.1 values, so the Edge worker's outcomes and `deliver_due`'s five counts are unchanged: routed jobs count as `ineligible`.
+- Only the SYNTHETIC `fixture_reminder` source registers a route today (`fixture_reminder_contact_needs`). Duties' **Needs direct contact** list is the first real consumer.
+- Dormancy (2.3) is not part of the routing: a dormant but otherwise active account still gets its item, which it sees after its review.
+
+### Device tokens and push settings (members)
+
+`POST /rest/v1/rpc/notifications_command` (`Content-Profile: api`, 1.4 envelope), by a member whose session passes the live-access predicate (a held or in-review account gets `forbidden`):
+
+| Command | `expected_revision` | Payload | Effect |
+|---|---|---|---|
+| `notifications.register_device` | null | `{token, platform}` (`android` or `ios`) | Registers the token for the caller's account and member. The same token again refreshes the same device (revision + 1). A token live on another account is retired there (`reassigned`). At most 10 live tokens per account: the least recently refreshed is retired (`replaced`). |
+| `notifications.retire_device` | device revision | `{device_id}` | Retires the caller's own device (`member_retired`); another account's device is `not_found`; a retired one is `conflict {"device_id": "retired"}`. |
+| `notifications.set_push_category` | null to create, the setting's revision to change | `{source_type, reminder_kind, push_enabled}` | Push on or off for one category (a reminder kind with a registered contract; otherwise `validation_failed {"reminder_kind": "unregistered"}`). No setting means on. Turning push off never removes in-app items. |
+
+`POST /rest/v1/rpc/notifications_my_push_settings` returns `{categories: [{source_type, reminder_kind, title, push_enabled, revision}], devices: [{device_id, platform, registered_at, refreshed_at, revision, retired}]}`. No answer or read ever carries a token. Tokens (`app.notifications_device_tokens`) and settings follow the account: member-push work is created only for the member's live linked account. The mobile registration call and push sending are entry 6; the settings screen is entry 7. Group mutes belong to the conditional chat epic.
+
+### Lifecycle and deletion hooks
+
+- `app.notifications_on_member_lifecycle` is registered for `sessions_revoked`, `access_hold_applied`, `membership_deactivated`, `account_deactivated` and `deletion_requested`. In Identity's transaction it retires the member's live tokens and cancels their pending member-push jobs, with the event name as the reason. `deletion_requested` also cancels the member's pending jobs and ends their active schedules (`member_deleted`). Inbox items stay (a held member sees them again after release). A released hold or a restoration re-registers nothing: the device registers again after sign-in (entry 6).
+- Enqueue and `app.notifications_set_schedule` **skip** a recipient with a deletion tombstone: nothing is written (no job, no schedule written or reactivated) and they answer `{created: false, refused: "member_deleted"}` (enqueue, `job_id` and `job_state` null) or `{schedule_id: null, refused: "member_deleted", ...}` (schedule). They do not raise, so one deleted member never rolls back a source's multi-recipient command. Source owners still drop deleted members through their own lifecycle hooks.
+- **Lock order (AD-2).** The worker's attempt and `notifications.register_device` take `FOR KEY SHARE` on the member row before any Notifications lock, and the `deletion_requested` hook skips jobs another transaction holds (`for update skip locked`; the attempt then routes them `member_deleted`), so a deletion, hold or deactivation cannot deadlock with the worker.
+- `app.notifications_erase_member` (Identity deletion hook): `erase` removes the member's jobs, their attempts, inbox items, schedules, needs and push jobs, and the account's tokens, settings and push jobs; `check` counts what is left. The fixture deletion hook (`app.fixture_erase_member`, now registered by migration) also erases the member's `fixture_reminder_sources` and `fixture_reminder_contact_needs`, and anonymises the account on reminders the member created for others.
+- **Fail closed:** until `20261008143100_notifications_routing_rows.sql` is applied, the two purge functions answer `unavailable` and Identity's `erase_owners` step waits (retried). Requests and every access denial work without it.
+
+### SYNTHETIC fixture additions
+
+`fixture.reminder_create_for {member_id, due_at}` (`expected_revision` null) through `api.fixture_reminder_command`: an Admin creates a reminder for another SYNTHETIC member in any membership state, with or without an account, in `local` or `staging` only. The fixture registers its direct-contact route into `app.fixture_reminder_contact_needs`.
+
+### Local runs
+
+```bash
+npx supabase db reset
+npm run -s db:test                        # supabase/tests/notifications_routing_test.sql (105)
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/routing.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+Fictional numbers: pgTAP `+44 7700 900880-900888` (the 3.3 suite borrows `900889`), E2E `900890-900899`. The E2E mints its own local `notifications_worker` credential (digest only), uses synthetic device tokens, and removes every row it created.
+
+### Hosted staging (parent session, then the owner)
+
+1. **Parent session:** apply `20261008143000_notifications_routing.sql` to staging after `20261008121248`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. It contains no row deletion. It:
+   - replaces in place (same signatures and privileges): `app.notifications_attempt`, `app.notifications_enqueue_job`, `app.notifications_set_schedule`, `app.fixture_authorize_command`, `app.fixture_reminder_in_scope`, `app.fixture_reminder_command` (EXECUTE for `authenticated` re-granted) and `app.fixture_erase_member`;
+   - adds the direct-contact route registry, four Notifications tables (needs, device tokens, push settings, push jobs) and the fixture's `fixture_reminder_contact_needs`;
+   - registers Notifications' five lifecycle hooks, its deletion hook, the fixture deletion hook (if absent) and the `notifications` command authorizer;
+   - grants `authenticated` EXECUTE on `api.notifications_command(jsonb)` and `api.notifications_my_push_settings()` (and their `app` entry points) only.
+2. **Owner, by hand (staging SQL editor):** apply `20261008143100_notifications_routing_rows.sql`. It replaces two stubs (`app.notifications_deletion_purge_rows(uuid, uuid)`, `app.fixture_deletion_purge_rows(uuid)`). Until then a staging deletion waits at `erase_owners` (`unavailable`) and nothing is erased.
+3. **No Edge Function change.** The worker's outcomes are unchanged, so `notifications-worker` needs no redeploy.
+4. **Demonstration** (owner, synthetic members only): repeat `tools/identity-e2e/routing.mjs`'s steps against staging with seeded SYNTHETIC members. An Admin places a hold on one member, deactivates another and records an accountless member with a relative's number, then runs `fixture.reminder_create_for` for an active, the held, the deactivated and the accountless member, and the worker once (`"delivered":1, "ineligible":3`). Check in SQL: one inbox item (the active member), three `routed` rows in `app.notifications_direct_contact_needs` and three in `app.fixture_reminder_contact_needs`, nothing for the relative. Then a lost-device hold on a member with a pending push job (device registered through `notifications.register_device` with a synthetic token) shows the token retired and the push job `cancelled`. Clean up as in story 3.1, step 7, plus the new tables.
+5. **Production:** nothing new to approve. The fixture command refuses production; routing, tokens and settings work behind the same gates as the rest (Q2 for enqueue, the live-access predicate for members).

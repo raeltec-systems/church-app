@@ -427,6 +427,11 @@ select is((select count(*)::int from app.notifications_jobs
   1, 'the earlier job was reinstated, not duplicated (one logical key, one job)');
 
 -- Snooze (owner operation) ---------------------------------------------------------------------
+-- Story 3.5: only an active linked account gets inbox items, so member 1 gets an account.
+insert into auth.users (id, aud, role, phone, phone_confirmed_at)
+values ('00000000-0000-4000-a000-000000033001', 'authenticated', 'authenticated', '447700900889', now());
+insert into app.identity_account_links (member_id, auth_user_id, approved_phone, approved_by)
+values ((select member_id from m where n = 1), '00000000-0000-4000-a000-000000033001', '+447700900889', 'pgtap 3.3');
 select is((app.notifications_sys_deliver_due(gen_random_uuid(), gen_random_uuid(), '{}') -> 'data' ->> 'delivered')::int >= 1,
   true, 'the due respond-now reminder is delivered to the inbox');
 create temp table it as
@@ -537,7 +542,8 @@ select ok(not exists (
   select 1 from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace
    cross join unnest(array['anon', 'authenticated', 'service_role']) r
    where n.nspname = 'app' and p.proname ~ '^notifications_'
-     and p.proname not in ('notifications_my_inbox', 'notifications_open_item')
+     and p.proname not in ('notifications_my_inbox', 'notifications_open_item',
+                           'notifications_command', 'notifications_my_push_settings')
      and has_function_privilege(r, p.oid, 'EXECUTE')),
   'no scheduling function is client-executable');
 select is((select count(*)::int from information_schema.columns

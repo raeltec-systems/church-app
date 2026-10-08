@@ -24,6 +24,9 @@ patterns=(
   'Rv![A-Za-z0-9]{16,}'
   # Token values in URLs/fragments that are not redacted
   '[?&#](access_token|refresh_token|token|token_hash|code|provider_token)=(?!\[redacted\])[^&#\s"]+'
+  # FCM registration tokens (<instance id>:APA91...) and the synthetic test device tokens (story 3.5)
+  '[A-Za-z0-9_-]{20,}:APA91[A-Za-z0-9_-]*'
+  '\bfcm-[A-Za-z0-9]{20,}'
   # GoTrue email-link tokens (56 hex) and token hashes
   '\b[0-9a-f]{56}\b'
   # Secret-bearing JSON keys with a non-empty, unredacted string value

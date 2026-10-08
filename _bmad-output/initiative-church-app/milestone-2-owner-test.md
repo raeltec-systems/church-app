@@ -25,3 +25,10 @@ Synthetic data only. Owner Q2 decisions: `owner-decisions-milestone-2.md`.
 ## Reminders
 
 ## Decisions for the owner at the end of milestone 2
+
+- **Q2 scheduling values (3.3)** before production: confirm or adjust the TEST FIXTURE in
+  `docs/runbooks/notifications.md` (story 3.3): Africa/Lusaka; default deadline 14 days before when
+  assigned 30+ days ahead, 48 h before when 72 h+ ahead, 24 h before when more than 24 h ahead,
+  otherwise respond now; default reminders 24 h before the deadline and at the deadline; snooze
+  1 h / 24 h / 2 days; merge reminders within 30 minutes; no quiet hours. Then approve
+  `q2_church_time` and run the re-plan, as the runbook says.

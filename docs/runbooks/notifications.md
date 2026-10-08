@@ -120,7 +120,7 @@ Fictional numbers: pgTAP `+44 7700 900830-900839`, E2E `900840-900849`.
 
 ## Story 3.3: church-time reminder schedules
 
-Migration: `supabase/migrations/20261008120000_notifications_scheduling.sql` (one file; no row deletions, no destructive statements). Tests: `supabase/tests/notifications_scheduling_test.sql` (96, table-driven). Source owners follow the consumer guide in [contracts-and-owner-seams.md](contracts-and-owner-seams.md#reminder-schedules-consumer-guide-story-33).
+Migration: `supabase/migrations/20261008102121_notifications_scheduling.sql` (one file; no row deletions, no destructive statements). Tests: `supabase/tests/notifications_scheduling_test.sql` (96, table-driven). Source owners follow the consumer guide in [contracts-and-owner-seams.md](contracts-and-owner-seams.md#reminder-schedules-consumer-guide-story-33).
 
 ### The policy value (`q2_church_time`)
 
@@ -186,7 +186,7 @@ npm run -s db:test          # supabase/tests/notifications_scheduling_test.sql (
 
 ### Hosted staging (parent session)
 
-1. Apply `20261008120000_notifications_scheduling.sql` to staging after `20261008090057`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. There is no `_rows` file. The migration:
+1. Apply `20261008102121_notifications_scheduling.sql` to staging after `20261008090057`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. There is no `_rows` file. The migration:
    - replaces the `q2_church_time` fixture value (UTC to Africa/Lusaka, version 1);
    - adds `notifications_schedules` and four nullable columns on `notifications_jobs`;
    - replaces the bodies of `notifications_enqueue` and `notifications_cancel`, with no privilege change;

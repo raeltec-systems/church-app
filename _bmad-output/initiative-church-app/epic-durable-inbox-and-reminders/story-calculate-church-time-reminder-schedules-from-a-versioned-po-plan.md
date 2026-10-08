@@ -3,7 +3,7 @@ title: 'Calculate church-time reminder schedules from a versioned policy'
 type: 'feature'
 ticket: '3'
 created: '2026-10-08'
-status: 'built'
+status: 'done'
 baseline_revision: '19ca3b1098c9a320fc78e0bf03c276cca9b2374c'
 route: 'full'
 route_source: 'auto'
@@ -66,7 +66,7 @@ Decision (agent, under owner pre-approval): a merged entry takes the kind of its
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261008120000_notifications_scheduling.sql` -- fixture value v1 (Africa/Lusaka); `notifications_policy_errors`, `notifications_policy`; duration and local helpers; `notifications_response_deadline`, `notifications_plan`, `notifications_occurrences`, `notifications_snooze_at`; `notifications_schedules` table; job columns `policy_version`, `expires_at`, `schedule_id`, `snoozed_from_item_id`; `notifications_enqueue_job` + enqueue wrapper; `notifications_set_schedule`, `notifications_replan_all`, `notifications_snooze_item`; cancel also ends schedules; privileges.
+- [x] `supabase/migrations/20261008102121_notifications_scheduling.sql` -- fixture value v1 (Africa/Lusaka); `notifications_policy_errors`, `notifications_policy`; duration and local helpers; `notifications_response_deadline`, `notifications_plan`, `notifications_occurrences`, `notifications_snooze_at`; `notifications_schedules` table; job columns `policy_version`, `expires_at`, `schedule_id`, `snoozed_from_item_id`; `notifications_enqueue_job` + enqueue wrapper; `notifications_set_schedule`, `notifications_replan_all`, `notifications_snooze_item`; cancel also ends schedules; privileges.
 - [x] `supabase/tests/notifications_scheduling_test.sql` -- table-driven pgTAP for the whole matrix, guards and privileges.
 - [x] `docs/runbooks/notifications.md`, `contracts-and-owner-seams.md` -- policy value shape, owner operations, operator re-plan, staging/owner steps.
 
@@ -76,7 +76,7 @@ Decision (agent, under owner pre-approval): a merged entry takes the kind of its
 
 ## Implementation Notes
 
-- Implemented directly (no subagent tool in this run). Files: `supabase/migrations/20261008120000_notifications_scheduling.sql`, `supabase/tests/notifications_scheduling_test.sql` (96 after review fixes, table-driven: bad policies, deadline cases, plan cases, intent errors), `docs/runbooks/notifications.md` (Story 3.3 section, owner production steps), `docs/runbooks/contracts-and-owner-seams.md` (schedule consumer guide, Q2 approval check).
+- Implemented directly (no subagent tool in this run). Files: `supabase/migrations/20261008102121_notifications_scheduling.sql`, `supabase/tests/notifications_scheduling_test.sql` (96 after review fixes, table-driven: bad policies, deadline cases, plan cases, intent errors), `docs/runbooks/notifications.md` (Story 3.3 section, owner production steps), `docs/runbooks/contracts-and-owner-seams.md` (schedule consumer guide, Q2 approval check).
 - Snooze choices are written `"1 hour"`, `"24 hours"`, `"2 days"` (durations accept singular and plural units); the Design Notes' `"1 hours"` was a typo.
 - A pending job that stays in a re-plan takes the new `policy_version`, digest and expiry, so "jobs record the applied policy version" holds after a policy change.
 - Re-planning keeps a due-but-undelivered job at the current revision (the worker delivers it) and cancels only future or older-revision jobs; the `respond_now` of a short-notice schedule is issued once per source revision (`respond_now_revision`), so a policy re-plan or a repeated fresh call never sends a second one.
@@ -87,7 +87,7 @@ Decision (agent, under owner pre-approval): a merged entry takes the kind of its
 
 ## Plan Change Log
 
-- 2026-10-08, independent review of 3.3 (coordinator; four mediums, three lows), patched in place in the unapplied migration `20261008120000`:
+- 2026-10-08, independent review of 3.3 (coordinator; four mediums, three lows), patched in place in the unapplied migration `20261008102121`:
   1. A kind-selective `notifications_cancel` no longer ends the schedule: it stays active and records the kind in `cancelled_kinds` (reset on a new revision), so a re-plan keeps the other kinds and never revives the cancelled one.
   2. `notifications_snooze_item` refuses (`conflict {"item_id": "superseded"}`) when the job's schedule is not active, its revision moved, its kind was cancelled, or it is a response kind and the intent is `responded`; re-planning a responded intent cancels pending snoozes of response kinds (`responded`).
   3. Re-planning respects merges already sent: an entry within the merge window after a due or delivered job of the same schedule and revision is `covered`, not enqueued. `notifications_apply_schedule` takes an optional `p_now` so tests can re-plan at a later instant.

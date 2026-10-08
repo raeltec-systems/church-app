@@ -563,7 +563,7 @@ Nothing yet. Production needs its own Firebase project and service account, its 
 
 ## Story 3.7: the inbox, notification settings and snooze on mobile and staff web
 
-Migration: `supabase/migrations/20261008181657_notifications_inbox_screens.sql` (one file; no row deletions, no destructive statements, no rows file). Tests: `supabase/tests/notifications_inbox_screens_test.sql`, E2E `tools/identity-e2e/inbox-screens.mjs` (real GoTrue, PostgREST, worker script and **Realtime**, with the captured signal frames), the live adapter check `tools/identity-e2e/live-inbox-check.sh` (steps L11-L18 drive the real Dart `SupabaseInboxSignals` on the private channel), client tests `packages/client_core/test/notifications/inbox_screens_test.dart` and both app tests. Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.7/`.
+Migration: `supabase/migrations/20261008183514_notifications_inbox_screens.sql` (one file; no row deletions, no destructive statements, no rows file). Tests: `supabase/tests/notifications_inbox_screens_test.sql`, E2E `tools/identity-e2e/inbox-screens.mjs` (real GoTrue, PostgREST, worker script and **Realtime**, with the captured signal frames), the live adapter check `tools/identity-e2e/live-inbox-check.sh` (steps L11-L18 drive the real Dart `SupabaseInboxSignals` on the private channel), client tests `packages/client_core/test/notifications/inbox_screens_test.dart` and both app tests. Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.7/`.
 
 ### Server contract (additions)
 
@@ -596,7 +596,7 @@ Start the stack with Realtime (do not pass `-x realtime`). Fictional numbers: E2
 
 ### Hosted staging (parent session, then the owner)
 
-1. **Parent session: the migration.** Apply `20261008181657_notifications_inbox_screens.sql` to staging (`tmurpotfluignacfueki`) after `20261008155801`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. No rows file and no Edge Function change (the worker's outcomes are unchanged). It:
+1. **Parent session: the migration.** Apply `20261008183514_notifications_inbox_screens.sql` to staging (`tmurpotfluignacfueki`) after `20261008155801`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. No rows file and no Edge Function change (the worker's outcomes are unchanged). It:
    - adds `opened_at` and `snooze_revision` to `app.notifications_inbox_items`, and `responded_at` to `app.fixture_reminder_sources`;
    - replaces in place (same signatures and grants): `app.notifications_my_inbox`, `app.notifications_open_item`, `app.notifications_authorize_command`, `app.notifications_command_in_scope`, `app.notifications_command`, `app.fixture_reminder_open_check`, `app.fixture_authorize_command`, `app.fixture_reminder_command`;
    - adds the publisher, four triggers, the fixture `fixture_reply` contract and commands, and the receive-only policy on `realtime.messages`; no new client grant.

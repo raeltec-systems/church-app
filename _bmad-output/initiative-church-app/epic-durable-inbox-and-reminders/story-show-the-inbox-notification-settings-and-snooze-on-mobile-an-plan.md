@@ -3,7 +3,7 @@ title: 'Show the inbox, notification settings and snooze on mobile and staff web
 type: 'feature'
 ticket: '7'
 created: '2026-10-08'
-status: 'built'
+status: 'done'
 baseline_revision: '5db8b266ebaaed7cc690a318df528e524b9642b0'
 route: 'full'
 route_source: 'auto'
@@ -63,7 +63,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261008181657_notifications_inbox_screens.sql` -- inbox items gain `opened_at`, `revision`; list adds `opened`, `snoozed_until`; open marks opened and (current only) adds `snooze_choices`, `snoozed_until`; `notifications.snooze_item {item_id, choice}`; refresh publisher triggers + receive-only policy on `realtime.messages` (guarded); fixture `reminder_schedule`/`reminder_respond` and `fixture_response` contract -- N6 server parts.
+- [x] `supabase/migrations/20261008183514_notifications_inbox_screens.sql` -- inbox items gain `opened_at`, `revision`; list adds `opened`, `snoozed_until`; open marks opened and (current only) adds `snooze_choices`, `snoozed_until`; `notifications.snooze_item {item_id, choice}`; refresh publisher triggers + receive-only policy on `realtime.messages` (guarded); fixture `reminder_schedule`/`reminder_respond` and `fixture_response` contract -- N6 server parts.
 - [x] `supabase/tests/notifications_inbox_screens_test.sql` (+ update `notifications_inbox_test.sql` key set) -- markers, snooze, clamp, response/cancel, push off, signal payload capture, privileges.
 - [x] `tools/identity-e2e/inbox-screens.mjs` (+ `.test.mjs`) -- real GoTrue/PostgREST/Realtime: signal frame capture, foreign join refused, snooze/clamp/response/cancel, push off.
 - [x] `client_core` domain/adapters/controllers/screens -- `InboxSignals` port + Supabase adapter, settings repository, snooze and push-category controllers, markers, settings screen, route `/notification-settings`; fakes in `testing.dart`; tests.
@@ -87,7 +87,7 @@ context:
 
 ## Owner checks (phone and web)
 
-Exact steps: `docs/runbooks/notifications.md`, story 3.7, "Hosted staging" and "Owner manual checks" (11 steps: reach, signal, Opened on both, follow, snooze, clamp, response/cancel, push off, deep link after sign-in, captured payload in the browser, clean up). Prerequisites: parent applies `20261008181657` to staging; owner/parent finish story 3.4 staging steps 4-6 (or run the worker by hand); owner builds the APK and staff web against staging with the publishable key.
+Exact steps: `docs/runbooks/notifications.md`, story 3.7, "Hosted staging" and "Owner manual checks" (11 steps: reach, signal, Opened on both, follow, snooze, clamp, response/cancel, push off, deep link after sign-in, captured payload in the browser, clean up). Prerequisites: parent applies `20261008183514` to staging; owner/parent finish story 3.4 staging steps 4-6 (or run the worker by hand); owner builds the APK and staff web against staging with the publishable key.
 
 ## Design Notes
 

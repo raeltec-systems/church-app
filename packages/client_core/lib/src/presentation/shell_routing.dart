@@ -96,6 +96,17 @@ abstract final class ClientPaths {
 
   /// Story 3.1 (both clients): the member's durable inbox.
   static const inbox = '/inbox';
+
+  /// Story 3.2: one opened inbox item, `/inbox/<item id>`.
+  static String inboxItem(String itemId) => '$inbox/$itemId';
+
+  /// Story 3.2: the server-provided deep-link targets this build has screens
+  /// for. A source owner adds its route pattern here with its first screen;
+  /// any other target is shown as current but not yet openable.
+  static final List<RegExp> deepLinkTargets = [];
+
+  static bool isKnownDeepLink(String target) =>
+      deepLinkTargets.any((p) => p.hasMatch(target));
 }
 
 /// Story 2.7: the incoming Auth email link for this route, read once. Only
@@ -263,6 +274,15 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.inbox,
         pageBuilder: (_, state) => page(state, const InboxScreen()),
+        routes: [
+          GoRoute(
+            path: ':itemId',
+            pageBuilder: (_, state) => page(
+              state,
+              InboxItemScreen(itemId: state.pathParameters['itemId']!),
+            ),
+          ),
+        ],
       ),
       GoRoute(
         path: ClientPaths.signIn,

@@ -121,3 +121,70 @@ class InboxController extends Notifier<InboxState> {
 final inboxProvider = NotifierProvider<InboxController, InboxState>(
   InboxController.new,
 );
+
+/// One opened item as last answered by the server for the CURRENT account
+/// generation (no result while the first answer is pending).
+class InboxItemOpenState {
+  const InboxItemOpenState({this.loading = false, this.result});
+
+  final bool loading;
+  final AccessRead<OpenedInboxItem>? result;
+
+  OpenedInboxItem? get opened => switch (result) {
+    AccessReadOk(:final value) => value,
+    _ => null,
+  };
+}
+
+/// Story 3.2: opening one inbox item. Every open asks the server, which
+/// re-reads the item's source through its registered contract; nothing is
+/// kept beyond this screen and this account generation (AD-13).
+class InboxItemController extends Notifier<InboxItemOpenState> {
+  InboxItemController(this.itemId);
+
+  final String itemId;
+
+  @override
+  InboxItemOpenState build() {
+    final generation = ref.watch(accountGenerationProvider);
+    final accountId = ref.watch(accountProvider.select((s) => s.accountId));
+    if (accountId == null) {
+      return const InboxItemOpenState(
+        result: AccessReadDenied(AccessDenial.signedOut),
+      );
+    }
+    Future.microtask(() => _load(generation));
+    return const InboxItemOpenState(loading: true);
+  }
+
+  /// Asks the server again (ignored while a request is in flight).
+  Future<void> refresh() async {
+    if (state.loading) return;
+    await _load(ref.read(accountGenerationProvider));
+  }
+
+  Future<void> _load(int generation) async {
+    if (!ref.mounted || ref.read(accountGenerationProvider) != generation) {
+      return;
+    }
+    if (ref.read(accountProvider).accountId == null) return;
+    state = InboxItemOpenState(loading: true, result: state.result);
+    final result = await ref.read(inboxRepositoryProvider).openItem(itemId);
+    if (!ref.mounted || ref.read(accountGenerationProvider) != generation) {
+      return;
+    }
+    state = InboxItemOpenState(result: result);
+    if (result is AccessReadDenied<OpenedInboxItem>) {
+      if (result.denial == AccessDenial.untrustedSession) {
+        await ref.read(accountProvider.notifier).endUntrustedSession();
+        return;
+      }
+      noteProtectedDenial(ref);
+    }
+  }
+}
+
+final inboxItemProvider = NotifierProvider.autoDispose
+    .family<InboxItemController, InboxItemOpenState, String>(
+      InboxItemController.new,
+    );

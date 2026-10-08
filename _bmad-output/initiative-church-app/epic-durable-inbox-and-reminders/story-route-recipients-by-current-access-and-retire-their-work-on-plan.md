@@ -3,7 +3,7 @@ title: 'Route recipients by current access and retire their work on lifecycle ev
 type: 'feature'
 ticket: '5'
 created: '2026-10-08'
-status: 'in-progress'
+status: 'built'
 baseline_revision: 'e1369683da6bdecb16b6f38d6325594e60e98aef'
 route: 'full'
 route_source: 'auto'

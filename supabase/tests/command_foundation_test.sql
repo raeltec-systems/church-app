@@ -67,7 +67,9 @@ select results_eq(
            ('api.identity_my_recovery_email'),
            ('api.identity_recovery_command'),
            ('api.identity_recovery_email_command'), ('api.identity_review_command'),
-           ('api.notifications_my_inbox'), ('api.notifications_open_item'),
+           ('api.notifications_command'),
+           ('api.notifications_my_inbox'), ('api.notifications_my_push_settings'),
+           ('api.notifications_open_item'),
            ('api.system_command'), ('app.cells_admin_overview'), ('app.cells_command'),
            ('app.cells_leader_queue'), ('app.cells_my_cell'), ('app.cells_private_fixture_read'),
            ('app.cells_signup_options'), ('app.fixture_counter_command'),
@@ -89,9 +91,11 @@ select results_eq(
            ('app.identity_my_recovery_email'),
            ('app.identity_recovery_command'),
            ('app.identity_recovery_email_command'), ('app.identity_review_command'),
-           ('app.notifications_my_inbox'), ('app.notifications_open_item'),
+           ('app.notifications_command'),
+           ('app.notifications_my_inbox'), ('app.notifications_my_push_settings'),
+           ('app.notifications_open_item'),
            ('app.sys_command')$$,
-  'authenticated can execute only the command wrappers, the live-access-checked identity reads (stories 2.1, 2.3), the applicant reads and command (2.4), the Admin review command and reads (2.5), the recovery-email command and reads (2.7), the credential-review command and reads (2.8), the assisted-recovery command and read (2.9), the lifecycle command and reads (2.10), the deletion command and read (2.11), the cells command and reads (2.6), the member inbox read (3.1) and item open (3.2), the synthetic scoped (2.3) and cell-private (2.6) fixture reads, the synthetic reminder command (3.1) and their definer entry points (the system route refuses sessions)'
+  'authenticated can execute only the command wrappers, the live-access-checked identity reads (stories 2.1, 2.3), the applicant reads and command (2.4), the Admin review command and reads (2.5), the recovery-email command and reads (2.7), the credential-review command and reads (2.8), the assisted-recovery command and read (2.9), the lifecycle command and reads (2.10), the deletion command and read (2.11), the cells command and reads (2.6), the member inbox read (3.1) and item open (3.2), the device and push-settings command and read (3.5), the synthetic scoped (2.3) and cell-private (2.6) fixture reads, the synthetic reminder command (3.1) and their definer entry points (the system route refuses sessions)'
 );
 select is_definer('app', 'fixture_counter_command',
   array['jsonb'], 'the app entry point is SECURITY DEFINER');

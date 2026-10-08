@@ -305,8 +305,8 @@ select is(pg_temp.try('stale_actionable'), '{"outcome": "obsolete", "finish_reas
 select is(pg_temp.try('expired'), '{"outcome": "expired", "finish_reason": "expired"}'::jsonb,
   'a job past its expiry ends expired at the attempt');
 update app.identity_members set membership_state = 'deactivated' where member_id = (select member_id from m where n = 2);
-select is(pg_temp.try('lost'), '{"outcome": "ineligible", "finish_reason": "membership_inactive"}'::jsonb,
-  'a recipient who is no longer an approved member ends ineligible');
+select is(pg_temp.try('lost'), '{"outcome": "ineligible", "finish_reason": "direct_contact"}'::jsonb,
+  'a recipient who is no longer an approved member gets no item: the need goes to direct contact (story 3.5)');
 update app.identity_members set membership_state = 'approved' where member_id = (select member_id from m where n = 2);
 select is((select string_agg(pg_temp.st(v), ';' order by k) from j where k in ('cancel', 'expired', 'revised', 'revoked', 'stale_actionable')),
   'cancelled|source_cancelled;obsolete|expired;obsolete|source_changed;ineligible|recipient_ineligible;obsolete|not_actionable',

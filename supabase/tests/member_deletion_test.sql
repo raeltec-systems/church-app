@@ -247,7 +247,9 @@ values (pg_temp.mid(4), 'phone', '+447700900619', 'member', true, pg_temp.mid(1)
 select app.contract_register_lifecycle_hook('fixture', e, 'app.fixture_record_lifecycle(jsonb)'::regprocedure)
   from unnest(array['membership_deactivated', 'deletion_requested', 'sessions_revoked', 'member_deleted']) e;
 select app.identity_register_handover_hook('fixture', 'app.fixture_report_handover(jsonb)'::regprocedure);
-select app.identity_register_deletion_hook('fixture', 'app.fixture_erase_member(jsonb)'::regprocedure);
+-- Since story 3.5 the fixture deletion hook is registered by migration; keep it registered.
+select app.identity_register_deletion_hook('fixture', 'app.fixture_erase_member(jsonb)'::regprocedure)
+ where not exists (select 1 from app.identity_deletion_hooks where module = 'fixture');
 create temp table t_ids (k text primary key, v uuid);
 grant select on t_ids to anon;
 insert into t_ids values ('principal', app.sys_create_principal('identity-deletion', 'identity_deletion', 'israel'));

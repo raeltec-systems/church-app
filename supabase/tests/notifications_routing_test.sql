@@ -6,7 +6,7 @@
 -- notification row. HTTP evidence: tools/identity-e2e/routing.mjs. Every account here is
 -- SYNTHETIC (+44 7700 900880-900888).
 begin;
-select plan(94);
+select plan(100);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000350' || lpad(n::text, 2, '0'))::uuid $$;
@@ -326,6 +326,16 @@ update app.notifications_jobs set last_failed_at = now() - interval '1 day' wher
 select is((pg_temp.run() ->> 'ineligible')::int, 1, 'the retry routes it');
 select is(pg_temp.st((select v from j where k = 'raising')), 'ineligible|direct_contact', 'to direct contact');
 
+-- No token: item only; a link in review: direct contact ----------------------------------------
+insert into j values ('notoken', pg_temp.for_member(7));
+select is((pg_temp.run() ->> 'delivered')::int, 1, 'an active member without a device is delivered');
+select is(pg_temp.push((select v from j where k = 'notoken')), 'none', 'but gets no member-push job');
+update app.identity_account_links set binding_review_required = true where member_id = pg_temp.mid(2) and link_state = 'active';
+insert into j values ('review', pg_temp.for_member(2));
+select is((pg_temp.run() ->> 'ineligible')::int, 1, 'a member whose link is in review gets no item');
+select is(pg_temp.st((select v from j where k = 'review')), 'ineligible|direct_contact', 'the need goes to direct contact');
+update app.identity_account_links set binding_review_required = false where member_id = pg_temp.mid(2) and link_state = 'active';
+
 -- Lifecycle events retire tokens and cancel member-push work ----------------------------------
 select pg_temp.dev(7, 'notifications.register_device', null,
                    jsonb_build_object('token', pg_temp.tok('l'), 'platform', 'ios'));
@@ -338,7 +348,7 @@ select is(pg_temp.call(1, 'identity_credential_command', 'identity.place_hold', 
 select is(pg_temp.tokens(7), 'access_hold_applied', 'the token is retired');
 select is(pg_temp.push((select v from j where k = 'lost')), 'cancelled|access_hold_applied',
   'the pending member-push job is cancelled in Identity''s transaction');
-select is(pg_temp.items(7), 1, 'the inbox item stays');
+select is(pg_temp.items(7), 2, 'the inbox items stay');
 select is(pg_temp.lifecycle('sessions_revoked', 2), 1, 'sessions_revoked reaches Notifications');
 select is(pg_temp.tokens(2), 'reassigned,member_retired,sessions_revoked', 'and retires the member''s live token');
 select is(pg_temp.push((select v from j where k = 'active2')), 'cancelled|sessions_revoked', 'and cancels their push job');
@@ -365,8 +375,11 @@ select is((select count(*)::int from app.notifications_jobs where recipient_memb
 select is((select string_agg(schedule_state || '|' || end_reason, ',') from app.notifications_schedules
             where recipient_member_id = pg_temp.mid(9)), 'ended|member_deleted', 'and ends their schedules');
 select is(pg_temp.tokens(9), 'deletion_requested', 'and retires their tokens');
+insert into j values ('del_route', pg_temp.for_member(9));
 insert into app.identity_deletions (member_id, had_account, origin, is_synthetic)
 values (pg_temp.mid(9), true, 'member_request', true);
+select is((pg_temp.run() ->> 'ineligible')::int, 1, 'a job of a member with a deletion tombstone is not delivered');
+select is(pg_temp.st((select v from j where k = 'del_route')), 'ineligible|member_deleted', 'it ends member_deleted, with no need');
 select throws_ok(format($$select app.notifications_enqueue(jsonb_build_object(
     'source_type', 'fixture_reminder', 'source_id', %L, 'source_revision', 1,
     'recipient_member_id', %L, 'reminder_kind', 'fixture_due', 'scheduled_at', app.cmd_utc(now())))$$,

@@ -89,12 +89,18 @@ class _MobileAppState extends State<MobileApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'BIC Kafue',
-      theme: churchMobileTheme(Brightness.light),
-      darkTheme: churchMobileTheme(Brightness.dark),
-      themeMode: widget.themeMode ?? ThemeMode.system,
-      routerConfig: _router,
+    // Story 3.6: a tapped notification opens its inbox item, and the device
+    // registers for push once member access is granted. The push SDK is off
+    // (NoPushMessaging) until the owner's Firebase app is wired in.
+    return PushBridge(
+      router: _router,
+      child: MaterialApp.router(
+        title: 'BIC Kafue',
+        theme: churchMobileTheme(Brightness.light),
+        darkTheme: churchMobileTheme(Brightness.dark),
+        themeMode: widget.themeMode ?? ThemeMode.system,
+        routerConfig: _router,
+      ),
     );
   }
 }

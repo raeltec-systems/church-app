@@ -15,6 +15,7 @@ import '../domain/membership_lifecycle.dart';
 import '../domain/membership_review.dart';
 import '../domain/password_recovery.dart';
 import '../domain/platform_status.dart';
+import '../domain/push_messaging.dart';
 import '../domain/recovery_email.dart';
 import '../domain/session.dart';
 
@@ -106,6 +107,12 @@ final memberDeletionRepositoryProvider = Provider<MemberDeletionRepository>(
 /// Story 3.1: the member's durable inbox.
 final inboxRepositoryProvider = Provider<InboxRepository>(
   (ref) => const UnconfiguredInboxRepository(),
+);
+
+/// Story 3.6: the device push SDK. Off by default ([NoPushMessaging]); the
+/// mobile composition root overrides it once a Firebase app is configured.
+final pushMessagingProvider = Provider<PushMessaging>(
+  (ref) => const NoPushMessaging(),
 );
 
 final requestIdsProvider = Provider<RequestIds>((ref) => SecureRequestIds());

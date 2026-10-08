@@ -107,6 +107,20 @@ abstract final class ClientPaths {
 
   static bool isKnownDeepLink(String target) =>
       deepLinkTargets.any((p) => p.hasMatch(target));
+
+  /// Story 3.6: sign in, then continue to [target] (an inbox item).
+  static String signInThen(String target) =>
+      Uri(path: signIn, queryParameters: {'then': target}).toString();
+
+  /// The continuation a sign-in may follow: only an inbox item path
+  /// (`/inbox/<uuid>`), never any other address, so a link cannot send a
+  /// fresh session anywhere else.
+  static String? continuationFrom(String? then) =>
+      then != null && _inboxItemPath.hasMatch(then) ? then : null;
+
+  static final _inboxItemPath = RegExp(
+    r'^/inbox/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+  );
 }
 
 /// Story 2.7: the incoming Auth email link for this route, read once. Only
@@ -291,6 +305,9 @@ GoRouter buildClientRouter({
           SignInScreen(
             afterCreateAccount: afterCreateAccount,
             assistedRecovery: assistedRecovery,
+            continueTo: ClientPaths.continuationFrom(
+              state.uri.queryParameters['then'],
+            ),
           ),
         ),
       ),

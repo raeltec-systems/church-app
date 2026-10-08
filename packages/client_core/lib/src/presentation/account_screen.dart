@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../application/account_controllers.dart';
 import '../application/membership_lifecycle_controllers.dart';
 import '../application/providers.dart';
+import '../application/push_controllers.dart';
 import '../domain/access_grants.dart' show AccessReadOk;
 import '../domain/member_access.dart';
 import 'shell_routing.dart' show ClientPaths;
@@ -66,6 +67,8 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     final signedIn = account.accountId != null;
 
     Future<void> signOut() async {
+      // Story 3.6: this device stops receiving the account's pushes first.
+      await ref.read(pushRegistrationProvider.notifier).retireBeforeSignOut();
       await ref.read(accountAuthGatewayProvider).signOut();
       if (context.mounted) announce(context, 'Signed out');
     }

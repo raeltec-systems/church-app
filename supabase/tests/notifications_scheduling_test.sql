@@ -5,7 +5,7 @@
 -- dates, snooze clamping, schedule reconciliation, policy re-planning without past-due work,
 -- the production gate, guards and privileges. Every member here is SYNTHETIC.
 begin;
-select plan(79);
+select plan(96);
 
 -- 'ok <json>' or 'sqlstate|message|detail' of a statement returning jsonb.
 create function pg_temp.try(p_sql text) returns text
@@ -58,7 +58,9 @@ with ins as (insert into app.identity_members (display_name, membership_state, i
 insert into m select row_number() over (), member_id from ins;
 create temp table src (k text primary key, id uuid);
 insert into src values ('S1', gen_random_uuid()), ('S2', gen_random_uuid()), ('S3', gen_random_uuid()),
-                       ('S4', gen_random_uuid()), ('S5', gen_random_uuid()), ('T1', gen_random_uuid());
+                       ('S4', gen_random_uuid()), ('S5', gen_random_uuid()), ('T1', gen_random_uuid()),
+                       ('S6', gen_random_uuid()), ('S7', gen_random_uuid()), ('S8', gen_random_uuid()),
+                       ('S9', gen_random_uuid());
 insert into app.fixture_reminder_sources (source_id, member_id, due_at, created_by_account)
 select s.id, (select member_id from m where n = 1), now(), gen_random_uuid() from src s;
 create function pg_temp.sched(p_k text, p_rev bigint, p_type text, p_intent jsonb,
@@ -112,6 +114,8 @@ insert into bad_policy values
   ('bad default anchor', '{"default_reminders": {"response": [{"anchor": "deadline", "before": "1 hour"}], "task": []}}', 'default_reminders'),
   ('zero snooze', '{"snooze_choices": ["0 hours"]}', 'snooze_choices'),
   ('bad duration', '{"merge_window": "30 mins"}', 'merge_window'),
+  ('merge window over a day', '{"merge_window": "2 days"}', 'merge_window'),
+  ('band offset over max_offset', '{"deadline_bands": [{"min_lead": "0 minutes", "before_start": "91 days"}]}', 'deadline_bands'),
   ('unknown key', '{"send_at_night": false}', 'send_at_night');
 select is((select string_agg(b.name, ', ') from bad_policy b
             where not (app.notifications_policy_errors(
@@ -130,32 +134,42 @@ update app.policy_gates set state = 'unresolved', approved_value = null, approve
        approved_at = null, approval_note = null where gate = 'q2_church_time';
 
 -- Response deadlines: the four bands and creator deadlines (now = 2026-10-01T08:00:00Z) --------
-create temp table deadline_cases (name text, starts text, creator text, expect text);
-insert into deadline_cases values
+create temp table deadline_cases (name text, starts text, creator text, expect text,
+                                  assigned text default '2026-10-01T08:00:00Z');
+insert into deadline_cases (name, starts, creator, expect) values
   ('long: 45 days ahead -> 14 local days before', '2026-11-15T07:00:00Z', null, '2026-11-01T07:00:00.000000Z|default|1|false'),
   ('long: exactly 30 days', '2026-10-31T08:00:00Z', null, '2026-10-17T08:00:00.000000Z|default|1|false'),
   ('medium: 10 days -> 48 hours before', '2026-10-11T07:00:00Z', null, '2026-10-09T07:00:00.000000Z|default|2|false'),
   ('medium: just under 30 days', '2026-10-31T07:59:00Z', null, '2026-10-29T07:59:00.000000Z|default|2|false'),
+  ('medium: exactly 72 hours -> 48 hours before (24 hours to respond)', '2026-10-04T08:00:00Z', null, '2026-10-02T08:00:00.000000Z|default|2|false'),
+  ('short: just under 72 hours -> 24 hours before', '2026-10-04T07:59:00Z', null, '2026-10-03T07:59:00.000000Z|default|3|false'),
+  ('short: exactly 48 hours -> 24 hours before', '2026-10-03T08:00:00Z', null, '2026-10-02T08:00:00.000000Z|default|3|false'),
   ('short: 30 hours -> 24 hours before', '2026-10-02T14:00:00Z', null, '2026-10-01T14:00:00.000000Z|default|3|false'),
+  ('short: 24 hours and a minute', '2026-10-02T08:01:00Z', null, '2026-10-01T08:01:00.000000Z|default|3|false'),
+  ('passed: exactly 24 hours -> respond now', '2026-10-02T08:00:00Z', null, '2026-10-01T08:00:00.000000Z|default|3|true'),
   ('passed: 20 hours -> due now (short notice)', '2026-10-02T04:00:00Z', null, '2026-10-01T08:00:00.000000Z|default|3|true'),
   ('creator deadline before the start', '2026-10-11T07:00:00Z', '2026-10-05T10:00:00Z', '2026-10-05T10:00:00.000000Z|creator||false'),
   ('creator deadline at the start', '2026-10-11T07:00:00Z', '2026-10-11T07:00:00Z', '2026-10-11T07:00:00.000000Z|creator||false'),
-  ('creator deadline already passed', '2026-10-11T07:00:00Z', '2026-09-30T07:00:00Z', '2026-10-01T08:00:00.000000Z|creator||true'),
-  ('month end: 31 March start -> 17 March, same local time', '2026-03-31T07:00:00Z', null, null);
-update deadline_cases set expect = '2026-03-17T07:00:00.000000Z|default|1|false' where expect is null;
+  ('creator deadline already passed', '2026-10-11T07:00:00Z', '2026-09-30T07:00:00Z', '2026-10-01T08:00:00.000000Z|creator||true');
+insert into deadline_cases values
+  ('month end: 31 March start -> 17 March, same local time', '2026-03-31T07:00:00Z', null,
+   '2026-03-17T07:00:00.000000Z|default|1|false', '2026-01-31T08:00:00Z'),
+  ('start already passed: never after the start', '2026-10-01T07:00:00Z', null,
+   '2026-10-01T07:00:00.000000Z|default|3|true', '2026-09-29T08:00:00Z'),
+  ('creator deadline with the start passed', '2026-10-01T07:00:00Z', '2026-09-30T08:00:00Z',
+   '2026-10-01T07:00:00.000000Z|creator||true', '2026-09-29T08:00:00Z');
 select is((select string_agg(c.name || ' => ' || d, '; ')
              from deadline_cases c,
                   lateral (select r ->> 'response_deadline' || '|' || (r ->> 'deadline_source') || '|'
                                   || coalesce(r ->> 'band', '') || '|' || (r ->> 'short_notice') as d
                              from app.notifications_response_deadline(
-                                    pg_temp.pol(),
-                                    case when c.starts like '2026-03%' then '2026-01-31T08:00:00Z'::timestamptz
-                                         else '2026-10-01T08:00:00Z'::timestamptz end,
-                                    c.starts::timestamptz, c.creator::timestamptz,
+                                    pg_temp.pol(), c.assigned::timestamptz, c.starts::timestamptz,
+                                    c.creator::timestamptz,
                                     case when c.starts like '2026-03%' then '2026-01-31T08:00:00Z'::timestamptz
                                          else '2026-10-01T08:00:00Z'::timestamptz end) r) x
             where d is distinct from c.expect),
-  null, 'every deadline band and creator case computes the expected deadline');
+  null, 'every deadline band boundary and creator case computes the expected deadline');
+select is((select count(*)::int from deadline_cases), 17, 'all deadline cases ran');
 select is(pg_temp.fe($$select pg_temp.plan('response', pg_temp.ri('2026-10-11T07:00:00Z', '{"response_deadline": "2026-10-11T07:00:01Z"}'))$$),
   'validation_failed {"response_deadline": "after_start"}', 'a creator deadline after the start is refused');
 select is(pg_temp.fe($$select pg_temp.plan('response', jsonb_build_object('assigned_at', '2026-10-12T08:00:00Z', 'starts_at', '2026-10-11T07:00:00Z'))$$),
@@ -186,6 +200,16 @@ select is(pg_temp.fe($$select app.notifications_occurrences(pg_temp.pol(), '{"lo
   'validation_failed {"every": "invalid", "exceptions": "invalid"}', 'an invalid recurrence rule is refused');
 select is(pg_temp.fe($$select app.notifications_occurrences(pg_temp.pol(), '{"local_start": "2026-10-01T09:00:00", "every": "day"}', now(), now() + interval '401 days')$$),
   'validation_failed {"window": "out_of_range"}', 'an unbounded window is refused');
+select is((select string_agg(o ->> 'starts_at', ' ') from jsonb_array_elements(app.notifications_occurrences(
+             pg_temp.pol(), '{"local_start": "2020-01-01T09:00:00", "every": "day"}',
+             '2026-10-01T00:00:00Z', '2026-10-03T23:00:00Z')) o),
+  '2026-10-01T07:00:00.000000Z 2026-10-02T07:00:00.000000Z 2026-10-03T07:00:00.000000Z',
+  'a daily rule from 2020 still finds its occurrences in a 2026 window');
+select is((select string_agg(o ->> 'local', ' ') from jsonb_array_elements(app.notifications_occurrences(
+             pg_temp.pol(), '{"local_start": "2020-01-31T19:00:00", "every": "month"}',
+             '2026-02-01T00:00:00Z', '2026-04-15T00:00:00Z')) o),
+  '2026-02-28T19:00:00 2026-03-31T19:00:00',
+  'a monthly rule from 2020 keeps the 31st and clamps February');
 
 -- The reminder plan ----------------------------------------------------------------------------
 create temp table plan_cases (name text, type text, intent jsonb, fresh boolean, expect text);
@@ -436,6 +460,69 @@ select is(pg_temp.jobs('S2') || ' / ' || (select cancel_reason from app.notifica
                                           where snoozed_from_item_id = (select item_id from it)
                                           order by finished_at desc limit 1),
   ' / source_revised', 'the pending snooze is cancelled with the old revision');
+
+-- Review fixes: kind-selective cancel, snooze after a response or cancel, sent merges --------
+create function pg_temp.item(p_k text) returns uuid language sql as $$
+  select i.item_id from app.notifications_inbox_items i join app.notifications_jobs j on j.job_id = i.job_id
+   where j.source_id = (select id from src where k = p_k) and j.snoozed_from_item_id is null
+   order by i.delivered_at limit 1
+$$;
+create function pg_temp.snooze(p_k text, p_choice text default '1 hour') returns text language sql as $$
+  select pg_temp.fe(format('select app.notifications_snooze_item(%L, %L, %L)',
+                           (select member_id from m where n = 1), pg_temp.item(p_k), p_choice))
+$$;
+
+-- S6: a response reminder and a pre-start reminder; the source cancels only the response kind.
+insert into r values ('S6a', pg_temp.sched('S6', 1, 'response',
+  jsonb_build_object('assigned_at', app.cmd_utc(now()), 'starts_at', pg_temp.rel('10 days'),
+                     'reminders', '[{"anchor": "response_deadline", "before": "0 minutes"}, {"anchor": "starts_at", "before": "2 hours"}]'::jsonb)));
+select is(pg_temp.jobs('S6'), 'fixture_response@r1+192h fixture_upcoming@r1+238h', 'S6 has a response and a pre-start reminder');
+select is(app.notifications_cancel(jsonb_build_object('source_type', 'fixture_reminder',
+            'source_id', (select id from src where k = 'S6'), 'reason', 'responded',
+            'reminder_kind', 'fixture_response')) ->> 'cancelled',
+  '1', 'a kind-selective cancel cancels only that kind');
+select is((select schedule_state || '|' || cancelled_kinds::text from app.notifications_schedules
+            where source_id = (select id from src where k = 'S6')),
+  'active|{fixture_response}', 'the schedule stays active and remembers the cancelled kind');
+update app.policy_gates set fixture_value = jsonb_set(fixture_value, '{policy_version}', '4')
+ where gate = 'q2_church_time';
+select is((app.notifications_replan_all('policy_changed') ->> 'failed'), '0', 'a later re-plan succeeds');
+select is((select string_agg(reminder_kind || ':v' || policy_version, ',') from app.notifications_jobs
+            where source_id = (select id from src where k = 'S6') and job_state = 'pending'),
+  'fixture_upcoming:v4', 'the re-plan keeps the pre-start reminder on the new policy and does not revive the cancelled kind');
+
+-- S7: short notice, delivered, snoozed; then the member responds at the same revision.
+insert into r values ('S7a', pg_temp.sched('S7', 1, 'response', jsonb_build_object('assigned_at', app.cmd_utc(now()), 'starts_at', pg_temp.rel('20 hours'))));
+insert into r values ('S8a', pg_temp.sched('S8', 1, 'response', jsonb_build_object('assigned_at', app.cmd_utc(now()), 'starts_at', pg_temp.rel('20 hours'))));
+select is((app.notifications_sys_deliver_due(gen_random_uuid(), gen_random_uuid(), '{}') -> 'data' ->> 'delivered')::int,
+  2, 'the respond-now reminders of S7 and S8 are delivered');
+select is(left(pg_temp.snooze('S7'), 3), 'ok ', 'S7 is snoozed before the response');
+insert into r values ('S7b', pg_temp.sched('S7', 1, 'response', jsonb_build_object('assigned_at', app.cmd_utc(now()), 'starts_at', pg_temp.rel('20 hours'), 'responded', true), p_fresh => false));
+select is(pg_temp.jobs('S7') || ' / ' || (select string_agg(cancel_reason, ',') from app.notifications_jobs
+                                          where source_id = (select id from src where k = 'S7') and snoozed_from_item_id is not null),
+  ' / responded', 'responding cancels the pending snooze of the response reminder');
+select is(pg_temp.snooze('S7'), 'conflict {"item_id": "superseded"}', 'a responded reminder cannot be snoozed again');
+-- S8: the source cancels everything (the fixture source itself stays active).
+insert into r values ('S8c', app.notifications_cancel(jsonb_build_object('source_type', 'fixture_reminder',
+         'source_id', (select id from src where k = 'S8'), 'reason', 'source_cancelled')));
+select is(pg_temp.snooze('S8'), 'conflict {"item_id": "superseded"}', 'a reminder of an ended schedule cannot be snoozed');
+select is(pg_temp.jobs('S8'), '', 'and nothing was enqueued for it');
+
+-- S9: a deadline reminder and a pre-start reminder 10 minutes apart are merged and sent once.
+insert into r values ('S9a', pg_temp.sched('S9', 1, 'response',
+  jsonb_build_object('assigned_at', app.cmd_utc(now()), 'starts_at', pg_temp.rel('24 hours 20 minutes'),
+                     'response_deadline', pg_temp.rel('10 minutes'),
+                     'reminders', '[{"anchor": "response_deadline", "before": "0 minutes"}, {"anchor": "starts_at", "before": "24 hours"}]'::jsonb)));
+select is((select count(*)::int from app.notifications_jobs where source_id = (select id from src where k = 'S9')),
+  1, 'the two reminders are merged into one job');
+update app.notifications_jobs set job_state = 'delivered', finished_at = now(), processed_by_principal = gen_random_uuid()
+ where source_id = (select id from src where k = 'S9');
+select is(app.notifications_apply_schedule((select (v ->> 'schedule_id')::uuid from r where k = 'S9a'),
+            pg_temp.pol(), false, now() + interval '15 minutes') - 'entries' - 'reinstated',
+  '{"enqueued": 0, "covered": 1, "cancelled": 0}'::jsonb,
+  'a re-plan 15 minutes later does not send the merged-away reminder separately');
+select is((select count(*)::int from app.notifications_jobs where source_id = (select id from src where k = 'S9')),
+  1, 'still one job for S9');
 
 -- Guards and privileges ------------------------------------------------------------------------
 select is((select count(*)::int from app.contract_unowned_objects()), 0, 'no unowned objects');

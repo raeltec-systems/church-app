@@ -76,7 +76,7 @@ Decision (agent, under owner pre-approval): a merged entry takes the kind of its
 
 ## Implementation Notes
 
-- Implemented directly (no subagent tool in this run). Files: `supabase/migrations/20261008120000_notifications_scheduling.sql`, `supabase/tests/notifications_scheduling_test.sql` (79, table-driven: bad policies, deadline cases, plan cases, intent errors), `docs/runbooks/notifications.md` (Story 3.3 section, owner production steps), `docs/runbooks/contracts-and-owner-seams.md` (schedule consumer guide, Q2 approval check).
+- Implemented directly (no subagent tool in this run). Files: `supabase/migrations/20261008120000_notifications_scheduling.sql`, `supabase/tests/notifications_scheduling_test.sql` (96 after review fixes, table-driven: bad policies, deadline cases, plan cases, intent errors), `docs/runbooks/notifications.md` (Story 3.3 section, owner production steps), `docs/runbooks/contracts-and-owner-seams.md` (schedule consumer guide, Q2 approval check).
 - Snooze choices are written `"1 hour"`, `"24 hours"`, `"2 days"` (durations accept singular and plural units); the Design Notes' `"1 hours"` was a typo.
 - A pending job that stays in a re-plan takes the new `policy_version`, digest and expiry, so "jobs record the applied policy version" holds after a policy change.
 - Re-planning keeps a due-but-undelivered job at the current revision (the worker delivers it) and cancels only future or older-revision jobs; the `respond_now` of a short-notice schedule is issued once per source revision (`respond_now_revision`), so a policy re-plan or a repeated fresh call never sends a second one.
@@ -87,12 +87,22 @@ Decision (agent, under owner pre-approval): a merged entry takes the kind of its
 
 ## Plan Change Log
 
+- 2026-10-08, independent review of 3.3 (coordinator; four mediums, three lows), patched in place in the unapplied migration `20261008120000`:
+  1. A kind-selective `notifications_cancel` no longer ends the schedule: it stays active and records the kind in `cancelled_kinds` (reset on a new revision), so a re-plan keeps the other kinds and never revives the cancelled one.
+  2. `notifications_snooze_item` refuses (`conflict {"item_id": "superseded"}`) when the job's schedule is not active, its revision moved, its kind was cancelled, or it is a response kind and the intent is `responded`; re-planning a responded intent cancels pending snoozes of response kinds (`responded`).
+  3. Re-planning respects merges already sent: an entry within the merge window after a due or delivered job of the same schedule and revision is `covered`, not enqueued. `notifications_apply_schedule` takes an optional `p_now` so tests can re-plan at a later instant.
+  4. `notifications_occurrences` jumps to one step before the window, however old `local_start` is, and raises `validation_failed {"window": "out_of_range"}` instead of returning a silent empty list when the 1000-step cap is hit.
+  5. Decision (agent, under owner pre-approval; adjustable policy values, also recorded in the epic Notes): the default deadline is 14 days before the start if the lead is 30 days or more; else 48 hours before if the lead is at least 72 hours (so at least 24 hours to respond); else 24 hours before if the lead is more than 24 hours; else short notice (respond now). The fixture's second band is now `min_lead` 72 hours; this replaces the frozen matrix's "2..30 days" medium band. Boundary tests at exactly 30 days, 72 hours, 48 hours and 24 hours.
+  6. The effective response deadline is never after the start (`least(..., starts_at)`), also when the start has passed (short notice).
+  7. The policy validator bounds `merge_window` to at most 1 day and every band's `before_start` to at most `max_offset`.
+  Tests: `notifications_scheduling_test.sql` grew from 79 to 96.
+
 ## Review Triage Log
 
 ## Design Notes
 
 Policy value (fixture adds `fixture_label`):
-`{"policy_version":1,"zone":"Africa/Lusaka","quiet_hours":null,"deadline_bands":[{"min_lead":"30 days","before_start":"14 days"},{"min_lead":"48 hours","before_start":"48 hours"},{"min_lead":"0 minutes","before_start":"24 hours"}],"default_reminders":{"response":[{"anchor":"response_deadline","before":"24 hours"},{"anchor":"response_deadline","before":"0 minutes"}],"task":[{"anchor":"deadline","before":"0 minutes"}]},"merge_window":"30 minutes","snooze_choices":["1 hour","24 hours","2 days"],"max_reminders":6,"max_offset":"90 days"}`
+`{"policy_version":1,"zone":"Africa/Lusaka","quiet_hours":null,"deadline_bands":[{"min_lead":"30 days","before_start":"14 days"},{"min_lead":"72 hours","before_start":"48 hours"},{"min_lead":"0 minutes","before_start":"24 hours"}],"default_reminders":{"response":[{"anchor":"response_deadline","before":"24 hours"},{"anchor":"response_deadline","before":"0 minutes"}],"task":[{"anchor":"deadline","before":"0 minutes"}]},"merge_window":"30 minutes","snooze_choices":["1 hour","24 hours","2 days"],"max_reminders":6,"max_offset":"90 days"}`
 
 Durations are `^(0|[1-9][0-9]{0,3}) (minutes|hours|days)$`. Intent (`response`): `assigned_at, starts_at, response_deadline?, expires_at? (default starts_at), responded?, reminders?`; (`task`): `due_at, task_state, review_at?, expires_at?, reminders?`. `reminders: null` = policy default, `[]` = none. A reminder spec is `{anchor, before}` or `{anchor, after}`.
 

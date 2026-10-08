@@ -3,7 +3,7 @@ title: 'Send generic expiring push through FCM and retire invalid tokens'
 type: 'feature'
 ticket: '6'
 created: '2026-10-08'
-status: 'in-progress'
+status: 'built'
 baseline_revision: 'a52c3b89ec6fb7b5ec75ee1f57bda786852e6585'
 route: 'full'
 route_source: 'auto'
@@ -78,6 +78,36 @@ Decision (agent, under owner pre-approval): a device signing out retires its own
 - Given any run, when evidence, function logs and answers are scanned, then no token, credential, service-account field or payload text beyond the fixed generic text appears.
 
 ## Implementation Notes
+
+- Implemented directly (no subagent tool in this run). Files:
+  - Migration `supabase/migrations/20261008151500_notifications_push.sql`: no `delete from`, no rows file.
+  - pgTAP `supabase/tests/notifications_push_test.sql` (91).
+  - Pins updated in `notifications_worker_test.sql` (attempt columns, `push_enabled` default, status keys), `notifications_inbox_test.sql` (worker commands) and `system_access_test.sql` (allowlist).
+  - Edge `supabase/functions/notifications-worker/fcm.mjs` (+ `fcm.test.mjs`), `logic.mjs` (`runPush`, parsers; + `push-run.test.mjs`) and `index.ts` (push stage after the inbox stage).
+  - E2E `tools/identity-e2e/push.mjs` (+ test, 12 checks, fake FCM).
+  - Clients: `client_core` `domain/push_messaging.dart`, `application/push_controllers.dart`, `presentation/push_bridge.dart`, `pushMessagingProvider`, `FakePushMessaging` and the harness `push`, the sign-in continuation (`ClientPaths.signInThen` / `continuationFrom`, `SignInScreen.continueTo`), **Sign in** on a signed-out item, and the retire before **Sign out**. `apps/mobile/lib/app.dart` wraps the app in `PushBridge`. Tests: `test/notifications/push_test.dart` and the mobile app test.
+  - Runbooks `notifications.md` (Story 3.6 section, earlier "entry 6" references) and `system-access-and-operations.md` (allowlist, `retain_result`).
+  - CI evidence scan step; evidence `evidence-3.6/`.
+- Surprise: the 1.9 kernel stores every system answer in `app.sys_receipts`, so `push_prepare`'s targets would have put device tokens at rest there. Fixed in the kernel with a per-kind `retain_result` flag: a marker is stored, and a replay is a conflict. `app.sys_execute` was copied from 2.9 with only that change.
+- A record whose answers are all for foreign devices (nothing recorded) frees the lease instead of ending it. Otherwise the next claim would count a false lapse; the first pgTAP run found this.
+- Push attempts have no foreign keys (push job, device), so the 3.5 rows file's deletion order stays valid even for an account relinked to another member.
+- Lane note: `inbox_screen.dart` (entry 7's file) got only the signed-out **Sign in** button, which is part of push-tap handling. No inbox list, settings or snooze UI changed.
+- Matrix audit (all ran and passed):
+  - Accepted: pgTAP accepted section; E2E P20/P21.
+  - Invalid token: pgTAP UNREGISTERED and SENDER_ID_MISMATCH, plus `fcm.test.mjs` for 400 `message.token` versus a payload 400 and a bare 404; E2E P22.
+  - Transient: pgTAP backoff / owed-only / same id / fenced late record, `exhausted`, `push-run.test.mjs` quota stop; E2E P30.
+  - Expired: pgTAP at claim and at prepare; E2E P40.
+  - Stale: pgTAP for source_changed, not_actionable, recipient_ineligible, snoozed, recipient_changed, push_disabled, a raising check and the lifecycle cancel.
+  - Lapse / fence: pgTAP lapse section.
+  - Off: pgTAP push-off claim; `push-run.test.mjs`; E2E P10 and `not_configured` in worker.mjs.
+  - Client denied: `push_test.dart` and the mobile test; E2E P11 (server side).
+  - Tap: `push_test.dart` (tap, launch tap, malformed id, signed out then sign-in then back) and the mobile test; E2E P50 (server re-check).
+- Owner/staging steps remaining (not blocking `built`), detailed in runbook `notifications.md`, Story 3.6, Hosted staging:
+  - parent: apply `20261008151500` + `verify-hosted.sql`; redeploy `notifications-worker` with `fcm.mjs`;
+  - owner: Firebase project and apps; a `bic-push-sender` service account key as the Edge secret `NOTIFICATIONS_FCM_SERVICE_ACCOUNT`; the APNs key uploaded to Firebase;
+  - follow-up builder ticket: the real `firebase_messaging` adapter with build-time app ids;
+  - `push_enabled` on;
+  - owner: the real-device check.
 
 ## Plan Change Log
 

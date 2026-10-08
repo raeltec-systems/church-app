@@ -3,6 +3,7 @@
 // and a mock HTTP client only; the server behaviour is covered by
 // supabase/tests/notifications_inbox_screens_test.sql and
 // tools/identity-e2e/inbox-screens.mjs (real Realtime signal capture).
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:church_client_core/church_client_core.dart';
@@ -225,6 +226,104 @@ void main() {
       h.session.switchTo(null);
       await settle(tester);
       expect(h.signals.listening, 0);
+    });
+
+    Inbox page(List<String> ids, {String? nextAfter}) => Inbox.fromJson({
+      'items': [for (final id in ids) inboxItemData(id: id)],
+      'next': nextAfter == null
+          ? null
+          : {
+              'after_delivered_at': '2026-10-08T07:00:05.000000Z',
+              'after_item_id': nextAfter,
+            },
+    });
+    const newer = '30303030-3030-4030-8030-303030303030';
+    const older = '29292929-2929-4929-8929-292929292929';
+
+    testWidgets('a refresh after Show older keeps the older pages', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.inbox,
+        setUp: (h) {
+          h.inbox.inbox = AccessReadOk(page([_item], nextAfter: _item));
+          h.inbox.olderPages[_item] = AccessReadOk(page([older]));
+        },
+      );
+      await tester.tap(byKey('inbox-older'));
+      await settle(tester);
+      expect(byKey('inbox-item-$older'), findsOneWidget);
+      h.inbox.inbox = AccessReadOk(page([newer, _item], nextAfter: _item));
+      h.signals.signal();
+      await settle(tester);
+      expect(byKey('inbox-item-$newer'), findsOneWidget);
+      expect(byKey('inbox-item-$_item'), findsOneWidget);
+      expect(byKey('inbox-item-$older'), findsOneWidget);
+    });
+
+    testWidgets('a signal while older reminders load is not lost', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.inbox,
+        setUp: (h) {
+          h.inbox.inbox = AccessReadOk(page([_item], nextAfter: _item));
+          h.inbox.olderPages[_item] = AccessReadOk(page([older]));
+          h.inbox.holdOlder = Completer<void>();
+        },
+      );
+      await tester.tap(byKey('inbox-older'));
+      await tester.pump();
+      final before = h.inbox.calls;
+      h.inbox.inbox = AccessReadOk(page([newer, _item], nextAfter: _item));
+      h.signals.signal();
+      await tester.pump();
+      expect(h.inbox.calls, before, reason: 'held while older loads');
+      h.inbox.holdOlder!.complete();
+      await settle(tester);
+      expect(h.inbox.calls, before + 1);
+      expect(byKey('inbox-item-$newer'), findsOneWidget);
+      expect(byKey('inbox-item-$older'), findsOneWidget);
+    });
+
+    testWidgets('in the background the channel and poll stop; back, it '
+        're-reads', (tester) async {
+      final h = await pumpAt(tester, ClientPaths.inbox);
+      expect(h.signals.listening, 1);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      await settle(tester);
+      expect(h.signals.listening, 0);
+      final before = h.inbox.calls;
+      await tester.pump(inboxPollInterval);
+      expect(h.inbox.calls, before, reason: 'no poll in the background');
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await settle(tester);
+      expect(h.signals.listening, 1);
+      expect(h.inbox.calls, greaterThan(before));
+    });
+
+    testWidgets('a failed background poll keeps the list and says so', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.inbox,
+        setUp: (h) => h.inbox.inbox = AccessReadOk(page([_item])),
+      );
+      h.inbox.inbox = const AccessReadFailed(unreachable: true);
+      await tester.pump(inboxPollInterval);
+      await settle(tester);
+      expect(byKey('inbox-item-$_item'), findsOneWidget);
+      expect(byKey('inbox-refresh-failed'), findsOneWidget);
+      expect(byKey('inbox-failed'), findsNothing);
+      h.inbox.inbox = AccessReadOk(page([_item]));
+      await tester.tap(byKey('refresh-inbox'));
+      await settle(tester);
+      expect(byKey('inbox-refresh-failed'), findsNothing);
     });
 
     testWidgets('a failure is recoverable with Check again', (tester) async {

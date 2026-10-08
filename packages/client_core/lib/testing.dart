@@ -1190,11 +1190,17 @@ class FakeInbox implements InboxRepository {
   final afters = <InboxCursor?>[];
   int calls = 0;
 
+  /// Story 3.7: when set, an older-page read waits for it (a request in
+  /// flight).
+  Completer<void>? holdOlder;
+
   @override
   Future<AccessRead<Inbox>> fetchMyInbox({InboxCursor? after}) async {
     calls++;
     afters.add(after);
     if (after == null) return inbox;
+    final hold = holdOlder;
+    if (hold != null) await hold.future;
     return olderPages[after.afterItemId] ??
         const AccessReadFailed(unreachable: false);
   }

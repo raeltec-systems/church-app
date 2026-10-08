@@ -6,7 +6,7 @@
 -- message partition for today (they then run in tools/identity-e2e/inbox-screens.mjs against
 -- a running Realtime). Every account here is SYNTHETIC (+44 7700 900920-900929).
 begin;
-select plan(57);
+select plan(65);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000370' || lpad(n::text, 2, '0'))::uuid $$;
@@ -378,6 +378,43 @@ select * from (select case when to_regclass('realtime.messages') is not null the
          and polname = 'notifications_account_refresh_receive'),
      'r:authenticated', 'the one Notifications policy on realtime.messages is SELECT for authenticated')
   else skip('Realtime is not installed here', 1) end) x;
+
+-- SYNTHETIC fixture commands and categories: never for real members, never in production -------
+update app.identity_members set is_synthetic = false where member_id = pg_temp.mid(3);
+select ok(pg_temp.res(pg_temp.cmd(3, 'fixture_reminder_command', 'fixture.reminder_schedule',
+            jsonb_build_object('starts_at', app.cmd_utc(now() + interval '20 hours')))) like 'forbidden%',
+  'a non-SYNTHETIC member cannot schedule a test request');
+select ok(pg_temp.res(pg_temp.cmd(3, 'fixture_reminder_command', 'fixture.reminder_respond',
+            jsonb_build_object('source_id', (select id from v where k = 'src2')), 1)) like 'forbidden%',
+  '... nor respond to one');
+update app.identity_members set is_synthetic = true where member_id = pg_temp.mid(3);
+select is((select count(*)::int from jsonb_array_elements(
+             pg_temp.read(2, 'select api.notifications_my_push_settings()') -> 'categories') e
+            where e ->> 'source_type' = 'fixture_reminder'), 2,
+  'in local, the SYNTHETIC categories are offered');
+create function pg_temp.set_err(p jsonb) returns text language plpgsql as $$
+begin
+  perform app.notifications_push_category_set(pg_temp.u(2), null, p);
+  return 'ok';
+exception when others then
+  return sqlerrm;
+end;
+$$;
+
+select app.platform_set_environment('production', 'pgtap 3.7');
+select isnt(pg_temp.res(pg_temp.cmd(2, 'fixture_reminder_command', 'fixture.reminder_schedule',
+            jsonb_build_object('starts_at', app.cmd_utc(now() + interval '20 hours')))), 'ok',
+  'production refuses a test request');
+select isnt(pg_temp.res(pg_temp.cmd(2, 'fixture_reminder_command', 'fixture.reminder_respond',
+            jsonb_build_object('source_id', (select id from v where k = 'src2')), 1)), 'ok',
+  '... and a test response');
+select ok(not app.notifications_category_offered('fixture') and app.notifications_category_offered('duties'),
+  'production offers no SYNTHETIC (fixture module) category; real modules stay');
+select ok((select prosrc like '%notifications_category_offered(c.module)%' from pg_proc
+            where oid = 'app.notifications_my_push_settings()'::regprocedure),
+  'notification settings list only offered categories');
+select is(pg_temp.set_err('{"source_type": "fixture_reminder", "reminder_kind": "fixture_reply", "push_enabled": false}'),
+  'validation_failed', 'setting a SYNTHETIC category is refused in production (unregistered)');
 
 select * from finish();
 rollback;

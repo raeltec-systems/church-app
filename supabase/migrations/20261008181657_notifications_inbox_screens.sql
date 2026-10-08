@@ -342,20 +342,20 @@ begin
   if p_member_id is null then
     return;
   end if;
-  select r.account_id into v_account from app.notifications_recipient_route(p_member_id) r
-   where r.route = 'member';
-  if v_account is null then
-    return;
-  end if;
-  v_sent := coalesce(current_setting('app.notifications_refreshed', true), '');
-  if position(v_account::text in v_sent) > 0 then
-    return;
-  end if;
-  perform set_config('app.notifications_refreshed', v_sent || v_account::text || ',', true);
-  if pg_catalog.to_regclass('realtime.messages') is null then
-    return;
-  end if;
+  -- Everything below runs in a subtransaction: a failure (routing read, Realtime absent, no
+  -- message partition) is logged and never fails the caller's change.
   begin
+    -- Per-transaction cache, keyed by member: checked before any routing read.
+    v_sent := coalesce(current_setting('app.notifications_refreshed', true), '');
+    if position(p_member_id::text in v_sent) > 0 then
+      return;
+    end if;
+    perform set_config('app.notifications_refreshed', v_sent || p_member_id::text || ',', true);
+    select r.account_id into v_account from app.notifications_recipient_route(p_member_id) r
+     where r.route = 'member';
+    if v_account is null or pg_catalog.to_regclass('realtime.messages') is null then
+      return;
+    end if;
     execute 'insert into realtime.messages (topic, extension, payload, event, private) '
             'values ($1, ''broadcast'', ''{}''::jsonb, ''inbox_changed'', true)'
       using 'account:' || v_account::text;
@@ -415,6 +415,11 @@ begin
             'for select to authenticated '
             'using (realtime.messages.extension = ''broadcast'' '
             'and (select realtime.topic()) = ''account:'' || (select auth.uid())::text)';
+  elsif pg_catalog.to_regclass('realtime.messages') is null
+        and app.platform_current_environment() <> 'local' then
+    -- Hosted projects always have Realtime: a missing table means the signal cannot work there.
+    -- Clients still converge by polling; the runbook's check after applying lists the policy.
+    raise warning 'realtime.messages is missing: the inbox refresh signal policy was not created';
   end if;
 end;
 $$;
@@ -646,12 +651,127 @@ comment on function api.fixture_reminder_command(jsonb) is
   '{member_id, due_at}) through the 1.4 command envelope; local/staging only.';
 
 -- ---------------------------------------------------------------------------------------------
+-- SYNTHETIC categories stay out of non-test environments
+-- ---------------------------------------------------------------------------------------------
+
+-- A reminder category members may see and set: every registered contract, except the SYNTHETIC
+-- `fixture` module's outside `local` and `staging` (an unmarked database counts as production).
+create function app.notifications_category_offered(p_module text)
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select p_module is distinct from 'fixture'
+         or app.platform_current_environment() in ('local', 'staging');
+$$;
+
+-- As in 3.5; categories filtered by app.notifications_category_offered.
+create or replace function app.notifications_my_push_settings()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_member uuid;
+  v_link uuid;
+  v_account uuid;
+  v_categories jsonb;
+  v_devices jsonb;
+begin
+  select a.member_id, a.link_id into v_member, v_link from app.identity_require_access() a;
+  select l.auth_user_id into v_account from app.identity_account_links l where l.link_id = v_link;
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'source_type', c.source_type, 'reminder_kind', c.reminder_kind, 'title', c.title,
+           'push_enabled', coalesce(s.push_enabled, true), 'revision', s.revision)
+           order by c.source_type, c.reminder_kind), '[]'::jsonb)
+    into v_categories
+    from app.contract_reminder_contracts c
+    left join app.notifications_push_settings s
+      on s.account_id = v_account and s.member_id = v_member
+     and s.source_type = c.source_type and s.reminder_kind = c.reminder_kind
+   where app.notifications_category_offered(c.module);
+  select coalesce(jsonb_agg(app.notifications_device_json(t)
+           order by t.refreshed_at desc, t.device_id), '[]'::jsonb)
+    into v_devices
+    from app.notifications_device_tokens t
+   where t.account_id = v_account and t.member_id = v_member and t.retired_at is null;
+  perform app.identity_record_activity(v_link);
+  return jsonb_build_object('categories', v_categories, 'devices', v_devices);
+end;
+$$;
+
+-- As in 3.5; a category that is not offered here is `unregistered`.
+create or replace function app.notifications_push_category_set(p_actor uuid, p_expected bigint, p_payload jsonb)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_member uuid;
+  v_errors jsonb;
+  v_row app.notifications_push_settings;
+begin
+  v_errors := jsonb_strip_nulls(jsonb_build_object(
+      'source_type', app.contract_token_error(p_payload -> 'source_type'),
+      'reminder_kind', app.contract_token_error(p_payload -> 'reminder_kind'),
+      'push_enabled', case when jsonb_typeof(p_payload -> 'push_enabled') is distinct from 'boolean'
+                           then 'required' end))
+    || coalesce((select jsonb_object_agg(k, 'unknown_field') from jsonb_object_keys(p_payload) k
+                  where k not in ('source_type', 'reminder_kind', 'push_enabled')), '{}'::jsonb);
+  if v_errors <> '{}'::jsonb then
+    perform app.cmd_fail('validation_failed', v_errors);
+  end if;
+  if not exists (select 1 from app.contract_reminder_contracts c
+                  where c.source_type = p_payload ->> 'source_type'
+                    and c.reminder_kind = p_payload ->> 'reminder_kind'
+                    and app.notifications_category_offered(c.module)) then
+    perform app.cmd_fail('validation_failed', '{"reminder_kind": "unregistered"}');
+  end if;
+  v_member := app.notifications_command_member();
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('notifications_push_settings:' || p_actor::text, 0));
+  select s.* into v_row from app.notifications_push_settings s
+   where s.account_id = p_actor and s.source_type = p_payload ->> 'source_type'
+     and s.reminder_kind = p_payload ->> 'reminder_kind'
+   for update;
+  if not found then
+    if p_expected is not null then
+      perform app.cmd_fail('conflict');
+    end if;
+    insert into app.notifications_push_settings (account_id, member_id, source_type, reminder_kind,
+                                                 push_enabled)
+    values (p_actor, v_member, p_payload ->> 'source_type', p_payload ->> 'reminder_kind',
+            (p_payload ->> 'push_enabled')::boolean)
+    returning * into v_row;
+  else
+    if p_expected is distinct from v_row.revision then
+      perform app.cmd_fail('conflict', null, v_row.revision);
+    end if;
+    update app.notifications_push_settings s
+       set push_enabled = (p_payload ->> 'push_enabled')::boolean, member_id = v_member,
+           revision = s.revision + 1, updated_at = clock_timestamp()
+     where s.setting_id = v_row.setting_id
+    returning * into v_row;
+  end if;
+  return jsonb_build_object('aggregate_type', 'notifications_push_setting',
+                            'aggregate_id', v_row.setting_id, 'revision', v_row.revision,
+                            'data', jsonb_build_object('source_type', v_row.source_type,
+                                                       'reminder_kind', v_row.reminder_kind,
+                                                       'push_enabled', v_row.push_enabled,
+                                                       'revision', v_row.revision));
+end;
+$$;
+
+-- ---------------------------------------------------------------------------------------------
 -- Privileges: nothing new is client-executable (EXECUTE on the replaced entry points is kept)
 -- ---------------------------------------------------------------------------------------------
 
 revoke all on function
   app.notifications_item_snoozed_until(uuid),
   app.notifications_snooze_choices(),
+  app.notifications_category_offered(text),
   app.notifications_item_snooze(uuid, bigint, jsonb),
   app.notifications_publish_refresh(uuid),
   app.notifications_inbox_item_signal(),

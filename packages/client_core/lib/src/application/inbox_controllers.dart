@@ -16,6 +16,7 @@ class InboxState {
     this.loading = false,
     this.result,
     this.olderFailed = false,
+    this.refreshFailed = false,
   });
 
   final bool loading;
@@ -23,6 +24,10 @@ class InboxState {
 
   /// The last request for an older page got no usable answer.
   final bool olderFailed;
+
+  /// Story 3.7: the last re-read got no usable answer; the list shown is the
+  /// previous answer, kept rather than blanked.
+  final bool refreshFailed;
 
   Inbox? get inbox => switch (result) {
     AccessReadOk(:final value) => value,
@@ -39,9 +44,14 @@ class InboxState {
 class InboxController extends Notifier<InboxState> {
   bool _again = false;
 
+  /// Older pages were appended: a re-read merges its first page in front of
+  /// them instead of replacing the list (story 3.7).
+  bool _olderLoaded = false;
+
   @override
   InboxState build() {
     _again = false;
+    _olderLoaded = false;
     final generation = ref.watch(accountGenerationProvider);
     final accountId = ref.watch(accountProvider.select((s) => s.accountId));
     if (accountId == null) {
@@ -77,17 +87,49 @@ class InboxController extends Notifier<InboxState> {
     }
     switch (result) {
       case AccessReadOk(:final value):
+        _olderLoaded = true;
         state = InboxState(result: AccessReadOk(current.append(value)));
       case AccessReadDenied():
+        _olderLoaded = false;
         state = InboxState(result: result);
         if (result.denial == AccessDenial.untrustedSession) {
+          _again = false;
           await ref.read(accountProvider.notifier).endUntrustedSession();
+          return;
         } else {
           noteProtectedDenial(ref);
         }
       case AccessReadFailed():
         state = InboxState(result: state.result, olderFailed: true);
     }
+    // A signal or refresh that arrived meanwhile is not lost (story 3.7).
+    if (_again) {
+      _again = false;
+      await _load(generation);
+    }
+  }
+
+  /// Story 3.7: the new first page in front of the older pages already
+  /// shown (deduplicated by id); items the server dropped from the older
+  /// range stay until the next full read (Check again from the top).
+  Inbox _merge(Inbox shown, Inbox first) {
+    if (!_olderLoaded || first.next == null || first.items.isEmpty) {
+      _olderLoaded = _olderLoaded && first.next != null;
+      return first;
+    }
+    final last = first.items.last;
+    final ids = {for (final i in first.items) i.itemId};
+    bool older(InboxItem i) =>
+        i.deliveredAt.isBefore(last.deliveredAt) ||
+        (i.deliveredAt == last.deliveredAt &&
+            i.itemId.compareTo(last.itemId) < 0);
+    return Inbox(
+      items: List.unmodifiable([
+        ...first.items,
+        ...shown.items.where((i) => !ids.contains(i.itemId) && older(i)),
+      ]),
+      next: shown.next,
+    );
   }
 
   Future<void> _load(int generation) async {
@@ -105,7 +147,20 @@ class InboxController extends Notifier<InboxState> {
       _again = false;
       return;
     }
-    state = InboxState(result: result);
+    final shown = state.inbox;
+    switch (result) {
+      case AccessReadOk(:final value):
+        state = InboxState(
+          result: AccessReadOk(shown == null ? value : _merge(shown, value)),
+        );
+      case AccessReadFailed() when shown != null:
+        // Story 3.7: a failed re-read (often a background signal or poll)
+        // keeps the list shown and says so; it never blanks it.
+        state = InboxState(result: state.result, refreshFailed: true);
+      case _:
+        _olderLoaded = false;
+        state = InboxState(result: result);
+    }
     if (result is AccessReadDenied<Inbox>) {
       if (result.denial == AccessDenial.untrustedSession) {
         _again = false;

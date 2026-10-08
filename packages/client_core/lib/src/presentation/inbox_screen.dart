@@ -22,10 +22,27 @@ class InboxScreen extends ConsumerStatefulWidget {
 class _InboxScreenState extends ConsumerState<InboxScreen> {
   late final AppLifecycleListener _lifecycle;
 
+  /// Story 3.7: the signal channel and the poll ([inboxLiveProvider]) run
+  /// only while the app is visible; back in the foreground the inbox is read
+  /// again. Held as a manual subscription because a hidden app draws no
+  /// frames (a conditional watch in build would never be dropped).
+  ProviderSubscription<void>? _live;
+
   @override
   void initState() {
     super.initState();
-    _lifecycle = AppLifecycleListener(onResume: _refresh);
+    _live = ref.listenManual(inboxLiveProvider, (_, _) {});
+    _lifecycle = AppLifecycleListener(
+      onResume: _refresh,
+      onHide: () {
+        _live?.close();
+        _live = null;
+      },
+      onShow: () {
+        _live ??= ref.listenManual(inboxLiveProvider, (_, _) {});
+        _refresh();
+      },
+    );
     Future.microtask(_refresh);
   }
 
@@ -37,6 +54,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   @override
   void dispose() {
     _lifecycle.dispose();
+    _live?.close();
     super.dispose();
   }
 
@@ -44,9 +62,6 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
     final layout = ChurchLayout.of(context);
-    // Story 3.7: while the inbox is open, the server's generic refresh
-    // signal and a 2-minute poll re-read it.
-    ref.watch(inboxLiveProvider);
     final s = ref.watch(inboxProvider);
     final inbox = s.inbox;
     final children = <Widget>[];
@@ -75,6 +90,20 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         ),
       );
     } else {
+      if (s.refreshFailed) {
+        children.addAll([
+          const RequestStateBanner(
+            key: Key('inbox-refresh-failed'),
+            tone: StatusTone.warning,
+            icon: Icons.cloud_off_outlined,
+            title: 'Couldn\'t check for new reminders',
+            message:
+                'Showing the last list the server sent. Pull down or use '
+                'Check again.',
+          ),
+          const SizedBox(height: 12),
+        ]);
+      }
       children.add(
         Semantics(
           header: true,

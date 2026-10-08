@@ -7,7 +7,7 @@ version and browser. Leave out numbers, ids and keys.
 
 ## What you need
 
-- **Phone:** `church-app-3.7-staging-arm64.apk` (from this session). Install it over the old test
+- **Phone:** `church-app-push-staging-arm64.apk` (3.7 plus Firebase push) (from this session). Install it over the old test
   app. Android may ask you to allow installing from this source.
 - **Staff web:** `staff-web-3.7-staging.zip`. Unzip it and serve it the same way as the 2.14 package
   (unzipped folder, then in it: `python3 -m http.server 8767`, and open http://localhost:8767).
@@ -17,8 +17,8 @@ version and browser. Leave out numbers, ids and keys.
   - Use the passwords you set during the identity test. If you have forgotten one, ask the
     assistant for a staff-assisted reset.
 - **Nothing to set up on staging:** the reminder worker runs every minute by itself (set up today).
-  Push to the phone is not part of this round: it needs the Firebase setup (owner step 4 in
-  `milestone-2-owner-test.md`). Every check below works through the Inbox.
+  Push to the phone is ON for staging (Firebase project `kbicc-church-app`). Allow notifications
+  when the app asks after sign-in.
 
 ## Steps
 
@@ -78,6 +78,13 @@ version and browser. Leave out numbers, ids and keys.
     shows you.
 13. **Clean up.** Tell the assistant "inbox test done": it removes the test reminders of A and B on
     staging.
+
+14. **Phone notification (3.6).** With notifications allowed: Fixture > **Send me a test reminder**,
+    then close the app (swipe it away). Within about a minute a phone notification shows only
+    "SYNTHETIC test reminder" and its generic text. Tap it: the app opens that item in the Inbox
+    (after sign-in if needed). Then Inbox > **Notification settings**, turn that category off, send
+    another: no phone notification, but the Inbox item still appears. If no notification arrives,
+    tell the assistant the time: it reads the provider's answer on staging.
 
 ## If something looks wrong
 

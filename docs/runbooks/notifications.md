@@ -472,7 +472,7 @@ worker run (Cron -> Edge Function notifications-worker), after the inbox stage:
 
 ### Clients (shared `client_core`, mobile)
 
-- **Port** `PushMessaging` (`lib/src/domain/push_messaging.dart`): permission, token, token refreshes, taps, launch tap and delete token. The default `NoPushMessaging` is what every build uses today.
+- **Port** `PushMessaging` (`lib/src/domain/push_messaging.dart`): permission, token, token refreshes, taps, launch tap and delete token. The default `NoPushMessaging` is used by every build without the Firebase defines; `apps/mobile/lib/push/` holds the real `FirebasePushMessaging` (step 6 below).
 - **`PushRegistrationController`**:
   - once the server grants member access, it asks the person once (the operating system dialog) and registers the token with `notifications.register_device`;
   - it registers again when the provider refreshes the token;
@@ -527,13 +527,28 @@ Steps 1 and 2 were done by the parent session on 2026-10-08 (evidence: `evidence
    1. [Apple Developer](https://developer.apple.com/account) > **Certificates, Identifiers & Profiles > Identifiers**: open `zm.bickafue.bicKafueMobile` (create it if missing) and tick **Push Notifications**.
    2. **Keys > +**: name `BIC Kafue APNs`, tick **Apple Push Notifications service (APNs)**, then Continue and Register. Download the `.p8` file; it can be downloaded only once. Note the **Key ID** and your **Team ID** (top right of the page).
    3. Firebase console > **Project settings > Cloud Messaging > Apple app configuration > APNs Authentication Key > Upload**: the `.p8`, Key ID and Team ID. Keep the `.p8` in your password manager.
-6. **Client follow-up** (a builder ticket; it needs only the non-secret app identifiers from step 3, passed at build time and never committed). Add pinned `firebase_core` and `firebase_messaging` to `apps/mobile` and write a `FirebasePushMessaging` adapter implementing `PushMessaging`:
-   - `Firebase.initializeApp(options: FirebaseOptions(...))` from `--dart-define`s: `FIREBASE_PROJECT_ID`, `FIREBASE_SENDER_ID`, `FIREBASE_API_KEY`, `FIREBASE_ANDROID_APP_ID` and `FIREBASE_IOS_APP_ID`. Their values come from `google-services.json` (`project_info.project_id`, `project_info.project_number`, `client[0].api_key[0].current_key`, `client[0].client_info.mobilesdk_app_id`) and `GoogleService-Info.plist` (`GOOGLE_APP_ID`). The adapter stays off when they are absent.
-   - Android: `POST_NOTIFICATIONS` in `AndroidManifest.xml` (Android 13+).
-   - iOS: the Push Notifications capability and `aps-environment` in `Runner.entitlements`, and Background Modes > Remote notifications.
-   - Override `pushMessagingProvider` in `apps/mobile/lib/main.dart`.
+6. **Client build with push** (done in code 2026-10-08; the owner builds it). `apps/mobile` has pinned `firebase_core` 4.15.0 and `firebase_messaging` 16.7.0 and the `FirebasePushMessaging` adapter (`apps/mobile/lib/push/`). It needs only the non-secret app identifiers from step 3, passed at build time and **never committed**:
 
-   Until this lands no device registers and nothing is sent.
+   | `--dart-define` | From |
+   |---|---|
+   | `FIREBASE_PROJECT_ID` | `google-services.json` `project_info.project_id` |
+   | `FIREBASE_SENDER_ID` | `project_info.project_number` |
+   | `FIREBASE_API_KEY` | `client[0].api_key[0].current_key` |
+   | `FIREBASE_ANDROID_APP_ID` | `client[0].client_info.mobilesdk_app_id` |
+   | `FIREBASE_IOS_APP_ID` (optional) | `GoogleService-Info.plist` `GOOGLE_APP_ID` |
+
+   ```bash
+   cd apps/mobile
+   flutter build apk --release --target-platform android-arm64 \
+     --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_PUBLISHABLE_KEY=... \
+     --dart-define=FIREBASE_PROJECT_ID=... --dart-define=FIREBASE_SENDER_ID=... \
+     --dart-define=FIREBASE_API_KEY=... --dart-define=FIREBASE_ANDROID_APP_ID=...
+   ```
+
+   - Without all four Android values (or if Firebase fails to start) the app keeps the no-op adapter: nothing is asked or registered.
+   - With them, `main.dart` overrides `pushMessagingProvider`. Once the server grants member access the app asks for notifications (Android 13+ `POST_NOTIFICATIONS`), registers the token, re-registers on token refresh, and retires it before **Sign out**. A tap opens `/inbox/<item_id>` (sign-in first when needed). A message that arrives while the app is open is not shown; the inbox only re-reads.
+   - Android: the Gradle build turns the same four defines into Firebase's string resources (`google_app_id`, `gcm_defaultSenderId`, `google_api_key`, `project_id`), so no `google-services.json` or Google services plugin is used and Firebase also starts when a push wakes a closed app. The default notification channel `reminders` ("Reminders") is created at process start.
+   - iOS (owner, in Xcode, once the APNs key of step 5 exists): open `apps/mobile/ios/Runner.xcworkspace` > target Runner > **Signing & Capabilities > + Capability > Push Notifications** (this creates `Runner.entitlements` with `aps-environment`). Background Modes > Remote notifications is already in `Info.plist`. Build with `FIREBASE_IOS_APP_ID` as well. Not done in the repository because a provisioning profile without the Push capability would break signing.
 7. **Parent or owner: turn push on for staging** once a device build exists: `select app.notifications_configure_worker('{"push_enabled": true}', 'israel');`.
 8. **Owner: the real-device check** (the ticket's verify line). Use a real Android phone with Google Play services, and an iPhone where available, with the build from step 6 signed in as a SYNTHETIC member. Allow notifications when asked.
    1. Close the app (swipe it away). Create a reminder due now for that member (`fixture.reminder_create`, or an Admin's `fixture.reminder_create_for`). Within about a minute a notification shows **SYNTHETIC test reminder / A test reminder is waiting for you.** and nothing else.
@@ -557,9 +572,9 @@ Nothing yet. Production needs its own Firebase project and service account, its 
 
 ### Known limits and follow-ups
 
-- **Client wiring.** The real `firebase_messaging` adapter is step 6 above. Until then the apps register nothing.
+- **Client wiring.** The real `firebase_messaging` adapter exists (step 6 above); a build without the Firebase defines registers nothing. Not yet checked on a real device (step 8).
 - **Sign-out elsewhere.** A device retires its own registration when the person signs out in the app. A session that ends any other way (expiry, revocation by `sessions_revoked`) is covered by the 3.5 lifecycle hooks only for the events they listen to. A plain session expiry leaves the token registered until the next sign-in on that phone; pushes stay generic and every open re-checks the session.
-- **Foreground display.** A notification arriving while the app is open is left to the SDK default; the inbox refreshes on resume. The settings screen (push categories) is entry 7, and the staff health view of the `push` status is entry 8.
+- **Foreground display.** A message arriving while the app is open is not shown (the SDK default on Android and iOS); it only makes an open inbox re-read. The settings screen (push categories) is entry 7, and the staff health view of the `push` status is entry 8.
 
 ## Story 3.7: the inbox, notification settings and snooze on mobile and staff web
 

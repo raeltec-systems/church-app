@@ -105,9 +105,18 @@ Decision (agent, under owner pre-approval): a device signing out retires its own
 - Owner/staging steps remaining (not blocking `built`), detailed in runbook `notifications.md`, Story 3.6, Hosted staging:
   - parent: apply `20261008155801` + `verify-hosted.sql`; redeploy `notifications-worker` with `fcm.mjs`;
   - owner: Firebase project and apps; a `bic-push-sender` service account key as the Edge secret `NOTIFICATIONS_FCM_SERVICE_ACCOUNT`; the APNs key uploaded to Firebase;
-  - follow-up builder ticket: the real `firebase_messaging` adapter with build-time app ids;
+  - ~~follow-up builder ticket: the real `firebase_messaging` adapter with build-time app ids~~ (done, below);
   - `push_enabled` on;
   - owner: the real-device check.
+
+### Client follow-up (done)
+
+2026-10-08, builder (no new ticket; no database or Edge change). `apps/mobile` now has pinned `firebase_core` 4.15.0 and `firebase_messaging` 16.7.0; `packages/client_core` stays free of Firebase.
+- `apps/mobile/lib/push/firebase_push_messaging.dart`: `FirebasePushMessaging` implements `PushMessaging` (permission, `getToken`/`onTokenRefresh` into the existing `notifications.register_device` path, `deleteToken` at sign-out, taps from `onMessageOpenedApp` and `getInitialMessage` through `pushItemId` to `/inbox/<id>`). A foreground message only nudges the inbox to re-read (`NudgedInboxSignals`, new optional `inboxNudges` on `compositionOverrides`); nothing is shown in the foreground.
+- `firebase_push_config.dart`: `FirebaseOptions` from `FIREBASE_PROJECT_ID`, `FIREBASE_SENDER_ID`, `FIREBASE_API_KEY`, `FIREBASE_ANDROID_APP_ID`, `FIREBASE_IOS_APP_ID` (optional). Any Android value missing, or Firebase failing to start: `main.dart` keeps `NoPushMessaging`.
+- Android: `POST_NOTIFICATIONS`; `BicKafueApplication` creates the default channel `reminders` (manifest `default_notification_channel_id`); `build.gradle.kts` turns the same four defines into the `google_app_id`, `gcm_defaultSenderId`, `google_api_key`, `project_id` string resources (no google-services.json or plugin), so Firebase also starts natively when a push wakes the app.
+- iOS: `UIBackgroundModes` `remote-notification` only. The Push Notifications capability and `aps-environment` entitlement are left to the owner in Xcode (runbook step 6), since a missing provisioning profile capability would break signing.
+- Verified: `flutter analyze` + `flutter test` (mobile, client_core, staff); `scan-secrets`; release APK `--target-platform android-arm64` built without defines (no Firebase resources) and with dummy defines (resources present). No real-device run (no device or emulator with Play services here).
 
 ## Plan Change Log
 

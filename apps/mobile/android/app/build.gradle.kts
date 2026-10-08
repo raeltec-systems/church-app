@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -8,6 +10,11 @@ android {
     namespace = "zm.bickafue.bic_kafue_mobile"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
+
+    // Story 3.6: the Firebase string resources below (resValue).
+    buildFeatures {
+        resValues = true
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -68,7 +75,7 @@ fun firebaseDartDefines(): Map<String, String>? {
     val raw = project.findProperty("dart-defines") as String? ?: return null
     val defines = raw.split(",").filter { it.isNotBlank() }.mapNotNull { encoded ->
         val decoded = try {
-            String(java.util.Base64.getDecoder().decode(encoded), Charsets.UTF_8)
+            String(Base64.getDecoder().decode(encoded), Charsets.UTF_8)
         } catch (e: IllegalArgumentException) {
             return@mapNotNull null
         }

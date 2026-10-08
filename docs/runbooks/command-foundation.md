@@ -42,6 +42,10 @@ Name every new `app` object with its owning module's registered prefix (see `con
 5. `revoke all` on every new function from `public, anon, authenticated, service_role`. Then grant EXECUTE only on the `app` entry function and the `api` wrapper, and only to the roles that need them.
 6. Add pgTAP cases to `supabase/tests/` and, for races, HTTP cases like `command_api_smoke.sh`.
 
+## Documented exceptions
+
+- `notifications.register_device` (story 3.5) takes `expected_revision: null` but may change an existing row: registering a token the caller's account already holds refreshes that device (revision + 1), and a token live on another account is retired there (`reassigned`). The command states the absolute desired state (this token belongs to this account), so a replay or a race converges and no lost update is possible; the request id still makes it idempotent. Every other change of a device (`notifications.retire_device`) carries the device revision.
+
 ## Seams that later epics replace
 
 - `app.cmd_current_actor()` currently returns the JWT `sub`, read without a cast so that a missing or non-UUID `sub` is `unauthenticated`. Identity replaces it with the AD-3 live-access predicate.

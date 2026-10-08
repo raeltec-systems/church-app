@@ -77,7 +77,7 @@ Decision (agent, under owner pre-approval): the SYNTHETIC fixture gains an Admin
 
 ## Implementation Notes
 
-- Implemented directly (no subagent tool in this run). Files: migrations `supabase/migrations/20261008143000_notifications_routing.sql` (no `delete from`; stubs `app.notifications_deletion_purge_rows(uuid, uuid)` and `app.fixture_deletion_purge_rows(uuid)` answer `unavailable`) and `supabase/migrations/20261008143100_notifications_routing_rows.sql` (the two bodies only); pgTAP `supabase/tests/notifications_routing_test.sql` (100); E2E `tools/identity-e2e/routing.mjs` (+ test, 18 checks); runbooks `notifications.md` (Story 3.5 section, earlier limits updated), `contracts-and-owner-seams.md` (direct-contact route guide, deletion hooks), `identity-access.md` (hook lists); CI evidence scan step; evidence `evidence-3.5/`.
+- Implemented directly (no subagent tool in this run). Files: migrations `supabase/migrations/20261008143000_notifications_routing.sql` (no `delete from`; stubs `app.notifications_deletion_purge_rows(uuid, uuid)` and `app.fixture_deletion_purge_rows(uuid)` answer `unavailable`) and `supabase/migrations/20261008143100_notifications_routing_rows.sql` (the two bodies only); pgTAP `supabase/tests/notifications_routing_test.sql` (105); E2E `tools/identity-e2e/routing.mjs` (+ test, 18 checks); runbooks `notifications.md` (Story 3.5 section, earlier limits updated), `contracts-and-owner-seams.md` (direct-contact route guide, deletion hooks), `identity-access.md` (hook lists); CI evidence scan step; evidence `evidence-3.5/`.
 - Pins updated in existing tests: `command_foundation_test.sql` (authenticated may execute `api/app.notifications_command` and `notifications_my_push_settings`), `notifications_scheduling_test.sql` (member 1 gets an account so the snooze case still has an item; client-executable allowlist), `notifications_worker_test.sql` (a deactivated recipient now ends `direct_contact`, not `membership_inactive`), `cross_epic_contracts_test.sql` (removes Notifications' real hooks inside the test before registering its synthetic ones), `member_deletion_test.sql` and `tools/identity-e2e/deletion.mjs` (the fixture deletion hook is registered by migration and stays registered).
 - Routing uses `app.identity_account_standing(auth_user_id)` (the predicate's account half): `ok` = member route; anything else with a live link = direct contact. Dormancy is not part of routing (documented).
 - Postgres regex repetition bounds stop at 255, so the token shape is a character class plus a length check (found by the first pgTAP run).
@@ -86,6 +86,15 @@ Decision (agent, under owner pre-approval): the SYNTHETIC fixture gains an Admin
 - Owner/staging steps remaining (not blocking `built`): parent applies `20261008143000` and runs `verify-hosted.sql`; owner pastes `20261008143100_notifications_routing_rows.sql` in the staging SQL editor (until then staging deletions wait at `erase_owners`); owner demonstration (runbook `notifications.md`, Story 3.5, Hosted staging). No Edge Function redeploy needed.
 
 ## Plan Change Log
+
+- 2026-10-08, independent review of 3.5 (coordinator; three mediums, three lows), patched in place in the unapplied migrations `20261008143000` / `20261008143100`:
+  1. (medium) Lock order: `notifications_attempt` and `notifications_device_register` take `FOR KEY SHARE` on the member row before any Notifications lock; the `deletion_requested` hook cancels pending jobs `for update skip locked` (a skipped job is routed `member_deleted` by the attempt and erased by the deletion hook). Not testable in single-session pgTAP; documented in the runbook.
+  2. (medium) Decision (agent, under owner pre-approval; supersedes the frozen "enqueue for a tombstone refused"): enqueue for a member with a deletion request is skipped, not raised: `{job_id: null, job_state: null, created: false, refused: "member_deleted"}`, nothing written, so one deleted member never rolls back a multi-recipient source command. Guide, runbook, pgTAP and E2E R51 updated.
+  3. (medium) `app.notifications_set_schedule` replaced in place (same signature and privileges): a member with a deletion request is skipped (`schedule_id: null, refused: "member_deleted"`); no schedule written or reactivated, even for a plan with no entries (pgTAP probe).
+  4. (low) The fail-closed pgTAP case saves `pg_get_functiondef` of the installed purge, asserts it is the rows file's body, stubs it and restores it verbatim with `execute`.
+  5. (low) `notifications.register_device` (null expected revision, may refresh an existing row) is a documented exception in `command-foundation.md`.
+  6. (low) `scan-evidence.sh` now has FCM token (`...:APA91...`) and synthetic `fcm-` device-token patterns.
+  pgTAP 100 -> 105.
 
 ## Review Triage Log
 

@@ -189,7 +189,7 @@ select app.contract_register_direct_contact_route(
 - The need never says why (a hold is never disclosed) and never carries a contact route: a relative's or household number is never a notification destination. Your leader screen decides how to reach the member, and records the member's explicit answer as your own attributed direct-contact confirmation; a need is not contact.
 - A raising handler makes the attempt a transient failure: nothing is recorded and the job is retried with backoff. Without a registered route the need is still recorded in Notifications, `unrouted` (finish reason `no_direct_contact_route`), for the reminder health view (entry 8).
 - Only the owner of the source type may register; the kind must have a reminder contract (PCTR1 otherwise). Registering again replaces the handler.
-- **Deleted members.** After a deletion request, `app.notifications_enqueue` and `app.notifications_set_schedule` refuse the member (`validation_failed {"recipient_member_id": "deleted"}`). Drop deleted members from your sources in your own `deletion_requested` lifecycle hook.
+- **Deleted members.** After a deletion request, `app.notifications_enqueue` and `app.notifications_set_schedule` skip the member without raising: nothing is written and the answer carries `created: false` (enqueue: `job_id` and `job_state` null) or `schedule_id: null`, with `refused: "member_deleted"`. Your command continues for the other recipients. Still drop deleted members from your sources in your own `deletion_requested` lifecycle hook.
 - The SYNTHETIC `fixture_reminder` source is the worked example (`app.fixture_reminder_direct_contact` into `app.fixture_reminder_contact_needs`).
 
 ## Policy gates and environment

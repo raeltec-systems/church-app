@@ -206,7 +206,7 @@ async function main() {
     const forMember = async (memberId, dueMs = Date.now() - 60_000) => {
       const r = await envelope('fixture_reminder_command', admin.token, 'fixture.reminder_create_for', null,
         { member_id: memberId, due_at: utc(dueMs) });
-      return { status: r.status, code: r.code ?? null, source: r.data?.source_id,
+      return { status: r.status, code: r.code ?? null, source: r.data?.source_id, jobCreated: r.data?.job_created ?? null,
         job: r.data?.source_id ? psql(`select job_id from app.notifications_jobs where source_id = '${r.data.source_id}'`) : null };
     };
 
@@ -315,7 +315,9 @@ async function main() {
       && /^cancelled\|/.test(pushOf(delDue.job)) && jobState(delFuture.job) === 'cancelled|member_deleted',
       { request: mine.code ?? 'ok', tokens: tokensOf(deleting.member), push: pushOf(delDue.job), future_job: jobState(delFuture.job) });
     const refused = await forMember(deleting.member);
-    check('R51-nothing-enqueued-after-the-request', refused.code === 'validation_failed' && !refused.job, { code: refused.code });
+    // Skipped, not refused: the source's command succeeds and no job is written for the member.
+    check('R51-nothing-enqueued-after-the-request', refused.status === 200 && !refused.code && refused.jobCreated === false && !refused.job,
+      { status: refused.status, code: refused.code, job_created: refused.jobCreated, job: Boolean(refused.job) });
     const hookCounts = (phase) => JSON.parse(psql(`select app.identity_call_deletion_hooks('${deleting.member}', '${deleting.user}', '${deletionId}', '${phase}')`));
     const before = hookCounts('check');
     const erased = hookCounts('erase');

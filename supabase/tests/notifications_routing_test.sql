@@ -6,7 +6,7 @@
 -- notification row. HTTP evidence: tools/identity-e2e/routing.mjs. Every account here is
 -- SYNTHETIC (+44 7700 900880-900888).
 begin;
-select plan(100);
+select plan(105);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000350' || lpad(n::text, 2, '0'))::uuid $$;
@@ -380,15 +380,34 @@ insert into app.identity_deletions (member_id, had_account, origin, is_synthetic
 values (pg_temp.mid(9), true, 'member_request', true);
 select is((pg_temp.run() ->> 'ineligible')::int, 1, 'a job of a member with a deletion tombstone is not delivered');
 select is(pg_temp.st((select v from j where k = 'del_route')), 'ineligible|member_deleted', 'it ends member_deleted, with no need');
-select throws_ok(format($$select app.notifications_enqueue(jsonb_build_object(
-    'source_type', 'fixture_reminder', 'source_id', %L, 'source_revision', 1,
-    'recipient_member_id', %L, 'reminder_kind', 'fixture_due', 'scheduled_at', app.cmd_utc(now())))$$,
-    (select source_id from app.notifications_jobs where job_id = (select v from j where k = 'del_future')), pg_temp.mid(9)),
-  'PCMD1', 'validation_failed', 'nothing can be enqueued for a member with a deletion tombstone');
+select is(app.notifications_enqueue(jsonb_build_object(
+    'source_type', 'fixture_reminder', 'source_id', (select source_id from app.notifications_jobs where job_id = (select v from j where k = 'del_future')),
+    'source_revision', 1, 'recipient_member_id', pg_temp.mid(9), 'reminder_kind', 'fixture_due',
+    'scheduled_at', app.cmd_utc(now() + interval '5 hours'))),
+  '{"job_id": null, "created": false, "refused": "member_deleted", "job_state": null}'::jsonb,
+  'enqueue for a member with a deletion tombstone is skipped, not raised');
+select is((select count(*)::int from app.notifications_jobs where recipient_member_id = pg_temp.mid(9)
+            and scheduled_at > now() + interval '4 hours' and scheduled_at < now() + interval '6 hours'), 0,
+  'and writes nothing');
+select is(app.notifications_set_schedule(jsonb_build_object(
+  'source_type', 'fixture_reminder', 'source_id', (select source_id from app.notifications_jobs where job_id = (select v from j where k = 'del_future')),
+  'source_revision', 1, 'recipient_member_id', pg_temp.mid(9), 'schedule_type', 'task',
+  'intent', jsonb_build_object('due_at', app.cmd_utc(now() + interval '4 days'), 'task_state', 'open', 'reminders', '[]'::jsonb),
+  'kinds', '{"deadline": "fixture_due"}'::jsonb, 'fresh', true)) ->> 'refused',
+  'member_deleted', 'set_schedule for that member is skipped too (even a plan with no entries)');
+select is((select string_agg(schedule_state || '|' || end_reason, ',') from app.notifications_schedules
+            where recipient_member_id = pg_temp.mid(9)), 'ended|member_deleted', 'the ended schedule is not reactivated');
+select is((select count(*)::int from app.notifications_jobs where recipient_member_id = pg_temp.mid(9) and job_state = 'pending'),
+  0, 'and nothing is pending for them');
 select is((select (r ->> 'remaining')::int from jsonb_array_elements(
              app.identity_call_deletion_hooks(pg_temp.mid(9), pg_temp.u(9), gen_random_uuid(), 'check')) r
             where r ->> 'module' = 'notifications') > 0, true, 'before erasure the check counts notification rows');
--- Fail closed while the rows file is missing (simulated in this transaction).
+-- Fail closed while the rows file is missing (simulated in this transaction): the installed body
+-- (from 20261008143100) is saved, replaced by the main migration's stub, and restored verbatim.
+create temp table saved_def as
+  select pg_catalog.pg_get_functiondef('app.notifications_deletion_purge_rows(uuid, uuid)'::regprocedure) as d;
+select ok((select d from saved_def) like '%delete from app.notifications_jobs%',
+  'the installed purge body is the rows file''s, not the stub');
 create or replace function app.notifications_deletion_purge_rows(p_member_id uuid, p_account_id uuid)
 returns integer language plpgsql set search_path = '' as $$
 begin
@@ -398,32 +417,7 @@ end; $$;
 select throws_ok(format($$select app.notifications_erase_member(jsonb_build_object(
     'member_id', %L, 'account_id', %L, 'deletion_id', gen_random_uuid(), 'phase', 'erase'))$$, pg_temp.mid(9), pg_temp.u(9)),
   'PCMD1', 'unavailable', 'without the rows file the erase step is unavailable');
--- Restore the real body (as in 20261008143100_notifications_routing_rows.sql).
-create or replace function app.notifications_deletion_purge_rows(p_member_id uuid, p_account_id uuid)
-returns integer language plpgsql set search_path = '' as $$
-declare
-  v_total integer := 0;
-  v_n integer;
-begin
-  delete from app.notifications_attempts a using app.notifications_jobs j
-   where a.job_id = j.job_id and j.recipient_member_id = p_member_id;
-  get diagnostics v_n = row_count; v_total := v_total + v_n;
-  delete from app.notifications_push_jobs p where p.recipient_member_id = p_member_id or p.account_id = p_account_id;
-  get diagnostics v_n = row_count; v_total := v_total + v_n;
-  delete from app.notifications_direct_contact_needs n where n.recipient_member_id = p_member_id;
-  get diagnostics v_n = row_count; v_total := v_total + v_n;
-  delete from app.notifications_inbox_items i where i.recipient_member_id = p_member_id;
-  get diagnostics v_n = row_count; v_total := v_total + v_n;
-  delete from app.notifications_jobs j where j.recipient_member_id = p_member_id;
-  get diagnostics v_n = row_count; v_total := v_total + v_n;
-  delete from app.notifications_schedules s where s.recipient_member_id = p_member_id;
-  get diagnostics v_n = row_count; v_total := v_total + v_n;
-  delete from app.notifications_device_tokens t where t.member_id = p_member_id or t.account_id = p_account_id;
-  get diagnostics v_n = row_count; v_total := v_total + v_n;
-  delete from app.notifications_push_settings s where s.member_id = p_member_id or s.account_id = p_account_id;
-  get diagnostics v_n = row_count; v_total := v_total + v_n;
-  return v_total;
-end; $$;
+do $$ begin execute (select d from pg_temp.saved_def); end $$;
 select is((select string_agg((r ->> 'module') || '=' || (r ->> 'remaining'), ',' order by r ->> 'module')
              from jsonb_array_elements(
                app.identity_call_deletion_hooks(pg_temp.mid(9), pg_temp.u(9), gen_random_uuid(), 'erase')) r

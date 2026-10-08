@@ -32,7 +32,12 @@
 --     The row deletions are fail-closed stubs here (`unavailable`), replaced by the small
 --     follow-up `20261008143100_notifications_routing_rows.sql` (applied by hand on hosted
 --     projects, as 2.11's rows file).
---   * Enqueue refuses a recipient with a deletion tombstone, so nothing recreates their data.
+--   * Enqueue and set_schedule skip a recipient with a deletion tombstone (no raise, nothing
+--     written: {created: false, refused: "member_deleted"}), so nothing recreates their data and
+--     a multi-recipient source command is not rolled back by one deleted member.
+--   * Lock order (AD-2, Identity first): the attempt and device registration take FOR KEY SHARE
+--     on the recipient's member row before any Notifications lock; the lifecycle hook skips jobs
+--     another transaction holds (the worker then routes them `member_deleted`).
 --   * SYNTHETIC: `fixture.reminder_create_for {member_id, due_at}` (an Admin, SYNTHETIC members,
 --     local/staging) and the fixture's direct-contact route into `fixture_reminder_contact_needs`.
 --
@@ -338,10 +343,18 @@ declare
   v_route record;
   v_need jsonb;
   v_item_id uuid;
+  v_recipient uuid;
   v_outcome text;
   v_reason text;
   v_sqlstate text;
 begin
+  -- AD-2 lock order: Identity before Notifications. The item and push inserts below take FOR KEY
+  -- SHARE on the member row through their foreign keys; take it now, before the job lock, so a
+  -- deletion or hold that holds the member row and then updates this job cannot deadlock with us.
+  select j.recipient_member_id into v_recipient from app.notifications_jobs j where j.job_id = p_job_id;
+  if v_recipient is not null then
+    perform 1 from app.identity_members m where m.member_id = v_recipient for key share;
+  end if;
   select j.* into v_job from app.notifications_jobs j where j.job_id = p_job_id for update;
   if not found then
     return '{"outcome": "not_found"}'::jsonb;
@@ -493,9 +506,11 @@ begin
     perform app.cmd_fail('validation_failed', '{"recipient_member_id": "unknown"}');
   end if;
   -- Story 3.5: after a deletion request nothing may recreate the member's notification data.
+  -- Skipped, not raised, so one deleted recipient never rolls back a source's whole command.
   if exists (select 1 from app.identity_deletions d
               where d.member_id = (v_key ->> 'recipient_member_id')::uuid) then
-    perform app.cmd_fail('validation_failed', '{"recipient_member_id": "deleted"}');
+    return jsonb_build_object('job_id', null, 'job_state', null, 'cancel_reason', null,
+                              'created', false, 'refused', 'member_deleted');
   end if;
   insert into app.notifications_jobs (source_type, source_id, source_revision, recipient_member_id,
                                       reminder_kind, scheduled_at, policy_source, policy_digest,
@@ -521,6 +536,103 @@ begin
   end if;
   return jsonb_build_object('job_id', v_job.job_id, 'job_state', v_job.job_state,
                             'cancel_reason', v_job.cancel_reason, 'created', v_created);
+end;
+$$;
+
+-- Story 3.3's owner operation, replaced in place (same signature and privileges): as before,
+-- plus a recipient with a deletion request is skipped ({schedule_id: null, refused:
+-- "member_deleted"}, nothing written, no ended schedule reactivated).
+create or replace function app.notifications_set_schedule(p_schedule jsonb)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_errors jsonb;
+  v_policy jsonb;
+  v_state jsonb;
+  v_id uuid;
+  v_result jsonb;
+begin
+  if jsonb_typeof(p_schedule) is distinct from 'object' then
+    perform app.cmd_fail('validation_failed', '{"schedule": "must_be_object"}');
+  end if;
+  v_errors := jsonb_strip_nulls(
+    app.contract_unknown_keys(p_schedule, array['source_type', 'source_id', 'source_revision',
+                                                'recipient_member_id', 'schedule_type', 'intent',
+                                                'kinds', 'fresh'])
+    || jsonb_build_object(
+         'source_type', app.contract_token_error(p_schedule -> 'source_type'),
+         'source_id', app.contract_uuid_error(p_schedule -> 'source_id'),
+         'source_revision', app.contract_revision_error(p_schedule -> 'source_revision'),
+         'recipient_member_id', app.contract_uuid_error(p_schedule -> 'recipient_member_id'),
+         'schedule_type', case when jsonb_typeof(p_schedule -> 'schedule_type') = 'string'
+                                    and (p_schedule ->> 'schedule_type') in ('response', 'task')
+                               then null else 'invalid' end,
+         'fresh', case when coalesce(jsonb_typeof(p_schedule -> 'fresh'), 'boolean') = 'boolean'
+                       then null else 'invalid' end,
+         'kinds', case
+                    when jsonb_typeof(p_schedule -> 'kinds') is distinct from 'object'
+                         or (p_schedule -> 'kinds') = '{}'::jsonb then 'invalid'
+                    when exists (select 1 from jsonb_each(p_schedule -> 'kinds') k
+                                  where not (k.key = any (coalesce(app.notifications_anchors(p_schedule ->> 'schedule_type'), '{}')
+                                                          || array['respond_now']))
+                                     or (k.key = 'respond_now' and p_schedule ->> 'schedule_type' <> 'response')
+                                     or app.contract_token_error(k.value) is not null) then 'invalid'
+                  end));
+  if v_errors <> '{}'::jsonb then
+    perform app.cmd_fail('validation_failed', v_errors);
+  end if;
+  v_policy := app.notifications_policy();
+  -- Validates the intent before anything is written (the plan is recomputed when applied).
+  perform app.notifications_plan(v_policy, p_schedule ->> 'schedule_type', p_schedule -> 'intent',
+                                 now(), false);
+  if exists (select 1 from jsonb_each_text(p_schedule -> 'kinds') k
+              where not exists (select 1 from app.contract_reminder_contracts c
+                                 where c.source_type = p_schedule ->> 'source_type'
+                                   and c.reminder_kind = k.value)) then
+    perform app.cmd_fail('validation_failed', '{"kinds": "unregistered"}');
+  end if;
+  if not exists (select 1 from app.identity_members m
+                  where m.member_id = (p_schedule ->> 'recipient_member_id')::uuid) then
+    perform app.cmd_fail('validation_failed', '{"recipient_member_id": "unknown"}');
+  end if;
+  -- Story 3.5: a member with a deletion request is skipped: no schedule is written or
+  -- reactivated and nothing is enqueued (the caller's command is not rolled back).
+  if exists (select 1 from app.identity_deletions d
+              where d.member_id = (p_schedule ->> 'recipient_member_id')::uuid) then
+    return jsonb_build_object('schedule_id', null, 'policy_version', (v_policy ->> 'version')::integer,
+                              'plan', null, 'entries', 0, 'enqueued', 0, 'reinstated', 0,
+                              'covered', 0, 'cancelled', 0, 'refused', 'member_deleted');
+  end if;
+  v_state := app.contract_check_source(jsonb_build_object(
+    'source_type', p_schedule -> 'source_type', 'source_id', p_schedule -> 'source_id',
+    'source_revision', p_schedule -> 'source_revision'));
+  if not (v_state ->> 'current')::boolean then
+    perform app.cmd_fail('conflict');
+  end if;
+  insert into app.notifications_schedules as s (
+      source_type, source_id, recipient_member_id, source_revision, schedule_type, intent, kinds,
+      plan, policy_version, policy_source, policy_digest)
+  values (p_schedule ->> 'source_type', (p_schedule ->> 'source_id')::uuid,
+          (p_schedule ->> 'recipient_member_id')::uuid,
+          (p_schedule ->> 'source_revision')::numeric::bigint, p_schedule ->> 'schedule_type',
+          p_schedule -> 'intent', p_schedule -> 'kinds', '{}'::jsonb,
+          (v_policy ->> 'version')::integer, v_policy ->> 'source', v_policy ->> 'digest')
+  on conflict (source_type, source_id, recipient_member_id) do update
+     set source_revision = excluded.source_revision, schedule_type = excluded.schedule_type,
+         intent = excluded.intent, kinds = excluded.kinds, schedule_state = 'active',
+         end_reason = null,
+         cancelled_kinds = case when s.source_revision = excluded.source_revision
+                                then s.cancelled_kinds else '{}' end,
+         updated_at = clock_timestamp()
+  returning s.schedule_id into v_id;
+  v_result := app.notifications_apply_schedule(v_id, v_policy,
+                                               coalesce((p_schedule ->> 'fresh')::boolean, true));
+  return jsonb_build_object('schedule_id', v_id, 'policy_version', (v_policy ->> 'version')::integer,
+                            'plan', (select s.plan from app.notifications_schedules s
+                                      where s.schedule_id = v_id))
+         || v_result;
 end;
 $$;
 
@@ -551,9 +663,13 @@ begin
     update app.notifications_schedules s
        set schedule_state = 'ended', end_reason = 'member_deleted', updated_at = clock_timestamp()
      where s.recipient_member_id = v_member and s.schedule_state = 'active';
+    -- Jobs another transaction holds (a worker's attempt or claim) are skipped: the attempt
+    -- then routes them `member_deleted` and the deletion hook erases them.
     update app.notifications_jobs j
        set job_state = 'cancelled', finished_at = clock_timestamp(), cancel_reason = 'member_deleted'
-     where j.recipient_member_id = v_member and j.job_state = 'pending';
+     where j.job_id in (select x.job_id from app.notifications_jobs x
+                         where x.recipient_member_id = v_member and x.job_state = 'pending'
+                         for update skip locked);
   end if;
 end;
 $$;
@@ -698,6 +814,8 @@ begin
     perform app.cmd_fail('validation_failed', v_errors);
   end if;
   v_member := app.notifications_command_member();
+  -- AD-2 lock order: the member row (Identity) before any Notifications lock.
+  perform 1 from app.identity_members m where m.member_id = v_member for key share;
   -- Serialise registrations of one token and of one account.
   perform pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended('notifications_device_token:' || (p_payload ->> 'token'), 0));
@@ -1206,6 +1324,7 @@ revoke all on function
   app.notifications_queue_push(uuid, app.notifications_jobs, uuid),
   app.notifications_attempt(uuid, uuid, uuid, bigint),
   app.notifications_enqueue_job(jsonb, timestamptz, uuid, uuid),
+  app.notifications_set_schedule(jsonb),
   app.notifications_on_member_lifecycle(jsonb),
   app.notifications_deletion_purge_rows(uuid, uuid),
   app.notifications_deletion_remaining(uuid, uuid),

@@ -343,7 +343,7 @@ Nothing. The tick and the enable refuse production until `ops_system_access`, `q
 
 ## Story 3.5: recipients routed by current access; work retired on lifecycle events
 
-Migrations: `supabase/migrations/20261008143000_notifications_routing.sql` (no row deletions; fail-closed stubs) and `supabase/migrations/20261008143100_notifications_routing_rows.sql` (ONLY the two functions that delete rows; applied by hand on hosted projects, like 2.11's rows file). Tests: `supabase/tests/notifications_routing_test.sql` (100), E2E `tools/identity-e2e/routing.mjs` (18 checks). Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.5/`.
+Migrations: `supabase/migrations/20261008143000_notifications_routing.sql` (no row deletions; fail-closed stubs) and `supabase/migrations/20261008143100_notifications_routing_rows.sql` (ONLY the two functions that delete rows; applied by hand on hosted projects, like 2.11's rows file). Tests: `supabase/tests/notifications_routing_test.sql` (105), E2E `tools/identity-e2e/routing.mjs` (18 checks). Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.5/`.
 
 ### Routing (at the worker's attempt, after the source and schedule rechecks)
 
@@ -379,7 +379,8 @@ The source's `recipient_eligible` false still ends the job `ineligible` (`recipi
 ### Lifecycle and deletion hooks
 
 - `app.notifications_on_member_lifecycle` is registered for `sessions_revoked`, `access_hold_applied`, `membership_deactivated`, `account_deactivated` and `deletion_requested`. In Identity's transaction it retires the member's live tokens and cancels their pending member-push jobs, with the event name as the reason. `deletion_requested` also cancels the member's pending jobs and ends their active schedules (`member_deleted`). Inbox items stay (a held member sees them again after release). A released hold or a restoration re-registers nothing: the device registers again after sign-in (entry 6).
-- Enqueue (and so every schedule) refuses a recipient with a deletion tombstone: `validation_failed {"recipient_member_id": "deleted"}`. Source owners drop deleted members through their own lifecycle hooks.
+- Enqueue and `app.notifications_set_schedule` **skip** a recipient with a deletion tombstone: nothing is written (no job, no schedule written or reactivated) and they answer `{created: false, refused: "member_deleted"}` (enqueue, `job_id` and `job_state` null) or `{schedule_id: null, refused: "member_deleted", ...}` (schedule). They do not raise, so one deleted member never rolls back a source's multi-recipient command. Source owners still drop deleted members through their own lifecycle hooks.
+- **Lock order (AD-2).** The worker's attempt and `notifications.register_device` take `FOR KEY SHARE` on the member row before any Notifications lock, and the `deletion_requested` hook skips jobs another transaction holds (`for update skip locked`; the attempt then routes them `member_deleted`), so a deletion, hold or deactivation cannot deadlock with the worker.
 - `app.notifications_erase_member` (Identity deletion hook): `erase` removes the member's jobs, their attempts, inbox items, schedules, needs and push jobs, and the account's tokens, settings and push jobs; `check` counts what is left. The fixture deletion hook (`app.fixture_erase_member`, now registered by migration) also erases the member's `fixture_reminder_sources` and `fixture_reminder_contact_needs`, and anonymises the account on reminders the member created for others.
 - **Fail closed:** until `20261008143100_notifications_routing_rows.sql` is applied, the two purge functions answer `unavailable` and Identity's `erase_owners` step waits (retried). Requests and every access denial work without it.
 
@@ -391,7 +392,7 @@ The source's `recipient_eligible` false still ends the job `ineligible` (`recipi
 
 ```bash
 npx supabase db reset
-npm run -s db:test                        # supabase/tests/notifications_routing_test.sql (100)
+npm run -s db:test                        # supabase/tests/notifications_routing_test.sql (105)
 node tools/auth-harness/local-phone-auth.mjs on
 node tools/identity-e2e/routing.mjs --evidence <file>.jsonl
 node tools/auth-harness/local-phone-auth.mjs off
@@ -402,7 +403,7 @@ Fictional numbers: pgTAP `+44 7700 900880-900888` (the 3.3 suite borrows `900889
 ### Hosted staging (parent session, then the owner)
 
 1. **Parent session:** apply `20261008143000_notifications_routing.sql` to staging after `20261008121248`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. It contains no row deletion. It:
-   - replaces in place (same signatures and privileges): `app.notifications_attempt`, `app.notifications_enqueue_job`, `app.fixture_authorize_command`, `app.fixture_reminder_in_scope`, `app.fixture_reminder_command` (EXECUTE for `authenticated` re-granted) and `app.fixture_erase_member`;
+   - replaces in place (same signatures and privileges): `app.notifications_attempt`, `app.notifications_enqueue_job`, `app.notifications_set_schedule`, `app.fixture_authorize_command`, `app.fixture_reminder_in_scope`, `app.fixture_reminder_command` (EXECUTE for `authenticated` re-granted) and `app.fixture_erase_member`;
    - adds the direct-contact route registry, four Notifications tables (needs, device tokens, push settings, push jobs) and the fixture's `fixture_reminder_contact_needs`;
    - registers Notifications' five lifecycle hooks, its deletion hook, the fixture deletion hook (if absent) and the `notifications` command authorizer;
    - grants `authenticated` EXECUTE on `api.notifications_command(jsonb)` and `api.notifications_my_push_settings()` (and their `app` entry points) only.

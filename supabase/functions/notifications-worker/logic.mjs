@@ -138,3 +138,159 @@ export async function runOnce({ system, limit, now = () => Date.now(), budgetMs 
   return { claimed: claim.claimed, reclaimed: claim.reclaimed, expired: claim.expired,
     outcomes, uncertain, deferred };
 }
+
+// ------------------------------------------------------------------------------------------------
+// Story 3.6: the push stage (after the inbox stage, only with the FCM secret configured)
+// ------------------------------------------------------------------------------------------------
+
+/** Push outcomes the database may answer (prepare and record); anything else is `unexpected`. */
+export const PUSH_OUTCOMES = ['accepted', 'retry', 'failed', 'exhausted', 'obsolete', 'expired', 'fenced',
+  'cancelled', 'finished', 'not_found'];
+/** Provider answers per device. */
+export const PUSH_RESULTS = ['accepted', 'token_invalid', 'rejected', 'transient'];
+const TOKEN_RE = /^[A-Za-z0-9_:.-]{20,4096}$/;
+const PROVIDER_CODE_RE = /^[A-Z][A-Z0-9_]{0,39}$/;
+
+/**
+ * Validates a push claim answer: {jobs: [{push_job_id, lease_token}], claimed, reclaimed, expired,
+ * lease_seconds, push_enabled}. Returns the normalised answer or null.
+ */
+export function parsePushClaim(data) {
+  if (!data || typeof data !== 'object' || !Array.isArray(data.jobs) || typeof data.push_enabled !== 'boolean') return null;
+  for (const k of ['claimed', 'reclaimed', 'expired', 'lease_seconds']) {
+    if (!Number.isInteger(data[k]) || data[k] < 0) return null;
+  }
+  const jobs = [];
+  for (const j of data.jobs) {
+    if (!j || typeof j.push_job_id !== 'string' || !UUID_RE.test(j.push_job_id)
+        || !Number.isSafeInteger(j.lease_token) || j.lease_token < 1) return null;
+    jobs.push({ push_job_id: j.push_job_id, lease_token: j.lease_token });
+  }
+  if (jobs.length !== data.claimed) return null;
+  return { jobs, claimed: data.claimed, reclaimed: data.reclaimed, expired: data.expired,
+    lease_seconds: data.lease_seconds, push_enabled: data.push_enabled };
+}
+
+/**
+ * Validates a prepare answer of outcome `send`: the generic message (exactly notification_id,
+ * item_id, title, body, ttl_seconds, expires_at_epoch) and 1..10 targets {device_id, platform,
+ * token}. Returns {message, targets} or null; nothing malformed is ever sent.
+ */
+export function parsePrepare(data) {
+  if (!data || data.outcome !== 'send') return null;
+  const m = data.message;
+  if (!m || typeof m !== 'object' || Object.keys(m).sort().join(',')
+      !== 'body,expires_at_epoch,item_id,notification_id,title,ttl_seconds') return null;
+  if (!UUID_RE.test(m.item_id ?? '') || !UUID_RE.test(m.notification_id ?? '')) return null;
+  if (typeof m.title !== 'string' || typeof m.body !== 'string' || m.title === '' || m.title.length > 200
+      || m.body.length > 500) return null;
+  if (!Number.isSafeInteger(m.ttl_seconds) || m.ttl_seconds < 1 || !Number.isSafeInteger(m.expires_at_epoch)) return null;
+  if (!Array.isArray(data.targets) || data.targets.length < 1 || data.targets.length > 10) return null;
+  const targets = [];
+  for (const t of data.targets) {
+    if (!t || !UUID_RE.test(t.device_id ?? '') || !['android', 'ios'].includes(t.platform)
+        || typeof t.token !== 'string' || !TOKEN_RE.test(t.token)) return null;
+    targets.push({ device_id: t.device_id, platform: t.platform, token: t.token });
+  }
+  return {
+    message: { notification_id: m.notification_id, item_id: m.item_id, title: m.title, body: m.body,
+      ttl_seconds: m.ttl_seconds, expires_at_epoch: m.expires_at_epoch },
+    targets,
+  };
+}
+
+/** One device answer for notifications.push_record (no token, no text). */
+export function deviceResult(target, answer) {
+  const result = PUSH_RESULTS.includes(answer?.result) ? answer.result : 'transient';
+  const out = { device_id: target.device_id, result };
+  if (Number.isInteger(answer?.provider_status) && answer.provider_status >= 100 && answer.provider_status <= 599) {
+    out.provider_status = answer.provider_status;
+  }
+  if (typeof answer?.provider_code === 'string' && PROVIDER_CODE_RE.test(answer.provider_code)) {
+    out.provider_code = answer.provider_code;
+  }
+  return out;
+}
+
+/**
+ * One push run: claim a batch of push jobs; for each, prepare (the database rechecks it now and
+ * answers the generic message with the live targets), send to each target through `sender`,
+ * then record the per-device answers. Provider acceptance is counted as `accepted`, never as
+ * delivery. A quota answer or our own credential refused stops sending: the rest are released
+ * unused. When the provider cannot be used at all (OAuth refused), the job is released and the
+ * run stops (no attempt counted). A failed or uncertain system call is counted `uncertain`: the
+ * lease lapses and the next claim counts it and sends again with the same notification id.
+ * Returns counts only (no ids, tokens or text).
+ */
+export async function runPush({ system, sender, limit, now = () => Date.now(), deadlineMs }) {
+  const start = now();
+  const claim = parsePushClaim(await system('notifications.push_claim', limit === undefined ? {} : { limit }));
+  if (!claim) throw new Error('unexpected_claim');
+  const deadline = Math.min(deadlineMs ?? start + RUN_BUDGET_MS, runDeadline(start, claim.lease_seconds));
+  const outcomes = {};
+  const sent = {};
+  let uncertain = 0;
+  let deferred = 0;
+  let stopped = null;
+  const count = (bag, key) => { bag[key] = (bag[key] ?? 0) + 1; };
+  const release = async (job) => {
+    deferred += 1;
+    try {
+      await system('notifications.push_release', job);
+    } catch {
+      // The lease lapses instead; the next claim counts it.
+    }
+  };
+  for (const job of claim.jobs) {
+    if (stopped || now() >= deadline) {
+      await release(job);
+      continue;
+    }
+    let prep;
+    try {
+      prep = await system('notifications.push_prepare', job);
+    } catch {
+      uncertain += 1;
+      continue;
+    }
+    if (prep?.outcome !== 'send') {
+      count(outcomes, PUSH_OUTCOMES.includes(prep?.outcome) ? prep.outcome : 'unexpected');
+      continue;
+    }
+    const parsed = parsePrepare(prep);
+    if (!parsed) {
+      count(outcomes, 'unexpected');
+      await release(job);
+      continue;
+    }
+    const results = [];
+    for (const target of parsed.targets) {
+      let answer;
+      try {
+        answer = await sender.send(target, parsed.message);
+      } catch (e) {
+        stopped = ['oauth_refused', 'oauth_unreachable'].includes(e?.code) ? e.code : 'provider_unavailable';
+        break;
+      }
+      const r = deviceResult(target, answer);
+      results.push(r);
+      count(sent, r.result);
+      if (answer?.stop) {
+        stopped = 'provider_stop';
+        break;
+      }
+    }
+    if (results.length === 0) {
+      await release(job);
+      continue;
+    }
+    try {
+      const rec = await system('notifications.push_record', { ...job, results });
+      count(outcomes, PUSH_OUTCOMES.includes(rec?.outcome) ? rec.outcome : 'unexpected');
+    } catch {
+      uncertain += 1;
+    }
+  }
+  return { claimed: claim.claimed, reclaimed: claim.reclaimed, expired: claim.expired, enabled: claim.push_enabled,
+    outcomes, sent, uncertain, deferred, ...(stopped ? { stopped } : {}) };
+}

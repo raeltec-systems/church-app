@@ -1,0 +1,5 @@
+$ bash -c ls '/tmp/claude-0/-home-user-church-app/53f9d846-6f17-5fcb-9db8-59c7e3ac6bf0/scratchpad/apk37/lib' 
+arm64-v8a
+armeabi-v7a
+x86_64
+# exit=0

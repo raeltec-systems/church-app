@@ -1,0 +1,9 @@
+{
+  "artifact": "staff-web-3.7-staging",
+  "environment": "staging",
+  "commit": "a9a157bda18daa93f64ab7371ff4fd16230ab4f5",
+  "supabase_api_url": "https://tmurpotfluignacfueki.supabase.co",
+  "file_count": 40,
+  "tree_sha256": "bc24df1f0fa4fabea1c49b9129e4be6be05ddf5184bc0468cd9af3725fa67dbe",
+  "sealed_at": "2026-10-08T18:37:51.608Z"
+}

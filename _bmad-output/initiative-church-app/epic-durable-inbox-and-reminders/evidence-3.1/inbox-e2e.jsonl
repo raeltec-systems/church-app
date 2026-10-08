@@ -1,0 +1,14 @@
+{"step":"I00-precondition","target":"LOCAL","at":"2026-10-08T06:57:06.689Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"I01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-08T06:57:08.052Z","verdict":"pass","amr":["password"]}
+{"step":"I10-command-writes-source-and-job","target":"LOCAL","at":"2026-10-08T06:57:08.441Z","verdict":"pass","status":200,"revision":1,"job_state":"pending","jobs":"pending"}
+{"step":"I11-repeated-command-adds-nothing","target":"LOCAL","at":"2026-10-08T06:57:08.758Z","verdict":"pass","same_result":true,"jobs":"pending"}
+{"step":"I12-nothing-before-the-worker","target":"LOCAL","at":"2026-10-08T06:57:08.774Z","verdict":"pass","status":200,"items":0}
+{"step":"I20-worker-delivers-one-item","target":"LOCAL","at":"2026-10-08T06:57:09.212Z","verdict":"pass","worker":{"exit":0,"claimed":1,"delivered":1},"items":1,"keys":["delivered_at","due_at","item_id","reminder_kind"],"jobs":"delivered"}
+{"step":"I21-repeat-worker-adds-nothing","target":"LOCAL","at":"2026-10-08T06:57:09.322Z","verdict":"pass","worker":{"delivered":0},"items":1}
+{"step":"I30-others-see-nothing","target":"LOCAL","at":"2026-10-08T06:57:09.374Z","verdict":"pass","member_b":0,"signed_out":401,"unlinked":{"status":403,"detail":"not_linked"}}
+{"step":"I40-cancelled-never-becomes-an-item","target":"LOCAL","at":"2026-10-08T06:57:09.823Z","verdict":"pass","cancel":{"status":200,"revision":2,"cancelled_jobs":1},"jobs":"cancelled","items":1}
+{"step":"I41-future-job-waits","target":"LOCAL","at":"2026-10-08T06:57:10.159Z","verdict":"pass","worker":{"delivered":0},"jobs":"pending"}
+{"step":"I50-racing-workers-one-item-per-job","target":"LOCAL","at":"2026-10-08T06:57:10.498Z","verdict":"pass","per_worker":[3,0],"total_delivered":3,"items_b":3,"items_a":1}
+{"step":"I60-unknown-credential-refused","target":"LOCAL","at":"2026-10-08T06:57:10.594Z","verdict":"pass","exit":1}
+{"step":"I61-worker-output-content-free","target":"LOCAL","at":"2026-10-08T06:57:10.594Z","verdict":"pass","leaked_values":0,"lines":6}
+{"step":"I99-cleanup","target":"LOCAL","at":"2026-10-08T06:57:11.544Z","users_left":0,"credential_revoked":true,"principal_disabled":true,"unmarked":true,"jobs_left":0,"items_left":0}

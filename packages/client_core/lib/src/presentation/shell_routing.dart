@@ -8,6 +8,7 @@ import 'account_screen.dart';
 import 'cell_screens.dart';
 import 'credential_screens.dart';
 import 'fixture_command_screen.dart';
+import 'inbox_screen.dart';
 import 'membership_application_screen.dart';
 import 'member_deletion_screens.dart';
 import 'membership_lifecycle_screen.dart';
@@ -92,6 +93,9 @@ abstract final class ClientPaths {
   /// Story 2.11, staff web, Admin only: member deletions and the staff route
   /// for members who cannot use the app.
   static const adminMemberDeletions = '/admin/member-deletions';
+
+  /// Story 3.1 (both clients): the member's durable inbox.
+  static const inbox = '/inbox';
 }
 
 /// Story 2.7: the incoming Auth email link for this route, read once. Only
@@ -255,6 +259,10 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.adminMemberDeletions,
         pageBuilder: (_, state) => page(state, const MemberDeletionScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.inbox,
+        pageBuilder: (_, state) => page(state, const InboxScreen()),
       ),
       GoRoute(
         path: ClientPaths.signIn,

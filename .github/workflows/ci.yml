@@ -94,7 +94,7 @@ jobs:
         with:
           node-version: 22
       - name: Harness helper tests (no network, no credentials)
-        run: node --test tools/auth-harness/*.test.mjs tools/identity-e2e/*.test.mjs supabase/functions/*/*.test.mjs tools/identity-deletion/*.test.mjs
+        run: node --test tools/auth-harness/*.test.mjs tools/identity-e2e/*.test.mjs supabase/functions/*/*.test.mjs tools/identity-deletion/*.test.mjs tools/notifications/*.test.mjs
       - name: Evidence holds no tokens, keys, passwords, OTPs or link tokens
         run: bash tools/auth-harness/scan-evidence.sh
       - name: Story 2.1 evidence and identity E2E tool hold no credentials
@@ -123,6 +123,8 @@ jobs:
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.12 docs/runbooks/identity-support.md
       - name: Story 2.14 staging evidence, the staging suite and the production package hold no credentials
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.14 tools/identity-e2e docs/runbooks/production-promotion-identity.md
+      - name: Story 3.1 evidence, the notification worker and its runbook hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.1 tools/notifications docs/runbooks/notifications.md
 
   flutter:
     name: flutter (analyze, test, web build)

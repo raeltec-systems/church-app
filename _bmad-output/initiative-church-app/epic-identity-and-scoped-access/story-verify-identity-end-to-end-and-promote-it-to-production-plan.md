@@ -3,7 +3,8 @@ title: 'Verify identity end to end and promote it to production'
 type: 'chore'
 ticket: '14'
 created: '2026-10-07'
-status: 'in-progress'
+status: 'blocked'
+blocked_reason: 'Staging evidence complete and verified; production promotion waits on owner-only items: (1) create the production Supabase project and GitHub production environment; (2) the production SMTP sender account (and the send-email hook, deferred) before q1_auth_recovery; (3) name the first real Admin and choose the first-Admin procedure (no production path exists yet); (4) decide each Q1/Q4 gate (dormancy, password/abuse policy, q4_personal_data, identity_deletion_retention, ops_system_access) as approve or leave fail-closed; (5) witness the mobile/staff-web demonstration (evidence-2.14/owner-demonstration.md); plus the email run and deletion-worker run in owner-consolidated-test.md.'
 baseline_revision: 'aca0241196bee6cedb930bc3b7448e6f52851f5e'
 route: 'full'
 route_source: 'auto'
@@ -89,6 +90,11 @@ Decision (agent, under owner pre-approval): an observed platform behaviour that 
 ## Review Triage Log
 
 ## Verification
+
+**Results (2026-10-07/08):**
+- Staging suite, one complete run 22:55-00:25 UTC: 45/45 checks, matrix 896/896 cells as expected, no finding (the forged x-forwarded-for stayed in the bucket). `evidence-2.14/staging-suite.jsonl`, `staging-suite-summary.md`.
+- Local (fresh reset each): db:test 18 files / 1487 PASS; db:smoke ok=138 notok=0; recovery:rehearse 0; all 11 identity E2Es pass (run 30, grants 18, apply 27, review 18, cells 13, recovery 20, credentials 15, assisted 16, lifecycle 9, deletion 12, runbooks 16); contracts:test 239; ci:policy-test 49; node unit 99 (+9 suite tests); ci:migrations, ci:secrets, env:check clean; scan-evidence clean for every evidence folder; flutter analyze clean and tests pass (client_core 348, staff 26, mobile 27; no Flutter package touched).
+- No change under `apps/`, `packages/` or `supabase/` since `aca0241`.
 
 **Commands:**
 - `node tools/identity-e2e/staging-suite.mjs --evidence <evidence-2.14>/staging-suite.jsonl` -- expected: all checks pass, findings listed.

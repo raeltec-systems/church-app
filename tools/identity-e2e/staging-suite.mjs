@@ -386,6 +386,10 @@ async function main() {
     authPacer.record(); save();
     return http('POST', path, { body });
   };
+  const authReserve = async (count) => {
+    const wait = authPacer.waitFor(count);
+    if (wait > 0) { log('auth-pacing', { wait_s: Math.round(wait / 1000) }); await sleep(wait); }
+  };
   const signIn = (phone, pw) => authCall('/auth/v1/token?grant_type=password', { phone, password: pw });
   const signUp = (phone, pw) => authCall('/auth/v1/signup', { phone, password: pw });
   const refresh = (rt) => http('POST', '/auth/v1/token?grant_type=refresh_token', { body: { refresh_token: rt } });
@@ -661,7 +665,7 @@ async function main() {
     const pw = newPassword();
     const r = await redeem(p.phone, q.s, pw);
     if (r.outcome === 'succeeded') { p.st.pw = pw; save(); }
-    return { request: q.r.outcome, grant: g.data?.grant?.state ?? g.code, redeem: r.outcome };
+    return { request: q.r.outcome, grant_state: g.data?.grant?.state ?? g.code, redeem: r.outcome };
   };
 
   if (phase('setup') || phase('matrix') || phase('flows') || phase('security') || phase('recovery')) {
@@ -704,7 +708,8 @@ async function main() {
     // Only Admin may grant; lead_pastor is the operator's alone; nothing an Admin holds reaches care/finance.
     check('M00-matrix', bad === 0, { principals: Object.keys(PRINCIPALS).length, reads: Object.keys(READS).length,
       commands: COMMANDS.length, cells, mismatches: bad });
-    ownerSteps.push('Lead-pastor rows of the matrix: the role is designated only by the restricted operator (`app.identity_designate_lead_pastor`, SQL); the suite proves an Admin cannot grant it (G15).');
+    ownerSteps.push('Lead-pastor rows of the matrix: the role is designated only by the restricted operator (`app.identity_designate_lead_pastor`, SQL); the suite proves an Admin cannot grant it (G12).');
+    ownerSteps.push('Email recovery (2.7): add, confirm and approve a recovery email, forgot password from mobile and web, the reset-gate canary; owner-approved inboxes only, in the consolidated owner test (needs the redirect allowlist first).');
   }
 
   // =============================================================================== flows
@@ -1079,18 +1084,25 @@ async function main() {
     // Password change and global sign-out use a second persona: a direct password change is an
     // unreviewed one, and X18's restore on `alt` would then (correctly) keep a security hold.
     const alt2 = persona('alt2');
+    // The sign-in "inside the margin" must happen within the 5 s trust margin: make room in the
+    // Auth pacer first so no pacing wait falls between the change and that sign-in.
+    await authReserve(4);
     const e1 = await tokenOf(alt2, { fresh: true });
     const e2 = (await signIn(alt2.phone, alt2.pw)).json;
     const pw2 = newPassword();
     const change = await http('PUT', '/auth/v1/user', { token: e2?.access_token, body: { password: pw2 } });
+    const changedAt = Date.now();
     if (change.status === 200) { alt2.st.pw = pw2; save(); }
+    const quickToken = await tokenOf(alt2, { fresh: true });
+    const quickAfterMs = Date.now() - changedAt;
+    const quick = await read('identity_my_member_summary', quickToken);
     const e1r = await read('identity_my_member_summary', e1);
     const e2r = await read('identity_my_member_summary', e2?.access_token);
-    const quick = await read('identity_my_member_summary', await tokenOf(alt2, { fresh: true }));
     const later = await read('identity_my_member_summary', await freshAfterEpoch(alt2));
     check('X19-password-change-needs-fresh-sign-in', change.status === 200 && e1r.status === 401 && e2r.status === 401
-      && quick.status === 401 && quick.detail === 'untrusted_session' && later.status === 200,
-      { change: change.status, other_session: e1r, changing_session: e2r, inside_margin: quick, after_margin: later.status });
+      && quickAfterMs < 4000 && quick.status === 401 && quick.detail === 'untrusted_session' && later.status === 200,
+      { change: change.status, other_session: e1r, changing_session: e2r, inside_margin: quick, inside_margin_after_ms: quickAfterMs,
+        after_margin: later.status });
     const g1 = (await signIn(alt2.phone, alt2.pw)).json;
     const g2 = (await signIn(alt2.phone, alt2.pw)).json;
     const go = await http('POST', '/auth/v1/logout?scope=global', { token: g1?.access_token });
@@ -1127,7 +1139,7 @@ async function main() {
       && ga.status === 200 && ga.data?.grant?.state === 'issued' && !staffText.includes(a.s) && !staffText.includes(digest(a.s)) && !staffText.includes(a.r.request_code)
       && ready.outcome === 'ready' && wrongSecret.outcome === 'rejected' && okA.outcome === 'succeeded' && replayA.outcome === 'rejected'
       && oldSess.status === 401 && fresh1.status === 200,
-      { request: a.r.outcome, grant: ga.data?.grant?.state ?? ga.code, staff_sees_secret_digest_or_code: false, status: ready.outcome,
+      { request: a.r.outcome, grant_state: ga.data?.grant?.state ?? ga.code, staff_sees_secret_digest_or_code: false, status: ready.outcome,
         wrong_secret: wrongSecret.outcome, redeem: okA.outcome, replay: replayA.outcome, old_session: oldSess.status, fresh_sign_in: fresh1.status });
     const unknownReq = await request(LIMIT_NUMBERS[10]);
     log('A10b-unknown-number-neutral', { verdict: unknownReq.r.outcome === 'received' ? 'pass' : 'FAIL', outcome: unknownReq.r.outcome });
@@ -1157,7 +1169,7 @@ async function main() {
     await sleep(EPOCH_WAIT_MS);
     const stillPw = await signIn(rec2.phone, rec2.pw);
     check('A12-direct-password-change-kills-grant', gc.status === 200 && put.status === 200 && killed.outcome === 'rejected' && stillPw.status === 200,
-      { grant: gc.data?.grant?.state ?? gc.code, direct_change: put.status, redeem: killed.outcome, own_password_still_works: stillPw.status });
+      { grant_state: gc.data?.grant?.state ?? gc.code, direct_change: put.status, redeem: killed.outcome, own_password_still_works: stillPw.status });
     await cancelOpen(rec2.member);
 
     // A15: a grant presented with another member's number is burned.
@@ -1170,7 +1182,7 @@ async function main() {
     const rec2Ok = await signIn(rec2.phone, rec2.pw);
     check('A15-cross-member-use-burns-grant', gd.status === 200 && cross.outcome === 'rejected' && afterBurn.outcome === 'rejected'
       && rec1Ok.status === 200 && rec2Ok.status === 200,
-      { grant: gd.data?.grant?.state ?? gd.code, other_number: cross.outcome, right_number_after: afterBurn.outcome, passwords_unchanged: [rec1Ok.status, rec2Ok.status] });
+      { grant_state: gd.data?.grant?.state ?? gd.code, other_number: cross.outcome, right_number_after: afterBurn.outcome, passwords_unchanged: [rec1Ok.status, rec2Ok.status] });
     await cancelOpen(rec2.member);
 
     // A14: two concurrent redemptions of one grant: exactly one wins.
@@ -1219,7 +1231,7 @@ async function main() {
     const back = await lifecycleCmd(await tokenOf(adm2), 'identity.restore_membership', deact.revision, { member_id: life.member, identity_check: 'in_person' });
     const lifeOk = await summary(await freshAfterEpoch(life));
     check('A22-deactivation-ends-issued-grant', gg.status === 200 && deact.status === 200 && dead.outcome === 'rejected' && back.status === 200 && lifeOk.status === 200,
-      { grant: gg.data?.grant?.state ?? gg.code, deactivate: outcomeOf(deact), redeem: dead.outcome, restore: outcomeOf(back), password_unchanged_sign_in: lifeOk.status });
+      { grant_state: gg.data?.grant?.state ?? gg.code, deactivate: outcomeOf(deact), redeem: dead.outcome, restore: outcomeOf(back), password_unchanged_sign_in: lifeOk.status });
 
     // A13: unlinking ends an issued grant; the account then rejoins the SAME member by an explicit link.
     await reserve(2);
@@ -1237,7 +1249,7 @@ async function main() {
     check('A13-unlink-ends-grant-and-explicit-relink-keeps-member', gh.status === 200 && unl.status === 200 && unlinked.outcome === 'rejected'
       && Boolean(r2tok) && reapply.status === 200 && rc?.link_eligible === true && relink.status === 200
       && r2back.status === 200 && r2back.json?.member_id === rec2.member,
-      { grant: gh.data?.grant?.state ?? gh.code, unlink: outcomeOf(unl), redeem: unlinked.outcome, new_application: reapply.data?.church_status ?? reapply.code,
+      { grant_state: gh.data?.grant?.state ?? gh.code, unlink: outcomeOf(unl), redeem: unlinked.outcome, new_application: reapply.data?.church_status ?? reapply.code,
         candidate_signals: rc?.signals, link: outcomeOf(relink), same_member_id: r2back.json?.member_id === rec2.member });
 
     // A23 / A24: the per-number and per-client limits. A23 floods one number with no account; it

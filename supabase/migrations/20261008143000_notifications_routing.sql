@@ -146,7 +146,7 @@ create table app.notifications_device_tokens (
   account_id uuid not null,
   member_id uuid not null references app.identity_members (member_id),
   platform text not null check (platform in ('android', 'ios')),
-  token text not null check (token ~ '^[A-Za-z0-9_:.-]{20,4096}$'),
+  token text not null check (token ~ '^[A-Za-z0-9_:.-]+$' and length(token) between 20 and 4096),
   revision bigint not null default 1 check (revision >= 1),
   registered_at timestamptz not null default clock_timestamp(),
   refreshed_at timestamptz not null default clock_timestamp(),
@@ -686,7 +686,8 @@ declare
 begin
   v_errors := jsonb_strip_nulls(jsonb_build_object(
       'token', case when jsonb_typeof(p_payload -> 'token') is distinct from 'string' then 'required'
-                    when (p_payload ->> 'token') ~ '^[A-Za-z0-9_:.-]{20,4096}$' then null
+                    when (p_payload ->> 'token') ~ '^[A-Za-z0-9_:.-]+$'
+                         and length(p_payload ->> 'token') between 20 and 4096 then null
                     else 'invalid' end,
       'platform', case when jsonb_typeof(p_payload -> 'platform') is distinct from 'string' then 'required'
                        when (p_payload ->> 'platform') in ('android', 'ios') then null

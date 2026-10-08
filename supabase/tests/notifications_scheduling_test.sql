@@ -429,9 +429,9 @@ select is((select count(*)::int from app.notifications_jobs
 -- Snooze (owner operation) ---------------------------------------------------------------------
 -- Story 3.5: only an active linked account gets inbox items, so member 1 gets an account.
 insert into auth.users (id, aud, role, phone, phone_confirmed_at)
-values ('00000000-0000-4000-a000-000000033001', 'authenticated', 'authenticated', '447700900891', now());
+values ('00000000-0000-4000-a000-000000033001', 'authenticated', 'authenticated', '447700900889', now());
 insert into app.identity_account_links (member_id, auth_user_id, approved_phone, approved_by)
-values ((select member_id from m where n = 1), '00000000-0000-4000-a000-000000033001', '+447700900891', 'pgtap 3.3');
+values ((select member_id from m where n = 1), '00000000-0000-4000-a000-000000033001', '+447700900889', 'pgtap 3.3');
 select is((app.notifications_sys_deliver_due(gen_random_uuid(), gen_random_uuid(), '{}') -> 'data' ->> 'delivered')::int >= 1,
   true, 'the due respond-now reminder is delivered to the inbox');
 create temp table it as

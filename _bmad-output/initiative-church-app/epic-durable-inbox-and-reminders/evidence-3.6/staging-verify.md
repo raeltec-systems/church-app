@@ -21,3 +21,8 @@ No rows file.
 Pending (owner): the worker credential and Edge secrets (3.4), then the Firebase project, the
 `NOTIFICATIONS_FCM_SERVICE_ACCOUNT` secret, APNs, the client adapter follow-up and the real-device
 check (`docs/runbooks/notifications.md`, story 3.6, Hosted staging steps 3 to 8).
+
+## Push live on staging (2026-10-09)
+
+- Owner: Firebase project `kbicc-church-app`, Android app, service account `bic-push-sender`, Edge secret `NOTIFICATIONS_FCM_SERVICE_ACCOUNT`; the push-enabled APK (adapter merged 2026-10-08) registered one Android device for the synthetic member.
+- `push_enabled` switched on. FCM first answered 403 PERMISSION_DENIED with only the role "Firebase Cloud Messaging Admin"; after adding "Firebase Cloud Messaging API Admin", the 05:25 UTC run answered `sent: {accepted: 4}`, `outcomes: {accepted: 4}` (provider acceptance, not delivery). The worker now reports `stop_detail` (provider status/code and the sender identity) when sending stops on configuration.

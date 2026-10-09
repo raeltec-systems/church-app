@@ -175,6 +175,12 @@ Deno.serve(async (req: Request) => {
     } catch {
       push = { state: 'unavailable' };
     }
+    // When sending stopped on our own configuration, name the sender identity (the service
+    // account's project and e-mail: identifiers, not secrets) so the operator can fix it.
+    if (FCM_ACCOUNT && typeof push.stop_detail === 'object' && push.stop_detail !== null) {
+      push.stop_detail = { ...(push.stop_detail as Json), sender_project: FCM_ACCOUNT.projectId,
+        sender_account: FCM_ACCOUNT.clientEmail };
+    }
     note({ outcome: 'ran', ...counts, push });
     return reply(200, { ...counts, push });
   } catch (e) {

@@ -84,7 +84,8 @@ version and browser. Leave out numbers, ids and keys.
     "SYNTHETIC test reminder" and its generic text. Tap it: the app opens that item in the Inbox
     (after sign-in if needed). Then Inbox > **Notification settings**, turn that category off, send
     another: no phone notification, but the Inbox item still appears. If no notification arrives,
-    tell the assistant the time: it reads the provider's answer on staging.
+    first check Settings > Apps > BIC Kafue > Notifications is on (Android blocks silently if the
+    one-time prompt was missed), then tell the assistant the time: it reads the provider's answer.
 
 ## If something looks wrong
 

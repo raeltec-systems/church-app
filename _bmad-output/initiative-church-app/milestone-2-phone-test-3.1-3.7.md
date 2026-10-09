@@ -7,17 +7,16 @@ version and browser. Leave out numbers, ids and keys.
 
 ## What you need
 
-- **Phone:** `church-app-push-staging-arm64.apk` (3.7 plus Firebase push) (from this session). Install it over the old test
-  app. Android may ask you to allow installing from this source.
+- **Phone:** `church-app-push-staging-arm64.apk` (3.7 plus Firebase push) (from this session). Install it over the old test app. Android may ask you to allow installing from this source.
 - **Staff web:** `staff-web-3.7-staging.zip`. Unzip it and serve it the same way as the 2.14 package
   (unzipped folder, then in it: `python3 -m http.server 8767`, and open http://localhost:8767).
 - **Accounts:** your existing synthetic accounts.
   - **A** = `+1 202 555 0152` (SYNTHETIC Church Member), on the phone AND on the web.
-  - **B** = `+1 202 555 0151` (SYNTHETIC Owner Demo), used only in step 9.
+  - **B** = `+1 202 555 0151` (SYNTHETIC Owner Demo), used only in step 11.
   - Use the passwords you set during the identity test. If you have forgotten one, ask the
     assistant for a staff-assisted reset.
 - **Nothing to set up on staging:** the reminder worker runs every minute by itself (set up today).
-  Push to the phone is ON for staging (Firebase project `kbicc-church-app`). Allow notifications
+  Phone notifications are ON for staging (Firebase project `kbicc-church-app`). Allow notifications
   when the app asks after sign-in.
 
 ## Steps
@@ -76,16 +75,15 @@ version and browser. Leave out numbers, ids and keys.
     reminders to an active, a held, a deactivated and an accountless synthetic member. Only the
     active one gets an Inbox item; the other three appear on the "needs direct contact" list it
     shows you.
-13. **Clean up.** Tell the assistant "inbox test done": it removes the test reminders of A and B on
-    staging.
-
-14. **Phone notification (3.6).** With notifications allowed: Fixture > **Send me a test reminder**,
+13. **Phone notification (3.6).** With notifications allowed: Fixture > **Send me a test reminder**,
     then close the app (swipe it away). Within about a minute a phone notification shows only
     "SYNTHETIC test reminder" and its generic text. Tap it: the app opens that item in the Inbox
     (after sign-in if needed). Then Inbox > **Notification settings**, turn that category off, send
     another: no phone notification, but the Inbox item still appears. If no notification arrives,
     first check Settings > Apps > BIC Kafue > Notifications is on (Android blocks silently if the
     one-time prompt was missed), then tell the assistant the time: it reads the provider's answer.
+14. **Clean up.** Tell the assistant "inbox test done": it removes the test reminders of A and B on
+    staging.
 
 ## If something looks wrong
 

@@ -1,0 +1,20 @@
+$ bash supabase/tests/identity_api_smoke.sh     (LOCAL, CLI default config: phone off; 2026-10-06, after the review fixes)
+ok   - linked synthetic member reads own summary (200)
+ok   - summary is the caller's own record
+ok   - unlinked account is forbidden (403)
+ok   - unlinked denial is generic (forbidden/not_linked)
+ok   - signed-out client is refused (401)
+ok   - direct query of the app schema is refused (not exposed) (406)
+ok   - no api relation named identity_members (404)
+ok   - no api relation named identity_account_links (404)
+ok   - no api relation named identity_holds (404)
+ok   - revoked session's unexpired JWT is refused (401)
+ok   - revoked session reason
+ok   - revoked session cannot refresh (400)
+ok   - a refreshed password session keeps access (200)
+ok   - magiclink session (otp AMR) is denied (401 untrusted_session)
+ok   - recovery session (otp AMR) is denied (401 untrusted_session)
+ok   - a direct Auth email change puts the account in review (403 review_required)
+ok   - a fresh sign-in with the changed email is still in review
+ok   - the change is recorded by kind (link_review_required,email)
+ok   - no SMS provider configured

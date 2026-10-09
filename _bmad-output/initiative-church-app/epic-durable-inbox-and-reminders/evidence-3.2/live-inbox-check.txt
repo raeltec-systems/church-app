@@ -1,0 +1,10 @@
+PASS L2 synthetic source command (command gateway): CommandConfirmed
+PASS L3 worker run through the system route: exit 0
+PASS L4 mobile client shows the one item: fixture_due
+PASS L5 staff web client shows the same single item: fixture_due
+PASS L6 member B sees nothing: 
+PASS L7 a signed-out client sees nothing: denied:signedOut
+PASS L9 staff web opens the item: current, with its target: current:target
+PASS L10 member B opening it learns nothing: notFound
+PASS L8 signing out on staff web drops access there: denied:signedOut
+synthetic users left: 0

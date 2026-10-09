@@ -1,0 +1,6 @@
+{
+  "name": "@church-app/contracts",
+  "private": true,
+  "type": "module",
+  "description": "Wire contract v1 TypeScript mapping; tested against ../fixtures/v1."
+}

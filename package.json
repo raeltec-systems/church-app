@@ -1,13 +1,20 @@
 {
   "name": "church-app",
   "private": true,
-  "description": "BIC Kafue church app monorepo tooling (Supabase CLI pin and database scripts).",
+  "description": "BIC Kafue church app monorepo tooling (Supabase CLI pin, database scripts and shared contract checks).",
   "scripts": {
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
-    "db:smoke": "bash supabase/tests/api_smoke.sh"
+    "db:smoke": "bash supabase/tests/api_smoke.sh && bash supabase/tests/command_api_smoke.sh && bash supabase/tests/contract_fixtures_check.sh && bash supabase/tests/system_api_smoke.sh && bash supabase/tests/identity_api_smoke.sh",
+    "contracts:test": "node --test packages/contracts/ts/contracts.test.ts",
+    "env:check": "node tools/env/environments.mjs check",
+    "ci:policy-test": "node --test tools/env/*.test.mjs tools/ci/*.test.mjs tools/ops/*.test.mjs tools/recovery/*.test.mjs",
+    "recovery:rehearse": "node tools/recovery/rehearse.mjs all",
+    "ci:migrations": "node tools/ci/check-migrations.mjs",
+    "ci:secrets": "node tools/ci/scan-secrets.mjs",
+    "ci:drift:staging": "node tools/ci/check-migration-drift.mjs --env staging"
   },
   "devDependencies": {
     "supabase": "2.119.0"

@@ -1,0 +1,14 @@
+# Owner decisions for the milestone 2 build run (Q2)
+
+Recorded 2026-10-08 from Israel Muyoba's answers. They resolve spec decision **Q2** for milestone 2 (durable inbox and reminders, duties and follow-ups, cell meetings and programmes) and replace the Q2 proposals in `spec-church-app/delivery-and-decisions.md` where they differ. The milestone 1 constraints still hold: synthetic data only off production, no SMS, production gated.
+
+| Area | Decision | Notes for the build |
+|------|----------|---------------------|
+| **Time zone** | `Africa/Lusaka` (IANA). | The church's single zone for schedules, deadlines and reminder times. Stored instants stay UTC; local dates/times are computed in this zone. |
+| **Pilot cells** | **Shikoswe Cell** and **Estates C5/C7 Cell** (C5/C7 is one cell, not two). | Real names are production configuration only. Staging and tests use synthetic stand-ins (`SYNTHETIC Shikoswe Cell`, `SYNTHETIC Estates C5/C7 Cell`). |
+| **Pilot department** | Not chosen yet. | Use a synthetic stand-in (`SYNTHETIC Preaching Rota`); the owner names the real one before the pilot. |
+| **Response deadlines** | Set per duty/rota by the person creating it, with defaults that depend on lead time. Long-standing assignments (e.g. the preaching rota, created and assigned at the start of each quarter) get a deadline **2 weeks to 1 month before** the duty. Short-notice assignments (e.g. assigned during the week for the coming Sunday) get **48 to 24 hours before**. | Agent interpretation (adjustable, owner may refine): the creator may set any deadline before the duty start. Default when not set: if the duty starts 30 days or more after assignment, 14 days before start; if it starts 2 to 30 days after assignment, 48 hours before start; if it starts within 48 hours, 24 hours before start, or immediately due if that has passed. Never later than the duty start. |
+| **Reminders** | **Configurable by the person setting the task** (which reminders, how long before). The **assigned member can snooze** a reminder: remind me in 2 days, 24 hours, 1 hour, and similar. | The creator's reminder offsets are stored per duty/task. Snooze is a per-recipient, per-reminder deferral; it never changes the duty, its deadline or anyone else's reminders, and a snoozed reminder still stops once the member responds or the duty is cancelled. Default offsets when the creator sets none: at the deadline and 24 hours before it (Q2 proposal). |
+| **Quiet hours** | **None.** This is a community app and is not meant to spam people. | Reminders are sent when due, at any hour. The no-spam intent is met by sending only what the creator configured and the member's own snoozes, deduplicating, and stopping reminders once the member has answered. |
+
+Still open under Q2: leaders and deputies for the pilot cells and department (named at the pilot; staging uses synthetic members).

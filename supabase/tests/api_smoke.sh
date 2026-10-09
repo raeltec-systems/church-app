@@ -4,9 +4,8 @@
 # Usage: npm run db:smoke   (expects `npm run db:start` to have run)
 set -euo pipefail
 
-eval "$(npx supabase status -o env 2>/dev/null | grep -E '^(API_URL|PUBLISHABLE_KEY)=')"
-: "${API_URL:?supabase status did not report API_URL}"
-: "${PUBLISHABLE_KEY:?supabase status did not report PUBLISHABLE_KEY}"
+source "$(dirname "${BASH_SOURCE[0]}")/lib/local_stack.sh"
+require_local_stack API_URL PUBLISHABLE_KEY
 REST="$API_URL/rest/v1/platform_status"
 fail=0
 

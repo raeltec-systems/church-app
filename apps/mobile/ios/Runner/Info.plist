@@ -49,6 +49,10 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -65,6 +69,22 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<!-- Story 2.7: Auth email links return through the app's own scheme
+	     (zm.bickafue.mobile://callback/auth/...); the router accepts only the
+	     recovery and email-confirmed paths. -->
+	<key>FlutterDeepLinkingEnabled</key>
+	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>zm.bickafue.mobile.auth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>zm.bickafue.mobile</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

@@ -1,0 +1,247 @@
+[
+  {
+    "scenario": "drive",
+    "journal_dir": "evidence-1.10/drive-readback",
+    "verdict": "complete",
+    "outcome": "reconciled",
+    "isolation": {
+      "networks": [
+        "none"
+      ],
+      "published_ports": {}
+    },
+    "restored": {
+      "state": "restored_held",
+      "subject_access_revoked": false,
+      "object_present": true,
+      "gates_if_approved": {
+        "private_access_if_approved": false,
+        "outbound_sending_if_approved": false
+      }
+    },
+    "after": {
+      "state": "reconciled",
+      "last_refusal": null,
+      "subject_access_revoked": true,
+      "object_present": false,
+      "gates_if_approved": {
+        "private_access_if_approved": true,
+        "outbound_sending_if_approved": true
+      },
+      "gates_unapproved": {
+        "private_access": false,
+        "outbound_sending": false
+      }
+    }
+  },
+  {
+    "scenario": "absent",
+    "journal_dir": ".recovery-state/scenarios/absent",
+    "verdict": "journal_absent",
+    "outcome": "held",
+    "isolation": {
+      "networks": [
+        "none"
+      ],
+      "published_ports": {}
+    },
+    "restored": {
+      "state": "restored_held",
+      "subject_access_revoked": false,
+      "object_present": true,
+      "gates_if_approved": {
+        "private_access_if_approved": false,
+        "outbound_sending_if_approved": false
+      }
+    },
+    "after": {
+      "state": "restored_held",
+      "last_refusal": "journal_absent",
+      "subject_access_revoked": false,
+      "object_present": true,
+      "gates_if_approved": {
+        "private_access_if_approved": false,
+        "outbound_sending_if_approved": false
+      },
+      "gates_unapproved": {
+        "private_access": false,
+        "outbound_sending": false
+      }
+    }
+  },
+  {
+    "scenario": "gap",
+    "journal_dir": ".recovery-state/scenarios/gap",
+    "verdict": "journal_gap",
+    "outcome": "held",
+    "isolation": {
+      "networks": [
+        "none"
+      ],
+      "published_ports": {}
+    },
+    "restored": {
+      "state": "restored_held",
+      "subject_access_revoked": false,
+      "object_present": true,
+      "gates_if_approved": {
+        "private_access_if_approved": false,
+        "outbound_sending_if_approved": false
+      }
+    },
+    "after": {
+      "state": "restored_held",
+      "last_refusal": "journal_gap",
+      "subject_access_revoked": false,
+      "object_present": true,
+      "gates_if_approved": {
+        "private_access_if_approved": false,
+        "outbound_sending_if_approved": false
+      },
+      "gates_unapproved": {
+        "private_access": false,
+        "outbound_sending": false
+      }
+    }
+  },
+  {
+    "scenario": "tampered",
+    "journal_dir": ".recovery-state/scenarios/tampered",
+    "verdict": "journal_chain_broken",
+    "outcome": "held",
+    "isolation": {
+      "networks": [
+        "none"
+      ],
+      "published_ports": {}
+    },
+    "restored": {
+      "state": "restored_held",
+      "subject_access_revoked": false,
+      "object_present": true,
+      "gates_if_approved": {
+        "private_access_if_approved": false,
+        "outbound_sending_if_approved": false
+      }
+    },
+    "after": {
+      "state": "restored_held",
+      "last_refusal": "journal_chain_broken",
+      "subject_access_revoked": false,
+      "object_present": true,
+      "gates_if_approved": {
+        "private_access_if_approved": false,
+        "outbound_sending_if_approved": false
+      },
+      "gates_unapproved": {
+        "private_access": false,
+        "outbound_sending": false
+      }
+    }
+  },
+  {
+    "scenario": "unsealed",
+    "journal_dir": ".recovery-state/scenarios/unsealed",
+    "verdict": "journal_unsealed",
+    "outcome": "held",
+    "isolation": {
+      "networks": [
+        "none"
+      ],
+      "published_ports": {}
+    },
+    "restored": {
+      "state": "restored_held",
+      "subject_access_revoked": false,
+      "object_present": true,
+      "gates_if_approved": {
+        "private_access_if_approved": false,
+        "outbound_sending_if_approved": false
+      }
+    },
+    "after": {
+      "state": "restored_held",
+      "last_refusal": "journal_unsealed",
+      "subject_access_revoked": false,
+      "object_present": true,
+      "gates_if_approved": {
+        "private_access_if_approved": false,
+        "outbound_sending_if_approved": false
+      },
+      "gates_unapproved": {
+        "private_access": false,
+        "outbound_sending": false
+      }
+    }
+  },
+  {
+    "scenario": "early_seal",
+    "journal_dir": ".recovery-state/scenarios/early_seal",
+    "verdict": "journal_seal_before_cutoff",
+    "outcome": "held",
+    "isolation": {
+      "networks": [
+        "none"
+      ],
+      "published_ports": {}
+    },
+    "restored": {
+      "state": "restored_held",
+      "subject_access_revoked": false,
+      "object_present": true,
+      "gates_if_approved": {
+        "private_access_if_approved": false,
+        "outbound_sending_if_approved": false
+      }
+    },
+    "after": {
+      "state": "restored_held",
+      "last_refusal": "journal_seal_before_cutoff",
+      "subject_access_revoked": false,
+      "object_present": true,
+      "gates_if_approved": {
+        "private_access_if_approved": false,
+        "outbound_sending_if_approved": false
+      },
+      "gates_unapproved": {
+        "private_access": false,
+        "outbound_sending": false
+      }
+    }
+  },
+  {
+    "scenario": "complete",
+    "journal_dir": ".recovery-state/journal",
+    "verdict": "complete",
+    "outcome": "reconciled",
+    "isolation": {
+      "networks": [
+        "none"
+      ],
+      "published_ports": {}
+    },
+    "restored": {
+      "state": "restored_held",
+      "subject_access_revoked": false,
+      "object_present": true,
+      "gates_if_approved": {
+        "private_access_if_approved": false,
+        "outbound_sending_if_approved": false
+      }
+    },
+    "after": {
+      "state": "reconciled",
+      "last_refusal": null,
+      "subject_access_revoked": true,
+      "object_present": false,
+      "gates_if_approved": {
+        "private_access_if_approved": true,
+        "outbound_sending_if_approved": true
+      },
+      "gates_unapproved": {
+        "private_access": false,
+        "outbound_sending": false
+      }
+    }
+  }
+]

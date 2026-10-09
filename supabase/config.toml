@@ -161,7 +161,17 @@ site_url = "http://127.0.0.1:3000"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+#
+# Story 2.7: the clients' allowlisted Auth email link targets. Mobile uses the app's own URL
+# scheme (PKCE: a link opened by another app is useless without the verifier this app holds);
+# staff web uses its own origin, which needs no entry while it equals site_url's host.
+# Staging/production get the same entries through the owner's Management API PATCH
+# (docs/runbooks/identity-access.md, "Recovery email and forgotten password").
+additional_redirect_urls = [
+  "https://127.0.0.1:3000",
+  "zm.bickafue.mobile://callback/auth/recovery",
+  "zm.bickafue.mobile://callback/auth/email-confirmed",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
@@ -385,6 +395,28 @@ deno_version = 2
 
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
+
+# Story 2.9: staff-assisted recovery. A member in recovery has no session, so the single-use
+# grant authenticates the call (not the gateway JWT check). Its system credential is the Edge
+# Function secret IDENTITY_RECOVERY_SYSTEM_CREDENTIAL (never in the repo); see
+# docs/runbooks/identity-access.md.
+[functions.identity-assisted-recovery]
+enabled = true
+verify_jwt = false
+
+# Story 2.11: the Auth Admin step of a member deletion. The caller is the deletion worker, which
+# authenticates with its own system credential (forwarded to the system route), not a JWT.
+[functions.identity-deletion]
+enabled = true
+verify_jwt = false
+
+# Story 3.4: the Cron-triggered notification worker. The scheduler tick (pg_cron + pg_net) posts
+# only a trigger token from Supabase Vault (no JWT); the function holds the worker's system
+# credential as its Edge secret NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL (never in the repo or the
+# database) plus NOTIFICATIONS_WORKER_TRIGGER; see docs/runbooks/notifications.md.
+[functions.notifications-worker]
+enabled = true
+verify_jwt = false
 
 [analytics]
 enabled = true

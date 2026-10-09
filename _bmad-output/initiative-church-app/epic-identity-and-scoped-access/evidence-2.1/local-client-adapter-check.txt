@@ -1,0 +1,16 @@
+# LOCAL (2026-10-06): packages/client_core/tool/live_identity_check.dart drives the real
+# SupabaseAccountAuthGateway + SupabaseMemberAccessRepository (the adapters both apps use)
+# against the local stack with tools/auth-harness/local-phone-auth.mjs on (no SMS provider).
+# Synthetic +44 7700 900181 (Ofcom drama range). Output copied verbatim; no tokens printed.
+## 1. sign up (no link yet), expect not_linked
+signup: session (amr=password)
+read: denied notLinked
+read after sign-out: signedOut
+PASS
+## (restricted operator) select app.identity_seed_synthetic_link(<user id>, 'SYNTHETIC Live Check Member', 'live-identity-check')
+## 2. sign in again from a fresh client (new device), expect granted without re-approval
+signin: session (amr=password)
+read: granted SYNTHETIC Live Check Member +447700900181
+read after sign-out: signedOut
+PASS
+## cleanup: identity rows and the synthetic Auth user deleted; 0 auth.users, 0 identity_members left

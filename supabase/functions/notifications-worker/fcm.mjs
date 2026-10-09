@@ -24,9 +24,11 @@ const CODE_RE = /^[A-Z][A-Z0-9_]{0,39}$/;
 
 /** Thrown when the provider cannot be used at all (OAuth refused or unreachable). */
 export class ProviderUnavailable extends Error {
-  constructor(code) {
+  /** detail: {provider_status?, provider_code?} from the provider's answer (no token, no text). */
+  constructor(code, detail = null) {
     super(code);
     this.code = code;
+    this.detail = detail;
   }
 }
 
@@ -208,7 +210,8 @@ export function createFcmSender({ account, endpoints, fetch, now = () => Date.no
     }
     const json = await res.json().catch(() => null);
     if (!res.ok || typeof json?.access_token !== 'string' || json.access_token === '') {
-      throw new ProviderUnavailable('oauth_refused');
+      const err = typeof json?.error === 'string' && /^[a-z_]{1,40}$/.test(json.error) ? json.error.toUpperCase() : null;
+      throw new ProviderUnavailable('oauth_refused', { provider_status: res.status, provider_code: err });
     }
     const seconds = Number.isFinite(json.expires_in) ? Math.min(Math.max(json.expires_in, 60), 3600) : 3000;
     cached = { value: json.access_token, expiresAtMs: now() + seconds * 1000 };
@@ -231,7 +234,7 @@ export function createFcmSender({ account, endpoints, fetch, now = () => Date.no
       const c = classifyFcm(res.status, json);
       if (c.fatal) {
         if (c.fatal === 'provider_auth') cached = null;
-        throw new ProviderUnavailable(c.fatal);
+        throw new ProviderUnavailable(c.fatal, { provider_status: res.status, provider_code: c.code });
       }
       const answer = { result: c.result, provider_status: res.status, stop: c.stop };
       if (c.code) answer.provider_code = c.code;

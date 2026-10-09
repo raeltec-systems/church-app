@@ -260,6 +260,7 @@ export async function runPush({ system, sender, limit, now = () => Date.now(), d
   let deferred = 0;
   let outage = 0;
   let stopped = null;
+  let stopDetail = null;
   const count = (bag, key) => { bag[key] = (bag[key] ?? 0) + 1; };
   const release = async (job) => {
     deferred += 1;
@@ -302,6 +303,16 @@ export async function runPush({ system, sender, limit, now = () => Date.now(), d
         answer = await sender.send(target, parsed.message);
       } catch (e) {
         stopped = typeof e?.code === 'string' && STOP_CODE_RE.test(e.code) ? e.code : 'provider_unavailable';
+        const d = e?.detail;
+        if (d && typeof d === 'object') {
+          stopDetail = {};
+          if (Number.isInteger(d.provider_status) && d.provider_status >= 100 && d.provider_status <= 599) {
+            stopDetail.provider_status = d.provider_status;
+          }
+          if (typeof d.provider_code === 'string' && PROVIDER_CODE_RE.test(d.provider_code)) {
+            stopDetail.provider_code = d.provider_code;
+          }
+        }
         break;
       }
       const r = deviceResult(target, answer);
@@ -329,5 +340,6 @@ export async function runPush({ system, sender, limit, now = () => Date.now(), d
     }
   }
   return { claimed: claim.claimed, reclaimed: claim.reclaimed, expired: claim.expired, enabled: claim.push_enabled,
-    outcomes, sent, uncertain, deferred, ...(stopped ? { stopped } : {}) };
+    outcomes, sent, uncertain, deferred, ...(stopped ? { stopped } : {}),
+    ...(stopDetail ? { stop_detail: stopDetail } : {}) };
 }

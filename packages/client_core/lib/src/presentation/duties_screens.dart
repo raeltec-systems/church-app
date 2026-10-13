@@ -97,12 +97,24 @@ abstract final class DutyPaths {
       'Your answer was not recorded: this duty is no longer assigned to you. '
           'Your current duties are listed here.',
     ),
+    DutyNotice.superseded when changed.isEmpty => (
+      StatusTone.warning,
+      'This duty changed',
+      'Your answer was not recorded: this duty changed since you opened it. '
+          'The current version is shown; please answer it again.',
+    ),
     DutyNotice.superseded => (
       StatusTone.warning,
       'This duty changed',
       'Your answer was not recorded: the ${DutyFields.describe(changed)} '
           'changed since you opened it. The current version is shown; please '
           'answer it again.',
+    ),
+    DutyNotice.dutyStarted => (
+      StatusTone.neutral,
+      'Already started',
+      'This duty has started, so it can no longer be changed. Nothing was '
+          'changed.',
     ),
     DutyNotice.dutyCancelled => (
       StatusTone.neutral,
@@ -1149,6 +1161,8 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
       'not_material' =>
         'Only needed when the duty, time, place or person '
             'changes',
+      'required_reassign' =>
+        'The current person can no longer serve: choose who takes this duty',
       _ => 'Check this',
     };
     Widget field(
@@ -1686,16 +1700,19 @@ class _OneDuty extends StatelessWidget {
     }
     if (duty.assignmentId != assignmentId) {
       // Story 4.2: an old reminder or link for an earlier version.
+      final needs = duty.needsResponse(DateTime.now());
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const RequestStateBanner(
-            key: Key('duty-was-changed'),
+          RequestStateBanner(
+            key: const Key('duty-was-changed'),
             tone: StatusTone.info,
             title: 'This duty changed',
-            message:
-                'It changed since that message. This is the current version; '
-                'your answer is needed for it.',
+            message: needs
+                ? 'It changed since that message. This is the current '
+                      'version; your answer is needed for it.'
+                : 'It changed since that message. This is the current '
+                      'version.',
           ),
           const SizedBox(height: 12),
           _DutyCard(duty: duty, busy: busy, full: true),
@@ -1778,7 +1795,7 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
                 Text('What changed: ${DutyFields.describe(c)}.'),
               ],
             ),
-            if (a.previousResponse case final p?)
+            if (a.previousResponse case final p? when p != DutyResponse.pending)
               _muted(
                 context,
                 'Your earlier answer was "${_responseLabel(p).$1}". '

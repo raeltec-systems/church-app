@@ -190,6 +190,46 @@ create trigger duties_slot_revisions_immutable
   before update on app.duties_slot_revisions
   for each row execute function app.duties_slot_revision_guard();
 
+-- An ended (superseded or cancelled) assignment is history: it is never changed again, except
+-- that member deletion replaces person ids with the nil UUID and clears the note.
+create function app.duties_assignment_history_guard()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_nil constant uuid := '00000000-0000-0000-0000-000000000000';
+begin
+  if old.assignment_state = 'current' then
+    return new;
+  end if;
+  if (new.assignment_id, new.slot_id, new.assignment_state, new.response, new.response_deadline,
+      new.responded_at, new.response_provenance, new.revision, new.assigned_at,
+      new.slot_revision, new.supersedes_assignment_id, new.ended_at, new.end_reason)
+     is distinct from
+     (old.assignment_id, old.slot_id, old.assignment_state, old.response, old.response_deadline,
+      old.responded_at, old.response_provenance, old.revision, old.assigned_at,
+      old.slot_revision, old.supersedes_assignment_id, old.ended_at, old.end_reason)
+     or (new.member_id is distinct from old.member_id and new.member_id is distinct from v_nil)
+     or (new.responded_by_member is distinct from old.responded_by_member
+         and new.responded_by_member is distinct from v_nil)
+     or (new.responded_by_account is distinct from old.responded_by_account
+         and new.responded_by_account is distinct from v_nil)
+     or (new.assigned_by_member is distinct from old.assigned_by_member
+         and new.assigned_by_member is distinct from v_nil)
+     or (new.assigned_by_account is distinct from old.assigned_by_account
+         and new.assigned_by_account is distinct from v_nil)
+     or (new.response_note is distinct from old.response_note and new.response_note is not null) then
+    raise exception using errcode = 'P0001', message = 'ended duties assignments are immutable';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger duties_assignments_history_immutable
+  before update on app.duties_assignments
+  for each row execute function app.duties_assignment_history_guard();
+
 -- Revision 1 (`published`) for every slot published before this story.
 insert into app.duties_slot_revisions (slot_id, slot_revision, occurrence_id, occurrence_revision,
                                        change_class, changed_fields, duty_name, starts_at, ends_at,
@@ -235,7 +275,9 @@ as $$
    where r.slot_id = p_slot_id and r.slot_revision > p_after and r.change_class = 'notes';
 $$;
 
--- The earlier assignments of the same member that this one replaced, newest first (at most 50).
+-- The member's own earlier assignments of this position that this one (directly or through
+-- other members' assignments, A -> B -> A) replaced, newest first; the chain is followed at most
+-- 50 steps. Other members' assignment ids are never listed.
 create function app.duties_previous_assignment_ids(p_assignment_id uuid)
 returns jsonb
 language sql
@@ -248,9 +290,23 @@ as $$
     union all
     select p.assignment_id, p.member_id, p.supersedes_assignment_id, c.depth + 1
       from chain c join app.duties_assignments p on p.assignment_id = c.supersedes
-     where p.member_id = c.member_id and c.depth < 50)
+     where c.depth < 50)
   select coalesce(jsonb_agg(to_jsonb(c.assignment_id) order by c.depth), '[]'::jsonb)
-    from chain c where c.depth > 0;
+    from chain c
+   where c.depth > 0
+     and c.member_id = (select a.member_id from app.duties_assignments a
+                         where a.assignment_id = p_assignment_id);
+$$;
+
+-- Can Notifications address this member? (Not the nil UUID of an erased member.)
+create function app.duties_notice_recipient(p_member_id uuid)
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select p_member_id is not null
+     and exists (select 1 from app.identity_members m where m.member_id = p_member_id);
 $$;
 
 -- The changed fields as command field errors: {"<field>": "changed", ...}.
@@ -554,6 +610,10 @@ declare
   v_job jsonb;
   v_queued boolean := false;
   v_request uuid := app.cmd_current_request_id(p_actor, 'duties.revise_duty');
+  v_in_department boolean;
+  v_kind text;
+  v_cancelled integer;
+  v_k text;
 begin
   select a.* into v_actor from app.duties_command_actor(p_actor) a;
   v_errors := app.contract_unknown_keys(p_payload,
@@ -698,11 +758,17 @@ begin
     perform 1 from app.duties_department_members dm
      where dm.department_id = v_department and dm.member_id = v_member and dm.ended_at is null
        for share;
-    if not found then
-      perform app.cmd_fail('validation_failed', '{"member_id": "not_in_department"}');
-    end if;
-    if not app.duties_member_active(v_member) then
-      perform app.cmd_fail('validation_failed', '{"member_id": "unknown"}');
+    v_in_department := found;
+    if not (v_in_department and app.duties_member_active(v_member)) then
+      if not p_payload ? 'member_id' then
+        -- The kept assignee was erased, left the department or is under deletion: a material
+        -- change would ask someone who cannot answer, so it needs a new assignee (fail closed).
+        perform app.cmd_fail('validation_failed', '{"member_id": "required_reassign"}');
+      elsif not v_in_department then
+        perform app.cmd_fail('validation_failed', '{"member_id": "not_in_department"}');
+      else
+        perform app.cmd_fail('validation_failed', '{"member_id": "unknown"}');
+      end if;
     end if;
   end if;
 
@@ -763,30 +829,41 @@ begin
       perform app.notifications_cancel(jsonb_build_object(
         'source_type', 'duties_assignment', 'source_id', v_old.assignment_id,
         'reason', 'source_revised'));
-      v_job := app.notifications_enqueue(jsonb_build_object(
-        'source_type', 'duties_assignment', 'source_id', v_current, 'source_revision', 1,
-        'recipient_member_id', v_current_member,
-        'reminder_kind', case when v_current_member = v_old.member_id then 'duty_changed'
-                              else 'duty_assigned' end,
-        'scheduled_at', app.cmd_utc(now())));
-      v_queued := coalesce((v_job ->> 'created')::boolean, false);
+      if app.duties_notice_recipient(v_current_member) then
+        v_job := app.notifications_enqueue(jsonb_build_object(
+          'source_type', 'duties_assignment', 'source_id', v_current, 'source_revision', 1,
+          'recipient_member_id', v_current_member,
+          'reminder_kind', case when v_current_member = v_old.member_id then 'duty_changed'
+                                else 'duty_assigned' end,
+          'scheduled_at', app.cmd_utc(now())));
+        v_queued := coalesce((v_job ->> 'created')::boolean, false);
+      end if;
       if v_current_member is distinct from v_old.member_id
-         and exists (select 1 from app.identity_members m where m.member_id = v_old.member_id) then
+         and app.duties_notice_recipient(v_old.member_id) then
         perform app.notifications_enqueue(jsonb_build_object(
           'source_type', 'duties_assignment', 'source_id', v_old.assignment_id,
           'source_revision', v_old_revision, 'recipient_member_id', v_old.member_id,
           'reminder_kind', 'duty_released', 'scheduled_at', app.cmd_utc(now())));
       end if;
-    elsif v_current is not null and v_response in ('pending', 'accepted') then
-      -- One pending update notice per assignment: an earlier one not yet sent is replaced. The
-      -- clock time keeps the new job's logical key distinct from the replaced one.
-      perform app.notifications_cancel(jsonb_build_object(
-        'source_type', 'duties_assignment', 'source_id', v_current, 'reason', 'replaced',
-        'reminder_kind', 'duty_updated'));
+    elsif v_current is not null and v_response in ('pending', 'accepted')
+          and app.duties_notice_recipient(v_current_member) then
+      -- One notice per assignment: any notice of it not yet sent (new duty, change or update) is
+      -- replaced by one of the most telling kind (a new duty stays a new duty). The clock time
+      -- keeps the new job's logical key distinct from the replaced one.
+      v_kind := null;
+      foreach v_k in array array['duty_assigned', 'duty_changed', 'duty_updated'] loop
+        v_cancelled := (app.notifications_cancel(jsonb_build_object(
+          'source_type', 'duties_assignment', 'source_id', v_current, 'reason', 'replaced',
+          'reminder_kind', v_k)) ->> 'cancelled')::integer;
+        if v_cancelled > 0 and v_kind is null then
+          v_kind := v_k;
+        end if;
+      end loop;
       v_job := app.notifications_enqueue(jsonb_build_object(
         'source_type', 'duties_assignment', 'source_id', v_current,
         'source_revision', v_current_revision, 'recipient_member_id', v_current_member,
-        'reminder_kind', 'duty_updated', 'scheduled_at', app.cmd_utc(clock_timestamp())));
+        'reminder_kind', coalesce(v_kind, 'duty_updated'),
+        'scheduled_at', app.cmd_utc(clock_timestamp())));
       v_queued := coalesce((v_job ->> 'created')::boolean, false);
     end if;
   end loop;
@@ -947,6 +1024,7 @@ declare
   v_assignment app.duties_assignments;
   v_occurrence app.duties_occurrences;
   v_revision bigint;
+  v_changes text[];
 begin
   select a.* into v_actor from app.duties_command_actor(p_actor) a;
   v_errors := app.contract_unknown_keys(p_payload, array['assignment_id', 'response', 'note']);
@@ -972,13 +1050,19 @@ begin
   end if;
   -- An old revision: refused with what changed from the change that replaced it onwards (the
   -- member saw every notes update while it was current), never the new assignee or their ids.
+  -- When the position is the member's again (A -> B -> A), the assignee did not change for them.
   if v_assignment.assignment_state = 'superseded' then
+    v_changes := app.duties_changes_since(v_assignment.slot_id,
+      coalesce((select n.slot_revision - 1 from app.duties_assignments n
+                 where n.supersedes_assignment_id = v_assignment.assignment_id),
+               v_assignment.slot_revision), null);
+    if exists (select 1 from app.duties_assignments c
+                where c.slot_id = v_assignment.slot_id and c.assignment_state = 'current'
+                  and c.member_id = v_actor.member_id) then
+      v_changes := array_remove(v_changes, 'member_id');
+    end if;
     perform app.cmd_fail('conflict',
-      '{"assignment_id": "superseded"}'::jsonb
-      || app.duties_changes_errors(app.duties_changes_since(v_assignment.slot_id,
-           coalesce((select n.slot_revision - 1 from app.duties_assignments n
-                      where n.supersedes_assignment_id = v_assignment.assignment_id),
-                    v_assignment.slot_revision), null)));
+      '{"assignment_id": "superseded"}'::jsonb || app.duties_changes_errors(v_changes));
   end if;
   if v_assignment.assignment_state <> 'current' then
     perform app.cmd_fail('conflict', '{"assignment_id": "cancelled"}');
@@ -1170,6 +1254,8 @@ revoke all on function
   app.duties_slot_field_class(text),
   app.duties_fields_ok(text[]),
   app.duties_slot_revision_guard(),
+  app.duties_assignment_history_guard(),
+  app.duties_notice_recipient(uuid),
   app.duties_changes_since(uuid, bigint, bigint),
   app.duties_notes_updated_at(uuid, bigint),
   app.duties_previous_assignment_ids(uuid),

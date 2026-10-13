@@ -6,7 +6,7 @@
 -- tools/identity-e2e/duties-revisions.mjs. Every account, phone and name is SYNTHETIC (fictional
 -- range +44 7700 900970-900979).
 begin;
-select plan(83);
+select plan(93);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000042' || lpad(n::text, 2, '0'))::uuid $$;
@@ -383,6 +383,24 @@ select is((select jsonb_array_length(x #> '{duties,0,positions,0,history}')
              from jsonb_array_elements(pg_temp.readj(2, 'select api.duties_leader_board()') -> 'departments') x),
   3, 'the leader sees every earlier revision in the history');
 
+-- Back to M (A -> B -> A): the duty is M's again.
+create temp table back as select pg_temp.revise(2, jsonb_build_object('member_id', pg_temp.mid(4),
+  'response_deadline', pg_temp.at(interval '8 days'))) as r;
+select is(pg_temp.jobs((select (r #>> '{data,assignment_id}')::uuid from back)), 'duty_assigned:pending:-',
+  'giving it back to M is a new duty for M');
+select is(pg_temp.duties(4, 'duties.respond', 3, jsonb_build_object('assignment_id', (select id from m_last),
+            'response', 'accepted')) -> 'field_errors',
+  '{"assignment_id": "superseded"}'::jsonb,
+  'a late answer to M''s old version no longer says the assignee changed (it is M''s again)');
+select ok((select (x -> 'previous_assignment_ids') @> jsonb_build_array((select id from m_last), pg_temp.asg1())
+             from jsonb_array_elements(pg_temp.readj(4, 'select api.duties_my_duties()') -> 'assignments') x
+            where x ->> 'duty_name' = 'Sunday preaching'),
+  'M''s old links (before O) find the current version through the position''s chain');
+select ok(not (select (x -> 'previous_assignment_ids') @> jsonb_build_array((r #>> '{data,assignment_id}'))
+                 from re, jsonb_array_elements(pg_temp.readj(4, 'select api.duties_my_duties()') -> 'assignments') x
+                where x ->> 'duty_name' = 'Sunday preaching'),
+  'but never O''s assignment id');
+
 -- Cancelled assignments are refused too (the cancelling command arrives with 4.3).
 create temp table pub2 as select pg_temp.duties(2, 'duties.publish_duty', null,
   pg_temp.duty(pg_temp.d(), 4, '{"duty_name": "Reading"}')) as r;
@@ -391,9 +409,13 @@ update app.duties_assignments set assignment_state = 'cancelled', ended_at = now
 select is(pg_temp.duties(4, 'duties.respond', 1, jsonb_build_object(
             'assignment_id', (select r #>> '{data,assignment_id}' from pub2), 'response', 'accepted')) -> 'field_errors',
   '{"assignment_id": "cancelled"}'::jsonb, 'an answer to a cancelled assignment is refused');
-select throws_ok($$update app.duties_assignments set assignment_state = 'current'
-                    where assignment_state = 'superseded'$$, '23514', null,
-  'the lifecycle check keeps ended_at and end_reason consistent with the state');
+select throws_ok($$update app.duties_assignments set assignment_state = 'current', ended_at = null,
+                      end_reason = null where assignment_state = 'superseded'$$,
+  'P0001', 'ended duties assignments are immutable', 'an ended assignment cannot be reopened');
+select throws_ok($$update app.duties_assignments set response = 'declined' where assignment_state = 'superseded'$$,
+  'P0001', 'ended duties assignments are immutable', 'nor its kept answer changed');
+select throws_ok($$update app.duties_assignments set ended_at = now() where assignment_state = 'current'$$,
+  '23514', null, 'the lifecycle check keeps ended_at consistent with the state');
 
 -- Immutable slot revisions ---------------------------------------------------------------------------
 select throws_ok(format($$update app.duties_slot_revisions set location = 'SYNTHETIC elsewhere'
@@ -441,6 +463,9 @@ select is(pg_temp.revise(2, jsonb_build_object('starts_at', pg_temp.at(interval 
 select is(pg_temp.revise(2, '{"instructions": "x"}') ->> 'code', 'forbidden', 'and so is a new revision');
 select is(pg_temp.revise(3, '{"instructions": "Deputy text."}') #>> '{data,change}', 'notes',
   'the deputy still manages the department');
+select is(pg_temp.jobs((select (r #>> '{data,assignment_id}')::uuid from back)),
+  'duty_assigned:cancelled:replaced,duty_assigned:pending:-',
+  'a notes-only edit replaces the unsent new-duty notice with one of the same kind (one notice)');
 
 -- Deletion --------------------------------------------------------------------------------------------
 select is((select (r ->> 'remaining')::int > 0 from jsonb_array_elements(
@@ -450,7 +475,7 @@ select is((select (r ->> 'remaining')::int from jsonb_array_elements(
              app.identity_call_deletion_hooks(pg_temp.mid(4), pg_temp.u(4), gen_random_uuid(), 'erase')) r
             where r ->> 'module' = 'duties'), 0, 'erasing M leaves nothing of M in Duties');
 select is((select count(*)::int from app.duties_slot_revisions
-            where member_id = '00000000-0000-0000-0000-000000000000' and occurrence_id = pg_temp.occ()), 5,
+            where member_id = '00000000-0000-0000-0000-000000000000' and occurrence_id = pg_temp.occ()), 7,
   'M''s slot revisions keep the facts with the nil UUID');
 select is((select count(*)::int from app.duties_assignments a join app.duties_slots s using (slot_id)
             where s.occurrence_id = pg_temp.occ() and a.member_id = '00000000-0000-0000-0000-000000000000'
@@ -462,6 +487,18 @@ select is((select count(*)::int from jsonb_array_elements(jsonb_path_query_first
 select is((select (r ->> 'remaining')::int from jsonb_array_elements(
              app.identity_call_deletion_hooks(pg_temp.mid(2), pg_temp.u(2), gen_random_uuid(), 'erase')) r
             where r ->> 'module' = 'duties'), 0, 'a leader''s revision traces are anonymised too');
+
+-- Revising after the current assignee was erased (M holds the position as the nil UUID).
+create temp table after_erase as select pg_temp.revise(3, '{"instructions": "After erase."}') as r;
+select is((select (r #>> '{data,change}') || '|' || (r #>> '{data,notice_queued}') from after_erase),
+  'notes|false', 'an instructions edit still saves and sends no notice to an erased member');
+select is(pg_temp.revise(3, jsonb_build_object('location', 'SYNTHETIC Side hall 2',
+            'response_deadline', pg_temp.at(interval '8 days'))) -> 'field_errors',
+  '{"member_id": "required_reassign"}'::jsonb,
+  'a material change that keeps an erased assignee needs a new assignee');
+select is(pg_temp.revise(3, jsonb_build_object('location', 'SYNTHETIC Side hall 2', 'member_id', pg_temp.mid(9),
+            'response_deadline', pg_temp.at(interval '8 days'))) -> 'field_errors',
+  '{"member_id": "not_in_department"}'::jsonb, 'and the new assignee must serve in the department');
 
 -- Gates: production without Q4 closes revisions; with Q4 synthetic departments are hidden ------------
 select app.platform_set_environment('production', 'pgtap 4.2');

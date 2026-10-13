@@ -44,6 +44,10 @@ enum DutyNotice {
   /// The duty has started: it can no longer be answered here.
   started,
 
+  /// Story 4.2 (leader): the duty has started, so it can no longer be
+  /// changed.
+  dutyStarted,
+
   /// A department with that name exists.
   nameTaken,
 
@@ -237,10 +241,10 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
         DutyNotice.dutyCancelled,
       ErrorCode.conflict when f['name'] == 'taken' => DutyNotice.nameTaken,
       ErrorCode.conflict => DutyNotice.changedElsewhere,
-      ErrorCode.validationFailed
-          when f['assignment_id'] == 'started' ||
-              f['occurrence_id'] == 'started' =>
+      ErrorCode.validationFailed when f['assignment_id'] == 'started' =>
         DutyNotice.started,
+      ErrorCode.validationFailed when f['occurrence_id'] == 'started' =>
+        DutyNotice.dutyStarted,
       ErrorCode.validationFailed when f['occurrence_id'] == 'unchanged' =>
         DutyNotice.unchanged,
       ErrorCode.validationFailed when f['member_id'] == 'not_in_department' =>

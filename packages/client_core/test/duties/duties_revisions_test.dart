@@ -446,6 +446,27 @@ void main() {
       expect(find.text('Must be before the duty starts'), findsOneWidget);
     });
 
+    testWidgets('a duty that started meanwhile gets the leader notice', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.dutyLeader,
+        setUp: (h) => h.duties.board = boardWith([leaderDuty()]),
+      );
+      await tapKey(tester, 'edit-$_occurrence');
+      await enter(tester, 'edit-instructions-$_occurrence', 'Late.');
+      await tapKey(tester, 'edit-save-$_occurrence');
+      h.gateway.sent.single.refuse(
+        ErrorCode.validationFailed,
+        fieldErrors: const {'occurrence_id': 'started'},
+      );
+      await settle(tester);
+      expect(byKey('duties-notice-dutyStarted'), findsOneWidget);
+      expect(find.textContaining('can no longer be changed'), findsOneWidget);
+      expect(find.textContaining('answered here'), findsNothing);
+    });
+
     testWidgets('Pastor oversight sees history but cannot change', (
       tester,
     ) async {
@@ -530,6 +551,68 @@ void main() {
       await settle(tester);
       expect(find.textContaining('no longer assigned to you'), findsOneWidget);
       expect(byKey('my-duties-empty'), findsOneWidget);
+    });
+
+    testWidgets('a duty that is yours again does not say it was taken away', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.myDuties,
+        setUp: (h) =>
+            h.duties.mine = mineWith([myDutyData(assignmentId: _old)]),
+      );
+      await tapKey(tester, 'duty-accept-$_old');
+      h.duties.mine = mineWith([
+        myDutyData(previousAssignmentIds: const [_old]),
+      ]);
+      h.gateway.sent.single.refuse(
+        ErrorCode.conflict,
+        fieldErrors: const {'assignment_id': 'superseded'},
+      );
+      await settle(tester);
+      expect(
+        find.textContaining('this duty changed since you opened it'),
+        findsOne,
+      );
+      expect(find.textContaining('no longer assigned'), findsNothing);
+    });
+
+    testWidgets('an earlier pending answer is not shown as an answer', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.myDuties,
+        setUp: (h) => h.duties.mine = mineWith([
+          myDutyData(
+            changes: const ['starts_at'],
+            previousResponse: 'pending',
+            previousAssignmentIds: const [_old],
+          ),
+        ]),
+      );
+      expect(find.textContaining('Your earlier answer'), findsNothing);
+      expect(byKey('duty-changed-$_assignment'), findsOneWidget);
+    });
+
+    testWidgets('an old link to an answered current version does not ask', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        '/duties/assignments/$_old',
+        setUp: (h) => h.duties.mine = mineWith([
+          myDutyData(
+            revision: 2,
+            response: 'accepted',
+            respondedAt: '2026-10-13T09:00:00.000000Z',
+            previousAssignmentIds: const [_old],
+          ),
+        ]),
+      );
+      expect(byKey('duty-was-changed'), findsOneWidget);
+      expect(find.textContaining('your answer is needed'), findsNothing);
     });
 
     testWidgets('an accepted change keeps the earlier answer visible', (

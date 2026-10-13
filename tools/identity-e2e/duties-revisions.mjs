@@ -11,7 +11,9 @@
 //   * a notes-only edit by the deputy keeps Accepted and sends a generic update;
 //   * the leader and the deputy edit the same revision at once: one success, one conflict;
 //   * a replayed request returns the original result; non-managers are refused; receipts and
-//     audit hold no names or notes.
+//     audit hold no names or notes;
+//   * a member's answer racing a material change: either order ends consistent (answer kept in
+//     history, or refused as superseded with what changed).
 //
 // Needs the local phone switch: `node tools/auth-harness/local-phone-auth.mjs on`, then `off`
 // afterwards. Needs a database with no usable Admin (`npx supabase db reset` first). LOCAL only
@@ -314,6 +316,28 @@ async function main() {
     check('R60-receipts-and-audit-content-free', receiptNames === 0
       && audit === 'response_recorded:accepted,duty_revised:material,response_recorded:accepted,duty_revised:notes,duty_revised:notes',
       { receipts_with_text: receiptNames, audit });
+
+    // ------------------------------------------- race: a member's answer against a material change
+    const second = await duties(leader.token, 'duties.publish_duty', null, {
+      department_id: departmentId, duty_name: 'Reading', starts_at: at(12 * DAY), member_id: member.member,
+      response_deadline: at(9 * DAY),
+    });
+    const [raceRevise, raceRespond] = await Promise.all([
+      duties(leader.token, 'duties.revise_duty', 1, { occurrence_id: second.data?.occurrence_id,
+        location: 'SYNTHETIC Side hall', response_deadline: at(9 * DAY) }),
+      duties(member.token, 'duties.respond', 1, { assignment_id: second.data?.assignment_id, response: 'accepted' }),
+    ]);
+    const racePos = firstPosition((await read('duties_leader_board', leader.token)).json?.departments?.[0]?.duties
+      ?.find((d) => d.occurrence_id === second.data?.occurrence_id));
+    const answeredFirst = raceRespond.status === 200 && !raceRespond.code;
+    check('R70-answer-racing-a-change-is-consistent', raceRevise.data?.change === 'material'
+      && racePos?.assignment?.response === 'pending' && racePos?.history?.length === 1
+      && (answeredFirst
+        ? racePos.history[0].response === 'accepted'
+        : raceRespond.code === 'conflict' && raceRespond.field_errors?.assignment_id === 'superseded'
+          && raceRespond.field_errors?.location === 'changed' && racePos.history[0].response === 'pending'),
+      { order: answeredFirst ? 'answer_first' : 'change_first', revise: raceRevise.data?.change ?? raceRevise.code,
+        answer: raceRespond.code ?? raceRespond.data?.response, history: racePos?.history?.[0]?.response });
   } finally {
     const left = cleanup();
     psql(`select app.sys_revoke_credential('${credentialId}', '${OPERATOR}'); select app.sys_disable_principal('${principal}', '${OPERATOR}');`);

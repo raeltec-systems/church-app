@@ -12,3 +12,18 @@ Recorded 2026-10-08 from Israel Muyoba's answers. They resolve spec decision **Q
 | **Quiet hours** | **None.** This is a community app and is not meant to spam people. | Reminders are sent when due, at any hour. The no-spam intent is met by sending only what the creator configured and the member's own snoozes, deduplicating, and stopping reminders once the member has answered. |
 
 Still open under Q2: leaders and deputies for the pilot cells and department (named at the pilot; staging uses synthetic members).
+
+## Production setup (2026-10-13)
+
+- Production Supabase project created by the parent session on the owner's instruction:
+  `bic-kafue-production`, ref `vwufdgggbkpwwbkuxrqk`, region eu-central-1, organisation
+  "Raeltec Systems Limited" (free plan). Empty: no migrations, no environment marker yet (the
+  first promotion sets `production`). Its ref is held only in the GitHub `production` environment
+  variable `SUPABASE_PROJECT_REF`, never in `config/environments/production.json` (env:check rule).
+- Owner states (2026-10-13) that `q2_church_time` (the Q2 values above), `ops_system_access` and
+  `q12_operations` are approved. They are recorded in the production database with
+  `app.policy_approve(..., 'israel', ...)` after the first promotion creates the schema; the Q12
+  value still needs the reminder-lateness tolerance figure.
+- Firebase: the owner may reuse the staging Firebase project `kbicc-church-app` for production;
+  production gets its own service-account key in its own Edge secret, so either can be revoked
+  alone. (Decision pending the owner's confirmation.)

@@ -89,6 +89,9 @@ Future<List<Override>> compositionOverrides(
       SupabaseReviewRepository(client),
     ),
     cellsRepositoryProvider.overrideWithValue(SupabaseCellsRepository(client)),
+    dutiesRepositoryProvider.overrideWithValue(
+      SupabaseDutiesRepository(client),
+    ),
     recoveryEmailRepositoryProvider.overrideWithValue(
       SupabaseRecoveryEmailRepository(client, redirects: redirects),
     ),

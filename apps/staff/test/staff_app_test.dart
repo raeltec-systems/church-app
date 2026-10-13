@@ -315,6 +315,56 @@ void main() {
   );
 
   testWidgets(
+    'story 4.1: Duties follows a department scope and Departments the Admin '
+    'grant; a cell scope gives neither',
+    (tester) async {
+      final h = await pumpStaff(tester);
+      expect(find.byKey(const Key('nav-/duties/leader')), findsNothing);
+      h.grants.myAccess = AccessReadOk(
+        syntheticGrants(
+          scopes: const [
+            ScopeGrant(
+              scopeKind: 'cell_leader',
+              scopeId: '44444444-4444-4444-8444-444444444444',
+            ),
+          ],
+        ),
+      );
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('nav-/duties/leader')), findsNothing);
+      h.grants.myAccess = AccessReadOk(
+        syntheticGrants(
+          scopes: const [
+            ScopeGrant(
+              scopeKind: 'department_leader',
+              scopeId: '44444444-4444-4444-8444-444444444444',
+            ),
+          ],
+        ),
+      );
+      h.duties.board = AccessReadOk(
+        DutyLeaderBoard.fromJson({'departments': const <Object?>[]}),
+      );
+      await tapKey(tester, 'nav-/access');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('nav-/admin/departments')), findsNothing);
+      await tapKey(tester, 'nav-/duties/leader');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('leader-no-departments')), findsOneWidget);
+      h.grants.myAccess = AccessReadOk(syntheticGrants(roles: ['admin']));
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('nav-/admin/departments')), findsOneWidget);
+      expect(find.byKey(const Key('nav-/duties/leader')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'story 2.5: Members & applications follows the Admin grant and opens the '
     'review queue',
     (tester) async {

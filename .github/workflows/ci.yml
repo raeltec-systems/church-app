@@ -190,6 +190,11 @@ jobs:
       - name: client core — test (request states, adapters, boundaries)
         working-directory: packages/client_core
         run: flutter test
+      - name: client core — duties in a non-Lusaka device zone (church time is device independent)
+        working-directory: packages/client_core
+        env:
+          TZ: America/New_York
+        run: flutter test test/duties
       - name: mobile — pub get (locked)
         working-directory: apps/mobile
         run: flutter pub get --enforce-lockfile

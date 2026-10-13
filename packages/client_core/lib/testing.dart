@@ -16,6 +16,7 @@ import 'src/domain/assisted_recovery.dart';
 import 'src/domain/cell_membership.dart';
 import 'src/domain/commands.dart';
 import 'src/domain/credential_review.dart';
+import 'src/domain/duties.dart';
 import 'src/domain/member_access.dart';
 import 'src/domain/membership_application.dart';
 import 'src/domain/member_deletion.dart';
@@ -509,6 +510,68 @@ class FakeCells implements CellsRepository {
     return admin;
   }
 }
+
+/// [DutiesRepository] answered by the test (story 4.1). Each field answers
+/// every read at once; the counters record how often each was asked.
+class FakeDuties implements DutiesRepository {
+  AccessRead<MyDuties> mine = const AccessReadDenied(AccessDenial.notLinked);
+  AccessRead<DutyLeaderBoard> board = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  AccessRead<DutyAdminOverview> admin = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  int mineCalls = 0;
+  int boardCalls = 0;
+  int adminCalls = 0;
+
+  @override
+  Future<AccessRead<MyDuties>> fetchMyDuties() async {
+    mineCalls++;
+    return mine;
+  }
+
+  @override
+  Future<AccessRead<DutyLeaderBoard>> fetchLeaderBoard() async {
+    boardCalls++;
+    return board;
+  }
+
+  @override
+  Future<AccessRead<DutyAdminOverview>> fetchAdminOverview() async {
+    adminCalls++;
+    return admin;
+  }
+}
+
+/// The wire form of one of the member's duties (story 4.1).
+Map<String, Object?> myDutyData({
+  String assignmentId = '42424242-4242-4242-8242-424242424242',
+  int revision = 1,
+  String response = 'pending',
+  String startsAt = '2099-01-04T08:00:00.000000Z',
+  String? endsAt = '2099-01-04T10:00:00.000000Z',
+  String responseDeadline = '2099-01-01T08:00:00.000000Z',
+  String? respondedAt,
+  String? note,
+  String dutyName = 'Sunday preaching',
+}) => {
+  'assignment_id': assignmentId,
+  'revision': revision,
+  'occurrence_id': '43434343-4343-4343-8343-434343434343',
+  'department_id': '44444444-4444-4444-8444-444444444444',
+  'department_name': 'SYNTHETIC Preaching Rota',
+  'duty_name': dutyName,
+  'starts_at': startsAt,
+  'ends_at': endsAt,
+  'reporting_at': null,
+  'location': 'SYNTHETIC Main hall',
+  'instructions': 'Arrive early.',
+  'response': response,
+  'response_deadline': responseDeadline,
+  'responded_at': respondedAt,
+  'note': note,
+};
 
 /// The wire form of a synthetic cell as the Admin sees it (story 2.6).
 Map<String, Object?> adminCellData({
@@ -1401,6 +1464,7 @@ class ClientTestHarness {
   final membership = FakeMembership();
   final review = FakeReview();
   final cells = FakeCells();
+  final duties = FakeDuties();
   final recovery = FakePasswordRecovery();
   final recoveryEmail = FakeRecoveryEmail();
   final credentials = FakeCredentialReview();
@@ -1434,6 +1498,7 @@ class ClientTestHarness {
       membershipRepositoryProvider.overrideWithValue(membership),
       reviewRepositoryProvider.overrideWithValue(review),
       cellsRepositoryProvider.overrideWithValue(cells),
+      dutiesRepositoryProvider.overrideWithValue(duties),
       passwordRecoveryGatewayProvider.overrideWithValue(recovery),
       recoveryEmailRepositoryProvider.overrideWithValue(recoveryEmail),
       credentialReviewRepositoryProvider.overrideWithValue(credentials),

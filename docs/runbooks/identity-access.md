@@ -178,7 +178,7 @@ Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/ev
     - An Admin may still remove the role with `identity.revoke_role`.
 - **Scope kinds** (`app.identity_scope_kinds`): each owning module registers its kinds at migration time with `app.identity_register_scope_kind(module, kind, target_hook, description)`. The target hook is `(jsonb {scope_kind, scope_id}) -> boolean` and checks that the target exists.
   - This story registers only the SYNTHETIC `fixture_care` and `fixture_finance` kinds.
-  - Cells registers `cell` at entry 6; Care, Offerings, Prayer and the other owners register their own kinds.
+  - Cells registers `cell_leader` and `cell_assistant` at entry 6 and Duties `department_leader` and `department_deputy` at story 4.1 ([duties.md](duties.md)); Care, Offerings, Prayer and the other owners register their own kinds.
 - **Grants** (`app.identity_grants`): one active row per member and role, or per member and scope. Each row records who granted and revoked it (member and acting account, or the restricted operator).
 - **Grant sets** (`app.identity_grant_sets`): one revisioned aggregate per member. Its revision is the `expected_revision` of every grant command.
 - **Audit** (`app.identity_access_audit`): action, actor (member and account, or operator), `request_id`, target, grant, role or scope, and the new revision. It holds ids and codes only, never names, phones, emails or free text.

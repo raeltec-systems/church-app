@@ -429,7 +429,7 @@ select is((select string_agg((r ->> 'module') || '=' || (r ->> 'remaining'), ','
 select is((select string_agg((r ->> 'module') || '=' || (r ->> 'remaining'), ',' order by r ->> 'module')
              from jsonb_array_elements(
                app.identity_call_deletion_hooks(pg_temp.mid(9), pg_temp.u(9), gen_random_uuid(), 'check')) r),
-  'cells=0,fixture=0,notifications=0', 'the deletion check answers zero for every owner');
+  'cells=0,duties=0,fixture=0,notifications=0', 'the deletion check answers zero for every owner');
 select is((select count(*)::int from app.notifications_jobs where recipient_member_id = pg_temp.mid(9))
           + (select count(*)::int from app.notifications_inbox_items where recipient_member_id = pg_temp.mid(9))
           + (select count(*)::int from app.notifications_schedules where recipient_member_id = pg_temp.mid(9))

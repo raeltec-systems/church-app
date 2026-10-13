@@ -7,6 +7,7 @@ export 'src/adapters/supabase_assisted_recovery.dart';
 export 'src/adapters/supabase_cells_repository.dart';
 export 'src/adapters/supabase_command_gateway.dart';
 export 'src/adapters/supabase_credential_review_repository.dart';
+export 'src/adapters/supabase_duties_repository.dart';
 export 'src/adapters/supabase_grants_repository.dart';
 export 'src/adapters/supabase_inbox_repository.dart';
 export 'src/adapters/supabase_member_access_repository.dart';

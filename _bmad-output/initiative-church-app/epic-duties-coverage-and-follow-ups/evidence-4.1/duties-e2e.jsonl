@@ -1,0 +1,15 @@
+{"step":"D00-precondition","target":"LOCAL","at":"2026-10-13T21:29:27.906Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"D01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-13T21:29:30.370Z","verdict":"pass","amr":["password"]}
+{"step":"D10-admin-creates-the-department","target":"LOCAL","at":"2026-10-13T21:29:30.472Z","verdict":"pass","non_admin":"forbidden","status":200,"revision":1,"answer_keys":["department_id","revision"]}
+{"step":"D11-admin-grants-the-leader-scope","target":"LOCAL","at":"2026-10-13T21:29:30.489Z","verdict":"pass","status":200,"code":null}
+{"step":"D12-admin-adds-two-members","target":"LOCAL","at":"2026-10-13T21:29:30.517Z","verdict":"pass","revisions":[2,3],"members":2}
+{"step":"D20-non-leaders-cannot-publish","target":"LOCAL","at":"2026-10-13T21:29:30.550Z","verdict":"pass","non_leader":"forbidden","member":"forbidden"}
+{"step":"D21-deadline-never-after-the-start","target":"LOCAL","at":"2026-10-13T21:29:30.572Z","verdict":"pass","code":"validation_failed","field_errors":{"response_deadline":"after_start"}}
+{"step":"D22-leader-publishes-one-position","target":"LOCAL","at":"2026-10-13T21:29:30.801Z","verdict":"pass","status":200,"response":"pending","replay_same":true,"occurrences":1}
+{"step":"D30-member-sees-the-duty-in-the-inbox","target":"LOCAL","at":"2026-10-13T21:29:31.009Z","verdict":"pass","worker":{"exit":0,"delivered":1},"item":true,"state":"current","target_is_duty_link":true,"other_items":0}
+{"step":"D31-others-are-refused","target":"LOCAL","at":"2026-10-13T21:29:31.043Z","verdict":"pass","other_answer":"not_found","non_leader_answer":"not_found","other_duties":0,"boards":[403,403],"signed_out":401}
+{"step":"D32-direct-table-queries-refused","target":"LOCAL","at":"2026-10-13T21:29:31.061Z","verdict":"pass","statuses":["app.duties_assignments:406","api.duties_assignments:404","app.duties_departments:406","api.duties_departments:404","app.duties_department_members:406","api.duties_department_members:404","app.duties_audit:406","api.duties_audit:404"],"app_rpc":406}
+{"step":"D40-member-accepts-and-leader-sees-accepted","target":"LOCAL","at":"2026-10-13T21:29:31.096Z","verdict":"pass","before":"pending","after":"accepted","revision":2,"board":"accepted","second_answer":"conflict","item_after":"superseded"}
+{"step":"D42-receipts-hold-no-names-or-notes","target":"LOCAL","at":"2026-10-13T21:29:31.349Z","verdict":"pass","receipts_with_names":0}
+{"step":"D41-audit-is-content-free","target":"LOCAL","at":"2026-10-13T21:29:31.349Z","verdict":"pass","audit":"department_created:admin,member_added:admin,member_added:admin,duty_published:department_leader,response_recorded:member"}
+{"step":"D99-cleanup","target":"LOCAL","at":"2026-10-13T21:29:31.969Z","users_left":0,"credential_revoked":true,"principal_disabled":true,"unmarked":true,"departments_left":0}

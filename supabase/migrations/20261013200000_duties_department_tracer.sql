@@ -447,20 +447,29 @@ as $$
    where g.scope_kind = p_kind and g.scope_id = p_department_id and g.revoked_at is null;
 $$;
 
-create function app.duties_roster(p_department_id uuid)
+-- The department's current, active members. p_full (Admin) gives the full account label; a
+-- leader sees only `app_account` or `no_login` (an access review is not disclosed to leaders).
+-- Members who are not approved or are under deletion are left out (their past assignments stay
+-- readable on the duties themselves).
+create function app.duties_roster(p_department_id uuid, p_full boolean)
 returns jsonb
 language sql
 stable
 set search_path = ''
 as $$
-  select coalesce(jsonb_agg(jsonb_build_object('member_id', dm.member_id,
-                                               'display_name', m.display_name,
-                                               'account', app.identity_member_account_label(dm.member_id),
-                                               'since', app.cmd_utc(dm.started_at))
-                            order by m.display_name, dm.member_id), '[]'::jsonb)
+  select coalesce(jsonb_agg(jsonb_build_object(
+                    'member_id', dm.member_id,
+                    'display_name', m.display_name,
+                    'account', case when p_full then app.identity_member_account_label(dm.member_id)
+                                    when app.identity_member_account_label(dm.member_id) = 'no_login'
+                                      then 'no_login'
+                                    else 'app_account' end,
+                    'since', app.cmd_utc(dm.started_at))
+                  order by m.display_name, dm.member_id), '[]'::jsonb)
     from app.duties_department_members dm
     join app.identity_members m on m.member_id = dm.member_id
-   where dm.department_id = p_department_id and dm.ended_at is null;
+   where dm.department_id = p_department_id and dm.ended_at is null
+     and app.duties_member_active(dm.member_id);
 $$;
 
 -- The Admin's view of one department.
@@ -478,11 +487,14 @@ as $$
     'revision', d.revision,
     'leaders', app.duties_staff_list(d.department_id, 'department_leader'),
     'deputies', app.duties_staff_list(d.department_id, 'department_deputy'),
-    'members', app.duties_roster(d.department_id))
+    'members', app.duties_roster(d.department_id, true))
     from app.duties_departments d
    where d.department_id = p_department_id;
 $$;
 
+-- A department command's outcome: ids and revision only. Receipts keep command results, and
+-- member deletion does not rewrite receipts, so no name or member list goes in here; clients
+-- read the department again.
 create function app.duties_department_outcome(p_department_id uuid)
 returns jsonb
 language sql
@@ -492,8 +504,9 @@ as $$
   select jsonb_build_object(
     'aggregate_type', 'duties_department',
     'aggregate_id', p_department_id,
-    'revision', (select d.revision from app.duties_departments d where d.department_id = p_department_id),
-    'data', app.duties_department_json(p_department_id));
+    'revision', d.revision,
+    'data', jsonb_build_object('department_id', d.department_id, 'revision', d.revision))
+    from app.duties_departments d where d.department_id = p_department_id;
 $$;
 
 -- One occurrence with its single position as a leader sees it. p_with_notes false hides the
@@ -678,9 +691,14 @@ begin
   if exists (select 1 from app.duties_departments d where lower(d.name) = lower(v_name)) then
     perform app.cmd_fail('conflict', '{"name": "taken"}');
   end if;
-  insert into app.duties_departments (name, is_synthetic, created_by_member, created_by_account)
-  values (v_name, not app.policy_is_open('q4_personal_data'), v_actor.member_id, v_actor.account_id)
-  returning department_id into v_department;
+  begin
+    insert into app.duties_departments (name, is_synthetic, created_by_member, created_by_account)
+    values (v_name, not app.policy_is_open('q4_personal_data'), v_actor.member_id, v_actor.account_id)
+    returning department_id into v_department;
+  exception when unique_violation then
+    -- A concurrent create with the same name committed first.
+    perform app.cmd_fail('conflict', '{"name": "taken"}');
+  end;
   perform app.duties_audit_event('department_created', v_actor.member_id, v_actor.account_id,
                                  'admin', 'duties.create_department', v_department, null, null,
                                  null, null, 1);
@@ -862,8 +880,12 @@ begin
     'scheduled_at', app.cmd_utc(now())));
   return jsonb_build_object(
     'aggregate_type', 'duties_occurrence', 'aggregate_id', v_occurrence, 'revision', 1,
-    'data', app.duties_occurrence_json(v_occurrence, true)
-            || jsonb_build_object('notice_queued', coalesce((v_job ->> 'created')::boolean, false)));
+    -- Ids and states only (no names or text in the receipt); clients read the board again.
+    'data', jsonb_build_object(
+              'occurrence_id', v_occurrence, 'department_id', v_department_id, 'revision', 1,
+              'slot_id', v_slot, 'assignment_id', v_assignment, 'assignment_revision', 1,
+              'response', 'pending',
+              'notice_queued', coalesce((v_job ->> 'created')::boolean, false)));
 end;
 $$;
 
@@ -935,7 +957,9 @@ begin
   return jsonb_build_object(
     'aggregate_type', 'duties_assignment', 'aggregate_id', v_assignment.assignment_id,
     'revision', v_revision,
-    'data', app.duties_my_assignment_json(v_assignment.assignment_id));
+    -- Ids and states only (the note stays out of the receipt); clients read My duties again.
+    'data', jsonb_build_object('assignment_id', v_assignment.assignment_id, 'revision', v_revision,
+                               'response', p_payload ->> 'response'));
 end;
 $$;
 
@@ -1057,8 +1081,9 @@ comment on function api.duties_command(jsonb) is
 -- Reads
 -- ---------------------------------------------------------------------------------------------
 
--- The signed-in member's own current assignments: every future duty and those of the last
--- 90 days, soonest first.
+-- The signed-in member's own current assignments of the last 90 days onwards: future duties
+-- first (soonest first), then past ones (most recent first); at most 200 (`truncated` says
+-- more exist).
 create function app.duties_my_duties()
 returns jsonb
 language plpgsql
@@ -1072,20 +1097,24 @@ declare
 begin
   select a.member_id, a.link_id into v_member, v_link from app.identity_require_access() a;
   perform app.duties_require_open_read();
+  with ranked as (
+    select a.assignment_id, o.starts_at,
+           row_number() over (order by (o.starts_at <= now()),
+                                       case when o.starts_at > now() then o.starts_at end,
+                                       o.starts_at desc, a.assignment_id) as rn
+      from app.duties_assignments a
+      join app.duties_slots s on s.slot_id = a.slot_id
+      join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
+     where a.member_id = v_member and a.assignment_state = 'current'
+       and o.occurrence_state = 'published'
+       and o.starts_at > now() - interval '90 days')
   select jsonb_build_object(
            'member_id', v_member,
-           'assignments', coalesce(jsonb_agg(app.duties_my_assignment_json(x.assignment_id)
-                                             order by x.starts_at, x.assignment_id), '[]'::jsonb))
+           'assignments', coalesce(jsonb_agg(app.duties_my_assignment_json(r.assignment_id)
+                                             order by r.rn) filter (where r.rn <= 200), '[]'::jsonb),
+           'truncated', count(*) > 200)
     into v_result
-    from (select a.assignment_id, o.starts_at
-            from app.duties_assignments a
-            join app.duties_slots s on s.slot_id = a.slot_id
-            join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
-           where a.member_id = v_member and a.assignment_state = 'current'
-             and o.occurrence_state = 'published'
-             and o.starts_at > now() - interval '90 days'
-           order by o.starts_at
-           limit 200) x;
+    from ranked r;
   perform app.identity_record_activity(v_link);
   return v_result;
 end;
@@ -1137,14 +1166,17 @@ begin
                'name', d.name,
                'capacity', coalesce(c.capacity, 'pastor'),
                'can_publish', c.capacity is not null,
-               'members', app.duties_roster(d.department_id),
+               'members', app.duties_roster(d.department_id, false),
                'duties', coalesce((
                  select jsonb_agg(app.duties_occurrence_json(o.occurrence_id, c.capacity is not null)
                                   order by o.starts_at, o.occurrence_id)
                    from (select o2.occurrence_id, o2.starts_at from app.duties_occurrences o2
                           where o2.department_id = d.department_id
                             and o2.starts_at > now() - interval '30 days'
-                          order by o2.starts_at limit 200) o), '[]'::jsonb)) as obj
+                          order by o2.starts_at limit 200) o), '[]'::jsonb),
+               'duties_truncated', (select count(*) > 200 from app.duties_occurrences o3
+                                     where o3.department_id = d.department_id
+                                       and o3.starts_at > now() - interval '30 days')) as obj
         from app.duties_departments d
         cross join lateral (select app.duties_manage_capacity(v_member, d.department_id) as capacity) c
        where (c.capacity is not null or v_pastor)
@@ -1201,7 +1233,11 @@ begin
            where im.membership_state = 'approved'
              and not exists (select 1 from app.identity_deletions dl where dl.member_id = im.member_id)
            order by im.display_name collate "C", im.member_id
-           limit 500) x), '[]'::jsonb));
+           limit 500) x), '[]'::jsonb),
+    'members_truncated', (select count(*) > 500 from app.identity_members im
+                           where im.membership_state = 'approved'
+                             and not exists (select 1 from app.identity_deletions dl
+                                              where dl.member_id = im.member_id)));
 end;
 $$;
 
@@ -1326,7 +1362,7 @@ revoke all on function
   app.duties_audit_event(text, uuid, uuid, text, text, uuid, uuid, uuid, uuid, text, bigint),
   app.duties_occurrence_start(app.duties_occurrences),
   app.duties_staff_list(uuid, text),
-  app.duties_roster(uuid),
+  app.duties_roster(uuid, boolean),
   app.duties_department_json(uuid),
   app.duties_department_outcome(uuid),
   app.duties_occurrence_json(uuid, boolean),

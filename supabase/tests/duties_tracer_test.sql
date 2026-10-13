@@ -5,7 +5,7 @@
 -- refusals, replay and the deletion hook. HTTP evidence: tools/identity-e2e/duties.mjs. Every
 -- account, phone and name here is SYNTHETIC (fictional range +44 7700 900950-900959).
 begin;
-select plan(82);
+select plan(94);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000041' || lpad(n::text, 2, '0'))::uuid $$;
@@ -149,8 +149,11 @@ create temp table de as select pg_temp.duties(1, 'duties.create_department', nul
   '{"name": "SYNTHETIC 4.1 Ushers"}') as r;
 create function pg_temp.d() returns uuid language sql as $$ select (r #>> '{data,department_id}')::uuid from dd $$;
 create function pg_temp.e() returns uuid language sql as $$ select (r #>> '{data,department_id}')::uuid from de $$;
-select is((select (r #>> '{data,name}') || '|' || (r ->> 'revision') || '|' || (r #>> '{data,is_synthetic}') from dd),
+select is((select d.name || '|' || (r ->> 'revision') || '|' || d.is_synthetic::text
+             from dd join app.duties_departments d on d.department_id = pg_temp.d()),
   'SYNTHETIC Preaching Rota|1|true', 'an Admin creates SYNTHETIC Preaching Rota (whitespace collapsed)');
+select is((select (r -> 'data') - 'department_id' from dd), '{"revision": 1}'::jsonb,
+  'the command answer holds ids and the revision only (no names in the receipt)');
 select is(pg_temp.duties(1, 'duties.create_department', null, '{"name": "synthetic preaching rota"}') -> 'field_errors',
   '{"name": "invalid"}'::jsonb, 'a lower-case name is not SYNTHETIC-prefixed');
 select is(pg_temp.duties(1, 'duties.create_department', null, '{"name": "SYNTHETIC PREACHING ROTA"}') ->> 'code',
@@ -239,19 +242,21 @@ create temp table pub_req as select gen_random_uuid() as id;
 create temp table pub as select pg_temp.duties(2, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(), 4),
   (select id from pub_req)) as r;
 create function pg_temp.asg() returns uuid language sql as
-$$ select (r #>> '{data,positions,0,assignment,assignment_id}')::uuid from pub $$;
-select is((select (r ->> 'revision') || '|'
-                  || (r #>> '{data,positions,0,assignment,response}') || '|'
-                  || (r #>> '{data,positions,0,position_no}') || '|' || (r #>> '{data,notice_queued}') from pub),
-  '1|pending|1|true', 'the leader publishes one position with a pending assignment');
+$$ select (r #>> '{data,assignment_id}')::uuid from pub $$;
+select is((select (r ->> 'revision') || '|' || (r #>> '{data,response}') || '|'
+                  || (r #>> '{data,notice_queued}') || '|'
+                  || (select string_agg(k, ',' order by k) from jsonb_object_keys(r -> 'data') k) from pub),
+  '1|pending|true|assignment_id,assignment_revision,department_id,notice_queued,occurrence_id,response,revision,slot_id',
+  'the leader publishes one position with a pending assignment; the answer holds ids and states only');
 select is((select string_agg(job_state || ':' || reminder_kind || ':' || source_revision, ',')
              from app.notifications_jobs where source_type = 'duties_assignment' and source_id = pg_temp.asg()),
   'pending:duty_assigned:1', 'publishing enqueued one duty_assigned job in the same transaction');
 select is(pg_temp.duties(2, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(), 4), (select id from pub_req)),
   (select r from pub), 'replaying the same request returns the stored result');
 select is((select count(*)::int from app.duties_occurrences), 1, 'and adds nothing');
+create temp table dep_req as select gen_random_uuid() as id;
 select is(pg_temp.duties(3, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(), 8,
-            '{"duty_name": "Reading"}')) #>> '{data,positions,0,assignment,response}',
+            '{"duty_name": "Reading"}'), (select id from dep_req)) #>> '{data,response}',
   'pending', 'the deputy publishes too (to the accountless member)');
 
 -- Inbox: the worker delivers one item to M; the open target is the duty screen --------------------
@@ -269,7 +274,7 @@ select is((pg_temp.readj(4, format('select api.notifications_open_item(%L::uuid)
 
 create temp table pub_admin as select pg_temp.duties(1, 'duties.publish_duty', null,
   pg_temp.duty(pg_temp.d(), 5, '{"duty_name": "Prayer"}')) as r;
-select is((select r #>> '{data,positions,0,assignment,response}' from pub_admin), 'pending',
+select is((select r #>> '{data,response}' from pub_admin), 'pending',
   'an Admin can manage any department');
 select is((select string_agg(actor_capacity, ',' order by event_id) from app.duties_audit where action = 'duty_published'),
   'department_leader,department_deputy,admin', 'publishing is audited with the capacity');
@@ -313,8 +318,9 @@ select is(pg_temp.duties(4, 'duties.respond', 5, jsonb_build_object('assignment_
 create temp table acc_req as select gen_random_uuid() as id;
 create temp table acc as select pg_temp.duties(4, 'duties.respond', 1, jsonb_build_object('assignment_id', pg_temp.asg(),
   'response', 'accepted', 'note', '  Happy to  serve. '), (select id from acc_req)) as r;
-select is((select (r ->> 'revision') || '|' || (r #>> '{data,response}') || '|' || (r #>> '{data,note}') from acc),
-  '2|accepted|Happy to serve.', 'M accepts with a practical note');
+select is((select (r ->> 'revision') || '|' || (r #>> '{data,response}') || '|' || coalesce(r #>> '{data,note}', 'none')
+                  || '|' || (select response_note from app.duties_assignments where assignment_id = pg_temp.asg()) from acc),
+  '2|accepted|none|Happy to serve.', 'M accepts with a practical note (stored, but not in the receipt)');
 select is((select response_provenance || '|' || (responded_by_member = pg_temp.mid(4))::text
                   || '|' || (responded_by_account = pg_temp.u(4))::text
              from app.duties_assignments where assignment_id = pg_temp.asg()),
@@ -340,12 +346,12 @@ select is((select (jsonb_path_query_first(x, '$.duties[*] ? (@.duty_name == "Sun
 select is((pg_temp.readj(4, format('select api.notifications_open_item(%L::uuid)', (select id from item)))) ->> 'state',
   'superseded', 'after the answer the inbox item no longer opens the duty');
 create temp table dec as select pg_temp.duties(5, 'duties.respond', 1, jsonb_build_object(
-  'assignment_id', (select r #>> '{data,positions,0,assignment,assignment_id}' from pub_admin),
+  'assignment_id', (select r #>> '{data,assignment_id}' from pub_admin),
   'response', 'declined')) as r;
 select is((select r #>> '{data,response}' from dec), 'declined', 'O says they cannot make it');
 select is((select string_agg(job_state || '|' || coalesce(cancel_reason, '-'), ',')
              from app.notifications_jobs where source_type = 'duties_assignment'
-              and source_id = (select (r #>> '{data,positions,0,assignment,assignment_id}')::uuid from pub_admin)),
+              and source_id = (select (r #>> '{data,assignment_id}')::uuid from pub_admin)),
   'cancelled|responded', 'an answer before delivery cancels the pending job');
 select is((select string_agg(code, ',' order by event_id) from app.duties_audit where action = 'response_recorded'),
   'accepted,declined', 'responses are audited with their code only');
@@ -358,11 +364,11 @@ create temp table late as select pg_temp.duties(1, 'duties.publish_duty', null,
 update app.duties_occurrences set starts_at = now() - interval '1 minute', ends_at = null
  where occurrence_id = (select (r #>> '{data,occurrence_id}')::uuid from late);
 select is(pg_temp.duties(5, 'duties.respond', 1, jsonb_build_object(
-            'assignment_id', (select r #>> '{data,positions,0,assignment,assignment_id}' from late),
+            'assignment_id', (select r #>> '{data,assignment_id}' from late),
             'response', 'accepted')) -> 'field_errors',
   '{"assignment_id": "started"}'::jsonb, 'a duty that has started cannot be answered');
 select is(app.duties_assignment_reminder_check(jsonb_build_object(
-            'source_id', (select r #>> '{data,positions,0,assignment,assignment_id}' from late),
+            'source_id', (select r #>> '{data,assignment_id}' from late),
             'source_revision', 1, 'recipient_member_id', pg_temp.mid(5))) ->> 'actionable',
   'false', 'and its reminder is no longer actionable');
 
@@ -374,6 +380,45 @@ select is(pg_temp.duties(2, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(
   'forbidden', 'after the scope is revoked even a replay of the leader''s publish is refused');
 select is(pg_temp.read(2, 'select api.duties_leader_board()'), 'PT403|forbidden|not_granted',
   'and the leader board is gone at once');
+
+-- Deputy loss: a new publish and a replay of the deputy's earlier publish are refused.
+select pg_temp.cmd(pg_temp.c(1), 'api.identity_grant_command', 'identity.revoke_scope',
+  (select s.revision from app.identity_grant_sets s where s.member_id = pg_temp.mid(3)),
+  jsonb_build_object('member_id', pg_temp.mid(3), 'scope_kind', 'department_deputy', 'scope_id', pg_temp.d()));
+select is(pg_temp.duties(3, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(), 8, '{"duty_name": "Reading"}'),
+            (select id from dep_req)) ->> 'code',
+  'forbidden', 'a revoked deputy''s replay is refused');
+select is(pg_temp.duties(3, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(), 5)) ->> 'code',
+  'forbidden', 'and so is a new publish');
+
+-- An untrusted (OTP) session is unauthenticated.
+insert into auth.sessions (id, user_id, aal, created_at)
+values (pg_temp.s(21), pg_temp.u(6), 'aal1', clock_timestamp() - interval '1 hour');
+insert into auth.mfa_amr_claims (id, session_id, created_at, updated_at, authentication_method)
+values (gen_random_uuid(), pg_temp.s(21), now(), now(), 'otp');
+select is(pg_temp.cmd(jsonb_build_object('sub', pg_temp.u(6), 'role', 'authenticated', 'aal', 'aal1',
+            'session_id', pg_temp.s(21), 'is_anonymous', false,
+            'amr', jsonb_build_array(jsonb_build_object('method', 'otp', 'timestamp', 1790000000))),
+            'api.duties_command', 'duties.publish_duty', null, pg_temp.duty(pg_temp.e(), 9)) ->> 'code',
+  'unauthenticated', 'a leader''s untrusted session is unauthenticated');
+
+-- A member with a pending deletion request cannot be given a duty.
+insert into app.identity_deletions (member_id, had_account, origin, is_synthetic)
+values (pg_temp.mid(9), true, 'member_request', true);
+select is(pg_temp.duties(6, 'duties.publish_duty', null, pg_temp.duty(pg_temp.e(), 9)) -> 'field_errors',
+  '{"member_id": "unknown"}'::jsonb, 'publishing to a member with a pending deletion is refused');
+select is(jsonb_array_length(pg_temp.readj(6, 'select api.duties_leader_board()') #> '{departments,0,members}'), 0,
+  'and they leave the department roster');
+
+-- A member who leaves the department is no longer an eligible recipient.
+create temp table nine as select pg_temp.duties(1, 'duties.publish_duty', null,
+  pg_temp.duty(pg_temp.d(), 5, '{"duty_name": "Usher"}')) as r;
+update app.duties_department_members set ended_at = now()
+ where department_id = pg_temp.d() and member_id = pg_temp.mid(5);
+select is(app.duties_assignment_reminder_check(jsonb_build_object(
+            'source_id', (select r #>> '{data,assignment_id}' from nine),
+            'source_revision', 1, 'recipient_member_id', pg_temp.mid(5))) ->> 'recipient_eligible',
+  'false', 'after leaving the department the reminder''s recipient is no longer eligible');
 
 -- Deletion ------------------------------------------------------------------------------------------
 select is((select (r ->> 'remaining')::int > 0 from jsonb_array_elements(
@@ -405,6 +450,27 @@ select is((select count(*)::int from app.duties_department_members where member_
 select is((select (r ->> 'remaining')::int from jsonb_array_elements(
              app.identity_call_deletion_hooks(pg_temp.mid(2), pg_temp.u(2), gen_random_uuid(), 'erase')) r
             where r ->> 'module' = 'duties'), 0, 'a leader''s publishing traces are anonymised too');
+select is((select count(*)::int from app.cmd_receipts c
+            where c.command like 'duties.%'
+              and (c.result::text like '%SYNTHETIC 4.1 Member 4%' or c.result::text like '%SYNTHETIC 4.1 Member 2%'
+                   or c.result::text like '%Happy to serve%')), 0,
+  'no duties receipt holds a deleted member''s name or note');
+
+-- Production marker: the Q4 gate closes Duties; once Q4 is approved, synthetic departments are
+-- hidden. (Rolled back with the test.)
+select app.platform_set_environment('production', 'pgtap 4.1');
+select app.policy_approve('private_access', '{}'::jsonb, 'pgtap', 'pgtap 4.1 production check');
+insert into app.identity_settings (setting, version, value, source, label, set_by)
+values ('dormancy_days', 99, '{"days": 90}', 'approved', 'pgtap 4.1 production check', 'pgtap');
+select is(pg_temp.duties(1, 'duties.create_department', null, '{"name": "SYNTHETIC Closed"}') ->> 'code',
+  'unavailable', 'with Q4 closed (production) Duties commands are unavailable');
+select is(pg_temp.read(1, 'select api.duties_admin_overview()'), 'PT403|unavailable|unavailable',
+  'and so are the reads');
+select app.policy_approve('q4_personal_data', '{}'::jsonb, 'pgtap', 'pgtap 4.1 production check');
+select is(jsonb_array_length(pg_temp.readj(1, 'select api.duties_admin_overview()') -> 'departments'), 0,
+  'in production synthetic departments are hidden from the Admin');
+select is(jsonb_array_length(pg_temp.readj(7, 'select api.duties_leader_board()') -> 'departments'), 0,
+  'and from the Pastor''s board');
 
 select * from finish();
 rollback;

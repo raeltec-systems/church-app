@@ -268,6 +268,43 @@ void main() {
       });
     });
 
+    test('church time is Africa/Lusaka (UTC+2) whatever the device zone', () {
+      // Run this file with TZ=America/New_York (and the default zone) to
+      // prove device independence; see docs/runbooks/duties.md.
+      expect(
+        ChurchTime.parse('2099-01-04', '08:00'),
+        DateTime.utc(2099, 1, 4, 6),
+      );
+      expect(
+        ChurchTime.parse('2099-01-01', '00:30'),
+        DateTime.utc(2098, 12, 31, 22, 30),
+      );
+      expect(ChurchTime.parse('2099-02-30', '08:00'), isNull);
+      expect(ChurchTime.parse('2099-01-04', '24:00'), isNull);
+      final w = ChurchTime.wall(DateTime.utc(2099, 1, 4, 23));
+      expect([w.year, w.month, w.day, w.hour], [2099, 1, 5, 1]);
+      expect(ChurchTime.wall(DateTime.utc(2099, 1, 4, 6).toLocal()).hour, 8);
+    });
+
+    test('truncation is explicit', () {
+      expect(
+        MyDuties.fromJson({
+          'member_id': _ruth,
+          'assignments': const <Object?>[],
+          'truncated': true,
+        }).truncated,
+        isTrue,
+      );
+      expect(
+        DutyAdminOverview.fromJson({
+          'departments': const <Object?>[],
+          'members': const <Object?>[],
+          'members_truncated': true,
+        }).membersTruncated,
+        isTrue,
+      );
+    });
+
     test('the reminder link is a known deep link', () {
       expect(
         ClientPaths.isKnownDeepLink('/duties/assignments/$_assignment'),
@@ -403,14 +440,10 @@ void main() {
       final payload = sent.wire['payload'] as Map;
       expect(payload['member_id'], _ruth);
       expect(payload['location'], 'SYNTHETIC Main hall');
-      expect(
-        DateTime.parse(payload['starts_at'] as String),
-        DateTime(2099, 1, 4, 8).toUtc(),
-      );
-      expect(
-        DateTime.parse(payload['response_deadline'] as String),
-        DateTime(2099, 1, 1, 8).toUtc(),
-      );
+      // Church time (Africa/Lusaka, UTC+2), whatever the device zone is.
+      expect(payload['starts_at'], '2099-01-04T06:00:00.000Z');
+      expect(payload['response_deadline'], '2099-01-01T06:00:00.000Z');
+      expect(payload.containsKey('ends_at'), isFalse);
       expect(byKey('duties-pending'), findsOneWidget);
       // Unknown outcome: never shown as published; Check again resends it.
       sent.unknown();
@@ -434,6 +467,46 @@ void main() {
       expect(find.text('Accepted'), findsOneWidget);
       expect(find.text('1 of 1 confirmed'), findsOneWidget);
       expect(byKey('note-$_assignment'), findsOneWidget);
+    });
+
+    testWidgets('an end past midnight and a reporting time are church time', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.dutyLeader,
+        setUp: (h) => h.duties.board = boardWith(),
+      );
+      await tester.enterText(byKey('publish-name-$_dept'), 'Night vigil');
+      await tester.enterText(byKey('publish-date-$_dept'), '2099-01-04');
+      await tester.enterText(byKey('publish-start-$_dept'), '22:00');
+      await tester.enterText(byKey('publish-end-date-$_dept'), '2099-01-05');
+      await tester.enterText(byKey('publish-end-$_dept'), '01:00');
+      await tester.enterText(byKey('publish-reporting-$_dept'), '21:30');
+      await choose(tester, 'publish-member-$_dept', 'SYNTHETIC Ruth');
+      await tester.enterText(
+        byKey('publish-deadline-date-$_dept'),
+        '2099-01-01',
+      );
+      await tester.enterText(byKey('publish-deadline-time-$_dept'), '18:00');
+      await tester.pump();
+      await tapKey(tester, 'publish-save-$_dept');
+      final payload = h.gateway.sent.single.wire['payload'] as Map;
+      expect(payload['starts_at'], '2099-01-04T20:00:00.000Z');
+      expect(payload['ends_at'], '2099-01-04T23:00:00.000Z');
+      expect(payload['reporting_at'], '2099-01-04T19:30:00.000Z');
+      expect(payload['response_deadline'], '2099-01-01T16:00:00.000Z');
+    });
+
+    testWidgets('times are shown in church time', (tester) async {
+      await pumpAt(
+        tester,
+        ClientPaths.dutyLeader,
+        setUp: (h) => h.duties.board = boardWith(duties: [leaderDuty()]),
+      );
+      // 08:00Z is 10:00 in Lusaka.
+      expect(find.textContaining('10:00'), findsWidgets);
+      expect(find.textContaining('(church time)'), findsWidgets);
     });
 
     testWidgets('a refusal names the field; Pastor oversight cannot publish', (
@@ -510,6 +583,51 @@ void main() {
         ),
         findsOneWidget,
       );
+    });
+
+    testWidgets('a reload while an answer is in flight cannot send it twice', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.myDuties,
+        setUp: (h) => h.duties.mine = mineWith([myDutyData()]),
+      );
+      await tapKey(tester, 'duty-accept-$_assignment');
+      final sent = h.gateway.sent.single;
+      final calls = h.duties.mineCalls;
+      // A resume while the request is out does not reload.
+      for (final st in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(st);
+      }
+      await settle(tester);
+      expect(h.duties.mineCalls, calls);
+      // Even a reload that does run keeps the request pending.
+      final container = ProviderScope.containerOf(
+        tester.element(byKey('duties-reload')),
+      );
+      await container.read(myDutiesProvider.notifier).reload();
+      await settle(tester);
+      expect(h.duties.mineCalls, calls + 1);
+      expect(byKey('duties-pending'), findsOneWidget);
+      expect(enabled(tester, 'duty-accept-$_assignment'), isFalse);
+      expect(enabled(tester, 'duty-decline-$_assignment'), isFalse);
+      await tester.tap(byKey('duty-accept-$_assignment'), warnIfMissed: false);
+      await tester.pump();
+      expect(h.gateway.sent, hasLength(1));
+      sent.unknown();
+      await settle(tester);
+      // The unconfirmed answer is resent under the same request id.
+      await tapKey(tester, 'duty-accept-$_assignment');
+      expect(h.gateway.sent, hasLength(2));
+      expect(h.gateway.sent.last.wire['request_id'], sent.wire['request_id']);
     });
 
     testWidgets('Can\'t make it; a stale answer reloads', (tester) async {

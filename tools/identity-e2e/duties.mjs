@@ -184,10 +184,12 @@ async function main() {
     const notAdmin = await duties(plain.token, 'duties.create_department', null, { name: DEPARTMENT });
     const created = await duties(admin.token, 'duties.create_department', null, { name: DEPARTMENT });
     const departmentId = created.data?.department_id;
-    check('D10-admin-creates-the-department', notAdmin.code === 'forbidden' && created.status === 200
-      && created.data?.name === DEPARTMENT && created.revision === 1 && created.data?.is_synthetic === true,
-      { non_admin: notAdmin.code, status: created.status, revision: created.revision });
     const overview = await read('duties_admin_overview', admin.token);
+    const listed = overview.json?.departments?.find((d) => d.department_id === departmentId);
+    check('D10-admin-creates-the-department', notAdmin.code === 'forbidden' && created.status === 200
+      && created.revision === 1 && listed?.name === DEPARTMENT && listed?.is_synthetic === true
+      && Object.keys(created.data ?? {}).sort().join(',') === 'department_id,revision',
+      { non_admin: notAdmin.code, status: created.status, revision: created.revision, answer_keys: Object.keys(created.data ?? {}).sort() });
     const grantsRev = (p) => overview.json?.members?.find((m) => m.member_id === p.member)?.grants_revision;
     const grant = await envelope('identity_grant_command', admin.token, 'identity.grant_scope', grantsRev(leader),
       { member_id: leader.member, scope_kind: 'department_leader', scope_id: departmentId });
@@ -196,9 +198,11 @@ async function main() {
       { status: grant.status, code: grant.code ?? null });
     const addM = await duties(admin.token, 'duties.add_member', 1, { department_id: departmentId, member_id: member.member });
     const addO = await duties(admin.token, 'duties.add_member', 2, { department_id: departmentId, member_id: other.member });
-    check('D12-admin-adds-two-members', addM.revision === 2 && addO.revision === 3 && addO.data?.members?.length === 2
-      && addO.data?.leaders?.[0]?.member_id === leader.member,
-      { revisions: [addM.revision, addO.revision], members: addO.data?.members?.length });
+    const afterAdd = (await read('duties_admin_overview', admin.token)).json?.departments
+      ?.find((d) => d.department_id === departmentId);
+    check('D12-admin-adds-two-members', addM.revision === 2 && addO.revision === 3 && afterAdd?.members?.length === 2
+      && afterAdd?.leaders?.[0]?.member_id === leader.member,
+      { revisions: [addM.revision, addO.revision], members: afterAdd?.members?.length });
 
     // ------------------------------------------------------------------------------ publishing
     const draft = {
@@ -216,8 +220,8 @@ async function main() {
     const publishRequest = randomUUID();
     const published = await duties(leader.token, 'duties.publish_duty', null, draft, publishRequest);
     const replay = await duties(leader.token, 'duties.publish_duty', null, draft, publishRequest);
-    const assignment = firstAssignment(published.data);
-    const assignmentId = assignment?.assignment_id;
+    const assignmentId = published.data?.assignment_id;
+    const assignment = firstAssignment((await read('duties_leader_board', leader.token)).json?.departments?.[0]?.duties?.[0]);
     const occurrences = Number(psql(`select count(*) from app.duties_occurrences where department_id = '${departmentId}'`));
     check('D22-leader-publishes-one-position', published.status === 200 && assignment?.response === 'pending'
       && assignment?.member_id === member.member && published.data?.notice_queued === true
@@ -276,6 +280,9 @@ async function main() {
         second_answer: again.code, item_after: reopened?.state });
     const audit = psql(`select string_agg(action || ':' || actor_capacity, ',' order by event_id) from app.duties_audit
       where department_id = '${departmentId}'`);
+    const receiptNames = Number(psql(`select count(*) from app.cmd_receipts where command like 'duties.%'
+      and (result::text like '%${NAME_PREFIX}%' or result::text like '%SYNTHETIC note%')`));
+    check('D42-receipts-hold-no-names-or-notes', receiptNames === 0, { receipts_with_names: receiptNames });
     check('D41-audit-is-content-free', audit === 'department_created:admin,member_added:admin,member_added:admin,duty_published:department_leader,response_recorded:member',
       { audit });
   } finally {

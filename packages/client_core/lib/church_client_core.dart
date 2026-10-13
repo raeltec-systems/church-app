@@ -25,6 +25,7 @@ export 'src/domain/account_auth.dart';
 export 'src/domain/assisted_recovery.dart';
 export 'src/domain/cell_membership.dart';
 export 'src/domain/commands.dart';
+export 'src/domain/church_time.dart';
 export 'src/domain/credential_review.dart';
 export 'src/domain/duties.dart';
 export 'src/domain/fixture_counter.dart';

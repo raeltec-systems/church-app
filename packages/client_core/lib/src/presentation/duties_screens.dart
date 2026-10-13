@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../application/duties_controllers.dart';
 import '../domain/access_grants.dart';
+import '../domain/church_time.dart';
 import '../domain/duties.dart';
 
 // Story 4.1: departments (Admin) and publishing with responses (leaders) on
@@ -207,8 +208,12 @@ class _DutiesPageState<T> extends ConsumerState<_DutiesPage<T>> {
     if (ref.read(widget.provider).result != null) Future.microtask(_reload);
   }
 
+  // Resume and revisit reloads wait while a command is in flight (its own
+  // answer reloads the list).
   void _reload() {
-    if (mounted) ref.read(widget.provider.notifier).reload();
+    if (mounted && !ref.read(widget.provider).busy) {
+      ref.read(widget.provider.notifier).reload();
+    }
   }
 
   @override
@@ -370,23 +375,34 @@ Widget _muted(BuildContext context, String text) => Text(
   style: ChurchType.secondary.copyWith(color: ChurchColors.of(context).muted),
 );
 
-String _when(BuildContext context, DateTime at) {
-  final l10n = MaterialLocalizations.of(context);
-  final local = at.toLocal();
-  return '${l10n.formatMediumDate(local)} '
-      '${l10n.formatTimeOfDay(TimeOfDay.fromDateTime(local), alwaysUse24HourFormat: true)}';
-}
-
-String _timesText(BuildContext context, DutyTimes t) {
-  final l10n = MaterialLocalizations.of(context);
-  String clock(DateTime at) => l10n.formatTimeOfDay(
-    TimeOfDay.fromDateTime(at.toLocal()),
+// Every duty time is shown in church time (Africa/Lusaka), whatever zone the
+// device is set to.
+String _clock(BuildContext context, DateTime at) {
+  final w = ChurchTime.wall(at);
+  return MaterialLocalizations.of(context).formatTimeOfDay(
+    TimeOfDay(hour: w.hour, minute: w.minute),
     alwaysUse24HourFormat: true,
   );
+}
+
+String _when(BuildContext context, DateTime at) =>
+    '${MaterialLocalizations.of(context).formatMediumDate(ChurchTime.wall(at))} '
+    '${_clock(context, at)}';
+
+String _timesText(BuildContext context, DutyTimes t) {
+  bool sameDay(DateTime a, DateTime b) {
+    final x = ChurchTime.wall(a), y = ChurchTime.wall(b);
+    return x.year == y.year && x.month == y.month && x.day == y.day;
+  }
+
   return [
     _when(context, t.startsAt),
-    if (t.endsAt case final e?) 'until ${clock(e)}',
-    if (t.reportingAt case final r?) '(report at ${clock(r)})',
+    if (t.endsAt case final e?)
+      sameDay(t.startsAt, e)
+          ? 'until ${_clock(context, e)}'
+          : 'until ${_when(context, e)}',
+    if (t.reportingAt case final r?) '(report at ${_clock(context, r)})',
+    '(church time)',
   ].join(' ');
 }
 
@@ -422,6 +438,11 @@ class DutyAdminScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _heading(context, 'Departments (${o.departments.length})'),
+        if (o.membersTruncated)
+          _muted(
+            context,
+            'Only the first 500 members (by name) can be chosen here.',
+          ),
         if (o.departments.isEmpty)
           const Text('No departments yet.', key: Key('no-departments')),
         for (final d in o.departments) ...[
@@ -749,6 +770,8 @@ class _LeaderDepartmentCard extends StatelessWidget {
             ],
           ),
           _heading(context, 'Duties (${d.duties.length})'),
+          if (d.dutiesTruncated)
+            _muted(context, 'Only the first 200 duties are shown.'),
           if (d.duties.isEmpty)
             Text('No duties yet.', key: Key('no-duties-${d.departmentId}')),
           for (final duty in d.duties) _LeaderDutyRow(duty: duty),
@@ -818,20 +841,6 @@ class _LeaderDutyRow extends StatelessWidget {
   }
 }
 
-/// Parses `YYYY-MM-DD` and `HH:MM` as this device's local wall time (the
-/// church's time on a staff computer in Zambia). Null when either is wrong.
-DateTime? _localInstant(String date, String time) {
-  final d = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(date.trim());
-  final t = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(time.trim());
-  if (d == null || t == null) return null;
-  final y = int.parse(d[1]!), mo = int.parse(d[2]!), da = int.parse(d[3]!);
-  final h = int.parse(t[1]!), mi = int.parse(t[2]!);
-  if (mo < 1 || mo > 12 || da < 1 || da > 31 || h > 23 || mi > 59) return null;
-  final at = DateTime(y, mo, da, h, mi);
-  if (at.month != mo || at.day != da) return null;
-  return at;
-}
-
 class _PublishForm extends ConsumerStatefulWidget {
   const _PublishForm({super.key, required this.department, required this.busy});
   final LeaderDepartment department;
@@ -846,6 +855,8 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
   final _date = TextEditingController();
   final _start = TextEditingController();
   final _end = TextEditingController();
+  final _endDate = TextEditingController();
+  final _reporting = TextEditingController();
   final _location = TextEditingController();
   final _instructions = TextEditingController();
   final _deadlineDate = TextEditingController();
@@ -857,6 +868,8 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
     _date,
     _start,
     _end,
+    _endDate,
+    _reporting,
     _location,
     _instructions,
     _deadlineDate,
@@ -873,16 +886,23 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
 
   DutyDraft? _draft() {
     final member = _memberId;
-    final starts = _localInstant(_date.text, _start.text);
-    final deadline = _localInstant(_deadlineDate.text, _deadlineTime.text);
+    // Church time (Africa/Lusaka), whatever zone this computer uses.
+    final starts = ChurchTime.parse(_date.text, _start.text);
+    final deadline = ChurchTime.parse(_deadlineDate.text, _deadlineTime.text);
+    final endDate = _endDate.text.trim().isEmpty ? _date.text : _endDate.text;
     final ends = _end.text.trim().isEmpty
         ? null
-        : _localInstant(_date.text, _end.text);
+        : ChurchTime.parse(endDate, _end.text);
+    final reporting = _reporting.text.trim().isEmpty
+        ? null
+        : ChurchTime.parse(_date.text, _reporting.text);
     if (member == null ||
         _name.text.trim().isEmpty ||
         starts == null ||
         deadline == null ||
-        (_end.text.trim().isNotEmpty && ends == null)) {
+        (_end.text.trim().isNotEmpty && ends == null) ||
+        (_endDate.text.trim().isNotEmpty && _end.text.trim().isEmpty) ||
+        (_reporting.text.trim().isNotEmpty && reporting == null)) {
       return null;
     }
     return DutyDraft(
@@ -890,6 +910,7 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
       dutyName: _name.text,
       startsAt: starts,
       endsAt: ends,
+      reportingAt: reporting,
       location: _location.text,
       instructions: _instructions.text,
       memberId: member,
@@ -941,7 +962,8 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
         _muted(
           context,
           'One person, one position. They are asked to accept or say they '
-          'can\'t make it by the deadline you set. Times are church time.',
+          'can\'t make it by the deadline you set. Times are church time '
+          '(Lusaka), whatever this computer\'s clock is set to.',
         ),
         const SizedBox(height: 8),
         field('publish-name', _name, 'Duty', wire: 'duty_name'),
@@ -966,6 +988,21 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
           'End time (optional)',
           hint: 'HH:MM',
           wire: 'ends_at',
+          maxLength: 5,
+        ),
+        field(
+          'publish-end-date',
+          _endDate,
+          'End date, if it ends on a later day (optional)',
+          hint: 'YYYY-MM-DD',
+          maxLength: 10,
+        ),
+        field(
+          'publish-reporting',
+          _reporting,
+          'Reporting time, if earlier than the start (optional)',
+          hint: 'HH:MM',
+          wire: 'reporting_at',
           maxLength: 5,
         ),
         field(
@@ -1106,6 +1143,11 @@ class _MyDutiesList extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (duties.truncated)
+          Text(
+            'Only your next 200 duties are shown.',
+            key: const Key('my-duties-truncated'),
+          ),
         ...section('Needs a response', needs, false),
         ...section('Upcoming', upcoming, false),
         if (past.isNotEmpty) ...section('Past', past, false),

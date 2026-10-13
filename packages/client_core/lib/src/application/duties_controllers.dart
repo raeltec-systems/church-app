@@ -139,9 +139,12 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
     state = state.copyWith(loading: true);
     final r = await fetch();
     if (!_current(epoch)) return;
-    // A denial or failure drops everything protected from the screen.
+    // A denial or failure drops everything protected from the screen. A
+    // request still in flight stays pending, so its buttons stay disabled
+    // and it cannot be sent twice.
     state = DutiesState<T>(
       result: r,
+      pending: state.pending,
       notice: state.notice,
       noticeAction: state.noticeAction,
       unconfirmed: state.unconfirmed,

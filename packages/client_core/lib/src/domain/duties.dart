@@ -173,7 +173,11 @@ class MyDuty {
 
 /// `api.duties_my_duties`.
 class MyDuties {
-  const MyDuties({required this.memberId, required this.assignments});
+  const MyDuties({
+    required this.memberId,
+    required this.assignments,
+    this.truncated = false,
+  });
 
   factory MyDuties.fromJson(Object? json) {
     final m = _map(json, 'my duties');
@@ -182,11 +186,15 @@ class MyDuties {
       assignments: List.unmodifiable(
         _req<List>(m, 'assignments').map(MyDuty.fromJson),
       ),
+      truncated: _opt<bool>(m, 'truncated') ?? false,
     );
   }
 
   final String memberId;
   final List<MyDuty> assignments;
+
+  /// More duties exist than the server listed (future ones come first).
+  final bool truncated;
 
   MyDuty? find(String? assignmentId) {
     for (final a in assignments) {
@@ -340,6 +348,7 @@ class LeaderDepartment {
     required this.canPublish,
     required this.members,
     required this.duties,
+    this.dutiesTruncated = false,
   });
 
   factory LeaderDepartment.fromJson(Object? json) {
@@ -365,8 +374,12 @@ class LeaderDepartment {
       duties: List.unmodifiable(
         _req<List>(m, 'duties').map(LeaderDuty.fromJson),
       ),
+      dutiesTruncated: _opt<bool>(m, 'duties_truncated') ?? false,
     );
   }
+
+  /// More duties exist than the server listed.
+  final bool dutiesTruncated;
 
   final String departmentId;
   final String name;
@@ -496,7 +509,11 @@ class DutyCandidate {
 
 /// `api.duties_admin_overview`.
 class DutyAdminOverview {
-  const DutyAdminOverview({required this.departments, required this.members});
+  const DutyAdminOverview({
+    required this.departments,
+    required this.members,
+    this.membersTruncated = false,
+  });
 
   factory DutyAdminOverview.fromJson(Object? json) {
     final m = _map(json, 'duties overview');
@@ -507,11 +524,15 @@ class DutyAdminOverview {
       members: List.unmodifiable(
         _req<List>(m, 'members').map(DutyCandidate.fromJson),
       ),
+      membersTruncated: _opt<bool>(m, 'members_truncated') ?? false,
     );
   }
 
   final List<AdminDepartment> departments;
   final List<DutyCandidate> members;
+
+  /// More approved members exist than the server listed (at most 500).
+  final bool membersTruncated;
 }
 
 /// What a leader enters to publish one duty. Instants are sent as UTC.

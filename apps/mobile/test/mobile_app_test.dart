@@ -51,6 +51,14 @@ void main() {
   // Each test starts as a fresh app: no input seen yet.
   setUp(FocusVisibility.instance.reset);
 
+  testWidgets('story 3.8: the staff reminder-health route does not exist on mobile', (
+    tester,
+  ) async {
+    await pumpMobile(tester, location: ClientPaths.notificationHealth);
+    expect(find.byType(NotificationHealthScreen), findsNothing);
+    expect(find.text('Reminder health'), findsNothing);
+  });
+
   testWidgets(
     'story 3.6: a tapped notification opens its inbox item; denied push registers nothing',
     (tester) async {

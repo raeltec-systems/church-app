@@ -8,12 +8,27 @@ cd "$(dirname "$0")/../.."
 BASE=_bmad-output/initiative-church-app/epic-platform-baseline
 EVIDENCE_DIRS=("$BASE/evidence-1.2" "$BASE/evidence-1.3")
 personal_data=false
-if [ "${1:-}" = "--personal-data" ]; then
-  personal_data=true
-  shift
+paths=()
+# Flags may come in any position; an unknown flag or a missing path is an error (exit 2), never
+# a "clean" report (review 3.8-3.10, finding 13).
+for arg in "$@"; do
+  case "$arg" in
+    --personal-data) personal_data=true ;;
+    --) ;;
+    -*) echo "scan-evidence: unknown option: $arg" >&2; exit 2 ;;
+    *) paths+=("$arg") ;;
+  esac
+done
+if [ ${#paths[@]} -eq 0 ]; then
+  [ "$personal_data" = true ] && { echo "scan-evidence: --personal-data needs at least one path" >&2; exit 2; }
+  paths=("${EVIDENCE_DIRS[@]}" tools/auth-harness)
 fi
-paths=("$@")
-[ ${#paths[@]} -eq 0 ] && paths=("${EVIDENCE_DIRS[@]}" tools/auth-harness)
+for path in "${paths[@]}"; do
+  if [ ! -e "$path" ]; then
+    echo "scan-evidence: no such path: $path" >&2
+    exit 2
+  fi
+done
 
 patterns=(
   # JWT (header.payload.signature)
@@ -43,17 +58,22 @@ fail=0
 # opt-in check because the broader harness and runbooks intentionally include
 # synthetic UUIDs, phones and example addresses.
 if [ "$personal_data" = true ]; then
+  allowed_words='(?:A|An|And|Android|Apple|Admin|Access|Account|Acceptance|All|Api|Apns|Browser|Build|Cells|Check|Checks|Chrome|Client|Clients|Cloud|Core|Count|Counts|Debug|Delivery|Design|Device|Devices|Direct|Contact|Edge|Evidence|Failed|Fake|Fcm|Firebase|Firefox|Flutter|Function|Functions|Gate|Google|Health|Hosted|In|Inbox|Ios|Item|Lifecycle|Local|Linux|Macos|Member|Members|Messaging|Mobile|Not|Notes|Notification|Notifications|Of|On|Out|Owner|Pass|Passed|Platform|Production|Push|Recorded|Redacted|Release|Reminder|Reminders|Result|Results|Review|Run|Safari|Scheduler|Settings|Sign|Signed|Snooze|Source|Staff|Staging|Status|Step|Story|Suite|Suites|Supabase|Synthetic|Test|Tests|The|This|To|Unavailable|Web|Windows|Witness|Worker)'
   personal_patterns=(
     # Canonical UUIDs (member/account/source/job/item/device identifiers).
     '\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b'
-    # E.164 and common North American phone formats.
-    '\+[1-9][0-9]{7,14}\b'
+    # E.164, also written with spaces, dots, dashes or brackets (+260 97 123 4567, +44 (0)7700 900800),
+    # and common North American phone formats.
+    '\+[1-9](?:[ .()-]{0,2}[0-9]){7,16}\b'
     '\b[2-9][0-9]{2}[-. ][2-9][0-9]{2}[-. ][0-9]{4}\b'
     '\([2-9][0-9]{2}\)[ .-]?[2-9][0-9]{2}[ .-][0-9]{4}\b'
     # Any ordinary number written in a labeled phone field.
     '(?i)\b(phone|telephone|mobile|cell)([ _-]+(number|no))?\s*[:=]\s*\+?[0-9][0-9 ()-]{5,}[0-9]'
     # Email addresses, including owner and member addresses.
     '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
+    # Unlabeled names: two adjacent capitalized words unless both are known product, platform or
+    # report vocabulary. A heuristic: add a word here only when it is not a personal name.
+    "\\b(?:(?!${allowed_words}\\b)[A-Z][a-z'’-]+[ ][A-Z][a-z'’-]+|[A-Z][a-z'’-]+[ ](?!${allowed_words}\\b)[A-Z][a-z'’-]+)\\b"
     # Names in explicitly labeled identity fields.
     '(?i)\b(member|account|source|job|item|device|witness|recipient)([ _-]+(full[ _-]+)?name)?\s*[:=]\s*[A-Z][[:alpha:]’'"'"'-]+[[:space:]]+[A-Z][[:alpha:]’'"'"'-]+'
   )

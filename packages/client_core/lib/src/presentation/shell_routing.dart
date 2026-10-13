@@ -106,8 +106,9 @@ abstract final class ClientPaths {
   /// Story 3.7 (both clients): push on or off by reminder category.
   static const notificationSettings = '/notification-settings';
 
-  /// Staff-only reminder health projection; authorization is checked by the
-  /// server for every read.
+  /// Story 3.8, staff web only (the route exists only when the router is
+  /// built with `reminderHealth`): the reminder health projection;
+  /// authorization is checked by the server for every read.
   static const notificationHealth = '/admin/reminder-health';
 
   /// Story 3.7, SYNTHETIC (local/staging only): test reminders for the
@@ -179,11 +180,15 @@ typedef ShellBuilder = Widget Function(
 /// [assistedRecovery] links the sign-in help to "I need help accessing my
 /// account" (story 2.9, mobile only: the member chooses the password on the
 /// phone that created the setup request).
+///
+/// [reminderHealth] registers the staff reminder-health screen (story 3.8,
+/// staff web only).
 GoRouter buildClientRouter({
   required ShellBuilder shell,
   String initialLocation = ClientPaths.status,
   bool membershipRequests = false,
   bool assistedRecovery = false,
+  bool reminderHealth = false,
 }) {
   final afterCreateAccount = membershipRequests
       ? ClientPaths.membership
@@ -234,11 +239,13 @@ GoRouter buildClientRouter({
         pageBuilder: (_, state) =>
             page(state, const NotificationSettingsScreen()),
       ),
-      GoRoute(
-        path: ClientPaths.notificationHealth,
-        pageBuilder: (_, state) =>
-            page(state, const NotificationHealthScreen()),
-      ),
+      // Story 3.8: staff web only (the mobile app has no operator screens).
+      if (reminderHealth)
+        GoRoute(
+          path: ClientPaths.notificationHealth,
+          pageBuilder: (_, state) =>
+              page(state, const NotificationHealthScreen()),
+        ),
       GoRoute(
         path: ClientPaths.account,
         pageBuilder: (_, state) => page(

@@ -103,6 +103,10 @@ begin
       into v_operator;
   end if;
   if not v_admin and not v_operator then
+    -- Same wire shape as app.identity_require_grant, so clients map each reason.
+    if v_access = 'unavailable' then
+      raise exception using errcode = 'PT403', message = 'unavailable', detail = v_access;
+    end if;
     raise exception using errcode = 'PT403', message = 'forbidden', detail = v_access;
   end if;
 

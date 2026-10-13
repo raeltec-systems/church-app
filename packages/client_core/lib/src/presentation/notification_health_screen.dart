@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/notification_health_controllers.dart';
 import '../domain/access_grants.dart';
+import '../domain/notification_health.dart';
 
 class NotificationHealthScreen extends ConsumerWidget {
   const NotificationHealthScreen({super.key});
@@ -22,15 +23,7 @@ class NotificationHealthScreen extends ConsumerWidget {
         key: Key('notification-health-loading'), tone: StatusTone.info, busy: true,
         title: 'Loading reminder health…', message: 'The server checks staff access every time.'));
     } else if (health == null) {
-      final denied = state.result is AccessReadDenied;
-      children.add(RequestStateBanner(
-        key: const Key('notification-health-unavailable'),
-        tone: denied ? StatusTone.warning : StatusTone.danger,
-        title: denied ? 'Reminder health unavailable' : 'Couldn’t check reminder health',
-        message: denied
-            ? 'This account is not authorized to view reminder health.'
-            : 'The health read failed. Try again.',
-      ));
+      children.add(_refusal(state.result!));
     } else {
       if (health.empty) {
         children.add(const RequestStateBanner(
@@ -45,7 +38,7 @@ class NotificationHealthScreen extends ConsumerWidget {
           key: Key('notification-health-stale'),
           tone: StatusTone.warning,
           title: 'Scheduler status may be stale',
-          message: 'No scheduler tick was recorded in the last five minutes.',
+          message: 'No successful scheduler hand-off was recorded in the last five minutes.',
         ));
       }
       children.addAll([
@@ -68,14 +61,17 @@ class NotificationHealthScreen extends ConsumerWidget {
         _row('Outbound gate', health.push.outboundOpen ? 'Open' : 'Closed'),
         _row('Pending push jobs', '${health.push.pending}'),
         _row('Active push leases', '${health.push.leased}'),
-        _row('Transient failures in 24 hours', '${health.push.failedAttempts24h}'),
+        _row('Failed push attempts in 24 hours', '${health.push.failedAttempts24h}'),
         _row('Retired device tokens', '${health.tokens.retired}'),
         _row('Retired tokens in 24 hours', '${health.tokens.retired24h}'),
         _row('Most recent token retirement', _time(health.tokens.lastRetiredAt)),
       ]),
       _section('Direct contact', [
-        _row('Backlog', '${health.directContact.backlog}'),
+        _row('Without a route in 24 hours', '${health.directContact.backlog}'),
         _row('Oldest due time', _time(health.directContact.oldestDueAt)),
+        _row('Routed in 24 hours', '${health.directContact.routed24h}'),
+        _row('Without a route, all time', '${health.directContact.totalUnrouted}'),
+        _row('All direct-contact needs', '${health.directContact.total}'),
       ]),
       Text('Snapshot: ${_time(health.capturedAt)}', key: const Key('notification-health-captured')),
       ]);
@@ -96,6 +92,43 @@ class NotificationHealthScreen extends ConsumerWidget {
       )),
     );
   }
+
+  /// One banner per refusal reason (review 3.8-3.10, finding 12).
+  static Widget _refusal(AccessRead<ReminderHealth> result) => switch (result) {
+    AccessReadDenied(:final denial) => RequestStateBanner(
+      key: Key('notification-health-denied-${denial.name}'),
+      tone: switch (denial) {
+        AccessDenial.untrustedSession || AccessDenial.reviewRequired => StatusTone.warning,
+        AccessDenial.signedOut => StatusTone.info,
+        _ => StatusTone.neutral,
+      },
+      title: switch (denial) {
+        AccessDenial.signedOut => 'Not signed in',
+        AccessDenial.untrustedSession => 'Please sign in again',
+        AccessDenial.reviewRequired => 'Access review required',
+        AccessDenial.unavailable => 'Reminder health not available here',
+        AccessDenial.notLinked || AccessDenial.notGranted => 'Reminder health unavailable',
+      },
+      message: switch (denial) {
+        AccessDenial.signedOut => 'Sign in to view reminder health.',
+        AccessDenial.untrustedSession => 'This sign-in is no longer valid.',
+        AccessDenial.reviewRequired =>
+          'Your access needs a check by the church before it can continue.',
+        AccessDenial.unavailable => 'The server does not offer reminder health here yet.',
+        AccessDenial.notLinked || AccessDenial.notGranted =>
+          'This account is not authorized to view reminder health.',
+      },
+    ),
+    AccessReadFailed(:final unreachable) => RequestStateBanner(
+      key: const Key('notification-health-failed'),
+      tone: StatusTone.danger,
+      title: unreachable ? 'No connection' : 'Couldn’t check reminder health',
+      message: unreachable
+          ? 'The server could not be reached. Try again.'
+          : 'The health read failed. Try again.',
+    ),
+    AccessReadOk() => const SizedBox.shrink(),
+  };
 
   static Widget _section(String title, List<Widget> rows) => Padding(
     padding: const EdgeInsets.only(bottom: 20),

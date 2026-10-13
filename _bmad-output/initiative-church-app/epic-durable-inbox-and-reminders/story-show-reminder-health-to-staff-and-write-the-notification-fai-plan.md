@@ -3,7 +3,7 @@ title: 'Show reminder health to staff and write the notification-failure runbook
 type: 'feature'
 ticket: '8'
 created: '2026-10-13'
-status: 'built'
+status: 'in-review'
 baseline_revision: 'b6e4d7328bb89859e7cfbe562c061e7885d2d1a1'
 route: 'full'
 route_source: 'auto'
@@ -91,3 +91,42 @@ Stories 3.5 and 2.3 are done; 3.7 is built. No local prerequisite blocks impleme
 **Database environment limitation:** The standard `npx supabase db reset && npm run -s db:test` path could not complete because the local Supabase containers could not reach Postgres through Docker's `db` alias. The same three pgTAP files passed through a host-gateway connection. No hosted database was changed.
 
 **Manual checks:** The staging demonstration remains for the owner: map the operator, set synthetic delayed/failure states, and confirm both roles, redaction, refusal, and gate pause/resume procedure.
+
+## Review fixes (2026-10-13)
+
+Source: `review-3.8-3.10.md` (findings 1-19, fix plan phases A-D). No new ticket. Owner decision:
+`outbound_sending` may be open on staging (push needs it); production stays closed until approved.
+
+- **Migration edited in place** (`20261013000000`, applied nowhere hosted): `auth_user_id uuid unique` without the `auth.users` FK (finding 2); triggers on `auth.users` delete/soft-delete clear the mapping (no hand-pasted function touched); the read checks the live-access predicate once and refuses unauthenticated/untrusted sessions explicitly with PT401 before either path (17); operator path needs an active row, an existing unbanned Auth user and standing not in review; `unavailable` refusals use the identity wire shape. Behaviour: claims with the gate closed still expire and count lapses (6); stale from `last_success_at` (8); direct-contact backlog = unrouted in 24 h, totals separate (9); push failures include `failed` and `lapsed` (10); `::numeric::bigint` lease token (16).
+- **Worker:** `gate_closed` is a known push outcome and a validated claim flag (7).
+- **Client:** per-reason refusal banners and a failed-read banner; nav entry has its own icon and is hidden while signed out; route only on staff web; malformed timestamps are format errors (12, 19).
+- **Tests:** `notifications_health_test.sql` rewritten (31: mapping lifecycle, untrusted/banned/soft-deleted sessions, push and token sections); 6 gate-closed cases in `notifications_push_test.sql`; privilege ledgers list the read (5); Dart and staff/mobile tests.
+- **Runbook:** Story 3.8 rewritten, with a **Hosted staging** section (apply via MCP, gate decision, redeploy `notifications-worker` and `identity-deletion` with `../_shared/system_access.mjs`, checks, owner mapping and demonstration).
+
+**Status `in-review`: pending owner/staging items (finding 15).**
+1. Parent session: apply `20261013000000_notifications_health.sql` to staging with MCP `apply_migration`, then `verify-hosted.sql` (`expected_env=staging`).
+2. Owner: approve `outbound_sending` on staging (`notifications.md` Story 3.6 step 7) if staging push stays in use.
+3. Parent session: redeploy `notifications-worker` (`index.ts`, `logic.mjs`, `fcm.mjs`, `../_shared/system_access.mjs`) and `identity-deletion` (`index.ts`, `logic.mjs`, `../_shared/system_access.mjs`); confirm no boot error, a fresh claim and `last_success_at` moving, and one accepted synthetic push.
+4. Owner: map the staging operator account, open Reminder health on staff web, run the synthetic failure and pause/resume demonstration, record pass/fail and counts in `evidence-3.8/`.
+
+**Full local verification (after all review fixes):** `npx supabase db reset`; `npm run -s db:test` (26 files, 2144 tests, PASS); `npm run -s db:smoke` (exit 0); `npm run -s contracts:test` (242); `npm run -s ci:policy-test` (56); `node --test tools/auth-harness/*.test.mjs tools/identity-e2e/*.test.mjs supabase/functions/*/*.test.mjs tools/identity-deletion/*.test.mjs tools/notifications/*.test.mjs` (156, includes `_shared`); `ci:secrets`, `ci:migrations -- --base origin/main` (34), `ci:function-imports`, `env:check` and all 23 CI evidence scans clean; Flutter analyze clean and tests pass for `packages/client_core` (428), `apps/staff` (33), `apps/mobile` (45); `verify-hosted.sql` exercised locally in five rolled-back marker/gate cases. E2E, each after a reset:
+
+```
+run exit=0 
+grants exit=0 
+apply exit=0 27/27 checks passed 
+review exit=0 18/18 checks passed 
+cells exit=0 13/13 checks passed 
+recovery exit=0 20/20 checks passed 
+credentials exit=0 15/15 checks passed 
+assisted exit=0 16/16 checks passed 
+lifecycle exit=0 9/9 checks passed 
+deletion exit=0 12/12 checks passed 
+runbooks exit=0 16/16 checks passed 
+inbox exit=0 13/13 checks passed 
+source-contracts exit=0 10/10 checks passed 
+worker exit=0 17/17 checks passed 
+routing exit=0 18/18 checks passed 
+push exit=0 12/12 checks passed 
+inbox-screens exit=0 12/12 checks passed
+```

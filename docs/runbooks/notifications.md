@@ -655,8 +655,10 @@ Record the outcome per step in `evidence-3.7/owner-device-check.md` (pass/fail, 
 
 ## Story 3.8: staff reminder health and notification recovery
 
-Migration: `supabase/migrations/20261013000000_notifications_health.sql` (edited in place by the
-2026-10-13 review fixes before any hosted apply; no row deletions, no destructive statements). The
+Migrations: `supabase/migrations/20261013000000_notifications_health.sql` and the review repair
+`supabase/migrations/20261013190000_notifications_health_repair.sql` (2026-10-13; it replaces the
+health read and the two push system commands, adds the mapping triggers and drops the
+`auth.users` foreign key under an owner-approved-cleanup marker). No row deletions. The
 read is `POST /rest/v1/rpc/notifications_health` (`Content-Profile: api`). It returns only counts,
 timestamps and fixed status codes for scheduler activity, due and leased jobs, failed/lapsed
 attempts, push work, retired tokens and the direct-contact backlog. It never returns reminder
@@ -759,11 +761,15 @@ found it in cleanup.
 Nothing of story 3.8 is applied to staging yet (staging's latest migration was `20261008183514`
 on 2026-10-13, and the deployed `notifications-worker` is the pre-refactor version). In order:
 
-1. **Parent session: the migration.** Apply `20261013000000_notifications_health.sql` to staging
-   (`tmurpotfluignacfueki`) with the Supabase MCP `apply_migration` (name
-   `notifications_health`). There is no rows file. It adds `last_success_at`,
-   `app.ops_operators.auth_user_id` and its two `auth.users` triggers, the health read, and
-   replaces the push claim/prepare functions with the `outbound_sending` checks. Check:
+1. **Parent session: the migrations, in order.** Apply to staging (`tmurpotfluignacfueki`) with
+   the Supabase MCP `apply_migration`: first `20261013000000_notifications_health.sql` (name
+   `notifications_health`), then `20261013190000_notifications_health_repair.sql` (name
+   `notifications_health_repair`). There is no rows file. Together they add `last_success_at`,
+   `app.ops_operators.auth_user_id` and its two `auth.users` triggers, the health read, and the
+   push claim/prepare `outbound_sending` checks. The repair contains one
+   `alter table app.ops_operators drop constraint ops_operators_auth_user_id_fkey;` (owner-approved
+   2026-10-13, review finding 2), so the MCP apply may ask for confirmation; approve it, as the
+   constraint only exists since the first file. Check:
    `select app.notifications_scheduler_status() -> 'push';` still answers, and
    `select count(*) from pg_trigger where tgname like 'ops_operators_auth_mapping_%';` answers 2.
 2. **Owner: the gate decision.** Push on staging now needs `outbound_sending` open. If staging

@@ -25,45 +25,11 @@ as $$
   select jsonb_build_object('tick', p_outcome);
 $$;
 
--- No foreign key to auth.users: an app-schema backup must restore into an isolated database
--- that has no auth schema (story 2.11 / 1.10 restore drill). The health read instead requires
--- the mapped Auth user to exist and pass the identity session and standing checks, and the
--- triggers below clear the mapping when that Auth user is deleted or soft-deleted.
 alter table app.ops_operators
-  add column auth_user_id uuid unique;
+  add column auth_user_id uuid unique references auth.users (id) on delete set null;
 
 comment on column app.ops_operators.auth_user_id is
-  'Optional Auth account explicitly mapped by the owner for reminder-health reads only. '
-  'Not a foreign key (restorable without the auth schema); cleared when the Auth user is deleted.';
-
-create function app.ops_operators_clear_auth_mapping()
-returns trigger
-language plpgsql
-security definer
-set search_path = ''
-as $$
-begin
-  update app.ops_operators o set auth_user_id = null where o.auth_user_id = old.id;
-  return null;
-end;
-$$;
-
-comment on function app.ops_operators_clear_auth_mapping() is
-  'Clears a reminder-health operator mapping when its Auth user is deleted or soft-deleted.';
-
-revoke all on function app.ops_operators_clear_auth_mapping()
-  from public, anon, authenticated, service_role;
-
-create trigger ops_operators_auth_mapping_delete
-  after delete on auth.users
-  for each row
-  execute function app.ops_operators_clear_auth_mapping();
-
-create trigger ops_operators_auth_mapping_soft_delete
-  after update of deleted_at on auth.users
-  for each row
-  when (old.deleted_at is null and new.deleted_at is not null)
-  execute function app.ops_operators_clear_auth_mapping();
+  'Optional Auth account explicitly mapped by the owner for reminder-health reads only.';
 
 create function app.notifications_health()
 returns jsonb
@@ -74,62 +40,39 @@ as $$
 declare
   v_scheduler jsonb;
   v_last_tick timestamptz;
-  v_last_success timestamptz;
   v_tick_outcome text;
-  v_access text;
   v_admin boolean := false;
   v_operator boolean := false;
-  v_push_attempts jsonb;
 begin
-  -- One evaluation of the live-access predicate for both paths. An unauthenticated or untrusted
-  -- session (no live password session, or an Auth user that is deleted, banned or anonymous) is
-  -- refused explicitly before either the Admin or the mapped-operator path is considered.
-  select e.outcome into v_access from app.identity_evaluate_grant('admin', null, null) e;
-  if auth.uid() is null or v_access is null or v_access in ('unauthenticated', 'untrusted_session') then
-    raise exception using errcode = 'PT401', message = 'unauthenticated',
-      detail = coalesce(v_access, 'unauthenticated');
+  if auth.uid() is null then
+    raise exception using errcode = 'PT401', message = 'unauthenticated';
   end if;
-  v_admin := v_access = 'granted';
-  if not v_admin then
-    -- Mapped operator: an active operator mapped to this live Auth user. A member account in
-    -- review, on hold or dormant (review_required) is refused; an operator account without a
-    -- member link (not_linked) or without the Admin role (not_granted) may read.
-    select exists (select 1 from app.ops_operators o
-                     join auth.users u on u.id = o.auth_user_id
-                    where o.active and o.auth_user_id = auth.uid()
-                      and u.deleted_at is null and not coalesce(u.is_anonymous, false)
-                      and (u.banned_until is null or u.banned_until <= now()))
-       and v_access in ('not_linked', 'not_granted', 'unavailable')
-      into v_operator;
-  end if;
+
+  begin
+    perform 1 from app.identity_require_grant('admin', null, null);
+    v_admin := true;
+  exception when sqlstate 'PT403' then
+    v_admin := false;
+  end;
+  select exists (select 1 from app.ops_operators o
+                  where o.active and o.auth_user_id = auth.uid()) into v_operator;
   if not v_admin and not v_operator then
-    -- Same wire shape as app.identity_require_grant, so clients map each reason.
-    if v_access = 'unavailable' then
-      raise exception using errcode = 'PT403', message = 'unavailable', detail = v_access;
-    end if;
-    raise exception using errcode = 'PT403', message = 'forbidden', detail = v_access;
+    raise exception using errcode = 'PT403', message = 'forbidden';
   end if;
 
   v_scheduler := app.notifications_scheduler_status();
   v_last_tick := nullif(v_scheduler ->> 'last_tick_at', '')::timestamptz;
-  select s.last_success_at into v_last_success
-    from app.notifications_scheduler_state s where s.singleton;
-  select coalesce(jsonb_object_agg(a.outcome, a.n), '{}'::jsonb) into v_push_attempts
-    from (select t.outcome, count(*) as n from app.notifications_attempts t
-           where t.channel = 'push' and t.attempted_at >= now() - interval '24 hours'
-           group by t.outcome) a;
   v_tick_outcome := v_scheduler ->> 'last_tick_outcome';
   return jsonb_build_object(
     'captured_at', app.cmd_utc(clock_timestamp()),
     'scheduler', jsonb_build_object(
       'last_tick_at', case when v_last_tick is not null then app.cmd_utc(v_last_tick) end,
       'last_tick_outcome', v_tick_outcome,
-      'last_success_at', case when v_last_success is not null then app.cmd_utc(v_last_success) end,
+      'last_success_at', (select app.cmd_utc(s.last_success_at)
+                            from app.notifications_scheduler_state s where s.singleton),
       'jobs', coalesce((v_scheduler ->> 'scheduler_jobs')::integer, 0),
       'cron_runs_24h', coalesce(v_scheduler -> 'cron_runs_24h', '{}'::jsonb),
-      -- Stale = no successful hand-off to the worker in five minutes. A tick that only notes
-      -- not_configured or gate_closed still moves last_tick_at, so it must not count as fresh.
-      'stale', v_last_success is null or v_last_success < now() - interval '5 minutes'),
+      'stale', v_last_tick is null or v_last_tick < now() - interval '5 minutes'),
     'jobs', jsonb_build_object(
       'due_pending', (select count(*) from app.notifications_jobs j
                        where j.job_state = 'pending' and j.scheduled_at <= now()),
@@ -148,30 +91,19 @@ begin
       'outbound_open', app.policy_is_open('outbound_sending'),
       'pending', coalesce((v_scheduler -> 'push' ->> 'pending')::integer, 0),
       'leased', coalesce((v_scheduler -> 'push' ->> 'leased')::integer, 0),
-      -- Every unsuccessful push attempt outcome: provider transient/rejected answers, recheck
-      -- failures, lapsed leases and exhaustion.
-      'failed_attempts_24h', (select coalesce(sum(e.value::integer), 0)::integer
-                                from jsonb_each_text(v_push_attempts) e
-                               where e.key in ('transient', 'rejected', 'failed', 'lapsed', 'exhausted'))),
+      'failed_attempts_24h',
+        coalesce((v_scheduler -> 'push' -> 'attempts_24h' ->> 'transient')::integer, 0)
+        + coalesce((v_scheduler -> 'push' -> 'attempts_24h' ->> 'rejected')::integer, 0)
+        + coalesce((v_scheduler -> 'push' -> 'attempts_24h' ->> 'exhausted')::integer, 0)),
     'tokens', jsonb_build_object(
       'retired', (select count(*) from app.notifications_device_tokens t where t.retired_at is not null),
       'retired_24h', (select count(*) from app.notifications_device_tokens t
                        where t.retired_at >= now() - interval '24 hours'),
       'last_retired_at', (select app.cmd_utc(max(t.retired_at))
                             from app.notifications_device_tokens t where t.retired_at is not null)),
-    -- The direct-contact table is append-only (one row per need, never closed), so the backlog
-    -- is a rolling window: needs with no registered route recorded in the last 24 hours. The
-    -- cumulative totals are reported separately.
     'direct_contact', jsonb_build_object(
-      'backlog', (select count(*) from app.notifications_direct_contact_needs n
-                   where n.route_state = 'unrouted' and n.routed_at >= now() - interval '24 hours'),
-      'oldest_due_at', (select app.cmd_utc(min(n.due_at)) from app.notifications_direct_contact_needs n
-                         where n.route_state = 'unrouted' and n.routed_at >= now() - interval '24 hours'),
-      'routed_24h', (select count(*) from app.notifications_direct_contact_needs n
-                      where n.route_state = 'routed' and n.routed_at >= now() - interval '24 hours'),
-      'total_unrouted', (select count(*) from app.notifications_direct_contact_needs n
-                          where n.route_state = 'unrouted'),
-      'total', (select count(*) from app.notifications_direct_contact_needs)));
+      'backlog', (select count(*) from app.notifications_direct_contact_needs),
+      'oldest_due_at', (select app.cmd_utc(min(n.due_at)) from app.notifications_direct_contact_needs n)));
 end;
 $$;
 
@@ -415,10 +347,8 @@ begin
 end;
 $$;
 
--- The owner-controlled outbound gate at the worker command boundary. Inbox delivery is
--- unchanged. While the gate is closed a claim still expires due push jobs and counts lapsed
--- leases (as in 3.6), but app.notifications_push_claim leases nothing and the answer carries
--- `gate_closed: true`; prepare answers `gate_closed` and returns no device tokens.
+-- Enforce the owner-controlled outbound gate at the worker command boundary. Inbox delivery is
+-- unchanged; when closed, push claims and preparations return no work or device tokens.
 create or replace function app.notifications_sys_push_claim(p_principal uuid, p_request uuid,
                                                               p_payload jsonb)
 returns jsonb
@@ -427,19 +357,19 @@ set search_path = ''
 as $$
 declare
   v_settings app.notifications_worker_settings := app.notifications_worker_config();
-  v_data jsonb;
 begin
-  if coalesce((p_payload ->> 'expire_only')::boolean, false) then
-    v_data := app.notifications_push_claim(p_principal, p_request, 0);
-  else
-    v_data := app.notifications_push_claim(
-      p_principal, p_request, least(coalesce((p_payload ->> 'limit')::numeric::integer,
-        v_settings.batch_max), v_settings.batch_max));
-  end if;
   if not app.policy_is_open('outbound_sending') then
-    v_data := v_data || '{"gate_closed": true}'::jsonb;
+    return jsonb_build_object('data', jsonb_build_object(
+      'jobs', '[]'::jsonb, 'claimed', 0, 'reclaimed', 0, 'expired', 0,
+      'lease_seconds', v_settings.lease_seconds,
+      'push_enabled', false, 'gate_closed', true));
   end if;
-  return jsonb_build_object('data', v_data);
+  if coalesce((p_payload ->> 'expire_only')::boolean, false) then
+    return jsonb_build_object('data', app.notifications_push_claim(p_principal, p_request, 0));
+  end if;
+  return jsonb_build_object('data', app.notifications_push_claim(
+    p_principal, p_request, least(coalesce((p_payload ->> 'limit')::numeric::integer,
+      v_settings.batch_max), v_settings.batch_max)));
 end;
 $$;
 
@@ -452,7 +382,7 @@ as $$
 begin
   return jsonb_build_object('data', app.notifications_push_prepare(
     p_principal, p_request, (p_payload ->> 'push_job_id')::uuid,
-    (p_payload ->> 'lease_token')::numeric::bigint));
+    (p_payload ->> 'lease_token')::bigint));
 end;
 $$;
 

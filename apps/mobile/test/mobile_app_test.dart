@@ -344,6 +344,59 @@ void main() {
   );
 
   testWidgets(
+    'story 4.1: Duties follows member access; the member accepts a duty and '
+    'it shows Accepted only after the server confirms',
+    (tester) async {
+      final h = await pumpMobile(tester, size: const Size(390, 1600));
+      expect(find.byKey(const Key('nav-/duties')), findsNothing);
+      h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.duties.mine = AccessReadOk(
+        MyDuties.fromJson({
+          'member_id': '22222222-2222-4222-8222-222222222222',
+          'assignments': [myDutyData()],
+        }),
+      );
+      await tapKey(tester, 'nav-/account');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tapKey(tester, 'nav-/duties');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.text('Sunday preaching'), findsOneWidget);
+      expect(find.text('Awaiting response'), findsOneWidget);
+      const id = '42424242-4242-4242-8242-424242424242';
+      await tapKey(tester, 'duty-accept-$id');
+      final sent = h.gateway.sent.single;
+      expect(sent.wire['command'], 'duties.respond');
+      h.duties.mine = AccessReadOk(
+        MyDuties.fromJson({
+          'member_id': '22222222-2222-4222-8222-222222222222',
+          'assignments': [
+            myDutyData(
+              revision: 2,
+              response: 'accepted',
+              respondedAt: '2026-10-13T09:00:00.000000Z',
+            ),
+          ],
+        }),
+      );
+      sent.confirm(const {}, 2);
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('my-duty-status-$id')),
+          matching: find.text('Accepted'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
     'story 2.11: a member deletes their account from the account page; the '
     'device is signed out',
     (tester) async {

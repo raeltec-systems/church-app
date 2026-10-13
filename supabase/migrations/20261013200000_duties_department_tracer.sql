@@ -32,7 +32,7 @@
 --     and audit rows are kept as anonymous facts (nil UUID, note cleared).
 --
 -- State vocabularies are checked by app.duties_state_ok(kind, value) instead of inline CHECK
--- lists, so a later story widens them with CREATE OR REPLACE instead of a DROP CONSTRAINT.
+-- lists, so a later story widens them with CREATE OR REPLACE instead of replacing a constraint.
 --
 -- Lock order (AD-2): the actor's Identity grant rows FOR SHARE (authorizer) -> command receipt
 -- -> department (FOR UPDATE for setup, FOR SHARE to publish) -> department membership FOR SHARE
@@ -350,7 +350,7 @@ begin
     value := null;
   elsif length(value) > p_max
         or regexp_replace(value, E'\n', '', 'g') ~ '[[:cntrl:]]'
-        or value ~ '[­​-‏‪-‮⁠-⁤⁦-⁯﻿]' then
+        or value ~ '[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u206f\ufeff]' then
     errors := errors || jsonb_build_object(p_key, 'invalid');
     value := null;
   end if;

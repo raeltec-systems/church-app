@@ -43,10 +43,19 @@ const mobileInboxDestination = (
   icon: Icons.inbox_outlined,
 );
 
+/// Story 4.1: shown while the server grants the caller member access; the
+/// member's duties (Accept / Can't make it).
+const mobileDutiesDestination = (
+  path: ClientPaths.myDuties,
+  label: 'Duties',
+  icon: Icons.assignment_turned_in_outlined,
+);
+
 /// The tabs for the caller's current grants (presentation only).
 List<MobileDestination> mobileDestinationsFor(MemberGrants? grants) => [
   ...mobileDestinations,
   if (grants != null) mobileInboxDestination,
+  if (grants != null) mobileDutiesDestination,
   if (grants != null) mobileAccessDestination,
   if (grants != null) mobileCellDestination,
 ];

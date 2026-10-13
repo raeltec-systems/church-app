@@ -7,6 +7,7 @@ import 'assisted_recovery_screens.dart';
 import 'account_screen.dart';
 import 'cell_screens.dart';
 import 'credential_screens.dart';
+import 'duties_screens.dart';
 import 'fixture_command_screen.dart';
 import 'fixture_reminder_screens.dart';
 import 'notification_settings_screen.dart';
@@ -57,6 +58,18 @@ abstract final class ClientPaths {
 
   /// The member's own cell and change request (story 2.6, mobile).
   static const myCell = '/my-cell';
+
+  /// Story 4.1 (mobile): the member's own duties; `/duties/assignments/<id>`
+  /// is one assignment (the reminder's deep link).
+  static const myDuties = DutyPaths.mine;
+
+  /// Story 4.1, staff web: department leaders and deputies (Admin; Pastor
+  /// read only): publish a duty and see the responses.
+  static const dutyLeader = DutyPaths.leader;
+
+  /// Story 4.1, staff web, Admin only: departments, leaders, deputies and
+  /// members.
+  static const adminDepartments = DutyPaths.adminDepartments;
 
   /// Story 2.7: forgot password (neutral acknowledgement).
   static const forgotPassword = '/forgot-password';
@@ -124,6 +137,10 @@ abstract final class ClientPaths {
   static final List<RegExp> deepLinkTargets = [
     RegExp(
       r'^/fixture/reminders/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    ),
+    // Story 4.1: the duties_assignment contract's link.
+    RegExp(
+      r'^/duties/assignments/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
     ),
   ];
 
@@ -279,6 +296,29 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.myCell,
         pageBuilder: (_, state) => page(state, const MyCellScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.myDuties,
+        pageBuilder: (_, state) => page(state, const MyDutiesScreen()),
+        routes: [
+          GoRoute(
+            path: 'leader',
+            pageBuilder: (_, state) => page(state, const DutyLeaderScreen()),
+          ),
+          GoRoute(
+            path: 'assignments/:assignmentId',
+            pageBuilder: (_, state) => page(
+              state,
+              MyDutiesScreen(
+                assignmentId: state.pathParameters['assignmentId'],
+              ),
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: ClientPaths.adminDepartments,
+        pageBuilder: (_, state) => page(state, const DutyAdminScreen()),
       ),
       GoRoute(
         path: ClientPaths.membership,

@@ -109,6 +109,21 @@ const staffCellLeaderDestination = (
   icon: Icons.diversity_3_outlined,
 );
 
+/// Story 4.1: shown while the caller leads or deputises a department, or is
+/// an Admin or Pastor (read only).
+const staffDutyLeaderDestination = (
+  path: ClientPaths.dutyLeader,
+  label: 'Duties',
+  icon: Icons.assignment_outlined,
+);
+
+/// Story 4.1: shown while the server's current answer includes Admin.
+const staffDepartmentsDestination = (
+  path: ClientPaths.adminDepartments,
+  label: 'Departments',
+  icon: Icons.workspaces_outline,
+);
+
 /// The sidebar for the caller's current grants. Presentation only: hiding an
 /// entry is not a control, and every screen's data is checked by the server.
 List<StaffDestination> staffDestinationsFor(
@@ -120,6 +135,7 @@ List<StaffDestination> staffDestinationsFor(
   if (grants != null) staffInboxDestination,
   if (grants != null) staffAccessDestination,
   if (servesACell(grants)) staffCellLeaderDestination,
+  if (seesDutyBoard(grants)) staffDutyLeaderDestination,
   if (grants?.isAdmin ?? false) staffMembersDestination,
   if (grants?.isAdmin ?? false) staffRecoveryEmailsDestination,
   if (grants?.isAdmin ?? false) staffCredentialReviewsDestination,
@@ -127,6 +143,7 @@ List<StaffDestination> staffDestinationsFor(
   if (grants?.isAdmin ?? false) staffMembershipLifecycleDestination,
   if (grants?.isAdmin ?? false) staffMemberDeletionsDestination,
   if (grants?.isAdmin ?? false) staffCellsDestination,
+  if (grants?.isAdmin ?? false) staffDepartmentsDestination,
   if (grants?.isAdmin ?? false) staffAdminDestination,
 ];
 

@@ -2,9 +2,8 @@
 --   psql "$DB_URL" -v ON_ERROR_STOP=1 -v expected_env=staging -f tools/ci/verify-hosted.sql
 -- Fails (non-zero exit) when the database marker is not the expected environment, or when the
 -- private_access / outbound_sending release gates are open in a baseline that must keep them
--- closed, or when the database is an unreconciled restore (story 1.10). Production stays
--- private-disabled and sending-disabled until the owner approves those
--- gates in that database.
+-- closed, production notification activation controls are open, or the database is an
+-- unreconciled restore (story 1.10). Staging may run its synthetic reminder scheduler.
 select set_config('ci.expected_env', :'expected_env', false);
 
 do $$
@@ -29,6 +28,20 @@ begin
   end if;
   if app.policy_is_open('outbound_sending') then
     raise exception 'verify-hosted: outbound_sending gate is open in %', v_actual;
+  end if;
+  if v_actual = 'production' then
+    if to_regprocedure('app.notifications_scheduler_status()') is null then
+      raise exception 'verify-hosted: app.notifications_scheduler_status() is missing';
+    end if;
+    if (app.notifications_scheduler_status() ->> 'scheduler_jobs')::integer is distinct from 0 then
+      raise exception 'verify-hosted: a production notification scheduler job is configured';
+    end if;
+    if to_regclass('app.notifications_worker_settings') is null then
+      raise exception 'verify-hosted: app.notifications_worker_settings is missing';
+    end if;
+    if (select s.push_enabled from app.notifications_worker_settings s where s.singleton) is distinct from false then
+      raise exception 'verify-hosted: production notification push is enabled';
+    end if;
   end if;
   -- Story 1.9: alerting stays disabled until the owner approves Q12 thresholds and the
   -- restricted alert destination; this baseline ships no dispatcher.

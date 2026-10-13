@@ -10,7 +10,8 @@
 //        Before any migration: a database that already carries a marker must carry <env>
 //        (story 1.12 follow-up: a mis-set ref is refused before db push, not after).
 //   node tools/ci/hosted-sql.mjs verify <env> <ref>
-//        Runs tools/ci/verify-hosted.sql: marker == <env>, private_access/outbound_sending closed.
+//        Runs tools/ci/verify-hosted.sql: marker and gates checked; production notification
+//        scheduler, push and alerting activation remain disabled (staging can run synthetic work).
 
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
@@ -82,7 +83,7 @@ async function main([cmd, env, ref, setBy]) {
   }
   if (cmd === 'verify') {
     await query(ref, verifySql(env));
-    console.log(`hosted-sql: ${env} (${ref}) marker confirmed; private_access and outbound_sending closed`);
+    console.log(`hosted-sql: ${env} (${ref}) marker confirmed; gates and release baseline verified`);
     return 0;
   }
   console.error('usage: hosted-sql.mjs ensure-marker <env> <ref> <set_by> | precheck <env> <ref> | verify <env> <ref>');

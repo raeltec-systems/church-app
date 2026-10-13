@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { evaluate, findDestructive, stripSql } from './check-migrations.mjs';
@@ -199,6 +199,39 @@ test('hosted SQL only targets known environments and quotes values', async () =>
   assert.equal(literal("o'brien"), "'o''brien'");
   assert.match(ensureMarkerSql('staging', "gh:o'brien run 1"), /'gh:o''brien run 1'/);
   assert.throws(() => ensureMarkerSql('staging', ' '), /set_by/);
+});
+
+test('hosted verification keeps production notification controls closed and allows staging scheduling', async () => {
+  const { verifySql } = await import('./hosted-sql.mjs');
+  const production = verifySql('production');
+  const staging = verifySql('staging');
+  const productionOnly = production.match(/if v_actual = 'production' then([\s\S]*?)\n  end if;/)?.[1] ?? '';
+  assert.ok(productionOnly.length > 0, 'notification controls must be production-only');
+  assert.match(productionOnly, /scheduler_jobs'\)::integer is distinct from 0/);
+  assert.match(productionOnly, /s\.push_enabled[\s\S]*?is distinct from false/);
+  assert.match(production, /policy_is_open\('outbound_sending'\)/);
+  assert.match(production, /ops_alert_status\(\)[\s\S]*?<> 'disabled'/);
+  assert.equal(staging, production.replace(
+    "set_config('ci.expected_env', 'production', false)",
+    "set_config('ci.expected_env', 'staging', false)",
+  ), 'staging changes only the expected marker and uses the same production-only branch');
+});
+
+test('promotion deploys every configured Edge Function to the guarded ref before client builds', () => {
+  const workflow = readFileSync(new URL('../../.github/workflows/promote.yml', import.meta.url), 'utf8');
+  const deployAt = workflow.indexOf('Deploy configured Edge Functions to the guarded project');
+  const verifyAt = workflow.indexOf('hosted-sql.mjs verify');
+  const migrationAt = workflow.indexOf('Apply reviewed migrations');
+  const buildAt = workflow.indexOf('Build the staff web client for this environment');
+  assert.ok(migrationAt >= 0 && verifyAt > migrationAt && deployAt > verifyAt && buildAt > deployAt,
+    'order must be migrations, hosted verification, functions, then clients');
+  const deployBlock = workflow.slice(deployAt, buildAt);
+  assert.match(deployBlock, /functions deploy "\$function"/);
+  for (const name of ['identity-assisted-recovery', 'identity-deletion', 'notifications-worker']) {
+    assert.ok(deployBlock.includes(name), `workflow must deploy ${name}`);
+  }
+  assert.match(deployBlock, /--project-ref "\$\{\{ steps\.target\.outputs\.ref \}\}"/);
+  assert.match(deployBlock, /--no-verify-jwt/);
 });
 
 test('pre-push precheck refuses a database marked as another environment', async () => {

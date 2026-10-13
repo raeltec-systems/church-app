@@ -105,13 +105,29 @@ Start it from Actions, then **promote**, then **Run workflow** with target `stag
 5. It handles the environment marker:
    - An unmarked database is marked with the target name.
    - A database that carries a different marker stops the run.
-   - `tools/ci/verify-hosted.sql` then asserts the marker and that `private_access` and `outbound_sending` are closed.
-6. Clients second:
+   - `tools/ci/verify-hosted.sql` then asserts the marker, closed `private_access` and `outbound_sending` gates, and the disabled baseline. In production it also requires no notification scheduler job and `push_enabled` false; staging may keep its synthetic scheduler running.
+6. Edge Functions:
+   - The pinned Supabase CLI deploys `identity-assisted-recovery`, `identity-deletion` and
+     `notifications-worker` to the same guarded project ref, each with `--no-verify-jwt` as
+     declared in `supabase/config.toml`.
+   - This runs after migration sync and hosted verification, and before any client build. A failed
+     deployment stops promotion.
+   - The function secrets remain owner-managed in each Supabase project's Edge Function secrets;
+     promotion never reads, copies or prints them. Runtime requirements are
+     `IDENTITY_RECOVERY_SYSTEM_CREDENTIAL` for `identity-assisted-recovery`, and
+     `NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL` plus `NOTIFICATIONS_WORKER_TRIGGER` for
+     `notifications-worker`. `NOTIFICATIONS_FCM_SERVICE_ACCOUNT` is optional while push is off;
+     `identity-deletion` uses the authenticated deletion worker credential forwarded in its
+     request. Supabase supplies the function URL and API keys at runtime.
+   - Missing or malformed runtime secrets leave the corresponding function fail-closed; a
+     missing `NOTIFICATIONS_FCM_SERVICE_ACCOUNT` keeps provider sending unavailable. Record only
+     whether each prerequisite is configured in the owner's environment checklist, never values.
+7. Clients second:
    - It builds `apps/staff` once for this commit and environment with the URL and publishable key.
    - It runs the bundle secret scan.
    - It seals the build: a per-file SHA-256 (`staff-web-<env>.SHA256SUMS`) plus a manifest with the environment, commit, API URL and tree hash.
    - It uploads the artifact `staff-web-<env>-<sha>` and keeps it for 90 days.
-7. Deploy:
+8. Deploy:
    - It runs `package-web.mjs verify` (wrong environment or commit, added, missing or changed files all fail).
    - Then it runs `wrangler pages deploy` of exactly that directory.
    - Without the hosting secrets, the job ends after the upload with a notice. The verified artifact is the deliverable.
@@ -126,7 +142,10 @@ For production, all of the following must hold:
 
 Command versions stay backwards compatible (AD-17 expand/contract). Old command versions are retained until supported clients migrate, so a backend promoted first never breaks clients already deployed. Rollback is forward repair: add a new migration. There is no destructive down-migration.
 
-Edge functions and scheduled jobs do not exist yet. When they arrive, add their deploy step between steps 4 and 6.
+The promotion workflow deploys the three configured Edge Functions after hosted verification.
+Production hosted verification also requires the notification scheduler and push switch to be off,
+`outbound_sending` closed and alerting disabled. Staging may run its synthetic acceptance
+scheduler; production-only assertions do not reject that staging activity.
 
 Mobile builds follow the same rule (`--dart-define`, one build per commit and environment). Store release signing is owned by the release epic.
 

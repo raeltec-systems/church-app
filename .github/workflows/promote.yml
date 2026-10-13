@@ -5,7 +5,7 @@
 #   policy vs origin/main, production environment must exist with required reviewers and an
 #   environment-scoped SUPABASE_PROJECT_REF) -> [production: staging-precondition, staging in
 #   sync] -> promote (environment-protected: target/secret guards -> drift check -> migrations,
-#   backend first -> marker + gate verification -> sealed client build + bundle scan -> verified
+#   backend first -> marker + hosted verification -> Edge Functions -> sealed client build + bundle scan -> verified
 #   artifact upload -> optional static-host deploy of exactly that verified artifact).
 # Owner steps: docs/runbooks/environments-and-promotion.md.
 
@@ -193,6 +193,16 @@ jobs:
         run: |
           node tools/ci/hosted-sql.mjs ensure-marker "$TARGET" "${{ steps.target.outputs.ref }}" "github:${{ github.actor }} run ${{ github.run_id }}"
           node tools/ci/hosted-sql.mjs verify "$TARGET" "${{ steps.target.outputs.ref }}"
+
+      # Deploy only after migrations and hosted assertions pass, using the same guarded ref.
+      # A failure stops before any client build.
+      - name: Deploy configured Edge Functions to the guarded project
+        run: |
+          for function in identity-assisted-recovery identity-deletion notifications-worker; do
+            npx supabase functions deploy "$function" \
+              --project-ref "${{ steps.target.outputs.ref }}" \
+              --no-verify-jwt
+          done
 
       - uses: subosito/flutter-action@v2
         with:

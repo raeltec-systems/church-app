@@ -135,6 +135,8 @@ jobs:
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.6 supabase/functions/notifications-worker docs/runbooks/notifications.md
       - name: Story 3.7 evidence (captured refresh signals) holds no credentials or private values
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.7
+      - name: Story 3.10 release evidence holds no credentials or personal data
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.10
 
   flutter:
     name: flutter (analyze, test, web build)

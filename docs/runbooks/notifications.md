@@ -711,3 +711,90 @@ select app.policy_approve('outbound_sending', '<reviewed-value>'::jsonb,
 Eligible, unexpired push work remains pending while paused and can be claimed after reapproval.
 The health view reports push state; it never changes the gate. Do not modify the gate during local
 implementation or demonstrations.
+
+## Story 3.10: closing staging acceptance and promotion
+
+Evidence directory: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.10/`.
+The operator records only pass/fail, counts, fixed outcome codes, client/build versions and a
+coarse timestamp. Do not record member names, phone numbers, account/member/source/job/item IDs,
+URLs containing project refs, reminder content, access tokens, worker credentials, device tokens,
+provider payloads or screenshots containing personal data. Keep raw E2E JSONL only when it passes
+the repository evidence scan.
+
+### Local scenario suites
+
+Run from a clean local Supabase database, using the commands in the individual story sections:
+
+1. `inbox.mjs` and `source-contracts.mjs` cover create, duplicate, cancel, generic content,
+   lifecycle changes, recipient isolation and signed-out reads.
+2. `worker.mjs` and `routing.mjs` cover due scheduling, retries, leases, fencing, lifecycle
+   retirement, current-access routing and direct-contact outcomes.
+3. `push.mjs` covers generic expiring push, denied registration, category settings, invalid-token
+   retirement and provider retry against its local fake FCM endpoint. It never contacts FCM.
+4. `inbox-screens.mjs` covers inbox refresh, open, snooze, cancellation, response and private
+   empty-payload Realtime signals.
+5. Keep the auth harness lifecycle and reset requirements from each script. The scripts are
+   local-only; do not point them at staging or production.
+
+Save each redacted JSONL output under `evidence-3.10/local/`. Record the command exit status and
+the corresponding fixed outcome summary in `README.md`; do not copy terminal environment values.
+
+### Staging owner acceptance
+
+Only the owner or restricted operator runs these steps. Use two approved SYNTHETIC members, A and
+B, and staging clients. Follow Story 3.1–3.8's hosted prerequisites first, including the staging
+worker configuration, health-read authorization for the owner's chosen account, and any device
+provider setup. The agent does not create hosted state, configure secrets or attest device checks.
+
+1. Build both clients from the same checkout and staging definitions. In `apps/mobile`, run
+   `flutter clean`, `flutter pub get --enforce-lockfile`, then the Android debug build from Story
+   3.7. In `apps/staff`, run `flutter clean`, `flutter pub get --enforce-lockfile`, then the Story
+   3.7 web build. Record success, Flutter version, platform and commit only.
+2. Verify the account split: A can reach Inbox and reminder settings on mobile and staff; B cannot
+   open A's item; signed-out clients cannot read or retain the Inbox destination.
+3. On both clients, repeat the Story 3.2 hosted lifecycle cases: current source, revised/stale
+   source, cancellation, revoked scope and expiry. Run the worker after each mutation; the first
+   item stays current and changed items show only the generic unavailable state. Use Story 3.4's
+   two-worker staging procedure with two staging worker credentials to confirm disjoint claims and
+   one inbox item per job. Include a
+   short-notice request and confirm its single `respond_now` reminder.
+4. Run the Story 3.7 owner checks on both clients: due reminder, open marker, authorized source
+   link, snooze replacement and expiry clamp, response/cancellation retirement, category push
+   off while inbox delivery continues, and sign-in return to an item. Repeat the due-reminder and
+   duplicate-request checks independently a second time; confirm no duplicate inbox item.
+5. With both apps closed, confirm the staging scheduler delivers one synthetic due reminder.
+   Exercise a synthetic source-check failure and recovery as in Story 3.4. The health projection
+   should show a failed attempt, then a recovered attempt; it must expose only counts, timestamps
+   and fixed status codes. Confirm the scheduler is fresh and report push state as disabled or
+   enabled without recording a device or provider identifier. To check the stale state, temporarily
+   disable the staging scheduler with `select app.notifications_scheduler_disable('israel');`,
+   wait over five minutes, confirm the health view reports stale, then re-enable it with
+   `select app.notifications_scheduler_enable('israel');` and wait until the health view is fresh.
+   Do not run these controls against production.
+6. If the owner's approved staging device setup is available, follow Story 3.6's real-device
+   checks on Android and iOS where available, including denied push, invalid-token retirement and
+   one notification after retry. Otherwise record the device checks as unavailable; do not treat
+   local fake-FCM results as real-device evidence.
+7. Clean up all synthetic rows and credentials using the story-specific cleanup instructions.
+   Revoke staging worker credentials when the demonstration is finished.
+8. An independent witness repeats the client and lifecycle acceptance steps on a fresh run.
+   Record separate pass/fail results and device/browser classes only, without personal identifiers.
+
+Use `evidence-3.10/owner-review.md` as the redacted witness record. At this repository revision,
+hosted staging and owner-device results have not been witnessed and must remain marked unavailable
+until the owner completes them.
+
+### Production gate
+
+Promotion deploys migrations, verifies hosted state, deploys all configured Edge Functions to the
+guarded project and then builds clients. `verify-hosted.sql` fails production promotion if any
+notification scheduler job is configured, `push_enabled` is true, `outbound_sending` is open or
+alerting is enabled. Staging scheduler activity for synthetic acceptance is allowed by the
+production-only notification assertions.
+
+Story 3.10 does not authorize production activation. Production project/ref, protected GitHub
+environment, Q2 church-time approval, `ops_system_access`, Q12 operations approval and lateness
+tolerance, Firebase/APNs setup, worker credential and Edge secrets, and owner witness evidence
+remain owner-held prerequisites. Scheduler, push, outbound sending and alerting stay disabled until
+their respective approvals are recorded. No production promotion or owner approval is claimed by
+this runbook.

@@ -61,8 +61,9 @@ Run **promote** with target `staging`, then with target `production` (environmen
 connector cannot apply row deletions (`20261007131600_membership_review_reclaim_sessions`,
 `20261007160100_credential_review_auth_rows`, `20261007175000_member_deletion_rows`). Nothing is
 pasted by hand in production. The first run marks the database `production` (terminal) and runs
-`tools/ci/verify-hosted.sql`, which must report: marker `production`, `private_access` and
-`outbound_sending` closed, alerting disabled, no recovery hold, and the proven Auth schema
+`tools/ci/verify-hosted.sql`, which must report: marker `production`, `private_access` closed,
+`outbound_sending` closed (unless the owner approved it for production; see `notifications.md`,
+Story 3.8), alerting disabled, no recovery hold, and the proven Auth schema
 `20260831180000` for the 2.7 reset gate (if production's GoTrue is newer, stop: run the reset-gate
 canary and the recovery E2E first, then add the version there).
 

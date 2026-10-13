@@ -11,7 +11,8 @@
 //        (story 1.12 follow-up: a mis-set ref is refused before db push, not after).
 //   node tools/ci/hosted-sql.mjs verify <env> <ref>
 //        Runs tools/ci/verify-hosted.sql: marker and gates checked; production notification
-//        scheduler, push and alerting activation remain disabled (staging can run synthetic work).
+//        scheduler, push and outbound sending stay off unless their gates are approved, alerting
+//        stays disabled (staging can run synthetic work and have outbound_sending open).
 
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';

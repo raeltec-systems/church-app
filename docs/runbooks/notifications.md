@@ -655,15 +655,32 @@ Record the outcome per step in `evidence-3.7/owner-device-check.md` (pass/fail, 
 
 ## Story 3.8: staff reminder health and notification recovery
 
-Migration: `supabase/migrations/20261013000000_notifications_health.sql`. The read is
-`POST /rest/v1/rpc/notifications_health` (`Content-Profile: api`). It returns only counts,
+Migration: `supabase/migrations/20261013000000_notifications_health.sql` (edited in place by the
+2026-10-13 review fixes before any hosted apply; no row deletions, no destructive statements). The
+read is `POST /rest/v1/rpc/notifications_health` (`Content-Profile: api`). It returns only counts,
 timestamps and fixed status codes for scheduler activity, due and leased jobs, failed/lapsed
 attempts, push work, retired tokens and the direct-contact backlog. It never returns reminder
-text, source payloads, recipient/member details, device tokens, worker credentials or URLs.
+text, source payloads, recipient/member details, device tokens, worker credentials or URLs. The
+staff web destination is **Reminder health** (`/admin/reminder-health`); the mobile app has no
+such route. Tests: `supabase/tests/notifications_health_test.sql`, the gate cases at the end of
+`notifications_push_test.sql`, `packages/client_core/test/notifications/notification_health_test.dart`
+and the staff app test.
 
 The server authorizes each call for a currently usable Admin grant or an explicitly mapped Auth
-account in `app.ops_operators.auth_user_id`. The owner maps an account per environment in the SQL
-editor; a migration does not seed or infer one:
+account in `app.ops_operators.auth_user_id`:
+
+- Both paths first need a live, trusted password session for an Auth user that exists and is not
+  deleted, banned or anonymous (the identity live-access predicate). Otherwise the read answers
+  `401 unauthenticated`.
+- The mapped-operator path also needs the operator row `active` and the mapped account's standing
+  not in review (a member account on hold, in binding review or dormant is refused). An operator
+  account without a member link may read.
+- Every other caller gets `403`, with the same reason codes as the identity reads
+  (`not_granted`, `not_linked`, `review_required`, or `unavailable`). The staff screen shows a
+  separate message for each, and a separate one for a failed read.
+
+The owner maps an account per environment in the SQL editor; a migration does not seed or infer
+one:
 
 ```sql
 update app.ops_operators
@@ -671,20 +688,32 @@ update app.ops_operators
  where operator = 'israel' and active;
 ```
 
-Keep the mapping nullable until the owner chooses the account. Clearing it removes health access
-for that operator. The mapping grants only this health projection; system credentials, operator
-procedures and their SQL functions remain unavailable to client sessions. The staff destination
-is visible in the shell, while the read itself is the authorization boundary.
+`auth_user_id` is unique and nullable, and it is **not** a foreign key to `auth.users`, so an
+app-schema backup restores into an isolated database without the auth schema (the story 1.10/2.11
+restore drill). Instead, triggers on `auth.users` clear the mapping when that Auth user is deleted
+(including by the 2.11 account deletion) or soft-deleted, and a mapping to a missing Auth user
+grants nothing. Clearing the mapping (`set auth_user_id = null`) or deactivating the operator
+removes health access. The mapping grants only this health projection; system credentials,
+operator procedures and their SQL functions remain unavailable to client sessions. The staff
+navigation shows the destination to any signed-in session (hidden while signed out); the read
+itself is the authorization boundary.
 
 ### Reading the health view
 
-- **Scheduler may be stale** means no scheduler tick is recorded in the last five minutes. Check
-  the scheduler status, worker URL/trigger configuration and Edge Function response using the
-  operator procedures in `system-access-and-operations.md`.
+- **Scheduler status may be stale** means no tick has successfully handed work to the Edge
+  Function (`last_success_at`) in the last five minutes. Ticks that only record `not_configured`
+  or `gate_closed` still update the last tick, but do not count as fresh. Check the scheduler
+  status, worker URL/trigger configuration and Edge Function response using the operator
+  procedures in `system-access-and-operations.md`.
 - **Due and pending** and **oldest due time** show reminder delay without selecting source or
   recipient data. Failed attempts and lapsed leases are rolling 24-hour counts.
-- **Direct-contact backlog** counts routed and unrouted needs. The read does not show which source
-  or person needs follow-up.
+- **Failed push attempts in 24 hours** counts every unsuccessful push attempt: `transient`,
+  `rejected`, `failed` (recheck error), `lapsed` (lease ran out) and `exhausted`.
+- **Direct contact.** The needs table is append-only, so **Without a route in 24 hours** (the
+  backlog) counts needs with no registered direct-contact route recorded in the last 24 hours, with
+  its oldest due time. **Routed in 24 hours**, **Without a route, all time** and **All
+  direct-contact needs** are shown separately. The read does not show which source or person needs
+  follow-up.
 - Use synthetic reminders only when demonstrating failures. On local/staging, set the synthetic
   source check fault as described under Story 3.4 Hosted staging; the view should show a failed
   attempt, then the reminder should recover after the fault and retry backoff end. Remove the
@@ -693,9 +722,18 @@ is visible in the shell, while the read itself is the authorization boundary.
 ### Pause and resume push sending
 
 `outbound_sending` is an owner-controlled release gate. Closing it prevents new push leases and
-preparation from returning device tokens. Inbox reminder delivery continues. Pushes already
-accepted by FCM cannot be recalled. The owner or database owner pauses by resetting the approval
-for this environment:
+stops preparation from returning device tokens (the worker counts that answer as `gate_closed`, a
+deliberate pause). While closed, the worker's claims still expire push jobs whose time has passed
+and count lapsed leases, as before story 3.8. Inbox reminder delivery continues. Pushes already
+accepted by FCM cannot be recalled.
+
+- **Staging** may keep the gate open for synthetic push (owner decision 2026-10-13); see Story 3.6,
+  Hosted staging, step 7, for the approval. `tools/ci/verify-hosted.sql` accepts it open there.
+- **Production** keeps it closed until the owner approves it there. The approval value must name
+  production (`{"environment": "production", ...}`); `verify-hosted.sql` fails a production
+  promotion when the gate is open without such an approval, or when `push_enabled` is on before it.
+
+The owner or database owner pauses by resetting the approval for this environment:
 
 ```sql
 update app.policy_gates
@@ -707,13 +745,58 @@ update app.policy_gates
 To resume, the owner reapproves the gate with the reviewed value and decision note:
 
 ```sql
-select app.policy_approve('outbound_sending', '<reviewed-value>'::jsonb,
+select app.policy_approve('outbound_sending', '{"environment": "<staging|production>"}'::jsonb,
                           'israel', '<decision note>');
 ```
 
 Eligible, unexpired push work remains pending while paused and can be claimed after reapproval.
-The health view reports push state; it never changes the gate. Do not modify the gate during local
-implementation or demonstrations.
+The health view reports push state; it never changes the gate. Locally, only
+`tools/identity-e2e/push.mjs` opens the gate, for its own run, and restores the row exactly as it
+found it in cleanup.
+
+### Hosted staging (parent session, then the owner)
+
+Nothing of story 3.8 is applied to staging yet (staging's latest migration was `20261008183514`
+on 2026-10-13, and the deployed `notifications-worker` is the pre-refactor version). In order:
+
+1. **Parent session: the migration.** Apply `20261013000000_notifications_health.sql` to staging
+   (`tmurpotfluignacfueki`) with the Supabase MCP `apply_migration` (name
+   `notifications_health`). There is no rows file. It adds `last_success_at`,
+   `app.ops_operators.auth_user_id` and its two `auth.users` triggers, the health read, and
+   replaces the push claim/prepare functions with the `outbound_sending` checks. Check:
+   `select app.notifications_scheduler_status() -> 'push';` still answers, and
+   `select count(*) from pg_trigger where tgname like 'ops_operators_auth_mapping_%';` answers 2.
+2. **Owner: the gate decision.** Push on staging now needs `outbound_sending` open. If staging
+   push is in use, the owner approves it as in Story 3.6, Hosted staging, step 7, before or right
+   after step 1; until then claims expire push jobs but send nothing (inbox delivery is
+   unaffected).
+3. **Parent session: redeploy both functions with the shared module.** Both now import
+   `supabase/functions/_shared/system_access.mjs`. With the Supabase MCP `deploy_edge_function`
+   on `tmurpotfluignacfueki`, `verify_jwt: false`, entrypoint `index.ts`, and file names relative
+   to the entrypoint's folder (the connector uploads relative dependencies under those names):
+   - `notifications-worker`: `index.ts`, `logic.mjs`, `fcm.mjs` and `../_shared/system_access.mjs`
+     (contents of `supabase/functions/_shared/system_access.mjs`);
+   - `identity-deletion`: `index.ts`, `logic.mjs` and `../_shared/system_access.mjs`.
+
+   Or with the CLI, which bundles `_shared` by itself (the Supabase convention for shared code):
+   `npx supabase functions deploy notifications-worker --project-ref tmurpotfluignacfueki --no-verify-jwt`
+   (and the same for `identity-deletion`). `npm run ci:function-imports` must pass first: no
+   function may import a file outside `supabase/functions/`.
+4. **Parent session: checks.**
+   1. `tools/ci/verify-hosted.sql` with `expected_env=staging` passes.
+   2. `POST https://tmurpotfluignacfueki.supabase.co/functions/v1/notifications-worker` with `{}`
+      and no trigger answers `401` (not a 5xx boot error); `identity-deletion` answers its usual
+      refusal, not a boot error.
+   3. Within two minutes `select app.notifications_scheduler_status();` shows a new
+      `last_claim_at`, and `select last_success_at from app.notifications_scheduler_state;` moves.
+   4. If push is on and the gate open: a synthetic reminder for a registered test phone produces
+      one `accepted` push attempt (Story 3.6, step 8.1).
+5. **Owner: the operator mapping and the health view.** Map the owner's staging account (SQL
+   above), sign in to staff web built against staging, open **Reminder health**: counts show,
+   **Scheduler status may be stale** is absent while the scheduler runs, and no private value
+   appears. Then run the synthetic failure demonstration (Story 3.4 fault, above) and the
+   pause/resume check (close the gate, see `outbound_open: false` and push work pending, reopen).
+   Record only pass/fail and counts in `evidence-3.8/`.
 
 ## Story 3.10: closing staging acceptance and promotion
 
@@ -790,10 +873,13 @@ until the owner completes them.
 ### Production gate
 
 Promotion deploys migrations, verifies hosted state, deploys all configured Edge Functions to the
-guarded project and then builds clients. `verify-hosted.sql` fails production promotion if any
-notification scheduler job is configured, `push_enabled` is true, `outbound_sending` is open or
-alerting is enabled. Staging scheduler activity for synthetic acceptance is allowed by the
-production-only notification assertions.
+guarded project and then builds clients. In production, `verify-hosted.sql` applies each
+activation assertion only while its gate is unapproved: a notification scheduler job fails it
+unless `ops_system_access`, `q2_church_time` and `q12_operations` are approved; `outbound_sending`
+open fails it unless the approval value names production; `push_enabled` fails it unless that
+production approval exists. Alerting must stay disabled and `private_access` closed. Staging may
+run its synthetic scheduler and have `outbound_sending` open. A legitimate production activation
+therefore does not break later promotions, and an unapproved one still fails verification.
 
 Story 3.10 does not authorize production activation. Production project/ref, protected GitHub
 environment, Q2 church-time approval, `ops_system_access`, Q12 operations approval and lateness

@@ -17,7 +17,7 @@ Architecture: AD-17 and AD-18. Owner decisions: `_bmad-output/initiative-church-
 | Supabase | `supabase start` (Docker) | `bic-kafue-platform-test`, ref `tmurpotfluignacfueki`, eu-central-1, free plan | **not created yet** (owner gate) |
 | Database marker (`app.platform_current_environment()`) | unset, so the database behaves as production; tests set `local` | `staging`, set 2026-10-03 by `israel` | set to `production` by the first promotion |
 | Fixture policy values (Q2, Q9) | only when marked `local` | yes, labelled | never |
-| `private_access` / `outbound_sending` gates | closed | closed | closed until the owner approves them in that database |
+| `private_access` / `outbound_sending` gates | closed | `private_access` closed; `outbound_sending` may be open for synthetic push (owner decision 2026-10-13) | closed until the owner approves them in that database |
 | Recipients | synthetic only (`*@example.test`, `*@example.com`, `*.invalid`) | synthetic only, plus the owner test inbox `israelmuyoba+<tag>@gmail.com` | none (sending disabled) |
 | SMS | never | never | never |
 | Secrets live in | nowhere (the local key comes from `npx supabase status`) | GitHub environment `staging` | GitHub environment `production` (required reviewer) |
@@ -105,7 +105,7 @@ Start it from Actions, then **promote**, then **Run workflow** with target `stag
 5. It handles the environment marker:
    - An unmarked database is marked with the target name.
    - A database that carries a different marker stops the run.
-   - `tools/ci/verify-hosted.sql` then asserts the marker, closed `private_access` and `outbound_sending` gates, and the disabled baseline. In production it also requires no notification scheduler job and `push_enabled` false; staging may keep its synthetic scheduler running.
+   - `tools/ci/verify-hosted.sql` then asserts the marker, a closed `private_access` gate and the disabled baseline. In production each notification activation assertion applies only while its gate is unapproved: no scheduler job unless `ops_system_access`, `q2_church_time` and `q12_operations` are approved; `outbound_sending` closed unless its approval value names production (`{"environment": "production"}`); `push_enabled` false unless that production approval exists. Staging may keep its synthetic scheduler running and `outbound_sending` open (owner decision 2026-10-13).
 6. Edge Functions:
    - The pinned Supabase CLI deploys `identity-assisted-recovery`, `identity-deletion` and
      `notifications-worker` to the same guarded project ref, each with `--no-verify-jwt` as
@@ -143,9 +143,10 @@ For production, all of the following must hold:
 Command versions stay backwards compatible (AD-17 expand/contract). Old command versions are retained until supported clients migrate, so a backend promoted first never breaks clients already deployed. Rollback is forward repair: add a new migration. There is no destructive down-migration.
 
 The promotion workflow deploys the three configured Edge Functions after hosted verification.
-Production hosted verification also requires the notification scheduler and push switch to be off,
-`outbound_sending` closed and alerting disabled. Staging may run its synthetic acceptance
-scheduler; production-only assertions do not reject that staging activity.
+Production hosted verification also requires the notification scheduler and push switch to be off
+and `outbound_sending` closed while their gates are unapproved (see `notifications.md`, Story 3.10,
+Production gate), and alerting disabled. Staging may run its synthetic acceptance scheduler and
+have `outbound_sending` open; production-only assertions do not reject that staging activity.
 
 Mobile builds follow the same rule (`--dart-define`, one build per commit and environment). Store release signing is owned by the release epic.
 
@@ -212,7 +213,7 @@ and add `NETLIFY_AUTH_TOKEN` / `NETLIFY_SITE_ID`.
 6. System access, operators and alerting in production follow `system-access-and-operations.md` (story 1.9): the system route stays closed there until the owner approves `ops_system_access`, and alerting stays off until Q12 thresholds and the restricted alert destination are approved.
 7. Backups and restores follow `backup-and-restore.md` (story 1.10). Restores go to isolated targets only, `verify-hosted.sql` fails promotion onto an unreconciled restore, and real-data backups stay off until Q4 and Q12 are resolved and the owner chooses the production journal and object store.
 8. The identity workflows (epic 2) follow their own ordered package, with every Q1/Q4 gate listed as approve-or-leave-fail-closed: [production-promotion-identity.md](production-promotion-identity.md).
-9. Do not approve the `private_access` or `outbound_sending` gates (`app.policy_approve`) until their release epics say so. Opening either gate is out of scope for milestone 1. While a gate is open, every promotion to that environment fails, because `tools/ci/verify-hosted.sql` requires both gates closed. Changing `features.*` does not help either: `env:check` rejects `true`. A later release epic must change `verify-hosted.sql` and the validator (`tools/env/environments.mjs`) together to allow an approved gate.
+9. Do not approve the `private_access` or `outbound_sending` gates (`app.policy_approve`) until their release epics say so. Opening either gate is out of scope for milestone 1. While `private_access` is open, every promotion to that environment fails, because `tools/ci/verify-hosted.sql` requires it closed. Since story 3.8 (review fixes, 2026-10-13), `outbound_sending` may be open on staging, and in production only with an approval value that names production (`notifications.md`, Story 3.8). Changing `features.*` does not help either: `env:check` rejects `true`. A later release epic must change `verify-hosted.sql` and the validator (`tools/env/environments.mjs`) together to allow an approved gate.
 
 ## Evidence
 

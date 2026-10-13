@@ -75,7 +75,8 @@ context:
 
 ## Review Triage Log
 
-- medium / patch — `tools/identity-deletion/worker.mjs` now adds a Bearer header for legacy JWT keys in both requests, while it previously sent only `apikey`; restore its prior operator-tool header behavior to keep the accepted request boundary unchanged.
+- maybe-false / defer — The prescribed `supabase functions serve` command started the Edge Runtime and listed both entrypoints without import errors, but this environment has no Kong container and requests to the local function port failed; a real invocation or deploy-bundle check is still needed to confirm the external shared-module imports execute.
+- medium / patch — carried: `tools/identity-deletion/worker.mjs` had changed legacy JWT headers from apikey-only to Bearer authorization; the implementation restored apikey-only behavior and added a regression assertion in `tools/identity-deletion/worker.test.mjs`.
 
 ## Design Notes
 

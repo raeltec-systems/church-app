@@ -4,7 +4,7 @@
 -- fake FCM endpoint in tools/identity-e2e/push.mjs. Every account here is SYNTHETIC
 -- (+44 7700 900900-900909); device tokens are synthetic.
 begin;
-select plan(102);
+select plan(108);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000360' || lpad(n::text, 2, '0'))::uuid $$;
@@ -525,6 +525,36 @@ select is(pg_temp.prep((select id from v where k = 'gate-route')) ->> 'outcome',
   'preparation with an active lease returns no device tokens after the gate closes');
 select ok(pg_temp.lease((select id from v where k = 'gate-route')) is null,
   'a push lease is released when preparation sees a closed gate');
+
+-- Review 3.8-3.10 finding 6: with the gate closed, claims still count lapsed leases and expire
+-- due push jobs (the 3.6 behaviour), and lease nothing.
+update app.notifications_push_jobs
+   set lease_token = nextval('app.notifications_lease_token_seq'), lease_principal = pg_temp.w(1),
+       lease_request = gen_random_uuid(), lease_expires_at = now() - interval '1 second'
+ where push_job_id = (select id from v where k = 'gate-route');
+update v set j = pg_temp.sys('notifications.push_claim', '{}', gen_random_uuid()) -> 'data'
+ where k = 'gate-route';
+select ok((select (j ->> 'gate_closed')::boolean and (j ->> 'reclaimed')::int = 1 and (j ->> 'claimed')::int = 0
+             from v where k = 'gate-route'),
+  'a closed-gate claim still counts the lapsed push lease and leases nothing');
+select is(pg_temp.outcomes((select id from v where k = 'gate-route')), 'lapsed',
+  'the lapsed lease is recorded as a push attempt while the gate is closed');
+update app.notifications_push_jobs set expires_at = now() - interval '1 second'
+ where push_job_id = (select id from v where k = 'gate-route');
+update v set j = pg_temp.sys('notifications.push_claim', '{"expire_only": true}', gen_random_uuid()) -> 'data'
+ where k = 'gate-route';
+select ok((select (j ->> 'gate_closed')::boolean and (j ->> 'expired')::int = 1 and (j ->> 'claimed')::int = 0
+             from v where k = 'gate-route'),
+  'a closed-gate expire-only claim still expires the due push job');
+select is(pg_temp.pst((select id from v where k = 'gate-route')), 'obsolete|expired',
+  'the expired push job is finished while the gate is closed');
+-- Finding 16: a JSON number with a fraction part of zero is a valid lease token on the system route.
+select is(pg_temp.sys('notifications.push_prepare',
+            jsonb_build_object('push_job_id', (select id from v where k = 'gate-route'), 'lease_token', 5.0),
+            gen_random_uuid()) -> 'data' ->> 'outcome', 'fenced',
+  'push_prepare accepts a lease token sent as 5.0 (fenced here, never internal_error)');
+select is(pg_temp.sys('notifications.push_claim', '{}', gen_random_uuid()) -> 'data' ->> 'push_enabled',
+  'true', 'the closed gate does not rewrite the push_enabled setting in the claim answer');
 
 select * from finish();
 rollback;

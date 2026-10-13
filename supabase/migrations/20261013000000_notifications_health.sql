@@ -108,17 +108,24 @@ begin
 
   v_scheduler := app.notifications_scheduler_status();
   v_last_tick := nullif(v_scheduler ->> 'last_tick_at', '')::timestamptz;
+  select s.last_success_at into v_last_success
+    from app.notifications_scheduler_state s where s.singleton;
+  select coalesce(jsonb_object_agg(a.outcome, a.n), '{}'::jsonb) into v_push_attempts
+    from (select t.outcome, count(*) as n from app.notifications_attempts t
+           where t.channel = 'push' and t.attempted_at >= now() - interval '24 hours'
+           group by t.outcome) a;
   v_tick_outcome := v_scheduler ->> 'last_tick_outcome';
   return jsonb_build_object(
     'captured_at', app.cmd_utc(clock_timestamp()),
     'scheduler', jsonb_build_object(
       'last_tick_at', case when v_last_tick is not null then app.cmd_utc(v_last_tick) end,
       'last_tick_outcome', v_tick_outcome,
-      'last_success_at', (select app.cmd_utc(s.last_success_at)
-                            from app.notifications_scheduler_state s where s.singleton),
+      'last_success_at', case when v_last_success is not null then app.cmd_utc(v_last_success) end,
       'jobs', coalesce((v_scheduler ->> 'scheduler_jobs')::integer, 0),
       'cron_runs_24h', coalesce(v_scheduler -> 'cron_runs_24h', '{}'::jsonb),
-      'stale', v_last_tick is null or v_last_tick < now() - interval '5 minutes'),
+      -- Stale = no successful hand-off to the worker in five minutes. A tick that only notes
+      -- not_configured or gate_closed still moves last_tick_at, so it must not count as fresh.
+      'stale', v_last_success is null or v_last_success < now() - interval '5 minutes'),
     'jobs', jsonb_build_object(
       'due_pending', (select count(*) from app.notifications_jobs j
                        where j.job_state = 'pending' and j.scheduled_at <= now()),
@@ -137,19 +144,30 @@ begin
       'outbound_open', app.policy_is_open('outbound_sending'),
       'pending', coalesce((v_scheduler -> 'push' ->> 'pending')::integer, 0),
       'leased', coalesce((v_scheduler -> 'push' ->> 'leased')::integer, 0),
-      'failed_attempts_24h',
-        coalesce((v_scheduler -> 'push' -> 'attempts_24h' ->> 'transient')::integer, 0)
-        + coalesce((v_scheduler -> 'push' -> 'attempts_24h' ->> 'rejected')::integer, 0)
-        + coalesce((v_scheduler -> 'push' -> 'attempts_24h' ->> 'exhausted')::integer, 0)),
+      -- Every unsuccessful push attempt outcome: provider transient/rejected answers, recheck
+      -- failures, lapsed leases and exhaustion.
+      'failed_attempts_24h', (select coalesce(sum(e.value::integer), 0)::integer
+                                from jsonb_each_text(v_push_attempts) e
+                               where e.key in ('transient', 'rejected', 'failed', 'lapsed', 'exhausted'))),
     'tokens', jsonb_build_object(
       'retired', (select count(*) from app.notifications_device_tokens t where t.retired_at is not null),
       'retired_24h', (select count(*) from app.notifications_device_tokens t
                        where t.retired_at >= now() - interval '24 hours'),
       'last_retired_at', (select app.cmd_utc(max(t.retired_at))
                             from app.notifications_device_tokens t where t.retired_at is not null)),
+    -- The direct-contact table is append-only (one row per need, never closed), so the backlog
+    -- is a rolling window: needs with no registered route recorded in the last 24 hours. The
+    -- cumulative totals are reported separately.
     'direct_contact', jsonb_build_object(
-      'backlog', (select count(*) from app.notifications_direct_contact_needs),
-      'oldest_due_at', (select app.cmd_utc(min(n.due_at)) from app.notifications_direct_contact_needs n)));
+      'backlog', (select count(*) from app.notifications_direct_contact_needs n
+                   where n.route_state = 'unrouted' and n.routed_at >= now() - interval '24 hours'),
+      'oldest_due_at', (select app.cmd_utc(min(n.due_at)) from app.notifications_direct_contact_needs n
+                         where n.route_state = 'unrouted' and n.routed_at >= now() - interval '24 hours'),
+      'routed_24h', (select count(*) from app.notifications_direct_contact_needs n
+                      where n.route_state = 'routed' and n.routed_at >= now() - interval '24 hours'),
+      'total_unrouted', (select count(*) from app.notifications_direct_contact_needs n
+                          where n.route_state = 'unrouted'),
+      'total', (select count(*) from app.notifications_direct_contact_needs)));
 end;
 $$;
 
@@ -393,8 +411,10 @@ begin
 end;
 $$;
 
--- Enforce the owner-controlled outbound gate at the worker command boundary. Inbox delivery is
--- unchanged; when closed, push claims and preparations return no work or device tokens.
+-- The owner-controlled outbound gate at the worker command boundary. Inbox delivery is
+-- unchanged. While the gate is closed a claim still expires due push jobs and counts lapsed
+-- leases (as in 3.6), but app.notifications_push_claim leases nothing and the answer carries
+-- `gate_closed: true`; prepare answers `gate_closed` and returns no device tokens.
 create or replace function app.notifications_sys_push_claim(p_principal uuid, p_request uuid,
                                                               p_payload jsonb)
 returns jsonb
@@ -403,19 +423,19 @@ set search_path = ''
 as $$
 declare
   v_settings app.notifications_worker_settings := app.notifications_worker_config();
+  v_data jsonb;
 begin
-  if not app.policy_is_open('outbound_sending') then
-    return jsonb_build_object('data', jsonb_build_object(
-      'jobs', '[]'::jsonb, 'claimed', 0, 'reclaimed', 0, 'expired', 0,
-      'lease_seconds', v_settings.lease_seconds,
-      'push_enabled', false, 'gate_closed', true));
-  end if;
   if coalesce((p_payload ->> 'expire_only')::boolean, false) then
-    return jsonb_build_object('data', app.notifications_push_claim(p_principal, p_request, 0));
+    v_data := app.notifications_push_claim(p_principal, p_request, 0);
+  else
+    v_data := app.notifications_push_claim(
+      p_principal, p_request, least(coalesce((p_payload ->> 'limit')::numeric::integer,
+        v_settings.batch_max), v_settings.batch_max));
   end if;
-  return jsonb_build_object('data', app.notifications_push_claim(
-    p_principal, p_request, least(coalesce((p_payload ->> 'limit')::numeric::integer,
-      v_settings.batch_max), v_settings.batch_max)));
+  if not app.policy_is_open('outbound_sending') then
+    v_data := v_data || '{"gate_closed": true}'::jsonb;
+  end if;
+  return jsonb_build_object('data', v_data);
 end;
 $$;
 
@@ -428,7 +448,7 @@ as $$
 begin
   return jsonb_build_object('data', app.notifications_push_prepare(
     p_principal, p_request, (p_payload ->> 'push_job_id')::uuid,
-    (p_payload ->> 'lease_token')::bigint));
+    (p_payload ->> 'lease_token')::numeric::bigint));
 end;
 $$;
 

@@ -170,3 +170,25 @@ test('no FCM credential: push jobs still expire (expire-only claim, nothing leas
   const leased = fakeSystem({ 'notifications.push_claim': claimOf([job(1)]) });
   await assert.rejects(expirePush({ system: leased.system }), /unexpected_claim/, 'an expire-only claim must lease nothing');
 });
+
+test('story 3.8: a closed outbound gate is a deliberate pause, never `unexpected`', async () => {
+  // Claim made while the gate was closed: nothing leased, lapses and expiry still counted.
+  const closed = fakeSystem({ 'notifications.push_claim': claimOf([], { gate_closed: true, expired: 1, reclaimed: 2 }) });
+  assert.deepEqual(await runPush({ system: closed.system, sender: { send: async () => assert.fail('nothing to send') } }),
+    { claimed: 0, reclaimed: 2, expired: 1, enabled: true, gate_closed: true, outcomes: {}, sent: {}, uncertain: 0, deferred: 0 });
+  assert.deepEqual(await expirePush({ system: closed.system }),
+    { state: 'not_configured', reclaimed: 2, expired: 1, gate_closed: true });
+  // A closed-gate claim that leases anything, or a non-boolean flag, is malformed.
+  assert.equal(parsePushClaim(claimOf([job(1)], { gate_closed: true })), null);
+  assert.equal(parsePushClaim(claimOf([], { gate_closed: 'yes' })), null);
+  // The gate closed between claim and prepare: the lease was released, the outcome is counted.
+  const { calls, system } = fakeSystem({
+    'notifications.push_claim': claimOf([job(1), job(2)]),
+    'notifications.push_prepare': { outcome: 'gate_closed' },
+  });
+  const counts = await runPush({ system, sender: { send: async () => assert.fail('nothing to send') } });
+  assert.deepEqual(counts.outcomes, { gate_closed: 2 });
+  assert.equal(counts.uncertain, 0);
+  assert.deepEqual(calls.map((c) => c.command),
+    ['notifications.push_claim', 'notifications.push_prepare', 'notifications.push_prepare']);
+});

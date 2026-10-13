@@ -77,7 +77,3 @@
   evidence: 3.6 retires the registration before an in-app sign-out only; pushes stay generic and every open re-checks the session, so this is a privacy refinement, not a leak of content.
 
 - **3.6 client follow-up review (2026-10-08), not yet fixed:** (1) `packages/client_core/lib/src/application/push_controllers.dart` ignores an FCM token refresh that arrives while registration is in progress or has failed (the server keeps the old token until the next sign-in or access grant): remember the latest token and re-register when the current attempt ends or from `failed`. (2) No monochrome `default_notification_icon` in `apps/mobile/android/app/src/main/AndroidManifest.xml` (the status bar shows the launcher icon as a silhouette). (3) Optional: `firebase_messaging_auto_init_enabled=false` until the member has granted access, so no FCM token exists before consent.
-
-- source_plan: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/story-refactor-sweep-plan.md`
-  summary: Verify deployed-style Deno bundling and execution of both Edge functions after the shared runtime module extraction.
-  evidence: `supabase functions serve` started the Edge Runtime and listed both entrypoints without import errors, but the missing Kong container prevented HTTP requests and both local function-port requests failed; confirm with a working local stack or a non-mutating bundle check.

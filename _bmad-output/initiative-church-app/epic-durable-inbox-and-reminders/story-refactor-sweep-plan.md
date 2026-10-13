@@ -77,6 +77,8 @@ context:
 
 - maybe-false / defer — The prescribed `supabase functions serve` command started the Edge Runtime and listed both entrypoints without import errors, but this environment has no Kong container and requests to the local function port failed; a real invocation or deploy-bundle check is still needed to confirm the external shared-module imports execute.
 - medium / patch — carried: `tools/identity-deletion/worker.mjs` had changed legacy JWT headers from apikey-only to Bearer authorization; the implementation restored apikey-only behavior and added a regression assertion in `tools/identity-deletion/worker.test.mjs`.
+- false / reject — Direct requests to the Edge Runtime container loaded both entrypoints and the shared module; identity-deletion returned 401 when the credential was missing, while 257-byte and 1025-byte requests returned the expected 413 responses and exact-limit requests returned 400 invalid-body responses. The missing Kong container prevented the gateway URL, but did not block runtime execution.
+- false / reject — The final worker still constructs its system-route headers with `apikey` and no `authorization`; the added legacy-key regression assertion passed, so the previously reported behavior is absent.
 
 ## Design Notes
 

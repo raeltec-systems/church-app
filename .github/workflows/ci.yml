@@ -53,6 +53,8 @@ jobs:
           fi
       - name: No secrets in tracked files
         run: npm run ci:secrets
+      - name: Edge Functions import nothing outside supabase/functions (shared code lives in _shared)
+        run: npm run ci:function-imports
       - name: Staging migration-history drift (skipped until the owner adds SUPABASE_ACCESS_TOKEN)
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -93,7 +95,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Harness helper tests (no network, no credentials)
+      - name: Harness, function and shared-module tests (no network, no credentials; supabase/functions/*/ includes _shared)
         run: node --test tools/auth-harness/*.test.mjs tools/identity-e2e/*.test.mjs supabase/functions/*/*.test.mjs tools/identity-deletion/*.test.mjs tools/notifications/*.test.mjs
       - name: Evidence holds no tokens, keys, passwords, OTPs or link tokens
         run: bash tools/auth-harness/scan-evidence.sh

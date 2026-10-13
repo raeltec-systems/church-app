@@ -206,7 +206,7 @@ Nothing is scheduled in production until Israel approves `q2_church_time`:
 
 ## Story 3.4: the leased and fenced worker, Cron and the Edge Function
 
-Migration: `supabase/migrations/20261008121248_notifications_worker.sql` (one file; no row deletions, no destructive statements). Edge Function: `supabase/functions/notifications-worker/` (`index.ts`, `logic.mjs`; `verify_jwt = false` in `supabase/config.toml`). Tests: `supabase/tests/notifications_worker_test.sql` (110), `supabase/functions/notifications-worker/logic.test.mjs`, E2E `tools/identity-e2e/worker.mjs` (17 checks, including a real pg_cron run). Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.4/`.
+Migration: `supabase/migrations/20261008121248_notifications_worker.sql` (one file; no row deletions, no destructive statements). Edge Function: `supabase/functions/notifications-worker/` (`index.ts`, `logic.mjs`; `verify_jwt = false` in `supabase/config.toml`; since the 3.9 refactor `logic.mjs` also imports the shared module `supabase/functions/_shared/system_access.mjs`, deployed as `../_shared/system_access.mjs`). Tests: `supabase/tests/notifications_worker_test.sql` (110), `supabase/functions/notifications-worker/logic.test.mjs`, E2E `tools/identity-e2e/worker.mjs` (17 checks, including a real pg_cron run). Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.4/`.
 
 ### How a job is worked
 
@@ -307,7 +307,7 @@ The agent deployed nothing and created no schedule. In order:
    - adds no client grant.
 
    Check: `select app.notifications_scheduler_status();` answers `"scheduler_jobs": 0`.
-2. **Parent session: deploy the function.** Supabase MCP `deploy_edge_function` on `tmurpotfluignacfueki`: name `notifications-worker`, entrypoint `index.ts`, files `supabase/functions/notifications-worker/index.ts` and `logic.mjs`, `verify_jwt: false`. Check: `POST https://tmurpotfluignacfueki.supabase.co/functions/v1/notifications-worker` with body `{}` answers `503 {"outcome":"unavailable"}` until the owner sets the secrets (step 5), then `401` without the trigger.
+2. **Parent session: deploy the function.** Supabase MCP `deploy_edge_function` on `tmurpotfluignacfueki`: name `notifications-worker`, entrypoint `index.ts`, files `supabase/functions/notifications-worker/index.ts` and `logic.mjs`, `verify_jwt: false`. **Current file list** (after 3.6 and the 3.9 refactor): `index.ts`, `logic.mjs`, `fcm.mjs` and `../_shared/system_access.mjs` (see Story 3.8, Hosted staging). Check: `POST https://tmurpotfluignacfueki.supabase.co/functions/v1/notifications-worker` with body `{}` answers `503 {"outcome":"unavailable"}` until the owner sets the secrets (step 5), then `401` without the trigger.
 3. **Parent session: the URL and the trigger.**
    1. `select app.notifications_configure_worker('{"worker_url": "https://tmurpotfluignacfueki.supabase.co/functions/v1/notifications-worker"}', 'israel');`
    2. `select app.notifications_scheduler_new_trigger('israel');` (answers `{"trigger_set": true, ...}`; the value is not shown).
@@ -414,7 +414,7 @@ Fictional numbers: pgTAP `+44 7700 900880-900888` (the 3.3 suite borrows `900889
 
 ## Story 3.6: generic expiring push through FCM; invalid tokens retired
 
-Migration: `supabase/migrations/20261008155801_notifications_push.sql` (one file; no row deletions, no destructive statements, no rows file: push attempts live in `app.notifications_attempts`, which the 3.5 deletion hook already erases). Edge Function: `supabase/functions/notifications-worker/` now has three files, `index.ts`, `logic.mjs` and `fcm.mjs`. Tests: `supabase/tests/notifications_push_test.sql` (96), `supabase/functions/notifications-worker/fcm.test.mjs` and `push-run.test.mjs`, E2E `tools/identity-e2e/push.mjs` (12 checks against a fake FCM endpoint), client tests `packages/client_core/test/notifications/push_test.dart` and the mobile app test. Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.6/`.
+Migration: `supabase/migrations/20261008155801_notifications_push.sql` (one file; no row deletions, no destructive statements, no rows file: push attempts live in `app.notifications_attempts`, which the 3.5 deletion hook already erases). Edge Function: `supabase/functions/notifications-worker/` now has three files, `index.ts`, `logic.mjs` and `fcm.mjs` (since the 3.9 refactor also the shared `../_shared/system_access.mjs`). Tests: `supabase/tests/notifications_push_test.sql` (96), `supabase/functions/notifications-worker/fcm.test.mjs` and `push-run.test.mjs`, E2E `tools/identity-e2e/push.mjs` (12 checks against a fake FCM endpoint), client tests `packages/client_core/test/notifications/push_test.dart` and the mobile app test. Evidence: `_bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.6/`.
 
 **Push is off until the owner's steps below are done.** Nothing in the repository holds a Firebase project id, app id, API key, service account or APNs key, and the apps ship with the no-op push adapter. The durable inbox and the leaders' direct-contact routes carry every reminder meanwhile.
 
@@ -509,7 +509,7 @@ Steps 1 and 2 were done by the parent session on 2026-10-08 (evidence: `evidence
    Check: `select app.notifications_scheduler_status() -> 'push';` answers `"enabled": false`.
 2. **Parent session: redeploy the function.** Supabase MCP `deploy_edge_function` on `tmurpotfluignacfueki`:
    - name `notifications-worker`, entrypoint `index.ts`, `verify_jwt: false`;
-   - files `supabase/functions/notifications-worker/index.ts`, `logic.mjs` and **`fcm.mjs`** (new).
+   - files `supabase/functions/notifications-worker/index.ts`, `logic.mjs` and **`fcm.mjs`** (new). Since the 3.9 refactor also `supabase/functions/_shared/system_access.mjs`, uploaded under the name `../_shared/system_access.mjs`; without it the function fails with module-not-found.
 
    Until step 4 the answer's `push` is `{"state":"not_configured", ...}` (push jobs only expire) and inbox delivery is unchanged.
 3. **Owner: the Firebase project** ([Firebase console](https://console.firebase.google.com)):
@@ -550,6 +550,9 @@ Steps 1 and 2 were done by the parent session on 2026-10-08 (evidence: `evidence
    - Android: the Gradle build turns the same four defines into Firebase's string resources (`google_app_id`, `gcm_defaultSenderId`, `google_api_key`, `project_id`), so no `google-services.json` or Google services plugin is used and Firebase also starts when a push wakes a closed app. The default notification channel `reminders` ("Reminders") is created at process start.
    - iOS (owner, in Xcode, once the APNs key of step 5 exists): open `apps/mobile/ios/Runner.xcworkspace` > target Runner > **Signing & Capabilities > + Capability > Push Notifications** (this creates `Runner.entitlements` with `aps-environment`). Background Modes > Remote notifications is already in `Info.plist`. Build with `FIREBASE_IOS_APP_ID` as well. Not done in the repository because a provisioning profile without the Push capability would break signing.
 7. **Parent or owner: turn push on for staging** once a device build exists: `select app.notifications_configure_worker('{"push_enabled": true}', 'israel');`.
+   Since story 3.8, push also needs the owner-controlled `outbound_sending` gate open in that database (closed, push jobs still expire but nothing is leased or sent). The owner decided on 2026-10-13 that staging may have it open for synthetic push; production stays closed until the owner approves it there. The owner (or the parent with the owner's go-ahead) approves it on staging in the SQL editor:
+   `select app.policy_approve('outbound_sending', '{"environment": "staging", "scope": "synthetic push"}', 'israel', '<decision note, e.g. owner decision 2026-10-13: staging synthetic push>');`
+   Check: `select app.policy_is_open('outbound_sending');` answers `true`, and `tools/ci/verify-hosted.sql` with `expected_env=staging` still passes (staging accepts the gate open). To pause, see Story 3.8, "Pause and resume push sending".
 8. **Owner: the real-device check** (the ticket's verify line). Use a real Android phone with Google Play services, and an iPhone where available, with the build from step 6 signed in as a SYNTHETIC member. Allow notifications when asked.
    1. Close the app (swipe it away). Create a reminder due now for that member (`fixture.reminder_create`, or an Admin's `fixture.reminder_create_for`). Within about a minute a notification shows **SYNTHETIC test reminder / A test reminder is waiting for you.** and nothing else.
    2. Tap it: the app opens **Reminder** for that item, after sign-in if the session has ended, and shows **Still current**.
@@ -564,11 +567,11 @@ Steps 1 and 2 were done by the parent session on 2026-10-08 (evidence: `evidence
    2. Replace the Edge secret.
    3. Wait for one run that shows `push.sent.accepted`.
    4. Delete the old key under **Keys**.
-10. **Stop push** at any time: `push_enabled` false (above). For a full stop, also delete the Edge secret `NOTIFICATIONS_FCM_SERVICE_ACCOUNT`.
+10. **Stop push** at any time: `push_enabled` false (above), or close `outbound_sending` (Story 3.8). For a full stop, also delete the Edge secret `NOTIFICATIONS_FCM_SERVICE_ACCOUNT`.
 
 ### Production
 
-Nothing yet. Production needs its own Firebase project and service account, its own APNs upload (the same `.p8` may serve both), its own Edge secret, the client build with production identifiers, and `push_enabled` set by the owner after the entry 10 gates.
+Nothing yet. Production needs its own Firebase project and service account, its own APNs upload (the same `.p8` may serve both), its own Edge secret, the client build with production identifiers, the owner's `outbound_sending` approval in production (its value must name production, `{"environment": "production", ...}`, or `verify-hosted.sql` fails the promotion), and `push_enabled` set by the owner after the entry 10 gates.
 
 ### Known limits and follow-ups
 

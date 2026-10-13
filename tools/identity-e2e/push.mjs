@@ -205,7 +205,21 @@ async function main() {
   } else if (marker !== 'local') {
     throw new Error(`local database is marked ${marker}`);
   }
-  log('P00-precondition', { leftover_users_removed: cleanup(), policy_reset: resetPolicy() !== null });
+  // Story 3.8: push needs the owner-controlled `outbound_sending` gate open. Local only: remember
+  // the gate row exactly as found, open it for this run, and put it back in cleanup.
+  const gateBefore = psql(`select coalesce((select to_jsonb(g) - 'gate' from app.policy_gates g
+                                              where gate = 'outbound_sending')::text, '')`);
+  if (gateBefore === '') throw new Error('the outbound_sending gate is missing');
+  const restoreGate = () => psql(`
+    update app.policy_gates g set (state, approved_value, approved_by, approved_at, approval_note) =
+      (select r.state, r.approved_value, r.approved_by, r.approved_at, r.approval_note
+         from jsonb_populate_record(null::app.policy_gates, '${gateBefore.replace(/'/g, "''")}'::jsonb) r)
+     where g.gate = 'outbound_sending';
+    select app.policy_is_open('outbound_sending');`);
+  psql(`select app.policy_approve('outbound_sending', '{"enabled": true, "scope": "local push e2e"}',
+    '${OPERATOR}', 'LOCAL E2E ONLY: push.mjs opens the gate and restores it in cleanup')`);
+  log('P00-precondition', { leftover_users_removed: cleanup(), policy_reset: resetPolicy() !== null,
+    outbound_sending_open: psql(`select app.policy_is_open('outbound_sending')`) === 't' });
 
   // The run's own Firebase-shaped service account: a fresh key pair, never stored.
   const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048,
@@ -383,6 +397,7 @@ async function main() {
     fake.server.close();
     rmSync(work, { recursive: true, force: true });
     resetPolicy();
+    const gateOpenAfter = restoreGate();
     const left = cleanup();
     psql(`select app.sys_revoke_credential('${credentialId}', '${OPERATOR}');
           select app.sys_disable_principal('${principal}', '${OPERATOR}');
@@ -395,6 +410,7 @@ async function main() {
       push_jobs_left: Number(psql(`select count(*) from app.notifications_push_jobs`)),
       tokens_left: Number(psql(`select count(*) from app.notifications_device_tokens`)),
       push_enabled: psql(`select push_enabled from app.notifications_worker_settings`) === 't',
+      outbound_sending_restored: gateOpenAfter === (JSON.parse(gateBefore).state === 'approved' ? 't' : 'f'),
       env_file_removed: true });
   }
   finish();

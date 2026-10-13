@@ -25,11 +25,45 @@ as $$
   select jsonb_build_object('tick', p_outcome);
 $$;
 
+-- No foreign key to auth.users: an app-schema backup must restore into an isolated database
+-- that has no auth schema (story 2.11 / 1.10 restore drill). The health read instead requires
+-- the mapped Auth user to exist and pass the identity session and standing checks, and the
+-- triggers below clear the mapping when that Auth user is deleted or soft-deleted.
 alter table app.ops_operators
-  add column auth_user_id uuid unique references auth.users (id) on delete set null;
+  add column auth_user_id uuid unique;
 
 comment on column app.ops_operators.auth_user_id is
-  'Optional Auth account explicitly mapped by the owner for reminder-health reads only.';
+  'Optional Auth account explicitly mapped by the owner for reminder-health reads only. '
+  'Not a foreign key (restorable without the auth schema); cleared when the Auth user is deleted.';
+
+create function app.ops_operators_clear_auth_mapping()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  update app.ops_operators o set auth_user_id = null where o.auth_user_id = old.id;
+  return null;
+end;
+$$;
+
+comment on function app.ops_operators_clear_auth_mapping() is
+  'Clears a reminder-health operator mapping when its Auth user is deleted or soft-deleted.';
+
+revoke all on function app.ops_operators_clear_auth_mapping()
+  from public, anon, authenticated, service_role;
+
+create trigger ops_operators_auth_mapping_delete
+  after delete on auth.users
+  for each row
+  execute function app.ops_operators_clear_auth_mapping();
+
+create trigger ops_operators_auth_mapping_soft_delete
+  after update of deleted_at on auth.users
+  for each row
+  when (old.deleted_at is null and new.deleted_at is not null)
+  execute function app.ops_operators_clear_auth_mapping();
 
 create function app.notifications_health()
 returns jsonb
@@ -40,24 +74,36 @@ as $$
 declare
   v_scheduler jsonb;
   v_last_tick timestamptz;
+  v_last_success timestamptz;
   v_tick_outcome text;
+  v_access text;
   v_admin boolean := false;
   v_operator boolean := false;
+  v_push_attempts jsonb;
 begin
-  if auth.uid() is null then
-    raise exception using errcode = 'PT401', message = 'unauthenticated';
+  -- One evaluation of the live-access predicate for both paths. An unauthenticated or untrusted
+  -- session (no live password session, or an Auth user that is deleted, banned or anonymous) is
+  -- refused explicitly before either the Admin or the mapped-operator path is considered.
+  select e.outcome into v_access from app.identity_evaluate_grant('admin', null, null) e;
+  if auth.uid() is null or v_access is null or v_access in ('unauthenticated', 'untrusted_session') then
+    raise exception using errcode = 'PT401', message = 'unauthenticated',
+      detail = coalesce(v_access, 'unauthenticated');
   end if;
-
-  begin
-    perform 1 from app.identity_require_grant('admin', null, null);
-    v_admin := true;
-  exception when sqlstate 'PT403' then
-    v_admin := false;
-  end;
-  select exists (select 1 from app.ops_operators o
-                  where o.active and o.auth_user_id = auth.uid()) into v_operator;
+  v_admin := v_access = 'granted';
+  if not v_admin then
+    -- Mapped operator: an active operator mapped to this live Auth user. A member account in
+    -- review, on hold or dormant (review_required) is refused; an operator account without a
+    -- member link (not_linked) or without the Admin role (not_granted) may read.
+    select exists (select 1 from app.ops_operators o
+                     join auth.users u on u.id = o.auth_user_id
+                    where o.active and o.auth_user_id = auth.uid()
+                      and u.deleted_at is null and not coalesce(u.is_anonymous, false)
+                      and (u.banned_until is null or u.banned_until <= now()))
+       and v_access in ('not_linked', 'not_granted', 'unavailable')
+      into v_operator;
+  end if;
   if not v_admin and not v_operator then
-    raise exception using errcode = 'PT403', message = 'forbidden';
+    raise exception using errcode = 'PT403', message = 'forbidden', detail = v_access;
   end if;
 
   v_scheduler := app.notifications_scheduler_status();

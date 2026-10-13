@@ -32,7 +32,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { DriveJournal, DriveRestClient, LocalSegmentJournal } from '../recovery/journal.mjs';
-import { SYSTEM_CREDENTIAL_RE, UUID_RE, systemEnvelope } from '../../packages/shared_runtime/system_access.mjs';
+import { SYSTEM_CREDENTIAL_RE, UUID_RE, systemEnvelope } from '../../supabase/functions/_shared/system_access.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 export const CREDENTIAL_RE = SYSTEM_CREDENTIAL_RE;

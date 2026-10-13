@@ -8,7 +8,7 @@ import {
   declaredTooLarge as sharedDeclaredTooLarge,
   keyHeaders,
   systemEnvelope,
-} from '../../../packages/shared_runtime/system_access.mjs';
+} from '../_shared/system_access.mjs';
 
 export const MAX_BODY_BYTES = 256;
 export const UUID_RE = SHARED_UUID_RE;

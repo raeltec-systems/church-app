@@ -2,11 +2,16 @@
 # Fails if story 1.2/1.3 evidence (or harness sources) contain a usable credential:
 # JWTs, Supabase keys, harness-generated passwords, link/OTP token values,
 # hex link tokens, or any secret-bearing JSON key whose value is not redacted.
-# Usage: bash tools/auth-harness/scan-evidence.sh [paths...]
+# Usage: bash tools/auth-harness/scan-evidence.sh [--personal-data] [paths...]
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 BASE=_bmad-output/initiative-church-app/epic-platform-baseline
 EVIDENCE_DIRS=("$BASE/evidence-1.2" "$BASE/evidence-1.3")
+personal_data=false
+if [ "${1:-}" = "--personal-data" ]; then
+  personal_data=true
+  shift
+fi
 paths=("$@")
 [ ${#paths[@]} -eq 0 ] && paths=("${EVIDENCE_DIRS[@]}" tools/auth-harness)
 
@@ -34,6 +39,27 @@ patterns=(
 )
 
 fail=0
+# Story 3.10 owner evidence must not contain personal identifiers. This is an
+# opt-in check because the broader harness and runbooks intentionally include
+# synthetic UUIDs, phones and example addresses.
+if [ "$personal_data" = true ]; then
+  personal_patterns=(
+    # Canonical UUIDs (member/account/source/job/item/device identifiers).
+    '\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b'
+    # E.164 and common North American phone formats.
+    '\+[1-9][0-9]{7,14}\b'
+    '\b[2-9][0-9]{2}[-. ][2-9][0-9]{2}[-. ][0-9]{4}\b'
+    '\([2-9][0-9]{2}\)[ .-]?[2-9][0-9]{2}[ .-][0-9]{4}\b'
+    # Any ordinary number written in a labeled phone field.
+    '(?i)\b(phone|telephone|mobile|cell)([ _-]+(number|no))?\s*[:=]\s*\+?[0-9][0-9 ()-]{5,}[0-9]'
+    # Email addresses, including owner and member addresses.
+    '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
+    # Names in explicitly labeled identity fields.
+    '(?i)\b(member|account|source|job|item|device|witness|recipient)([ _-]+(full[ _-]+)?name)?\s*[:=]\s*[A-Z][[:alpha:]’'"'"'-]+[[:space:]]+[A-Z][[:alpha:]’'"'"'-]+'
+  )
+  patterns+=("${personal_patterns[@]}")
+fi
+
 for p in "${patterns[@]}"; do
   # Scenario lines that send deliberately invalid dummy values carry the marker
   # `# scan-evidence:allow` (a comment run-script.mjs strips); only those are skipped.

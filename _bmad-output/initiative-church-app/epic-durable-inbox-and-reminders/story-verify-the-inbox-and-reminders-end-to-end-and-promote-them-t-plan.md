@@ -66,12 +66,18 @@ context:
 
 ## Implementation Notes
 
+- Added the guarded Edge Function deployment step and production-only notification activation assertions; offline tests cover workflow order, function names/flags and SQL branch scope.
+- `npm run ci:policy-test` passed (51); `npm run env:check`, `npm run ci:migrations -- --base origin/main` (34 migrations), and `npm run ci:secrets` passed.
+- Notification helper/function tests passed (107). Flutter 3.47.6 Core analysis and tests passed (427); mobile analysis/tests passed (44); staff analysis/tests passed (31). A clean staff web release build passed.
+- Mobile APK build is still unverified because Android SDK is absent; mobile is not configured as a web target. Full local Supabase reset/E2E is unavailable: `supabase start` fails in the Realtime migration with a Postgres connection-pool timeout, leaving GoTrue schema incomplete. No staging or production tests were run.
+- Matrix coverage is present in offline release-policy tests and shared-client tests. Live integrated staging evidence and independent witness remain owner steps; implementation does not mark those as complete.
 
 ## Plan Change Log
 
 
 ## Review Triage Log
 
+- **medium — patch:** `.github/workflows/ci.yml` ran the credential scanner without checking personal identifiers, so a UUID, phone number, email address, or labeled witness name could enter Story 3.10 release evidence despite the runbook ban. Reproduced with a temporary UUID in `owner-review.md`; the scan passed. The opt-in personal-data patterns now run only on Story 3.10 evidence, with focused reject/clean tests.
 
 ## Design Notes
 
@@ -79,9 +85,14 @@ Promotion remains one ordered release: migrations establish server contracts, ho
 
 ## Verification
 
-**Commands:**
-- `npm run ci:policy-test` -- expected: offline workflow and hosted-SQL assertions pass.
-- `npm run env:check && npm run ci:migrations` -- expected: environment and migration policies pass.
-- `npm run ci:secrets` -- expected: no credentials in tracked files.
-- `node --test tools/identity-e2e/*.test.mjs supabase/functions/*/*.test.mjs` -- expected: scenario helper and function tests pass.
-- Flutter analysis, tests and clean web builds for `apps/mobile` and `apps/staff` -- expected: both clients build with staging defines.
+**Commands and results:**
+- `npm run ci:policy-test` -- passed, 51 tests including production-only verification and function deployment order.
+- `npm run env:check` -- passed.
+- `npm run ci:migrations -- --base origin/main` -- passed, 34 migrations checked.
+- `npm run ci:secrets` -- passed, 1,437 tracked files scanned.
+- `node --test tools/auth-harness/scan-evidence.test.mjs` and `bash tools/auth-harness/scan-evidence.sh --personal-data _bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.10` -- passed; personal-data fixtures are rejected and release evidence is clean.
+- `node --test tools/identity-e2e/*.test.mjs supabase/functions/*/*.test.mjs` -- passed, 107 helper and function tests.
+- `/tmp/flutter/bin/flutter analyze --fatal-infos && /tmp/flutter/bin/flutter test` in `packages/client_core` -- passed, 427 tests.
+- Flutter analyze/test in `apps/mobile` -- passed, 44 tests; `flutter build apk --debug` could not run because Android SDK is not installed.
+- Flutter analyze/test in `apps/staff` -- passed, 31 tests; clean `flutter build web --release --no-web-resources-cdn` passed.
+- `npx supabase db reset` and local full-stack E2E -- blocked by Realtime migration connection-pool timeout during Supabase startup. Staging and production owner checks remain unwitnessed.

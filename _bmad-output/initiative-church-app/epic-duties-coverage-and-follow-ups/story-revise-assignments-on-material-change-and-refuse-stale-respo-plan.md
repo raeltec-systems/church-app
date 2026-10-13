@@ -65,17 +65,29 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261014090000_duties_revisions.sql` -- vocab widening, `duties_slot_revisions` (+ immutability trigger, backfill), assignment lifecycle columns, field classification, `duties.revise_duty`, respond refusal, new reminder kinds/checks, reads with history/changes, replaced dispatch/authorizer/deletion hook.
-- [ ] `supabase/tests/duties_revisions_test.sql` (+ fix `duties_tracer_test.sql`, ledgers if needed) -- matrix.
-- [ ] client_core domain/controller/screens/routing + `test/duties/duties_revisions_test.dart` -- leader Edit form and history; member Changed state, stale refusal, deep link from an old id.
-- [ ] `tools/identity-e2e/duties-revisions.mjs` + `.test.mjs` -- local E2E of the verify.
-- [ ] `docs/runbooks/duties.md` -- 4.2 section with owner manual checks.
+- [x] `supabase/migrations/20261013221115_duties_revisions.sql` -- vocab widening, `duties_slot_revisions` (+ immutability trigger, backfill), assignment lifecycle columns, field classification, `duties.revise_duty`, respond refusal, new reminder kinds/checks, reads with history/changes, replaced dispatch/authorizer/deletion hook.
+- [x] `supabase/tests/duties_revisions_test.sql` (+ fix `duties_tracer_test.sql`, ledgers if needed) -- matrix.
+- [x] client_core domain/controller/screens/routing + `test/duties/duties_revisions_test.dart` -- leader Edit form and history; member Changed state, stale refusal, deep link from an old id.
+- [x] `tools/identity-e2e/duties-revisions.mjs` + `.test.mjs` -- local E2E of the verify.
+- [x] `docs/runbooks/duties.md` -- 4.2 section with owner manual checks.
 
 **Acceptance Criteria:**
 - Given the local stack, when the E2E runs, then a member accepts, the leader changes the time, a new pending revision appears with the old acceptance in history and its jobs cancelled, a late accept of the old revision is refused with what changed, a notes-only edit keeps Accepted, two concurrent edits give one success and one conflict, and a replay returns the original result.
 - Given the full local verification, when run, then db:test, db:smoke, every E2E, contracts, offline tool tests, flutter analyze/test, secrets, migrations and function-imports pass.
 
 ## Implementation Notes
+
+- Implemented directly (no implementation subagent is available inside this builder run).
+- Server: `supabase/migrations/20261013221115_duties_revisions.sql` (forward only; the 4.1 files are untouched). New: `app.duties_slot_revisions` (+ `app.duties_slot_revision_guard` trigger: updates refused except person ids set to the nil UUID; 4.1 slots back-filled as revision 1), `duties_slots.revision`, assignment columns `slot_revision`, `supersedes_assignment_id`, `ended_at`, `end_reason` with the lifecycle CHECK, `app.duties_slot_field_class` (the explicit classification), `app.duties_revise_duty`, change helpers, the `duty_changed` / `duty_updated` / `duty_released` kinds with `app.duties_update_reminder_check` and `app.duties_released_reminder_check`. Replaced by `create or replace`: `duties_state_ok` (widened), `duties_publish_duty` (records slot revision 1), `duties_respond` (stale and cancelled refusals before the revision check), `duties_assignment_source_check` (a superseded assignment is the current source at its final revision so the released notice can be keyed to it; per-kind checks still decide delivery), `duties_occurrence_json` / `duties_my_assignment_json` (history, changes, earlier ids), `duties_authorize_command` / `duties_command` (allowlist and dispatch), `duties_erase_member` / `duties_deletion_remaining` (slot revisions anonymised). No new client grant, no row deletions, no `_rows` file.
+- Surprise: `notifications_enqueue` validates the source through the registered source check, which required `current`; hence the source-check widening above (pgTAP and E2E prove the old revision's items still open out of date).
+- Surprise: the `duty_updated` replacement job is stamped with `clock_timestamp()` so its logical key differs from the replaced one inside one transaction (pgTAP moves it to `now()` before running the worker).
+- The stale refusal lists the fields changed from the change that replaced the assignment onwards (not notes the member already saw while it was current); `changes` on a read are the fields of the revision that created the assignment.
+- Tests: `supabase/tests/duties_revisions_test.sql` (83 checks); `duties_tracer_test.sql` subtracts the new my-duties keys. Ledgers unchanged (no new client-executable function). Client: `packages/client_core/test/duties/duties_revisions_test.dart` (15 tests, also run under `TZ=America/New_York` by CI's duties step); `myDutyData` in `testing.dart` takes the 4.2 keys.
+- Clients: staff **Change this duty** form (`_EditDutyForm`, prefilled in church time, explains material versus notes, needs a new answer-by for a material change), **Changed: …** label and **Earlier versions** history on the leader board; mobile **Changed** state with the earlier answer, "Details updated … Your answer stands.", the **This duty changed** refusal notice and the old-link banner; `/duties` added to `ClientPaths.deepLinkTargets` (released notice). Field errors are scoped to the form that sent the command.
+- E2E: `tools/identity-e2e/duties-revisions.mjs` (12 checks, R01-R60, real concurrent leader/deputy race) + offline `duties-revisions.test.mjs`; `duties.mjs` cleanup now deletes slot revisions first. Evidence in `evidence-4.2/`. Fictional numbers: pgTAP `+44 7700 900970-900979`, E2E `900980-900989`.
+- Runbooks: `docs/runbooks/duties.md` story 4.2 section (model, command, refusals, notices, reads, deletion, clients, local runs, hosted steps, owner manual checks 1-9, known limits); `contracts-and-owner-seams.md` updated.
+- Matrix audit: every row is covered in `duties_revisions_test.sql` (material same/new assignee, notes-only, stale, concurrent, replay incl. revoked scope, every refusal incl. gate closed and untrusted session, deletion); the material, stale, notes, concurrent, replay and refusal rows also run over HTTP in the E2E.
+- Owner/staging steps remaining (not blocking): the parent session applies the migration to staging and checks function md5s; the owner runs the manual checks in `docs/runbooks/duties.md` (story 4.2) and records `evidence-4.2/owner-check.md`.
 
 ## Plan Change Log
 
@@ -89,3 +101,7 @@ context:
 - `npm run -s contracts:test && node --test tools/auth-harness/*.test.mjs tools/identity-e2e/*.test.mjs supabase/functions/*/*.test.mjs tools/identity-deletion/*.test.mjs tools/notifications/*.test.mjs` -- expected: pass
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/mobile`, `apps/staff` -- expected: pass
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/ccr-93e730dd-89lbvg && npm run -s ci:function-imports` -- expected: pass
+
+**Manual checks (if no CLI):**
+- Parent session: apply `20261013221115_duties_revisions.sql` to staging (`tmurpotfluignacfueki`) after `20261013220300`, run `tools/ci/verify-hosted.sql` (`expected_env=staging`), compare per-function md5 of the new and replaced `app.duties_*` functions with local, and check `select count(*) from app.duties_slot_revisions` equals the slots published before. No Edge Function change, no rows file, no new client grant.
+- Owner staging walkthrough (`docs/runbooks/duties.md`, story 4.2, "Owner manual checks", steps 1-9): accept, change the time (form needs a new answer-by; **Duty changed**, **Awaiting response**, **Changed: date or start time**, **Earlier versions** keeps M's Accepted), the phone's **Duty changed** notice and the out-of-date old item, a late Accept on a stale screen refused with **This duty changed**, an instructions-only edit keeps **Accepted** with **Duty details updated**, two leaders saving at once give **Details updated** and **Changed elsewhere**, giving the duty to O (O's new duty, M's released notice, history kept), refusals (member, Pastor, direct table), clean up. Record in `evidence-4.2/owner-check.md`.

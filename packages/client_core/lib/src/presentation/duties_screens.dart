@@ -10,6 +10,10 @@ import '../domain/duties.dart';
 
 // Story 4.1: departments (Admin) and publishing with responses (leaders) on
 // staff web, and the member's duties with Accept / Can't make it on mobile.
+// Story 4.2: leaders change a published duty (a material change asks the
+// member again and keeps the earlier answer in history; an instructions-only
+// change keeps the answer), and an answer to an old version is refused with
+// what changed.
 // Every list comes from a server-checked read and every action is a
 // server-checked command; hiding a button is never the control. An answer
 // shows as Accepted only after the server confirmed it.
@@ -30,8 +34,13 @@ abstract final class DutyPaths {
   static const adminDepartments = '/admin/departments';
 }
 
-(StatusTone, String, String) _noticeText(DutyNotice n, DutyAction? a) {
+(StatusTone, String, String) _noticeText(
+  DutyNotice n,
+  DutyAction? a, [
+  Map<String, String> fieldErrors = const {},
+]) {
   final what = a?.subject ?? 'this';
+  final changed = DutyFields.changedIn(fieldErrors);
   return switch (n) {
     DutyNotice.departmentCreated => (
       StatusTone.success,
@@ -69,6 +78,41 @@ abstract final class DutyPaths {
       StatusTone.success,
       'Answer sent',
       'Your leader now sees that you can\'t make $what.',
+    ),
+    DutyNotice.revised => (
+      StatusTone.success,
+      'Duty changed',
+      '$what was changed. The member is asked to answer again by the new '
+          'deadline; their earlier answer is kept in the history.',
+    ),
+    DutyNotice.notesUpdated => (
+      StatusTone.success,
+      'Details updated',
+      'The instructions for $what were updated. The member\'s answer stands; '
+          'they get a notice to read the new details.',
+    ),
+    DutyNotice.superseded when changed.contains(DutyFields.memberId) => (
+      StatusTone.warning,
+      'This duty changed',
+      'Your answer was not recorded: this duty is no longer assigned to you. '
+          'Your current duties are listed here.',
+    ),
+    DutyNotice.superseded => (
+      StatusTone.warning,
+      'This duty changed',
+      'Your answer was not recorded: the ${DutyFields.describe(changed)} '
+          'changed since you opened it. The current version is shown; please '
+          'answer it again.',
+    ),
+    DutyNotice.dutyCancelled => (
+      StatusTone.neutral,
+      'Cancelled',
+      'This duty was cancelled, so it can no longer be answered.',
+    ),
+    DutyNotice.unchanged => (
+      StatusTone.neutral,
+      'Nothing changed',
+      'The duty already has these details.',
     ),
     DutyNotice.changedElsewhere => (
       StatusTone.warning,
@@ -231,9 +275,11 @@ class _DutiesPageState<T> extends ConsumerState<_DutiesPage<T>> {
     final ctl = ref.read(widget.provider.notifier);
     ref.listen(widget.provider.select((x) => x.notice), (prev, next) {
       if (next == null || next == prev) return;
+      final now = ref.read(widget.provider);
       final (_, title, message) = _noticeText(
         next,
-        ref.read(widget.provider).noticeAction,
+        now.noticeAction,
+        now.fieldErrors,
       );
       announce(context, '$title. $message');
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -256,7 +302,11 @@ class _DutiesPageState<T> extends ConsumerState<_DutiesPage<T>> {
         ),
       );
     } else if (s.notice case final n?) {
-      final (tone, title, message) = _noticeText(n, s.noticeAction);
+      final (tone, title, message) = _noticeText(
+        n,
+        s.noticeAction,
+        s.fieldErrors,
+      );
       children.add(
         RequestStateBanner(
           key: Key('duties-notice-${n.name}'),
@@ -404,6 +454,19 @@ String _timesText(BuildContext context, DutyTimes t) {
     if (t.reportingAt case final r?) '(report at ${_clock(context, r)})',
     '(church time)',
   ].join(' ');
+}
+
+// Church-time form values for a stored instant (Africa/Lusaka).
+String _dateField(DateTime at) {
+  final w = ChurchTime.wall(at);
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${w.year.toString().padLeft(4, '0')}-${two(w.month)}-${two(w.day)}';
+}
+
+String _timeField(DateTime at) {
+  final w = ChurchTime.wall(at);
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${two(w.hour)}:${two(w.minute)}';
 }
 
 (String, StatusTone) _responseLabel(DutyResponse r) => switch (r) {
@@ -774,7 +837,13 @@ class _LeaderDepartmentCard extends StatelessWidget {
             _muted(context, 'Only the first 200 duties are shown.'),
           if (d.duties.isEmpty)
             Text('No duties yet.', key: Key('no-duties-${d.departmentId}')),
-          for (final duty in d.duties) _LeaderDutyRow(duty: duty),
+          for (final duty in d.duties)
+            _LeaderDutyRow(
+              key: Key('leader-duty-row-${duty.occurrenceId}'),
+              duty: duty,
+              department: d,
+              busy: busy,
+            ),
           if (d.canPublish) ...[
             const SizedBox(height: 12),
             _PublishForm(
@@ -789,14 +858,39 @@ class _LeaderDepartmentCard extends StatelessWidget {
   }
 }
 
-class _LeaderDutyRow extends StatelessWidget {
-  const _LeaderDutyRow({required this.duty});
+class _LeaderDutyRow extends StatefulWidget {
+  const _LeaderDutyRow({
+    super.key,
+    required this.duty,
+    required this.department,
+    required this.busy,
+  });
   final LeaderDuty duty;
+  final LeaderDepartment department;
+  final bool busy;
+
+  @override
+  State<_LeaderDutyRow> createState() => _LeaderDutyRowState();
+}
+
+class _LeaderDutyRowState extends State<_LeaderDutyRow> {
+  bool _editing = false;
+
+  @override
+  void didUpdateWidget(_LeaderDutyRow old) {
+    super.didUpdateWidget(old);
+    // A new revision from the server closes the form (it was saved, or
+    // someone else changed the duty: the form would edit stale values).
+    if (old.duty.revision != widget.duty.revision) _editing = false;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final duty = widget.duty;
+    final id = duty.occurrenceId;
+    final started = !duty.times.arriveBy.isAfter(DateTime.now());
     return Padding(
-      key: Key('leader-duty-${duty.occurrenceId}'),
+      key: Key('leader-duty-$id'),
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -804,11 +898,12 @@ class _LeaderDutyRow extends StatelessWidget {
           Text(duty.dutyName, style: ChurchType.cardTitle),
           Text(_timesText(context, duty.times)),
           if (duty.location case final l?) Text('Where: $l'),
+          if (duty.instructions case final i?) Text('Instructions: $i'),
           Text(
             '${duty.accepted} of ${duty.positions.length} confirmed',
-            key: Key('coverage-${duty.occurrenceId}'),
+            key: Key('coverage-$id'),
           ),
-          for (final p in duty.positions)
+          for (final p in duty.positions) ...[
             if (p.assignment case final a?)
               Wrap(
                 spacing: 8,
@@ -826,15 +921,421 @@ class _LeaderDutyRow extends StatelessWidget {
                       );
                     },
                   ),
+                  if (a.changes case final c?)
+                    StatusLabel(
+                      key: Key('changed-${a.assignmentId}'),
+                      label: 'Changed: ${DutyFields.describe(c)}',
+                      tone: StatusTone.info,
+                    ),
                   if (a.response == DutyResponse.pending)
                     _muted(
                       context,
                       'Answer by ${_when(context, a.responseDeadline)}',
                     ),
+                  if (a.notesUpdatedAt case final u?)
+                    _muted(context, 'Details updated ${_when(context, u)}'),
                   if (a.note case final n?)
                     Text('Note: $n', key: Key('note-${a.assignmentId}')),
                 ],
               ),
+            if (p.history.isNotEmpty) _History(position: p),
+          ],
+          if (widget.department.canPublish && !started) ...[
+            if (!_editing)
+              FocusRing(
+                child: TextButton(
+                  key: Key('edit-$id'),
+                  onPressed: widget.busy
+                      ? null
+                      : () => setState(() => _editing = true),
+                  child: const Text('Change this duty'),
+                ),
+              )
+            else
+              _EditDutyForm(
+                key: Key('edit-form-$id-r${duty.revision}'),
+                duty: duty,
+                department: widget.department,
+                busy: widget.busy,
+                onClose: () => setState(() => _editing = false),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Story 4.2: the earlier assignments of a position with the answers they
+/// had (kept, never reset), newest first.
+class _History extends StatelessWidget {
+  const _History({required this.position});
+  final DutyPosition position;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      key: Key('history-${position.slotId}'),
+      padding: const EdgeInsets.only(top: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _muted(context, 'Earlier versions (${position.history.length})'),
+          for (final h in position.history)
+            Padding(
+              key: Key('history-${h.assignmentId}'),
+              padding: const EdgeInsetsDirectional.only(start: 12),
+              child: _muted(
+                context,
+                [
+                  '${h.displayName ?? 'Removed member'}: '
+                      '${_responseLabel(h.response).$1}',
+                  if (h.respondedAt case final r?)
+                    'answered ${_when(context, r)}',
+                  if (h.provenance == 'member') 'by the member',
+                  h.state == 'cancelled'
+                      ? 'cancelled ${_when(context, h.endedAt)}'
+                      : 'replaced by a change ${_when(context, h.endedAt)}',
+                  if (h.note case final n?) 'note: $n',
+                ].join(', '),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Story 4.2, staff web: change a published duty. Changing the duty, date,
+/// times, place or person asks the member to answer again by a new answer-by
+/// time (their earlier answer is kept); changing only the instructions keeps
+/// the answer. The server decides; this form only explains it.
+class _EditDutyForm extends ConsumerStatefulWidget {
+  const _EditDutyForm({
+    super.key,
+    required this.duty,
+    required this.department,
+    required this.busy,
+    required this.onClose,
+  });
+  final LeaderDuty duty;
+  final LeaderDepartment department;
+  final bool busy;
+  final VoidCallback onClose;
+
+  @override
+  ConsumerState<_EditDutyForm> createState() => _EditDutyFormState();
+}
+
+class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
+  late final _name = TextEditingController(text: widget.duty.dutyName);
+  late final _date = TextEditingController(
+    text: _dateField(widget.duty.times.startsAt),
+  );
+  late final _start = TextEditingController(
+    text: _timeField(widget.duty.times.startsAt),
+  );
+  late final _end = TextEditingController(
+    text: switch (widget.duty.times.endsAt) {
+      final e? => _timeField(e),
+      null => '',
+    },
+  );
+  late final _endDate = TextEditingController(
+    text: switch (widget.duty.times.endsAt) {
+      final e? when _dateField(e) != _dateField(widget.duty.times.startsAt) =>
+        _dateField(e),
+      _ => '',
+    },
+  );
+  late final _reporting = TextEditingController(
+    text: switch (widget.duty.times.reportingAt) {
+      final r? => _timeField(r),
+      null => '',
+    },
+  );
+  late final _location = TextEditingController(
+    text: widget.duty.location ?? '',
+  );
+  late final _instructions = TextEditingController(
+    text: widget.duty.instructions ?? '',
+  );
+  final _deadlineDate = TextEditingController();
+  final _deadlineTime = TextEditingController();
+  late String? _memberId = widget.duty.memberId;
+
+  List<TextEditingController> get _all => [
+    _name,
+    _date,
+    _start,
+    _end,
+    _endDate,
+    _reporting,
+    _location,
+    _instructions,
+    _deadlineDate,
+    _deadlineTime,
+  ];
+
+  @override
+  void dispose() {
+    for (final c in _all) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  /// The edit, or null while a field cannot be read.
+  DutyEdit? _edit() {
+    final starts = ChurchTime.parse(_date.text, _start.text);
+    final endDate = _endDate.text.trim().isEmpty ? _date.text : _endDate.text;
+    final ends = _end.text.trim().isEmpty
+        ? null
+        : ChurchTime.parse(endDate, _end.text);
+    final reporting = _reporting.text.trim().isEmpty
+        ? null
+        : ChurchTime.parse(_date.text, _reporting.text);
+    final deadlineGiven =
+        _deadlineDate.text.trim().isNotEmpty ||
+        _deadlineTime.text.trim().isNotEmpty;
+    final deadline = deadlineGiven
+        ? ChurchTime.parse(_deadlineDate.text, _deadlineTime.text)
+        : null;
+    if (_name.text.trim().isEmpty ||
+        starts == null ||
+        (_end.text.trim().isNotEmpty && ends == null) ||
+        (_endDate.text.trim().isNotEmpty && _end.text.trim().isEmpty) ||
+        (_reporting.text.trim().isNotEmpty && reporting == null) ||
+        (deadlineGiven && deadline == null)) {
+      return null;
+    }
+    return DutyEdit(
+      duty: widget.duty,
+      dutyName: _name.text,
+      startsAt: starts,
+      endsAt: ends,
+      reportingAt: reporting,
+      location: _location.text,
+      instructions: _instructions.text,
+      memberId: _memberId,
+      responseDeadline: deadline,
+    );
+  }
+
+  String _memberName(String? id) {
+    for (final m in widget.department.members) {
+      if (m.memberId == id) return m.displayName;
+    }
+    return 'the member';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final duty = widget.duty;
+    final id = duty.occurrenceId;
+    final s = ref.watch(dutyLeaderProvider);
+    // Only this form's own refusal names its fields.
+    final mine =
+        s.noticeAction?.command == DutyCommands.revise &&
+        s.noticeAction?.request.payload['occurrence_id'] == id;
+    final errors = mine ? s.fieldErrors : const <String, String>{};
+    String? err(String wire) => switch (errors[wire]) {
+      null => null,
+      'required' => 'Required',
+      'past' => 'This is in the past',
+      'after_start' => 'Must be before the duty starts',
+      'before_start' => 'Must be after the start',
+      'not_in_department' => 'Not a member of this department',
+      'not_material' =>
+        'Only needed when the duty, time, place or person '
+            'changes',
+      _ => 'Check this',
+    };
+    Widget field(
+      String key,
+      TextEditingController c,
+      String label, {
+      String? wire,
+      String? hint,
+      int maxLength = 80,
+      int maxLines = 1,
+    }) => Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: TextField(
+        key: Key('$key-$id'),
+        controller: c,
+        enabled: !widget.busy,
+        maxLength: maxLength,
+        maxLines: maxLines,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          errorText: wire == null ? null : err(wire),
+        ),
+      ),
+    );
+    final inRoster = widget.department.members.any(
+      (m) => m.memberId == _memberId,
+    );
+    return _Card(
+      key: Key('edit-card-$id'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _heading(context, 'Change this duty'),
+          _muted(
+            context,
+            'Changing the duty, date, times, place or person asks the member '
+            'to answer again by a new answer-by time; their earlier answer is '
+            'kept. Changing only the instructions keeps their answer. Times '
+            'are church time (Lusaka).',
+          ),
+          const SizedBox(height: 8),
+          field('edit-name', _name, 'Duty', wire: 'duty_name'),
+          field(
+            'edit-date',
+            _date,
+            'Date',
+            hint: 'YYYY-MM-DD',
+            wire: 'starts_at',
+            maxLength: 10,
+          ),
+          field(
+            'edit-start',
+            _start,
+            'Start time',
+            hint: 'HH:MM',
+            maxLength: 5,
+          ),
+          field(
+            'edit-end',
+            _end,
+            'End time (optional)',
+            hint: 'HH:MM',
+            wire: 'ends_at',
+            maxLength: 5,
+          ),
+          field(
+            'edit-end-date',
+            _endDate,
+            'End date, if it ends on a later day (optional)',
+            hint: 'YYYY-MM-DD',
+            maxLength: 10,
+          ),
+          field(
+            'edit-reporting',
+            _reporting,
+            'Reporting time, if earlier than the start (optional)',
+            hint: 'HH:MM',
+            wire: 'reporting_at',
+            maxLength: 5,
+          ),
+          field(
+            'edit-location',
+            _location,
+            'Location (optional)',
+            wire: 'location',
+            maxLength: 120,
+          ),
+          field(
+            'edit-instructions',
+            _instructions,
+            'Instructions (optional)',
+            wire: 'instructions',
+            maxLength: 1000,
+            maxLines: 3,
+          ),
+          DropdownButton<String>(
+            key: Key('edit-member-$id'),
+            hint: const Text('Who'),
+            value: inRoster ? _memberId : null,
+            isExpanded: true,
+            items: [
+              for (final m in widget.department.members)
+                DropdownMenuItem(
+                  value: m.memberId,
+                  child: Text(
+                    m.account == AccountStanding.noLogin
+                        ? '${m.displayName} (no login: contact them directly)'
+                        : m.displayName,
+                  ),
+                ),
+            ],
+            onChanged: widget.busy
+                ? null
+                : (v) => setState(() => _memberId = v),
+          ),
+          if (err('member_id') case final e?)
+            Text(e, style: TextStyle(color: ChurchColors.of(context).redFg)),
+          const SizedBox(height: 8),
+          field(
+            'edit-deadline-date',
+            _deadlineDate,
+            'New answer by: date (needed when the member must answer again)',
+            hint: 'YYYY-MM-DD',
+            wire: 'response_deadline',
+            maxLength: 10,
+          ),
+          field(
+            'edit-deadline-time',
+            _deadlineTime,
+            'New answer by: time',
+            hint: 'HH:MM',
+            maxLength: 5,
+          ),
+          ListenableBuilder(
+            listenable: Listenable.merge(_all),
+            builder: (context, _) {
+              final edit = _edit();
+              final changed = edit?.changed ?? const <String>[];
+              final material = edit?.material ?? false;
+              final ready =
+                  edit != null &&
+                  changed.isNotEmpty &&
+                  (!material || edit.responseDeadline != null);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (changed.isNotEmpty)
+                    Text(
+                      material
+                          ? '${_memberName(edit!.memberId)} will be asked to '
+                                'answer again (changed: '
+                                '${DutyFields.describe(changed)}).'
+                          : 'Only the instructions change: the answer '
+                                'stands.',
+                      key: Key('edit-summary-$id'),
+                    ),
+                  if (material && edit?.responseDeadline == null)
+                    _muted(context, 'Set the new answer-by date and time.'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FocusRing(
+                        child: FilledButton(
+                          key: Key('edit-save-$id'),
+                          onPressed: widget.busy || !ready
+                              ? null
+                              : () => ref
+                                    .read(dutyLeaderProvider.notifier)
+                                    .revise(edit, edit.duty.dutyName),
+                          child: const Text('Save the change'),
+                        ),
+                      ),
+                      FocusRing(
+                        child: TextButton(
+                          key: Key('edit-cancel-$id'),
+                          onPressed: widget.busy ? null : widget.onClose,
+                          child: const Text('Close without saving'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
@@ -922,7 +1423,11 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
   Widget build(BuildContext context) {
     final d = widget.department;
     final id = d.departmentId;
-    final errors = ref.watch(dutyLeaderProvider.select((s) => s.fieldErrors));
+    final st = ref.watch(dutyLeaderProvider);
+    // Only a publish refusal names this form's fields (not an edit's).
+    final errors = st.noticeAction?.command == DutyCommands.publish
+        ? st.fieldErrors
+        : const <String, String>{};
     String? err(String wire) => switch (errors[wire]) {
       null => null,
       'required' => 'Required',
@@ -1168,7 +1673,7 @@ class _OneDuty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final duty = duties.find(assignmentId);
+    final duty = duties.findCurrent(assignmentId);
     if (duty == null) {
       return const RequestStateBanner(
         key: Key('duty-not-available'),
@@ -1177,6 +1682,24 @@ class _OneDuty extends StatelessWidget {
         message:
             'This duty is no longer yours or no longer current. Your current '
             'duties are under My duties.',
+      );
+    }
+    if (duty.assignmentId != assignmentId) {
+      // Story 4.2: an old reminder or link for an earlier version.
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const RequestStateBanner(
+            key: Key('duty-was-changed'),
+            tone: StatusTone.info,
+            title: 'This duty changed',
+            message:
+                'It changed since that message. This is the current version; '
+                'your answer is needed for it.',
+          ),
+          const SizedBox(height: 12),
+          _DutyCard(duty: duty, busy: busy, full: true),
+        ],
       );
     }
     return _DutyCard(duty: duty, busy: busy, full: true);
@@ -1240,6 +1763,34 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
           Text(a.departmentName),
           Text(_timesText(context, a.times)),
           if (a.location case final l?) Text('Where: $l'),
+          if (a.changes case final c?) ...[
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                StatusLabel(
+                  key: Key('duty-changed-$id'),
+                  label: 'Changed',
+                  tone: StatusTone.info,
+                ),
+                Text('What changed: ${DutyFields.describe(c)}.'),
+              ],
+            ),
+            if (a.previousResponse case final p?)
+              _muted(
+                context,
+                'Your earlier answer was "${_responseLabel(p).$1}". '
+                        '${a.response == DutyResponse.pending ? 'Please answer again.' : ''}'
+                    .trim(),
+              ),
+          ],
+          if (a.notesUpdatedAt case final u?)
+            _muted(
+              context,
+              'Details updated ${_when(context, u)}. Your answer stands.',
+            ),
           if (widget.full)
             if (a.instructions case final i?) ...[
               const SizedBox(height: 4),

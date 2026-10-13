@@ -1,4 +1,6 @@
-/// Story 4.1: departments and assigned duties as the server reports them.
+/// Stories 4.1-4.2: departments and assigned duties as the server reports
+/// them, with revisions (a material change replaces an assignment with a new
+/// pending one; the earlier answer is kept in history).
 /// Department setup (Admin), publishing (the department's leader or deputy,
 /// or an Admin) and the assignee's explicit answer are all decided by the
 /// server; these reads are presentation only. Free of widgets and SDKs.
@@ -22,6 +24,54 @@ abstract final class DutyCommands {
   static const addMember = 'duties.add_member';
   static const publish = 'duties.publish_duty';
   static const respond = 'duties.respond';
+  static const revise = 'duties.revise_duty';
+}
+
+/// Story 4.2: the revisable fields (wire names) in display order, and the
+/// words a member or leader reads for them. Which ones are material is the
+/// server's decision (`app.duties_slot_field_class`); this only names them.
+abstract final class DutyFields {
+  static const dutyName = 'duty_name';
+  static const startsAt = 'starts_at';
+  static const endsAt = 'ends_at';
+  static const reportingAt = 'reporting_at';
+  static const location = 'location';
+  static const memberId = 'member_id';
+  static const instructions = 'instructions';
+
+  static const order = [
+    dutyName,
+    startsAt,
+    endsAt,
+    reportingAt,
+    location,
+    memberId,
+    instructions,
+  ];
+
+  static String label(String field) => switch (field) {
+    dutyName => 'duty',
+    startsAt => 'date or start time',
+    endsAt => 'end time',
+    reportingAt => 'reporting time',
+    location => 'place',
+    memberId => 'who is assigned',
+    instructions => 'instructions',
+    _ => 'details',
+  };
+
+  /// "date or start time, place" for the known fields in display order.
+  static String describe(Iterable<String> fields) {
+    final known = order.where(fields.contains).map(label).toList();
+    return known.isEmpty ? 'details' : known.join(', ');
+  }
+
+  /// The changed fields of a stale-response refusal
+  /// (`{"assignment_id": "superseded", "<field>": "changed"}`).
+  static List<String> changedIn(Map<String, String> fieldErrors) => [
+    for (final f in order)
+      if (fieldErrors[f] == 'changed') f,
+  ];
 }
 
 /// The member's explicit answer (wire codes).
@@ -75,6 +125,31 @@ DateTime _instant(Map json, String key) {
 DateTime? _optInstant(Map json, String key) =>
     json[key] == null ? null : _instant(json, key);
 
+/// Story 4.2: an optional list of changed field names (null when absent).
+List<String>? _optFields(Map json, String key) {
+  final v = json[key];
+  if (v == null) return null;
+  if (v is! List || v.any((f) => f is! String)) {
+    throw FormatException('unexpected $key');
+  }
+  return List.unmodifiable(v.cast<String>());
+}
+
+List<String> _ids(Map json, String key) {
+  final v = json[key];
+  if (v == null) return const [];
+  if (v is! List || v.any((f) => f is! String)) {
+    throw FormatException('unexpected $key');
+  }
+  return List.unmodifiable(v.cast<String>());
+}
+
+int _slotRevision(Map json) {
+  final r = _opt<int>(json, 'slot_revision') ?? 1;
+  if (r < 1) throw const FormatException('unexpected slot_revision');
+  return r;
+}
+
 int _revision(Map json, [String key = 'revision']) {
   final r = _req<int>(json, key);
   if (r < 1) throw FormatException('unexpected $key');
@@ -122,6 +197,11 @@ class MyDuty {
     this.instructions,
     this.respondedAt,
     this.note,
+    this.slotRevision = 1,
+    this.changes,
+    this.previousResponse,
+    this.previousAssignmentIds = const [],
+    this.notesUpdatedAt,
   });
 
   factory MyDuty.fromJson(Object? json) {
@@ -145,6 +225,13 @@ class MyDuty {
       responseDeadline: _instant(m, 'response_deadline'),
       respondedAt: respondedAt,
       note: _opt<String>(m, 'note'),
+      slotRevision: _slotRevision(m),
+      changes: _optFields(m, 'changes'),
+      previousResponse: m['previous_response'] == null
+          ? null
+          : DutyResponse.fromWire(m['previous_response']),
+      previousAssignmentIds: _ids(m, 'previous_assignment_ids'),
+      notesUpdatedAt: _optInstant(m, 'notes_updated_at'),
     );
   }
 
@@ -163,6 +250,26 @@ class MyDuty {
   final DateTime responseDeadline;
   final DateTime? respondedAt;
   final String? note;
+
+  /// Story 4.2: the slot revision this assignment asks the member to answer.
+  final int slotRevision;
+
+  /// What the change that created this assignment changed (field names),
+  /// when it replaced the member's own earlier assignment; null otherwise.
+  final List<String>? changes;
+
+  /// The member's answer to the assignment this one replaced.
+  final DutyResponse? previousResponse;
+
+  /// The member's earlier assignments for this position (an old reminder
+  /// link still finds this, the current version).
+  final List<String> previousAssignmentIds;
+
+  /// The latest notes-only update since this assignment was made.
+  final DateTime? notesUpdatedAt;
+
+  /// A revision asking again after a material change.
+  bool get isChanged => changes != null;
 
   bool startedAt(DateTime now) => !times.arriveBy.isAfter(now);
 
@@ -202,6 +309,17 @@ class MyDuties {
     }
     return null;
   }
+
+  /// Story 4.2: the current version of [assignmentId], also when it is an
+  /// earlier (superseded) assignment of the member for the same position.
+  MyDuty? findCurrent(String? assignmentId) {
+    final own = find(assignmentId);
+    if (own != null) return own;
+    for (final a in assignments) {
+      if (a.previousAssignmentIds.contains(assignmentId)) return a;
+    }
+    return null;
+  }
 }
 
 /// A position's current assignment as a leader sees it.
@@ -215,6 +333,9 @@ class PositionAssignment {
     this.displayName,
     this.respondedAt,
     this.note,
+    this.slotRevision = 1,
+    this.changes,
+    this.notesUpdatedAt,
   });
 
   factory PositionAssignment.fromJson(Object? json) {
@@ -228,6 +349,9 @@ class PositionAssignment {
       respondedAt: _optInstant(m, 'responded_at'),
       note: _opt<String>(m, 'note'),
       revision: _revision(m),
+      slotRevision: _slotRevision(m),
+      changes: _optFields(m, 'changes'),
+      notesUpdatedAt: _optInstant(m, 'notes_updated_at'),
     );
   }
 
@@ -243,6 +367,80 @@ class PositionAssignment {
   /// The member's practical note (never shown to Pastor oversight).
   final String? note;
   final int revision;
+
+  /// Story 4.2: the slot revision this assignment answers.
+  final int slotRevision;
+
+  /// What the change that created this assignment changed; null for the
+  /// first assignment of the position.
+  final List<String>? changes;
+
+  /// The latest notes-only update since this assignment was made.
+  final DateTime? notesUpdatedAt;
+}
+
+/// Story 4.2: an ended assignment of a position (superseded by a material
+/// change, or cancelled), with the answer it had, kept as history.
+class AssignmentHistoryEntry {
+  const AssignmentHistoryEntry({
+    required this.assignmentId,
+    required this.memberId,
+    required this.state,
+    required this.endedAt,
+    required this.response,
+    required this.slotRevision,
+    this.displayName,
+    this.endReason,
+    this.respondedAt,
+    this.provenance,
+    this.note,
+  });
+
+  factory AssignmentHistoryEntry.fromJson(Object? json) {
+    final m = _map(json, 'history entry');
+    final state = _req<String>(m, 'state');
+    if (state != 'superseded' && state != 'cancelled') {
+      throw const FormatException('unexpected state');
+    }
+    final provenance = _opt<String>(m, 'response_provenance');
+    if (provenance != null && provenance != 'member') {
+      throw const FormatException('unexpected response_provenance');
+    }
+    return AssignmentHistoryEntry(
+      assignmentId: _req<String>(m, 'assignment_id'),
+      memberId: _req<String>(m, 'member_id'),
+      displayName: _opt<String>(m, 'display_name'),
+      state: state,
+      endReason: _opt<String>(m, 'end_reason'),
+      endedAt: _instant(m, 'ended_at'),
+      response: DutyResponse.fromWire(m['response']),
+      respondedAt: _optInstant(m, 'responded_at'),
+      provenance: provenance,
+      note: _opt<String>(m, 'note'),
+      slotRevision: _slotRevision(m),
+    );
+  }
+
+  final String assignmentId;
+  final String memberId;
+
+  /// Null once the member's record was erased.
+  final String? displayName;
+
+  /// `superseded` or `cancelled`.
+  final String state;
+  final String? endReason;
+  final DateTime endedAt;
+
+  /// The answer the assignment had when it ended (kept, never reset).
+  final DutyResponse response;
+  final DateTime? respondedAt;
+
+  /// Who recorded the answer (`member` until entry 9 adds leader
+  /// confirmation).
+  final String? provenance;
+  final String? note;
+  final int slotRevision;
 }
 
 class DutyPosition {
@@ -250,6 +448,8 @@ class DutyPosition {
     required this.slotId,
     required this.positionNo,
     this.assignment,
+    this.slotRevision = 1,
+    this.history = const [],
   });
 
   factory DutyPosition.fromJson(Object? json) {
@@ -262,12 +462,24 @@ class DutyPosition {
       assignment: m['assignment'] == null
           ? null
           : PositionAssignment.fromJson(m['assignment']),
+      slotRevision: _slotRevision(m),
+      history: m['history'] == null
+          ? const []
+          : List.unmodifiable(
+              _req<List>(m, 'history').map(AssignmentHistoryEntry.fromJson),
+            ),
     );
   }
 
   final String slotId;
   final int positionNo;
   final PositionAssignment? assignment;
+
+  /// Story 4.2: the slot's current revision.
+  final int slotRevision;
+
+  /// Ended assignments, newest first (at most 20).
+  final List<AssignmentHistoryEntry> history;
 }
 
 /// One published occurrence on the leader board.
@@ -315,6 +527,10 @@ class LeaderDuty {
   int get accepted => positions
       .where((p) => p.assignment?.response == DutyResponse.accepted)
       .length;
+
+  /// The assignee of the first position (one position per duty until 4.3).
+  String? get memberId =>
+      positions.isEmpty ? null : positions.first.assignment?.memberId;
 }
 
 /// One member of a department's roster.
@@ -576,6 +792,79 @@ class DutyDraft {
       'instructions': ?text(instructions),
       'member_id': memberId,
       'response_deadline': utc(responseDeadline),
+    };
+  }
+}
+
+/// Story 4.2: a leader's edit of a published duty. Only the fields that
+/// differ from [duty] are sent (a patch; `null` clears an optional field);
+/// the server decides what is material and refuses a material change without
+/// a new [responseDeadline].
+class DutyEdit {
+  const DutyEdit({
+    required this.duty,
+    required this.dutyName,
+    required this.startsAt,
+    required this.memberId,
+    this.endsAt,
+    this.reportingAt,
+    this.location,
+    this.instructions,
+    this.responseDeadline,
+  });
+
+  final LeaderDuty duty;
+  final String dutyName;
+  final DateTime startsAt;
+  final DateTime? endsAt;
+  final DateTime? reportingAt;
+  final String? location;
+  final String? instructions;
+  final String? memberId;
+  final DateTime? responseDeadline;
+
+  static String? _line(String? s) {
+    final t = s?.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return t == null || t.isEmpty ? null : t;
+  }
+
+  static String? _text(String? s) {
+    final t = s?.trim();
+    return t == null || t.isEmpty ? null : t;
+  }
+
+  static bool _same(DateTime? a, DateTime? b) =>
+      a == null ? b == null : (b != null && a.isAtSameMomentAs(b));
+
+  /// The changed fields, in display order.
+  List<String> get changed => [
+    if (_line(dutyName) != duty.dutyName) DutyFields.dutyName,
+    if (!_same(startsAt, duty.times.startsAt)) DutyFields.startsAt,
+    if (!_same(endsAt, duty.times.endsAt)) DutyFields.endsAt,
+    if (!_same(reportingAt, duty.times.reportingAt)) DutyFields.reportingAt,
+    if (_line(location) != duty.location) DutyFields.location,
+    if (memberId != null && memberId != duty.memberId) DutyFields.memberId,
+    if (_text(instructions) != duty.instructions) DutyFields.instructions,
+  ];
+
+  /// A change the assignee must answer again (anything but instructions).
+  bool get material => changed.any((f) => f != DutyFields.instructions);
+
+  Map<String, Object?> toPayload() {
+    String? utc(DateTime? t) => t?.toUtc().toIso8601String();
+    final c = changed;
+    return {
+      'occurrence_id': duty.occurrenceId,
+      if (c.contains(DutyFields.dutyName)) 'duty_name': _line(dutyName),
+      if (c.contains(DutyFields.startsAt)) 'starts_at': utc(startsAt),
+      if (c.contains(DutyFields.endsAt)) 'ends_at': utc(endsAt),
+      if (c.contains(DutyFields.reportingAt)) 'reporting_at': utc(reportingAt),
+      if (c.contains(DutyFields.location)) 'location': _line(location),
+      if (c.contains(DutyFields.memberId)) 'member_id': memberId,
+      if (c.contains(DutyFields.instructions))
+        'instructions': _text(instructions),
+      if (material && responseDeadline != null)
+        'response_deadline': utc(responseDeadline),
     };
   }
 }

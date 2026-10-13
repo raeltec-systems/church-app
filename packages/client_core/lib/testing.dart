@@ -544,7 +544,7 @@ class FakeDuties implements DutiesRepository {
   }
 }
 
-/// The wire form of one of the member's duties (story 4.1).
+/// The wire form of one of the member's duties (stories 4.1, 4.2).
 Map<String, Object?> myDutyData({
   String assignmentId = '42424242-4242-4242-8242-424242424242',
   int revision = 1,
@@ -555,6 +555,11 @@ Map<String, Object?> myDutyData({
   String? respondedAt,
   String? note,
   String dutyName = 'Sunday preaching',
+  int slotRevision = 1,
+  List<String>? changes,
+  String? previousResponse,
+  List<String> previousAssignmentIds = const [],
+  String? notesUpdatedAt,
 }) => {
   'assignment_id': assignmentId,
   'revision': revision,
@@ -571,6 +576,11 @@ Map<String, Object?> myDutyData({
   'response_deadline': responseDeadline,
   'responded_at': respondedAt,
   'note': note,
+  'slot_revision': slotRevision,
+  'changes': changes,
+  'previous_response': previousResponse,
+  'previous_assignment_ids': previousAssignmentIds,
+  'notes_updated_at': notesUpdatedAt,
 };
 
 /// The wire form of a synthetic cell as the Admin sees it (story 2.6).

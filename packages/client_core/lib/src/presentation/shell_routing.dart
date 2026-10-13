@@ -142,6 +142,8 @@ abstract final class ClientPaths {
     RegExp(
       r'^/duties/assignments/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
     ),
+    // Story 4.2: the duty_released notice opens My duties.
+    RegExp(r'^/duties$'),
   ];
 
   static bool isKnownDeepLink(String target) =>

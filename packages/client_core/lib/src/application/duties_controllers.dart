@@ -19,6 +19,22 @@ enum DutyNotice {
   accepted,
   declined,
 
+  /// Story 4.2: a material change: the assignee is asked again.
+  revised,
+
+  /// Story 4.2: a notes-only change: the answer stands.
+  notesUpdated,
+
+  /// Story 4.2: the duty changed after this answer was sent (a stale
+  /// revision); the field errors name what changed.
+  superseded,
+
+  /// Story 4.2: the duty or position was cancelled.
+  dutyCancelled,
+
+  /// Story 4.2: the edit changed nothing.
+  unchanged,
+
   /// Changed in another tab or by someone else: reloaded.
   changedElsewhere,
 
@@ -193,27 +209,40 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
     );
   }
 
-  static DutyNotice _success(DutyAction action) => switch (action.command) {
-    DutyCommands.createDepartment => DutyNotice.departmentCreated,
-    DutyCommands.addMember => DutyNotice.memberAdded,
-    GrantCommands.grantScope => DutyNotice.staffAssigned,
-    GrantCommands.revokeScope => DutyNotice.staffRemoved,
-    DutyCommands.publish => DutyNotice.published,
-    _ =>
-      action.request.payload['response'] == DutyResponse.declined.wire
-          ? DutyNotice.declined
-          : DutyNotice.accepted,
-  };
+  static DutyNotice _success(DutyAction action, Object? data) =>
+      switch (action.command) {
+        DutyCommands.createDepartment => DutyNotice.departmentCreated,
+        DutyCommands.revise =>
+          data is Map && data['change'] == 'notes'
+              ? DutyNotice.notesUpdated
+              : DutyNotice.revised,
+        DutyCommands.addMember => DutyNotice.memberAdded,
+        GrantCommands.grantScope => DutyNotice.staffAssigned,
+        GrantCommands.revokeScope => DutyNotice.staffRemoved,
+        DutyCommands.publish => DutyNotice.published,
+        _ =>
+          action.request.payload['response'] == DutyResponse.declined.wire
+              ? DutyNotice.declined
+              : DutyNotice.accepted,
+      };
 
   static DutyNotice _refusal(CommandError error) {
     final f = error.fieldErrors;
     return switch (error.code) {
       ErrorCode.conflict when f['assignment_id'] == 'responded' =>
         DutyNotice.alreadyAnswered,
+      ErrorCode.conflict when f['assignment_id'] == 'superseded' =>
+        DutyNotice.superseded,
+      ErrorCode.conflict when f['assignment_id'] == 'cancelled' =>
+        DutyNotice.dutyCancelled,
       ErrorCode.conflict when f['name'] == 'taken' => DutyNotice.nameTaken,
       ErrorCode.conflict => DutyNotice.changedElsewhere,
-      ErrorCode.validationFailed when f['assignment_id'] == 'started' =>
+      ErrorCode.validationFailed
+          when f['assignment_id'] == 'started' ||
+              f['occurrence_id'] == 'started' =>
         DutyNotice.started,
+      ErrorCode.validationFailed when f['occurrence_id'] == 'unchanged' =>
+        DutyNotice.unchanged,
       ErrorCode.validationFailed when f['member_id'] == 'not_in_department' =>
         DutyNotice.notInDepartment,
       ErrorCode.validationFailed => DutyNotice.invalid,
@@ -237,11 +266,11 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
         .send(action.function, action.request);
     if (!_current(epoch)) return;
     switch (outcome) {
-      case CommandConfirmed():
+      case CommandConfirmed(:final success):
         state = state.copyWith(
           clearPending: true,
           clearUnconfirmed: true,
-          notice: _success(action),
+          notice: _success(action, success.data),
           noticeAction: action,
         );
         if (action.function == GrantCommands.function) {
@@ -351,6 +380,15 @@ class DutyLeaderController extends DutiesController<DutyLeaderBoard> {
     DutyCommands.publish,
     const Optional.of(null),
     draft.toPayload(),
+    subject,
+  );
+
+  /// Story 4.2: revise a published duty at its current revision. A conflict
+  /// (another manager changed it first) reloads the board.
+  Future<void> revise(DutyEdit edit, String subject) => send(
+    DutyCommands.revise,
+    Optional.of(edit.duty.revision),
+    edit.toPayload(),
     subject,
   );
 }

@@ -93,3 +93,47 @@ The shared module must stay independent of `tools/` and function-specific policy
 
 **Manual checks:**
 - Compare the existing 256/1024 byte boundaries, legacy key headers, envelope fields, and valid/malformed credential cases before and after the extraction. Confirm deferred client behaviors and SQL files remain untouched.
+
+## Review fixes (2026-10-13)
+
+Source: `review-3.8-3.10.md` findings 1 and 14. The shared module the sweep introduced in
+`packages/shared_runtime/` was outside the Edge Function deploy boundary: the documented MCP deploy
+(`index.ts`, `logic.mjs`, `fcm.mjs`) would have failed with module-not-found.
+
+- Moved to `supabase/functions/_shared/system_access.mjs` (+ test), the Supabase convention for
+  shared function code; `identity-deletion` and `notifications-worker` import
+  `../_shared/system_access.mjs`; `tools/identity-deletion/worker.mjs`, `tools/ops/system-credential.mjs`
+  and `tools/ci/secret-patterns.mjs` import the new path; `packages/shared_runtime/` removed.
+- CI: `npm run ci:function-imports` (`tools/ci/check-function-imports.mjs`, 5 tests in
+  `check-function-imports.test.mjs`) fails when any file under `supabase/functions/` imports a path
+  outside it or a missing file; the shared test now runs in the CI auth-harness job through
+  `supabase/functions/*/*.test.mjs`.
+- Runbooks: the deploy file lists in `notifications.md` and `identity-access.md` include
+  `../_shared/system_access.mjs` (name relative to the entrypoint folder for MCP
+  `deploy_edge_function`; the CLI bundles `_shared` itself).
+- `supabase functions serve` serves both functions with the shared module (deletion, worker and
+  push E2Es pass). The hosted redeploy of both functions is listed in the 3.8 plan's pending items.
+
+Status stays `built`: no owner item belongs to this refactor beyond the 3.8 staging redeploy.
+
+**Full local verification (after all review fixes):** `npx supabase db reset`; `npm run -s db:test` (26 files, 2144 tests, PASS); `npm run -s db:smoke` (exit 0); `npm run -s contracts:test` (242); `npm run -s ci:policy-test` (56); `node --test tools/auth-harness/*.test.mjs tools/identity-e2e/*.test.mjs supabase/functions/*/*.test.mjs tools/identity-deletion/*.test.mjs tools/notifications/*.test.mjs` (156, includes `_shared`); `ci:secrets`, `ci:migrations -- --base origin/main` (34), `ci:function-imports`, `env:check` and all 23 CI evidence scans clean; Flutter analyze clean and tests pass for `packages/client_core` (428), `apps/staff` (33), `apps/mobile` (45); `verify-hosted.sql` exercised locally in five rolled-back marker/gate cases. E2E, each after a reset:
+
+```
+run exit=0 
+grants exit=0 
+apply exit=0 27/27 checks passed 
+review exit=0 18/18 checks passed 
+cells exit=0 13/13 checks passed 
+recovery exit=0 20/20 checks passed 
+credentials exit=0 15/15 checks passed 
+assisted exit=0 16/16 checks passed 
+lifecycle exit=0 9/9 checks passed 
+deletion exit=0 12/12 checks passed 
+runbooks exit=0 16/16 checks passed 
+inbox exit=0 13/13 checks passed 
+source-contracts exit=0 10/10 checks passed 
+worker exit=0 17/17 checks passed 
+routing exit=0 18/18 checks passed 
+push exit=0 12/12 checks passed 
+inbox-screens exit=0 12/12 checks passed
+```

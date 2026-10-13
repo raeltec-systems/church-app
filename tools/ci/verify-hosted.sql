@@ -1,9 +1,15 @@
 -- Post-promotion assertions for a hosted environment (story 1.8). Read-only.
 --   psql "$DB_URL" -v ON_ERROR_STOP=1 -v expected_env=staging -f tools/ci/verify-hosted.sql
--- Fails (non-zero exit) when the database marker is not the expected environment, or when the
--- private_access / outbound_sending release gates are open in a baseline that must keep them
--- closed, production notification activation controls are open, or the database is an
--- unreconciled restore (story 1.10). Staging may run its synthetic reminder scheduler.
+-- Fails (non-zero exit) when the database marker is not the expected environment, when the
+-- private_access gate is open, when production activation controls are on without the owner's
+-- matching approval, when alerting is enabled, or when the database is an unreconciled restore
+-- (story 1.10). Staging may run its synthetic reminder scheduler and may have outbound_sending
+-- open for synthetic push (owner decision 2026-10-13). In production each activation assertion
+-- applies only while its gate is unapproved (review 3.8-3.10, finding 11):
+--   * outbound_sending open needs an approval whose value names production
+--     ({"environment": "production", ...}, recorded by app.policy_approve);
+--   * push_enabled needs outbound_sending approved for production;
+--   * a scheduler job needs ops_system_access, q2_church_time and q12_operations approved.
 select set_config('ci.expected_env', :'expected_env', false);
 
 do $$
@@ -11,6 +17,8 @@ declare
   v_expected text := current_setting('ci.expected_env');
   v_actual text := app.platform_current_environment();
   v_marked boolean := exists (select 1 from app.platform_environment);
+  v_outbound_approved boolean := false;
+  v_scheduler_approved boolean := false;
 begin
   if v_expected not in ('staging', 'production') then
     raise exception 'verify-hosted: unknown expected environment %', v_expected;
@@ -26,21 +34,31 @@ begin
   if app.policy_is_open('private_access') then
     raise exception 'verify-hosted: private_access gate is open in %', v_actual;
   end if;
-  if app.policy_is_open('outbound_sending') then
-    raise exception 'verify-hosted: outbound_sending gate is open in %', v_actual;
-  end if;
   if v_actual = 'production' then
-    if to_regprocedure('app.notifications_scheduler_status()') is null then
-      raise exception 'verify-hosted: app.notifications_scheduler_status() is missing';
+    v_outbound_approved := app.policy_is_open('outbound_sending')
+      and exists (select 1 from app.policy_gates g
+                   where g.gate = 'outbound_sending' and g.state = 'approved'
+                     and g.approved_value ->> 'environment' = 'production');
+    v_scheduler_approved := app.policy_is_open('ops_system_access')
+      and app.policy_is_open('q2_church_time') and app.policy_is_open('q12_operations');
+    if app.policy_is_open('outbound_sending') and not v_outbound_approved then
+      raise exception 'verify-hosted: outbound_sending gate is open in % without a production approval', v_actual;
     end if;
-    if (app.notifications_scheduler_status() ->> 'scheduler_jobs')::integer is distinct from 0 then
-      raise exception 'verify-hosted: a production notification scheduler job is configured';
+    if not v_scheduler_approved then
+      if to_regprocedure('app.notifications_scheduler_status()') is null then
+        raise exception 'verify-hosted: app.notifications_scheduler_status() is missing';
+      end if;
+      if (app.notifications_scheduler_status() ->> 'scheduler_jobs')::integer is distinct from 0 then
+        raise exception 'verify-hosted: a production notification scheduler job is configured before its gates are approved';
+      end if;
     end if;
-    if to_regclass('app.notifications_worker_settings') is null then
-      raise exception 'verify-hosted: app.notifications_worker_settings is missing';
-    end if;
-    if (select s.push_enabled from app.notifications_worker_settings s where s.singleton) is distinct from false then
-      raise exception 'verify-hosted: production notification push is enabled';
+    if not v_outbound_approved then
+      if to_regclass('app.notifications_worker_settings') is null then
+        raise exception 'verify-hosted: app.notifications_worker_settings is missing';
+      end if;
+      if (select s.push_enabled from app.notifications_worker_settings s where s.singleton) is distinct from false then
+        raise exception 'verify-hosted: production notification push is enabled before outbound_sending is approved';
+      end if;
     end if;
   end if;
   -- Story 1.9: alerting stays disabled until the owner approves Q12 thresholds and the
@@ -59,7 +77,8 @@ begin
   if app.rcv_serving_hold() then
     raise exception 'verify-hosted: % is an unreconciled restore (recovery hold active); see docs/runbooks/backup-and-restore.md', v_actual;
   end if;
-  raise notice 'verify-hosted: % marker confirmed; private_access and outbound_sending closed; alerting disabled; no recovery hold', v_actual;
+  raise notice 'verify-hosted: % marker confirmed; private_access closed; outbound_sending % (approved for production: %); alerting disabled; no recovery hold',
+    v_actual, case when app.policy_is_open('outbound_sending') then 'open' else 'closed' end, v_outbound_approved;
 end;
 $$;
 

@@ -5,7 +5,7 @@
 // mode "bundle": built client output. Additionally flags ANY JWT and the literal service_role:
 //                clients may only carry the project URL and a publishable (sb_publishable_) key.
 
-import { SYSTEM_CREDENTIAL_PATTERN } from '../../packages/shared_runtime/system_access.mjs';
+import { SYSTEM_CREDENTIAL_PATTERN } from '../../supabase/functions/_shared/system_access.mjs';
 
 // Story 1.9 system credential: `sysc_<environment>_<43 base64url chars>` (256 random bits).
 // The shared runtime module is the canonical source; keep this re-export for scanner callers.

@@ -201,15 +201,25 @@ test('hosted SQL only targets known environments and quotes values', async () =>
   assert.throws(() => ensureMarkerSql('staging', ' '), /set_by/);
 });
 
-test('hosted verification keeps production notification controls closed and allows staging scheduling', async () => {
+test('hosted verification gates each production activation on its approval and lets staging push', async () => {
   const { verifySql } = await import('./hosted-sql.mjs');
   const production = verifySql('production');
   const staging = verifySql('staging');
-  const productionOnly = production.match(/if v_actual = 'production' then([\s\S]*?)\n  end if;/)?.[1] ?? '';
+  const productionOnly = production.match(/if v_actual = 'production' then([\s\S]*?)\n  end if;\n  -- Story 1\.9/)?.[1] ?? '';
   assert.ok(productionOnly.length > 0, 'notification controls must be production-only');
-  assert.match(productionOnly, /scheduler_jobs'\)::integer is distinct from 0/);
-  assert.match(productionOnly, /s\.push_enabled[\s\S]*?is distinct from false/);
-  assert.match(production, /policy_is_open\('outbound_sending'\)/);
+  // Every outbound_sending reference sits inside the production branch: staging may have it open.
+  const outside = production.replace(productionOnly, '');
+  assert.doesNotMatch(outside.replace(/^--.*$/gm, ''), /policy_is_open\('outbound_sending'\)\s+then\s+raise/,
+    'staging must accept outbound_sending open (owner decision 2026-10-13)');
+  // outbound_sending open in production needs an approval naming production.
+  assert.match(productionOnly, /v_outbound_approved := app\.policy_is_open\('outbound_sending'\)[\s\S]*?approved_value ->> 'environment' = 'production'/);
+  assert.match(productionOnly, /if app\.policy_is_open\('outbound_sending'\) and not v_outbound_approved then\s+raise exception/);
+  // The scheduler-job assertion applies only while its three gates are not all approved.
+  assert.match(productionOnly, /v_scheduler_approved := app\.policy_is_open\('ops_system_access'\)\s+and app\.policy_is_open\('q2_church_time'\) and app\.policy_is_open\('q12_operations'\)/);
+  assert.match(productionOnly, /if not v_scheduler_approved then[\s\S]*?scheduler_jobs'\)::integer is distinct from 0/);
+  // The push assertion applies only while outbound_sending is not approved for production.
+  assert.match(productionOnly, /if not v_outbound_approved then[\s\S]*?s\.push_enabled[\s\S]*?is distinct from false/);
+  assert.match(production, /policy_is_open\('private_access'\) then\s+raise exception/);
   assert.match(production, /ops_alert_status\(\)[\s\S]*?<> 'disabled'/);
   assert.equal(staging, production.replace(
     "set_config('ci.expected_env', 'production', false)",

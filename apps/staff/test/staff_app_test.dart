@@ -22,13 +22,14 @@ Future<Harness> pumpStaff(
   String location = '/status',
   bool configured = true,
   NotificationHealthRepository? healthRepository,
+  String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   tester.platformDispatcher.textScaleFactorTestValue = textScale;
   addTearDown(tester.view.reset);
   addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-  final h = ClientTestHarness();
+  final h = ClientTestHarness(account: account);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -69,13 +70,62 @@ void main() {
     handle.dispose();
   });
 
-  testWidgets('reminder health destination reports server refusal for an unmapped account', (
+  testWidgets('reminder health maps each server refusal to its own message', (
     tester,
   ) async {
-    await pumpStaff(tester, location: ClientPaths.notificationHealth);
-    expect(find.byKey(const Key('nav-${ClientPaths.notificationHealth}')), findsOneWidget);
-    expect(find.text('Reminder health unavailable'), findsOneWidget);
-    expect(find.text('This account is not authorized to view reminder health.'), findsOneWidget);
+    const cases = <AccessDenial, (String, String)>{
+      AccessDenial.notGranted: ('Reminder health unavailable',
+          'This account is not authorized to view reminder health.'),
+      AccessDenial.notLinked: ('Reminder health unavailable',
+          'This account is not authorized to view reminder health.'),
+      AccessDenial.signedOut: ('Not signed in', 'Sign in to view reminder health.'),
+      AccessDenial.untrustedSession: ('Please sign in again', 'This sign-in is no longer valid.'),
+      AccessDenial.reviewRequired: ('Access review required',
+          'Your access needs a check by the church before it can continue.'),
+      AccessDenial.unavailable: ('Reminder health not available here',
+          'The server does not offer reminder health here yet.'),
+    };
+    for (final MapEntry(key: denial, value: (title, message)) in cases.entries) {
+      // A fresh app per reason: overrides apply only to a new ProviderScope.
+      await tester.pumpWidget(const SizedBox.shrink());
+      await pumpStaff(
+        tester,
+        location: ClientPaths.notificationHealth,
+        healthRepository: _HealthRepository(AccessReadDenied(denial)),
+      );
+      expect(find.byKey(const Key('nav-${ClientPaths.notificationHealth}')), findsOneWidget);
+      expect(find.byKey(Key('notification-health-denied-${denial.name}')), findsOneWidget,
+          reason: denial.name);
+      expect(find.text(title), findsOneWidget, reason: denial.name);
+      expect(find.text(message), findsOneWidget, reason: denial.name);
+    }
+  });
+
+  testWidgets('reminder health reports a failed read separately from a refusal', (
+    tester,
+  ) async {
+    await pumpStaff(
+      tester,
+      location: ClientPaths.notificationHealth,
+      healthRepository: _HealthRepository(const AccessReadFailed(unreachable: true)),
+    );
+    expect(find.byKey(const Key('notification-health-failed')), findsOneWidget);
+    expect(find.text('No connection'), findsOneWidget);
+    expect(find.text('This account is not authorized to view reminder health.'), findsNothing);
+  });
+
+  testWidgets('reminder health is not in the navigation while signed out', (
+    tester,
+  ) async {
+    await pumpStaff(tester, account: null);
+    expect(find.byKey(const Key('nav-${ClientPaths.notificationHealth}')), findsNothing);
+    expect(staffDestinationsFor(null), isNot(contains(staffReminderHealthDestination)));
+    expect(staffDestinationsFor(null, signedIn: true), contains(staffReminderHealthDestination));
+    expect(
+      {for (final d in staffDestinationsFor(null, signedIn: true)) d.icon}.length,
+      staffDestinationsFor(null, signedIn: true).length,
+      reason: 'every destination has its own icon',
+    );
   });
 
   testWidgets('reminder health renders aggregate status for an authorized read', (
@@ -87,6 +137,8 @@ void main() {
       healthRepository: _HealthRepository(),
     );
     expect(find.text('Due and pending'), findsOneWidget);
+    expect(find.text('Without a route in 24 hours'), findsOneWidget);
+    expect(find.text('Failed push attempts in 24 hours'), findsOneWidget);
     expect(find.text('2'), findsOneWidget);
     expect(find.text('Last successful scheduler handoff'), findsOneWidget);
     expect(find.text('2026-10-13T11:59:00.000Z'), findsNWidgets(2));
@@ -868,8 +920,13 @@ void main() {
 }
 
 class _HealthRepository implements NotificationHealthRepository {
+  _HealthRepository([this.answer]);
+
+  /// A refusal or failure to answer with; null answers the sample health.
+  final AccessRead<ReminderHealth>? answer;
+
   @override
-  Future<AccessRead<ReminderHealth>> fetchHealth() async => AccessReadOk(
+  Future<AccessRead<ReminderHealth>> fetchHealth() async => answer ?? AccessReadOk(
         ReminderHealth.fromJson({
           'captured_at': '2026-10-13T12:00:00Z',
           'scheduler': {
@@ -895,7 +952,13 @@ class _HealthRepository implements NotificationHealthRepository {
             'failed_attempts_24h': 0,
           },
           'tokens': {'retired': 0, 'retired_24h': 0, 'last_retired_at': null},
-          'direct_contact': {'backlog': 0, 'oldest_due_at': null},
+          'direct_contact': {
+            'backlog': 0,
+            'oldest_due_at': null,
+            'routed_24h': 0,
+            'total_unrouted': 0,
+            'total': 0,
+          },
         }),
       );
 }

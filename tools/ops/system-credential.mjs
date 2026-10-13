@@ -20,7 +20,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SYSTEM_CREDENTIAL_PATTERN, SYSTEM_CREDENTIAL_RE } from '../../packages/shared_runtime/system_access.mjs';
+import { SYSTEM_CREDENTIAL_PATTERN, SYSTEM_CREDENTIAL_RE } from '../../supabase/functions/_shared/system_access.mjs';
 import { ENVIRONMENT_NAMES, loadEnvironments } from '../env/environments.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');

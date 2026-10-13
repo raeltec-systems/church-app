@@ -20,10 +20,16 @@ const staffDestinations = <StaffDestination>[
     icon: Icons.science_outlined,
   ),
   (path: ClientPaths.account, label: 'My account', icon: Icons.person_outline),
-  // The destination is discoverable by mapped operators without an Admin
-  // grant; the health read enforces authorization on the server.
-  (path: ClientPaths.notificationHealth, label: 'Reminder health', icon: Icons.monitor_heart_outlined),
 ];
+
+/// Story 3.8: shown to any signed-in session, so a mapped operator without a
+/// member link or Admin grant can find it; the health read enforces
+/// authorization on the server. Hidden while signed out.
+const staffReminderHealthDestination = (
+  path: ClientPaths.notificationHealth,
+  label: 'Reminder health',
+  icon: Icons.notifications_active_outlined,
+);
 
 /// Story 2.3: shown while the server grants the caller member access.
 const staffAccessDestination = (
@@ -105,8 +111,12 @@ const staffCellLeaderDestination = (
 
 /// The sidebar for the caller's current grants. Presentation only: hiding an
 /// entry is not a control, and every screen's data is checked by the server.
-List<StaffDestination> staffDestinationsFor(MemberGrants? grants) => [
+List<StaffDestination> staffDestinationsFor(
+  MemberGrants? grants, {
+  bool signedIn = false,
+}) => [
   ...staffDestinations,
+  if (signedIn) staffReminderHealthDestination,
   if (grants != null) staffInboxDestination,
   if (grants != null) staffAccessDestination,
   if (servesACell(grants)) staffCellLeaderDestination,
@@ -132,6 +142,7 @@ class StaffApp extends StatefulWidget {
 class _StaffAppState extends State<StaffApp> {
   late final GoRouter _router = buildClientRouter(
     initialLocation: widget.initialLocation,
+    reminderHealth: true,
     shell: (location, focusSelectedNav, child) => StaffShell(
       location: location,
       focusSelectedNav: focusSelectedNav,
@@ -176,6 +187,7 @@ class StaffShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final destinations = staffDestinationsFor(
       ref.watch(myAccessProvider.select((s) => s.grants)),
+      signedIn: ref.watch(accountProvider.select((s) => s.accountId != null)),
     );
     final nav = FocusTraversalGroup(
       child: Semantics(

@@ -37,7 +37,7 @@ class ReminderHealth {
   bool get empty => scheduler.jobs == 0 && scheduler.lastSuccessAt == null &&
       jobs.duePending == 0 && jobs.leased == 0 && jobs.failedAttempts24h == 0 &&
       jobs.lapsedLeases24h == 0 && push.pending == 0 && push.leased == 0 &&
-      push.failedAttempts24h == 0 && tokens.retired == 0 && directContact.backlog == 0;
+      push.failedAttempts24h == 0 && tokens.retired == 0 && directContact.total == 0;
 }
 
 class SchedulerHealth {
@@ -99,13 +99,19 @@ class TokenHealth {
   final DateTime? lastRetiredAt;
 }
 
+/// Direct-contact needs. [backlog] is the needs with no registered route
+/// recorded in the last 24 hours (the table is append-only); the totals are
+/// cumulative.
 class DirectContactHealth {
-  const DirectContactHealth({required this.backlog, this.oldestDueAt});
+  const DirectContactHealth({required this.backlog, required this.routed24h,
+    required this.totalUnrouted, required this.total, this.oldestDueAt});
   factory DirectContactHealth.fromJson(Object? value) {
     final m = _map(value);
-    return DirectContactHealth(backlog: _int(m['backlog']), oldestDueAt: _optionalDate(m['oldest_due_at']));
+    return DirectContactHealth(backlog: _int(m['backlog']),
+      routed24h: _int(m['routed_24h']), totalUnrouted: _int(m['total_unrouted']),
+      total: _int(m['total']), oldestDueAt: _optionalDate(m['oldest_due_at']));
   }
-  final int backlog;
+  final int backlog, routed24h, totalUnrouted, total;
   final DateTime? oldestDueAt;
 }
 
@@ -130,5 +136,10 @@ Map<String, int> _counts(Object? value) {
 }
 DateTime _date(Object? value) => _optionalDate(value)
     ?? (throw const FormatException('missing reminder health timestamp'));
-DateTime? _optionalDate(Object? value) => value == null
-    ? null : value is String ? DateTime.tryParse(value) : null;
+/// Null only when the server sent null; a malformed timestamp is a format
+/// error, never shown as "Not recorded".
+DateTime? _optionalDate(Object? value) {
+  if (value == null) return null;
+  final parsed = value is String ? DateTime.tryParse(value) : null;
+  return parsed ?? (throw const FormatException('malformed reminder health timestamp'));
+}

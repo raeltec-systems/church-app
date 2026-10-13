@@ -138,10 +138,13 @@ select ok(not exists (
      and (p.proname ~ '^notifications_' or p.proname ~ '^contract_(register_)?(route_)?direct_contact'
           or p.proname in ('fixture_reminder_direct_contact', 'fixture_reminder_create_for',
                            'fixture_deletion_purge_rows', 'fixture_erase_member'))
-     and not (p.proname in ('notifications_command', 'notifications_my_push_settings',
-                            'notifications_my_inbox', 'notifications_open_item') and r = 'authenticated')
+     and not ((p.proname in ('notifications_command', 'notifications_my_push_settings',
+                             'notifications_my_inbox', 'notifications_open_item')
+               -- Story 3.8: the content-free health read (api wrapper only; app body stays private).
+               or (n.nspname = 'api' and p.proname = 'notifications_health'))
+              and r = 'authenticated')
      and has_function_privilege(r, p.oid, 'EXECUTE')),
-  'only the member command and reads are client-executable, and only by authenticated');
+  'only the member command and reads (and the 3.8 health read) are client-executable, and only by authenticated');
 select is((select handler from app.identity_deletion_hooks where module = 'notifications'),
   'app.notifications_erase_member(jsonb)', 'Notifications registered its deletion hook');
 select is((select handler from app.identity_deletion_hooks where module = 'fixture'),

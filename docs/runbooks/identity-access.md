@@ -841,7 +841,7 @@ The E2E uses `+44 7700 900520–900529` (step `L40` races the last two Admins de
 
 ## Full member deletion through a resumable workflow (story 2.11)
 
-Migrations: `supabase/migrations/20261007174952_member_deletion.sql` (no row deletions) and `supabase/migrations/20261007175000_member_deletion_rows.sql` (ONLY the three functions that delete rows; applied by hand on hosted projects). Edge Function: `supabase/functions/identity-deletion/`. Worker: `tools/identity-deletion/worker.mjs`. Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.11/`.
+Migrations: `supabase/migrations/20261007174952_member_deletion.sql` (no row deletions) and `supabase/migrations/20261007175000_member_deletion_rows.sql` (ONLY the three functions that delete rows; applied by hand on hosted projects). Edge Function: `supabase/functions/identity-deletion/` (plus the shared `supabase/functions/_shared/system_access.mjs` since the 3.9 refactor). Worker: `tools/identity-deletion/worker.mjs`. Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.11/`.
 
 Full deletion is the fourth lifecycle effect (I10, AD-14), distinct from a login hold, a church deactivation and a restoration (story 2.10): access ends for good at once, then the data is erased step by step, and nothing comes back from a backup.
 
@@ -986,7 +986,7 @@ node tools/auth-harness/local-phone-auth.mjs off
    - restore replay only, while a restore is held: the restored `auth.users` and `auth.identities` rows.
 
    Confirm on staging that the migration owner may delete from `auth.audit_log_entries`. If not, the erase step answers `unavailable` (fail closed) and the owner decides.
-3. **Deploy the function** (owner or parent): `npx supabase functions deploy identity-deletion --project-ref tmurpotfluignacfueki --no-verify-jwt`, or the connector's `deploy_edge_function` with `verify_jwt: false` and the files `index.ts` and `logic.mjs`. It needs **no secret**: `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` come from the platform. If the project's legacy API keys are disabled it answers `unavailable`, as 2.9 does.
+3. **Deploy the function** (owner or parent): `npx supabase functions deploy identity-deletion --project-ref tmurpotfluignacfueki --no-verify-jwt`, or the connector's `deploy_edge_function` with `verify_jwt: false` and the files `index.ts`, `logic.mjs` and (since the 3.9 refactor) `../_shared/system_access.mjs` (source `supabase/functions/_shared/system_access.mjs`; the name is relative to the entrypoint's folder, which is how the connector uploads a relative dependency, and the CLI bundles it by itself). It needs **no secret**: `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` come from the platform. If the project's legacy API keys are disabled it answers `unavailable`, as 2.9 does.
 4. **Owner (restricted operator): the worker's credential.**
    1. Run `OPS_STATE_DIR=.ops-state/identity-deletion node tools/ops/system-credential.mjs mint --env staging`. It prints the digest only; the token stays in that gitignored folder, mode 0600.
    2. In the staging SQL editor, run `select app.sys_register_credential(app.sys_create_principal('identity-deletion-worker', 'identity_deletion', 'israel'), '<digest>', 'deletion worker staging', interval '30 days', 'israel');`.

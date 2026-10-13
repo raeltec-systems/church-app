@@ -8,7 +8,7 @@ import {
   declaredTooLarge as sharedDeclaredTooLarge,
   keyHeaders,
   systemEnvelope,
-} from '../../../packages/shared_runtime/system_access.mjs';
+} from '../_shared/system_access.mjs';
 
 export const MAX_BODY_BYTES = 256;
 export const UUID_RE = SHARED_UUID_RE;
@@ -138,7 +138,10 @@ export async function runOnce({ system, limit, now = () => Date.now(), budgetMs 
 
 /** Push outcomes the database may answer (prepare and record); anything else is `unexpected`. */
 export const PUSH_OUTCOMES = ['accepted', 'retry', 'failed', 'exhausted', 'obsolete', 'expired', 'fenced',
-  'cancelled', 'finished', 'not_found'];
+  'cancelled', 'finished', 'not_found',
+  // Story 3.8: the owner closed `outbound_sending` after the claim; the lease was released and no
+  // token was returned. A deliberate pause, not an unexpected answer.
+  'gate_closed'];
 /** Provider answers per device. */
 export const PUSH_RESULTS = ['accepted', 'token_invalid', 'rejected', 'transient'];
 const TOKEN_RE = /^[A-Za-z0-9_:.-]{20,4096}$/;
@@ -160,8 +163,12 @@ export function parsePushClaim(data) {
     jobs.push({ push_job_id: j.push_job_id, lease_token: j.lease_token });
   }
   if (jobs.length !== data.claimed) return null;
+  if (data.gate_closed !== undefined && data.gate_closed !== true) return null;
+  // Story 3.8: a closed `outbound_sending` gate leases nothing (expiry and lapses still run).
+  if (data.gate_closed === true && data.claimed !== 0) return null;
   return { jobs, claimed: data.claimed, reclaimed: data.reclaimed, expired: data.expired,
-    lease_seconds: data.lease_seconds, push_enabled: data.push_enabled };
+    lease_seconds: data.lease_seconds, push_enabled: data.push_enabled,
+    ...(data.gate_closed === true ? { gate_closed: true } : {}) };
 }
 
 /**
@@ -221,7 +228,8 @@ const STOP_CODE_RE = /^[a-z][a-z0-9_]{0,40}$/;
 export async function expirePush({ system }) {
   const claim = parsePushClaim(await system('notifications.push_claim', { expire_only: true }));
   if (!claim || claim.claimed !== 0) throw new Error('unexpected_claim');
-  return { state: 'not_configured', reclaimed: claim.reclaimed, expired: claim.expired };
+  return { state: 'not_configured', reclaimed: claim.reclaimed, expired: claim.expired,
+    ...(claim.gate_closed ? { gate_closed: true } : {}) };
 }
 
 /**
@@ -333,6 +341,6 @@ export async function runPush({ system, sender, limit, now = () => Date.now(), d
     }
   }
   return { claimed: claim.claimed, reclaimed: claim.reclaimed, expired: claim.expired, enabled: claim.push_enabled,
-    outcomes, sent, uncertain, deferred, ...(stopped ? { stopped } : {}),
+    ...(claim.gate_closed ? { gate_closed: true } : {}), outcomes, sent, uncertain, deferred, ...(stopped ? { stopped } : {}),
     ...(stopDetail ? { stop_detail: stopDetail } : {}) };
 }

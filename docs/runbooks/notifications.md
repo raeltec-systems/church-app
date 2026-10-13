@@ -655,8 +655,8 @@ Record the outcome per step in `evidence-3.7/owner-device-check.md` (pass/fail, 
 
 ## Story 3.8: staff reminder health and notification recovery
 
-Migrations: `supabase/migrations/20261013000000_notifications_health.sql` and the review repair
-`supabase/migrations/20261013190000_notifications_health_repair.sql` (2026-10-13; it replaces the
+Migrations: `supabase/migrations/20261013193932_notifications_health.sql` and the review repair
+`supabase/migrations/20261013194009_notifications_health_repair.sql` (2026-10-13; it replaces the
 health read and the two push system commands, adds the mapping triggers and drops the
 `auth.users` foreign key under an owner-approved-cleanup marker). No row deletions. The
 read is `POST /rest/v1/rpc/notifications_health` (`Content-Profile: api`). It returns only counts,
@@ -773,8 +773,8 @@ on 2026-10-13, and the deployed `notifications-worker` is the pre-refactor versi
    tmurpotfluignacfueki --no-verify-jwt`), which bundles `_shared` itself; if both fail, stop and
    redeploy the previous version from the dashboard before going on.
 1. **Parent session: the migrations, in order.** Apply to staging (`tmurpotfluignacfueki`) with
-   the Supabase MCP `apply_migration`: first `20261013000000_notifications_health.sql` (name
-   `notifications_health`), then `20261013190000_notifications_health_repair.sql` (name
+   the Supabase MCP `apply_migration`: first `20261013193932_notifications_health.sql` (name
+   `notifications_health`), then `20261013194009_notifications_health_repair.sql` (name
    `notifications_health_repair`). There is no rows file. Together they add `last_success_at`,
    `app.ops_operators.auth_user_id` and its two `auth.users` triggers, the health read, and the
    push claim/prepare `outbound_sending` checks. The repair contains one

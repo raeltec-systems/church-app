@@ -111,7 +111,7 @@ Source: `review-3.8-3.10.md` findings 3, 4, 11, 13 and 15.
   exit 2, spaced international numbers and unlabeled names flagged; tests added.
 - Runbooks: `notifications.md` Story 3.10 production gate, `environments-and-promotion.md` and
   `production-promotion-identity.md` describe the conditional assertions.
-- The 3.8 fixes ship as the repair migration `20261013190000_notifications_health_repair.sql`;
+- The 3.8 fixes ship as the repair migration `20261013194009_notifications_health_repair.sql`;
   `check-migrations` passes with `--base ccr-93e730dd-89lbvg` and `--base origin/main`.
 
 **Status `in-review`: pending owner/staging items (finding 15).** Every execution item of this

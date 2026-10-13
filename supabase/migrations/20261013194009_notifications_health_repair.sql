@@ -1,6 +1,6 @@
 -- owner-approved-cleanup: owner decision 2026-10-13 (review-3.8-3.10 finding 2): drop the auth.users foreign key that breaks app-only backup restore; 3.8 not yet applied to any hosted project
 --
--- Repair of 20261013000000_notifications_health.sql after review-3.8-3.10 (findings 2, 6, 8-10,
+-- Repair of 20261013193932_notifications_health.sql after review-3.8-3.10 (findings 2, 6, 8-10,
 -- 12, 16, 17). That migration stays as merged; this one, applied right after it:
 --   * drops the app.ops_operators.auth_user_id foreign key into auth.users (an app-schema backup
 --     must restore into an isolated database without the auth schema). The column stays
@@ -14,7 +14,7 @@
 --     (lease token cast through numeric).
 -- No row deletions; no hand-pasted function is touched; nothing is granted to anon.
 
--- Default name of the inline foreign key added by 20261013000000.
+-- Default name of the inline foreign key added by 20261013193932.
 alter table app.ops_operators drop constraint ops_operators_auth_user_id_fkey;
 
 comment on column app.ops_operators.auth_user_id is

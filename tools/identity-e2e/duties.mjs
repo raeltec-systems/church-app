@@ -107,6 +107,8 @@ async function main() {
        or j.source_id in (select assignment_id from gone_assignments);
     delete from app.duties_audit a where a.department_id in (select department_id from gone_departments)
        or a.actor_member_id in (select member_id from gone_members);
+    delete from app.duties_slot_revisions r using app.duties_occurrences o
+     where r.occurrence_id = o.occurrence_id and o.department_id in (select department_id from gone_departments);
     delete from app.duties_assignments a where a.assignment_id in (select assignment_id from gone_assignments);
     delete from app.duties_slots s using app.duties_occurrences o
      where s.occurrence_id = o.occurrence_id and o.department_id in (select department_id from gone_departments);

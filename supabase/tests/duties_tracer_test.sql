@@ -283,7 +283,9 @@ select is((select string_agg(actor_capacity, ',' order by event_id) from app.dut
 select is(pg_temp.readj(4, 'select api.duties_my_duties()') #>> '{assignments,0,department_name}',
   'SYNTHETIC Preaching Rota', 'M sees the duty with its owning department');
 select is((pg_temp.readj(4, 'select api.duties_my_duties()') -> 'assignments' -> 0) - 'assignment_id' - 'occurrence_id'
-            - 'department_id' - 'starts_at' - 'ends_at' - 'response_deadline',
+            - 'department_id' - 'starts_at' - 'ends_at' - 'response_deadline'
+            -- Story 4.2 keys (revisions) are checked in duties_revisions_test.sql.
+            - 'slot_revision' - 'changes' - 'previous_response' - 'previous_assignment_ids' - 'notes_updated_at',
   '{"revision": 1, "duty_name": "Sunday preaching", "department_name": "SYNTHETIC Preaching Rota", "reporting_at": null, "location": "SYNTHETIC Main hall", "instructions": "Arrive early.", "response": "pending", "responded_at": null, "note": null}'::jsonb,
   'with its detail, deadline and pending response');
 select is(jsonb_array_length(pg_temp.readj(5, 'select api.duties_my_duties()') -> 'assignments'), 1,

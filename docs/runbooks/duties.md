@@ -111,13 +111,118 @@ Use synthetic members only (no real names or numbers). You need: an Admin A, a l
 6. **Leader sees it.** Staff web as L: **Reload**: **Accepted**, "1 of 1 confirmed" and M's note.
 7. **Refusals.** As O on a phone or web: **Duties** shows no duty of M's, and the staff web has no **Duties** entry for O (a direct `POST /rest/v1/rpc/duties_leader_board` with O's token answers 403). As N: the same; N cannot publish (no entry, and the API answers `forbidden`). A direct table query with any member token (`GET /rest/v1/duties_assignments`, with `Accept-Profile: app` or `api`) is refused (406/404).
 8. **Pastor (optional).** Give a SYNTHETIC member the Pastor role (Roles & access): **Duties** lists every department as "Pastor oversight (read only)" without the note and without a publish form.
-9. **Clean up** (SQL editor): delete the duties rows of the department (audit, assignments, slots, occurrences, department members), the jobs/attempts/items of the synthetic members, the scope grants, then the department; remove the members as in `identity-access.md`.
+9. **Clean up** (SQL editor): delete the duties rows of the department (audit, slot revisions (since 4.2), assignments, slots, occurrences, department members), the jobs/attempts/items of the synthetic members, the scope grants, then the department; remove the members as in `identity-access.md`.
 
 Record the outcome per step in `evidence-4.1/owner-check.md` (pass/fail, device model, Android version, browser; no numbers, ids or keys).
 
 ### Known limits (later entries)
 
-- One position, one-off occurrences, no drafts, no edits, no cancellation (4.2, 4.3).
+- One position, one-off occurrences, no drafts, no cancellation (4.3). Edits arrive with 4.2 (below).
 - No later decline ("Can't make it anymore"), bulk acceptance or calendar export (4.5).
 - No default deadline, Short notice, response or pre-service reminders, snooze of duty reminders, or Needs contact list (4.8, 4.9).
 - No lifecycle or handover hooks (4.12).
+
+## Story 4.2: revise assignments on material change and refuse stale responses
+
+Migration: `supabase/migrations/20261013221115_duties_revisions.sql` (forward only: the 4.1 files are not edited; no destructive statements, no row deletions, no new `_rows` file, no new client grant). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-revise-assignments-on-material-change-and-refuse-stale-respo-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.2/`.
+
+### Model
+
+- **Slot revisions** (`app.duties_slot_revisions`): one immutable row per published, material or notes change of a slot (`change_class` `published`, `material`, `notes`) with `changed_fields`, a snapshot of the slot's fields, the assignee and the current assignment at that revision. A trigger refuses every update except member deletion replacing a person id with the nil UUID. The migration back-fills revision 1 for slots published under 4.1.
+- **Assignment lifecycle**: `current`, `superseded` (a material change replaced it; `end_reason` `revised`) and `cancelled` (vocabulary only until 4.3 adds the cancelling command). An assignment records the slot revision it answers and the assignment it supersedes. The answer, its member, account, time, provenance and note stay on the superseded row. A slot keeps exactly one current assignment. A trigger (`app.duties_assignment_history_guard`) makes an ended assignment immutable, except member deletion replacing person ids with the nil UUID and clearing the note.
+- **What is material** (`app.duties_slot_field_class`, the single classification): `duty_name`, `starts_at` (the date and start), `ends_at`, `reporting_at`, `location` and `member_id` (the assignee) are material; `instructions` are notes. `response_deadline` belongs to the assignment. Any slot field a later story adds must be classified there.
+
+### Command `duties.revise_duty`
+
+`{occurrence_id, duty_name?, starts_at?, ends_at?, reporting_at?, location?, instructions?, member_id?, response_deadline?}` with `expected_revision` = the occurrence revision. The department's leader or deputy, or an Admin (not Pastor, not another department's leader, not a cell leader). The payload is a patch: present keys are the change, `null` clears an optional field, a value equal to the current one is no change.
+
+- **Material change** (any material field differs): needs a new `response_deadline` (the leader's until entry 8 adds the 3.3 default), checked against the new times. The current assignment becomes `superseded` (answer kept), a new `pending` assignment is created for the same member or the new one, the old assignment's pending jobs are cancelled `source_revised` and a generic notice is queued: `duty_changed` to the same member, or `duty_assigned` to a new member plus `duty_released` to the old one.
+- **Notes-only change** (only `instructions`): the answer stands (no new assignment, no revision change of the assignment); one generic notice goes to a pending or accepted assignee: any notice of the assignment not yet sent (`duty_assigned`, `duty_changed`, `duty_updated`) is cancelled `replaced` and re-sent once as the most telling kind (a new duty stays a new duty), otherwise `duty_updated`.
+- **Erased or departed assignee**: no notice is ever addressed to an erased member (nil UUID). A material change that keeps an assignee who was erased, left the department or is under deletion is refused `{"member_id": "required_reassign"}`: choose a new assignee. An instructions-only change still saves (no notice).
+- Answer: `{occurrence_id, revision, change: material | notes, slot_id, slot_revision, assignment_id, assignment_revision, superseded_assignment_id, response, notice_queued}`: ids, revisions and states only.
+
+| Case | Answer |
+|---|---|
+| Not a manager of the department, Pastor | `forbidden` |
+| Unknown occurrence | `not_found` |
+| Stale occurrence revision (another manager saved first) | `conflict` with `current_revision` |
+| The duty has started | `validation_failed {"occurrence_id": "started"}` |
+| Nothing differs | `validation_failed {"occurrence_id": "unchanged"}` |
+| Material change without a deadline; deadline past or after the (reporting) start | `{"response_deadline": "required" \| "past" \| "after_start"}` |
+| A deadline with a notes-only change | `{"response_deadline": "not_material"}` |
+| A required field cleared; times out of order | `{"duty_name" \| "starts_at": "required"}`, `{"ends_at": "before_start"}`, `{"reporting_at": "after_start" \| "past"}` |
+| New assignee not a current, active department member | `{"member_id": "not_in_department" \| "unknown"}` |
+| Material change keeping an assignee who can no longer serve | `{"member_id": "required_reassign"}` |
+| Gate closed (production without Q4); untrusted session | `unavailable {"policy": "gate_closed"}`; `unauthenticated` |
+
+A replay with the same request id returns the stored answer after the kernel rechecks the leader's scope; a leader whose scope was revoked gets `forbidden`.
+
+### Stale responses
+
+`duties.respond` on a superseded assignment answers `conflict` with `field_errors` `{"assignment_id": "superseded", "<field>": "changed", ...}`: the fields changed from the change that replaced it onwards (`member_id` when the duty went to someone else, but not when it is the member's again after A -> B -> A; never the new assignee's id or name). A cancelled assignment answers `conflict {"assignment_id": "cancelled"}`. Nothing changes. A revise and a respond racing on the same assignment serialise on the assignment row: whichever commits first wins, and the other sees the new state.
+
+### Notices (3.2 contracts on `duties_assignment`)
+
+| Kind | Title / body | Link | Delivered while |
+|---|---|---|---|
+| `duty_changed` | **Duty changed** / "One of your duties changed. Open it to see what changed and answer again." | `/duties/assignments/{source_id}` (the new revision) | the assignment is current and pending, the duty has not started, the member serves in the department |
+| `duty_updated` | **Duty details updated** / "The details of one of your duties were updated. Open it to read them." | `/duties/assignments/{source_id}` | the assignment is current, not declined, not started |
+| `duty_released` | **Duty changed** / "A duty you were given has changed and is no longer assigned to you." | `/duties` | the superseded assignment's position is not the member's again, not started |
+
+The source check now also treats a superseded assignment at its final revision as current, so the released notice can be keyed to it; the per-kind checks decide delivery. An inbox item of an older revision opens as out of date. Push stays generic (story 3.6).
+
+### Reads
+
+- `api.duties_my_duties`: each assignment adds `slot_revision`, `changes` (what the change that created it changed, when it replaced the member's own earlier assignment; null otherwise), `previous_response`, `previous_assignment_ids` (the member's own earlier assignments of the position, following the position's chain through other members' assignments, so an old reminder link still finds the current version; other members' ids are never listed) and `notes_updated_at`.
+- `api.duties_leader_board`: each position adds `slot_revision` and `history` (ended assignments, newest first, at most 20, with `state`, `end_reason`, `ended_at`, the kept `response`, `responded_at`, `response_provenance` and the note; Pastor sees no notes); the current assignment adds `slot_revision`, `changes` and `notes_updated_at`.
+
+### Member deletion
+
+`app.duties_erase_member` and `app.duties_deletion_remaining` are replaced: slot revisions (`member_id`, `created_by_member`, `created_by_account`) are anonymised with the nil UUID, like assignments and audit. No new rows are deleted, so the 4.1 rows file stays the only purge.
+
+### Clients
+
+- **Staff web, Duties** (leader, deputy, Admin): **Change this duty** on a duty that has not started opens the form prefilled in church time. It says what will happen: "<name> will be asked to answer again (changed: …)" or "Only the instructions change: the answer stands." A material change needs **New answer by** (date and time) before **Save the change** is enabled. Each position shows **Changed: …** on a new revision and **Earlier versions** with each kept answer ("SYNTHETIC Ruth: Accepted, answered …, by the member, replaced by a change …"). A conflict ("Changed elsewhere") reloads the board. Pastor sees the history and no form.
+- **Mobile, Duties**: a new revision shows **Changed** with "What changed: …" and "Your earlier answer was "Accepted". Please answer again."; an instructions update shows "Details updated …. Your answer stands." An answer to an old version is refused: **This duty changed** ("Your answer was not recorded: the … changed since you opened it…", or "…no longer assigned to you") and the list reloads. An old reminder link opens the current version under **This duty changed**. **Sending…** / **Not sent** / **Check again** (same request id) work as in 4.1.
+
+### Local runs
+
+```bash
+npx supabase db reset
+npm run -s db:test                           # supabase/tests/duties_revisions_test.sql (+ duties_tracer_test.sql)
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/duties-revisions.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+node --test tools/identity-e2e/duties-revisions.test.mjs
+(cd packages/client_core && flutter test test/duties)
+```
+
+Fictional numbers: pgTAP `+44 7700 900970-900979`, E2E `900980-900989`. The E2E proves the race with two real concurrent HTTP requests (leader and deputy at the same revision).
+
+### Hosted staging (parent session, then the owner)
+
+1. **Parent session:** apply `20261013221115_duties_revisions.sql` to staging (`tmurpotfluignacfueki`) after `20261013220300`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. Compare the md5 of each replaced or new `app.duties_*` function body with the local one (the MCP apply decodes `\uXXXX` escapes; this migration has none, but check). No Edge Function change, no new client grant, no rows file. Check: `select count(*) from app.duties_slot_revisions;` equals the number of slots published before (revision 1 back-filled).
+2. **Owner:** nothing to paste. Then the manual checks below.
+3. **Production:** nothing in this story (Q2 and Q4 gates stay closed).
+
+### Owner manual checks (staging, phone and web, story 4.2)
+
+Use synthetic members only. You need the setup of the 4.1 checks (Admin A, leader L, a deputy D of the same department, member M with the app on an Android phone, member O). Build the clients against staging as in 4.1.
+
+1. **Accept.** As L publish `Sunday preaching` to M (a date next week, start `09:00`, answer by two days before). On the phone as M, open the **New duty assigned** item and tap **Accept**: **Accepted**.
+2. **Change the time.** Staff web as L: on the duty, **Change this duty**. Change **Start time** to `10:00`: the form says "… will be asked to answer again (changed: date or start time)". **Save the change** stays disabled until **New answer by** is filled; fill it, save. Expect **Duty changed**, the position **Awaiting response** with **Changed: date or start time**, and under **Earlier versions** "M: Accepted, answered …, by the member, replaced by a change …".
+3. **Change notice.** Within about a minute M's **Inbox** shows **Duty changed**; **Open** shows the duty at 10:00 with **Changed**, "What changed: date or start time." and "Your earlier answer was "Accepted". Please answer again." The old **New duty assigned** item now says it is out of date.
+4. **Late answer to the old version.** As L publish a second duty (`Reading`) to M. On M's phone open it and keep that screen in the foreground with the screen on (the app re-reads only on **Reload** or when it comes back to the foreground). As L change its start time (with a new answer-by time). Then, without leaving the screen, tap **Accept** on the phone. Expect **This duty changed** ("Your answer was not recorded: the date or start time changed …") and the duty reloads to the new version; the leader still sees **Awaiting response**. **Accept** the new version: the leader sees **Accepted**.
+5. **Instructions only.** Staff web as D: **Change this duty**, change only **Instructions**: the form says "Only the instructions change: the answer stands." Save: **Details updated**; the position still shows **Accepted**. M gets **Duty details updated**; the duty shows "Details updated …. Your answer stands." and **Accepted**.
+6. **Two leaders at once.** Open the duty's **Change this duty** form as L and as D in two browsers; change the instructions in both and save one after the other without reloading. The first shows **Details updated**; the second shows **Changed elsewhere** and its board reloads with the first one's text.
+7. **Give it to someone else.** As L change **Who** to O with a new answer-by time. O gets **New duty assigned**; M gets **Duty changed** ("… no longer assigned to you"), whose **Open** shows My duties without that duty. The history keeps M's acceptances.
+8. **Refusals.** As O (a member), the staff web has no **Change this duty**; a direct `POST /rest/v1/rpc/duties_command` with `duties.revise_duty` and O's token answers `forbidden`. As Pastor the history shows without notes and without the form. `GET /rest/v1/duties_slot_revisions` with any member token is refused.
+9. **Clean up** as in 4.1, step 9 (slot revisions before assignments).
+
+Record the outcome per step in `evidence-4.2/owner-check.md` (pass/fail, device model, Android version, browser; no numbers, ids or keys).
+
+### Known limits (later entries)
+
+- One position per occurrence: `member_id` in a revision is refused (`unsupported`) once occurrences have several positions (4.3 adds per-position edits, series edits and cancellation).
+- The new deadline is the leader's; the 3.3 default deadline, Short notice and response or pre-service reminders arrive with entry 8 (a material change will then re-plan them).
+- A declined assignment stays current until the leader changes or reassigns it; the coverage queue and leader confirmation arrive with entry 9.

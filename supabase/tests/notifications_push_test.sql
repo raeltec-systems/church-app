@@ -4,7 +4,7 @@
 -- fake FCM endpoint in tools/identity-e2e/push.mjs. Every account here is SYNTHETIC
 -- (+44 7700 900900-900909); device tokens are synthetic.
 begin;
-select plan(96);
+select plan(102);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000360' || lpad(n::text, 2, '0'))::uuid $$;
@@ -135,18 +135,20 @@ end;
 $$;
 create temp table v (k text primary key, id uuid, j jsonb);
 
--- Accounts: 1 Admin; 2, 3, 4, 5 active members with devices; 6 to be held.
+-- Accounts: 1 Admin; 2-5 active members with devices; 6 to be held; 7 isolates gate coverage.
 insert into auth.users (id, aud, role, phone, phone_confirmed_at)
 select pg_temp.u(n), 'authenticated', 'authenticated', ltrim(pg_temp.phone(n), '+'), now()
-  from generate_series(1, 6) n;
-select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 6) n;
+  from generate_series(1, 7) n;
+select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 7) n;
 select app.platform_set_environment('local', 'pgtap 3.6');
+update app.policy_gates set state = 'approved', approved_value = '{}', approved_by = 'pgtap',
+       approved_at = now(), approval_note = 'synthetic push tests' where gate = 'outbound_sending';
 insert into m select n, app.identity_seed_synthetic_link(pg_temp.u(n), 'SYNTHETIC 3.6 Member ' || n, 'pgtap 3.6')
-  from generate_series(1, 6) n;
+  from generate_series(1, 7) n;
 select app.identity_bootstrap_admin(pg_temp.mid(1), 'israel');
 select pg_temp.register(2, 'a'), pg_temp.register(2, 'b'), pg_temp.register(3, 'c'),
        pg_temp.register(3, 'd'), pg_temp.register(4, 'e'), pg_temp.register(5, 'f'),
-       pg_temp.register(6, 'g');
+       pg_temp.register(6, 'g'), pg_temp.register(7, 'h');
 insert into v (k, id) values ('da', pg_temp.dev('a')), ('db', pg_temp.dev('b'));
 
 -- Structure, privileges and the kernel's result retention ---------------------------------------
@@ -497,6 +499,32 @@ select is((select count(*)::int from pg_catalog.pg_proc p join pg_catalog.pg_nam
   'no push function is a security definer');
 select is((select count(*)::int from app.notifications_attempts where channel = 'push' and push_job_id is null), 0,
   'every push attempt names its push job');
+
+-- Gate pause/resume coverage is last so its claims cannot change earlier fixtures.
+insert into v (k, id) values ('gate-route', null);
+select pg_temp.call(7, 'notifications_command', 'notifications.set_push_category', null,
+  '{"source_type": "fixture_reminder", "reminder_kind": "fixture_due", "push_enabled": true}');
+update v set id = pg_temp.pushed(7) where k = 'gate-route';
+update app.policy_gates set state = 'unresolved', approved_value = null, approved_by = null,
+       approved_at = null, approval_note = null where gate = 'outbound_sending';
+select is(pg_temp.sys('notifications.push_claim', '{}', gen_random_uuid()) -> 'data' ->> 'gate_closed',
+  'true', 'outbound_sending closed prevents push claims');
+select is((pg_temp.claim() ->> 'claimed')::int, 0, 'the internal claim function also honors the closed gate');
+select ok(exists (select 1 from app.notifications_push_jobs p
+                   join app.notifications_inbox_items i on i.item_id = p.item_id
+                  where p.push_job_id = (select id from v where k = 'gate-route')),
+  'the outbound gate leaves the durable inbox reminder available');
+update app.policy_gates set state = 'approved', approved_value = '{}', approved_by = 'pgtap',
+       approved_at = now(), approval_note = 'synthetic gate test' where gate = 'outbound_sending';
+select app.notifications_push_claim(pg_temp.w(1), gen_random_uuid(), 500);
+select ok(pg_temp.lease((select id from v where k = 'gate-route')) is not null,
+  'an eligible push can be leased while the gate is open');
+update app.policy_gates set state = 'unresolved', approved_value = null, approved_by = null,
+       approved_at = null, approval_note = null where gate = 'outbound_sending';
+select is(pg_temp.prep((select id from v where k = 'gate-route')) ->> 'outcome', 'gate_closed',
+  'preparation with an active lease returns no device tokens after the gate closes');
+select ok(pg_temp.lease((select id from v where k = 'gate-route')) is null,
+  'a push lease is released when preparation sees a closed gate');
 
 select * from finish();
 rollback;

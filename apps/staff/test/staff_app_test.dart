@@ -21,6 +21,7 @@ Future<Harness> pumpStaff(
   double textScale = 1,
   String location = '/status',
   bool configured = true,
+  NotificationHealthRepository? healthRepository,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -30,7 +31,11 @@ Future<Harness> pumpStaff(
   final h = ClientTestHarness();
   await tester.pumpWidget(
     ProviderScope(
-      overrides: h.overrides(configured: configured),
+      overrides: [
+        ...h.overrides(configured: configured),
+        if (healthRepository != null)
+          notificationHealthRepositoryProvider.overrideWithValue(healthRepository),
+      ],
       child: StaffApp(initialLocation: location),
     ),
   );
@@ -62,6 +67,30 @@ void main() {
     final list = tester.getSemantics(find.bySemanticsLabel('Staff sections'));
     expect(list.role, SemanticsRole.tabBar);
     handle.dispose();
+  });
+
+  testWidgets('reminder health destination reports server refusal for an unmapped account', (
+    tester,
+  ) async {
+    await pumpStaff(tester, location: ClientPaths.notificationHealth);
+    expect(find.byKey(const Key('nav-${ClientPaths.notificationHealth}')), findsOneWidget);
+    expect(find.text('Reminder health unavailable'), findsOneWidget);
+    expect(find.text('This account is not authorized to view reminder health.'), findsOneWidget);
+  });
+
+  testWidgets('reminder health renders aggregate status for an authorized read', (
+    tester,
+  ) async {
+    await pumpStaff(
+      tester,
+      location: ClientPaths.notificationHealth,
+      healthRepository: _HealthRepository(),
+    );
+    expect(find.text('Due and pending'), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
+    expect(find.text('Last successful scheduler handoff'), findsOneWidget);
+    expect(find.text('2026-10-13T11:59:00.000Z'), findsNWidgets(2));
+    expect(find.textContaining('no reminder content or recipient details'), findsOneWidget);
   });
 
   testWidgets(
@@ -836,4 +865,37 @@ void main() {
       expect(h.inbox.openedIds, [item]);
     },
   );
+}
+
+class _HealthRepository implements NotificationHealthRepository {
+  @override
+  Future<AccessRead<ReminderHealth>> fetchHealth() async => AccessReadOk(
+        ReminderHealth.fromJson({
+          'captured_at': '2026-10-13T12:00:00Z',
+          'scheduler': {
+            'jobs': 1,
+            'cron_runs_24h': <String, int>{},
+            'stale': false,
+            'last_tick_at': '2026-10-13T11:59:00Z',
+            'last_tick_outcome': 'sent',
+            'last_success_at': '2026-10-13T11:59:00Z',
+          },
+          'jobs': {
+            'due_pending': 2,
+            'oldest_due_at': '2026-10-13T11:30:00Z',
+            'leased': 1,
+            'failed_attempts_24h': 0,
+            'lapsed_leases_24h': 0,
+          },
+          'push': {
+            'enabled': true,
+            'outbound_open': true,
+            'pending': 0,
+            'leased': 0,
+            'failed_attempts_24h': 0,
+          },
+          'tokens': {'retired': 0, 'retired_24h': 0, 'last_retired_at': null},
+          'direct_contact': {'backlog': 0, 'oldest_due_at': null},
+        }),
+      );
 }

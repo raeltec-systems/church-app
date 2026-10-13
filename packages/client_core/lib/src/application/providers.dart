@@ -14,6 +14,7 @@ import '../domain/membership_application.dart';
 import '../domain/membership_lifecycle.dart';
 import '../domain/membership_review.dart';
 import '../domain/notification_settings.dart';
+import '../domain/notification_health.dart';
 import '../domain/password_recovery.dart';
 import '../domain/platform_status.dart';
 import '../domain/push_messaging.dart';
@@ -114,6 +115,12 @@ final inboxRepositoryProvider = Provider<InboxRepository>(
 final notificationSettingsRepositoryProvider =
     Provider<NotificationSettingsRepository>(
       (ref) => const UnconfiguredNotificationSettingsRepository(),
+    );
+
+/// Content-free staff reminder and worker health projection.
+final notificationHealthRepositoryProvider =
+    Provider<NotificationHealthRepository>(
+      (ref) => const UnconfiguredNotificationHealthRepository(),
     );
 
 /// Story 3.7: the per-account generic inbox refresh signal.

@@ -649,3 +649,65 @@ Record the outcome per step in `evidence-3.7/owner-device-check.md` (pass/fail, 
 - The signal is a hint: Realtime gives no delivery guarantee, so the clients poll every 2 minutes while the Inbox is open and re-read on resume and on every channel rejoin.
 - Push categories cover registered reminder kinds only; group mutes stay with the conditional chat epic. Staff web never shows notifications.
 - A snooze is offered only on a current item with policy choices. In production the choices stay empty until the owner approves `q2_church_time` (entry 10).
+
+## Story 3.8: staff reminder health and notification recovery
+
+Migration: `supabase/migrations/20261013000000_notifications_health.sql`. The read is
+`POST /rest/v1/rpc/notifications_health` (`Content-Profile: api`). It returns only counts,
+timestamps and fixed status codes for scheduler activity, due and leased jobs, failed/lapsed
+attempts, push work, retired tokens and the direct-contact backlog. It never returns reminder
+text, source payloads, recipient/member details, device tokens, worker credentials or URLs.
+
+The server authorizes each call for a currently usable Admin grant or an explicitly mapped Auth
+account in `app.ops_operators.auth_user_id`. The owner maps an account per environment in the SQL
+editor; a migration does not seed or infer one:
+
+```sql
+update app.ops_operators
+   set auth_user_id = '<auth-user-uuid>'::uuid
+ where operator = 'israel' and active;
+```
+
+Keep the mapping nullable until the owner chooses the account. Clearing it removes health access
+for that operator. The mapping grants only this health projection; system credentials, operator
+procedures and their SQL functions remain unavailable to client sessions. The staff destination
+is visible in the shell, while the read itself is the authorization boundary.
+
+### Reading the health view
+
+- **Scheduler may be stale** means no scheduler tick is recorded in the last five minutes. Check
+  the scheduler status, worker URL/trigger configuration and Edge Function response using the
+  operator procedures in `system-access-and-operations.md`.
+- **Due and pending** and **oldest due time** show reminder delay without selecting source or
+  recipient data. Failed attempts and lapsed leases are rolling 24-hour counts.
+- **Direct-contact backlog** counts routed and unrouted needs. The read does not show which source
+  or person needs follow-up.
+- Use synthetic reminders only when demonstrating failures. On local/staging, set the synthetic
+  source check fault as described under Story 3.4 Hosted staging; the view should show a failed
+  attempt, then the reminder should recover after the fault and retry backoff end. Remove the
+  synthetic fixture rows after the demonstration.
+
+### Pause and resume push sending
+
+`outbound_sending` is an owner-controlled release gate. Closing it prevents new push leases and
+preparation from returning device tokens. Inbox reminder delivery continues. Pushes already
+accepted by FCM cannot be recalled. The owner or database owner pauses by resetting the approval
+for this environment:
+
+```sql
+update app.policy_gates
+   set state = 'unresolved', approved_value = null, approved_by = null,
+       approved_at = null, approval_note = null
+ where gate = 'outbound_sending';
+```
+
+To resume, the owner reapproves the gate with the reviewed value and decision note:
+
+```sql
+select app.policy_approve('outbound_sending', '<reviewed-value>'::jsonb,
+                          'israel', '<decision note>');
+```
+
+Eligible, unexpired push work remains pending while paused and can be claimed after reapproval.
+The health view reports push state; it never changes the gate. Do not modify the gate during local
+implementation or demonstrations.

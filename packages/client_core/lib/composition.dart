@@ -105,6 +105,9 @@ Future<List<Override>> compositionOverrides(
     notificationSettingsRepositoryProvider.overrideWithValue(
       SupabaseNotificationSettingsRepository(client),
     ),
+    notificationHealthRepositoryProvider.overrideWithValue(
+      SupabaseNotificationHealthRepository(client),
+    ),
     inboxSignalsProvider.overrideWithValue(
       inboxNudges == null
           ? SupabaseInboxSignals(client)

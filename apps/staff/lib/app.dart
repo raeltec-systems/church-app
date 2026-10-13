@@ -20,6 +20,9 @@ const staffDestinations = <StaffDestination>[
     icon: Icons.science_outlined,
   ),
   (path: ClientPaths.account, label: 'My account', icon: Icons.person_outline),
+  // The destination is discoverable by mapped operators without an Admin
+  // grant; the health read enforces authorization on the server.
+  (path: ClientPaths.notificationHealth, label: 'Reminder health', icon: Icons.monitor_heart_outlined),
 ];
 
 /// Story 2.3: shown while the server grants the caller member access.

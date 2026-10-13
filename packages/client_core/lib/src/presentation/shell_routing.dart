@@ -10,6 +10,7 @@ import 'credential_screens.dart';
 import 'fixture_command_screen.dart';
 import 'fixture_reminder_screens.dart';
 import 'notification_settings_screen.dart';
+import 'notification_health_screen.dart';
 import 'inbox_screen.dart';
 import 'membership_application_screen.dart';
 import 'member_deletion_screens.dart';
@@ -104,6 +105,10 @@ abstract final class ClientPaths {
 
   /// Story 3.7 (both clients): push on or off by reminder category.
   static const notificationSettings = '/notification-settings';
+
+  /// Staff-only reminder health projection; authorization is checked by the
+  /// server for every read.
+  static const notificationHealth = '/admin/reminder-health';
 
   /// Story 3.7, SYNTHETIC (local/staging only): test reminders for the
   /// signed-in member, and one test source (`/fixture/reminders/<id>`, the
@@ -228,6 +233,11 @@ GoRouter buildClientRouter({
         path: ClientPaths.notificationSettings,
         pageBuilder: (_, state) =>
             page(state, const NotificationSettingsScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.notificationHealth,
+        pageBuilder: (_, state) =>
+            page(state, const NotificationHealthScreen()),
       ),
       GoRoute(
         path: ClientPaths.account,

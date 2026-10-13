@@ -5,7 +5,7 @@
 -- refusals, replay and the deletion hook. HTTP evidence: tools/identity-e2e/duties.mjs. Every
 -- account, phone and name here is SYNTHETIC (fictional range +44 7700 900950-900959).
 begin;
-select plan(81);
+select plan(82);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000041' || lpad(n::text, 2, '0'))::uuid $$;
@@ -207,6 +207,12 @@ select is(pg_temp.duties(6, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(
   'forbidden', 'another department''s leader cannot publish for D');
 select is(pg_temp.duties(7, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(), 4)) ->> 'code',
   'forbidden', 'the Pastor oversees but does not publish');
+with c as (insert into app.cells_cells (name, broad_area, is_synthetic, created_by)
+           values ('SYNTHETIC 4.1 Cell', 'SYNTHETIC North', true, 'pgtap 4.1') returning cell_id)
+insert into app.identity_grants (member_id, scope_kind, scope_id, granted_by_operator)
+select pg_temp.mid(9), 'cell_leader', cell_id, 'israel' from c;
+select is(pg_temp.duties(9, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(), 4)) ->> 'code',
+  'forbidden', 'a cell leader gains no department authority');
 select is(pg_temp.duties(2, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(), 9)) -> 'field_errors',
   '{"member_id": "not_in_department"}'::jsonb, 'the assignee must be a current member of the department');
 select is(pg_temp.duties(2, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(), 4,

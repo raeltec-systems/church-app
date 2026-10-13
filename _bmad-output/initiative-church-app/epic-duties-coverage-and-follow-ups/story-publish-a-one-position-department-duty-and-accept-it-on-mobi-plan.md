@@ -3,7 +3,7 @@ title: 'Publish a one-position department duty and accept it on mobile'
 type: 'feature'
 ticket: '1'
 created: '2026-10-13'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '239a701d3adebed22fd7c4699539f74dc02c1d06'
 route: 'full'
 route_source: 'auto'
@@ -68,20 +68,31 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261013200000_duties_department_tracer.sql` -- tables (departments, department members, occurrences, slots, assignments, audit), scope kinds, source + reminder contract, commands, authorizer, reads, deletion hook with stub, privileges.
-- [ ] `supabase/migrations/20261013200100_duties_department_tracer_rows.sql` -- real `duties_deletion_purge_rows`.
-- [ ] `supabase/tests/duties_tracer_test.sql` -- pgTAP for the matrix; extend ledgers in `command_foundation_test.sql`, `notifications_routing_test.sql` (and any test listing deletion owners).
-- [ ] `packages/client_core/lib/src/domain/duties.dart`, `application/duties_controllers.dart`, `presentation/duties_screens.dart`, `adapters/supabase_duties_repository.dart` + exports, providers, composition, fakes, routes, deep link -- client.
-- [ ] `apps/mobile/lib/app.dart`, `apps/staff/lib/app.dart` -- Duties tab (mobile), Departments (Admin) and Duties (leader/Admin/Pastor) sidebar entries.
-- [ ] `packages/client_core/test/duties/duties_test.dart`, app tests -- wire parsing, publish/respond flows, unknown outcome.
-- [ ] `tools/identity-e2e/duties.mjs` + `duties.test.mjs` -- local E2E of the verify.
-- [ ] `docs/runbooks/duties.md` (+ links in `contracts-and-owner-seams.md`) -- model, commands, reads, local runs, hosted steps, owner manual checks.
+- [x] `supabase/migrations/20261013200000_duties_department_tracer.sql` -- tables (departments, department members, occurrences, slots, assignments, audit), scope kinds, source + reminder contract, commands, authorizer, reads, deletion hook with stub, privileges.
+- [x] `supabase/migrations/20261013200100_duties_department_tracer_rows.sql` -- real `duties_deletion_purge_rows`.
+- [x] `supabase/tests/duties_tracer_test.sql` -- pgTAP for the matrix; extend ledgers in `command_foundation_test.sql`, `notifications_routing_test.sql` (and any test listing deletion owners).
+- [x] `packages/client_core/lib/src/domain/duties.dart`, `application/duties_controllers.dart`, `presentation/duties_screens.dart`, `adapters/supabase_duties_repository.dart` + exports, providers, composition, fakes, routes, deep link -- client.
+- [x] `apps/mobile/lib/app.dart`, `apps/staff/lib/app.dart` -- Duties tab (mobile), Departments (Admin) and Duties (leader/Admin/Pastor) sidebar entries.
+- [x] `packages/client_core/test/duties/duties_test.dart`, app tests -- wire parsing, publish/respond flows, unknown outcome.
+- [x] `tools/identity-e2e/duties.mjs` + `duties.test.mjs` -- local E2E of the verify.
+- [x] `docs/runbooks/duties.md` (+ links in `contracts-and-owner-seams.md`) -- model, commands, reads, local runs, hosted steps, owner manual checks.
 
 **Acceptance Criteria:**
 - Given the local stack, when the E2E runs, then Admin creates `SYNTHETIC Preaching Rota`, grants a leader, adds a member, the leader publishes, the worker delivers one inbox item whose open target is `/duties/assignments/<id>`, the member accepts, and the leader board shows Accepted; another member, a non-leader and direct table queries are refused.
 - Given the full local verification, when run, then db:test, db:smoke, every E2E, contracts, offline tool tests, flutter analyze/test, secrets, migrations and function-imports checks pass.
 
 ## Implementation Notes
+
+- Implemented directly (no implementation subagent is available inside this builder run).
+- Server: `supabase/migrations/20261013200000_duties_department_tracer.sql` (+ `20261013200100_duties_department_tracer_rows.sql`). State vocabularies go through `app.duties_state_ok(kind, value)` in CHECK constraints so 4.2+ widen them by `create or replace` (a widened inline CHECK would need a DROP CONSTRAINT, which hosted migrations forbid). Department membership rows carry `started_at`/`ended_at` with a partial unique index so entry 12 can end memberships without a schema change.
+- The command success envelope has no `aggregate_type`; `publish_duty` answers the leader view of the occurrence plus `notice_queued` (false when the assignee is under deletion and Notifications skipped the job).
+- Replay recheck (`app.duties_in_scope`) is real, not existence-only: department = Admin, occurrence = a current manager of its department, assignment = its assignee. A leader whose scope was revoked gets `forbidden` even for a replay (pgTAP).
+- Ledgers extended: `command_foundation_test.sql` (authenticated EXECUTE list: the four duties pairs), `notifications_routing_test.sql` (deletion check now `cells=0,duties=0,fixture=0,notifications=0`), `identity_grants_test.sql` (scope kinds outside cells and duties). New `supabase/tests/duties_tracer_test.sql` (82 checks).
+- Clients: `packages/client_core/lib/src/{domain/duties.dart, application/duties_controllers.dart, presentation/duties_screens.dart, adapters/supabase_duties_repository.dart}`, routes `/duties`, `/duties/assignments/:id`, `/duties/leader`, `/admin/departments`, deep-link pattern added; mobile **Duties** tab; staff **Duties** (leader/deputy/Admin/Pastor) and **Departments** (Admin). Tests: `packages/client_core/test/duties/duties_test.dart`, one test each in `apps/mobile/test/mobile_app_test.dart` and `apps/staff/test/staff_app_test.dart`.
+- Staff time entry is `YYYY-MM-DD` + `HH:MM` in the computer's local time (church time on a staff computer in Zambia); instants travel as UTC.
+- E2E: `tools/identity-e2e/duties.mjs` (12 checks, D01-D41) with offline `duties.test.mjs`; evidence `evidence-4.1/duties-e2e.jsonl`. Fictional numbers: pgTAP `+44 7700 900950-900959`, E2E `900960-900969`.
+- Runbook: `docs/runbooks/duties.md` (owner manual checks, hosted steps); links added in `contracts-and-owner-seams.md` and `identity-access.md`.
+- Matrix audit: every row has a covering pgTAP check (`duties_tracer_test.sql`); publish/inbox/accept/refusals/direct-table rows also run over HTTP in the E2E.
 
 ## Plan Change Log
 
@@ -102,4 +113,6 @@ context:
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/ccr-93e730dd-89lbvg && npm run -s ci:function-imports` -- expected: pass
 
 **Manual checks (if no CLI):**
-- Owner staging walkthrough in `docs/runbooks/duties.md` (story 4.1 owner checks).
+- Parent session: apply `20261013200000_duties_department_tracer.sql` to staging (`tmurpotfluignacfueki`) after `20261013194009`, run `tools/ci/verify-hosted.sql` (`expected_env=staging`). No Edge Function change.
+- Owner: paste `20261013200100_duties_department_tracer_rows.sql` in the staging SQL editor (replaces the fail-closed purge stub); check `pg_get_functiondef('app.duties_deletion_purge_rows(uuid)'::regprocedure)` contains `delete from app.duties_department_members`.
+- Owner staging walkthrough (`docs/runbooks/duties.md`, "Owner manual checks", steps 1-9): Admin creates `SYNTHETIC Preaching Rota` and gives a leader on staff web; members added; leader publishes a duty with an answer-by time; the member's phone Inbox shows **New duty assigned** within a minute and opens the duty; **Accept** goes Sending… then Accepted (airplane mode shows Not sent); the leader's staff web shows Accepted, "1 of 1 confirmed" and the note; another member, a non-leader and a direct table query are refused; optional Pastor read-only view; clean up. Record in `evidence-4.1/owner-check.md`.

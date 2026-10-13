@@ -28,7 +28,7 @@
 --     members and the approved members to choose from).
 --   * Content-free audit app.duties_audit (ids, codes, revisions).
 --   * Deletion hook app.duties_erase_member: department memberships are deleted (row deletion in
---     20261013200100_duties_department_tracer_rows.sql; the stub here fails closed), assignments
+--     20261013220300_duties_department_tracer_rows.sql; the stub here fails closed), assignments
 --     and audit rows are kept as anonymous facts (nil UUID, note cleared).
 --
 -- State vocabularies are checked by app.duties_state_ok(kind, value) instead of inline CHECK
@@ -1257,7 +1257,7 @@ comment on function api.duties_admin_overview() is
 -- Deletion hook (story 2.11 contract) and its fail-closed row stub
 -- ---------------------------------------------------------------------------------------------
 
--- The member's department memberships: replaced by 20261013200100_duties_department_tracer_rows.sql.
+-- The member's department memberships: replaced by 20261013220300_duties_department_tracer_rows.sql.
 -- Returns the number of rows removed.
 create function app.duties_deletion_purge_rows(p_member_id uuid)
 returns integer

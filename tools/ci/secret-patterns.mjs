@@ -5,11 +5,11 @@
 // mode "bundle": built client output. Additionally flags ANY JWT and the literal service_role:
 //                clients may only carry the project URL and a publishable (sb_publishable_) key.
 
-// Story 1.9 system credential: `sysc_<environment>_<43 base64url chars>` (256 random bits). The one
-// definition of its shape: tools/ops/system-credential.mjs derives its token check and its scrubber
-// from it, so the scan, the validator and the redaction cannot drift apart. (Migration
-// 20261003154040_bounded_system_access.sql holds the same shape in SQL and is immutable.)
-export const SYSTEM_CREDENTIAL_PATTERN = 'sysc_(local|staging|production)_[A-Za-z0-9_-]{43}';
+import { SYSTEM_CREDENTIAL_PATTERN } from '../../packages/shared_runtime/system_access.mjs';
+
+// Story 1.9 system credential: `sysc_<environment>_<43 base64url chars>` (256 random bits).
+// The shared runtime module is the canonical source; keep this re-export for scanner callers.
+export { SYSTEM_CREDENTIAL_PATTERN };
 
 const JWT_RE = /\beyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g;
 

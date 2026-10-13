@@ -20,11 +20,11 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SYSTEM_CREDENTIAL_PATTERN } from '../ci/secret-patterns.mjs';
+import { SYSTEM_CREDENTIAL_PATTERN, SYSTEM_CREDENTIAL_RE } from '../../packages/shared_runtime/system_access.mjs';
 import { ENVIRONMENT_NAMES, loadEnvironments } from '../env/environments.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-export const TOKEN_RE = new RegExp(`^${SYSTEM_CREDENTIAL_PATTERN}$`);
+export const TOKEN_RE = SYSTEM_CREDENTIAL_RE;
 export const PROBE = 'system.synthetic_probe';
 
 export function stateDir() {

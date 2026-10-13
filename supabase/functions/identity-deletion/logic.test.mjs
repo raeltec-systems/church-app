@@ -55,7 +55,9 @@ test('the fence answer never passes an account id on', () => {
 test('bodies, keys and envelopes', () => {
   assert.equal(declaredTooLarge(null), false);
   assert.equal(declaredTooLarge('512'), false);
-  assert.equal(declaredTooLarge('4096'), true);
+  assert.equal(declaredTooLarge('1023'), false);
+  assert.equal(declaredTooLarge('1024'), false);
+  assert.equal(declaredTooLarge('1025'), true);
   assert.equal(declaredTooLarge('1e3'), true);
   assert.deepEqual(keyHeaders('sb_publishable_x'), { apikey: 'sb_publishable_x' });
   assert.deepEqual(keyHeaders('eyJabc'), { apikey: 'eyJabc', authorization: 'Bearer eyJabc' });

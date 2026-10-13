@@ -1,10 +1,20 @@
 // Pure rules of the identity-deletion Edge Function (story 2.11, AD-14, AD-19).
-// Shared by the Deno function and the Node tests: no imports, no I/O, no logging.
+// Shared by the Deno function and the Node tests: only imports runtime-neutral shared primitives,
+// with no I/O or logging.
+
+import {
+  SYSTEM_CREDENTIAL_RE,
+  UUID_RE,
+  credentialFrom as sharedCredentialFrom,
+  declaredTooLarge as sharedDeclaredTooLarge,
+  keyHeaders,
+  systemEnvelope,
+} from '../../../packages/shared_runtime/system_access.mjs';
 
 export const MAX_BODY_BYTES = 1024;
-export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export { UUID_RE };
 /** A 1.9 system credential (the worker's, purpose identity_deletion). Never stored or logged here. */
-export const CREDENTIAL_RE = /^sysc_(local|staging|production)_[A-Za-z0-9_-]{43}$/;
+export const CREDENTIAL_RE = SYSTEM_CREDENTIAL_RE;
 
 /**
  * Validates the worker's body: {action: "auth_delete", deletion_id}. Returns {ok: true, value}
@@ -19,26 +29,9 @@ export function parseBody(body) {
 }
 
 /** The caller's system credential header, or null when missing or malformed. */
-export function credentialFrom(header) {
-  return typeof header === 'string' && CREDENTIAL_RE.test(header) ? header : null;
-}
-
-/** A Content-Length header that already announces more than MAX_BODY_BYTES (or is malformed). */
-export function declaredTooLarge(header) {
-  if (header === null || header === undefined) return false;
-  if (!/^[0-9]{1,15}$/.test(String(header).trim())) return true;
-  return Number(header) > MAX_BODY_BYTES;
-}
-
-/**
- * Headers for a platform key: a legacy JWT key goes in both `apikey` and `Authorization`; a new
- * `sb_publishable_`/`sb_secret_` key only in `apikey` (the gateway maps it to its role).
- */
-export function keyHeaders(key) {
-  const headers = { apikey: key };
-  if (typeof key === 'string' && key.startsWith('eyJ')) headers.authorization = `Bearer ${key}`;
-  return headers;
-}
+export const credentialFrom = sharedCredentialFrom;
+export const declaredTooLarge = (header) => sharedDeclaredTooLarge(header, MAX_BODY_BYTES);
+export { keyHeaders, systemEnvelope };
 
 /**
  * What the Auth Admin user deletion did, as far as the function can tell:
@@ -65,9 +58,4 @@ export function beginOutcome(data) {
 /** The worker-facing outcome of the completion step. */
 export function completeOutcome(data) {
   return ['done', 'retry', 'not_next', 'not_found'].includes(data?.outcome) ? data.outcome : 'retry';
-}
-
-/** A system-route envelope for one allowlisted command (no expected_revision). */
-export function systemEnvelope(command, payload, requestId) {
-  return { version: 1, command, request_id: requestId, payload };
 }

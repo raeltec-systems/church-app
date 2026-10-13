@@ -154,6 +154,10 @@ test('the clients send the credential only as a header and never a service key',
   assert.ok(seen.every((s) => s.headers['x-system-credential'] === credential && s.headers.apikey === 'sb_publishable_x'
     && !('authorization' in s.headers) && !JSON.stringify(s.body).includes(credential)));
   assert.deepEqual(seen[1].body, { action: 'auth_delete', deletion_id: D });
+  const legacy = systemClient({ url: 'http://127.0.0.1:54321', publishableKey: 'eyJlegacy', credential, fetchImpl });
+  await legacy('identity.deletion_queue', {});
+  assert.equal(seen[2].headers.apikey, 'eyJlegacy');
+  assert.equal('authorization' in seen[2].headers, false);
   assert.throws(() => systemClient({ url: 'x', publishableKey: 'k', credential: 'nope' }), /malformed/);
   const down = authClient({ functionUrl: 'http://x', publishableKey: 'k', credential, fetchImpl: async () => { throw new Error('ECONNREFUSED'); } });
   assert.equal(await down(D), 'unreachable');

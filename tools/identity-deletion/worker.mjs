@@ -32,10 +32,10 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { DriveJournal, DriveRestClient, LocalSegmentJournal } from '../recovery/journal.mjs';
+import { SYSTEM_CREDENTIAL_RE, UUID_RE, systemEnvelope } from '../../packages/shared_runtime/system_access.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-export const CREDENTIAL_RE = /^sysc_(local|staging|production)_[A-Za-z0-9_-]{43}$/;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const CREDENTIAL_RE = SYSTEM_CREDENTIAL_RE;
 
 /** Deep equality of the opaque fields that identify a journal entry (kind, subject, object). */
 export function sameEntry(entry, fields) {
@@ -128,7 +128,7 @@ export function systemClient({ url, publishableKey, credential, fetchImpl = glob
       method: 'POST',
       headers: { apikey: publishableKey, 'content-type': 'application/json', 'content-profile': 'api',
         'x-system-credential': credential },
-      body: JSON.stringify({ version: 1, command, request_id: randomUUID(), payload }),
+      body: JSON.stringify(systemEnvelope(command, payload, randomUUID())),
     });
     const json = await res.json().catch(() => null);
     if (!res.ok || !json || json.code) throw new Error(`system route refused ${command}: ${json?.code ?? `HTTP ${res.status}`}`);

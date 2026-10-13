@@ -59,7 +59,8 @@ test('only the configured trigger starts a run, compared in constant time', () =
 
 test('size, key headers and the envelope', () => {
   assert.equal(declaredTooLarge(null), false);
-  assert.equal(declaredTooLarge('100'), false);
+  assert.equal(declaredTooLarge('255'), false);
+  assert.equal(declaredTooLarge('256'), false);
   assert.equal(declaredTooLarge('257'), true);
   assert.equal(declaredTooLarge('12x'), true);
   assert.deepEqual(keyHeaders('sb_publishable_x'), { apikey: 'sb_publishable_x' });

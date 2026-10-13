@@ -1,11 +1,19 @@
 // Pure rules and the run loop of the notifications-worker Edge Function (story 3.4; AD-8,
-// AD-17, AD-19). Shared by the Deno function and the Node tests: no imports, no I/O of its own
-// (the system-route call and the clock are injected), no logging.
+// AD-17, AD-19). Shared by the Deno function and the Node tests: only imports runtime-neutral
+// shared primitives, does no I/O of its own (the system-route call and clock are injected), no logging.
+
+import {
+  SYSTEM_CREDENTIAL_RE,
+  UUID_RE as SHARED_UUID_RE,
+  declaredTooLarge as sharedDeclaredTooLarge,
+  keyHeaders,
+  systemEnvelope,
+} from '../../../packages/shared_runtime/system_access.mjs';
 
 export const MAX_BODY_BYTES = 256;
-export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const UUID_RE = SHARED_UUID_RE;
 /** The worker's 1.9 system credential (Edge secret). Never logged or returned. */
-export const CREDENTIAL_RE = /^sysc_(local|staging|production)_[A-Za-z0-9_-]{43}$/;
+export const CREDENTIAL_RE = SYSTEM_CREDENTIAL_RE;
 /** The scheduler's trigger token (Vault + Edge secret): it can only start one run. */
 export const TRIGGER_RE = /^nwt_[0-9a-f]{64}$/;
 /** Wall-clock budget of one run; the lease (from the claim) bounds it further. */
@@ -56,23 +64,8 @@ export function triggerMatches(header, expected) {
 }
 
 /** A Content-Length header that already announces more than MAX_BODY_BYTES (or is malformed). */
-export function declaredTooLarge(header) {
-  if (header === null || header === undefined) return false;
-  if (!/^[0-9]{1,15}$/.test(String(header).trim())) return true;
-  return Number(header) > MAX_BODY_BYTES;
-}
-
-/** Headers for a platform key (legacy JWT keys also go in Authorization). */
-export function keyHeaders(key) {
-  const headers = { apikey: key };
-  if (typeof key === 'string' && key.startsWith('eyJ')) headers.authorization = `Bearer ${key}`;
-  return headers;
-}
-
-/** A system-route envelope for one allowlisted command (no expected_revision). */
-export function systemEnvelope(command, payload, requestId) {
-  return { version: 1, command, request_id: requestId, payload };
-}
+export const declaredTooLarge = (header) => sharedDeclaredTooLarge(header, MAX_BODY_BYTES);
+export { keyHeaders, systemEnvelope };
 
 /**
  * Validates a claim answer: {jobs: [{job_id, lease_token}], claimed, reclaimed, expired,

@@ -26,6 +26,10 @@ test('Story 3.10 personal-data scan rejects identifiers and contact details', ()
       'reached +1 (202) 555-0101',
       '| Android | pass | Jordan Example |',
       'Checked by Mary Banda on Android.',
+      // Local formats without a country code, and a label without a separator.
+      'phone 0971234567',
+      'called 097 123 4567',
+      'reached 0977-123-456',
     ];
 
     for (const value of cases) {

@@ -173,15 +173,19 @@ as $$
 declare
   v_settings app.notifications_worker_settings := app.notifications_worker_config();
   v_data jsonb;
+  -- Read the gate once: the limit and the gate_closed flag come from the same answer, so a gate
+  -- closing mid-call can never yield leased jobs together with gate_closed.
+  v_open boolean := app.policy_is_open('outbound_sending');
 begin
-  if coalesce((p_payload ->> 'expire_only')::boolean, false) then
+  if not v_open or coalesce((p_payload ->> 'expire_only')::boolean, false) then
+    -- Expiry and lapse counting only; nothing is leased.
     v_data := app.notifications_push_claim(p_principal, p_request, 0);
   else
     v_data := app.notifications_push_claim(
       p_principal, p_request, least(coalesce((p_payload ->> 'limit')::numeric::integer,
         v_settings.batch_max), v_settings.batch_max));
   end if;
-  if not app.policy_is_open('outbound_sending') then
+  if not v_open then
     v_data := v_data || '{"gate_closed": true}'::jsonb;
   end if;
   return jsonb_build_object('data', v_data);

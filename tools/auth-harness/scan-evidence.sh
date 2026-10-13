@@ -67,8 +67,10 @@ if [ "$personal_data" = true ]; then
     '\+[1-9](?:[ .()-]{0,2}[0-9]){7,16}\b'
     '\b[2-9][0-9]{2}[-. ][2-9][0-9]{2}[-. ][0-9]{4}\b'
     '\([2-9][0-9]{2}\)[ .-]?[2-9][0-9]{2}[ .-][0-9]{4}\b'
-    # Any ordinary number written in a labeled phone field.
-    '(?i)\b(phone|telephone|mobile|cell)([ _-]+(number|no))?\s*[:=]\s*\+?[0-9][0-9 ()-]{5,}[0-9]'
+    # Local-format numbers without a country code (0971234567, 097 123 4567).
+    '\b0[1-9][0-9](?:[ .-]?[0-9]){6,7}\b'
+    # Any ordinary number written in a phone field, with or without a separator after the label.
+    '(?i)\b(phone|telephone|mobile|cell)([ _-]+(number|no))?\s*[:=]?\s*\+?[0-9][0-9 ()-]{5,}[0-9]'
     # Email addresses, including owner and member addresses.
     '\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
     # Unlabeled names: two adjacent capitalized words unless both are known product, platform or

@@ -4,7 +4,7 @@
 -- fake FCM endpoint in tools/identity-e2e/push.mjs. Every account here is SYNTHETIC
 -- (+44 7700 900900-900909); device tokens are synthetic.
 begin;
-select plan(108);
+select plan(109);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000360' || lpad(n::text, 2, '0'))::uuid $$;
@@ -510,6 +510,12 @@ update app.policy_gates set state = 'unresolved', approved_value = null, approve
 select is(pg_temp.sys('notifications.push_claim', '{}', gen_random_uuid()) -> 'data' ->> 'gate_closed',
   'true', 'outbound_sending closed prevents push claims');
 select is((pg_temp.claim() ->> 'claimed')::int, 0, 'the internal claim function also honors the closed gate');
+select ok((select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+            where n.nspname = 'app' and p.proname = 'notifications_sys_push_claim'
+              and p.prosrc ~ 'v_open boolean := app\.policy_is_open\(''outbound_sending''\)'
+              and p.prosrc ~ 'if not v_open or' and p.prosrc ~ 'if not v_open then'
+              and (select count(*) from regexp_matches(p.prosrc, 'policy_is_open', 'g')) = 1) = 1,
+  'the system claim reads the outbound gate once: a closed gate means limit 0 and gate_closed together');
 select ok(exists (select 1 from app.notifications_push_jobs p
                    join app.notifications_inbox_items i on i.item_id = p.item_id
                   where p.push_job_id = (select id from v where k = 'gate-route')),

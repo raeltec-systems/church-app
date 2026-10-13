@@ -761,6 +761,17 @@ found it in cleanup.
 Nothing of story 3.8 is applied to staging yet (staging's latest migration was `20261008183514`
 on 2026-10-13, and the deployed `notifications-worker` is the pre-refactor version). In order:
 
+0. **Parent session: trial redeploy of `notifications-worker` with `_shared`, before any
+   migration.** Deploy it exactly as in step 3 (MCP `deploy_edge_function`, files `index.ts`,
+   `logic.mjs`, `fcm.mjs` and `../_shared/system_access.mjs`). The refactored worker runs against
+   the 3.7 schema (it only adds the `gate_closed` handling), so this proves the multi-file
+   upload before anything else changes. Boot check: `POST
+   https://tmurpotfluignacfueki.supabase.co/functions/v1/notifications-worker` with `{}` and no
+   trigger answers `401` (a module-not-found shows as a 5xx boot error), and the next scheduler
+   minute still moves `last_claim_at`. If the MCP upload fails to resolve `../_shared/`, use the
+   CLI fallback from step 3 (`npx supabase functions deploy notifications-worker --project-ref
+   tmurpotfluignacfueki --no-verify-jwt`), which bundles `_shared` itself; if both fail, stop and
+   redeploy the previous version from the dashboard before going on.
 1. **Parent session: the migrations, in order.** Apply to staging (`tmurpotfluignacfueki`) with
    the Supabase MCP `apply_migration`: first `20261013000000_notifications_health.sql` (name
    `notifications_health`), then `20261013190000_notifications_health_repair.sql` (name
@@ -776,7 +787,8 @@ on 2026-10-13, and the deployed `notifications-worker` is the pre-refactor versi
    push is in use, the owner approves it as in Story 3.6, Hosted staging, step 7, before or right
    after step 1; until then claims expire push jobs but send nothing (inbox delivery is
    unaffected).
-3. **Parent session: redeploy both functions with the shared module.** Both now import
+3. **Parent session: redeploy both functions with the shared module** (`notifications-worker`
+   again only if step 0 used an older checkout). Both now import
    `supabase/functions/_shared/system_access.mjs`. With the Supabase MCP `deploy_edge_function`
    on `tmurpotfluignacfueki`, `verify_jwt: false`, entrypoint `index.ts`, and file names relative
    to the entrypoint's folder (the connector uploads relative dependencies under those names):

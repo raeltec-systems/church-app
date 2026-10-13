@@ -216,6 +216,17 @@ async function main() {
          from jsonb_populate_record(null::app.policy_gates, '${gateBefore.replace(/'/g, "''")}'::jsonb) r)
      where g.gate = 'outbound_sending';
     select app.policy_is_open('outbound_sending');`);
+  // Registered BEFORE the gate is opened: any setup failure, uncaught error or Ctrl-C between here
+  // and the cleanup still puts the gate row back (psql is synchronous, so it runs in 'exit').
+  let gateRestored = null;
+  const restoreGateOnce = () => {
+    if (gateRestored === null) gateRestored = restoreGate();
+    return gateRestored;
+  };
+  process.once('exit', () => { try { restoreGateOnce(); } catch { /* reported by the run */ } });
+  for (const sig of ['SIGINT', 'SIGTERM']) {
+    process.once(sig, () => { try { restoreGateOnce(); } finally { process.exit(130); } });
+  }
   psql(`select app.policy_approve('outbound_sending', '{"enabled": true, "scope": "local push e2e"}',
     '${OPERATOR}', 'LOCAL E2E ONLY: push.mjs opens the gate and restores it in cleanup')`);
   log('P00-precondition', { leftover_users_removed: cleanup(), policy_reset: resetPolicy() !== null,
@@ -397,7 +408,7 @@ async function main() {
     fake.server.close();
     rmSync(work, { recursive: true, force: true });
     resetPolicy();
-    const gateOpenAfter = restoreGate();
+    const gateOpenAfter = restoreGateOnce();
     const left = cleanup();
     psql(`select app.sys_revoke_credential('${credentialId}', '${OPERATOR}');
           select app.sys_disable_principal('${principal}', '${OPERATOR}');

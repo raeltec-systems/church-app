@@ -104,6 +104,7 @@ Source: `review-3.8-3.10.md` (findings 1-19, fix plan phases A-D). No new ticket
 - **Runbook:** Story 3.8 rewritten, with a **Hosted staging** section (apply via MCP, gate decision, redeploy `notifications-worker` and `identity-deletion` with `../_shared/system_access.mjs`, checks, owner mapping and demonstration).
 
 **Status `in-review`: pending owner/staging items (finding 15).**
+0. Parent session: trial redeploy of `notifications-worker` with `../_shared/system_access.mjs` before any migration; boot check (401, not 5xx); CLI deploy as the fallback.
 1. Parent session: apply `20261013000000_notifications_health.sql`, then `20261013190000_notifications_health_repair.sql` (contains an owner-approved DROP CONSTRAINT; MCP may ask to confirm) to staging with MCP `apply_migration`, then `verify-hosted.sql` (`expected_env=staging`).
 2. Owner: approve `outbound_sending` on staging (`notifications.md` Story 3.6 step 7) if staging push stays in use.
 3. Parent session: redeploy `notifications-worker` (`index.ts`, `logic.mjs`, `fcm.mjs`, `../_shared/system_access.mjs`) and `identity-deletion` (`index.ts`, `logic.mjs`, `../_shared/system_access.mjs`); confirm no boot error, a fresh claim and `last_success_at` moving, and one accepted synthetic push.

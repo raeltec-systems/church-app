@@ -206,11 +206,11 @@ Unchanged: `duties_in_scope`, `duties_my_duties`, the client grants, deletion. A
 - Parent session: apply the migration to staging and compare per-function md5.
 - Owner: run `docs/runbooks/duties.md`, story 4.5, "Owner manual checks".
 
-**Results (2026-10-14, after the container restart; resumed builder):**
-- db reset 0; db:test PASS (31 files, 2633 tests, including `duties_responses_test.sql` 67); db:smoke pass, no SMS provider.
-- Every E2E `exit=0` (23 scripts), `duties-responses` 12/12. Race V30: bulk first twice (3 accepted, moved date pending again), edit first once (bulk refused whole, 0 accepted).
-- contracts:test 242/0; node tool tests (CI set) 183/0; ci:policy-test 56/0.
-- flutter analyze clean in all three; flutter test client_core 512, apps/staff 35, apps/mobile 49; under `TZ=America/New_York` client_core `test/duties` 84 and apps/mobile 49.
+**Results (2026-10-14, after the review fixes S1-S3 and N1-N10):**
+- db reset 0; db:test PASS (31 files, 2640 tests, including `duties_responses_test.sql` 74); db:smoke pass, no SMS provider.
+- Every E2E `exit=0` (23 scripts), `duties-responses` 12/12. Race V30 `orders_seen` [bulk_first, edit_first]: round 1 bulk first (3 accepted, moved date pending again), rounds 2-3 edit first (bulk refused whole, 0 accepted).
+- contracts:test 242/0; node tool tests (CI set) 184/0; ci:policy-test 56/0.
+- flutter analyze clean in all three; flutter test client_core 516, apps/staff 35, apps/mobile 50; under `TZ=America/New_York` client_core `test/duties` 88 and apps/mobile 50.
 - ci:secrets clean; ci:migrations (`--base origin/main`) ordered, unique, non-destructive; ci:function-imports ok; evidence scan clean.
 - Evidence: `evidence-4.5/duties-responses-e2e.jsonl`, `evidence-4.5/e2e-suite-summary.txt`.
 - Remaining (not builder steps): staging apply and md5 parity (parent session), staging APK rebuild for `share_plus`, owner manual checks in `docs/runbooks/duties.md` story 4.5.

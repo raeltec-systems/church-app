@@ -1,6 +1,6 @@
-Story 4.5 full local verification, 2026-10-14 (worktree branch worktree-agent-a79a1dc45818657ea, LOCAL stack, SYNTHETIC data).
+Story 4.5 full local verification after the review fixes (S1-S3, N1-N10), 2026-10-14 (worktree branch worktree-agent-a79a1dc45818657ea, LOCAL stack, SYNTHETIC data).
 reset=0
-db:test=0 Files=31, Tests=2633, 48 wallclock secs ( 0.60 usr  0.08 sys +  0.56 cusr  0.30 csys =  1.54 CPU) Result: PASS 
+db:test=0 Files=31, Tests=2640, 47 wallclock secs ( 0.56 usr  0.12 sys +  0.51 cusr  0.33 csys =  1.52 CPU) Result: PASS 
 db:smoke=0 ok   - no SMS provider configured
 run exit=0 
 grants exit=0 
@@ -25,12 +25,12 @@ duties-rota exit=0 17/17 checks passed
 duties-overlaps exit=0 13/13 checks passed 
 duties-responses exit=0 12/12 checks passed 
 supabase_auth_church-app: GOTRUE_EXTERNAL_PHONE_ENABLED=false, GOTRUE_SMS_AUTOCONFIRM=true; no SMS provider (LOCAL only)
-pgTAP: supabase/tests/duties_responses_test.sql 67 checks (within the 2633 above)
-duties-responses V30 race: 3 rounds, both orders seen (bulk first: 3 accepted, moved date pending again; edit first: bulk refused whole, 0 accepted)
+pgTAP: supabase/tests/duties_responses_test.sql 74 checks (within the 2640 above)
+duties-responses V30 race: 3 rounds, orders_seen [bulk_first, edit_first] (round 1 bulk_first: 3 accepted, moved date pending again; rounds 2-3 edit_first: bulk refused whole, 0 accepted)
 contracts:test pass 242 fail 0
-node tool tests (CI set) pass 183 fail 0
+node tool tests (CI set) pass 184 fail 0
 ci:policy-test pass 56 fail 0
 ci:secrets clean; ci:migrations --base origin/main: 41 ordered, unique and non-destructive (3 new since base); ci:function-imports ok
 flutter analyze: no issues (packages/client_core, apps/staff, apps/mobile)
-flutter test: client_core 512 passed, apps/staff 35 passed, apps/mobile 49 passed
-TZ=America/New_York: client_core test/duties 84 passed; apps/mobile 49 passed
+flutter test: client_core 516 passed, apps/staff 35 passed, apps/mobile 50 passed
+TZ=America/New_York: client_core test/duties 88 passed; apps/mobile 50 passed

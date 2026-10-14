@@ -16,11 +16,11 @@ routing exit=0 18/18 checks passed
 push exit=0 12/12 checks passed 
 inbox-screens exit=0 12/12 checks passed 
 duties exit=0 13/13 checks passed 
-duties-revisions exit=0 13/13 checks passed (rerun after its job summary was limited to notice kinds; the first run failed R12 only because the 4.8 reminders appeared in it)
+duties-revisions exit=0 13/13 checks passed 
 duties-rota exit=0 17/17 checks passed 
 duties-overlaps exit=0 13/13 checks passed 
 duties-responses exit=0 12/12 checks passed 
 followups exit=0 15/15 checks passed 
 followups-reminders exit=0 12/12 checks passed 
-duties-reminders exit=0 15/15 checks passed 
+duties-reminders exit=0 17/17 checks passed 
 supabase_auth_church-app: GOTRUE_EXTERNAL_PHONE_ENABLED=false, GOTRUE_SMS_AUTOCONFIRM=true; no SMS provider (LOCAL only)

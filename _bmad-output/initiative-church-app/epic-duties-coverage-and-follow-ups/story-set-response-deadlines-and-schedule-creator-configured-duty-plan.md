@@ -127,7 +127,14 @@ context:
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/staff`, `apps/mobile`; `TZ=America/New_York` for `test/duties` and mobile -- expected: pass.
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/main && npm run -s ci:function-imports`; evidence scan -- expected: clean.
 
-**Results (2026-10-14):**
+**Results after the review fixes (2026-10-14):**
+- db reset 0; db:test PASS (35 files, 3053 tests; `duties_reminders_test.sql` 135, `duties_reminders_scale_test.sql` 8 with timings publish 26 = 0.6 s, publish 200 = 4.5 s, accept 50 = 0.57 s under `statement_timeout = '8s'`; the 4.7 Follow-ups files unchanged and passing); db:smoke pass (no SMS provider).
+- Every E2E `exit=0` (25 scripts, reset before each; `duties-reminders` 17/17 incl. D82 race and D85 S1; `followups` 15/15 and `followups-reminders` 12/12 unchanged) (`evidence-4.8/e2e-suite-summary.txt`).
+- contracts:test 242/0; node tool tests (CI set) 200/0; ci:policy-test 56/0.
+- flutter analyze clean in client_core, apps/staff, apps/mobile; flutter test client_core 567 (also under `TZ=America/New_York`), apps/staff 38, apps/mobile 53.
+- ci:secrets clean; ci:migrations (`--base origin/main`) ordered, unique, non-destructive; ci:function-imports ok; migration 2708 lines, ASCII, no backslashes, no DROP/TRUNCATE/`delete from`; evidence scan clean.
+
+**Results at first build (2026-10-14, superseded):**
 - db reset 0; db:test PASS (34 files, 3018 tests, including `duties_reminders_test.sql` 103); db:smoke pass (0 failures, no SMS provider).
 - Every E2E `exit=0` (25 scripts, reset before each; `duties-reminders` 15/15; `duties-revisions` 13/13 after its helper fix) (`evidence-4.8/e2e-suite-summary.txt`).
 - contracts:test 242/0; node tool tests (CI set) 200/0; ci:policy-test 56/0.

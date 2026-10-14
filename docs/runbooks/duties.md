@@ -344,3 +344,98 @@ Record the outcome per step in `evidence-4.3/owner-check.md` (pass/fail, device 
 - Overlap warnings and each candidate's upcoming load arrive with entry 4; default deadlines, Short notice and response or pre-service reminders with entry 8; the coverage queue, position cancellation of one-off duties and leader confirmation with entry 9.
 - A this-and-future edit overwrites the given fields on later dates, including dates changed one at a time before; fields not given keep each date's own value.
 - Series times are on one church-local date: a reporting time must be at or before the start time on the same day, so a duty starting just after midnight with reporting the evening before cannot be expressed in a series (publish it as a one-off duty with instants instead).
+
+## Story 4.4: warn on overlapping duties and record reasoned overrides
+
+Migration: `supabase/migrations/20261014024352_duties_overlaps.sql` (forward only: the 4.1-4.3 files are not edited; no destructive statements, no row deletions, no new `_rows` file; `department_id` on occurrences becomes nullable with `ALTER ... DROP NOT NULL`, which the migration policy allows). New client grant: `api.duties_candidates(...)` and its `app` body (authenticated only). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-warn-on-overlapping-duties-and-record-reasoned-overrides-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.4/`.
+
+### Model
+
+- **Owning scope.** Every occurrence is owned by exactly one department or one cell (`app.duties_occurrences.cell_id`; check `duties_occurrences_one_owner`). No command creates a cell-owned occurrence yet: entry 11 adds the Cells owner operations. Until then cell-owned occurrences exist only as SYNTHETIC fixtures in pgTAP and the local E2E, and My duties lists department-owned duties only.
+- **Commitment.** A current assignment the member has not declined (`pending` or `accepted`) on a published occurrence of any owner. Declined, superseded and cancelled assignments and cancelled occurrences are not commitments.
+- **Busy time** (`app.duties_busy_range`): from the reporting time (or the start) to the end time; with no end time, **two hours** from the start (an adjustable assumption in one function). Ranges are half-open: a duty ending at 10:00 does not overlap one starting at 10:00.
+- **The conflict query** (`app.duties_busy_items(member, range, exclude_slot, department)`): the member's commitments overlapping the range, other than the position itself, plus (when a department is given) the member's planned draft positions in that department. **No conflict never means free**: availability is not collected, and the screens say so.
+- **Override.** Recorded with the assignment: `override_reason` (1-280 characters, the leader's words), `override_overlaps` (how many commitments overlapped), `override_by_member`/`override_by_account` and `override_at`. A planned (draft) position keeps `draft_override_reason` with its planner and time; Publish N copies it into the assignment. Ended assignments keep their override unchanged (only erasure may clear the reason).
+- **Audit:** `overlap_override` with code `overlap` (ids only, never the reason); a draft planned over an overlap is audited `draft_assigned` with code `overlap`.
+
+### The override gate
+
+Every command that creates an assignment for a **new assignee** or with **new times** checks the person's commitments at the new busy time. Per-member transaction advisory locks (member id order, at the membership step of the lock order) serialise concurrent assignments of the same person, so two leaders cannot both skip the warning.
+
+| Command | When it checks | Field |
+|---|---|---|
+| `duties.publish_duty` | always | `override_reason?` |
+| `duties.assign_slot` (published) | the person given the position | `override_reason?` |
+| `duties.assign_slot` (draft) | the planned person, against commitments **and** other planned positions of the department | `override_reason?`, kept on the slot; the same person with a new reason replaces it |
+| `duties.publish_drafts` | every new assignment, after all of them exist (two positions of one person in one publish overlap each other) | the reason planned on each slot |
+| `duties.revise_duty` | assignments re-created with new times or for a new person | `override_reason?` (one for the change) |
+| `duties.revise_series` | likewise, on every date | `override_reason?` (one for the change) |
+
+- An overlap without a reason: `validation_failed {"member_id": "overlap", "override_reason": "required"}`; nothing is written. Series commands also name the first date that needs it (`occurrence:<id>`).
+- With a reason the assignment is made **pending**: the assignee still chooses whether to accept. Notices are the usual ones and never contain the reason.
+- A change that keeps the person and the times (place, duty name) **carries the earlier override forward** without a new check, but only while that person's answer still stands (pending or accepted): asking a member again after they declined is a new commitment and is checked like any other. A reason given when nothing overlaps is not recorded.
+- Cancelling a draft date (this date or this and later dates) clears its planned people and their planned reasons.
+- A reason longer than 280 characters: `{"override_reason": "invalid"}`.
+- Answers add counts only: `override_recorded` (`publish_duty`, `assign_slot`), `overrides` (`publish_drafts`, `revise_duty`, `revise_series`).
+
+### Reads
+
+- `api.duties_candidates(slot_id)`, `(slot_id, starts_at, ends_at?, reporting_at?)` (a position at the new times of an edit; the person's other positions of the same date move with it and count as overlaps) or `(department_id, starts_at, ends_at?, reporting_at?)` (a one-off duty not yet published), named parameters. The department's leader, deputy or an Admin; anyone else (Pastor and members included), an unknown or cell-owned position, or a synthetic department in production: `403 not_granted`; Q4 gate closed: `403 unavailable`; a malformed request: `400 validation_failed`. Answer: `{department_id, slot_id, window: {from, to}, candidates: [{member_id, display_name, account (app_account|no_login), current, upcoming: {total, here}, conflicts: {count, items}}]}` for the department's current active members.
+  - `upcoming`: pending or accepted duties starting in the next 90 days, all owners (`total`) and this department (`here`).
+  - Each conflict item (at most 10, earliest first) is **full** when the caller manages its department (leader, deputy, Admin) or leads or assists its cell: `occurrence_id`, `owner_kind`, `owner_name` (department name; null for a cell, because Duties never reads Cells), `duty_name`, `position_name`, `state` (`published`, or `draft` for a plan of this department), `response`, `starts_at`, `ends_at`, `reporting_at`, `location`, `from`, `to`. Otherwise it is **limited**: `visibility`, `owner_kind` and the busy time `from`/`to` only. Instructions are never part of a conflict. An Admin role alone gives no cell detail, and a synthetic department is never shown in full outside local and staging.
+- `api.duties_leader_board` and `api.duties_rota` add, per current assignment, `overlaps` (how many commitments and planned positions of the department overlap it now; 0 for started or cancelled dates) and `override` (`{reason, overlaps, at, by}`), and per planned person `overlaps` and `override_reason`. Both are shown to the department's managers and Pastor oversight; never to the member, never to another department, and a reader never sees the reason recorded about their own assignment or plan (a leader who also serves). The counts are computed once per read, set-based (`app.duties_overlap_counts`), with the partial index `duties_assignments_member_current`. Measured locally on a seeded rota of 50 series x 52 weekly dates x 3 positions, every position assigned (2,600 dates, 7,800 assignments): all series projected in about 2.9 s (1.6 s without counts) and 200 board duties in about 0.25 s (0.09 s without); the per-position query it replaced took about 49 s.
+
+### Member deletion
+
+`app.duties_erase_member` and `app.duties_deletion_remaining` are replaced: an erased assignee's override reasons are cleared (the fact that an override was recorded stays, anonymous); recorders of overrides and planned reasons are anonymised with the nil UUID; a planned position of the erased member loses its planned reason with the person. No new rows are deleted.
+
+### Clients (staff web)
+
+- **Who** pickers (Publish a duty, Change this duty on a one-position duty, and each position on the Rota page) carry a permanent **Who** label and show every member with their load ("3 upcoming (1 here)") and "overlaps N at this time" on a second line that is never cut off (also in the item's screen-reader label). While times are typed, the check runs after a 400 ms pause. Choosing someone with an overlap shows a warning box listing what the leader may see: their own department's duties in full ("SYNTHETIC Preaching Rota: Evening service (Reader), <date> 10:30 to 11:30, at SYNTHETIC Side room, Accepted"), anyone else's as "Another department's duty, <time>" or "A cell programme part, <time>". A **Why assign them anyway? (required)** field appears, saying it is seen by the department's leaders and Pastor, not the member, and that they still choose whether to accept. With no overlap the picker says "No overlapping duty found ... This does not mean they are free: check with them."
+- If the check could not run, the picker says so and the server still checks: a refusal shows **Overlaps another duty** and the reason field with "Give a reason, or choose someone else". A refused rota change shows a reason field for the change; a refused Publish N names the date with an **Open** button, where the leader re-plans the person with a reason (**Save the reason**).
+- The board shows **Overlaps N other duties** and "Assigned despite an overlap: "..." (leader, time)"; the rota grid and list add "; overlaps N other duties (reason given)" to the position text.
+- Mobile is unchanged: the member never sees the reason.
+
+### Local runs
+
+```bash
+npx supabase db reset
+npm run -s db:test                           # supabase/tests/duties_overlaps_test.sql (+ 4.1-4.3 and the ledgers)
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/duties-overlaps.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+node --test tools/identity-e2e/duties-overlaps.test.mjs
+(cd packages/client_core && flutter test test/duties)
+```
+
+Fictional numbers: pgTAP `+44 7700 900770-900779`, E2E `900760-900769`. The E2E proves real races: two leaders of different departments assign the same member to the same time at once without reasons, three rounds of two one-off duties and one round of a rota position against a one-off duty, and exactly one succeeds each time (with the member lock disabled both succeed, so the check is meaningful). It also proves that asking a member again after they declined (a place change) needs a reason when another department has since given them that time.
+
+### Hosted staging (parent session, then the owner)
+
+1. **Parent session:** apply `20261014024352_duties_overlaps.sql` to staging (`tmurpotfluignacfueki`) after `20261014023442`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. Compare the md5 of each new or replaced `app.duties_*` function body with the local one (the migration has no `\u` escapes, but check). New client grant: `api.duties_candidates(uuid, uuid, timestamptz, timestamptz, timestamptz)` / `app.duties_candidates(...)` (authenticated only). No Edge Function change, no rows file. Checks right after the apply: `select count(*) from app.duties_occurrences where cell_id is not null;` is 0 and `select count(*) from app.duties_assignments where override_at is not null;` is 0.
+2. **Owner:** nothing to paste. Then the manual checks below.
+3. **Production:** nothing in this story (the Q4 gate keeps the reads and commands closed).
+
+### Owner manual checks (staging, phone and web, story 4.4)
+
+Use synthetic members only. You need the 4.1 setup (Admin A, leader L of `SYNTHETIC Preaching Rota`, member M with the app on an Android phone), a second department `SYNTHETIC 4.4 Ushers` with leader U (another synthetic account; as A: **Departments** > add it, **Leader** = U), M added to both departments, and the staff web built against staging.
+
+1. **First duty.** Staff web as U: **Duties** > **Publish a duty** in Ushers: `Sunday ushering`, a Sunday at least three days away, `10:00` to `12:00`, instructions `SYNTHETIC private ushers note`, Who = M, answer-by the day before. Expect **Duty published**.
+2. **The warning, limited.** Staff web as L: **Publish a duty** in Preaching Rota: `Sunday preaching`, the same Sunday, `11:00` to `12:00`. Open **Who**: M shows "1 upcoming (0 here), overlaps 1 at this time". Choose M: the warning box says "M has 1 other duty at that time" and lists "Another department's duty, <date> 10:00 to 12:00" only: no "Ushers", no "Sunday ushering", no place and not the private note. The reason field appears.
+3. **Refused without a reason.** Leave the reason empty, set the answer-by, **Publish**. Expect **Overlaps another duty** and "Give a reason, or choose someone else"; the board shows no new duty.
+4. **Recorded with a reason.** Enter `SYNTHETIC: agreed to arrive after the first hour.` and **Publish**. Expect **Duty published**; the duty shows **Awaiting response**, **Overlaps 1 other duty** and "Assigned despite an overlap: ..." with L's name and the time. On M's phone, **Duties** shows both duties awaiting an answer and no reason anywhere; the inbox item is the usual **New duty assigned**.
+5. **The other team cannot see it.** As U, **Duties**: the ushering duty shows **Overlaps 1 other duty** but no reason and no preaching details.
+6. **No overlap, no warning.** As L, publish another duty for M the same Sunday `12:00` to `13:00`. Choosing M says "No overlapping duty found ... This does not mean they are free" and asks no reason; **Publish** succeeds.
+7. **Rota.** As L, **Rota** > **New rota** for that Sunday only, start `10:30`, end `11:30`, positions `Preacher`; select the date, Who = M: the warning lists the 11:00 preaching duty in full (your department) and the ushering duty as "Another department's duty". **Save plan** without a reason is refused; with a reason the grid reads "Planned: M; overlaps 2 other duties (reason given)". **Publish 1 draft slot** succeeds and the position shows the recorded reason; M is **Awaiting response**.
+8. **Refusals.** A direct `POST /rest/v1/rpc/duties_candidates` (`Content-Profile: api`) with M's token answers 403; with L's token and the Ushers `department_id` also 403.
+9. **Clean up** as in 4.1, step 9, plus the Ushers department and its grants.
+
+Record the outcome per step in `evidence-4.4/owner-check.md` (pass/fail, device model, Android version, browser; no numbers, ids or keys).
+
+### Known limits (later entries)
+
+- Cell-owned occurrences arrive with entry 11 (the Cells owner operations); until then they are fixtures only, and a cell conflict never shows the cell's name (Duties never reads Cells).
+- A duty without an end time is assumed to take two hours; every warning shows the busy time used.
+- An overlap created later by someone else is recorded on the later assignment (with its reason); the earlier one only shows the overlap count.
+- Draft edits (this date or this and later dates on drafts) ask no reason; Publish N checks and names the date.
+- The member never sees the reason; the coverage queue, leader confirmation and the Home "upcoming conflicts" count arrive with entry 9.

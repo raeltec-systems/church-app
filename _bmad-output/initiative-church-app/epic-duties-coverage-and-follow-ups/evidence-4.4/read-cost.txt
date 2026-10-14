@@ -1,0 +1,12 @@
+Story 4.4 read cost (review S1), LOCAL only, one rolled-back transaction, SYNTHETIC data:
+1 department, 40 members, 50 weekly series x 52 dates x 3 positions = 2,600 published dates and
+7,800 pending assignments, analyzed. Timings are psql \timing on the local stack (2026-10-14).
+
+                                             per-position query   set-based counts   4.3 baseline (no counts)
+all 50 series projected (app.duties_series_json)     49.2 s              2.9 s              1.6 s
+200 board duties (app.duties_occurrence_json)         3.4 s              0.25 s             0.09 s
+counts alone, all 50 series                              -               0.65 s               -
+
+Set-based: app.duties_overlap_counts(uuid[]) once per series (rota) or per department (board, its
+200 listed duties), as an init plan, with the partial index duties_assignments_member_current
+(member_id, slot_id) where assignment_state = 'current'.

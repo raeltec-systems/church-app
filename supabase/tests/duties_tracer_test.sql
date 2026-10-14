@@ -119,9 +119,10 @@ select ok(not exists (
    cross join unnest(array['anon', 'authenticated', 'service_role']) r
    where n.nspname in ('app', 'api') and p.proname ~ '^duties_'
      and not (p.proname in ('duties_command', 'duties_my_duties', 'duties_leader_board',
-                            'duties_admin_overview', 'duties_rota') and r = 'authenticated')
+                            'duties_admin_overview', 'duties_rota', 'duties_candidates')
+                  and r = 'authenticated')
      and has_function_privilege(r, p.oid, 'EXECUTE')),
-  'only the command and the reads (with the 4.3 rota) are client-executable, and only by authenticated');
+  'only the command and the reads (with the 4.3 rota and the 4.4 candidates) are client-executable, and only by authenticated');
 select is((select count(*)::int from app.contract_unowned_objects()), 0, 'no unowned objects');
 select is((select count(*)::int from app.contract_unpinned_functions()), 0, 'every function is pinned');
 select is((select count(*)::int from app.contract_boundary_violations()), 0, 'no boundary violations');
@@ -246,7 +247,7 @@ $$ select (r #>> '{data,assignment_id}')::uuid from pub $$;
 select is((select (r ->> 'revision') || '|' || (r #>> '{data,response}') || '|'
                   || (r #>> '{data,notice_queued}') || '|'
                   || (select string_agg(k, ',' order by k) from jsonb_object_keys(r -> 'data') k) from pub),
-  '1|pending|true|assignment_id,assignment_revision,department_id,notice_queued,occurrence_id,response,revision,slot_id',
+  '1|pending|true|assignment_id,assignment_revision,department_id,notice_queued,occurrence_id,override_recorded,response,revision,slot_id',
   'the leader publishes one position with a pending assignment; the answer holds ids and states only');
 select is((select string_agg(job_state || ':' || reminder_kind || ':' || source_revision, ',')
              from app.notifications_jobs where source_type = 'duties_assignment' and source_id = pg_temp.asg()),

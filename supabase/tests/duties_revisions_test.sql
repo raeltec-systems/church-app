@@ -154,9 +154,10 @@ select ok(not exists (
    cross join unnest(array['anon', 'authenticated', 'service_role']) r
    where n.nspname in ('app', 'api') and p.proname ~ '^duties_'
      and not (p.proname in ('duties_command', 'duties_my_duties', 'duties_leader_board',
-                            'duties_admin_overview', 'duties_rota') and r = 'authenticated')
+                            'duties_admin_overview', 'duties_rota', 'duties_candidates')
+                  and r = 'authenticated')
      and has_function_privilege(r, p.oid, 'EXECUTE')),
-  'still only the command and the reads (with the 4.3 rota) are client-executable');
+  'still only the command and the reads (with the 4.3 rota and the 4.4 candidates) are client-executable');
 select is((select count(*)::int from app.contract_unowned_objects()), 0, 'no unowned objects');
 select is((select count(*)::int from app.contract_unpinned_functions()), 0, 'every function is pinned');
 select is((select count(*)::int from app.contract_boundary_violations()), 0, 'no boundary violations');
@@ -227,7 +228,7 @@ create temp table rev as select pg_temp.revise(2, jsonb_build_object(
 create function pg_temp.asg2() returns uuid language sql as $$ select (r #>> '{data,assignment_id}')::uuid from rev $$;
 select is((select (r -> 'data') - 'occurrence_id' - 'slot_id' - 'assignment_id' from rev),
   jsonb_build_object('revision', 2, 'change', 'material', 'slot_revision', 2, 'assignment_revision', 1,
-                     'superseded_assignment_id', pg_temp.asg1(), 'response', 'pending', 'notice_queued', true),
+                     'superseded_assignment_id', pg_temp.asg1(), 'response', 'pending', 'notice_queued', true, 'overrides', 0),
   'a time change is material: a new pending assignment revision; the answer holds ids and states only');
 select isnt(pg_temp.asg2(), pg_temp.asg1(), 'the new revision is a new assignment for the same member');
 select is((select assignment_state || '|' || end_reason || '|' || response || '|' || response_provenance
@@ -314,7 +315,7 @@ create temp table notes as select pg_temp.revise(3, '{"instructions": "Bring a B
 select is((select (r -> 'data') - 'occurrence_id' - 'slot_id' from notes),
   jsonb_build_object('revision', 3, 'change', 'notes', 'slot_revision', 3, 'assignment_id', pg_temp.asg2(),
                      'assignment_revision', 2, 'superseded_assignment_id', null, 'response', 'accepted',
-                     'notice_queued', true),
+                     'notice_queued', true, 'overrides', 0),
   'the deputy''s instructions edit is notes-only: same assignment, still Accepted');
 select is((select response || '|' || revision || '|' || assignment_state from app.duties_assignments
             where assignment_id = pg_temp.asg2()), 'accepted|2|current', 'the acceptance is untouched');

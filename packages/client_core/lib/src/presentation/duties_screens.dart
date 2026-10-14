@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -183,6 +185,13 @@ abstract final class DutyPaths {
           'answer or had accepted get a notice (not those who declined, and '
           'not for drafts); '
           'their earlier answers are kept.',
+    ),
+    DutyNotice.overlapNeedsReason => (
+      StatusTone.warning,
+      'Overlaps another duty',
+      'This person has another duty at that time. Say why they are assigned '
+          'anyway, or choose someone else. They still choose whether to '
+          'accept.',
     ),
     DutyNotice.draftCountChanged => (
       StatusTone.warning,
@@ -1033,6 +1042,19 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
                     _muted(context, 'Details updated ${_when(context, u)}'),
                   if (a.note case final n?)
                     Text('Note: $n', key: Key('note-${a.assignmentId}')),
+                  if (a.overlaps > 0)
+                    StatusLabel(
+                      key: Key('overlaps-${a.assignmentId}'),
+                      label:
+                          'Overlaps ${a.overlaps} other '
+                          '${a.overlaps == 1 ? 'duty' : 'duties'}',
+                      tone: StatusTone.warning,
+                    ),
+                  if (a.override case final o?)
+                    Text(
+                      _overrideText(context, o),
+                      key: Key('override-${a.assignmentId}'),
+                    ),
                 ],
               ),
             if (p.history.isNotEmpty) _History(position: p),
@@ -1159,6 +1181,7 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
   );
   final _deadlineDate = TextEditingController();
   final _deadlineTime = TextEditingController();
+  final _reason = TextEditingController();
   late String? _memberId = widget.duty.memberId;
 
   List<TextEditingController> get _all => [
@@ -1172,6 +1195,7 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
     _instructions,
     _deadlineDate,
     _deadlineTime,
+    _reason,
   ];
 
   @override
@@ -1216,6 +1240,21 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
       instructions: _instructions.text,
       memberId: _memberId,
       responseDeadline: deadline,
+      overrideReason: _reason.text,
+    );
+  }
+
+  /// Story 4.4: the one position at the times entered (its own assignment
+  /// is never its own conflict).
+  CandidateQuery _query() {
+    final slot = widget.duty.positions.first.slotId;
+    final e = _edit();
+    if (e == null) return CandidateQuery.slot(slot);
+    return CandidateQuery.slot(
+      slot,
+      startsAt: e.startsAt,
+      endsAt: e.endsAt,
+      reportingAt: e.reportingAt,
     );
   }
 
@@ -1248,6 +1287,7 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
             'changes',
       'required_reassign' =>
         'The current person can no longer serve: choose who takes this duty',
+      'overlap' => 'Has another duty at that time',
       _ => 'Check this',
     };
     Widget field(
@@ -1347,25 +1387,38 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
             maxLines: 3,
           ),
           if (duty.positions.length == 1)
-            DropdownButton<String>(
-              key: Key('edit-member-$id'),
-              hint: const Text('Who'),
-              value: inRoster ? _memberId : null,
-              isExpanded: true,
-              items: [
-                for (final m in widget.department.members)
-                  DropdownMenuItem(
-                    value: m.memberId,
-                    child: Text(
-                      m.account == AccountStanding.noLogin
-                          ? '${m.displayName} (no login: contact them directly)'
-                          : m.displayName,
-                    ),
-                  ),
-              ],
-              onChanged: widget.busy
-                  ? null
-                  : (v) => setState(() => _memberId = v),
+            ListenableBuilder(
+              listenable: Listenable.merge([
+                _date,
+                _start,
+                _end,
+                _endDate,
+                _reporting,
+              ]),
+              builder: (context, _) => _CandidatePicker(
+                pickerKey: 'edit-member-$id',
+                members: widget.department.members,
+                value: inRoster ? _memberId : null,
+                query: _query(),
+                reason: _reason,
+                busy: widget.busy,
+                reasonError: errors['override_reason'],
+                onChanged: (v) => setState(() => _memberId = v),
+              ),
+            )
+          else if (errors['override_reason'] != null)
+            TextField(
+              key: Key('edit-reason-$id'),
+              controller: _reason,
+              enabled: !widget.busy,
+              maxLength: DutyOverride.maxLength,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText:
+                    'Someone has another duty at the new time. Why keep them? '
+                    '(required)',
+                errorText: 'Give a reason, or change the time',
+              ),
             ),
           if (err('member_id') case final e?)
             Text(e, style: TextStyle(color: ChurchColors.of(context).redFg)),
@@ -1464,6 +1517,7 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
   final _instructions = TextEditingController();
   final _deadlineDate = TextEditingController();
   final _deadlineTime = TextEditingController();
+  final _reason = TextEditingController();
   String? _memberId;
 
   List<TextEditingController> get _all => [
@@ -1477,6 +1531,7 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
     _instructions,
     _deadlineDate,
     _deadlineTime,
+    _reason,
   ];
 
   @override
@@ -1485,6 +1540,31 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// Story 4.4: the busy time entered so far (null until it can be read).
+  CandidateQuery? _query() {
+    final starts = ChurchTime.parse(_date.text, _start.text);
+    if (starts == null) return null;
+    final endDate = _endDate.text.trim().isEmpty ? _date.text : _endDate.text;
+    final ends = _end.text.trim().isEmpty
+        ? null
+        : ChurchTime.parse(endDate, _end.text);
+    final reporting = _reporting.text.trim().isEmpty
+        ? null
+        : ChurchTime.parse(_date.text, _reporting.text);
+    if ((_end.text.trim().isNotEmpty &&
+            (ends == null || !ends.isAfter(starts))) ||
+        (_reporting.text.trim().isNotEmpty &&
+            (reporting == null || reporting.isAfter(starts)))) {
+      return null;
+    }
+    return CandidateQuery.window(
+      departmentId: widget.department.departmentId,
+      startsAt: starts,
+      endsAt: ends,
+      reportingAt: reporting,
+    );
   }
 
   DutyDraft? _draft() {
@@ -1518,6 +1598,7 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
       instructions: _instructions.text,
       memberId: member,
       responseDeadline: deadline,
+      overrideReason: _reason.text,
     );
   }
 
@@ -1537,6 +1618,7 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
       'after_start' => 'Must be before the duty starts',
       'before_start' => 'Must be after the start',
       'not_in_department' => 'Not a member of this department',
+      'overlap' => 'Has another duty at that time',
       _ => 'Check this',
     };
     Widget field(
@@ -1627,23 +1709,24 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
           maxLength: 1000,
           maxLines: 3,
         ),
-        DropdownButton<String>(
-          key: Key('publish-member-$id'),
-          hint: const Text('Who'),
-          value: _memberId,
-          isExpanded: true,
-          items: [
-            for (final m in d.members)
-              DropdownMenuItem(
-                value: m.memberId,
-                child: Text(
-                  m.account == AccountStanding.noLogin
-                      ? '${m.displayName} (no login: contact them directly)'
-                      : m.displayName,
-                ),
-              ),
-          ],
-          onChanged: widget.busy ? null : (v) => setState(() => _memberId = v),
+        ListenableBuilder(
+          listenable: Listenable.merge([
+            _date,
+            _start,
+            _end,
+            _endDate,
+            _reporting,
+          ]),
+          builder: (context, _) => _CandidatePicker(
+            pickerKey: 'publish-member-$id',
+            members: d.members,
+            value: _memberId,
+            query: _query(),
+            reason: _reason,
+            busy: widget.busy,
+            reasonError: errors['override_reason'],
+            onChanged: (v) => setState(() => _memberId = v),
+          ),
         ),
         if (err('member_id') case final e?)
           Text(e, style: TextStyle(color: ChurchColors.of(context).redFg)),
@@ -1984,6 +2067,266 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
             ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Story 4.4: the assignment picker with each person's load and overlaps
+// ---------------------------------------------------------------------------
+
+/// The busy time of a conflict in church time ("18 Oct 2026 10:00 to 12:00").
+String _spanText(BuildContext context, DateTime from, DateTime to) {
+  final a = ChurchTime.wall(from), b = ChurchTime.wall(to);
+  final sameDay = a.year == b.year && a.month == b.month && a.day == b.day;
+  return '${_when(context, from)} to '
+      '${sameDay ? _clock(context, to) : _when(context, to)}';
+}
+
+/// One overlapping duty, saying only what the server disclosed: another
+/// team's duty is a busy time, never its name, place or instructions.
+String _conflictText(BuildContext context, DutyConflict c) {
+  final span = _spanText(context, c.from, c.to);
+  if (!c.full) return '${c.ownerLabel}, $span';
+  final what = c.positionName == null
+      ? c.dutyName
+      : '${c.dutyName} (${c.positionName})';
+  return [
+    '${c.ownerLabel}: $what',
+    span,
+    if (c.location case final l?) 'at $l',
+    if (c.isDraft)
+      'planned, not published'
+    else if (c.response case final r?)
+      r.label,
+  ].join(', ');
+}
+
+/// A recorded override, for the department's readers (never the member).
+String _overrideText(BuildContext context, DutyOverride o) =>
+    'Assigned despite an overlap'
+    '${o.reason == null ? '' : ': "${o.reason}"'}'
+    '${o.by == null ? '' : ' (${o.by}, ${_when(context, o.at)})'}';
+
+/// Who takes a position: the department's members with their upcoming load
+/// and, for the chosen person, the overlapping duties the leader may see.
+/// When the person has another duty at that time (or the server refused for
+/// it), the leader must say why they are assigned anyway; the person still
+/// chooses whether to accept. No overlap found never means "free". A new
+/// query (times being typed) is read after a 400 ms pause.
+class _CandidatePicker extends ConsumerStatefulWidget {
+  const _CandidatePicker({
+    required this.pickerKey,
+    required this.members,
+    required this.value,
+    required this.onChanged,
+    required this.reason,
+    required this.busy,
+    this.query,
+    this.allowNobody = false,
+    this.reasonError,
+  });
+
+  /// The dropdown's key; the reason field and warning use it as a prefix.
+  final String pickerKey;
+  final List<DepartmentMember> members;
+  final String? value;
+  final ValueChanged<String?> onChanged;
+  final TextEditingController reason;
+  final bool busy;
+
+  /// Null while the times cannot be read (no check yet).
+  final CandidateQuery? query;
+  final bool allowNobody;
+
+  /// The server's code for `override_reason` from the last refusal.
+  final String? reasonError;
+
+  @override
+  ConsumerState<_CandidatePicker> createState() => _CandidatePickerState();
+}
+
+class _CandidatePickerState extends ConsumerState<_CandidatePicker> {
+  late CandidateQuery? _query = widget.query;
+  Timer? _debounce;
+
+  @override
+  void didUpdateWidget(_CandidatePicker old) {
+    super.didUpdateWidget(old);
+    if (widget.query == old.query) return;
+    _debounce?.cancel();
+    if (widget.query == null) {
+      _query = null;
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) setState(() => _query = widget.query);
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pickerKey = widget.pickerKey;
+    final members = widget.members;
+    final value = widget.value;
+    final reason = widget.reason;
+    final busy = widget.busy;
+    final reasonError = widget.reasonError;
+    final q = _query;
+    final read = q == null ? null : ref.watch(dutyCandidatesProvider(q));
+    final checks = switch (read) {
+      AsyncData(value: AccessReadOk(:final value)) => value,
+      _ => null,
+    };
+    final failed = switch (read) {
+      AsyncError() => true,
+      AsyncData(value: AccessReadOk()) => false,
+      AsyncData() => true,
+      _ => false,
+    };
+    final chosen = checks?.of(value);
+    final overlapping = chosen?.overlaps ?? false;
+    String name(DepartmentMember m) => m.account == AccountStanding.noLogin
+        ? '${m.displayName} (no login: contact them directly)'
+        : m.displayName;
+    // The load and overlap count stay on their own line (never cut off by
+    // the name) and in the item's screen-reader label.
+    String? load(DepartmentMember m) => switch (checks?.of(m.memberId)) {
+      null => null,
+      final c =>
+        '${c.loadLabel}'
+            '${c.overlaps ? ', overlaps ${c.conflictCount} at this time' : ''}',
+    };
+
+    final (warnBg, warnFg) = toneColors(
+      ChurchColors.of(context),
+      StatusTone.warning,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InputDecorator(
+          decoration: const InputDecoration(
+            labelText: 'Who',
+            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String?>(
+              key: Key(pickerKey),
+              hint: const Text('Choose someone'),
+              value: value,
+              isExpanded: true,
+              itemHeight: null,
+              items: [
+                if (widget.allowNobody)
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('Nobody yet'),
+                  ),
+                for (final m in members)
+                  DropdownMenuItem<String?>(
+                    value: m.memberId,
+                    child: Semantics(
+                      label: [name(m), ?load(m)].join(', '),
+                      excludeSemantics: true,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(name(m), overflow: TextOverflow.ellipsis),
+                          if (load(m) case final l?)
+                            Text(l, style: ChurchType.secondary),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+              onChanged: busy ? null : widget.onChanged,
+            ),
+          ),
+        ),
+        if (read is AsyncLoading)
+          _muted(context, 'Checking their other duties…'),
+        if (failed)
+          Text(
+            'Could not check their other duties. The server still checks '
+            'when you save.',
+            key: Key('$pickerKey-check-failed'),
+          ),
+        if (chosen != null && overlapping)
+          Semantics(
+            liveRegion: true,
+            child: Container(
+              key: Key('$pickerKey-overlaps'),
+              margin: const EdgeInsets.only(top: 6),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: warnBg,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${chosen.displayName} has ${chosen.conflictCount} other '
+                    '${chosen.conflictCount == 1 ? 'duty' : 'duties'} at '
+                    'that time:',
+                    style: TextStyle(
+                      color: warnFg,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  for (final c in chosen.conflicts)
+                    Text(
+                      '- ${_conflictText(context, c)}',
+                      style: TextStyle(color: warnFg),
+                    ),
+                  if (chosen.conflictCount > chosen.conflicts.length)
+                    Text(
+                      'and ${chosen.conflictCount - chosen.conflicts.length} '
+                      'more',
+                      style: TextStyle(color: warnFg),
+                    ),
+                ],
+              ),
+            ),
+          )
+        else if (chosen != null)
+          Text(
+            'No overlapping duty found (${chosen.loadLabel} in the next 90 '
+            'days). This does not mean they are free: check with them.',
+            key: Key('$pickerKey-no-overlap'),
+          ),
+        if (value != null && (overlapping || reasonError != null))
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: TextField(
+              key: Key('$pickerKey-reason'),
+              controller: reason,
+              enabled: !busy,
+              maxLength: DutyOverride.maxLength,
+              maxLines: 2,
+              decoration: InputDecoration(
+                labelText: 'Why assign them anyway? (required)',
+                helperText:
+                    'Seen by this department\'s leaders and Pastor, not by '
+                    'the member. They still choose whether to accept.',
+                helperMaxLines: 2,
+                errorText: switch (reasonError) {
+                  null => null,
+                  'required' => 'Give a reason, or choose someone else',
+                  _ => 'At most ${DutyOverride.maxLength} characters',
+                },
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

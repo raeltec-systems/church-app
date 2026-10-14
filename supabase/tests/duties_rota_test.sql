@@ -257,7 +257,7 @@ create temp table d_future as select pg_temp.duties(3, 'duties.revise_series',
   jsonb_build_object('series_id', (select r #>> '{data,series_id}' from gen2), 'from_occurrence_id', pg_temp.g2(1),
                      'start_time', '18:30', 'topic', 'SYNTHETIC Prayer')) as r;
 select is((select (r -> 'data') - 'series_id' - 'from_occurrence_id' from d_future),
-  '{"revision": 2, "occurrences": 3, "drafts": 3, "material": 0, "assignments": 0, "notices_queued": 0}'::jsonb,
+  '{"revision": 2, "occurrences": 3, "drafts": 3, "material": 0, "assignments": 0, "notices_queued": 0, "overrides": 0}'::jsonb,
   'this and future on drafts edits them in place without a lead time or a notice');
 
 -- Drafts are hidden from members -----------------------------------------------------------------
@@ -302,7 +302,7 @@ select is(pg_temp.assign(2, 1, 1, pg_temp.mid(4), jsonb_build_object('response_d
             -> 'field_errors', '{"response_deadline": "draft"}'::jsonb, 'a draft takes no answer-by');
 create temp table a1 as select pg_temp.assign(2, 1, 1, pg_temp.mid(4)) as r;
 select is((select (r -> 'data') - 'occurrence_id' - 'slot_id' from a1),
-  '{"revision": 2, "state": "draft", "draft_assigned": true}'::jsonb,
+  '{"revision": 2, "state": "draft", "draft_assigned": true, "override_recorded": false}'::jsonb,
   'the leader plans M as Preacher (ids and states only)');
 select is(pg_temp.assign(3, 1, 2, pg_temp.mid(5), '{}', 1) - 'request_id' - 'message',
   '{"code": "conflict", "field_errors": {}, "current_revision": 2}'::jsonb,
@@ -340,7 +340,7 @@ select is(pg_temp.publish(7, 39, '1 day') ->> 'code', 'forbidden', 'the Pastor c
 create temp table pub_req as select gen_random_uuid() as id;
 create temp table pub as select pg_temp.publish(2, 39, '1 day', null, (select id from pub_req)) as r;
 select is((select (r -> 'data') - 'series_id' from pub),
-  '{"revision": 2, "occurrences": 13, "slots": 39, "assignments": 9, "notices_queued": 9}'::jsonb,
+  '{"revision": 2, "occurrences": 13, "slots": 39, "assignments": 9, "notices_queued": 9, "overrides": 0}'::jsonb,
   'publishing 39 draft slots creates 9 assignments with one notice each (counts only)');
 select is((select count(*) filter (where occurrence_state = 'published')::int
              from app.duties_occurrences where series_id = pg_temp.sr()), 13, 'every occurrence is published');
@@ -414,7 +414,7 @@ create temp table this1 as select pg_temp.duties(2, 'duties.revise_duty', pg_tem
   'starts_at', app.cmd_utc(app.duties_wall(pg_temp.sunday(1), '09:00', 'Africa/Lusaka')),
   'response_deadline', app.cmd_utc(app.duties_wall(pg_temp.sunday(1) - 1, '09:00', 'Africa/Lusaka')))) as r;
 select is((select r #>> '{data,change}' from this1), 'material', 'changing one occurrence''s time is material');
-select is((select string_agg(assignment_state || ':' || response, ',' order by s.position_no, a.assigned_at)
+select is((select string_agg(assignment_state || ':' || response, ',' order by s.position_no, a.assigned_at, a.assignment_state desc)
              from app.duties_assignments a join app.duties_slots s using (slot_id) where s.occurrence_id = pg_temp.o(2)),
   'superseded:pending,current:pending,superseded:accepted,current:pending',
   'every position of the occurrence is revised together; the kept acceptance stays in history');
@@ -464,7 +464,7 @@ select is(pg_temp.future(2, 5, '{"start_time": "10:00"}') -> 'field_errors', '{"
   'a started occurrence cannot be the anchor');
 create temp table fut as select pg_temp.future(2, 3, '{"start_time": "10:00", "deadline_before": "2 days"}') as r;
 select is((select (r -> 'data') - 'series_id' - 'from_occurrence_id' from fut),
-  '{"revision": 3, "occurrences": 10, "drafts": 0, "material": 10, "assignments": 4, "notices_queued": 4}'::jsonb,
+  '{"revision": 3, "occurrences": 10, "drafts": 0, "material": 10, "assignments": 4, "notices_queued": 4, "overrides": 0}'::jsonb,
   'this and future changes the anchor and the 10 later occurrences that have not started (counts only)');
 select is((select count(*)::int from app.duties_occurrences where series_id = pg_temp.sr()
             and to_char(starts_at at time zone 'Africa/Lusaka', 'HH24:MI') = '10:00'), 10,

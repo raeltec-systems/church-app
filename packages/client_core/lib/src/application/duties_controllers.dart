@@ -71,6 +71,10 @@ enum DutyNotice {
   /// Story 4.3: only the linked-event reference changed (no notice).
   referenceUpdated,
 
+  /// Story 4.4: the person has another duty at that time; a reason is
+  /// needed to assign them anyway.
+  overlapNeedsReason,
+
   /// The duty was already answered.
   alreadyAnswered,
 
@@ -287,6 +291,8 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
       ErrorCode.conflict when f['slot_count'] == 'changed' =>
         DutyNotice.draftCountChanged,
       ErrorCode.conflict => DutyNotice.changedElsewhere,
+      ErrorCode.validationFailed when f['override_reason'] == 'required' =>
+        DutyNotice.overlapNeedsReason,
       ErrorCode.validationFailed when f['assignment_id'] == 'started' =>
         DutyNotice.started,
       ErrorCode.validationFailed when f['occurrence_id'] == 'started' =>
@@ -330,6 +336,8 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
     if (!_current(epoch)) return;
     switch (outcome) {
       case CommandConfirmed(:final success):
+        // Story 4.4: loads and overlaps changed; pickers read them again.
+        ref.invalidate(dutyCandidatesProvider);
         state = state.copyWith(
           clearPending: true,
           clearUnconfirmed: true,
@@ -342,6 +350,7 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
         }
         await _reload(epoch);
       case CommandRefused(:final error):
+        ref.invalidate(dutyCandidatesProvider);
         final notice = _refusal(error);
         state = state.copyWith(
           clearPending: true,
@@ -477,13 +486,15 @@ class DutyRotaController extends DutiesController<DutyRota> {
   );
 
   /// A draft position: [memberId] is the planned person (null clears). A
-  /// published position needs [lead] for the answer-by time.
+  /// published position needs [lead] for the answer-by time. Story 4.4:
+  /// [overrideReason] when the person has another duty at that time.
   Future<void> assignSlot(
     RotaOccurrence occurrence,
     RotaPosition position,
     String? memberId, {
     String? lead,
     String? subject,
+    String? overrideReason,
   }) => send(DutyCommands.assignSlot, Optional.of(occurrence.revision), {
     'slot_id': position.slotId,
     'member_id': memberId,
@@ -492,6 +503,8 @@ class DutyRotaController extends DutiesController<DutyRota> {
         occurrence.times.arriveBy,
         lead,
       ).toUtc().toIso8601String(),
+    if (memberId != null)
+      'override_reason': ?DutyOverride.clean(overrideReason),
   }, subject ?? position.label);
 
   /// "Publish N draft slots": N is what the leader confirmed; the server
@@ -557,3 +570,13 @@ final myDutiesProvider =
     NotifierProvider<MyDutiesController, DutiesState<MyDuties>>(
       MyDutiesController.new,
     );
+
+/// Story 4.4, staff web: each roster member's upcoming load and the
+/// overlapping duties the caller may see, for a position or a prospective
+/// one-off duty. Read again after every duties command and on an account
+/// change; nothing is kept beyond the screen that shows it.
+final dutyCandidatesProvider = FutureProvider.autoDispose
+    .family<AccessRead<DutyCandidates>, CandidateQuery>((ref, query) {
+      ref.watch(accountGenerationProvider);
+      return ref.read(dutiesRepositoryProvider).fetchCandidates(query);
+    });

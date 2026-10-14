@@ -1,5 +1,6 @@
+Re-verified after the review fixes (B1, B2, S1, S2, N1, N2, N5, N6), 2026-10-14.
 reset=0
-db:test=0 Files=30, Tests=2556 Result: PASS (duties_overlaps_test.sql 93 checks)
+db:test=0 Files=30, Tests=2566 Result: PASS (duties_overlaps_test.sql 103 checks; after review fixes)
 db:smoke=0 ok - no SMS provider configured
 run exit=0
 grants exit=0
@@ -21,7 +22,7 @@ inbox-screens exit=0 12/12 checks passed
 duties exit=0 13/13 checks passed
 duties-revisions exit=0 13/13 checks passed
 duties-rota exit=0 17/17 checks passed
-duties-overlaps exit=0 11/11 checks passed
+duties-overlaps exit=0 13/13 checks passed
 supabase_auth_church-app: GOTRUE_EXTERNAL_PHONE_ENABLED=false, GOTRUE_SMS_AUTOCONFIRM=true; no SMS provider (LOCAL only)
 duties-overlaps V20 race with app.duties_lock_members replaced by a no-op (then reset): FAIL (both succeed) -> the lock is what makes it pass
 contracts:test pass 242 fail 0

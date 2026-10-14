@@ -39,6 +39,22 @@
 -- login is recorded `unrouted` in Notifications (reminder health), and the supervisor still gets
 -- the overdue alert.
 --
+-- Review amendments (2026-10-14, before any merge or apply; this file was edited in place):
+--   B1  reassignment (owner or supervisor) moves schedule_revision, and a recipient whose
+--       schedule of this task ended (reassigned away, inactive) gets a new revision when they
+--       come back, so their reminders are never swallowed by cancelled logical keys;
+--   S1  a supervisor whose alert time for the current deadline has already passed gets one
+--       alert now, unless an alert for that deadline was already delivered to them;
+--   S2  every Follow-ups command, read and owner operation also needs a valid Q2 scheduling
+--       policy (fail closed, `unavailable {"policy": "gate_closed"}`): Q4 needs Q2;
+--   S3  a source schedule's supervisor specs must be `after` the deadline;
+--   N1  a Pastor owner must hold the role AND live access (active link, no hold, no review,
+--       not dormant); the Pastor grant is share-locked on create, open and reassign;
+--   N2  a narrower Q2 policy never fails a command: out-of-policy reminder specs are dropped
+--       at plan time and recorded in the activity (`reminders_adjusted`);
+--   N4  an owner who created or assigned the task to themself gets no assignment notice;
+--   N7  a missing source_revision is never current.
+--
 -- Lock order (AD-2): Identity grants FOR SHARE (authorizer) -> receipt -> task FOR UPDATE ->
 -- Notifications (schedules, jobs) last.
 --
@@ -75,6 +91,71 @@ comment on table app.followups_reminder_schedules is
 
 alter table app.followups_reminder_schedules enable row level security;
 revoke all on table app.followups_reminder_schedules from public, anon, authenticated, service_role;
+
+-- Widened vocabulary (review N2): `reminders_adjusted` records reminder specs a narrower Q2
+-- policy no longer allows (dropped at plan time, never failing the command).
+create or replace function app.followups_state_ok(p_kind text, p_value text)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select p_value is not null and case p_kind
+    when 'task_state' then p_value in ('open', 'in_progress', 'waiting', 'done', 'closed')
+    when 'active_state' then p_value in ('open', 'in_progress', 'waiting')
+    when 'effect' then p_value in ('close', 'keep')
+    when 'source_event' then p_value in ('resolved', 'cancelled')
+    when 'close_code' then p_value in ('manual', 'source_resolved', 'source_cancelled')
+    when 'capacity' then p_value in ('owner', 'supervisor', 'admin', 'source')
+    when 'notes_access' then p_value in ('practical')
+    when 'activity' then p_value in ('created', 'status_changed', 'review_date_set',
+                                     'outcome_recorded', 'next_action_changed', 'note_added',
+                                     'reassigned', 'supervisor_changed', 'closed_by_source',
+                                     'reminders_adjusted')
+    else false end;
+$$;
+
+-- Is a valid Q2 scheduling policy in effect here (review S2)? Never raises.
+create function app.followups_reminders_ready()
+returns boolean
+language plpgsql
+set search_path = ''
+as $$
+begin
+  perform app.notifications_policy();
+  return true;
+exception when sqlstate 'PCMD1' then
+  return false;
+end;
+$$;
+
+-- Review S2: the personal-data gate (Q4) AND the scheduling policy (Q2) for every Follow-ups
+-- command and owner operation. Q4 approval needs Q2 approval; either closed is the same
+-- fail-closed, non-retryable `unavailable {"policy": "gate_closed"}` (nothing is written).
+create or replace function app.followups_require_open()
+returns void
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if not app.identity_applications_open() or not app.followups_reminders_ready() then
+    perform app.cmd_fail('unavailable', '{"policy": "gate_closed"}');
+  end if;
+end;
+$$;
+
+-- The read-side denial: the same two gates (reads answer 403 unavailable).
+create or replace function app.followups_require_open_read()
+returns void
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if not app.identity_applications_open() or not app.followups_reminders_ready() then
+    raise exception using errcode = 'PT403', message = 'unavailable', detail = 'unavailable';
+  end if;
+end;
+$$;
 
 -- ---------------------------------------------------------------------------------------------
 -- Reminder specs
@@ -143,6 +224,11 @@ begin
     perform app.contract_registration_fail(
       'owner and supervisor must be lists of at most 6 {anchor: deadline, before|after} specs');
   end if;
+  -- Review S3: a supervisor alert before the deadline could never be actionable (the alert
+  -- needs the task to be overdue), so it is refused.
+  if exists (select 1 from jsonb_array_elements(p_config -> 'supervisor') e where e ? 'before') then
+    perform app.contract_registration_fail('supervisor specs must be after the deadline');
+  end if;
   if jsonb_typeof(p_config -> 'on_assignment') is distinct from 'boolean' then
     perform app.contract_registration_fail('on_assignment must be a boolean');
   end if;
@@ -180,8 +266,9 @@ begin
     return '{"current": false, "revision": null}'::jsonb;
   end if;
   return jsonb_build_object(
-    'current', app.followups_state_ok('active_state', v_task.task_state)
-               and v_task.schedule_revision = (p_source ->> 'source_revision')::numeric::bigint,
+    'current', coalesce(app.followups_state_ok('active_state', v_task.task_state)
+                        and v_task.schedule_revision = (p_source ->> 'source_revision')::numeric::bigint,
+                        false),
     'revision', v_task.schedule_revision);
 end;
 $$;
@@ -207,7 +294,8 @@ begin
   end if;
   v_active := app.followups_state_ok('active_state', v_task.task_state);
   return jsonb_build_object(
-    'current', v_active and v_task.schedule_revision = (p_key ->> 'source_revision')::numeric::bigint,
+    'current', coalesce(v_active and v_task.schedule_revision = (p_key ->> 'source_revision')::numeric::bigint,
+                        false),
     'revision', v_task.schedule_revision,
     'actionable', v_active and (p_key ->> 'reminder_kind' <> 'followup_overdue'
                                 or app.followups_overdue(v_task)),
@@ -297,35 +385,99 @@ $$;
 -- followup_overdue) and, when p_assigned (a new task or a new owner) and the rules say so, one
 -- assignment notice now. A recipient who is no longer an active member gets nothing (their
 -- reminders are cancelled). Answers counts only.
-create function app.followups_schedule_reminders(p_task_id uuid, p_assigned boolean)
+-- Review N2: the specs a policy still allows (each offset within max_offset, at most
+-- max_reminders, in order); null (the church default) passes through.
+create function app.followups_clamp_specs(p_specs jsonb, p_policy jsonb)
+returns jsonb
+language sql
+stable
+set search_path = ''
+as $$
+  select case when p_specs is null or jsonb_typeof(p_specs) = 'null' then null else coalesce((
+    select jsonb_agg(x.e order by x.ord)
+      from (select e, ord from jsonb_array_elements(p_specs) with ordinality as t(e, ord)
+             where app.notifications_duration_minutes(coalesce(e ->> 'before', e ->> 'after'))
+                   <= app.notifications_duration_minutes(p_policy -> 'value' ->> 'max_offset')
+             order by ord
+             limit (p_policy -> 'value' ->> 'max_reminders')::integer) x), '[]'::jsonb) end;
+$$;
+
+-- (Re)plans an active task's reminders: the owner's schedule (followups_task / followup_due), the
+-- supervisor's alert (followups_supervision / followup_overdue) and, when p_assigned (a new
+-- task or a new owner) and the rules say so, one assignment notice now unless the owner is
+-- p_actor (review N4). A recipient who is no longer an active member gets nothing (their
+-- reminders are cancelled). Review B1: when a recipient's schedule of this task was ended at
+-- the current schedule_revision (reassigned away, inactive) and they are active again, the
+-- revision moves first. Review S1: when the supervisor's alert time for the current deadline
+-- has already passed and no alert for that deadline reached them, one alert is enqueued now.
+-- Review N2: specs a narrower policy no longer allows are dropped and recorded. Counts only.
+create function app.followups_schedule_reminders(p_task_id uuid, p_assigned boolean,
+                                                 p_actor uuid default null)
 returns jsonb
 language plpgsql
 set search_path = ''
 as $$
 declare
   v_task app.followups_tasks;
+  v_policy jsonb;
   v_rules jsonb;
+  v_owner_specs jsonb;
+  v_sup_specs jsonb;
   v_intent jsonb;
+  v_deadline timestamptz;
   v_owner jsonb;
   v_supervisor jsonb;
   v_assigned jsonb;
+  v_alert jsonb;
+  v_owner_active boolean;
+  v_sup_active boolean;
 begin
   select t.* into v_task from app.followups_tasks t where t.task_id = p_task_id;
   if not found or not app.followups_state_ok('active_state', v_task.task_state) then
     return '{"scheduled": false}'::jsonb;
   end if;
+  v_policy := app.notifications_policy();
+  v_owner_active := app.followups_member_active(v_task.owner_member_id);
+  v_sup_active := app.followups_member_active(v_task.supervisor_member_id);
+  -- B1: a returning recipient gets fresh logical keys.
+  if exists (select 1 from app.notifications_schedules s
+              where s.source_id = v_task.task_id and s.schedule_state = 'ended'
+                and s.source_revision = v_task.schedule_revision
+                and ((s.source_type = 'followups_task' and v_owner_active
+                      and s.recipient_member_id = v_task.owner_member_id)
+                  or (s.source_type = 'followups_supervision' and v_sup_active
+                      and s.recipient_member_id = v_task.supervisor_member_id))) then
+    update app.followups_tasks t set schedule_revision = t.schedule_revision + 1
+     where t.task_id = v_task.task_id
+    returning t.* into v_task;
+  end if;
   v_rules := app.followups_reminder_rules(v_task);
+  v_owner_specs := app.followups_clamp_specs(v_rules -> 'owner', v_policy);
+  v_sup_specs := app.followups_clamp_specs(v_rules -> 'supervisor', v_policy);
+  if v_owner_specs is distinct from nullif(v_rules -> 'owner', 'null'::jsonb)
+     or v_sup_specs is distinct from (v_rules -> 'supervisor') then
+    -- N2: recorded once for the creator's specs (the stored list is narrowed); a source's own
+    -- schedule is narrowed again on each re-plan and recorded each time.
+    if (v_rules ->> 'schedule') = 'custom' then
+      update app.followups_tasks t set reminders = v_owner_specs where t.task_id = v_task.task_id;
+    end if;
+    perform app.followups_activity_event(v_task.task_id, 'reminders_adjusted', null, null, 'source',
+                                         null, null, null, null, null, null, null, null,
+                                         'policy_limit', v_task.revision);
+  end if;
+  v_deadline := case when v_task.task_state = 'waiting' then v_task.review_at else v_task.due_at end;
   v_intent := jsonb_build_object('due_at', app.cmd_utc(v_task.due_at), 'task_state', v_task.task_state)
               || case when v_task.task_state = 'waiting'
                       then jsonb_build_object('review_at', app.cmd_utc(v_task.review_at))
                       else '{}'::jsonb end;
-  if app.followups_member_active(v_task.owner_member_id) then
+  if v_owner_active then
     v_owner := app.notifications_set_schedule(jsonb_build_object(
       'source_type', 'followups_task', 'source_id', v_task.task_id,
       'source_revision', v_task.schedule_revision, 'recipient_member_id', v_task.owner_member_id,
-      'schedule_type', 'task', 'intent', v_intent || jsonb_build_object('reminders', v_rules -> 'owner'),
+      'schedule_type', 'task', 'intent', v_intent || jsonb_build_object('reminders', v_owner_specs),
       'kinds', '{"deadline": "followup_due"}'::jsonb, 'fresh', true));
-    if p_assigned and (v_rules ->> 'on_assignment')::boolean then
+    if p_assigned and (v_rules ->> 'on_assignment')::boolean
+       and v_task.owner_member_id is distinct from p_actor then
       v_assigned := app.notifications_enqueue(jsonb_build_object(
         'source_type', 'followups_task', 'source_id', v_task.task_id,
         'source_revision', v_task.schedule_revision, 'recipient_member_id', v_task.owner_member_id,
@@ -334,13 +486,29 @@ begin
   else
     perform app.followups_cancel_reminders(v_task.task_id, 'followups_task', null, 'owner_inactive');
   end if;
-  if jsonb_array_length(v_rules -> 'supervisor') > 0
-     and app.followups_member_active(v_task.supervisor_member_id) then
+  if jsonb_array_length(v_sup_specs) > 0 and v_sup_active then
     v_supervisor := app.notifications_set_schedule(jsonb_build_object(
       'source_type', 'followups_supervision', 'source_id', v_task.task_id,
       'source_revision', v_task.schedule_revision, 'recipient_member_id', v_task.supervisor_member_id,
-      'schedule_type', 'task', 'intent', v_intent || jsonb_build_object('reminders', v_rules -> 'supervisor'),
+      'schedule_type', 'task', 'intent', v_intent || jsonb_build_object('reminders', v_sup_specs),
       'kinds', '{"deadline": "followup_overdue"}'::jsonb, 'fresh', true));
+    -- S1: the alert time for this deadline has passed (the plan skips past times), and no alert
+    -- for this deadline reached this supervisor: one alert now, once per deadline.
+    if v_deadline <= now()
+       and exists (select 1 from jsonb_array_elements(v_sup_specs) e
+                    where app.notifications_shift(v_deadline, e ->> 'after', 1, v_policy ->> 'zone') <= now())
+       and not exists (
+         select 1 from app.notifications_jobs j
+          where j.source_type = 'followups_supervision' and j.source_id = v_task.task_id
+            and j.recipient_member_id = v_task.supervisor_member_id
+            and j.reminder_kind = 'followup_overdue' and j.scheduled_at >= v_deadline
+            and (j.job_state = 'delivered'
+                 or (j.job_state = 'pending' and j.source_revision = v_task.schedule_revision))) then
+      v_alert := app.notifications_enqueue(jsonb_build_object(
+        'source_type', 'followups_supervision', 'source_id', v_task.task_id,
+        'source_revision', v_task.schedule_revision, 'recipient_member_id', v_task.supervisor_member_id,
+        'reminder_kind', 'followup_overdue', 'scheduled_at', app.cmd_utc(now())));
+    end if;
   else
     perform app.followups_cancel_reminders(v_task.task_id, 'followups_supervision', null,
                                            'no_supervisor_alert');
@@ -349,7 +517,8 @@ begin
     'scheduled', true,
     'owner_entries', coalesce((v_owner ->> 'entries')::integer, 0),
     'supervisor_entries', coalesce((v_supervisor ->> 'entries')::integer, 0),
-    'assigned', coalesce((v_assigned ->> 'created')::boolean, false));
+    'assigned', coalesce((v_assigned ->> 'created')::boolean, false),
+    'overdue_now', coalesce((v_alert ->> 'created')::boolean, false));
 end;
 $$;
 
@@ -366,6 +535,33 @@ $$;
 -- ---------------------------------------------------------------------------------------------
 -- Owner decision Q4 (owner scope): the task's own group, plus the current Pastors
 -- ---------------------------------------------------------------------------------------------
+
+-- Review N1: a Pastor who may be chosen as an owner: holds the role now AND has live access
+-- (an active, reviewed link without an open hold, not dormant). A Pastor's own tasks need the
+-- app; an accountless or held member stays possible only inside the task's own group.
+create function app.followups_pastor_live(p_member_id uuid)
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select app.identity_member_has_role(p_member_id, 'pastor')
+     and app.identity_member_account_label(p_member_id) = 'app_account'
+     and exists (select 1 from app.identity_account_links l
+                  where l.member_id = p_member_id and l.link_state = 'active'
+                    and app.identity_link_dormancy(l.link_id) is null);
+$$;
+
+-- Share-locks a member's live Pastor grant (review N1), so a revocation waits for the command.
+create function app.followups_lock_pastor(p_member_id uuid)
+returns void
+language sql
+set search_path = ''
+as $$
+  select null from app.identity_grants g
+   where g.member_id = p_member_id and g.role = 'pastor' and g.revoked_at is null
+     for share;
+$$;
 
 -- As in 4.6 (the target's roster through its owner's hook, plus the current holders of the
 -- family's scope kinds), plus the members who hold the Pastor role now; all approved and not
@@ -413,7 +609,7 @@ begin
                   union
                   select g.member_id from app.identity_grants g
                    where g.revoked_at is null and g.role = 'pastor'
-                     and app.identity_member_has_role(g.member_id, 'pastor')) y
+                     and app.followups_pastor_live(g.member_id)) y
            where app.followups_member_active(y.x));
 end;
 $$;
@@ -487,12 +683,13 @@ begin
         where r.source_type = v_source_type and r.purpose = v_purpose) then
     perform app.cmd_fail('validation_failed', '{"reminders": "fixed_by_source"}');
   end if;
+  perform app.followups_lock_pastor(v_owner);
   v_task := app.followups_insert_task(v_source_type, v_source_id,
               (p_input ->> 'source_revision')::numeric::bigint, v_purpose, v_owner, v_supervisor,
               v_scope_kind, v_scope_id, v_next, v_due, v_actor_member, v_actor_account, 'source',
               false, null);
   update app.followups_tasks t set reminders = v_reminders where t.task_id = v_task;
-  perform app.followups_schedule_reminders(v_task, true);
+  perform app.followups_schedule_reminders(v_task, true, v_actor_member);
   return jsonb_build_object('task_id', v_task, 'revision', 1);
 end;
 $$;
@@ -638,6 +835,7 @@ begin
         where r.source_type = v_source_type and r.purpose = v_purpose) then
     perform app.cmd_fail('validation_failed', '{"reminders": "fixed_by_source"}');
   end if;
+  perform app.followups_lock_pastor(v_owner);
   v_task := app.followups_insert_task(v_source_type, v_source_id,
               (p_payload ->> 'source_revision')::numeric::bigint, v_purpose, v_owner, v_supervisor,
               v_scope_kind, v_scope_id, v_next, v_due, v_actor.member_id, v_actor.account_id,
@@ -654,7 +852,7 @@ begin
                                          'followups.create_task', null, null, null, null, null,
                                          null, null, 1);
   end if;
-  perform app.followups_schedule_reminders(v_task, true);
+  perform app.followups_schedule_reminders(v_task, true, v_actor.member_id);
   return app.followups_task_outcome(v_task);
 end;
 $$;
@@ -819,7 +1017,7 @@ begin
   if v_new_state in ('done', 'closed') then
     perform app.followups_cancel_reminders(v_task.task_id, null, null, 'task_' || v_new_state);
   elsif v_new_state <> v_task.task_state or v_new_review is distinct from v_task.review_at then
-    perform app.followups_schedule_reminders(v_task.task_id, false);
+    perform app.followups_schedule_reminders(v_task.task_id, false, v_actor.member_id);
   end if;
   return app.followups_task_outcome(v_task.task_id);
 end;
@@ -881,6 +1079,7 @@ begin
   end if;
   v_errors := '{}'::jsonb;
   if v_owner is not null then
+    perform app.followups_lock_pastor(v_owner);
     if v_owner = v_task.owner_member_id then
       v_errors := v_errors || '{"owner_member_id": "unchanged"}';
     elsif not app.followups_member_active(v_owner) then
@@ -905,6 +1104,8 @@ begin
   update app.followups_tasks t
      set owner_member_id = coalesce(v_owner, t.owner_member_id),
          supervisor_member_id = coalesce(v_supervisor, t.supervisor_member_id),
+         -- Review B1: new recipients get new logical keys (M -> O -> M never collides).
+         schedule_revision = t.schedule_revision + 1,
          revision = t.revision + 1, updated_at = now()
    where t.task_id = v_task.task_id
   returning t.revision into v_revision;
@@ -929,7 +1130,7 @@ begin
     perform app.followups_cancel_reminders(v_task.task_id, 'followups_supervision',
                                            v_task.supervisor_member_id, 'supervisor_changed');
   end if;
-  perform app.followups_schedule_reminders(v_task.task_id, v_owner is not null);
+  perform app.followups_schedule_reminders(v_task.task_id, v_owner is not null, v_actor.member_id);
   return app.followups_task_outcome(v_task.task_id);
 end;
 $$;
@@ -1074,7 +1275,11 @@ revoke all on function
   app.followups_reminder_check(jsonb),
   app.followups_cancel_reminders(uuid, text, uuid, text),
   app.followups_reminder_rules(app.followups_tasks),
-  app.followups_schedule_reminders(uuid, boolean),
+  app.followups_schedule_reminders(uuid, boolean, uuid),
+  app.followups_clamp_specs(jsonb, jsonb),
+  app.followups_reminders_ready(),
+  app.followups_pastor_live(uuid),
+  app.followups_lock_pastor(uuid),
   app.followups_reminders_json(app.followups_tasks)
   from public, anon, authenticated, service_role;
 

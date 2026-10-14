@@ -67,7 +67,7 @@ context:
 
 **Execution:**
 - [x] `supabase/migrations/20261014143021_followups_reminders.sql` -- columns, schedule registry, sources and contracts, scheduling helpers, replaced commands/owner operations/reads, Q4 roster, SYNTHETIC `synthetic_report_due` with its schedule.
-- [x] `supabase/tests/followups_reminders_test.sql` (91, worker-driven) and `supabase/tests/followups_registry_test.sql` (three Q4 assertions) -- the matrix.
+- [x] `supabase/tests/followups_reminders_test.sql` (132, worker-driven) and `supabase/tests/followups_registry_test.sql` (three Q4 assertions) -- the matrix.
 - [x] `packages/client_core` (domain reminders, create-form choice, summary line, deep link, Q4 refusal text, fake) + `test/followups/followups_reminders_test.dart`; `apps/mobile/test/mobile_app_test.dart`, `apps/staff/test/staff_app_test.dart` (reminder item opens the task).
 - [x] `tools/identity-e2e/followups-reminders.mjs` + `.test.mjs`; `tools/identity-e2e/followups.mjs` cleanup.
 - [x] `docs/runbooks/follow-ups.md` (story 4.7, owner checks, Q4 decided), `docs/runbooks/contracts-and-owner-seams.md`; 4.6 plan owner-decision entry.
@@ -87,13 +87,36 @@ context:
 - Q4 owner decision: `app.followups_scope_roster` adds current Pastor-role holders; one function covers create, reassign (Admin too), the owner operation and both candidate lists. Three 4.6 pgTAP assertions changed accordingly (Pastor now a candidate; the outsider case uses a non-Pastor; Admin roster count 7).
 - Clients: `FollowUpReminderSpec`, `FollowUpReminders`, `FollowUpReminderSchedule`, `followUpReminderChoices`, `FollowUpTask.reminders`, `FollowUpPurpose.fixedReminders`, `FollowUpDraft.reminders`; create form **Choose the owner's reminders**; summary line `followup-reminders-text`; `ClientPaths.deepLinkTargets` gains `/followups/tasks/<uuid>`; refusal texts for `not_in_scope` and `reminders`. `pumpStaff` in the staff test gained an optional `setUp`.
 - E2E: `tools/identity-e2e/followups-reminders.mjs` (12 checks, R01-R90) with offline test; the 4.6 E2E cleanup now removes the Notifications rows its tasks create (otherwise member deletion hits the jobs/schedules foreign keys).
+- Review amendments (2026-10-14, independent review of 4.7; the migration `20261014143021` was edited in place because it had not been merged or applied anywhere, as 4.6 did before its merge):
+  - Decision (agent, under owner pre-approval, review B1): `followups_reassign` moves `schedule_revision` whenever the owner or the supervisor changes, and `followups_schedule_reminders` moves it first when a recipient whose schedule of the task ended at the current revision (reassigned away, `owner_inactive`) is active again. Avoids: M -> O -> M or L -> P -> L, or a returning owner, colliding with cancelled logical keys and silently getting nothing. Cost: a supervisor change re-keys the owner's future reminders too (a pending snooze of the owner is cancelled `source_revised`).
+  - Decision (agent, under owner pre-approval, review S1): after re-planning the supervisor, if the current deadline's alert time has already passed and no `followup_overdue` for that deadline reached this supervisor (delivered at any revision with `scheduled_at` at or after the deadline, or pending at the current revision), one alert is enqueued now. A new supervisor of an already overdue task is told once; the old supervisor coming back is not told again.
+  - Decision (agent, under owner pre-approval, review S2): `followups_require_open` and `followups_require_open_read` also need a valid Q2 policy (`followups_reminders_ready`, which never raises): every command, read and owner operation answers `unavailable {"policy": "gate_closed"}` / `403 unavailable` (non-retryable; the clients say "Not available yet") when Q4 or Q2 is closed. Gate prerequisite "Q4 approval requires Q2 approval" written in `follow-ups.md` and in `production-promotion-identity.md` section 6.
+  - Decision (agent, under owner pre-approval, review S3): `followups_register_reminder_schedule` refuses `before` specs in the supervisor list (PCTR1).
+  - Decision (agent, under owner pre-approval, review N1): a Pastor candidate needs live access too (`followups_pastor_live`: role, active reviewed link without an open hold, not dormant), and the Pastor grant is share-locked on create, open and reassign (`followups_lock_pastor`). The same check is NOT applied to the task's own group: accountless and held members stay valid owners there by design (4.6: the supervisor records for them).
+  - Decision (agent, under owner pre-approval, review N2): `followups_clamp_specs` drops specs a narrower policy no longer allows (offset over `max_offset`, beyond `max_reminders`) at plan time; a creator's stored list is narrowed once, a source schedule on each re-plan; each narrowing is an activity row `reminders_adjusted` (code `policy_limit`, capacity `source`). Commands never fail for it.
+  - Decision (agent, under owner pre-approval, review N4): no assignment notice to an owner who is the acting creator or reassigner (`p_actor`).
+  - Review N5: the task screen speaks of the review date while Waiting (`labelFor`, `ownerText(waiting:)`, `supervisorText(waiting:)`).
+  - Review N6: the client refusal tests now run through the real `SupabaseCommandGateway` over mock HTTP (the request path, Content-Profile and payload; `not_in_scope`, `fixed_by_source` and `unavailable gate_closed` mapped to their texts), plus a `SupabaseFollowUpsRepository.fetchTask` request/parse test and its 403 `unavailable` denial.
+  - Review N7: the source and reminder checks answer `current: false` for a missing `source_revision` (never null).
+  - Review N8: not changed. Setting `reminders` inside the insert would need a new signature for the 4.6 `followups_insert_task` (an overload, not a replacement), so it stays a same-transaction update right after the insert, before any scheduling.
+  - Review N9: noted as reviewed; no code change in this pass.
+  - Tests: `followups_reminders_test.sql` grows to 132 (B1 owner and supervisor round trips and the returning inactive owner, S1 both cases, S2 Q2 closed with Q4 open for commands, reads and the owner operation, S3, owner-is-supervisor with N4, N1 held Pastor, N2 narrower policy, N7).
 - Matrix audit: Assign, Missed deadline, Waiting, Reassign, Finish, Creator reminders, Source schedule and Q4 are covered in pgTAP (`followups_reminders_test.sql`) and over HTTP (R10-R80); the stray old-owner job and the former Pastor are pgTAP only.
 
 ## Plan Change Log
 
+- 2026-10-14, independent review of 4.7:
+  - **B1 reassigning back dropped reminders.** Finding: M -> O -> M and L -> P -> L rebuilt jobs at the same `schedule_revision`, colliding with the cancelled keys. Amended: reassignment moves the revision; a returning recipient (also after inactivity) moves it before planning. KEEP: one alert per deadline.
+  - **S1 past deadlines.** Finding: leaving Waiting onto a long-passed due date, or a new supervisor on an overdue task, got no alert. Amended: one alert now when the alert time passed and none for that deadline reached the supervisor.
+  - **S2 gate order.** Finding: Q4 open with Q2 closed made commands fail as a retryable error. Amended: Follow-ups needs both gates (fail closed, `gate_closed`); runbooks state "Q4 approval requires Q2 approval".
+  - **S3** supervisor `before` specs refused at registration. **S4** missing tests added.
+  - **N1, N2, N4, N5, N6, N7** fixed; N8 and N9 noted (Implementation Notes).
+
 - 2026-10-14, coordinator relayed the owner's Q4 answer mid-build ("allow only from task's own group and pastor"): added to this story's migration, tests (pgTAP, client, E2E R80), runbook and the 4.6 plan (dated owner-decision entry outside its frozen block). Avoids: editing the merged 4.6 migration.
 
 ## Review Triage Log
+
+- 2026-10-14, independent review of 4.7: 1 blocker (B1), 4 should-fix (S1-S4), nits N1, N2, N4-N9. All fixed except N8 (not simple; see Implementation Notes) and N9 (noted); see the Change Log.
 
 ## Design Notes
 

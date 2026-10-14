@@ -8,7 +8,7 @@
 -- evidence: tools/identity-e2e/followups-reminders.mjs. Every account, phone and name here is
 -- SYNTHETIC (fictional range +44 7700 900360-900369).
 begin;
-select plan(91);
+select plan(132);
 create temp table m (n int, member_id uuid);
 create function pg_temp.mid(n int) returns uuid language sql as $$ select member_id from m where m.n = $1 $$;
 
@@ -409,6 +409,127 @@ select ok((select bool_and(x ->> 'member_id' <> pg_temp.mid(8)::text and x ->> '
              and bool_or(x ->> 'member_id' = pg_temp.mid(7)::text)
              from jsonb_array_elements(pg_temp.readj(2, 'select api.followups_supervision()') #> '{scopes,0,candidates}') x),
   'the candidate list offers the Pastor and no other outsider');
+
+-- Review amendments (B1, S1-S4, N1, N2, N4, N7) ------------------------------------------------
+-- B1: reassigning back gives the returning owner and supervisor fresh reminders.
+select is(pg_temp.new_task(2, pg_temp.mid(4), 20) #>> '{data,state}', 'open', 'B1: a task for M');
+select is(pg_temp.reassign(2, 20, jsonb_build_object('owner_member_id', pg_temp.mid(5))) #>> '{data,state}', 'open',
+  'B1: L reassigns it to O');
+select is(pg_temp.reassign(2, 20, jsonb_build_object('owner_member_id', pg_temp.mid(4))) #>> '{data,state}', 'open',
+  'B1: and back to M');
+select is(pg_temp.jobs(20), 'owner:followup_due:4:1,sup:followup_overdue:2:48',
+  'B1: M -> O -> M leaves M with a pending reminder (the registered check-in schedule applies)');
+select is((select schedule_revision from app.followups_tasks where source_id = pg_temp.src(20)), 3::bigint,
+  'B1: each reassignment moved the reminders'' revision');
+select is(pg_temp.reassign(2, 20, jsonb_build_object('supervisor_member_id', pg_temp.mid(3))) #>> '{data,state}', 'open',
+  'B1: L hands the supervision to P');
+select is(pg_temp.reassign(3, 20, jsonb_build_object('supervisor_member_id', pg_temp.mid(2))) #>> '{data,state}', 'open',
+  'B1: and P hands it back to L');
+select is(pg_temp.jobs(20), 'owner:followup_due:4:1,sup:followup_overdue:2:48',
+  'B1: L -> P -> L leaves L with a pending alert');
+-- An owner who becomes inactive and active again.
+update app.identity_members set membership_state = 'deactivated' where member_id = pg_temp.mid(4);
+select is(pg_temp.upd(2, 20, '{"status": "in_progress"}') #>> '{data,state}', 'in_progress',
+  'B1: a re-plan while M is inactive');
+select is(pg_temp.jobs(20), 'sup:followup_overdue:2:48', 'B1: an inactive owner has nothing pending');
+select ok(pg_temp.cancelled(20) ~ 'owner_inactive', 'B1: their reminders were cancelled `owner_inactive`');
+update app.identity_members set membership_state = 'approved' where member_id = pg_temp.mid(4);
+select is(pg_temp.upd(2, 20, '{"status": "open"}') #>> '{data,state}', 'open', 'B1: a re-plan after M is active again');
+select is(pg_temp.jobs(20), 'owner:followup_due:4:1,sup:followup_overdue:2:48',
+  'B1: the returning owner has their reminder again (a new revision)');
+
+-- Back to the generic schedule for the remaining cases.
+select lives_ok($$select app.followups_register_reminder_schedule('fixture', 'fixture_followup', 'synthetic_check_in',
+    '{"owner": [{"anchor": "deadline", "before": "0 minutes"}], "supervisor": [{"anchor": "deadline", "after": "1 day"}],
+      "on_assignment": true}')$$, 'the check-in purpose gets a generic-shaped schedule again');
+
+-- S1: leaving Waiting onto a due date that passed more than a day ago alerts the supervisor once.
+select is(pg_temp.new_task(2, pg_temp.mid(4), 21) #>> '{data,state}', 'open', 'S1: a task for M');
+select is(pg_temp.upd(4, 21, jsonb_build_object('status', 'waiting', 'review_at', pg_temp.at('2 days'))) #>> '{data,state}',
+  'waiting', 'S1: M waits for a review date');
+update app.followups_tasks set due_at = now() - interval '3 days' where source_id = pg_temp.src(21);
+select is(pg_temp.upd(4, 21, '{"status": "in_progress"}') #>> '{data,state}', 'in_progress',
+  'S1: M leaves Waiting; the original due date passed three days ago');
+select is((select count(*)::int from app.notifications_jobs j
+            where j.source_id = (pg_temp.task(21)).task_id and j.reminder_kind = 'followup_overdue'
+              and j.job_state = 'pending' and j.scheduled_at <= now()), 1,
+  'S1: one supervisor alert is due now');
+select is(pg_temp.upd(4, 21, '{"status": "open"}') #>> '{data,state}', 'open', 'S1: another re-plan');
+select is((select count(*)::int from app.notifications_jobs j
+            where j.source_id = (pg_temp.task(21)).task_id and j.reminder_kind = 'followup_overdue'
+              and j.job_state <> 'cancelled'), 1,
+  'S1: still one alert for that deadline');
+select is(pg_temp.run() ->> 'delivered', '1', 'S1: the worker delivers it');
+select is(pg_temp.reassign(2, 21, jsonb_build_object('supervisor_member_id', pg_temp.mid(3))) #>> '{data,state}', 'open',
+  'S1: a new supervisor P on the already overdue task');
+select is((select string_agg(pg_temp.who(j.recipient_member_id) || ':' || j.job_state, ',' order by j.enqueued_at)
+             from app.notifications_jobs j
+            where j.source_id = (pg_temp.task(21)).task_id and j.reminder_kind = 'followup_overdue'
+              and j.job_state <> 'cancelled'),
+  '2:delivered,3:pending', 'S1: P gets one alert now too');
+select is(pg_temp.reassign(3, 21, jsonb_build_object('supervisor_member_id', pg_temp.mid(2))) #>> '{data,state}', 'open',
+  'S1: and hands it back to L');
+select is((select count(*)::int from app.notifications_jobs j
+            where j.source_id = (pg_temp.task(21)).task_id and j.reminder_kind = 'followup_overdue'
+              and j.recipient_member_id = pg_temp.mid(2) and j.job_state <> 'cancelled'), 1,
+  'S1: L, already told about this deadline, is not told again');
+
+-- S4: an owner who is also the supervisor gets both, and no notice for assigning themself (N4).
+select is(pg_temp.new_task(2, pg_temp.mid(2), 22) #>> '{data,state}', 'open', 'S4: L creates a task L owns');
+select is(pg_temp.jobs(22), 'owner:followup_due:2:0,sup:followup_overdue:2:24',
+  'S4: L gets the due reminder and the overdue alert, and no notice for their own assignment (N4)');
+
+-- S3: a supervisor alert before the deadline cannot be registered.
+select throws_ok($$select app.followups_register_reminder_schedule('fixture', 'fixture_followup', 'synthetic_report_due',
+    '{"owner": [], "supervisor": [{"anchor": "deadline", "before": "1 hour"}], "on_assignment": false}')$$,
+  'PCTR1', null, 'S3: supervisor specs must be after the deadline');
+
+-- N7: a missing source revision is never current.
+select is(app.followups_reminder_source_check(jsonb_build_object('source_type', 'followups_task',
+            'source_id', (pg_temp.task(22)).task_id)) ->> 'current', 'false', 'N7: no revision, not current');
+select is(app.followups_reminder_check(jsonb_build_object('source_type', 'followups_task',
+            'source_id', (pg_temp.task(22)).task_id, 'recipient_member_id', pg_temp.mid(2),
+            'reminder_kind', 'followup_due')) ->> 'current', 'false', 'N7: the reminder check agrees');
+
+-- N1: a Pastor on hold is not a candidate.
+insert into app.identity_holds (member_id, hold_kind, reason, placed_by)
+values (pg_temp.mid(7), 'access_review', 'SYNTHETIC review', 'pgtap 4.7');
+select is(pg_temp.new_task(2, pg_temp.mid(7), 23) #>> '{field_errors,owner_member_id}', 'not_in_scope',
+  'N1: a Pastor without live access cannot be chosen');
+update app.identity_holds set released_at = now(), released_by = 'pgtap 4.7' where member_id = pg_temp.mid(7);
+
+-- N2: a narrower policy never fails a command; the dropped reminders are recorded.
+select lives_ok($$select app.followups_register_reminder_schedule('fixture', 'fixture_followup', 'synthetic_check_in',
+    '{"owner": [{"anchor": "deadline", "before": "1 hour"}, {"anchor": "deadline", "before": "0 minutes"},
+                {"anchor": "deadline", "after": "1 hour"}],
+      "supervisor": [{"anchor": "deadline", "after": "1 day"}], "on_assignment": true}')$$,
+  'N2: the check-in source asks for three owner reminders');
+update app.policy_gates set fixture_value = jsonb_set(jsonb_set(fixture_value, '{max_reminders}', '2'),
+                                                      '{policy_version}', '2')
+ where gate = 'q2_church_time';
+select is(app.notifications_policy_errors((select fixture_value from app.policy_gates where gate = 'q2_church_time')),
+  '{}'::jsonb, 'N2: a valid policy that allows at most 2 reminders');
+select is(pg_temp.upd(2, 22, '{"status": "in_progress"}') #>> '{data,state}', 'in_progress',
+  'N2: a status change still works');
+select is(pg_temp.jobs(22), 'owner:followup_due:2:-1,owner:followup_due:2:0,sup:followup_overdue:2:24',
+  'N2: the third owner reminder was dropped');
+select is((select string_agg(a.action || ':' || a.code || ':' || a.actor_capacity, ',') from app.followups_activity a
+            where a.task_id = (pg_temp.task(22)).task_id and a.action = 'reminders_adjusted'),
+  'reminders_adjusted:policy_limit:source', 'N2: and recorded in the activity');
+
+-- S2: Q4 open but Q2 not valid: every Follow-ups command, read and owner operation is refused.
+update app.policy_gates set fixture_value = jsonb_set(fixture_value, '{quiet_hours}', '"21:00-07:00"')
+ where gate = 'q2_church_time';
+select is(app.identity_applications_open(), true, 'S2: Q4 (local) is open');
+select is((select v ->> 'code' || '|' || (v -> 'field_errors')::text
+             from (select pg_temp.new_task(2, pg_temp.mid(4), 25) as v) y),
+  'unavailable|{"policy": "gate_closed"}', 'S2: a create is refused gate_closed (not a retryable failure)');
+select is((select v ->> 'code' || '|' || (v -> 'field_errors')::text
+             from (select pg_temp.upd(4, 21, '{"note": "SYNTHETIC: x"}') as v) y),
+  'unavailable|{"policy": "gate_closed"}', 'S2: so is an update');
+select is(pg_temp.read(4, 'select api.followups_my_tasks()'), 'PT403|unavailable|unavailable',
+  'S2: and every read');
+select throws_ok($$select pg_temp.open_report(26)$$, 'PCMD1', null, 'S2: and the owner operation');
 
 select * from finish();
 rollback;

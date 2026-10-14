@@ -5,13 +5,20 @@
 // only; the server behaviour is covered by
 // supabase/tests/followups_reminders_test.sql and
 // tools/identity-e2e/followups-reminders.mjs.
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:church_client_core/church_client_core.dart';
+import 'package:church_client_core/supabase_adapters.dart';
 import 'package:church_client_core/testing.dart';
 import 'package:church_contracts/church_contracts.dart';
 import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:supabase/supabase.dart' hide ErrorCode;
 
 const _task = '46464646-4646-4646-8646-464646464646';
 const _pastor = '88888888-8888-4888-8888-888888888888';
@@ -139,10 +146,22 @@ void main() {
         'on_assignment': true,
       });
       expect(r.schedule, FollowUpReminderSchedule.custom);
-      expect(r.ownerText, 'Owner reminders: 24 hours before, at the due time.');
       expect(
-        r.supervisorText,
+        r.ownerText(),
+        'Owner reminders: 24 hours before, at the due time.',
+      );
+      expect(
+        r.supervisorText(),
         'Supervisor alert: 1 day after a missed deadline.',
+      );
+      // Review N5: while Waiting the review date is the deadline.
+      expect(
+        r.ownerText(waiting: true),
+        'Owner reminders: 24 hours before the review date, at the review time.',
+      );
+      expect(
+        r.supervisorText(waiting: true),
+        'Supervisor alert: 1 day after a missed review date.',
       );
       expect(
         FollowUpReminders.fromJson({
@@ -150,7 +169,7 @@ void main() {
           'owner': null,
           'supervisor': <Object?>[],
           'on_assignment': false,
-        }).ownerText,
+        }).ownerText(),
         'Owner reminders: the church default.',
       );
     });
@@ -279,15 +298,6 @@ void main() {
         {'anchor': 'deadline', 'before': '0 minutes'},
         {'anchor': 'deadline', 'before': '24 hours'},
       ]);
-      first.refuse(
-        ErrorCode.validationFailed,
-        fieldErrors: const {'reminders': 'fixed_by_source'},
-      );
-      await settle(tester);
-      expect(
-        find.textContaining('This source sets its own reminders.'),
-        findsOneWidget,
-      );
     },
   );
 
@@ -327,27 +337,6 @@ void main() {
       expect(byKey('followups-notice-created'), findsOneWidget);
     });
 
-    testWidgets('a refusal for an owner outside the group (or a former '
-        'Pastor) is explained', (tester) async {
-      final h = await pumpAt(
-        tester,
-        FollowUpPaths.supervision,
-        setUp: (h) => h.followUps.supervision = AccessReadOk(
-          FollowUpSupervision.fromJson(supervisionData()),
-        ),
-      );
-      final sent = await createWith(tester, h, owner: 'SYNTHETIC Pastor');
-      sent.refuse(
-        ErrorCode.validationFailed,
-        fieldErrors: const {'owner_member_id': 'not_in_scope'},
-      );
-      await settle(tester);
-      expect(
-        find.textContaining('belong to this task\'s group or be a Pastor'),
-        findsOneWidget,
-      );
-    });
-
     test('candidates come only from the roster the server sent', () {
       final sup = FollowUpSupervision.fromJson(supervisionData());
       final names = followUpCandidatesFor(
@@ -357,4 +346,236 @@ void main() {
       expect(names, ['SYNTHETIC Member M', 'SYNTHETIC Pastor']);
     });
   });
+
+  // Review N6: the same screens over the REAL SupabaseCommandGateway and
+  // SupabaseFollowUpsRepository (mock HTTP only): the request that goes out
+  // and how the server's refusal envelope maps to what the leader reads.
+  group('over the real adapters', () {
+    for (final (fieldErrors, code, expected) in [
+      (
+        {'owner_member_id': 'not_in_scope'},
+        'validation_failed',
+        'The owner must belong to this task\'s group or be a Pastor.',
+      ),
+      (
+        {'reminders': 'fixed_by_source'},
+        'validation_failed',
+        'This source sets its own reminders.',
+      ),
+      ({'policy': 'gate_closed'}, 'unavailable', 'Not available yet'),
+    ]) {
+      testWidgets('a create refused $code ${jsonEncode(fieldErrors)} is '
+          'explained', (tester) async {
+        final sent = <http.Request>[];
+        final h = await pumpAt(
+          tester,
+          FollowUpPaths.supervision,
+          setUp: (h) => h.followUps.supervision = AccessReadOk(
+            FollowUpSupervision.fromJson(supervisionData()),
+          ),
+        );
+        // A second harness is not needed: swap the gateway before acting.
+        final real = (await tester.runAsync(
+          () async => _realGateway(
+            (body) => {
+              'request_id': body['request_id'],
+              'code': code,
+              'message': 'The request is not valid.',
+              'field_errors': fieldErrors,
+            },
+            sent: sent,
+          ),
+        ))!;
+        await tester.pumpWidget(const SizedBox());
+        h.commandGateway = _RealZoneGateway(real);
+        final router = buildClientRouter(
+          initialLocation: FollowUpPaths.supervision,
+          memberHome: true,
+          shell: (_, _, child) => AccessRefresher(child: child),
+        );
+        addTearDown(router.dispose);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: h.overrides(),
+            child: MaterialApp.router(
+              theme: churchStaffTheme(),
+              routerConfig: router,
+            ),
+          ),
+        );
+        await _realSettle(tester);
+        await choose(tester, 'followup-create-owner', 'SYNTHETIC Pastor');
+        await tester.enterText(
+          byKey('followup-create-next'),
+          'SYNTHETIC: call',
+        );
+        await tester.enterText(byKey('followup-create-due-date'), '2099-01-04');
+        await tester.pump();
+        await tapKey(tester, 'followup-create-save');
+        await _realSettle(tester);
+        final request = sent.single;
+        expect(request.url.path, '/rest/v1/rpc/followups_command');
+        expect(request.headers['content-profile'], 'api');
+        final body = jsonDecode(request.body) as Map;
+        expect(body['command'], 'followups.create_task');
+        expect((body['payload'] as Map)['owner_member_id'], _pastor);
+        expect(find.textContaining(expected), findsOneWidget);
+      });
+    }
+
+    test('the task read asks followups_task for that id and reads its '
+        'reminders; a closed gate is a denial, not a failure', () async {
+      final requests = <http.Request>[];
+      var answer = (
+        jsonEncode({
+          'view': 'full',
+          'task': followUpTaskData(
+            state: 'waiting',
+            reviewAt: '2099-01-05T08:00:00.000000Z',
+            reminders: {
+              'schedule': 'custom',
+              'owner': [
+                {'anchor': 'deadline', 'before': '0 minutes'},
+              ],
+              'supervisor': [
+                {'anchor': 'deadline', 'after': '1 day'},
+              ],
+              'on_assignment': true,
+            },
+          ),
+          'activity': <Object?>[],
+          'notes': <Object?>[],
+        }),
+        200,
+      );
+      final client = SupabaseClient(
+        'http://localhost:54321',
+        'sb_publishable_test',
+        httpClient: MockClient((request) async {
+          if (request.url.path.startsWith('/auth/')) {
+            return http.Response(
+              jsonEncode(_session()),
+              200,
+              headers: {'content-type': 'application/json'},
+              request: request,
+            );
+          }
+          requests.add(request);
+          return http.Response(
+            answer.$1,
+            answer.$2,
+            headers: {'content-type': 'application/json'},
+            request: request,
+          );
+        }),
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+      addTearDown(client.dispose);
+      await client.auth.signInWithPassword(
+        phone: '+447700900372',
+        password: 'p',
+      );
+      final repo = SupabaseFollowUpsRepository(client);
+      final read = await repo.fetchTask(_task);
+      expect(requests.single.url.path, '/rest/v1/rpc/followups_task');
+      expect(jsonDecode(requests.single.body), {'p_task_id': _task});
+      final task = (read as AccessReadOk<FollowUpDetail>).value.task!;
+      expect(task.reminders!.schedule, FollowUpReminderSchedule.custom);
+      expect(
+        task.reminders!.ownerText(waiting: task.state == FollowUpState.waiting),
+        'Owner reminders: at the review time.',
+      );
+      answer = (
+        jsonEncode({
+          'code': 'PT403',
+          'message': 'unavailable',
+          'details': 'unavailable',
+          'hint': null,
+        }),
+        403,
+      );
+      final denied = await repo.fetchTask(_task);
+      expect(denied, isA<AccessReadDenied<FollowUpDetail>>());
+      expect(
+        (denied as AccessReadDenied<FollowUpDetail>).denial,
+        AccessDenial.unavailable,
+      );
+    });
+  });
 }
+
+/// A real SupabaseCommandGateway whose HTTP client answers every RPC with
+/// [answer]; [sent] collects the requests.
+SupabaseCommandGateway _realGateway(
+  Map<String, Object?> Function(Map<String, Object?> sent) answer, {
+  required List<http.Request> sent,
+}) {
+  final client = SupabaseClient(
+    'http://localhost:54321',
+    'sb_publishable_test',
+    httpClient: MockClient((request) async {
+      sent.add(request);
+      final body = (jsonDecode(request.body) as Map).cast<String, Object?>();
+      return http.Response(
+        jsonEncode(answer(body)),
+        200,
+        headers: {'content-type': 'application/json'},
+        request: request,
+      );
+    }),
+    authOptions: const AuthClientOptions(autoRefreshToken: false),
+  );
+  addTearDown(client.dispose);
+  return SupabaseCommandGateway(client);
+}
+
+/// Runs the real gateway outside a widget test's fake clock.
+class _RealZoneGateway implements CommandGateway {
+  _RealZoneGateway(this._inner);
+  final CommandGateway _inner;
+
+  @override
+  Future<CommandOutcome> send(String function, CommandRequest request) =>
+      Zone.root.run(() => _inner.send(function, request));
+}
+
+Future<void> _realSettle(WidgetTester tester) async {
+  for (var i = 0; i < 6; i++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+  }
+}
+
+const _sub = '11111111-1111-4111-8111-111111111111';
+
+String _testJwt(String sub) {
+  String b64(Object o) =>
+      base64Url.encode(utf8.encode(jsonEncode(o))).replaceAll('=', '');
+  return '${b64({'alg': 'none'})}.${b64({
+    'sub': sub,
+    'exp': 4102444800,
+    'amr': [
+      {'method': 'password', 'timestamp': 1790000000},
+    ],
+    'role': 'authenticated',
+  })}.x';
+}
+
+Map<String, Object?> _session() => {
+  'access_token': _testJwt(_sub),
+  'token_type': 'bearer',
+  'expires_in': 3600,
+  'expires_at': 4102444800,
+  'refresh_token': 'test-refresh',
+  'user': {
+    'id': _sub,
+    'aud': 'authenticated',
+    'role': 'authenticated',
+    'phone': '447700900372',
+    'app_metadata': <String, Object?>{},
+    'user_metadata': <String, Object?>{},
+    'created_at': '2026-10-14T07:00:00Z',
+  },
+};

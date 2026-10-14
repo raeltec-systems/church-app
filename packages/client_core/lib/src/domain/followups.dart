@@ -280,14 +280,21 @@ class FollowUpReminderSpec {
   };
 
   /// "at the due time", "24 hours before", "1 day after".
-  String get label {
+  String get label => labelFor();
+
+  /// Review N5: while a task is Waiting its deadline is the review date, so
+  /// "at the review time", "24 hours before the review date".
+  String labelFor({bool waiting = false}) {
     final parts = offset.split(' ');
     if (parts.length != 2) return offset;
-    if (parts[0] == '0') return 'at the due time';
+    if (parts[0] == '0') {
+      return waiting ? 'at the review time' : 'at the due time';
+    }
     final unit = parts[0] == '1' && parts[1].endsWith('s')
         ? parts[1].substring(0, parts[1].length - 1)
         : parts[1];
-    return '${parts[0]} $unit ${after ? 'after' : 'before'}';
+    final text = '${parts[0]} $unit ${after ? 'after' : 'before'}';
+    return waiting ? '$text the review date' : text;
   }
 
   @override
@@ -362,18 +369,20 @@ class FollowUpReminders {
   final List<FollowUpReminderSpec> supervisor;
   final bool onAssignment;
 
-  /// "Owner reminders: 24 hours before, at the due time."
-  String get ownerText => switch (owner) {
+  /// "Owner reminders: 24 hours before, at the due time." ([waiting]: the
+  /// review date is the deadline.)
+  String ownerText({bool waiting = false}) => switch (owner) {
     null => 'Owner reminders: the church default.',
     final o when o.isEmpty => 'Owner reminders: none.',
-    final o => 'Owner reminders: ${o.map((s) => s.label).join(', ')}.',
+    final o =>
+      'Owner reminders: ${o.map((s) => s.labelFor(waiting: waiting)).join(', ')}.',
   };
 
   /// "Supervisor alert: 1 day after a missed deadline."
-  String get supervisorText => supervisor.isEmpty
+  String supervisorText({bool waiting = false}) => supervisor.isEmpty
       ? 'No supervisor alert.'
       : 'Supervisor alert: ${supervisor.map((s) => s.label).join(', ')} a '
-            'missed deadline.';
+            'missed ${waiting ? 'review date' : 'deadline'}.';
 
   /// Who set them.
   String get sourceText => switch (schedule) {

@@ -115,7 +115,7 @@ Record the outcome per step in `evidence-4.6/owner-check.md` (pass/fail, device 
 
 ### Owner questions
 
-- **Q4: who may be chosen as an owner. Decided 2026-10-14** (owner: "allow only from task's own group and pastor"): the task's own group (its target's roster) and the current Pastors; nobody else. Applied in story 4.7's migration (`app.followups_scope_roster`). The Q4 personal-data gate itself stays closed in production.
+- **Q4: who may be chosen as an owner. Decided 2026-10-14** (owner: "allow only from task's own group and pastor"): the task's own group (its target's roster) and the current Pastors; nobody else. Applied in story 4.7's migration (`app.followups_scope_roster`). A Pastor counts only with live access (an active, reviewed link, no open hold, not dormant; review N1), and the Pastor grant is share-locked while a task is created, opened or reassigned to them. Members of the task's own group stay eligible with or without a login (their supervisor records for them). The Q4 personal-data gate itself stays closed in production, and needs Q2 (above).
 
 ### Known limits (later entries)
 
@@ -126,7 +126,7 @@ Record the outcome per step in `evidence-4.6/owner-check.md` (pass/fail, device 
 
 ## Story 4.7: remind follow-up owners and supervisors on the task schedule
 
-Migration: `supabase/migrations/20261014143021_followups_reminders.sql` (forward only; the 4.6 file is not edited; no destructive statements, no row deletions, no `_rows` file, so **no owner SQL paste**). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-remind-follow-up-owners-and-supervisors-on-the-task-schedule-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.7/`. Tests: `supabase/tests/followups_reminders_test.sql` (91, worker-driven), `packages/client_core/test/followups/followups_reminders_test.dart`, one test in each app, E2E `tools/identity-e2e/followups-reminders.mjs` (12 checks, R01-R90) with its offline test.
+Migration: `supabase/migrations/20261014143021_followups_reminders.sql` (forward only; the 4.6 file is not edited; no destructive statements, no row deletions, no `_rows` file, so **no owner SQL paste**). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-remind-follow-up-owners-and-supervisors-on-the-task-schedule-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.7/`. Tests: `supabase/tests/followups_reminders_test.sql` (132, worker-driven), `packages/client_core/test/followups/followups_reminders_test.dart`, one test in each app, E2E `tools/identity-e2e/followups-reminders.mjs` (12 checks, R01-R90) with its offline test.
 
 ### What is sent, to whom, when
 
@@ -138,7 +138,10 @@ Follow-ups registers two reminder sources (3.2 contracts), both keyed by the tas
 | `followups_task` / `followup_due` | the owner | at the actionable deadline (the due date while Open or In progress, the review date while Waiting), or at the creator's reminder times | Follow-up task due |
 | `followups_supervision` / `followup_overdue` | the supervisor | once, one day after the deadline, if the task is still active and overdue | Follow-up task overdue |
 
-- **Logical key and revision.** The reminders' source revision is the task's `schedule_revision`. It moves only when the actionable deadline moves (into or out of Waiting, a new review date). Notes, outcomes, next actions and Open <-> In progress re-plan at the same revision, so nothing is sent twice. Past times are never enqueued, so the supervisor is told **once per deadline**, also across re-plans, reassignment and a supervisor change.
+- **Logical key and revision.** The reminders' source revision is the task's `schedule_revision`. It moves when the actionable deadline moves (into or out of Waiting, a new review date), on every reassignment of the owner or the supervisor, and when a recipient whose reminders of the task ended (reassigned away, inactive) is active again (review B1: M -> O -> M and L -> P -> L keep their reminders). Notes, outcomes, next actions and Open <-> In progress re-plan at the same revision, so nothing is sent twice. Past times are never enqueued.
+- **One supervisor alert per deadline (review S1).** When the alert time for the current deadline has already passed at a re-plan (leaving Waiting onto a due date long gone, a new supervisor on an already overdue task), the supervisor gets one alert now, unless an alert for that deadline already reached them; further re-plans add none.
+- **Assignment notice.** Not sent to an owner who created the task for themself or reassigned it to themself (review N4). An owner who is also the supervisor gets both the due reminder and the overdue alert.
+- **A narrower policy (review N2).** If a later `q2_church_time` allows fewer or shorter reminders, the specs it no longer allows are dropped at plan time (a creator's stored list is narrowed once) and recorded in the activity (`reminders_adjusted`, code `policy_limit`); a command never fails for it.
 - **Review dates.** A new review date is recorded in the activity (`status_changed` or `review_date_set`, with the date), the original due date never moves, and the reminders (and any snooze of the old date) move to the new date: an item of the old date opens **out of date**.
 - **Reassignment.** The old owner's pending reminders and snoozes are cancelled (`reassigned`); the new owner gets `followup_assigned` and the schedule. A supervisor change moves the alert (`supervisor_changed`). An item the old owner already has opens out of date (they are no longer the owner), and a stray job would end `ineligible` at the worker.
 - **Done, Closed, a closing source event.** Every pending reminder of the task is cancelled (`task_done`, `task_closed`, `source_resolved`, `source_cancelled`) and the source is no longer current, so nothing is delivered after it.
@@ -147,7 +150,7 @@ Follow-ups registers two reminder sources (3.2 contracts), both keyed by the tas
 - **No quiet hours** (owner Q2). Church time is Africa/Lusaka (3.3 calculation).
 - **Accountless or held owners.** No direct-contact route is registered in 4.7: their reminder ends `ineligible` / `no_direct_contact_route` and is counted **Without a route** in Reminder health; the supervisor still gets the overdue alert. A Follow-ups contact route is a later change.
 - **Privacy.** Titles, bodies, push payloads and links never carry a next action, outcome, close reason, context, name or private note; the task screen re-reads the task with the reader's own rights (AD-5).
-- **Production.** Inert: Follow-ups stays behind the Q4 personal-data gate, and scheduling needs the approved `q2_church_time` (otherwise `unavailable`, and the command rolls back).
+- **Production and gate order (review S2).** Every Follow-ups command, read and owner operation needs the Q4 personal-data gate **and** a valid Q2 scheduling policy (`q2_church_time`). Either closed answers the same non-retryable `unavailable {"policy": "gate_closed"}` (reads `403 unavailable`; the clients say "Not available yet") and writes nothing. **Q4 approval requires Q2 approval** (listed under the gates in `production-promotion-identity.md`, section 6).
 - **Tasks opened before 4.7** have no reminders until their next deadline change, state change or reassignment (no backfill: it would need the Q2 policy at migration time, which production lacks).
 
 ### Source-specific schedules (source owners, in their own migration)
@@ -160,21 +163,21 @@ select app.followups_register_reminder_schedule('cells', 'cells_meeting', 'missi
     "supervisor": [], "on_assignment": false}');
 ```
 
-- `owner` and `supervisor` are spec lists as above (`[]` = none); `on_assignment` sends the owner the assignment notice or not. Refusals (PCTR1): not the source type's owner, not a Follow-ups purpose, a malformed list, unknown keys. Registering again replaces it; it applies to existing tasks at their next re-plan.
+- `owner` and `supervisor` are spec lists as above (`[]` = none); `on_assignment` sends the owner the assignment notice or not. Refusals (PCTR1): not the source type's owner, not a Follow-ups purpose, a malformed list, unknown keys, a supervisor spec `before` the deadline (review S3: an alert needs the task overdue). Registering again replaces it; it applies to existing tasks at their next re-plan.
 - The kinds and texts stay the Follow-ups ones (generic). The SYNTHETIC worked example is `fixture_followup/synthetic_report_due` (not a manual purpose; opened through `app.followups_open_task`): reminders at the deadline and two days later, no assignment notice, no supervisor alert.
 - Reads: the task carries `reminders: {schedule: "source"|"custom"|"default", owner, supervisor, on_assignment}`; the supervision read marks a manual purpose `fixed_reminders: true`.
 
 ### Clients
 
 - **Deep link.** `/followups/tasks/<uuid>` is a known inbox target (`ClientPaths.deepLinkTargets`): a current follow-up reminder shows **Open**, which opens the task (owner, supervisor, or **Not available to you**). Push taps open the inbox item first, as for every reminder.
-- **Task screen** (both apps): a line saying where the reminders come from, the owner's reminders and the supervisor alert.
+- **Task screen** (both apps): a line saying where the reminders come from, the owner's reminders and the supervisor alert; while Waiting it speaks of the review date ("at the review time", "a missed review date"; review N5).
 - **Staff web, Create a task:** **Choose the owner's reminders** (at the due time, 1 hour, 24 hours, 2 days before); unticked = the church default; a purpose with its own schedule says so and offers no choice. A refused owner explains "The owner must belong to this task's group or be a Pastor."
 
 ### Local runs
 
 ```sh
 npx supabase db reset
-npm run -s db:test                     # includes supabase/tests/followups_reminders_test.sql (91)
+npm run -s db:test                     # includes supabase/tests/followups_reminders_test.sql (132)
 node tools/auth-harness/local-phone-auth.mjs on
 node tools/identity-e2e/followups-reminders.mjs --evidence <file.jsonl>   # real worker script
 node tools/auth-harness/local-phone-auth.mjs off

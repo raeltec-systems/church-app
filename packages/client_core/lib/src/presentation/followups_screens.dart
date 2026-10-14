@@ -720,7 +720,9 @@ class _TaskSummary extends StatelessWidget {
               padding: const EdgeInsets.only(top: 4),
               child: _muted(
                 context,
-                '${rem.sourceText} ${rem.ownerText} ${rem.supervisorText}',
+                '${rem.sourceText} '
+                '${rem.ownerText(waiting: r.state == FollowUpState.waiting)} '
+                '${rem.supervisorText(waiting: r.state == FollowUpState.waiting)}',
                 key: const Key('followup-reminders-text'),
               ),
             ),

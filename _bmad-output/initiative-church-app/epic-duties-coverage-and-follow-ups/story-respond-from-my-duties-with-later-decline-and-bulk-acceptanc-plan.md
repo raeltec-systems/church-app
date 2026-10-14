@@ -3,7 +3,7 @@ title: 'Respond from My duties with later decline and bulk acceptance'
 type: 'feature'
 ticket: '5'
 created: '2026-10-14'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '6927ff83c1287a3371ee44f3f0a994f91488bee1'
 route: 'full'
 route_source: 'auto'
@@ -191,7 +191,7 @@ Unchanged: `duties_in_scope`, `duties_my_duties`, the client grants, deletion. A
 
 **Commands:**
 - `npx supabase db reset && npm run -s db:test && npm run -s db:smoke` -- expected: all pass.
-- `bash <scratchpad>/e2e-4-5.sh` (every E2E, including `duties-responses`) -- expected: each `exit=0`.
+- `bash <scratchpad>/verify-4-5.sh` (db reset, db:test, db:smoke, then every E2E with a reset before each, including `duties-responses`) -- expected: each `exit=0`.
 - `npm run -s contracts:test && node --test tools/**/*.test.mjs && npm run -s ci:policy-test` -- expected: pass.
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/mobile` and `apps/staff`; the duties tests again under `TZ=America/New_York` -- expected: pass.
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/main && npm run -s ci:function-imports` -- expected: pass.
@@ -199,3 +199,12 @@ Unchanged: `duties_in_scope`, `duties_my_duties`, the client grants, deletion. A
 **Manual checks (if no CLI):**
 - Parent session: apply the migration to staging and compare per-function md5.
 - Owner: run `docs/runbooks/duties.md`, story 4.5, "Owner manual checks".
+
+**Results (2026-10-14, after the container restart; resumed builder):**
+- db reset 0; db:test PASS (31 files, 2633 tests, including `duties_responses_test.sql` 67); db:smoke pass, no SMS provider.
+- Every E2E `exit=0` (23 scripts), `duties-responses` 12/12. Race V30: bulk first twice (3 accepted, moved date pending again), edit first once (bulk refused whole, 0 accepted).
+- contracts:test 242/0; node tool tests (CI set) 183/0; ci:policy-test 56/0.
+- flutter analyze clean in all three; flutter test client_core 512, apps/staff 35, apps/mobile 49; under `TZ=America/New_York` client_core `test/duties` 84 and apps/mobile 49.
+- ci:secrets clean; ci:migrations (`--base origin/main`) ordered, unique, non-destructive; ci:function-imports ok; evidence scan clean.
+- Evidence: `evidence-4.5/duties-responses-e2e.jsonl`, `evidence-4.5/e2e-suite-summary.txt`.
+- Remaining (not builder steps): staging apply and md5 parity (parent session), staging APK rebuild for `share_plus`, owner manual checks in `docs/runbooks/duties.md` story 4.5.

@@ -1,0 +1,36 @@
+Story 4.5 full local verification, 2026-10-14 (worktree branch worktree-agent-a79a1dc45818657ea, LOCAL stack, SYNTHETIC data).
+reset=0
+db:test=0 Files=31, Tests=2633, 48 wallclock secs ( 0.60 usr  0.08 sys +  0.56 cusr  0.30 csys =  1.54 CPU) Result: PASS 
+db:smoke=0 ok   - no SMS provider configured
+run exit=0 
+grants exit=0 
+apply exit=0 27/27 checks passed 
+review exit=0 18/18 checks passed 
+cells exit=0 13/13 checks passed 
+recovery exit=0 20/20 checks passed 
+credentials exit=0 15/15 checks passed 
+assisted exit=0 16/16 checks passed 
+lifecycle exit=0 9/9 checks passed 
+deletion exit=0 12/12 checks passed 
+runbooks exit=0 16/16 checks passed 
+inbox exit=0 13/13 checks passed 
+source-contracts exit=0 10/10 checks passed 
+worker exit=0 17/17 checks passed 
+routing exit=0 18/18 checks passed 
+push exit=0 12/12 checks passed 
+inbox-screens exit=0 12/12 checks passed 
+duties exit=0 13/13 checks passed 
+duties-revisions exit=0 13/13 checks passed 
+duties-rota exit=0 17/17 checks passed 
+duties-overlaps exit=0 13/13 checks passed 
+duties-responses exit=0 12/12 checks passed 
+supabase_auth_church-app: GOTRUE_EXTERNAL_PHONE_ENABLED=false, GOTRUE_SMS_AUTOCONFIRM=true; no SMS provider (LOCAL only)
+pgTAP: supabase/tests/duties_responses_test.sql 67 checks (within the 2633 above)
+duties-responses V30 race: 3 rounds, both orders seen (bulk first: 3 accepted, moved date pending again; edit first: bulk refused whole, 0 accepted)
+contracts:test pass 242 fail 0
+node tool tests (CI set) pass 183 fail 0
+ci:policy-test pass 56 fail 0
+ci:secrets clean; ci:migrations --base origin/main: 41 ordered, unique and non-destructive (3 new since base); ci:function-imports ok
+flutter analyze: no issues (packages/client_core, apps/staff, apps/mobile)
+flutter test: client_core 512 passed, apps/staff 35 passed, apps/mobile 49 passed
+TZ=America/New_York: client_core test/duties 84 passed; apps/mobile 49 passed

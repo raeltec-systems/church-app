@@ -162,6 +162,11 @@ abstract final class ClientPaths {
     ),
     // Story 4.2: the duty_released notice opens My duties.
     RegExp(r'^/duties$'),
+    // Story 4.7: the follow-up reminders (followups_task and
+    // followups_supervision contracts) open the task, which reads it again.
+    RegExp(
+      r'^/followups/tasks/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    ),
   ];
 
   static bool isKnownDeepLink(String target) =>

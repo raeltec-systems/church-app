@@ -2,7 +2,7 @@
 
 Synthetic data only. Merged `800975d` after the independent review fixes (blocker 1 policy-check
 cost on large publishes; should-fix 2 held leaders unrouted, 3 released/cancelled needs invisible,
-4 accept with Q2 closed; deadline edges; client and test nits).
+4 accept with Q2 closed; deadline edges; client and test nits). PR #6 CI green on `800975d` and `08045ad`. Local verification on the merged branch: db:test 35 files / 3053 tests, db:smoke, Flutter client_core 567 / staff 38 / mobile 53, all 25 E2Es exit 0 (`duties-reminders` 17/17).
 
 | Version | Name | How applied |
 |---|---|---|
@@ -10,7 +10,7 @@ cost on large publishes; should-fix 2 held leaders unrouted, 3 released/cancelle
 
 | Check | Result |
 |---|---|
-| The 204 `app`/`api` `duties_*` and `notifications_*` functions | staging aggregate `764f7d48...`; comparison with local pending the local verification run |
+| The 204 `app`/`api` `duties_*` and `notifications_*` functions | per-function `md5(pg_get_functiondef)` identical to local: aggregate `764f7d48...`, 204 rows each side |
 | Backslashes | none |
 | Client grants | `anon` none on any `duties_*` / `notifications_*` function; no new client grant (the new command goes through `api.duties_command`) |
 | After the apply | 0 assignments with `deadline_source <> 'creator'` or `short_notice`; 7 direct-contact routes for `duties_assignment` |

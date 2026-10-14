@@ -7,7 +7,7 @@
 -- tools/identity-e2e/duties-overlaps.mjs. Every account, phone and name is SYNTHETIC
 -- (fictional range +44 7700 900770-900779).
 begin;
-select plan(91);
+select plan(93);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000044' || lpad(n::text, 2, '0'))::uuid $$;
@@ -479,6 +479,13 @@ select is((select count(*)::int from app.duties_assignments a join app.duties_sl
             where o.series_id = pg_temp.sr() and a.assignment_state = 'current'
               and a.override_reason = 'SYNTHETIC: rota moved, still agreed.' and a.response = 'pending'), 5,
   'and every one of them awaits a fresh answer');
+
+-- A cancelled date is no commitment ---------------------------------------------------------------------
+select is(pg_temp.of(pg_temp.candj(6, pg_temp.e(), 2, '10:30', '11:30'), 4) #> '{conflicts,count}', '1'::jsonb,
+  'M''s Sunday 2 reading (10:30-12:00) conflicts with an E duty at 10:30');
+select pg_temp.duties(2, 'duties.cancel_occurrence', pg_temp.orev(3), jsonb_build_object('occurrence_id', pg_temp.o(3)));
+select is(pg_temp.of(pg_temp.candj(6, pg_temp.e(), 2, '10:30', '11:30'), 4) #> '{conflicts,count}', '0'::jsonb,
+  'once that date is cancelled it no longer conflicts');
 
 -- Deletion -------------------------------------------------------------------------------------------------
 select is((select (r ->> 'remaining')::int from jsonb_array_elements(

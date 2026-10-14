@@ -1,0 +1,32 @@
+reset=0
+db:test=0 Files=30, Tests=2556 Result: PASS (duties_overlaps_test.sql 93 checks)
+db:smoke=0 ok - no SMS provider configured
+run exit=0
+grants exit=0
+apply exit=0 27/27 checks passed
+review exit=0 18/18 checks passed
+cells exit=0 13/13 checks passed
+recovery exit=0 20/20 checks passed
+credentials exit=0 15/15 checks passed
+assisted exit=0 16/16 checks passed
+lifecycle exit=0 9/9 checks passed
+deletion exit=0 12/12 checks passed
+runbooks exit=0 16/16 checks passed
+inbox exit=0 13/13 checks passed
+source-contracts exit=0 10/10 checks passed
+worker exit=0 17/17 checks passed
+routing exit=0 18/18 checks passed
+push exit=0 12/12 checks passed
+inbox-screens exit=0 12/12 checks passed
+duties exit=0 13/13 checks passed
+duties-revisions exit=0 13/13 checks passed
+duties-rota exit=0 17/17 checks passed
+duties-overlaps exit=0 11/11 checks passed
+supabase_auth_church-app: GOTRUE_EXTERNAL_PHONE_ENABLED=false, GOTRUE_SMS_AUTOCONFIRM=true; no SMS provider (LOCAL only)
+duties-overlaps V20 race with app.duties_lock_members replaced by a no-op (then reset): FAIL (both succeed) -> the lock is what makes it pass
+contracts:test pass 242 fail 0
+node tool tests (CI set) pass 178 fail 0
+ci:policy-test pass 56 fail 0
+ci:secrets clean; ci:migrations --base origin/main ordered, unique, non-destructive; ci:function-imports ok
+flutter analyze: no issues (packages/client_core, apps/staff, apps/mobile)
+flutter test: client_core 496 passed, apps/staff 35 passed, apps/mobile 46 passed; test/duties also passes with TZ=America/New_York

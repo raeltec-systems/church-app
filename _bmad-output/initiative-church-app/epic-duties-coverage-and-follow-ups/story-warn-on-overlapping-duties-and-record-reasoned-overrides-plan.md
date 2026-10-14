@@ -3,7 +3,7 @@ title: 'Warn on overlapping duties and record reasoned overrides'
 type: 'feature'
 ticket: '4'
 created: '2026-10-14'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '3de975e13138a0839b6e8d23e1af07820d1d1f60'
 route: 'full'
 route_source: 'auto'
@@ -68,18 +68,29 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/<new>_duties_overlaps.sql` -- owner columns, override columns, busy range, commitments, per-member lock, gates, candidates read, replaced commands/projections/guard/my_duties/deletion hook, privileges.
-- [ ] `supabase/tests/duties_overlaps_test.sql` (+ ledgers) -- the matrix.
-- [ ] client_core domain (`DutyConflict`, `DutyCandidates`, `CandidateQuery`, override fields), repository `fetchCandidates`, controllers (reason in payloads, `overlapNeedsReason` notice), candidate picker widget in the publish form, edit form and rota panel, overlap markers and recorded reasons; fakes.
-- [ ] `packages/client_core/test/duties/duties_overlaps_test.dart` -- parsing, picker load and warnings, reason required, refusal shown.
-- [ ] `tools/identity-e2e/duties-overlaps.mjs` + `.test.mjs`.
-- [ ] `docs/runbooks/duties.md` story 4.4 section with owner manual checks; evidence in `evidence-4.4/`.
+- [x] `supabase/migrations/20261014024352_duties_overlaps.sql` -- owner columns, override columns, busy range, commitments, per-member lock, gates, candidates read, replaced commands/projections/guard/my_duties/deletion hook, privileges.
+- [x] `supabase/tests/duties_overlaps_test.sql` (+ ledgers) -- the matrix.
+- [x] client_core domain (`DutyConflict`, `DutyCandidates`, `CandidateQuery`, override fields), repository `fetchCandidates`, controllers (reason in payloads, `overlapNeedsReason` notice), candidate picker widget in the publish form, edit form and rota panel, overlap markers and recorded reasons; fakes.
+- [x] `packages/client_core/test/duties/duties_overlaps_test.dart` -- parsing, picker load and warnings, reason required, refusal shown.
+- [x] `tools/identity-e2e/duties-overlaps.mjs` + `.test.mjs`.
+- [x] `docs/runbooks/duties.md` story 4.4 section with owner manual checks; evidence in `evidence-4.4/`.
 
 **Acceptance Criteria:**
 - Given the local stack, when `duties-overlaps.mjs` runs, then a member assigned to overlapping duties in two departments shows the warning to the second leader without the first team's instructions or names, the assignment is refused without a reason, recorded with one while the member stays Awaiting response, a cell-owned fixture conflict is disclosed as limited, a non-overlapping assignment raises no warning, and concurrent assignments without reasons give one success and one refusal.
 - Given the full local verification, when run, then db:test, db:smoke, every E2E, contracts, offline tool tests, flutter analyze/test, secrets, migrations and function-imports pass.
 
 ## Implementation Notes
+
+- Implemented directly (no implementation subagent is available inside this builder run). Merged `ccr-93e730dd-89lbvg` at the start (4.3 on staging as `20261014023442`); the 4.4 version `20261014024352` is later.
+- Server: `supabase/migrations/20261014024352_duties_overlaps.sql`. New: `app.duties_occurrences.cell_id` with `department_id` nullable (`ALTER ... DROP NOT NULL`, allowed by the migration policy) and the one-owner check; assignment override columns (`override_reason`, `override_overlaps`, `override_by_member`, `override_by_account`, `override_at`) and slot draft override columns; `app.duties_busy_range(_of)`, `app.duties_busy_items` (the conflict query), `app.duties_overlap_count`, `app.duties_conflicts_json` (viewer-safe items), `app.duties_upcoming`, `app.duties_lock_members` (per-member `pg_advisory_xact_lock`), `app.duties_overlap_gate`, `app.duties_gate_created`, `app.duties_occurrence_members`, `app.duties_override_json`, `app.duties_position_overlaps`, read `api.duties_candidates` (typed named parameters; slot, slot at new times, or department window). Replaced by `create or replace` (same signatures): `duties_state_ok` (audit `overlap_override`), the ended-assignment guard, `duties_apply_change` (carries an override when person and times are unchanged; returns `created`), `publish_duty`, `assign_slot`, `publish_drafts`, `revise_duty`, `revise_series`, `duties_occurrence_json`, `duties_rota_occurrence_json`, `duties_my_duties` (department-owned only), deletion hook and remaining check. Authorizer, dispatch and `in_scope` unchanged (no new command).
+- Decision (agent, under owner pre-approval): `api.duties_candidates` also takes a position at new times (`slot_id` + `starts_at`...) so the edit form checks the person at the edited times without counting the position itself; a department window is used before publishing.
+- Decision (agent, under owner pre-approval): the reason is not required up front on the client (the Save button is not blocked): the server is the authority, and the picker shows the reason field whenever the read shows an overlap or the server refused for one.
+- Decision (agent, under owner pre-approval): draft edits (this date / this and later on drafts) ask no reason; Publish N rechecks every new assignment after all are inserted (so two positions of one person in one publish overlap) and names the first date.
+- Surprise: none of the 4.1-4.3 behaviour changed; ledgers in `command_foundation_test.sql`, `duties_tracer_test.sql`, `duties_revisions_test.sql`, `duties_rota_test.sql` gained the new client grant and the new count keys in answers (`override_recorded`, `overrides`).
+- Tests: `supabase/tests/duties_overlaps_test.sql` (93 checks). Client: `packages/client_core/test/duties/duties_overlaps_test.dart` (13 tests, also run with `TZ=America/New_York` by CI's duties step). E2E: `tools/identity-e2e/duties-overlaps.mjs` (11 checks, V01-V40) with offline `duties-overlaps.test.mjs`; with `app.duties_lock_members` replaced by a no-op the race check V20 fails (both leaders succeed), so it proves the lock. Fictional numbers: pgTAP `+44 7700 900770-900779`, E2E `900760-900769`.
+- Clients: `_CandidatePicker` (in `duties_screens.dart`) replaces the Who dropdown in Publish a duty, Change this duty (one position) and every Rota position; load and overlap count in each item, a warning box with what the leader may see, the reason field, "no overlap does not mean free". Board and rota show overlap counts and recorded overrides; refused rota changes show a reason field; Publish N refusals name the date (existing Open button). Mobile unchanged (only the shared core).
+- Matrix audit: Overlap no reason, Override, No overlap, Disclosure (incl. non-manager, Pastor, member 403), Declined/cancelled (both tested), Material edit (reason required / carried), Drafts (planned reason, later overlap refuses publish with the date), Load, Deletion: pgTAP. Race: E2E V20 (pgTAP is one session). Disclosure, refusal, override, member still Awaiting response, no-overlap, cell fixture and the race also run over HTTP in the E2E.
+- Owner/staging steps remaining (not blocking): the parent applies the migration to staging and checks function md5s; the owner runs `docs/runbooks/duties.md`, story 4.4, "Owner manual checks" and records `evidence-4.4/owner-check.md`.
 
 ## Plan Change Log
 

@@ -1789,8 +1789,9 @@ $$;
 -- The candidates read
 -- ---------------------------------------------------------------------------------------------
 
--- api.duties_candidates(slot_id) or (department_id, starts_at, ends_at?, reporting_at?): the
--- department's leader, deputy or an Admin (anyone else, Pastor included: 403 not_granted; an
+-- api.duties_candidates(slot_id), (slot_id, starts_at, ends_at?, reporting_at?) for the position
+-- at new times, or (department_id, starts_at, ends_at?, reporting_at?): the department's leader,
+-- deputy or an Admin (anyone else, Pastor included: 403 not_granted; an
 -- unknown or cell-owned position answers the same, nothing is disclosed). For the position's
 -- (or the prospective duty's) busy time: the window, and each current active roster member
 -- with their account label (`app_account` / `no_login`), whether they hold or are planned for
@@ -1814,9 +1815,15 @@ declare
 begin
   select a.member_id, a.link_id into v_member, v_link from app.identity_require_access() a;
   perform app.duties_require_open_read();
+  if p_starts_at is not null
+     and ((p_ends_at is not null and p_ends_at <= p_starts_at)
+          or (p_reporting_at is not null and p_reporting_at > p_starts_at)) then
+    raise exception using errcode = 'PT400', message = 'validation_failed', detail = 'window';
+  end if;
   if p_slot_id is not null then
-    if p_department_id is not null or p_starts_at is not null or p_ends_at is not null
-       or p_reporting_at is not null then
+    -- The position (at its own times, or at the new times of an edit), never with a department.
+    if p_department_id is not null
+       or (p_starts_at is null and (p_ends_at is not null or p_reporting_at is not null)) then
       raise exception using errcode = 'PT400', message = 'validation_failed', detail = 'slot_or_window';
     end if;
     select o.* into v_occ
@@ -1824,16 +1831,16 @@ begin
      where s.slot_id = p_slot_id;
     if found then
       v_department := v_occ.department_id;
-      v_range := app.duties_busy_range(v_occ);
+      v_range := case when p_starts_at is not null
+                      then app.duties_busy_range_of(p_starts_at, p_ends_at, p_reporting_at)
+                      else app.duties_busy_range(v_occ) end;
       select coalesce((select a.member_id from app.duties_assignments a
                         where a.slot_id = p_slot_id and a.assignment_state = 'current'),
                       (select s.draft_member_id from app.duties_slots s where s.slot_id = p_slot_id))
         into v_current;
     end if;
   else
-    if p_department_id is null or p_starts_at is null
-       or (p_ends_at is not null and p_ends_at <= p_starts_at)
-       or (p_reporting_at is not null and p_reporting_at > p_starts_at) then
+    if p_department_id is null or p_starts_at is null then
       raise exception using errcode = 'PT400', message = 'validation_failed', detail = 'window';
     end if;
     v_department := p_department_id;

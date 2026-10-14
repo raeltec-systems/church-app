@@ -48,13 +48,21 @@ String _positionText(RotaOccurrence o, RotaPosition p) {
     final d = p.draft;
     if (d == null) return 'Not planned';
     return 'Planned: ${_personName(d.displayName)}'
-        '${d.available ? '' : ' (can\'t serve now)'}';
+        '${d.available ? '' : ' (can\'t serve now)'}'
+        '${_overlapText(d.overlaps, d.overrideReason != null)}';
   }
   final a = p.assignment;
   if (a == null) return 'Unfilled';
   return '${_personName(a.displayName)}: ${_responseLabel(a.response).$1}'
-      '${a.available ? '' : ' (can\'t serve now)'}';
+      '${a.available ? '' : ' (can\'t serve now)'}'
+      '${o.started ? '' : _overlapText(a.overlaps, a.override != null)}';
 }
+
+/// Story 4.4: "; overlaps 1 other duty (reason given)".
+String _overlapText(int overlaps, bool reasoned) => overlaps == 0
+    ? ''
+    : '; overlaps $overlaps other ${overlaps == 1 ? 'duty' : 'duties'}'
+          '${reasoned ? ' (reason given)' : ''}';
 
 /// What a refused rota command's field code means, in words.
 String _rotaError(String code) => switch (code) {
@@ -70,6 +78,8 @@ String _rotaError(String code) => switch (code) {
   'unknown' => 'This person can no longer serve',
   'unavailable' =>
     'Someone planned can no longer serve: plan someone else first',
+  'overlap' =>
+    'Has another duty at that time: give a reason, or choose someone else',
   'required_reassign' =>
     'Someone assigned can no longer serve: give that position to someone '
         'else first',
@@ -559,6 +569,13 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
   bool _future = false;
   String _lead = '2 days';
   final Map<String, String?> _pick = {};
+
+  /// Story 4.4: the reason typed for each position, and for a change.
+  final Map<String, TextEditingController> _reasons = {};
+  final _changeReason = TextEditingController();
+
+  TextEditingController _reasonFor(String slotId) =>
+      _reasons.putIfAbsent(slotId, TextEditingController.new);
   late final _name = TextEditingController(text: widget.occurrence.dutyName);
   late final _start = TextEditingController(
     text: RotaEdit.hm(widget.occurrence.times.startsAt),
@@ -601,7 +618,7 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
 
   @override
   void dispose() {
-    for (final c in _all) {
+    for (final c in [..._all, ..._reasons.values, _changeReason]) {
       c.dispose();
     }
     super.dispose();
@@ -618,6 +635,7 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
     topic: _topic.text,
     scripture: _scripture.text,
     lead: _lead,
+    overrideReason: _changeReason.text,
   );
 
   Widget _leadPicker(String key, {String? error}) => Column(
@@ -786,61 +804,84 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
         : (inRoster ? current : null);
     final draft = o.state == RotaState.draft;
     final changed = picked != (inRoster ? current : null);
+    final reason = _reasonFor(p.slotId);
+    final errors = _errorsFor({DutyCommands.assignSlot}, slotId: p.slotId);
+    final recorded = draft ? null : p.assignment?.override;
+    final planned = draft ? p.draft?.overrideReason : null;
     return Padding(
       key: Key('rota-position-${p.slotId}'),
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 4,
-        crossAxisAlignment: WrapCrossAlignment.center,
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('${p.label}: ${_positionText(o, p)}'),
-          if (manage) ...[
-            DropdownButton<String?>(
-              key: Key('rota-pick-${p.slotId}'),
-              hint: const Text('Who'),
-              value: picked,
-              items: [
-                if (draft)
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('Nobody yet'),
-                  ),
-                for (final m in members)
-                  DropdownMenuItem<String?>(
-                    value: m.memberId,
-                    child: Text(
-                      m.account == AccountStanding.noLogin
-                          ? '${m.displayName} (no login: contact them directly)'
-                          : m.displayName,
-                    ),
-                  ),
-              ],
-              onChanged: widget.busy
-                  ? null
-                  : (v) => setState(() => _pick[p.slotId] = v),
+          if (recorded != null)
+            Text(
+              _overrideText(context, recorded),
+              key: Key('rota-override-${p.slotId}'),
             ),
-            FocusRing(
-              child: TextButton(
-                key: Key('rota-save-${p.slotId}'),
-                onPressed: widget.busy || !changed || (!draft && picked == null)
-                    ? null
-                    : () => ref
-                          .read(dutyRotaProvider.notifier)
-                          .assignSlot(
-                            o,
-                            p,
-                            picked,
-                            lead: draft ? null : _lead,
-                            subject: p.label,
-                          ),
-                child: Text(draft ? 'Save plan' : 'Give this position'),
+          if (planned != null)
+            Text(
+              'Planned despite an overlap: "$planned"',
+              key: Key('rota-planned-reason-${p.slotId}'),
+            ),
+          if (manage) ...[
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: _CandidatePicker(
+                pickerKey: 'rota-pick-${p.slotId}',
+                members: members,
+                value: picked,
+                allowNobody: draft,
+                query: CandidateQuery.slot(p.slotId),
+                reason: reason,
+                busy: widget.busy,
+                reasonError: errors['override_reason'],
+                onChanged: (v) => setState(() => _pick[p.slotId] = v),
               ),
             ),
-            if (_errorsFor({
-                  DutyCommands.assignSlot,
-                }, slotId: p.slotId)['member_id']
-                case final e?)
+            ListenableBuilder(
+              listenable: reason,
+              builder: (context, _) {
+                final given = DutyOverride.clean(reason.text);
+                // A planned person can be kept with a new reason (after
+                // Publish N named an overlap that appeared later).
+                final newReason =
+                    draft &&
+                    !changed &&
+                    picked != null &&
+                    given != null &&
+                    given != p.draft?.overrideReason;
+                return FocusRing(
+                  child: TextButton(
+                    key: Key('rota-save-${p.slotId}'),
+                    onPressed:
+                        widget.busy ||
+                            !(changed || newReason) ||
+                            (!draft && picked == null)
+                        ? null
+                        : () => ref
+                              .read(dutyRotaProvider.notifier)
+                              .assignSlot(
+                                o,
+                                p,
+                                picked,
+                                lead: draft ? null : _lead,
+                                subject: p.label,
+                                overrideReason: reason.text,
+                              ),
+                    child: Text(
+                      newReason
+                          ? 'Save the reason'
+                          : draft
+                          ? 'Save plan'
+                          : 'Give this position',
+                    ),
+                  ),
+                );
+              },
+            ),
+            if (errors['member_id'] case final e?)
               _errorLine(
                 context,
                 _rotaError(e),
@@ -865,6 +906,7 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
     final named = _namedDate(widget.series, errors);
     final leadError = err(['deadline_before', 'response_deadline']);
     final memberError = err(['member_id']);
+    final reasonError = errors['override_reason'];
 
     Widget field(
       String key,
@@ -979,6 +1021,26 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
                     context,
                     memberError,
                     key: Key('rota-edit-member-error-$id'),
+                  ),
+                if (reasonError != null || _changeReason.text.isNotEmpty)
+                  TextField(
+                    key: Key('rota-edit-reason-$id'),
+                    controller: _changeReason,
+                    enabled: !widget.busy,
+                    maxLength: DutyOverride.maxLength,
+                    maxLines: 2,
+                    decoration: InputDecoration(
+                      labelText:
+                          'Someone assigned has another duty at the new time. '
+                          'Why keep them? (required)',
+                      helperText:
+                          'Recorded for every overlapping position of this '
+                          'change; they still choose whether to accept.',
+                      helperMaxLines: 2,
+                      errorText: reasonError == null
+                          ? null
+                          : 'Give a reason, or choose other times',
+                    ),
                   ),
                 if (named != null && named.occurrenceId != id)
                   Align(

@@ -522,6 +522,12 @@ class FakeDuties implements DutiesRepository {
     AccessDenial.notGranted,
   );
   AccessRead<DutyRota> rota = const AccessReadDenied(AccessDenial.notGranted);
+
+  /// Story 4.4: the candidates read (every query gets this answer).
+  AccessRead<DutyCandidates> candidates = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  final List<CandidateQuery> candidateQueries = [];
   int mineCalls = 0;
   int boardCalls = 0;
   int adminCalls = 0;
@@ -549,6 +555,14 @@ class FakeDuties implements DutiesRepository {
   Future<AccessRead<DutyRota>> fetchRota() async {
     rotaCalls++;
     return rota;
+  }
+
+  @override
+  Future<AccessRead<DutyCandidates>> fetchCandidates(
+    CandidateQuery query,
+  ) async {
+    candidateQueries.add(query);
+    return candidates;
   }
 }
 

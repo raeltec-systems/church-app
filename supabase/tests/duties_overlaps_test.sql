@@ -7,7 +7,7 @@
 -- tools/identity-e2e/duties-overlaps.mjs. Every account, phone and name is SYNTHETIC
 -- (fictional range +44 7700 900770-900779).
 begin;
-select plan(90);
+select plan(91);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000044' || lpad(n::text, 2, '0'))::uuid $$;
@@ -355,6 +355,10 @@ create function pg_temp.revise(n int, p_publish jsonb, p_patch jsonb) returns js
     (select revision from app.duties_occurrences where occurrence_id = (p_publish #>> '{data,occurrence_id}')::uuid),
     jsonb_build_object('occurrence_id', p_publish #>> '{data,occurrence_id}') || p_patch)
 $$;
+select is((select pg_temp.of(pg_temp.readj(2, format(
+             'select api.duties_candidates(slot_id => %L::uuid, starts_at => %L::timestamptz, ends_at => %L::timestamptz)',
+             r #>> '{data,slot_id}', pg_temp.lt(0, '11:30'), pg_temp.lt(0, '12:30'))), 4) #> '{conflicts,count}' from d2),
+  '1'::jsonb, 'the picker can ask about a position at its new times (its own assignment is not a conflict)');
 select is((select pg_temp.revise(2, r, jsonb_build_object('starts_at', pg_temp.utc(0, '11:30'), 'ends_at', pg_temp.utc(0, '12:30'),
               'response_deadline', app.cmd_utc(pg_temp.lt(0, '09:00')))) -> 'field_errors' from d2),
   '{"member_id": "overlap", "override_reason": "required"}'::jsonb,

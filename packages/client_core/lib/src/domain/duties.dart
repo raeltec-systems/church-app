@@ -2,6 +2,9 @@
 /// them, with revisions (a material change replaces an assignment with a new
 /// pending one; the earlier answer is kept in history) and rota series
 /// (drafts, Publish N draft slots, this-occurrence and this-and-future edits).
+/// Story 4.4 adds overlap warnings: each candidate's upcoming load, the
+/// overlapping duties the viewer may see and the leader's recorded reason for
+/// assigning anyway (the assignee still answers).
 /// Department setup (Admin), publishing (the department's leader or deputy,
 /// or an Admin) and the assignee's explicit answer are all decided by the
 /// server; these reads are presentation only. Free of widgets and SDKs.
@@ -177,6 +180,13 @@ int _revision(Map json, [String key = 'revision']) {
   final r = _req<int>(json, key);
   if (r < 1) throw FormatException('unexpected $key');
   return r;
+}
+
+/// Story 4.4: an optional non-negative overlap count (0 when absent).
+int _overlaps(Map json) {
+  final v = _opt<int>(json, 'overlaps') ?? 0;
+  if (v < 0) throw const FormatException('unexpected overlaps');
+  return v;
 }
 
 AccountStanding _account(Object? v) => switch (v) {
@@ -372,6 +382,8 @@ class PositionAssignment {
     this.slotRevision = 1,
     this.changes,
     this.notesUpdatedAt,
+    this.overlaps = 0,
+    this.override,
   });
 
   factory PositionAssignment.fromJson(Object? json) {
@@ -388,11 +400,20 @@ class PositionAssignment {
       slotRevision: _slotRevision(m),
       changes: _optFields(m, 'changes'),
       notesUpdatedAt: _optInstant(m, 'notes_updated_at'),
+      overlaps: _overlaps(m),
+      override: DutyOverride.fromJsonOrNull(m['override']),
     );
   }
 
   final String assignmentId;
   final String memberId;
+
+  /// Story 4.4: how many other duties of the member overlap this one now.
+  final int overlaps;
+
+  /// Story 4.4: the leader's recorded reason for assigning despite an
+  /// overlap (null when none was needed).
+  final DutyOverride? override;
 
   /// Null once the member's record was erased (the fact stays anonymous).
   final String? displayName;
@@ -813,6 +834,7 @@ class DutyDraft {
     this.reportingAt,
     this.location,
     this.instructions,
+    this.overrideReason,
   });
 
   final String departmentId;
@@ -824,6 +846,9 @@ class DutyDraft {
   final String? instructions;
   final String memberId;
   final DateTime responseDeadline;
+
+  /// Story 4.4: why the member is assigned although another duty overlaps.
+  final String? overrideReason;
 
   Map<String, Object?> toPayload() {
     String utc(DateTime t) => t.toUtc().toIso8601String();
@@ -842,6 +867,7 @@ class DutyDraft {
       'instructions': ?text(instructions),
       'member_id': memberId,
       'response_deadline': utc(responseDeadline),
+      'override_reason': ?DutyOverride.clean(overrideReason),
     };
   }
 }
@@ -861,9 +887,13 @@ class DutyEdit {
     this.location,
     this.instructions,
     this.responseDeadline,
+    this.overrideReason,
   });
 
   final LeaderDuty duty;
+
+  /// Story 4.4: why, when the change puts someone into an overlap.
+  final String? overrideReason;
   final String dutyName;
   final DateTime startsAt;
   final DateTime? endsAt;
@@ -915,6 +945,7 @@ class DutyEdit {
         'instructions': _text(instructions),
       if (material && responseDeadline != null)
         'response_deadline': utc(responseDeadline),
+      if (material) 'override_reason': ?DutyOverride.clean(overrideReason),
     };
   }
 }
@@ -931,6 +962,8 @@ class RotaPerson {
     required this.memberId,
     required this.available,
     this.displayName,
+    this.overlaps = 0,
+    this.overrideReason,
   });
 
   factory RotaPerson.fromJson(Object? json) {
@@ -939,12 +972,20 @@ class RotaPerson {
       memberId: _req<String>(m, 'member_id'),
       displayName: _opt<String>(m, 'display_name'),
       available: _req<bool>(m, 'available'),
+      overlaps: _overlaps(m),
+      overrideReason: _opt<String>(m, 'override_reason'),
     );
   }
 
   final String memberId;
   final String? displayName;
   final bool available;
+
+  /// Story 4.4: other duties (and plans of this department) that overlap.
+  final int overlaps;
+
+  /// Story 4.4: the planned reason to assign despite an overlap.
+  final String? overrideReason;
 }
 
 /// The current assignment of a published rota position.
@@ -957,6 +998,8 @@ class RotaAssignment {
     required this.revision,
     required this.available,
     this.displayName,
+    this.overlaps = 0,
+    this.override,
   });
 
   factory RotaAssignment.fromJson(Object? json) {
@@ -969,8 +1012,14 @@ class RotaAssignment {
       responseDeadline: _instant(m, 'response_deadline'),
       revision: _revision(m),
       available: _req<bool>(m, 'available'),
+      overlaps: _overlaps(m),
+      override: DutyOverride.fromJsonOrNull(m['override']),
     );
   }
+
+  /// Story 4.4: overlapping duties now, and the recorded override.
+  final int overlaps;
+  final DutyOverride? override;
 
   final String assignmentId;
   final String memberId;
@@ -1397,9 +1446,13 @@ class RotaEdit {
     this.topic,
     this.scripture,
     this.lead,
+    this.overrideReason,
   });
 
   final RotaOccurrence occurrence;
+
+  /// Story 4.4: why, when new times put an assignee into an overlap.
+  final String? overrideReason;
   final String dutyName;
   final String startTime;
   final String? endTime;
@@ -1507,6 +1560,7 @@ class RotaEdit {
       if (c.contains(DutyFields.scripture)) 'scripture': _clean(scripture),
       if (needsLead && lead != null)
         'response_deadline': utc(DutyLeads.before(reporting ?? starts, lead!)),
+      if (needsLead) 'override_reason': ?DutyOverride.clean(overrideReason),
     };
   }
 
@@ -1529,8 +1583,288 @@ class RotaEdit {
       if (c.contains(DutyFields.topic)) 'topic': _clean(topic),
       if (c.contains(DutyFields.scripture)) 'scripture': _clean(scripture),
       if (material && lead != null) 'deadline_before': lead,
+      if (material) 'override_reason': ?DutyOverride.clean(overrideReason),
     };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Story 4.4: overlaps, load and reasoned overrides (`api.duties_candidates`)
+// ---------------------------------------------------------------------------
+
+/// A leader's recorded reason for assigning someone despite an overlap. The
+/// member does not see it; [reason] is null once the assignee was erased.
+class DutyOverride {
+  const DutyOverride({required this.at, this.reason, this.overlaps, this.by});
+
+  static DutyOverride? fromJsonOrNull(Object? json) {
+    if (json == null) return null;
+    final m = _map(json, 'override');
+    final n = _opt<int>(m, 'overlaps');
+    if (n != null && n < 1) throw const FormatException('unexpected overlaps');
+    return DutyOverride(
+      reason: _opt<String>(m, 'reason'),
+      overlaps: n,
+      at: _instant(m, 'at'),
+      by: _opt<String>(m, 'by'),
+    );
+  }
+
+  /// At most this many characters (the server refuses longer).
+  static const maxLength = 280;
+
+  /// A reason as sent: trimmed, null when blank.
+  static String? clean(String? reason) {
+    final t = reason?.trim();
+    return t == null || t.isEmpty ? null : t;
+  }
+
+  /// Did the server refuse for an overlap without a reason?
+  static bool required(Map<String, String> fieldErrors) =>
+      fieldErrors['override_reason'] == 'required';
+
+  final String? reason;
+  final int? overlaps;
+  final DateTime at;
+
+  /// Who recorded it (null once erased).
+  final String? by;
+}
+
+/// One overlapping duty of a candidate, as the viewer may see it. A
+/// limited conflict (another department's duty, or a cell programme part
+/// the viewer does not lead) carries only its owner kind and busy time.
+class DutyConflict {
+  const DutyConflict({
+    required this.full,
+    required this.ownerKind,
+    required this.from,
+    required this.to,
+    this.occurrenceId,
+    this.ownerName,
+    this.dutyName,
+    this.positionName,
+    this.state,
+    this.response,
+    this.times,
+    this.location,
+  });
+
+  factory DutyConflict.fromJson(Object? json) {
+    final m = _map(json, 'conflict');
+    final visibility = _req<String>(m, 'visibility');
+    final kind = _req<String>(m, 'owner_kind');
+    if (visibility != 'full' && visibility != 'limited') {
+      throw const FormatException('unexpected visibility');
+    }
+    if (kind != 'department' && kind != 'cell') {
+      throw const FormatException('unexpected owner_kind');
+    }
+    final full = visibility == 'full';
+    final state = full ? _req<String>(m, 'state') : null;
+    if (state != null && state != 'published' && state != 'draft') {
+      throw const FormatException('unexpected state');
+    }
+    return DutyConflict(
+      full: full,
+      ownerKind: kind,
+      from: _instant(m, 'from'),
+      to: _instant(m, 'to'),
+      occurrenceId: full ? _req<String>(m, 'occurrence_id') : null,
+      ownerName: full ? _opt<String>(m, 'owner_name') : null,
+      dutyName: full ? _req<String>(m, 'duty_name') : null,
+      positionName: full ? _opt<String>(m, 'position_name') : null,
+      state: state,
+      response: full && m['response'] != null
+          ? DutyResponse.fromWire(m['response'])
+          : null,
+      times: full ? DutyTimes.fromJson(m) : null,
+      location: full ? _opt<String>(m, 'location') : null,
+    );
+  }
+
+  final bool full;
+
+  /// `department` or `cell`.
+  final String ownerKind;
+
+  /// The busy time: reporting time (or start) to end time (or two hours).
+  final DateTime from;
+  final DateTime to;
+
+  final String? occurrenceId;
+  final String? ownerName;
+  final String? dutyName;
+  final String? positionName;
+
+  /// `published`, or `draft` (a plan of this department).
+  final String? state;
+  final DutyResponse? response;
+  final DutyTimes? times;
+  final String? location;
+
+  bool get isCell => ownerKind == 'cell';
+  bool get isDraft => state == 'draft';
+
+  /// Who owns it, in words.
+  String get ownerLabel => switch ((full, isCell)) {
+    (false, false) => 'Another department\'s duty',
+    (false, true) => 'A cell programme part',
+    (true, true) => 'Your cell\'s programme',
+    (true, false) => ownerName ?? 'A department',
+  };
+}
+
+/// One roster member as the assignment picker shows them.
+class CandidateCheck {
+  const CandidateCheck({
+    required this.memberId,
+    required this.displayName,
+    required this.account,
+    required this.current,
+    required this.upcomingTotal,
+    required this.upcomingHere,
+    required this.conflictCount,
+    required this.conflicts,
+  });
+
+  factory CandidateCheck.fromJson(Object? json) {
+    final m = _map(json, 'candidate');
+    final upcoming = _map(m['upcoming'], 'upcoming');
+    final c = _map(m['conflicts'], 'conflicts');
+    final total = _req<int>(upcoming, 'total');
+    final here = _req<int>(upcoming, 'here');
+    final count = _req<int>(c, 'count');
+    final items = List<DutyConflict>.unmodifiable(
+      _req<List>(c, 'items').map(DutyConflict.fromJson),
+    );
+    if (total < 0 || here < 0 || here > total || count < items.length) {
+      throw const FormatException('unexpected counts');
+    }
+    return CandidateCheck(
+      memberId: _req<String>(m, 'member_id'),
+      displayName: _req<String>(m, 'display_name'),
+      account: _account(m['account']),
+      current: _req<bool>(m, 'current'),
+      upcomingTotal: total,
+      upcomingHere: here,
+      conflictCount: count,
+      conflicts: items,
+    );
+  }
+
+  final String memberId;
+  final String displayName;
+  final AccountStanding account;
+
+  /// Holds (or is planned for) the position asked about.
+  final bool current;
+
+  /// Duties awaiting an answer or accepted in the next 90 days: all owners,
+  /// and in this department.
+  final int upcomingTotal;
+  final int upcomingHere;
+
+  /// Overlapping duties in all, and the first ones (at most 10).
+  final int conflictCount;
+  final List<DutyConflict> conflicts;
+
+  bool get overlaps => conflictCount > 0;
+
+  /// "3 upcoming (1 here)".
+  String get loadLabel =>
+      '$upcomingTotal upcoming'
+      '${upcomingTotal == upcomingHere ? '' : ' ($upcomingHere here)'}';
+}
+
+/// `api.duties_candidates`.
+class DutyCandidates {
+  const DutyCandidates({
+    required this.departmentId,
+    required this.from,
+    required this.to,
+    required this.candidates,
+    this.slotId,
+  });
+
+  factory DutyCandidates.fromJson(Object? json) {
+    final m = _map(json, 'candidates read');
+    final w = _map(m['window'], 'window');
+    return DutyCandidates(
+      departmentId: _req<String>(m, 'department_id'),
+      slotId: _opt<String>(m, 'slot_id'),
+      from: _instant(w, 'from'),
+      to: _instant(w, 'to'),
+      candidates: List.unmodifiable(
+        _req<List>(m, 'candidates').map(CandidateCheck.fromJson),
+      ),
+    );
+  }
+
+  final String departmentId;
+  final String? slotId;
+
+  /// The busy time asked about.
+  final DateTime from;
+  final DateTime to;
+  final List<CandidateCheck> candidates;
+
+  CandidateCheck? of(String? memberId) {
+    for (final c in candidates) {
+      if (c.memberId == memberId) return c;
+    }
+    return null;
+  }
+}
+
+/// What the candidates read is asked about: a position (at its own times,
+/// or at the new times of an edit), or the busy time of a one-off duty not
+/// published yet. Equal queries share one read.
+class CandidateQuery {
+  const CandidateQuery.slot(
+    String this.slotId, {
+    this.startsAt,
+    this.endsAt,
+    this.reportingAt,
+  }) : departmentId = null;
+
+  const CandidateQuery.window({
+    required String this.departmentId,
+    required DateTime this.startsAt,
+    this.endsAt,
+    this.reportingAt,
+  }) : slotId = null;
+
+  final String? slotId;
+  final String? departmentId;
+  final DateTime? startsAt;
+  final DateTime? endsAt;
+  final DateTime? reportingAt;
+
+  /// The named parameters of `api.duties_candidates`.
+  Map<String, Object?> toParams() {
+    String utc(DateTime t) => t.toUtc().toIso8601String();
+    return {
+      'slot_id': ?slotId,
+      'department_id': ?departmentId,
+      if (startsAt case final s?) 'starts_at': utc(s),
+      if (endsAt case final e?) 'ends_at': utc(e),
+      if (reportingAt case final r?) 'reporting_at': utc(r),
+    };
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is CandidateQuery &&
+      other.slotId == slotId &&
+      other.departmentId == departmentId &&
+      other.startsAt == startsAt &&
+      other.endsAt == endsAt &&
+      other.reportingAt == reportingAt;
+
+  @override
+  int get hashCode =>
+      Object.hash(slotId, departmentId, startsAt, endsAt, reportingAt);
 }
 
 /// Application port for the duties reads. Never throws; a fresh request
@@ -1542,6 +1876,10 @@ abstract interface class DutiesRepository {
 
   /// Story 4.3: `api.duties_rota`.
   Future<AccessRead<DutyRota>> fetchRota();
+
+  /// Story 4.4: `api.duties_candidates` for a position or a prospective
+  /// one-off duty.
+  Future<AccessRead<DutyCandidates>> fetchCandidates(CandidateQuery query);
 }
 
 class UnconfiguredDutiesRepository implements DutiesRepository {
@@ -1562,6 +1900,11 @@ class UnconfiguredDutiesRepository implements DutiesRepository {
   @override
   Future<AccessRead<DutyRota>> fetchRota() async =>
       const AccessReadDenied(AccessDenial.unavailable);
+
+  @override
+  Future<AccessRead<DutyCandidates>> fetchCandidates(
+    CandidateQuery query,
+  ) async => const AccessReadDenied(AccessDenial.unavailable);
 }
 
 /// Does [grants] lead or deputise a department, or oversee them (Admin,

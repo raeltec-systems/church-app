@@ -56,8 +56,21 @@ String _positionText(RotaOccurrence o, RotaPosition p) {
   return '${_personName(a.displayName)}: '
       '${_answerLabel(a.response, a.priorAcceptedAt).$1}'
       '${a.available ? '' : ' (can\'t serve now)'}'
-      '${o.started ? '' : _overlapText(a.overlaps, a.override != null)}';
+      '${o.started ? '' : _overlapText(a.overlaps, a.override != null)}'
+      // Story 4.8: Short notice and Needs contact.
+      '${a.shortNotice && a.response == DutyResponse.pending && !o.started ? '; short notice' : ''}'
+      '${a.needsContact != null ? '; needs contact' : ''}';
 }
+
+/// Story 4.8: the "church default" entry first, then the lead times.
+List<DropdownMenuItem<String>> _leadItems() => [
+  const DropdownMenuItem(
+    value: DutyLeads.churchDefault,
+    child: Text('the church default (by lead time)'),
+  ),
+  for (final (wire, label) in DutyLeads.choices)
+    DropdownMenuItem(value: wire, child: Text(label)),
+];
 
 /// Story 4.4: "; overlaps 1 other duty (reason given)".
 String _overlapText(int overlaps, bool reasoned) => overlaps == 0
@@ -327,16 +340,14 @@ class _SeriesViewState extends ConsumerState<_SeriesView> {
             'unfilled. Dates that have started are not published.',
           ),
           const SizedBox(height: 8),
-          Row(
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               const Text('Answer by: '),
               DropdownButton<String>(
                 key: Key('rota-publish-lead-$id'),
                 value: _lead,
-                items: [
-                  for (final (wire, label) in DutyLeads.choices)
-                    DropdownMenuItem(value: wire, child: Text(label)),
-                ],
+                items: _leadItems(),
                 onChanged: widget.busy
                     ? null
                     : (v) => setState(() => _lead = v ?? _lead),
@@ -373,7 +384,7 @@ class _SeriesViewState extends ConsumerState<_SeriesView> {
                       ? null
                       : () => ref
                             .read(dutyRotaProvider.notifier)
-                            .publishDrafts(r, n, _lead),
+                            .publishDrafts(r, n, DutyLeads.wire(_lead)),
                   child: Text('Publish $n draft ${n == 1 ? 'slot' : 'slots'}'),
                 ),
               ),
@@ -568,6 +579,9 @@ enum _Mode { view, change, cancel }
 class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
   _Mode _mode = _Mode.view;
   bool _future = false;
+
+  /// Story 4.8: save the reminders for this and the later dates.
+  bool _remindersFuture = false;
   String _lead = '2 days';
   final Map<String, String?> _pick = {};
 
@@ -635,23 +649,21 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
     instructions: _instructions.text,
     topic: _topic.text,
     scripture: _scripture.text,
-    lead: _lead,
+    lead: DutyLeads.wire(_lead),
     overrideReason: _changeReason.text,
   );
 
   Widget _leadPicker(String key, {String? error}) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Row(
+      Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           const Text('Answer by: '),
           DropdownButton<String>(
             key: Key(key),
             value: _lead,
-            items: [
-              for (final (wire, label) in DutyLeads.choices)
-                DropdownMenuItem(value: wire, child: Text(label)),
-            ],
+            items: _leadItems(),
             onChanged: widget.busy
                 ? null
                 : (v) => setState(() => _lead = v ?? _lead),
@@ -713,6 +725,35 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
               },
             ),
           const SizedBox(height: 8),
+          // Story 4.8: this date's member reminders (or this and the later
+          // dates'); nobody is asked to answer again.
+          if (o.reminders case final rem?) ...[
+            if (manage)
+              CheckboxListTile(
+                key: Key('rota-reminders-future-$id'),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: _remindersFuture,
+                onChanged: widget.busy
+                    ? null
+                    : (v) => setState(() => _remindersFuture = v ?? false),
+                title: const Text('Reminders: this and later dates'),
+              ),
+            _RemindersEditor(
+              key: Key('rota-reminders-$id-r${o.revision}'),
+              keyPrefix: 'rota-$id',
+              reminders: rem,
+              canChange: manage,
+              busy: widget.busy,
+              saveLabel: _remindersFuture
+                  ? 'Save for this and later dates'
+                  : 'Save for this date',
+              error: _errorsFor({DutyCommands.setReminders})['reminders'],
+              onSave: (specs) => _remindersFuture
+                  ? ctl.setSeriesReminders(widget.series, o, specs)
+                  : ctl.setReminders(o, specs),
+            ),
+          ],
           if (manage && _mode == _Mode.view)
             Wrap(
               spacing: 8,
@@ -867,7 +908,7 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
                                 o,
                                 p,
                                 picked,
-                                lead: draft ? null : _lead,
+                                lead: draft ? null : DutyLeads.wire(_lead),
                                 subject: p.label,
                                 overrideReason: reason.text,
                               ),
@@ -1175,6 +1216,11 @@ class _NewSeriesFormState extends ConsumerState<_NewSeriesForm> {
   final _positions = TextEditingController();
   String _every = 'week';
 
+  /// Story 4.8: the creator's member reminders for every date (off = the
+  /// defaults).
+  bool _customReminders = false;
+  final Set<DutyReminderSpec> _reminders = {};
+
   List<TextEditingController> get _all => [
     _name,
     _interval,
@@ -1373,6 +1419,17 @@ class _NewSeriesFormState extends ConsumerState<_NewSeriesForm> {
             wire: 'scripture',
             maxLength: 120,
           ),
+          // Story 4.8: the member reminders of every date.
+          _ReminderChoice(
+            keyPrefix: 'series-$id',
+            custom: _customReminders,
+            selected: _reminders,
+            enabled: !widget.busy,
+            error: errors['reminders'],
+            onCustom: (v) => setState(() => _customReminders = v),
+            onToggle: (c, on) =>
+                setState(() => on ? _reminders.add(c) : _reminders.remove(c)),
+          ),
           ListenableBuilder(
             listenable: Listenable.merge(_all),
             builder: (context, _) {
@@ -1387,7 +1444,14 @@ class _NewSeriesFormState extends ConsumerState<_NewSeriesForm> {
                           ? null
                           : () => ref
                                 .read(dutyRotaProvider.notifier)
-                                .createSeries(draft),
+                                .createSeries(
+                                  draft.withReminders(
+                                    _chosenReminders(
+                                      _customReminders,
+                                      _reminders,
+                                    ),
+                                  ),
+                                ),
                       child: const Text('Make the draft dates'),
                     ),
                   ),

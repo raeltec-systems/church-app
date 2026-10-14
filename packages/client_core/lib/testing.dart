@@ -689,7 +689,7 @@ class FakeDuties implements DutiesRepository {
 
 /// The wire form of one of the member's duties (stories 4.1, 4.2; 4.5 adds
 /// the slot id, the owner kind, the earlier acceptance and the leader
-/// names).
+/// names; 4.8 keys go in [extra]).
 Map<String, Object?> myDutyData({
   String assignmentId = '42424242-4242-4242-8242-424242424242',
   int revision = 1,
@@ -712,6 +712,9 @@ Map<String, Object?> myDutyData({
   List<Map<String, Object?>> leaders = const [],
   String slotId = '45454545-4545-4545-8545-454545454545',
   String ownerKind = 'department',
+  // Story 4.8: deadline_source, short_notice, reminders (absent = a server
+  // before 4.8).
+  Map<String, Object?> extra = const {},
 }) => {
   'assignment_id': assignmentId,
   'revision': revision,
@@ -738,6 +741,7 @@ Map<String, Object?> myDutyData({
   'previous_response': previousResponse,
   'previous_assignment_ids': previousAssignmentIds,
   'notes_updated_at': notesUpdatedAt,
+  ...extra,
 };
 
 /// The wire form of a synthetic cell as the Admin sees it (story 2.6).

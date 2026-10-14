@@ -3,7 +3,7 @@ title: 'Open the Follow-ups registry with My follow-ups for every owner'
 type: 'feature'
 ticket: '6'
 created: '2026-10-14'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '269cd5d2d35320656d273e559e2cb573597884bc'
 route: 'full'
 route_source: 'auto'
@@ -71,19 +71,32 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261014120000_followups_registry.sql` -- purposes, tasks, activity, notes; registration; owner operations; commands, authorizer, in_scope; reads; deletion hook; SYNTHETIC fixture source; privileges.
-- [ ] `supabase/tests/followups_registry_test.sql` + ledgers (`command_foundation_test.sql`, `notifications_routing_test.sql`) -- the matrix.
-- [ ] `packages/client_core/lib/src/{domain/followups.dart, application/followups_controllers.dart, presentation/followups_screens.dart, adapters/supabase_followups_repository.dart}` + exports, provider, composition, fake, routes -- client.
-- [ ] `apps/mobile/lib/app.dart` (Home card via `MemberHomeScreen`), `apps/staff/lib/app.dart` -- destinations; tests in `packages/client_core/test/followups/followups_test.dart` and both app tests.
-- [ ] `tools/identity-e2e/followups.mjs` + `followups.test.mjs` -- the verify over HTTP.
-- [ ] `docs/runbooks/follow-ups.md` (+ link in `contracts-and-owner-seams.md`) -- model, registration guide, owner manual checks.
-- [ ] `evidence-4.6/` -- E2E JSONL and suite summary.
+- [x] `supabase/migrations/20261014120000_followups_registry.sql` -- purposes, tasks, activity, notes; registration; owner operations; commands, authorizer, in_scope; reads; deletion hook; SYNTHETIC fixture source; privileges.
+- [x] `supabase/tests/followups_registry_test.sql` + ledgers (`command_foundation_test.sql`, `notifications_routing_test.sql`) -- the matrix.
+- [x] `packages/client_core/lib/src/{domain/followups.dart, application/followups_controllers.dart, presentation/followups_screens.dart, adapters/supabase_followups_repository.dart}` + exports, provider, composition, fake, routes -- client.
+- [x] `apps/mobile/lib/app.dart` (Home card via `MemberHomeScreen`), `apps/staff/lib/app.dart` -- destinations; tests in `packages/client_core/test/followups/followups_test.dart` and both app tests.
+- [x] `tools/identity-e2e/followups.mjs` + `followups.test.mjs` -- the verify over HTTP.
+- [x] `docs/runbooks/follow-ups.md` (+ link in `contracts-and-owner-seams.md`) -- model, registration guide, owner manual checks.
+- [x] `evidence-4.6/` -- E2E JSONL and suite summary.
 
 **Acceptance Criteria:**
 - Given the local stack, when the E2E runs, then a leader creates SYNTHETIC tasks for an app member and an accountless member, the owner sees them in My follow-ups and moves one through In progress, Waiting (due date kept), Done, a second is Closed with a reason (refused without), the leader reassigns one and records an update for the accountless owner, a duplicate is refused, Admin routing shows no private content, and direct table queries are refused.
 - Given the full local verification, when run, then every listed check passes.
 
 ## Implementation Notes
+
+- Implemented directly (no implementation subagent is available inside this builder run).
+- Server: `supabase/migrations/20261014120000_followups_registry.sql`. Vocabularies through `app.followups_state_ok` (widened later by replacement, as Duties does). The text validator builds its invisible-character class with `chr()` (`app.followups_invisible_class`), so the file holds no `\u` escape and survives the MCP apply byte for byte. No `_rows` file: deletion anonymises and clears note text (`erased_at`) without deleting rows.
+- Decision (agent, under owner pre-approval): `followups.create_task` and `app.followups_open_task` take `source_revision` because the shared `source_ref` contract (`contract_check_source`) requires it; it is stored on the task as the revision the task was opened at.
+- Decision (agent, under owner pre-approval): an Admin with a scope acts as a scope holder for that scope (the scope capacity wins); an owner who also holds the scope acts as owner on their own task. Updates by Admin capacity are `forbidden`; reassign by the owner without scope is `forbidden`; anyone else gets `not_found`.
+- Decision (agent, under owner pre-approval): in production the SYNTHETIC accounts are not live members, so a create is refused (`forbidden`) before the Q4 gate is even reached; the gate itself is pinned by pgTAP (`app.followups_require_open()` raises `unavailable` in production) and the reads answer `403 unavailable`.
+- Decision (agent, under owner pre-approval): the Home card lives in `MemberHomeScreen` (duties_screens.dart, one added child and an import); no other Duties code changed. Staff web gets **My follow-ups** (member access), **Follow-ups** (department leader/deputy, cell leader/assistant) and **Follow-up routing** (Admin).
+- Ledgers: `command_foundation_test.sql` (five followups pairs added to the authenticated EXECUTE list), `notifications_routing_test.sql` (deletion check `cells=0,duties=0,fixture=0,followups=0,notifications=0`). New `supabase/tests/followups_registry_test.sql` (117 checks).
+- Clients: `packages/client_core/lib/src/{domain/followups.dart, application/followups_controllers.dart, presentation/followups_screens.dart, adapters/supabase_followups_repository.dart}`; routes `/followups`, `/followups/tasks/:taskId`, `/followups/supervision`, `/admin/followups`; fakes `FakeFollowUps`, `followUpTaskData`, `followUpPersonData` in `testing.dart`. Tests: `packages/client_core/test/followups/followups_test.dart` (17), one test each in `apps/mobile/test/mobile_app_test.dart` and `apps/staff/test/staff_app_test.dart`. No deep-link pattern yet (no reminder links until entry 7).
+- E2E: `tools/identity-e2e/followups.mjs` (13 checks, F01-F51) with offline `followups.test.mjs`. Fictional numbers: pgTAP +44 7700 900210-900219, E2E 900220-900229 (unused before; grepped).
+- Runbook: `docs/runbooks/follow-ups.md` (model, commands, reads, registration guide, deletion, clients, local and hosted steps, owner manual checks, open owner question); linked from `contracts-and-owner-seams.md`.
+- Open owner question (fail-closed default taken): Q4, whether a leader may choose any approved member as a task owner or only their scope's members. Production stays closed behind the Q4 gate until decided.
+- Matrix audit: Create, Duplicate, Outsider create, Lifecycle, Supervisor update, Reassign, Admin view, Stale, Deletion are covered in pgTAP and (except Source event, Stale and Deletion) also over HTTP in the E2E; Source event (close and keep) is pgTAP only (no client source exists yet).
 
 ## Plan Change Log
 
@@ -106,3 +119,12 @@ context:
 **Manual checks (if no CLI):**
 - Parent session: apply the migration to staging and compare per-function md5. No owner SQL paste.
 - Owner: `docs/runbooks/follow-ups.md`, "Owner manual checks (story 4.6)".
+
+**Results (2026-10-14):**
+- db reset 0; db:test PASS (32 files, 2757 tests, including `followups_registry_test.sql` 117); db:smoke pass, no SMS provider.
+- Every E2E `exit=0` (23 scripts), `followups` 13/13.
+- contracts:test 242/0; node tool tests (CI set) 189/0; ci:policy-test 56/0.
+- flutter analyze clean in all three; flutter test client_core 533 (followups 17), apps/staff 36, apps/mobile 51; under `TZ=America/New_York` client_core `test/followups` 17 and apps/mobile 51.
+- ci:secrets clean; ci:migrations (`--base origin/main`) ordered, unique, non-destructive; ci:function-imports ok; evidence scan clean (no numbers, tokens or note text).
+- Evidence: `evidence-4.6/followups-e2e.jsonl`, `evidence-4.6/e2e-suite-summary.txt`.
+- Remaining (not builder steps): staging apply and md5 parity (parent session; no owner SQL paste), staging client rebuild, owner manual checks in `docs/runbooks/follow-ups.md` story 4.6, open owner question Q4 (owner candidates).

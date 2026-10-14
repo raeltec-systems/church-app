@@ -1,0 +1,15 @@
+{"step":"F00-precondition","target":"LOCAL","at":"2026-10-14T09:25:26.707Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"F01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-14T09:25:29.129Z","verdict":"pass","amr":["password"]}
+{"step":"F02-leader-scope-and-synthetic-purpose","target":"LOCAL","at":"2026-10-14T09:25:29.262Z","verdict":"pass","department":200,"grant":200,"supervision":200,"purpose":true,"accountless_label":"no_login"}
+{"step":"F10-leader-creates-synthetic-tasks","target":"LOCAL","at":"2026-10-14T09:25:29.377Z","verdict":"pass","non_leader":"forbidden","created":[200,200,200],"replay_same":true,"duplicate":"conflict:task_exists"}
+{"step":"F20-owner-sees-my-follow-ups","target":"LOCAL","at":"2026-10-14T09:25:29.416Z","verdict":"pass","tasks":2,"state":"open","context":"SYNTHETIC check-in source","capacity":"owner"}
+{"step":"F21-owner-moves-a-task-through-every-state","target":"LOCAL","at":"2026-10-14T09:25:29.479Z","verdict":"pass","states":["in_progress","waiting","done"],"waiting_without_review":"required","due_kept":true,"review_after_due":true,"after_done":"finished"}
+{"step":"F22-closing-needs-a-reason","target":"LOCAL","at":"2026-10-14T09:25:29.499Z","verdict":"pass","without_reason":"validation_failed:required","closed":"closed"}
+{"step":"F30-leader-records-an-update-for-an-accountless-owner","target":"LOCAL","at":"2026-10-14T09:25:29.521Z","verdict":"pass","status":200,"capacity":"supervisor","attributed":true,"for_owner":true,"notes":2}
+{"step":"F31-leader-reassigns-and-the-owner-cannot","target":"LOCAL","at":"2026-10-14T09:25:29.580Z","verdict":"pass","owner_attempt":"forbidden","reassigned":200,"new_owner_sees_it":true}
+{"step":"F32-an-unrelated-member-sees-nothing","target":"LOCAL","at":"2026-10-14T09:25:29.590Z","verdict":"pass","reassign_attempt":"not_found"}
+{"step":"F40-admin-sees-routing-metadata-only","target":"LOCAL","at":"2026-10-14T09:25:29.635Z","verdict":"pass","routed":3,"private_keys":0,"view":"routing","admin_update":"forbidden"}
+{"step":"F41-others-are-refused","target":"LOCAL","at":"2026-10-14T09:25:29.652Z","verdict":"pass","task":403,"supervision":403,"routing":403}
+{"step":"F50-direct-table-queries-refused","target":"LOCAL","at":"2026-10-14T09:25:29.676Z","verdict":"pass","statuses":["app.followups_tasks:406","api.followups_tasks:404","app.followups_notes:406","api.followups_notes:404","app.followups_activity:406","api.followups_activity:404","app.followups_purposes:406","api.followups_purposes:404"],"owner_operation":406}
+{"step":"F51-receipts-and-activity-hold-no-text","target":"LOCAL","at":"2026-10-14T09:25:30.004Z","verdict":"pass","receipts_with_text":0,"activity_text_columns":"action,actor_capacity,code,environment,from_state,outcome,to_state"}
+{"step":"F99-cleanup","target":"LOCAL","at":"2026-10-14T09:25:30.626Z","users_left":0,"unmarked":true,"tasks_left":0,"departments_left":0}

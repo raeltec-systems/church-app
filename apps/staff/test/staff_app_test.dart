@@ -23,6 +23,7 @@ Future<Harness> pumpStaff(
   bool configured = true,
   NotificationHealthRepository? healthRepository,
   String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  void Function(Harness h)? setUp,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -30,6 +31,7 @@ Future<Harness> pumpStaff(
   addTearDown(tester.view.reset);
   addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
   final h = ClientTestHarness(account: account);
+  setUp?.call(h);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -406,6 +408,51 @@ void main() {
         findsOneWidget,
       );
       expect(find.byKey(const Key('nav-/admin/followups')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'story 4.7: a supervisor\'s overdue alert opens the follow-up task',
+    (tester) async {
+      const item = '33333333-3333-4333-8333-323232323232';
+      const task = '46464646-4646-4646-8646-464646464646';
+      final h = await pumpStaff(
+        tester,
+        size: const Size(1280, 2000),
+        location: '/inbox/$item',
+        setUp: (h) {
+          h.grants.myAccess = AccessReadOk(syntheticGrants());
+          h.inbox.opened[item] = AccessReadOk(
+            OpenedInboxItem.fromJson({
+              ...inboxItemData(
+                id: item,
+                kind: 'followup_overdue',
+                title: 'Follow-up task overdue',
+                body:
+                    'A follow-up task you supervise is overdue. Open it to '
+                    'follow up with its owner.',
+              ),
+              'state': 'current',
+              'target': '/followups/tasks/$task',
+            }),
+          );
+          h.followUps.task = AccessReadOk(
+            FollowUpDetail.fromJson({
+              'view': 'full',
+              'task': followUpTaskData(capacity: 'supervisor', overdue: true),
+              'activity': const <Object?>[],
+              'notes': const <Object?>[],
+            }),
+          );
+        },
+      );
+      expect(find.text('Follow-up task overdue'), findsOneWidget);
+      await tapKey(tester, 'inbox-item-open-target');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(h.followUps.taskReads, contains(task));
+      expect(find.byKey(const Key('followup-summary')), findsOneWidget);
+      expect(tester.takeException(), isNull);
     },
   );
 

@@ -146,6 +146,14 @@ that this table does not name.**
 | G10 | Church settings: `operational_contact` (Q1), `lead_pastor_designation` (Q4) | `select app.identity_approve_church_setting('operational_contact', '{"route": "<church office route>"}', 'israel', '<note>');`; the lead pastor only after Q4 (`app.identity_designate_lead_pastor`). | Help screens say "contact the church office"; the lead-pastor role cannot be assigned or used. |
 | G11 | Public sign-up (`disable_signup`, tied to G5/Q4) | Only after G5 is approved (and G8's first-Admin procedure is decided, since the first Admin also needs an account): `GET` the Auth config, then `PATCH` it with `disable_signup: false` and every other field unchanged. | `disable_signup: true`: `POST /auth/v1/signup` is refused (`422`, `signup_disabled`) and **Create account** fails generically on both clients; nobody can register a number. |
 
+**Gate prerequisite (story 4.7): approve Q4 only together with or after Q2.** Follow-ups (tasks,
+My follow-ups, supervision, Admin routing and the source owner operations) needs BOTH
+`q4_personal_data` (G5) and a valid approved `q2_church_time` (the church-time scheduling policy,
+`notifications.md` story 3.3). With Q4 approved and Q2 not, every Follow-ups command and owner
+operation answers `unavailable {"policy": "gate_closed"}` and every read `403 unavailable`
+(fail closed, nothing written; the clients say "Not available yet"), so Follow-ups stays inert
+rather than half working. Approve `q2_church_time` first (or in the same session), then G5.
+
 ### 7. Verify that production shows the gates disabled (read-only, SQL editor)
 
 ```sql

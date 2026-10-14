@@ -584,6 +584,7 @@ Map<String, Object?> followUpTaskData({
   Map<String, Object?>? owner,
   Map<String, Object?>? supervisor,
   bool routing = false,
+  Map<String, Object?>? reminders,
 }) {
   final active =
       state == 'open' || state == 'in_progress' || state == 'waiting';
@@ -627,6 +628,7 @@ Map<String, Object?> followUpTaskData({
     'capacity': capacity,
     'can_update': canUpdate ?? (active && capacity != 'admin'),
     'can_reassign': canReassign,
+    'reminders': ?reminders,
   };
 }
 

@@ -1,6 +1,6 @@
 # Runbook: follow-up tasks (epic 4, Follow-ups owner)
 
-Follow-ups is the one accountable task registry (architecture AD-7). Sources (duties coverage, visitors, missing reports, care, custody) do not keep their own trackers: they open one task per source and purpose in Follow-ups and register what their source events do to it. Reminders arrive with entry 7, lifecycle and handover hooks with entry 12.
+Follow-ups is the one accountable task registry (architecture AD-7). Sources (duties coverage, visitors, missing reports, care, custody) do not keep their own trackers: they open one task per source and purpose in Follow-ups and register what their source events do to it. Reminders arrived with story 4.7 (below); lifecycle and handover hooks arrive with entry 12.
 
 ## Story 4.6: open the Follow-ups registry with My follow-ups for every owner
 
@@ -15,7 +15,7 @@ Migration: `supabase/migrations/20261014110258_followups_registry.sql` (forward 
 - **Activity** (`app.followups_activity`): content-free (ids, codes, states, dates): who acted, in which capacity (`owner`, `supervisor`, `admin`, `source`) and for whom (`on_behalf_of_member` when a scope holder records for the owner).
 - **Private notes** (`app.followups_notes`): free text, shown only to the owner and the holders of the task's scope; never to Admin routing, never in receipts or activity.
 - **Scope families** (`app.followups_scope_families`, review S1/S2): the owner of a scope kind registers its family and a read-only roster hook. Duties registers `department_leader` and `department_deputy` as family `department` (roster: the department's current members); Cells registers `cell_leader` and `cell_assistant` as family `cell` (roster: the cell's current members). A member supervises a task when they hold an active grant on the same target (`scope_id`) whose kind is in the task's family **and** is one of the kinds the purpose registers now: so a department's leader and deputy, or a cell's leader and assistant, supervise each other's tasks, and narrowing a purpose's `scope_kinds` narrows every command and read at once.
-- **Owner candidates** (fail closed): a task's owner is chosen from its target's roster only: the target's current members and the current holders of the family's scope kinds, approved and not under deletion. Create, reassign (also by an Admin) and the owner operation refuse anyone else (`owner_member_id: not_in_scope`). Widening this is open owner question Q4 below.
+- **Owner candidates**: a task's owner is chosen from its target's roster (the target's current members and the current holders of the family's scope kinds) **plus the current Pastors** (owner decision Q4, 2026-10-14, applied by story 4.7), all approved and not under deletion. Create, reassign (also by an Admin) and the owner operation refuse anyone else (`owner_member_id: not_in_scope`), including a former Pastor. A Pastor chosen as owner gets exactly the owner's rights on that task; the Pastor role alone still shows no other task and gives no supervision.
 - Every Follow-ups command, owner operation (including source events) and read is behind the Q4 personal-data gate (`app.identity_applications_open()`): open in a database marked local or staging, closed in production until Q4 is approved. Production stays inert.
 
 ### Who may do what
@@ -100,8 +100,8 @@ The E2E uses the fictional numbers +44 7700 900220-900229 (pgTAP: 900210-900219)
 
 Use synthetic members only. You need: an Admin A, a leader L of `SYNTHETIC Preaching Rota` (from 4.1, or give the scope again), a member M with the app on an Android phone, a member O and an accountless member X (staff web **Members & applications** > create a member without a login, SYNTHETIC name, fictional number).
 
-0. **Roster.** Staff web as A: **Departments**: M, O and X are members of `SYNTHETIC Preaching Rota` (owners are chosen from the department's members and leaders only). Optionally give a deputy D of the department.
-1. **Create.** Staff web as L: **Follow-ups** > **Create a task**: purpose `SYNTHETIC check-in`, scope = the department, owner M (the owner list shows only the department's members and leaders), next action `SYNTHETIC: phone and check in`, a due date next week, **Create task**. Expect **Task created** and the task with **Open**. Create a second task for M and one for X with a private note.
+0. **Roster.** Staff web as A: **Departments**: M, O and X are members of `SYNTHETIC Preaching Rota` (owners are chosen from the department's members and leaders, and since story 4.7 also the current Pastors). Optionally give a deputy D of the department.
+1. **Create.** Staff web as L: **Follow-ups** > **Create a task**: purpose `SYNTHETIC check-in`, scope = the department, owner M (the owner list shows only the department's members and leaders, plus any Pastors since story 4.7), next action `SYNTHETIC: phone and check in`, a due date next week, **Create task**. Expect **Task created** and the task with **Open**. Create a second task for M and one for X with a private note.
 2. **My follow-ups on the phone.** As M: **Home** shows **My follow-ups** with "2 open". **See all** lists both; open the first: the next action, `SYNTHETIC check-in source`, due date and supervisor L.
 3. **Every state.** Tap **In progress** (**Sending…** then **Saved**, status **In progress**). Enter a review date and time, tap **Waiting**: the due date stays and the review date shows. Pick **Contacted**, **Record outcome**. Tap **Done**: status **Done**, the update buttons are gone. On the second task type no reason: **Close** stays disabled; type a reason and **Close**: **Closed** with the reason.
 4. **For the accountless owner.** Staff web as L: open X's task: the line "what you record here is shown as recorded by you for X". Record **Contacted** and a note: the activity and the note say "recorded by L for X".
@@ -113,13 +113,98 @@ Use synthetic members only. You need: an Admin A, a leader L of `SYNTHETIC Preac
 
 Record the outcome per step in `evidence-4.6/owner-check.md` (pass/fail, device model, Android version, browser; no numbers, ids or keys).
 
-### Open owner questions
+### Owner questions
 
-- **Q4: who may be chosen as an owner.** Since the review, a leader (and an Admin) chooses only from the task's target: the department's or cell's current members and its leaders (the fail-closed default). Everything also stays behind the Q4 personal-data gate in production. Decide whether owners may ever be chosen from outside the target (for example a church-wide follow-up team).
+- **Q4: who may be chosen as an owner. Decided 2026-10-14** (owner: "allow only from task's own group and pastor"): the task's own group (its target's roster) and the current Pastors; nobody else. Applied in story 4.7's migration (`app.followups_scope_roster`). A Pastor counts only with live access (an active, reviewed link, no open hold, not dormant; review N1), and the Pastor grant is share-locked while a task is created, opened or reassigned to them. Members of the task's own group stay eligible with or without a login (their supervisor records for them). The Q4 personal-data gate itself stays closed in production, and needs Q2 (above).
 
 ### Known limits (later entries)
 
-- No reminders on assignment, at the deadline or to the supervisor a day later (entry 7).
+- Reminders: done in story 4.7 (below).
 - No lifecycle or handover hooks: deactivation does not yet hand over open tasks (entry 12).
 - No real source yet: duties coverage (entry 9) and the consumer guide with both-client fixtures (entry 11) follow. Care and finance note grants arrive with their owners.
 - No due-date change and no reopen of a Done or Closed task.
+
+## Story 4.7: remind follow-up owners and supervisors on the task schedule
+
+Migration: `supabase/migrations/20261014143021_followups_reminders.sql` (forward only; the 4.6 file is not edited; no destructive statements, no row deletions, no `_rows` file, so **no owner SQL paste**). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-remind-follow-up-owners-and-supervisors-on-the-task-schedule-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.7/`. Tests: `supabase/tests/followups_reminders_test.sql` (132, worker-driven), `packages/client_core/test/followups/followups_reminders_test.dart`, one test in each app, E2E `tools/identity-e2e/followups-reminders.mjs` (12 checks, R01-R90) with its offline test.
+
+### What is sent, to whom, when
+
+Follow-ups registers two reminder sources (3.2 contracts), both keyed by the task id, with fixed generic text and the deep link `/followups/tasks/{source_id}`:
+
+| Source / kind | Recipient | When | Title |
+|---|---|---|---|
+| `followups_task` / `followup_assigned` | the owner | when the task is created or reassigned to them | New follow-up task |
+| `followups_task` / `followup_due` | the owner | at the actionable deadline (the due date while Open or In progress, the review date while Waiting), or at the creator's reminder times | Follow-up task due |
+| `followups_supervision` / `followup_overdue` | the supervisor | once, one day after the deadline, if the task is still active and overdue | Follow-up task overdue |
+
+- **Logical key and revision.** The reminders' source revision is the task's `schedule_revision`. It moves when the actionable deadline moves (into or out of Waiting, a new review date), on every reassignment of the owner or the supervisor, and when a recipient whose reminders of the task ended (reassigned away, inactive) is active again (review B1: M -> O -> M and L -> P -> L keep their reminders). Notes, outcomes, next actions and Open <-> In progress re-plan at the same revision, so nothing is sent twice. Past times are never enqueued.
+- **One supervisor alert per deadline (review S1).** When the alert time for the current deadline has already passed at a re-plan (leaving Waiting onto a due date long gone, a new supervisor on an already overdue task), the supervisor gets one alert now, unless an alert for that deadline already reached them; further re-plans add none.
+- **Assignment notice.** Not sent to an owner who created the task for themself or reassigned it to themself (review N4). An owner who is also the supervisor gets both the due reminder and the overdue alert.
+- **A narrower policy (review N2).** If a later `q2_church_time` allows fewer or shorter reminders, the specs it no longer allows are dropped at plan time (a creator's stored list is narrowed once) and recorded in the activity (`reminders_adjusted`, code `policy_limit`); a command never fails for it.
+- **Review dates.** A new review date is recorded in the activity (`status_changed` or `review_date_set`, with the date), the original due date never moves, and the reminders (and any snooze of the old date) move to the new date: an item of the old date opens **out of date**.
+- **Reassignment.** The old owner's pending reminders and snoozes are cancelled (`reassigned`); the new owner gets `followup_assigned` and the schedule. A supervisor change moves the alert (`supervisor_changed`). An item the old owner already has opens out of date (they are no longer the owner), and a stray job would end `ineligible` at the worker.
+- **Done, Closed, a closing source event.** Every pending reminder of the task is cancelled (`task_done`, `task_closed`, `source_resolved`, `source_cancelled`) and the source is no longer current, so nothing is delivered after it.
+- **Creator reminders.** `followups.create_task` and `app.followups_open_task` take an optional `reminders`: up to 6 `{"anchor": "deadline", "before"|"after": "<n> minutes|hours|days"}` (at most 90 days). Absent or null: the church default (`q2_church_time` `default_reminders.task`: at the deadline). `[]`: no deadline reminders (the assignment notice and the supervisor alert stay). Refusals: `validation_failed {"reminders": "invalid"|"out_of_range"|"fixed_by_source"}`. The staff create form offers: at the due time, 1 hour, 24 hours, 2 days before. Reminders cannot be changed after creation in 4.7.
+- **Snooze** (story 3.7): the member's **Remind me later** works on every follow-up reminder (1 hour, 24 hours, 2 days); a moved deadline, a reassignment or the end of the task cancels the snooze.
+- **No quiet hours** (owner Q2). Church time is Africa/Lusaka (3.3 calculation).
+- **Accountless or held owners.** No direct-contact route is registered in 4.7: their reminder ends `ineligible` / `no_direct_contact_route` and is counted **Without a route** in Reminder health; the supervisor still gets the overdue alert. A Follow-ups contact route is a later change.
+- **Privacy.** Titles, bodies, push payloads and links never carry a next action, outcome, close reason, context, name or private note; the task screen re-reads the task with the reader's own rights (AD-5).
+- **Production and gate order (review S2).** Every Follow-ups command, read and owner operation needs the Q4 personal-data gate **and** a valid Q2 scheduling policy (`q2_church_time`). Either closed answers the same non-retryable `unavailable {"policy": "gate_closed"}` (reads `403 unavailable`; the clients say "Not available yet") and writes nothing. **Q4 approval requires Q2 approval** (listed under the gates in `production-promotion-identity.md`, section 6).
+- **Tasks opened before 4.7** have no reminders until their next deadline change, state change or reassignment (no backfill: it would need the Q2 policy at migration time, which production lacks).
+
+### Source-specific schedules (source owners, in their own migration)
+
+A source whose purpose needs its own reminder rule (missing cell reports, epic 7, are the first) registers it after `app.followups_register_purpose`; tasks of that purpose then follow it **instead of** the generic schedule, and creators' reminders are refused for them:
+
+```sql
+select app.followups_register_reminder_schedule('cells', 'cells_meeting', 'missing_report',
+  '{"owner": [{"anchor": "deadline", "before": "0 minutes"}, {"anchor": "deadline", "after": "2 days"}],
+    "supervisor": [], "on_assignment": false}');
+```
+
+- `owner` and `supervisor` are spec lists as above (`[]` = none); `on_assignment` sends the owner the assignment notice or not. Refusals (PCTR1): not the source type's owner, not a Follow-ups purpose, a malformed list, unknown keys, a supervisor spec `before` the deadline (review S3: an alert needs the task overdue). Registering again replaces it; it applies to existing tasks at their next re-plan.
+- The kinds and texts stay the Follow-ups ones (generic). The SYNTHETIC worked example is `fixture_followup/synthetic_report_due` (not a manual purpose; opened through `app.followups_open_task`): reminders at the deadline and two days later, no assignment notice, no supervisor alert.
+- Reads: the task carries `reminders: {schedule: "source"|"custom"|"default", owner, supervisor, on_assignment}`; the supervision read marks a manual purpose `fixed_reminders: true`.
+
+### Clients
+
+- **Deep link.** `/followups/tasks/<uuid>` is a known inbox target (`ClientPaths.deepLinkTargets`): a current follow-up reminder shows **Open**, which opens the task (owner, supervisor, or **Not available to you**). Push taps open the inbox item first, as for every reminder.
+- **Task screen** (both apps): a line saying where the reminders come from, the owner's reminders and the supervisor alert; while Waiting it speaks of the review date ("at the review time", "a missed review date"; review N5).
+- **Staff web, Create a task:** **Choose the owner's reminders** (at the due time, 1 hour, 24 hours, 2 days before); unticked = the church default; a purpose with its own schedule says so and offers no choice. A refused owner explains "The owner must belong to this task's group or be a Pastor."
+
+### Local runs
+
+```sh
+npx supabase db reset
+npm run -s db:test                     # includes supabase/tests/followups_reminders_test.sql (132)
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/followups-reminders.mjs --evidence <file.jsonl>   # real worker script
+node tools/auth-harness/local-phone-auth.mjs off
+node --test tools/identity-e2e/followups-reminders.test.mjs
+```
+
+Fictional numbers: pgTAP +44 7700 900360-900369, E2E 900370-900379. The E2E mints its own local `notifications_worker` credential (digest only) and removes every row it created.
+
+### Hosted staging (parent session, then the owner)
+
+1. **Parent session:** apply `20261014143021_followups_reminders.sql` to staging (`tmurpotfluignacfueki`) after `20261014110258` (`followups_registry`). Compare per-function md5 with the local database (the file holds no `\u` escapes). Run `tools/ci/verify-hosted.sql` (`expected_env=staging`). It adds two task columns, `app.followups_reminder_schedules`, two source types, three reminder contracts, the SYNTHETIC `synthetic_report_due` purpose and schedule, and replaces (same signatures and grants) `followups_scope_roster` (Q4), `followups_open_task`, `followups_source_event`, `followups_create_task`, `followups_update_task`, `followups_reassign`, `followups_task_json`, `followups_supervision`. **No client grant, no Edge Function change** (the worker is generic: no redeploy), **no owner SQL paste**.
+2. Check: `select count(*) from app.contract_reminder_contracts where source_type like 'followups_%';` answers 3; `select app.notifications_scheduler_status() ->> 'scheduler_jobs';` answers 1 (the 3.4 Cron worker delivers).
+3. Rebuild the staging staff web and phone builds (publishable key only) as in `notifications.md`, story 3.7, step 2.
+
+### Owner manual checks (staging, phone and web, story 4.7)
+
+Use synthetic members only, as in the 4.6 checks: Admin A, leader L of `SYNTHETIC Preaching Rota`, members M (Android phone) and O of the department, a member P who holds the **Pastor** role and is not in the department, and a member Y outside the department without the Pastor role. The staging scheduler must run (it delivers within about a minute). Push needs the 3.6 Firebase steps; without them every check still holds in **Inbox**.
+
+1. **Assignment notice.** Staff web as L: **Follow-ups > Create a task** for M, due in about 10 minutes, leave **Choose the owner's reminders** unticked, **Create task**. Within about a minute M's phone **Inbox** shows **New follow-up task** ("A follow-up task was assigned to you. Open it to see the next action.") and nothing about the task. Tap it, then **Open**: the task opens. Its screen says **Church default reminders.**
+2. **At the deadline.** When the due time passes, M's **Inbox** shows **Follow-up task due**, once. On the item choose **Remind me later > 1 hour**: **Snoozed until ...**.
+3. **Supervisor alert, once.** One day after the due time (or ask the parent session to move that task's `followup_overdue` job's `scheduled_at` into the past on staging), L's **Inbox** (staff web) shows **Follow-up task overdue** once; **Open** leads to the task. Checking again later shows no second alert for that deadline.
+4. **Review date.** As M, set **Waiting** with a review date tomorrow: the activity shows the change with the date, the due date is still shown, and the snoozed reminder no longer shows as snoozed (opening the old reminder says it is out of date). Change the review date again: a second activity line, not a silent reset.
+5. **Reassign.** As L, **Reassign** the task to O: O's **Inbox** shows **New follow-up task**; M receives nothing more about it, and M's old items open out of date.
+6. **Done and Closed.** As O mark it **Done**; create a second task for M and **Close** it with a reason. No further reminder arrives for either, also after their deadlines.
+7. **Creator reminders.** As L create a task with **Choose the owner's reminders** ticked and **24 hours before** and **At the due time** chosen: the task screen lists them; both arrive at their times.
+8. **Q4 owner decision.** As L, the **Owner** list offers P (the Pastor) but not Y. Create a task for P: P's **My follow-ups** shows it with the owner's actions; P cannot open L's other tasks (**Not available to you**) and has no **Follow-ups** supervision screen. (API, optional: a create for Y answers `validation_failed {"owner_member_id": "not_in_scope"}`.)
+9. **Source-specific schedule (optional, SQL editor).** As in `tools/identity-e2e/followups-reminders.mjs` R70, call `app.followups_open_task` for purpose `synthetic_report_due`: the task's pending jobs are two `followup_due` jobs (at the deadline and two days later) and no assignment notice or supervisor alert.
+10. **Clean up** (SQL editor): delete the attempts, inbox items, jobs and schedules of the synthetic tasks (`source_id` = the task ids), then the 4.6 cleanup (notes, activity, tasks, members).
+
+Record the outcome per step in `evidence-4.7/owner-check.md` (pass/fail, device model, Android version, browser; no numbers, ids or keys).

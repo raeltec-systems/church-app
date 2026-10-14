@@ -488,6 +488,71 @@ void main() {
   );
 
   testWidgets(
+    'story 4.7: a tapped follow-up reminder opens its item, then the task',
+    (tester) async {
+      const item = '32323232-3232-4232-8232-323232323232';
+      const task = '46464646-4646-4646-8646-464646464646';
+      final push = FakePushMessaging(
+        deviceToken: 'synthetic-AAAAAAAAAAAAAAAAAAAAAAAA:APA91b',
+        answer: PushPermission.denied,
+      );
+      final h = await pumpMobile(
+        tester,
+        size: const Size(390, 2000),
+        setUp: (h) {
+          h.push = push;
+          h.grants.myAccess = AccessReadOk(syntheticGrants());
+          h.inbox.opened[item] = AccessReadOk(
+            OpenedInboxItem.fromJson({
+              ...inboxItemData(
+                id: item,
+                kind: 'followup_due',
+                title: 'Follow-up task due',
+                body:
+                    'A follow-up task is due. Open it to record progress or '
+                    'set a review date.',
+              ),
+              'state': 'current',
+              'target': '/followups/tasks/$task',
+            }),
+          );
+          h.followUps.task = AccessReadOk(
+            FollowUpDetail.fromJson({
+              'view': 'full',
+              'task': followUpTaskData(
+                reminders: {
+                  'schedule': 'default',
+                  'owner': null,
+                  'supervisor': [
+                    {'anchor': 'deadline', 'after': '1 day'},
+                  ],
+                  'on_assignment': true,
+                },
+              ),
+              'activity': const <Object?>[],
+              'notes': const <Object?>[],
+            }),
+          );
+        },
+      );
+      push.tap(item);
+      await tester.pumpAndSettle();
+      expect(find.text('Follow-up task due'), findsOneWidget);
+      expect(
+        find.textContaining('SYNTHETIC: phone'),
+        findsNothing,
+        reason: 'the reminder carries no task content',
+      );
+      await tapKey(tester, 'inbox-item-open-target');
+      await tester.pumpAndSettle();
+      expect(h.followUps.taskReads, contains(task));
+      expect(find.byKey(const Key('followup-summary')), findsOneWidget);
+      expect(find.byKey(const Key('followup-reminders-text')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'story 2.11: a member deletes their account from the account page; the '
     'device is signed out',
     (tester) async {

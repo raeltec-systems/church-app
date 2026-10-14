@@ -249,6 +249,149 @@ class FollowUpRouting {
   DateTime get actionableAt => reviewAt ?? dueAt;
 }
 
+/// Story 4.7: one task reminder, relative to the task's actionable deadline
+/// (the due date, or the review date while Waiting).
+class FollowUpReminderSpec {
+  const FollowUpReminderSpec.before(this.offset) : after = false;
+  const FollowUpReminderSpec.after(this.offset) : after = true;
+
+  factory FollowUpReminderSpec.fromJson(Object? json) {
+    final m = _map(json, 'reminder');
+    if (m['anchor'] != 'deadline') {
+      throw const FormatException('unexpected anchor');
+    }
+    final before = _opt<String>(m, 'before');
+    final after = _opt<String>(m, 'after');
+    if ((before == null) == (after == null)) {
+      throw const FormatException('unexpected reminder');
+    }
+    return before != null
+        ? FollowUpReminderSpec.before(before)
+        : FollowUpReminderSpec.after(after!);
+  }
+
+  /// `<n> minutes|hours|days`, as the server takes it.
+  final String offset;
+  final bool after;
+
+  Map<String, Object?> toJson() => {
+    'anchor': 'deadline',
+    if (after) 'after': offset else 'before': offset,
+  };
+
+  /// "at the due time", "24 hours before", "1 day after".
+  String get label => labelFor();
+
+  /// Review N5: while a task is Waiting its deadline is the review date, so
+  /// "at the review time", "24 hours before the review date".
+  String labelFor({bool waiting = false}) {
+    final parts = offset.split(' ');
+    if (parts.length != 2) return offset;
+    if (parts[0] == '0') {
+      return waiting ? 'at the review time' : 'at the due time';
+    }
+    final unit = parts[0] == '1' && parts[1].endsWith('s')
+        ? parts[1].substring(0, parts[1].length - 1)
+        : parts[1];
+    final text = '${parts[0]} $unit ${after ? 'after' : 'before'}';
+    return waiting ? '$text the review date' : text;
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is FollowUpReminderSpec &&
+      other.offset == offset &&
+      other.after == after;
+
+  @override
+  int get hashCode => Object.hash(offset, after);
+}
+
+/// The owner reminders the staff create form offers.
+const followUpReminderChoices = [
+  FollowUpReminderSpec.before('0 minutes'),
+  FollowUpReminderSpec.before('1 hour'),
+  FollowUpReminderSpec.before('24 hours'),
+  FollowUpReminderSpec.before('2 days'),
+];
+
+/// Where a task's reminders come from (story 4.7).
+enum FollowUpReminderSchedule {
+  /// The church's default reminders (the creator chose none).
+  churchDefault('default'),
+
+  /// The creator's own reminders.
+  custom('custom'),
+
+  /// The task's source registered its own schedule; it replaces the
+  /// generic one.
+  source('source');
+
+  const FollowUpReminderSchedule(this.wire);
+  final String wire;
+
+  static FollowUpReminderSchedule fromWire(Object? v) {
+    for (final s in values) {
+      if (s.wire == v) return s;
+    }
+    throw FormatException('unexpected reminder schedule $v');
+  }
+}
+
+List<FollowUpReminderSpec> _specs(Object? v) {
+  if (v is! List) throw const FormatException('unexpected reminders');
+  return List.unmodifiable(v.map(FollowUpReminderSpec.fromJson));
+}
+
+/// The reminders that apply to a task: the owner's (null = the church
+/// default), the supervisor's alerts and whether the owner is told when
+/// assigned. Reminder text and links never carry task content (server rule).
+class FollowUpReminders {
+  const FollowUpReminders({
+    required this.schedule,
+    required this.supervisor,
+    required this.onAssignment,
+    this.owner,
+  });
+
+  factory FollowUpReminders.fromJson(Object? json) {
+    final m = _map(json, 'reminders');
+    return FollowUpReminders(
+      schedule: FollowUpReminderSchedule.fromWire(m['schedule']),
+      owner: m['owner'] == null ? null : _specs(m['owner']),
+      supervisor: _specs(m['supervisor']),
+      onAssignment: _req<bool>(m, 'on_assignment'),
+    );
+  }
+
+  final FollowUpReminderSchedule schedule;
+  final List<FollowUpReminderSpec>? owner;
+  final List<FollowUpReminderSpec> supervisor;
+  final bool onAssignment;
+
+  /// "Owner reminders: 24 hours before, at the due time." ([waiting]: the
+  /// review date is the deadline.)
+  String ownerText({bool waiting = false}) => switch (owner) {
+    null => 'Owner reminders: the church default.',
+    final o when o.isEmpty => 'Owner reminders: none.',
+    final o =>
+      'Owner reminders: ${o.map((s) => s.labelFor(waiting: waiting)).join(', ')}.',
+  };
+
+  /// "Supervisor alert: 1 day after a missed deadline."
+  String supervisorText({bool waiting = false}) => supervisor.isEmpty
+      ? 'No supervisor alert.'
+      : 'Supervisor alert: ${supervisor.map((s) => s.label).join(', ')} a '
+            'missed ${waiting ? 'review date' : 'deadline'}.';
+
+  /// Who set them.
+  String get sourceText => switch (schedule) {
+    FollowUpReminderSchedule.churchDefault => 'Church default reminders.',
+    FollowUpReminderSchedule.custom => 'Reminders chosen by the creator.',
+    FollowUpReminderSchedule.source => 'Reminders set by this task\'s source.',
+  };
+}
+
 /// A task as its owner or a holder of its scope sees it.
 class FollowUpTask {
   const FollowUpTask({
@@ -263,6 +406,7 @@ class FollowUpTask {
     this.latestOutcome,
     this.closeCode,
     this.closeReason,
+    this.reminders,
   });
 
   factory FollowUpTask.fromJson(Object? json) {
@@ -282,6 +426,9 @@ class FollowUpTask {
       capacity: FollowUpCapacity.fromWire(m['capacity']),
       canUpdate: _req<bool>(m, 'can_update'),
       canReassign: _req<bool>(m, 'can_reassign'),
+      reminders: m['reminders'] == null
+          ? null
+          : FollowUpReminders.fromJson(m['reminders']),
     );
   }
 
@@ -302,6 +449,9 @@ class FollowUpTask {
   final FollowUpCapacity capacity;
   final bool canUpdate;
   final bool canReassign;
+
+  /// Story 4.7: the reminders that apply (null from an older server).
+  final FollowUpReminders? reminders;
 
   String get taskId => routing.taskId;
   int get revision => routing.revision;
@@ -497,6 +647,7 @@ class FollowUpPurpose {
     required this.label,
     required this.scopeKinds,
     required this.outcomes,
+    this.fixedReminders = false,
   });
 
   factory FollowUpPurpose.fromJson(Object? json) {
@@ -507,6 +658,7 @@ class FollowUpPurpose {
       label: _req<String>(m, 'label'),
       scopeKinds: _tokens(m, 'scope_kinds'),
       outcomes: _tokens(m, 'outcomes'),
+      fixedReminders: _opt<bool>(m, 'fixed_reminders') ?? false,
     );
   }
 
@@ -515,6 +667,10 @@ class FollowUpPurpose {
   final String label;
   final List<String> scopeKinds;
   final List<String> outcomes;
+
+  /// Story 4.7: the source registered its own reminder schedule, so the
+  /// creator chooses no reminders.
+  final bool fixedReminders;
 
   /// SYNTHETIC sources accept any id at revision 1.
   bool get synthetic => sourceType.startsWith('fixture_');
@@ -629,6 +785,7 @@ class FollowUpDraft {
     required this.nextAction,
     required this.dueAt,
     this.note,
+    this.reminders,
   });
 
   final FollowUpPurpose purpose;
@@ -638,6 +795,9 @@ class FollowUpDraft {
   final String nextAction;
   final DateTime dueAt;
   final String? note;
+
+  /// Story 4.7: the owner's reminders; null = the church default.
+  final List<FollowUpReminderSpec>? reminders;
 
   Map<String, Object?> toPayload() {
     final n = note?.trim();
@@ -652,6 +812,8 @@ class FollowUpDraft {
       'next_action': nextAction.trim(),
       'due_at': dueAt.toUtc().toIso8601String(),
       if (n != null && n.isNotEmpty) 'note': n,
+      if (reminders case final r? when !purpose.fixedReminders)
+        'reminders': [for (final x in r) x.toJson()],
     };
   }
 }

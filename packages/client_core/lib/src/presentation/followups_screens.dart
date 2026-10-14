@@ -130,6 +130,13 @@ String _invalidText(Map<String, String> f) {
     if (f['next_action'] == 'unchanged') 'That is already the next action.',
     if (f['owner_member_id'] == 'unchanged') 'That person already owns it.',
     if (f['owner_member_id'] == 'unknown') 'That person cannot own a task.',
+    // Story 4.7, owner decision Q4: the task's own group or a Pastor.
+    if (f['owner_member_id'] == 'not_in_scope')
+      'The owner must belong to this task\'s group or be a Pastor.',
+    if (f['reminders'] == 'fixed_by_source')
+      'This source sets its own reminders.',
+    if (f['reminders'] == 'invalid' || f['reminders'] == 'out_of_range')
+      'Those reminders cannot be used.',
     if (f['supervisor_member_id'] == 'not_in_scope')
       'The supervisor must lead this scope.',
     if (f['outcome'] == 'unregistered') 'That outcome is not available here.',
@@ -708,6 +715,17 @@ class _TaskSummary extends StatelessWidget {
             _muted(context, 'The original due date has passed.'),
           Text('Owner: ${_personText(r.owner)}'),
           Text('Supervisor: ${_personText(r.supervisor)}'),
+          if (task.reminders case final rem? when r.state.active)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: _muted(
+                context,
+                '${rem.sourceText} '
+                '${rem.ownerText(waiting: r.state == FollowUpState.waiting)} '
+                '${rem.supervisorText(waiting: r.state == FollowUpState.waiting)}',
+                key: const Key('followup-reminders-text'),
+              ),
+            ),
           const SizedBox(height: 6),
           Wrap(
             spacing: 8,
@@ -1221,6 +1239,10 @@ class _CreateTaskFormState extends ConsumerState<_CreateTaskForm> {
   int _scope = 0;
   String? _owner;
 
+  /// Story 4.7: the creator's owner reminders (off = the church default).
+  bool _customReminders = false;
+  final Set<FollowUpReminderSpec> _reminders = {followUpReminderChoices.first};
+
   /// Review S4: one SYNTHETIC source id per draft. It is kept while the
   /// outcome is unknown (Check again or a re-tap resends the same request)
   /// and replaced only after the server answered.
@@ -1232,6 +1254,77 @@ class _CreateTaskFormState extends ConsumerState<_CreateTaskForm> {
       c.dispose();
     }
     super.dispose();
+  }
+
+  /// Story 4.7: which reminders the owner gets. A source with its own
+  /// schedule fixes them; otherwise the church default applies unless the
+  /// creator chooses. The owner is told when assigned and the supervisor a
+  /// day after a missed deadline either way (server rule).
+  Widget _reminderChoice(
+    BuildContext context,
+    FollowUpPurpose purpose,
+    bool busy,
+  ) {
+    if (purpose.fixedReminders) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: _muted(
+          context,
+          'Reminders: this source sets its own reminder schedule.',
+          key: const Key('followup-create-reminders-fixed'),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CheckboxListTile(
+            key: const Key('followup-create-reminders-custom'),
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            value: _customReminders,
+            onChanged: busy
+                ? null
+                : (v) => setState(() => _customReminders = v ?? false),
+            title: const Text('Choose the owner\'s reminders'),
+          ),
+          _muted(
+            context,
+            _customReminders
+                ? 'The owner is reminded at the times you pick before the '
+                      'due date (or the review date while Waiting). None '
+                      'picked means no reminders.'
+                : 'The church default applies. The owner is told when the '
+                      'task is assigned; the supervisor a day after a missed '
+                      'deadline.',
+          ),
+          if (_customReminders)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final (i, c) in followUpReminderChoices.indexed)
+                  FilterChip(
+                    key: Key('followup-create-reminder-$i'),
+                    label: Text(
+                      c.label == 'at the due time'
+                          ? 'At the due time'
+                          : c.label,
+                    ),
+                    selected: _reminders.contains(c),
+                    onSelected: busy
+                        ? null
+                        : (on) => setState(
+                            () => on ? _reminders.add(c) : _reminders.remove(c),
+                          ),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
   }
 
   static String _newSourceId() {
@@ -1258,7 +1351,13 @@ class _CreateTaskFormState extends ConsumerState<_CreateTaskForm> {
       if (n == FollowUpNotice.created) {
         _next.clear();
         _note.clear();
-        setState(() => _owner = null);
+        setState(() {
+          _owner = null;
+          _customReminders = false;
+          _reminders
+            ..clear()
+            ..add(followUpReminderChoices.first);
+        });
       }
     });
     final sup = widget.supervision;
@@ -1365,6 +1464,7 @@ class _CreateTaskFormState extends ConsumerState<_CreateTaskForm> {
               hintText: 'HH:MM',
             ),
           ),
+          _reminderChoice(context, purpose, busy),
           TextField(
             key: const Key('followup-create-note'),
             controller: _note,
@@ -1403,6 +1503,15 @@ class _CreateTaskFormState extends ConsumerState<_CreateTaskForm> {
                                   nextAction: _next.text,
                                   dueAt: due,
                                   note: _note.text,
+                                  reminders:
+                                      purpose.fixedReminders ||
+                                          !_customReminders
+                                      ? null
+                                      : [
+                                          for (final c
+                                              in followUpReminderChoices)
+                                            if (_reminders.contains(c)) c,
+                                        ],
                                 ),
                                 'the task',
                               ),

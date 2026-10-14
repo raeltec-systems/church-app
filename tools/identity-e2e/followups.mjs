@@ -97,6 +97,20 @@ async function main() {
       select t.task_id from app.followups_tasks t
        where t.scope_id in (select department_id from gone_departments)
           or t.owner_member_id in (select member_id from gone_members);
+    -- Since story 4.7 tasks carry reminders (jobs, schedules, inbox items).
+    create temp table gone_jobs as
+      select j.job_id from app.notifications_jobs j
+       where j.recipient_member_id in (select member_id from gone_members)
+          or j.source_id in (select task_id from gone_tasks);
+    delete from app.notifications_push_jobs p where p.recipient_member_id in (select member_id from gone_members);
+    delete from app.notifications_attempts a where a.job_id in (select job_id from gone_jobs);
+    delete from app.notifications_direct_contact_needs n where n.job_id in (select job_id from gone_jobs);
+    update app.notifications_jobs j set snoozed_from_item_id = null where j.job_id in (select job_id from gone_jobs);
+    delete from app.notifications_inbox_items i where i.job_id in (select job_id from gone_jobs)
+       or i.recipient_member_id in (select member_id from gone_members);
+    delete from app.notifications_jobs j where j.job_id in (select job_id from gone_jobs);
+    delete from app.notifications_schedules s where s.source_id in (select task_id from gone_tasks)
+       or s.recipient_member_id in (select member_id from gone_members);
     delete from app.followups_notes n where n.task_id in (select task_id from gone_tasks);
     delete from app.followups_activity a where a.task_id in (select task_id from gone_tasks);
     delete from app.followups_tasks t where t.task_id in (select task_id from gone_tasks);

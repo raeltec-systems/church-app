@@ -229,7 +229,7 @@ Record the outcome per step in `evidence-4.2/owner-check.md` (pass/fail, device 
 
 ## Story 4.3: generate recurring multi-position rotas with drafts and series edits
 
-Migration: `supabase/migrations/20261014093000_duties_rota_series.sql` (forward only: the 4.1 and 4.2 files are not edited; no destructive statements, no row deletions, no new `_rows` file). New client grant: `api.duties_rota()` and its `app` body (authenticated only). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-generate-recurring-multi-position-rotas-with-drafts-and-seri-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.3/`.
+Migration: `supabase/migrations/20261014023442_duties_rota_series.sql` (forward only: the 4.1 and 4.2 files are not edited; no destructive statements, no row deletions, no new `_rows` file). New client grant: `api.duties_rota()` and its `app` body (authenticated only). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-generate-recurring-multi-position-rotas-with-drafts-and-seri-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.3/`.
 
 ### Model
 
@@ -317,7 +317,7 @@ Fictional numbers: pgTAP `+44 7700 900990-900999`, E2E `900740-900749`. The E2E 
 
 ### Hosted staging (parent session, then the owner)
 
-1. **Parent session:** apply `20261014093000_duties_rota_series.sql` to staging (`tmurpotfluignacfueki`) after `20261014001142`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. Compare the md5 of each new or replaced `app.duties_*` function body with the local one (the MCP apply decodes `\uXXXX` escapes; this migration has none, but check). New client grant: `api.duties_rota()` / `app.duties_rota()` (authenticated only). No Edge Function change, no rows file. Check: `select count(*) from app.duties_series;` is 0 and `select count(*) from app.duties_occurrences where occurrence_state <> 'published';` is 0 right after the apply.
+1. **Parent session:** apply `20261014023442_duties_rota_series.sql` to staging (`tmurpotfluignacfueki`) after `20261014001142`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. Compare the md5 of each new or replaced `app.duties_*` function body with the local one (the MCP apply decodes `\uXXXX` escapes; this migration has none, but check). New client grant: `api.duties_rota()` / `app.duties_rota()` (authenticated only). No Edge Function change, no rows file. Check: `select count(*) from app.duties_series;` is 0 and `select count(*) from app.duties_occurrences where occurrence_state <> 'published';` is 0 right after the apply.
 2. **Owner:** nothing to paste. Then the manual checks below.
 3. **Production:** nothing in this story (Q2 and Q4 gates stay closed: generation and publishing answer `unavailable`).
 

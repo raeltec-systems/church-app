@@ -3,7 +3,7 @@ title: 'Generate recurring multi-position rotas with drafts and series edits'
 type: 'feature'
 ticket: '3'
 created: '2026-10-14'
-status: 'built'
+status: 'done'
 baseline_revision: 'c55d1d65d2926546a237b1e191c83c6ea2cf85b2'
 route: 'full'
 route_source: 'auto'
@@ -68,7 +68,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261014093000_duties_rota_series.sql` -- series table, occurrence/slot/revision columns, vocab, field classes, shared change helper, seven commands, `duty_cancelled` contract, rota read, replaced projections/source check/in_scope/authorizer/dispatch/deletion hook, privileges.
+- [x] `supabase/migrations/20261014023442_duties_rota_series.sql` -- series table, occurrence/slot/revision columns, vocab, field classes, shared change helper, seven commands, `duty_cancelled` contract, rota read, replaced projections/source check/in_scope/authorizer/dispatch/deletion hook, privileges.
 - [x] `supabase/tests/duties_rota_test.sql` (+ ledgers in the 4.1/4.2/command tests) -- the matrix.
 - [x] client_core domain (`DutyRota`, series/occurrence/slot models, edits), controller, repository, rota screen (grid + list), routes, fakes; staff sidebar **Rota**; board shows position names and hides the member picker on multi-position duties; mobile shows position, topic and scripture.
 - [x] `packages/client_core/test/duties/duties_rota_test.dart` (+ staff app test) -- parsing, grid/list, publish N, scopes, cancel, pending/unconfirmed.
@@ -81,8 +81,8 @@ context:
 
 ## Implementation Notes
 
-- Implemented directly (no implementation subagent is available inside this builder run). Merged `ccr-93e730dd-89lbvg` twice (start; before final verification, which brought the 4.2 file renamed to its hosted version `20261014001142_duties_revisions.sql`); the 4.3 migration version `20261014093000` is later than both.
-- Server: `supabase/migrations/20261014093000_duties_rota_series.sql`. New: `app.duties_series` (church-local intent, zone and policy version), occurrence columns `series_id`/`series_date` (unique per series and date: idempotent generation), `topic`, `scripture`, `event_ref`; slot columns `position_name`, `draft_member_id`; slot-revision snapshot columns `topic`, `scripture`, `event_ref` (guard replaced to cover them); audit `series_id`. Shared engine `app.duties_apply_change` (the 4.2 per-slot loop generalised to every position and to one target position) returns its notification work as ops that callers run last through `app.duties_notify` (AD-2); `app.duties_cancel_one` likewise. Commands `create_series`, `assign_slot`, `publish_drafts`, `revise_series`, `cancel_occurrence`, `cancel_series`; `revise_duty` replaced (drafts in place; new notes fields; 4.2 answer keys unchanged). Read `api.duties_rota`. Replaced by `create or replace`: `duties_state_ok`, `duties_slot_field_class`, `duties_changes_since`, projections, `duties_leader_board` (published only: older clients reject other states), source check (cancelled assignments), authorizer, `duties_in_scope` (series), dispatch, deletion hook.
+- Implemented directly (no implementation subagent is available inside this builder run). Merged `ccr-93e730dd-89lbvg` twice (start; before final verification, which brought the 4.2 file renamed to its hosted version `20261014001142_duties_revisions.sql`); the 4.3 migration version `20261014023442` is later than both.
+- Server: `supabase/migrations/20261014023442_duties_rota_series.sql`. New: `app.duties_series` (church-local intent, zone and policy version), occurrence columns `series_id`/`series_date` (unique per series and date: idempotent generation), `topic`, `scripture`, `event_ref`; slot columns `position_name`, `draft_member_id`; slot-revision snapshot columns `topic`, `scripture`, `event_ref` (guard replaced to cover them); audit `series_id`. Shared engine `app.duties_apply_change` (the 4.2 per-slot loop generalised to every position and to one target position) returns its notification work as ops that callers run last through `app.duties_notify` (AD-2); `app.duties_cancel_one` likewise. Commands `create_series`, `assign_slot`, `publish_drafts`, `revise_series`, `cancel_occurrence`, `cancel_series`; `revise_duty` replaced (drafts in place; new notes fields; 4.2 answer keys unchanged). Read `api.duties_rota`. Replaced by `create or replace`: `duties_state_ok`, `duties_slot_field_class`, `duties_changes_since`, projections, `duties_leader_board` (published only: older clients reject other states), source check (cancelled assignments), authorizer, `duties_in_scope` (series), dispatch, deletion hook.
 - Decision (agent, under owner pre-approval): cancelling a one-off (non-series) duty is refused `{"occurrence_id": "not_in_series"}` in 4.3, because the published-only leader board would hide it; entry 9 brings position cancellation for one-off duties.
 - Decision (agent, under owner pre-approval): generation needs the Q2 policy (`app.notifications_policy`) as well as Q4, so it fails closed in production like publishing.
 - Surprise: 4.2's `revise_duty` reports time errors together with the answer-by error; the replacement keeps that (pgTAP 4.2 test 19).
@@ -120,5 +120,5 @@ context:
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/ccr-93e730dd-89lbvg && npm run -s ci:function-imports` -- expected: pass
 
 **Manual checks (if no CLI):**
-- Parent session: apply `20261014093000_duties_rota_series.sql` to staging after `20261014001142`, run `tools/ci/verify-hosted.sql`, compare per-function md5 with local (the MCP apply decodes `\uXXXX`). New client grant: `api.duties_rota()` / `app.duties_rota()`. No rows file, no Edge Function change.
+- Parent session: apply `20261014023442_duties_rota_series.sql` to staging after `20261014001142`, run `tools/ci/verify-hosted.sql`, compare per-function md5 with local (the MCP apply decodes `\uXXXX`). New client grant: `api.duties_rota()` / `app.duties_rota()`. No rows file, no Edge Function change.
 - Owner staging walkthrough: `docs/runbooks/duties.md`, story 4.3, "Owner manual checks".

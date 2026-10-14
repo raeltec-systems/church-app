@@ -401,11 +401,9 @@ void main() {
       final sent = h.gateway.sent.single;
       expect(sent.wire['command'], 'duties.publish_drafts');
       expect(sent.wire['expected_revision'], 1);
-      expect(sent.wire['payload'], {
-        'series_id': _series,
-        'slot_count': 6,
-        'deadline_before': '2 days',
-      });
+      // Review (4.8): the answer-by picker starts at the church default, so
+      // no lead is sent and the server applies the lead-time bands.
+      expect(sent.wire['payload'], {'series_id': _series, 'slot_count': 6});
       expect(byKey('duties-pending'), findsOneWidget);
       // A reload while it is out keeps it pending (not sent twice).
       await tapKey(tester, 'rota-view-$_series');
@@ -471,11 +469,10 @@ void main() {
       final sent = h.gateway.sent.single;
       expect(sent.wire['command'], 'duties.assign_slot');
       expect(sent.wire['expected_revision'], 4);
+      // The church default: the server sets the answer-by time.
       expect(sent.wire['payload'], {
         'slot_id': _slot(_o1, 3),
         'member_id': _lydia,
-        // 2 days before 10:00 church time on 4 January.
-        'response_deadline': '2099-01-02T08:00:00.000Z',
       });
       sent.confirm(const {'state': 'published'}, 5);
       await settle(tester);
@@ -511,6 +508,12 @@ void main() {
         findsOneWidget,
       );
       expect(byKey('rota-edit-lead-$_o1'), findsOneWidget);
+      // The leader picks a lead time instead of the church default.
+      await tester.ensureVisible(byKey('rota-edit-lead-$_o1'));
+      await tester.tap(byKey('rota-edit-lead-$_o1'));
+      await settle(tester);
+      await tester.tap(find.text('2 days before').last);
+      await settle(tester);
       await tapKey(tester, 'rota-edit-save-$_o1');
       final sent = h.gateway.sent.single;
       expect(sent.wire['command'], 'duties.revise_series');
@@ -530,7 +533,12 @@ void main() {
       // Cancel this date only.
       await tapKey(tester, 'rota-edit-close-$_o1');
       await tapKey(tester, 'rota-cancel-$_o1');
-      expect(find.textContaining('People who were waiting to answer or had accepted'), findsOneWidget);
+      expect(
+        find.textContaining(
+          'People who were waiting to answer or had accepted',
+        ),
+        findsOneWidget,
+      );
       await tapKey(tester, 'rota-cancel-confirm-$_o1');
       final cancel = h.gateway.sent.last;
       expect(cancel.wire['command'], 'duties.cancel_occurrence');
@@ -679,7 +687,8 @@ void main() {
         tester
             .getSemantics(find.textContaining('(church time): Draft'))
             .getSemanticsData()
-            .flagsCollection.isHeader,
+            .flagsCollection
+            .isHeader,
         isTrue,
       );
       handle.dispose();

@@ -1133,6 +1133,7 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
                   key: Key('leader-reminders-$id-r${duty.revision}'),
                   keyPrefix: 'leader-$id',
                   reminders: r,
+                  reporting: duty.times.reportingAt != null,
                   canChange: widget.department.canPublish && !started,
                   busy: widget.busy,
                   error: mine ? st.fieldErrors['reminders'] : null,
@@ -1846,15 +1847,19 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
         ),
         _muted(context, _defaultDeadlineHelp),
         const SizedBox(height: 8),
-        _ReminderChoice(
-          keyPrefix: 'publish-$id',
-          custom: _customReminders,
-          selected: _reminders,
-          enabled: !widget.busy,
-          error: errors['reminders'],
-          onCustom: (v) => setState(() => _customReminders = v),
-          onToggle: (c, on) =>
-              setState(() => on ? _reminders.add(c) : _reminders.remove(c)),
+        ListenableBuilder(
+          listenable: _reporting,
+          builder: (context, _) => _ReminderChoice(
+            keyPrefix: 'publish-$id',
+            custom: _customReminders,
+            selected: _reminders,
+            enabled: !widget.busy,
+            error: errors['reminders'],
+            reporting: _reporting.text.trim().isNotEmpty,
+            onCustom: (v) => setState(() => _customReminders = v),
+            onToggle: (c, on) =>
+                setState(() => on ? _reminders.add(c) : _reminders.remove(c)),
+          ),
         ),
         const SizedBox(height: 8),
         Align(
@@ -2602,7 +2607,8 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
         if (a.reminders case final r?)
           _muted(
             context,
-            '${r.text} You can snooze a reminder from the Inbox.',
+            '${r.textFor(reporting: a.times.reportingAt != null)} '
+            'You can snooze a reminder from the Inbox.',
           ),
       if (a.declinedLater)
         _muted(

@@ -829,6 +829,7 @@ class LeaderDepartment {
     required this.members,
     required this.duties,
     this.dutiesTruncated = false,
+    this.contactNotices = const [],
   });
 
   factory LeaderDepartment.fromJson(Object? json) {
@@ -855,8 +856,18 @@ class LeaderDepartment {
         _req<List>(m, 'duties').map(LeaderDuty.fromJson),
       ),
       dutiesTruncated: _opt<bool>(m, 'duties_truncated') ?? false,
+      contactNotices: m['contact_notices'] == null
+          ? const []
+          : List.unmodifiable(
+              _req<List>(m, 'contact_notices').map(DutyContactNotice.fromJson),
+            ),
     );
   }
+
+  /// Story 4.8 (review): notices the leader must still pass on in person to
+  /// members the app cannot reach (released from a position, a cancelled
+  /// date). Empty from a server before 4.8 and for Pastor oversight.
+  final List<DutyContactNotice> contactNotices;
 
   /// More duties exist than the server listed.
   final bool dutiesTruncated;
@@ -2245,10 +2256,13 @@ class DutyReminderSpec {
 
   /// "24 hours before the answer-by time", "at the answer-by time",
   /// "2 hours before the start".
-  String get label {
+  String get label => labelFor();
+
+  /// Review: with a reporting time the start anchor is the reporting time.
+  String labelFor({bool reporting = false}) {
     final what = anchor == DutyReminderAnchor.deadline
         ? 'the answer-by time'
-        : 'the start';
+        : (reporting ? 'the reporting time' : 'the start');
     final parts = offset.split(' ');
     if (parts.length != 2) return '$offset ${after ? 'after' : 'before'} $what';
     if (parts[0] == '0') return 'at $what';
@@ -2301,12 +2315,16 @@ class DutyReminders {
       specs == null ? null : [for (final s in specs!) s.toJson()];
 
   /// What leaders and members read.
-  String get text => switch (specs) {
+  String get text => textFor();
+
+  /// Review: "before the reporting time" when the duty has one.
+  String textFor({bool reporting = false}) => switch (specs) {
     null =>
       'Reminders: the defaults (24 hours before and at the answer-by time, '
-          'and 24 hours before the start).',
+          'and 24 hours before ${reporting ? 'the reporting time' : 'the start'}).',
     final s when s.isEmpty => 'Reminders: none.',
-    final s => 'Reminders: ${s.map((x) => x.label).join(', ')}.',
+    final s =>
+      'Reminders: ${s.map((x) => x.labelFor(reporting: reporting)).join(', ')}.',
   };
 }
 
@@ -2345,4 +2363,55 @@ class DutyContactNeed {
     if (shortNotice) 'Given at short notice: ask for an answer now',
     if (notReached) 'Reminders cannot reach them in the app',
   ].join('; ');
+}
+
+/// Story 4.8 (review): a notice to pass on in person to a member the app
+/// cannot reach (never why): released from a position, or the date was
+/// cancelled. Listed until the duty would have started.
+class DutyContactNotice {
+  const DutyContactNotice({
+    required this.assignmentId,
+    required this.memberId,
+    required this.occurrenceId,
+    required this.dutyName,
+    required this.startsAt,
+    required this.cancelled,
+    required this.since,
+    this.displayName,
+    this.positionName,
+  });
+
+  factory DutyContactNotice.fromJson(Object? json) {
+    final m = _map(json, 'contact notice');
+    final notice = _req<String>(m, 'notice');
+    if (notice != 'released' && notice != 'cancelled') {
+      throw const FormatException('unexpected notice');
+    }
+    return DutyContactNotice(
+      assignmentId: _req<String>(m, 'assignment_id'),
+      memberId: _req<String>(m, 'member_id'),
+      displayName: _opt<String>(m, 'display_name'),
+      occurrenceId: _req<String>(m, 'occurrence_id'),
+      dutyName: _req<String>(m, 'duty_name'),
+      positionName: _opt<String>(m, 'position_name'),
+      startsAt: _instant(m, 'starts_at'),
+      cancelled: notice == 'cancelled',
+      since: _instant(m, 'since'),
+    );
+  }
+
+  final String assignmentId;
+  final String memberId;
+  final String? displayName;
+  final String occurrenceId;
+  final String dutyName;
+  final String? positionName;
+  final DateTime startsAt;
+
+  /// The date was cancelled (otherwise the position went to someone else).
+  final bool cancelled;
+  final DateTime since;
+
+  String get title =>
+      positionName == null ? dutyName : '$dutyName: $positionName';
 }

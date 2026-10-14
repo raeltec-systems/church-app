@@ -26,7 +26,17 @@ class _ReminderChoice extends StatelessWidget {
     required this.onCustom,
     required this.onToggle,
     this.error,
+    this.extra = const [],
+    this.reporting = false,
   });
+
+  /// Review: stored reminders that are not among [dutyReminderChoices] (set
+  /// by another client or an earlier version): shown as "custom" and kept
+  /// unless the leader unticks them.
+  final List<DutyReminderSpec> extra;
+
+  /// The duty has a reporting time ("before the reporting time").
+  final bool reporting;
 
   final String keyPrefix;
   final bool custom;
@@ -56,7 +66,7 @@ class _ReminderChoice extends StatelessWidget {
                     'reminders. Reminders before the answer-by time stop once '
                     'they answer; reminders before the start continue after '
                     'they accept.'
-              : const DutyReminders().text,
+              : const DutyReminders().textFor(reporting: reporting),
         ),
       ),
       if (custom)
@@ -67,7 +77,14 @@ class _ReminderChoice extends StatelessWidget {
             for (final (i, c) in dutyReminderChoices.indexed)
               FilterChip(
                 key: Key('$keyPrefix-reminder-$i'),
-                label: Text(c.label),
+                label: Text(c.labelFor(reporting: reporting)),
+                selected: selected.contains(c),
+                onSelected: enabled ? (on) => onToggle(c, on) : null,
+              ),
+            for (final (i, c) in extra.indexed)
+              FilterChip(
+                key: Key('$keyPrefix-reminder-custom-$i'),
+                label: Text('${c.labelFor(reporting: reporting)} (custom)'),
                 selected: selected.contains(c),
                 onSelected: enabled ? (on) => onToggle(c, on) : null,
               ),
@@ -90,13 +107,14 @@ class _ReminderChoice extends StatelessWidget {
 }
 
 /// The specs a [_ReminderChoice] stands for (null = the defaults), in the
-/// order of [dutyReminderChoices].
+/// order of [dutyReminderChoices], then any kept [extra] (custom) specs.
 List<DutyReminderSpec>? _chosenReminders(
   bool custom,
-  Set<DutyReminderSpec> selected,
-) => custom
+  Set<DutyReminderSpec> selected, [
+  List<DutyReminderSpec> extra = const [],
+]) => custom
     ? [
-        for (final c in dutyReminderChoices)
+        for (final c in [...dutyReminderChoices, ...extra])
           if (selected.contains(c)) c,
       ]
     : null;
@@ -113,10 +131,14 @@ class _RemindersEditor extends StatefulWidget {
     required this.onSave,
     this.saveLabel = 'Save the reminders',
     this.error,
+    this.reporting = false,
   });
 
   final String keyPrefix;
   final DutyReminders reminders;
+
+  /// The duty has a reporting time ("before the reporting time").
+  final bool reporting;
   final bool canChange;
   final bool busy;
   final String saveLabel;
@@ -132,12 +154,28 @@ class _RemindersEditorState extends State<_RemindersEditor> {
   late bool _custom = !widget.reminders.isDefault;
   late final Set<DutyReminderSpec> _selected = {...?widget.reminders.specs};
 
+  /// Review: stored specs outside [dutyReminderChoices] ("custom"), kept
+  /// unless the leader unticks them.
+  late final List<DutyReminderSpec> _extra = [
+    for (final s in widget.reminders.specs ?? const <DutyReminderSpec>[])
+      if (!dutyReminderChoices.contains(s)) s,
+  ];
+
+  /// Review: Cancel puts the stored reminders back.
+  void _reset() => setState(() {
+    _open = false;
+    _custom = !widget.reminders.isDefault;
+    _selected
+      ..clear()
+      ..addAll(widget.reminders.specs ?? const []);
+  });
+
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
-        widget.reminders.text,
+        widget.reminders.textFor(reporting: widget.reporting),
         key: Key('${widget.keyPrefix}-reminders-text'),
       ),
       if (widget.canChange && !_open)
@@ -155,6 +193,8 @@ class _RemindersEditorState extends State<_RemindersEditor> {
           selected: _selected,
           enabled: !widget.busy,
           error: widget.error,
+          extra: _extra,
+          reporting: widget.reporting,
           onCustom: (v) => setState(() => _custom = v),
           onToggle: (c, on) =>
               setState(() => on ? _selected.add(c) : _selected.remove(c)),
@@ -167,17 +207,19 @@ class _RemindersEditorState extends State<_RemindersEditor> {
                 key: Key('${widget.keyPrefix}-reminders-save'),
                 onPressed: widget.busy
                     ? null
-                    : () {
-                        widget.onSave(_chosenReminders(_custom, _selected));
-                        setState(() => _open = false);
-                      },
+                    // Review: the editor stays open (with any field error)
+                    // until the server accepts; the new revision replaces
+                    // this widget with a closed one.
+                    : () => widget.onSave(
+                        _chosenReminders(_custom, _selected, _extra),
+                      ),
                 child: Text(widget.saveLabel),
               ),
             ),
             FocusRing(
               child: TextButton(
                 key: Key('${widget.keyPrefix}-reminders-cancel'),
-                onPressed: () => setState(() => _open = false),
+                onPressed: _reset,
                 child: const Text('Cancel'),
               ),
             ),
@@ -228,13 +270,25 @@ class _NeedsContactList extends StatelessWidget {
           if (p.assignment case final a? when a.needsContact != null)
             (duty, p, a),
     ];
+    final notices = department.contactNotices;
     return Column(
       key: Key('needs-contact-list-${department.departmentId}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _heading(context, 'Needs contact (${rows.length})'),
+        _heading(context, 'Needs contact (${rows.length + notices.length})'),
+        if (rows.isEmpty && notices.isEmpty)
+          _muted(context, 'Nobody needs direct contact right now.'),
+        // Review: members the app cannot reach whose duty was taken away
+        // (released, or the date cancelled), until it would have started.
+        for (final n in notices)
+          Text(
+            'Tell ${n.displayName ?? 'the removed member'}: ${n.title}, '
+            '${_when(context, n.startsAt)} '
+            '${n.cancelled ? 'is cancelled' : 'is no longer theirs'}.',
+            key: Key('contact-notice-${n.assignmentId}'),
+          ),
         if (rows.isEmpty)
-          _muted(context, 'Nobody needs direct contact right now.')
+          const SizedBox.shrink()
         else ...[
           _muted(
             context,

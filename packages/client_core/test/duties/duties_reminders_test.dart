@@ -145,34 +145,37 @@ Map<String, Object?> leaderDuty({
   ],
 };
 
-AccessRead<DutyLeaderBoard> boardWith(List<Map<String, Object?>> duties) =>
-    AccessReadOk(
-      DutyLeaderBoard.fromJson({
-        'departments': [
+AccessRead<DutyLeaderBoard> boardWith(
+  List<Map<String, Object?>> duties, {
+  List<Map<String, Object?>>? notices,
+}) => AccessReadOk(
+  DutyLeaderBoard.fromJson({
+    'departments': [
+      {
+        'department_id': _dept,
+        'name': 'SYNTHETIC Preaching Rota',
+        'capacity': 'department_leader',
+        'can_publish': true,
+        'members': [
           {
-            'department_id': _dept,
-            'name': 'SYNTHETIC Preaching Rota',
-            'capacity': 'department_leader',
-            'can_publish': true,
-            'members': [
-              {
-                'member_id': _ruth,
-                'display_name': 'SYNTHETIC Ruth',
-                'account': 'app_account',
-                'since': '2026-10-13T08:00:00.000000Z',
-              },
-              {
-                'member_id': _lydia,
-                'display_name': 'SYNTHETIC Lydia',
-                'account': 'no_login',
-                'since': '2026-10-13T08:00:00.000000Z',
-              },
-            ],
-            'duties': duties,
+            'member_id': _ruth,
+            'display_name': 'SYNTHETIC Ruth',
+            'account': 'app_account',
+            'since': '2026-10-13T08:00:00.000000Z',
+          },
+          {
+            'member_id': _lydia,
+            'display_name': 'SYNTHETIC Lydia',
+            'account': 'no_login',
+            'since': '2026-10-13T08:00:00.000000Z',
           },
         ],
-      }),
-    );
+        'duties': duties,
+        'contact_notices': ?notices,
+      },
+    ],
+  }),
+);
 
 Map<String, Object?> rotaOccurrence(
   String id,
@@ -352,6 +355,18 @@ void main() {
         contains('24 hours before and at the answer-by time'),
       );
       expect(const DutyReminders([]).text, 'Reminders: none.');
+      // Review: with a reporting time the start anchor reads as reporting.
+      expect(
+        const DutyReminderSpec.before(
+          DutyReminderAnchor.start,
+          '2 hours',
+        ).labelFor(reporting: true),
+        '2 hours before the reporting time',
+      );
+      expect(
+        const DutyReminders().textFor(reporting: true),
+        contains('24 hours before the reporting time'),
+      );
       expect(const DutyReminders().toWire(), isNull);
       expect(const DutyReminders([]).toWire(), isEmpty);
     });
@@ -527,6 +542,114 @@ void main() {
       sent.confirm({'occurrence_id': _occurrence, 'revision': 4}, 4);
       await settle(tester);
       expect(byKey('duties-notice-remindersSet'), findsOneWidget);
+    });
+  });
+
+  group('staff web: review fixes', () {
+    testWidgets('released and cancelled notices are on Needs contact', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.dutyLeader,
+        setUp: (h) => h.duties.board = boardWith(
+          [leaderDuty()],
+          notices: [
+            {
+              'assignment_id': _x,
+              'member_id': _lydia,
+              'display_name': 'SYNTHETIC Lydia',
+              'occurrence_id': _occurrence2,
+              'duty_name': 'Sunday preaching',
+              'position_name': null,
+              'starts_at': '2099-01-11T08:00:00.000000Z',
+              'notice': 'cancelled',
+              'since': '2026-10-14T08:00:00.000000Z',
+            },
+            {
+              'assignment_id': _slot2,
+              'member_id': _lydia,
+              'display_name': 'SYNTHETIC Lydia',
+              'occurrence_id': _occurrence,
+              'duty_name': 'Sunday preaching',
+              'position_name': 'Reader',
+              'starts_at': '2099-01-04T08:00:00.000000Z',
+              'notice': 'released',
+              'since': '2026-10-14T08:00:00.000000Z',
+            },
+          ],
+        ),
+      );
+      expect(find.text('Needs contact (2)'), findsOneWidget);
+      final cancelled = tester.widget<Text>(byKey('contact-notice-$_x')).data!;
+      expect(cancelled, startsWith('Tell SYNTHETIC Lydia: Sunday preaching'));
+      expect(cancelled, endsWith('is cancelled.'));
+      expect(
+        tester.widget<Text>(byKey('contact-notice-$_slot2')).data,
+        endsWith('is no longer theirs.'),
+      );
+      expect(find.textContaining('Nobody needs direct contact'), findsNothing);
+      expect(find.textContaining(RegExp('hold|review|account')), findsNothing);
+    });
+
+    testWidgets('the reminders editor keeps a refusal visible; Cancel resets', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.dutyLeader,
+        setUp: (h) => h.duties.board = boardWith([leaderDuty()]),
+      );
+      await tapKey(tester, 'leader-$_occurrence-reminders-change');
+      await tapKey(tester, 'leader-$_occurrence-edit-reminders-custom');
+      await tapKey(tester, 'leader-$_occurrence-reminders-save');
+      h.gateway.sent.single.refuse(
+        ErrorCode.validationFailed,
+        fieldErrors: const {'reminders': 'out_of_range'},
+      );
+      await settle(tester);
+      // Still open, with the field error under the choices.
+      expect(byKey('leader-$_occurrence-edit-reminders-error'), findsOneWidget);
+      expect(byKey('leader-$_occurrence-reminders-save'), findsOneWidget);
+      // Cancel closes and puts the stored (default) reminders back.
+      await tapKey(tester, 'leader-$_occurrence-reminders-cancel');
+      await tapKey(tester, 'leader-$_occurrence-reminders-change');
+      expect(
+        tester
+            .widget<CheckboxListTile>(
+              byKey('leader-$_occurrence-edit-reminders-custom'),
+            )
+            .value,
+        isFalse,
+      );
+    });
+
+    testWidgets('a stored reminder outside the choices is kept as custom', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.dutyLeader,
+        setUp: (h) => h.duties.board = boardWith([
+          leaderDuty(
+            reminders: const [
+              {'anchor': 'starts_at', 'before': '3 hours'},
+              {'anchor': 'response_deadline', 'before': '0 minutes'},
+            ],
+          ),
+        ]),
+      );
+      await tapKey(tester, 'leader-$_occurrence-reminders-change');
+      expect(find.text('3 hours before the start (custom)'), findsOneWidget);
+      // Untick "at the answer-by time" (choice 2); the custom one stays.
+      await tapKey(tester, 'leader-$_occurrence-edit-reminder-2');
+      await tapKey(tester, 'leader-$_occurrence-reminders-save');
+      expect(h.gateway.sent.single.wire['payload'], {
+        'occurrence_id': _occurrence,
+        'reminders': [
+          {'anchor': 'starts_at', 'before': '3 hours'},
+        ],
+      });
     });
   });
 

@@ -220,7 +220,7 @@ class _SeriesView extends ConsumerStatefulWidget {
 class _SeriesViewState extends ConsumerState<_SeriesView> {
   bool _list = false;
   bool _publishing = false;
-  String _lead = '2 days';
+  String _lead = DutyLeads.churchDefault;
   String? _selected;
 
   @override
@@ -582,7 +582,7 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
 
   /// Story 4.8: save the reminders for this and the later dates.
   bool _remindersFuture = false;
-  String _lead = '2 days';
+  String _lead = DutyLeads.churchDefault;
   final Map<String, String?> _pick = {};
 
   /// Story 4.4: the reason typed for each position, and for a change.
@@ -743,6 +743,7 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
               key: Key('rota-reminders-$id-r${o.revision}'),
               keyPrefix: 'rota-$id',
               reminders: rem,
+              reporting: o.times.reportingAt != null,
               canChange: manage,
               busy: widget.busy,
               saveLabel: _remindersFuture
@@ -1420,15 +1421,19 @@ class _NewSeriesFormState extends ConsumerState<_NewSeriesForm> {
             maxLength: 120,
           ),
           // Story 4.8: the member reminders of every date.
-          _ReminderChoice(
-            keyPrefix: 'series-$id',
-            custom: _customReminders,
-            selected: _reminders,
-            enabled: !widget.busy,
-            error: errors['reminders'],
-            onCustom: (v) => setState(() => _customReminders = v),
-            onToggle: (c, on) =>
-                setState(() => on ? _reminders.add(c) : _reminders.remove(c)),
+          ListenableBuilder(
+            listenable: _reporting,
+            builder: (context, _) => _ReminderChoice(
+              keyPrefix: 'series-$id',
+              custom: _customReminders,
+              selected: _reminders,
+              enabled: !widget.busy,
+              error: errors['reminders'],
+              reporting: _reporting.text.trim().isNotEmpty,
+              onCustom: (v) => setState(() => _customReminders = v),
+              onToggle: (c, on) =>
+                  setState(() => on ? _reminders.add(c) : _reminders.remove(c)),
+            ),
           ),
           ListenableBuilder(
             listenable: Listenable.merge(_all),

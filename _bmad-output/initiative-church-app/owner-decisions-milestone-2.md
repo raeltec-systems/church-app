@@ -27,3 +27,9 @@ Still open under Q2: leaders and deputies for the pilot cells and department (na
 - Firebase: the owner may reuse the staging Firebase project `kbicc-church-app` for production;
   production gets its own service-account key in its own Edge secret, so either can be revoked
   alone. (Decision pending the owner's confirmation.)
+- 2026-10-14: Firebase confirmed. Production reuses Firebase project `kbicc-church-app` with its own
+  `bic-push-sender` JSON key, saved by the owner as the production Edge secret
+  `NOTIFICATIONS_FCM_SERVICE_ACCOUNT` (separate from the staging key, so either can be revoked alone).
+- 2026-10-14: Q12 reminder-lateness tolerance = **10 minutes** (owner accepted the recommendation:
+  a due reminder not delivered within 10 minutes counts as a fault). Recorded as part of the
+  `q12_operations` approval value at the first production promotion.

@@ -429,6 +429,65 @@ void main() {
   );
 
   testWidgets(
+    'story 4.6: Home shows My follow-ups for an ordinary owner with open work '
+    'and opens the task',
+    (tester) async {
+      final h = await pumpMobile(tester, size: const Size(390, 2000));
+      h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.duties.mine = AccessReadOk(
+        MyDuties.fromJson({
+          'member_id': '22222222-2222-4222-8222-222222222222',
+          'assignments': const <Object?>[],
+        }),
+      );
+      h.followUps.mine = AccessReadOk(
+        MyFollowUps.fromJson({
+          'member_id': '22222222-2222-4222-8222-222222222222',
+          'tasks': [followUpTaskData()],
+          'truncated': false,
+        }),
+      );
+      h.followUps.task = AccessReadOk(
+        FollowUpDetail.fromJson({
+          'view': 'full',
+          'task': followUpTaskData(),
+          'activity': const <Object?>[],
+          'notes': const <Object?>[],
+        }),
+      );
+      await tapKey(tester, 'nav-/account');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tapKey(tester, 'nav-/home');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('home-followups-card')), findsOneWidget);
+      await tapKey(tester, 'home-followups-see-all');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tapKey(
+        tester,
+        'followup-open-46464646-4646-4646-8646-464646464646',
+      );
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('followup-actions')), findsOneWidget);
+      await tapKey(tester, 'followup-done');
+      final sent = h.gateway.sent.single;
+      expect(sent.wire['command'], 'followups.update_task');
+      expect(sent.wire['payload'], {
+        'task_id': '46464646-4646-4646-8646-464646464646',
+        'status': 'done',
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'story 2.11: a member deletes their account from the account page; the '
     'device is signed out',
     (tester) async {

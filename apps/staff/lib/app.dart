@@ -131,6 +131,30 @@ const staffDepartmentsDestination = (
   icon: Icons.workspaces_outline,
 );
 
+/// Story 4.6: shown while the server grants the caller member access; every
+/// owner's own follow-up tasks.
+const staffMyFollowUpsDestination = (
+  path: ClientPaths.myFollowUps,
+  label: 'My follow-ups',
+  icon: Icons.checklist_outlined,
+);
+
+/// Story 4.6: shown while the caller leads or deputises a department or
+/// leads or assists a cell: the tasks in those scopes.
+const staffFollowUpSupervisionDestination = (
+  path: ClientPaths.followUpSupervision,
+  label: 'Follow-ups',
+  icon: Icons.fact_check_outlined,
+);
+
+/// Story 4.6: shown while the server's current answer includes Admin;
+/// routing metadata only.
+const staffFollowUpRoutingDestination = (
+  path: ClientPaths.adminFollowUps,
+  label: 'Follow-up routing',
+  icon: Icons.alt_route_outlined,
+);
+
 /// The sidebar for the caller's current grants. Presentation only: hiding an
 /// entry is not a control, and every screen's data is checked by the server.
 List<StaffDestination> staffDestinationsFor(
@@ -144,6 +168,9 @@ List<StaffDestination> staffDestinationsFor(
   if (servesACell(grants)) staffCellLeaderDestination,
   if (seesDutyBoard(grants)) staffDutyLeaderDestination,
   if (seesDutyBoard(grants)) staffDutyRotaDestination,
+  if (grants != null) staffMyFollowUpsDestination,
+  if (supervisesFollowUps(grants)) staffFollowUpSupervisionDestination,
+  if (grants?.isAdmin ?? false) staffFollowUpRoutingDestination,
   if (grants?.isAdmin ?? false) staffMembersDestination,
   if (grants?.isAdmin ?? false) staffRecoveryEmailsDestination,
   if (grants?.isAdmin ?? false) staffCredentialReviewsDestination,

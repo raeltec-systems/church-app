@@ -442,7 +442,7 @@ Record the outcome per step in `evidence-4.4/owner-check.md` (pass/fail, device 
 
 ## Story 4.5: respond from My duties with later decline and bulk acceptance
 
-Migration: `supabase/migrations/20261014093012_duties_member_responses.sql`.
+Migration: `supabase/migrations/20261014081513_duties_member_responses.sql`.
 - Forward only: the 4.1-4.4 files are not edited.
 - No destructive statements, no row deletions and no `_rows` file.
 - No new client grant: both new commands go through `api.duties_command`.
@@ -575,7 +575,7 @@ Fictional numbers: pgTAP `+44 7700 900550-900559`, E2E `900560-900569`. The E2E 
 ### Hosted staging (parent session, then the owner)
 
 1. **Parent session:**
-   - Apply `20261014093012_duties_member_responses.sql` to staging (`tmurpotfluignacfueki`) after `20261014052239`.
+   - Apply `20261014081513_duties_member_responses.sql` to staging (`tmurpotfluignacfueki`) after `20261014052239`.
    - Run `tools/ci/verify-hosted.sql` with `expected_env=staging`.
    - Compare the md5 of each new or replaced `app.duties_*` function with the local one. The migration has no backslashes, so no `\u` decoding applies.
    - Grants: there is no new client grant. Check that `authenticated` has no execute on `app.duties_withdraw_acceptance`, `app.duties_accept_many`, `app.duties_refuse_ended` or `app.duties_assignment_occurrence`.

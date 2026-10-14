@@ -3,7 +3,7 @@ title: 'Respond from My duties with later decline and bulk acceptance'
 type: 'feature'
 ticket: '5'
 created: '2026-10-14'
-status: 'built'
+status: 'done'
 baseline_revision: '6927ff83c1287a3371ee44f3f0a994f91488bee1'
 route: 'full'
 route_source: 'auto'
@@ -107,7 +107,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261014093012_duties_member_responses.sql` -- column, guard, commands, dispatch, projections, privileges.
+- [x] `supabase/migrations/20261014081513_duties_member_responses.sql` -- column, guard, commands, dispatch, projections, privileges.
 - [x] `supabase/tests/duties_responses_test.sql` -- the matrix (single session).
 - [x] client_core:
   - domain: commands, `priorAcceptedAt`, leaders, segments, `.ics` builder, `DutyCalendarExport` port;
@@ -130,11 +130,11 @@ context:
 
 ## Implementation Notes
 
-- Implemented directly: no implementation subagent is available inside this builder run. The worktree merged `ccr-93e730dd-89lbvg` first (4.4 is on staging as `20261014052239`). The new version, `20261014093012`, sorts after it.
+- Implemented directly: no implementation subagent is available inside this builder run. The worktree merged `ccr-93e730dd-89lbvg` first (4.4 is on staging as `20261014052239`). The new version, `20261014081513`, sorts after it.
 
 ### Server
 
-`supabase/migrations/20261014093012_duties_member_responses.sql`.
+`supabase/migrations/20261014081513_duties_member_responses.sql`.
 
 New:
 - `app.duties_assignments.prior_accepted_at` and its check `duties_assignments_prior_accepted`;

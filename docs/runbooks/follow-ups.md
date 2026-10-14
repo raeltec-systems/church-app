@@ -115,7 +115,7 @@ Record the outcome per step in `evidence-4.6/owner-check.md` (pass/fail, device 
 
 ### Owner questions
 
-- **Q4: who may be chosen as an owner. Decided 2026-10-14** (owner: "allow only from task's own group and pastor"): the task's own group (its target's roster) and the current Pastors; nobody else. Applied in story 4.7's migration (`app.followups_scope_roster`). A Pastor counts only with live access (an active, reviewed link, no open hold, not dormant; review N1), and the Pastor grant is share-locked while a task is created, opened or reassigned to them. Members of the task's own group stay eligible with or without a login (their supervisor records for them). The Q4 personal-data gate itself stays closed in production, and needs Q2 (above).
+- **Q4: who may be chosen as an owner. Decided 2026-10-14** (owner: "allow on[ly] from task's own group and pastor"): the task's own group (its target's roster) and the current Pastors; nobody else. Applied in story 4.7's migration (`app.followups_scope_roster`). A Pastor counts only with live access (an active, reviewed link, no open hold, not dormant; review N1), and the Pastor grant is share-locked while a task is created, opened or reassigned to them. Members of the task's own group stay eligible with or without a login (their supervisor records for them). The Q4 personal-data gate itself stays closed in production, and needs Q2 (above).
 
 ### Known limits (later entries)
 
@@ -126,7 +126,7 @@ Record the outcome per step in `evidence-4.6/owner-check.md` (pass/fail, device 
 
 ## Story 4.7: remind follow-up owners and supervisors on the task schedule
 
-Migration: `supabase/migrations/20261014143021_followups_reminders.sql` (forward only; the 4.6 file is not edited; no destructive statements, no row deletions, no `_rows` file, so **no owner SQL paste**). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-remind-follow-up-owners-and-supervisors-on-the-task-schedule-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.7/`. Tests: `supabase/tests/followups_reminders_test.sql` (132, worker-driven), `packages/client_core/test/followups/followups_reminders_test.dart`, one test in each app, E2E `tools/identity-e2e/followups-reminders.mjs` (12 checks, R01-R90) with its offline test.
+Migration: `supabase/migrations/20261014130535_followups_reminders.sql` (forward only; the 4.6 file is not edited; no destructive statements, no row deletions, no `_rows` file, so **no owner SQL paste**). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-remind-follow-up-owners-and-supervisors-on-the-task-schedule-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.7/`. Tests: `supabase/tests/followups_reminders_test.sql` (132, worker-driven), `packages/client_core/test/followups/followups_reminders_test.dart`, one test in each app, E2E `tools/identity-e2e/followups-reminders.mjs` (12 checks, R01-R90) with its offline test.
 
 ### What is sent, to whom, when
 
@@ -188,7 +188,7 @@ Fictional numbers: pgTAP +44 7700 900360-900369, E2E 900370-900379. The E2E mint
 
 ### Hosted staging (parent session, then the owner)
 
-1. **Parent session:** apply `20261014143021_followups_reminders.sql` to staging (`tmurpotfluignacfueki`) after `20261014110258` (`followups_registry`). Compare per-function md5 with the local database (the file holds no `\u` escapes). Run `tools/ci/verify-hosted.sql` (`expected_env=staging`). It adds two task columns, `app.followups_reminder_schedules`, two source types, three reminder contracts, the SYNTHETIC `synthetic_report_due` purpose and schedule, and replaces (same signatures and grants) `followups_scope_roster` (Q4), `followups_open_task`, `followups_source_event`, `followups_create_task`, `followups_update_task`, `followups_reassign`, `followups_task_json`, `followups_supervision`. **No client grant, no Edge Function change** (the worker is generic: no redeploy), **no owner SQL paste**.
+1. **Parent session:** apply `20261014130535_followups_reminders.sql` to staging (`tmurpotfluignacfueki`) after `20261014110258` (`followups_registry`). Compare per-function md5 with the local database (the file holds no `\u` escapes). Run `tools/ci/verify-hosted.sql` (`expected_env=staging`). It adds two task columns, `app.followups_reminder_schedules`, two source types, three reminder contracts, the SYNTHETIC `synthetic_report_due` purpose and schedule, and replaces (same signatures and grants) `followups_scope_roster` (Q4), `followups_open_task`, `followups_source_event`, `followups_create_task`, `followups_update_task`, `followups_reassign`, `followups_task_json`, `followups_supervision`. **No client grant, no Edge Function change** (the worker is generic: no redeploy), **no owner SQL paste**.
 2. Check: `select count(*) from app.contract_reminder_contracts where source_type like 'followups_%';` answers 3; `select app.notifications_scheduler_status() ->> 'scheduler_jobs';` answers 1 (the 3.4 Cron worker delivers).
 3. Rebuild the staging staff web and phone builds (publishable key only) as in `notifications.md`, story 3.7, step 2.
 

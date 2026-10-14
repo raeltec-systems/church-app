@@ -4,7 +4,7 @@ Synthetic data only. Merged `5fb6d9e` after the independent review fixes (B1 rea
 swallowed reminders, S1 already-passed deadline alert, S2 Q4 needs Q2, S3 supervisor `before`
 specs refused, S4 tests, nits N1-N7). PR #6 CI green on `5fb6d9e`. Local verification on the
 merged branch: db:test 33 files / 2915 tests, db:smoke, Flutter client_core 550 / staff 37 /
-mobile 52 (analyze clean), every E2E (see `e2e-suite-summary.txt`).
+mobile 52 (analyze clean), all 24 E2Es exit 0 (duties 13, duties-revisions 13, duties-rota 17, duties-overlaps 13, duties-responses 12, followups 15, followups-reminders 12).
 
 | Version | Name | How applied |
 |---|---|---|
@@ -12,7 +12,7 @@ mobile 52 (analyze clean), every E2E (see `e2e-suite-summary.txt`).
 
 | Check | Result |
 |---|---|
-| The 64 `app`/`api` `followups_*` functions | staging aggregate `a3b6b06b...` (64 rows); comparison with local pending the local E2E run |
+| The 64 `app`/`api` `followups_*` functions | per-function `md5(pg_get_functiondef)` identical to local: aggregate `a3b6b06b...`, 64 rows each side |
 | `\u` escapes / backslashes | none |
 | Client grants | unchanged: `anon` none; `authenticated` execute only on `followups_command`, `followups_my_tasks`, `followups_task`, `followups_supervision`, `followups_admin_routing` (app and api) |
 | Reminder contracts | 3 `followups_*` reminder contracts; 1 source-specific schedule (SYNTHETIC `fixture_followup/synthetic_report_due`) |

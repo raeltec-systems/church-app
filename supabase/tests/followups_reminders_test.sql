@@ -201,7 +201,9 @@ select is((select count(*)::int from app.contract_unpinned_functions()), 0, 'eve
 select is((select count(*)::int from app.contract_boundary_violations()), 0, 'no boundary violations');
 select is((select string_agg(purpose || ':' || on_assignment || ':' || owner_reminders::text || ':'
                              || supervisor_reminders::text, ',')
-             from app.followups_reminder_schedules),
+             from app.followups_reminder_schedules
+            -- Story 4.9 registers coverage_follow_up (tested in duties_coverage_test.sql).
+            where purpose = 'synthetic_report_due'),
   'synthetic_report_due:false:'
   || '[{"anchor": "deadline", "before": "0 minutes"}, {"after": "2 days", "anchor": "deadline"}]:[]',
   'the SYNTHETIC source registered its own schedule for synthetic_report_due') ;

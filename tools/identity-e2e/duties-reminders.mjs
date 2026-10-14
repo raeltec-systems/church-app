@@ -53,6 +53,8 @@ export const GENERIC_TEXT = {
     'A duty in your department passed its answer-by time without an answer. Open Duties to follow it up.'],
   duty_short_notice: ['Short-notice duty',
     'A duty in your department was given at short notice and needs an answer now. Contact the member directly.'],
+  // Story 4.9: a decline now alerts the leaders (tools/identity-e2e/duties-coverage.mjs).
+  duty_declined: ['Duty declined', 'A member cannot make a duty in your department. Open Coverage to find cover.'],
 };
 
 /** The reserved fictional numbers this run uses (+44 7700 900670-900679). */
@@ -353,7 +355,9 @@ async function main() {
 
     // ------------------------------------------------- decline: nothing left
     const dec = await duty(member.token, 'duties.respond', asgRevision(bId), { assignment_id: bId, response: 'declined' });
-    check('D31-decline-stops-everything', dec.status === 200 && pending(bId) === '',
+    // Story 4.9: a decline leaves only the leaders' decline alert (duties-coverage.mjs).
+    check('D31-decline-stops-everything', dec.status === 200
+      && pending(bId) === summarize(['l:duty_declined@leader:now', 'l:duty_declined@deputy:now']),
       { declined: dec.status, pending: pending(bId) });
 
     // ------------------------------------------------- reassign A -> B -> A

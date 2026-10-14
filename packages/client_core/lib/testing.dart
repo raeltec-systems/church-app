@@ -687,6 +687,40 @@ class FakeDuties implements DutiesRepository {
   }
 }
 
+/// [DutyCoverageRepository] answered by the test (story 4.9).
+class FakeDutyCoverage implements DutyCoverageRepository {
+  AccessRead<DutyCoverage> coverage = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  final List<CoverageQuery> queries = [];
+
+  @override
+  Future<AccessRead<DutyCoverage>> fetchCoverage(CoverageQuery query) async {
+    queries.add(query);
+    return coverage;
+  }
+}
+
+/// [ContactLauncher] that records what the screen asked for (story 4.9).
+class FakeContactLauncher implements ContactLauncher {
+  FakeContactLauncher([this.result = ContactLaunch.opened]);
+  ContactLaunch result;
+  final List<String> calls = [];
+  final List<String> messages = [];
+
+  @override
+  Future<ContactLaunch> call(String phone) async {
+    calls.add(phone);
+    return result;
+  }
+
+  @override
+  Future<ContactLaunch> message(String phone) async {
+    messages.add(phone);
+    return result;
+  }
+}
+
 /// The wire form of one of the member's duties (stories 4.1, 4.2; 4.5 adds
 /// the slot id, the owner kind, the earlier acceptance and the leader
 /// names; 4.8 keys go in [extra]).
@@ -1636,6 +1670,8 @@ class ClientTestHarness {
   final review = FakeReview();
   final cells = FakeCells();
   final duties = FakeDuties();
+  final coverage = FakeDutyCoverage();
+  final contact = FakeContactLauncher();
   final followUps = FakeFollowUps();
   final recovery = FakePasswordRecovery();
   final recoveryEmail = FakeRecoveryEmail();
@@ -1671,6 +1707,8 @@ class ClientTestHarness {
       reviewRepositoryProvider.overrideWithValue(review),
       cellsRepositoryProvider.overrideWithValue(cells),
       dutiesRepositoryProvider.overrideWithValue(duties),
+      dutyCoverageRepositoryProvider.overrideWithValue(coverage),
+      contactLauncherProvider.overrideWithValue(contact),
       followUpsRepositoryProvider.overrideWithValue(followUps),
       passwordRecoveryGatewayProvider.overrideWithValue(recovery),
       recoveryEmailRepositoryProvider.overrideWithValue(recoveryEmail),

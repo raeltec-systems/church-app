@@ -121,7 +121,7 @@ Record the outcome per step in `evidence-4.6/owner-check.md` (pass/fail, device 
 
 - Reminders: done in story 4.7 (below).
 - No lifecycle or handover hooks: deactivation does not yet hand over open tasks (entry 12).
-- No real source yet: duties coverage (entry 9) and the consumer guide with both-client fixtures (entry 11) follow. Care and finance note grants arrive with their owners.
+- No real source yet: duties coverage (entry 9; built in story 4.9, below) and the consumer guide with both-client fixtures (entry 11) follow. Care and finance note grants arrive with their owners.
 - No due-date change and no reopen of a Done or Closed task.
 
 ## Story 4.7: remind follow-up owners and supervisors on the task schedule
@@ -208,3 +208,41 @@ Use synthetic members only, as in the 4.6 checks: Admin A, leader L of `SYNTHETI
 10. **Clean up** (SQL editor): delete the attempts, inbox items, jobs and schedules of the synthetic tasks (`source_id` = the task ids), then the 4.6 cleanup (notes, activity, tasks, members).
 
 Record the outcome per step in `evidence-4.7/owner-check.md` (pass/fail, device model, Android version, browser; no numbers, ids or keys).
+
+## Story 4.9: the first real source (duty coverage) and the source review operation
+
+Migration: `supabase/migrations/20261014201500_duties_coverage.sql` (the Duties story 4.9 migration; the Follow-ups files are not edited and no Follow-ups body is replaced). Runbook of the source: [duties.md](duties.md), story 4.9.
+
+### The coverage purpose (owner: Duties)
+
+| Source type | Purpose | Label | Scope kinds | Outcomes | Effects | Hand-made |
+|---|---|---|---|---|---|---|
+| `duties_coverage_case` (source id = the coverage case id, revision 1; current while the case is open and its assignment is current on a published duty) | `coverage_follow_up` | Duty cover follow-up | `department_leader`, `department_deputy` | `no_answer`, `left_message`, `will_answer`, `cannot_serve`, `other` | resolved: close; cancelled: close | no (opened by `duties.record_contact_attempt` through `app.followups_open_task`) |
+
+- Context hook `app.duties_coverage_case_context`: "Duty cover: <duty> on <church date>" (no member, note or route).
+- Owner: the recording leader or deputy (always in the task's group). Supervisor: another current, reachable leader or deputy of the department (a leader first), or the recorder when nobody else holds the scope (a recorded fallback). The generic next action is "Follow up a duty position that needs an answer or cover."; due = the next follow-up date.
+- Source-specific schedule (`app.followups_register_reminder_schedule`): the owner at the due or review time only, no supervisor alert, no assignment notice (the due and review dates are always before the duty, so nothing arrives after it).
+- Closing: Duties applies `app.followups_source_event` when the assignment is accepted, confirmed by a leader or superseded (`resolved`) or cancelled (`cancelled`). Task completion never changes the duty: a task marked Done is not an answer or a confirmation.
+
+### New owner operation: `app.followups_source_review(input)`
+
+A source owner records progress on the active task of a source and purpose inside its own command, after locking its source (Follow-ups after the domain owner, before Notifications):
+
+```sql
+select app.followups_source_review(jsonb_build_object(
+  'source_type', 'duties_coverage_case', 'source_id', <case_id>, 'purpose', 'coverage_follow_up',
+  'review_at', '<future instant, at most a year away>', 'outcome', '<a registered outcome>',
+  'actor_member_id', <member>, 'actor_account_id', <account>));
+```
+
+- The active task becomes **Waiting** with that review date (the original due date never moves), `latest_outcome` is set when given, and the activity records `outcome_recorded` and `status_changed` / `review_date_set` with capacity `source` (ids, states and dates only). The reminders follow the new review date (the 4.7 scheduler; `schedule_revision` moves only when the date changes).
+- Answers `{task_id, revision}`, or `{task_id: null}` when the source has no active task (finished by hand). Refusals: `validation_failed` (`review_at: past | out_of_range`, `outcome: unregistered`, `purpose: unregistered`, malformed input) and `unavailable` while the Q4 or Q2 gate is closed (the calling Duties command catches it, records the attempt and audits `followup_skipped`).
+- Not client-executable (revoked from public, anon, authenticated and service_role).
+
+### `app.followups_source_event` needs only the Q4 gate (review S1)
+
+Replaced (same signature and answers): closing or keeping a source's tasks only removes work, and cancelling their reminders needs no scheduling policy, so a source event is applied whenever the Q4 personal-data gate is open, also with the Q2 policy closed or invalid. Every other Follow-ups command, read and owner operation still needs both gates.
+
+### Staging and owner checks
+
+Nothing separate: the parent session applies the Duties 4.9 migration (see duties.md, story 4.9); the owner's checks 4, 6 and 7 there cover the task's opening, update and closing.

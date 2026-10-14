@@ -210,20 +210,19 @@ select is((select (r ->> 'code') || '|' || (r #>> '{field_errors,assignment_id}'
 select is((select (r ->> 'code') || '|' || (r #>> '{field_errors,assignment_id}')
              from (select pg_temp.answer(4, pg_temp.a(4, 0), 'accepted') as r) x),
   'conflict|responded', 'duties.respond still refuses a second answer');
--- Only the member's own acceptance can be withdrawn (fail closed for answers recorded another way,
--- entry 9). The vocabulary is widened inside this transaction only, to stage such an answer.
+-- Only the member's own acceptance can be withdrawn (fail closed for answers recorded another way:
+-- story 4.9 adds Confirmed by leader, provenance `leader`, staged here directly).
 create temp table state_def as
   select pg_catalog.pg_get_functiondef('app.duties_state_ok(text, text)'::regprocedure) as d;
-select ok((select d from state_def) like '%p_value in (''member'')%', 'the provenance vocabulary is member only');
-do $$ begin execute replace((select d from state_def), $q$p_value in ('member')$q$, $q$p_value in ('member', 'leader')$q$); end $$;
+select ok((select d from state_def) like '%p_value in (''member'', ''leader'')%',
+  'the provenance vocabulary is member and (story 4.9) leader');
 select is(pg_temp.answer(4, pg_temp.a(4, 8), 'accepted') #>> '{data,response}', 'accepted', 'M accepts duty 8');
-update app.duties_assignments set response_provenance = 'leader' where assignment_id = pg_temp.a(4, 8);
+update app.duties_assignments set response_provenance = 'leader', confirmed_channel = 'phone' where assignment_id = pg_temp.a(4, 8);
 select is((select (r ->> 'code') || '|' || (r #>> '{field_errors,assignment_id}')
              from (select pg_temp.withdraw(4, pg_temp.a(4, 8)) as r) x),
   'conflict|responded', 'an acceptance not recorded by the member cannot be withdrawn here');
 select is((pg_temp.row(pg_temp.a(4, 8))).response, 'accepted', 'and nothing changed');
-update app.duties_assignments set response_provenance = 'member' where assignment_id = pg_temp.a(4, 8);
-do $$ begin execute (select d from state_def); end $$;
+update app.duties_assignments set response_provenance = 'member', confirmed_channel = null where assignment_id = pg_temp.a(4, 8);
 
 -- The leader sees it at once, the member sees their earlier acceptance --------------------------
 create temp table board as select jsonb_path_query_first(pg_temp.readj(2, 'select api.duties_leader_board()'),

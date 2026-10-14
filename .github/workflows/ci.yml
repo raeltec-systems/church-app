@@ -151,6 +151,8 @@ jobs:
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.7 tools/identity-e2e/followups-reminders.mjs docs/runbooks/follow-ups.md
       - name: Story 4.8 evidence (duty deadlines and reminders), its E2E and the duties runbook hold no credentials
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.8 tools/identity-e2e/duties-reminders.mjs docs/runbooks/duties.md
+      - name: Story 4.9 evidence (coverage queue, contact attempts, leader confirmation), its E2E and the duties and follow-ups runbooks hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.9 tools/identity-e2e/duties-coverage.mjs docs/runbooks/duties.md docs/runbooks/follow-ups.md
 
   flutter:
     name: flutter (analyze, test, web build)

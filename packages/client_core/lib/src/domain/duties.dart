@@ -13,6 +13,8 @@ library;
 import 'access_grants.dart';
 import 'church_time.dart';
 
+part 'duty_coverage.dart';
+
 /// Duties-registered scope kinds in the Identity grant model (story 2.3).
 abstract final class DutyScopeKinds {
   static const leader = 'department_leader';
@@ -258,6 +260,8 @@ class MyDuty {
     this.deadlineSource = DutyDeadlineSource.creator,
     this.shortNotice = false,
     this.reminders,
+    this.confirmedByLeader = false,
+    this.confirmedChannel,
   });
 
   factory MyDuty.fromJson(Object? json) {
@@ -298,8 +302,19 @@ class MyDuty {
       deadlineSource: DutyDeadlineSource.fromWire(m['deadline_source']),
       shortNotice: _shortNotice(m),
       reminders: DutyReminders.fromJsonIn(m),
+      confirmedByLeader: m['response_provenance'] == 'leader',
+      confirmedChannel: m['confirmed_channel'] == null
+          ? null
+          : ContactChannel.fromWire(m['confirmed_channel']),
     );
   }
+
+  /// Story 4.9: the acceptance was recorded by a leader (Confirmed by
+  /// leader, after a call or in person), not by the member in the app.
+  final bool confirmedByLeader;
+
+  /// Story 4.9: how the leader reached the member (never the reason).
+  final ContactChannel? confirmedChannel;
 
   /// Story 4.8: whose answer-by time this is (the leader's, or the church's
   /// lead-time default).
@@ -385,9 +400,13 @@ class MyDuty {
       answerable && response == DutyResponse.pending && !startedAt(now);
 
   /// Story 4.5: an accepted duty that has not started can be withdrawn
-  /// ("Can't make it anymore").
+  /// ("Can't make it anymore"). Story 4.9: not an acceptance a leader
+  /// recorded (the server refuses it; the member tells their leader).
   bool canWithdraw(DateTime now) =>
-      answerable && response == DutyResponse.accepted && !startedAt(now);
+      answerable &&
+      response == DutyResponse.accepted &&
+      !confirmedByLeader &&
+      !startedAt(now);
 
   /// Story 4.5: declined after an earlier acceptance.
   bool get declinedLater =>
@@ -550,6 +569,7 @@ class PositionAssignment {
     this.deadlineSource = DutyDeadlineSource.creator,
     this.shortNotice = false,
     this.needsContact,
+    this.confirmation,
   });
 
   factory PositionAssignment.fromJson(Object? json) {
@@ -573,6 +593,9 @@ class PositionAssignment {
       deadlineSource: DutyDeadlineSource.fromWire(m['deadline_source']),
       shortNotice: _shortNotice(m),
       needsContact: DutyContactNeed.fromJsonOrNull(m['needs_contact']),
+      confirmation: m['response_provenance'] == 'leader'
+          ? CoverageConfirmation.fromJsonOrNull(m['confirmation'])
+          : null,
     );
   }
 
@@ -581,6 +604,9 @@ class PositionAssignment {
   final DutyDeadlineSource deadlineSource;
   final bool shortNotice;
   final DutyContactNeed? needsContact;
+
+  /// Story 4.9: Confirmed by leader (null for the member's own answer).
+  final CoverageConfirmation? confirmation;
 
   final String assignmentId;
   final String memberId;
@@ -695,6 +721,7 @@ class DutyPosition {
     this.slotRevision = 1,
     this.history = const [],
     this.positionName,
+    this.cancelled = false,
   });
 
   factory DutyPosition.fromJson(Object? json) {
@@ -709,6 +736,7 @@ class DutyPosition {
           : PositionAssignment.fromJson(m['assignment']),
       slotRevision: _slotRevision(m),
       positionName: _opt<String>(m, 'position_name'),
+      cancelled: _opt<bool>(m, 'cancelled') ?? false,
       history: m['history'] == null
           ? const []
           : List.unmodifiable(
@@ -726,6 +754,9 @@ class DutyPosition {
 
   /// Story 4.2: the slot's current revision.
   final int slotRevision;
+
+  /// Story 4.9: the position was cancelled (no longer required).
+  final bool cancelled;
 
   /// Ended assignments, newest first (at most 20).
   final List<AssignmentHistoryEntry> history;
@@ -790,6 +821,9 @@ class LeaderDuty {
   int get accepted => positions
       .where((p) => p.assignment?.response == DutyResponse.accepted)
       .length;
+
+  /// Story 4.9: the positions still required (cancelled ones are not).
+  int get required => positions.where((p) => !p.cancelled).length;
 
   /// The assignee of a one-position duty (null with several positions: a
   /// rota position is given with duties.assign_slot).
@@ -1216,6 +1250,7 @@ class RotaAssignment {
     this.deadlineSource = DutyDeadlineSource.creator,
     this.shortNotice = false,
     this.needsContact,
+    this.confirmedByLeader = false,
   });
 
   factory RotaAssignment.fromJson(Object? json) {
@@ -1235,8 +1270,12 @@ class RotaAssignment {
       deadlineSource: DutyDeadlineSource.fromWire(m['deadline_source']),
       shortNotice: _shortNotice(m),
       needsContact: DutyContactNeed.fromJsonOrNull(m['needs_contact']),
+      confirmedByLeader: m['response_provenance'] == 'leader',
     );
   }
+
+  /// Story 4.9: accepted through Confirmed by leader.
+  final bool confirmedByLeader;
 
   /// Story 4.8.
   final DutyDeadlineSource deadlineSource;
@@ -1266,6 +1305,7 @@ class RotaPosition {
     this.positionName,
     this.draft,
     this.assignment,
+    this.cancelled = false,
   });
 
   factory RotaPosition.fromJson(Object? json) {
@@ -1280,8 +1320,12 @@ class RotaPosition {
       assignment: m['assignment'] == null
           ? null
           : RotaAssignment.fromJson(m['assignment']),
+      cancelled: _opt<bool>(m, 'cancelled') ?? false,
     );
   }
+
+  /// Story 4.9: the position was cancelled.
+  final bool cancelled;
 
   final String slotId;
   final int positionNo;

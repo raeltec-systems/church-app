@@ -75,6 +75,19 @@ final dutiesRepositoryProvider = Provider<DutiesRepository>(
   (ref) => const UnconfiguredDutiesRepository(),
 );
 
+/// Story 4.9: the coverage queue (leaders, deputies; Admin and Pastor
+/// operational).
+final dutyCoverageRepositoryProvider = Provider<DutyCoverageRepository>(
+  (ref) => const UnconfiguredDutyCoverageRepository(),
+);
+
+/// Story 4.9: opens the phone or messaging app for a labelled contact route.
+/// Unavailable by default; the app composition roots supply the platform
+/// launcher (the app never sends a call or message itself).
+final contactLauncherProvider = Provider<ContactLauncher>(
+  (ref) => const UnavailableContactLauncher(),
+);
+
 /// Story 4.6: My follow-ups, one task, supervision and Admin routing.
 final followUpsRepositoryProvider = Provider<FollowUpsRepository>(
   (ref) => const UnconfiguredFollowUpsRepository(),

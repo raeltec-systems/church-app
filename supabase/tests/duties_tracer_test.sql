@@ -119,10 +119,11 @@ select ok(not exists (
    cross join unnest(array['anon', 'authenticated', 'service_role']) r
    where n.nspname in ('app', 'api') and p.proname ~ '^duties_'
      and not (p.proname in ('duties_command', 'duties_my_duties', 'duties_leader_board',
-                            'duties_admin_overview', 'duties_rota', 'duties_candidates')
+                            'duties_admin_overview', 'duties_rota', 'duties_candidates',
+                            'duties_coverage')
                   and r = 'authenticated')
      and has_function_privilege(r, p.oid, 'EXECUTE')),
-  'only the command and the reads (with the 4.3 rota and the 4.4 candidates) are client-executable, and only by authenticated');
+  'only the command and the reads (with the 4.3 rota, the 4.4 candidates and the 4.9 coverage queue) are client-executable, and only by authenticated');
 select is((select count(*)::int from app.contract_unowned_objects()), 0, 'no unowned objects');
 select is((select count(*)::int from app.contract_unpinned_functions()), 0, 'every function is pinned');
 select is((select count(*)::int from app.contract_boundary_violations()), 0, 'no boundary violations');
@@ -294,7 +295,9 @@ select is((pg_temp.readj(4, 'select api.duties_my_duties()') -> 'assignments' ->
             -- Story 4.5 keys are checked in duties_responses_test.sql.
             - 'owner_kind' - 'prior_accepted_at' - 'leaders' - 'slot_id'
             -- Story 4.8 keys are checked in duties_reminders_test.sql.
-            - 'deadline_source' - 'short_notice' - 'reminders',
+            - 'deadline_source' - 'short_notice' - 'reminders'
+            -- Story 4.9 keys are checked in duties_coverage_test.sql.
+            - 'response_provenance' - 'confirmed_channel',
   '{"revision": 1, "duty_name": "Sunday preaching", "department_name": "SYNTHETIC Preaching Rota", "reporting_at": null, "location": "SYNTHETIC Main hall", "instructions": "Arrive early.", "response": "pending", "responded_at": null, "note": null}'::jsonb,
   'with its detail, deadline and pending response');
 select is(jsonb_array_length(pg_temp.readj(5, 'select api.duties_my_duties()') -> 'assignments'), 1,
@@ -362,7 +365,9 @@ create temp table dec as select pg_temp.duties(5, 'duties.respond', 1, jsonb_bui
 select is((select r #>> '{data,response}' from dec), 'declined', 'O says they cannot make it');
 select is((select string_agg(distinct job_state || '|' || coalesce(cancel_reason, '-'), ',')
              from app.notifications_jobs where source_type in ('duties_assignment', 'duties_coverage')
-              and source_id = (select (r #>> '{data,assignment_id}')::uuid from pub_admin)),
+              and source_id = (select (r #>> '{data,assignment_id}')::uuid from pub_admin)
+              -- Story 4.9: a decline then alerts the leaders (duties_coverage_test.sql).
+              and reminder_kind <> 'duty_declined'),
   'cancelled|responded', 'an answer before delivery cancels the pending jobs (story 4.8: reminders and leader alerts too)');
 select is((select string_agg(code, ',' order by event_id) from app.duties_audit where action = 'response_recorded'),
   'accepted,declined', 'responses are audited with their code only');

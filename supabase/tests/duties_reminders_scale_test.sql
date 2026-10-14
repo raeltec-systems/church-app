@@ -113,6 +113,12 @@ create temp table big as select pg_temp.series('Year', 49, '10:00', 4) as id;
 lock table app.notifications_jobs, app.notifications_schedules, app.duties_assignments, app.duties_slots,
   app.duties_occurrences, app.duties_slot_revisions, app.duties_audit, app.duties_contact_needs,
   app.cmd_receipts in share update exclusive mode;
+-- Story 4.9: an earlier scale test's ANALYZE (inside its rolled-back transaction) leaves its row
+-- counts in pg_class; measured right after a reset, the publish below then timed out. Analyzing
+-- this test's own rows first makes the measurement independent of the earlier files.
+analyze app.notifications_jobs, app.notifications_schedules, app.duties_assignments, app.duties_slots,
+  app.duties_occurrences, app.duties_slot_revisions, app.duties_audit, app.duties_contact_needs,
+  app.cmd_receipts;
 set local statement_timeout = '8s';
 create temp table t0 as select clock_timestamp() as t;
 create temp table ps as select pg_temp.publish((select id from small)) as r;

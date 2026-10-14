@@ -51,10 +51,12 @@ String _positionText(RotaOccurrence o, RotaPosition p) {
         '${d.available ? '' : ' (can\'t serve now)'}'
         '${_overlapText(d.overlaps, d.overrideReason != null)}';
   }
+  // Story 4.9: a cancelled position.
+  if (p.cancelled) return 'Cancelled';
   final a = p.assignment;
   if (a == null) return 'Unfilled';
   return '${_personName(a.displayName)}: '
-      '${_answerLabel(a.response, a.priorAcceptedAt).$1}'
+      '${a.confirmedByLeader ? 'Confirmed by leader' : _answerLabel(a.response, a.priorAcceptedAt).$1}'
       '${a.available ? '' : ' (can\'t serve now)'}'
       '${o.started ? '' : _overlapText(a.overlaps, a.override != null)}'
       // Story 4.8: Short notice and Needs contact.

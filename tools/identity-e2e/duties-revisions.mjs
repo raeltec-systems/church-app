@@ -175,7 +175,9 @@ async function main() {
   };
   const jobs = (assignmentId) => psql(`select coalesce(string_agg(reminder_kind || ':' || job_state || ':'
       || coalesce(cancel_reason, finish_reason, '-'), ',' order by enqueued_at, reminder_kind, job_state), '')
-    from app.notifications_jobs where source_type = 'duties_assignment' and source_id = '${assignmentId}'`);
+    from app.notifications_jobs where source_type = 'duties_assignment' and source_id = '${assignmentId}'
+     -- Story 4.8's reminders are proved by duties-reminders.mjs.
+     and reminder_kind not in ('duty_response_due', 'duty_starting')`);
 
   try {
     const { admin, leader, deputy, member, other } = people;

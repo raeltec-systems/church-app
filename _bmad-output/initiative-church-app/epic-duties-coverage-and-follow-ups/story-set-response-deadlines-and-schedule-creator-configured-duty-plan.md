@@ -3,7 +3,7 @@ title: 'Set response deadlines and schedule creator-configured duty reminders'
 type: 'feature'
 ticket: '8'
 created: '2026-10-14'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '7f43e77de1340e40d2bb9dee6cd7d84070c27c98'
 route: 'full'
 route_source: 'auto'
@@ -67,18 +67,38 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261014153012_duties_reminders.sql` -- columns, sources/kinds/contracts/route, deadline and plan helpers, replaced commands/engine/projections, `duties.set_reminders`, create_series wrapper.
-- [ ] `supabase/tests/duties_reminders_test.sql` (+ earlier duties tests where job counts change) -- the matrix through the worker.
-- [ ] `packages/client_core` (domain, publish/rota forms, Short notice, Needs contact, set reminders) + `test/duties/duties_reminders_test.dart`; app tests.
-- [ ] `tools/identity-e2e/duties-reminders.mjs` + `.test.mjs`.
-- [ ] `docs/runbooks/duties.md` (story 4.8, owner checks), `contracts-and-owner-seams.md`.
-- [ ] `evidence-4.8/`, `.github/workflows/ci.yml` evidence scan step.
+- [x] `supabase/migrations/20261014153012_duties_reminders.sql` -- columns, sources/kinds/contracts/route, deadline and plan helpers, replaced commands/engine/projections, `duties.set_reminders`, create_series wrapper.
+- [x] `supabase/tests/duties_reminders_test.sql` (+ earlier duties tests where job counts change) -- the matrix through the worker.
+- [x] `packages/client_core` (domain, publish/rota forms, Short notice, Needs contact, set reminders) + `test/duties/duties_reminders_test.dart`; app tests.
+- [x] `tools/identity-e2e/duties-reminders.mjs` + `.test.mjs`.
+- [x] `docs/runbooks/duties.md` (story 4.8, owner checks), `contracts-and-owner-seams.md`.
+- [x] `evidence-4.8/`, `.github/workflows/ci.yml` evidence scan step.
 
 **Acceptance Criteria:**
 - Given the local stack, when `duties-reminders.mjs` runs through the real worker script, then every matrix row passes over HTTP and every duty inbox item carries only its contract's generic text.
 - Given the full local verification, when run, then every listed check passes.
 
 ## Implementation Notes
+
+- Implemented directly (no implementation subagent inside this builder run).
+- Server: `supabase/migrations/20261014153012_duties_reminders.sql` (2340 lines; no backslashes, ASCII, no DROP/TRUNCATE/`delete from`, no grants).
+  - New columns: `duties_assignments.deadline_source` (`creator` | `default`, existing rows `creator`) and `.short_notice` (check: only with a default deadline); `duties_occurrences.reminders`, `duties_series.reminders` (null = defaults). New table `app.duties_contact_needs` (RLS on, no client privileges; FK to the assignment `on delete cascade`, so the earlier E2E/owner clean-ups that delete assignments keep working).
+  - New source `duties_coverage` (check `duties_coverage_source_check`), kinds `duty_response_due`, `duty_starting` (on `duties_assignment`, reusing the 4.1 pending check and the 4.2 not-declined check), `duty_response_overdue`, `duty_short_notice` (on `duties_coverage`, `duties_coverage_reminder_check`); the direct-contact route `duties_record_contact_need` for the seven member kinds.
+  - New functions: `duties_reminders_field`, `duties_default_reminders`, `duties_reminder_specs`, `duties_default_deadline`, `duties_alert_recipients`, `duties_needs_contact`, `duties_plan_reminders`, `duties_after_answer`, `duties_set_reminders`, `duties_create_series_with_reminders`, plus the three checks and the route handler; all revoked from public, anon, authenticated, service_role.
+  - Replaced (latest body copied, changes marked "Story 4.8"; a body-by-body diff against the previous version shows only those lines): `duties_state_ok` (4.5), `duties_assignment_history_guard` (4.5), `duties_notify` (4.3), `duties_apply_change` (4.4), `duties_publish_duty` (4.4), `duties_publish_drafts` (4.4), `duties_revise_duty` (4.4), `duties_respond` (4.5), `duties_withdraw_acceptance` (4.5), `duties_accept_many` (4.5), `duties_authorize_command` (4.5), `duties_command` (4.5), `duties_my_assignment_json` (4.5), `duties_occurrence_json` 3-arg (4.5), `duties_rota_occurrence_json` (4.5). `duties_assign_slot` and `duties_revise_series` are not replaced: they already pass a null deadline to the change engine, which now applies the default.
+- Decision (agent, under owner pre-approval): the deadline default is computed by the shared `app.notifications_response_deadline` with the assignment made now; the stored deadline (default included) is always sent to Notifications as the intent's `response_deadline`, so `notifications_replan_all` never moves a Duties deadline.
+- Decision (agent, under owner pre-approval): the member's "respond now" on Short notice is the notice the command queued (`kinds.respond_now` = `duty_assigned` / `duty_changed`, same logical key as the notice, so one item). Without a notice (erased member) nobody is planned.
+- Decision (agent, under owner pre-approval): an answer keeps the 4.1-4.5 blanket cancel (`responded`), then `duties_after_answer` ends the leaders' alerts and, for an acceptance, plans the pre-service reminders at the new revision. Because that plan needs the Q2 policy, an acceptance now needs Q2 like publishing does (production stays closed on both gates; fail closed).
+- Decision (agent, under owner pre-approval): `reminders` on `create_series` goes through a wrapper (`duties_create_series_with_reminders`) that validates the field, calls the unchanged 4.3 command without it and copies the value to the series and its dates; a malformed list is refused before the series is checked (one error set).
+- Decision (agent, under owner pre-approval): leader recipients are chosen at plan time (current leader and deputy grants of the department, live members, not the assignee) and rechecked at delivery; a leader granted later is alerted from the next re-plan (`duties.set_reminders`). Admins and Pastors get no alert. Cell-owned occurrences are not planned (entry 11).
+- Decision (agent, under owner pre-approval): the S1 lesson: a non-fresh plan of an unanswered assignment whose deadline has passed enqueues one `duty_response_overdue` now for each leader with no live alert at the revision. The B1 lesson needs no revision counter here: every new assignment is a new source id (pgTAP and E2E prove A -> B -> A).
+- Decision (agent, under owner pre-approval): Needs contact lists the current assignee only (short notice while pending; `not_reached` while a need of the current revision is still relevant). Released/cancelled needs are recorded, not listed. No reason is ever shown.
+- Earlier tests changed for the new behaviour (no merged migration edited): `duties_tracer_test.sql` (a missing deadline now takes the default: the refusal case uses a malformed one; the accountless notice is now `direct_contact`; job queries filter notices; 4.8 keys excluded from the 4.1 key list), `duties_revisions_test.sql` (two malformed-deadline cases instead of missing ones; notice-only job helper; 4.8 keys excluded), `duties_rota_test.sql` (two malformed lead/deadline cases; notice-only job helper), `duties_overlaps_test.sql` and `duties_responses_test.sql` (notice-only job queries). Client: `duties_revisions_test.dart` (a material change saves without a new answer-by; `/duties/leader` is now a deep-link target).
+- The 4.1-4.5 E2E clean-ups (`duties.mjs`, `duties-revisions.mjs`, `duties-rota.mjs`, `duties-overlaps.mjs`, `duties-responses.mjs`) now delete the Notifications schedules and Needs contact rows their duties create (otherwise member deletion hits the schedules' foreign key).
+- Clients: `DutyDeadlineSource`, `DutyReminderAnchor`, `DutyReminderSpec`, `dutyReminderChoices`, `DutyReminders`, `DutyContactNeed`, `DutyCommands.setReminders`, `DutyLeads.churchDefault`; `MyDuty`/`PositionAssignment`/`RotaAssignment` gain deadline source, Short notice and (leaders) Needs contact; `LeaderDuty`/`RotaOccurrence` gain reminders; `DutyDraft.responseDeadline` optional and `reminders`; `SeriesDraft.reminders`; controllers `setReminders`, `setSeriesReminders`, `publishDrafts(lead?)`; notice `remindersSet`. New part file `duties_reminder_widgets.dart` (`_ReminderChoice`, `_RemindersEditor`, `_contactFlags`, `_NeedsContactList`). `testing.dart` `myDutyData(extra:)`.
+- E2E: `tools/identity-e2e/duties-reminders.mjs` (15 checks, D01-D90) with offline test; `duties-revisions.mjs` job summary limited to notice kinds (its R12 otherwise lists the 4.8 reminders).
+- Matrix audit: Quarterly rota (pgTAP 14-day/48-hour bands; E2E D11), Mid-week (pgTAP; D10), Same day (pgTAP incl. a short-notice change; D12), Creator (pgTAP incl. refusals; D20), Accept / decline (pgTAP incl. later decline and bulk; D30, D31), Reassign / cancel (pgTAP A -> B -> A and cancel; D40, D41; the stray old job is covered by the global no-stale assertion), Held / accountless (pgTAP; D50), Snooze (pgTAP; D60). No quiet hours: pgTAP and D70. All ran and passed.
+- Open owner questions: none blocking. The deadline bands and the 24-hour pre-service default are the agent's reading of Q2 (ticket `unknown`); the owner may change the bands in the `q2_church_time` value and the pre-service default in `app.duties_default_reminders`.
 
 ## Plan Change Log
 
@@ -92,3 +112,11 @@ context:
 - `npm run -s contracts:test && node --test <CI set> && npm run -s ci:policy-test` -- expected: pass.
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/staff`, `apps/mobile`; `TZ=America/New_York` for `test/duties` and mobile -- expected: pass.
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/main && npm run -s ci:function-imports`; evidence scan -- expected: clean.
+
+**Results (2026-10-14):**
+- db reset 0; db:test PASS (34 files, 3018 tests, including `duties_reminders_test.sql` 103); db:smoke pass (0 failures, no SMS provider).
+- Every E2E `exit=0` (25 scripts, reset before each; `duties-reminders` 15/15; `duties-revisions` 13/13 after its helper fix) (`evidence-4.8/e2e-suite-summary.txt`).
+- contracts:test 242/0; node tool tests (CI set) 200/0; ci:policy-test 56/0.
+- flutter analyze clean in client_core, apps/staff, apps/mobile; flutter test client_core 564 (`test/duties/duties_reminders_test.dart` 14), apps/staff 38, apps/mobile 53; under `TZ=America/New_York` client_core `test/duties` + `test/followups` 136 and apps/mobile 53.
+- ci:secrets clean; ci:migrations (`--base origin/main`) ordered, unique, non-destructive; ci:function-imports ok; evidence scan clean (evidence-4.8, the E2E tool, duties and seams runbooks).
+- Remaining (not builder steps): staging apply of `20261014153012_duties_reminders.sql` and per-function md5 parity (parent; no owner SQL paste; no Edge Function redeploy), staging staff web and APK rebuild, owner manual checks in `docs/runbooks/duties.md` story 4.8 (record in `evidence-4.8/owner-check.md`).

@@ -10,7 +10,7 @@
 -- alert, generic contract text, privileges. HTTP evidence: tools/identity-e2e/duties-reminders.mjs.
 -- Every account, phone and name is SYNTHETIC (fictional range +44 7700 900650-900669).
 begin;
-select plan(102);
+select plan(103);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000048' || lpad(n::text, 2, '0'))::uuid $$;
@@ -267,6 +267,14 @@ select is(pg_temp.jobs(pg_temp.sa(12)),
   'm:duty_assigned:4:now,m:duty_response_due:4:-24,m:duty_response_due:4:0,m:duty_starting:4:312,'
   || 'l:duty_response_overdue:2:0,l:duty_response_overdue:3:0',
   'the last Sunday: reminders around its 14-day deadline and one the day before the service');
+create temp table give as select pg_temp.duties(2, 'duties.assign_slot', pg_temp.orev(pg_temp.so(3)), jsonb_build_object(
+  'slot_id', (select slot_id from app.duties_slots where occurrence_id = pg_temp.so(3)), 'member_id', pg_temp.mid(5))) as r;
+select is((select (r #>> '{data,state}') || '|' || x.deadline_source || '|'
+                  || (x.response_deadline = (select o.starts_at - case when o.starts_at >= now() + interval '30 days'
+                                                                       then interval '14 days' else interval '48 hours' end
+                                               from app.duties_occurrences o where o.occurrence_id = pg_temp.so(3)))::text
+             from give, pg_temp.row(pg_temp.sa(3)) x),
+  'published|default|true', 'an unfilled published position given without an answer-by takes the default too');
 select is((select r ->> 'code' from (select pg_temp.duties(2, 'duties.publish_drafts', 1, jsonb_build_object(
              'series_id', pg_temp.sr(), 'slot_count', 13, 'deadline_before', 'soon')) as r) x),
   'validation_failed', 'a malformed lead time is still refused');
@@ -342,7 +350,7 @@ select is(pg_temp.duties(2, 'duties.publish_duty', null, jsonb_build_object(
 select is((select count(*)::int from app.duties_occurrences where duty_name = 'Refused'), 0, 'refusals wrote nothing');
 
 -- No quiet hours: a reminder at 23:30 church time stays at 23:30 ---------------------------------------
-create temp table late as select pg_temp.pub('L', 5, pg_temp.lt(pg_temp.sunday(3), '09:00'), jsonb_build_object(
+create temp table late as select pg_temp.pub('L', 5, pg_temp.lt(pg_temp.sunday(3), '18:00'), jsonb_build_object(
   'response_deadline', app.cmd_utc(pg_temp.lt(pg_temp.sunday(3) - 1, '23:30')),
   'reminders', '[{"anchor": "response_deadline", "before": "0 minutes"}]'::jsonb)) as r;
 select is((select string_agg(to_char(j.scheduled_at at time zone 'Africa/Lusaka', 'HH24:MI'), ',')

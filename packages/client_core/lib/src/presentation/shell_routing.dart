@@ -75,6 +75,9 @@ abstract final class ClientPaths {
   /// Story 4.3 (staff web): the rota grid.
   static const dutyRota = DutyPaths.rota;
 
+  /// Story 4.9 (staff web and mobile): the coverage queue.
+  static const dutyCoverage = DutyPaths.coverage;
+
   /// Story 4.1, staff web, Admin only: departments, leaders, deputies and
   /// members.
   static const adminDepartments = DutyPaths.adminDepartments;
@@ -165,6 +168,9 @@ abstract final class ClientPaths {
     // Story 4.8: the leaders' overdue and short-notice alerts open the
     // Duties board, which reads the duty again (a pointer, not a grant).
     RegExp(r'^/duties/leader$'),
+    // Story 4.9: the leaders' decline alert opens the coverage queue, which
+    // reads every position again.
+    RegExp(r'^/duties/coverage$'),
     // Story 4.7: the follow-up reminders (followups_task and
     // followups_supervision contracts) open the task, which reads it again.
     RegExp(
@@ -343,6 +349,11 @@ GoRouter buildClientRouter({
           GoRoute(
             path: 'rota',
             pageBuilder: (_, state) => page(state, const DutyRotaScreen()),
+          ),
+          // Story 4.9: both apps (the leader's essential actions on mobile).
+          GoRoute(
+            path: 'coverage',
+            pageBuilder: (_, state) => page(state, const DutyCoverageScreen()),
           ),
           GoRoute(
             path: 'assignments/:assignmentId',

@@ -191,7 +191,9 @@ select is((select string_agg(reminder_kind || '=' || title, '; ' order by source
   || 'duty_response_overdue=Duty answer overdue; duty_short_notice=Short-notice duty',
   'the reminder contracts carry fixed generic titles');
 select is((select string_agg(distinct link, ',') from app.contract_reminder_contracts
-            where source_type = 'duties_coverage'), '/duties/leader',
+            where source_type = 'duties_coverage'
+              -- Story 4.9: the decline alert opens the coverage queue (duties_coverage_test.sql).
+              and reminder_kind <> 'duty_declined'), '/duties/leader',
   'the leaders'' alerts open the Duties board (which reads the duty again)');
 select is((select string_agg(reminder_kind, ',' order by reminder_kind) from app.contract_direct_contact_routes
             where source_type = 'duties_assignment' and handler = 'app.duties_record_contact_need(jsonb)'),
@@ -396,13 +398,15 @@ select is(pg_temp.items(4, 'duty_starting'), 1, 'the accepted member gets the pr
 
 -- Decline: everything stops ----------------------------------------------------------------------------
 select is(pg_temp.answer(4, pg_temp.a('B'), 'declined') #>> '{data,response}', 'declined', 'M declines duty B');
-select is(pg_temp.jobs(pg_temp.a('B')), '-', 'no reminder and no leader alert is left after a decline');
+select is(pg_temp.jobs(pg_temp.a('B')), 'l:duty_declined:2:now,l:duty_declined:3:now',
+  'no reminder and no overdue alert is left after a decline (story 4.9: only the leaders'' decline alert)');
 
 -- Later decline and bulk acceptance -------------------------------------------------------------------
 select is(pg_temp.duties(4, 'duties.withdraw_acceptance', pg_temp.rev(pg_temp.a('D')),
             jsonb_build_object('assignment_id', pg_temp.a('D'))) #>> '{data,response}', 'declined',
   'M can''t make duty D anymore');
-select is(pg_temp.jobs(pg_temp.a('D')), '-', 'the pre-service reminder stops too');
+select is(pg_temp.jobs(pg_temp.a('D')), 'l:duty_declined:2:now,l:duty_declined:3:now',
+  'the pre-service reminder stops too (story 4.9: only the leaders'' decline alert)');
 create temp table bulk as select pg_temp.duties(5, 'duties.accept_many', null, jsonb_build_object(
   'assignments', jsonb_build_array(
     jsonb_build_object('assignment_id', pg_temp.sa(1), 'revision', pg_temp.rev(pg_temp.sa(1))),

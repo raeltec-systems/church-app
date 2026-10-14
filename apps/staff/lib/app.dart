@@ -124,6 +124,14 @@ const staffDutyRotaDestination = (
   icon: Icons.calendar_view_week_outlined,
 );
 
+/// Story 4.9: the coverage queue, shown with the Duties entry (Pastor and
+/// Admin: the church-wide view of gaps).
+const staffDutyCoverageDestination = (
+  path: ClientPaths.dutyCoverage,
+  label: 'Coverage',
+  icon: Icons.fact_check_outlined,
+);
+
 /// Story 4.1: shown while the server's current answer includes Admin.
 const staffDepartmentsDestination = (
   path: ClientPaths.adminDepartments,
@@ -168,6 +176,7 @@ List<StaffDestination> staffDestinationsFor(
   if (servesACell(grants)) staffCellLeaderDestination,
   if (seesDutyBoard(grants)) staffDutyLeaderDestination,
   if (seesDutyBoard(grants)) staffDutyRotaDestination,
+  if (seesDutyBoard(grants)) staffDutyCoverageDestination,
   if (grants != null) staffMyFollowUpsDestination,
   if (supervisesFollowUps(grants)) staffFollowUpSupervisionDestination,
   if (grants?.isAdmin ?? false) staffFollowUpRoutingDestination,

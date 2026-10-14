@@ -82,6 +82,22 @@ enum DutyNotice {
   /// Story 4.8: the member reminders of a duty (or a series) were set.
   remindersSet,
 
+  /// Story 4.9: a contact attempt was recorded (and its follow-up task
+  /// opened or updated).
+  contactRecorded,
+
+  /// Story 4.9: Confirmed by leader was recorded.
+  leaderConfirmed,
+
+  /// Story 4.9: a position was cancelled (or, the last one, its duty).
+  positionCancelled,
+
+  /// Story 4.9: a declined position is reassigned, not confirmed.
+  confirmDeclined,
+
+  /// Story 4.9: the position is already confirmed (no contact needed).
+  alreadyConfirmed,
+
   /// Story 4.5: "Can't make it anymore" was recorded.
   withdrawn,
 
@@ -326,14 +342,37 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
         DutyCommands.withdrawAcceptance => DutyNotice.withdrawn,
         DutyCommands.acceptMany => DutyNotice.bulkAccepted,
         DutyCommands.setReminders => DutyNotice.remindersSet,
+        DutyCoverageCommands.recordContactAttempt => DutyNotice.contactRecorded,
+        DutyCoverageCommands.confirmByLeader => DutyNotice.leaderConfirmed,
+        DutyCoverageCommands.cancelPosition =>
+          data is Map && data['cancelled'] == 'occurrence'
+              ? DutyNotice.occurrenceCancelled
+              : DutyNotice.positionCancelled,
         _ =>
           action.request.payload['response'] == DutyResponse.declined.wire
               ? DutyNotice.declined
               : DutyNotice.accepted,
       };
 
-  static DutyNotice _refusal(CommandError error) {
+  static DutyNotice _refusal(CommandError error, [DutyAction? action]) {
     final f = error.fieldErrors;
+    // Story 4.9: a leader's coverage command on an assignment that changed
+    // (an answer, a change, a cancellation) reloads the queue; it is never
+    // the member's "your answer was not recorded".
+    final coverage =
+        action?.command == DutyCoverageCommands.recordContactAttempt ||
+        action?.command == DutyCoverageCommands.confirmByLeader;
+    if (coverage && error.code == ErrorCode.conflict) {
+      return switch (f['assignment_id']) {
+        'declined' => DutyNotice.confirmDeclined,
+        'responded' => DutyNotice.alreadyConfirmed,
+        'cancelled' => DutyNotice.dutyCancelled,
+        _ => DutyNotice.changedElsewhere,
+      };
+    }
+    if (coverage && f['assignment_id'] == 'confirmed') {
+      return DutyNotice.alreadyConfirmed;
+    }
     return switch (error.code) {
       ErrorCode.conflict when f['assignments'] == 'changed' =>
         DutyNotice.bulkChanged,
@@ -360,7 +399,8 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
         DutyNotice.unchanged,
       ErrorCode.validationFailed
           when f['occurrence_id'] == 'cancelled' ||
-              f['from_occurrence_id'] == 'cancelled' =>
+              f['from_occurrence_id'] == 'cancelled' ||
+              f['slot_id'] == 'cancelled' =>
         DutyNotice.dutyCancelled,
       ErrorCode.validationFailed when f['from_occurrence_id'] == 'started' =>
         DutyNotice.dutyStarted,
@@ -407,7 +447,7 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
         await _reload(epoch);
       case CommandRefused(:final error):
         ref.invalidate(dutyCandidatesProvider);
-        final notice = _refusal(error);
+        final notice = _refusal(error, action);
         state = state.copyWith(
           clearPending: true,
           clearUnconfirmed: true,
@@ -733,3 +773,109 @@ final dutyCandidatesProvider = FutureProvider.autoDispose
       ref.watch(accountGenerationProvider);
       return ref.read(dutiesRepositoryProvider).fetchCandidates(query);
     });
+
+// ---------------------------------------------------------------------------
+// Story 4.9: the coverage queue
+// ---------------------------------------------------------------------------
+
+/// The queue's server-side filters (window, department, duty). Memory only,
+/// reset on an account change.
+class DutyCoverageQueryController extends Notifier<CoverageQuery> {
+  @override
+  CoverageQuery build() {
+    ref.watch(accountGenerationProvider);
+    return const CoverageQuery();
+  }
+
+  void set(CoverageQuery query) => state = query;
+}
+
+final dutyCoverageQueryProvider =
+    NotifierProvider<DutyCoverageQueryController, CoverageQuery>(
+      DutyCoverageQueryController.new,
+    );
+
+/// Story 4.9 (staff web and mobile): the scoped coverage queue and the
+/// leader's essential actions: record a contact attempt, Confirmed by
+/// leader, (re)assign a position, cancel a position. Every action is a
+/// server-checked command; the queue is read again after each answer.
+class DutyCoverageController extends DutiesController<DutyCoverage> {
+  @override
+  DutiesState<DutyCoverage> build() {
+    ref.watch(dutyCoverageQueryProvider);
+    return super.build();
+  }
+
+  @override
+  Future<AccessRead<DutyCoverage>> fetch() => ref
+      .read(dutyCoverageRepositoryProvider)
+      .fetchCoverage(ref.read(dutyCoverageQueryProvider));
+
+  void setQuery(CoverageQuery query) =>
+      ref.read(dutyCoverageQueryProvider.notifier).set(query);
+
+  Future<void> recordAttempt(CoveragePosition p, ContactAttemptDraft draft) {
+    final a = p.assignment;
+    if (a == null) return Future.value();
+    return send(
+      DutyCoverageCommands.recordContactAttempt,
+      Optional.of(a.revision),
+      draft.toPayload(a.assignmentId),
+      a.name,
+    );
+  }
+
+  Future<void> confirm(CoveragePosition p, LeaderConfirmationDraft draft) {
+    final a = p.assignment;
+    if (a == null) return Future.value();
+    return send(
+      DutyCoverageCommands.confirmByLeader,
+      Optional.of(a.revision),
+      draft.toPayload(a.assignmentId),
+      a.name,
+    );
+  }
+
+  /// Gives the position to [memberId] (the 4.3 command; the old assignee's
+  /// reminders end and their follow-up task closes). The answer-by time is
+  /// the church default; [reason] when they have an overlapping duty.
+  Future<void> assign(
+    CoveragePosition p,
+    String memberId,
+    String subject, {
+    String? reason,
+  }) {
+    final r = reason?.trim();
+    return send(DutyCommands.assignSlot, Optional.of(p.occurrenceRevision), {
+      'slot_id': p.slotId,
+      'member_id': memberId,
+      if (r != null && r.isNotEmpty) 'override_reason': r,
+    }, subject);
+  }
+
+  Future<void> cancelPosition(CoveragePosition p) => send(
+    DutyCoverageCommands.cancelPosition,
+    Optional.of(p.occurrenceRevision),
+    {'slot_id': p.slotId},
+    p.title,
+  );
+}
+
+final dutyCoverageProvider =
+    NotifierProvider<DutyCoverageController, DutiesState<DutyCoverage>>(
+      DutyCoverageController.new,
+    );
+
+/// Story 4.9 (mobile Home): the leader's Needs attention card reads the
+/// queue with the defaults (this week, every department they lead).
+class LeaderAttentionController extends DutiesController<DutyCoverage> {
+  @override
+  Future<AccessRead<DutyCoverage>> fetch() => ref
+      .read(dutyCoverageRepositoryProvider)
+      .fetchCoverage(const CoverageQuery());
+}
+
+final leaderAttentionProvider =
+    NotifierProvider<LeaderAttentionController, DutiesState<DutyCoverage>>(
+      LeaderAttentionController.new,
+    );

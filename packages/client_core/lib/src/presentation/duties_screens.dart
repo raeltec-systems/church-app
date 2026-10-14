@@ -5,13 +5,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../application/access_controllers.dart' show myAccessProvider;
 import '../application/duties_controllers.dart';
+import '../application/providers.dart' show contactLauncherProvider;
 import '../domain/access_grants.dart';
 import '../domain/church_time.dart';
 import '../domain/duties.dart';
 import '../domain/duty_calendar.dart';
-import 'followups_screens.dart' show MyFollowUpsHomeCard;
+import 'followups_screens.dart' show FollowUpPaths, MyFollowUpsHomeCard;
 
+part 'duties_coverage_screens.dart';
 part 'duties_reminder_widgets.dart';
 part 'duties_rota_screens.dart';
 
@@ -49,6 +52,11 @@ abstract final class DutyPaths {
 
   /// Story 4.5 (mobile): the member Home with the My duties card.
   static const home = '/home';
+
+  /// Story 4.9 (staff web and mobile): the coverage queue (leaders and
+  /// deputies; Admin and Pastor oversight). The leaders' decline alert
+  /// opens it.
+  static const coverage = '/duties/coverage';
 }
 
 (StatusTone, String, String) _noticeText(
@@ -237,6 +245,38 @@ abstract final class DutyPaths {
       StatusTone.success,
       'Reminders saved',
       'The reminders of $what are set. Nobody is asked to answer again.',
+    ),
+    DutyNotice.contactRecorded => (
+      StatusTone.success,
+      'Contact attempt recorded',
+      'Your contact attempt with $what is recorded with the next follow-up '
+          'date. It is on your follow-up task (My follow-ups), which closes '
+          'when the position is answered, confirmed or given to someone else.',
+    ),
+    DutyNotice.leaderConfirmed => (
+      StatusTone.success,
+      'Confirmed by leader',
+      '$what is recorded as Confirmed by leader, with you, the time, how they '
+          'confirmed and your reason. It is kept apart from an answer in the '
+          'app; their answer reminders stop.',
+    ),
+    DutyNotice.positionCancelled => (
+      StatusTone.success,
+      'Position cancelled',
+      '$what is cancelled and no longer counts as required. Anyone who was '
+          'asked or had accepted gets a cancellation notice.',
+    ),
+    DutyNotice.confirmDeclined => (
+      StatusTone.warning,
+      'They declined',
+      'A decline is not overwritten: give the position to someone (Reassign). '
+          'Nothing was recorded.',
+    ),
+    DutyNotice.alreadyConfirmed => (
+      StatusTone.neutral,
+      'Already confirmed',
+      'This position is already confirmed, so nothing was recorded. The list '
+          'was reloaded.',
     ),
     DutyNotice.bulkAccepted => (
       StatusTone.success,
@@ -1040,13 +1080,19 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
           if (duty.location case final l?) Text('Where: $l'),
           if (duty.instructions case final i?) Text('Instructions: $i'),
           Text(
-            '${duty.accepted} of ${duty.positions.length} confirmed',
+            '${duty.accepted} of ${duty.required} confirmed',
             key: Key('coverage-$id'),
           ),
           if (duty.topic case final t?) Text('Topic: $t'),
           if (duty.scripture case final sc?) Text('Scripture: $sc'),
           for (final p in duty.positions) ...[
-            if (p.assignment == null && p.positionName != null)
+            // Story 4.9: a cancelled position is no longer required.
+            if (p.cancelled)
+              Text(
+                '${p.positionName ?? 'Position ${p.positionNo}'}: Cancelled',
+                key: Key('position-cancelled-${p.slotId}'),
+              )
+            else if (p.assignment == null && p.positionName != null)
               Text('${p.positionName}: Unfilled'),
             if (p.assignment case final a?)
               Wrap(
@@ -1068,11 +1114,21 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
                       );
                       return StatusLabel(
                         key: Key('response-${a.assignmentId}'),
-                        label: label,
+                        // Story 4.9: kept apart from the member's own answer.
+                        label: a.confirmation != null
+                            ? 'Confirmed by leader'
+                            : label,
                         tone: tone,
                       );
                     },
                   ),
+                  if (a.confirmation case final c?)
+                    _muted(
+                      context,
+                      '${c.by ?? 'A leader'} recorded it ${_when(context, c.at)} '
+                      '(${c.channel.label.toLowerCase()})'
+                      '${c.reason == null ? '' : ': "${c.reason}"'}',
+                    ),
                   if (a.priorAcceptedAt case final t?)
                     _muted(
                       context,
@@ -2245,6 +2301,9 @@ class _OneDuty extends StatelessWidget {
     ? ('Sending…', StatusTone.info)
     : unsent
     ? ('Not sent', StatusTone.warning)
+    // Story 4.9: an acceptance a leader recorded after a call or in person.
+    : a.confirmedByLeader && a.response == DutyResponse.accepted
+    ? ('Confirmed by your leader', StatusTone.success)
     : _answerLabel(a.response, a.priorAcceptedAt);
 
 /// Story 4.5: Can't make it (a pending duty) or Can't make it anymore (an
@@ -2770,7 +2829,13 @@ class MemberHomeScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 // Story 4.6: My follow-ups shows while the member owns open
                 // work.
-                children: [MyDutiesHomeCard(), MyFollowUpsHomeCard()],
+                // Story 4.9: a department leader's Needs attention card
+                // comes first (hidden for everyone else).
+                children: [
+                  LeaderNeedsAttentionCard(),
+                  MyDutiesHomeCard(),
+                  MyFollowUpsHomeCard(),
+                ],
               ),
             ),
           ),

@@ -724,3 +724,145 @@ Record the outcome of each step in `evidence-4.8/owner-check.md`: pass or fail, 
 - Released and cancelled notices are listed until the old start and cannot be marked done yet. Contact attempts, leader confirmation and the coverage queue arrive with entry 9.
 - An operator re-plan after a policy change (`app.notifications_replan_all`) cannot call Duties: a leader alert it moves into the past is not re-sent until the assignment is next re-planned.
 - Duties published before 4.8 keep their 4.1-4.5 jobs; there is no back-fill of reminders. **On staging**, duties published before this migration get the new reminders and leader alerts only after their next change (a reassignment, a material change, an answer or `duties.set_reminders`); test with duties published after the apply.
+
+## Story 4.9: work the coverage queue with contact attempts and leader confirmation
+
+Migration: `supabase/migrations/20261014201500_duties_coverage.sql`.
+- Forward only: the 4.1-4.8 files and the Follow-ups files are not edited. The replaced function bodies are listed in its header; each is copied from its latest version and keeps every earlier review fix.
+- No destructive statements, no row deletions and no `_rows` file.
+- One new client grant: `api.duties_coverage(date, date, uuid, text)` and its `app` body (authenticated only). The three new commands go through `api.duties_command`.
+
+Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-work-the-coverage-queue-with-contact-attempts-and-leader-con-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.9/`.
+
+### Who sees what
+
+| Reader | Departments | View |
+|---|---|---|
+| A department's leader or deputy | the departments they lead or deputise | **full**: positions, states, names, deadlines, counts, the labelled contact routes of members not yet confirmed, contact attempts with their notes, the Follow-ups task link, member notes and Confirmed by leader reasons |
+| Admin (role alone) | every department | **operational**: positions, states, names, deadlines and counts; may reassign and cancel positions; never a contact route, note, reason or task link; cannot record contact attempts or confirmations (`forbidden`) |
+| Pastor | every department (the church-wide gap view) | **operational**, read only |
+| Anyone else, a member | none | `403 not_granted` |
+
+A leader asking for another department (`department_id`) gets `403 not_granted`. Synthetic departments are hidden outside local and staging. With the Q4 gate closed the read answers `403 unavailable`.
+
+### Contact routes (Identity, behind Q4)
+
+`app.identity_scoped_contact_routes(viewer, scope_kind, scope_id, member_ids)` (owner Identity, not client-executable) returns the **labelled 2.5 contact routes** (`app.identity_contact_routes`: number, whose it is, holder label) of the given members to a viewer who holds that department scope now. Never a phone username, never a hold or deletion reason. It is behind `identity_applications_open()` (local, staging or Q4 approved); until `q4_personal_data` itself is approved only SYNTHETIC routes are returned. Members no longer approved or under deletion have none. The caller (the Duties read) passes only members of its own department positions. Clients open the phone's dialler or messages (`tel:` / `sms:`) through a launcher port; the app never calls or sends anything itself.
+
+### The queue (`api.duties_coverage(from_date?, to_date?, department_id?, duty?)`)
+
+- Window: church dates (Africa/Lusaka), default today and the next six days, at most 31 days; only duties that have not started (completion outcomes are entry 10). `duty` filters by name (case-insensitive). Errors: `400 validation_failed` (`window`, `duty`).
+- Per position of a published duty (cancelled positions are left out): `status` = `unfilled` (no current assignment), `awaiting` (pending, before the answer-by time), `overdue` (pending, answer-by passed), `changed` (pending re-ask of the same member after a material change), `declined`, `confirmed` (accepted by the member, or Confirmed by leader); the 4.8 `needs_contact`; `overlaps`; the assignment (account `app_account` / `no_login`, `response_provenance` `member` / `leader`, `confirmation` `{by, at, channel, reason}`); the open coverage case `follow_up` (attempts, latest attempt, next follow-up, `overdue`, `task_id`).
+- Per department: `counts` (`required`, `confirmed`, `unfilled`, `awaiting`, `overdue`, `declined` (declined and changed), `needs_contact`, `conflicts`, `overdue_follow_ups`), `can_manage`, `can_contact`, the roster for reassignment (managers only) and `contact_routes`.
+- At most 1000 positions are listed, soonest first (`truncated`); the counts always cover every position.
+- Cost: set-based; the overlap counts and the contact routes are computed once per read. `supabase/tests/duties_coverage_scale_test.sql` (under `statement_timeout = '8s'`): a leader's week of 250 positions about 0.2 s, Pastor's view of 40 departments (2,590 positions) about 0.7 s, an Admin's 31 days about 0.7 s (local).
+
+### Commands (`api.duties_command`)
+
+| Command | Who | `expected_revision` | Payload | Effect |
+|---|---|---|---|---|
+| `duties.record_contact_attempt` | the department's leader or deputy | assignment revision (unchanged by an attempt) | `{assignment_id, channel: phone\|message\|in_person\|other, outcome: no_answer\|left_message\|will_answer\|cannot_serve\|other, note?, next_follow_up_at}` | records the practical attempt (note 1-280, no pastoral or medical detail); the first attempt of an assignment opens a coverage case and its Follow-ups task (below); later ones set that task Waiting with the next follow-up as review date |
+| `duties.confirm_by_leader` | the department's leader or deputy | assignment revision | `{assignment_id, channel, reason}` | a **pending** assignment becomes accepted with provenance `leader`, the leader as actor, the time, the channel and the reason (1-200); its answer reminders and leader alerts stop, the pre-service reminder is planned, the case and task close |
+| `duties.cancel_position` | leader, deputy or Admin | occurrence revision | `{slot_id}` | cancels one position of a published duty (its assignee who was waiting or had accepted gets `duty_cancelled`; it no longer counts as required); the last remaining position cancels the whole date, one-off duties included |
+| `duties.assign_slot` (4.3) | leader, deputy or Admin | occurrence revision | `{slot_id, member_id, override_reason?}` | reassignment: the old assignment is superseded (answer kept), its reminders and alerts end, `duty_released` goes to the old assignee, the new one gets a fresh plan |
+
+Refusals:
+
+| Case | Answer |
+|---|---|
+| Admin (role alone) recording contact or confirming | `forbidden` |
+| Pastor, another department's leader, a member, an unknown or cell-owned assignment | `not_found` |
+| An ended assignment | `conflict {"assignment_id": "superseded" \| "cancelled"}` |
+| Stale revision | `conflict` with `current_revision` |
+| The duty has started | `validation_failed {"assignment_id": "started"}` |
+| An attempt on an accepted assignment | `validation_failed {"assignment_id": "confirmed"}` |
+| Next follow-up in the past, at or after the (reporting) start, more than a year away | `{"next_follow_up_at": "past" \| "after_start" \| "out_of_range"}` |
+| Bad channel or outcome | `{"channel" \| "outcome": "invalid" \| "required"}` |
+| Confirmation without a reason; on an answered or declined assignment; of a member who can no longer serve | `{"reason": "required"}`; `conflict {"assignment_id": "responded" \| "declined"}`; `{"member_id": "required_reassign"}` |
+| A cancelled position (given again, cancelled again); a draft date's position | `{"slot_id": "cancelled"}`; `{"slot_id": "draft"}` |
+| Gate closed (production without Q4); untrusted session | `unavailable {"policy": "gate_closed"}`; `unauthenticated` |
+
+Answers carry ids, revisions and codes only (never a note or reason). A replay rechecks that the actor still manages the occurrence's department.
+
+### Coverage cases and the Follow-ups task
+
+- `app.duties_coverage_cases`: one open case per assignment, opened by the first contact attempt; `app.duties_contact_attempts`: the attempts (immutable, except erasure). Both RLS on, no client privilege.
+- The task: Follow-ups source `duties_coverage_case` (source id = the case id), purpose `coverage_follow_up` (label "Duty cover follow-up", scope kinds `department_leader`/`department_deputy`, outcomes = the attempt outcomes, `close` on resolved and cancelled, not hand-made). Owner and supervisor: the recording leader; scope: their department scope; next action generic; due at the next follow-up; context label "Duty cover: <duty> on <church date>". The church-default task reminder fires at the due (or review) time. See `follow-ups.md`, story 4.9, for the new owner operation `app.followups_source_review`.
+- The case closes, and its task with it, when the assignment is accepted by the member (`accepted`), confirmed by a leader (`confirmed`), superseded by a change or reassignment (`superseded`; task `source_resolved`) or cancelled (`cancelled`; task `source_cancelled`). A decline keeps it open (the position needs cover). A later need opens a fresh case and task (fresh keys).
+- Lock order: grants -> receipt -> department -> series -> occurrence -> slots -> assignment -> coverage case -> Follow-ups (its task and its own reminders) -> Notifications.
+
+### The leaders' decline alert
+
+`duties_coverage` / `duty_declined`: **Duty declined** / "A member cannot make a duty in your department. Open Coverage to find cover." Link `/duties/coverage` (in `ClientPaths.deepLinkTargets`). Sent now to each current leader and deputy the app can reach (never the assignee; a held or in-review leader is skipped and refused at delivery) when a member declines or says they can't make it anymore; keyed by the assignment's declined revision, so every decline is a fresh key (A -> B -> A included). Delivered while the assignment is current, declined and not started; a reassignment or cancellation ends it, and a reminder re-plan never cancels it.
+
+### Gates
+
+- Every read and command needs the Q4 personal-data gate (production stays inert).
+- With the Q2 policy closed or invalid a confirmation and a contact attempt are still recorded (as 4.8 decided for answers): the Follow-ups step and the reminder work are skipped and audited (`followup_skipped` / `reminders_skipped`, code `policy_unavailable`). A case closed while Follow-ups was unavailable leaves its task open; its reminders stop at delivery because the source is no longer current.
+
+### Member deletion
+
+`app.duties_erase_member` and `app.duties_deletion_remaining` are replaced: the attempt notes about an erased assignee and the confirmation reason are cleared; the recorders of attempts, cases and cancelled positions are anonymised with the nil UUID. No new rows are deleted.
+
+### Clients
+
+- **Staff web, Coverage** (`/duties/coverage`, sidebar **Coverage** with **Duties** and **Rota**): the window (**From**, 7/14/31 days), **Duty name contains**, a department choice and **Show**; filter chips **All**, **Unfilled**, **Overdue**, **Declined**, **Awaiting**, **Needs contact**, **Confirmed** with counts; per department "N of M confirmed, ... unfilled, ... overdue, ... declined or changed, ... need contact" and an issue card per position: duty, position, church time, place, the state, Short notice, Needs contact, overlaps, the assignee ("no login: contact them directly"), the answer-by time, **Confirmed by leader** (by, when, how, reason), the latest attempt and next follow-up with **Open the follow-up task**, the labelled contact routes with **Call** and **Message**, and the actions **Record contact attempt**, **Confirmed by leader**, **Assign**/**Reassign** (the 4.4 picker with load and overlaps) and **Cancel position**. Pastor and Admin read **Gaps across the church** with the per-department totals; Pastor read only, Admin with Reassign and Cancel position only.
+- **Mobile**: the same screen at `/duties/coverage` (the leader's essential actions on the phone; Call and Message open the dialler and messages), and the leader's **Needs attention** card first on **Home** (only for leaders and deputies): Unfilled, Overdue, Declined, Needs contact, "This week: N of M positions confirmed", overlapping duties and overdue follow-ups, **Open coverage**. A member reads **Confirmed by your leader** on a duty a leader confirmed (never the reason).
+- The Duties board shows **Confirmed by leader** with the recorder, time, channel and (managers) reason, and cancelled positions as **Cancelled** ("N of M confirmed" counts required positions only); the rota grid reads "Confirmed by leader" and "Cancelled".
+- Every action shows **Sending…**, and **Not sent yet** with **Check again** (same request id) when the outcome is unknown; nothing is shown as done until the server answers.
+
+### Local runs
+
+```bash
+npx supabase db reset
+npm run -s db:test                           # supabase/tests/duties_coverage_test.sql, duties_coverage_scale_test.sql (+ 4.1-4.8)
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/duties-coverage.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+node --test tools/identity-e2e/duties-coverage.test.mjs
+(cd packages/client_core && flutter test test/duties)
+```
+
+Fictional numbers: pgTAP `+44 7700 900780-900789`, E2E `900790-900799` (including the accountless member's household number). The 4.8 E2E `D31` and pgTAP decline checks now expect the leaders' decline alert.
+
+### Hosted staging (parent session, then the owner)
+
+1. **Parent session:**
+   - Apply `20261014201500_duties_coverage.sql` to staging (`tmurpotfluignacfueki`) after `20261014171038` (rename the local file to the recorded hosted version if the apply records another one, as for 4.8).
+   - Run `tools/ci/verify-hosted.sql` with `expected_env=staging`.
+   - Compare the md5 of each new or replaced `app.duties_*`, `app.followups_source_review` and `app.identity_scoped_contact_routes` function with the local one (the migration has no backslashes).
+   - Grants: among the new functions `authenticated` executes only `api.duties_coverage` and `app.duties_coverage`; `anon` none.
+   - Right after the apply: `select count(*) from app.duties_coverage_cases;` is 0; `select count(*) from app.contract_reminder_contracts where reminder_kind = 'duty_declined';` is 1; `select count(*) from app.followups_purposes where source_type = 'duties_coverage_case';` is 1.
+   - No Edge Function change (the worker is generic), no rows file, no owner SQL paste.
+2. **Staging clients:** rebuild the staff web and the staging APK (new screens; both apps add `url_launcher` 6.3.3, already a transitive dependency, so `flutter pub get` and a full build are needed; Android declares the `tel:`/`sms:` queries).
+3. **Production:** nothing in this story (Q2 and Q4 stay closed; every Duties command and read needs Q4).
+
+### Owner manual checks (staging, phone and web, story 4.9)
+
+Use synthetic members only. You need the 4.1 setup: Admin A, leader L of `SYNTHETIC Preaching Rota` with the staging APK on an Android phone (and staff web), member M with the app, member O with the app, member R, and an accountless member X with a SYNTHETIC labelled contact number (staff web **Members & applications** > **Add member record (no login)** with a fictional contact number and "whose it is" = household with a SYNTHETIC label); a second department `SYNTHETIC 4.9 Ushers` with leader K; a member P with the Pastor role. Add M, O, R and X to the Preaching Rota.
+
+1. **A synthetic rota.** As L, **Rota** > **New rota**: one Sunday at least four days away, `10:00`, positions `Preacher, Reader, Usher, Steward`; plan M (Preacher), X (Reader) and O (Usher), leave Steward unplanned; **Publish 4 draft slots** (church default answer-by).
+2. **The decline alert.** As O on a phone, decline the Usher duty. Within about a minute L's **Inbox** shows **Duty declined**; **Open** opens **Coverage**.
+3. **The queue.** Staff web as L: **Coverage**: "0 of 4 confirmed, 1 unfilled, ... 1 declined or changed, 1 need contact". M is **Awaiting response** with the answer-by time; X shows "(no login: contact them directly)", **Needs contact** and the household number with its label, **Call** and **Message**; O is **Declined**; Steward is **Unfilled**. The **Declined** chip shows only O.
+4. **Contact attempt.** On M's card: **Record contact attempt**: Phone call, No answer, note `SYNTHETIC: rang twice`, next follow-up tomorrow `18:00`, **Save contact attempt**: **Contact attempt recorded**; the card shows "1 contact attempt ... Next follow-up ..." and **Open the follow-up task**, which opens the task ("Duty cover: Sunday service on <date>", due tomorrow 18:00; also in **My follow-ups**). Record a second attempt (Left a message, the day after): the task is **Waiting** with that review date.
+5. **Confirm by phone (mobile).** On L's phone: **Home** shows **Needs attention** first (Unfilled 1, Declined 1, Needs contact 1); **Open coverage**; on X's card **Call** opens the dialler with the number (do not call; go back). **Confirmed by leader**: Phone call, reason `SYNTHETIC: confirmed by phone with the household`, **Record Confirmed by leader**: **Confirmed by leader**; the card reads **Confirmed by leader** with L, the time and the reason. Staff web **Duties** shows **Confirmed by leader** too.
+6. **Reassign the decline.** On O's card: **Record contact attempt** (Cannot serve), then **Reassign** > R > **Give this position**. O's card leaves; O gets **Duty changed** ("no longer assigned to you") and no further reminder; O's follow-up task is **Closed** (source resolved); R gets **New duty assigned**.
+7. **The member's own answer.** As M, accept on the phone: M's follow-up task closes; M's duty reads **Accepted**. As L, confirm another of R's pending duties as **Confirmed by leader**: on R's phone that duty reads **Confirmed by your leader** (never the reason), and **Can't make it anymore** is not offered for it.
+8. **Nothing private.** As K (Ushers leader): **Coverage** lists only the Ushers department; nothing of the Preaching Rota. As A (Admin, no department scope): **Coverage** shows **Gaps across the church** and the Preaching Rota with states and names but no number, no **Call**, no attempt note, no reason and no **Record contact attempt** or **Confirmed by leader**; A may **Reassign** and **Cancel position**. As P (Pastor): the same operational view, read only. (API, optional: `duties.record_contact_attempt` as A answers `forbidden`, as K `not_found`.)
+9. **Cancel a position.** As L, **Cancel position** on the Steward: it leaves the queue and "N of 3" is shown. Cancel the remaining positions: the last one cancels the date and the assignees get **Duty cancelled**.
+10. **Clean up** as in 4.8, step 11, plus (SQL editor) the `app.duties_contact_attempts` and `app.duties_coverage_cases` rows of the synthetic assignments and the `app.followups_*` rows of their tasks (`source_type = 'duties_coverage_case'`), before the assignments.
+
+Record the outcome of each step in `evidence-4.9/owner-check.md`: pass or fail, device model, Android version and browser. Include no numbers, ids or keys.
+
+### Owner questions
+
+- **Q4 (open, fail-closed default):** which member contact fields a leader may see in production. Staging shows only the labelled 2.5 contact routes through the scoped Identity read; production shows nothing until `q4_personal_data` is approved, and even then only labelled routes (never phone usernames).
+
+### Known limits (later entries)
+
+- The queue lists duties that have not started; completion outcomes (Completed, Excused, No-show) are entry 10; cell-owned positions are entry 11; lifecycle and handover hooks are entry 12.
+- Confirmed by leader is for a member who has not answered: a decline is reassigned, not overwritten, and the same member cannot be given the position back without first giving it to someone else (the 4.3 command refuses an unchanged assignee).
+- Contact details are the labelled 2.5 routes only (no phone usernames); members with an app account usually have none, so the leader contacts them through other agreed means.
+- "Needs contact" does not yet include "no active push device" (the 3.6 device state is not disclosed to leaders).
+- A case closed while Follow-ups was unavailable (Q2 invalid) leaves its task open until closed by hand.
+- The board's history list shows ended assignments with their provenance; a cancelled position's earlier assignment is in its history.

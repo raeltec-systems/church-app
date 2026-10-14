@@ -46,3 +46,18 @@ class SupabaseDutiesRepository implements DutiesRepository {
         DutyCandidates.fromJson,
       );
 }
+
+/// Story 4.9: `api.duties_coverage` (named parameters). The server decides
+/// which departments, contact routes and notes the caller may see.
+class SupabaseDutyCoverageRepository implements DutyCoverageRepository {
+  SupabaseDutyCoverageRepository(
+    SupabaseClient client, {
+    Duration timeout = const Duration(seconds: 10),
+  }) : _reader = SupabaseApiReader(client, timeout: timeout);
+
+  final SupabaseApiReader _reader;
+
+  @override
+  Future<AccessRead<DutyCoverage>> fetchCoverage(CoverageQuery query) =>
+      _reader.read('duties_coverage', query.toParams(), DutyCoverage.fromJson);
+}

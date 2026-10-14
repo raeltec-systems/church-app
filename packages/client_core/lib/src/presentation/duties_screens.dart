@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -2110,8 +2112,9 @@ String _overrideText(BuildContext context, DutyOverride o) =>
 /// and, for the chosen person, the overlapping duties the leader may see.
 /// When the person has another duty at that time (or the server refused for
 /// it), the leader must say why they are assigned anyway; the person still
-/// chooses whether to accept. No overlap found never means "free".
-class _CandidatePicker extends ConsumerWidget {
+/// chooses whether to accept. No overlap found never means "free". A new
+/// query (times being typed) is read after a 400 ms pause.
+class _CandidatePicker extends ConsumerStatefulWidget {
   const _CandidatePicker({
     required this.pickerKey,
     required this.members,
@@ -2140,8 +2143,42 @@ class _CandidatePicker extends ConsumerWidget {
   final String? reasonError;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final q = query;
+  ConsumerState<_CandidatePicker> createState() => _CandidatePickerState();
+}
+
+class _CandidatePickerState extends ConsumerState<_CandidatePicker> {
+  late CandidateQuery? _query = widget.query;
+  Timer? _debounce;
+
+  @override
+  void didUpdateWidget(_CandidatePicker old) {
+    super.didUpdateWidget(old);
+    if (widget.query == old.query) return;
+    _debounce?.cancel();
+    if (widget.query == null) {
+      _query = null;
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) setState(() => _query = widget.query);
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pickerKey = widget.pickerKey;
+    final members = widget.members;
+    final value = widget.value;
+    final reason = widget.reason;
+    final busy = widget.busy;
+    final reasonError = widget.reasonError;
+    final q = _query;
     final read = q == null ? null : ref.watch(dutyCandidatesProvider(q));
     final checks = switch (read) {
       AsyncData(value: AccessReadOk(:final value)) => value,
@@ -2155,15 +2192,17 @@ class _CandidatePicker extends ConsumerWidget {
     };
     final chosen = checks?.of(value);
     final overlapping = chosen?.overlaps ?? false;
-    String label(DepartmentMember m) {
-      final base = m.account == AccountStanding.noLogin
-          ? '${m.displayName} (no login: contact them directly)'
-          : m.displayName;
-      final c = checks?.of(m.memberId);
-      if (c == null) return base;
-      return '$base: ${c.loadLabel}'
-          '${c.overlaps ? ', overlaps ${c.conflictCount} at this time' : ''}';
-    }
+    String name(DepartmentMember m) => m.account == AccountStanding.noLogin
+        ? '${m.displayName} (no login: contact them directly)'
+        : m.displayName;
+    // The load and overlap count stay on their own line (never cut off by
+    // the name) and in the item's screen-reader label.
+    String? load(DepartmentMember m) => switch (checks?.of(m.memberId)) {
+      null => null,
+      final c =>
+        '${c.loadLabel}'
+            '${c.overlaps ? ', overlaps ${c.conflictCount} at this time' : ''}',
+    };
 
     final (warnBg, warnFg) = toneColors(
       ChurchColors.of(context),
@@ -2172,24 +2211,45 @@ class _CandidatePicker extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        DropdownButton<String?>(
-          key: Key(pickerKey),
-          hint: const Text('Who'),
-          value: value,
-          isExpanded: true,
-          items: [
-            if (allowNobody)
-              const DropdownMenuItem<String?>(
-                value: null,
-                child: Text('Nobody yet'),
-              ),
-            for (final m in members)
-              DropdownMenuItem<String?>(
-                value: m.memberId,
-                child: Text(label(m), overflow: TextOverflow.ellipsis),
-              ),
-          ],
-          onChanged: busy ? null : onChanged,
+        InputDecorator(
+          decoration: const InputDecoration(
+            labelText: 'Who',
+            contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String?>(
+              key: Key(pickerKey),
+              hint: const Text('Choose someone'),
+              value: value,
+              isExpanded: true,
+              itemHeight: null,
+              items: [
+                if (widget.allowNobody)
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('Nobody yet'),
+                  ),
+                for (final m in members)
+                  DropdownMenuItem<String?>(
+                    value: m.memberId,
+                    child: Semantics(
+                      label: [name(m), ?load(m)].join(', '),
+                      excludeSemantics: true,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(name(m), overflow: TextOverflow.ellipsis),
+                          if (load(m) case final l?)
+                            Text(l, style: ChurchType.secondary),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+              onChanged: busy ? null : widget.onChanged,
+            ),
+          ),
         ),
         if (read is AsyncLoading)
           _muted(context, 'Checking their other duties…'),

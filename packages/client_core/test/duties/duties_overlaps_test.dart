@@ -482,6 +482,8 @@ void main() {
       await enter(tester, 'publish-end-$_dept', '12:00');
       await enter(tester, 'publish-deadline-date-$_dept', '2099-01-01');
       await enter(tester, 'publish-deadline-time-$_dept', '08:00');
+      // The read waits for a 400 ms pause in typing.
+      await tester.pump(const Duration(milliseconds: 450));
       await settle(tester);
       return h;
     }
@@ -635,6 +637,13 @@ void main() {
       );
       await tapKey(tester, 'edit-$_occurrence');
       await enter(tester, 'edit-start-$_occurrence', '10:30');
+      await settle(tester);
+      // Debounced: still the position at its own times while typing.
+      expect(
+        h.duties.candidateQueries.last,
+        CandidateQuery.slot(_slot, startsAt: DateTime.utc(2099, 1, 4, 8)),
+      );
+      await tester.pump(const Duration(milliseconds: 450));
       await settle(tester);
       expect(
         h.duties.candidateQueries.last,

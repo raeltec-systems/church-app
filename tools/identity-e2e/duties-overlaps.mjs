@@ -12,8 +12,11 @@
 //   * a SYNTHETIC cell-owned occurrence (the fixture entry 11 will replace with the Cells
 //     owner operations) is a conflict too: limited for a department leader, in full for the
 //     cell's leader;
-//   * two leaders assigning the same member to overlapping duties at once, without reasons: one
+//   * two leaders assigning the same member to overlapping duties at once (two one-off duties, and
+//     a rota position against a one-off duty), without reasons: one
 //     success and one refusal (the per-member lock);
+//   * asking a member again after they declined (a place change) while another department has
+//     given them that time needs a reason (nothing is carried from a declined answer);
 //   * a member, another department's leader and direct table queries are refused; receipts,
 //     audit rows and notification jobs hold no reason text.
 //
@@ -133,6 +136,7 @@ async function main() {
     delete from app.duties_assignments a where a.assignment_id in (select assignment_id from gone_assignments);
     delete from app.duties_slots s where s.occurrence_id in (select occurrence_id from gone_occurrences);
     delete from app.duties_occurrences o where o.occurrence_id in (select occurrence_id from gone_occurrences);
+    delete from app.duties_series r where r.department_id in (select department_id from gone_departments);
     delete from app.duties_department_members dm where dm.department_id in (select department_id from gone_departments);
     delete from app.identity_access_audit a
      where a.target_member_id in (select member_id from gone_members) or a.actor_member_id in (select member_id from gone_members);
@@ -200,7 +204,8 @@ async function main() {
     const addTo = async (departmentId, m) => duties(admin.token, 'duties.add_member',
       Number(psql(`select revision from app.duties_departments where department_id = '${departmentId}'`)),
       { department_id: departmentId, member_id: m });
-    const added = [await addTo(dId, member.member), await addTo(dId, other.member), await addTo(eId, member.member)];
+    const added = [await addTo(dId, member.member), await addTo(dId, other.member), await addTo(eId, member.member),
+      await addTo(eId, other.member)];
     check('V02-departments-roles-and-members', dCreated.status === 200 && eCreated.status === 200
       && grants.every((g) => g.status === 200 && !g.code) && added.every((a) => a.status === 200 && !a.code),
       { grants: grants.map((g) => g.code ?? g.status), added: added.map((a) => a.code ?? a.status) });
@@ -208,6 +213,8 @@ async function main() {
     const now = Date.now();
     const sun0 = churchSunday(now, 0);
     const sun1 = churchSunday(now, 1);
+    const sun2 = churchSunday(now, 2);
+    const sun3 = churchSunday(now, 3);
     // The SYNTHETIC cell-owned part for M on Sunday 1, 18:00-19:00 (no Cells command exists yet).
     psql(`with o as (insert into app.duties_occurrences (cell_id, duty_name, starts_at, ends_at, instructions,
                                                         created_by_member, created_by_account)
@@ -297,6 +304,43 @@ async function main() {
     }
     check('V20-concurrent-assignments-one-wins', races.every(oneAssigned),
       { rounds: races.map((r) => r.map((a) => a.code ? a.field_errors?.member_id ?? a.code : 'ok')) });
+
+    // -------------------------------------------------------------- a rota position and a one-off at once
+    const gen = await duties(leaderD.token, 'duties.create_series', null, {
+      department_id: dId, duty_name: 'SYNTHETIC early prayer', every: 'week', from_date: sun2, until_date: sun2,
+      start_time: '09:00', end_time: '10:00', positions: ['Reader'] });
+    const rotaOcc = async () => {
+      const rota = (await read('duties_rota', leaderD.token)).json;
+      const series = rota?.departments?.find((d) => d.department_id === dId)?.series
+        ?.find((x) => x.series_id === gen.data?.series_id);
+      return { series, occ: series?.occurrences?.[0] };
+    };
+    let { series, occ } = await rotaOcc();
+    const pubRota = await duties(leaderD.token, 'duties.publish_drafts', series?.revision,
+      { series_id: gen.data?.series_id, slot_count: 1, deadline_before: '1 day' });
+    ({ occ } = await rotaOcc());
+    const mixed = await Promise.all([
+      duties(leaderD.token, 'duties.assign_slot', occ?.revision, {
+        slot_id: occ?.positions?.[0]?.slot_id, member_id: member.member,
+        response_deadline: new Date(Date.parse(churchInstant(sun2, '09:00')) - 86_400_000).toISOString() }),
+      publish(leaderE.token, eId, member.member, sun2, '09:00', '10:00'),
+    ]);
+    check('V21-rota-position-and-one-off-race-one-wins', gen.status === 200 && pubRota.status === 200 && !pubRota.code
+      && oneAssigned(mixed),
+      { answers: mixed.map((a) => a.code ? a.field_errors?.member_id ?? a.code : 'ok') });
+
+    // -------------------------------------------------------------- decline, other department, place change
+    const dx = await publish(leaderD.token, dId, other.member, sun3, '10:00', '12:00');
+    const declined = await duties(other.token, 'duties.respond', 1, { assignment_id: dx.data?.assignment_id, response: 'declined' });
+    const ex = await publish(leaderE.token, eId, other.member, sun3, '10:00', '12:00');
+    const dxRev = Number(psql(`select revision from app.duties_occurrences where occurrence_id = '${dx.data?.occurrence_id}'`));
+    const placeOnly = await duties(leaderD.token, 'duties.revise_duty', dxRev, {
+      occurrence_id: dx.data?.occurrence_id, location: 'SYNTHETIC new room',
+      response_deadline: new Date(Date.parse(churchInstant(sun3, '10:00')) - 86_400_000).toISOString() });
+    check('V22-asking-a-declined-member-again-needs-a-reason', dx.status === 200 && declined.data?.response === 'declined'
+      && ex.status === 200 && ex.data?.override_recorded === false
+      && placeOnly.code === 'validation_failed' && placeOnly.field_errors?.override_reason === 'required',
+      { other_department: ex.data?.override_recorded, place_change: placeOnly.field_errors ?? placeOnly.code });
 
     // -------------------------------------------------------------- refusals
     const byMember = await candidates(member.token, dId, sun0, '11:00', '12:00');

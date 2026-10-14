@@ -92,6 +92,19 @@ context:
 - Matrix audit: Overlap no reason, Override, No overlap, Disclosure (incl. non-manager, Pastor, member 403), Declined/cancelled (both tested), Material edit (reason required / carried), Drafts (planned reason, later overlap refuses publish with the date), Load, Deletion: pgTAP. Race: E2E V20 (pgTAP is one session). Disclosure, refusal, override, member still Awaiting response, no-overlap, cell fixture and the race also run over HTTP in the E2E.
 - Owner/staging steps remaining (not blocking): the parent applies the migration to staging and checks function md5s; the owner runs `docs/runbooks/duties.md`, story 4.4, "Owner manual checks" and records `evidence-4.4/owner-check.md`.
 
+- Review fixes (independent review; the migration was edited in place, as it is applied nowhere hosted):
+  - B1: `app.duties_cancel_one` replaced (full body copied): cancelling a draft clears its planned people and their planned reasons, so `cancel_occurrence`/`cancel_series` over a planned-reason draft no longer hit the `duties_slots_draft_override` check. No other writer nulls `draft_member_id` alone (publish, erase and assign_slot clear both). pgTAP covers both commands.
+  - B2: an override is carried only while the old answer stands (`pending`/`accepted`): asking a declined member again (a place change after another department gave them that time) is gated. pgTAP and E2E V22 cover it.
+  - S1: overlap counts are computed once per read, set-based (`app.duties_overlap_counts(uuid[])`, init-plan subqueries in the board and in `app.duties_series_json`, replaced), with the partial index `duties_assignments_member_current`; 3-argument projections take the counts and the 4.1-4.3 signatures wrap them. Seeded local benchmark (50 series x 52 weeks x 3 positions, 7,800 assignments): rota 49 s -> 2.9 s (1.6 s without counts), 200 board duties 3.4 s -> 0.25 s (0.09 s without); recorded in `evidence-4.4/read-cost.txt`.
+  - S2: E2E V21 races `assign_slot` (rota position in D) against `publish_duty` (E) for the same member and time: one wins.
+  - N1: the edit preview moves the person's other positions of the same date with the new times (`p_moving` in the conflict query).
+  - N2: the board and rota reads name the viewer (`app.duties_viewer`, transaction-local) and the reason (or planned reason) about the viewer's own assignment is hidden; `app.duties_leader_board` and `app.duties_rota` replaced for that.
+  - N3 (note for entry 11): `duties.respond` on a cell-owned assignment is unreachable today (no command creates one, My duties lists department-owned duties only); entry 11 must decide the member view and answer path for cell parts, including the audit's null department.
+  - N5: the picker reads after a 400 ms pause in typing, has a permanent **Who** label, and shows load and "overlaps N" on their own line and in the item's semantics label.
+  - N6: a synthetic department is never shown in full in a conflict outside local and staging.
+  - A 4.3 pgTAP check ordered assignments by `assigned_at` only (a tie inside one transaction); the new index changed the scan order and exposed it, so the check now also orders by state.
+  - Tests now: pgTAP `duties_overlaps_test.sql` 103 checks; E2E 13 checks.
+
 ## Plan Change Log
 
 ## Review Triage Log

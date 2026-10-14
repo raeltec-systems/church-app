@@ -7,7 +7,7 @@
 -- tools/identity-e2e/duties-overlaps.mjs. Every account, phone and name is SYNTHETIC
 -- (fictional range +44 7700 900770-900779).
 begin;
-select plan(93);
+select plan(103);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000044' || lpad(n::text, 2, '0'))::uuid $$;
@@ -124,6 +124,7 @@ select pg_temp.add(4, pg_temp.d());
 select pg_temp.add(5, pg_temp.d());
 select pg_temp.add(4, pg_temp.e());
 select pg_temp.add(8, pg_temp.e());
+select pg_temp.add(5, pg_temp.e());
 
 -- A one-off duty of department p_department for member p_member on Sunday k, church-local times.
 create function pg_temp.pub(n int, p_department uuid, p_member int, k int, p_from text, p_to text,
@@ -451,6 +452,22 @@ select is((select count(*)::int from app.duties_slots s join app.duties_occurren
             where o.series_id = pg_temp.sr() and (s.draft_override_reason is not null or s.draft_member_id is not null)),
   0, 'published positions keep no planned reason');
 
+-- The edit preview moves the position's siblings with it (M also reads on that date).
+select is((select pg_temp.of(pg_temp.readj(2, format(
+             'select api.duties_candidates(slot_id => %L::uuid, starts_at => %L::timestamptz, ends_at => %L::timestamptz)',
+             pg_temp.slot(1, 1), pg_temp.lt(0, '13:00'), pg_temp.lt(0, '14:00'))), 4) #> '{conflicts,count}'),
+  '1'::jsonb, 'previewing new times counts M''s other position of the same date at the new times');
+
+-- The viewer never reads the reason recorded about their own assignment.
+select is((select set_config('app.duties_viewer', pg_temp.mid(4)::text, true) is not null
+                  and app.duties_override_json(a) ->> 'reason' is null
+             from app.duties_assignments a where a.slot_id = pg_temp.slot(1, 1) and a.assignment_state = 'current'),
+  true, 'the reason is hidden when the assignee is the viewer');
+select is((select set_config('app.duties_viewer', pg_temp.mid(2)::text, true) is not null
+                  and app.duties_override_json(a) ->> 'reason' is not null
+             from app.duties_assignments a where a.slot_id = pg_temp.slot(1, 1) and a.assignment_state = 'current'),
+  true, 'and shown to another reader');
+
 -- Giving a published position ------------------------------------------------------------------------------
 select is(pg_temp.duties(2, 'duties.assign_slot', pg_temp.orev(2), jsonb_build_object(
             'slot_id', pg_temp.slot(2, 2), 'member_id', pg_temp.mid(5),
@@ -487,6 +504,48 @@ select pg_temp.duties(2, 'duties.cancel_occurrence', pg_temp.orev(3), jsonb_buil
 select is(pg_temp.of(pg_temp.candj(6, pg_temp.e(), 2, '10:30', '11:30'), 4) #> '{conflicts,count}', '0'::jsonb,
   'once that date is cancelled it no longer conflicts');
 
+-- Cancelling drafts that carry a planned reason --------------------------------------------------------------
+create temp table gen2 as select pg_temp.duties(2, 'duties.create_series', null, jsonb_build_object(
+  'department_id', pg_temp.d(), 'duty_name', 'Night vigil', 'every', 'week',
+  'from_date', to_char(pg_temp.sunday(4), 'YYYY-MM-DD'), 'until_date', to_char(pg_temp.sunday(6), 'YYYY-MM-DD'),
+  'start_time', '20:00', 'end_time', '21:00', 'positions', jsonb_build_array('Watch', 'Pray'))) as r;
+create function pg_temp.o2(k int) returns uuid language sql as $$
+  select occurrence_id from app.duties_occurrences where series_id = (select (r #>> '{data,series_id}')::uuid from gen2)
+   order by series_date offset k - 1 limit 1
+$$;
+create function pg_temp.plan2(k int, p int) returns jsonb language sql as $$
+  select pg_temp.duties(2, 'duties.assign_slot', (select revision from app.duties_occurrences where occurrence_id = pg_temp.o2(k)),
+    jsonb_build_object('slot_id', (select slot_id from app.duties_slots where occurrence_id = pg_temp.o2(k) and position_no = p),
+                       'member_id', pg_temp.mid(4), 'override_reason', 'SYNTHETIC: both positions.'))
+$$;
+-- M in both positions of every date: the second plan of each date overlaps the first.
+select pg_temp.plan2(k, 1) from generate_series(1, 3) k;
+select is((select string_agg(pg_temp.plan2(k, 2) #>> '{data,override_recorded}', ',') from generate_series(1, 3) k),
+  'true,true,true', 'each date carries a planned reason');
+select is(pg_temp.duties(2, 'duties.cancel_occurrence',
+            (select revision from app.duties_occurrences where occurrence_id = pg_temp.o2(1)),
+            jsonb_build_object('occurrence_id', pg_temp.o2(1))) #>> '{data,state}', 'cancelled',
+  'a draft with a planned reason can be cancelled');
+select is(pg_temp.duties(2, 'duties.cancel_series',
+            (select revision from app.duties_series where series_id = (select (r #>> '{data,series_id}')::uuid from gen2)),
+            jsonb_build_object('series_id', (select r #>> '{data,series_id}' from gen2), 'from_occurrence_id', pg_temp.o2(2)))
+            #>> '{data,occurrences}', '2', 'so can this and later drafts');
+select is((select count(*)::int from app.duties_slots s join app.duties_occurrences o using (occurrence_id)
+            where o.series_id = (select (r #>> '{data,series_id}')::uuid from gen2)
+              and (s.draft_member_id is not null or s.draft_override_reason is not null)), 0,
+  'cancelled drafts keep no planned people or reasons');
+
+-- A declined assignee asked again is a new commitment -------------------------------------------------------
+create temp table dx as select pg_temp.pub(2, pg_temp.d(), 5, 3, '10:00', '12:00') as r;
+select pg_temp.duties(5, 'duties.respond', 1, jsonb_build_object('assignment_id', r #>> '{data,assignment_id}', 'response', 'declined'))
+  from dx;
+create temp table ex as select pg_temp.pub(6, pg_temp.e(), 5, 3, '10:00', '12:00') as r;
+select is((select r #>> '{data,override_recorded}' from ex), 'false', 'after O declined D''s duty, E gives O that time freely');
+select is((select pg_temp.revise(2, r, jsonb_build_object('location', 'SYNTHETIC new room',
+              'response_deadline', app.cmd_utc(pg_temp.lt(3, '09:00')))) -> 'field_errors' from dx),
+  '{"member_id": "overlap", "override_reason": "required"}'::jsonb,
+  'asking O again by a place change is not carried: it needs a reason');
+
 -- Deletion -------------------------------------------------------------------------------------------------
 select is((select (r ->> 'remaining')::int from jsonb_array_elements(
              app.identity_call_deletion_hooks(pg_temp.mid(5), pg_temp.u(5), gen_random_uuid(), 'erase')) r
@@ -518,6 +577,10 @@ select is(split_part(pg_temp.cand(2, pg_temp.d(), 0, '11:00', '12:00'), '|', 2),
 select app.policy_approve('q4_personal_data', '{}'::jsonb, 'pgtap', 'pgtap 4.4 production check');
 select is(split_part(pg_temp.cand(2, pg_temp.d(), 0, '11:00', '12:00'), '|', 3), 'not_granted',
   'and in production a synthetic department has no candidates read');
+select is((select bool_and(x ->> 'visibility' = 'limited') and count(*) > 0 from jsonb_array_elements(app.duties_conflicts_json(
+             pg_temp.mid(1), pg_temp.mid(4), tstzrange(pg_temp.lt(0, '11:00'), pg_temp.lt(0, '11:30')), null, null, null)
+             -> 'items') x),
+  true, 'nor is a synthetic department named in a conflict in production');
 
 select * from finish();
 rollback;

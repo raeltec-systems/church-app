@@ -414,7 +414,7 @@ create temp table this1 as select pg_temp.duties(2, 'duties.revise_duty', pg_tem
   'starts_at', app.cmd_utc(app.duties_wall(pg_temp.sunday(1), '09:00', 'Africa/Lusaka')),
   'response_deadline', app.cmd_utc(app.duties_wall(pg_temp.sunday(1) - 1, '09:00', 'Africa/Lusaka')))) as r;
 select is((select r #>> '{data,change}' from this1), 'material', 'changing one occurrence''s time is material');
-select is((select string_agg(assignment_state || ':' || response, ',' order by s.position_no, a.assigned_at)
+select is((select string_agg(assignment_state || ':' || response, ',' order by s.position_no, a.assigned_at, a.assignment_state desc)
              from app.duties_assignments a join app.duties_slots s using (slot_id) where s.occurrence_id = pg_temp.o(2)),
   'superseded:pending,current:pending,superseded:accepted,current:pending',
   'every position of the occurrence is revised together; the kept acceptance stays in history');

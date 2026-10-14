@@ -92,6 +92,10 @@ alter table app.duties_occurrences
 create index duties_occurrences_cell on app.duties_occurrences (cell_id, starts_at)
   where cell_id is not null;
 
+-- The conflict query and the overlap counts read a member's current assignments.
+create index duties_assignments_member_current on app.duties_assignments (member_id, slot_id)
+  where assignment_state = 'current';
+
 comment on column app.duties_occurrences.cell_id is
   'Story 4.4: the owning cell of a cell-owned occurrence (exactly one of department_id and '
   'cell_id is set). Created only through the Cells owner operations (entry 11).';
@@ -203,15 +207,17 @@ comment on function app.duties_busy_range_of(timestamptz, timestamptz, timestamp
 -- What a member is busy with during p_range, other than position p_exclude_slot: commitments
 -- (current pending or accepted assignments on published occurrences of any owner) and, when
 -- p_department is given, planned draft positions in that department. The nil (erased) member
--- has none.
+-- has none. p_moving: an occurrence being moved to p_range (an edit preview), whose other
+-- positions move with it and so always overlap.
 create function app.duties_busy_items(p_member uuid, p_range tstzrange, p_exclude_slot uuid,
-                                      p_department uuid)
+                                      p_department uuid, p_moving uuid)
 returns table (kind text, slot_id uuid, occurrence_id uuid, response text, busy tstzrange)
 language sql
 stable
 set search_path = ''
 as $$
-  select 'assignment', s.slot_id, o.occurrence_id, a.response, app.duties_busy_range(o)
+  select 'assignment', s.slot_id, o.occurrence_id, a.response,
+         case when o.occurrence_id = p_moving then p_range else app.duties_busy_range(o) end
     from app.duties_assignments a
     join app.duties_slots s on s.slot_id = a.slot_id
     join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
@@ -219,18 +225,19 @@ as $$
      and a.response in ('pending', 'accepted') and o.occurrence_state = 'published'
      and s.slot_id is distinct from p_exclude_slot
      and p_member is distinct from '00000000-0000-0000-0000-000000000000'::uuid
-     and app.duties_busy_range(o) && p_range
+     and (o.occurrence_id = p_moving or app.duties_busy_range(o) && p_range)
   union all
-  select 'draft', s.slot_id, o.occurrence_id, null, app.duties_busy_range(o)
+  select 'draft', s.slot_id, o.occurrence_id, null,
+         case when o.occurrence_id = p_moving then p_range else app.duties_busy_range(o) end
     from app.duties_slots s
     join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
    where p_department is not null and s.draft_member_id = p_member
      and o.occurrence_state = 'draft' and o.department_id = p_department
      and s.slot_id is distinct from p_exclude_slot
-     and app.duties_busy_range(o) && p_range;
+     and (o.occurrence_id = p_moving or app.duties_busy_range(o) && p_range);
 $$;
 
-comment on function app.duties_busy_items(uuid, tstzrange, uuid, uuid) is
+comment on function app.duties_busy_items(uuid, tstzrange, uuid, uuid, uuid) is
   'Story 4.4: the conflict query: a member''s commitments (any owner) and, with a department, '
   'planned draft positions there, overlapping a range.';
 
@@ -241,14 +248,14 @@ language sql
 stable
 set search_path = ''
 as $$
-  select count(*)::integer from app.duties_busy_items(p_member, p_range, p_exclude_slot, p_department);
+  select count(*)::integer from app.duties_busy_items(p_member, p_range, p_exclude_slot, p_department, null);
 $$;
 
 -- The overlaps of a member as p_viewer may see them (at most 10, earliest first) and their
 -- count. Full detail for a department p_viewer manages or a cell p_viewer leads or assists;
 -- otherwise only the owner kind and the busy time. Never instructions.
 create function app.duties_conflicts_json(p_viewer uuid, p_member uuid, p_range tstzrange,
-                                          p_exclude_slot uuid, p_department uuid)
+                                          p_exclude_slot uuid, p_department uuid, p_moving uuid)
 returns jsonb
 language sql
 stable
@@ -259,11 +266,15 @@ as $$
            o.duty_name, o.occurrence_state, o.starts_at, o.ends_at, o.reporting_at, o.location,
            case when o.department_id is not null
                 then app.duties_manage_capacity(p_viewer, o.department_id) is not null
+                     -- A synthetic department is never named outside local and staging.
+                     and (not d.is_synthetic
+                          or app.platform_current_environment() in ('local', 'staging'))
                 else app.identity_member_has_scope(p_viewer, 'cell_leader', o.cell_id)
                      or app.identity_member_has_scope(p_viewer, 'cell_assistant', o.cell_id) end
              as visible
-      from app.duties_busy_items(p_member, p_range, p_exclude_slot, p_department) b
+      from app.duties_busy_items(p_member, p_range, p_exclude_slot, p_department, p_moving) b
       join app.duties_occurrences o on o.occurrence_id = b.occurrence_id
+      left join app.duties_departments d on d.department_id = o.department_id
   ), firsts as (
     select i.* from items i order by lower(i.busy), i.occurrence_id, i.slot_id limit 10
   )
@@ -614,9 +625,11 @@ begin
       v_superseded := v_old.assignment_id;
     end if;
     if v_slot_material and v_new_member is not null then
-      -- Story 4.4: the same person at the same times keeps the earlier override (no new check).
+      -- Story 4.4: the same person at the same times, still pending or accepted, keeps the
+      -- earlier override (no new check).
+      -- A declined assignee asked again is a new commitment (checked like any other).
       v_carry := v_old.assignment_id is not null and v_new_member = v_old.member_id
-                 and not v_window_changed;
+                 and not v_window_changed and v_old.response in ('pending', 'accepted');
       insert into app.duties_assignments (slot_id, member_id, response_deadline, assigned_by_member,
                                           assigned_by_account, slot_revision,
                                           supersedes_assignment_id, override_reason,
@@ -703,6 +716,94 @@ begin
     'created', v_created_list, 'ops', v_ops);
 end;
 $$;
+
+-- (Replaced, story 4.4: the planned reasons of a cancelled draft are cleared with its people.)
+-- Ends one occurrence that the caller locked (draft or published, not started): the occurrence
+-- and every current assignment become `cancelled`, a `cancelled` slot revision is recorded for
+-- each position of a published occurrence. Returns {assignments_cancelled, ops}: the caller runs
+-- ops LAST (pending jobs of every assignment of the occurrence cancelled `source_cancelled`,
+-- then one `duty_cancelled` notice per pending or accepted assignee).
+create or replace function app.duties_cancel_one(p_occ app.duties_occurrences, p_actor_member uuid,
+                                      p_actor_account uuid, p_capacity text, p_command text)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_revision bigint;
+  v_slot app.duties_slots;
+  v_old app.duties_assignments;
+  v_slot_revision bigint;
+  v_end_revision bigint;
+  v_cancels jsonb := '[]'::jsonb;
+  v_notices jsonb := '[]'::jsonb;
+  v_count integer := 0;
+  v_request uuid := app.cmd_current_request_id(p_actor_account, p_command);
+  v_id uuid;
+begin
+  update app.duties_occurrences o
+     set occurrence_state = 'cancelled', revision = o.revision + 1
+   where o.occurrence_id = p_occ.occurrence_id
+  returning o.revision into v_revision;
+  if p_occ.occurrence_state <> 'published' then
+    -- A cancelled draft keeps no planned people, nor their planned reasons (story 4.4).
+    update app.duties_slots s
+       set draft_member_id = null, draft_override_reason = null, draft_override_by_member = null,
+           draft_override_by_account = null, draft_override_at = null
+     where s.occurrence_id = p_occ.occurrence_id
+       and (s.draft_member_id is not null or s.draft_override_reason is not null);
+    perform app.duties_audit_series_event('occurrence_cancelled', p_actor_member, p_actor_account,
+                                          p_capacity, p_command, p_occ.department_id, p_occ.series_id,
+                                          p_occ.occurrence_id, null, null, p_occ.occurrence_state,
+                                          v_revision);
+    return jsonb_build_object('assignments_cancelled', 0, 'ops', '[]'::jsonb);
+  end if;
+  for v_slot in select s.* from app.duties_slots s where s.occurrence_id = p_occ.occurrence_id
+                 order by s.position_no for update loop
+    update app.duties_slots s set revision = s.revision + 1 where s.slot_id = v_slot.slot_id
+    returning s.revision into v_slot_revision;
+    v_old := null;
+    select a.* into v_old from app.duties_assignments a
+     where a.slot_id = v_slot.slot_id and a.assignment_state = 'current' for update;
+    if v_old.assignment_id is not null then
+      update app.duties_assignments a
+         set assignment_state = 'cancelled', ended_at = now(), end_reason = 'cancelled',
+             revision = a.revision + 1
+       where a.assignment_id = v_old.assignment_id
+      returning a.revision into v_end_revision;
+      v_count := v_count + 1;
+      if v_old.response in ('pending', 'accepted') and app.duties_notice_recipient(v_old.member_id) then
+        v_notices := v_notices || jsonb_build_array(jsonb_build_object('op', 'enqueue', 'counts', true,
+          'key', jsonb_build_object(
+            'source_type', 'duties_assignment', 'source_id', v_old.assignment_id,
+            'source_revision', v_end_revision, 'recipient_member_id', v_old.member_id,
+            'reminder_kind', 'duty_cancelled', 'scheduled_at', app.cmd_utc(now()))));
+      end if;
+    end if;
+    insert into app.duties_slot_revisions (slot_id, slot_revision, occurrence_id,
+                                           occurrence_revision, change_class, changed_fields,
+                                           duty_name, starts_at, ends_at, reporting_at, location,
+                                           instructions, topic, scripture, event_ref, member_id,
+                                           assignment_id, response_deadline, created_by_member,
+                                           created_by_account, command_request_id)
+    values (v_slot.slot_id, v_slot_revision, p_occ.occurrence_id, v_revision, 'cancelled', '{}',
+            p_occ.duty_name, p_occ.starts_at, p_occ.ends_at, p_occ.reporting_at, p_occ.location,
+            p_occ.instructions, p_occ.topic, p_occ.scripture, p_occ.event_ref, null, null, null,
+            p_actor_member, p_actor_account, v_request);
+    perform app.duties_audit_series_event('occurrence_cancelled', p_actor_member, p_actor_account,
+                                          p_capacity, p_command, p_occ.department_id, p_occ.series_id,
+                                          p_occ.occurrence_id, v_old.assignment_id, v_old.member_id,
+                                          p_occ.occurrence_state, v_revision);
+    -- Every pending job of the position's assignments (current, superseded) ends with it.
+    for v_id in select a.assignment_id from app.duties_assignments a where a.slot_id = v_slot.slot_id loop
+      v_cancels := v_cancels || jsonb_build_array(jsonb_build_object(
+        'op', 'cancel', 'source_id', v_id, 'reason', 'source_cancelled'));
+    end loop;
+  end loop;
+  return jsonb_build_object('assignments_cancelled', v_count, 'ops', v_cancels || v_notices);
+end;
+$$;
+
 
 -- ---------------------------------------------------------------------------------------------
 -- Commands: publish a one-off duty (replaced: the override gate)
@@ -1586,7 +1687,9 @@ $$;
 -- Projections (replaced: overlap counts and recorded overrides for the department's readers)
 -- ---------------------------------------------------------------------------------------------
 
--- The recorded override of an assignment (null when none).
+-- The recorded override of an assignment (null when none). The reason is hidden when the
+-- assignee is the viewer (app.duties_viewer, set by the board and rota reads): a leader never
+-- reads what another leader wrote about them.
 create function app.duties_override_json(p_assignment app.duties_assignments)
 returns jsonb
 language sql
@@ -1594,28 +1697,64 @@ stable
 set search_path = ''
 as $$
   select case when p_assignment.override_at is not null then jsonb_build_object(
-    'reason', p_assignment.override_reason,
+    'reason', case when p_assignment.member_id::text
+                        is distinct from pg_catalog.current_setting('app.duties_viewer', true)
+                   then p_assignment.override_reason end,
     'overlaps', p_assignment.override_overlaps,
     'at', app.cmd_utc(p_assignment.override_at),
     'by', app.duties_display_name(p_assignment.override_by_member)) end;
 $$;
 
--- How many other commitments (and planned positions of the department) overlap a position of
--- an occurrence that is still to come; 0 for cancelled or past occurrences.
-create function app.duties_position_overlaps(p_member uuid, p_occurrence app.duties_occurrences,
-                                             p_slot_id uuid)
-returns integer
+-- How many other commitments (and planned positions of the same department) overlap each
+-- position of the given occurrences, computed once, set-based (the per-position conflict
+-- query was too slow for a full rota): {slot_id: count} for positions with a count above 0.
+-- Cancelled and past occurrences count nothing. Same rules as app.duties_busy_items.
+create function app.duties_overlap_counts(p_occurrences uuid[])
+returns jsonb
 language sql
 stable
 set search_path = ''
 as $$
-  select case when p_member is null or p_occurrence.occurrence_state = 'cancelled'
-                   or upper(app.duties_busy_range(p_occurrence)) <= now() then 0
-              else app.duties_overlap_count(p_member, app.duties_busy_range(p_occurrence), p_slot_id,
-                                            p_occurrence.department_id) end;
+  with pos as (
+    select s.slot_id, o.department_id,
+           case when o.occurrence_state = 'draft' then s.draft_member_id else a.member_id end as member_id,
+           tstzrange(coalesce(o.reporting_at, o.starts_at),
+                     coalesce(o.ends_at, o.starts_at + interval '2 hours'), '[)') as busy
+      from app.duties_occurrences o
+      join app.duties_slots s on s.occurrence_id = o.occurrence_id
+      left join app.duties_assignments a on a.slot_id = s.slot_id and a.assignment_state = 'current'
+     where o.occurrence_id = any (p_occurrences) and o.occurrence_state <> 'cancelled'
+       and coalesce(o.ends_at, o.starts_at + interval '2 hours') > now()
+  ), people as (
+    select distinct p.member_id from pos p
+     where p.member_id is not null
+       and p.member_id <> '00000000-0000-0000-0000-000000000000'::uuid
+  ), items as (
+    select a.member_id, s.slot_id, null::uuid as department_id,
+           tstzrange(coalesce(o.reporting_at, o.starts_at),
+                     coalesce(o.ends_at, o.starts_at + interval '2 hours'), '[)') as busy
+      from app.duties_assignments a
+      join app.duties_slots s on s.slot_id = a.slot_id
+      join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
+     where a.member_id in (select member_id from people) and a.assignment_state = 'current'
+       and a.response in ('pending', 'accepted') and o.occurrence_state = 'published'
+    union all
+    select s.draft_member_id, s.slot_id, o.department_id,
+           tstzrange(coalesce(o.reporting_at, o.starts_at),
+                     coalesce(o.ends_at, o.starts_at + interval '2 hours'), '[)')
+      from app.duties_slots s
+      join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
+     where s.draft_member_id in (select member_id from people) and o.occurrence_state = 'draft'
+  )
+  select coalesce(jsonb_object_agg(x.slot_id, x.n), '{}'::jsonb)
+    from (select p.slot_id, count(*) as n
+            from pos p
+            join items i on i.member_id = p.member_id and i.slot_id <> p.slot_id and i.busy && p.busy
+                        and (i.department_id is null or i.department_id = p.department_id)
+           group by p.slot_id) x;
 $$;
 
-create or replace function app.duties_occurrence_json(p_occurrence_id uuid, p_with_notes boolean)
+create function app.duties_occurrence_json(p_occurrence_id uuid, p_with_notes boolean, p_counts jsonb)
 returns jsonb
 language sql
 stable
@@ -1661,7 +1800,7 @@ as $$
                           'notes_updated_at', (select app.cmd_utc(t.ts) from (
                                                  select app.duties_notes_updated_at(s.slot_id, a.slot_revision) as ts) t
                                                 where t.ts is not null),
-                          'overlaps', app.duties_position_overlaps(a.member_id, o, s.slot_id),
+                          'overlaps', coalesce((p_counts ->> s.slot_id::text)::integer, 0),
                           'override', app.duties_override_json(a))
                    from app.duties_assignments a
                   where a.slot_id = s.slot_id and a.assignment_state = 'current'),
@@ -1690,7 +1829,7 @@ as $$
    where o.occurrence_id = p_occurrence_id;
 $$;
 
-create or replace function app.duties_rota_occurrence_json(p_occurrence_id uuid)
+create function app.duties_rota_occurrence_json(p_occurrence_id uuid, p_counts jsonb)
 returns jsonb
 language sql
 stable
@@ -1726,8 +1865,10 @@ as $$
                           'member_id', s.draft_member_id,
                           'display_name', app.duties_display_name(s.draft_member_id),
                           'available', app.duties_can_serve(s.draft_member_id, o.department_id),
-                          'overlaps', app.duties_position_overlaps(s.draft_member_id, o, s.slot_id),
-                          'override_reason', s.draft_override_reason) end,
+                          'overlaps', coalesce((p_counts ->> s.slot_id::text)::integer, 0),
+                          'override_reason', case when s.draft_member_id::text is distinct from
+                                                          pg_catalog.current_setting('app.duties_viewer', true)
+                                                  then s.draft_override_reason end) end,
                'assignment', (
                  select jsonb_build_object(
                           'assignment_id', a.assignment_id,
@@ -1737,7 +1878,7 @@ as $$
                           'response_deadline', app.cmd_utc(a.response_deadline),
                           'revision', a.revision,
                           'available', app.duties_can_serve(a.member_id, o.department_id),
-                          'overlaps', app.duties_position_overlaps(a.member_id, o, s.slot_id),
+                          'overlaps', coalesce((p_counts ->> s.slot_id::text)::integer, 0),
                           'override', app.duties_override_json(a))
                    from app.duties_assignments a
                   where a.slot_id = s.slot_id and a.assignment_state = 'current'))
@@ -1745,6 +1886,190 @@ as $$
         from app.duties_slots s where s.occurrence_id = o.occurrence_id), '[]'::jsonb))
     from app.duties_occurrences o
    where o.occurrence_id = p_occurrence_id;
+$$;
+
+
+-- The 4.1-4.3 one-occurrence projections (replaced): the same, with that occurrence's counts.
+create or replace function app.duties_occurrence_json(p_occurrence_id uuid, p_with_notes boolean)
+returns jsonb
+language sql
+stable
+set search_path = ''
+as $$
+  select app.duties_occurrence_json(p_occurrence_id, p_with_notes,
+                                    app.duties_overlap_counts(array[p_occurrence_id]));
+$$;
+
+create or replace function app.duties_rota_occurrence_json(p_occurrence_id uuid)
+returns jsonb
+language sql
+stable
+set search_path = ''
+as $$
+  select app.duties_rota_occurrence_json(p_occurrence_id, app.duties_overlap_counts(array[p_occurrence_id]));
+$$;
+
+-- A series on the rota (replaced): the counts of all its occurrences are computed once.
+create or replace function app.duties_series_json(p_series_id uuid)
+returns jsonb
+language sql
+stable
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'series_id', r.series_id,
+    'department_id', r.department_id,
+    'duty_name', r.duty_name,
+    'every', r.every,
+    'interval', r.every_interval,
+    'from_date', to_char(r.from_date, 'YYYY-MM-DD'),
+    'until_date', to_char(r.until_date, 'YYYY-MM-DD'),
+    'start_time', to_char(r.start_time, 'HH24:MI'),
+    'end_time', to_char(r.end_time, 'HH24:MI'),
+    'reporting_time', to_char(r.reporting_time, 'HH24:MI'),
+    'location', r.location,
+    'instructions', r.instructions,
+    'topic', r.topic,
+    'scripture', r.scripture,
+    'event_ref', r.event_ref,
+    'positions', to_jsonb(r.positions),
+    'zone', r.zone,
+    'revision', r.revision,
+    'draft_slots', (select count(*) from app.duties_occurrences o
+                      join app.duties_slots s on s.occurrence_id = o.occurrence_id
+                     where o.series_id = r.series_id and o.occurrence_state = 'draft'
+                       and app.duties_occurrence_start(o) > now()),
+    'occurrences', coalesce((
+      -- The counts are an init plan of this subquery: computed once per series.
+      select jsonb_agg(app.duties_rota_occurrence_json(o.occurrence_id, (
+                         select app.duties_overlap_counts(array(
+                                  select o2.occurrence_id from app.duties_occurrences o2
+                                   where o2.series_id = r.series_id))))
+                       order by o.series_date, o.occurrence_id)
+        from app.duties_occurrences o
+       where o.series_id = r.series_id), '[]'::jsonb))
+    from app.duties_series r
+   where r.series_id = p_series_id;
+$$;
+
+-- The board and the rota (replaced, story 4.4): as in 4.3, and they name the viewer for
+-- app.duties_override_json.
+create or replace function app.duties_leader_board()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_member uuid;
+  v_link uuid;
+  v_admin boolean;
+  v_pastor boolean;
+  v_result jsonb;
+begin
+  select a.member_id, a.link_id into v_member, v_link from app.identity_require_access() a;
+  v_admin := app.identity_member_has_role(v_member, 'admin');
+  v_pastor := app.identity_member_has_role(v_member, 'pastor');
+  if not v_admin and not v_pastor
+     and not exists (select 1 from app.identity_grants g
+                      where g.member_id = v_member and g.revoked_at is null
+                        and g.scope_kind in ('department_leader', 'department_deputy')) then
+    raise exception using errcode = 'PT403', message = 'forbidden', detail = 'not_granted';
+  end if;
+  perform app.duties_require_open_read();
+  -- Story 4.4: an override about the viewer's own assignment hides its reason.
+  perform pg_catalog.set_config('app.duties_viewer', v_member::text, true);
+  select jsonb_build_object('departments', coalesce(jsonb_agg(x.obj order by x.name, x.department_id),
+                                                    '[]'::jsonb))
+    into v_result
+    from (
+      select d.department_id, d.name, c.capacity, jsonb_build_object(
+               'department_id', d.department_id,
+               'name', d.name,
+               'capacity', coalesce(c.capacity, 'pastor'),
+               'can_publish', c.capacity is not null,
+               'members', app.duties_roster(d.department_id, false),
+               'duties', coalesce((
+                 -- Story 4.4: the overlap counts of these duties, an init plan computed once.
+                 select jsonb_agg(app.duties_occurrence_json(o.occurrence_id, c.capacity is not null, (
+                                    select app.duties_overlap_counts(array(
+                                             select o4.occurrence_id from app.duties_occurrences o4
+                                              where o4.department_id = d.department_id
+                                                and o4.occurrence_state = 'published'
+                                                and o4.starts_at > now() - interval '30 days'
+                                              order by o4.starts_at limit 200))))
+                                  order by o.starts_at, o.occurrence_id)
+                   from (select o2.occurrence_id, o2.starts_at from app.duties_occurrences o2
+                          where o2.department_id = d.department_id
+                            and o2.occurrence_state = 'published'
+                            and o2.starts_at > now() - interval '30 days'
+                          order by o2.starts_at limit 200) o), '[]'::jsonb),
+               'duties_truncated', (select count(*) > 200 from app.duties_occurrences o3
+                                     where o3.department_id = d.department_id
+                                       and o3.occurrence_state = 'published'
+                                       and o3.starts_at > now() - interval '30 days')) as obj
+        from app.duties_departments d
+        cross join lateral (select app.duties_manage_capacity(v_member, d.department_id) as capacity) c
+       where (c.capacity is not null or v_pastor)
+         and (not d.is_synthetic or app.platform_current_environment() in ('local', 'staging'))
+    ) x;
+  perform app.identity_record_activity(v_link);
+  return v_result;
+end;
+$$;
+
+create or replace function app.duties_rota()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_member uuid;
+  v_link uuid;
+  v_admin boolean;
+  v_pastor boolean;
+  v_result jsonb;
+begin
+  select a.member_id, a.link_id into v_member, v_link from app.identity_require_access() a;
+  v_admin := app.identity_member_has_role(v_member, 'admin');
+  v_pastor := app.identity_member_has_role(v_member, 'pastor');
+  if not v_admin and not v_pastor
+     and not exists (select 1 from app.identity_grants g
+                      where g.member_id = v_member and g.revoked_at is null
+                        and g.scope_kind in ('department_leader', 'department_deputy')) then
+    raise exception using errcode = 'PT403', message = 'forbidden', detail = 'not_granted';
+  end if;
+  perform app.duties_require_open_read();
+  -- Story 4.4: an override about the viewer's own assignment hides its reason.
+  perform pg_catalog.set_config('app.duties_viewer', v_member::text, true);
+  select jsonb_build_object('departments', coalesce(jsonb_agg(x.obj order by x.name, x.department_id),
+                                                    '[]'::jsonb))
+    into v_result
+    from (
+      select d.department_id, d.name, jsonb_build_object(
+               'department_id', d.department_id,
+               'name', d.name,
+               'capacity', coalesce(c.capacity, 'pastor'),
+               'can_manage', c.capacity is not null,
+               'members', app.duties_roster(d.department_id, false),
+               'series', coalesce((
+                 select jsonb_agg(app.duties_series_json(r.series_id) order by r.from_date, r.series_id)
+                   from (select r2.series_id, r2.from_date from app.duties_series r2
+                          where r2.department_id = d.department_id
+                            and r2.until_date >= (now() at time zone r2.zone)::date - 30
+                          order by r2.from_date, r2.series_id limit 50) r), '[]'::jsonb),
+               'series_truncated', (select count(*) > 50 from app.duties_series r3
+                                     where r3.department_id = d.department_id
+                                       and r3.until_date >= (now() at time zone r3.zone)::date - 30)) as obj
+        from app.duties_departments d
+        cross join lateral (select app.duties_manage_capacity(v_member, d.department_id) as capacity) c
+       where (c.capacity is not null or v_pastor)
+         and (not d.is_synthetic or app.platform_current_environment() in ('local', 'staging'))
+    ) x;
+  perform app.identity_record_activity(v_link);
+  return v_result;
+end;
 $$;
 
 -- My duties (replaced): department-owned duties only until cell-owned parts get their member
@@ -1865,7 +2190,8 @@ begin
                         then 'no_login' else 'app_account' end,
         'current', dm.member_id = v_current,
         'upcoming', app.duties_upcoming(dm.member_id, v_department),
-        'conflicts', app.duties_conflicts_json(v_member, dm.member_id, v_range, p_slot_id, v_department))
+        'conflicts', app.duties_conflicts_json(v_member, dm.member_id, v_range, p_slot_id, v_department,
+                                                case when p_starts_at is not null then v_occ.occurrence_id end))
       order by m.display_name, dm.member_id), '[]'::jsonb))
     into v_result
     from app.duties_department_members dm
@@ -2007,16 +2333,18 @@ comment on function app.duties_erase_member(jsonb) is
 revoke all on function
   app.duties_busy_range_of(timestamptz, timestamptz, timestamptz),
   app.duties_busy_range(app.duties_occurrences),
-  app.duties_busy_items(uuid, tstzrange, uuid, uuid),
+  app.duties_busy_items(uuid, tstzrange, uuid, uuid, uuid),
   app.duties_overlap_count(uuid, tstzrange, uuid, uuid),
-  app.duties_conflicts_json(uuid, uuid, tstzrange, uuid, uuid),
+  app.duties_conflicts_json(uuid, uuid, tstzrange, uuid, uuid, uuid),
   app.duties_upcoming(uuid, uuid),
   app.duties_lock_members(uuid[]),
   app.duties_overlap_gate(uuid, text, uuid, uuid, timestamptz, uuid, uuid, text, text, jsonb),
   app.duties_gate_created(jsonb, text, uuid, uuid, text, text),
   app.duties_occurrence_members(uuid),
   app.duties_override_json(app.duties_assignments),
-  app.duties_position_overlaps(uuid, app.duties_occurrences, uuid),
+  app.duties_overlap_counts(uuid[]),
+  app.duties_occurrence_json(uuid, boolean, jsonb),
+  app.duties_rota_occurrence_json(uuid, jsonb),
   app.duties_candidates(uuid, uuid, timestamptz, timestamptz, timestamptz),
   api.duties_candidates(uuid, uuid, timestamptz, timestamptz, timestamptz)
   from public, anon, authenticated, service_role;

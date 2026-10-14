@@ -104,6 +104,15 @@ $$;
 create temp table small as select pg_temp.series('Quarter', 12, '18:00', 2) as id;
 create temp table big as select pg_temp.series('Year', 49, '10:00', 4) as id;
 
+-- The test's rows exist only inside this transaction. An autovacuum ANALYZE of these tables in the
+-- middle of it (likely after the earlier test files) would record them as empty while they hold
+-- the test's uncommitted rows, and the re-planned statements would then misjudge them (measured
+-- 12-44 s for 200 slots in the full suite, never alone). A populated database has real
+-- statistics; this lock (taken by ANALYZE too, so autovacuum skips the tables) keeps the
+-- measurement about the code. It does not block this transaction's own writes.
+lock table app.notifications_jobs, app.notifications_schedules, app.duties_assignments, app.duties_slots,
+  app.duties_occurrences, app.duties_slot_revisions, app.duties_audit, app.duties_contact_needs,
+  app.cmd_receipts in share update exclusive mode;
 set local statement_timeout = '8s';
 create temp table t0 as select clock_timestamp() as t;
 create temp table ps as select pg_temp.publish((select id from small)) as r;

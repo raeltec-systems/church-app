@@ -154,9 +154,9 @@ select ok(not exists (
    cross join unnest(array['anon', 'authenticated', 'service_role']) r
    where n.nspname in ('app', 'api') and p.proname ~ '^duties_'
      and not (p.proname in ('duties_command', 'duties_my_duties', 'duties_leader_board',
-                            'duties_admin_overview') and r = 'authenticated')
+                            'duties_admin_overview', 'duties_rota') and r = 'authenticated')
      and has_function_privilege(r, p.oid, 'EXECUTE')),
-  'still only the command and the three reads are client-executable');
+  'still only the command and the reads (with the 4.3 rota) are client-executable');
 select is((select count(*)::int from app.contract_unowned_objects()), 0, 'no unowned objects');
 select is((select count(*)::int from app.contract_unpinned_functions()), 0, 'every function is pinned');
 select is((select count(*)::int from app.contract_boundary_violations()), 0, 'no boundary violations');
@@ -168,7 +168,7 @@ select is((select string_agg(f || '=' || coalesce(app.duties_slot_field_class(f)
   'every revisable field is classified explicitly (spec list material; instructions notes)');
 select is((select string_agg(c.reminder_kind || '|' || c.title || '|' || c.link, ',' order by c.reminder_kind)
              from app.contract_reminder_contracts c
-            where c.source_type = 'duties_assignment' and c.reminder_kind <> 'duty_assigned'),
+            where c.source_type = 'duties_assignment' and c.reminder_kind in ('duty_changed', 'duty_updated', 'duty_released')),
   'duty_changed|Duty changed|/duties/assignments/{source_id},'
   'duty_released|Duty changed|/duties,'
   'duty_updated|Duty details updated|/duties/assignments/{source_id}',
@@ -285,7 +285,9 @@ create temp table mine as select pg_temp.readj(4, 'select api.duties_my_duties()
 select is((select jsonb_array_length(j -> 'assignments') from mine), 1, 'My duties lists the current revision only');
 select is((select (j -> 'assignments' -> 0) - 'occurrence_id' - 'department_id' - 'starts_at' - 'ends_at'
                   - 'response_deadline' - 'duty_name' - 'department_name' - 'location' - 'instructions'
-                  - 'reporting_at' - 'responded_at' - 'note' from mine),
+                  - 'reporting_at' - 'responded_at' - 'note'
+                  -- Story 4.3 keys are checked in duties_rota_test.sql.
+                  - 'position_name' - 'topic' - 'scripture' from mine),
   jsonb_build_object('assignment_id', pg_temp.asg2(), 'revision', 1, 'response', 'pending', 'slot_revision', 2,
                      'changes', jsonb_build_array('starts_at', 'ends_at'), 'previous_response', 'accepted',
                      'previous_assignment_ids', jsonb_build_array(pg_temp.asg1()), 'notes_updated_at', null),

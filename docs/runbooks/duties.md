@@ -611,7 +611,7 @@ Record the outcome of each step in `evidence-4.5/owner-check.md`: pass or fail, 
 
 ## Story 4.8: set response deadlines and schedule creator-configured duty reminders
 
-Migration: `supabase/migrations/20261014153012_duties_reminders.sql`.
+Migration: `supabase/migrations/20261014171038_duties_reminders.sql`.
 - Forward only: the 4.1-4.5 files are not edited (replaced function bodies are listed in its header and keep every earlier review fix).
 - No destructive statements, no row deletions and no `_rows` file.
 - No new client grant: `duties.set_reminders` goes through `api.duties_command`.
@@ -685,7 +685,7 @@ Fictional numbers: pgTAP `+44 7700 900650-900669`, E2E `900670-900689`. The 4.1-
 ### Hosted staging (parent session, then the owner)
 
 1. **Parent session:**
-   - Apply `20261014153012_duties_reminders.sql` to staging (`tmurpotfluignacfueki`) after `20261014130535`.
+   - Apply `20261014171038_duties_reminders.sql` to staging (`tmurpotfluignacfueki`) after `20261014130535`.
    - Run `tools/ci/verify-hosted.sql` with `expected_env=staging`.
    - Compare the md5 of each new or replaced `app.duties_*` function with the local one (the migration has no backslashes, so no `\u` decoding applies).
    - Grants: no new client grant. `authenticated` has no execute on any new `app.duties_*` function.

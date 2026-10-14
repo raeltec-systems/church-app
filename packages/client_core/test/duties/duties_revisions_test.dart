@@ -303,7 +303,9 @@ void main() {
 
     test('the released notice opens My duties', () {
       expect(ClientPaths.isKnownDeepLink('/duties'), isTrue);
-      expect(ClientPaths.isKnownDeepLink('/duties/leader'), isFalse);
+      // Story 4.8: the leaders' alerts open the board; the rota is no link.
+      expect(ClientPaths.isKnownDeepLink('/duties/leader'), isTrue);
+      expect(ClientPaths.isKnownDeepLink('/duties/rota'), isFalse);
     });
   });
 
@@ -330,9 +332,10 @@ void main() {
       expect(find.textContaining('will be asked to answer again'), findsOne);
       expect(
         enabled(tester, 'edit-save-$_occurrence'),
-        isFalse,
-        reason: 'a material change needs a new answer-by time',
+        isTrue,
+        reason: 'story 4.8: without a new answer-by time the default applies',
       );
+      expect(find.textContaining('the church default applies'), findsOne);
       await enter(tester, 'edit-deadline-date-$_occurrence', '2099-01-02');
       await enter(tester, 'edit-deadline-time-$_occurrence', '18:00');
       await tapKey(tester, 'edit-save-$_occurrence');

@@ -54,8 +54,8 @@ Refusals with their field codes:
 - Source type `duties_assignment` (source id = assignment id, source revision = the assignment's revision), kind `duty_assigned`.
 - Contract text: **New duty assigned** / "You have a new duty. Open it to accept or say you cannot make it." Link `/duties/assignments/{source_id}`; both clients list it in `ClientPaths.deepLinkTargets`.
 - Check `app.duties_assignment_reminder_check`: `current` while the assignment is current at that revision; `actionable` while the answer is pending and the duty has not started; `recipient_eligible` while the recipient is the assignee and still a department member. After an answer the opened item shows the generic superseded state; My duties is the live view.
-- The job is scheduled at publish time. A held, deactivated or accountless assignee gets no inbox item: 3.5 routes the need to a direct-contact route, and 4.1 registers none, so the need is recorded `unrouted` (finish reason `no_direct_contact_route`) and shows in **Reminder health** until entry 8 adds the leader's Needs contact list.
-- Response reminders, default deadlines and Short notice arrive with entry 8.
+- The job is scheduled at publish time. A held, deactivated or accountless assignee gets no inbox item: 3.5 routes the need to a direct-contact route, and 4.1 registers none, so the need is recorded `unrouted` (finish reason `no_direct_contact_route`) and shows in **Reminder health** until entry 8 adds the leader's Needs contact list (built in story 4.8, below).
+- Response reminders, default deadlines and Short notice arrive with entry 8 (built in story 4.8, below).
 
 ### Reads
 
@@ -608,3 +608,119 @@ Record the outcome of each step in `evidence-4.5/owner-check.md`: pass or fail, 
 - No phone or Call action for the leader on the detail screen (Q4, entry 9 contact routes).
 - Accepting several dates together is without a note; accept a date on its own to add one. The Home card's Accept sends no note.
 - The calendar export is a copy. The iOS share sheet (iPad popover anchor) is unverified on a device until an iOS build exists.
+
+## Story 4.8: set response deadlines and schedule creator-configured duty reminders
+
+Migration: `supabase/migrations/20261014153012_duties_reminders.sql`.
+- Forward only: the 4.1-4.5 files are not edited (replaced function bodies are listed in its header and keep every earlier review fix).
+- No destructive statements, no row deletions and no `_rows` file.
+- No new client grant: `duties.set_reminders` goes through `api.duties_command`.
+
+Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-set-response-deadlines-and-schedule-creator-configured-duty-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.8/`.
+
+### Deadlines
+
+- The answer-by time is optional everywhere a duty is given to someone: `response_deadline` on `duties.publish_duty`, `duties.assign_slot` and `duties.revise_duty`, `deadline_before` on `duties.publish_drafts` and `duties.revise_series`. A leader's time keeps the 4.1-4.3 checks (`past`, `after_start`, `passed`); an answer-by time equal to the start (or the reporting time) is `after_start` too, and a `deadline_before` of zero is `out_of_range`.
+- Without one, each new assignment takes the **3.3 lead-time default** for an assignment made now (`app.notifications_response_deadline`, anchored on the reporting time or the start). With the Q2 fixture: a duty 30 days or more ahead, 14 days before; 3 to 30 days ahead, 48 hours before; otherwise 24 hours before.
+- When that default has already passed, or leaves less than **one hour** to answer (an agent decision under owner pre-approval: a reminder minutes after the assignment is no use), the assignment is **Short notice**: its deadline is the moment it was given, `app.duties_assignments.short_notice` is true, the member's new-duty (or change) notice is the one "answer now" message, and each leader and deputy gets `duty_short_notice` at once.
+- `app.duties_assignments.deadline_source` is `creator` or `default` (rows from before 4.8 are `creator`). The stored deadline is always passed to Notifications explicitly, so an operator re-plan after a policy change never moves it.
+
+### Reminders (creator-configured)
+
+- `reminders` on `duties.publish_duty` and `duties.create_series` (copied to every generated date): `null` or absent = the defaults, `[]` = none, or up to the policy's `max_reminders` 3.3 `response` specs `{"anchor": "response_deadline" | "starts_at", "before" | "after": "<n> minutes|hours|days"}`. Refusals: `validation_failed {"reminders": "invalid" | "out_of_range"}`.
+- **Defaults** (`app.duties_default_reminders`, one function to adjust): the policy's response defaults (24 hours before and at the deadline) and one pre-service reminder 24 hours before the reporting time or start. While the member has not answered, a pre-service reminder is sent as `duty_response_due` (it asks for the answer); after an acceptance it is `duty_starting`. Clients say "before the reporting time" when the duty has one. Specs a narrower policy no longer allows are dropped at plan time; a command never fails for them.
+- **`duties.set_reminders`** (the department's leader or deputy, or an Admin):
+
+  | Payload | `expected_revision` | Effect |
+  |---|---|---|
+  | `{occurrence_id, reminders}` | the occurrence revision | one date (draft or published, not started, not cancelled) |
+  | `{series_id, from_occurrence_id, reminders}` | the series revision | the series template and every later date that has not started and is not cancelled |
+
+  `reminders` is required (`null` for the defaults). Nobody is asked to answer again: current assignments are re-planned at their revision (a pending snooze survives). The same value again is `validation_failed {"occurrence_id" | "series_id": "unchanged"}`. Audited `reminders_set` (code `occurrence` or `series`). Answer: `{occurrence_id | series_id, revision, occurrences, replanned}`.
+- **Leaders' alerts** are fixed rules, not creator options: one job per leader, `duty_response_overdue` at the deadline and `duty_short_notice` at once on Short notice, to each current department leader and deputy the app can reach (never the assignee; a held or in-review leader is skipped and refused at delivery, never an unrouted need), rechecked at delivery (still manages the department, answer still pending, not started). A re-plan of an unanswered assignment whose deadline has passed gives each leader who has no alert at that revision one now (a leader granted after the deadline gets it at the next re-plan, for example `duties.set_reminders`).
+- **An answer is always recorded.** If the Q2 church-time policy is unavailable when a member accepts, declines or withdraws, the answer is still saved: the re-plan is skipped and audited (`reminders_skipped`, code `policy_unavailable`); the answer has already cancelled the response reminders and the leaders' alerts. Publishing or changing duties still needs the policy (fail-closed).
+- **Cost.** The Q2 policy is validated once per transaction (`app.notifications_zone_known` and `app.notifications_policy` memoise per transaction), so a publish of 200 rota slots plans well inside the 8-second statement timeout (`supabase/tests/duties_reminders_scale_test.sql`; local: 26 slots 0.5 s, 200 slots 4.1 s, `accept_many` of 50 dates 0.55 s; before the fix 26 slots took 16.7 s).
+- **No quiet hours**: reminders are sent when due, at any hour (a 23:30 church-time reminder stays at 23:30). The member can snooze a reminder from the Inbox (1 hour, 24 hours, 2 days); an answer stops the snooze.
+
+### Reminder kinds (3.2 contracts)
+
+| Source / kind | Title / body | Link | Delivered while |
+|---|---|---|---|
+| `duties_assignment` / `duty_response_due` | **Duty answer needed** / "One of your duties is waiting for your answer. Open it to accept or say you cannot make it." | `/duties/assignments/{source_id}` | current at that revision, pending, not started, still a member of the department |
+| `duties_assignment` / `duty_starting` | **Duty coming up** / "One of your duties is coming up soon. Open it to see the details." | `/duties/assignments/{source_id}` | current at that revision, not declined, not started |
+| `duties_coverage` / `duty_response_overdue` | **Duty answer overdue** / "A duty in your department passed its answer-by time without an answer. Open Duties to follow it up." | `/duties/leader` | the assignment is current and pending, not started, the recipient leads or deputises the department |
+| `duties_coverage` / `duty_short_notice` | **Short-notice duty** / "A duty in your department was given at short notice and needs an answer now. Contact the member directly." | `/duties/leader` | as above |
+
+`duties_coverage` is a second source keyed by the same assignment id (the member's reminders are a Notifications schedule; the leaders' alerts are single enqueued jobs, so a leader who also serves keeps both). Every new assignment, also after A -> B -> A, is a new source id: a returning member never meets a cancelled logical key.
+
+**What stops what.** Accept: the member's response reminders and the leaders' alerts are cancelled (`responded`), the pre-service reminder is planned again at the new revision. Decline and "Can't make it anymore": everything is cancelled. A material change, reassignment or cancellation: every pending job of the old assignment ends (`source_revised` / `source_cancelled`), including the leaders' alerts; the new assignment gets a fresh plan.
+
+### Needs contact (3.5 direct-contact route)
+
+- `app.duties_record_contact_need` is registered for every kind an assignee is sent (`duty_assigned`, `duty_changed`, `duty_updated`, `duty_released`, `duty_cancelled`, `duty_response_due`, `duty_starting`). A held, in-review, accountless or deactivated assignee gets no inbox item; the worker records the need in `app.duties_contact_needs` (need id, assignment id, revision, kind, time; idempotent; no member id, no reason) and Notifications marks it `routed` (no longer `unrouted` in Reminder health).
+- `api.duties_leader_board` and `api.duties_rota` add, per current assignment, `deadline_source`, `short_notice` and `needs_contact` (`{reasons: ["short_notice" | "not_reached"], since}` or null) and, per occurrence, `reminders`. `api.duties_my_duties` adds `deadline_source`, `short_notice` and `reminders`. The reason a member was not reached is never given (a hold is never disclosed).
+- **Released and cancelled notices** (`app.duties_contact_notices`, in `api.duties_leader_board` as `contact_notices` per department for its leaders, deputies and Admins; empty for Pastor oversight): a member the app cannot reach whose duty was given to someone else or whose date was cancelled is listed (`notice`: `released` | `cancelled`, the duty, date and position, `since`) until the duty would have started, so the leader tells them in person. Never why. A released notice disappears when the position is theirs again.
+- Contact attempts, leader confirmation and the coverage queue arrive with entry 9.
+
+### Clients
+
+- **Staff web, Duties.** **Publish a duty**: **Answer by** is optional ("Leave the answer-by time empty for the church default ..."); **Choose the member's reminders** offers 2 days, 24 hours and at the answer-by time, 24 hours and 2 hours before the start (none picked = no reminders). **Change this duty** saves a material change without a new answer-by time (the default applies). Each duty shows its reminders with **Change reminders**. A position shows **Short notice** ("Given at short notice: answer requested now") and **Needs contact**; "(church default)" follows a default answer-by time. Each department starts with **Needs contact (n)**, listing who to contact directly and why in general terms, and "Tell <name>: <duty>, <date> is cancelled / is no longer theirs" for released and cancelled members the app cannot reach. **Change reminders** stays open with any refusal shown until the server accepts; **Cancel** puts the stored reminders back; a stored reminder that is not one of the choices is shown as "(custom)" and kept unless unticked.
+- **Staff web, Rota.** **New rota** has the same reminder choice. **Publish N draft slots** and the date panel's **Answer by** start at **the church default (by lead time)**. A date shows its reminders with **Change reminders** and **Reminders: this and later dates**. The grid adds "; short notice" and "; needs contact".
+- **Mobile.** A short-notice duty that waits for an answer reads **Short notice: please answer now**; the detail shows its reminders and that a reminder can be snoozed from the Inbox. The leaders' alert opens `/duties/leader` (now in `ClientPaths.deepLinkTargets`).
+
+### Local runs
+
+```bash
+npx supabase db reset
+npm run -s db:test                           # supabase/tests/duties_reminders_test.sql (+ 4.1-4.5)
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/duties-reminders.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+node --test tools/identity-e2e/duties-reminders.test.mjs
+(cd packages/client_core && flutter test test/duties)
+```
+
+Fictional numbers: pgTAP `+44 7700 900650-900669`, E2E `900670-900689`. The 4.1-4.5 E2E clean-ups now also remove the Notifications schedules and Needs contact rows their duties create.
+
+### Hosted staging (parent session, then the owner)
+
+1. **Parent session:**
+   - Apply `20261014153012_duties_reminders.sql` to staging (`tmurpotfluignacfueki`) after `20261014130535`.
+   - Run `tools/ci/verify-hosted.sql` with `expected_env=staging`.
+   - Compare the md5 of each new or replaced `app.duties_*` function with the local one (the migration has no backslashes, so no `\u` decoding applies).
+   - Grants: no new client grant. `authenticated` has no execute on any new `app.duties_*` function.
+   - Right after the apply: `select count(*) from app.duties_assignments where deadline_source <> 'creator' or short_notice;` is 0, and `select count(*) from app.contract_direct_contact_routes where source_type = 'duties_assignment';` is 7.
+   - Existing pending duties keep their 4.1-4.5 jobs; reminders are planned from the next assignment or change (no back-fill), like 4.7.
+   - No Edge Function change, no rows file, no owner SQL paste.
+2. **Staging clients:** rebuild the staff web and the staging APK (new screens).
+3. **Owner:** nothing to paste. Then the manual checks below.
+4. **Production:** nothing in this story (Q2 and Q4 stay closed; every Duties command needs both).
+
+### Owner manual checks (staging, phone and web, story 4.8)
+
+Use synthetic members only. You need the 4.1 setup: Admin A, leader L and deputy D of `SYNTHETIC Preaching Rota`, member M with the staging APK on an Android phone, member O, and an accountless member X in the department. The staging worker runs every minute.
+
+1. **Mid-week for Sunday (default).** As L, **Publish a duty** for M next Sunday `10:00`, leave **Answer by** empty. Expect **Duty published**; the position reads "Answer by <Friday 10:00> (church default)" (48 hours before) and "Reminders: the defaults ...".
+2. **A quarterly rota.** As L, **Rota** > **New rota** every week for 12 weeks; plan M on the first and last Sundays; **Publish N draft slots** with **Answer by: the church default (by lead time)**. The last Sunday's answer-by is 2 weeks before it; the first one's 2 days before.
+3. **Same day (Short notice).** As L, publish a duty for M starting in 3 hours with no answer-by time. On the phone M gets one **New duty assigned** (not two items); the duty reads **Short notice: please answer now**. L and D each get **Short-notice duty** in their Inbox; **Open** leads to **Duties**, where the position shows **Short notice**, **Needs contact** and the department's **Needs contact (1)** list.
+4. **Creator's reminders.** As L, publish another duty for O in 3 weeks with an answer-by time 3 days before and **Choose the member's reminders**: "2 days before the answer-by time" and "2 hours before the start". The duty shows exactly those.
+5. **Accept and decline.** As M accept the step 1 duty: the leaders' overdue alert and the answer reminders stop (nothing arrives at its answer-by time); the pre-service reminder still arrives the day before. As O decline the step 4 duty: nothing more arrives for it.
+6. **Reassign there and back.** As L, **Change this duty** on a duty of M's: Who = O (no new answer-by), save; then back to M. M gets **Duty changed** / **New duty assigned** as each time; O's reminders stop when it moves back.
+7. **Accountless and held.** Publish a duty for X, and one for a SYNTHETIC member with the app who is then placed on hold (Admin, credential review). Within a minute neither gets an inbox item, and the board lists both under **Needs contact** ("Reminders cannot reach them in the app"; no reason given). Then **Change this duty** on X's duty to give it to O, and cancel another date of X's (Rota): **Needs contact** lists "Tell X: ... is no longer theirs" and "... is cancelled" until each date would have started.
+7a. **Held deputy.** Place D on hold (Admin) and publish a duty for O in 3 hours (Short notice): only L gets **Short-notice duty**; D gets nothing, also after the hold is released for that duty. Release D's hold.
+8. **Snooze.** When M's **Duty answer needed** arrives (or use a duty whose answer-by is about a day away), open it, **Remind me later** > **1 hour**: it comes back an hour later. Snooze again and then accept: it does not come back.
+9. **Change reminders later.** On a published duty, **Change reminders** > none picked > **Save the reminders**: **Reminders saved**; nobody is asked to answer again (the position keeps its answer).
+10. **No quiet hours.** Give a duty an answer-by time of `23:30`: the reminder arrives at 23:30 church time.
+10a. **Answer-by edges.** Publish a duty for O starting in 24 hours 30 minutes with no answer-by time: it is **Short notice** (less than an hour to answer). Publish one with an answer-by time equal to its start: refused "Must be before the start". With a reporting time set, the reminder choices read "... before the reporting time"; a pre-service reminder while O has not answered reads **Duty answer needed**.
+11. **Clean up** as in 4.1, step 9 (also `app.duties_contact_needs` and `app.notifications_schedules` of the synthetic members before the assignments).
+
+Record the outcome of each step in `evidence-4.8/owner-check.md`: pass or fail, device model, Android version and browser. Include no numbers, ids or keys.
+
+### Known limits (later entries)
+
+- Leaders and deputies are chosen when an assignment is planned (or re-planned by `duties.set_reminders`): a leader granted later gets no alert for an earlier assignment until it is re-planned; one whose scope is revoked or who is held is not alerted (rechecked at delivery).
+- Cell-owned occurrences get no reminders until entry 11 builds their member view.
+- A very large publish (hundreds of slots) is planned in one transaction (about 4 s locally for 200 slots). On an almost empty database an autovacuum ANALYZE during it can make it much slower; publish a big rota in parts if a timeout is seen.
+- Released and cancelled notices are listed until the old start and cannot be marked done yet. Contact attempts, leader confirmation and the coverage queue arrive with entry 9.
+- An operator re-plan after a policy change (`app.notifications_replan_all`) cannot call Duties: a leader alert it moves into the past is not re-sent until the assignment is next re-planned.
+- Duties published before 4.8 keep their 4.1-4.5 jobs; there is no back-fill of reminders. **On staging**, duties published before this migration get the new reminders and leader alerts only after their next change (a reassignment, a material change, an answer or `duties.set_reminders`); test with duties published after the apply.

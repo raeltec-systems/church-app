@@ -553,6 +553,67 @@ void main() {
   );
 
   testWidgets(
+    'story 4.8: a duty answer reminder opens the duty, marked Short notice',
+    (tester) async {
+      const item = '34343434-3434-4434-8434-343434343434';
+      const duty = '42424242-4242-4242-8242-424242424242';
+      final push = FakePushMessaging(
+        deviceToken: 'synthetic-AAAAAAAAAAAAAAAAAAAAAAAA:APA91b',
+        answer: PushPermission.denied,
+      );
+      final h = await pumpMobile(
+        tester,
+        size: const Size(390, 2400),
+        setUp: (h) {
+          h.push = push;
+          h.grants.myAccess = AccessReadOk(syntheticGrants());
+          h.inbox.opened[item] = AccessReadOk(
+            OpenedInboxItem.fromJson({
+              ...inboxItemData(
+                id: item,
+                kind: 'duty_response_due',
+                title: 'Duty answer needed',
+                body:
+                    'One of your duties is waiting for your answer. Open it '
+                    'to accept or say you cannot make it.',
+              ),
+              'state': 'current',
+              'target': '/duties/assignments/$duty',
+            }),
+          );
+          h.duties.mine = AccessReadOk(
+            MyDuties.fromJson({
+              'member_id': '66666666-6666-4666-8666-666666666666',
+              'assignments': [
+                myDutyData(
+                  extra: const {
+                    'deadline_source': 'default',
+                    'short_notice': true,
+                    'reminders': null,
+                  },
+                ),
+              ],
+            }),
+          );
+        },
+      );
+      push.tap(item);
+      await tester.pumpAndSettle();
+      expect(find.text('Duty answer needed'), findsOneWidget);
+      expect(
+        find.textContaining('SYNTHETIC Main hall'),
+        findsNothing,
+        reason: 'the reminder carries no duty content',
+      );
+      await tapKey(tester, 'inbox-item-open-target');
+      await tester.pumpAndSettle();
+      expect(h.duties.mineCalls, greaterThan(0));
+      expect(find.byKey(const Key('duty-short-notice-$duty')), findsWidgets);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'story 2.11: a member deletes their account from the account page; the '
     'device is signed out',
     (tester) async {

@@ -108,6 +108,10 @@ async function main() {
     delete from app.notifications_direct_contact_needs n where n.recipient_member_id in (select member_id from gone_members);
     delete from app.notifications_jobs j where j.recipient_member_id in (select member_id from gone_members)
        or j.source_id in (select assignment_id from gone_assignments);
+    -- Story 4.8: duties schedule reminders (member and leader schedules) and record Needs contact.
+    delete from app.notifications_schedules s where s.recipient_member_id in (select member_id from gone_members)
+       or s.source_id in (select assignment_id from gone_assignments);
+    delete from app.duties_contact_needs n where n.assignment_id in (select assignment_id from gone_assignments);
     delete from app.duties_audit a where a.department_id in (select department_id from gone_departments)
        or a.actor_member_id in (select member_id from gone_members);
     delete from app.duties_slot_revisions r using app.duties_occurrences o
@@ -171,7 +175,9 @@ async function main() {
   };
   const jobs = (assignmentId) => psql(`select coalesce(string_agg(reminder_kind || ':' || job_state || ':'
       || coalesce(cancel_reason, finish_reason, '-'), ',' order by enqueued_at, reminder_kind, job_state), '')
-    from app.notifications_jobs where source_type = 'duties_assignment' and source_id = '${assignmentId}'`);
+    from app.notifications_jobs where source_type = 'duties_assignment' and source_id = '${assignmentId}'
+     -- Story 4.8's reminders are proved by duties-reminders.mjs.
+     and reminder_kind not in ('duty_response_due', 'duty_starting')`);
 
   try {
     const { admin, leader, deputy, member, other } = people;

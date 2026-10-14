@@ -79,6 +79,9 @@ enum DutyNotice {
   /// The duty was already answered.
   alreadyAnswered,
 
+  /// Story 4.8: the member reminders of a duty (or a series) were set.
+  remindersSet,
+
   /// Story 4.5: "Can't make it anymore" was recorded.
   withdrawn,
 
@@ -322,6 +325,7 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
         DutyCommands.publish => DutyNotice.published,
         DutyCommands.withdrawAcceptance => DutyNotice.withdrawn,
         DutyCommands.acceptMany => DutyNotice.bulkAccepted,
+        DutyCommands.setReminders => DutyNotice.remindersSet,
         _ =>
           action.request.payload['response'] == DutyResponse.declined.wire
               ? DutyNotice.declined
@@ -515,6 +519,16 @@ class DutyLeaderController extends DutiesController<DutyLeaderBoard> {
     edit.toPayload(),
     subject,
   );
+
+  /// Story 4.8: the member reminders of [duty] ([reminders] null = the
+  /// defaults). Nobody is asked again.
+  Future<void> setReminders(
+    LeaderDuty duty,
+    List<DutyReminderSpec>? reminders,
+  ) => send(DutyCommands.setReminders, Optional.of(duty.revision), {
+    'occurrence_id': duty.occurrenceId,
+    'reminders': DutyReminders(reminders).toWire(),
+  }, duty.dutyName);
 }
 
 final dutyLeaderProvider =
@@ -560,13 +574,36 @@ class DutyRotaController extends DutiesController<DutyRota> {
   }, subject ?? position.label);
 
   /// "Publish N draft slots": N is what the leader confirmed; the server
-  /// refuses when it no longer matches.
-  Future<void> publishDrafts(RotaSeries series, int slots, String lead) =>
+  /// refuses when it no longer matches. Story 4.8: a null [lead] lets each
+  /// date take the church's lead-time default.
+  Future<void> publishDrafts(RotaSeries series, int slots, String? lead) =>
       send(DutyCommands.publishDrafts, Optional.of(series.revision), {
         'series_id': series.seriesId,
         'slot_count': slots,
-        'deadline_before': lead,
+        'deadline_before': ?lead,
       }, series.dutyName);
+
+  /// Story 4.8: the member reminders of one date ([reminders] null = the
+  /// defaults).
+  Future<void> setReminders(
+    RotaOccurrence occurrence,
+    List<DutyReminderSpec>? reminders,
+  ) => send(DutyCommands.setReminders, Optional.of(occurrence.revision), {
+    'occurrence_id': occurrence.occurrenceId,
+    'reminders': DutyReminders(reminders).toWire(),
+  }, occurrence.dutyName);
+
+  /// Story 4.8: the member reminders of [series] from [from] onwards (the
+  /// series template and every later date that has not started).
+  Future<void> setSeriesReminders(
+    RotaSeries series,
+    RotaOccurrence from,
+    List<DutyReminderSpec>? reminders,
+  ) => send(DutyCommands.setReminders, Optional.of(series.revision), {
+    'series_id': series.seriesId,
+    'from_occurrence_id': from.occurrenceId,
+    'reminders': DutyReminders(reminders).toWire(),
+  }, series.dutyName);
 
   Future<void> reviseThis(RotaEdit edit) => send(
     DutyCommands.revise,

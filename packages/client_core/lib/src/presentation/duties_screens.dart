@@ -12,6 +12,7 @@ import '../domain/duties.dart';
 import '../domain/duty_calendar.dart';
 import 'followups_screens.dart' show MyFollowUpsHomeCard;
 
+part 'duties_reminder_widgets.dart';
 part 'duties_rota_screens.dart';
 
 // Story 4.1: departments (Admin) and publishing with responses (leaders) on
@@ -231,6 +232,11 @@ abstract final class DutyPaths {
       StatusTone.success,
       'Answer sent',
       'Your leader now sees that you can\'t make $what anymore.',
+    ),
+    DutyNotice.remindersSet => (
+      StatusTone.success,
+      'Reminders saved',
+      'The reminders of $what are set. Nobody is asked to answer again.',
     ),
     DutyNotice.bulkAccepted => (
       StatusTone.success,
@@ -964,6 +970,8 @@ class _LeaderDepartmentCard extends StatelessWidget {
               StatusLabel(label: d.capacityLabel, tone: StatusTone.info),
             ],
           ),
+          // Story 4.8: who needs direct contact, before the duties.
+          _NeedsContactList(department: d),
           _heading(context, 'Duties (${d.duties.length})'),
           if (d.dutiesTruncated)
             _muted(context, 'Only the first 200 duties are shown.'),
@@ -1079,8 +1087,18 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
                   if (a.response == DutyResponse.pending)
                     _muted(
                       context,
-                      'Answer by ${_when(context, a.responseDeadline)}',
+                      a.shortNotice
+                          ? 'Given at short notice: answer requested now'
+                          : 'Answer by ${_when(context, a.responseDeadline)}'
+                                '${a.deadlineSource == DutyDeadlineSource.churchDefault ? ' (church default)' : ''}',
                     ),
+                  ..._contactFlags(
+                    context,
+                    assignmentId: a.assignmentId,
+                    shortNotice: a.shortNotice,
+                    response: a.response,
+                    needsContact: a.needsContact,
+                  ),
                   if (a.notesUpdatedAt case final u?)
                     _muted(context, 'Details updated ${_when(context, u)}'),
                   if (a.note case final n?)
@@ -1102,6 +1120,29 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
               ),
             if (p.history.isNotEmpty) _History(position: p),
           ],
+          // Story 4.8: the member reminders, changed without asking anyone
+          // again.
+          if (duty.reminders case final r?)
+            Consumer(
+              builder: (context, ref, _) {
+                final st = ref.watch(dutyLeaderProvider);
+                final mine =
+                    st.noticeAction?.command == DutyCommands.setReminders &&
+                    st.noticeAction?.request.payload['occurrence_id'] == id;
+                return _RemindersEditor(
+                  key: Key('leader-reminders-$id-r${duty.revision}'),
+                  keyPrefix: 'leader-$id',
+                  reminders: r,
+                  reporting: duty.times.reportingAt != null,
+                  canChange: widget.department.canPublish && !started,
+                  busy: widget.busy,
+                  error: mine ? st.fieldErrors['reminders'] : null,
+                  onSave: (specs) => ref
+                      .read(dutyLeaderProvider.notifier)
+                      .setReminders(duty, specs),
+                );
+              },
+            ),
           if (widget.department.canPublish && !started) ...[
             if (!_editing)
               FocusRing(
@@ -1469,7 +1510,7 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
           field(
             'edit-deadline-date',
             _deadlineDate,
-            'New answer by: date (needed when the member must answer again)',
+            'New answer by: date (optional; empty = the church default)',
             hint: 'YYYY-MM-DD',
             wire: 'response_deadline',
             maxLength: 10,
@@ -1487,10 +1528,9 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
               final edit = _edit();
               final changed = edit?.changed ?? const <String>[];
               final material = edit?.material ?? false;
-              final ready =
-                  edit != null &&
-                  changed.isNotEmpty &&
-                  (!material || edit.responseDeadline != null);
+              // Story 4.8: without a new answer-by time the church default
+              // applies (Short notice when it has already passed).
+              final ready = edit != null && changed.isNotEmpty;
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -1505,7 +1545,11 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
                       key: Key('edit-summary-$id'),
                     ),
                   if (material && edit?.responseDeadline == null)
-                    _muted(context, 'Set the new answer-by date and time.'),
+                    _muted(
+                      context,
+                      'No new answer-by time: the church default applies. '
+                      '$_defaultDeadlineHelp',
+                    ),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -1563,6 +1607,10 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
   final _reason = TextEditingController();
   String? _memberId;
 
+  /// Story 4.8: the creator's member reminders (off = the defaults).
+  bool _customReminders = false;
+  final Set<DutyReminderSpec> _reminders = {};
+
   List<TextEditingController> get _all => [
     _name,
     _date,
@@ -1614,7 +1662,12 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
     final member = _memberId;
     // Church time (Africa/Lusaka), whatever zone this computer uses.
     final starts = ChurchTime.parse(_date.text, _start.text);
-    final deadline = ChurchTime.parse(_deadlineDate.text, _deadlineTime.text);
+    // Story 4.8: an empty answer-by time is the church default.
+    final noDeadline =
+        _deadlineDate.text.trim().isEmpty && _deadlineTime.text.trim().isEmpty;
+    final deadline = noDeadline
+        ? null
+        : ChurchTime.parse(_deadlineDate.text, _deadlineTime.text);
     final endDate = _endDate.text.trim().isEmpty ? _date.text : _endDate.text;
     final ends = _end.text.trim().isEmpty
         ? null
@@ -1625,7 +1678,7 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
     if (member == null ||
         _name.text.trim().isEmpty ||
         starts == null ||
-        deadline == null ||
+        (!noDeadline && deadline == null) ||
         (_end.text.trim().isNotEmpty && ends == null) ||
         (_endDate.text.trim().isNotEmpty && _end.text.trim().isEmpty) ||
         (_reporting.text.trim().isNotEmpty && reporting == null)) {
@@ -1642,6 +1695,7 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
       memberId: member,
       responseDeadline: deadline,
       overrideReason: _reason.text,
+      reminders: _chosenReminders(_customReminders, _reminders),
     );
   }
 
@@ -1694,7 +1748,7 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
         _muted(
           context,
           'One person, one position. They are asked to accept or say they '
-          'can\'t make it by the deadline you set. Times are church time '
+          'can\'t make it by the answer-by time. Times are church time '
           '(Lusaka), whatever this computer\'s clock is set to.',
         ),
         const SizedBox(height: 8),
@@ -1779,7 +1833,7 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
         field(
           'publish-deadline-date',
           _deadlineDate,
-          'Answer by: date',
+          'Answer by: date (optional)',
           hint: 'YYYY-MM-DD',
           wire: 'response_deadline',
           maxLength: 10,
@@ -1787,10 +1841,27 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
         field(
           'publish-deadline-time',
           _deadlineTime,
-          'Answer by: time',
+          'Answer by: time (optional)',
           hint: 'HH:MM',
           maxLength: 5,
         ),
+        _muted(context, _defaultDeadlineHelp),
+        const SizedBox(height: 8),
+        ListenableBuilder(
+          listenable: _reporting,
+          builder: (context, _) => _ReminderChoice(
+            keyPrefix: 'publish-$id',
+            custom: _customReminders,
+            selected: _reminders,
+            enabled: !widget.busy,
+            error: errors['reminders'],
+            reporting: _reporting.text.trim().isNotEmpty,
+            onCustom: (v) => setState(() => _customReminders = v),
+            onToggle: (c, on) =>
+                setState(() => on ? _reminders.add(c) : _reminders.remove(c)),
+          ),
+        ),
+        const SizedBox(height: 8),
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: ListenableBuilder(
@@ -2519,10 +2590,26 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
             label: shown,
             tone: shownTone,
           ),
-          if (a.response == DutyResponse.pending)
+          // Story 4.8: given at short notice, the member is asked to answer
+          // now (the answer-by time is when it was given).
+          if (a.answerNow(now))
+            StatusLabel(
+              key: Key('duty-short-notice-$id'),
+              label: 'Short notice: please answer now',
+              tone: StatusTone.warning,
+            )
+          else if (a.response == DutyResponse.pending)
             _muted(context, 'Answer by ${_when(context, a.responseDeadline)}'),
         ],
       ),
+      // Story 4.8: the reminders this duty sends (the detail screen).
+      if (widget.full && a.response != DutyResponse.declined)
+        if (a.reminders case final r?)
+          _muted(
+            context,
+            '${r.textFor(reporting: a.times.reportingAt != null)} '
+            'You can snooze a reminder from the Inbox.',
+          ),
       if (a.declinedLater)
         _muted(
           context,

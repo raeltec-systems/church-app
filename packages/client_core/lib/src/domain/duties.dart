@@ -47,6 +47,10 @@ abstract final class DutyCommands {
 
   /// The most dates one bulk acceptance may carry (the server's limit).
   static const maxBulk = 50;
+
+  /// Story 4.8: the member reminders of one date, or of a series from a date
+  /// onwards.
+  static const setReminders = 'duties.set_reminders';
 }
 
 /// Story 4.2: the revisable fields (wire names) in display order, and the
@@ -251,6 +255,9 @@ class MyDuty {
     this.leaders = const [],
     this.slotId,
     this.ownerKind = DutyOwnerKind.department,
+    this.deadlineSource = DutyDeadlineSource.creator,
+    this.shortNotice = false,
+    this.reminders,
   });
 
   factory MyDuty.fromJson(Object? json) {
@@ -288,8 +295,23 @@ class MyDuty {
       leaders: _leaders(m),
       slotId: _opt<String>(m, 'slot_id'),
       ownerKind: DutyOwnerKind.fromWire(m['owner_kind']),
+      deadlineSource: DutyDeadlineSource.fromWire(m['deadline_source']),
+      shortNotice: _shortNotice(m),
+      reminders: DutyReminders.fromJsonIn(m),
     );
   }
+
+  /// Story 4.8: whose answer-by time this is (the leader's, or the church's
+  /// lead-time default).
+  final DutyDeadlineSource deadlineSource;
+
+  /// Story 4.8: given at short notice (the default answer-by time had
+  /// already passed): the member is asked to answer now.
+  final bool shortNotice;
+
+  /// Story 4.8: the reminders this duty sends (null from a server before
+  /// 4.8).
+  final DutyReminders? reminders;
 
   /// Story 4.5: the position's slot (stable across revisions; the calendar
   /// entry's id). Null from a server before 4.5.
@@ -354,6 +376,9 @@ class MyDuty {
   bool get isChanged => changes != null;
 
   bool startedAt(DateTime now) => !times.arriveBy.isAfter(now);
+
+  /// Story 4.8: Short notice and still waiting for an answer.
+  bool answerNow(DateTime now) => shortNotice && needsResponse(now);
 
   /// Still asks for an answer: pending and not yet started.
   bool needsResponse(DateTime now) =>
@@ -522,6 +547,9 @@ class PositionAssignment {
     this.overlaps = 0,
     this.override,
     this.priorAcceptedAt,
+    this.deadlineSource = DutyDeadlineSource.creator,
+    this.shortNotice = false,
+    this.needsContact,
   });
 
   factory PositionAssignment.fromJson(Object? json) {
@@ -542,8 +570,17 @@ class PositionAssignment {
       notesUpdatedAt: _optInstant(m, 'notes_updated_at'),
       overlaps: _overlaps(m),
       override: DutyOverride.fromJsonOrNull(m['override']),
+      deadlineSource: DutyDeadlineSource.fromWire(m['deadline_source']),
+      shortNotice: _shortNotice(m),
+      needsContact: DutyContactNeed.fromJsonOrNull(m['needs_contact']),
     );
   }
+
+  /// Story 4.8: whose answer-by time, Short notice, and whether the leader
+  /// should contact the member directly.
+  final DutyDeadlineSource deadlineSource;
+  final bool shortNotice;
+  final DutyContactNeed? needsContact;
 
   final String assignmentId;
   final String memberId;
@@ -707,6 +744,7 @@ class LeaderDuty {
     this.instructions,
     this.topic,
     this.scripture,
+    this.reminders,
   });
 
   factory LeaderDuty.fromJson(Object? json) {
@@ -727,8 +765,13 @@ class LeaderDuty {
       positions: List.unmodifiable(
         _req<List>(m, 'positions').map(DutyPosition.fromJson),
       ),
+      reminders: DutyReminders.fromJsonIn(m),
     );
   }
+
+  /// Story 4.8: the member reminders of this duty (null from a server
+  /// before 4.8).
+  final DutyReminders? reminders;
 
   final String occurrenceId;
   final String departmentId;
@@ -786,6 +829,7 @@ class LeaderDepartment {
     required this.members,
     required this.duties,
     this.dutiesTruncated = false,
+    this.contactNotices = const [],
   });
 
   factory LeaderDepartment.fromJson(Object? json) {
@@ -812,8 +856,18 @@ class LeaderDepartment {
         _req<List>(m, 'duties').map(LeaderDuty.fromJson),
       ),
       dutiesTruncated: _opt<bool>(m, 'duties_truncated') ?? false,
+      contactNotices: m['contact_notices'] == null
+          ? const []
+          : List.unmodifiable(
+              _req<List>(m, 'contact_notices').map(DutyContactNotice.fromJson),
+            ),
     );
   }
+
+  /// Story 4.8 (review): notices the leader must still pass on in person to
+  /// members the app cannot reach (released from a position, a cancelled
+  /// date). Empty from a server before 4.8 and for Pastor oversight.
+  final List<DutyContactNotice> contactNotices;
 
   /// More duties exist than the server listed.
   final bool dutiesTruncated;
@@ -979,12 +1033,13 @@ class DutyDraft {
     required this.dutyName,
     required this.startsAt,
     required this.memberId,
-    required this.responseDeadline,
+    this.responseDeadline,
     this.endsAt,
     this.reportingAt,
     this.location,
     this.instructions,
     this.overrideReason,
+    this.reminders,
   });
 
   final String departmentId;
@@ -995,7 +1050,13 @@ class DutyDraft {
   final String? location;
   final String? instructions;
   final String memberId;
-  final DateTime responseDeadline;
+
+  /// Story 4.8: null = the church's lead-time default.
+  final DateTime? responseDeadline;
+
+  /// Story 4.8: the creator's member reminders (null = the defaults; empty =
+  /// none).
+  final List<DutyReminderSpec>? reminders;
 
   /// Story 4.4: why the member is assigned although another duty overlaps.
   final String? overrideReason;
@@ -1016,8 +1077,9 @@ class DutyDraft {
       'location': ?text(location),
       'instructions': ?text(instructions),
       'member_id': memberId,
-      'response_deadline': utc(responseDeadline),
+      if (responseDeadline case final d?) 'response_deadline': utc(d),
       'override_reason': ?DutyOverride.clean(overrideReason),
+      if (reminders case final r?) 'reminders': [for (final x in r) x.toJson()],
     };
   }
 }
@@ -1151,6 +1213,9 @@ class RotaAssignment {
     this.overlaps = 0,
     this.override,
     this.priorAcceptedAt,
+    this.deadlineSource = DutyDeadlineSource.creator,
+    this.shortNotice = false,
+    this.needsContact,
   });
 
   factory RotaAssignment.fromJson(Object? json) {
@@ -1167,8 +1232,16 @@ class RotaAssignment {
       available: _req<bool>(m, 'available'),
       overlaps: _overlaps(m),
       override: DutyOverride.fromJsonOrNull(m['override']),
+      deadlineSource: DutyDeadlineSource.fromWire(m['deadline_source']),
+      shortNotice: _shortNotice(m),
+      needsContact: DutyContactNeed.fromJsonOrNull(m['needs_contact']),
     );
   }
+
+  /// Story 4.8.
+  final DutyDeadlineSource deadlineSource;
+  final bool shortNotice;
+  final DutyContactNeed? needsContact;
 
   /// Story 4.4: overlapping duties now, and the recorded override.
   final int overlaps;
@@ -1252,6 +1325,7 @@ class RotaOccurrence {
     this.instructions,
     this.topic,
     this.scripture,
+    this.reminders,
   });
 
   factory RotaOccurrence.fromJson(Object? json) {
@@ -1279,8 +1353,13 @@ class RotaOccurrence {
       required: required,
       confirmed: confirmed,
       positions: positions,
+      reminders: DutyReminders.fromJsonIn(m),
     );
   }
+
+  /// Story 4.8: this date's member reminders (null from a server before
+  /// 4.8).
+  final DutyReminders? reminders;
 
   final String occurrenceId;
 
@@ -1452,6 +1531,13 @@ class DutyRota {
 /// The answer-by lead times a leader picks (before the reporting or start
 /// time, in church time). Wire values of `deadline_before`.
 abstract final class DutyLeads {
+  /// Story 4.8: the pickers' "church default" entry (no lead time is sent;
+  /// each date takes the 3.3 lead-time default).
+  static const churchDefault = '';
+
+  /// [lead], or null for [churchDefault].
+  static String? wire(String lead) => lead == churchDefault ? null : lead;
+
   static const choices = <(String, String)>[
     ('2 hours', '2 hours before'),
     ('12 hours', '12 hours before'),
@@ -1499,7 +1585,11 @@ class SeriesDraft {
     this.instructions,
     this.topic,
     this.scripture,
+    this.reminders,
   });
+
+  /// Story 4.8: the member reminders of every date (null = the defaults).
+  final List<DutyReminderSpec>? reminders;
 
   final String departmentId;
   final String dutyName;
@@ -1583,7 +1673,27 @@ class SeriesDraft {
     'topic': ?_clean(topic),
     'scripture': ?_clean(scripture),
     'positions': positions,
+    if (reminders case final r?) 'reminders': [for (final x in r) x.toJson()],
   };
+
+  /// Story 4.8: the same draft with the creator's reminders.
+  SeriesDraft withReminders(List<DutyReminderSpec>? r) => SeriesDraft(
+    departmentId: departmentId,
+    dutyName: dutyName,
+    every: every,
+    interval: interval,
+    fromDate: fromDate,
+    untilDate: untilDate,
+    startTime: startTime,
+    endTime: endTime,
+    reportingTime: reportingTime,
+    location: location,
+    instructions: instructions,
+    topic: topic,
+    scripture: scripture,
+    positions: positions,
+    reminders: r,
+  );
 }
 
 /// Story 4.3: a leader's change of a rota occurrence, applied to "this
@@ -2072,3 +2182,236 @@ bool seesDutyBoard(MemberGrants? grants) =>
         grants.scopes.any(
           (s) => DutyScopeKinds.isDepartmentScope(s.scopeKind),
         ));
+
+// ---------------------------------------------------------------------------
+// Story 4.8: answer-by defaults, Short notice, reminders and Needs contact
+// ---------------------------------------------------------------------------
+
+bool _shortNotice(Map m) => _opt<bool>(m, 'short_notice') ?? false;
+
+/// Whose answer-by time an assignment has. A server before 4.8 sends none:
+/// every deadline then was the leader's.
+enum DutyDeadlineSource {
+  creator('creator'),
+  churchDefault('default');
+
+  const DutyDeadlineSource(this.wire);
+  final String wire;
+
+  static DutyDeadlineSource fromWire(Object? v) {
+    if (v == null) return creator;
+    for (final s in values) {
+      if (s.wire == v) return s;
+    }
+    throw FormatException('unexpected deadline_source $v');
+  }
+}
+
+/// What a reminder is relative to.
+enum DutyReminderAnchor {
+  /// The answer-by time (stops once the member answered).
+  deadline('response_deadline'),
+
+  /// The reporting time, or the start (kept after an acceptance).
+  start('starts_at');
+
+  const DutyReminderAnchor(this.wire);
+  final String wire;
+
+  static DutyReminderAnchor fromWire(Object? v) {
+    for (final a in values) {
+      if (a.wire == v) return a;
+    }
+    throw FormatException('unexpected anchor $v');
+  }
+}
+
+/// One member reminder the creator chose: [offset] (`<n> minutes|hours|days`)
+/// before (or [after]) its [anchor].
+class DutyReminderSpec {
+  const DutyReminderSpec.before(this.anchor, this.offset) : after = false;
+  const DutyReminderSpec.after(this.anchor, this.offset) : after = true;
+
+  factory DutyReminderSpec.fromJson(Object? json) {
+    final m = _map(json, 'reminder');
+    final anchor = DutyReminderAnchor.fromWire(m['anchor']);
+    final before = _opt<String>(m, 'before');
+    final after = _opt<String>(m, 'after');
+    if ((before == null) == (after == null)) {
+      throw const FormatException('unexpected reminder');
+    }
+    return before != null
+        ? DutyReminderSpec.before(anchor, before)
+        : DutyReminderSpec.after(anchor, after!);
+  }
+
+  final DutyReminderAnchor anchor;
+  final String offset;
+  final bool after;
+
+  Map<String, Object?> toJson() => {
+    'anchor': anchor.wire,
+    if (after) 'after': offset else 'before': offset,
+  };
+
+  /// "24 hours before the answer-by time", "at the answer-by time",
+  /// "2 hours before the start".
+  String get label => labelFor();
+
+  /// Review: with a reporting time the start anchor is the reporting time.
+  String labelFor({bool reporting = false}) {
+    final what = anchor == DutyReminderAnchor.deadline
+        ? 'the answer-by time'
+        : (reporting ? 'the reporting time' : 'the start');
+    final parts = offset.split(' ');
+    if (parts.length != 2) return '$offset ${after ? 'after' : 'before'} $what';
+    if (parts[0] == '0') return 'at $what';
+    final unit = parts[0] == '1' && parts[1].endsWith('s')
+        ? parts[1].substring(0, parts[1].length - 1)
+        : parts[1];
+    return '${parts[0]} $unit ${after ? 'after' : 'before'} $what';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is DutyReminderSpec &&
+      other.anchor == anchor &&
+      other.offset == offset &&
+      other.after == after;
+
+  @override
+  int get hashCode => Object.hash(anchor, offset, after);
+}
+
+/// The member reminders a creator may pick (staff web).
+const dutyReminderChoices = [
+  DutyReminderSpec.before(DutyReminderAnchor.deadline, '2 days'),
+  DutyReminderSpec.before(DutyReminderAnchor.deadline, '24 hours'),
+  DutyReminderSpec.before(DutyReminderAnchor.deadline, '0 minutes'),
+  DutyReminderSpec.before(DutyReminderAnchor.start, '24 hours'),
+  DutyReminderSpec.before(DutyReminderAnchor.start, '2 hours'),
+];
+
+/// The member reminders of a duty: [specs] null = the church defaults.
+class DutyReminders {
+  const DutyReminders([this.specs]);
+
+  /// Reads `reminders` from [m] (null when the server sent no such key: a
+  /// server before 4.8).
+  static DutyReminders? fromJsonIn(Map m) {
+    if (!m.containsKey('reminders')) return null;
+    final v = m['reminders'];
+    if (v == null) return const DutyReminders();
+    if (v is! List) throw const FormatException('unexpected reminders');
+    return DutyReminders(List.unmodifiable(v.map(DutyReminderSpec.fromJson)));
+  }
+
+  final List<DutyReminderSpec>? specs;
+
+  bool get isDefault => specs == null;
+
+  /// The wire value (`null` = the defaults).
+  List<Map<String, Object?>>? toWire() =>
+      specs == null ? null : [for (final s in specs!) s.toJson()];
+
+  /// What leaders and members read.
+  String get text => textFor();
+
+  /// Review: "before the reporting time" when the duty has one.
+  String textFor({bool reporting = false}) => switch (specs) {
+    null =>
+      'Reminders: the defaults (24 hours before and at the answer-by time, '
+          'and 24 hours before ${reporting ? 'the reporting time' : 'the start'}).',
+    final s when s.isEmpty => 'Reminders: none.',
+    final s =>
+      'Reminders: ${s.map((x) => x.labelFor(reporting: reporting)).join(', ')}.',
+  };
+}
+
+/// Story 4.8: why the leader should contact a member directly.
+/// [shortNotice]: given at short notice and not answered yet; [notReached]:
+/// a notice or reminder could not reach the member in the app (no reason is
+/// ever given).
+class DutyContactNeed {
+  const DutyContactNeed({
+    required this.shortNotice,
+    required this.notReached,
+    required this.since,
+  });
+
+  static DutyContactNeed? fromJsonOrNull(Object? json) {
+    if (json == null) return null;
+    final m = _map(json, 'needs_contact');
+    final reasons = _ids(m, 'reasons');
+    if (reasons.isEmpty ||
+        reasons.any((r) => r != 'short_notice' && r != 'not_reached')) {
+      throw const FormatException('unexpected reasons');
+    }
+    return DutyContactNeed(
+      shortNotice: reasons.contains('short_notice'),
+      notReached: reasons.contains('not_reached'),
+      since: _instant(m, 'since'),
+    );
+  }
+
+  final bool shortNotice;
+  final bool notReached;
+  final DateTime since;
+
+  /// What the leader reads.
+  String get text => [
+    if (shortNotice) 'Given at short notice: ask for an answer now',
+    if (notReached) 'Reminders cannot reach them in the app',
+  ].join('; ');
+}
+
+/// Story 4.8 (review): a notice to pass on in person to a member the app
+/// cannot reach (never why): released from a position, or the date was
+/// cancelled. Listed until the duty would have started.
+class DutyContactNotice {
+  const DutyContactNotice({
+    required this.assignmentId,
+    required this.memberId,
+    required this.occurrenceId,
+    required this.dutyName,
+    required this.startsAt,
+    required this.cancelled,
+    required this.since,
+    this.displayName,
+    this.positionName,
+  });
+
+  factory DutyContactNotice.fromJson(Object? json) {
+    final m = _map(json, 'contact notice');
+    final notice = _req<String>(m, 'notice');
+    if (notice != 'released' && notice != 'cancelled') {
+      throw const FormatException('unexpected notice');
+    }
+    return DutyContactNotice(
+      assignmentId: _req<String>(m, 'assignment_id'),
+      memberId: _req<String>(m, 'member_id'),
+      displayName: _opt<String>(m, 'display_name'),
+      occurrenceId: _req<String>(m, 'occurrence_id'),
+      dutyName: _req<String>(m, 'duty_name'),
+      positionName: _opt<String>(m, 'position_name'),
+      startsAt: _instant(m, 'starts_at'),
+      cancelled: notice == 'cancelled',
+      since: _instant(m, 'since'),
+    );
+  }
+
+  final String assignmentId;
+  final String memberId;
+  final String? displayName;
+  final String occurrenceId;
+  final String dutyName;
+  final String? positionName;
+  final DateTime startsAt;
+
+  /// The date was cancelled (otherwise the position went to someone else).
+  final bool cancelled;
+  final DateTime since;
+
+  String get title =>
+      positionName == null ? dutyName : '$dutyName: $positionName';
+}

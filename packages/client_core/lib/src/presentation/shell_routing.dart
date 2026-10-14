@@ -162,6 +162,9 @@ abstract final class ClientPaths {
     ),
     // Story 4.2: the duty_released notice opens My duties.
     RegExp(r'^/duties$'),
+    // Story 4.8: the leaders' overdue and short-notice alerts open the
+    // Duties board, which reads the duty again (a pointer, not a grant).
+    RegExp(r'^/duties/leader$'),
     // Story 4.7: the follow-up reminders (followups_task and
     // followups_supervision contracts) open the task, which reads it again.
     RegExp(

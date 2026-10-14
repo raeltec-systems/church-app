@@ -457,6 +457,53 @@ void main() {
   );
 
   testWidgets(
+    'story 4.8: a leader\'s overdue alert opens the Duties board',
+    (tester) async {
+      const item = '35353535-3535-4535-8535-353535353535';
+      final h = await pumpStaff(
+        tester,
+        size: const Size(1280, 2000),
+        location: '/inbox/$item',
+        setUp: (h) {
+          h.grants.myAccess = AccessReadOk(
+            syntheticGrants(
+              scopes: const [
+                ScopeGrant(
+                  scopeKind: 'department_leader',
+                  scopeId: '44444444-4444-4444-8444-444444444444',
+                ),
+              ],
+            ),
+          );
+          h.inbox.opened[item] = AccessReadOk(
+            OpenedInboxItem.fromJson({
+              ...inboxItemData(
+                id: item,
+                kind: 'duty_response_overdue',
+                title: 'Duty answer overdue',
+                body:
+                    'A duty in your department passed its answer-by time '
+                    'without an answer. Open Duties to follow it up.',
+              ),
+              'state': 'current',
+              'target': '/duties/leader',
+            }),
+          );
+          h.duties.board = AccessReadOk(
+            DutyLeaderBoard.fromJson({'departments': const <Object?>[]}),
+          );
+        },
+      );
+      expect(find.text('Duty answer overdue'), findsOneWidget);
+      await tapKey(tester, 'inbox-item-open-target');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(h.duties.boardCalls, greaterThan(0));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'story 4.3: Rota follows the department scope and opens the rota grid',
     (tester) async {
       final h = await pumpStaff(tester);

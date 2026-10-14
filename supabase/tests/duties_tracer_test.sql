@@ -232,8 +232,9 @@ select is(pg_temp.duties(2, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(
             -> 'field_errors',
   '{"response_deadline": "after_start"}'::jsonb, 'the deadline is never after the (reporting) start');
 select is(pg_temp.duties(2, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(), 4,
-            jsonb_build_object('response_deadline', null))) -> 'field_errors',
-  '{"response_deadline": "required"}'::jsonb, 'the leader enters the deadline (no default in 4.1)');
+            jsonb_build_object('response_deadline', 1))) -> 'field_errors',
+  '{"response_deadline": "invalid"}'::jsonb,
+  'a malformed deadline is refused (story 4.8: a missing one takes the 3.3 default; duties_reminders_test.sql)');
 select is(pg_temp.duties(2, 'duties.publish_duty', 1, pg_temp.duty(pg_temp.d(), 4)) -> 'field_errors',
   '{"expected_revision": "must_be_null"}'::jsonb, 'publishing is a create (expected_revision null)');
 select is((select count(*)::int from app.duties_occurrences) + (select count(*)::int from app.notifications_jobs
@@ -250,8 +251,9 @@ select is((select (r ->> 'revision') || '|' || (r #>> '{data,response}') || '|'
   '1|pending|true|assignment_id,assignment_revision,department_id,notice_queued,occurrence_id,override_recorded,response,revision,slot_id',
   'the leader publishes one position with a pending assignment; the answer holds ids and states only');
 select is((select string_agg(job_state || ':' || reminder_kind || ':' || source_revision, ',')
-             from app.notifications_jobs where source_type = 'duties_assignment' and source_id = pg_temp.asg()),
-  'pending:duty_assigned:1', 'publishing enqueued one duty_assigned job in the same transaction');
+             from app.notifications_jobs where source_type = 'duties_assignment' and source_id = pg_temp.asg()
+              and reminder_kind = 'duty_assigned'),
+  'pending:duty_assigned:1', 'publishing enqueued one duty_assigned job in the same transaction (story 4.8 adds its reminders)');
 select is(pg_temp.duties(2, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(), 4), (select id from pub_req)),
   (select r from pub), 'replaying the same request returns the stored result');
 select is((select count(*)::int from app.duties_occurrences), 1, 'and adds nothing');
@@ -264,9 +266,9 @@ select is(pg_temp.duties(3, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(
 select is(pg_temp.run() ->> 'delivered', '1', 'the worker delivers the app member''s new-duty item');
 select is((select string_agg(job_state || '|' || coalesce(finish_reason, '-'), ',' order by enqueued_at)
              from app.notifications_jobs where source_type = 'duties_assignment'
-               and recipient_member_id = pg_temp.mid(8)),
-  'ineligible|no_direct_contact_route',
-  'the accountless member gets no inbox item (a direct-contact need, unrouted until 4.8)');
+               and recipient_member_id = pg_temp.mid(8) and reminder_kind = 'duty_assigned'),
+  'ineligible|direct_contact',
+  'the accountless member gets no inbox item (story 4.8: a direct-contact need on the leader''s list)');
 create temp table item as select (pg_temp.readj(4, 'select api.notifications_my_inbox()') #>> '{items,0,item_id}')::uuid as id;
 select is((pg_temp.readj(4, format('select api.notifications_open_item(%L::uuid)', (select id from item)))) ->> 'target',
   '/duties/assignments/' || pg_temp.asg(), 'opening the item gives the duty''s deep link');
@@ -290,7 +292,9 @@ select is((pg_temp.readj(4, 'select api.duties_my_duties()') -> 'assignments' ->
             -- Story 4.3 keys are checked in duties_rota_test.sql.
             - 'position_name' - 'topic' - 'scripture'
             -- Story 4.5 keys are checked in duties_responses_test.sql.
-            - 'owner_kind' - 'prior_accepted_at' - 'leaders' - 'slot_id',
+            - 'owner_kind' - 'prior_accepted_at' - 'leaders' - 'slot_id'
+            -- Story 4.8 keys are checked in duties_reminders_test.sql.
+            - 'deadline_source' - 'short_notice' - 'reminders',
   '{"revision": 1, "duty_name": "Sunday preaching", "department_name": "SYNTHETIC Preaching Rota", "reporting_at": null, "location": "SYNTHETIC Main hall", "instructions": "Arrive early.", "response": "pending", "responded_at": null, "note": null}'::jsonb,
   'with its detail, deadline and pending response');
 select is(jsonb_array_length(pg_temp.readj(5, 'select api.duties_my_duties()') -> 'assignments'), 1,
@@ -356,10 +360,10 @@ create temp table dec as select pg_temp.duties(5, 'duties.respond', 1, jsonb_bui
   'assignment_id', (select r #>> '{data,assignment_id}' from pub_admin),
   'response', 'declined')) as r;
 select is((select r #>> '{data,response}' from dec), 'declined', 'O says they cannot make it');
-select is((select string_agg(job_state || '|' || coalesce(cancel_reason, '-'), ',')
-             from app.notifications_jobs where source_type = 'duties_assignment'
+select is((select string_agg(distinct job_state || '|' || coalesce(cancel_reason, '-'), ',')
+             from app.notifications_jobs where source_type in ('duties_assignment', 'duties_coverage')
               and source_id = (select (r #>> '{data,assignment_id}')::uuid from pub_admin)),
-  'cancelled|responded', 'an answer before delivery cancels the pending job');
+  'cancelled|responded', 'an answer before delivery cancels the pending jobs (story 4.8: reminders and leader alerts too)');
 select is((select string_agg(code, ',' order by event_id) from app.duties_audit where action = 'response_recorded'),
   'accepted,declined', 'responses are audited with their code only');
 -- A duty that has started cannot be answered.

@@ -701,6 +701,30 @@ class FakeDutyCoverage implements DutyCoverageRepository {
   }
 }
 
+/// [DutyOutcomesRepository] answered by the test (story 4.10).
+class FakeDutyOutcomes implements DutyOutcomesRepository {
+  AccessRead<DutyOutcomes> outcomes = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  AccessRead<MemberHistory> history = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  final List<OutcomesQuery> queries = [];
+  final List<HistoryQuery> historyQueries = [];
+
+  @override
+  Future<AccessRead<DutyOutcomes>> fetchOutcomes(OutcomesQuery query) async {
+    queries.add(query);
+    return outcomes;
+  }
+
+  @override
+  Future<AccessRead<MemberHistory>> fetchHistory(HistoryQuery query) async {
+    historyQueries.add(query);
+    return history;
+  }
+}
+
 /// [ContactLauncher] that records what the screen asked for (story 4.9).
 class FakeContactLauncher implements ContactLauncher {
   FakeContactLauncher([this.result = ContactLaunch.opened]);
@@ -1671,6 +1695,7 @@ class ClientTestHarness {
   final cells = FakeCells();
   final duties = FakeDuties();
   final coverage = FakeDutyCoverage();
+  final outcomes = FakeDutyOutcomes();
   final contact = FakeContactLauncher();
   final followUps = FakeFollowUps();
   final recovery = FakePasswordRecovery();
@@ -1708,6 +1733,7 @@ class ClientTestHarness {
       cellsRepositoryProvider.overrideWithValue(cells),
       dutiesRepositoryProvider.overrideWithValue(duties),
       dutyCoverageRepositoryProvider.overrideWithValue(coverage),
+      dutyOutcomesRepositoryProvider.overrideWithValue(outcomes),
       contactLauncherProvider.overrideWithValue(contact),
       followUpsRepositoryProvider.overrideWithValue(followUps),
       passwordRecoveryGatewayProvider.overrideWithValue(recovery),

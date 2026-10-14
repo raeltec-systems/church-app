@@ -78,6 +78,13 @@ abstract final class ClientPaths {
   /// Story 4.9 (staff web and mobile): the coverage queue.
   static const dutyCoverage = DutyPaths.coverage;
 
+  /// Story 4.10 (staff web and mobile): record and correct duty outcomes.
+  static const dutyOutcomes = DutyPaths.outcomes;
+
+  /// Story 4.10: the reader's own duty history (a leader opens a member's
+  /// with `?member=<id>`).
+  static const dutyHistory = DutyPaths.history;
+
   /// Story 4.1, staff web, Admin only: departments, leaders, deputies and
   /// members.
   static const adminDepartments = DutyPaths.adminDepartments;
@@ -355,6 +362,21 @@ GoRouter buildClientRouter({
             path: 'coverage',
             pageBuilder: (_, state) => page(state, const DutyCoverageScreen()),
           ),
+          // Story 4.10: both apps.
+          GoRoute(
+            path: 'outcomes',
+            pageBuilder: (_, state) => page(state, const DutyOutcomesScreen()),
+          ),
+          GoRoute(
+            path: 'history',
+            pageBuilder: (_, state) => page(
+              state,
+              DutyHistoryScreen(
+                key: ValueKey(state.uri.queryParameters['member']),
+                memberId: _memberParam(state.uri.queryParameters['member']),
+              ),
+            ),
+          ),
           GoRoute(
             path: 'assignments/:assignmentId',
             pageBuilder: (_, state) => page(
@@ -500,3 +522,13 @@ void goFromNav(BuildContext context, String path) => context.go(
   path,
   extra: keyboardFocusVisible ? const NavFocusRequest() : null,
 );
+
+/// Story 4.10: a history link's member id (a UUID only; anything else opens
+/// the reader's own history).
+String? _memberParam(String? v) =>
+    v != null &&
+        RegExp(
+          r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+        ).hasMatch(v)
+    ? v
+    : null;

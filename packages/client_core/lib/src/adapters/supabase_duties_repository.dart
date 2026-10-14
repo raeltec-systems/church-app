@@ -61,3 +61,23 @@ class SupabaseDutyCoverageRepository implements DutyCoverageRepository {
   Future<AccessRead<DutyCoverage>> fetchCoverage(CoverageQuery query) =>
       _reader.read('duties_coverage', query.toParams(), DutyCoverage.fromJson);
 }
+
+/// Story 4.10: `api.duties_outcomes` and `api.duties_member_history` (named
+/// parameters). The server decides which departments, notes, reasons and
+/// histories the caller may see.
+class SupabaseDutyOutcomesRepository implements DutyOutcomesRepository {
+  SupabaseDutyOutcomesRepository(
+    SupabaseClient client, {
+    Duration timeout = const Duration(seconds: 10),
+  }) : _reader = SupabaseApiReader(client, timeout: timeout);
+
+  final SupabaseApiReader _reader;
+
+  @override
+  Future<AccessRead<DutyOutcomes>> fetchOutcomes(OutcomesQuery query) =>
+      _reader.read('duties_outcomes', query.toParams(), DutyOutcomes.fromJson);
+
+  @override
+  Future<AccessRead<MemberHistory>> fetchHistory(HistoryQuery query) => _reader
+      .read('duties_member_history', query.toParams(), MemberHistory.fromJson);
+}

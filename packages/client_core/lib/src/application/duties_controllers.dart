@@ -101,6 +101,24 @@ enum DutyNotice {
   /// Story 4.9 (review S2): the leader's own duty is answered in My duties.
   ownAssignment,
 
+  /// Story 4.10: an outcome was recorded after the duty.
+  outcomeRecorded,
+
+  /// Story 4.10: an outcome was corrected (the earlier value is kept).
+  outcomeCorrected,
+
+  /// Story 4.10: someone recorded an outcome first; correct it instead.
+  outcomeAlreadyRecorded,
+
+  /// Story 4.10: No-show needs an acceptance (declined or never answered).
+  outcomeNotAccepted,
+
+  /// Story 4.10: the duty has not started; nothing to record yet.
+  outcomeNotStarted,
+
+  /// Story 4.10: a leader never records the outcome of their own duty.
+  ownOutcome,
+
   /// Story 4.5: "Can't make it anymore" was recorded.
   withdrawn,
 
@@ -351,6 +369,8 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
           data is Map && data['cancelled'] == 'occurrence'
               ? DutyNotice.occurrenceCancelled
               : DutyNotice.positionCancelled,
+        DutyOutcomeCommands.recordOutcome => DutyNotice.outcomeRecorded,
+        DutyOutcomeCommands.correctOutcome => DutyNotice.outcomeCorrected,
         _ =>
           action.request.payload['response'] == DutyResponse.declined.wire
               ? DutyNotice.declined
@@ -378,6 +398,28 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
     }
     if (coverage && f['assignment_id'] == 'own') {
       return DutyNotice.ownAssignment;
+    }
+    // Story 4.10: the outcome commands (a leader's, never the member's answer).
+    final outcome =
+        action?.command == DutyOutcomeCommands.recordOutcome ||
+        action?.command == DutyOutcomeCommands.correctOutcome;
+    if (outcome) {
+      if (error.code == ErrorCode.conflict) {
+        return switch (f['assignment_id']) {
+          'recorded' => DutyNotice.outcomeAlreadyRecorded,
+          'cancelled' => DutyNotice.dutyCancelled,
+          _ => DutyNotice.changedElsewhere,
+        };
+      }
+      if (f['assignment_id'] == 'own') return DutyNotice.ownOutcome;
+      if (f['assignment_id'] == 'not_started') {
+        return DutyNotice.outcomeNotStarted;
+      }
+      if (f['outcome'] == 'not_accepted') return DutyNotice.outcomeNotAccepted;
+      if (f['outcome'] == 'unchanged') return DutyNotice.unchanged;
+      if (f['assignment_id'] == 'unrecorded') {
+        return DutyNotice.changedElsewhere;
+      }
     }
     return switch (error.code) {
       ErrorCode.conflict when f['assignments'] == 'changed' =>
@@ -884,4 +926,131 @@ class LeaderAttentionController extends DutiesController<DutyCoverage> {
 final leaderAttentionProvider =
     NotifierProvider<LeaderAttentionController, DutiesState<DutyCoverage>>(
       LeaderAttentionController.new,
+    );
+
+// ---------------------------------------------------------------------------
+// Story 4.10: completion outcomes and a member's assignment history
+// ---------------------------------------------------------------------------
+
+/// The outcomes read's filters. Memory only, reset on an account change.
+class DutyOutcomesQueryController extends Notifier<OutcomesQuery> {
+  @override
+  OutcomesQuery build() {
+    ref.watch(accountGenerationProvider);
+    return const OutcomesQuery();
+  }
+
+  void set(OutcomesQuery query) => state = query;
+}
+
+final dutyOutcomesQueryProvider =
+    NotifierProvider<DutyOutcomesQueryController, OutcomesQuery>(
+      DutyOutcomesQueryController.new,
+    );
+
+/// Story 4.10 (staff web and mobile): the started duties of the departments
+/// the reader leads or deputises, and recording or correcting an outcome.
+/// Nothing shows as recorded until the server answers; the list is read
+/// again after each answer.
+class DutyOutcomesController extends DutiesController<DutyOutcomes> {
+  @override
+  DutiesState<DutyOutcomes> build() {
+    ref.watch(dutyOutcomesQueryProvider);
+    return super.build();
+  }
+
+  @override
+  Future<AccessRead<DutyOutcomes>> fetch() => ref
+      .read(dutyOutcomesRepositoryProvider)
+      .fetchOutcomes(ref.read(dutyOutcomesQueryProvider));
+
+  void setQuery(OutcomesQuery query) =>
+      ref.read(dutyOutcomesQueryProvider.notifier).set(query);
+
+  /// The first outcome of [p]'s assignment, sent against its answer revision.
+  Future<void> record(OutcomePosition p, OutcomeDraft draft) {
+    final a = p.assignment;
+    if (a == null) return Future.value();
+    return send(
+      DutyOutcomeCommands.recordOutcome,
+      Optional.of(a.revision),
+      draft.toPayload(a.assignmentId, correction: false),
+      a.name,
+    );
+  }
+
+  /// A correction, sent against the current outcome revision (the earlier
+  /// value stays in the trail).
+  Future<void> correct(OutcomePosition p, OutcomeDraft draft) {
+    final a = p.assignment;
+    final o = a?.outcome;
+    if (a == null || o == null) return Future.value();
+    return send(
+      DutyOutcomeCommands.correctOutcome,
+      Optional.of(o.revision),
+      draft.toPayload(a.assignmentId, correction: true),
+      a.name,
+    );
+  }
+}
+
+final dutyOutcomesProvider =
+    NotifierProvider<DutyOutcomesController, DutiesState<DutyOutcomes>>(
+      DutyOutcomesController.new,
+    );
+
+/// Whose history is open and which page. Memory only, reset on an account
+/// change.
+class MemberHistoryQueryController extends Notifier<HistoryQuery> {
+  @override
+  HistoryQuery build() {
+    ref.watch(accountGenerationProvider);
+    return const HistoryQuery();
+  }
+
+  void set(HistoryQuery query) => state = query;
+}
+
+final memberHistoryQueryProvider =
+    NotifierProvider<MemberHistoryQueryController, HistoryQuery>(
+      MemberHistoryQueryController.new,
+    );
+
+/// Story 4.10: one page of a member's assignment history (the reader's own,
+/// or a member of a department they lead). Read only.
+class MemberHistoryController extends DutiesController<MemberHistory> {
+  @override
+  DutiesState<MemberHistory> build() {
+    ref.watch(memberHistoryQueryProvider);
+    return super.build();
+  }
+
+  @override
+  Future<AccessRead<MemberHistory>> fetch() => ref
+      .read(dutyOutcomesRepositoryProvider)
+      .fetchHistory(ref.read(memberHistoryQueryProvider));
+
+  /// Opens [memberId]'s history (null: the reader's own) at its newest page.
+  void open(String? memberId) {
+    final q = ref.read(memberHistoryQueryProvider);
+    if (q.memberId == memberId && q.pages.isEmpty) return;
+    ref
+        .read(memberHistoryQueryProvider.notifier)
+        .set(HistoryQuery(memberId: memberId));
+  }
+
+  void older(HistoryCursor c) {
+    final q = ref.read(memberHistoryQueryProvider);
+    ref.read(memberHistoryQueryProvider.notifier).set(q.older(c));
+  }
+
+  void newer() {
+    final q = ref.read(memberHistoryQueryProvider);
+    ref.read(memberHistoryQueryProvider.notifier).set(q.newer());
+  }
+}
+
+final memberHistoryProvider =
+    NotifierProvider<MemberHistoryController, DutiesState<MemberHistory>>(
+      MemberHistoryController.new,
     );

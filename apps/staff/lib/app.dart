@@ -132,6 +132,21 @@ const staffDutyCoverageDestination = (
   icon: Icons.fact_check_outlined,
 );
 
+/// Story 4.10: shown while the caller leads or deputises a department:
+/// record and correct the outcomes of started duties.
+const staffDutyOutcomesDestination = (
+  path: ClientPaths.dutyOutcomes,
+  label: 'Outcomes',
+  icon: Icons.task_alt_outlined,
+);
+
+/// Story 4.10: the caller's own duty history (every member).
+const staffDutyHistoryDestination = (
+  path: ClientPaths.dutyHistory,
+  label: 'My duty history',
+  icon: Icons.history_outlined,
+);
+
 /// Story 4.1: shown while the server's current answer includes Admin.
 const staffDepartmentsDestination = (
   path: ClientPaths.adminDepartments,
@@ -177,6 +192,8 @@ List<StaffDestination> staffDestinationsFor(
   if (seesDutyBoard(grants)) staffDutyLeaderDestination,
   if (seesDutyBoard(grants)) staffDutyRotaDestination,
   if (seesDutyBoard(grants)) staffDutyCoverageDestination,
+  if (leadsADepartment(grants)) staffDutyOutcomesDestination,
+  if (grants != null) staffDutyHistoryDestination,
   if (grants != null) staffMyFollowUpsDestination,
   if (supervisesFollowUps(grants)) staffFollowUpSupervisionDestination,
   if (grants?.isAdmin ?? false) staffFollowUpRoutingDestination,

@@ -1023,6 +1023,18 @@ class _LeaderNeedsAttentionCardState
           ),
         ),
       ),
+      // Story 4.10: the outcomes of past duties (mobile leaders).
+      Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: FocusRing(
+          child: TextButton(
+            key: const Key('home-attention-outcomes'),
+            style: TextButton.styleFrom(foregroundColor: on),
+            onPressed: () => context.go(DutyPaths.outcomes),
+            child: const Text('Record outcomes of past duties'),
+          ),
+        ),
+      ),
     ]);
     return Padding(
       padding: const EdgeInsets.only(bottom: ChurchGeometry.sectionGap),

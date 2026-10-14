@@ -59,7 +59,7 @@ context:
 
 ## Code Map
 
-- `supabase/migrations/20261013220239_duties_department_tracer.sql`, `20261013221115_duties_revisions.sql` -- read-only reference: helpers, `duties_revise_duty` per-slot loop (extracted into a shared helper here), reminder checks, `duties_in_scope`, deletion hook, authorizer and dispatch (all replaced by `create or replace`).
+- `supabase/migrations/20261013220239_duties_department_tracer.sql`, `20261014001142_duties_revisions.sql (the 4.2 file, renamed to its hosted version)` -- read-only reference: helpers, `duties_revise_duty` per-slot loop (extracted into a shared helper here), reminder checks, `duties_in_scope`, deletion hook, authorizer and dispatch (all replaced by `create or replace`).
 - `supabase/migrations/20261008102121_notifications_scheduling.sql` -- `notifications_policy()`, `notifications_occurrences(policy, rule, from, until)`, `notifications_shift`; reused, never duplicated.
 - `supabase/tests/duties_revisions_test.sql`, `duties_tracer_test.sql`, `command_foundation_test.sql` -- client-executable ledgers and audit column list to extend.
 - `packages/client_core/lib/src/{domain/duties.dart, application/duties_controllers.dart, presentation/duties_screens.dart, adapters/supabase_duties_repository.dart, presentation/shell_routing.dart}` + `testing.dart` fakes; `apps/staff/lib/app.dart` sidebar.
@@ -68,18 +68,28 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261014093000_duties_rota_series.sql` -- series table, occurrence/slot/revision columns, vocab, field classes, shared change helper, seven commands, `duty_cancelled` contract, rota read, replaced projections/source check/in_scope/authorizer/dispatch/deletion hook, privileges.
-- [ ] `supabase/tests/duties_rota_test.sql` (+ ledgers in the 4.1/4.2/command tests) -- the matrix.
-- [ ] client_core domain (`DutyRota`, series/occurrence/slot models, edits), controller, repository, rota screen (grid + list), routes, fakes; staff sidebar **Rota**; board shows position names and hides the member picker on multi-position duties; mobile shows position, topic and scripture.
-- [ ] `packages/client_core/test/duties/duties_rota_test.dart` (+ staff app test) -- parsing, grid/list, publish N, scopes, cancel, pending/unconfirmed.
-- [ ] `tools/identity-e2e/duties-rota.mjs` + `.test.mjs`; add to the E2E list.
-- [ ] `docs/runbooks/duties.md` story 4.3 section with owner manual checks.
+- [x] `supabase/migrations/20261014093000_duties_rota_series.sql` -- series table, occurrence/slot/revision columns, vocab, field classes, shared change helper, seven commands, `duty_cancelled` contract, rota read, replaced projections/source check/in_scope/authorizer/dispatch/deletion hook, privileges.
+- [x] `supabase/tests/duties_rota_test.sql` (+ ledgers in the 4.1/4.2/command tests) -- the matrix.
+- [x] client_core domain (`DutyRota`, series/occurrence/slot models, edits), controller, repository, rota screen (grid + list), routes, fakes; staff sidebar **Rota**; board shows position names and hides the member picker on multi-position duties; mobile shows position, topic and scripture.
+- [x] `packages/client_core/test/duties/duties_rota_test.dart` (+ staff app test) -- parsing, grid/list, publish N, scopes, cancel, pending/unconfirmed.
+- [x] `tools/identity-e2e/duties-rota.mjs` + `.test.mjs`; add to the E2E list.
+- [x] `docs/runbooks/duties.md` story 4.3 section with owner manual checks.
 
 **Acceptance Criteria:**
 - Given the local stack, when `duties-rota.mjs` runs, then a quarterly Sunday series with three positions is generated as drafts invisible to the member, some positions are assigned, "Publish N" publishes them with one inbox job per assignment, an occurrence and then this-and-future are edited, one occurrence is cancelled with its jobs cancelled, earlier occurrences are unchanged, each occurrence keeps its own responses, "2 of 3 confirmed" is derived from current positions, and races give one success and one conflict.
 - Given the full local verification, when run, then db:test, db:smoke, every E2E, contracts, offline tool tests, flutter analyze/test, secrets, migrations and function-imports pass.
 
 ## Implementation Notes
+
+- Implemented directly (no implementation subagent is available inside this builder run). Merged `ccr-93e730dd-89lbvg` twice (start; before final verification, which brought the 4.2 file renamed to its hosted version `20261014001142_duties_revisions.sql`); the 4.3 migration version `20261014093000` is later than both.
+- Server: `supabase/migrations/20261014093000_duties_rota_series.sql`. New: `app.duties_series` (church-local intent, zone and policy version), occurrence columns `series_id`/`series_date` (unique per series and date: idempotent generation), `topic`, `scripture`, `event_ref`; slot columns `position_name`, `draft_member_id`; slot-revision snapshot columns `topic`, `scripture`, `event_ref` (guard replaced to cover them); audit `series_id`. Shared engine `app.duties_apply_change` (the 4.2 per-slot loop generalised to every position and to one target position) returns its notification work as ops that callers run last through `app.duties_notify` (AD-2); `app.duties_cancel_one` likewise. Commands `create_series`, `assign_slot`, `publish_drafts`, `revise_series`, `cancel_occurrence`, `cancel_series`; `revise_duty` replaced (drafts in place; new notes fields; 4.2 answer keys unchanged). Read `api.duties_rota`. Replaced by `create or replace`: `duties_state_ok`, `duties_slot_field_class`, `duties_changes_since`, projections, `duties_leader_board` (published only: older clients reject other states), source check (cancelled assignments), authorizer, `duties_in_scope` (series), dispatch, deletion hook.
+- Decision (agent, under owner pre-approval): cancelling a one-off (non-series) duty is refused `{"occurrence_id": "not_in_series"}` in 4.3, because the published-only leader board would hide it; entry 9 brings position cancellation for one-off duties.
+- Decision (agent, under owner pre-approval): generation needs the Q2 policy (`app.notifications_policy`) as well as Q4, so it fails closed in production like publishing.
+- Surprise: 4.2's `revise_duty` reports time errors together with the answer-by error; the replacement keeps that (pgTAP 4.2 test 19).
+- Tests: `supabase/tests/duties_rota_test.sql` (117 checks); ledgers in `command_foundation_test.sql`, `duties_tracer_test.sql`, `duties_revisions_test.sql` (new client grant, audit column, new my-duties keys, the extra reminder kind). Client: `packages/client_core/test/duties/duties_rota_test.dart` (11 tests, also run with `TZ=America/New_York` by CI's duties step) and one staff app test. E2E: `tools/identity-e2e/duties-rota.mjs` (17 checks, O01-O70: real races for planning and publishing, answer vs series edit) with offline `duties-rota.test.mjs`. Fictional numbers: pgTAP `+44 7700 900990-900999`, E2E `900740-900749`.
+- Clients: staff **Rota** (`/duties/rota`, `DutyRotaScreen` in `presentation/duties_rota_screens.dart`, a `part` of `duties_screens.dart`): grid and accessible list, New rota, Publish N draft slots with confirmation and lead time, per-position plan/give, Change and Cancel with **This date only** / **This and later dates**. Board shows position names, topic, scripture and hides **Who** on multi-position duties; mobile shows position, topic and scripture. `DutyRotaController` reuses the 4.1 controller base (pending kept across reloads; unknown outcome resent with the same request id).
+- Matrix audit: Generate, Assign drafts, Publish N, Edit this, Edit this and future, Cancel, Coverage, Refusals (member, other department, Pastor, gate closed, untrusted session, revoked scope incl. replay), Races, Deletion: each has pgTAP checks in `duties_rota_test.sql`; Generate, drafts hidden, planning, Publish N, coverage, both edits, cancel, races, refusals and replay also run over HTTP in the E2E.
+- Owner/staging steps remaining (not blocking): the parent applies the migration to staging and checks function md5s; the owner runs `docs/runbooks/duties.md`, story 4.3, "Owner manual checks" and records `evidence-4.3/owner-check.md`.
 
 ## Plan Change Log
 
@@ -95,5 +105,5 @@ context:
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/ccr-93e730dd-89lbvg && npm run -s ci:function-imports` -- expected: pass
 
 **Manual checks (if no CLI):**
-- Parent session: apply `20261014093000_duties_rota_series.sql` to staging after `20261013221115`, run `tools/ci/verify-hosted.sql`, compare per-function md5 with local (the MCP apply decodes `\uXXXX`). New client grant: `api.duties_rota()` / `app.duties_rota()`. No rows file, no Edge Function change.
+- Parent session: apply `20261014093000_duties_rota_series.sql` to staging after `20261014001142`, run `tools/ci/verify-hosted.sql`, compare per-function md5 with local (the MCP apply decodes `\uXXXX`). New client grant: `api.duties_rota()` / `app.duties_rota()`. No rows file, no Edge Function change.
 - Owner staging walkthrough: `docs/runbooks/duties.md`, story 4.3, "Owner manual checks".

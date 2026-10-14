@@ -226,3 +226,117 @@ Record the outcome per step in `evidence-4.2/owner-check.md` (pass/fail, device 
 - One position per occurrence: `member_id` in a revision is refused (`unsupported`) once occurrences have several positions (4.3 adds per-position edits, series edits and cancellation).
 - The new deadline is the leader's; the 3.3 default deadline, Short notice and response or pre-service reminders arrive with entry 8 (a material change will then re-plan them).
 - A declined assignment stays current until the leader changes or reassigns it; the coverage queue and leader confirmation arrive with entry 9.
+
+## Story 4.3: generate recurring multi-position rotas with drafts and series edits
+
+Migration: `supabase/migrations/20261014093000_duties_rota_series.sql` (forward only: the 4.1 and 4.2 files are not edited; no destructive statements, no row deletions, no new `_rows` file). New client grant: `api.duties_rota()` and its `app` body (authenticated only). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-generate-recurring-multi-position-rotas-with-drafts-and-seri-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.3/`.
+
+### Model
+
+- **Rota series** (`app.duties_series`): a Duties-owned standalone recurrence for one department: duty name, every N days, weeks or months, a first and last **church-local date** (the same date for a one-off multi-position duty), church-local start, optional end and reporting times, location, instructions, optional topic and scripture, an optional linked-event reference (`event_ref`, an opaque id until Content exists), 1 to 10 named positions and optional exception dates. It records the church zone and the Q2 policy version used (AD-9).
+- **Generation** happens once, when the series is created, through the shared 3.3 calculation (`app.notifications_occurrences` under the Q2 zone, `Africa/Lusaka`): a duty at 00:30 church time on Sunday stays on Sunday although it is Saturday in UTC. It is bounded (at most 60 occurrences, a window of at most 366 days, only starts that are still in the future) and idempotent (one occurrence per series and church-local date; a replayed command returns the stored answer). An end time at or before the start time ends on the next day.
+- **Drafts**: every generated occurrence starts as `draft` with one slot per named position. A slot may carry a **planned person** (`draft_member_id`): not an assignment, no notice, no reminder. My duties, reminders and the 4.1/4.2 leader board never show drafts; the leader board lists published duties only.
+- **Occurrence states**: `draft`, `published`, `cancelled`. A cancelled occurrence ends its current assignments (`cancelled`, `end_reason` `cancelled`; their answers are kept) and records a `cancelled` slot revision per position.
+- **Field classes** (`app.duties_slot_field_class`): `topic` and `scripture` are notes (an update notice; answers stand); `event_ref` is a reference (recorded in the slot revision, no notice); `position_name` is material and fixed at creation (4.3 cannot rename or add positions).
+
+### Commands (all through `api.duties_command`)
+
+The department's leader or deputy, or an Admin (never Pastor, another department's leader or a cell leader). Times in a series are church-local `HH:MM`, dates `YYYY-MM-DD`. Answers carry ids, revisions, states and counts only.
+
+| Command | `expected_revision` | Payload | What it does |
+|---|---|---|---|
+| `duties.create_series` | null | `{department_id, duty_name, every: day\|week\|month, interval?, from_date, until_date, start_time, end_time?, reporting_time?, location?, instructions?, topic?, scripture?, event_ref?, positions: [names], exceptions?: [dates]}` | generates the draft occurrences; `{series_id, department_id, revision, occurrences, draft_slots}` |
+| `duties.assign_slot` | occurrence revision | `{slot_id, member_id, response_deadline?}` | draft: plan (or with `member_id: null` clear) the person, no notice; published: give the position to a current department member with the answer-by `response_deadline` (a current assignment of someone else is superseded by the 4.2 rules: answer kept, jobs cancelled, released notice) |
+| `duties.publish_drafts` | series revision | `{series_id, slot_count, deadline_before}` | "Publish N draft slots": every draft of the series that has not started; `slot_count` must be N; each planned person gets a pending assignment with the answer-by `(reporting or start) - deadline_before` in church time and one `duty_assigned` notice; positions without anyone publish unfilled; all or nothing |
+| `duties.revise_duty` | occurrence revision | 4.2 payload plus `topic?`, `scripture?`, `event_ref?` | **this date only**: every position changes together (material: every assignee is asked again with the new `response_deadline`; notes: answers stand, one update notice each); a draft is edited in place without notices and takes no `response_deadline`; `member_id` only for a one-position published duty |
+| `duties.revise_series` | series revision | `{series_id, from_occurrence_id, duty_name?, start_time?, end_time?, reporting_time?, location?, instructions?, topic?, scripture?, event_ref?, deadline_before?}` | **this and later dates**: the anchor and every later occurrence that has not started and is not cancelled, on each one's own church-local date; earlier and started occurrences are never changed; a material change of a published occurrence needs `deadline_before` |
+| `duties.cancel_occurrence` | occurrence revision | `{occurrence_id}` | cancels one series occurrence (draft or published, not started) |
+| `duties.cancel_series` | series revision | `{series_id, from_occurrence_id}` | cancels the anchor and every later occurrence that has not started |
+
+Refusals with their field codes:
+
+| Case | Answer |
+|---|---|
+| Not a manager of the department, Pastor | `forbidden` |
+| Unknown series, occurrence or slot | `not_found` |
+| Stale revision (another leader saved first) | `conflict` with `current_revision` |
+| N no longer the number of draft slots | `conflict {"slot_count": "changed"}` |
+| More than 60 dates; more than 366 days; last before first; last date past; nothing in the future | `{"until_date": "too_many" \| "out_of_range" \| "before_from" \| "past"}`, `{"from_date": "no_occurrences"}` |
+| Bad times, rule, positions | `{"start_time" \| "end_time" \| "reporting_time": "invalid"}`, `{"reporting_time": "after_start"}`, `{"every": "invalid"}`, `{"interval": "out_of_range"}`, `{"positions": "required" \| "too_many" \| "invalid" \| "duplicate"}` |
+| An answer-by that has already passed for a date | `{"deadline_before": "passed"}` |
+| A material this-and-future change of published duties without the lead time | `{"deadline_before": "required"}` |
+| A planned person who can no longer serve (left, not approved, under deletion) | `{"member_id": "unavailable"}` (publish), `{"member_id": "required_reassign"}` (a material edit keeping them) |
+| A person who is not a current department member | `{"member_id": "not_in_department" \| "unknown"}` |
+| An answer-by on a draft | `{"response_deadline": "draft"}` |
+| Started or cancelled occurrence; anchor not in the series | `{"occurrence_id" \| "from_occurrence_id": "started" \| "cancelled"}`, `{"from_occurrence_id": "not_in_series"}` |
+| A one-off duty cancelled here | `{"occurrence_id": "not_in_series"}` (entry 9 brings position cancellation) |
+| Nothing changes | `{"occurrence_id" \| "series_id" \| "slot_id": "unchanged"}` |
+| Gate closed (production without Q4, or without Q2 for generation and publishing); untrusted session | `unavailable {"policy": "gate_closed"}`; `unauthenticated` |
+
+A replay with the same request id returns the stored answer after the kernel rechecks scope (series: a current manager of its department); a leader whose scope was revoked gets `forbidden`, also for a replay. Lock order: grants -> receipt -> department -> series -> occurrences (date order) -> membership -> slots -> assignments -> Notifications (always last; the change engine returns its notification work and the command runs it after every Duties row is written). A member's answer racing a series edit serialises on the assignment row: whichever commits first wins, and the other sees the new state.
+
+### Notices
+
+| Kind | Title / body | Link | Delivered while |
+|---|---|---|---|
+| `duty_cancelled` | **Duty cancelled** / "One of your duties was cancelled. Open My duties to see what is still yours." | `/duties` | the cancelled assignment is at its final revision and the duty would not yet have started; sent to assignees who were pending or had accepted |
+
+Publishing a rota uses the 4.1 `duty_assigned` contract for every generated assignment; changes use the 4.2 kinds. Cancelling an occurrence cancels every pending job of its assignments (`source_cancelled`). An accountless or held assignee's notice is recorded `ineligible`/`no_direct_contact_route` until entry 8 adds the leader's Needs contact list.
+
+### Reads
+
+- `api.duties_rota()` (leaders and deputies: their departments; Admin: all; Pastor: all, read only; anyone else `403 not_granted`; Q4 gate; synthetic departments hidden outside local/staging): each department with `can_manage`, its roster (`app_account`/`no_login` only; inactive members filtered) and its series that end 30 days ago or later (at most 50, `series_truncated`), each with its template, `draft_slots` (the N to publish) and every occurrence (`draft`, `published`, `cancelled`) with `started`, `confirmed` of `required` (current accepted positions over all positions) and each position's planned person or current assignment with `available` (false when the person can no longer serve; no reason given). No member notes.
+- `api.duties_my_duties` adds `position_name`, `topic` and `scripture`; `api.duties_leader_board` (published duties only) adds `series_id`, `position_name`, `topic`, `scripture` and `event_ref`.
+
+### Member deletion
+
+`app.duties_erase_member` and `app.duties_deletion_remaining` are replaced: a planned (draft) position of the member becomes unplanned, and series creators are anonymised with the nil UUID. No new rows are deleted, so the 4.1 rows file stays the only purge.
+
+### Clients
+
+- **Staff web, Rota** (`/duties/rota`, sidebar **Rota** next to **Duties**; leaders, deputies, Admin; Pastor read only): **New rota** (duty, repeats every N day(s)/week(s)/month(s), first and last date, start, optional end and reporting time, positions separated by commas, location, instructions, topic, scripture) makes the draft dates. Each rota shows a **grid** (one row per date, one column per position, **Confirmed** "2 of 3") and **Show as list**, an accessible text list of the same facts. **Publish N draft slots** asks for confirmation with the number of planned people and unfilled positions and an **Answer by** lead time (2 hours to 30 days before the reporting or start time). Selecting a date opens it: **Who** per position (**Save plan** for a draft, **Give this position** with the answer-by for a published date; members without a login are marked "no login: contact them directly"), **Change** (scope **This date only** or **This and later dates**; it says whether people will be asked again) and **Cancel this date…** (same scopes, with a confirmation). Every state is the server's: **Sending…**, **Not sent yet** with **Check again** (same request id), and a reload while a command is out keeps it pending.
+- **Staff web, Duties** (the 4.1/4.2 board) lists published duties with their position names, topic and scripture; **Change this duty** on a multi-position date changes every position together and has no **Who** field (positions are given on the Rota page).
+- **Mobile, Duties** shows the position ("Sunday service: Preacher"), the topic and the scripture. Cancelled duties leave the list; the **Duty cancelled** notice opens My duties.
+
+### Local runs
+
+```bash
+npx supabase db reset
+npm run -s db:test                           # supabase/tests/duties_rota_test.sql (+ 4.1, 4.2 and the ledgers)
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/duties-rota.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+node --test tools/identity-e2e/duties-rota.test.mjs
+(cd packages/client_core && flutter test test/duties)
+```
+
+Fictional numbers: pgTAP `+44 7700 900990-900999`, E2E `900740-900749`. The E2E proves two real races (two leaders planning the same position, two leaders publishing at once) and a member's answer racing a series edit.
+
+### Hosted staging (parent session, then the owner)
+
+1. **Parent session:** apply `20261014093000_duties_rota_series.sql` to staging (`tmurpotfluignacfueki`) after `20261014001142`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. Compare the md5 of each new or replaced `app.duties_*` function body with the local one (the MCP apply decodes `\uXXXX` escapes; this migration has none, but check). New client grant: `api.duties_rota()` / `app.duties_rota()` (authenticated only). No Edge Function change, no rows file. Check: `select count(*) from app.duties_series;` is 0 and `select count(*) from app.duties_occurrences where occurrence_state <> 'published';` is 0 right after the apply.
+2. **Owner:** nothing to paste. Then the manual checks below.
+3. **Production:** nothing in this story (Q2 and Q4 gates stay closed: generation and publishing answer `unavailable`).
+
+### Owner manual checks (staging, phone and web, story 4.3)
+
+Use synthetic members only. You need the 4.1 setup (Admin A, leader L, deputy D of `SYNTHETIC Preaching Rota`, member M with the app on an Android phone, member O, and an accountless member X added to the department), and the staff web built against staging.
+
+1. **Generate.** Staff web as L: **Rota** > **New rota**: `Sunday service`, every 1 week(s), first date a Sunday at least three days away, last date 12 weeks later, start `10:00`, positions `Preacher, Reader, Usher`, **Make the draft dates**. Expect **Rota created** and a grid of 13 Sundays (church time), each **Draft** with **Not planned** in the three columns; **Publish 39 draft slots**.
+2. **Drafts are private.** On the phone as M: **Duties** shows nothing new and the inbox has no item. As O on staff web there is no **Rota** entry; a direct `POST /rest/v1/rpc/duties_rota` with O's token answers 403.
+3. **Plan.** Select the first Sunday: Preacher = M (**Save plan**), Reader = O, Usher = X ("no login: contact them directly"); the second and third Sundays: Preacher = M. Expect **Plan saved** each time, the grid showing "Planned: …", and still no notice on M's phone. **Show as list** shows the same in text.
+4. **Publish.** **Publish 39 draft slots**: the confirmation says 5 planned people are asked and 34 positions stay unfilled; **Answer by** 1 day before; confirm. Expect **Drafts published**, every row **Published**, unplanned cells **Unfilled**; within about a minute M's inbox shows three **New duty assigned** items.
+5. **Coverage.** M accepts the first Sunday on the phone; O accepts on another device. Staff web **Reload**: the first Sunday's **Confirmed** reads **2 of 3** (X still **Awaiting response**).
+6. **This date.** Select the second Sunday > **Change** > **This date only**, start `09:00`; the form says everyone assigned is asked again; pick **Answer by** 1 day before; **Save for this date**. Expect **Duty changed**: only that row moves to 09:00 and M's position there is **Awaiting response**; the first Sunday still shows **2 of 3**.
+7. **This and later dates.** Select the third Sunday > **Change** > **This and later dates**, start `11:00`, **Answer by** 2 days before, **Save for this and later dates**. Expect **Rota changed**: the third Sunday onwards show 11:00; the first two Sundays are unchanged (10:00 and 09:00) and each keeps its own answers.
+8. **Cancel.** Select the second Sunday > **Cancel this date…** > **This date only** > **Cancel this date**. Expect **Cancelled** and the row **Cancelled**; M gets **Duty cancelled** on the phone and the duty leaves My duties.
+9. **Pastor and refusals.** As a Pastor (Roles & access), **Rota** shows every department with "Pastor oversight (read only)", drafts included, and no buttons. A direct `GET /rest/v1/duties_series` with any member token is refused.
+10. **Clean up** as in 4.1, step 9, with `app.duties_series` deleted after the occurrences.
+
+Record the outcome per step in `evidence-4.3/owner-check.md` (pass/fail, device model, Android version, browser; no numbers, ids or keys).
+
+### Known limits (later entries)
+
+- Positions are fixed when a rota is generated (no adding, removing or renaming in 4.3), and a series is not extended after creation (make a new rota for the next quarter).
+- Overlap warnings and each candidate's upcoming load arrive with entry 4; default deadlines, Short notice and response or pre-service reminders with entry 8; the coverage queue, position cancellation of one-off duties and leader confirmation with entry 9.
+- A this-and-future edit overwrites the given fields on later dates, including dates changed one at a time before; fields not given keep each date's own value.

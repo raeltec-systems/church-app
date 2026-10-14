@@ -10,7 +10,7 @@
 -- alert, generic contract text, privileges. HTTP evidence: tools/identity-e2e/duties-reminders.mjs.
 -- Every account, phone and name is SYNTHETIC (fictional range +44 7700 900650-900669).
 begin;
-select plan(103);
+select plan(130);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000048' || lpad(n::text, 2, '0'))::uuid $$;
@@ -223,9 +223,10 @@ select is((select (x.response_deadline = pg_temp.t('4 days') - interval '48 hour
                   || x.deadline_source || '|' || x.short_notice from pg_temp.row(pg_temp.a('B')) x),
   'true|default|false', 'starting in 4 days, it takes the 48-hour default (stored, default, not short notice)');
 select is(pg_temp.jobs(pg_temp.a('B')),
-  'm:duty_assigned:4:now,m:duty_response_due:4:-24,m:duty_response_due:4:0,m:duty_starting:4:24,'
+  'm:duty_assigned:4:now,m:duty_response_due:4:-24,m:duty_response_due:4:0,m:duty_response_due:4:24,'
   || 'l:duty_response_overdue:2:0,l:duty_response_overdue:3:0',
-  'default reminders: 24 h before and at the deadline, 24 h before the start; leader and deputy at the deadline');
+  'default reminders: 24 h before and at the deadline, 24 h before the start (asking for the answer while '
+  || 'none is given); leader and deputy at the deadline');
 select is((select x ->> 'deadline_source' || '|' || (x ->> 'short_notice') || '|' || coalesce(x ->> 'reminders', 'null')
              from pg_temp.mine(4, pg_temp.a('B')) x),
   'default|false|null', 'My duties says the deadline is the default and the reminders are the defaults');
@@ -264,7 +265,7 @@ select is((select count(*)::int from app.duties_assignments a join app.duties_sl
             where o.series_id = pg_temp.sr() and o.starts_at - a.response_deadline = interval '14 days'), 2,
   'the two dates a month or more ahead have the 14-day default (the quarterly band)');
 select is(pg_temp.jobs(pg_temp.sa(12)),
-  'm:duty_assigned:4:now,m:duty_response_due:4:-24,m:duty_response_due:4:0,m:duty_starting:4:312,'
+  'm:duty_assigned:4:now,m:duty_response_due:4:-24,m:duty_response_due:4:0,m:duty_response_due:4:312,'
   || 'l:duty_response_overdue:2:0,l:duty_response_overdue:3:0',
   'the last Sunday: reminders around its 14-day deadline and one the day before the service');
 create temp table give as select pg_temp.duties(2, 'duties.assign_slot', pg_temp.orev(pg_temp.so(3)), jsonb_build_object(
@@ -316,7 +317,7 @@ create temp table dc as select pg_temp.pub('D', 4, pg_temp.lt(pg_temp.sunday(2),
 select is((select x.deadline_source || '|' || x.short_notice from pg_temp.row(pg_temp.a('D')) x), 'creator|false',
   'the creator''s deadline is stored as given');
 select is(pg_temp.jobs(pg_temp.a('D')),
-  'm:duty_assigned:4:now,m:duty_response_due:4:-48,m:duty_starting:4:70,'
+  'm:duty_assigned:4:now,m:duty_response_due:4:-48,m:duty_response_due:4:70,'
   || 'l:duty_response_overdue:2:0,l:duty_response_overdue:3:0',
   'the creator''s offsets replace the defaults; the leaders'' overdue alert stays');
 select is((select x -> 'reminders' from pg_temp.mine(4, pg_temp.a('D')) x),
@@ -348,6 +349,31 @@ select is(pg_temp.duties(2, 'duties.publish_duty', null, jsonb_build_object(
             'response_deadline', app.cmd_utc(pg_temp.t('-1 hour')))) -> 'field_errors',
   '{"response_deadline": "past"}'::jsonb, 'a creator''s deadline in the past is still refused (never Short notice)');
 select is((select count(*)::int from app.duties_occurrences where duty_name = 'Refused'), 0, 'refusals wrote nothing');
+
+-- Review 5: deadline edges -------------------------------------------------------------------------
+create temp table e1 as select pg_temp.pub('E1', 5, pg_temp.t('24 hours 30 minutes')) as r;
+select is((select (x.response_deadline = now())::text || '|' || x.short_notice from pg_temp.row(pg_temp.a('E1')) x),
+  'true|true', 'a default leaving 30 minutes to answer is Short notice (one-hour minimum answer window)');
+select is(pg_temp.jobs(pg_temp.a('E1')),
+  'm:duty_assigned:5:now,l:duty_short_notice:2:now,l:duty_short_notice:3:now',
+  'so the leaders are told now, not at an overdue alert minutes later');
+create temp table e2 as select pg_temp.pub('E2', 4, pg_temp.t('30 hours')) as r;
+select is((select (x.response_deadline = pg_temp.t('6 hours'))::text || '|' || x.short_notice
+             from pg_temp.row(pg_temp.a('E2')) x),
+  'true|false', 'six hours to answer is a normal default deadline');
+select is(pg_temp.duties(2, 'duties.publish_duty', null, jsonb_build_object(
+            'department_id', pg_temp.d(), 'member_id', pg_temp.mid(5), 'duty_name', 'Refused',
+            'starts_at', app.cmd_utc(pg_temp.t('10 days')),
+            'response_deadline', app.cmd_utc(pg_temp.t('10 days')))) -> 'field_errors',
+  '{"response_deadline": "after_start"}'::jsonb, 'a creator''s answer-by at the start itself is refused');
+select is(pg_temp.duties(2, 'duties.publish_duty', null, jsonb_build_object(
+            'department_id', pg_temp.d(), 'member_id', pg_temp.mid(5), 'duty_name', 'Refused',
+            'starts_at', app.cmd_utc(pg_temp.t('10 days')), 'reporting_at', app.cmd_utc(pg_temp.t('10 days') - interval '1 hour'),
+            'response_deadline', app.cmd_utc(pg_temp.t('10 days') - interval '1 hour'))) -> 'field_errors',
+  '{"response_deadline": "after_start"}'::jsonb, 'and so is one at the reporting time');
+select is(pg_temp.duties(2, 'duties.publish_drafts', (select revision from app.duties_series where series_id = pg_temp.sr()),
+            jsonb_build_object('series_id', pg_temp.sr(), 'slot_count', 1, 'deadline_before', '0 minutes')) -> 'field_errors',
+  '{"deadline_before": "out_of_range"}'::jsonb, 'a zero lead time is refused');
 
 -- No quiet hours: a reminder at 23:30 church time stays at 23:30 ---------------------------------------
 create temp table late as select pg_temp.pub('L', 5, pg_temp.lt(pg_temp.sunday(3), '18:00'), jsonb_build_object(
@@ -403,12 +429,12 @@ create function pg_temp.step(k int) returns uuid language sql as $$ select assig
 select is(pg_temp.give(5) #>> '{data,change}', 'material', 'the duty goes to O (no answer-by: the default)');
 select is(pg_temp.jobs(pg_temp.step(0)), 'm:duty_released:4:now', 'M''s old assignment keeps only the released notice');
 select is(pg_temp.jobs(pg_temp.step(1)),
-  'm:duty_assigned:5:now,m:duty_response_due:5:-24,m:duty_response_due:5:0,m:duty_starting:5:24,'
+  'm:duty_assigned:5:now,m:duty_response_due:5:-24,m:duty_response_due:5:0,m:duty_response_due:5:24,'
   || 'l:duty_response_overdue:2:0,l:duty_response_overdue:3:0', 'O gets a fresh schedule');
 select is(pg_temp.give(4) #>> '{data,change}', 'material', 'and back to M');
 select is(pg_temp.jobs(pg_temp.step(1)), 'm:duty_released:5:now', 'O''s assignment keeps only the released notice');
 select is(pg_temp.jobs(pg_temp.step(2)),
-  'm:duty_assigned:4:now,m:duty_response_due:4:-24,m:duty_response_due:4:0,m:duty_starting:4:24,'
+  'm:duty_assigned:4:now,m:duty_response_due:4:-24,m:duty_response_due:4:0,m:duty_response_due:4:24,'
   || 'l:duty_response_overdue:2:0,l:duty_response_overdue:3:0',
   'M is back with every reminder (a new source id: nothing collides with the cancelled keys)');
 select is((select count(distinct source_id)::int from app.notifications_jobs
@@ -451,9 +477,9 @@ select is(pg_temp.board_asg(2, pg_temp.a('X')) #> '{needs_contact,reasons}', '["
   'the board shows the accountless assignee as Needs contact');
 select is(pg_temp.board_asg(3, pg_temp.a('H')) #> '{needs_contact,reasons}', '["not_reached"]'::jsonb,
   'and the held one, without saying why');
-select is(pg_temp.due_now(pg_temp.a('X'), 'duty_response_due'), 2, 'X''s response reminders fall due');
+select is(pg_temp.due_now(pg_temp.a('X'), 'duty_response_due'), 3, 'X''s response reminders fall due');
 select pg_temp.run();
-select is((select count(*)::int from app.duties_contact_needs where assignment_id = pg_temp.a('X')), 3,
+select is((select count(*)::int from app.duties_contact_needs where assignment_id = pg_temp.a('X')), 4,
   'each reminder that cannot reach X is a need too (idempotent per need)');
 select is(app.duties_record_contact_need((select jsonb_build_object(
             'need_id', need_id, 'source_type', 'duties_assignment', 'source_id', assignment_id,
@@ -461,7 +487,7 @@ select is(app.duties_record_contact_need((select jsonb_build_object(
             'reminder_kind', reminder_kind, 'scheduled_at', scheduled_at)
              from app.duties_contact_needs where assignment_id = pg_temp.a('X') limit 1))::text, '',
   'a retried need is recorded once');
-select is((select count(*)::int from app.duties_contact_needs where assignment_id = pg_temp.a('X')), 3, 'still three');
+select is((select count(*)::int from app.duties_contact_needs where assignment_id = pg_temp.a('X')), 4, 'still four');
 select is(pg_temp.board_asg(2, pg_temp.a('B')) -> 'needs_contact', 'null'::jsonb, 'an app member who answered needs no contact');
 
 -- The leader is never alerted about their own duty ------------------------------------------------------
@@ -472,7 +498,7 @@ select is((select string_agg(distinct pg_temp.who(recipient_member_id), ',') fro
 
 -- Snooze: honoured, and stopped by the answer ------------------------------------------------------------
 create temp table sz as select pg_temp.pub('S', 4, pg_temp.t('8 days')) as r;
-select is(pg_temp.due_now(pg_temp.a('S'), 'duty_response_due'), 2, 'S''s response reminders fall due');
+select is(pg_temp.due_now(pg_temp.a('S'), 'duty_response_due'), 3, 'S''s response reminders fall due');
 select pg_temp.run();
 create temp table it as select i.item_id from app.notifications_inbox_items i join app.notifications_jobs j on j.job_id = i.job_id
   where j.source_id = pg_temp.a('S') and j.reminder_kind = 'duty_response_due' order by i.delivered_at limit 1;
@@ -486,7 +512,7 @@ update app.notifications_jobs set scheduled_at = now() - interval '10 seconds'
  where snoozed_from_item_id = (select item_id from it) and job_state = 'pending';
 select pg_temp.run();
 select is((select count(*)::int from app.notifications_inbox_items i join app.notifications_jobs j on j.job_id = i.job_id
-            where j.source_id = pg_temp.a('S') and j.reminder_kind = 'duty_response_due'), 3,
+            where j.source_id = pg_temp.a('S') and j.reminder_kind = 'duty_response_due'), 4,
   'the snoozed reminder is delivered again');
 create temp table it2 as select i.item_id from app.notifications_inbox_items i join app.notifications_jobs j on j.job_id = i.job_id
   where j.source_id = pg_temp.a('S') and j.snoozed_from_item_id is not null;
@@ -503,7 +529,7 @@ create temp table sr1 as select pg_temp.duties(2, 'duties.set_reminders', pg_tem
   jsonb_build_object('occurrence_id', pg_temp.occ('N'), 'reminders', null)) as r;
 select is((select r #>> '{data,replanned}' from sr1), '1', 'the leader sets duty N back to the default reminders');
 select is(pg_temp.jobs(pg_temp.a('N')),
-  'm:duty_response_due:5:-24,m:duty_response_due:5:0,m:duty_starting:5:24,'
+  'm:duty_response_due:5:-24,m:duty_response_due:5:0,m:duty_response_due:5:24,'
   || 'l:duty_response_overdue:2:0,l:duty_response_overdue:3:0',
   'O''s reminders are re-planned without asking O again (the delivered notice is not sent again)');
 select is((pg_temp.row(pg_temp.a('N'))).revision, 1::bigint, 'the assignment revision did not move');
@@ -528,7 +554,7 @@ create temp table sr2 as select pg_temp.duties(2, 'duties.set_reminders',
 select is((select (r #>> '{data,occurrences}') || '|' || (r #>> '{data,replanned}') from sr2), '7|1',
   'this and later dates: 7 dates changed, the one published assignment among them re-planned');
 select is(pg_temp.jobs(pg_temp.sa(12)),
-  'm:duty_starting:4:334,l:duty_response_overdue:2:0,l:duty_response_overdue:3:0',
+  'm:duty_response_due:4:334,l:duty_response_overdue:2:0,l:duty_response_overdue:3:0',
   'the last Sunday now reminds M 2 hours before the start only; the leaders'' alert is unchanged');
 select is((select count(*)::int from app.duties_occurrences where series_id = pg_temp.sr() and reminders is null), 6,
   'the six earlier dates keep the defaults');
@@ -570,6 +596,70 @@ select is(pg_temp.duties(2, 'duties.set_reminders', pg_temp.orev(pg_temp.occ('P'
 select is((select count(*)::int from app.notifications_jobs where source_id = pg_temp.a('P')
             and source_type = 'duties_coverage' and job_state = 'pending'), 2, 'adds no second alert');
 
+-- Review 2: a held deputy is not alerted --------------------------------------------------------------
+create temp table hl as select pg_temp.pub('HL', 6, pg_temp.t('17 days'), '{"override_reason": "SYNTHETIC: agreed"}') as r;
+select is(pg_temp.call(1, 'identity_credential_command', 'identity.place_hold', pg_temp.mrev(3),
+            jsonb_build_object('member_id', pg_temp.mid(3), 'reason_code', 'security_concern')) ->> 'code',
+  null, 'the Admin places a hold on the deputy');
+select is(pg_temp.due_now(pg_temp.a('HL'), 'duty_response_overdue'), 2, 'HL''s deadline passes unanswered');
+select pg_temp.run();
+select is((select string_agg(pg_temp.who(recipient_member_id) || ':' || job_state || ':' || coalesce(finish_reason, '-'), ','
+                             order by pg_temp.who(recipient_member_id))
+             from app.notifications_jobs where source_id = pg_temp.a('HL') and reminder_kind = 'duty_response_overdue'),
+  '2:delivered:delivered,3:ineligible:recipient_ineligible',
+  'an alert queued before the hold is refused at delivery (no direct-contact need)');
+select is((select count(*)::int from app.notifications_direct_contact_needs where source_type = 'duties_coverage'), 0,
+  'leader alerts never become unrouted needs');
+create temp table hl2 as select pg_temp.pub('HL2', 6, pg_temp.t('18 days'), '{"override_reason": "SYNTHETIC: agreed"}') as r;
+select is((select string_agg(distinct pg_temp.who(recipient_member_id), ',') from app.notifications_jobs
+            where source_id = pg_temp.a('HL2') and source_type = 'duties_coverage'), '2',
+  'a held deputy is not chosen for new alerts');
+
+-- Review 3: notices to pass on in person (released, cancelled) --------------------------------------
+create temp table rx as select pg_temp.pub('RX', 8, pg_temp.t('16 days'), '{"override_reason": "SYNTHETIC: agreed"}') as r;
+select is(pg_temp.duties(2, 'duties.revise_duty', pg_temp.orev(pg_temp.occ('RX')),
+            jsonb_build_object('occurrence_id', pg_temp.occ('RX'), 'member_id', pg_temp.mid(5))) #>> '{data,change}',
+  'material', 'the accountless member''s duty goes to O');
+select is(pg_temp.duties(2, 'duties.assign_slot', pg_temp.orev(pg_temp.so(7)), jsonb_build_object(
+            'slot_id', (select slot_id from app.duties_slots where occurrence_id = pg_temp.so(7)),
+            'member_id', pg_temp.mid(8))) #>> '{data,state}', 'published', 'X is given a rota date');
+select is(pg_temp.duties(2, 'duties.cancel_occurrence', pg_temp.orev(pg_temp.so(7)),
+            jsonb_build_object('occurrence_id', pg_temp.so(7))) ->> 'code', null, 'and that date is cancelled');
+select pg_temp.run();
+create temp table cn as select pg_temp.readj(2, 'select api.duties_leader_board()') #> '{departments,0,contact_notices}' as v;
+select is((select string_agg(x ->> 'notice', ',' order by x ->> 'notice') from cn, jsonb_array_elements(v) x
+            where x ->> 'member_id' = pg_temp.mid(8)::text), 'cancelled,released',
+  'the leader is told to pass on both: released from RX, the rota date cancelled');
+select is((select string_agg(distinct k, ',' order by k) from cn, jsonb_array_elements(v) x, jsonb_object_keys(x) k),
+  'assignment_id,display_name,duty_name,member_id,notice,occurrence_id,position_name,since,starts_at',
+  'each notice names the member and the duty only, never why the member was not reached');
+select is((select jsonb_array_length(pg_temp.readj(7, 'select api.duties_leader_board()') #> '{departments,0,contact_notices}')), 0,
+  'Pastor oversight is not handed the list');
+select is(pg_temp.duties(2, 'duties.revise_duty', pg_temp.orev(pg_temp.occ('RX')),
+            jsonb_build_object('occurrence_id', pg_temp.occ('RX'), 'member_id', pg_temp.mid(8))) #>> '{data,change}',
+  'material', 'RX goes back to X');
+select is((select count(*)::int from jsonb_array_elements(pg_temp.readj(2, 'select api.duties_leader_board()') #> '{departments,0,contact_notices}') x
+            where x ->> 'notice' = 'released' and x ->> 'member_id' = pg_temp.mid(8)::text), 0,
+  'a released notice disappears once the position is X''s again');
+
+-- Review 7: a material this-and-later change leaves no stale reminder ---------------------------------
+create temp table rs as select pg_temp.duties(2, 'duties.revise_series',
+  (select revision from app.duties_series where series_id = pg_temp.sr()),
+  jsonb_build_object('series_id', pg_temp.sr(), 'from_occurrence_id', pg_temp.so(1), 'start_time', '09:00')) as r;
+select is((select r #>> '{data,material}' from rs)::int > 0, true, 'the leader moves this and later dates to 09:00');
+select is((select count(*)::int from app.notifications_jobs j join app.duties_assignments a on a.assignment_id = j.source_id
+             join app.duties_slots s on s.slot_id = a.slot_id join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
+            where o.series_id = pg_temp.sr() and a.assignment_state = 'superseded' and j.job_state = 'pending'
+              and j.reminder_kind not in ('duty_released')), 0,
+  'the superseded assignments keep no pending reminder or alert');
+select is((select count(*)::int from app.duties_assignments a join app.duties_slots s on s.slot_id = a.slot_id
+             join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
+            where o.series_id = pg_temp.sr() and a.assignment_state = 'current' and a.response = 'pending'
+              and o.series_date >= (select series_date from app.duties_occurrences where occurrence_id = pg_temp.so(1))
+              and not exists (select 1 from app.notifications_jobs j where j.source_id = a.assignment_id
+                                and j.source_type = 'duties_coverage' and j.job_state = 'pending')), 0,
+  'every re-asked assignment has its leaders'' alert again');
+
 -- Leader alerts are delivered at the deadline; revoked leaders are not alerted ------------------------
 select is(pg_temp.due_now(pg_temp.a('N'), 'duty_response_overdue'), 2, 'duty N''s deadline passes unanswered');
 select pg_temp.call(1, 'identity_grant_command', 'identity.revoke_scope',
@@ -592,12 +682,19 @@ select is((select count(*)::int from app.notifications_jobs j
               and not exists (select 1 from app.duties_assignments a where a.assignment_id = j.source_id
                                 and a.response = 'pending' and a.assignment_state = 'current')), 0,
   'no leader alert waits on an answered or ended assignment');
-select is((select count(*)::int from app.notifications_inbox_items i join app.notifications_jobs j on j.job_id = i.job_id
-            where j.source_type in ('duties_assignment', 'duties_coverage')
-              and j.reminder_kind in ('duty_response_due', 'duty_starting', 'duty_response_overdue', 'duty_short_notice')
-              and (select count(*) from app.contract_reminder_contracts rc
-                    where rc.source_type = j.source_type and rc.reminder_kind = j.reminder_kind) <> 1), 0,
-  'every delivered duty reminder has exactly one generic contract');
+create temp table opened as
+  select i.recipient_member_id, j.reminder_kind, j.source_id,
+         pg_temp.readj((select m.n from m where m.member_id = i.recipient_member_id),
+                       format('select api.notifications_open_item(%L::uuid)', i.item_id)) as o
+    from app.notifications_inbox_items i join app.notifications_jobs j on j.job_id = i.job_id
+   where j.reminder_kind in ('duty_response_due', 'duty_starting', 'duty_response_overdue', 'duty_short_notice')
+     and i.recipient_member_id <> pg_temp.mid(3);  -- the deputy is held (cannot open items now)
+select is((select count(distinct reminder_kind)::int from opened), 4, 'every 4.8 kind was delivered and opened');
+select is((select count(*)::int from opened x join app.contract_reminder_contracts rc
+             on rc.reminder_kind = x.reminder_kind
+            where x.o ->> 'title' is distinct from rc.title or x.o ->> 'body' is distinct from rc.body
+               or x.o::text ~ 'SYNTHETIC|Duty [A-Z]|Sunday'), 0,
+  'each opened reminder shows exactly its contract''s generic text and nothing of the duty');
 
 -- History guard and vocabulary ------------------------------------------------------------------------
 select throws_ok(format('update app.duties_assignments set short_notice = true, deadline_source = %L where assignment_id = %L',
@@ -610,6 +707,18 @@ select ok(app.duties_state_ok('audit_action', 'reminders_set') and app.duties_st
   'the vocabularies gain reminders_set and the deadline sources and keep the 4.5 actions');
 select is((select count(*)::int from app.duties_audit where action = 'reminders_set'), 4,
   'every reminder change is audited (ids and codes only)');
+
+-- Review 4: an answer is always recorded, also with the Q2 policy unavailable ---------------------
+create temp table q4a as select pg_temp.pub('QA', 5, pg_temp.t('19 days')) as r;
+create temp table q4b as select pg_temp.pub('QB', 5, pg_temp.t('19 days 4 hours')) as r;
+update app.policy_gates set fixture_value = fixture_value || '{"zone": "Mars/Base"}' where gate = 'q2_church_time';
+select is(pg_temp.answer(5, pg_temp.a('QA'), 'accepted') #>> '{data,response}', 'accepted',
+  'with an invalid Q2 policy, O can still accept');
+select is(pg_temp.answer(5, pg_temp.a('QB'), 'declined') #>> '{data,response}', 'declined', 'and decline');
+select is((select count(*)::int from app.duties_audit where action = 'reminders_skipped' and code = 'policy_unavailable'
+             and assignment_id = pg_temp.a('QA')), 1, 'the skipped re-plan is recorded');
+select is(pg_temp.jobs(pg_temp.a('QA')) || ' / ' || pg_temp.jobs(pg_temp.a('QB')), '- / -',
+  'nothing is left pending for either (the leaders'' alerts stopped)');
 
 select * from finish();
 rollback;

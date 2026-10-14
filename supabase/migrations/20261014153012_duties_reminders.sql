@@ -21,7 +21,8 @@
 --   * Scheduling (app.duties_plan_reminders, Notifications last): the assignee's schedule on
 --     `duties_assignment` (kinds duty_response_due, duty_starting; on Short notice the new-duty or
 --     change notice is the member's single "respond now" item) and, while the answer is pending,
---     one schedule per current department leader and deputy on the new source `duties_coverage`
+--     one alert job per current department leader and deputy the app can reach, on the new
+--     source `duties_coverage`
 --     (duty_response_overdue at the deadline, duty_short_notice now on Short notice). An
 --     unanswered assignment re-planned after its deadline gives each leader who has no alert yet
 --     one now. An acceptance stops the response reminders and the leaders' alerts and keeps the
@@ -36,11 +37,28 @@
 --   * Projections: deadline_source, short_notice and the occurrence's reminders in My duties, the
 --     leader board and the rota.
 --
+-- Review fixes (independent review of 4.8, 2026-10-14; this migration was unmerged and unapplied,
+-- so it is amended in place):
+--   1 app.notifications_policy() remembers the validated policy for the transaction (keyed by the
+--     effective value) and the zone check remembers a known zone (pg_timezone_names was scanned on
+--     every call, about 50 ms): Publish 26 slots 17 s -> under 1 s, 200 slots 125 s -> about 5 s.
+--     Leader alerts are single jobs (no schedule per leader).
+--   2 held or in-review leaders and deputies are not alerted (and are refused at delivery).
+--   3 released or cancelled notices for members the app cannot reach are listed for the leader
+--     (`contact_notices` on the leader board) until the duty would have started.
+--   4 an answer is always recorded: with the Q2 policy unavailable the re-plan after an
+--     acceptance is skipped and audited (`reminders_skipped`).
+--   5 a default leaving less than one hour to answer is Short notice; a creator's answer-by must
+--     be strictly before the (reporting) start, and a zero lead time is refused.
+--   6 a pre-service reminder to a member who has not answered yet asks for the answer.
+--
 -- Replaced bodies (each keeps every earlier review fix; changes are marked "Story 4.8"):
 -- duties_state_ok, duties_assignment_history_guard, duties_notify, duties_apply_change,
 -- duties_publish_duty, duties_publish_drafts, duties_revise_duty, duties_respond,
 -- duties_withdraw_acceptance, duties_accept_many, duties_authorize_command, duties_command,
--- duties_my_assignment_json, duties_occurrence_json (3 arguments), duties_rota_occurrence_json.
+-- duties_my_assignment_json, duties_occurrence_json (3 arguments), duties_rota_occurrence_json,
+-- duties_lead, duties_leader_board, and (Notifications, same signatures and answers)
+-- notifications_policy_errors and notifications_policy.
 --
 -- Lock order (AD-2), as in 4.3-4.5: the actor's grant rows FOR SHARE (authorizer) -> command
 -- receipt -> department FOR SHARE -> series FOR UPDATE -> occurrences (series date order) ->
@@ -49,6 +67,163 @@
 --
 -- No destructive statements, no row deletions (no _rows file). No new client grant: both new
 -- commands go through api.duties_command. ASCII only.
+
+
+-- ---------------------------------------------------------------------------------------------
+-- Review fix (blocker 1): a cheap policy check. app.notifications_policy() validates the Q2 value
+-- on every call, and the zone check scanned pg_timezone_names (about 50 ms). A zone found there
+-- is remembered for the rest of the transaction (transaction-local setting), so a rota publish
+-- or a bulk acceptance scans once. Same answers as before for every value.
+-- ---------------------------------------------------------------------------------------------
+
+create function app.notifications_zone_known(p_zone text)
+returns boolean
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if p_zone is null then
+    return false;
+  end if;
+  if pg_catalog.current_setting('app.notifications_zone_known', true) = p_zone then
+    return true;
+  end if;
+  if not exists (select 1 from pg_catalog.pg_timezone_names z where z.name = p_zone) then
+    return false;
+  end if;
+  perform pg_catalog.set_config('app.notifications_zone_known', p_zone, true);
+  return true;
+end;
+$$;
+
+-- (Replaced, same signature and answers: the zone is checked through app.notifications_zone_known.)
+create or replace function app.notifications_policy_errors(p_value jsonb)
+returns jsonb
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  e jsonb := '{}'::jsonb;
+  v_band jsonb;
+  v_prev integer;
+  v_max integer;
+  v_max_offset text;
+  v_type text;
+begin
+  if jsonb_typeof(p_value) is distinct from 'object' then
+    return '{"$": "must_be_object"}'::jsonb;
+  end if;
+  e := app.contract_unknown_keys(p_value, array['fixture_label', 'policy_version', 'zone',
+         'quiet_hours', 'deadline_bands', 'default_reminders', 'merge_window', 'snooze_choices',
+         'max_reminders', 'max_offset']);
+  if not app.contract_integer_in(p_value -> 'policy_version', 1, 2147483647) then
+    e := e || '{"policy_version": "invalid"}';
+  end if;
+  if app.contract_zone_error(p_value -> 'zone') is not null
+     or not app.notifications_zone_known(p_value ->> 'zone') then
+    e := e || '{"zone": "invalid"}';
+  end if;
+  -- Owner decision 2026-10-08: no quiet hours. Any window is refused, not ignored.
+  if not (p_value ? 'quiet_hours') or jsonb_typeof(p_value -> 'quiet_hours') <> 'null' then
+    e := e || '{"quiet_hours": "unsupported"}';
+  end if;
+  if not app.contract_integer_in(p_value -> 'max_reminders', 1, 20) then
+    e := e || '{"max_reminders": "invalid"}';
+  end if;
+  if app.notifications_duration_error(p_value -> 'max_offset') is not null then
+    e := e || '{"max_offset": "invalid"}';
+  end if;
+  if app.notifications_duration_error(p_value -> 'merge_window') is not null
+     or app.notifications_duration_minutes(p_value ->> 'merge_window') > 1440 then
+    e := e || '{"merge_window": "invalid"}';
+  end if;
+  -- Bands: 1..10, strictly decreasing min_lead, the last one 0 so every lead has a band.
+  if jsonb_typeof(p_value -> 'deadline_bands') is distinct from 'array'
+     or jsonb_array_length(p_value -> 'deadline_bands') not between 1 and 10 then
+    e := e || '{"deadline_bands": "invalid"}';
+  else
+    v_prev := null;
+    for v_band in select b from jsonb_array_elements(p_value -> 'deadline_bands') b loop
+      if jsonb_typeof(v_band) is distinct from 'object'
+         or app.contract_unknown_keys(v_band, array['min_lead', 'before_start']) <> '{}'::jsonb
+         or app.notifications_duration_error(v_band -> 'min_lead') is not null
+         or app.notifications_duration_error(v_band -> 'before_start') is not null
+         or app.notifications_duration_error(p_value -> 'max_offset') is not null
+         or app.notifications_duration_minutes(v_band ->> 'before_start')
+            > app.notifications_duration_minutes(p_value ->> 'max_offset')
+         or (v_prev is not null
+             and app.notifications_duration_minutes(v_band ->> 'min_lead') >= v_prev) then
+        e := e || '{"deadline_bands": "invalid"}';
+        exit;
+      end if;
+      v_prev := app.notifications_duration_minutes(v_band ->> 'min_lead');
+    end loop;
+    if not (e ? 'deadline_bands') and v_prev <> 0 then
+      e := e || '{"deadline_bands": "invalid"}';
+    end if;
+  end if;
+  if jsonb_typeof(p_value -> 'snooze_choices') is distinct from 'array'
+     or jsonb_array_length(p_value -> 'snooze_choices') not between 1 and 10
+     or exists (select 1 from jsonb_array_elements(p_value -> 'snooze_choices') c
+                 where app.notifications_duration_error(c) is not null
+                    or app.notifications_duration_minutes(c #>> '{}') = 0)
+     or (select count(distinct c) from jsonb_array_elements(p_value -> 'snooze_choices') c)
+        <> jsonb_array_length(p_value -> 'snooze_choices') then
+    e := e || '{"snooze_choices": "invalid"}';
+  end if;
+  if jsonb_typeof(p_value -> 'default_reminders') is distinct from 'object'
+     or app.contract_unknown_keys(p_value -> 'default_reminders', array['response', 'task']) <> '{}'::jsonb
+     or (e ? 'max_reminders') or (e ? 'max_offset') then
+    e := e || '{"default_reminders": "invalid"}';
+  else
+    v_max := (p_value ->> 'max_reminders')::integer;
+    v_max_offset := p_value ->> 'max_offset';
+    foreach v_type in array array['response', 'task'] loop
+      if app.notifications_reminders_error(p_value -> 'default_reminders' -> v_type, v_type,
+                                            v_max, v_max_offset) is not null then
+        e := e || '{"default_reminders": "invalid"}';
+      end if;
+    end loop;
+  end if;
+  return e;
+end;
+$$;
+
+-- (Replaced, same signature and answers.) The validated policy is remembered for the rest of the
+-- transaction, keyed by the md5 of the effective gate answer (source and value), so a command that
+-- plans many reminders validates the value once; any change of the value or its source within the
+-- transaction is validated again. A closed gate or an invalid value still fails closed on every
+-- call (nothing is remembered for them).
+create or replace function app.notifications_policy()
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_policy jsonb := app.policy_effective('q2_church_time');
+  v_value jsonb := v_policy -> 'value';
+  v_key text := md5(v_policy::text);
+  v_cached text := pg_catalog.current_setting('app.notifications_policy_cache', true);
+  v_result jsonb;
+begin
+  if v_cached is not null and left(v_cached, 32) = v_key then
+    return substr(v_cached, 34)::jsonb;
+  end if;
+  if app.notifications_policy_errors(v_value) <> '{}'::jsonb then
+    raise log 'q2_church_time is not a valid scheduling policy (source %)', v_policy ->> 'source';
+    perform app.cmd_fail('unavailable', '{"policy": "gate_closed"}');
+  end if;
+  v_result := jsonb_build_object(
+    'version', (v_value ->> 'policy_version')::integer,
+    'source', v_policy ->> 'source',
+    'digest', encode(sha256(convert_to(v_value::text, 'UTF8')), 'hex'),
+    'zone', v_value ->> 'zone',
+    'value', v_value);
+  perform pg_catalog.set_config('app.notifications_policy_cache', v_key || '|' || v_result::text, true);
+  return v_result;
+end;
+$$;
 
 
 -- ---------------------------------------------------------------------------------------------
@@ -79,7 +254,8 @@ as $$
                                          'response_recorded', 'duty_revised', 'series_created',
                                          'draft_assigned', 'draft_revised', 'series_revised',
                                          'occurrence_cancelled', 'overlap_override',
-                                         'acceptance_withdrawn', 'reminders_set')
+                                         'acceptance_withdrawn', 'reminders_set',
+                                         'reminders_skipped')
     else false end;
 $$;
 
@@ -183,6 +359,35 @@ end;
 $$;
 
 
+-- A lead time before the (reporting) start (replaced, review fix 5: zero is refused).
+
+create or replace function app.duties_lead(p_payload jsonb, p_key text, p_required boolean,
+                                inout errors jsonb, out value text)
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v jsonb := p_payload -> p_key;
+  v_error text;
+begin
+  if not p_required and coalesce(jsonb_typeof(v), 'null') = 'null' then
+    return;
+  end if;
+  v_error := app.notifications_duration_error(v);
+  -- Story 4.8 review: zero would put the answer-by at the start itself (refused, out_of_range).
+  if v_error is null and (app.notifications_duration_minutes(v #>> '{}') > 90 * 1440
+                          or app.notifications_duration_minutes(v #>> '{}') = 0) then
+    v_error := 'out_of_range';
+  end if;
+  if v_error is not null then
+    errors := errors || jsonb_build_object(p_key, v_error);
+    return;
+  end if;
+  value := v #>> '{}';
+end;
+$$;
+
+
 -- ---------------------------------------------------------------------------------------------
 -- Reminder kinds and sources (3.2 contracts), the leaders' source and the direct-contact route
 -- ---------------------------------------------------------------------------------------------
@@ -249,7 +454,10 @@ begin
                           and (app.identity_member_has_scope((p_key ->> 'recipient_member_id')::uuid,
                                                              'department_leader', v_occurrence.department_id)
                                or app.identity_member_has_scope((p_key ->> 'recipient_member_id')::uuid,
-                                                                'department_deputy', v_occurrence.department_id)));
+                                                                'department_deputy', v_occurrence.department_id))
+                          -- Review fix 2: a held or in-review leader is not alerted (an alert is
+                          -- never a direct-contact need).
+                          and app.duties_leader_reachable((p_key ->> 'recipient_member_id')::uuid));
 end;
 $$;
 
@@ -393,7 +601,9 @@ $$;
 -- The 3.3 lead-time default deadline of an assignment made now for a duty starting (or
 -- reporting) at p_start: {response_deadline, short_notice}. Short notice (the default has already
 -- passed) gives the moment of assignment; a policy whose bands give nothing fails closed as
--- Short notice. Requires the Q2 policy (unavailable otherwise).
+-- Short notice. Review fix 5 (agent decision the owner may change): a default leaving less than
+-- one hour to answer is Short notice too (the leaders are told now, not minutes later). Requires
+-- the Q2 policy (unavailable otherwise).
 create function app.duties_default_deadline(p_start timestamptz)
 returns jsonb
 language plpgsql
@@ -403,13 +613,27 @@ declare
   v jsonb := app.notifications_response_deadline(app.notifications_policy(), now(), p_start, null,
                                                  now());
 begin
-  return jsonb_build_object('response_deadline', v -> 'response_deadline',
-                            'short_notice', coalesce((v ->> 'short_notice')::boolean, true));
+  if coalesce((v ->> 'short_notice')::boolean, true)
+     or (v ->> 'response_deadline')::timestamptz < now() + interval '1 hour' then
+    return jsonb_build_object('response_deadline', app.cmd_utc(now()), 'short_notice', true);
+  end if;
+  return jsonb_build_object('response_deadline', v -> 'response_deadline', 'short_notice', false);
 end;
 $$;
 
--- Who gets the leaders' alerts: the department's current leaders and deputies (live members),
--- never the assignee.
+-- Review fix 2: a leader or deputy the app can reach now (the 3.5 route is `member`: approved,
+-- a live link in good standing, no hold, no review).
+create function app.duties_leader_reachable(p_member_id uuid)
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce((select r.route = 'member' from app.notifications_recipient_route(p_member_id) r), false);
+$$;
+
+-- Who gets the leaders' alerts: the department's current leaders and deputies whom the app can
+-- reach (not held, not in review, with a live link), never the assignee.
 create function app.duties_alert_recipients(p_department_id uuid, p_exclude uuid)
 returns uuid[]
 language sql
@@ -422,7 +646,8 @@ as $$
            where g.scope_id = p_department_id and g.revoked_at is null
              and g.scope_kind in ('department_leader', 'department_deputy')
              and g.member_id is distinct from p_exclude
-             and app.duties_member_active(g.member_id)) x;
+             and app.duties_member_active(g.member_id)
+             and app.duties_leader_reachable(g.member_id)) x;
 $$;
 
 -- Needs contact (the leader board and the rota): for a current assignment of a published duty
@@ -467,11 +692,12 @@ $$;
 --     `duties_assignment` with the stored deadline, `responded` once answered, the creator's
 --     specs or the defaults; p_fresh for a new assignment (a Short-notice plan then asks for an
 --     answer now with p_notice, the notice this command queued, so the member gets one item).
---   * While the answer is pending, each current leader and deputy: a schedule on
---     `duties_coverage` with one alert at the deadline (duty_response_overdue), or now on Short
---     notice (duty_short_notice). Leaders no longer in the list lose theirs (`not_recipient`).
---     When the deadline has passed and a leader has no alert at this revision yet (a re-plan
---     after the deadline), one alert is queued now: a passed deadline never silently drops it.
+--   * While the answer is pending, each current leader and deputy the app can reach: one alert
+--     job on `duties_coverage` at the deadline (duty_response_overdue), or now on Short notice
+--     (duty_short_notice). Leaders no longer in the list lose theirs (`not_recipient`). When the
+--     deadline has passed and a leader has no alert at this revision yet (a re-plan after the
+--     deadline, a leader granted later), one alert is queued now: a passed deadline never
+--     silently drops it.
 -- Returns counts.
 create function app.duties_plan_reminders(p_assignment_id uuid, p_fresh boolean, p_notice text)
 returns jsonb
@@ -513,8 +739,11 @@ begin
       'schedule_type', 'response',
       'intent', v_intent || jsonb_build_object('reminders',
                                                app.duties_reminder_specs(v_policy, v_o.reminders)),
+      -- Review fix 6: before the member answers, the pre-service reminder asks for the answer
+      -- (duty_response_due); after an acceptance it is `duty_starting`.
       'kinds', jsonb_build_object('response_deadline', 'duty_response_due',
-                                  'starts_at', 'duty_starting',
+                                  'starts_at', case when v_a.response = 'pending'
+                                                    then 'duty_response_due' else 'duty_starting' end,
                                   'respond_now', coalesce(p_notice, 'duty_response_due')),
       'fresh', p_fresh));
   end if;
@@ -522,39 +751,36 @@ begin
   if v_a.response = 'pending' then
     v_leaders := app.duties_alert_recipients(v_o.department_id, v_a.member_id);
   end if;
-  for v_leader in select s.recipient_member_id from app.notifications_schedules s
-                   where s.source_type = 'duties_coverage' and s.source_id = v_a.assignment_id
-                     and s.schedule_state = 'active'
-                     and not (s.recipient_member_id = any (v_leaders))
-                   order by s.recipient_member_id loop
+  -- Leaders no longer in the list (or an answered assignment) lose their pending alert.
+  for v_leader in select distinct j.recipient_member_id from app.notifications_jobs j
+                   where j.source_type = 'duties_coverage' and j.source_id = v_a.assignment_id
+                     and j.job_state = 'pending'
+                     and not (j.recipient_member_id = any (v_leaders))
+                   order by j.recipient_member_id loop
     perform app.notifications_cancel(jsonb_build_object(
       'source_type', 'duties_coverage', 'source_id', v_a.assignment_id,
       'recipient_member_id', v_leader, 'reason', 'not_recipient'));
   end loop;
+  -- Review fix 1: one alert job per leader, enqueued directly (a fixed rule on a stored
+  -- deadline needs no schedule): `duty_short_notice` now on Short notice, otherwise
+  -- `duty_response_overdue` at the deadline, or now when the deadline has already passed and
+  -- this leader has no live alert at this revision (a passed deadline never drops it).
   foreach v_leader in array v_leaders loop
-    perform app.notifications_set_schedule(jsonb_build_object(
+    v_alerts := v_alerts + 1;
+    continue when exists (select 1 from app.notifications_jobs j
+                           where j.source_type = 'duties_coverage' and j.source_id = v_a.assignment_id
+                             and j.recipient_member_id = v_leader
+                             and j.source_revision = v_a.revision
+                             and j.reminder_kind in ('duty_response_overdue', 'duty_short_notice')
+                             and j.job_state <> 'cancelled');
+    v_job := app.notifications_enqueue(jsonb_build_object(
       'source_type', 'duties_coverage', 'source_id', v_a.assignment_id,
       'source_revision', v_a.revision, 'recipient_member_id', v_leader,
-      'schedule_type', 'response',
-      'intent', v_intent || jsonb_build_object(
-                  'reminders', '[{"anchor": "response_deadline", "before": "0 minutes"}]'::jsonb),
-      'kinds', '{"response_deadline": "duty_response_overdue", "respond_now": "duty_short_notice"}'::jsonb,
-      'fresh', p_fresh));
-    v_alerts := v_alerts + 1;
-    if v_a.response_deadline <= now()
-       and not exists (select 1 from app.notifications_jobs j
-                        where j.source_type = 'duties_coverage' and j.source_id = v_a.assignment_id
-                          and j.recipient_member_id = v_leader
-                          and j.source_revision = v_a.revision
-                          and j.reminder_kind in ('duty_response_overdue', 'duty_short_notice')
-                          and j.job_state <> 'cancelled') then
-      v_job := app.notifications_enqueue(jsonb_build_object(
-        'source_type', 'duties_coverage', 'source_id', v_a.assignment_id,
-        'source_revision', v_a.revision, 'recipient_member_id', v_leader,
-        'reminder_kind', 'duty_response_overdue', 'scheduled_at', app.cmd_utc(now())));
-      if coalesce((v_job ->> 'created')::boolean, false) then
-        v_late := v_late + 1;
-      end if;
+      'reminder_kind', case when v_a.short_notice then 'duty_short_notice' else 'duty_response_overdue' end,
+      'scheduled_at', app.cmd_utc(greatest(v_a.response_deadline, now()))));
+    if coalesce((v_job ->> 'created')::boolean, false) and v_a.response_deadline <= now()
+       and not (p_fresh and v_a.short_notice) then
+      v_late := v_late + 1;
     end if;
   end loop;
   return jsonb_build_object('planned', true,
@@ -565,20 +791,40 @@ $$;
 
 -- After the assignee answered (respond, withdraw_acceptance, accept_many; their own cancel of
 -- the assignment's jobs has run): the leaders' alerts stop, and an acceptance plans its
--- pre-service reminders again at the new revision (a decline keeps nothing).
-create function app.duties_after_answer(p_assignment_id uuid)
+-- pre-service reminders again at the new revision (a decline keeps nothing). Review fix 4: an
+-- answer is always recorded. When the Q2 policy is unavailable (closed or invalid) the re-plan
+-- is skipped and recorded (audit `reminders_skipped`, code `policy_unavailable`); the answer
+-- stands like a decline does.
+create function app.duties_after_answer(p_assignment_id uuid, p_actor_member uuid,
+                                        p_actor_account uuid, p_command text)
 returns void
 language plpgsql
 set search_path = ''
 as $$
+declare
+  v_message text;
+  v_a app.duties_assignments;
+  v_o app.duties_occurrences;
 begin
   perform app.notifications_cancel(jsonb_build_object(
     'source_type', 'duties_coverage', 'source_id', p_assignment_id, 'reason', 'responded'));
-  if exists (select 1 from app.duties_assignments a
-              where a.assignment_id = p_assignment_id and a.assignment_state = 'current'
-                and a.response = 'accepted') then
-    perform app.duties_plan_reminders(p_assignment_id, false, null);
+  select a.* into v_a from app.duties_assignments a
+   where a.assignment_id = p_assignment_id and a.assignment_state = 'current' and a.response = 'accepted';
+  if not found then
+    return;
   end if;
+  begin
+    perform app.duties_plan_reminders(p_assignment_id, false, null);
+  exception when sqlstate 'PCMD1' then
+    get stacked diagnostics v_message = message_text;
+    if v_message is distinct from 'unavailable' then
+      raise;
+    end if;
+    v_o := app.duties_assignment_occurrence(v_a.slot_id);
+    perform app.duties_audit_event('reminders_skipped', p_actor_member, p_actor_account, 'member',
+                                   p_command, v_o.department_id, v_o.occurrence_id,
+                                   p_assignment_id, v_a.member_id, 'policy_unavailable', v_a.revision);
+  end;
 end;
 $$;
 
@@ -586,6 +832,51 @@ $$;
 -- written (Notifications last, AD-2). Replaced (story 4.8): `cancel` also ends the leaders'
 -- alerts of the assignment, and the new op
 --   {"op": "plan", "assignment_id", "fresh", "notice"}  app.duties_plan_reminders.
+
+-- Review fix 3: what a leader must still tell members the app cannot reach: a held or
+-- accountless member released from a position (the position went to someone else) or whose
+-- position was cancelled. One row per ended assignment with a `duty_released` or
+-- `duty_cancelled` need of its final revision, until the duty would have started; a released one
+-- disappears if the position becomes the member's again. Never why the member was not reached.
+create function app.duties_contact_notices(p_department_id uuid)
+returns jsonb
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'assignment_id', x.assignment_id,
+           'member_id', x.member_id,
+           'display_name', app.duties_display_name(x.member_id),
+           'occurrence_id', x.occurrence_id,
+           'duty_name', x.duty_name,
+           'position_name', x.position_name,
+           'starts_at', app.cmd_utc(x.starts_at),
+           'notice', x.notice,
+           'since', app.cmd_utc(x.since))
+         order by x.starts_at, x.assignment_id), '[]'::jsonb)
+    from (
+      select a.assignment_id, a.member_id, o.occurrence_id, o.duty_name, s.position_name, o.starts_at,
+             case when bool_or(c.reminder_kind = 'duty_cancelled') then 'cancelled' else 'released' end
+               as notice,
+             min(c.recorded_at) as since
+        from app.duties_contact_needs c
+        join app.duties_assignments a on a.assignment_id = c.assignment_id
+        join app.duties_slots s on s.slot_id = a.slot_id
+        join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
+       where o.department_id = p_department_id
+         and c.reminder_kind in ('duty_released', 'duty_cancelled')
+         and c.source_revision = a.revision
+         and a.assignment_state in ('superseded', 'cancelled')
+         and app.duties_occurrence_start(o) > now()
+         and a.member_id is distinct from '00000000-0000-0000-0000-000000000000'::uuid
+         and not (c.reminder_kind = 'duty_released'
+                  and exists (select 1 from app.duties_assignments n
+                               where n.slot_id = a.slot_id and n.assignment_state = 'current'
+                                 and n.member_id = a.member_id))
+       group by a.assignment_id, a.member_id, o.occurrence_id, o.duty_name, s.position_name, o.starts_at
+    ) x;
+$$;
 
 create or replace function app.duties_notify(p_ops jsonb)
 returns jsonb
@@ -781,7 +1072,7 @@ begin
     elsif p_deadline <= now() then
       perform app.cmd_fail('validation_failed', jsonb_build_object(p_deadline_key,
         case when p_deadline_key = 'deadline_before' then 'passed' else 'past' end));
-    elsif p_deadline > v_start then
+    elsif p_deadline >= v_start then
       perform app.cmd_fail('validation_failed', jsonb_build_object(p_deadline_key, 'after_start'));
     end if;
   end if;
@@ -1041,7 +1332,7 @@ begin
     -- the 3.3 lead-time default applies).
     if v_deadline is not null and v_deadline <= now() then
       v_errors := v_errors || '{"response_deadline": "past"}';
-    elsif v_deadline is not null and v_deadline > coalesce(v_reporting, v_starts) then
+    elsif v_deadline is not null and v_deadline >= coalesce(v_reporting, v_starts) then
       v_errors := v_errors || '{"response_deadline": "after_start"}';
     end if;
   end if;
@@ -1434,7 +1725,7 @@ begin
     if v_errors <> '{}'::jsonb and v_occ.occurrence_state = 'published' and v_deadline is not null then
       if v_deadline <= now() then
         v_errors := v_errors || '{"response_deadline": "past"}';
-      elsif v_deadline > coalesce(v_new.reporting_at, v_new.starts_at) then
+      elsif v_deadline >= coalesce(v_new.reporting_at, v_new.starts_at) then
         v_errors := v_errors || '{"response_deadline": "after_start"}';
       end if;
     end if;
@@ -1562,7 +1853,8 @@ begin
     'source_type', 'duties_assignment', 'source_id', v_assignment.assignment_id,
     'reason', 'responded'));
   -- Story 4.8: the leaders' alert stops; an acceptance keeps its pre-service reminders.
-  perform app.duties_after_answer(v_assignment.assignment_id);
+  perform app.duties_after_answer(v_assignment.assignment_id, v_actor.member_id, v_actor.account_id,
+                                  'duties.respond');
   return jsonb_build_object(
     'aggregate_type', 'duties_assignment', 'aggregate_id', v_assignment.assignment_id,
     'revision', v_revision,
@@ -1647,8 +1939,9 @@ begin
   perform app.notifications_cancel(jsonb_build_object(
     'source_type', 'duties_assignment', 'source_id', v_assignment.assignment_id,
     'reason', 'responded'));
-  -- Story 4.8: the leaders' alert stops; an acceptance keeps its pre-service reminders.
-  perform app.duties_after_answer(v_assignment.assignment_id);
+  -- Story 4.8: the leaders' alert stops (a decline keeps no reminder).
+  perform app.duties_after_answer(v_assignment.assignment_id, v_actor.member_id, v_actor.account_id,
+                                  'duties.withdraw_acceptance');
   return jsonb_build_object(
     'aggregate_type', 'duties_assignment', 'aggregate_id', v_assignment.assignment_id,
     'revision', v_revision,
@@ -1806,7 +2099,8 @@ begin
     perform app.notifications_cancel(jsonb_build_object(
       'source_type', 'duties_assignment', 'source_id', v_row.id, 'reason', 'responded'));
     -- Story 4.8: the leaders' alert stops; the pre-service reminders are planned again.
-    perform app.duties_after_answer(v_row.id::uuid);
+    perform app.duties_after_answer(v_row.id::uuid, v_actor.member_id, v_actor.account_id,
+                                    'duties.accept_many');
   end loop;
   return jsonb_build_object(
     'aggregate_type', 'duties_assignment', 'aggregate_id', v_first,
@@ -2311,6 +2605,77 @@ as $$
 $$;
 
 
+-- The leader board (4.4, plus review fix 3: `contact_notices` per department for its managers).
+
+create or replace function app.duties_leader_board()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_member uuid;
+  v_link uuid;
+  v_admin boolean;
+  v_pastor boolean;
+  v_result jsonb;
+begin
+  select a.member_id, a.link_id into v_member, v_link from app.identity_require_access() a;
+  v_admin := app.identity_member_has_role(v_member, 'admin');
+  v_pastor := app.identity_member_has_role(v_member, 'pastor');
+  if not v_admin and not v_pastor
+     and not exists (select 1 from app.identity_grants g
+                      where g.member_id = v_member and g.revoked_at is null
+                        and g.scope_kind in ('department_leader', 'department_deputy')) then
+    raise exception using errcode = 'PT403', message = 'forbidden', detail = 'not_granted';
+  end if;
+  perform app.duties_require_open_read();
+  -- Story 4.4: an override about the viewer's own assignment hides its reason.
+  perform pg_catalog.set_config('app.duties_viewer', v_member::text, true);
+  select jsonb_build_object('departments', coalesce(jsonb_agg(x.obj order by x.name, x.department_id),
+                                                    '[]'::jsonb))
+    into v_result
+    from (
+      select d.department_id, d.name, c.capacity, jsonb_build_object(
+               'department_id', d.department_id,
+               'name', d.name,
+               'capacity', coalesce(c.capacity, 'pastor'),
+               'can_publish', c.capacity is not null,
+               'members', app.duties_roster(d.department_id, false),
+               -- Story 4.8 review fix 3: notices still to pass on in person (managers only).
+               'contact_notices', case when c.capacity is not null
+                                       then app.duties_contact_notices(d.department_id)
+                                       else '[]'::jsonb end,
+               'duties', coalesce((
+                 -- Story 4.4: the overlap counts of these duties, an init plan computed once.
+                 select jsonb_agg(app.duties_occurrence_json(o.occurrence_id, c.capacity is not null, (
+                                    select app.duties_overlap_counts(array(
+                                             select o4.occurrence_id from app.duties_occurrences o4
+                                              where o4.department_id = d.department_id
+                                                and o4.occurrence_state = 'published'
+                                                and o4.starts_at > now() - interval '30 days'
+                                              order by o4.starts_at limit 200))))
+                                  order by o.starts_at, o.occurrence_id)
+                   from (select o2.occurrence_id, o2.starts_at from app.duties_occurrences o2
+                          where o2.department_id = d.department_id
+                            and o2.occurrence_state = 'published'
+                            and o2.starts_at > now() - interval '30 days'
+                          order by o2.starts_at limit 200) o), '[]'::jsonb),
+               'duties_truncated', (select count(*) > 200 from app.duties_occurrences o3
+                                     where o3.department_id = d.department_id
+                                       and o3.occurrence_state = 'published'
+                                       and o3.starts_at > now() - interval '30 days')) as obj
+        from app.duties_departments d
+        cross join lateral (select app.duties_manage_capacity(v_member, d.department_id) as capacity) c
+       where (c.capacity is not null or v_pastor)
+         and (not d.is_synthetic or app.platform_current_environment() in ('local', 'staging'))
+    ) x;
+  perform app.identity_record_activity(v_link);
+  return v_result;
+end;
+$$;
+
+
 comment on function api.duties_command(jsonb) is
   'Stories 4.1-4.8: departments, publishing and revising duties, the assignee''s answer '
   '(respond, withdraw_acceptance, accept_many), rota series (create_series, assign_slot, '
@@ -2332,7 +2697,10 @@ revoke all on function
   app.duties_alert_recipients(uuid, uuid),
   app.duties_needs_contact(app.duties_assignments, app.duties_occurrences),
   app.duties_plan_reminders(uuid, boolean, text),
-  app.duties_after_answer(uuid),
+  app.duties_after_answer(uuid, uuid, uuid, text),
+  app.duties_leader_reachable(uuid),
+  app.duties_contact_notices(uuid),
+  app.notifications_zone_known(text),
   app.duties_set_reminders(uuid, bigint, jsonb),
   app.duties_create_series_with_reminders(uuid, bigint, jsonb)
   from public, anon, authenticated, service_role;

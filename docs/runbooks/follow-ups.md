@@ -4,7 +4,7 @@ Follow-ups is the one accountable task registry (architecture AD-7). Sources (du
 
 ## Story 4.6: open the Follow-ups registry with My follow-ups for every owner
 
-Migration: `supabase/migrations/20261014120000_followups_registry.sql` (forward only; no destructive statements, no row deletions, no `_rows` file, so **no owner SQL paste**). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-open-the-follow-ups-registry-with-my-follow-ups-for-every-ow-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.6/`.
+Migration: `supabase/migrations/20261014110258_followups_registry.sql` (forward only; no destructive statements, no row deletions, no `_rows` file, so **no owner SQL paste**). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-open-the-follow-ups-registry-with-my-follow-ups-for-every-ow-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.6/`.
 
 ### Model (Follow-ups owns it)
 
@@ -93,7 +93,7 @@ The E2E uses the fictional numbers +44 7700 900220-900229 (pgTAP: 900210-900219)
 
 ### Hosted staging (parent session, then the owner)
 
-1. Parent session: apply `20261014120000_followups_registry.sql` to staging (`tmurpotfluignacfueki`) after `20261014081513`. Compare per-function md5 with the local database (the file holds no `\u` escapes; the invisible-character class is built with `chr()`). Run `tools/ci/verify-hosted.sql` (`expected_env=staging`). No Edge Function change. No owner SQL paste.
+1. Parent session: apply `20261014110258_followups_registry.sql` to staging (`tmurpotfluignacfueki`) after `20261014081513`. Compare per-function md5 with the local database (the file holds no `\u` escapes; the invisible-character class is built with `chr()`). Run `tools/ci/verify-hosted.sql` (`expected_env=staging`). No Edge Function change. No owner SQL paste.
 2. Rebuild the staging staff web and phone builds (publishable key only) as in `notifications.md`, story 3.7, step 2.
 
 ### Owner manual checks (staging, phone and web, story 4.6)

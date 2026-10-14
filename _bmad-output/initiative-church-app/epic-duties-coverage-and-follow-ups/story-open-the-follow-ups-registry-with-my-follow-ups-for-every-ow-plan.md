@@ -3,7 +3,7 @@ title: 'Open the Follow-ups registry with My follow-ups for every owner'
 type: 'feature'
 ticket: '6'
 created: '2026-10-14'
-status: 'built'
+status: 'done'
 baseline_revision: '269cd5d2d35320656d273e559e2cb573597884bc'
 route: 'full'
 route_source: 'auto'
@@ -71,7 +71,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261014120000_followups_registry.sql` -- purposes, tasks, activity, notes; registration; owner operations; commands, authorizer, in_scope; reads; deletion hook; SYNTHETIC fixture source; privileges.
+- [x] `supabase/migrations/20261014110258_followups_registry.sql` -- purposes, tasks, activity, notes; registration; owner operations; commands, authorizer, in_scope; reads; deletion hook; SYNTHETIC fixture source; privileges.
 - [x] `supabase/tests/followups_registry_test.sql` + ledgers (`command_foundation_test.sql`, `notifications_routing_test.sql`) -- the matrix.
 - [x] `packages/client_core/lib/src/{domain/followups.dart, application/followups_controllers.dart, presentation/followups_screens.dart, adapters/supabase_followups_repository.dart}` + exports, provider, composition, fake, routes -- client.
 - [x] `apps/mobile/lib/app.dart` (Home card via `MemberHomeScreen`), `apps/staff/lib/app.dart` -- destinations; tests in `packages/client_core/test/followups/followups_test.dart` and both app tests.
@@ -86,7 +86,7 @@ context:
 ## Implementation Notes
 
 - Implemented directly (no implementation subagent is available inside this builder run).
-- Server: `supabase/migrations/20261014120000_followups_registry.sql`. Vocabularies through `app.followups_state_ok` (widened later by replacement, as Duties does). The text validator builds its invisible-character class with `chr()` (`app.followups_invisible_class`), so the file holds no `\u` escape and survives the MCP apply byte for byte. No `_rows` file: deletion anonymises and clears note text (`erased_at`) without deleting rows.
+- Server: `supabase/migrations/20261014110258_followups_registry.sql`. Vocabularies through `app.followups_state_ok` (widened later by replacement, as Duties does). The text validator builds its invisible-character class with `chr()` (`app.followups_invisible_class`), so the file holds no `\u` escape and survives the MCP apply byte for byte. No `_rows` file: deletion anonymises and clears note text (`erased_at`) without deleting rows.
 - Decision (agent, under owner pre-approval): `followups.create_task` and `app.followups_open_task` take `source_revision` because the shared `source_ref` contract (`contract_check_source`) requires it; it is stored on the task as the revision the task was opened at.
 - Decision (agent, under owner pre-approval): an Admin with a scope acts as a scope holder for that scope (the scope capacity wins); an owner who also holds the scope acts as owner on their own task. Updates by Admin capacity are `forbidden`; reassign by the owner without scope is `forbidden`; anyone else gets `not_found`.
 - Decision (agent, under owner pre-approval): in production the SYNTHETIC accounts are not live members, so a create is refused (`forbidden`) before the Q4 gate is even reached; the gate itself is pinned by pgTAP (`app.followups_require_open()` raises `unavailable` in production) and the reads answer `403 unavailable`.
@@ -104,7 +104,7 @@ context:
 
 ## Plan Change Log
 
-- 2026-10-14, review of 4.6 (no blockers; S1-S4 and N1-N8, N10 fixed in place, migration 20261014120000 edited before any merge or apply):
+- 2026-10-14, review of 4.6 (no blockers; S1-S4 and N1-N8, N10 fixed in place, migration 20261014110258 edited before any merge or apply):
   - **S1 scope families.** Finding: an exact (scope_kind, scope_id) match split a department's leader and deputy (and a cell's leader and assistant). Amended: `app.followups_scope_families` and `app.followups_register_scope_family` (Duties registers `department_leader`/`department_deputy` as `department`, Cells `cell_leader`/`cell_assistant` as `cell`), and one rule `app.followups_member_holds` (same target id, same family, kind in the purpose's current `scope_kinds`) used by every command and read (also N4). Avoids: deputies blind to their leader's tasks. KEEP: the target id stays exact.
   - **S2 owner candidates.** Finding: every scope holder saw up to 500 approved members. Amended: candidates are the target's roster only (Duties `app.duties_followups_roster`: current department members; Cells `app.cells_followups_roster`: current cell members; plus the family's current scope holders), returned per scope in supervision and per active task scope in Admin routing; create, reassign (Admin too) and `followups_open_task` refuse anyone else (`owner_member_id: not_in_scope`). Avoids: exposing the church roster. Q4 widening stays an open owner question.
   - **S3 manual create.** Finding: a hand-made task never checks that its source belongs to the scope and blocks the source for ever. Amended: `manual_create: true` is refused (PCTR1) unless the source type starts with `fixture_`; documented in the runbook.

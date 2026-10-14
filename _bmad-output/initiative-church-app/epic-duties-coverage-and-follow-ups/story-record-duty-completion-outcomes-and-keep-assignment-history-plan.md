@@ -3,7 +3,7 @@ title: 'Record duty completion outcomes and keep assignment history'
 type: 'feature'
 ticket: '10'
 created: '2026-10-14'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '3f8e1bfb6a611535e9c3ac940dc1a6f1de50807f'
 route: 'full'
 route_source: 'auto'
@@ -65,17 +65,35 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/<after 20261014212507>_duties_outcomes.sql` -- outcome log, vocabularies, commands, reads, replaced bodies, privileges.
-- [ ] `supabase/tests/duties_outcomes_test.sql`, `duties_outcomes_scale_test.sql`; earlier tests' ledgers and key subsets.
-- [ ] `packages/client_core` outcomes domain, port, adapter, controllers, screens (Outcomes, history), routes, fakes, tests; staff and mobile nav.
-- [ ] `tools/identity-e2e/duties-outcomes.mjs` + `.test.mjs`.
-- [ ] `docs/runbooks/duties.md` story 4.10 section with owner manual checks; `evidence-4.10/`; CI evidence step.
+- [x] `supabase/migrations/20261014231512_duties_outcomes.sql` -- outcome log, vocabularies, commands, reads, replaced bodies, privileges.
+- [x] `supabase/tests/duties_outcomes_test.sql`, `duties_outcomes_scale_test.sql`; earlier tests' ledgers and key subsets.
+- [x] `packages/client_core` outcomes domain, port, adapter, controllers, screens (Outcomes, history), routes, fakes, tests; staff and mobile nav.
+- [x] `tools/identity-e2e/duties-outcomes.mjs` + `.test.mjs`.
+- [x] `docs/runbooks/duties.md` story 4.10 section with owner manual checks; `evidence-4.10/`; CI evidence step.
 
 **Acceptance Criteria:**
 - Given the local stack, when `duties-outcomes.mjs` runs, then the verify line passes over HTTP (record, correct with prior value and actor kept, unrecorded stays unrecorded, declined cannot be No-show, cancelled accepted duty has no outcome, another member and other readers see no history).
 - Given the full local verification, when run, then every listed check passes.
 
 ## Implementation Notes
+
+- Implemented directly (no implementation subagent inside this builder run), as 4.1-4.9. CHECKPOINT 1 pre-approved by the owner (owner-decisions-milestone-1.md, -2.md); the frozen block's decisions are the agent's under that pre-approval.
+- Server: `supabase/migrations/20261014231512_duties_outcomes.sql` (ASCII, no backslashes, no DROP/TRUNCATE/`delete from`, `search_path = ''` everywhere; new functions revoked from public, anon, authenticated and service_role; client grants only `api.duties_outcomes`/`app.duties_outcomes` and `api.duties_member_history`/`app.duties_member_history` to authenticated).
+  - New: table `app.duties_outcomes` (append-only log: `revision` per assignment, `supersedes_outcome_id`, `correction_reason`, `recorded_by_member/account`, `recorded_at` = `clock_timestamp()`; unique (assignment, revision); FK to the assignment `on delete cascade` so earlier E2E clean-ups keep working; RLS on, no client privilege; trigger `duties_outcomes_append_only` refuses every update except erasure clearing text and anonymising the recorder).
+  - New functions: `duties_outcome_guard`, `duties_outcomes_allowed`, `duties_outcome_trail`, `duties_outcome_json`, `duties_lock_for_outcome`, `duties_record_outcome`, `duties_correct_outcome`, `duties_church_zone`, the reads `duties_outcomes` and `duties_member_history` (app and api).
+  - Replaced bodies (copied from `20261014212507`, 4.9, the latest version of each; every earlier review fix kept; changes marked "Story 4.10"): `duties_state_ok` (vocabulary `completion_outcome`; audit actions `outcome_recorded`, `outcome_corrected`), `duties_authorize_command` and `duties_command` (the two commands), `duties_my_assignment_json` (the member's own `outcome`), `duties_deletion_remaining` and `duties_erase_member` (outcome text and recorders). Not replaced: the board, rota, coverage, Admin overview, `duties_my_duties`, any Follow-ups or Notifications function, the 4.5 `accept_many` (its lock order untouched), the 4.8 reminder plan.
+- Decision (agent, under owner pre-approval): an outcome may be recorded once the duty's reporting (or start) time has passed (a No-show is known then); no upper time limit for records or corrections (the ticket's unknown).
+- Decision (agent, under owner pre-approval): the commands are keyed to the occurrence aggregate like 4.9 (replay rechecks "still manages the department"); the record's expected revision is the assignment (answer) revision, the correction's the current outcome revision (the kernel refuses an expected revision of 0, so a correction without an outcome is only reachable with a non-zero revision and then answers `unrecorded`).
+- Decision (agent, under owner pre-approval): scope is checked through the Identity grant itself (`identity_member_has_scope`), not `duties_manage_capacity`, so an Admin who also leads the department acts as its leader, and the Admin role alone is `forbidden`.
+- Decision (agent, under owner pre-approval): the outcomes read lists started positions with a current assignment and also unfilled started positions (assignment null, counted `unfilled`), so a leader sees the whole duty; cancelled positions and cancelled duties are left out.
+- Decision (agent, under owner pre-approval): a member's history for a leader requires the member to have (had) a membership row in a department the leader leads or deputises now; Admin role alone and Pastor are refused (`403 not_granted`) like every other non-member reader; an unknown member answers the same.
+- Decision (agent, under owner pre-approval): no notification is sent for an outcome (privacy; the member sees it in My duties and the history).
+- Clients: `duty_outcomes.dart` (part of `duties.dart`): `DutyOutcomeCommands`, `DutyOutcome`, `OutcomeState`, `OutcomeRevision`, `DutyOutcomeRecord`, `OutcomeAssignment`, `OutcomePosition`, `OutcomeCounts`, `OutcomeDepartment`, `DutyOutcomes`, `OutcomesQuery`, `OutcomeDraft`, `HistoryEntry`, `HistorySummary`, `MemberHistory`, `HistoryCursor`, `HistoryQuery`, the `DutyOutcomesRepository` port; `MyDuty.outcome`. Adapter `SupabaseDutyOutcomesRepository`; provider `dutyOutcomesRepositoryProvider` (wired in `composition.dart`); controllers `DutyOutcomesController` (`record`, `correct`), `MemberHistoryController` (`open`, `older`, `newer`) with their query providers; six notices. Screens (`duties_outcome_screens.dart`, part of `duties_screens.dart`): `DutyOutcomesScreen` (`/duties/outcomes`), `DutyHistoryScreen` (`/duties/history`, `?member=<uuid>`); My duties shows the outcome and a **My duty history** link; the leader Home card links **Record outcomes of past duties** (mobile). Staff sidebar **Outcomes** (leaders and deputies) and **My duty history** (every member). `testing.dart`: `FakeDutyOutcomes`.
+- Earlier tests changed for the new behaviour (no merged migration edited): `command_foundation_test.sql` (privilege ledger), `duties_tracer_test.sql` and `duties_revisions_test.sql` (client-executable list; My duties key subsets drop `outcome`), `duties_coverage_test.dart` (the Home card's outcomes link), `staff_app_test.dart` (destinations).
+- Matrix audit: Record (pgTAP recording block; E2E O20; widget "record an outcome"), Unrecorded (pgTAP "passing time" block with the worker run; E2E O10; widget "Not recorded"), Declined (pgTAP; E2E O21; widget "no No-show chip"), Cancelled accepted (pgTAP; E2E O22), Correct (pgTAP corrections block incl. stale, reason, unchanged, append-only trigger; E2E O30; widget correction), Own / others (pgTAP who-may-record and privacy sweep over every Duties read; E2E O31, O40; widget own duty), History (pgTAP history block; E2E O40; widget history). All ran and passed (see Verification).
+- Fictional numbers: pgTAP +44 7700 900130-900139, E2E 900140-900149 (grepped: no earlier suite uses them). Tests use fixed church-time clock times on whole days (coordinator's note on 3f8e1bf).
+- Open owner questions: none new. Q4 (production personal data) stays the fail-closed default: every outcome read and command is behind the Q4 gate.
+- Remaining (not builder steps): staging apply of `20261014231512_duties_outcomes.sql` and per-function md5 parity (parent; no owner SQL paste; no Edge Function redeploy); rebuild the staging staff web and APK; owner manual checks in `docs/runbooks/duties.md`, story 4.10 (record in `evidence-4.10/owner-check.md`).
 
 ## Plan Change Log
 
@@ -89,3 +107,10 @@ context:
 - `npm run -s contracts:test && node --test <CI set> && npm run -s ci:policy-test` -- expected: pass.
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/staff`, `apps/mobile`; `TZ=America/New_York` for `test/duties` and mobile -- expected: pass.
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/main && npm run -s ci:function-imports`; evidence scan -- expected: clean.
+
+**Results (2026-10-14):**
+- db reset 0; db:test PASS (39 files, 3358 tests; `duties_outcomes_test.sql` 126, `duties_outcomes_scale_test.sql` 12: member history 33-44 ms, leader's fortnight 336 ms, 31 days 267 ms under `statement_timeout = '8s'`); passed after a reset three times; db:smoke pass.
+- Every E2E `exit=0` (27 scripts, reset before each, one at a time; `duties-outcomes` 11/11) (`evidence-4.10/e2e-suite-summary.txt`).
+- contracts:test 242/0; node tool tests (CI set) 211/0; ci:policy-test 56/0.
+- flutter analyze clean in client_core, apps/staff, apps/mobile; flutter test client_core 606 (`duties_outcomes_test.dart` 14), apps/staff 40, apps/mobile 55; under `TZ=America/New_York` client_core `test/duties` + `test/followups` 178 and apps/mobile 55.
+- ci:secrets clean; ci:migrations (`--base origin/main`) ordered, unique, non-destructive; ci:function-imports ok; evidence scan clean.

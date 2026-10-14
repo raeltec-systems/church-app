@@ -10,6 +10,7 @@ import '../domain/access_grants.dart';
 import '../domain/church_time.dart';
 import '../domain/duties.dart';
 import '../domain/duty_calendar.dart';
+import 'followups_screens.dart' show MyFollowUpsHomeCard;
 
 part 'duties_rota_screens.dart';
 
@@ -2662,8 +2663,8 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
 // Story 4.5: the Home My duties card and the member Home
 // ---------------------------------------------------------------------------
 
-/// Story 4.5, mobile: the member Home. It holds the My duties card; later
-/// features add their own cards here.
+/// Story 4.5, mobile: the member Home. It holds the My duties card and
+/// (story 4.6) the My follow-ups card; later features add their own cards.
 class MemberHomeScreen extends StatelessWidget {
   const MemberHomeScreen({super.key});
 
@@ -2680,7 +2681,9 @@ class MemberHomeScreen extends StatelessWidget {
               constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
               child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [MyDutiesHomeCard()],
+                // Story 4.6: My follow-ups shows while the member owns open
+                // work.
+                children: [MyDutiesHomeCard(), MyFollowUpsHomeCard()],
               ),
             ),
           ),

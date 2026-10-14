@@ -8,6 +8,7 @@ import 'account_screen.dart';
 import 'cell_screens.dart';
 import 'credential_screens.dart';
 import 'duties_screens.dart';
+import 'followups_screens.dart';
 import 'fixture_command_screen.dart';
 import 'fixture_reminder_screens.dart';
 import 'notification_settings_screen.dart';
@@ -77,6 +78,16 @@ abstract final class ClientPaths {
   /// Story 4.1, staff web, Admin only: departments, leaders, deputies and
   /// members.
   static const adminDepartments = DutyPaths.adminDepartments;
+
+  /// Story 4.6: My follow-ups (every owner; mobile from the Home card, staff
+  /// web in the sidebar); `/followups/tasks/<id>` is one task.
+  static const myFollowUps = FollowUpPaths.mine;
+
+  /// Story 4.6, staff web: the tasks in the scopes the caller holds.
+  static const followUpSupervision = FollowUpPaths.supervision;
+
+  /// Story 4.6, staff web, Admin only: routing metadata of every task.
+  static const adminFollowUps = FollowUpPaths.adminRouting;
 
   /// Story 2.7: forgot password (neutral acknowledgement).
   static const forgotPassword = '/forgot-password';
@@ -339,6 +350,28 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.adminDepartments,
         pageBuilder: (_, state) => page(state, const DutyAdminScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.myFollowUps,
+        pageBuilder: (_, state) => page(state, const MyFollowUpsScreen()),
+        routes: [
+          GoRoute(
+            path: 'supervision',
+            pageBuilder: (_, state) =>
+                page(state, const FollowUpSupervisionScreen()),
+          ),
+          GoRoute(
+            path: 'tasks/:taskId',
+            pageBuilder: (_, state) => page(
+              state,
+              FollowUpTaskScreen(taskId: state.pathParameters['taskId']!),
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: ClientPaths.adminFollowUps,
+        pageBuilder: (_, state) => page(state, const FollowUpRoutingScreen()),
       ),
       GoRoute(
         path: ClientPaths.membership,

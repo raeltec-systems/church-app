@@ -365,6 +365,51 @@ void main() {
   );
 
   testWidgets(
+    'story 4.6: My follow-ups follows member access, Follow-ups a leader '
+    'scope and Follow-up routing the Admin grant',
+    (tester) async {
+      final h = await pumpStaff(tester, size: const Size(1280, 1600));
+      expect(find.byKey(const Key('nav-/followups')), findsNothing);
+      h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.followUps.mine = AccessReadOk(
+        MyFollowUps.fromJson({
+          'member_id': '22222222-2222-4222-8222-222222222222',
+          'tasks': [followUpTaskData()],
+          'truncated': false,
+        }),
+      );
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('nav-/followups/supervision')), findsNothing);
+      expect(find.byKey(const Key('nav-/admin/followups')), findsNothing);
+      await tapKey(tester, 'nav-/followups');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('SYNTHETIC: phone and check in'), findsOneWidget);
+      h.grants.myAccess = AccessReadOk(
+        syntheticGrants(
+          roles: ['admin'],
+          scopes: const [
+            ScopeGrant(
+              scopeKind: 'cell_leader',
+              scopeId: '44444444-4444-4444-8444-444444444444',
+            ),
+          ],
+        ),
+      );
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        find.byKey(const Key('nav-/followups/supervision')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('nav-/admin/followups')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'story 4.3: Rota follows the department scope and opens the rota grid',
     (tester) async {
       final h = await pumpStaff(tester);

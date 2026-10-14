@@ -7,6 +7,7 @@ import '../domain/cell_membership.dart';
 import '../domain/commands.dart';
 import '../domain/credential_review.dart';
 import '../domain/duties.dart';
+import '../domain/followups.dart';
 import '../domain/fixture_counter.dart';
 import '../domain/inbox.dart';
 import '../domain/member_access.dart';
@@ -72,6 +73,11 @@ final cellsRepositoryProvider = Provider<CellsRepository>(
 /// Story 4.1: the member's duties, the leader board and the Admin overview.
 final dutiesRepositoryProvider = Provider<DutiesRepository>(
   (ref) => const UnconfiguredDutiesRepository(),
+);
+
+/// Story 4.6: My follow-ups, one task, supervision and Admin routing.
+final followUpsRepositoryProvider = Provider<FollowUpsRepository>(
+  (ref) => const UnconfiguredFollowUpsRepository(),
 );
 
 /// Story 2.7: the isolated forgotten-password route (its own Auth client).

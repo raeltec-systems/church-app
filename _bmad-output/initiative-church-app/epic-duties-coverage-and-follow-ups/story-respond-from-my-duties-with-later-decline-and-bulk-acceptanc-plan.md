@@ -107,17 +107,17 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261014093012_duties_member_responses.sql` -- column, guard, commands, dispatch, projections, privileges.
-- [ ] `supabase/tests/duties_responses_test.sql` -- the matrix (single session).
-- [ ] client_core:
+- [x] `supabase/migrations/20261014093012_duties_member_responses.sql` -- column, guard, commands, dispatch, projections, privileges.
+- [x] `supabase/tests/duties_responses_test.sql` -- the matrix (single session).
+- [x] client_core:
   - domain: commands, `priorAcceptedAt`, leaders, segments, `.ics` builder, `DutyCalendarExport` port;
   - controller: `withdraw` and `acceptMany`, with per-duty Sending and Not sent;
   - screens: segments, detail footer, decline sheet, selection and confirmation, calendar, Home card and route, leader "Can't make it anymore";
   - fakes.
-- [ ] `packages/client_core/test/duties/duties_responses_test.dart`.
-- [ ] `apps/mobile` -- Home tab, `share_plus` calendar adapter, tests.
-- [ ] `tools/identity-e2e/duties-responses.mjs` and `.test.mjs`.
-- [ ] `docs/runbooks/duties.md`, story 4.5 section with owner manual checks; `evidence-4.5/`.
+- [x] `packages/client_core/test/duties/duties_responses_test.dart`.
+- [x] `apps/mobile` -- Home tab, `share_plus` calendar adapter, tests.
+- [x] `tools/identity-e2e/duties-responses.mjs` and `.test.mjs`.
+- [x] `docs/runbooks/duties.md`, story 4.5 section with owner manual checks; `evidence-4.5/`.
 
 **Acceptance Criteria:**
 - Given the local stack, when `duties-responses.mjs` runs, then:
@@ -129,6 +129,59 @@ context:
 - Given the full local verification, when it runs, then every gate in Verification passes.
 
 ## Implementation Notes
+
+- Implemented directly: no implementation subagent is available inside this builder run. The worktree merged `ccr-93e730dd-89lbvg` first (4.4 is on staging as `20261014052239`). The new version, `20261014093012`, sorts after it.
+
+### Server
+
+`supabase/migrations/20261014093012_duties_member_responses.sql`.
+
+New:
+- `app.duties_assignments.prior_accepted_at` and its check `duties_assignments_prior_accepted`;
+- the helpers `app.duties_refuse_ended` (the 4.2 stale-response refusal, shared) and `app.duties_assignment_occurrence`;
+- the commands `app.duties_withdraw_acceptance` and `app.duties_accept_many`.
+
+Replaced with `create or replace`, same signatures:
+- `duties_state_ok` (audit `acceptance_withdrawn`);
+- the history guard (`prior_accepted_at` immutable on ended rows);
+- `duties_respond` (cell-owned answers `not_found`);
+- `duties_authorize_command` and `duties_command` (the two commands; `accept_many` takes a null expected revision);
+- `duties_my_assignment_json` (`owner_kind`, `prior_accepted_at`, `leaders`);
+- the 3-argument `duties_occurrence_json` and the 2-argument `duties_rota_occurrence_json` (`prior_accepted_at`).
+
+Unchanged: `duties_in_scope`, `duties_my_duties`, the client grants, deletion. ASCII only, with no backslashes, no DROP, TRUNCATE or `delete from`, and `search_path = ''` everywhere. New functions are revoked from every client role.
+
+### Decisions
+
+- Decision (agent, under owner pre-approval): a **declined future duty stays in Upcoming**, labelled "Can't make it" (or "Can't make it anymore"), so the member sees what they told their leader. With nothing waiting for an answer, My duties opens on Upcoming.
+- Decision (agent, under owner pre-approval): **Accept carries no note** in the new screens. The optional practical note belongs to the Can't make it sheet, following the design contract. The server still accepts a note with `duties.respond`.
+- Decision (agent, under owner pre-approval): **bulk selection** is offered only when two or more dates wait. The client caps it at 50, the server's limit. A failed bulk acceptance keeps the still-pending dates selected; changed dates drop out because they have new ids after the reload.
+- Decision (agent, under owner pre-approval): the calendar handoff is `share_plus` 13.3.0 in `apps/mobile` only.
+  - It is a new native plugin. The adapter sits behind the client_core port `DutyCalendarExport`, and staff web and tests get "not available".
+  - `share_plus` writes the `.ics` to the app's temporary directory for the handoff.
+
+### Tests
+
+- pgTAP: `supabase/tests/duties_responses_test.sql`, 67 checks. The ledgers `duties_tracer_test.sql` and `duties_revisions_test.sql` now subtract the three new My duties keys and the history key, which are checked in the new suite. No client grant changed, so `command_foundation_test.sql` is untouched.
+- Client: `packages/client_core/test/duties/duties_responses_test.dart`, 16 tests. Three 4.1/4.2 widget tests were updated for the new flow: Can't make it now opens a sheet, Accept from the list sends no note, and an answered duty moves to Upcoming.
+- Mobile: `apps/mobile/test/share_calendar_export_test.dart` (mocked platform channels), a Home tab test, and the 4.1 mobile test (taps Upcoming).
+- E2E: `tools/identity-e2e/duties-responses.mjs`, 12 checks, V00-V99, with the offline `duties-responses.test.mjs`.
+  - Race V30 ran three rounds and recorded both orders: bulk first (all three accepted, the moved date pending again) and edit first (bulk refused whole, none accepted).
+  - Fictional numbers: pgTAP `+44 7700 900550-900559`, E2E `900560-900569`. No earlier suite uses these blocks (grepped).
+
+### Matrix audit
+
+| Row | Covered by |
+|---|---|
+| Later decline | pgTAP, E2E V12 |
+| Withdraw invalid (pending, declined, started, superseded, cancelled, someone else's, cell-owned) | pgTAP, all seven; E2E V12/V13 |
+| Bulk 3 of 4 | pgTAP, E2E V20 |
+| Bulk with a changed date (responded, stale, superseded, cancelled, started) | pgTAP, E2E V22 |
+| Bulk with a foreign, unknown or cell item | pgTAP, E2E V40 |
+| Replay | pgTAP, E2E V21 |
+| Race | E2E V30 (pgTAP is one session) |
+| Offline / timeout | client tests (Not sent, Check again with the same request id; also on Home) |
+| Empty / error | client tests (segments, Home) |
 
 ## Plan Change Log
 

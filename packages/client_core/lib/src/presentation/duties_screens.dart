@@ -313,6 +313,12 @@ abstract final class DutyPaths {
       'Not started yet',
       'An outcome is recorded after the duty starts. Nothing was recorded.',
     ),
+    DutyNotice.outcomeMemberGone => (
+      StatusTone.neutral,
+      'No longer a member',
+      'This member was removed or is leaving the church, so no outcome is '
+          'recorded about them. Nothing was recorded.',
+    ),
     DutyNotice.ownOutcome => (
       StatusTone.neutral,
       'Your own duty',

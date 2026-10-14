@@ -119,6 +119,10 @@ enum DutyNotice {
   /// Story 4.10: a leader never records the outcome of their own duty.
   ownOutcome,
 
+  /// Story 4.10 (review N2): the member was erased, left the church or is
+  /// under deletion; no outcome is recorded about them.
+  outcomeMemberGone,
+
   /// Story 4.5: "Can't make it anymore" was recorded.
   withdrawn,
 
@@ -412,6 +416,9 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
         };
       }
       if (f['assignment_id'] == 'own') return DutyNotice.ownOutcome;
+      if (f['member_id'] == 'erased' || f['member_id'] == 'inactive') {
+        return DutyNotice.outcomeMemberGone;
+      }
       if (f['assignment_id'] == 'not_started') {
         return DutyNotice.outcomeNotStarted;
       }

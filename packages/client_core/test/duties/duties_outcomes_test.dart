@@ -313,15 +313,36 @@ void main() {
     });
 
     test('queries and drafts', () {
-      expect(const OutcomesQuery().toParams(), isEmpty);
+      // Review S2: the window never reaches past today (church date).
+      final now = DateTime.utc(
+        2026,
+        10,
+        14,
+        23,
+        30,
+      ); // 01:30 on 15 Oct in Lusaka
+      expect(const OutcomesQuery().toParams(now: now), {
+        'from_date': '2026-10-02',
+        'to_date': '2026-10-15',
+      });
+      expect(const OutcomesQuery(days: 31).toParams(now: now), {
+        'from_date': '2026-09-15',
+        'to_date': '2026-10-15',
+      });
       expect(
         const OutcomesQuery(
           from: '2026-10-01',
           days: 31,
           duty: ' Sun ',
-        ).toParams(),
-        {'from_date': '2026-10-01', 'to_date': '2026-10-31', 'duty': 'Sun'},
+        ).toParams(now: now),
+        {'from_date': '2026-10-01', 'to_date': '2026-10-15', 'duty': 'Sun'},
       );
+      expect(
+        const OutcomesQuery(from: '2026-09-01', days: 7).toParams(now: now),
+        {'from_date': '2026-09-01', 'to_date': '2026-09-07'},
+      );
+      expect(OutcomesQuery.afterToday('2026-10-16', now), isTrue);
+      expect(OutcomesQuery.afterToday('2026-10-15', now), isFalse);
       final c = HistoryCursor(DateTime.utc(2026, 10, 4, 8), _asgB);
       expect(const HistoryQuery(memberId: _ruth).older(c).toParams(), {
         'member_id': _ruth,
@@ -480,6 +501,136 @@ void main() {
       await pumpAt(tester, ClientPaths.dutyOutcomes);
       expect(find.textContaining('leaders and deputies'), findsWidgets);
       expect(byKey('outcomes-record-$_slotA'), findsNothing);
+    });
+  });
+
+  group('review fixes', () {
+    String today() {
+      final d = OutcomesQuery.churchToday();
+      String two(int v) => v.toString().padLeft(2, '0');
+      return '${d.year}-${two(d.month)}-${two(d.day)}';
+    }
+
+    Future<void> chooseDays(WidgetTester tester, int days) async {
+      await tapKey(tester, 'outcomes-days');
+      await tester.tap(find.text('$days days').last);
+      await settle(tester);
+    }
+
+    testWidgets('S2: 31 days from the shown From never asks past today', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.dutyOutcomes,
+        setUp: (h) => h.outcomes.outcomes = outcomes(standardPositions()),
+      );
+      await chooseDays(tester, 31);
+      await tapKey(tester, 'outcomes-apply');
+      final p = h.outcomes.queries.last.toParams();
+      expect(p['from_date'], '2026-10-01');
+      expect((p['to_date']! as String).compareTo(today()) <= 0, isTrue);
+    });
+
+    testWidgets('S2: with From cleared the window ends today', (tester) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.dutyOutcomes,
+        setUp: (h) => h.outcomes.outcomes = outcomes(standardPositions()),
+      );
+      await enter(tester, 'outcomes-from', '');
+      await chooseDays(tester, 31);
+      await tapKey(tester, 'outcomes-apply');
+      final p = h.outcomes.queries.last.toParams();
+      expect(p['to_date'], today());
+      expect(h.outcomes.queries.last.from, isNull);
+      await enter(tester, 'outcomes-from', '2099-01-01');
+      final before = h.outcomes.queries.length;
+      await tapKey(tester, 'outcomes-apply');
+      expect(find.text('Must not be after today'), findsOneWidget);
+      expect(h.outcomes.queries.length, before);
+    });
+
+    testWidgets('N2: nothing to record about an erased member', (tester) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.dutyOutcomes,
+        setUp: (h) => h.outcomes.outcomes = outcomes([
+          position(
+            slot: _slotA,
+            asg: _asgA,
+            member: '00000000-0000-0000-0000-000000000000',
+            name: 'Removed member',
+          ),
+          position(
+            slot: _slotB,
+            asg: _asgB,
+            member: _omar,
+            name: 'SYNTHETIC Omar',
+          ),
+        ]),
+      );
+      expect(byKey('outcomes-record-$_slotA'), findsNothing);
+      expect(byKey('outcomes-history-$_slotA'), findsNothing);
+      expect(find.textContaining('record was removed'), findsOneWidget);
+      // A member who left meanwhile: the refusal is explained.
+      await tapKey(tester, 'outcomes-record-$_slotB');
+      await tapKey(tester, 'outcomes-choice-$_slotB-completed');
+      await tapKey(tester, 'outcomes-save-$_slotB');
+      h.gateway.sent.single.refuse(
+        ErrorCode.validationFailed,
+        fieldErrors: const {'member_id': 'inactive'},
+      );
+      await settle(tester);
+      expect(byKey('duties-notice-outcomeMemberGone'), findsOneWidget);
+    });
+
+    testWidgets(
+      'N4: an unknown outcome shows Not sent and Check again resends it',
+      (tester) async {
+        final h = await pumpAt(
+          tester,
+          ClientPaths.dutyOutcomes,
+          setUp: (h) => h.outcomes.outcomes = outcomes(standardPositions()),
+        );
+        await tapKey(tester, 'outcomes-record-$_slotA');
+        await tapKey(tester, 'outcomes-choice-$_slotA-excused');
+        await tapKey(tester, 'outcomes-save-$_slotA');
+        final first = h.gateway.sent.single;
+        first.unknown();
+        await settle(tester);
+        expect(byKey('duties-notice-unconfirmed'), findsOneWidget);
+        expect(byKey('duties-notice-outcomeRecorded'), findsNothing);
+        // Nothing is shown as recorded.
+        expect(byKey('outcomes-state-$_slotA'), findsOneWidget);
+        await tester.tap(find.text('Check again'));
+        await settle(tester);
+        expect(h.gateway.sent, hasLength(2));
+        final again = h.gateway.sent.last;
+        expect(again.request.requestId, first.request.requestId);
+        expect(again.request.payload, first.request.payload);
+        again.confirm({'outcome': 'excused', 'outcome_revision': 1}, 5);
+        await settle(tester);
+        expect(byKey('duties-notice-outcomeRecorded'), findsOneWidget);
+      },
+    );
+
+    testWidgets('N6: the paging buttons show keyboard focus', (tester) async {
+      await pumpAt(
+        tester,
+        ClientPaths.dutyHistory,
+        setUp: (h) => h.outcomes.history = AccessReadOk(
+          MemberHistory.fromJson(historyJson(hasMore: true)),
+        ),
+      );
+      expect(
+        find.ancestor(
+          of: byKey('history-older'),
+          matching: find.byType(FocusRing),
+        ),
+        findsOneWidget,
+      );
+      expect(find.textContaining('past duties assigned'), findsOneWidget);
     });
   });
 

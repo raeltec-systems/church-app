@@ -1,0 +1,16 @@
+# Review S1 probe (local stack, 2026-10-14, SYNTHETIC rows removed afterwards)
+
+Two database sessions on one synthetic member's past, accepted assignment:
+
+- Session A: `begin`; locks the assignment `FOR UPDATE` (as `duties_lock_for_outcome` does);
+  sleeps 3 s; inserts an outcome with a note; `commit`.
+- Session B, started 1 s later: `app.duties_erase_member({member_id, phase: 'erase'})`.
+
+Result after the fix: "erase waited 2.1 s; remaining=0; note after erase=NULL".
+
+The erase phase waited for the in-flight outcome. It then cleared the committed note, using the
+assignment ids it had locked, and `_remaining` was 0. Before the fix, a note committed after the
+clear survived, and `_remaining` could not see it once the assignment's member id was nil.
+
+The commands now also refuse an assignee who left the church or is under deletion
+(`validation_failed {"member_id": "inactive"}`). This is covered in `duties_outcomes_test.sql`.

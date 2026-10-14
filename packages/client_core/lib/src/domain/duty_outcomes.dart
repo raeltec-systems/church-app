@@ -205,6 +205,9 @@ class OutcomeAssignment {
 
   String get name => displayName ?? 'A member';
 
+  /// Review N2: the member's record was erased (the server's nil id).
+  bool get erased => memberId == '00000000-0000-0000-0000-000000000000';
+
   String get responseLabel => confirmedByLeader
       ? 'Confirmed by leader'
       : switch (response) {
@@ -374,23 +377,41 @@ class OutcomesQuery {
   final String? departmentId;
   final String? duty;
 
-  Map<String, Object?> toParams() {
+  /// Today's church date (Africa/Lusaka) at [now].
+  static DateTime churchToday([DateTime? now]) {
+    final w = ChurchTime.wall(now ?? DateTime.now());
+    return DateTime.utc(w.year, w.month, w.day);
+  }
+
+  static String _ymdOf(DateTime d) {
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${d.year.toString().padLeft(4, '0')}-${two(d.month)}-${two(d.day)}';
+  }
+
+  /// Is [ymd] (`YYYY-MM-DD`) after today's church date?
+  static bool afterToday(String ymd, [DateTime? now]) =>
+      ymd.compareTo(_ymdOf(churchToday(now))) > 0;
+
+  /// Review S2: the window never reaches past today. Without a From date it
+  /// ends today and starts [days] - 1 days earlier; with one it starts there
+  /// and ends [days] - 1 days later, or today when that is sooner. Both
+  /// dates are always sent.
+  Map<String, Object?> toParams({DateTime? now}) {
     final d = duty?.trim();
-    final start = from;
-    String? end;
-    if (start != null) {
-      final day = DateTime.utc(
-        int.parse(start.substring(0, 4)),
-        int.parse(start.substring(5, 7)),
-        int.parse(start.substring(8, 10)),
-      ).add(Duration(days: days.clamp(1, CoverageQuery.maxDays) - 1));
-      String two(int v) => v.toString().padLeft(2, '0');
-      end =
-          '${day.year.toString().padLeft(4, '0')}-${two(day.month)}-${two(day.day)}';
-    }
+    final n = days.clamp(1, CoverageQuery.maxDays);
+    final today = churchToday(now);
+    final start = from == null
+        ? today.subtract(Duration(days: n - 1))
+        : DateTime.utc(
+            int.parse(from!.substring(0, 4)),
+            int.parse(from!.substring(5, 7)),
+            int.parse(from!.substring(8, 10)),
+          );
+    var end = start.add(Duration(days: n - 1));
+    if (end.isAfter(today)) end = today;
     return {
-      'from_date': ?start,
-      'to_date': ?end,
+      'from_date': _ymdOf(start),
+      'to_date': _ymdOf(end),
       if (departmentId != null) 'department_id': departmentId,
       if (d != null && d.isNotEmpty) 'duty': d,
     };

@@ -125,8 +125,16 @@ class _OutcomesBodyState extends ConsumerState<_OutcomesBody> {
         from.isEmpty ||
         (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(from) &&
             ChurchTime.parse(from, '00:00') != null);
-    setState(() => _fromError = valid ? null : 'Use YYYY-MM-DD');
-    if (!valid) return;
+    // Review S2: outcomes are about past duties; the window never passes today.
+    final future = valid && from.isNotEmpty && OutcomesQuery.afterToday(from);
+    setState(
+      () => _fromError = !valid
+          ? 'Use YYYY-MM-DD'
+          : future
+          ? 'Must not be after today'
+          : null,
+    );
+    if (!valid || future) return;
     ref
         .read(dutyOutcomesProvider.notifier)
         .setQuery(
@@ -415,32 +423,43 @@ class _OutcomeCardState extends ConsumerState<_OutcomeCard> {
         ),
       );
     }
+    // Review N2: nothing is recorded about an erased member.
+    final actionable = !a.own && !a.erased;
+    if (a.erased) {
+      lines.add(
+        _muted(
+          context,
+          'This member\'s record was removed: no outcome is recorded.',
+        ),
+      );
+    }
     final actions = <Widget>[
-      if (!a.own && a.outcome == null)
+      if (actionable && a.outcome == null)
         OutlinedButton(
           key: Key('outcomes-record-${p.slotId}'),
           onPressed: busy ? null : () => _open(_OutcomeForm.record),
           child: const Text('Record outcome'),
         ),
-      if (!a.own && a.outcome != null)
+      if (actionable && a.outcome != null)
         OutlinedButton(
           key: Key('outcomes-correct-${p.slotId}'),
           onPressed: busy ? null : () => _open(_OutcomeForm.correct),
           child: const Text('Correct outcome'),
         ),
-      TextButton(
-        key: Key('outcomes-history-${p.slotId}'),
-        onPressed: () => context.go(
-          a.own ? DutyPaths.history : DutyPaths.memberHistory(a.memberId),
+      if (!a.erased)
+        TextButton(
+          key: Key('outcomes-history-${p.slotId}'),
+          onPressed: () => context.go(
+            a.own ? DutyPaths.history : DutyPaths.memberHistory(a.memberId),
+          ),
+          child: Text(a.own ? 'My history' : 'History of ${a.name}'),
         ),
-        child: Text(a.own ? 'My history' : 'History of ${a.name}'),
-      ),
     ];
     lines.addAll([
       const SizedBox(height: 8),
       Wrap(spacing: 8, runSpacing: 8, children: actions),
     ]);
-    if (_form != _OutcomeForm.none && !a.own) {
+    if (_form != _OutcomeForm.none && actionable) {
       lines.addAll([const SizedBox(height: 8), _formFor(context, a, errors)]);
     }
     return _Card(
@@ -589,7 +608,7 @@ class _HistoryBody extends ConsumerWidget {
           ),
         const SizedBox(height: 8),
         Text(
-          'Last 12 months: ${sum.held} duties served or due '
+          'Last 12 months: ${sum.held} past duties assigned '
           '(${sum.accepted} accepted, ${sum.confirmedByLeader} confirmed by '
           'leader, ${sum.declined} declined, ${sum.unanswered} never '
           'answered). Outcomes: ${sum.completed} completed, ${sum.excused} '
@@ -646,17 +665,22 @@ class _HistoryBody extends ConsumerWidget {
         Wrap(
           spacing: 8,
           children: [
+            // Review N6: keyboard focus is visible on the paging buttons.
             if (q.pages.isNotEmpty)
-              OutlinedButton(
-                key: const Key('history-newer'),
-                onPressed: state.busy ? null : ctl.newer,
-                child: const Text('Newer'),
+              FocusRing(
+                child: OutlinedButton(
+                  key: const Key('history-newer'),
+                  onPressed: state.busy ? null : ctl.newer,
+                  child: const Text('Newer'),
+                ),
               ),
             if (v.next case final c?)
-              OutlinedButton(
-                key: const Key('history-older'),
-                onPressed: state.busy ? null : () => ctl.older(c),
-                child: const Text('Older'),
+              FocusRing(
+                child: OutlinedButton(
+                  key: const Key('history-older'),
+                  onPressed: state.busy ? null : () => ctl.older(c),
+                  child: const Text('Older'),
+                ),
               ),
           ],
         ),

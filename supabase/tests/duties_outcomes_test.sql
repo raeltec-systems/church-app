@@ -8,10 +8,11 @@
 -- Pastor, another department's leader and other members see nothing), My duties, every other read
 -- free of outcome text, codes-only audit and receipts, no notifications, erasure, the Q4 gate and
 -- privileges. HTTP evidence: tools/identity-e2e/duties-outcomes.mjs.
--- Every account, phone and name is SYNTHETIC (fictional range +44 7700 900130-900139). Duty times
+-- Every account, phone and name is SYNTHETIC (fictional ranges +44 7700 900130-900139 and
+-- 900151-900153). Duty times
 -- are fixed church-time (Africa/Lusaka) clock times on whole days, never the current clock time.
 begin;
-select plan(126);
+select plan(138);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000410' || lpad(n::text, 2, '0'))::uuid $$;
@@ -119,21 +120,26 @@ $$ select (now() at time zone 'Africa/Lusaka')::date + p_days $$;
 
 -- Accounts: 1 Admin (no department scope); 2 leader L of D; 3 deputy P of D; 4 member M; 5 member
 -- O; 6 member Q; 7 Pastor; 8 accountless member X (no account); 9 leader K of department E;
--- 10 a member with no role and no department.
+-- 10 a member with no role and no department; review N4: 11 an Admin who is also a deputy of D,
+-- 12 a deputy of D whose scope is revoked, 13 a deputy of D on hold (11-13: +44 7700 900151-900153).
 insert into auth.users (id, aud, role, phone, phone_confirmed_at)
 select pg_temp.u(n), 'authenticated', 'authenticated', ltrim(pg_temp.phone(n % 10), '+'), now()
   from generate_series(1, 10) n where n <> 8;
-select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 10) n where n <> 8;
+insert into auth.users (id, aud, role, phone, phone_confirmed_at)
+select pg_temp.u(n), 'authenticated', 'authenticated', '447700900' || (140 + n)::text, now()
+  from generate_series(11, 13) n;
+select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 13) n where n <> 8;
 select app.platform_set_environment('local', 'pgtap 4.10');
 create temp table m (n int, member_id uuid);
 insert into m select n, app.identity_seed_synthetic_link(pg_temp.u(n), 'SYNTHETIC 4.10 Member ' || n, 'pgtap 4.10')
-  from generate_series(1, 10) n where n <> 8;
+  from generate_series(1, 13) n where n <> 8;
 with ins as (insert into app.identity_members (display_name, membership_state, is_synthetic)
              values ('SYNTHETIC 4.10 Accountless', 'approved', true) returning member_id)
 insert into m select 8, member_id from ins;
 create function pg_temp.mid(n int) returns uuid language sql as $$ select member_id from m where m.n = $1 $$;
 select app.identity_bootstrap_admin(pg_temp.mid(1), 'israel');
 insert into app.identity_grants (member_id, role, granted_by_operator) values (pg_temp.mid(7), 'pastor', 'israel');
+insert into app.identity_grants (member_id, role, granted_by_operator) values (pg_temp.mid(11), 'admin', 'israel');
 
 create temp table dd as select pg_temp.duties(1, 'duties.create_department', null,
   '{"name": "SYNTHETIC Preaching Rota"}') as r;
@@ -149,6 +155,7 @@ $$;
 select pg_temp.grant_scope(2, 'department_leader', pg_temp.d());
 select pg_temp.grant_scope(3, 'department_deputy', pg_temp.d());
 select pg_temp.grant_scope(9, 'department_leader', pg_temp.e());
+select pg_temp.grant_scope(n, 'department_deputy', pg_temp.d()) from unnest(array[11, 12, 13]) n;
 create function pg_temp.add(n int, p_department uuid) returns jsonb language sql as $$
   select pg_temp.duties(1, 'duties.add_member',
     (select revision from app.duties_departments where department_id = p_department),
@@ -238,6 +245,7 @@ select pg_temp.pub('R', 4, 17);          -- M, a material change re-asks M (one 
 select pg_temp.pub('L', 2, 18);          -- the leader's own duty
 select pg_temp.pub('X', 8, 19);          -- accountless X, Confirmed by leader
 select pg_temp.pub('E', 4, 20, 9, pg_temp.e());  -- M in department E
+select pg_temp.pub('T', 8, 21);          -- X, never answered (review N4: Admin who is a deputy)
 select pg_temp.answer(4, pg_temp.a('A'), 'accepted');
 select pg_temp.answer(5, pg_temp.a('B'), 'declined');
 select pg_temp.answer(4, pg_temp.a('K'), 'accepted');
@@ -260,6 +268,9 @@ select pg_temp.answer(4, pg_temp.cur('R'), 'accepted');
 select pg_temp.past('A', 1); select pg_temp.past('B', 2); select pg_temp.past('C', 2);
 select pg_temp.past('K', 3); select pg_temp.past('S', 3); select pg_temp.past('R', 4);
 select pg_temp.past('L', 1); select pg_temp.past('X', 5); select pg_temp.past('E', 6);
+select pg_temp.past('T', 6);
+-- Review N4: a second position of C that nobody holds (fixture row: an unfilled started position).
+insert into app.duties_slots (occurrence_id, position_no, position_name) values (pg_temp.occ('C'), 2, 'Helper');
 
 -- Passing time never sets an outcome -----------------------------------------------------------------
 select pg_temp.run();
@@ -323,9 +334,31 @@ select is(pg_temp.err(pg_temp.record(2, pg_temp.a('L'), 'completed')), 'validati
   'a leader cannot grade their own duty');
 select is(pg_temp.err(pg_temp.record(1, pg_temp.cur('R'), 'completed')), 'forbidden', 'the Admin role alone cannot');
 select is(pg_temp.err(pg_temp.record(9, pg_temp.cur('R'), 'completed')), 'not_found', 'another department''s leader cannot (nothing disclosed)');
-select is(pg_temp.err(pg_temp.record(7, pg_temp.cur('R'), 'completed')) in ('forbidden', 'not_found'), true, 'Pastor cannot');
-select is(pg_temp.err(pg_temp.record(4, pg_temp.cur('R'), 'completed')) in ('forbidden', 'not_found'), true, 'the member cannot grade themselves');
-select is(pg_temp.err(pg_temp.record(10, pg_temp.cur('R'), 'completed')) in ('forbidden', 'not_found'), true, 'another member cannot');
+select is(pg_temp.err(pg_temp.record(7, pg_temp.cur('R'), 'completed')), 'not_found', 'Pastor cannot (nothing disclosed)');
+select is(pg_temp.err(pg_temp.record(4, pg_temp.cur('R'), 'completed')), 'not_found', 'the member cannot grade themselves');
+select is(pg_temp.err(pg_temp.record(10, pg_temp.cur('R'), 'completed')), 'not_found', 'another member cannot');
+-- Review N4: revoked and held deputies; an Admin who also holds the scope; a replay.
+select is(pg_temp.call(1, 'identity_grant_command', 'identity.revoke_scope',
+            (select s.revision from app.identity_grant_sets s where s.member_id = pg_temp.mid(12)),
+            jsonb_build_object('member_id', pg_temp.mid(12), 'scope_kind', 'department_deputy',
+                               'scope_id', pg_temp.d())) ->> 'code', null, 'deputy 12''s scope is revoked');
+select is(pg_temp.err(pg_temp.record(12, pg_temp.cur('R'), 'completed')), 'not_found',
+  'a deputy whose scope was revoked cannot record');
+insert into app.identity_holds (member_id, hold_kind, reason, placed_by)
+values (pg_temp.mid(13), 'access_review', 'SYNTHETIC review', 'pgtap 4.10');
+select is(pg_temp.err(pg_temp.record(13, pg_temp.cur('R'), 'completed')), 'forbidden',
+  'a deputy on hold cannot record');
+create temp table replay as select gen_random_uuid() as id;
+create temp table rp1 as select pg_temp.call(11, 'duties_command', 'duties.record_outcome', pg_temp.rev(pg_temp.a('T')),
+  jsonb_build_object('assignment_id', pg_temp.a('T'), 'outcome', 'completed'), (select id from replay)) as r;
+select is(pg_temp.err((select r from rp1)), 'ok', 'an Admin who is also a deputy of D records through the scope');
+select is((select actor_capacity from app.duties_audit where assignment_id = pg_temp.a('T') and action = 'outcome_recorded'),
+  'department_deputy', 'attributed to the deputy scope, not the Admin role');
+select is(pg_temp.call(11, 'duties_command', 'duties.record_outcome', pg_temp.rev(pg_temp.a('T')),
+            jsonb_build_object('assignment_id', pg_temp.a('T'), 'outcome', 'completed'), (select id from replay)),
+  (select r from rp1), 'a replay answers the same receipt');
+select is((select count(*)::int from app.duties_outcomes where assignment_id = pg_temp.a('T')), 1,
+  'and records nothing twice');
 select is(pg_temp.err(pg_temp.record(3, pg_temp.a('L'), 'completed')), 'ok', 'the deputy may record the leader''s duty');
 select is(pg_temp.err(pg_temp.record(9, pg_temp.a('E'), 'excused', 'SYNTHETIC 4.10 note E')), 'ok',
   'department E''s leader records E''s duty');
@@ -374,7 +407,14 @@ select throws_ok(format('update app.duties_outcomes set note = %L where assignme
   'P0001', 'duties outcomes are append-only', 'nor its note');
 select throws_ok(format('insert into app.duties_outcomes (assignment_id, revision, outcome, recorded_by_member, recorded_by_account) values (%L, 9, %L, %L, %L)',
                         pg_temp.a('A'), 'completed', pg_temp.mid(2), pg_temp.u(2)),
-  '23514', null, 'a later revision must name the one it replaces');
+  'P0001', 'duties outcomes are append-only', 'a later revision must name the one it replaces');
+select throws_ok(format('insert into app.duties_outcomes (assignment_id, revision, outcome, supersedes_outcome_id, correction_reason, recorded_by_member, recorded_by_account) values (%L, 2, %L, %L, %L, %L, %L)',
+                        pg_temp.a('C'), 'excused',
+                        (select outcome_id from app.duties_outcomes where assignment_id = pg_temp.a('A') and revision = 1),
+                        'x', pg_temp.mid(2), pg_temp.u(2)),
+  'P0001', 'duties outcomes are append-only', 'review N3: it must name the same assignment''s previous revision');
+select throws_ok(format('delete from app.duties_outcomes where assignment_id = %L', pg_temp.a('A')),
+  'P0001', 'duties outcomes are append-only', 'review N3: an outcome is never deleted on its own');
 select is(pg_temp.err(pg_temp.duties(6, 'duties.respond', pg_temp.rev(pg_temp.a('C')),
                                      jsonb_build_object('assignment_id', pg_temp.a('C'), 'response', 'accepted'))) <> 'ok',
   true, 'an outcome does not reopen the response (a started duty takes no answer)');
@@ -393,8 +433,10 @@ select is(pg_temp.opos(2, pg_temp.a('L')) #>> '{assignment,own}', 'true', 'the l
 select is(pg_temp.opos(2, pg_temp.a('X')) #>> '{assignment,response_provenance}', 'leader',
   'Confirmed by leader stays distinct from a member''s acceptance');
 select is((select d -> 'counts' from jsonb_array_elements(pg_temp.readj(2, 'select api.duties_outcomes()') -> 'departments') d),
-  '{"positions": 7, "unfilled": 0, "unrecorded": 2, "completed": 2, "excused": 2, "no_show": 1}'::jsonb,
-  'department totals (A, B, C, L, X, S and R; S and R unrecorded)');
+  '{"positions": 9, "unfilled": 1, "unrecorded": 2, "completed": 3, "excused": 2, "no_show": 1}'::jsonb,
+  'department totals (A, B, C, C2, L, X, S, R and T; S and R unrecorded; C2 unfilled)');
+select is((select count(*)::int from jsonb_array_elements(pg_temp.readj(2, 'select api.duties_outcomes()') #> '{departments,0,positions}') p
+            where p -> 'assignment' = 'null'::jsonb), 1, 'the unfilled started position is listed without an assignment');
 select is((select jsonb_agg(d ->> 'name') from jsonb_array_elements(pg_temp.readj(9, 'select api.duties_outcomes()') -> 'departments') d),
   '["SYNTHETIC 4.10 Ushers"]'::jsonb, 'another department''s leader sees only their own department');
 select is(pg_temp.read(9, format('select api.duties_outcomes(department_id => %L::uuid)', pg_temp.d())),
@@ -484,6 +526,14 @@ select is(pg_temp.readj(2, 'select api.duties_coverage()')::text ~ 'SYNTHETIC 4.
 select is((select count(*)::int from app.duties_audit where code ~ ' '), 0, 'the audit holds codes only');
 select is((select count(*)::int from app.cmd_receipts where result::text ~ 'SYNTHETIC 4.10 (note|reason)'), 0,
   'no receipt holds outcome text');
+
+-- Review S1: no outcome text about a member under deletion ---------------------------------------------
+insert into app.identity_deletions (member_id, had_account, origin, is_synthetic)
+values (pg_temp.mid(6), true, 'member_request', true);
+select is(pg_temp.err(pg_temp.record(2, pg_temp.cur('S'), 'completed', 'SYNTHETIC 4.10 late note')),
+  'validation_failed|member_id=inactive', 'an assignee under deletion gets no new outcome');
+select is(pg_temp.err(pg_temp.correct(2, pg_temp.a('C'), 'excused', 'SYNTHETIC 4.10 late reason')),
+  'validation_failed|member_id=inactive', 'nor a correction');
 
 -- Erasure ------------------------------------------------------------------------------------------
 select is((app.duties_erase_member(jsonb_build_object('member_id', pg_temp.mid(3), 'account_id', pg_temp.u(3),

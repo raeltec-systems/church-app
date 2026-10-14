@@ -7,7 +7,7 @@
 -- commands are tested in duties_outcomes_test.sql). Every account, phone and name is SYNTHETIC
 -- (fictional range +44 7700 900130-900139). Duty times are whole church days at fixed clock times.
 begin;
-select plan(12);
+select plan(16);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000411' || lpad(n::text, 2, '0'))::uuid $$;
@@ -167,6 +167,29 @@ create temp table t4 as select clock_timestamp() as t;
 create temp table om as select pg_temp.readj(2, format('select api.duties_outcomes(from_date => %L::date)',
   (now() at time zone 'Africa/Lusaka')::date - 30)) as j;
 create temp table t5 as select clock_timestamp() as t;
+-- Review N4: walk M's whole history page after page with the cursor each page hands out.
+create temp table walk (page int, j jsonb, ms numeric);
+do $$
+declare
+  v_j jsonb;
+  v_page int := 0;
+  v_at text;
+  v_id text;
+  v_t timestamptz;
+begin
+  loop
+    v_page := v_page + 1;
+    v_t := clock_timestamp();
+    v_j := pg_temp.readj(3, case when v_at is null then 'select api.duties_member_history()'
+                                 else format('select api.duties_member_history(before_at => %L::timestamptz, before_id => %L::uuid)',
+                                             v_at, v_id) end);
+    insert into walk values (v_page, v_j, extract(epoch from clock_timestamp() - v_t) * 1000);
+    exit when not (v_j ->> 'has_more')::boolean or v_page > 20;
+    v_at := v_j #>> '{entries,99,starts_at}';
+    v_id := v_j #>> '{entries,99,assignment_id}';
+  end loop;
+end;
+$$;
 reset statement_timeout;
 
 select is((select jsonb_array_length(j -> 'entries') from hs), 100, 'M''s history pages 100 rows');
@@ -181,6 +204,12 @@ select ok((select (j #>> '{departments,0,counts,positions}')::int > 1000 and (j 
   'the leader''s fortnight is over 1000 positions: 1000 listed, truncated said');
 select is((select (j #>> '{departments,0,counts,positions}')::int from om), 30 * 80 + 4,
   'the 31-day window (today and the 30 days before) counts every position (the department''s and M''s)');
+select is((select count(*)::int from walk), 8, 'the walk takes eight pages');
+select is((select count(*)::int from walk, jsonb_array_elements(j -> 'entries') e), 784,
+  'every position M held is listed once over the walk (780 past, 4 upcoming)');
+select is((select count(distinct e ->> 'assignment_id')::int from walk, jsonb_array_elements(j -> 'entries') e), 784,
+  'with no row repeated across pages');
+select ok((select max(ms) from walk) < 3000, 'every page, the last included, is well inside the timeout');
 select ok((select t from t1) - (select t from t0) < interval '3 seconds', 'M''s own history is well inside the 8 s timeout');
 select ok((select t from t2) - (select t from t1) < interval '3 seconds', 'the leader''s view of M''s history too');
 select ok((select t from t3) - (select t from t2) < interval '3 seconds', 'a late page too');
@@ -190,7 +219,8 @@ select diag('timings (ms): history self = ' || round(extract(epoch from (select 
             || ', history by leader = ' || round(extract(epoch from (select t from t2) - (select t from t1)) * 1000)
             || ', late page = ' || round(extract(epoch from (select t from t3) - (select t from t2)) * 1000)
             || ', outcomes fortnight = ' || round(extract(epoch from (select t from t4) - (select t from t3)) * 1000)
-            || ', outcomes 31 days = ' || round(extract(epoch from (select t from t5) - (select t from t4)) * 1000));
+            || ', outcomes 31 days = ' || round(extract(epoch from (select t from t5) - (select t from t4)) * 1000)
+            || ', walk of 8 pages max = ' || round((select max(ms) from walk)));
 
 select * from finish();
 rollback;

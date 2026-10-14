@@ -135,7 +135,6 @@ async function main() {
     delete from app.notifications_jobs j where j.job_id in (select job_id from gone_jobs);
     delete from app.notifications_schedules s where s.source_id in (select assignment_id from gone_assignments)
        or s.recipient_member_id in (select member_id from gone_members);
-    delete from app.duties_outcomes x where x.assignment_id in (select assignment_id from gone_assignments);
     delete from app.duties_contact_attempts t where t.assignment_id in (select assignment_id from gone_assignments);
     delete from app.duties_coverage_cases c where c.assignment_id in (select assignment_id from gone_assignments);
     delete from app.duties_contact_needs n where n.assignment_id in (select assignment_id from gone_assignments);

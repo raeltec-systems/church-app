@@ -32,6 +32,19 @@
 --   * Gates: the Q4 personal-data gate (production stays inert); no scheduling, so the Q2 policy
 --     is not needed.
 --
+-- Review fixes (independent review of 4.10, 2026-10-14; this migration was unmerged and unapplied,
+-- so it is amended in place):
+--   S1 erasure locks, in the commands' AD-2 order (departments and series the member created,
+--      then the occurrences they created or hold a position in, then their assignments, all FOR
+--      UPDATE), before it clears outcome and contact-attempt text by the captured assignment ids,
+--      so no outcome or attempt in flight can commit text about the member after the clear; the
+--      outcome commands refuse an assignee who is no longer active or is under deletion
+--      (`{"member_id": "inactive"}`).
+--   N3 the outcome log refuses a direct DELETE (only the cascade from its assignment, which the
+--      local test clean-ups use, may remove a row) and an insert whose supersedes_outcome_id does
+--      not name the same assignment's previous revision.
+--   N5 the two reads check the Q4 gate before the caller's grants (no change to 4.9's reads).
+--
 -- Replaced bodies (each copied from its latest version, keeping every earlier review fix; changes
 -- are marked "Story 4.10"):
 --   from 20261014212507 (4.9): duties_state_ok, duties_authorize_command, duties_command,
@@ -128,7 +141,9 @@ alter table app.duties_outcomes enable row level security;
 revoke all on table app.duties_outcomes from public, anon, authenticated, service_role;
 
 -- Outcomes are append-only: a row never changes, except erasure clearing its note or correction
--- reason and anonymising its recorder.
+-- reason and anonymising its recorder. Review N3: a later revision must name the same
+-- assignment's previous revision; a row is never deleted on its own (only the cascade from its
+-- assignment removes it, pg_trigger_depth() > 1).
 create function app.duties_outcome_guard()
 returns trigger
 language plpgsql
@@ -137,6 +152,21 @@ as $$
 declare
   v_nil constant uuid := '00000000-0000-0000-0000-000000000000';
 begin
+  if tg_op = 'DELETE' then
+    if pg_catalog.pg_trigger_depth() < 2 then
+      raise exception using errcode = 'P0001', message = 'duties outcomes are append-only';
+    end if;
+    return old;
+  end if;
+  if tg_op = 'INSERT' then
+    if new.revision > 1 and not exists (
+         select 1 from app.duties_outcomes p
+          where p.outcome_id = new.supersedes_outcome_id and p.assignment_id = new.assignment_id
+            and p.revision = new.revision - 1) then
+      raise exception using errcode = 'P0001', message = 'duties outcomes are append-only';
+    end if;
+    return new;
+  end if;
   if (new.outcome_id, new.assignment_id, new.revision, new.outcome, new.supersedes_outcome_id,
       new.recorded_at)
      is distinct from
@@ -156,7 +186,7 @@ end;
 $$;
 
 create trigger duties_outcomes_append_only
-  before update on app.duties_outcomes
+  before insert or update or delete on app.duties_outcomes
   for each row execute function app.duties_outcome_guard();
 
 
@@ -230,7 +260,8 @@ $$;
 -- department now (the Admin role alone: forbidden; anyone else, a cell-owned or unknown
 -- assignment: not_found). Refuses the actor's own assignment (`own`), an ended assignment
 -- (`conflict superseded | cancelled`, a cancelled position or duty included), a draft
--- (`not_found`), a duty that has not started (`not_started`) and an erased assignee (`erased`).
+-- (`not_found`), a duty that has not started (`not_started`), an erased assignee (`erased`) and
+-- one who is no longer active or is under deletion (`inactive`, review S1).
 create function app.duties_lock_for_outcome(p_actor_member uuid, p_assignment_id uuid,
                                             out assignment app.duties_assignments,
                                             out occurrence app.duties_occurrences,
@@ -294,6 +325,9 @@ begin
   end if;
   if assignment.member_id = '00000000-0000-0000-0000-000000000000'::uuid then
     perform app.cmd_fail('validation_failed', '{"member_id": "erased"}');
+  elsif not app.duties_member_active(assignment.member_id) then
+    -- Review S1: no new outcome text about a member who left the church or is under deletion.
+    perform app.cmd_fail('validation_failed', '{"member_id": "inactive"}');
   end if;
 end;
 $$;
@@ -577,12 +611,13 @@ declare
   v_result jsonb;
 begin
   select a.member_id, a.link_id into v_member, v_link from app.identity_require_access() a;
+  -- Review N5: the Q4 gate first.
+  perform app.duties_require_open_read();
   if not exists (select 1 from app.identity_grants g
                   where g.member_id = v_member and g.revoked_at is null
                     and g.scope_kind in ('department_leader', 'department_deputy')) then
     raise exception using errcode = 'PT403', message = 'forbidden', detail = 'not_granted';
   end if;
-  perform app.duties_require_open_read();
   v_zone := app.duties_church_zone();
   v_today := (now() at time zone v_zone)::date;
   v_to := coalesce(p_to, v_today);
@@ -730,6 +765,8 @@ begin
   select a.member_id, a.link_id into v_member, v_link from app.identity_require_access() a;
   v_target := coalesce(p_member_id, v_member);
   v_self := v_target = v_member;
+  -- Review N5: the Q4 gate first.
+  perform app.duties_require_open_read();
   if (p_before_at is null) <> (p_before_id is null) then
     raise exception using errcode = 'PT400', message = 'validation_failed', detail = 'cursor';
   end if;
@@ -746,7 +783,6 @@ begin
       raise exception using errcode = 'PT403', message = 'forbidden', detail = 'not_granted';
     end if;
   end if;
-  perform app.duties_require_open_read();
 
   with held as (
     -- The member's assignments, one row per position held: the latest revision of this person on
@@ -987,23 +1023,38 @@ declare
   v_member uuid := (p_input ->> 'member_id')::uuid;
   v_account uuid := nullif(p_input ->> 'account_id', '')::uuid;
   v_nil constant uuid := '00000000-0000-0000-0000-000000000000';
+  v_assignments uuid[];
 begin
   if p_input ->> 'phase' = 'erase' then
+    -- Review S1 (story 4.10): lock first, in the commands' AD-2 order (departments, series,
+    -- occurrences, then assignments, FOR UPDATE), so an outcome or contact attempt in flight
+    -- either commits before the text below is cleared or waits and then sees the member erased.
+    perform 1 from app.duties_departments d where d.created_by_member = v_member
+     order by d.department_id for update;
+    perform 1 from app.duties_series r where r.created_by_member = v_member
+     order by r.series_id for update;
+    perform 1 from app.duties_occurrences o
+     where o.created_by_member = v_member
+        or o.occurrence_id in (select s.occurrence_id from app.duties_assignments a
+                                 join app.duties_slots s on s.slot_id = a.slot_id
+                                where a.member_id = v_member)
+     order by o.series_id nulls last, o.series_date nulls last, o.starts_at, o.occurrence_id
+       for update;
+    select coalesce(array_agg(x.assignment_id), '{}') into v_assignments
+      from (select a.assignment_id from app.duties_assignments a
+             where a.member_id = v_member order by a.assignment_id for update) x;
     perform app.duties_deletion_purge_rows(v_member);
     update app.duties_department_members dm set added_by_member = v_nil
      where dm.added_by_member = v_member;
     -- Story 4.9: the leaders' practical notes about the erased assignee go with them (before the
     -- assignee is anonymised below).
     update app.duties_contact_attempts t set note = null
-     where t.note is not null
-       and t.assignment_id in (select a.assignment_id from app.duties_assignments a
-                                where a.member_id = v_member);
+     where t.note is not null and t.assignment_id = any (v_assignments);
     -- Story 4.10: the outcome notes and correction reasons about the erased assignee go with them
     -- (the outcome values stay, attached to the anonymised assignment).
     update app.duties_outcomes x set note = null, correction_reason = null
      where (x.note is not null or x.correction_reason is not null)
-       and x.assignment_id in (select a.assignment_id from app.duties_assignments a
-                                where a.member_id = v_member);
+       and x.assignment_id = any (v_assignments);
     -- The leader's words about the erased assignee go with them (stories 4.4, 4.9).
     update app.duties_assignments a set member_id = v_nil, response_note = null, override_reason = null,
                                         confirmed_reason = null
@@ -1067,6 +1118,10 @@ begin
   return jsonb_build_object('remaining', app.duties_deletion_remaining(v_member, v_account));
 end;
 $$;
+
+-- Review N5: the hook's comment names this story too.
+comment on function app.duties_erase_member(jsonb) is
+  'Duties deletion hook (stories 4.1-4.10): erase or check the member''s Duties personal data.';
 
 
 -- ---------------------------------------------------------------------------------------------

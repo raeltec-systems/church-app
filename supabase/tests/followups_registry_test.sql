@@ -4,7 +4,7 @@
 -- and the closed personal-data gate. HTTP evidence: tools/identity-e2e/followups.mjs. Every
 -- account, phone and name here is SYNTHETIC (fictional range +44 7700 900210-900219).
 begin;
-select plan(117);
+select plan(143);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000046' || lpad(n::text, 2, '0'))::uuid $$;
@@ -67,6 +67,7 @@ $$ select app.cmd_utc(date_trunc('second', now()) + p_offset) $$;
 -- Scope D (a SYNTHETIC department) and E (a SYNTHETIC cell).
 create function pg_temp.d() returns uuid language sql as $$ select '00000000-0000-4000-a000-0000000046d0'::uuid $$;
 create function pg_temp.e() returns uuid language sql as $$ select '00000000-0000-4000-a000-0000000046e0'::uuid $$;
+create function pg_temp.f() returns uuid language sql as $$ select '00000000-0000-4000-a000-0000000046f0'::uuid $$;
 create function pg_temp.src(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-b000-0000000046' || lpad(n::text, 2, '0'))::uuid $$;
 create function pg_temp.new_task(n int, p_owner uuid, p_src int, p_extra jsonb default '{}')
@@ -80,16 +81,18 @@ $$;
 create function pg_temp.task(p_src int) returns app.followups_tasks language sql as
 $$ select t.* from app.followups_tasks t where t.source_id = pg_temp.src(p_src) $$;
 
--- Accounts: 1 Admin; 2 leader L of D; 3 second leader L2 of D; 4 member M (app owner);
--- 5 member O (no role); 6 cell leader of E; 7 (no account) accountless member X; 8 Pastor.
+-- Accounts: 1 Admin; 2 leader L of D; 3 deputy P of D; 4 member M of D (app owner); 5 member O
+-- of D (no role); 6 cell leader of E; 7 (no account) accountless member X of D; 8 Pastor;
+-- 9 deputy of another department F (not a member of D); 10 cell assistant of E; 11 an Admin who
+-- also leads D. D and F are SYNTHETIC Duties departments; D's members are M, O and X.
 insert into auth.users (id, aud, role, phone, phone_confirmed_at)
 select pg_temp.u(n), 'authenticated', 'authenticated', ltrim(pg_temp.phone(n), '+'), now()
-  from generate_series(1, 8) n where n <> 7;
-select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 8) n where n <> 7;
+  from generate_series(1, 11) n where n <> 7;
+select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 11) n where n <> 7;
 select app.platform_set_environment('local', 'pgtap 4.6');
 create temp table m (n int, member_id uuid);
 insert into m select n, app.identity_seed_synthetic_link(pg_temp.u(n), 'SYNTHETIC 4.6 Member ' || n, 'pgtap 4.6')
-  from generate_series(1, 8) n where n <> 7;
+  from generate_series(1, 11) n where n <> 7;
 with ins as (insert into app.identity_members (display_name, membership_state, is_synthetic)
              values ('SYNTHETIC 4.6 Accountless', 'approved', true) returning member_id)
 insert into m select 7, member_id from ins;
@@ -98,8 +101,17 @@ select app.identity_bootstrap_admin(pg_temp.mid(1), 'israel');
 insert into app.identity_grants (member_id, role, granted_by_operator) values (pg_temp.mid(8), 'pastor', 'israel');
 insert into app.identity_grants (member_id, scope_kind, scope_id, granted_by_operator) values
   (pg_temp.mid(2), 'department_leader', pg_temp.d(), 'israel'),
-  (pg_temp.mid(3), 'department_leader', pg_temp.d(), 'israel'),
-  (pg_temp.mid(6), 'cell_leader', pg_temp.e(), 'israel');
+  (pg_temp.mid(3), 'department_deputy', pg_temp.d(), 'israel'),
+  (pg_temp.mid(6), 'cell_leader', pg_temp.e(), 'israel'),
+  (pg_temp.mid(9), 'department_deputy', pg_temp.f(), 'israel'),
+  (pg_temp.mid(10), 'cell_assistant', pg_temp.e(), 'israel'),
+  (pg_temp.mid(11), 'department_leader', pg_temp.d(), 'israel');
+insert into app.identity_grants (member_id, role, granted_by_operator) values (pg_temp.mid(11), 'admin', 'israel');
+insert into app.duties_departments (department_id, name, is_synthetic, created_by_member, created_by_account)
+values (pg_temp.d(), 'SYNTHETIC 4.6 Department D', true, pg_temp.mid(1), pg_temp.u(1)),
+       (pg_temp.f(), 'SYNTHETIC 4.6 Department F', true, pg_temp.mid(1), pg_temp.u(1));
+insert into app.duties_department_members (department_id, member_id, added_by_member, added_by_account)
+select pg_temp.d(), pg_temp.mid(n), pg_temp.mid(1), pg_temp.u(1) from unnest(array[4, 5, 7]) n;
 
 -- Structure, privileges and guards -------------------------------------------------------------
 select is((select count(*)::int from information_schema.tables where table_schema = 'app'
@@ -198,10 +210,10 @@ select is(pg_temp.new_task(1, pg_temp.mid(4), 2, jsonb_build_object('supervisor_
   'not_in_scope', 'the supervisor must hold the task''s scope');
 select is(pg_temp.new_task(1, pg_temp.mid(4), 2, jsonb_build_object('supervisor_member_id', pg_temp.mid(3), 'note', 'x')) #>> '{field_errors,note}',
   'not_allowed', 'an Admin adds no private note');
-select is(pg_temp.new_task(2, pg_temp.mid(4), 2, '{"scope_kind": "fixture_care"}') ->> 'code', 'forbidden',
-  'a scope the creator does not hold is refused');
-insert into app.identity_grants (member_id, scope_kind, scope_id, granted_by_operator)
-values (pg_temp.mid(2), 'fixture_care', pg_temp.d(), 'israel');
+select is(pg_temp.new_task(9, pg_temp.mid(4), 2) ->> 'code', 'forbidden',
+  'a deputy of another department cannot create in D');
+select is(pg_temp.new_task(2, pg_temp.mid(9), 2) #>> '{field_errors,owner_member_id}', 'not_in_scope',
+  'the owner must be on D''s roster (its members and leaders), not anyone in the church');
 select is(pg_temp.new_task(2, pg_temp.mid(4), 2, '{"scope_kind": "fixture_care"}') #>> '{field_errors,scope_kind}', 'not_allowed',
   'a scope kind the purpose did not register is refused');
 select is(pg_temp.new_task(2, gen_random_uuid(), 2) #>> '{field_errors,owner_member_id}', 'unknown',
@@ -348,10 +360,25 @@ select is(pg_temp.read(5, format('select api.followups_task(%L)', (pg_temp.task(
 select is(pg_temp.read(8, format('select api.followups_task(%L)', (pg_temp.task(1)).task_id)),
   'PT403|forbidden|not_granted', 'the Pastor role alone sees nothing');
 select is((select jsonb_array_length(v -> 'tasks') || '|' || jsonb_array_length(v -> 'purposes') || '|'
-                  || (select x ->> 'account' from jsonb_array_elements(v -> 'candidates') x
+                  || jsonb_array_length(v -> 'scopes') || '|'
+                  || (select x ->> 'account' from jsonb_array_elements(v #> '{scopes,0,candidates}') x
                        where x ->> 'member_id' = pg_temp.mid(7)::text)
              from (select pg_temp.readj(2, 'select api.followups_supervision()') as v) y),
-  '5|1|no_login', 'the leader of D supervises the five D tasks, may create the SYNTHETIC purpose and sees who has no login');
+  '5|1|1|no_login', 'the leader of D supervises the five D tasks, may create the SYNTHETIC purpose and sees who has no login');
+select is((select string_agg(x ->> 'member_id', ',' order by x ->> 'member_id')
+             from jsonb_array_elements(pg_temp.readj(2, 'select api.followups_supervision()') #> '{scopes,0,candidates}') x),
+  (select string_agg(v::text, ',' order by v::text) from unnest(array[pg_temp.mid(2), pg_temp.mid(3), pg_temp.mid(4),
+     pg_temp.mid(5), pg_temp.mid(7), pg_temp.mid(11)]) v),
+  'the candidates are D''s members and leaders only (no Pastor, no other department''s deputy)');
+select is((select string_agg(x ->> 'task_id', ',' order by x ->> 'task_id')
+             from jsonb_array_elements(pg_temp.readj(3, 'select api.followups_supervision()') -> 'tasks') x),
+          (select string_agg(x ->> 'task_id', ',' order by x ->> 'task_id')
+             from jsonb_array_elements(pg_temp.readj(2, 'select api.followups_supervision()') -> 'tasks') x),
+  'the deputy of D supervises exactly the leader''s tasks');
+select is((select jsonb_array_length(v -> 'tasks') from (select pg_temp.readj(9, 'select api.followups_supervision()') as v) y),
+  0, 'the deputy of another department supervises none of D''s tasks');
+select is(pg_temp.upd(9, 4, '{"note": "SYNTHETIC: not mine"}') ->> 'code', 'not_found',
+  'nor may they record on one');
 select is((select jsonb_array_length(v -> 'tasks') || '|' || jsonb_array_length(v -> 'purposes')
              from (select pg_temp.readj(6, 'select api.followups_supervision()') as v) y),
   '0|1', 'the cell leader of E sees none of D''s tasks');
@@ -420,12 +447,80 @@ select is(pg_temp.fu(3, 'followups.update_task', 1,
   jsonb_build_object('task_id', (pg_temp.task(3)).task_id, 'next_action', 'SYNTHETIC: visit instead'), (select id from rq)),
   (select v from k where key = 'r1'), 'the same request replays the stored result');
 update app.identity_grants set revoked_at = now(), revoked_by_member = pg_temp.mid(1), revoked_by_account = pg_temp.u(1)
- where member_id = pg_temp.mid(3) and scope_kind = 'department_leader';
+ where member_id = pg_temp.mid(3) and scope_kind = 'department_deputy';
 select is(pg_temp.fu(3, 'followups.update_task', 1,
   jsonb_build_object('task_id', (pg_temp.task(3)).task_id, 'next_action', 'SYNTHETIC: visit instead'), (select id from rq)) ->> 'code',
   'forbidden', 'after the scope is revoked the replay is refused');
 select is(pg_temp.upd(3, 4, '{"note": "SYNTHETIC note: again"}') ->> 'code', 'not_found',
   'a revoked leader can no longer act on the scope''s tasks');
+
+-- Scope families both ways, Admin with a scope (review S1, N10) --------------------------------
+-- (the deputy's grant was revoked above; the leader 2 and the Admin-leader 11 remain)
+insert into app.identity_grants (member_id, scope_kind, scope_id, granted_by_operator)
+values (pg_temp.mid(3), 'department_deputy', pg_temp.d(), 'israel');
+insert into k values ('dep', pg_temp.new_task(3, pg_temp.mid(5), 10, '{"scope_kind": "department_deputy"}'));
+select is((select v #>> '{data,state}' from k where key = 'dep'), 'open', 'the deputy of D creates a task in the deputy scope');
+select is(pg_temp.reassign(2, 10, jsonb_build_object('owner_member_id', pg_temp.mid(7))) #>> '{data,state}', 'open',
+  'the leader of D reassigns the deputy''s task (one department family)');
+select is(pg_temp.reassign(9, 10, jsonb_build_object('owner_member_id', pg_temp.mid(4))) ->> 'code', 'not_found',
+  'another department''s deputy cannot');
+select is(pg_temp.fu(6, 'followups.create_task', null, jsonb_build_object(
+    'source_type', 'fixture_followup', 'source_id', pg_temp.src(11), 'source_revision', 1,
+    'purpose', 'synthetic_check_in', 'owner_member_id', pg_temp.mid(10), 'scope_kind', 'cell_leader',
+    'scope_id', pg_temp.e(), 'next_action', 'SYNTHETIC: cell visit', 'due_at', pg_temp.at('2 days'))) #>> '{data,state}',
+  'open', 'the cell leader of E creates a task for the cell''s assistant');
+select is(pg_temp.upd(10, 11, '{"status": "in_progress"}') #>> '{data,state}', 'in_progress',
+  'the assistant works it as its owner');
+select is(pg_temp.reassign(10, 11, jsonb_build_object('owner_member_id', pg_temp.mid(6))) #>> '{data,state}', 'in_progress',
+  'and, holding the cell family scope, reassigns it to the cell leader');
+select is((select x ->> 'capacity' from jsonb_array_elements(pg_temp.readj(10, 'select api.followups_supervision()') -> 'tasks') x
+            where x ->> 'task_id' = (pg_temp.task(11)).task_id::text), 'supervisor',
+  'the assistant supervises the cell leader''s task');
+select is((select v ->> 'view' || '|' || (v #>> '{task,capacity}')
+             from (select pg_temp.readj(11, format('select api.followups_task(%L)', (pg_temp.task(4)).task_id)) as v) y),
+  'full|supervisor', 'an Admin who also leads D sees D''s tasks in full, as a supervisor');
+select is(pg_temp.upd(11, 4, '{"note": "SYNTHETIC: as leader"}') #>> '{data,state}', 'waiting',
+  'and records on them (the scope capacity wins over Admin routing)');
+select is(pg_temp.reassign(1, 4, jsonb_build_object('owner_member_id', pg_temp.mid(8))) #>> '{field_errors,owner_member_id}',
+  'not_in_scope', 'an Admin reassigns only within the task''s scope roster');
+select is((select string_agg(x ->> 'scope_id', ',') from jsonb_array_elements(
+             pg_temp.readj(1, 'select api.followups_admin_routing()') -> 'scopes') x
+            where x ->> 'scope_id' = pg_temp.d()::text and x ->> 'family' = 'department'
+              and jsonb_array_length(x -> 'candidates') = 6), pg_temp.d()::text,
+  'Admin routing carries each active task scope''s roster, not the whole church');
+
+-- Registration hardening (review S3, N1) ------------------------------------------------------
+select app.contract_register_purpose('duties', 'duties_assignment', 'pgtap_manual');
+select throws_ok($$select app.followups_register_purpose('duties', 'duties_assignment', 'pgtap_manual',
+    '{"label": "X", "scope_kinds": ["department_leader"], "on_source_resolved": "close",
+      "on_source_cancelled": "keep", "manual_create": true}')$$,
+  'PCTR1', 'manual_create is only for SYNTHETIC fixture_ sources',
+  'a real source cannot allow hand-made tasks (no source-scope check yet)');
+create function app.fixture_followup_volatile_context(p_input jsonb) returns jsonb language sql volatile
+set search_path = '' as $$ select '{"label": "x"}'::jsonb $$;
+select throws_ok($$select app.followups_register_purpose('fixture', 'fixture_followup', 'synthetic_check_in',
+    '{"label": "X", "scope_kinds": ["cell_leader"], "on_source_resolved": "close", "on_source_cancelled": "keep"}',
+    'app.fixture_followup_volatile_context(jsonb)'::regprocedure)$$,
+  'PCTR1', null, 'a volatile context hook is refused');
+create function app.fixture_followup_definer_context(p_input jsonb) returns jsonb language sql stable
+security definer set search_path = '' as $$ select '{"label": "x"}'::jsonb $$;
+select throws_ok($$select app.followups_register_purpose('fixture', 'fixture_followup', 'synthetic_check_in',
+    '{"label": "X", "scope_kinds": ["cell_leader"], "on_source_resolved": "close", "on_source_cancelled": "keep"}',
+    'app.fixture_followup_definer_context(jsonb)'::regprocedure)$$,
+  'PCTR1', null, 'a SECURITY DEFINER context hook is refused');
+select throws_ok($$select app.followups_register_scope_family('duties', 'cell_leader', 'cell',
+    'app.duties_followups_roster(jsonb)'::regprocedure)$$,
+  'PCTR1', null, 'only the owner of a scope kind registers its family');
+create function app.fixture_followup_raising_context(p_input jsonb) returns jsonb language plpgsql stable
+set search_path = '' as $$ begin raise exception 'SYNTHETIC hook failure'; end $$;
+select app.followups_register_purpose('fixture', 'fixture_followup', 'synthetic_check_in',
+  '{"label": "SYNTHETIC check-in", "scope_kinds": ["department_leader", "department_deputy", "cell_leader", "cell_assistant"],
+    "outcomes": ["contacted", "unreachable", "no_longer_needed"], "on_source_resolved": "close",
+    "on_source_cancelled": "keep", "manual_create": true}',
+  'app.fixture_followup_raising_context(jsonb)'::regprocedure);
+select is((select x -> 'context' from jsonb_array_elements(pg_temp.readj(4, 'select api.followups_my_tasks()') -> 'tasks') x
+            where x ->> 'task_id' = (pg_temp.task(1)).task_id::text), 'null'::jsonb,
+  'a context hook that raises shows no context and the read still answers');
 
 -- Deletion hook ------------------------------------------------------------------------------
 insert into k values ('f', pg_temp.new_task(2, pg_temp.mid(4), 8, '{"note": "SYNTHETIC note: about M"}'));
@@ -446,14 +541,29 @@ select is((select x #>> '{owner,display_name}' from jsonb_array_elements(pg_temp
 select is((select r ->> 'remaining' from jsonb_array_elements(
              app.identity_call_deletion_hooks(pg_temp.mid(4), pg_temp.u(4), gen_random_uuid(), 'check')) r
             where r ->> 'module' = 'followups'), '0', 'the check answers 0');
-select is((select count(*)::int from app.followups_tasks t where t.source_type = 'fixture_followup'), 7,
+select is((select r ->> 'remaining' from jsonb_array_elements(
+             app.identity_call_deletion_hooks(pg_temp.mid(2), pg_temp.u(2), gen_random_uuid(), 'erase')) r
+            where r ->> 'module' = 'followups'), '0', 'erasing the supervising and creating leader leaves nothing of them');
+select is((select (a ->> 'actor') || '|' || (select n ->> 'on_behalf_of' from jsonb_array_elements(v -> 'notes') n
+                                              where n ->> 'author' = 'a former member' limit 1)
+             from (select pg_temp.readj(11, format('select api.followups_task(%L)', (pg_temp.task(8)).task_id)) as v) y,
+                  jsonb_array_elements(v -> 'activity') a
+            where a ->> 'action' = 'created'),
+  'a former member|a former member', 'activity and notes name an erased creator and owner as a former member');
+select is((select x #>> '{supervisor,display_name}' from jsonb_array_elements(
+             pg_temp.readj(11, 'select api.followups_supervision()') -> 'tasks') x
+            where x ->> 'task_id' = (pg_temp.task(8)).task_id::text), null,
+  'the erased supervisor shows as a former member; the task stays with D''s other leaders');
+select is((select count(*)::int from app.followups_tasks t where t.source_type = 'fixture_followup'), 9,
   'no task row was removed');
 
 -- The personal-data gate (production stays inert) -----------------------------------------------
 select app.platform_set_environment('production', 'pgtap 4.6');
-select ok(pg_temp.new_task(2, pg_temp.mid(5), 9) ->> 'code' in ('forbidden', 'unavailable')
-          and not exists (select 1 from app.followups_tasks where source_id = pg_temp.src(9)),
-  'in production (Q4 unapproved, SYNTHETIC accounts) a create is refused and nothing is written');
+select is(pg_temp.new_task(11, pg_temp.mid(5), 9) ->> 'code', 'forbidden',
+  'in production a SYNTHETIC account is no live member, so a create is refused forbidden');
+select is((select count(*)::int from app.followups_tasks where source_id = pg_temp.src(9)), 0, 'and nothing is written');
+select throws_ok($$select app.followups_source_event('{"source_type": "fixture_followup", "source_id": "00000000-0000-4000-b000-000000004604", "event": "resolved"}')$$,
+  'PCMD1', 'unavailable', 'a source event is gated too');
 select throws_ok($$select app.followups_require_open()$$, 'PCMD1', 'unavailable',
   'the Follow-ups personal-data gate is closed in production');
 select is(pg_temp.read(5, 'select api.followups_my_tasks()'), 'PT403|unavailable|unavailable',

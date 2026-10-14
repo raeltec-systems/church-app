@@ -9,6 +9,8 @@
 //   * M sees My follow-ups (next action, minimal source context) and moves one task through In
 //     progress, Waiting (with a review date; the original due date is kept) and Done, and closes
 //     another (refused without a reason);
+//   * owners come from the department roster only (an outsider is refused) and two concurrent
+//     opens of one source make one task;
 //   * the leader records an update for X (attributed to the leader, for X) and reassigns X's task
 //     to member O, who then sees it; M cannot reassign;
 //   * the Admin's routing view and task view carry no private notes, next action or context, and
@@ -161,14 +163,25 @@ async function main() {
     const grantsRev = overview?.members?.find((m) => m.member_id === leader.member)?.grants_revision;
     const grant = await envelope('identity_grant_command', admin.token, 'identity.grant_scope', grantsRev,
       { member_id: leader.member, scope_kind: 'department_leader', scope_id: departmentId });
+    // The department's members: owners are chosen from its roster only (review S2).
+    const added = [];
+    for (const [i, id] of [member.member, other.member, accountless].entries()) {
+      added.push((await envelope('duties_command', admin.token, 'duties.add_member', i + 1,
+        { department_id: departmentId, member_id: id })).status);
+    }
     const supervision = await read('followups_supervision', leader.token);
     const purpose = supervision.json?.purposes?.find((p) => p.source_type === SOURCE_TYPE && p.purpose === PURPOSE);
-    const xCandidate = supervision.json?.candidates?.find((c) => c.member_id === accountless);
-    check('F02-leader-scope-and-synthetic-purpose', dept.status === 200 && grant.status === 200 && supervision.status === 200
-      && Boolean(purpose) && xCandidate?.account === 'no_login'
-      && supervision.json?.scopes?.some((s) => s.scope_kind === 'department_leader' && s.scope_id === departmentId),
-      { department: dept.status, grant: grant.status, supervision: supervision.status, purpose: Boolean(purpose),
-        accountless_label: xCandidate?.account ?? null });
+    const scope = supervision.json?.scopes?.find((s) => s.scope_id === departmentId);
+    const roster = (scope?.candidates ?? []).map((c) => c.member_id);
+    const xCandidate = scope?.candidates?.find((c) => c.member_id === accountless);
+    check('F02-leader-scope-roster-and-synthetic-purpose', dept.status === 200 && grant.status === 200
+      && added.every((x) => x === 200) && supervision.status === 200 && Boolean(purpose)
+      && scope?.family === 'department' && xCandidate?.account === 'no_login'
+      && roster.includes(member.member) && roster.includes(other.member) && !roster.includes(plain.member)
+      && !roster.includes(admin.member),
+      { department: dept.status, grant: grant.status, members_added: added, supervision: supervision.status,
+        purpose: Boolean(purpose), family: scope?.family ?? null, roster_size: roster.length,
+        outsider_in_roster: roster.includes(plain.member), accountless_label: xCandidate?.account ?? null });
 
     // ------------------------------------------------------------------------------ creating
     const draft = (owner, sourceId, extra = {}) => ({
@@ -187,6 +200,19 @@ async function main() {
     const taskX = await fu(leader.token, 'followups.create_task', null,
       draft(accountless, sources.x, { note: 'SYNTHETIC note: prefers a call after work' }));
     const ids = { a: taskA.data?.task_id, b: taskB.data?.task_id, x: taskX.data?.task_id };
+    // Two leaders' clients open the same source at once: exactly one task (review N10).
+    const raceSource = randomUUID();
+    const race = await Promise.all([0, 1].map(() =>
+      fu(leader.token, 'followups.create_task', null, draft(other.member, raceSource))));
+    const raceTasks = Number(psql(`select count(*) from app.followups_tasks where source_id = '${raceSource}'`));
+    check('F11-concurrent-open-makes-one-task', raceTasks === 1
+      && race.filter((r) => r.data?.state === 'open').length === 1
+      && race.filter((r) => r.code === 'conflict' && r.field_errors?.purpose === 'task_exists').length === 1,
+      { answers: race.map((r) => r.code ?? r.status), fields: race.map((r) => r.field_errors ?? null), tasks: raceTasks });
+    const outsider = await fu(leader.token, 'followups.create_task', null, draft(plain.member, randomUUID()));
+    check('F12-owner-outside-the-roster-refused', outsider.code === 'validation_failed'
+      && outsider.field_errors?.owner_member_id === 'not_in_scope',
+      { code: outsider.code, field: outsider.field_errors?.owner_member_id ?? null });
     check('F10-leader-creates-synthetic-tasks', byPlain.code === 'forbidden' && taskA.status === 200
       && taskA.data?.state === 'open' && JSON.stringify(replay.data) === JSON.stringify(taskA.data)
       && dup.code === 'conflict' && dup.field_errors?.purpose === 'task_exists'
@@ -247,6 +273,8 @@ async function main() {
     const adminWork = await update(admin.token, ids.x, reassigned.revision, { note: 'SYNTHETIC: admin' });
     check('F40-admin-sees-routing-metadata-only', routing.status === 200 && routed.length === 3
       && routed.every((t) => !hasPrivateKey(t) && t.owner?.display_name && t.state && t.due_at)
+      && !Object.hasOwn(routing.json ?? {}, 'candidates')
+      && (routing.json?.scopes ?? []).every((s) => s.candidates.every((c) => c.member_id !== plain.member))
       && adminView?.view === 'routing' && !hasPrivateKey(adminView) && !hasPrivateKey(adminView?.task)
       && adminWork.code === 'forbidden',
       { routed: routed.length, private_keys: routed.filter(hasPrivateKey).length, view: adminView?.view, admin_update: adminWork.code });

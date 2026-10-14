@@ -10,6 +10,10 @@
 --     source event (`resolved` / `cancelled` -> `close` or `keep`), whether a scope holder may
 --     create tasks by hand (`manual_create`) and an optional context hook that returns a
 --     minimal {"label"} for the task's viewers.
+--   * Scope families (app.followups_scope_families, review S1/S2): the owner of a scope kind
+--     registers its family and a read-only roster hook. A department's leader and deputy (Duties)
+--     and a cell's leader and assistant (Cells) supervise the same tasks, and a task's owner is
+--     chosen from the target's roster (its current members and leaders) only.
 --   * Tasks (app.followups_tasks): exactly one per source_type/source_id/purpose, one owner, a
 --     supervisor holding the task's scope, the scope, a next action, the original due date,
 --     state open / in_progress / waiting (with review date) / done / closed (with a reason),
@@ -178,12 +182,27 @@ create index followups_notes_task on app.followups_notes (task_id, created_at);
 comment on table app.followups_notes is
   'owner: followups. Private task notes (owner and scope holders only; never Admin routing).';
 
+-- Scope families (review S1, S2): the scope kinds of one target (a department's leader and
+-- deputy, a cell's leader and assistant) supervise the same tasks; the owning module registers
+-- the family and a read-only roster hook naming the target's members (owner candidates).
+create table app.followups_scope_families (
+  scope_kind text primary key check (scope_kind ~ '^[a-z][a-z0-9_]{0,62}$'),
+  family text not null check (family ~ '^[a-z][a-z0-9_]{0,62}$'),
+  module text not null,
+  roster_hook text not null,
+  registered_at timestamptz not null default now()
+);
+
+comment on table app.followups_scope_families is
+  'owner: followups. Scope kinds grouped by target family, with the owner''s roster hook.';
+
+alter table app.followups_scope_families enable row level security;
 alter table app.followups_purposes enable row level security;
 alter table app.followups_tasks enable row level security;
 alter table app.followups_activity enable row level security;
 alter table app.followups_notes enable row level security;
 revoke all on table app.followups_purposes, app.followups_tasks, app.followups_activity,
-                    app.followups_notes
+                    app.followups_notes, app.followups_scope_families
   from public, anon, authenticated, service_role;
 revoke all on sequence app.followups_activity_activity_id_seq
   from public, anon, authenticated, service_role;
@@ -192,12 +211,64 @@ revoke all on sequence app.followups_activity_activity_id_seq
 -- Purpose registration (source owners, in their own migration)
 -- ---------------------------------------------------------------------------------------------
 
+-- A registered read hook (context or roster): the owner's (jsonb) -> jsonb app function, with
+-- search_path pinned, STABLE or IMMUTABLE (never volatile) and not SECURITY DEFINER. Hooks run
+-- with Follow-ups' owner rights inside definer reads, so they must only read.
+create function app.followups_validate_read_hook(p_module text, p_hook regprocedure)
+returns text
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_hook text := app.contract_validate_handler(p_module, p_hook, 'jsonb'::regtype);
+begin
+  if not exists (select 1 from pg_catalog.pg_proc p
+                  where p.oid = p_hook and p.provolatile in ('s', 'i') and not p.prosecdef) then
+    perform app.contract_registration_fail(
+      format('hook %s must be STABLE or IMMUTABLE and not SECURITY DEFINER', p_hook));
+  end if;
+  return v_hook;
+end;
+$$;
+
+-- The owner of a scope kind registers its family and roster hook (refused, PCTR1, for another
+-- module's scope kind). The roster hook gets {scope_kind, scope_id} and answers exactly
+-- {"member_ids": [uuid, ...]}: the target's current members.
+create function app.followups_register_scope_family(
+  p_module text,
+  p_scope_kind text,
+  p_family text,
+  p_roster_hook regprocedure
+) returns void
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_hook text;
+begin
+  if not exists (select 1 from app.identity_scope_kinds k
+                  where k.scope_kind = p_scope_kind and k.module = p_module) then
+    perform app.contract_registration_fail(
+      format('module %s does not own scope kind %s', p_module, p_scope_kind));
+  end if;
+  if app.contract_token_error(to_jsonb(p_family)) is not null then
+    perform app.contract_registration_fail('invalid family');
+  end if;
+  v_hook := app.followups_validate_read_hook(p_module, p_roster_hook);
+  insert into app.followups_scope_families (scope_kind, family, module, roster_hook)
+  values (p_scope_kind, p_family, p_module, v_hook)
+  on conflict (scope_kind) do update
+     set family = excluded.family, roster_hook = excluded.roster_hook, registered_at = now();
+end;
+$$;
+
 -- Registers (or, from the owner's later migration, replaces) a Follow-ups purpose. Refusals are
 -- migration-time programming errors (SQLSTATE PCTR1).
 -- p_config keys: label (1-60 printable ASCII, generic, no { } < > @ \), scope_kinds (1-8
 -- registered Identity scope kinds), outcomes (0-12 tokens), on_source_resolved and
--- on_source_cancelled (`close` | `keep`), manual_create (boolean, default false).
--- p_context_hook: optional app function of the source owner, (jsonb) returns jsonb.
+-- on_source_cancelled (`close` | `keep`), manual_create (boolean, default false; only for a
+-- SYNTHETIC `fixture_` source until a source-scope check exists: review S3).
+-- p_context_hook: optional read-only app function of the source owner, (jsonb) returns jsonb.
 create function app.followups_register_purpose(
   p_module text,
   p_source_type text,
@@ -258,8 +329,13 @@ begin
   if coalesce(jsonb_typeof(p_config -> 'manual_create'), 'boolean') <> 'boolean' then
     perform app.contract_registration_fail('manual_create must be a boolean');
   end if;
+  -- Hand-made tasks never check that the source belongs to the chosen scope, so only SYNTHETIC
+  -- fixture sources may allow them (a real source opens its tasks with followups_open_task).
+  if coalesce((p_config ->> 'manual_create')::boolean, false) and p_source_type !~ '^fixture_' then
+    perform app.contract_registration_fail('manual_create is only for SYNTHETIC fixture_ sources');
+  end if;
   if p_context_hook is not null then
-    v_hook := app.contract_validate_handler(p_module, p_context_hook, 'jsonb'::regtype);
+    v_hook := app.followups_validate_read_hook(p_module, p_context_hook);
   end if;
   insert into app.followups_purposes (source_type, purpose, module, label, scope_kinds, outcomes,
                                       on_source_resolved, on_source_cancelled, manual_create,
@@ -483,6 +559,46 @@ begin
 end;
 $$;
 
+-- A scope kind's family (its registered family, or the kind itself when none is registered).
+create function app.followups_family(p_scope_kind text)
+returns text
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce((select f.family from app.followups_scope_families f
+                    where f.scope_kind = p_scope_kind), p_scope_kind);
+$$;
+
+-- The one supervision rule (review S1, N4), used by every command and read: the member holds
+-- an active grant on the same target (scope_id) whose kind is in the same family as p_scope_kind
+-- and is one of the kinds the purpose registered now. So a department's leader and deputy, or a
+-- cell's leader and assistant, supervise each other's tasks; a narrowed registration narrows
+-- every command and read at once.
+create function app.followups_member_holds(p_member_id uuid, p_scope_kind text, p_scope_id uuid,
+                                           p_purpose_kinds text[])
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select p_member_id is not null and exists (
+    select 1 from app.identity_grants g
+     where g.member_id = p_member_id and g.revoked_at is null and g.scope_id = p_scope_id
+       and g.scope_kind = any (p_purpose_kinds)
+       and app.followups_family(g.scope_kind) = app.followups_family(p_scope_kind));
+$$;
+
+create function app.followups_purpose_kinds(p_source_type text, p_purpose text)
+returns text[]
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce((select p.scope_kinds from app.followups_purposes p
+                    where p.source_type = p_source_type and p.purpose = p_purpose), '{}');
+$$;
+
 -- Does the member currently hold the task's scope (the supervising leaders)?
 create function app.followups_holds_scope(p_member_id uuid, p_task app.followups_tasks)
 returns boolean
@@ -490,8 +606,55 @@ language sql
 stable
 set search_path = ''
 as $$
-  select p_member_id is not null
-     and app.identity_member_has_scope(p_member_id, p_task.scope_kind, p_task.scope_id);
+  select app.followups_member_holds(p_member_id, p_task.scope_kind, p_task.scope_id,
+                                    app.followups_purpose_kinds(p_task.source_type, p_task.purpose));
+$$;
+
+-- The members of a scope's target who may own its tasks (review S2, fail closed): the members
+-- its owner's roster hook names (a department's current members, a cell's current members) and
+-- the current holders of the family's scope kinds, all approved and not under deletion. A hook
+-- that raises or answers anything but {"member_ids": [uuid, ...]} names nobody.
+create function app.followups_scope_roster(p_scope_kind text, p_scope_id uuid)
+returns uuid[]
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_hook text;
+  v_proc regprocedure;
+  v_answer jsonb;
+  v_ids uuid[] := '{}';
+  v_state text;
+begin
+  select f.roster_hook into v_hook from app.followups_scope_families f
+   where f.scope_kind = p_scope_kind;
+  v_proc := case when v_hook is not null then pg_catalog.to_regprocedure(v_hook) end;
+  if v_proc is not null then
+    begin
+      execute format('select %s($1)', v_proc::regproc) into v_answer
+        using jsonb_build_object('scope_kind', p_scope_kind, 'scope_id', p_scope_id);
+    exception when others then
+      get stacked diagnostics v_state = returned_sqlstate;
+      raise log 'followups roster hook failed: %', v_state;
+      v_answer := null;
+    end;
+    if jsonb_typeof(v_answer) = 'object'
+       and app.contract_unknown_keys(v_answer, array['member_ids']) = '{}'::jsonb
+       and jsonb_typeof(v_answer -> 'member_ids') = 'array'
+       and not exists (select 1 from jsonb_array_elements(v_answer -> 'member_ids') e
+                        where app.contract_uuid_error(e) is not null) then
+      select coalesce(array_agg((e #>> '{}')::uuid), '{}') into v_ids
+        from jsonb_array_elements(v_answer -> 'member_ids') e;
+    end if;
+  end if;
+  return (select coalesce(array_agg(distinct x order by x), '{}')
+            from (select unnest(v_ids) as x
+                  union
+                  select g.member_id from app.identity_grants g
+                   where g.revoked_at is null and g.scope_id = p_scope_id
+                     and app.followups_family(g.scope_kind) = app.followups_family(p_scope_kind)) y
+           where app.followups_member_active(y.x));
+end;
 $$;
 
 -- How the member may act on the task: `owner` (their own task), `supervisor` (holds the task's
@@ -552,6 +715,7 @@ declare
   v_hook text;
   v_proc regprocedure;
   v_answer jsonb;
+  v_state text;
 begin
   select p.context_hook into v_hook from app.followups_purposes p
    where p.source_type = p_task.source_type and p.purpose = p_task.purpose;
@@ -568,6 +732,8 @@ begin
                                'purpose', p_task.purpose, 'task_id', p_task.task_id,
                                'viewer_member_id', p_viewer);
   exception when others then
+    get stacked diagnostics v_state = returned_sqlstate;
+    raise log 'followups context hook failed: %', v_state;
     return null;
   end;
   if jsonb_typeof(v_answer) is distinct from 'object'
@@ -671,6 +837,17 @@ begin
 end;
 $$;
 
+-- A person named in activity or notes: their name, or `a former member` once erased (review N3).
+create function app.followups_person_name(p_member_id uuid)
+returns text
+language sql
+stable
+set search_path = ''
+as $$
+  select case when p_member_id is not null
+              then coalesce(app.followups_display_name(p_member_id), 'a former member') end;
+$$;
+
 -- The task's activity (oldest first, at most 200) for its owner and scope holders.
 create function app.followups_activity_json(p_task_id uuid)
 returns jsonb
@@ -682,18 +859,14 @@ as $$
            'at', app.cmd_utc(a.occurred_at),
            'action', a.action,
            'capacity', a.actor_capacity,
-           'actor', case when a.actor_member_id is not null
-                         then app.followups_display_name(a.actor_member_id) end,
-           'on_behalf_of', case when a.on_behalf_of_member is not null
-                                then app.followups_display_name(a.on_behalf_of_member) end,
+           'actor', app.followups_person_name(a.actor_member_id),
+           'on_behalf_of', app.followups_person_name(a.on_behalf_of_member),
            'from_state', a.from_state,
            'to_state', a.to_state,
            'outcome', a.outcome,
            'review_at', case when a.review_at is not null then app.cmd_utc(a.review_at) end,
-           'from_member', case when a.from_member is not null
-                               then app.followups_display_name(a.from_member) end,
-           'to_member', case when a.to_member is not null
-                             then app.followups_display_name(a.to_member) end,
+           'from_member', app.followups_person_name(a.from_member),
+           'to_member', app.followups_person_name(a.to_member),
            'code', a.code)
          order by a.activity_id), '[]'::jsonb)
     from (select a2.* from app.followups_activity a2 where a2.task_id = p_task_id
@@ -710,9 +883,8 @@ as $$
   select coalesce(jsonb_agg(jsonb_build_object(
            'note_id', n.note_id,
            'at', app.cmd_utc(n.created_at),
-           'author', app.followups_display_name(n.author_member_id),
-           'on_behalf_of', case when n.on_behalf_of_member is not null
-                                then app.followups_display_name(n.on_behalf_of_member) end,
+           'author', app.followups_person_name(n.author_member_id),
+           'on_behalf_of', app.followups_person_name(n.on_behalf_of_member),
            'body', n.body,
            'erased', n.erased_at is not null)
          order by n.created_at desc, n.note_id), '[]'::jsonb)
@@ -720,21 +892,24 @@ as $$
            order by n2.created_at desc, n2.note_id limit 100) n;
 $$;
 
--- Approved members (with or without a login) an owner may be chosen from (at most 500).
-create function app.followups_candidates(p_full boolean)
+-- One scope with the members an owner may be chosen from (its roster, at most 200): name and
+-- account standing only.
+create function app.followups_scope_json(p_scope_kind text, p_scope_id uuid, p_full boolean)
 returns jsonb
 language sql
-stable
 set search_path = ''
 as $$
-  select coalesce(jsonb_agg(x.obj order by x.display_name collate "C", x.member_id), '[]'::jsonb)
-    from (
-      select im.member_id, im.display_name, app.followups_member_ref(im.member_id, p_full) as obj
-        from app.identity_members im
-       where im.membership_state = 'approved'
-         and not exists (select 1 from app.identity_deletions dl where dl.member_id = im.member_id)
-       order by im.display_name collate "C", im.member_id
-       limit 500) x;
+  select jsonb_build_object(
+    'scope_kind', p_scope_kind,
+    'scope_id', p_scope_id,
+    'family', app.followups_family(p_scope_kind),
+    'candidates', coalesce((
+      select jsonb_agg(x.obj order by x.display_name collate "C", x.member_id)
+        from (select im.member_id, im.display_name, app.followups_member_ref(im.member_id, p_full) as obj
+                from app.identity_members im
+               where im.member_id = any (app.followups_scope_roster(p_scope_kind, p_scope_id))
+               order by im.display_name collate "C", im.member_id
+               limit 200) x), '[]'::jsonb));
 $$;
 
 -- A command's outcome: ids, revision and state only (receipts keep results; no text).
@@ -809,8 +984,16 @@ begin
   if not app.followups_member_active(p_owner) then
     perform app.cmd_fail('validation_failed', '{"owner_member_id": "unknown"}');
   end if;
+  -- Review S2 (fail closed): the owner is a member of the scope's target or one of its leaders.
+  if not (p_owner = any (app.followups_scope_roster(p_scope_kind, p_scope_id))) then
+    perform app.cmd_fail('validation_failed', '{"owner_member_id": "not_in_scope"}');
+  end if;
+  -- Review N5: the supervisor's grants are share-locked (Identity rows, as the authorizer does).
+  perform 1 from app.identity_grants g
+   where g.member_id = p_supervisor and g.revoked_at is null for share;
   if not app.followups_member_active(p_supervisor)
-     or not app.identity_member_has_scope(p_supervisor, p_scope_kind, p_scope_id) then
+     or not app.followups_member_holds(p_supervisor, p_scope_kind, p_scope_id,
+                                       v_purpose.scope_kinds) then
     perform app.cmd_fail('validation_failed', '{"supervisor_member_id": "not_in_scope"}');
   end if;
   if exists (select 1 from app.followups_tasks t
@@ -946,6 +1129,8 @@ begin
   if v_errors <> '{}'::jsonb then
     perform app.cmd_fail('validation_failed', v_errors);
   end if;
+  -- Review N2: the same personal-data gate as every other Follow-ups change.
+  perform app.followups_require_open();
   for v_task in
     select t.task_id, t.task_state, t.revision,
            case v_event when 'resolved' then p.on_source_resolved else p.on_source_cancelled end as effect
@@ -1004,6 +1189,7 @@ declare
   v_due timestamptz;
   v_capacity text;
   v_task uuid;
+  v_kinds text[];
 begin
   select a.* into v_actor from app.followups_command_actor(p_actor) a;
   v_errors := app.contract_unknown_keys(p_payload, array['source_type', 'source_id',
@@ -1035,7 +1221,13 @@ begin
     perform app.cmd_fail('validation_failed', v_errors);
   end if;
   perform app.followups_require_open();
-  if app.identity_member_has_scope(v_actor.member_id, v_scope_kind, v_scope_id) then
+  v_kinds := app.followups_purpose_kinds(v_source_type, v_purpose);
+  if cardinality(v_kinds) = 0 then
+    perform app.cmd_fail('validation_failed', '{"purpose": "unregistered"}');
+  elsif not (v_scope_kind = any (v_kinds)) then
+    perform app.cmd_fail('validation_failed', '{"scope_kind": "not_allowed"}');
+  end if;
+  if app.followups_member_holds(v_actor.member_id, v_scope_kind, v_scope_id, v_kinds) then
     v_capacity := 'supervisor';
     v_supervisor := coalesce(v_supervisor, v_actor.member_id);
   elsif v_actor.is_admin then
@@ -1284,9 +1476,15 @@ begin
       v_errors := v_errors || '{"owner_member_id": "unchanged"}';
     elsif not app.followups_member_active(v_owner) then
       v_errors := v_errors || '{"owner_member_id": "unknown"}';
+    elsif not (v_owner = any (app.followups_scope_roster(v_task.scope_kind, v_task.scope_id))) then
+      -- Review S2: an Admin routes within the scope's target too (fail closed).
+      v_errors := v_errors || '{"owner_member_id": "not_in_scope"}';
     end if;
   end if;
   if v_supervisor is not null then
+    -- Review N5: the new supervisor's grants are share-locked (also by the authorizer).
+    perform 1 from app.identity_grants g
+     where g.member_id = v_supervisor and g.revoked_at is null for share;
     if v_supervisor = v_task.supervisor_member_id then
       v_errors := v_errors || '{"supervisor_member_id": "unchanged"}';
     elsif not app.followups_member_active(v_supervisor)
@@ -1349,6 +1547,14 @@ begin
    where g.member_id = r.member_id and g.revoked_at is null
      and (g.role = 'admin' or g.scope_kind is not null)
      for share;
+  -- Review N5: a named supervisor's grants too, before the receipt (AD-2 lock order).
+  if jsonb_typeof(p_request -> 'payload') = 'object'
+     and app.contract_uuid_error(p_request #> '{payload,supervisor_member_id}') is null then
+    perform 1 from app.identity_grants g
+     where g.member_id = (p_request #>> '{payload,supervisor_member_id}')::uuid
+       and g.revoked_at is null
+       for share;
+  end if;
   return true;
 end;
 $$;
@@ -1520,9 +1726,9 @@ $$;
 comment on function api.followups_task(uuid) is
   'Story 4.6: one follow-up task (owner and scope holders: all; Admin: routing metadata only).';
 
--- The tasks in every scope the caller holds (active and finished in the last 30 days, at most
--- 200), the caller's scopes that registered purposes accept, the manual purposes, and the
--- approved members an owner may be chosen from. Refused when the caller holds no such scope.
+-- The tasks the caller supervises (followups_holds_scope; active and finished in the last 30
+-- days, at most 200), the caller's scopes (one per family and target) each with the members an
+-- owner may be chosen from, and the manual purposes. Refused when the caller holds no such scope.
 create function app.followups_supervision()
 returns jsonb
 language plpgsql
@@ -1552,12 +1758,16 @@ begin
                                        coalesce(t.review_at, t.due_at), t.finished_at desc,
                                        t.task_id) as rn
       from app.followups_tasks t
-      join mine s on s.scope_kind = t.scope_kind and s.scope_id = t.scope_id
-     where t.finished_at is null or t.finished_at > now() - interval '30 days')
+     where t.scope_id in (select s.scope_id from mine s)
+       and app.followups_holds_scope(v_member, t)
+       and (t.finished_at is null or t.finished_at > now() - interval '30 days')),
+  families as (
+    select distinct on (app.followups_family(s.scope_kind), s.scope_id) s.scope_kind, s.scope_id
+      from mine s
+     order by app.followups_family(s.scope_kind), s.scope_id, s.scope_kind)
   select jsonb_build_object(
-    'scopes', coalesce((select jsonb_agg(jsonb_build_object('scope_kind', s.scope_kind,
-                                                            'scope_id', s.scope_id)
-                                         order by s.scope_kind, s.scope_id) from mine s), '[]'::jsonb),
+    'scopes', coalesce((select jsonb_agg(app.followups_scope_json(f.scope_kind, f.scope_id, false)
+                                         order by f.scope_kind, f.scope_id) from families f), '[]'::jsonb),
     'purposes', coalesce((
       select jsonb_agg(jsonb_build_object('source_type', p.source_type, 'purpose', p.purpose,
                                           'label', p.label, 'scope_kinds', to_jsonb(p.scope_kinds),
@@ -1568,8 +1778,7 @@ begin
          and exists (select 1 from mine s where s.scope_kind = any (p.scope_kinds))), '[]'::jsonb),
     'tasks', coalesce((select jsonb_agg(app.followups_task_json(r.task_id, v_member) order by r.rn)
                          from ranked r where r.rn <= 200), '[]'::jsonb),
-    'truncated', (select count(*) > 200 from ranked),
-    'candidates', app.followups_candidates(false))
+    'truncated', (select count(*) > 200 from ranked))
     into v_result;
   perform app.identity_record_activity(v_link);
   return v_result;
@@ -1589,7 +1798,8 @@ comment on function api.followups_supervision() is
   'Story 4.6: follow-up tasks in the scopes the caller holds, with manual purposes and members.';
 
 -- Admin only: routing metadata of every task (active and finished in the last 30 days, at most
--- 500) and the approved members to reassign to. No next action, outcome, context or notes.
+-- 500) and, per active task scope, the members to reassign to. No next action, outcome, context
+-- or notes.
 create function app.followups_admin_routing()
 returns jsonb
 language plpgsql
@@ -1609,12 +1819,20 @@ begin
                                        coalesce(t.review_at, t.due_at), t.finished_at desc,
                                        t.task_id) as rn
       from app.followups_tasks t
-     where t.finished_at is null or t.finished_at > now() - interval '30 days')
+     where t.finished_at is null or t.finished_at > now() - interval '30 days'),
+  -- Review S2: an Admin reassigns within each active task's scope (its roster), not the roster
+  -- of the whole church.
+  families as (
+    select distinct on (app.followups_family(t.scope_kind), t.scope_id) t.scope_kind, t.scope_id
+      from app.followups_tasks t join ranked r on r.task_id = t.task_id
+     where r.rn <= 500 and t.finished_at is null
+     order by app.followups_family(t.scope_kind), t.scope_id, t.scope_kind)
   select jsonb_build_object(
     'tasks', coalesce((select jsonb_agg(app.followups_routing_json(r.task_id) order by r.rn)
                          from ranked r where r.rn <= 500), '[]'::jsonb),
     'truncated', (select count(*) > 500 from ranked),
-    'candidates', app.followups_candidates(true))
+    'scopes', coalesce((select jsonb_agg(app.followups_scope_json(f.scope_kind, f.scope_id, true)
+                                         order by f.scope_kind, f.scope_id) from families f), '[]'::jsonb))
     into v_result;
   perform app.identity_record_activity(v_link);
   return v_result;
@@ -1707,6 +1925,45 @@ comment on function app.followups_erase_member(jsonb) is
 select app.identity_register_deletion_hook('followups', 'app.followups_erase_member(jsonb)'::regprocedure);
 
 -- ---------------------------------------------------------------------------------------------
+-- Scope families: department (Duties) and cell (Cells) rosters (review S1, S2)
+-- ---------------------------------------------------------------------------------------------
+
+-- Duties: a department's current members (read only).
+create function app.duties_followups_roster(p_input jsonb)
+returns jsonb
+language sql
+stable
+set search_path = ''
+as $$
+  select jsonb_build_object('member_ids', coalesce(jsonb_agg(dm.member_id order by dm.member_id),
+                                                   '[]'::jsonb))
+    from app.duties_department_members dm
+   where dm.department_id::text = p_input ->> 'scope_id' and dm.ended_at is null;
+$$;
+
+-- Cells: a cell's current members (read only).
+create function app.cells_followups_roster(p_input jsonb)
+returns jsonb
+language sql
+stable
+set search_path = ''
+as $$
+  select jsonb_build_object('member_ids', coalesce(jsonb_agg(m.member_id order by m.member_id),
+                                                   '[]'::jsonb))
+    from app.cells_memberships m
+   where m.cell_id::text = p_input ->> 'scope_id' and m.ended_at is null;
+$$;
+
+select app.followups_register_scope_family('duties', 'department_leader', 'department',
+  'app.duties_followups_roster(jsonb)'::regprocedure);
+select app.followups_register_scope_family('duties', 'department_deputy', 'department',
+  'app.duties_followups_roster(jsonb)'::regprocedure);
+select app.followups_register_scope_family('cells', 'cell_leader', 'cell',
+  'app.cells_followups_roster(jsonb)'::regprocedure);
+select app.followups_register_scope_family('cells', 'cell_assistant', 'cell',
+  'app.cells_followups_roster(jsonb)'::regprocedure);
+
+-- ---------------------------------------------------------------------------------------------
 -- SYNTHETIC source: fixture_followup (owner: fixture)
 -- ---------------------------------------------------------------------------------------------
 
@@ -1773,7 +2030,16 @@ revoke all on function
   app.followups_task_json(uuid, uuid),
   app.followups_activity_json(uuid),
   app.followups_notes_json(uuid),
-  app.followups_candidates(boolean),
+  app.followups_scope_json(text, uuid, boolean),
+  app.followups_person_name(uuid),
+  app.followups_family(text),
+  app.followups_member_holds(uuid, text, uuid, text[]),
+  app.followups_purpose_kinds(text, text),
+  app.followups_scope_roster(text, uuid),
+  app.followups_validate_read_hook(text, regprocedure),
+  app.followups_register_scope_family(text, text, text, regprocedure),
+  app.duties_followups_roster(jsonb),
+  app.cells_followups_roster(jsonb),
   app.followups_task_outcome(uuid),
   app.followups_insert_task(text, uuid, bigint, text, uuid, uuid, text, uuid, text, timestamptz,
                             uuid, uuid, text, boolean, text),

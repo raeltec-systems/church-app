@@ -124,7 +124,7 @@ Record the outcome per step in `evidence-4.1/owner-check.md` (pass/fail, device 
 
 ## Story 4.2: revise assignments on material change and refuse stale responses
 
-Migration: `supabase/migrations/20261013221115_duties_revisions.sql` (forward only: the 4.1 files are not edited; no destructive statements, no row deletions, no new `_rows` file, no new client grant). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-revise-assignments-on-material-change-and-refuse-stale-respo-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.2/`.
+Migration: `supabase/migrations/20261014001142_duties_revisions.sql` (forward only: the 4.1 files are not edited; no destructive statements, no row deletions, no new `_rows` file, no new client grant). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-revise-assignments-on-material-change-and-refuse-stale-respo-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.2/`.
 
 ### Model
 
@@ -201,7 +201,7 @@ Fictional numbers: pgTAP `+44 7700 900970-900979`, E2E `900980-900989`. The E2E 
 
 ### Hosted staging (parent session, then the owner)
 
-1. **Parent session:** apply `20261013221115_duties_revisions.sql` to staging (`tmurpotfluignacfueki`) after `20261013220300`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. Compare the md5 of each replaced or new `app.duties_*` function body with the local one (the MCP apply decodes `\uXXXX` escapes; this migration has none, but check). No Edge Function change, no new client grant, no rows file. Check: `select count(*) from app.duties_slot_revisions;` equals the number of slots published before (revision 1 back-filled).
+1. **Parent session:** apply `20261014001142_duties_revisions.sql` to staging (`tmurpotfluignacfueki`) after `20261013220300`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. Compare the md5 of each replaced or new `app.duties_*` function body with the local one (the MCP apply decodes `\uXXXX` escapes; this migration has none, but check). No Edge Function change, no new client grant, no rows file. Check: `select count(*) from app.duties_slot_revisions;` equals the number of slots published before (revision 1 back-filled).
 2. **Owner:** nothing to paste. Then the manual checks below.
 3. **Production:** nothing in this story (Q2 and Q4 gates stay closed).
 

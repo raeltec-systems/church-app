@@ -1,5 +1,5 @@
 {
-  "$comment": "Production BASELINE template. The project does not exist yet (owner gate in owner-decisions-milestone-1.md). Private access and sending stay disabled until the owner approves their release gates in the production database.",
+  "$comment": "Production BASELINE template. The project exists (created 2026-10-13, see owner-decisions-milestone-2.md, \"Production setup\"); it stays empty until the first promote.yml run from main. Private access and sending stay disabled until the owner approves their release gates in the production database.",
   "name": "production",
   "kind": "production",
   "database_marker": "production",

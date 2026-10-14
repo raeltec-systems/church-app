@@ -226,17 +226,37 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
     if (!_current(epoch)) return;
     // A denial or failure drops everything protected from the screen. A
     // request still in flight stays pending, so its buttons stay disabled
-    // and it cannot be sent twice.
+    // and it cannot be sent twice. Story 4.5: an unknown outcome is let go
+    // once the fresh read shows no target still waiting for that command
+    // (the server did record it, or the duty changed): the server's state
+    // is shown, never a stale Not sent.
+    var unconfirmed = state.unconfirmed;
+    var notice = state.notice;
+    var noticeAction = state.noticeAction;
+    if (unconfirmed != null &&
+        r is AccessReadOk<T> &&
+        !stillUnconfirmed(unconfirmed, r.value)) {
+      unconfirmed = null;
+      if (notice == DutyNotice.unconfirmed) {
+        notice = null;
+        noticeAction = null;
+      }
+    }
     state = DutiesState<T>(
       result: r,
       pending: state.pending,
-      notice: state.notice,
-      noticeAction: state.noticeAction,
-      unconfirmed: state.unconfirmed,
+      notice: notice,
+      noticeAction: noticeAction,
+      unconfirmed: unconfirmed,
       fieldErrors: state.fieldErrors,
     );
     if (r is AccessReadDenied<T>) noteProtectedDenial(ref);
   }
+
+  /// Story 4.5: whether [action], whose outcome was never learned, may still
+  /// be unanswered according to the fresh read [value]. By default it is
+  /// kept until Check again learns the outcome.
+  bool stillUnconfirmed(DutyAction action, T value) => true;
 
   void dismissNotice() =>
       state = state.copyWith(clearNotice: true, fieldErrors: const {});
@@ -589,6 +609,20 @@ class MyDutiesController extends DutiesController<MyDuties> {
   Future<AccessRead<MyDuties>> fetch() =>
       ref.read(dutiesRepositoryProvider).fetchMyDuties();
 
+  /// Story 4.5: [duty] is still in the state [action] expected (withdrawing
+  /// expects an acceptance; answering and bulk acceptance expect a pending
+  /// duty). Once it is not, the server's answer is what the member sees.
+  static bool awaits(DutyAction action, MyDuty duty) =>
+      action.touches(duty.assignmentId) &&
+      duty.response ==
+          (action.command == DutyCommands.withdrawAcceptance
+              ? DutyResponse.accepted
+              : DutyResponse.pending);
+
+  @override
+  bool stillUnconfirmed(DutyAction action, MyDuties value) =>
+      value.assignments.any((d) => awaits(action, d));
+
   Future<void> respond(MyDuty duty, DutyResponse response, {String? note}) {
     final n = note?.trim();
     return send(DutyCommands.respond, Optional.of(duty.revision), {
@@ -627,6 +661,25 @@ final myDutiesProvider =
     NotifierProvider<MyDutiesController, DutiesState<MyDuties>>(
       MyDutiesController.new,
     );
+
+/// Story 4.5: the optional note a member is typing for Accept, per
+/// assignment, so the list card, the detail card and the detail footer share
+/// it. Memory only, dropped on an account change.
+class DutyAnswerNotes extends Notifier<Map<String, String>> {
+  @override
+  Map<String, String> build() {
+    ref.watch(accountGenerationProvider);
+    return const {};
+  }
+
+  void set(String assignmentId, String text) =>
+      state = {...state, assignmentId: text};
+
+  void clear(String assignmentId) => state = {...state}..remove(assignmentId);
+}
+
+final dutyAnswerNotesProvider =
+    NotifierProvider<DutyAnswerNotes, Map<String, String>>(DutyAnswerNotes.new);
 
 /// Story 4.5: hands a duty's calendar file to the platform. Unavailable by
 /// default; the mobile composition root supplies the share-sheet handoff.

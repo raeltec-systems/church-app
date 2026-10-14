@@ -47,14 +47,14 @@ context:
   - A decline only removes a commitment. A gate racing with it can at worst ask for a reason that is no longer needed, which fails closed.
   - After a later decline no override is carried on a material change (4.4 B2), so the leader is gated again.
   - Members see no overlap warning. The leader's recorded override already covered it, and the member chooses.
-- Decision (agent, under owner pre-approval): **lock order**. `accept_many` takes the occurrences FOR SHARE in (start, id) order and then the assignments FOR UPDATE in the same order, and runs Notifications last. This matches the documented order: occurrences, then assignments, then Notifications. The withdrawal locks only its assignment, like `duties.respond`.
+- Decision (agent, under owner pre-approval): **lock order** (amended after review S2). `accept_many` takes the occurrences FOR SHARE in (series, series date, start, id) order, one-off duties after every series date, and then the assignments FOR UPDATE in the same order, and runs Notifications last. Series date order is the order `duties.revise_series` and `duties.cancel_series` lock a series' dates in; start order differs from it once one date was moved by `duties.revise_duty`, and could deadlock. This matches the documented order: occurrences, then assignments, then Notifications. The withdrawal checks ownership without a lock, then locks only its assignment, like `duties.respond`.
 - Decision (agent, under owner pre-approval): **cell-owned fails closed**. Every member response path refuses a cell-owned assignment as `not_found`, now including `duties.respond`, until entry 11. My duties stays department-owned.
 - Decision (agent, under owner pre-approval): **detail and leader contact**.
   - The detail screen shows the department's current leader and deputy names.
   - No phone or Call action is shown: contact display waits on the Q4 gate and the 2.5 routes, and entry 9 builds the contact routes.
   - Declined future duties stay in Upcoming, labelled "Can't make it".
 - Decision (agent, under owner pre-approval): **calendar**.
-  - Add to calendar builds an iCalendar (.ics) event and hands it to the phone's share sheet through `share_plus`, the platform handoff. The event has a stable UID, reporting or start time to end time (start + 2 h when there is no end), duty, position, department and place. Instructions and notes are left out.
+  - Add to calendar builds an iCalendar (.ics) event and hands it to the phone's share sheet through `share_plus`, the platform handoff. The event's UID is the occurrence and its slot, stable across a material change (review N4), with `SEQUENCE` = the slot revision; reporting or start time to end time (start + 2 h when there is no end), duty, position, department and place. Instructions and notes are left out.
   - Wording is honest: the app says it handed a calendar file to the phone, never that it was added. The caveat says the copy does not update after a change and points to My duties in the app.
   - The app link scheme is not widened: the deep link back is the in-app route `/duties/assignments/{id}`.
 - Decision (agent, under owner pre-approval): **Home**. A minimal member Home route (`/home`, a mobile tab once access is granted) holds the My duties card. Later epics add their own cards to it.
@@ -146,7 +146,7 @@ Replaced with `create or replace`, same signatures:
 - the history guard (`prior_accepted_at` immutable on ended rows);
 - `duties_respond` (cell-owned answers `not_found`);
 - `duties_authorize_command` and `duties_command` (the two commands; `accept_many` takes a null expected revision);
-- `duties_my_assignment_json` (`owner_kind`, `prior_accepted_at`, `leaders`);
+- `duties_my_assignment_json` (`slot_id`, `owner_kind`, `prior_accepted_at`, `leaders`);
 - the 3-argument `duties_occurrence_json` and the 2-argument `duties_rota_occurrence_json` (`prior_accepted_at`).
 
 Unchanged: `duties_in_scope`, `duties_my_duties`, the client grants, deletion. ASCII only, with no backslashes, no DROP, TRUNCATE or `delete from`, and `search_path = ''` everywhere. New functions are revoked from every client role.
@@ -154,7 +154,11 @@ Unchanged: `duties_in_scope`, `duties_my_duties`, the client grants, deletion. A
 ### Decisions
 
 - Decision (agent, under owner pre-approval): a **declined future duty stays in Upcoming**, labelled "Can't make it" (or "Can't make it anymore"), so the member sees what they told their leader. With nothing waiting for an answer, My duties opens on Upcoming.
-- Decision (agent, under owner pre-approval): **Accept carries no note** in the new screens. The optional practical note belongs to the Can't make it sheet, following the design contract. The server still accepts a note with `duties.respond`.
+- Decision (agent, under owner pre-approval; amended after review S3): **a single Accept carries the optional note** again, as the FR says ("Accept or Can't make it, with an optional note"). A pending duty's card (list and detail) has **Note for your leader (optional)**; the list card's and the detail footer's **Accept** send it with `duties.respond` (the draft is shared in memory per assignment, dropped on an account change), and the Can't make it sheet starts with it. **Bulk acceptance stays note-less** (`duties.accept_many` items are `{assignment_id, revision}` only); the confirmation says so and points to accepting a date on its own. The Home card's inline **Accept** sends no note (a quick action; the full card is one tap away).
+- Decision (agent, under owner pre-approval; review N1): **only a member-recorded acceptance can be withdrawn**: `response_provenance` must be `member`; anything else is refused `conflict {"assignment_id": "responded"}` (fail closed for leader confirmation in entry 9).
+- Decision (agent, under owner pre-approval; review N8): the client parses `owner_kind`; only `department` is answerable (no Accept, Can't make it, Can't make it anymore or selection otherwise). A missing value is a department, because a server before 4.5 lists department-owned duties only; a non-string value is a format error.
+- Decision (agent, under owner pre-approval; review S1): **Not sent lasts only while the server still shows the duty as the command found it** (pending for respond and accept_many, accepted for withdraw). A read that shows otherwise lets the unknown outcome go: the server's answer shows, and the Not sent notice and Check again go away.
+- Decision (agent, under owner pre-approval; review N9): `/home` is registered only when the app asks for it (`buildClientRouter(memberHome: true)`, mobile); staff web has no member Home. Resume and revisit reloads skip while a read is already under way, so the Home card and a page mounted together read once.
 - Decision (agent, under owner pre-approval): **bulk selection** is offered only when two or more dates wait. The client caps it at 50, the server's limit. A failed bulk acceptance keeps the still-pending dates selected; changed dates drop out because they have new ids after the reload.
 - Decision (agent, under owner pre-approval): the calendar handoff is `share_plus` 13.3.0 in `apps/mobile` only.
   - It is a new native plugin. The adapter sits behind the client_core port `DutyCalendarExport`, and staff web and tests get "not available".
@@ -162,11 +166,11 @@ Unchanged: `duties_in_scope`, `duties_my_duties`, the client grants, deletion. A
 
 ### Tests
 
-- pgTAP: `supabase/tests/duties_responses_test.sql`, 67 checks. The ledgers `duties_tracer_test.sql` and `duties_revisions_test.sql` now subtract the three new My duties keys and the history key, which are checked in the new suite. No client grant changed, so `command_foundation_test.sql` is untouched.
-- Client: `packages/client_core/test/duties/duties_responses_test.dart`, 16 tests. Three 4.1/4.2 widget tests were updated for the new flow: Can't make it now opens a sheet, Accept from the list sends no note, and an answered duty moves to Upcoming.
-- Mobile: `apps/mobile/test/share_calendar_export_test.dart` (mocked platform channels), a Home tab test, and the 4.1 mobile test (taps Upcoming).
+- pgTAP: `supabase/tests/duties_responses_test.sql`, 74 checks (after review: a non-member acceptance cannot be withdrawn, `slot_id`, and the erase phase on withdrawn duties). The ledgers `duties_tracer_test.sql` and `duties_revisions_test.sql` now subtract the four new My duties keys and the history key, which are checked in the new suite. No client grant changed, so `command_foundation_test.sql` is untouched.
+- Client: `packages/client_core/test/duties/duties_responses_test.dart`, 20 tests (after review: owner kind, an unknown outcome the server recorded, Accept's note from the detail footer, `/home` on mobile only, UID/SEQUENCE and the share origin). 4.1/4.2 widget tests were updated for the new flow: Can't make it now opens a sheet and an answered duty moves to Upcoming; the 4.1 Accept-with-note assertion (" On my way " sent as `On my way`) is restored.
+- Mobile: `apps/mobile/test/share_calendar_export_test.dart` (mocked platform channels, including the iPad `sharePositionOrigin`), a Home tab test, and the 4.1 mobile test (taps Upcoming).
 - E2E: `tools/identity-e2e/duties-responses.mjs`, 12 checks, V00-V99, with the offline `duties-responses.test.mjs`.
-  - Race V30 ran three rounds and recorded both orders: bulk first (all three accepted, the moved date pending again) and edit first (bulk refused whole, none accepted).
+  - Race V30 runs three rounds; each round records its `order` (`bulk_first`: all three accepted, the moved date pending again; `edit_first`: bulk refused whole, none accepted) and the step lists `orders_seen` (review N10).
   - Fictional numbers: pgTAP `+44 7700 900550-900559`, E2E `900560-900569`. No earlier suite uses these blocks (grepped).
 
 ### Matrix audit
@@ -184,6 +188,8 @@ Unchanged: `duties_in_scope`, `duties_my_duties`, the client grants, deletion. A
 | Empty / error | client tests (segments, Home) |
 
 ## Plan Change Log
+
+- 2026-10-14, review of 4.5 (no blockers): S1 Not sent yields to the server's state after a read; S2 accept_many lock order (series, series date, start, id) to agree with series edits; S3 the optional note on a single Accept restored (bulk stays note-less); N1 member provenance required to withdraw; N2 unlocked ownership check before the row lock; N3 `is distinct from` for revisions; N4 `.ics` UID occurrence+slot with SEQUENCE (My duties adds `slot_id`); N5 footer SafeArea; N6 share origin; N7 pgTAP erase on withdrawn duties; N8 `owner_kind` parsed, fail closed; N9 selection pruned outside build, one reload on resume, `/home` mobile only; N10 V30 logs each round's order. The migration was edited in place (not merged or applied anywhere yet). The frozen lock-order and calendar decisions were amended at the reviewer's request.
 
 ## Review Triage Log
 

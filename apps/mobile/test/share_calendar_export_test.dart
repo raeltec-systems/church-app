@@ -30,7 +30,10 @@ void main() {
 
   const ics = 'BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n';
 
-  Future<(CalendarHandoff, Map?)> run(Object? Function() answer) async {
+  Future<(CalendarHandoff, Map?)> run(
+    Object? Function() answer, {
+    ShareOrigin? origin,
+  }) async {
     Map? args;
     messenger.setMockMethodCallHandler(share, (call) async {
       args = call.arguments as Map?;
@@ -41,6 +44,7 @@ void main() {
     final r = await const ShareCalendarExport().export(
       fileName: 'duty-2099-01-04.ics',
       ics: ics,
+      origin: origin,
     );
     return (r, args);
   }
@@ -64,5 +68,23 @@ void main() {
       (await run(() => PlatformException(code: 'x'))).$1,
       CalendarHandoff.failed,
     );
+  });
+
+  test('the share sheet is anchored to the button (iPad popover)', () async {
+    final (_, args) = await run(
+      () => 'com.example.calendar',
+      origin: const ShareOrigin(10, 20, 30, 40),
+    );
+    expect(
+      [
+        args!['originX'],
+        args['originY'],
+        args['originWidth'],
+        args['originHeight'],
+      ],
+      [10.0, 20.0, 30.0, 40.0],
+    );
+    final (_, none) = await run(() => 'com.example.calendar');
+    expect(none!.containsKey('originX'), isFalse);
   });
 }

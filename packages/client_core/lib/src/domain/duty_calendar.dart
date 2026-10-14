@@ -30,6 +30,13 @@ abstract final class DutyCalendar {
         '${two(w.day)}.ics';
   }
 
+  /// The event's UID: the occurrence and its position (slot), so it stays
+  /// the same when a material change replaces the assignment. A server
+  /// before 4.5 sends no slot id; the assignment id stands in.
+  static String uid(MyDuty duty) =>
+      'duty-${duty.occurrenceId}-${duty.slotId ?? duty.assignmentId}'
+      '@bickafue.app';
+
   /// The iCalendar text of [duty] (CRLF lines, folded at 75 octets). [now]
   /// is the export time (DTSTAMP).
   static String ics(MyDuty duty, {required DateTime now}) {
@@ -50,7 +57,10 @@ abstract final class DutyCalendar {
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       'BEGIN:VEVENT',
-      'UID:duty-${duty.assignmentId}@bickafue.app',
+      'UID:${uid(duty)}',
+      // A later export of a changed duty replaces the earlier copy in
+      // calendars that honour SEQUENCE (the slot revision only grows).
+      'SEQUENCE:${duty.slotRevision}',
       'DTSTAMP:${_utc(now)}',
       'DTSTART:${_utc(start)}',
       'DTEND:${_utc(end.isAfter(start) ? end : start.add(defaultLength))}',
@@ -124,11 +134,23 @@ enum CalendarHandoff {
   failed,
 }
 
+/// Where the share sheet should point from (the Add to calendar button, in
+/// global logical pixels). iPad shows the share sheet as a popover anchored
+/// here; phones ignore it.
+class ShareOrigin {
+  const ShareOrigin(this.left, this.top, this.width, this.height);
+  final double left;
+  final double top;
+  final double width;
+  final double height;
+}
+
 /// Application port: hands an `.ics` file to the platform. Never throws.
 abstract interface class DutyCalendarExport {
   Future<CalendarHandoff> export({
     required String fileName,
     required String ics,
+    ShareOrigin? origin,
   });
 }
 
@@ -140,5 +162,6 @@ class UnavailableCalendarExport implements DutyCalendarExport {
   Future<CalendarHandoff> export({
     required String fileName,
     required String ics,
+    ShareOrigin? origin,
   }) async => CalendarHandoff.unavailable;
 }

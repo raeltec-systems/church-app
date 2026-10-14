@@ -21,18 +21,23 @@ const _a2 = '42424242-4242-4242-8242-424242424242';
 const _a3 = '42424242-4242-4242-8242-424242424243';
 const _a4 = '42424242-4242-4242-8242-424242424244';
 const _ruth = '66666666-6666-4666-8666-666666666666';
+const _occ = '43434343-4343-4343-8343-434343434343';
+const _slot = '45454545-4545-4545-8545-454545454545';
 
 class _FakeCalendar implements DutyCalendarExport {
   _FakeCalendar(this.answer);
   final CalendarHandoff answer;
   final List<(String, String)> exported = [];
+  final List<ShareOrigin?> origins = [];
 
   @override
   Future<CalendarHandoff> export({
     required String fileName,
     required String ics,
+    ShareOrigin? origin,
   }) async {
     exported.add((fileName, ics));
+    origins.add(origin);
     return answer;
   }
 }
@@ -50,6 +55,7 @@ Future<ClientTestHarness> pumpAt(
   setUp?.call(h);
   final router = buildClientRouter(
     initialLocation: location,
+    memberHome: true,
     shell: (_, _, child) => AccessRefresher(child: child),
   );
   addTearDown(router.dispose);
@@ -164,6 +170,35 @@ void main() {
       }
     });
 
+    test('only a department-owned duty can be answered (fail closed)', () {
+      final now = DateTime.utc(2099, 1, 1);
+      final dept = MyDuty.fromJson(myDutyData());
+      expect(dept.ownerKind, DutyOwnerKind.department);
+      expect(dept.needsResponse(now), isTrue);
+      // A server before 4.5 sends no owner kind: department-owned only.
+      expect(
+        MyDuty.fromJson({...myDutyData()}..remove('owner_kind')).answerable,
+        isTrue,
+      );
+      for (final kind in ['cell', 'care']) {
+        final d = MyDuty.fromJson(myDutyData(ownerKind: kind));
+        expect(d.answerable, isFalse, reason: kind);
+        expect(d.needsResponse(now), isFalse, reason: kind);
+        final accepted = MyDuty.fromJson(
+          myDutyData(
+            ownerKind: kind,
+            response: 'accepted',
+            respondedAt: _accepted,
+          ),
+        );
+        expect(accepted.canWithdraw(now), isFalse, reason: kind);
+      }
+      expect(
+        () => MyDuty.fromJson({...myDutyData(), 'owner_kind': 3}),
+        throwsFormatException,
+      );
+    });
+
     test(
       'segments: needs a response, upcoming (accepted or declined), past',
       () {
@@ -241,7 +276,26 @@ void main() {
       final lines = ics.split('\r\n');
       expect(lines.first, 'BEGIN:VCALENDAR');
       expect(ics.endsWith('END:VCALENDAR\r\n'), isTrue);
-      expect(lines, contains('UID:duty-$_a1@bickafue.app'));
+      // The occurrence and its position: the same entry after a material
+      // change replaces the assignment; SEQUENCE is the slot revision.
+      // A long UID line is folded at 75 octets.
+      final unfoldedLines = ics.replaceAll('\r\n ', '').split('\r\n');
+      expect(unfoldedLines, contains('UID:duty-$_occ-$_slot@bickafue.app'));
+      expect(lines, contains('SEQUENCE:1'));
+      final moved = MyDuty.fromJson(
+        myDutyData(
+          assignmentId: _a2,
+          slotRevision: 2,
+          changes: const ['starts_at'],
+          startsAt: '2099-01-03T23:00:00.000000Z',
+        ),
+      );
+      final movedIcs = DutyCalendar.ics(moved, now: DateTime.utc(2026, 10, 15));
+      expect(
+        movedIcs.replaceAll('\r\n ', ''),
+        contains('UID:duty-$_occ-$_slot@bickafue.app'),
+      );
+      expect(movedIcs, contains('SEQUENCE:2'));
       expect(lines, contains('DTSTAMP:20261014T070000Z'));
       // From the reporting time; two hours from the start with no end.
       expect(lines, contains('DTSTART:20990103T223000Z'));
@@ -373,6 +427,68 @@ void main() {
       expect(byKey('duty-withdraw-$_a1'), findsNothing);
     });
 
+    testWidgets('an unknown outcome the server did record: after a reload '
+        'the server\'s answer shows, not Not sent', (tester) async {
+      final h = await pumpAt(
+        tester,
+        '/duties/assignments/$_a1',
+        setUp: (h) => h.duties.mine = mineWith([
+          sunday(
+            _a1,
+            1,
+            response: 'accepted',
+            revision: 2,
+            respondedAt: _accepted,
+          ),
+        ]),
+      );
+      await tapKey(tester, 'duty-withdraw-$_a1');
+      await settle(tester);
+      await tapKey(tester, 'decline-confirm');
+      await settle(tester);
+      h.gateway.sent.single.unknown();
+      await settle(tester);
+      expect(statusOf(tester, 'my-duty-status-$_a1'), 'Not sent');
+      // A reload that still shows the duty accepted keeps Not sent.
+      await tapKey(tester, 'duties-reload');
+      await settle(tester);
+      expect(statusOf(tester, 'my-duty-status-$_a1'), 'Not sent');
+      expect(byKey('duties-notice-unconfirmed'), findsOneWidget);
+      // The server did record it; the list is read again (resume, Reload).
+      h.duties.mine = mineWith([
+        sunday(
+          _a1,
+          1,
+          response: 'declined',
+          revision: 3,
+          respondedAt: '2026-10-14T09:00:00.000000Z',
+          priorAcceptedAt: _accepted,
+        ),
+      ]);
+      await tapKey(tester, 'duties-reload');
+      await settle(tester);
+      expect(statusOf(tester, 'my-duty-status-$_a1'), 'Can\'t make it anymore');
+      expect(byKey('duties-notice-unconfirmed'), findsNothing);
+      expect(byKey('duties-check-again'), findsNothing);
+      expect(h.gateway.sent, hasLength(1));
+    });
+
+    testWidgets('Accept carries the optional note from the detail card to '
+        'the footer', (tester) async {
+      final h = await pumpAt(
+        tester,
+        '/duties/assignments/$_a1',
+        setUp: (h) => h.duties.mine = mineWith([sunday(_a1, 1)]),
+      );
+      await tester.enterText(byKey('duty-note-$_a1'), ' Bringing the slides ');
+      await tapKey(tester, 'duty-accept-$_a1');
+      expect(h.gateway.sent.single.wire['payload'], {
+        'assignment_id': _a1,
+        'response': 'accepted',
+        'note': 'Bringing the slides',
+      });
+    });
+
     testWidgets('bulk: select three of four dates, confirm the dates, one '
         'all-or-nothing request', (tester) async {
       final h = await pumpAt(
@@ -397,6 +513,8 @@ void main() {
         expect(byKey('bulk-date-$id'), findsOneWidget);
       }
       expect(byKey('bulk-date-$_a4'), findsNothing);
+      // Bulk acceptance carries no note (decision recorded in the plan).
+      expect(byKey('duties-bulk-no-note'), findsOneWidget);
       await tapKey(tester, 'duties-bulk-cancel');
       await settle(tester);
       expect(h.gateway.sent, isEmpty);
@@ -496,7 +614,14 @@ void main() {
       await tapKey(tester, 'duty-calendar-$_a1');
       await settle(tester);
       expect(calendar.exported.single.$1, 'duty-2099-01-11.ics');
-      expect(calendar.exported.single.$2, contains('UID:duty-$_a1@'));
+      expect(
+        calendar.exported.single.$2.replaceAll('\r\n ', ''),
+        contains('UID:duty-$_occ-$_slot@'),
+      );
+      // The share sheet is anchored to the button (iPad popover).
+      final origin = calendar.origins.single!;
+      expect(origin.width, greaterThan(0));
+      expect(origin.height, greaterThan(0));
       expect(
         tester.widget<Text>(byKey('duty-calendar-result-$_a1')).data,
         contains('can\'t tell whether it was saved'),
@@ -563,6 +688,25 @@ void main() {
         'assignment_id': _a1,
         'response': 'declined',
       });
+    });
+
+    testWidgets('the member Home is registered on mobile only', (tester) async {
+      final h = ClientTestHarness();
+      h.duties.mine = mineWith([sunday(_a1, 1)]);
+      final router = buildClientRouter(
+        initialLocation: ClientPaths.home,
+        shell: (_, _, child) => child,
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: h.overrides(),
+          child: MaterialApp.router(routerConfig: router),
+        ),
+      );
+      await settle(tester);
+      expect(find.byType(MemberHomeScreen), findsNothing);
+      expect(find.byType(MyDutiesHomeCard), findsNothing);
     });
 
     testWidgets('empty and failed reads differ', (tester) async {

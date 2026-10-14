@@ -92,6 +92,8 @@ class _MobileAppState extends State<MobileApp> {
     membershipRequests: true,
     // Story 2.9: sign-in help links to staff-assisted recovery on this phone.
     assistedRecovery: true,
+    // Story 4.5: the member Home with the My duties card.
+    memberHome: true,
     shell: (location, focusSelectedNav, child) => MobileShell(
       location: location,
       focusSelectedNav: focusSelectedNav,

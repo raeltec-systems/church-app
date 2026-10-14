@@ -249,6 +249,8 @@ class MyDuty {
     this.scripture,
     this.priorAcceptedAt,
     this.leaders = const [],
+    this.slotId,
+    this.ownerKind = DutyOwnerKind.department,
   });
 
   factory MyDuty.fromJson(Object? json) {
@@ -284,8 +286,21 @@ class MyDuty {
       scripture: _opt<String>(m, 'scripture'),
       priorAcceptedAt: _priorAccepted(m, response),
       leaders: _leaders(m),
+      slotId: _opt<String>(m, 'slot_id'),
+      ownerKind: DutyOwnerKind.fromWire(m['owner_kind']),
     );
   }
+
+  /// Story 4.5: the position's slot (stable across revisions; the calendar
+  /// entry's id). Null from a server before 4.5.
+  final String? slotId;
+
+  /// Story 4.5: who owns the duty. Only a department-owned duty can be
+  /// answered here (cell parts wait on entry 11; anything else fails closed).
+  final DutyOwnerKind ownerKind;
+
+  /// Story 4.5: the member may answer this duty from My duties.
+  bool get answerable => ownerKind == DutyOwnerKind.department;
 
   /// Story 4.5: when the member had accepted before saying they can't make
   /// it anymore (null otherwise).
@@ -342,12 +357,12 @@ class MyDuty {
 
   /// Still asks for an answer: pending and not yet started.
   bool needsResponse(DateTime now) =>
-      response == DutyResponse.pending && !startedAt(now);
+      answerable && response == DutyResponse.pending && !startedAt(now);
 
   /// Story 4.5: an accepted duty that has not started can be withdrawn
   /// ("Can't make it anymore").
   bool canWithdraw(DateTime now) =>
-      response == DutyResponse.accepted && !startedAt(now);
+      answerable && response == DutyResponse.accepted && !startedAt(now);
 
   /// Story 4.5: declined after an earlier acceptance.
   bool get declinedLater =>
@@ -356,6 +371,21 @@ class MyDuty {
   /// "Sunday preaching: Reader" (or the duty name alone).
   String get title =>
       positionName == null ? dutyName : '$dutyName: $positionName';
+}
+
+/// Story 4.5: who owns a duty the member sees. A server before 4.5 sends no
+/// owner kind and lists department-owned duties only, so a missing value is
+/// a department; any other value (a cell part, or one this app does not
+/// know) is shown but cannot be answered here (fail closed).
+enum DutyOwnerKind {
+  department,
+  other;
+
+  static DutyOwnerKind fromWire(Object? v) => switch (v) {
+    null || 'department' => department,
+    String() => other,
+    _ => throw const FormatException('unexpected owner_kind'),
+  };
 }
 
 /// Story 4.5: a leader or deputy of the duty's department, by name only.

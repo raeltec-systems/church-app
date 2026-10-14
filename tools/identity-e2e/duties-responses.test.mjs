@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
-  CELL, DEPARTMENT, allOrNothing, churchInstant, churchSunday, isFictionalResponsesPhone, selection,
+  CELL, DEPARTMENT, allOrNothing, churchInstant, churchSunday, isFictionalResponsesPhone, raceOrder, selection,
 } from './duties-responses.mjs';
 
 test('only the reserved fictional numbers of this run are accepted', () => {
@@ -34,4 +34,11 @@ test('a race round is all or nothing', () => {
   assert.equal(allOrNothing({ bulk: { status: 200, code: 'conflict' }, acceptedCount: 1, selected: 3 }), false);
   assert.equal(allOrNothing({ bulk: { status: 200, code: 'unavailable' }, acceptedCount: 0, selected: 3 }), false);
   assert.equal(allOrNothing({ bulk: undefined, acceptedCount: 0, selected: 3 }), false);
+});
+
+test('each race round names the order it took', () => {
+  assert.equal(raceOrder({ bulk: { status: 200 }, acceptedCount: 3, selected: 3 }), 'bulk_first');
+  assert.equal(raceOrder({ bulk: { status: 200, code: 'conflict' }, acceptedCount: 0, selected: 3 }), 'edit_first');
+  assert.equal(raceOrder({ bulk: { status: 200 }, acceptedCount: 2, selected: 3 }), 'partial');
+  assert.equal(raceOrder({ bulk: { status: 200, code: 'conflict' }, acceptedCount: 1, selected: 3 }), 'partial');
 });

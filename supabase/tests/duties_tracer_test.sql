@@ -290,7 +290,7 @@ select is((pg_temp.readj(4, 'select api.duties_my_duties()') -> 'assignments' ->
             -- Story 4.3 keys are checked in duties_rota_test.sql.
             - 'position_name' - 'topic' - 'scripture'
             -- Story 4.5 keys are checked in duties_responses_test.sql.
-            - 'owner_kind' - 'prior_accepted_at' - 'leaders',
+            - 'owner_kind' - 'prior_accepted_at' - 'leaders' - 'slot_id',
   '{"revision": 1, "duty_name": "Sunday preaching", "department_name": "SYNTHETIC Preaching Rota", "reporting_at": null, "location": "SYNTHETIC Main hall", "instructions": "Arrive early.", "response": "pending", "responded_at": null, "note": null}'::jsonb,
   'with its detail, deadline and pending response');
 select is(jsonb_array_length(pg_temp.readj(5, 'select api.duties_my_duties()') -> 'assignments'), 1,

@@ -458,7 +458,8 @@ Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/st
 ### Commands (`api.duties_command`)
 
 **`duties.withdraw_acceptance {assignment_id, note?}`** ("Can't make it anymore")
-- `expected_revision` is the assignment's revision. Only the assignee may send it, only for an accepted answer, and only before the reporting time (or the start).
+- `expected_revision` is the assignment's revision. Only the assignee may send it, only for an acceptance the member recorded (`response_provenance = 'member'`), and only before the reporting time (or the start). An acceptance recorded any other way (a leader confirming on the member's behalf, entry 9) is refused as `responded` (fail closed).
+- Ownership is checked first without a lock (`not_found` takes no row lock); the assignment is then locked and checked again.
 - The answer becomes `declined` and the earlier acceptance time is kept. The response actor and time become the withdrawal's, and the note (1..280 characters, practical) replaces any earlier one.
 - The assignment's pending jobs are cancelled (`responded`). The answer holds ids and states only: `{assignment_id, revision, response: "declined", withdrawn: true}`.
 - Refusals:
@@ -478,11 +479,11 @@ Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/st
 - **All or nothing.** If any date is superseded, cancelled, already answered (`responded`), at another revision (`stale`) or started, nothing is recorded and the answer is `conflict {"assignments": "changed", "assignment:<id>": "<code>"}`, naming only the dates that failed.
 - Someone else's, unknown or cell-owned dates answer `not_found` for the whole command, which says nothing about which date.
 - Shape errors are `validation_failed` with `{"assignments": "required" | "invalid" | "too_many" | "duplicate"}`.
-- Success: `{response: "accepted", count, assignments: [{assignment_id, revision}]}` in date order. The receipt's aggregate is the first date, so a replay is rechecked against its assignee. A retry under the same request id (a timeout) returns the stored answer and records nothing new.
+- Success: `{response: "accepted", count, assignments: [{assignment_id, revision}]}` in lock order (below). The receipt's aggregate is the first date in that order, so a replay is rechecked against its assignee. A retry under the same request id (a timeout) returns the stored answer and records nothing new.
 
 **Lock order** follows the 4.3 and 4.4 header: authority grants, then the receipt, then occurrences, then assignments, then Notifications last.
-- `accept_many` takes its occurrences FOR SHARE in start order, then its assignments FOR UPDATE in the same order.
-- `withdraw_acceptance`, like `respond`, locks only its assignment.
+- `accept_many` takes its occurrences FOR SHARE in (series, series date, start, id) order, with one-off duties after every series date, then its assignments FOR UPDATE in the same order. Series order by series date is the order `duties.revise_series` and `duties.cancel_series` lock a series' dates in; start order would differ from it once one date was moved with `duties.revise_duty`, and the two could deadlock.
+- `withdraw_acceptance`, like `respond`, locks only its assignment (after an unlocked ownership check).
 
 A leader's material change racing a bulk acceptance either lands first, so the bulk acceptance is refused whole, or lands second, so every date was accepted and the moved one is asked again. A partial acceptance never happens.
 
@@ -496,7 +497,8 @@ A leader's material change racing a bulk acceptance either lands first, so the b
 ### Reads
 
 **`api.duties_my_duties`** adds, per assignment:
-- `owner_kind` (`department`);
+- `slot_id` (the position; stays the same when a material change replaces the assignment, so it is the calendar entry's id);
+- `owner_kind` (`department`). The app answers only a `department` duty; any other value is shown but cannot be answered (fail closed). A missing value (a server before 4.5) is a department, since those list department-owned duties only;
 - `prior_accepted_at`;
 - `leaders`: `[{display_name, role: leader|deputy}]` for the department's current leaders and deputies.
 
@@ -518,21 +520,26 @@ Leader names only: contact details wait on Q4 and the entry 9 contact routes.
 - Cards have a date badge (church date), the duty and position, department, times (church time), place and status.
 
 **Answering**
-- **Can't make it** opens a sheet with an optional practical note and **Cancel**. Nothing is sent until **Send: can't make it**.
+- A duty that waits for an answer has an optional **Note for your leader** field on its card (list and detail). **Accept** sends it with the answer (the list card's **Accept**, the detail footer's **Accept**). The Home card's **Accept** sends no note.
+- **Can't make it** opens a sheet with an optional practical note (prefilled with anything already typed on the card) and **Cancel**. Nothing is sent until **Send: can't make it**.
 - **Details** opens the duty with a sticky footer:
   - pending: **Accept** and **Can't make it**;
   - accepted and not started: **Can't make it anymore**, which opens the same sheet and says the leader sees at once that the position needs cover;
   - otherwise nothing.
 - A declined-after-accepting duty reads **Can't make it anymore**, with "You had accepted on ...".
 
-**Bulk acceptance.** With two or more dates waiting, each card has a checkbox. **Accept selected (n)** opens a confirmation listing each date, duty and department. **Accept n duties** sends one `duties.accept_many`; **Cancel** sends nothing. If a date changed, **Nothing accepted** explains and the list is read again.
+**Bulk acceptance.** With two or more dates waiting, each card has a checkbox. **Accept selected (n)** opens a confirmation listing each date, duty and department. **Accept n duties** sends one `duties.accept_many`; **Cancel** sends nothing. A bulk acceptance carries no note, and the confirmation says so ("To add a note, accept that date on its own"). If a date changed, **Nothing accepted** explains and the list is read again.
 
 **Honest states**
 - While a command is out, the duty (every selected duty for a bulk acceptance) reads **Sending…**.
 - An unknown outcome (airplane mode, a timeout) reads **Not sent**. **Check again** resends the same request id and body. **Accepted** shows only after the server confirms.
+- **Not sent** lasts only while the server still shows the duty as the command found it (pending for Accept, Can't make it and a bulk acceptance; accepted for Can't make it anymore). When a read (Reload, resume) shows it answered, the server did record it: the server's answer is shown and the Not sent notice goes away.
+- Screens shown together (the Home card, a list under a detail) read once on resume, not once each.
 
 **Add to calendar** (detail; not for declined or started duties)
 - The app builds an iCalendar file: reporting or start time to end time (two hours with no end), duty, position, department and place. Instructions and notes are never exported.
+- The event's UID is the occurrence and its position (`duty-<occurrence_id>-<slot_id>@bickafue.app`), so exporting again after a material change replaces the earlier copy in calendars that honour it; `SEQUENCE` is the slot revision.
+- On an iPad the share sheet is a popover anchored to the **Add to calendar** button (`sharePositionOrigin`).
 - The mobile app hands the file to the phone's share sheet (`share_plus`). The wording follows the platform's answer:
   - "Calendar file shared ...";
   - "Calendar file handed to your phone. We can't tell whether it was saved ...";
@@ -546,7 +553,7 @@ Leader names only: contact details wait on Q4 and the entry 9 contact routes.
 - the next duty (date, duty, department, times, place, status) with inline **Accept** and **Can't make it**;
 - **See all**.
 
-Empty and failed reads differ. Later features add their own cards to Home.
+Empty and failed reads differ. Later features add their own cards to Home. The `/home` route is registered in the mobile app only (staff web has no member Home).
 
 **Staff web.** The board, its history and the rota read **Can't make it anymore** for a later decline, with "Had accepted <time>; needs cover".
 
@@ -563,7 +570,7 @@ node --test tools/identity-e2e/duties-responses.test.mjs
 (cd apps/mobile && flutter test)
 ```
 
-Fictional numbers: pgTAP `+44 7700 900550-900559`, E2E `900560-900569`. The E2E runs a real race in three rounds: the member accepts three dates together while the leader moves one of them. Each round must be all or nothing, and the recorded evidence shows both orders, bulk first and edit first.
+Fictional numbers: pgTAP `+44 7700 900550-900559`, E2E `900560-900569`. The E2E runs a real race in three rounds: the member accepts three dates together while the leader moves one of them. Each round must be all or nothing. Every round records the order it took (`bulk_first`: all three accepted, the moved date asked again; `edit_first`: the bulk acceptance refused whole), and `orders_seen` lists them; a timing run may see only one order.
 
 ### Hosted staging (parent session, then the owner)
 
@@ -587,7 +594,7 @@ Use synthetic members only. You need the 4.1 setup: Admin A, leader L of `SYNTHE
 3. **Later decline.** On the phone, go to **Duties** > **Upcoming**, open the accepted duty (**Details**). The footer shows **Can't make it anymore**. Tap it, add a note and send. The status reads **Can't make it anymore** with "You had accepted on ...". As L, **Reload**: **Can't make it anymore**, "Had accepted ...; needs cover", "0 of 1 confirmed".
 4. **Bulk: three of four.** As L, **Rota** > **New rota**: four Sundays, position `Reader`. Plan M on every date and **Publish 4 draft slots**. On the phone, go to **Needs a response**: four dates with checkboxes. Tick three, then **Accept selected (3)**. The confirmation lists the three dates. Tap **Accept 3 duties**: **Accepted** "... accepted 3 duties". The fourth still waits. As L, the rota shows three **Accepted** and one **Awaiting response**.
 5. **Airplane mode stays Not sent.** On the fourth date, turn on airplane mode and tap **Accept**. It must show **Not sent** with **Check again**, never **Accepted**. As L (web), **Reload**: still **Awaiting response**. Turn airplane mode off and tap **Check again**: **Accepted** (the same request is sent again). L sees it on **Reload**.
-6. **A changed date refuses the selection.** As L, publish two more Sundays for M. On the phone, tick both but do not confirm. As L, change the time of one of them. On the phone, confirm: **Nothing accepted**. The list is read again, and the changed date shows **Changed**.
+6. **A changed date refuses the selection.** As L, publish two more Sundays for M. On the phone, tick both but do not confirm. As L, change the time of one of them. On the phone, confirm: **Nothing accepted**. The list is read again, and the changed date shows **Changed**. Then, on the date that did not change, type `SYNTHETIC: on my way` in **Note for your leader** and tap its **Accept**: **Accepted**. As L, **Reload**: **Accepted** with the note.
 7. **Empty versus error.** With nothing left to answer, **Needs a response** says "Nothing waiting for your response.". In airplane mode, **Reload** shows **No connection** (not an empty list), and the Home card says "No connection ... This is not an empty list."
 8. **Add to calendar.** Open an accepted duty, **Add to calendar**. The share sheet opens with a `.ics` file; choose the calendar app. The app says the file was shared or handed over (never "added"), and the caveat says the copy does not update. Change the duty's time as L: the calendar entry stays old, and My duties shows the new time with **Changed**.
 9. **Clean up** as in 4.1, step 9.
@@ -599,5 +606,5 @@ Record the outcome of each step in `evidence-4.5/owner-check.md`: pass or fail, 
 - Leaders get no push or inbox alert for a decline yet; the board shows it at once. The leader decline alert and the coverage queue arrive with entry 9.
 - Cell programme parts are not answerable or listed in My duties until entry 11.
 - No phone or Call action for the leader on the detail screen (Q4, entry 9 contact routes).
-- Accepting is always without a note (the note belongs to Can't make it).
-- The calendar export is a copy. The iOS share sheet (iPad popover anchor) is unverified until an iOS build exists.
+- Accepting several dates together is without a note; accept a date on its own to add one. The Home card's Accept sends no note.
+- The calendar export is a copy. The iOS share sheet (iPad popover anchor) is unverified on a device until an iOS build exists.

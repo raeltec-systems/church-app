@@ -5,7 +5,7 @@
 -- guard. HTTP evidence (including the concurrent race): tools/identity-e2e/duties-responses.mjs.
 -- Every account, phone and name is SYNTHETIC (fictional range +44 7700 900550-900559).
 begin;
-select plan(67);
+select plan(74);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000045' || lpad(n::text, 2, '0'))::uuid $$;
@@ -208,6 +208,20 @@ select is((select (r ->> 'code') || '|' || (r #>> '{field_errors,assignment_id}'
 select is((select (r ->> 'code') || '|' || (r #>> '{field_errors,assignment_id}')
              from (select pg_temp.answer(4, pg_temp.a(4, 0), 'accepted') as r) x),
   'conflict|responded', 'duties.respond still refuses a second answer');
+-- Only the member's own acceptance can be withdrawn (fail closed for answers recorded another way,
+-- entry 9). The vocabulary is widened inside this transaction only, to stage such an answer.
+create temp table state_def as
+  select pg_catalog.pg_get_functiondef('app.duties_state_ok(text, text)'::regprocedure) as d;
+select ok((select d from state_def) like '%p_value in (''member'')%', 'the provenance vocabulary is member only');
+do $$ begin execute replace((select d from state_def), $q$p_value in ('member')$q$, $q$p_value in ('member', 'leader')$q$); end $$;
+select is(pg_temp.answer(4, pg_temp.a(4, 8), 'accepted') #>> '{data,response}', 'accepted', 'M accepts duty 8');
+update app.duties_assignments set response_provenance = 'leader' where assignment_id = pg_temp.a(4, 8);
+select is((select (r ->> 'code') || '|' || (r #>> '{field_errors,assignment_id}')
+             from (select pg_temp.withdraw(4, pg_temp.a(4, 8)) as r) x),
+  'conflict|responded', 'an acceptance not recorded by the member cannot be withdrawn here');
+select is((pg_temp.row(pg_temp.a(4, 8))).response, 'accepted', 'and nothing changed');
+update app.duties_assignments set response_provenance = 'member' where assignment_id = pg_temp.a(4, 8);
+do $$ begin execute (select d from state_def); end $$;
 
 -- The leader sees it at once, the member sees their earlier acceptance --------------------------
 create temp table board as select jsonb_path_query_first(pg_temp.readj(2, 'select api.duties_leader_board()'),
@@ -231,6 +245,8 @@ select is((select pg_temp.my(pg_temp.a(4, 0)) -> 'leaders'),
   '[{"role": "leader", "display_name": "SYNTHETIC 4.5 Member 2"}, {"role": "deputy", "display_name": "SYNTHETIC 4.5 Member 3"}]'::jsonb,
   'and the department''s leader and deputy names, leader first, with no contact details');
 select is((select pg_temp.my(pg_temp.a(4, 1)) ->> 'prior_accepted_at'), null, 'a never-accepted duty has none');
+select is((select pg_temp.my(pg_temp.a(4, 0)) ->> 'slot_id'), (pg_temp.row(pg_temp.a(4, 0))).slot_id::text,
+  'My duties carries the slot id (a calendar entry''s stable id across revisions)');
 
 -- Started, superseded, cancelled ------------------------------------------------------------------
 select is(pg_temp.answer(4, pg_temp.a(4, 2), 'accepted') #>> '{data,response}', 'accepted', 'M accepts duty 2');
@@ -412,6 +428,16 @@ select is((app.duties_erase_member(jsonb_build_object('member_id', pg_temp.mid(4
   'before erasure the member''s duties are counted');
 select is((select count(*)::int from app.duties_assignments where prior_accepted_at is not null
              and member_id = pg_temp.mid(4)), 2, 'the two withdrawn acceptances are the member''s');
+select is((select (r ->> 'remaining')::int from jsonb_array_elements(
+             app.identity_call_deletion_hooks(pg_temp.mid(4), pg_temp.u(4), gen_random_uuid(), 'erase')) r
+            where r ->> 'module' = 'duties'), 0, 'the erase phase leaves nothing of M in Duties, withdrawn duties included');
+select is((select count(*)::int || '|' || count(*) filter (
+                    where response_note is null
+                      and member_id = '00000000-0000-0000-0000-000000000000'
+                      and responded_by_member = '00000000-0000-0000-0000-000000000000')
+             from app.duties_assignments
+            where prior_accepted_at is not null),
+  '2|2', 'each withdrawn duty stays as an anonymous fact: the note is cleared and the member is the nil UUID');
 
 select * from finish();
 rollback;

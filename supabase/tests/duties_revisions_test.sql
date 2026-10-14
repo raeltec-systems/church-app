@@ -290,7 +290,7 @@ select is((select (j -> 'assignments' -> 0) - 'occurrence_id' - 'department_id' 
                   -- Story 4.3 keys are checked in duties_rota_test.sql.
                   - 'position_name' - 'topic' - 'scripture'
                   -- Story 4.5 keys are checked in duties_responses_test.sql.
-                  - 'owner_kind' - 'prior_accepted_at' - 'leaders' from mine),
+                  - 'owner_kind' - 'prior_accepted_at' - 'leaders' - 'slot_id' from mine),
   jsonb_build_object('assignment_id', pg_temp.asg2(), 'revision', 1, 'response', 'pending', 'slot_revision', 2,
                      'changes', jsonb_build_array('starts_at', 'ends_at'), 'previous_response', 'accepted',
                      'previous_assignment_ids', jsonb_build_array(pg_temp.asg1()), 'notes_updated_at', null),

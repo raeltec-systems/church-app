@@ -545,6 +545,7 @@ void main() {
         setUp: (h) => h.duties.mine = mineWith([myDutyData()]),
       );
       expect(find.text('Needs a response (1)'), findsOneWidget);
+      await tester.enterText(byKey('duty-note-$_assignment'), ' On my way ');
       await tapKey(tester, 'duty-accept-$_assignment');
       final sent = h.gateway.sent.single;
       expect(sent.function, 'duties_command');
@@ -553,6 +554,7 @@ void main() {
       expect(sent.wire['payload'], {
         'assignment_id': _assignment,
         'response': 'accepted',
+        'note': 'On my way',
       });
       expect(find.text('Sending…'), findsWidgets);
       expect(find.text('Accepted'), findsNothing);
@@ -567,6 +569,7 @@ void main() {
           revision: 2,
           response: 'accepted',
           respondedAt: '2026-10-13T09:00:00.000000Z',
+          note: 'On my way',
         ),
       ]);
       h.gateway.sent.last.confirm(const {}, 2);

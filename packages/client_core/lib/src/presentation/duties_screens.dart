@@ -376,9 +376,12 @@ class _DutiesPageState<T> extends ConsumerState<_DutiesPage<T>> {
   }
 
   // Resume and revisit reloads wait while a command is in flight (its own
-  // answer reloads the list).
+  // answer reloads the list). Story 4.5: and while a read is already under
+  // way, so screens mounted together (the Home card, a list under a pushed
+  // detail) read once on resume.
   void _reload() {
-    if (mounted && !ref.read(widget.provider).busy) {
+    final s = ref.read(widget.provider);
+    if (mounted && !s.busy && !s.loading) {
       ref.read(widget.provider.notifier).reload();
     }
   }
@@ -1916,6 +1919,19 @@ class _MyDutiesListState extends ConsumerState<_MyDutiesList> {
   _Segment? _chosen;
   final _selected = <String>{};
 
+  // Only dates that still need an answer stay selected: an answered or
+  // changed date drops out once the list is read again.
+  @override
+  void didUpdateWidget(covariant _MyDutiesList old) {
+    super.didUpdateWidget(old);
+    final now = DateTime.now();
+    final open = {
+      for (final d in widget.duties.assignments)
+        if (d.needsResponse(now)) d.assignmentId,
+    };
+    _selected.retainWhere(open.contains);
+  }
+
   Future<void> _confirmBulk(List<MyDuty> chosen) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -1941,6 +1957,12 @@ class _MyDutiesListState extends ConsumerState<_MyDutiesList> {
             const Text(
               'If any of them changed since you opened this list, nothing '
               'is accepted and the list is shown again.',
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Notes are not sent when accepting several dates. To add a '
+              'note, accept that date on its own.',
+              key: Key('duties-bulk-no-note'),
             ),
           ],
         ),
@@ -1982,10 +2004,6 @@ class _MyDutiesListState extends ConsumerState<_MyDutiesList> {
     final current =
         _chosen ??
         (seg.needsResponse.isNotEmpty ? _Segment.needs : _Segment.upcoming);
-    // Only dates that still need an answer stay selected (an answered or
-    // changed date drops out after the list is read again).
-    final needsIds = {for (final d in seg.needsResponse) d.assignmentId};
-    _selected.removeWhere((id) => !needsIds.contains(id));
     final chosen = [
       for (final d in seg.needsResponse)
         if (_selected.contains(d.assignmentId)) d,
@@ -2129,17 +2147,27 @@ class _OneDuty extends StatelessWidget {
   }
 }
 
-/// Story 4.5: is a command for [id] in flight, or sent with an unknown
-/// outcome?
-(bool sending, bool unsent) _commandState(WidgetRef ref, String id) => (
-  ref.watch(myDutiesProvider.select((s) => s.pending?.touches(id) ?? false)),
+/// Story 4.5: is a command for [a] in flight, or sent with an unknown
+/// outcome while the server still shows [a] as that command found it? Once
+/// a read shows the duty answered (the server did record it) or changed,
+/// the server's state wins over Not sent.
+(bool sending, bool unsent) _commandState(WidgetRef ref, MyDuty a) => (
   ref.watch(
-    myDutiesProvider.select((s) => s.unconfirmed?.touches(id) ?? false),
+    myDutiesProvider.select((s) => s.pending?.touches(a.assignmentId) ?? false),
+  ),
+  ref.watch(
+    myDutiesProvider.select(
+      (s) => switch (s.unconfirmed) {
+        final u? => MyDutiesController.awaits(u, a),
+        null => false,
+      },
+    ),
   ),
 );
 
 /// The status a member reads: Sending… while a command for this duty is
-/// out, Not sent while its outcome is unknown, otherwise the server's.
+/// out, Not sent while its outcome is unknown and the duty still waits for
+/// it, otherwise the server's.
 (String, StatusTone) _shownStatus(MyDuty a, bool sending, bool unsent) =>
     sending
     ? ('Sending…', StatusTone.info)
@@ -2156,11 +2184,16 @@ Future<void> _showDeclineSheet(
   MyDuty duty,
 ) async {
   final later = duty.response == DutyResponse.accepted;
+  // A note already typed on the card carries into Can't make it.
+  final draft = later
+      ? null
+      : ref.read(dutyAnswerNotesProvider)[duty.assignmentId];
   final note = await showModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (context) => _DeclineSheet(duty: duty, later: later),
+    builder: (context) =>
+        _DeclineSheet(duty: duty, later: later, initialNote: draft),
   );
   if (note == null) return;
   final ctl = ref.read(myDutiesProvider.notifier);
@@ -2172,16 +2205,21 @@ Future<void> _showDeclineSheet(
 }
 
 class _DeclineSheet extends StatefulWidget {
-  const _DeclineSheet({required this.duty, required this.later});
+  const _DeclineSheet({
+    required this.duty,
+    required this.later,
+    this.initialNote,
+  });
   final MyDuty duty;
   final bool later;
+  final String? initialNote;
 
   @override
   State<_DeclineSheet> createState() => _DeclineSheetState();
 }
 
 class _DeclineSheetState extends State<_DeclineSheet> {
-  final _note = TextEditingController();
+  late final _note = TextEditingController(text: widget.initialNote ?? '');
 
   @override
   void dispose() {
@@ -2292,7 +2330,11 @@ class _DutyFooter extends ConsumerWidget {
                 ? null
                 : () => ref
                       .read(myDutiesProvider.notifier)
-                      .respond(duty, DutyResponse.accepted),
+                      .respond(
+                        duty,
+                        DutyResponse.accepted,
+                        note: ref.read(dutyAnswerNotesProvider)[id],
+                      ),
             child: const Text('Accept'),
           ),
         ),
@@ -2323,9 +2365,13 @@ class _DutyFooter extends ConsumerWidget {
         color: c.surface,
         border: Border(top: BorderSide(color: c.line)),
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: Wrap(spacing: 8, runSpacing: 8, children: buttons),
+      // Clear of the home indicator and gesture bar.
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Wrap(spacing: 8, runSpacing: 8, children: buttons),
+        ),
       ),
     );
   }
@@ -2358,13 +2404,38 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
   CalendarHandoff? _calendar;
   bool _exporting = false;
 
-  Future<void> _addToCalendar(MyDuty a) async {
+  // The optional note for Accept (shared with the detail footer).
+  late final TextEditingController _note;
+
+  @override
+  void initState() {
+    super.initState();
+    _note = TextEditingController(
+      text: ref.read(dutyAnswerNotesProvider)[widget.duty.assignmentId] ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addToCalendar(MyDuty a, BuildContext button) async {
+    // The share sheet points at the button (an iPad popover needs it).
+    final box = button.findRenderObject();
+    ShareOrigin? origin;
+    if (box is RenderBox && box.hasSize) {
+      final o = box.localToGlobal(Offset.zero);
+      origin = ShareOrigin(o.dx, o.dy, box.size.width, box.size.height);
+    }
     setState(() => _exporting = true);
     final result = await ref
         .read(dutyCalendarExportProvider)
         .export(
           fileName: DutyCalendar.fileName(a),
           ics: DutyCalendar.ics(a, now: DateTime.now()),
+          origin: origin,
         );
     if (!mounted) return;
     setState(() {
@@ -2393,7 +2464,7 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
     final a = widget.duty;
     final id = a.assignmentId;
     final now = DateTime.now();
-    final (sending, unsent) = _commandState(ref, id);
+    final (sending, unsent) = _commandState(ref, a);
     final (shown, shownTone) = _shownStatus(a, sending, unsent);
     final canAnswer = a.needsResponse(now);
     final details = <Widget>[
@@ -2458,6 +2529,21 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
           'told your leader you can\'t make it.',
         ),
       if (a.note case final n?) Text('Your note: $n'),
+      if (canAnswer) ...[
+        const SizedBox(height: 8),
+        TextField(
+          key: Key('duty-note-$id'),
+          controller: _note,
+          enabled: !widget.busy,
+          maxLength: 280,
+          onChanged: (v) =>
+              ref.read(dutyAnswerNotesProvider.notifier).set(id, v),
+          decoration: const InputDecoration(
+            labelText: 'Note for your leader (optional)',
+            helperText: 'Sent with Accept or Can\'t make it.',
+          ),
+        ),
+      ],
       if (widget.full) ...[
         if (a.leaders.isNotEmpty) ...[
           const SizedBox(height: 8),
@@ -2478,11 +2564,15 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: FocusRing(
-              child: OutlinedButton.icon(
-                key: Key('duty-calendar-$id'),
-                onPressed: _exporting ? null : () => _addToCalendar(a),
-                icon: const Icon(Icons.event_outlined),
-                label: const Text('Add to calendar'),
+              child: Builder(
+                builder: (button) => OutlinedButton.icon(
+                  key: Key('duty-calendar-$id'),
+                  onPressed: _exporting
+                      ? null
+                      : () => _addToCalendar(a, button),
+                  icon: const Icon(Icons.event_outlined),
+                  label: const Text('Add to calendar'),
+                ),
               ),
             ),
           ),
@@ -2501,7 +2591,11 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
                 ? null
                 : () => ref
                       .read(myDutiesProvider.notifier)
-                      .respond(a, DutyResponse.accepted),
+                      .respond(
+                        a,
+                        DutyResponse.accepted,
+                        note: ref.read(dutyAnswerNotesProvider)[id],
+                      ),
             child: const Text('Accept'),
           ),
         ),
@@ -2617,7 +2711,8 @@ class _MyDutiesHomeCardState extends ConsumerState<MyDutiesHomeCard> {
   }
 
   void _reload() {
-    if (mounted && !ref.read(myDutiesProvider).busy) {
+    final s = ref.read(myDutiesProvider);
+    if (mounted && !s.busy && !s.loading) {
       ref.read(myDutiesProvider.notifier).reload();
     }
   }
@@ -2724,7 +2819,7 @@ class _MyDutiesHomeCardState extends ConsumerState<MyDutiesHomeCard> {
             ),
           );
         } else {
-          final (sending, unsent) = _commandState(ref, next.assignmentId);
+          final (sending, unsent) = _commandState(ref, next);
           final (shown, tone) = _shownStatus(next, sending, unsent);
           final id = next.assignmentId;
           children.addAll([

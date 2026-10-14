@@ -16,12 +16,13 @@
 --     revision or started refuses the whole command with `conflict`
 --     {"assignments": "changed", "assignment:<id>": "<code>"}; an unknown item, someone else's or
 --     a cell-owned one answers `not_found` (nothing is disclosed). The receipt's aggregate is the
---     first assignment (start order), so a replay is rechecked against its assignee.
+--     first assignment (lock order), so a replay is rechecked against its assignee.
 --   * Cell-owned assignments stay unreachable to members until entry 11 builds their member view:
 --     duties.respond (replaced), duties.withdraw_acceptance and duties.accept_many all answer
 --     `not_found` for an assignment of a cell-owned occurrence (fail closed). My duties stays
 --     department-owned (4.4).
---   * My duties (app.duties_my_assignment_json replaced) adds the owner kind, the earlier
+--   * My duties (app.duties_my_assignment_json replaced) adds the slot id (the calendar entry's
+--     stable id), the owner kind, the earlier
 --     acceptance of a withdrawn answer and the department's current leader and deputy names (no
 --     phone: contact display waits on Q4 and entry 9). The leader projections (the 3-argument
 --     app.duties_occurrence_json and the 2-argument app.duties_rota_occurrence_json, replaced)
@@ -37,8 +38,11 @@
 -- receipt -> department FOR SHARE -> series FOR UPDATE -> occurrences (series date order) ->
 -- member advisory locks and department membership FOR SHARE -> slots FOR UPDATE -> assignments
 -- FOR UPDATE -> Notifications (cancel, enqueue), always last. duties.accept_many takes its
--- occurrences FOR SHARE in (start, id) order and then its assignments FOR UPDATE in the same
--- order; duties.withdraw_acceptance, like duties.respond, locks only its assignment.
+-- occurrences FOR SHARE in (series, series date, start, id) order, one-off duties after every
+-- series date, and then its assignments FOR UPDATE in the same order, so it agrees with
+-- duties.revise_series and duties.cancel_series (series date order) even after one date was
+-- moved; duties.withdraw_acceptance, like duties.respond, checks ownership without a lock and
+-- then locks only its assignment.
 --
 -- No destructive statements, no row deletions. No new client grant (both commands go through
 -- api.duties_command).
@@ -284,9 +288,18 @@ begin
     perform app.cmd_fail('validation_failed', v_errors);
   end if;
   perform app.duties_require_open();
+  -- Ownership first, without a lock: someone else's, unknown or cell-owned is not found (no
+  -- disclosure, and no lock taken on a row the actor may not touch). Then lock and re-check.
+  if not exists (select 1 from app.duties_assignments a
+                   join app.duties_slots s on s.slot_id = a.slot_id
+                   join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
+                  where a.assignment_id = v_assignment_id and a.member_id = v_actor.member_id
+                    and o.department_id is not null) then
+    perform app.cmd_fail('not_found');
+  end if;
   select a.* into v_assignment from app.duties_assignments a
    where a.assignment_id = v_assignment_id for update;
-  if not found or v_assignment.member_id <> v_actor.member_id then
+  if not found or v_assignment.member_id is distinct from v_actor.member_id then
     perform app.cmd_fail('not_found');
   end if;
   v_occurrence := app.duties_assignment_occurrence(v_assignment.slot_id);
@@ -294,13 +307,16 @@ begin
     perform app.cmd_fail('not_found');
   end if;
   perform app.duties_refuse_ended(v_assignment, v_actor.member_id);
-  if v_assignment.revision <> p_expected_revision then
+  if v_assignment.revision is distinct from p_expected_revision then
     perform app.cmd_fail('conflict', null, v_assignment.revision);
   end if;
   if v_assignment.response = 'pending' then
     perform app.cmd_fail('conflict', '{"assignment_id": "not_accepted"}', v_assignment.revision);
   end if;
-  if v_assignment.response <> 'accepted' then
+  -- Only the member's own acceptance can be withdrawn here. An answer recorded any other way
+  -- (a leader confirming on the member's behalf, entry 9) fails closed as already answered.
+  if v_assignment.response <> 'accepted'
+     or v_assignment.response_provenance is distinct from 'member' then
     perform app.cmd_fail('conflict', '{"assignment_id": "responded"}', v_assignment.revision);
   end if;
   if app.duties_occurrence_start(v_occurrence) <= now() then
@@ -401,18 +417,22 @@ begin
   if v_found <> cardinality(v_ids) then
     perform app.cmd_fail('not_found');
   end if;
-  -- AD-2: occurrences FOR SHARE (start order), then the assignments FOR UPDATE (same order).
+  -- AD-2: occurrences FOR SHARE, then the assignments FOR UPDATE, in one order: series, then
+  -- series date (the order duties.revise_series and duties.cancel_series lock a series' dates
+  -- in, which differs from start order once one date was moved by duties.revise_duty), then
+  -- start and id. One-off duties (no series) come after every series date.
   perform 1 from app.duties_occurrences o
    where o.occurrence_id in (select s.occurrence_id from app.duties_assignments a
                                join app.duties_slots s on s.slot_id = a.slot_id
                               where a.assignment_id = any(v_ids))
-   order by o.starts_at, o.occurrence_id
+   order by o.series_id nulls last, o.series_date nulls last, o.starts_at, o.occurrence_id
      for share;
   perform 1 from app.duties_assignments a
     join app.duties_slots s on s.slot_id = a.slot_id
     join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
    where a.assignment_id = any(v_ids)
-   order by o.starts_at, o.occurrence_id, s.position_no, a.assignment_id
+   order by o.series_id nulls last, o.series_date nulls last, o.starts_at, o.occurrence_id,
+            s.position_no, a.assignment_id
      for update of a;
   for v_row in
     select a.*, o.occurrence_id as occ_id, o.department_id as dept_id,
@@ -421,16 +441,17 @@ begin
       join app.duties_slots s on s.slot_id = a.slot_id
       join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
      where a.assignment_id = any(v_ids)
-     order by o.starts_at, o.occurrence_id, s.position_no, a.assignment_id
+     order by o.series_id nulls last, o.series_date nulls last, o.starts_at, o.occurrence_id,
+              s.position_no, a.assignment_id
   loop
-    if v_row.member_id <> v_actor.member_id or v_row.dept_id is null then
+    if v_row.member_id is distinct from v_actor.member_id or v_row.dept_id is null then
       perform app.cmd_fail('not_found');
     end if;
     v_code := case
       when v_row.assignment_state = 'superseded' then 'superseded'
       when v_row.assignment_state <> 'current' then 'cancelled'
       when v_row.response <> 'pending' then 'responded'
-      when v_row.revision <> (v_revs ->> v_row.assignment_id::text)::bigint then 'stale'
+      when v_row.revision is distinct from (v_revs ->> v_row.assignment_id::text)::bigint then 'stale'
       when v_row.start_at <= now() then 'started'
     end;
     if v_code is not null then
@@ -446,7 +467,8 @@ begin
       join app.duties_slots s on s.slot_id = a.slot_id
       join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
      where a.assignment_id = any(v_ids)
-     order by o.starts_at, o.occurrence_id, s.position_no, a.assignment_id
+     order by o.series_id nulls last, o.series_date nulls last, o.starts_at, o.occurrence_id,
+              s.position_no, a.assignment_id
   loop
     update app.duties_assignments a
        set response = 'accepted', responded_at = now(),
@@ -561,7 +583,8 @@ comment on function api.duties_command(jsonb) is
 -- Projections (replaced)
 -- ---------------------------------------------------------------------------------------------
 
--- One assignment as its member sees it (4.3, plus the owner kind, the earlier acceptance of a
+-- One assignment as its member sees it (4.3, plus the slot id (a stable calendar entry id across
+-- revisions), the owner kind, the earlier acceptance of a
 -- withdrawn answer and the department's current leader and deputy names). Department-owned only
 -- (the inner join), as My duties lists.
 create or replace function app.duties_my_assignment_json(p_assignment_id uuid)
@@ -574,6 +597,7 @@ as $$
     'assignment_id', a.assignment_id,
     'revision', a.revision,
     'occurrence_id', o.occurrence_id,
+    'slot_id', a.slot_id,
     'owner_kind', 'department',
     'department_id', d.department_id,
     'department_name', d.name,

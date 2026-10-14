@@ -215,6 +215,7 @@ GoRouter buildClientRouter({
   bool membershipRequests = false,
   bool assistedRecovery = false,
   bool reminderHealth = false,
+  bool memberHome = false,
 }) {
   final afterCreateAccount = membershipRequests
       ? ClientPaths.membership
@@ -306,10 +307,12 @@ GoRouter buildClientRouter({
         path: ClientPaths.myCell,
         pageBuilder: (_, state) => page(state, const MyCellScreen()),
       ),
-      GoRoute(
-        path: ClientPaths.home,
-        pageBuilder: (_, state) => page(state, const MemberHomeScreen()),
-      ),
+      // Story 4.5: the member Home is a mobile destination only.
+      if (memberHome)
+        GoRoute(
+          path: ClientPaths.home,
+          pageBuilder: (_, state) => page(state, const MemberHomeScreen()),
+        ),
       GoRoute(
         path: ClientPaths.myDuties,
         pageBuilder: (_, state) => page(state, const MyDutiesScreen()),

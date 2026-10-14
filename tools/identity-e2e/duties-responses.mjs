@@ -65,6 +65,15 @@ export function allOrNothing({ bulk, acceptedCount, selected }) {
   return ok ? acceptedCount === selected : acceptedCount === 0 && bulk?.code === 'conflict';
 }
 
+/**
+ * Which order a race round took: `bulk_first` (every selected date accepted, the moved one asked
+ * again), `edit_first` (the bulk acceptance refused whole) or `partial` (never expected).
+ */
+export function raceOrder({ bulk, acceptedCount, selected }) {
+  if (!allOrNothing({ bulk, acceptedCount, selected })) return 'partial';
+  return bulk?.code === 'conflict' ? 'edit_first' : 'bulk_first';
+}
+
 async function main() {
   const { log, check, finish } = startRun();
   const keys = localKey();
@@ -286,13 +295,16 @@ async function main() {
         where slot_id in (${slots}) and response = 'accepted'`));
       const movedNow = psql(`select response from app.duties_assignments
         where slot_id = '${moved.data?.slot_id}' and assignment_state = 'current'`);
-      rounds.push({ bulk: bulkRace.code ?? 'ok', revise: revise.code ?? revise.data?.change,
+      rounds.push({ order: raceOrder({ bulk: bulkRace, acceptedCount, selected: 3 }),
+        bulk: bulkRace.code ?? 'ok', revise: revise.code ?? revise.data?.change,
         acceptedCount, movedNow,
         ok: allOrNothing({ bulk: bulkRace, acceptedCount, selected: 3 })
           && revise.status === 200 && !revise.code && movedNow === 'pending' });
     }
     check('V30-bulk-versus-leader-edit-never-partial', rounds.every((r) => r.ok),
-      { rounds: rounds.map(({ bulk, revise, acceptedCount, movedNow }) => ({ bulk, revise, acceptedCount, movedNow })) });
+      { orders_seen: [...new Set(rounds.map((r) => r.order))].sort(),
+        rounds: rounds.map(({ order, bulk, revise, acceptedCount, movedNow }) =>
+          ({ order, bulk, revise, acceptedCount, movedNow })) });
 
     // -------------------------------------------------------------- refusals
     const cellId = psql(`insert into app.cells_cells (name, broad_area, is_synthetic, created_by)

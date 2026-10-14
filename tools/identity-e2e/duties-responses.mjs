@@ -124,6 +124,10 @@ async function main() {
     delete from app.notifications_direct_contact_needs n where n.recipient_member_id in (select member_id from gone_members);
     delete from app.notifications_jobs j where j.recipient_member_id in (select member_id from gone_members)
        or j.source_id in (select assignment_id from gone_assignments);
+    -- Story 4.8: duties schedule reminders (member and leader schedules) and record Needs contact.
+    delete from app.notifications_schedules s where s.recipient_member_id in (select member_id from gone_members)
+       or s.source_id in (select assignment_id from gone_assignments);
+    delete from app.duties_contact_needs n where n.assignment_id in (select assignment_id from gone_assignments);
     delete from app.duties_audit a where a.department_id in (select department_id from gone_departments)
        or a.occurrence_id in (select occurrence_id from gone_occurrences)
        or a.actor_member_id in (select member_id from gone_members);

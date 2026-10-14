@@ -28,6 +28,7 @@ export 'src/domain/commands.dart';
 export 'src/domain/church_time.dart';
 export 'src/domain/credential_review.dart';
 export 'src/domain/duties.dart';
+export 'src/domain/duty_calendar.dart';
 export 'src/domain/fixture_counter.dart';
 export 'src/domain/inbox.dart';
 export 'src/domain/member_access.dart';

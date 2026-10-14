@@ -51,13 +51,14 @@ void main() {
   // Each test starts as a fresh app: no input seen yet.
   setUp(FocusVisibility.instance.reset);
 
-  testWidgets('story 3.8: the staff reminder-health route does not exist on mobile', (
-    tester,
-  ) async {
-    await pumpMobile(tester, location: ClientPaths.notificationHealth);
-    expect(find.byType(NotificationHealthScreen), findsNothing);
-    expect(find.text('Reminder health'), findsNothing);
-  });
+  testWidgets(
+    'story 3.8: the staff reminder-health route does not exist on mobile',
+    (tester) async {
+      await pumpMobile(tester, location: ClientPaths.notificationHealth);
+      expect(find.byType(NotificationHealthScreen), findsNothing);
+      expect(find.text('Reminder health'), findsNothing);
+    },
+  );
 
   testWidgets(
     'story 3.6: a tapped notification opens its inbox item; denied push registers nothing',
@@ -386,6 +387,11 @@ void main() {
       for (var i = 0; i < 3; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
+      // Story 4.5: the answered duty is under Upcoming.
+      await tester.tap(find.text('Upcoming (1)'));
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
       expect(
         find.descendant(
           of: find.byKey(const Key('my-duty-status-$id')),
@@ -393,6 +399,32 @@ void main() {
         ),
         findsOneWidget,
       );
+    },
+  );
+
+  testWidgets(
+    'story 4.5: Home follows member access and shows the My duties card',
+    (tester) async {
+      final h = await pumpMobile(tester, size: const Size(390, 1600));
+      expect(find.byKey(const Key('nav-/home')), findsNothing);
+      h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.duties.mine = AccessReadOk(
+        MyDuties.fromJson({
+          'member_id': '22222222-2222-4222-8222-222222222222',
+          'assignments': [myDutyData()],
+        }),
+      );
+      await tapKey(tester, 'nav-/account');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tapKey(tester, 'nav-/home');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('home-duties-card')), findsOneWidget);
+      expect(find.text('1 awaiting your response'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     },
   );
 

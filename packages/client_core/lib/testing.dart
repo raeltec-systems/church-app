@@ -566,7 +566,8 @@ class FakeDuties implements DutiesRepository {
   }
 }
 
-/// The wire form of one of the member's duties (stories 4.1, 4.2).
+/// The wire form of one of the member's duties (stories 4.1, 4.2; 4.5 adds
+/// the owner kind, the earlier acceptance and the leader names).
 Map<String, Object?> myDutyData({
   String assignmentId = '42424242-4242-4242-8242-424242424242',
   int revision = 1,
@@ -582,18 +583,27 @@ Map<String, Object?> myDutyData({
   String? previousResponse,
   List<String> previousAssignmentIds = const [],
   String? notesUpdatedAt,
+  String? reportingAt,
+  String? location = 'SYNTHETIC Main hall',
+  String? positionName,
+  String? priorAcceptedAt,
+  List<Map<String, Object?>> leaders = const [],
 }) => {
   'assignment_id': assignmentId,
   'revision': revision,
   'occurrence_id': '43434343-4343-4343-8343-434343434343',
+  'owner_kind': 'department',
   'department_id': '44444444-4444-4444-8444-444444444444',
   'department_name': 'SYNTHETIC Preaching Rota',
   'duty_name': dutyName,
+  'position_name': positionName,
   'starts_at': startsAt,
   'ends_at': endsAt,
-  'reporting_at': null,
-  'location': 'SYNTHETIC Main hall',
+  'reporting_at': reportingAt,
+  'location': location,
   'instructions': 'Arrive early.',
+  'prior_accepted_at': priorAcceptedAt,
+  'leaders': leaders,
   'response': response,
   'response_deadline': responseDeadline,
   'responded_at': respondedAt,

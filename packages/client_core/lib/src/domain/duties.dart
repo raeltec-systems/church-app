@@ -38,6 +38,15 @@ abstract final class DutyCommands {
   static const reviseSeries = 'duties.revise_series';
   static const cancelOccurrence = 'duties.cancel_occurrence';
   static const cancelSeries = 'duties.cancel_series';
+
+  /// Story 4.5: "Can't make it anymore" after accepting.
+  static const withdrawAcceptance = 'duties.withdraw_acceptance';
+
+  /// Story 4.5: accept several listed dates together (all or nothing).
+  static const acceptMany = 'duties.accept_many';
+
+  /// The most dates one bulk acceptance may carry (the server's limit).
+  static const maxBulk = 50;
 }
 
 /// Story 4.2: the revisable fields (wire names) in display order, and the
@@ -238,6 +247,8 @@ class MyDuty {
     this.positionName,
     this.topic,
     this.scripture,
+    this.priorAcceptedAt,
+    this.leaders = const [],
   });
 
   factory MyDuty.fromJson(Object? json) {
@@ -271,8 +282,18 @@ class MyDuty {
       positionName: _opt<String>(m, 'position_name'),
       topic: _opt<String>(m, 'topic'),
       scripture: _opt<String>(m, 'scripture'),
+      priorAcceptedAt: _priorAccepted(m, response),
+      leaders: _leaders(m),
     );
   }
+
+  /// Story 4.5: when the member had accepted before saying they can't make
+  /// it anymore (null otherwise).
+  final DateTime? priorAcceptedAt;
+
+  /// Story 4.5: the department's current leader and deputy names (no
+  /// contact details; those wait on the Q4 contact routes).
+  final List<DutyLeaderName> leaders;
 
   /// Story 4.3: the named position of a rota (null for a one-position duty).
   final String? positionName;
@@ -322,6 +343,92 @@ class MyDuty {
   /// Still asks for an answer: pending and not yet started.
   bool needsResponse(DateTime now) =>
       response == DutyResponse.pending && !startedAt(now);
+
+  /// Story 4.5: an accepted duty that has not started can be withdrawn
+  /// ("Can't make it anymore").
+  bool canWithdraw(DateTime now) =>
+      response == DutyResponse.accepted && !startedAt(now);
+
+  /// Story 4.5: declined after an earlier acceptance.
+  bool get declinedLater =>
+      response == DutyResponse.declined && priorAcceptedAt != null;
+
+  /// "Sunday preaching: Reader" (or the duty name alone).
+  String get title =>
+      positionName == null ? dutyName : '$dutyName: $positionName';
+}
+
+/// Story 4.5: a leader or deputy of the duty's department, by name only.
+class DutyLeaderName {
+  const DutyLeaderName({required this.displayName, required this.isDeputy});
+
+  factory DutyLeaderName.fromJson(Object? json) {
+    final m = _map(json, 'leader');
+    final role = _req<String>(m, 'role');
+    if (role != 'leader' && role != 'deputy') {
+      throw const FormatException('unexpected role');
+    }
+    return DutyLeaderName(
+      displayName: _req<String>(m, 'display_name'),
+      isDeputy: role == 'deputy',
+    );
+  }
+
+  final String displayName;
+  final bool isDeputy;
+}
+
+List<DutyLeaderName> _leaders(Map m) {
+  final v = m['leaders'];
+  if (v == null) return const [];
+  if (v is! List) throw const FormatException('unexpected leaders');
+  return List.unmodifiable(v.map(DutyLeaderName.fromJson));
+}
+
+/// Story 4.5: an earlier acceptance is only ever kept on a declined answer.
+DateTime? _priorAccepted(Map m, DutyResponse response) {
+  final t = _optInstant(m, 'prior_accepted_at');
+  if (t != null && response != DutyResponse.declined) {
+    throw const FormatException('unexpected prior_accepted_at');
+  }
+  return t;
+}
+
+/// Story 4.5: the three My duties segments.
+class MyDutySegments {
+  const MyDutySegments._(this.needsResponse, this.upcoming, this.past);
+
+  /// Needs a response: pending and not started (soonest first). Upcoming:
+  /// every other duty that has not started, accepted or not (soonest
+  /// first; a declined one stays visible as "Can't make it"). Past: started
+  /// (most recent first).
+  factory MyDutySegments.of(List<MyDuty> duties, DateTime now) {
+    int soonest(MyDuty a, MyDuty b) =>
+        a.times.arriveBy.compareTo(b.times.arriveBy);
+    return MyDutySegments._(
+      List.unmodifiable(
+        duties.where((a) => a.needsResponse(now)).toList()..sort(soonest),
+      ),
+      List.unmodifiable(
+        duties.where((a) => !a.needsResponse(now) && !a.startedAt(now)).toList()
+          ..sort(soonest),
+      ),
+      List.unmodifiable(
+        duties.where((a) => a.startedAt(now)).toList()
+          ..sort((a, b) => b.times.startsAt.compareTo(a.times.startsAt)),
+      ),
+    );
+  }
+
+  final List<MyDuty> needsResponse;
+  final List<MyDuty> upcoming;
+  final List<MyDuty> past;
+
+  /// The duty the Home card shows: the soonest that needs an answer, else
+  /// the soonest upcoming one the member accepted.
+  MyDuty? get next =>
+      needsResponse.firstOrNull ??
+      upcoming.where((a) => a.response == DutyResponse.accepted).firstOrNull;
 }
 
 /// `api.duties_my_duties`.
@@ -384,15 +491,18 @@ class PositionAssignment {
     this.notesUpdatedAt,
     this.overlaps = 0,
     this.override,
+    this.priorAcceptedAt,
   });
 
   factory PositionAssignment.fromJson(Object? json) {
     final m = _map(json, 'assignment');
+    final response = DutyResponse.fromWire(m['response']);
     return PositionAssignment(
+      priorAcceptedAt: _priorAccepted(m, response),
       assignmentId: _req<String>(m, 'assignment_id'),
       memberId: _req<String>(m, 'member_id'),
       displayName: _opt<String>(m, 'display_name'),
-      response: DutyResponse.fromWire(m['response']),
+      response: response,
       responseDeadline: _instant(m, 'response_deadline'),
       respondedAt: _optInstant(m, 'responded_at'),
       note: _opt<String>(m, 'note'),
@@ -407,6 +517,10 @@ class PositionAssignment {
 
   final String assignmentId;
   final String memberId;
+
+  /// Story 4.5: the member accepted at this time, then said they can't make
+  /// it anymore.
+  final DateTime? priorAcceptedAt;
 
   /// Story 4.4: how many other duties of the member overlap this one now.
   final int overlaps;
@@ -451,6 +565,7 @@ class AssignmentHistoryEntry {
     this.respondedAt,
     this.provenance,
     this.note,
+    this.priorAcceptedAt,
   });
 
   factory AssignmentHistoryEntry.fromJson(Object? json) {
@@ -463,6 +578,7 @@ class AssignmentHistoryEntry {
     if (provenance != null && provenance != 'member') {
       throw const FormatException('unexpected response_provenance');
     }
+    final response = DutyResponse.fromWire(m['response']);
     return AssignmentHistoryEntry(
       assignmentId: _req<String>(m, 'assignment_id'),
       memberId: _req<String>(m, 'member_id'),
@@ -470,7 +586,8 @@ class AssignmentHistoryEntry {
       state: state,
       endReason: _opt<String>(m, 'end_reason'),
       endedAt: _instant(m, 'ended_at'),
-      response: DutyResponse.fromWire(m['response']),
+      priorAcceptedAt: _priorAccepted(m, response),
+      response: response,
       respondedAt: _optInstant(m, 'responded_at'),
       provenance: provenance,
       note: _opt<String>(m, 'note'),
@@ -498,6 +615,9 @@ class AssignmentHistoryEntry {
   final String? provenance;
   final String? note;
   final int slotRevision;
+
+  /// Story 4.5: an acceptance the member later withdrew.
+  final DateTime? priorAcceptedAt;
 }
 
 class DutyPosition {
@@ -1000,15 +1120,18 @@ class RotaAssignment {
     this.displayName,
     this.overlaps = 0,
     this.override,
+    this.priorAcceptedAt,
   });
 
   factory RotaAssignment.fromJson(Object? json) {
     final m = _map(json, 'rota assignment');
+    final response = DutyResponse.fromWire(m['response']);
     return RotaAssignment(
       assignmentId: _req<String>(m, 'assignment_id'),
       memberId: _req<String>(m, 'member_id'),
       displayName: _opt<String>(m, 'display_name'),
-      response: DutyResponse.fromWire(m['response']),
+      priorAcceptedAt: _priorAccepted(m, response),
+      response: response,
       responseDeadline: _instant(m, 'response_deadline'),
       revision: _revision(m),
       available: _req<bool>(m, 'available'),
@@ -1020,6 +1143,9 @@ class RotaAssignment {
   /// Story 4.4: overlapping duties now, and the recorded override.
   final int overlaps;
   final DutyOverride? override;
+
+  /// Story 4.5: accepted at this time, then "can't make it anymore".
+  final DateTime? priorAcceptedAt;
 
   final String assignmentId;
   final String memberId;

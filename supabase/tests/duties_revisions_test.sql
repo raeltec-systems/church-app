@@ -77,6 +77,8 @@ create function pg_temp.jobs(p_source uuid) returns text language sql as $$
   select string_agg(reminder_kind || ':' || job_state || ':' || coalesce(cancel_reason, finish_reason, '-'),
                     ',' order by enqueued_at, reminder_kind, job_state)
     from app.notifications_jobs where source_type = 'duties_assignment' and source_id = p_source
+      -- Story 4.8's reminders are checked in duties_reminders_test.sql.
+      and reminder_kind not in ('duty_response_due', 'duty_starting')
 $$;
 
 -- Accounts: 1 Admin; 2 leader of D; 3 deputy of D; 4 member M (assignee); 5 member O (another
@@ -201,8 +203,9 @@ select is(pg_temp.revise(2, jsonb_build_object('instructions', 'Bring a Bible.',
             'response_deadline', pg_temp.at(interval '8 days'))) -> 'field_errors',
   '{"response_deadline": "not_material"}'::jsonb, 'a notes-only change takes no new deadline');
 select is(pg_temp.revise(2, jsonb_build_object('starts_at', pg_temp.at(interval '11 days'),
-            'ends_at', pg_temp.at(interval '11 days 2 hours'))) -> 'field_errors',
-  '{"response_deadline": "required"}'::jsonb, 'a material change needs a new response deadline');
+            'ends_at', pg_temp.at(interval '11 days 2 hours'), 'response_deadline', 1)) -> 'field_errors',
+  '{"response_deadline": "invalid"}'::jsonb,
+  'a material change checks its new response deadline (story 4.8: without one the 3.3 default applies)');
 select is(pg_temp.revise(2, jsonb_build_object('starts_at', pg_temp.at(interval '11 days'),
             'response_deadline', pg_temp.at(interval '12 days'))) -> 'field_errors',
   '{"ends_at": "before_start", "response_deadline": "after_start"}'::jsonb,
@@ -290,7 +293,9 @@ select is((select (j -> 'assignments' -> 0) - 'occurrence_id' - 'department_id' 
                   -- Story 4.3 keys are checked in duties_rota_test.sql.
                   - 'position_name' - 'topic' - 'scripture'
                   -- Story 4.5 keys are checked in duties_responses_test.sql.
-                  - 'owner_kind' - 'prior_accepted_at' - 'leaders' - 'slot_id' from mine),
+                  - 'owner_kind' - 'prior_accepted_at' - 'leaders' - 'slot_id'
+                  -- Story 4.8 keys are checked in duties_reminders_test.sql.
+                  - 'deadline_source' - 'short_notice' - 'reminders' from mine),
   jsonb_build_object('assignment_id', pg_temp.asg2(), 'revision', 1, 'response', 'pending', 'slot_revision', 2,
                      'changes', jsonb_build_array('starts_at', 'ends_at'), 'previous_response', 'accepted',
                      'previous_assignment_ids', jsonb_build_array(pg_temp.asg1()), 'notes_updated_at', null),
@@ -345,8 +350,8 @@ select is((select string_agg(x ->> 'title', ',' order by x ->> 'title')
 
 -- Concurrent edits: one success and one conflict ------------------------------------------------------
 create temp table race as select pg_temp.orev() as expected;
-create temp table race1 as select pg_temp.revise(2, '{"location": "SYNTHETIC Side hall"}', (select expected from race)) as r;
-select is((select r ->> 'code' from race1), 'validation_failed', 'a location change is material and needs a deadline');
+create temp table race1 as select pg_temp.revise(2, '{"location": "SYNTHETIC Side hall", "response_deadline": 1}', (select expected from race)) as r;
+select is((select r ->> 'code' from race1), 'validation_failed', 'a location change with a malformed deadline is refused');
 create temp table race2 as select pg_temp.revise(2, jsonb_build_object('location', 'SYNTHETIC Side hall',
   'response_deadline', pg_temp.at(interval '9 days')), (select expected from race)) as r;
 create temp table race3 as select pg_temp.revise(1, '{"instructions": "Admin text."}', (select expected from race)) as r;

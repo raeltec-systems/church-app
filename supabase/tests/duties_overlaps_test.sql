@@ -248,7 +248,10 @@ select is((select au.code || '|' || au.actor_capacity from app.duties_audit au
             where au.action = 'overlap_override' and au.assignment_id = (select (r #>> '{data,assignment_id}')::uuid from d1)),
   'overlap|department_leader', 'the override is audited content-free');
 select is((select string_agg(reminder_kind || ':' || job_state, ',') from app.notifications_jobs
-            where source_id = (select (r #>> '{data,assignment_id}')::uuid from d1)), 'duty_assigned:pending',
+            where source_id = (select (r #>> '{data,assignment_id}')::uuid from d1)
+              -- Story 4.8's reminders and leader alerts are checked in duties_reminders_test.sql.
+              and source_type = 'duties_assignment'
+              and reminder_kind not in ('duty_response_due', 'duty_starting')), 'duty_assigned:pending',
   'the assignee is notified as usual');
 select ok((select r::text not like '%SYNTHETIC: M agreed%' from d1), 'the reason is not in the answer (receipts stay content-free)');
 select is((select string_agg(a ->> 'response', ',' order by a ->> 'starts_at')

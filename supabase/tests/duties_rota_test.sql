@@ -78,6 +78,8 @@ create function pg_temp.jobs(p_source uuid) returns text language sql as $$
   select coalesce(string_agg(reminder_kind || ':' || job_state || ':' || coalesce(cancel_reason, finish_reason, '-'),
                     ',' order by enqueued_at, reminder_kind, job_state), '')
     from app.notifications_jobs where source_type = 'duties_assignment' and source_id = p_source
+      -- Story 4.8's reminders are checked in duties_reminders_test.sql.
+      and reminder_kind not in ('duty_response_due', 'duty_starting')
 $$;
 -- The k-th Sunday (church-local) at least four days from now.
 create function pg_temp.sunday(k int) returns date language sql as $$
@@ -457,9 +459,9 @@ language sql as $$
   select pg_temp.duties(n, 'duties.revise_series', coalesce(p_expected, pg_temp.srev()),
     jsonb_build_object('series_id', pg_temp.sr(), 'from_occurrence_id', pg_temp.o(p_from)) || p_extra)
 $$;
-select is(pg_temp.future(2, 3, '{"start_time": "10:00"}') -> 'field_errors',
-  jsonb_build_object('deadline_before', 'required', 'occurrence:' || pg_temp.o(3), 'required'),
-  'a material this-and-future change of published duties needs the answer-by lead time');
+select is(pg_temp.future(2, 3, '{"start_time": "10:00", "deadline_before": "soon"}') -> 'field_errors',
+  '{"deadline_before": "invalid"}'::jsonb,
+  'a this-and-future lead time is checked (story 4.8: without one each date takes the 3.3 default)');
 select is(pg_temp.future(2, 5, '{"start_time": "10:00"}') -> 'field_errors', '{"from_occurrence_id": "started"}'::jsonb,
   'a started occurrence cannot be the anchor');
 create temp table fut as select pg_temp.future(2, 3, '{"start_time": "10:00", "deadline_before": "2 days"}') as r;
@@ -493,8 +495,9 @@ select is(pg_temp.duties(4, 'duties.respond', 1, jsonb_build_object('assignment_
   'an answer to the version before the series edit is refused with what changed');
 
 -- Per-position assignment of a published rota ---------------------------------------------------------
-select is(pg_temp.assign(2, 4, 1, pg_temp.mid(5)) -> 'field_errors', '{"response_deadline": "required"}'::jsonb,
-  'giving a published position needs an answer-by');
+select is(pg_temp.assign(2, 4, 1, pg_temp.mid(5), '{"response_deadline": 1}') -> 'field_errors',
+  '{"response_deadline": "invalid"}'::jsonb,
+  'a published position''s answer-by is checked (story 4.8: without one the 3.3 default applies)');
 create temp table give as select pg_temp.assign(2, 4, 1, pg_temp.mid(5), jsonb_build_object(
   'response_deadline', app.cmd_utc(app.duties_wall(pg_temp.sunday(3) - 1, '10:00', 'Africa/Lusaka')))) as r;
 select is((select (r #>> '{data,state}') || '|' || (r #>> '{data,response}') || '|' || (r #>> '{data,notice_queued}') from give),

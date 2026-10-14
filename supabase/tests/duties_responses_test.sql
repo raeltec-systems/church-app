@@ -159,6 +159,8 @@ $$;
 create function pg_temp.jobs(p_id uuid) returns text language sql as $$
   select coalesce(string_agg(job_state, ',' order by enqueued_at), '')
     from app.notifications_jobs where source_type = 'duties_assignment' and source_id = p_id
+      -- Story 4.8's reminders are checked in duties_reminders_test.sql.
+      and reminder_kind not in ('duty_response_due', 'duty_starting')
 $$;
 
 select pg_temp.pub(4, k) from generate_series(0, 9) k;

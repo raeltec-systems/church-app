@@ -347,7 +347,7 @@ Record the outcome per step in `evidence-4.3/owner-check.md` (pass/fail, device 
 
 ## Story 4.4: warn on overlapping duties and record reasoned overrides
 
-Migration: `supabase/migrations/20261014024352_duties_overlaps.sql` (forward only: the 4.1-4.3 files are not edited; no destructive statements, no row deletions, no new `_rows` file; `department_id` on occurrences becomes nullable with `ALTER ... DROP NOT NULL`, which the migration policy allows). New client grant: `api.duties_candidates(...)` and its `app` body (authenticated only). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-warn-on-overlapping-duties-and-record-reasoned-overrides-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.4/`.
+Migration: `supabase/migrations/20261014052239_duties_overlaps.sql` (forward only: the 4.1-4.3 files are not edited; no destructive statements, no row deletions, no new `_rows` file; `department_id` on occurrences becomes nullable with `ALTER ... DROP NOT NULL`, which the migration policy allows). New client grant: `api.duties_candidates(...)` and its `app` body (authenticated only). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-warn-on-overlapping-duties-and-record-reasoned-overrides-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.4/`.
 
 ### Model
 
@@ -412,7 +412,7 @@ Fictional numbers: pgTAP `+44 7700 900770-900779`, E2E `900760-900769`. The E2E 
 
 ### Hosted staging (parent session, then the owner)
 
-1. **Parent session:** apply `20261014024352_duties_overlaps.sql` to staging (`tmurpotfluignacfueki`) after `20261014023442`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. Compare the md5 of each new or replaced `app.duties_*` function body with the local one (the migration has no `\u` escapes, but check). New client grant: `api.duties_candidates(uuid, uuid, timestamptz, timestamptz, timestamptz)` / `app.duties_candidates(...)` (authenticated only). No Edge Function change, no rows file. Checks right after the apply: `select count(*) from app.duties_occurrences where cell_id is not null;` is 0 and `select count(*) from app.duties_assignments where override_at is not null;` is 0.
+1. **Parent session:** apply `20261014052239_duties_overlaps.sql` to staging (`tmurpotfluignacfueki`) after `20261014023442`, then run `tools/ci/verify-hosted.sql` with `expected_env=staging`. Compare the md5 of each new or replaced `app.duties_*` function body with the local one (the migration has no `\u` escapes, but check). New client grant: `api.duties_candidates(uuid, uuid, timestamptz, timestamptz, timestamptz)` / `app.duties_candidates(...)` (authenticated only). No Edge Function change, no rows file. Checks right after the apply: `select count(*) from app.duties_occurrences where cell_id is not null;` is 0 and `select count(*) from app.duties_assignments where override_at is not null;` is 0.
 2. **Owner:** nothing to paste. Then the manual checks below.
 3. **Production:** nothing in this story (the Q4 gate keeps the reads and commands closed).
 

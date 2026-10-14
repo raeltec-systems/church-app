@@ -124,12 +124,7 @@ Map<String, Object?> activityData({
 };
 
 Map<String, Object?> supervisionData({List<Map<String, Object?>>? tasks}) => {
-  'scopes': [
-    {
-      'scope_kind': 'department_leader',
-      'scope_id': '44444444-4444-4444-8444-444444444444',
-    },
-  ],
+  'scopes': [rosterData()],
   'purposes': [
     {
       'source_type': 'fixture_followup',
@@ -152,6 +147,14 @@ Map<String, Object?> supervisionData({List<Map<String, Object?>>? tasks}) => {
           ),
         ),
       ],
+  'truncated': false,
+};
+
+/// The department scope with its roster (review S2: owners come from it).
+Map<String, Object?> rosterData() => {
+  'scope_kind': 'department_leader',
+  'scope_id': '44444444-4444-4444-8444-444444444444',
+  'family': 'department',
   'candidates': [
     followUpPersonData(),
     followUpPersonData(memberId: _o, displayName: 'SYNTHETIC Member O'),
@@ -161,7 +164,6 @@ Map<String, Object?> supervisionData({List<Map<String, Object?>>? tasks}) => {
       account: 'no_login',
     ),
   ],
-  'truncated': false,
 };
 
 void main() {
@@ -571,7 +573,7 @@ void main() {
         setUp: (h) => h.followUps.routing = AccessReadOk(
           FollowUpAdminRouting.fromJson({
             'tasks': [followUpTaskData(routing: true)],
-            'candidates': [followUpPersonData()],
+            'scopes': [rosterData()],
             'truncated': false,
           }),
         ),
@@ -589,6 +591,8 @@ void main() {
       setUp: (h) => h.followUps.mine = mine([followUpTaskData(state: 'done')]),
     );
     expect(byKey('home-followups-card'), findsNothing);
+    // Review N6: finished work stays reachable from Home.
+    expect(byKey('home-followups-link'), findsOneWidget);
   });
 
   testWidgets('the Home card counts open and overdue work and shows the next', (
@@ -609,7 +613,7 @@ void main() {
     expect(byKey('home-followups-card'), findsOneWidget);
     expect(
       tester.widget<Text>(byKey('home-followups-count')).data,
-      '2 open, 1 overdue',
+      '2 active, 1 overdue',
     );
     expect(byKey('home-followup-$_task'), findsOneWidget);
   });
@@ -624,5 +628,84 @@ void main() {
           h.followUps.mine = const AccessReadFailed(unreachable: true),
     );
     expect(byKey('home-followups-failed'), findsOneWidget);
+  });
+
+  testWidgets(
+    'review S4: after Saved the note field is empty, so a second Add note '
+    'sends nothing',
+    (tester) async {
+      final h = await pumpAt(
+        tester,
+        FollowUpPaths.task(_task),
+        setUp: (h) => h.followUps.task = full(followUpTaskData()),
+      );
+      await tester.enterText(byKey('followup-note'), 'SYNTHETIC note');
+      await tester.pump();
+      await tapKey(tester, 'followup-add-note');
+      h.followUps.task = full(followUpTaskData(revision: 2));
+      h.gateway.sent.single.confirm(const {}, 2);
+      await settle(tester);
+      expect(byKey('followups-notice-updated'), findsOneWidget);
+      expect(enabled(tester, 'followup-add-note'), isFalse);
+      await tester.tap(byKey('followup-add-note'), warnIfMissed: false);
+      await tester.pump();
+      expect(h.gateway.sent, hasLength(1));
+    },
+  );
+
+  testWidgets(
+    'review S4: re-tapping Create after an unknown outcome resends the same '
+    'request and source; a confirmed create starts a new source',
+    (tester) async {
+      final h = await pumpAt(
+        tester,
+        FollowUpPaths.supervision,
+        setUp: (h) => h.followUps.supervision = AccessReadOk(
+          FollowUpSupervision.fromJson(supervisionData()),
+        ),
+      );
+      await choose(tester, 'followup-create-owner', 'SYNTHETIC Member O');
+      await tester.enterText(byKey('followup-create-next'), 'SYNTHETIC: call');
+      await tester.enterText(byKey('followup-create-due-date'), '2099-01-04');
+      await tester.pump();
+      await tapKey(tester, 'followup-create-save');
+      final first = h.gateway.sent.single;
+      first.unknown();
+      await settle(tester);
+      expect(byKey('followups-notice-unconfirmed'), findsOneWidget);
+      await tapKey(tester, 'followup-create-save');
+      final second = h.gateway.sent.last;
+      expect(h.gateway.sent, hasLength(2));
+      expect(second.wire, first.wire);
+      second.confirm(const {}, 1);
+      await settle(tester);
+      expect(byKey('followups-notice-created'), findsOneWidget);
+      await choose(tester, 'followup-create-owner', 'SYNTHETIC Member O');
+      await tester.enterText(byKey('followup-create-next'), 'SYNTHETIC: again');
+      await tester.pump();
+      await tapKey(tester, 'followup-create-save');
+      final third = h.gateway.sent.last;
+      expect(
+        (third.wire['payload'] as Map)['source_id'],
+        isNot((first.wire['payload'] as Map)['source_id']),
+      );
+      expect(third.wire['request_id'], isNot(first.wire['request_id']));
+    },
+  );
+
+  test('candidates come from the task scope\'s roster only', () {
+    final sup = FollowUpSupervision.fromJson(supervisionData());
+    final task = sup.tasks.single;
+    expect(
+      followUpCandidatesFor(sup.scopes, task.routing.scope).map((p) => p.name),
+      ['SYNTHETIC Member M', 'SYNTHETIC Member O', 'SYNTHETIC Accountless X'],
+    );
+    expect(
+      followUpCandidatesFor(
+        sup.scopes,
+        const FollowUpScope(scopeKind: 'cell_leader', scopeId: 'other'),
+      ),
+      isEmpty,
+    );
   });
 }

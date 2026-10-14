@@ -473,7 +473,10 @@ class _TaskRow extends StatelessWidget {
                   key: Key('followup-open-${task.taskId}'),
                   onPressed: () =>
                       context.push(FollowUpPaths.task(task.taskId)),
-                  child: const Text('Open'),
+                  child: Text(
+                    'Open task',
+                    semanticsLabel: 'Open task: ${task.nextAction}',
+                  ),
                 ),
               ),
               ?trailing,
@@ -579,7 +582,7 @@ class _MyFollowUpsHomeCardState extends ConsumerState<MyFollowUpsHomeCard> {
         final overdue = value.overdue;
         lines.addAll([
           Text(
-            '${active.length} open'
+            '${active.length} active'
             '${overdue == 0 ? '' : ', $overdue overdue'}',
             key: const Key('home-followups-count'),
           ),
@@ -601,8 +604,24 @@ class _MyFollowUpsHomeCardState extends ConsumerState<MyFollowUpsHomeCard> {
             key: const Key('home-followups-failed'),
           ),
         );
+      case AccessReadOk():
+        // Review N6: nothing active, but finished work stays reachable.
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FocusRing(
+              child: TextButton.icon(
+                key: const Key('home-followups-link'),
+                onPressed: () => context.go(FollowUpPaths.mine),
+                icon: const Icon(Icons.checklist_outlined),
+                label: const Text('My follow-ups'),
+              ),
+            ),
+          ),
+        );
       default:
-        // Loading, denied or nothing open: the card is not shown.
+        // Loading or denied: nothing is shown.
         return const SizedBox.shrink(key: Key('home-followups-none'));
     }
     return Padding(
@@ -772,6 +791,16 @@ class _UpdatePanelState extends ConsumerState<_UpdatePanel> {
 
   @override
   Widget build(BuildContext context) {
+    // Review S4: after a confirmed save the typed text is cleared, so a
+    // second tap cannot send the same note or next action again.
+    ref.listen(followUpTaskProvider(widget.task.taskId), (prev, next) {
+      if (next.notice == FollowUpNotice.updated && prev?.pending != null) {
+        for (final c in [_note, _next, _reason]) {
+          c.clear();
+        }
+        setState(() => _outcome = null);
+      }
+    });
     final t = widget.task;
     final busy = widget.busy;
     final waiting = t.state == FollowUpState.waiting;
@@ -824,7 +853,7 @@ class _UpdatePanelState extends ConsumerState<_UpdatePanel> {
               if (t.state != FollowUpState.inProgress)
                 button(
                   'followup-start',
-                  'In progress',
+                  'Mark in progress',
                   () => _send(
                     const FollowUpUpdate(status: FollowUpState.inProgress),
                   ),
@@ -1152,7 +1181,10 @@ class FollowUpSupervisionScreen extends StatelessWidget {
             trailing: t.canReassign
                 ? _ReassignButton(
                     routing: t.routing,
-                    candidates: value.candidates,
+                    candidates: followUpCandidatesFor(
+                      value.scopes,
+                      t.routing.scope,
+                    ),
                     busy: s.busy,
                     onReassign: (ref, owner) => ref
                         .read(followUpSupervisionProvider.notifier)
@@ -1189,6 +1221,11 @@ class _CreateTaskFormState extends ConsumerState<_CreateTaskForm> {
   int _scope = 0;
   String? _owner;
 
+  /// Review S4: one SYNTHETIC source id per draft. It is kept while the
+  /// outcome is unknown (Check again or a re-tap resends the same request)
+  /// and replaced only after the server answered.
+  String? _sourceId;
+
   @override
   void dispose() {
     for (final c in [_next, _dueDate, _dueTime, _note]) {
@@ -1209,11 +1246,26 @@ class _CreateTaskFormState extends ConsumerState<_CreateTaskForm> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(followUpSupervisionProvider, (prev, next) {
+      final n = next.notice;
+      if (prev?.pending == null || n == null || n == prev?.notice) return;
+      if (n == FollowUpNotice.unconfirmed || n == FollowUpNotice.notSent) {
+        return;
+      }
+      if (next.noticeAction?.command != FollowUpCommands.createTask) return;
+      // The server answered this draft: the next one is a new source.
+      _sourceId = null;
+      if (n == FollowUpNotice.created) {
+        _next.clear();
+        _note.clear();
+        setState(() => _owner = null);
+      }
+    });
     final sup = widget.supervision;
     final busy = widget.busy;
     final purpose = sup.purposes[min(_purpose, sup.purposes.length - 1)];
     final scopes = sup.scopes
-        .where((s) => purpose.scopeKinds.contains(s.scopeKind))
+        .where((s) => purpose.scopeKinds.contains(s.scope.scopeKind))
         .toList();
     final scope = scopes.isEmpty
         ? null
@@ -1265,9 +1317,14 @@ class _CreateTaskFormState extends ConsumerState<_CreateTaskForm> {
                 isExpanded: true,
                 items: [
                   for (final (i, sc) in scopes.indexed)
-                    DropdownMenuItem(value: i, child: Text(sc.label)),
+                    DropdownMenuItem(value: i, child: Text(sc.scope.label)),
                 ],
-                onChanged: busy ? null : (v) => setState(() => _scope = v ?? 0),
+                onChanged: busy
+                    ? null
+                    : (v) => setState(() {
+                        _scope = v ?? 0;
+                        _owner = null;
+                      }),
               ),
             ),
           ),
@@ -1275,7 +1332,7 @@ class _CreateTaskFormState extends ConsumerState<_CreateTaskForm> {
           _PersonPicker(
             pickerKey: 'followup-create-owner',
             label: 'Owner',
-            people: sup.candidates,
+            people: scope?.candidates ?? const [],
             value: _owner,
             busy: busy,
             onChanged: (v) => setState(() => _owner = v),
@@ -1340,9 +1397,9 @@ class _CreateTaskFormState extends ConsumerState<_CreateTaskForm> {
                               .create(
                                 FollowUpDraft(
                                   purpose: purpose,
-                                  sourceId: _newSourceId(),
+                                  sourceId: _sourceId ??= _newSourceId(),
                                   ownerMemberId: owner,
-                                  scope: scope,
+                                  scope: scope.scope,
                                   nextAction: _next.text,
                                   dueAt: due,
                                   note: _note.text,
@@ -1499,7 +1556,10 @@ class FollowUpRoutingScreen extends StatelessWidget {
                     if (r.state.active)
                       _ReassignButton(
                         routing: r,
-                        candidates: value.candidates,
+                        candidates: followUpCandidatesFor(
+                          value.scopes,
+                          r.scope,
+                        ),
                         busy: s.busy,
                         onReassign: (ref, owner) => ref
                             .read(followUpRoutingProvider.notifier)

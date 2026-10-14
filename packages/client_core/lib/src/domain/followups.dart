@@ -520,13 +520,50 @@ class FollowUpPurpose {
   bool get synthetic => sourceType.startsWith('fixture_');
 }
 
+/// One scope the reader may act in, with its family (`department`, `cell`)
+/// and the members a task's owner may be chosen from there: the target's
+/// current members and leaders only (review S2).
+class FollowUpScopeRoster {
+  const FollowUpScopeRoster({
+    required this.scope,
+    required this.family,
+    required this.candidates,
+  });
+
+  factory FollowUpScopeRoster.fromJson(Object? json) {
+    final m = _map(json, 'scope roster');
+    return FollowUpScopeRoster(
+      scope: FollowUpScope.fromJson(m),
+      family: _req<String>(m, 'family'),
+      candidates: List.unmodifiable(
+        _req<List>(m, 'candidates').map(FollowUpPerson.fromJson),
+      ),
+    );
+  }
+
+  final FollowUpScope scope;
+  final String family;
+  final List<FollowUpPerson> candidates;
+}
+
+/// The owner candidates for a task's target (scope ids are unique across
+/// families); none when the reader has no roster for it.
+List<FollowUpPerson> followUpCandidatesFor(
+  List<FollowUpScopeRoster> rosters,
+  FollowUpScope scope,
+) {
+  for (final r in rosters) {
+    if (r.scope.scopeId == scope.scopeId) return r.candidates;
+  }
+  return const [];
+}
+
 /// `api.followups_supervision`.
 class FollowUpSupervision {
   const FollowUpSupervision({
     required this.scopes,
     required this.purposes,
     required this.tasks,
-    required this.candidates,
     required this.truncated,
   });
 
@@ -534,7 +571,7 @@ class FollowUpSupervision {
     final m = _map(json, 'supervision');
     return FollowUpSupervision(
       scopes: List.unmodifiable(
-        _req<List>(m, 'scopes').map(FollowUpScope.fromJson),
+        _req<List>(m, 'scopes').map(FollowUpScopeRoster.fromJson),
       ),
       purposes: List.unmodifiable(
         _req<List>(m, 'purposes').map(FollowUpPurpose.fromJson),
@@ -542,17 +579,14 @@ class FollowUpSupervision {
       tasks: List.unmodifiable(
         _req<List>(m, 'tasks').map(FollowUpTask.fromJson),
       ),
-      candidates: List.unmodifiable(
-        _req<List>(m, 'candidates').map(FollowUpPerson.fromJson),
-      ),
       truncated: _req<bool>(m, 'truncated'),
     );
   }
 
-  final List<FollowUpScope> scopes;
+  /// One per family and target, each with its owner candidates.
+  final List<FollowUpScopeRoster> scopes;
   final List<FollowUpPurpose> purposes;
   final List<FollowUpTask> tasks;
-  final List<FollowUpPerson> candidates;
   final bool truncated;
 }
 
@@ -560,7 +594,7 @@ class FollowUpSupervision {
 class FollowUpAdminRouting {
   const FollowUpAdminRouting({
     required this.tasks,
-    required this.candidates,
+    required this.scopes,
     required this.truncated,
   });
 
@@ -570,15 +604,17 @@ class FollowUpAdminRouting {
       tasks: List.unmodifiable(
         _req<List>(m, 'tasks').map(FollowUpRouting.fromJson),
       ),
-      candidates: List.unmodifiable(
-        _req<List>(m, 'candidates').map(FollowUpPerson.fromJson),
+      scopes: List.unmodifiable(
+        _req<List>(m, 'scopes').map(FollowUpScopeRoster.fromJson),
       ),
       truncated: _req<bool>(m, 'truncated'),
     );
   }
 
   final List<FollowUpRouting> tasks;
-  final List<FollowUpPerson> candidates;
+
+  /// Each active task's scope with the members it may be reassigned to.
+  final List<FollowUpScopeRoster> scopes;
   final bool truncated;
 }
 

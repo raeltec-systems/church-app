@@ -727,7 +727,7 @@ Record the outcome of each step in `evidence-4.8/owner-check.md`: pass or fail, 
 
 ## Story 4.9: work the coverage queue with contact attempts and leader confirmation
 
-Migration: `supabase/migrations/20261014201500_duties_coverage.sql`.
+Migration: `supabase/migrations/20261014212507_duties_coverage.sql`.
 - Forward only: the 4.1-4.8 files and the Follow-ups files are not edited. The replaced function bodies are listed in its header; each is copied from its latest version and keeps every earlier review fix.
 - No destructive statements, no row deletions and no `_rows` file.
 - One new client grant: `api.duties_coverage(date, date, uuid, text)` and its `app` body (authenticated only). The three new commands go through `api.duties_command`.
@@ -832,7 +832,7 @@ Fictional numbers: pgTAP `+44 7700 900780-900789`, E2E `900790-900799` (includin
 ### Hosted staging (parent session, then the owner)
 
 1. **Parent session:**
-   - Apply `20261014201500_duties_coverage.sql` to staging (`tmurpotfluignacfueki`) after `20261014171038` (rename the local file to the recorded hosted version if the apply records another one, as for 4.8).
+   - Apply `20261014212507_duties_coverage.sql` to staging (`tmurpotfluignacfueki`) after `20261014171038` (rename the local file to the recorded hosted version if the apply records another one, as for 4.8).
    - Run `tools/ci/verify-hosted.sql` with `expected_env=staging`.
    - Compare the md5 of each new or replaced `app.duties_*`, `app.followups_source_review` and `app.identity_scoped_contact_routes` function with the local one (the migration has no backslashes).
    - Grants: among the new functions `authenticated` executes only `api.duties_coverage` and `app.duties_coverage`; `anon` none.

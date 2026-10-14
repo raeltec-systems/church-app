@@ -211,7 +211,7 @@ Record the outcome per step in `evidence-4.7/owner-check.md` (pass/fail, device 
 
 ## Story 4.9: the first real source (duty coverage) and the source review operation
 
-Migration: `supabase/migrations/20261014201500_duties_coverage.sql` (the Duties story 4.9 migration; the Follow-ups files are not edited and no Follow-ups body is replaced). Runbook of the source: [duties.md](duties.md), story 4.9.
+Migration: `supabase/migrations/20261014212507_duties_coverage.sql` (the Duties story 4.9 migration; the Follow-ups files are not edited and no Follow-ups body is replaced). Runbook of the source: [duties.md](duties.md), story 4.9.
 
 ### The coverage purpose (owner: Duties)
 

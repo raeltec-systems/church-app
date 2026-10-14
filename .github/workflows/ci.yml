@@ -147,6 +147,8 @@ jobs:
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.3
       - name: Duties evidence (every 4.x story) and the duties runbook hold no credentials
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.* docs/runbooks/duties.md
+      - name: Story 4.7 evidence (follow-up reminders), its E2E and the follow-ups runbook hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.7 tools/identity-e2e/followups-reminders.mjs docs/runbooks/follow-ups.md
 
   flutter:
     name: flutter (analyze, test, web build)
@@ -199,6 +201,11 @@ jobs:
         env:
           TZ: America/New_York
         run: flutter test test/duties
+      - name: client core — follow-ups in a non-Lusaka device zone (story 4.7 reminders and dates)
+        working-directory: packages/client_core
+        env:
+          TZ: America/New_York
+        run: flutter test test/followups
       - name: mobile — pub get (locked)
         working-directory: apps/mobile
         run: flutter pub get --enforce-lockfile

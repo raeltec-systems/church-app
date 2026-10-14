@@ -739,7 +739,7 @@ Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/st
 | Reader | Departments | View |
 |---|---|---|
 | A department's leader or deputy | the departments they lead or deputise | **full**: positions, states, names, deadlines, counts, the labelled contact routes of members not yet confirmed, contact attempts with their notes, the Follow-ups task link, member notes and Confirmed by leader reasons |
-| Admin (role alone) | every department | **operational**: positions, states, names, deadlines and counts; may reassign and cancel positions; never a contact route, note, reason or task link; cannot record contact attempts or confirmations (`forbidden`) |
+| Admin (role alone) | every department | **operational**: positions, states, names, deadlines and counts; may reassign and cancel positions; never a contact route, note, reason or task link (also not the Confirmed by leader reason on the Duties board: review B1); cannot record contact attempts or confirmations (`forbidden`) |
 | Pastor | every department (the church-wide gap view) | **operational**, read only |
 | Anyone else, a member | none | `403 not_granted` |
 
@@ -753,9 +753,9 @@ A leader asking for another department (`department_id`) gets `403 not_granted`.
 
 - Window: church dates (Africa/Lusaka), default today and the next six days, at most 31 days; only duties that have not started (completion outcomes are entry 10). `duty` filters by name (case-insensitive). Errors: `400 validation_failed` (`window`, `duty`).
 - Per position of a published duty (cancelled positions are left out): `status` = `unfilled` (no current assignment), `awaiting` (pending, before the answer-by time), `overdue` (pending, answer-by passed), `changed` (pending re-ask of the same member after a material change), `declined`, `confirmed` (accepted by the member, or Confirmed by leader); the 4.8 `needs_contact`; `overlaps`; the assignment (account `app_account` / `no_login`, `response_provenance` `member` / `leader`, `confirmation` `{by, at, channel, reason}`); the open coverage case `follow_up` (attempts, latest attempt, next follow-up, `overdue`, `task_id`).
-- Per department: `counts` (`required`, `confirmed`, `unfilled`, `awaiting`, `overdue`, `declined` (declined and changed), `needs_contact`, `conflicts`, `overdue_follow_ups`), `can_manage`, `can_contact`, the roster for reassignment (managers only) and `contact_routes`.
-- At most 1000 positions are listed, soonest first (`truncated`); the counts always cover every position.
-- Cost: set-based; the overlap counts and the contact routes are computed once per read. `supabase/tests/duties_coverage_scale_test.sql` (under `statement_timeout = '8s'`): a leader's week of 250 positions about 0.2 s, Pastor's view of 40 departments (2,590 positions) about 0.7 s, an Admin's 31 days about 0.7 s (local).
+- Per department: `counts` (`required`, `confirmed`, `unfilled`, `awaiting`, `overdue`, `declined` (declined or changed: a changed position counts here only, review N8), `needs_contact`, `conflicts`, `overdue_follow_ups`), `can_manage`, `can_contact`, the roster for reassignment (managers only) and `contact_routes`.
+- At most 1000 positions are listed, soonest first (`truncated`); the counts always cover every position, and the JSON is built only for the listed ones (review N5).
+- Cost: set-based; the overlap counts and the contact routes are computed once per read. `supabase/tests/duties_coverage_scale_test.sql` (under `statement_timeout = '8s'`): a leader's week of 250 positions about 0.2 s, Pastor's view of 40 departments (2,590 positions) about 0.7 s, an Admin's 31 days of a real month (4,930 positions) about 0.7 s (local).
 
 ### Commands (`api.duties_command`)
 
@@ -776,6 +776,8 @@ Refusals:
 | Stale revision | `conflict` with `current_revision` |
 | The duty has started | `validation_failed {"assignment_id": "started"}` |
 | An attempt on an accepted assignment | `validation_failed {"assignment_id": "confirmed"}` |
+| The leader's own assignment (answer it in My duties; review S2) | `validation_failed {"assignment_id": "own"}` |
+| An attempt on an erased or departed assignee (review N9) | `validation_failed {"member_id": "required_reassign"}` |
 | Next follow-up in the past, at or after the (reporting) start, more than a year away | `{"next_follow_up_at": "past" \| "after_start" \| "out_of_range"}` |
 | Bad channel or outcome | `{"channel" \| "outcome": "invalid" \| "required"}` |
 | Confirmation without a reason; on an answered or declined assignment; of a member who can no longer serve | `{"reason": "required"}`; `conflict {"assignment_id": "responded" \| "declined"}`; `{"member_id": "required_reassign"}` |
@@ -787,7 +789,9 @@ Answers carry ids, revisions and codes only (never a note or reason). A replay r
 ### Coverage cases and the Follow-ups task
 
 - `app.duties_coverage_cases`: one open case per assignment, opened by the first contact attempt; `app.duties_contact_attempts`: the attempts (immutable, except erasure). Both RLS on, no client privilege.
-- The task: Follow-ups source `duties_coverage_case` (source id = the case id), purpose `coverage_follow_up` (label "Duty cover follow-up", scope kinds `department_leader`/`department_deputy`, outcomes = the attempt outcomes, `close` on resolved and cancelled, not hand-made). Owner and supervisor: the recording leader; scope: their department scope; next action generic; due at the next follow-up; context label "Duty cover: <duty> on <church date>". The church-default task reminder fires at the due (or review) time. See `follow-ups.md`, story 4.9, for the new owner operation `app.followups_source_review`.
+- The task: Follow-ups source `duties_coverage_case` (source id = the case id), purpose `coverage_follow_up` (label "Duty cover follow-up", scope kinds `department_leader`/`department_deputy`, outcomes = the attempt outcomes, `close` on resolved and cancelled, not hand-made). Owner: the recording leader or deputy. Supervisor (review S3): another current leader or deputy of the department whom the app can reach, a leader first; only when nobody else holds the scope the recorder supervises (the answer says `supervisor_fallback: true`). The task's scope is the supervisor's; next action generic; due at the next follow-up; context label "Duty cover: <duty> on <church date>". See `follow-ups.md`, story 4.9, for the new owner operation `app.followups_source_review`.
+- Reminders (review N1): a source-specific schedule: the owner at the due or review time only (both always before the duty), no supervisor alert and no assignment notice, so nothing arrives after the service. A case whose duty has started closes (`started`, task `source_resolved`) at the next coverage command of a leader of that department (the lazy close).
+- A new attempt on a case whose task was finished by hand, or whose task owner no longer holds the department scope, closes that case (`replaced`; its task, if still active, `source_resolved`) and opens a fresh case and task for the recorder (reviews N2, N3).
 - The case closes, and its task with it, when the assignment is accepted by the member (`accepted`), confirmed by a leader (`confirmed`), superseded by a change or reassignment (`superseded`; task `source_resolved`) or cancelled (`cancelled`; task `source_cancelled`). A decline keeps it open (the position needs cover). A later need opens a fresh case and task (fresh keys).
 - Lock order: grants -> receipt -> department -> series -> occurrence -> slots -> assignment -> coverage case -> Follow-ups (its task and its own reminders) -> Notifications.
 
@@ -798,7 +802,7 @@ Answers carry ids, revisions and codes only (never a note or reason). A replay r
 ### Gates
 
 - Every read and command needs the Q4 personal-data gate (production stays inert).
-- With the Q2 policy closed or invalid a confirmation and a contact attempt are still recorded (as 4.8 decided for answers): the Follow-ups step and the reminder work are skipped and audited (`followup_skipped` / `reminders_skipped`, code `policy_unavailable`). A case closed while Follow-ups was unavailable leaves its task open; its reminders stop at delivery because the source is no longer current.
+- With the Q2 policy closed or invalid a confirmation, an answer, a contact attempt and a cancellation are still recorded (as 4.8 decided for answers). Closing a case still closes its Follow-ups task and cancels the task's reminders (review S1: `app.followups_source_event` needs only the Q4 gate). Only work that schedules something is skipped and audited (`followup_skipped` for an attempt's new task, `reminders_skipped` for re-plans and alerts; code `policy_unavailable`); the change engine and the cancellations pass their actor, so every skip is audited.
 
 ### Member deletion
 
@@ -806,8 +810,8 @@ Answers carry ids, revisions and codes only (never a note or reason). A replay r
 
 ### Clients
 
-- **Staff web, Coverage** (`/duties/coverage`, sidebar **Coverage** with **Duties** and **Rota**): the window (**From**, 7/14/31 days), **Duty name contains**, a department choice and **Show**; filter chips **All**, **Unfilled**, **Overdue**, **Declined**, **Awaiting**, **Needs contact**, **Confirmed** with counts; per department "N of M confirmed, ... unfilled, ... overdue, ... declined or changed, ... need contact" and an issue card per position: duty, position, church time, place, the state, Short notice, Needs contact, overlaps, the assignee ("no login: contact them directly"), the answer-by time, **Confirmed by leader** (by, when, how, reason), the latest attempt and next follow-up with **Open the follow-up task**, the labelled contact routes with **Call** and **Message**, and the actions **Record contact attempt**, **Confirmed by leader**, **Assign**/**Reassign** (the 4.4 picker with load and overlaps) and **Cancel position**. Pastor and Admin read **Gaps across the church** with the per-department totals; Pastor read only, Admin with Reassign and Cancel position only.
-- **Mobile**: the same screen at `/duties/coverage` (the leader's essential actions on the phone; Call and Message open the dialler and messages), and the leader's **Needs attention** card first on **Home** (only for leaders and deputies): Unfilled, Overdue, Declined, Needs contact, "This week: N of M positions confirmed", overlapping duties and overdue follow-ups, **Open coverage**. A member reads **Confirmed by your leader** on a duty a leader confirmed (never the reason).
+- **Staff web, Coverage** (`/duties/coverage`, sidebar **Coverage** with **Duties** and **Rota**): the window (**From**, 7/14/31 days; a malformed date shows "Use YYYY-MM-DD"), **Duty name contains**, a department choice and **Show**; filter chips **All**, **Unfilled**, **Overdue**, **Declined**, **Awaiting**, **Needs contact**, **Confirmed** with counts; per department "N of M confirmed, ... unfilled, ... overdue, ... declined or changed, ... need contact" and an issue card per position: duty, position, church time, place, the state, Short notice, Needs contact, overlaps, the assignee ("no login: contact them directly"), the answer-by time, **Confirmed by leader** (by, when, how, reason), the latest attempt and next follow-up with **Open the follow-up task**, the labelled contact routes with **Call** and **Message**, and the actions **Record contact attempt**, **Confirmed by leader**, **Assign**/**Reassign** (the 4.4 picker with load and overlaps) and **Cancel position**. Pastor and Admin read **Gaps across the church** with the per-department totals; Pastor read only, Admin with Reassign and Cancel position only.
+- **Mobile**: the same screen at `/duties/coverage` (the leader's essential actions on the phone; Call and Message open the dialler and messages), and the leader's **Needs attention** card first on **Home** (only for leaders and deputies): Unfilled, Overdue, Declined or changed, Needs contact, "This week: N of M positions confirmed", overlapping duties and overdue follow-ups, **Open coverage**. A member reads **Confirmed by your leader** on a duty a leader confirmed (never the reason).
 - The Duties board shows **Confirmed by leader** with the recorder, time, channel and (managers) reason, and cancelled positions as **Cancelled** ("N of M confirmed" counts required positions only); the rota grid reads "Confirmed by leader" and "Cancelled".
 - Every action shows **Sending…**, and **Not sent yet** with **Check again** (same request id) when the outcome is unknown; nothing is shown as done until the server answers.
 
@@ -864,5 +868,6 @@ Record the outcome of each step in `evidence-4.9/owner-check.md`: pass or fail, 
 - Confirmed by leader is for a member who has not answered: a decline is reassigned, not overwritten, and the same member cannot be given the position back without first giving it to someone else (the 4.3 command refuses an unchanged assignee).
 - Contact details are the labelled 2.5 routes only (no phone usernames); members with an app account usually have none, so the leader contacts them through other agreed means.
 - "Needs contact" does not yet include "no active push device" (the 3.6 device state is not disclosed to leaders).
-- A case closed while Follow-ups was unavailable (Q2 invalid) leaves its task open until closed by hand.
+- A case of a started duty closes lazily (at the next coverage command of the department's leaders), not at the start itself; its task sends nothing after the duty. A reminder the owner snoozes past the duty can still arrive once.
+- A leader's own duty is answered in My duties; the queue shows no contact actions on it.
 - The board's history list shows ended assignments with their provenance; a cancelled position's earlier assignment is in its history.

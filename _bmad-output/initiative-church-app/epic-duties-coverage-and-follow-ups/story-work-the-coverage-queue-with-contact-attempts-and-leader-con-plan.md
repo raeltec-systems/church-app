@@ -94,16 +94,46 @@ context:
 - Decision (agent, under owner pre-approval): contact routes are listed only for members whose position is not yet confirmed; the Home card counts only departments the reader leads or deputises.
 - Decision (agent, under owner pre-approval): cancelling the last remaining position cancels the date through the 4.3 `duties_cancel_one` (one-off duties included; 4.3 `cancel_occurrence` still refuses one-off duties).
 - Decision (agent, under owner pre-approval): with Q2 closed or invalid, a case closed by a change's notification runner (`duties_notify` has no actor) is written to the server log, not the audit; most such commands then fail on their own notices (which need the policy), but a cancellation with no notice to send (an unfilled or declined position) succeeds and leaves the task open (its reminders stop at delivery: the source is no longer current). Documented as a known limit.
+- Earlier tests changed by the review fixes: `followups_reminders_test.sql` test 8 reads only its own purpose's schedule (4.9 registers `coverage_follow_up`); `duties_reminders_scale_test.sql` analyzes its own rows before measuring (the 4.9 scale test's in-transaction ANALYZE leaves row counts in pg_class that made the 4.8 publish of 200 slots time out when the suite ran straight after a reset).
 - Earlier tests changed for the new behaviour (no merged migration edited): `duties_tracer_test.sql` and `duties_revisions_test.sql` (the client-executable list gains `duties_coverage`; the My duties key subsets drop the 4.9 keys; a decline's pending-job check ignores the decline alert), `duties_reminders_test.sql` (the `duties_coverage` link check ignores `duty_declined`; a decline and a later decline leave only the leaders' decline alert), `duties_responses_test.sql` (the provenance vocabulary now has `leader`; the staged leader answer sets its channel), `command_foundation_test.sql` (privilege ledger), and the E2E `duties-reminders.mjs` D31 (the decline alert).
 - Clients: `duty_coverage.dart` (part of `duties.dart`): `DutyCoverageCommands`, `CoverageStatus`, `CoverageFilter`, `ContactChannel`, `ContactOutcome`, `DutyContactRoute`, `CoverageConfirmation`, `CoverageAttempt`, `CoverageFollowUp`, `CoverageAssignment`, `CoveragePosition`, `CoverageCounts`, `CoverageDepartment`, `DutyCoverage`, `CoverageQuery`, `ContactAttemptDraft`, `LeaderConfirmationDraft`, the `DutyCoverageRepository` and `ContactLauncher` ports; `MyDuty.confirmedByLeader` (no "Can't make it anymore" for it), `PositionAssignment.confirmation`, `DutyPosition.cancelled`, `LeaderDuty.required`, `RotaAssignment.confirmedByLeader`, `RotaPosition.cancelled`. Adapter `SupabaseDutyCoverageRepository`; providers `dutyCoverageRepositoryProvider`, `contactLauncherProvider`; controllers `DutyCoverageController` (query provider, `recordAttempt`, `confirm`, `assign`, `cancelPosition`), `LeaderAttentionController`; five notices. Screens (`duties_coverage_screens.dart`, part of `duties_screens.dart`): `DutyCoverageScreen` (`/duties/coverage`, both apps), `LeaderNeedsAttentionCard` (first on Home, leaders and deputies only); board, rota and My duties labels. Staff sidebar **Coverage**; deep link `/duties/coverage`. Apps: `url_launcher` 6.3.3 (already transitive) and `UrlContactLauncher` (tel:/sms:, E.164 only); Android `<queries>` for DIAL and SENDTO. `testing.dart`: `FakeDutyCoverage`, `FakeContactLauncher`.
 - Matrix audit: Queue (pgTAP states/counts/routes/privacy; E2E C11, C40; widget tests), Contact attempt (pgTAP first/second/refusals/Q2 skipped; E2E C20, C21), Confirm by phone (pgTAP incl. refusals and Q2; E2E C30; widget tests), Reassign the decline (pgTAP O2 incl. pending decline alert cancelled and A -> B -> A; E2E C31), Cancel position (pgTAP multi, last, one-off with a case, refusals; E2E C50), Decline (pgTAP leader+deputy, held deputy skipped, fresh key; E2E C10). All ran and passed (see Verification).
 - Open owner question (fail-closed default taken): Q4, which contact fields a leader may see in production. Staging shows only the labelled 2.5 routes through the scoped Identity read; production shows nothing until `q4_personal_data` is approved, and then still only labelled routes (never phone usernames).
+- Review amendments (independent review, 2026-10-14; the migration was unmerged and unapplied, so `20261014201500_duties_coverage.sql` was amended in place; the frozen block is unchanged):
+  - Decision B1: the Confirmed by leader `reason` on the Duties board and rota (`duties_occurrence_json`) is shown only when the viewer's capacity for that department (`duties_manage_capacity` of `app.duties_viewer`) is `department_leader` or `department_deputy`; the Admin role alone sees by, at and channel only. The other reads were audited: the coverage queue already gated reasons, notes and routes to leader/deputy scope; the rota passes no notes; My duties shows the member their own answer. Audit note: the Admin seeing members' own answer notes on the board is the 4.1 behaviour (`with_notes = capacity is not null`), unchanged here and out of this story's scope. Tests: pgTAP (leader yes, Admin and Pastor no on board, queue and rota) and E2E C40.
+  - Decision S1 (option b): `app.followups_source_event` (4.7) is replaced so it needs only the Q4 gate (closing or keeping a source's tasks and cancelling their reminders schedules nothing). With Q2 closed or invalid a confirmation, an acceptance and a cancellation close the case and its task (`source_resolved` / `source_cancelled`) and cancel the task's reminders. `duties_apply_change` and `duties_cancel_one` set `app.duties_actor`, which `duties_notify` reads, so every skip is audited with an actor. This supersedes the earlier decision that a case closed while Q2 was invalid leaves its task open. Tests: pgTAP for confirm, accept and cancel_position with Q2 invalid (task closed, reminders cancelled).
+  - Decision S2: `duties_lock_for_leader` refuses an attempt or confirmation on the actor's own assignment with `validation_failed {"assignment_id": "own"}`; the client hides the actions on the leader's own duty with "This is your own duty: answer it in My duties." and maps the refusal to the notice `ownAssignment`. Tests: pgTAP and widget test.
+  - Decision S3: `duties_coverage_supervisor` picks another current leader or deputy of the department whom the app can reach (a leader first, then by member id); only when nobody else holds the scope the recorder supervises, answered as `supervisor_fallback: true` and audited. The task's scope is the supervisor's scope (the owner is in the same department group, so the Q4 owner-scope rule holds). Tests: a deputy records and a leader supervises; a single-leader department falls back.
+  - Decision N1: a source-specific reminder schedule (owner at the due or review time, no supervisor alert, no assignment notice); due and review dates are refused after the duty start, so nothing is sent after the service. Cases of started duties close lazily (`started`, `duties_close_started_cases`, `skip locked`) at the next attempt or confirmation in that department; documented in the runbook.
+  - Decision N2/N3: a new attempt on a case whose task was finished by hand, or whose task owner no longer holds the department scope, closes that case (`replaced`; its task `source_resolved` if still active) and opens a fresh case and task for the recorder.
+  - Decision N4: `duties_cancel_one` (4.4 body) skips cancelled positions.
+  - Decision N5: the queue computes every position's state for the counts but builds the JSON only for the first 1000 listed.
+  - Decision N6: the scale test uses a real month (39 other departments with 30 more duties each over days 7-30; Admin 4,930 positions).
+  - Decision N7: a malformed From date shows "Use YYYY-MM-DD" and does not query.
+  - Decision N8: `changed` is counted once, under declined (labelled "Declined or changed"); `awaiting` counts only positions awaiting an answer.
+  - Decision N9: an attempt on an erased or departed assignee answers `validation_failed {"member_id": "required_reassign"}`.
+  - Replaced bodies added by the review: `followups_source_event` (from `20261014130535_followups_reminders.sql`, its latest version) and `duties_cancel_one` (from `20261014052239`, 4.4).
 - Remaining (not builder steps): staging apply of `20261014201500_duties_coverage.sql` and per-function md5 parity (parent; no owner SQL paste; no Edge Function redeploy); rebuild the staging staff web and APK (`url_launcher` direct dependency, Android tel:/sms: queries); owner manual checks in `docs/runbooks/duties.md`, story 4.9 (record in `evidence-4.9/owner-check.md`).
 
 
 ## Plan Change Log
 
+- 2026-10-14: independent review amendments B1, S1 (option b), S2, S3, N1-N9 applied to the unmerged migration, clients, tests, E2E and runbooks; recorded under Implementation Notes, "Review amendments". The earlier Q2 decision (task left open) is superseded by S1. Frozen block unchanged.
+
 ## Review Triage Log
+
+- B1 (blocker, Admin sees Confirmed by leader reason on the board): fixed (scope-gated reason; pgTAP and E2E C40).
+- S1 (should, task left open when Q2 invalid): fixed, option (b) (`followups_source_event` Q4-only; actor passed; pgTAP per closing path).
+- S2 (should, leader acts on own assignment): fixed (`own` refusal; client hint and notice; pgTAP and widget test).
+- S3 (should, supervisor = recorder): fixed (another reachable leader or deputy, leader first; recorded fallback; pgTAP).
+- N1 (alert after the service): fixed (owner-only schedule before the duty; lazy close of started cases).
+- N2, N3 (hand-closed task, owner without scope): fixed (case `replaced`, fresh task).
+- N4 (cancel_one on cancelled slots): fixed.
+- N5 (JSON for every position): fixed.
+- N6 (31-day timing on thin data): fixed (real month).
+- N7 (malformed From date): fixed.
+- N8 (double counting): fixed.
+- N9 (attempt on erased assignee): fixed.
 
 ## Verification
 
@@ -114,7 +144,14 @@ context:
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/staff`, `apps/mobile`; `TZ=America/New_York` for `test/duties` and mobile -- expected: pass.
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/main && npm run -s ci:function-imports`; evidence scan -- expected: clean.
 
-**Results (2026-10-14):**
+**Results after the review fixes (2026-10-14):**
+- db reset 0; db:test PASS (37 files, 3220 tests; `duties_coverage_test.sql` 157, `duties_coverage_scale_test.sql` 10 with leader 250 positions 207 ms, Pastor 40 departments 478 ms, Admin 31 days of a real month (4,930 positions) 914 ms); passed after a reset four times out of four; db:smoke pass.
+- Every E2E `exit=0` (26 scripts, reset before each, run one at a time; `duties-coverage` 12/12 including the B1 board checks).
+- contracts:test 242/0; node tool tests (CI set) 206/0; ci:policy-test 56/0.
+- flutter analyze clean in client_core, apps/staff, apps/mobile; flutter test client_core 592 (`duties_coverage_test.dart` 25), apps/staff 39, apps/mobile 55; under `TZ=America/New_York` client_core `test/duties` + `test/followups` 164 and apps/mobile 55.
+- ci:secrets clean; ci:migrations (`--base origin/main`) ordered, unique, non-destructive; ci:function-imports ok; evidence scan clean.
+
+**Results of the first build (2026-10-14):**
 - db reset 0; db:test PASS (37 files, 3191 tests; `duties_coverage_test.sql` 129, `duties_coverage_scale_test.sql` 9 with leader 250 positions 178 ms, Pastor 40 departments 611 ms, Admin 31 days 665 ms under `statement_timeout = '8s'`); db:smoke pass (no SMS provider).
 - Every E2E `exit=0` (26 scripts, reset before each; `duties-coverage` 12/12). A container restart interrupted the first run after 23 passing scripts; the last three were re-run (`duties-reminders` D90 needed `duty_declined` in its generic-text list, then 17/17) (`evidence-4.9/e2e-suite-summary.txt`).
 - contracts:test 242/0; node tool tests (CI set) 206/0; ci:policy-test 56/0.

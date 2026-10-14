@@ -715,6 +715,52 @@ void main() {
     });
   });
 
+  group('review fixes', () {
+    testWidgets('S2: no contact work on the leader\'s own duty', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.dutyCoverage,
+        setUp: (h) {
+          h.grants.myAccess = AccessReadOk(syntheticGrants(memberId: _ruth));
+          h.coverage.coverage = coverage([fullDepartment()]);
+        },
+      );
+      expect(byKey('coverage-attempt-$_slotA'), findsNothing);
+      expect(byKey('coverage-confirm-$_slotA'), findsNothing);
+      expect(
+        find.text('This is your own duty: answer it in My duties.'),
+        findsOneWidget,
+      );
+      // Someone else's duty keeps its actions; a refusal says why.
+      await tapKey(tester, 'coverage-confirm-$_slotX');
+      await enter(tester, 'coverage-confirm-reason-$_slotX', 'SYNTHETIC');
+      await tapKey(tester, 'coverage-confirm-save-$_slotX');
+      h.gateway.sent.single.refuse(
+        ErrorCode.validationFailed,
+        fieldErrors: const {'assignment_id': 'own'},
+      );
+      await settle(tester);
+      expect(byKey('duties-notice-ownAssignment'), findsOneWidget);
+    });
+
+    testWidgets('N7: a malformed From date is an error, not today', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.dutyCoverage,
+        setUp: (h) => h.coverage.coverage = coverage([fullDepartment()]),
+      );
+      final reads = h.coverage.queries.length;
+      await enter(tester, 'coverage-from', '2099-13-45');
+      await tapKey(tester, 'coverage-apply');
+      expect(find.text('Use YYYY-MM-DD'), findsOneWidget);
+      expect(h.coverage.queries.length, reads);
+    });
+  });
+
   group('the queue (Pastor and Admin: nothing private)', () {
     testWidgets('Pastor: church-wide gaps, read only', (tester) async {
       await pumpAt(

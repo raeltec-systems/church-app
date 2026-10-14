@@ -6,7 +6,7 @@
 -- duties_coverage_test.sql). Every account, phone and name is SYNTHETIC (fictional range
 -- +44 7700 900780-900789).
 begin;
-select plan(9);
+select plan(10);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000051' || lpad(n::text, 2, '0'))::uuid $$;
@@ -74,15 +74,22 @@ insert into app.identity_grants (member_id, scope_kind, scope_id, granted_by_mem
 select pg_temp.mid(2), 'department_leader', d.department_id, pg_temp.mid(1), pg_temp.u(1) from depts d where d.k = 0;
 
 -- Department 0: 125 two-position duties over the next six days (250 positions); every other
--- department: 30 two-position duties (60 positions). One hour each, spread through the week.
+-- department: 30 two-position duties (60 positions) in the week and 30 more over the rest of the
+-- month. One hour each.
 create temp table occs as
   with ins as (
     insert into app.duties_occurrences (department_id, duty_name, starts_at, ends_at, location,
                                         created_by_member, created_by_account)
-    select d.department_id, 'Duty ' || g, date_trunc('hour', now()) + interval '3 hours' + g * interval '67 minutes',
-           date_trunc('hour', now()) + interval '4 hours' + g * interval '67 minutes', 'SYNTHETIC hall',
-           pg_temp.mid(2), pg_temp.u(2)
-      from depts d cross join lateral generate_series(1, case when d.k = 0 then 125 else 30 end) g
+    -- Review N6: a real month: every other department also has 30 duties spread over days 7-30.
+    select d.department_id, 'Duty ' || g,
+           case when g <= 125 and (d.k = 0 or g <= 30)
+                then date_trunc('hour', now()) + interval '3 hours' + g * interval '67 minutes'
+                else date_trunc('hour', now()) + interval '7 days' + (g - 30) * interval '18 hours' end,
+           case when g <= 125 and (d.k = 0 or g <= 30)
+                then date_trunc('hour', now()) + interval '4 hours' + g * interval '67 minutes'
+                else date_trunc('hour', now()) + interval '7 days 1 hour' + (g - 30) * interval '18 hours' end,
+           'SYNTHETIC hall', pg_temp.mid(2), pg_temp.u(2)
+      from depts d cross join lateral generate_series(1, case when d.k = 0 then 125 else 60 end) g
     returning occurrence_id, department_id)
   select * from ins;
 insert into app.duties_slots (occurrence_id, position_no, position_name)
@@ -151,13 +158,15 @@ select is((select sum((d #>> '{counts,required}')::int)::int from qp, jsonb_arra
 select ok((select (j ->> 'truncated')::boolean and (select sum(jsonb_array_length(d -> 'positions'))
                                                      from jsonb_array_elements(j -> 'departments') d) = 1000
              from qp), 'at most 1000 positions are listed (truncated is said)');
+select is((select sum((d #>> '{counts,required}')::int)::int from qa, jsonb_array_elements(j -> 'departments') d),
+  250 + 39 * 120, 'the Admin''s 31 days cover a real month of positions (review N6)');
 select ok((select t from t1) - (select t from t0) < interval '3 seconds', 'the leader''s read is well inside the 8 s timeout');
 select ok((select t from t2) - (select t from t1) < interval '4 seconds', 'Pastor''s church-wide view is well inside it');
 select ok((select t from t3) - (select t from t2) < interval '4 seconds', 'an Admin''s 31-day view too');
 
 select diag('timings (ms): leader 250 = ' || round(extract(epoch from (select t from t1) - (select t from t0)) * 1000)
             || ', pastor 40 departments = ' || round(extract(epoch from (select t from t2) - (select t from t1)) * 1000)
-            || ', admin 31 days = ' || round(extract(epoch from (select t from t3) - (select t from t2)) * 1000));
+            || ', admin 31 days (4,930 positions) = ' || round(extract(epoch from (select t from t3) - (select t from t2)) * 1000));
 
 select * from finish();
 rollback;

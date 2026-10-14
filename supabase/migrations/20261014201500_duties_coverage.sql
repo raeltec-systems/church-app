@@ -34,13 +34,34 @@
 --     Follow-ups step and the reminder work are skipped and audited (`followup_skipped`,
 --     `reminders_skipped`, code `policy_unavailable`).
 --
+-- Review fixes (independent review of 4.9, 2026-10-14; this migration was unmerged and unapplied,
+-- so it is amended in place):
+--   B1 the Confirmed by leader reason is shown on the leader board only to the department's
+--      leaders and deputies (never to the Admin role alone or Pastor).
+--   S1 closing a coverage case closes its Follow-ups task also with the Q2 policy invalid:
+--      app.followups_source_event (replaced) needs only the Q4 gate (closing only removes work and
+--      cancelling reminders needs no policy); the change engine passes its actor so any remaining
+--      skip is audited.
+--   S2 a leader cannot record contact or Confirmed by leader on their own assignment (`own`).
+--   S3 the task's supervisor is another current, reachable leader or deputy of the department
+--      (a leader first); the recorder only when nobody else holds the scope (a recorded fallback).
+--   N1 coverage tasks follow a source-specific reminder schedule: the owner at the due or review
+--      time (always before the duty), no supervisor alert, so nothing arrives after the service;
+--      a case whose duty has started closes at its next touch.
+--   N2/N3 an attempt whose case's task was finished by hand, or whose owner no longer holds the
+--      department scope, closes that case and opens a fresh case and task for the recorder.
+--   N4 duties_cancel_one (replaced) leaves already-cancelled positions alone.
+--   N5 the queue builds its JSON only for the positions it lists; N8 `changed` counts once
+--      (declined or changed); N9 an attempt on an erased assignee is `required_reassign`.
+--
 -- Replaced bodies (each copied from its latest version, keeping every earlier review fix; changes
 -- are marked "Story 4.9"):
 --   from 20261014171038 (4.8): duties_state_ok, duties_assignment_history_guard, duties_notify,
 --     duties_apply_change, duties_plan_reminders, duties_after_answer, duties_respond,
 --     duties_accept_many, duties_authorize_command, duties_command, duties_my_assignment_json,
 --     duties_occurrence_json (3 arguments), duties_rota_occurrence_json;
---   from 20261014052239 (4.4): duties_erase_member, duties_deletion_remaining.
+--   from 20261014052239 (4.4): duties_erase_member, duties_deletion_remaining, duties_cancel_one;
+--   from 20261014130535 (4.7, Follow-ups): followups_source_event (review S1: the Q4 gate only).
 --
 -- Lock order (AD-2): the actor's grant rows FOR SHARE (authorizer) -> command receipt ->
 -- department FOR SHARE -> series FOR SHARE -> occurrence -> slots -> assignment FOR UPDATE ->
@@ -81,7 +102,8 @@ as $$
     when 'contact_channel' then p_value in ('phone', 'message', 'in_person', 'other')
     when 'contact_outcome' then p_value in ('no_answer', 'left_message', 'will_answer',
                                             'cannot_serve', 'other')
-    when 'case_close' then p_value in ('accepted', 'confirmed', 'superseded', 'cancelled')
+    when 'case_close' then p_value in ('accepted', 'confirmed', 'superseded', 'cancelled',
+                                       'replaced', 'started')
     when 'audit_action' then p_value in ('department_created', 'member_added', 'duty_published',
                                          'response_recorded', 'duty_revised', 'series_created',
                                          'draft_assigned', 'draft_revised', 'series_revised',
@@ -409,6 +431,72 @@ begin
 end;
 $$;
 
+-- Replaced (owner: followups; copied from 20261014130535, same signature and answers), story 4.9
+-- review S1: the Q4 gate only (see above).
+create or replace function app.followups_source_event(p_input jsonb)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_errors jsonb;
+  v_source_id uuid;
+  v_event text;
+  v_task record;
+  v_closed integer := 0;
+  v_kept integer := 0;
+begin
+  if jsonb_typeof(p_input) is distinct from 'object' then
+    perform app.cmd_fail('validation_failed', '{"input": "must_be_object"}');
+  end if;
+  v_errors := app.contract_unknown_keys(p_input, array['source_type', 'source_id', 'event'])
+              || jsonb_strip_nulls(jsonb_build_object(
+                   'source_type', app.contract_token_error(p_input -> 'source_type')));
+  select t.errors, t.value into v_errors, v_source_id
+    from app.followups_uuid(p_input, 'source_id', true, v_errors) t;
+  v_event := p_input ->> 'event';
+  if jsonb_typeof(p_input -> 'event') is distinct from 'string'
+     or not app.followups_state_ok('source_event', v_event) then
+    v_errors := v_errors || '{"event": "invalid"}';
+  end if;
+  if v_errors <> '{}'::jsonb then
+    perform app.cmd_fail('validation_failed', v_errors);
+  end if;
+  -- Story 4.9 review S1: closing (or keeping) a source's tasks only removes work and cancelling
+  -- their reminders needs no scheduling policy, so only the Q4 personal-data gate applies here; a
+  -- source event is never lost to an invalid Q2 policy.
+  if not app.identity_applications_open() then
+    perform app.cmd_fail('unavailable', '{"policy": "gate_closed"}');
+  end if;
+  for v_task in
+    select t.task_id, t.task_state, t.revision,
+           case v_event when 'resolved' then p.on_source_resolved else p.on_source_cancelled end as effect
+      from app.followups_tasks t
+      join app.followups_purposes p on p.source_type = t.source_type and p.purpose = t.purpose
+     where t.source_type = p_input ->> 'source_type' and t.source_id = v_source_id
+       and app.followups_state_ok('active_state', t.task_state)
+     order by t.task_id
+       for update of t
+  loop
+    if v_task.effect = 'close' then
+      update app.followups_tasks t
+         set task_state = 'closed', review_at = null, finished_at = now(),
+             close_code = 'source_' || v_event, revision = t.revision + 1, updated_at = now()
+       where t.task_id = v_task.task_id;
+      perform app.followups_activity_event(v_task.task_id, 'closed_by_source', null, null, 'source',
+                                           null, null, v_task.task_state, 'closed', null, null,
+                                           null, null, v_event, v_task.revision + 1);
+      perform app.followups_cancel_reminders(v_task.task_id, null, null, 'source_' || v_event);
+      v_closed := v_closed + 1;
+    else
+      v_kept := v_kept + 1;
+    end if;
+  end loop;
+  return jsonb_build_object('closed', v_closed, 'kept', v_kept);
+end;
+$$;
+
+
 comment on function app.followups_source_review(jsonb) is
   'Story 4.9 owner operation: a source sets its active task Waiting with a new review date and '
   'optional outcome (activity capacity source; reminders follow).';
@@ -466,6 +554,11 @@ select app.followups_register_purpose(
     "outcomes": ["no_answer", "left_message", "will_answer", "cannot_serve", "other"],
     "on_source_resolved": "close", "on_source_cancelled": "close", "manual_create": false}',
   'app.duties_coverage_case_context(jsonb)'::regprocedure);
+-- Review N1: the owner is reminded at the due or review time only (both always before the duty
+-- starts); no supervisor alert (it would come a day after the deadline, possibly after the
+-- service); no assignment notice (the owner recorded the attempt).
+select app.followups_register_reminder_schedule('duties', 'duties_coverage_case', 'coverage_follow_up',
+  '{"owner": [{"anchor": "deadline", "before": "0 minutes"}], "supervisor": [], "on_assignment": false}');
 
 -- duty_declined: actionable while the assignment is current at that revision, declined and the
 -- duty has not started; the recipient leads or deputises the department now, is reachable in
@@ -752,6 +845,9 @@ declare
   v_cancelled integer;
   v_revised uuid[];
   v_ended uuid[];
+  -- Review S1: the actor of the change (set by the change engine and the cancellations), so a
+  -- skipped Follow-ups step is audited.
+  v_actor jsonb := nullif(pg_catalog.current_setting('app.duties_actor', true), '')::jsonb;
 begin
   -- Story 4.9: coverage cases close with their assignment (Follow-ups, before Notifications).
   select coalesce(array_agg(distinct (x ->> 'source_id')::uuid) filter (where x ->> 'reason' = 'source_revised'), '{}'),
@@ -760,10 +856,14 @@ begin
     from jsonb_array_elements(coalesce(p_ops, '[]'::jsonb)) x
    where x ->> 'op' = 'cancel';
   if cardinality(v_revised) > 0 then
-    perform app.duties_close_cases(v_revised, 'superseded', null, null, null, null);
+    perform app.duties_close_cases(v_revised, 'superseded', (v_actor ->> 'member')::uuid,
+                                   (v_actor ->> 'account')::uuid, v_actor ->> 'capacity',
+                                   v_actor ->> 'command');
   end if;
   if cardinality(v_ended) > 0 then
-    perform app.duties_close_cases(v_ended, 'cancelled', null, null, null, null);
+    perform app.duties_close_cases(v_ended, 'cancelled', (v_actor ->> 'member')::uuid,
+                                   (v_actor ->> 'account')::uuid, v_actor ->> 'capacity',
+                                   v_actor ->> 'command');
   end if;
   for v_op in select x from jsonb_array_elements(coalesce(p_ops, '[]'::jsonb)) x loop
     if v_op ->> 'op' = 'cancel' then
@@ -878,6 +978,10 @@ declare
   v_notice text;
   r record;
 begin
+  -- Story 4.9 review S1: the change's actor for app.duties_notify.
+  perform pg_catalog.set_config('app.duties_actor', jsonb_build_object(
+    'member', p_actor_member, 'account', p_actor_account, 'capacity', p_capacity,
+    'command', p_command)::text, true);
   if p_member_given then
     -- Story 4.9: a cancelled position is never given again.
     if exists (select 1 from app.duties_slots s
@@ -1379,6 +1483,100 @@ $$;
 
 
 -- ---------------------------------------------------------------------------------------------
+-- Cancelling one occurrence (replaced; copied from 20261014052239, story 4.9 review N4 and S1)
+-- ---------------------------------------------------------------------------------------------
+
+create or replace function app.duties_cancel_one(p_occ app.duties_occurrences, p_actor_member uuid,
+                                      p_actor_account uuid, p_capacity text, p_command text)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_revision bigint;
+  v_slot app.duties_slots;
+  v_old app.duties_assignments;
+  v_slot_revision bigint;
+  v_end_revision bigint;
+  v_cancels jsonb := '[]'::jsonb;
+  v_notices jsonb := '[]'::jsonb;
+  v_count integer := 0;
+  v_request uuid := app.cmd_current_request_id(p_actor_account, p_command);
+  v_id uuid;
+begin
+  -- Story 4.9 review S1: the cancellation's actor for app.duties_notify.
+  perform pg_catalog.set_config('app.duties_actor', jsonb_build_object(
+    'member', p_actor_member, 'account', p_actor_account, 'capacity', p_capacity,
+    'command', p_command)::text, true);
+  update app.duties_occurrences o
+     set occurrence_state = 'cancelled', revision = o.revision + 1
+   where o.occurrence_id = p_occ.occurrence_id
+  returning o.revision into v_revision;
+  if p_occ.occurrence_state <> 'published' then
+    -- A cancelled draft keeps no planned people, nor their planned reasons (story 4.4).
+    update app.duties_slots s
+       set draft_member_id = null, draft_override_reason = null, draft_override_by_member = null,
+           draft_override_by_account = null, draft_override_at = null
+     where s.occurrence_id = p_occ.occurrence_id
+       and (s.draft_member_id is not null or s.draft_override_reason is not null);
+    perform app.duties_audit_series_event('occurrence_cancelled', p_actor_member, p_actor_account,
+                                          p_capacity, p_command, p_occ.department_id, p_occ.series_id,
+                                          p_occ.occurrence_id, null, null, p_occ.occurrence_state,
+                                          v_revision);
+    return jsonb_build_object('assignments_cancelled', 0, 'ops', '[]'::jsonb);
+  end if;
+  -- Story 4.9 review N4: a position cancelled before keeps its own cancelled revision.
+  for v_slot in select s.* from app.duties_slots s where s.occurrence_id = p_occ.occurrence_id
+                   and s.cancelled_at is null
+                 order by s.position_no for update loop
+    update app.duties_slots s set revision = s.revision + 1 where s.slot_id = v_slot.slot_id
+    returning s.revision into v_slot_revision;
+    v_old := null;
+    select a.* into v_old from app.duties_assignments a
+     where a.slot_id = v_slot.slot_id and a.assignment_state = 'current' for update;
+    if v_old.assignment_id is not null then
+      update app.duties_assignments a
+         set assignment_state = 'cancelled', ended_at = now(), end_reason = 'cancelled',
+             revision = a.revision + 1
+       where a.assignment_id = v_old.assignment_id
+      returning a.revision into v_end_revision;
+      v_count := v_count + 1;
+      if v_old.response in ('pending', 'accepted') and app.duties_notice_recipient(v_old.member_id) then
+        v_notices := v_notices || jsonb_build_array(jsonb_build_object('op', 'enqueue', 'counts', true,
+          'key', jsonb_build_object(
+            'source_type', 'duties_assignment', 'source_id', v_old.assignment_id,
+            'source_revision', v_end_revision, 'recipient_member_id', v_old.member_id,
+            'reminder_kind', 'duty_cancelled', 'scheduled_at', app.cmd_utc(now()))));
+      end if;
+    end if;
+    insert into app.duties_slot_revisions (slot_id, slot_revision, occurrence_id,
+                                           occurrence_revision, change_class, changed_fields,
+                                           duty_name, starts_at, ends_at, reporting_at, location,
+                                           instructions, topic, scripture, event_ref, member_id,
+                                           assignment_id, response_deadline, created_by_member,
+                                           created_by_account, command_request_id)
+    values (v_slot.slot_id, v_slot_revision, p_occ.occurrence_id, v_revision, 'cancelled', '{}',
+            p_occ.duty_name, p_occ.starts_at, p_occ.ends_at, p_occ.reporting_at, p_occ.location,
+            p_occ.instructions, p_occ.topic, p_occ.scripture, p_occ.event_ref, null, null, null,
+            p_actor_member, p_actor_account, v_request);
+    perform app.duties_audit_series_event('occurrence_cancelled', p_actor_member, p_actor_account,
+                                          p_capacity, p_command, p_occ.department_id, p_occ.series_id,
+                                          p_occ.occurrence_id, v_old.assignment_id, v_old.member_id,
+                                          p_occ.occurrence_state, v_revision);
+    -- Every pending job of the position's assignments (current, superseded) ends with it.
+    for v_id in select a.assignment_id from app.duties_assignments a where a.slot_id = v_slot.slot_id loop
+      v_cancels := v_cancels || jsonb_build_array(jsonb_build_object(
+        'op', 'cancel', 'source_id', v_id, 'reason', 'source_cancelled'));
+    end loop;
+  end loop;
+  return jsonb_build_object('assignments_cancelled', v_count, 'ops', v_cancels || v_notices);
+end;
+$$;
+
+
+
+
+-- ---------------------------------------------------------------------------------------------
 -- Leader commands on one assignment (story 4.9)
 -- ---------------------------------------------------------------------------------------------
 
@@ -1401,8 +1599,10 @@ declare
   v_department uuid;
   v_series uuid;
   v_occurrence uuid;
+  v_assignee uuid;
 begin
-  select o.department_id, o.series_id, o.occurrence_id into v_department, v_series, v_occurrence
+  select o.department_id, o.series_id, o.occurrence_id, a.member_id
+    into v_department, v_series, v_occurrence, v_assignee
     from app.duties_assignments a
     join app.duties_slots s on s.slot_id = a.slot_id
     join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
@@ -1416,6 +1616,11 @@ begin
   elsif capacity = 'admin' then
     -- The Admin role alone does not hold the department's scope (no contact work, no task).
     perform app.cmd_fail('forbidden');
+  end if;
+  -- Review S2: a leader answers their own duty in My duties (never as a contact or a leader
+  -- confirmation of themselves).
+  if v_assignee = p_actor_member then
+    perform app.cmd_fail('validation_failed', '{"assignment_id": "own"}');
   end if;
   perform 1 from app.duties_departments d
    where d.department_id = v_department and d.department_state = 'active' for share;
@@ -1441,6 +1646,26 @@ begin
 end;
 $$;
 
+-- Review S3: the supervisor of a coverage task recorded by p_actor: another current leader or
+-- deputy of the department whom the app can reach (a leader first, then by member id); null when
+-- nobody else holds the scope (the recorder then supervises, a recorded fallback).
+create function app.duties_coverage_supervisor(p_department_id uuid, p_actor uuid)
+returns uuid
+language sql
+stable
+set search_path = ''
+as $$
+  select g.member_id
+    from app.identity_grants g
+   where g.scope_id = p_department_id and g.revoked_at is null
+     and g.scope_kind in ('department_leader', 'department_deputy')
+     and g.member_id is distinct from p_actor
+     and app.duties_member_active(g.member_id)
+     and app.duties_leader_reachable(g.member_id)
+   order by (g.scope_kind = 'department_deputy'), g.member_id
+   limit 1;
+$$;
+
 -- A single token from a fixed vocabulary (required).
 create function app.duties_code(p_payload jsonb, p_key text, p_kind text, inout errors jsonb, out value text)
 language plpgsql
@@ -1456,6 +1681,38 @@ begin
   else
     value := p_payload ->> p_key;
   end if;
+end;
+$$;
+
+-- Review N1: the lazy close. Open coverage cases of the department whose duty has started close
+-- (`started`) with their tasks at a leader's next coverage command there (a case is about getting
+-- an answer or cover before the duty; after it, completion is entry 10). Cases locked by another
+-- command are left for the next touch (skip locked: no lock waits). Their reminders already
+-- stopped (the owner is reminded only before the duty; review N1 schedule).
+create function app.duties_close_started_cases(p_department_id uuid, p_actor_member uuid,
+                                               p_actor_account uuid, p_capacity text, p_command text)
+returns integer
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_ids uuid[];
+begin
+  select coalesce(array_agg(c.assignment_id order by c.assignment_id), '{}') into v_ids
+    from app.duties_coverage_cases c
+    join app.duties_assignments a on a.assignment_id = c.assignment_id
+    join app.duties_slots s on s.slot_id = a.slot_id
+    join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
+   where c.department_id = p_department_id and c.closed_at is null
+     and app.duties_occurrence_start(o) <= now();
+  if cardinality(v_ids) = 0 then
+    return 0;
+  end if;
+  perform 1 from app.duties_coverage_cases c
+   where c.assignment_id = any (v_ids) and c.closed_at is null
+   order by c.assignment_id for update skip locked;
+  return app.duties_close_cases(v_ids, 'started', p_actor_member, p_actor_account, p_capacity,
+                                p_command);
 end;
 $$;
 
@@ -1486,6 +1743,9 @@ declare
   v_task jsonb;
   v_followup text := 'none';
   v_message text;
+  v_supervisor uuid;
+  v_old_case uuid;
+  v_task_row app.followups_tasks;
   v_cmd constant text := 'duties.record_contact_attempt';
 begin
   select a.* into v_actor from app.duties_command_actor(p_actor) a;
@@ -1510,6 +1770,11 @@ begin
   if (v_lock.assignment).response = 'accepted' then
     perform app.cmd_fail('validation_failed', '{"assignment_id": "confirmed"}');
   end if;
+  -- Review N9: an erased or departed assignee is reassigned, not contacted.
+  if (v_lock.assignment).member_id = '00000000-0000-0000-0000-000000000000'::uuid
+     or not app.duties_can_serve((v_lock.assignment).member_id, (v_lock.occurrence).department_id) then
+    perform app.cmd_fail('validation_failed', '{"member_id": "required_reassign"}');
+  end if;
   if v_next <= now() then
     perform app.cmd_fail('validation_failed', '{"next_follow_up_at": "past"}');
   elsif v_next >= app.duties_occurrence_start(v_lock.occurrence) then
@@ -1520,7 +1785,23 @@ begin
   -- The open case (after the assignment, AD-2), or a new one.
   select c.* into v_case from app.duties_coverage_cases c
    where c.assignment_id = v_assignment_id and c.closed_at is null for update;
-  if not found then
+  -- Review N2/N3: a case whose task was finished by hand, or whose task owner no longer holds the
+  -- department's scope, is replaced: it closes (`replaced`, its task too below) and a fresh case
+  -- and task are opened for the recorder (a new source id, so no uniqueness refusal).
+  if found and v_case.task_id is not null then
+    select t.* into v_task_row from app.followups_tasks t where t.task_id = v_case.task_id;
+    if not app.followups_state_ok('active_state', v_task_row.task_state)
+       or not (app.identity_member_has_scope(v_task_row.owner_member_id, 'department_leader',
+                                             (v_lock.occurrence).department_id)
+               or app.identity_member_has_scope(v_task_row.owner_member_id, 'department_deputy',
+                                                (v_lock.occurrence).department_id)) then
+      update app.duties_coverage_cases c set closed_at = now(), close_code = 'replaced'
+       where c.case_id = v_case.case_id;
+      v_old_case := v_case.case_id;
+      v_case := null;
+    end if;
+  end if;
+  if v_case.case_id is null then
     insert into app.duties_coverage_cases (assignment_id, department_id, opened_by_member,
                                            opened_by_account)
     values (v_assignment_id, (v_lock.occurrence).department_id, v_actor.member_id, v_actor.account_id)
@@ -1538,12 +1819,26 @@ begin
                                  (v_lock.assignment).member_id, v_outcome,
                                  (v_lock.assignment).revision);
   -- Follow-ups (after every Duties row, before Notifications; its own reminder work runs inside).
+  perform app.duties_close_started_cases((v_lock.occurrence).department_id, v_actor.member_id,
+                                         v_actor.account_id, v_lock.capacity, v_cmd);
+  v_supervisor := app.duties_coverage_supervisor((v_lock.occurrence).department_id, v_actor.member_id);
+  if v_old_case is not null then
+    -- The replaced case's task, if still active, closes (Q4 gate only, review S1).
+    perform app.followups_source_event(jsonb_build_object(
+      'source_type', 'duties_coverage_case', 'source_id', v_old_case, 'event', 'resolved'));
+  end if;
   begin
     if v_case.task_id is null then
       v_task := app.followups_open_task(jsonb_build_object(
         'source_type', 'duties_coverage_case', 'source_id', v_case.case_id, 'source_revision', 1,
         'purpose', 'coverage_follow_up', 'owner_member_id', v_actor.member_id,
-        'supervisor_member_id', v_actor.member_id, 'scope_kind', v_lock.capacity,
+        'supervisor_member_id', coalesce(v_supervisor, v_actor.member_id),
+        -- The task's scope is the supervisor's (a leader may supervise a deputy's task: same
+        -- department family).
+        'scope_kind', case when v_supervisor is null then v_lock.capacity
+                           when app.identity_member_has_scope(v_supervisor, 'department_leader',
+                                                              (v_lock.occurrence).department_id)
+                             then 'department_leader' else 'department_deputy' end,
         'scope_id', (v_lock.occurrence).department_id,
         'next_action', 'Follow up a duty position that needs an answer or cover.',
         'due_at', app.cmd_utc(v_next), 'actor_member_id', v_actor.member_id,
@@ -1576,7 +1871,9 @@ begin
     'data', jsonb_build_object('assignment_id', v_assignment_id,
                                'revision', (v_lock.assignment).revision,
                                'case_id', v_case.case_id, 'attempt_id', v_attempt,
-                               'task_id', v_case.task_id, 'followup', v_followup));
+                               'task_id', v_case.task_id, 'followup', v_followup,
+                               'replaced_case', v_old_case is not null,
+                               'supervisor_fallback', v_supervisor is null));
 end;
 $$;
 
@@ -1639,6 +1936,8 @@ begin
                                  (v_lock.occurrence).occurrence_id, v_assignment_id,
                                  (v_lock.assignment).member_id, v_channel, v_revision);
   -- Follow-ups before Notifications.
+  perform app.duties_close_started_cases((v_lock.occurrence).department_id, v_actor.member_id,
+                                         v_actor.account_id, v_lock.capacity, v_cmd);
   perform app.duties_close_cases(array[v_assignment_id], 'confirmed', v_actor.member_id,
                                  v_actor.account_id, v_lock.capacity, v_cmd);
   perform app.notifications_cancel(jsonb_build_object(
@@ -1721,6 +2020,10 @@ begin
                                  'notices_queued', (v_notified ->> 'queued')::integer));
   end if;
   v_request := app.cmd_current_request_id(v_actor.account_id, v_cmd);
+  -- Review S1: the actor for app.duties_notify.
+  perform pg_catalog.set_config('app.duties_actor', jsonb_build_object(
+    'member', v_actor.member_id, 'account', v_actor.account_id, 'capacity', v_lock.capacity,
+    'command', v_cmd)::text, true);
   update app.duties_occurrences o set revision = o.revision + 1
    where o.occurrence_id = v_occurrence returning o.revision into v_revision;
   update app.duties_slots s
@@ -1988,7 +2291,14 @@ as $$
                                             'by', app.duties_display_name(a.responded_by_member),
                                             'at', app.cmd_utc(a.responded_at),
                                             'channel', a.confirmed_channel,
-                                            'reason', case when p_with_notes then a.confirmed_reason end) end,
+                                            -- Review B1: the department's leaders and
+                                            -- deputies only (never the Admin role alone).
+                                            'reason', case when p_with_notes
+                                                            and app.duties_manage_capacity(
+                                                                  nullif(pg_catalog.current_setting('app.duties_viewer', true), '')::uuid,
+                                                                  o.department_id)
+                                                                in ('department_leader', 'department_deputy')
+                                                           then a.confirmed_reason end) end,
                           'response_deadline', app.cmd_utc(a.response_deadline),
                           'deadline_source', a.deadline_source,
                           'short_notice', a.short_notice,
@@ -2199,65 +2509,14 @@ begin
            app.duties_manage_capacity(v_member, d.department_id) is not null as can_manage
       from app.duties_departments d
      where d.department_id = any (v_departments)
-  ), pos as (
-    select o.department_id, o.occurrence_id, o.starts_at, s.position_no, a.member_id, x.status,
+  ), base as (
+    -- Review N5: every position's state (for the counts); the JSON is built below only for the
+    -- positions listed (rn <= 1000).
+    select o.department_id, o.occurrence_id, o.starts_at, s.slot_id, s.position_no,
+           a.assignment_id, a.member_id, c.case_id, l.attempt_id, cd.scope_kind, x.status,
            x.needs_contact, coalesce((v_counts ->> s.slot_id::text)::integer, 0) as overlaps,
            c.case_id is not null and l.next_follow_up_at <= now() as follow_up_overdue,
-           row_number() over (order by o.starts_at, o.occurrence_id, s.position_no) as rn,
-           jsonb_build_object(
-             'slot_id', s.slot_id,
-             'position_no', s.position_no,
-             'position_name', s.position_name,
-             'occurrence_id', o.occurrence_id,
-             'occurrence_revision', o.revision,
-             'series_id', o.series_id,
-             'duty_name', o.duty_name,
-             'starts_at', app.cmd_utc(o.starts_at),
-             'ends_at', case when o.ends_at is not null then app.cmd_utc(o.ends_at) end,
-             'reporting_at', case when o.reporting_at is not null then app.cmd_utc(o.reporting_at) end,
-             'location', o.location,
-             'positions_left', (select count(*) from app.duties_slots s2
-                                 where s2.occurrence_id = o.occurrence_id and s2.cancelled_at is null),
-             'status', x.status,
-             'needs_contact', x.needs_contact,
-             'overlaps', coalesce((v_counts ->> s.slot_id::text)::integer, 0),
-             'assignment', case when a.assignment_id is not null then jsonb_build_object(
-               'assignment_id', a.assignment_id,
-               'revision', a.revision,
-               'member_id', a.member_id,
-               'display_name', app.duties_display_name(a.member_id),
-               'account', case when app.identity_member_account_label(a.member_id) = 'no_login'
-                               then 'no_login' else 'app_account' end,
-               'response', a.response,
-               'response_provenance', a.response_provenance,
-               'response_deadline', app.cmd_utc(a.response_deadline),
-               'deadline_source', a.deadline_source,
-               'short_notice', a.short_notice,
-               'responded_at', case when a.responded_at is not null then app.cmd_utc(a.responded_at) end,
-               'prior_accepted_at', case when a.prior_accepted_at is not null
-                                         then app.cmd_utc(a.prior_accepted_at) end,
-               'note', case when cd.scope_kind is not null then a.response_note end,
-               'confirmation', case when a.response_provenance = 'leader' then jsonb_build_object(
-                                 'by', app.duties_display_name(a.responded_by_member),
-                                 'at', app.cmd_utc(a.responded_at),
-                                 'channel', a.confirmed_channel,
-                                 'reason', case when cd.scope_kind is not null then a.confirmed_reason end) end,
-               'changes', case when x.status = 'changed'
-                               then to_jsonb(app.duties_changes_since(s.slot_id, a.slot_revision - 1,
-                                                                       a.slot_revision)) end) end,
-             'follow_up', case when c.case_id is not null then jsonb_build_object(
-               'case_id', c.case_id,
-               'task_id', case when cd.scope_kind is not null then c.task_id end,
-               'opened_at', app.cmd_utc(c.opened_at),
-               'attempts', (select count(*) from app.duties_contact_attempts t where t.case_id = c.case_id),
-               'next_follow_up_at', app.cmd_utc(l.next_follow_up_at),
-               'overdue', l.next_follow_up_at <= now(),
-               'last_attempt', jsonb_build_object(
-                 'at', app.cmd_utc(l.recorded_at),
-                 'by', app.duties_display_name(l.recorded_by_member),
-                 'channel', l.channel,
-                 'outcome', l.outcome,
-                 'note', case when cd.scope_kind is not null then l.note end)) end) as obj
+           row_number() over (order by o.starts_at, o.occurrence_id, s.position_no) as rn
       from cd
       join app.duties_occurrences o on o.department_id = cd.department_id
       join app.duties_slots s on s.occurrence_id = o.occurrence_id and s.cancelled_at is null
@@ -2277,13 +2536,76 @@ begin
      where o.occurrence_state = 'published' and o.starts_at >= v_lo and o.starts_at < v_hi
        and app.duties_occurrence_start(o) > now()
        and (v_duty is null or position(lower(v_duty) in lower(o.duty_name)) > 0)
+  ), pos as (
+    select b.department_id, b.member_id, b.status, b.rn,
+           jsonb_build_object(
+             'slot_id', s.slot_id,
+             'position_no', s.position_no,
+             'position_name', s.position_name,
+             'occurrence_id', o.occurrence_id,
+             'occurrence_revision', o.revision,
+             'series_id', o.series_id,
+             'duty_name', o.duty_name,
+             'starts_at', app.cmd_utc(o.starts_at),
+             'ends_at', case when o.ends_at is not null then app.cmd_utc(o.ends_at) end,
+             'reporting_at', case when o.reporting_at is not null then app.cmd_utc(o.reporting_at) end,
+             'location', o.location,
+             'positions_left', (select count(*) from app.duties_slots s2
+                                 where s2.occurrence_id = o.occurrence_id and s2.cancelled_at is null),
+             'status', b.status,
+             'needs_contact', b.needs_contact,
+             'overlaps', coalesce((v_counts ->> s.slot_id::text)::integer, 0),
+             'assignment', case when a.assignment_id is not null then jsonb_build_object(
+               'assignment_id', a.assignment_id,
+               'revision', a.revision,
+               'member_id', a.member_id,
+               'display_name', app.duties_display_name(a.member_id),
+               'account', case when app.identity_member_account_label(a.member_id) = 'no_login'
+                               then 'no_login' else 'app_account' end,
+               'response', a.response,
+               'response_provenance', a.response_provenance,
+               'response_deadline', app.cmd_utc(a.response_deadline),
+               'deadline_source', a.deadline_source,
+               'short_notice', a.short_notice,
+               'responded_at', case when a.responded_at is not null then app.cmd_utc(a.responded_at) end,
+               'prior_accepted_at', case when a.prior_accepted_at is not null
+                                         then app.cmd_utc(a.prior_accepted_at) end,
+               'note', case when b.scope_kind is not null then a.response_note end,
+               'confirmation', case when a.response_provenance = 'leader' then jsonb_build_object(
+                                 'by', app.duties_display_name(a.responded_by_member),
+                                 'at', app.cmd_utc(a.responded_at),
+                                 'channel', a.confirmed_channel,
+                                 'reason', case when b.scope_kind is not null then a.confirmed_reason end) end,
+               'changes', case when b.status = 'changed'
+                               then to_jsonb(app.duties_changes_since(s.slot_id, a.slot_revision - 1,
+                                                                       a.slot_revision)) end) end,
+             'follow_up', case when c.case_id is not null then jsonb_build_object(
+               'case_id', c.case_id,
+               'task_id', case when b.scope_kind is not null then c.task_id end,
+               'opened_at', app.cmd_utc(c.opened_at),
+               'attempts', (select count(*) from app.duties_contact_attempts t where t.case_id = c.case_id),
+               'next_follow_up_at', app.cmd_utc(l.next_follow_up_at),
+               'overdue', l.next_follow_up_at <= now(),
+               'last_attempt', jsonb_build_object(
+                 'at', app.cmd_utc(l.recorded_at),
+                 'by', app.duties_display_name(l.recorded_by_member),
+                 'channel', l.channel,
+                 'outcome', l.outcome,
+                 'note', case when b.scope_kind is not null then l.note end)) end) as obj
+      from base b
+      join app.duties_occurrences o on o.occurrence_id = b.occurrence_id
+      join app.duties_slots s on s.slot_id = b.slot_id
+      left join app.duties_assignments a on a.assignment_id = b.assignment_id
+      left join app.duties_coverage_cases c on c.case_id = b.case_id
+      left join app.duties_contact_attempts l on l.attempt_id = b.attempt_id
+     where b.rn <= 1000
   )
   select jsonb_build_object(
     'window', jsonb_build_object('from', to_char(v_from, 'YYYY-MM-DD'), 'to', to_char(v_to, 'YYYY-MM-DD'),
                                  'zone', v_zone),
     'duty', v_duty,
     -- At most 1000 positions are listed (soonest first); the counts always cover every one.
-    'truncated', (select count(*) > 1000 from pos),
+    'truncated', (select count(*) > 1000 from base),
     'departments', coalesce((
       select jsonb_agg(jsonb_build_object(
           'department_id', cd.department_id,
@@ -2297,18 +2619,19 @@ begin
                        'required', count(*),
                        'confirmed', count(*) filter (where r.status = 'confirmed'),
                        'unfilled', count(*) filter (where r.status = 'unfilled'),
-                       'awaiting', count(*) filter (where r.status in ('awaiting', 'changed')),
+                       -- Review N8: `changed` counts once, under declined or changed.
+                       'awaiting', count(*) filter (where r.status = 'awaiting'),
                        'overdue', count(*) filter (where r.status = 'overdue'),
                        'declined', count(*) filter (where r.status in ('declined', 'changed')),
                        'needs_contact', count(*) filter (where r.needs_contact is not null),
                        'conflicts', count(*) filter (where r.overlaps > 0 and r.status <> 'unfilled'),
                        'overdue_follow_ups', count(*) filter (where r.follow_up_overdue))
-                       from pos r where r.department_id = cd.department_id),
+                       from base r where r.department_id = cd.department_id),
           -- Contact routes through the scoped Identity read: the department's leaders and
           -- deputies only, for members whose position is not yet confirmed.
           'contact_routes', case when cd.scope_kind is not null then
               app.identity_scoped_contact_routes(v_member, cd.scope_kind, cd.department_id, array(
-                select distinct r.member_id from pos r
+                select distinct r.member_id from base r
                  where r.department_id = cd.department_id and r.member_id is not null
                    and r.status <> 'confirmed' and r.rn <= 1000))
             else '{}'::jsonb end,
@@ -2479,6 +2802,8 @@ revoke all on function
   app.duties_coverage_case_context(jsonb),
   app.duties_decline_alert_check(jsonb),
   app.duties_close_cases(uuid[], text, uuid, uuid, text, text),
+  app.duties_coverage_supervisor(uuid, uuid),
+  app.duties_close_started_cases(uuid, uuid, uuid, text, text),
   app.duties_lock_for_leader(uuid, uuid, bigint),
   app.duties_code(jsonb, text, text, jsonb),
   app.duties_record_contact_attempt(uuid, bigint, jsonb),

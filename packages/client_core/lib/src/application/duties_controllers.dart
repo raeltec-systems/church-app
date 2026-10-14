@@ -98,6 +98,9 @@ enum DutyNotice {
   /// Story 4.9: the position is already confirmed (no contact needed).
   alreadyConfirmed,
 
+  /// Story 4.9 (review S2): the leader's own duty is answered in My duties.
+  ownAssignment,
+
   /// Story 4.5: "Can't make it anymore" was recorded.
   withdrawn,
 
@@ -372,6 +375,9 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
     }
     if (coverage && f['assignment_id'] == 'confirmed') {
       return DutyNotice.alreadyConfirmed;
+    }
+    if (coverage && f['assignment_id'] == 'own') {
+      return DutyNotice.ownAssignment;
     }
     return switch (error.code) {
       ErrorCode.conflict when f['assignments'] == 'changed' =>

@@ -395,16 +395,30 @@ async function main() {
       { assignment_id: newO, channel: 'phone', reason: 'x' });
     const kFilter = await coverage(other, { department_id: departmentId });
     const routing = await read('followups_task', admin.token, { p_task_id: tX });
+    // Review B1: the Confirmed by leader reason on the board is for the department's leaders only.
+    const boardConfirmation = async (p) => {
+      const b = await read('duties_leader_board', p.token);
+      for (const d of b?.departments ?? []) for (const du of d.duties ?? []) for (const pos of du.positions ?? []) {
+        if (pos.assignment?.assignment_id === aX) return pos.assignment.confirmation ?? null;
+      }
+      return null;
+    };
+    const leaderBoard = await boardConfirmation(leader);
+    const adminBoard = await boardConfirmation(admin);
+    const adminRota = JSON.stringify(await read('duties_rota', admin.token));
     check('C40-another-leader-and-an-admin-see-nothing-private', qk.status === 200
       && (qk.json?.departments ?? []).every((d) => d.department_id !== departmentId) && !holdsPrivate(qk.json)
       && qa.status === 200 && adminDept?.view === 'operational' && !holdsPrivate(qa.json)
       && positionOf(qa.json, aX)?.assignment?.confirmation?.channel === 'phone'
       && kAttempt.code === 'not_found' && aAttempt.code === 'forbidden' && aConfirm.code === 'forbidden'
-      && kFilter.status === 403 && routing?.view === 'routing' && !JSON.stringify(routing ?? {}).includes('SYNTHETIC:'),
+      && kFilter.status === 403 && routing?.view === 'routing' && !JSON.stringify(routing ?? {}).includes('SYNTHETIC:')
+      && typeof leaderBoard?.reason === 'string' && adminBoard?.channel === 'phone' && adminBoard?.reason == null
+      && !adminRota.includes('SYNTHETIC:'),
       { other_departments: (qk.json?.departments ?? []).length, other_private: holdsPrivate(qk.json),
         admin_view: adminDept?.view, admin_private: holdsPrivate(qa.json), other_attempt: kAttempt.code ?? null,
         admin_attempt: aAttempt.code ?? null, admin_confirm: aConfirm.code ?? null, other_filter: kFilter.status,
-        admin_task_view: routing?.view ?? null });
+        admin_task_view: routing?.view ?? null, leader_board_reason: typeof leaderBoard?.reason === 'string',
+        admin_board_reason: adminBoard?.reason != null, admin_rota_private: adminRota.includes('SYNTHETIC:') });
 
     // ------------------------------------------------------- cancel a position, then the last ones
     const c1 = await duty(leader.token, 'duties.cancel_position', occRevision(occId), { slot_id: slot(4) });

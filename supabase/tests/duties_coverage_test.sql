@@ -10,7 +10,7 @@
 -- closed (nothing); erasure; privileges. HTTP evidence: tools/identity-e2e/duties-coverage.mjs.
 -- Every account, phone and name is SYNTHETIC (fictional range +44 7700 900780-900789).
 begin;
-select plan(129);
+select plan(157);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000050' || lpad(n::text, 2, '0'))::uuid $$;
@@ -326,6 +326,9 @@ select is(pg_temp.call(1, 'identity_credential_command', 'identity.place_hold', 
 select is(pg_temp.answer(5, pg_temp.a('O2'), 'declined') #>> '{data,response}', 'declined', 'O declines duty O2');
 select is(pg_temp.jobs(pg_temp.a('O2')), 'l:duty_declined:2', 'a held deputy is not alerted (no unrouted need)');
 
+-- Review S3: a reachable deputy (member 10; the first deputy is held) supervises the leader's tasks.
+select is(pg_temp.grant_scope(10, 'department_deputy', pg_temp.d()) ->> 'code', null, 'member 10 becomes a deputy of D');
+
 -- Contact attempts and the Follow-ups task ------------------------------------------------------------
 create temp table at1 as select pg_temp.attempt(2, pg_temp.a('M'), 'no_answer', '1 day',
                                                 'SYNTHETIC: rang twice, will try after work.') as r;
@@ -333,11 +336,16 @@ select is(pg_temp.err((select r from at1)), 'ok', 'the leader records a contact 
 select is((select r #>> '{data,followup}' from at1), 'opened', 'which opens the follow-up task');
 select is((pg_temp.case_of(pg_temp.a('M'))).task_id::text, (select r #>> '{data,task_id}' from at1),
   'one coverage case per assignment holds its task');
-select is((select t.owner_member_id = pg_temp.mid(2) and t.supervisor_member_id = pg_temp.mid(2)
-                  and t.scope_kind = 'department_leader' and t.scope_id = pg_temp.d() and t.task_state = 'open'
+select is((select t.owner_member_id = pg_temp.mid(2) and t.supervisor_member_id = pg_temp.mid(10)
+                  and t.scope_kind = 'department_deputy' and t.scope_id = pg_temp.d() and t.task_state = 'open'
                   and t.due_at = pg_temp.t('1 day')
              from app.followups_tasks t where t.task_id = (select (r #>> '{data,task_id}')::uuid from at1)), true,
-  'the task: owner and supervisor the leader, the department scope, Open, due at the next follow-up');
+  'the task: owner the leader, supervised by the other reachable deputy (review S3), Open, due at the next follow-up');
+select is((select (r #>> '{data,supervisor_fallback}')::boolean from at1), false, 'not a fallback');
+select is((select count(*)::int from app.notifications_jobs j
+            where j.source_type = 'followups_supervision'
+              and j.source_id = (select (r #>> '{data,task_id}')::uuid from at1)), 0,
+  'review N1: no supervisor alert (it could come after the service)');
 select is((select count(*)::int from app.notifications_jobs j
             where j.source_type = 'followups_task' and j.job_state = 'pending'
               and j.source_id = (select (r #>> '{data,task_id}')::uuid from at1)
@@ -389,6 +397,87 @@ select is(pg_temp.err(pg_temp.duties(2, 'duties.record_contact_attempt', 7,
             jsonb_build_object('assignment_id', pg_temp.a('X'), 'channel', 'phone', 'outcome', 'no_answer',
                                'next_follow_up_at', app.cmd_utc(pg_temp.t('1 hour'))))),
   'conflict', 'a stale assignment revision is a conflict');
+
+-- Review S3: a deputy records, a leader supervises; only one leader in a department: the fallback.
+create temp table atd as select pg_temp.attempt(10, pg_temp.a('O'), 'no_answer', '1 day') as r;
+select is((select t.owner_member_id = pg_temp.mid(10) and t.supervisor_member_id = pg_temp.mid(2)
+                  and t.scope_kind = 'department_leader'
+             from app.followups_tasks t where t.task_id = (select (r #>> '{data,task_id}')::uuid from atd)), true,
+  'a deputy records: the leader supervises (a leader first)');
+create temp table pe as select pg_temp.duties(9, 'duties.publish_duty', null, jsonb_build_object(
+  'department_id', pg_temp.e(), 'member_id', pg_temp.mid(4), 'duty_name', 'Duty E',
+  'starts_at', app.cmd_utc(pg_temp.t('5 days 6 hours')))) as r;
+create temp table ate as select pg_temp.attempt(9, (select (r #>> '{data,assignment_id}')::uuid from pe),
+                                                'no_answer', '1 day') as r;
+select is((select (r #>> '{data,supervisor_fallback}')::boolean from ate), true,
+  'the only leader of a department supervises their own task (recorded fallback)');
+select is((select t.supervisor_member_id = pg_temp.mid(9)
+             from app.followups_tasks t where t.task_id = (select (r #>> '{data,task_id}')::uuid from ate)), true,
+  'and is the supervisor');
+
+-- Review S2: never on the actor's own assignment.
+select pg_temp.pub('OWN', 2, pg_temp.t('5 days 2 hours'));
+select is(pg_temp.err(pg_temp.attempt(2, pg_temp.a('OWN'), 'no_answer', '1 day')), 'validation_failed|assignment_id=own',
+  'a leader cannot record contact with themselves');
+select is(pg_temp.err(pg_temp.confirm(2, pg_temp.a('OWN'), 'SYNTHETIC')), 'validation_failed|assignment_id=own',
+  'nor confirm themselves');
+
+-- Review N2: a task closed by hand: the next attempt opens a fresh case and task.
+select pg_temp.pub('N2', 5, pg_temp.t('5 days 4 hours'));
+create temp table n2a as select pg_temp.attempt(2, pg_temp.a('N2'), 'no_answer', '1 day') as r;
+select is(pg_temp.call(2, 'followups_command', 'followups.update_task',
+            (select revision from app.followups_tasks where task_id = (select (r #>> '{data,task_id}')::uuid from n2a)),
+            jsonb_build_object('task_id', (select r #>> '{data,task_id}' from n2a), 'status', 'closed',
+                               'close_reason', 'SYNTHETIC: handled elsewhere')) ->> 'code', null,
+  'the owner closes the task by hand');
+create temp table n2b as select pg_temp.attempt(2, pg_temp.a('N2'), 'left_message', '1 day') as r;
+select is((select r #>> '{data,followup}' || '|' || (r #>> '{data,replaced_case}') from n2b), 'opened|true',
+  'the next attempt opens a fresh case and task');
+select is((select count(*)::int from app.duties_coverage_cases where assignment_id = pg_temp.a('N2')
+             and close_code = 'replaced'), 1, 'the old case is closed as replaced');
+
+-- Review N3: the task owner lost the scope: the next attempt (by the leader) takes it over.
+select pg_temp.pub('N3', 5, pg_temp.t('5 days 8 hours'));
+create temp table n3a as select pg_temp.attempt(10, pg_temp.a('N3'), 'no_answer', '1 day') as r;
+select is(pg_temp.call(1, 'identity_grant_command', 'identity.revoke_scope',
+            (select s.revision from app.identity_grant_sets s where s.member_id = pg_temp.mid(10)),
+            jsonb_build_object('member_id', pg_temp.mid(10), 'scope_kind', 'department_deputy',
+                               'scope_id', pg_temp.d())) ->> 'code', null, 'the second deputy''s scope is revoked');
+create temp table n3b as select pg_temp.attempt(2, pg_temp.a('N3'), 'no_answer', '1 day') as r;
+select is((select (r #>> '{data,replaced_case}') from n3b)
+          || '|' || (pg_temp.task((select (r #>> '{data,case_id}')::uuid from n3a))).close_code
+          || '|' || ((pg_temp.task((select (r #>> '{data,case_id}')::uuid from n3b))).owner_member_id = pg_temp.mid(2))::text,
+  'true|source_resolved|true', 'the old task closes and the leader owns the fresh one');
+
+-- Review N9: an assignee who left the department is reassigned, not contacted.
+select pg_temp.pub('N9', 6, pg_temp.t('5 days 10 hours'));
+update app.duties_department_members set ended_at = now()
+ where department_id = pg_temp.d() and member_id = pg_temp.mid(6) and ended_at is null;
+select is(pg_temp.err(pg_temp.attempt(2, pg_temp.a('N9'), 'no_answer', '1 day')),
+  'validation_failed|member_id=required_reassign', 'an attempt on a departed assignee is refused');
+update app.duties_department_members set ended_at = null
+ where department_id = pg_temp.d() and member_id = pg_temp.mid(6)
+   and membership_id = (select membership_id from app.duties_department_members
+                         where department_id = pg_temp.d() and member_id = pg_temp.mid(6)
+                         order by started_at desc limit 1);
+
+-- Review B1: the Confirmed by leader reason is for the department's leaders and deputies only.
+create temp table b1 as select pg_temp.confirm(2, pg_temp.a('N3'), 'SYNTHETIC: board reason check.') as r;
+create function pg_temp.board_conf(n int, p_id uuid) returns jsonb language sql as $$
+  select p #> '{assignment,confirmation}'
+    from jsonb_array_elements(pg_temp.readj(n, 'select api.duties_leader_board()') -> 'departments') dep,
+         jsonb_array_elements(dep -> 'duties') du, jsonb_array_elements(du -> 'positions') p
+   where p #>> '{assignment,assignment_id}' = p_id::text
+$$;
+select is(pg_temp.board_conf(2, pg_temp.a('N3')) ->> 'reason', 'SYNTHETIC: board reason check.',
+  'the leader''s board shows the reason');
+select is(pg_temp.board_conf(1, pg_temp.a('N3')) ->> 'reason', null, 'the Admin''s board does not (review B1)');
+select is(pg_temp.board_conf(1, pg_temp.a('N3')) ->> 'channel', 'phone', 'only the fact and the channel');
+select is(pg_temp.board_conf(7, pg_temp.a('N3')) ->> 'reason', null, 'nor Pastor''s');
+select is(pg_temp.qpos(1, pg_temp.a('N3')) #>> '{assignment,confirmation,reason}', null, 'nor the Admin''s queue');
+select ok(pg_temp.readj(1, 'select api.duties_rota()')::text !~ 'board reason check'
+          and pg_temp.readj(2, 'select api.duties_rota()')::text !~ 'board reason check',
+  'the rota never carries the reason');
 
 -- The member's own acceptance closes the case and its task --------------------------------------------
 select is(pg_temp.answer(4, pg_temp.a('M'), 'accepted') #>> '{data,response}', 'accepted', 'M accepts');
@@ -499,6 +588,9 @@ select is(pg_temp.duties(2, 'duties.cancel_position', pg_temp.orev(pg_temp.socc(
   'cancelling the last position cancels the date');
 select is((select occurrence_state from app.duties_occurrences where occurrence_id = pg_temp.socc()), 'cancelled',
   'the occurrence is cancelled');
+select is((select count(*)::int from app.duties_slot_revisions where slot_id = pg_temp.slot(3)
+             and change_class = 'cancelled'), 1,
+  'review N4: a position cancelled before keeps its single cancelled revision');
 -- A one-off duty with an open case: cancelling its position cancels the duty, the case and the task.
 create temp table af as select pg_temp.attempt(2, pg_temp.a('FAR'), 'no_answer', '2 days') as r;
 select is(pg_temp.duties(2, 'duties.cancel_position', pg_temp.orev(pg_temp.occ('FAR')),
@@ -517,11 +609,13 @@ update app.policy_gates set fixture_value = fixture_value || '{"zone": "Mars/Bas
 select is(pg_temp.err(pg_temp.confirm(2, pg_temp.a('Z1'), 'SYNTHETIC: confirmed at the door.')), 'ok',
   'with Q2 invalid the leader can still confirm');
 select is((pg_temp.case_of(pg_temp.a('Z1'))).close_code || '|'
-          || (pg_temp.task((pg_temp.case_of(pg_temp.a('Z1'))).case_id)).task_state, 'confirmed|open',
-  'the case closes; the Follow-ups step is skipped (its reminders stop: the source is no longer current)');
+          || (pg_temp.task((pg_temp.case_of(pg_temp.a('Z1'))).case_id)).close_code || '|'
+          || (select count(*) from app.notifications_jobs j where j.job_state = 'pending'
+               and j.source_id = (pg_temp.task((pg_temp.case_of(pg_temp.a('Z1'))).case_id)).task_id)::text,
+  'confirmed|source_resolved|0', 'review S1: the case and its task close, the task''s reminders cancelled');
 select is((select string_agg(action || ':' || code, ',' order by action) from app.duties_audit
             where assignment_id = pg_temp.a('Z1') and code = 'policy_unavailable'),
-  'followup_skipped:policy_unavailable,reminders_skipped:policy_unavailable', 'both skipped steps are audited');
+  'reminders_skipped:policy_unavailable', 'only the reminder re-plan is skipped (and audited)');
 select is((app.duties_coverage_case_source_check(jsonb_build_object(
             'source_id', (pg_temp.case_of(pg_temp.a('Z1'))).case_id, 'source_revision', 1)) ->> 'current')::boolean,
   false, 'the closed case is no longer a current Follow-ups source');
@@ -531,7 +625,30 @@ select is((select count(*)::int from app.duties_contact_attempts where assignmen
   'the attempt itself is kept');
 select is(pg_temp.answer(6, pg_temp.a('Z2'), 'declined') #>> '{data,response}', 'declined',
   'a decline is recorded too (the alert is skipped)');
+-- Review S1: accept and cancel_position close the task with Q2 invalid too.
+select is(pg_temp.answer(5, pg_temp.a('N2'), 'accepted') #>> '{data,response}', 'accepted', 'O accepts N2 (Q2 invalid)');
+select is((pg_temp.task((select (r #>> '{data,case_id}')::uuid from n2b))).close_code || '|'
+          || (select count(*) from app.notifications_jobs j where j.job_state = 'pending'
+               and j.source_id = (select (r #>> '{data,task_id}')::uuid from n2b))::text,
+  'source_resolved|0', 'its task closes, reminders cancelled');
+select is(pg_temp.duties(2, 'duties.cancel_position', pg_temp.orev(pg_temp.occ('O')),
+            jsonb_build_object('slot_id', (select slot_id from app.duties_assignments where assignment_id = pg_temp.a('O'))))
+          #>> '{data,cancelled}', 'occurrence', 'the leader cancels O''s declined duty (Q2 invalid)');
+select is((pg_temp.task((select (r #>> '{data,case_id}')::uuid from atd))).close_code || '|'
+          || (select count(*) from app.notifications_jobs j where j.job_state = 'pending'
+               and j.source_id = (select (r #>> '{data,task_id}')::uuid from atd))::text,
+  'source_cancelled|0', 'its task closes as cancelled, reminders cancelled');
 update app.policy_gates set fixture_value = fixture_value || '{"zone": "Africa/Lusaka"}' where gate = 'q2_church_time';
+
+-- Review N1: a case whose duty has started closes (with its task) at the next coverage command.
+select pg_temp.pub('L1', 5, pg_temp.t('7 days'));
+create temp table l1 as select pg_temp.attempt(2, pg_temp.a('L1'), 'no_answer', '1 day') as r;
+update app.duties_occurrences set starts_at = now() - interval '1 minute' where occurrence_id = pg_temp.occ('L1');
+select pg_temp.pub('L2', 5, pg_temp.t('7 days 3 hours'));
+select is(pg_temp.err(pg_temp.attempt(2, pg_temp.a('L2'), 'no_answer', '1 day')), 'ok', 'another attempt in D');
+select is((pg_temp.case_of(pg_temp.a('L1'))).close_code || '|'
+          || (pg_temp.task((select (r #>> '{data,case_id}')::uuid from l1))).close_code,
+  'started|source_resolved', 'the started duty''s case and task are closed');
 
 -- History guard, attempts guard, erasure --------------------------------------------------------------
 select throws_ok(format('update app.duties_assignments set confirmed_channel = %L where assignment_id = %L',
@@ -550,6 +667,12 @@ select is((select count(*)::int from app.duties_contact_attempts where assignmen
 select is((app.duties_erase_member(jsonb_build_object('member_id', pg_temp.mid(2), 'account_id', pg_temp.u(2),
                                                       'phase', 'check')) ->> 'remaining')::int > 0, true,
   'the leader''s attempts and confirmations are counted for their own erasure');
+
+-- Review N1: the source-specific schedule (owner at the due or review time only).
+select is((select on_assignment || ':' || owner_reminders::text || ':' || supervisor_reminders::text
+             from app.followups_reminder_schedules where purpose = 'coverage_follow_up'),
+  'false:[{"anchor": "deadline", "before": "0 minutes"}]:[]',
+  'the coverage task reminds its owner at the due time only: no supervisor alert, no assignment notice');
 
 -- Q4 closed (production marker): nothing --------------------------------------------------------------
 select app.platform_set_environment('production', 'pgtap 4.9');

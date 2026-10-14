@@ -66,6 +66,7 @@ class _CoverageBodyState extends ConsumerState<_CoverageBody> {
   late final _from = TextEditingController(text: widget.value.from);
   late final _duty = TextEditingController(text: widget.value.duty ?? '');
   late int _days = ref.read(dutyCoverageQueryProvider).days;
+  String? _fromError;
   late String? _department = ref.read(dutyCoverageQueryProvider).departmentId;
 
   @override
@@ -77,6 +78,13 @@ class _CoverageBodyState extends ConsumerState<_CoverageBody> {
 
   void _apply() {
     final from = _from.text.trim();
+    // Review N7: a malformed date is shown as an error, never silently replaced by today.
+    final valid =
+        from.isEmpty ||
+        (RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(from) &&
+            ChurchTime.parse(from, '00:00') != null);
+    setState(() => _fromError = valid ? null : 'Use YYYY-MM-DD');
+    if (!valid) return;
     ref
         .read(dutyCoverageProvider.notifier)
         .setQuery(
@@ -111,7 +119,10 @@ class _CoverageBodyState extends ConsumerState<_CoverageBody> {
             child: TextField(
               key: const Key('coverage-from'),
               controller: _from,
-              decoration: const InputDecoration(labelText: 'From (YYYY-MM-DD)'),
+              decoration: InputDecoration(
+                labelText: 'From (YYYY-MM-DD)',
+                errorText: _fromError,
+              ),
             ),
           ),
           DropdownButton<int>(
@@ -379,6 +390,11 @@ class _CoverageCardState extends ConsumerState<_CoverageCard> {
     final a = p.assignment;
     final busy = widget.busy;
     final started = !p.times.arriveBy.isAfter(DateTime.now());
+    // Review S2: a leader's own duty is answered in My duties, not as contact work.
+    final own =
+        a != null &&
+        a.memberId ==
+            ref.watch(myAccessProvider.select((s) => s.grants?.memberId));
     final routes = a == null
         ? const <DutyContactRoute>[]
         : d.routesOf(a.memberId);
@@ -509,14 +525,19 @@ class _CoverageCardState extends ConsumerState<_CoverageCard> {
     if (_launch case final l?) {
       lines.add(Text(l, key: Key('coverage-launch-${p.slotId}')));
     }
+    if (own && p.contactable) {
+      lines.add(
+        _muted(context, 'This is your own duty: answer it in My duties.'),
+      );
+    }
     final actions = <Widget>[
-      if (d.canContact && p.contactable && !started)
+      if (d.canContact && p.contactable && !started && !own)
         OutlinedButton(
           key: Key('coverage-attempt-${p.slotId}'),
           onPressed: busy ? null : () => _open(_CoverageForm.attempt),
           child: const Text('Record contact attempt'),
         ),
-      if (d.canContact && p.confirmable && !started)
+      if (d.canContact && p.confirmable && !started && !own)
         OutlinedButton(
           key: Key('coverage-confirm-${p.slotId}'),
           onPressed: busy ? null : () => _open(_CoverageForm.confirm),
@@ -959,7 +980,7 @@ class _LeaderNeedsAttentionCardState
             children: [
               tile('Unfilled', t.unfilled, 'unfilled'),
               tile('Overdue', t.overdue, 'overdue'),
-              tile('Declined', t.declined, 'declined'),
+              tile('Declined or changed', t.declined, 'declined'),
               tile('Needs contact', t.needsContact, 'needs-contact'),
             ],
           ),

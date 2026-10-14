@@ -272,6 +272,12 @@ abstract final class DutyPaths {
       'A decline is not overwritten: give the position to someone (Reassign). '
           'Nothing was recorded.',
     ),
+    DutyNotice.ownAssignment => (
+      StatusTone.neutral,
+      'Your own duty',
+      'This duty is yours: answer it yourself in My duties. Nothing was '
+          'recorded.',
+    ),
     DutyNotice.alreadyConfirmed => (
       StatusTone.neutral,
       'Already confirmed',

@@ -113,4 +113,11 @@ context:
 - Parent session: apply the migration to staging after `20261014110258`, compare per-function md5, run `verify-hosted.sql`. No owner SQL paste, no Edge Function redeploy.
 - Owner: `docs/runbooks/follow-ups.md`, "Owner manual checks (staging, phone and web, story 4.7)".
 
-**Results (2026-10-14):** RESULTS_PENDING
+**Results (2026-10-14):**
+- db reset 0; db:test PASS (33 files, 2874 tests, including `followups_reminders_test.sql` 91 and `followups_registry_test.sql` 143); db:smoke pass (0 failures, no SMS provider).
+- Every E2E `exit=0` (24 scripts, reset before each), `followups-reminders` 12/12, `followups` 15/15 (`evidence-4.7/e2e-suite-summary.txt`).
+- contracts:test 242/0; node tool tests (CI set) 194/0; ci:policy-test 56/0.
+- flutter analyze clean in all three; flutter test client_core 547 (follow-ups 31, 11 new), apps/staff 37, apps/mobile 52; under `TZ=America/New_York` client_core `test/followups` + `test/duties` 119 and apps/mobile 52.
+- ci:secrets clean; ci:migrations (`--base origin/main`) ordered, unique, non-destructive; ci:function-imports ok; evidence scan clean. Migration ASCII, no `\u`, no DROP/TRUNCATE/`delete from`, no grants.
+- Evidence: `evidence-4.7/followups-reminders-e2e.jsonl`, `evidence-4.7/e2e-suite-summary.txt`.
+- Remaining (not builder steps): staging apply and md5 parity (parent session; no owner SQL paste; no Edge Function redeploy), staging client rebuild, owner manual checks in `docs/runbooks/follow-ups.md` story 4.7 (record in `evidence-4.7/owner-check.md`).

@@ -12,7 +12,11 @@
 //   * a held and an accountless assignee: no inbox item, both on the leader's Needs contact list;
 //   * snooze honoured and stopped by the answer; no quiet-hours deferral (23:30 church time stays);
 //   * duties.set_reminders for one date (nobody asked again);
-//   * the expected jobs only: no stale reminder after any change, generic text on every item.
+//   * the expected jobs only: no stale reminder after any change, generic text on every item;
+//   * (review) a pre-service reminder to a member who has not answered asks for the answer
+//     (duty_response_due); a leader granted after a deadline passed gets the overdue alert at the
+//     next re-plan (driven by the real clock, no time travel); set_reminders racing accept_many
+//     ends consistent with no deadlock.
 //
 // Needs the local phone switch: `node tools/auth-harness/local-phone-auth.mjs on`, then `off`
 // afterwards. Needs a database with no usable Admin (`npx supabase db reset` first). LOCAL only
@@ -278,7 +282,7 @@ async function main() {
     check('D10-mid-week-48-hour-default', b.status === 200 && bRow.deadline_source === 'default' && !bRow.short_notice
       && bRow.before_start_h === 48 && bMine?.deadline_source === 'default' && bMine?.short_notice === false
       && pending(bId) === summarize(['m:duty_assigned@member:now', 'm:duty_response_due@member:-24', 'm:duty_response_due@member:0',
-        'm:duty_starting@member:24', 'l:duty_response_overdue@leader:0', 'l:duty_response_overdue@deputy:0']),
+        'm:duty_response_due@member:24', 'l:duty_response_overdue@leader:0', 'l:duty_response_overdue@deputy:0']),
       { published: b.status, row: bRow, pending: pending(bId) });
 
     // ------------------------------------------------- a quarterly rota: 14 days a month ahead
@@ -331,7 +335,7 @@ async function main() {
     const dId = d.data?.assignment_id;
     const bad = await publish(member, minute(21 * DAY), { reminders: [{ anchor: 'deadline', before: '1 day' }] });
     check('D20-creator-deadline-and-offsets', d.status === 200 && row(dId).deadline_source === 'creator'
-      && pending(dId) === summarize(['m:duty_assigned@member:now', 'm:duty_response_due@member:-48', 'm:duty_starting@member:70',
+      && pending(dId) === summarize(['m:duty_assigned@member:now', 'm:duty_response_due@member:-48', 'm:duty_response_due@member:70',
         'l:duty_response_overdue@leader:0', 'l:duty_response_overdue@deputy:0'])
       && bad.code === 'validation_failed' && bad.field_errors?.reminders === 'invalid',
       { published: d.status, pending: pending(dId), malformed: bad.field_errors?.reminders ?? null });
@@ -361,7 +365,7 @@ async function main() {
       chain.push(rv.data?.assignment_id);
     }
     const full = (who) => summarize([`m:duty_assigned@${who}:now`, `m:duty_response_due@${who}:-24`, `m:duty_response_due@${who}:0`,
-      `m:duty_starting@${who}:24`, 'l:duty_response_overdue@leader:0', 'l:duty_response_overdue@deputy:0']);
+      `m:duty_response_due@${who}:24`, 'l:duty_response_overdue@leader:0', 'l:duty_response_overdue@deputy:0']);
     check('D40-reassign-back-gets-fresh-reminders', new Set(chain).size === 3
       && pending(chain[0]) === 'm:duty_released@member:now' && pending(chain[1]) === 'm:duty_released@other:now'
       && pending(chain[2]) === full('member'),
@@ -410,8 +414,10 @@ async function main() {
     const ans = await duty(member.token, 'duties.respond', asgRevision(sId), { assignment_id: sId, response: 'accepted' });
     const stopped = psql(`select coalesce(string_agg(job_state || ':' || coalesce(cancel_reason, '-'), ','), '')
       from app.notifications_jobs where snoozed_from_item_id = '${again[0]?.item_id}'`);
-    check('D60-snooze-honoured-and-stopped-by-the-answer', madeS === 2 && due.length === 2 && snooze.status === 200
-      && snoozedAt >= 59 && snoozedAt <= 61 && runS.delivered === 1 && again.length === 3 && later.status === 200
+    // Three asks to answer while pending: 24 hours before and at the deadline, and 24 hours before
+    // the start (a pre-service reminder asks for the answer while none is given).
+    check('D60-snooze-honoured-and-stopped-by-the-answer', madeS === 3 && due.length === 3 && snooze.status === 200
+      && snoozedAt >= 59 && snoozedAt <= 61 && runS.delivered === 1 && again.length === 4 && later.status === 200
       && ans.status === 200 && stopped === 'cancelled:responded',
       { made_due: madeS, items: [due.length, again.length], snooze: snooze.status, minutes: snoozedAt,
         delivered_again: runS.delivered, second_snooze: later.status, after_answer: stopped });
@@ -438,12 +444,57 @@ async function main() {
       { set: set.status, replanned: set.data?.replanned, pending: pending(n.data?.assignment_id),
         unchanged: unchanged.field_errors?.occurrence_id ?? null, member: asMember.code ?? asMember.status });
 
+    // ------------------------------------------------- review: set_reminders racing accept_many
+    const raceRounds = [];
+    for (let round = 0; round < 3; round += 1) {
+      const pr = await publish(member, minute((30 + round) * DAY));
+      const prId = pr.data?.assignment_id;
+      const prOcc = pr.data?.occurrence_id;
+      const [setR, accR] = await Promise.all([
+        duty(leader.token, 'duties.set_reminders', occRevision(prOcc),
+          { occurrence_id: prOcc, reminders: [{ anchor: 'starts_at', before: '3 hours' }] }),
+        duty(member.token, 'duties.accept_many', null,
+          { assignments: [{ assignment_id: prId, revision: asgRevision(prId) }] }),
+      ]);
+      const hoursFromDeadline = row(prId).before_start_h - 3;
+      raceRounds.push({ set: setR.status, accept: accR.status, response: row(prId).response,
+        pending: pending(prId), expected: `m:duty_starting@member:${hoursFromDeadline}` });
+    }
+    check('D82-set-reminders-racing-accept-many-is-consistent', raceRounds.every((x) => x.set === 200 && x.accept === 200
+      && x.response === 'accepted' && x.pending === x.expected),
+      { rounds: raceRounds.map(({ set, accept, response, pending: pend }) => ({ set, accept, response, pending: pend })) });
+
+    // ------------------------------------------------- review S1: a leader granted after the deadline
+    // A creator deadline 75 seconds ahead passes on the real clock; then Member M becomes a deputy
+    // and a re-plan (set_reminders) gives them the overdue alert now. The leaders who already had
+    // one keep exactly one.
+    const lateDeadline = new Date(Math.ceil((Date.now() + 75_000) / 1000) * 1000);
+    const lt = await publish(other, minute(11 * DAY), { response_deadline: lateDeadline.toISOString() });
+    const ltId = lt.data?.assignment_id;
+    const ltOcc = lt.data?.occurrence_id;
+    while (Date.now() < lateDeadline.getTime() + 2_000) await new Promise((res) => setTimeout(res, 1_000));
+    const g3 = await envelope('identity_grant_command', admin.token, 'identity.grant_scope', grantRev(member.member),
+      { member_id: member.member, scope_kind: 'department_deputy', scope_id: departmentId });
+    const ltSet = await duty(leader.token, 'duties.set_reminders', occRevision(ltOcc), { occurrence_id: ltOcc, reminders: [] });
+    const alerts = psql(`select coalesce(string_agg(recipient_member_id || ':' || job_state, ',' order by recipient_member_id), '')
+      from app.notifications_jobs where source_id = '${ltId}' and reminder_kind = 'duty_response_overdue'`)
+      .split(',').filter(Boolean).map((x) => x.replace(/^([0-9a-f-]{36})/, (_, m) => roleOf(m))).sort().join(',');
+    const runL = await worker();
+    const newItems = (await inbox(member)).filter((i) => i.reminder_kind === 'duty_response_overdue');
+    const newOpen = newItems[0] ? await openItem(member, newItems[0].item_id) : null;
+    check('D85-leader-granted-after-the-deadline-is-alerted', lt.status === 200 && g3.status === 200 && ltSet.status === 200
+      && g3.code == null && row(ltId).short_notice === false && alerts === 'deputy:pending,leader:pending,member:pending'
+      && runL.exit === 0 && newItems.length === 1 && newOpen?.target === '/duties/leader' && isGenericDutyItem(newOpen),
+      { published: lt.status, grant: g3.status, grant_code: g3.code ?? null, set: ltSet.status, alerts,
+        new_deputy_items: newItems.length, new_deputy_target: newOpen?.target ?? null });
+
     // ------------------------------------------------- the expected jobs only; generic text
     const stale = Number(psql(`select count(*) from app.notifications_jobs j join app.duties_assignments a on a.assignment_id = j.source_id
       where j.job_state = 'pending'
         and j.reminder_kind in ('duty_response_due', 'duty_starting', 'duty_response_overdue', 'duty_short_notice')
         and (a.assignment_state <> 'current' or j.source_revision <> a.revision or a.response = 'declined'
-             or (j.reminder_kind <> 'duty_starting' and a.response <> 'pending'))`));
+             or (j.reminder_kind <> 'duty_starting' and a.response <> 'pending')
+             or (j.reminder_kind = 'duty_starting' and a.response = 'pending'))`));
     const items = [];
     for (const p of [member, other, leader, deputy]) items.push(...(await inbox(p)).filter((i) => i.reminder_kind?.startsWith('duty_')));
     const tableQuery = await http('GET', '/rest/v1/duties_contact_needs?select=*', { token: leader.token, profile: 'app' });

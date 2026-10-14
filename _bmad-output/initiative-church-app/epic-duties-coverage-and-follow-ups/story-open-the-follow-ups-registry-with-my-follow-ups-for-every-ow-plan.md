@@ -136,11 +136,11 @@ context:
 - Parent session: apply the migration to staging and compare per-function md5. No owner SQL paste.
 - Owner: `docs/runbooks/follow-ups.md`, "Owner manual checks (story 4.6)".
 
-**Results (2026-10-14):**
-- db reset 0; db:test PASS (32 files, 2757 tests, including `followups_registry_test.sql` 117); db:smoke pass, no SMS provider.
-- Every E2E `exit=0` (23 scripts), `followups` 13/13.
+**Results (2026-10-14, after the review fixes S1-S4, N1-N8, N10):**
+- db reset 0; db:test PASS (32 files, 2783 tests, including `followups_registry_test.sql` 143); db:smoke pass, no SMS provider.
+- Every E2E `exit=0` (23 scripts), `followups` 15/15 (adds the roster refusal and a concurrent open that makes one task).
 - contracts:test 242/0; node tool tests (CI set) 189/0; ci:policy-test 56/0.
-- flutter analyze clean in all three; flutter test client_core 533 (followups 17), apps/staff 36, apps/mobile 51; under `TZ=America/New_York` client_core `test/followups` 17 and apps/mobile 51.
+- flutter analyze clean in all three; flutter test client_core 536 (followups 20), apps/staff 36, apps/mobile 51; under `TZ=America/New_York` client_core `test/followups` 20 and apps/mobile 51.
 - ci:secrets clean; ci:migrations (`--base origin/main`) ordered, unique, non-destructive; ci:function-imports ok; evidence scan clean (no numbers, tokens or note text).
 - Evidence: `evidence-4.6/followups-e2e.jsonl`, `evidence-4.6/e2e-suite-summary.txt`.
-- Remaining (not builder steps): staging apply and md5 parity (parent session; no owner SQL paste), staging client rebuild, owner manual checks in `docs/runbooks/follow-ups.md` story 4.6, open owner question Q4 (owner candidates).
+- Remaining (not builder steps): staging apply and md5 parity (parent session; no owner SQL paste; the migration now also creates `app.duties_followups_roster` and `app.cells_followups_roster`), staging client rebuild, owner manual checks in `docs/runbooks/follow-ups.md` story 4.6, open owner question Q4 (owners from outside the target).

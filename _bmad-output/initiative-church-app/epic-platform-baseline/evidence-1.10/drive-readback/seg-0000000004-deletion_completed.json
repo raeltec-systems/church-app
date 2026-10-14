@@ -1,0 +1,1 @@
+{"at":"2026-10-03T16:15:33.060Z","hash":"b24c6352d80eb0d6ae79cb62f71a275d120ebe96379d002efdedf60cb85fd657","journal":"bic-kafue-recovery-SYNTHETIC","kind":"deletion_completed","object":{"bucket":"rcv-synthetic-rehearsal","object_id":"e58a36bf-7b02-4112-89fd-482542361bde"},"prev_hash":"3a990443f858093f237d95ff0cbdf7291b7983843f0c529a9c77a2869e14b7ba","seq":4,"v":1}

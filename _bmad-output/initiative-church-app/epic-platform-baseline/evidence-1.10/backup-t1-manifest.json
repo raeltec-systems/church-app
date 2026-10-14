@@ -1,0 +1,24 @@
+{
+  "label": "SYNTHETIC",
+  "backup_id": "t1-4802b0d7-SYNTHETIC",
+  "taken_at": "2026-10-03T16:15:15.585Z",
+  "source_environment": "local",
+  "journal_watermark": 1,
+  "database": {
+    "file": "database.sql",
+    "schemas": [
+      "app",
+      "api"
+    ],
+    "bytes": 175306,
+    "sha256": "b7cae14119848ab1415d3b62489da6dc466c7a222978b29f7948cd32bf1404f4"
+  },
+  "objects": [
+    {
+      "bucket": "rcv-synthetic-rehearsal",
+      "object_id": "e58a36bf-7b02-4112-89fd-482542361bde",
+      "bytes": 100,
+      "sha256": "34a570dabea61716510792bd6c6c8d4dce8544e222743c0d7ccf37671eb2d330"
+    }
+  ]
+}

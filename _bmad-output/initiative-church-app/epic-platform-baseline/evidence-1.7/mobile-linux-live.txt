@@ -1,0 +1,20 @@
+# apps/mobile live run on Linux desktop (native target) under Xvfb, 2026-10-03
+# Build: flutter build linux --release --dart-define-from-file=<SUPABASE_URL=http://127.0.0.1:54321, local publishable key>
+# Run:   Xvfb :99 -screen 0 1280x800x24; DISPLAY=:99 build/linux/x64/release/bundle/bic_kafue_mobile
+# Against the already-running local stack: reads plus one signed-out command; nothing written
+# (no session, publishable key only). Driven with xdotool mouse clicks and typing:
+#   1. start on Platform status            -> 04-mobile-linux-status.png ("Status: operational", local API value)
+#   2. click the Fixture tab, click Intent key, type "SYNTHETIC linux live", click Create counter
+#                                          -> 05-mobile-linux-fixture-refused.png ("Not saved: sign-in required")
+#   No focus ring is left behind by the mouse clicks.
+#
+# Raw app stdout/stderr (the app logs nothing itself; these are engine/GTK warnings of the headless display):
+libEGL warning: DRI3 error: Could not get DRI3 device
+libEGL warning: Ensure your X server supports DRI3 to get accelerated rendering
+
+(zm.bickafue.bic_kafue_mobile:9148): Atk-CRITICAL **: 14:54:51.766: atk_socket_embed: assertion 'plug_id != NULL' failed
+[IMPORTANT:flutter/shell/platform/embedder/embedder_surface_gl_impeller.cc(126)] Using the Impeller rendering backend (OpenGLESSDF).
+
+** (zm.bickafue.bic_kafue_mobile:9148): CRITICAL **: 14:54:51.888: void fl_gnome_settings_set_interface_settings(FlGnomeSettings *, GSettings *): assertion 'G_IS_SETTINGS(settings)' failed
+
+[killed after the screenshots]

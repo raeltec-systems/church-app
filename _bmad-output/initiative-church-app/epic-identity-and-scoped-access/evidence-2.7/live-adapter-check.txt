@@ -1,0 +1,7 @@
+== adapters: add and approve a recovery email, then reset the password from the mobile link
+PASS L1 add a recovery email to the same account: can_propose=true password=AuthSucceeded proposal=CommandConfirmed verification=sent
+PASS L2 the confirmation link returns to the allowlisted app link; access waits: link=emailConfirmed in_review=true
+PASS L3 the Admin approves; a fresh sign-in is granted with the email: approve=CommandConfirmed fresh=granted
+PASS L4 neutral request; the mobile link opens a recovery session: request=sent unknown=sent link=recovery open=ready
+PASS L5 password set; the earlier session is refused; fresh sign-in granted: set=PasswordSet earlier=untrustedSession old_password=AuthFailed fresh=granted
+synthetic users left: 0

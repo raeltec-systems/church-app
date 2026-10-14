@@ -1,0 +1,7 @@
+# live_local_check.dart against the already-running local stack (2026-10-03)
+# command: (cd packages/client_core && dart run tool/live_local_check.dart <file with `npx supabase status -o env` output>)
+# publishable key only, no session, nothing written; raw stdout below (Flutter's root-user banner removed)
+platform_status: operational / SYNTHETIC tracer status: the platform path is reachable. Not real church data.
+fixture_counter.create signed out: refused: unauthenticated
+LIVE CHECK PASSED
+# exit code: 0

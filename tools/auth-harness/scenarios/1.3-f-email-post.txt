@@ -1,0 +1,12 @@
+# Story 1.3 re-run, part F (after both email-change links were confirmed,
+# steps 203/204): the native email change is detected and blocks recovery
+# until staff review approves the new login.
+rc-probe me-s1 --step 205-probe-after-native-email-change
+rc-redeem ge1 --account me --step 206-redeem-ge1-with-approved-old-login
+rc-request ge2 --account me --step 207-request-claiming-old-approved-login
+rc-issue ge2 --staff staff-s1 --account me --step 208-issue-while-binding-review
+rc-relink --staff staff-s1 --account me --new-tag r13-x-me2 --step 209-staff-review-approves-new-login
+rc-request ge3 --account me --step 210-request-claiming-new-login
+rc-issue ge3 --staff staff-s1 --account me --step 211-issue-after-review
+rc-redeem ge3 --account me --step 212-redeem-ge3-new-login
+rc-observe --staff staff-s1 --prefix r13-x- --step 299-db-state-final

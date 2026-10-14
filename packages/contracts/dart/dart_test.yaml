@@ -1,0 +1,6 @@
+# The fixture tests also run in a browser (`dart test -p chrome`) so the dart2js number model
+# (1.0 is an int there) is exercised. --no-sandbox lets headless Chrome run in containers.
+override_platforms:
+  chrome:
+    settings:
+      arguments: --no-sandbox

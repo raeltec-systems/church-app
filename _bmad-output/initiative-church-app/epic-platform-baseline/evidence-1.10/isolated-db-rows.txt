@@ -1,0 +1,263 @@
+### isolated database rcv_drive (container bic-rcv-isolated, --network none)
+ id | environment | operator |          action          |              restore_id              | journal_seq | reason 
+----+-------------+----------+--------------------------+--------------------------------------+-------------+--------
+ 12 | local       | israel   | synthetic_created        |                                      |             | 
+ 13 | local       | israel   | entry_applied            |                                      |           1 | 
+ 14 | local       | israel   | hold_applied             | 4252e090-cb50-414d-98ce-1756a2c8a436 |             | 
+ 15 | local       | israel   | entry_already_applied    | 4252e090-cb50-414d-98ce-1756a2c8a436 |           1 | 
+ 16 | local       | israel   | entry_applied            | 4252e090-cb50-414d-98ce-1756a2c8a436 |           2 | 
+ 17 | local       | israel   | entry_applied            | 4252e090-cb50-414d-98ce-1756a2c8a436 |           3 | 
+ 18 | local       | israel   | entry_applied            | 4252e090-cb50-414d-98ce-1756a2c8a436 |           4 | 
+ 19 | local       | israel   | entry_applied            | 4252e090-cb50-414d-98ce-1756a2c8a436 |           5 | 
+ 20 | local       | israel   | reconciliation_completed | 4252e090-cb50-414d-98ce-1756a2c8a436 |           5 | 
+(9 rows)
+
+   state    |              restore_id              |       backup_id       | restored_from_environment | journal_head_seq | last_refusal 
+------------+--------------------------------------+-----------------------+---------------------------+------------------+--------------
+ reconciled | 4252e090-cb50-414d-98ce-1756a2c8a436 | t1-4802b0d7-SYNTHETIC | local                     |                5 | 
+(1 row)
+
+ seq |        kind        | replayed 
+-----+--------------------+----------
+   1 | checkpoint         | f
+   2 | access_revoked     | t
+   3 | deletion_manifest  | t
+   4 | deletion_completed | t
+   5 | seal               | t
+(5 rows)
+
+              subject_id              |   label   | access_revoked 
+--------------------------------------+-----------+----------------
+ 31561f42-0c70-43be-9bc8-b962a555b13d | SYNTHETIC | t
+(1 row)
+
+              object_id               |         bucket          | deletion_pending | deleted | verified_absent 
+--------------------------------------+-------------------------+------------------+---------+-----------------
+ e58a36bf-7b02-4112-89fd-482542361bde | rcv-synthetic-rehearsal | t                | t       | t
+(1 row)
+
+ private_access_open | outbound_sending_open | serving_hold 
+---------------------+-----------------------+--------------
+ f                   | f                     | f
+(1 row)
+
+
+### isolated database rcv_complete (container bic-rcv-isolated, --network none)
+ id | environment | operator |          action          |              restore_id              | journal_seq | reason 
+----+-------------+----------+--------------------------+--------------------------------------+-------------+--------
+ 12 | local       | israel   | synthetic_created        |                                      |             | 
+ 13 | local       | israel   | entry_applied            |                                      |           1 | 
+ 14 | local       | israel   | hold_applied             | cf6d828f-bdec-4b24-a774-60a153078ec3 |             | 
+ 15 | local       | israel   | entry_already_applied    | cf6d828f-bdec-4b24-a774-60a153078ec3 |           1 | 
+ 16 | local       | israel   | entry_applied            | cf6d828f-bdec-4b24-a774-60a153078ec3 |           2 | 
+ 17 | local       | israel   | entry_applied            | cf6d828f-bdec-4b24-a774-60a153078ec3 |           3 | 
+ 18 | local       | israel   | entry_applied            | cf6d828f-bdec-4b24-a774-60a153078ec3 |           4 | 
+ 19 | local       | israel   | entry_applied            | cf6d828f-bdec-4b24-a774-60a153078ec3 |           5 | 
+ 20 | local       | israel   | reconciliation_completed | cf6d828f-bdec-4b24-a774-60a153078ec3 |           5 | 
+(9 rows)
+
+   state    |              restore_id              |       backup_id       | restored_from_environment | journal_head_seq | last_refusal 
+------------+--------------------------------------+-----------------------+---------------------------+------------------+--------------
+ reconciled | cf6d828f-bdec-4b24-a774-60a153078ec3 | t1-4802b0d7-SYNTHETIC | local                     |                5 | 
+(1 row)
+
+ seq |        kind        | replayed 
+-----+--------------------+----------
+   1 | checkpoint         | f
+   2 | access_revoked     | t
+   3 | deletion_manifest  | t
+   4 | deletion_completed | t
+   5 | seal               | t
+(5 rows)
+
+              subject_id              |   label   | access_revoked 
+--------------------------------------+-----------+----------------
+ 31561f42-0c70-43be-9bc8-b962a555b13d | SYNTHETIC | t
+(1 row)
+
+              object_id               |         bucket          | deletion_pending | deleted | verified_absent 
+--------------------------------------+-------------------------+------------------+---------+-----------------
+ e58a36bf-7b02-4112-89fd-482542361bde | rcv-synthetic-rehearsal | t                | t       | t
+(1 row)
+
+ private_access_open | outbound_sending_open | serving_hold 
+---------------------+-----------------------+--------------
+ f                   | f                     | f
+(1 row)
+
+
+### isolated database rcv_absent (container bic-rcv-isolated, --network none)
+ id | environment | operator |         action         |              restore_id              | journal_seq |     reason     
+----+-------------+----------+------------------------+--------------------------------------+-------------+----------------
+ 12 | local       | israel   | synthetic_created      |                                      |             | 
+ 13 | local       | israel   | entry_applied          |                                      |           1 | 
+ 14 | local       | israel   | hold_applied           | 2d54eedf-737c-4348-8267-c6940bab34f0 |             | 
+ 15 | local       | israel   | reconciliation_refused | 2d54eedf-737c-4348-8267-c6940bab34f0 |             | journal_absent
+(4 rows)
+
+     state     |              restore_id              |       backup_id       | restored_from_environment | journal_head_seq |  last_refusal  
+---------------+--------------------------------------+-----------------------+---------------------------+------------------+----------------
+ restored_held | 2d54eedf-737c-4348-8267-c6940bab34f0 | t1-4802b0d7-SYNTHETIC | local                     |                  | journal_absent
+(1 row)
+
+ seq |    kind    | replayed 
+-----+------------+----------
+   1 | checkpoint | f
+(1 row)
+
+              subject_id              |   label   | access_revoked 
+--------------------------------------+-----------+----------------
+ 31561f42-0c70-43be-9bc8-b962a555b13d | SYNTHETIC | f
+(1 row)
+
+              object_id               |         bucket          | deletion_pending | deleted | verified_absent 
+--------------------------------------+-------------------------+------------------+---------+-----------------
+ e58a36bf-7b02-4112-89fd-482542361bde | rcv-synthetic-rehearsal | f                | f       | f
+(1 row)
+
+ private_access_open | outbound_sending_open | serving_hold 
+---------------------+-----------------------+--------------
+ f                   | f                     | t
+(1 row)
+
+
+### isolated database rcv_gap (container bic-rcv-isolated, --network none)
+ id | environment | operator |         action         |              restore_id              | journal_seq |   reason    
+----+-------------+----------+------------------------+--------------------------------------+-------------+-------------
+ 12 | local       | israel   | synthetic_created      |                                      |             | 
+ 13 | local       | israel   | entry_applied          |                                      |           1 | 
+ 14 | local       | israel   | hold_applied           | 2c068071-9475-472f-ada5-70a2520c8bf6 |             | 
+ 15 | local       | israel   | reconciliation_refused | 2c068071-9475-472f-ada5-70a2520c8bf6 |             | journal_gap
+(4 rows)
+
+     state     |              restore_id              |       backup_id       | restored_from_environment | journal_head_seq | last_refusal 
+---------------+--------------------------------------+-----------------------+---------------------------+------------------+--------------
+ restored_held | 2c068071-9475-472f-ada5-70a2520c8bf6 | t1-4802b0d7-SYNTHETIC | local                     |                  | journal_gap
+(1 row)
+
+ seq |    kind    | replayed 
+-----+------------+----------
+   1 | checkpoint | f
+(1 row)
+
+              subject_id              |   label   | access_revoked 
+--------------------------------------+-----------+----------------
+ 31561f42-0c70-43be-9bc8-b962a555b13d | SYNTHETIC | f
+(1 row)
+
+              object_id               |         bucket          | deletion_pending | deleted | verified_absent 
+--------------------------------------+-------------------------+------------------+---------+-----------------
+ e58a36bf-7b02-4112-89fd-482542361bde | rcv-synthetic-rehearsal | f                | f       | f
+(1 row)
+
+ private_access_open | outbound_sending_open | serving_hold 
+---------------------+-----------------------+--------------
+ f                   | f                     | t
+(1 row)
+
+
+### isolated database rcv_tampered (container bic-rcv-isolated, --network none)
+ id | environment | operator |         action         |              restore_id              | journal_seq |        reason        
+----+-------------+----------+------------------------+--------------------------------------+-------------+----------------------
+ 12 | local       | israel   | synthetic_created      |                                      |             | 
+ 13 | local       | israel   | entry_applied          |                                      |           1 | 
+ 14 | local       | israel   | hold_applied           | 8e9b25c0-c98d-4d78-90af-541b12b89960 |             | 
+ 15 | local       | israel   | reconciliation_refused | 8e9b25c0-c98d-4d78-90af-541b12b89960 |             | journal_chain_broken
+(4 rows)
+
+     state     |              restore_id              |       backup_id       | restored_from_environment | journal_head_seq |     last_refusal     
+---------------+--------------------------------------+-----------------------+---------------------------+------------------+----------------------
+ restored_held | 8e9b25c0-c98d-4d78-90af-541b12b89960 | t1-4802b0d7-SYNTHETIC | local                     |                  | journal_chain_broken
+(1 row)
+
+ seq |    kind    | replayed 
+-----+------------+----------
+   1 | checkpoint | f
+(1 row)
+
+              subject_id              |   label   | access_revoked 
+--------------------------------------+-----------+----------------
+ 31561f42-0c70-43be-9bc8-b962a555b13d | SYNTHETIC | f
+(1 row)
+
+              object_id               |         bucket          | deletion_pending | deleted | verified_absent 
+--------------------------------------+-------------------------+------------------+---------+-----------------
+ e58a36bf-7b02-4112-89fd-482542361bde | rcv-synthetic-rehearsal | f                | f       | f
+(1 row)
+
+ private_access_open | outbound_sending_open | serving_hold 
+---------------------+-----------------------+--------------
+ f                   | f                     | t
+(1 row)
+
+
+### isolated database rcv_unsealed (container bic-rcv-isolated, --network none)
+ id | environment | operator |         action         |              restore_id              | journal_seq |      reason      
+----+-------------+----------+------------------------+--------------------------------------+-------------+------------------
+ 12 | local       | israel   | synthetic_created      |                                      |             | 
+ 13 | local       | israel   | entry_applied          |                                      |           1 | 
+ 14 | local       | israel   | hold_applied           | 3007bba3-8a35-4aaf-a2ab-9f2c30411452 |             | 
+ 15 | local       | israel   | reconciliation_refused | 3007bba3-8a35-4aaf-a2ab-9f2c30411452 |             | journal_unsealed
+(4 rows)
+
+     state     |              restore_id              |       backup_id       | restored_from_environment | journal_head_seq |   last_refusal   
+---------------+--------------------------------------+-----------------------+---------------------------+------------------+------------------
+ restored_held | 3007bba3-8a35-4aaf-a2ab-9f2c30411452 | t1-4802b0d7-SYNTHETIC | local                     |                  | journal_unsealed
+(1 row)
+
+ seq |    kind    | replayed 
+-----+------------+----------
+   1 | checkpoint | f
+(1 row)
+
+              subject_id              |   label   | access_revoked 
+--------------------------------------+-----------+----------------
+ 31561f42-0c70-43be-9bc8-b962a555b13d | SYNTHETIC | f
+(1 row)
+
+              object_id               |         bucket          | deletion_pending | deleted | verified_absent 
+--------------------------------------+-------------------------+------------------+---------+-----------------
+ e58a36bf-7b02-4112-89fd-482542361bde | rcv-synthetic-rehearsal | f                | f       | f
+(1 row)
+
+ private_access_open | outbound_sending_open | serving_hold 
+---------------------+-----------------------+--------------
+ f                   | f                     | t
+(1 row)
+
+
+### isolated database rcv_early_seal (container bic-rcv-isolated, --network none)
+ id | environment | operator |         action         |              restore_id              | journal_seq |           reason           
+----+-------------+----------+------------------------+--------------------------------------+-------------+----------------------------
+ 12 | local       | israel   | synthetic_created      |                                      |             | 
+ 13 | local       | israel   | entry_applied          |                                      |           1 | 
+ 14 | local       | israel   | hold_applied           | ef65c2e2-8b40-4880-b86a-8c856a8582fc |             | 
+ 15 | local       | israel   | reconciliation_refused | ef65c2e2-8b40-4880-b86a-8c856a8582fc |             | journal_seal_before_cutoff
+(4 rows)
+
+     state     |              restore_id              |       backup_id       | restored_from_environment | journal_head_seq |        last_refusal        
+---------------+--------------------------------------+-----------------------+---------------------------+------------------+----------------------------
+ restored_held | ef65c2e2-8b40-4880-b86a-8c856a8582fc | t1-4802b0d7-SYNTHETIC | local                     |                  | journal_seal_before_cutoff
+(1 row)
+
+ seq |    kind    | replayed 
+-----+------------+----------
+   1 | checkpoint | f
+(1 row)
+
+              subject_id              |   label   | access_revoked 
+--------------------------------------+-----------+----------------
+ 31561f42-0c70-43be-9bc8-b962a555b13d | SYNTHETIC | f
+(1 row)
+
+              object_id               |         bucket          | deletion_pending | deleted | verified_absent 
+--------------------------------------+-------------------------+------------------+---------+-----------------
+ e58a36bf-7b02-4112-89fd-482542361bde | rcv-synthetic-rehearsal | f                | f       | f
+(1 row)
+
+ private_access_open | outbound_sending_open | serving_hold 
+---------------------+-----------------------+--------------
+ f                   | f                     | t
+(1 row)
+
+

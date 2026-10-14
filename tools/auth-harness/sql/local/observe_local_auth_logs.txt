@@ -1,0 +1,10 @@
+LOCAL stack only (story 1.2). Not SQL: the local GoTrue container log for the
+run window, summarised by tools/auth-harness/local-auth-logs.mjs into
+{path, method, status, error_code, n} groups plus the count of lines that
+mention an SMS provider or SMS sending (sms, twilio, messagebird, textlocal,
+vonage). Command:
+
+  docker logs --since <run start ISO> supabase_auth_church-app 2>&1 \
+    | node tools/auth-harness/local-auth-logs.mjs \
+    | HARNESS_TARGET=local node tools/auth-harness/run.mjs attach \
+        --source sql/local/observe_local_auth_logs.txt --via local-docker-logs --step <s>

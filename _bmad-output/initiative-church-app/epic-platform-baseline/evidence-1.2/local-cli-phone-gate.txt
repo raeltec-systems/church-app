@@ -1,0 +1,48 @@
+LOCAL (Supabase CLI stack, project_id church-app) -- story 1.2 phone track gate
+Captured 2026-10-03 ~17:13Z in worktree agent-a71ef1969b667b26e. Raw output, unedited except where marked.
+
+1. CLI and Auth versions
+$ npx --no-install supabase --version
+2.119.0
+$ docker ps (auth container image)
+supabase_auth_church-app public.ecr.aws/supabase/gotrue:v2.197.0
+
+2. Config under test (temporary, local only, reverted after the run):
+   [auth.sms] enable_signup = true, enable_confirmations = false
+   [auth.sms.twilio] enabled = false (and every other SMS provider absent/disabled)
+   no [auth.sms.test_otp], no [auth.hook.send_sms], no phone MFA
+   (plus, for hosted parity of the email rows: [auth.email] enable_confirmations = true)
+
+$ npx --no-install supabase stop && npx --no-install supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,realtime,postgres-meta
+{"project_id_filter":"church-app","backup":true,"message":"Stopped supabase local development setup."}
+WARN: no SMS provider is enabled. Disabling phone login
+Starting database from backup...
+{...status JSON with local keys elided...}
+
+3. Effective GoTrue environment after that start
+$ docker inspect supabase_auth_church-app --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -iE "SMS|PHONE|MAILER_AUTO"
+GOTRUE_RATE_LIMIT_SMS_SENT=30
+GOTRUE_SMS_AUTOCONFIRM=true
+GOTRUE_SMS_OTP_EXP=6000
+GOTRUE_MFA_PHONE_VERIFY_ENABLED=false
+GOTRUE_EXTERNAL_PHONE_ENABLED=false
+GOTRUE_SMS_MAX_FREQUENCY=5s
+GOTRUE_SMS_OTP_LENGTH=6
+GOTRUE_SMS_TEST_OTP=
+GOTRUE_MAILER_AUTOCONFIRM=false
+GOTRUE_SMS_TEMPLATE=Your code is {{ .Code }}
+GOTRUE_MFA_PHONE_ENROLL_ENABLED=false
+
+4. Where the CLI decides (string search in the CLI 2.119.0 binary, condition reproduced verbatim, minified):
+$ strings ~/.npm/_npx/<hash>/node_modules/@supabase/cli-linux-x64/bin/supabase | grep "no SMS provider is enabled"   (the binary npx ran; --version 2.119.0)
+...if(...,!b.twilio.enabled&&!b.twilio_verify.enabled&&!b.messagebird.enabled&&!b.textlocal.enabled&&!b.vonage.enabled&&Qt("SUPABASE_AUTH_SMS_ENABLE_SIGNUP",m.auth.sms.enable_signup,"auth.sms.enable_signup",h))yield*r.raw(`WARN: no SMS provider is enabled. Disabling phone login
+...
+
+Reading: the CLI enables the phone provider (GOTRUE_EXTERNAL_PHONE_ENABLED=true) only
+when one of twilio, twilio_verify, messagebird, textlocal or vonage is enabled. With
+[auth.sms] enable_signup = true and no provider it forces phone login OFF. The CLI's
+only route to phone signup is therefore an enabled SMS provider, which story 1.2 must
+not configure. No provider, hook, test OTP or SMS MFA was configured.
+
+5. Harness view of the same start: local-harness-log.jsonl steps L00 (settings
+external.phone=false, phone_autoconfirm=true, sms_provider="") and L10-L14.

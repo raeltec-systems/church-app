@@ -1,0 +1,6 @@
+Not SQL: provenance of the observe_edge_function evidence lines.
+Source: Supabase MCP get_edge_function (project szfyfezfvxyuvovnnakr, slug
+harness-recovery), saved verbatim, reduced by
+tools/auth-harness/edge-function-fingerprint.mjs (version, verify_jwt, ezbr
+hash, sha256 of each deployed file vs the committed file), then
+run.mjs attach --source sql/observe_edge_function.txt --via supabase-mcp-get_edge_function

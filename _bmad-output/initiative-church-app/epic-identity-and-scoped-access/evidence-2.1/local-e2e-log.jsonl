@@ -1,0 +1,17 @@
+{"step":"E00-precondition","target":"LOCAL","at":"2026-10-06T21:15:34.528Z","settings":{"status":200,"phone":true,"phone_autoconfirm":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"E10-phone-signup","target":"LOCAL","at":"2026-10-06T21:15:34.674Z","verdict":"pass","status":200,"amr":["password"],"stored_phone":"12025550171"}
+{"step":"E11-read-before-link","target":"LOCAL","at":"2026-10-06T21:15:34.725Z","verdict":"pass","status":403,"code":"forbidden","detail":"not_linked"}
+{"step":"E12-operator-seeded-link","target":"LOCAL","at":"2026-10-06T21:15:35.240Z","approved_phone":"+12025550171"}
+{"step":"E13-read-after-link","target":"LOCAL","at":"2026-10-06T21:15:35.274Z","verdict":"pass","status":200,"summary":{"member_id":"[uuid]","display_name":"SYNTHETIC E2E Member","is_synthetic":true,"phone_username":"+12025550171","membership_state":"approved","has_recovery_email":false}}
+{"step":"E14-second-device-sign-in","target":"LOCAL","at":"2026-10-06T21:15:35.485Z","verdict":"pass","status":200,"amr":["password"],"read_status":200}
+{"step":"E15-generic-credential-errors","target":"LOCAL","at":"2026-10-06T21:15:35.640Z","verdict":"pass","wrong":{"status":400,"code":"invalid_credentials","msg":"Invalid login credentials"},"unknown":{"status":400,"code":"invalid_credentials","msg":"Invalid login credentials"}}
+{"step":"E16-duplicate-username-refused","target":"LOCAL","at":"2026-10-06T21:15:35.725Z","verdict":"pass","status":422,"code":"user_already_exists","msg":"User already registered"}
+{"step":"E17-passwordless-signup-refused","target":"LOCAL","at":"2026-10-06T21:15:35.730Z","verdict":"pass","status":400,"code":"validation_failed","msg":"Signup requires a valid password"}
+{"step":"E18-phone-otp-no-sms-no-tokens-no-link","target":"LOCAL","at":"2026-10-06T21:15:36.286Z","verdict":"pass","status":500,"code":"unexpected_failure","msg":"Unable to get SMS provider","f1_user_rows":1,"linked":0}
+{"step":"E19-uk-number-unlinked-denied","target":"LOCAL","at":"2026-10-06T21:15:36.485Z","verdict":"pass","signup_status":200,"stored_phone":"447700900171","read":{"status":403,"code":"forbidden","detail":"not_linked"}}
+{"step":"E20-signed-out-denied","target":"LOCAL","at":"2026-10-06T21:15:36.507Z","verdict":"pass","status":401,"code":"permission denied for function identity_my_member_summary","detail":null}
+{"step":"E21-direct-table-query-denied","target":"LOCAL","at":"2026-10-06T21:15:36.513Z","verdict":"pass","app_schema":406,"api_schema":404}
+{"step":"E22-signed-out-session-denied-other-session-kept","target":"LOCAL","at":"2026-10-06T21:15:36.679Z","verdict":"pass","logout_status":204,"revoked_read":{"status":401,"code":"unauthenticated","detail":"untrusted_session"},"other_session_read":200}
+{"step":"E23-activity-recorded-only-after-grant","target":"LOCAL","at":"2026-10-06T21:15:36.842Z","verdict":"pass","activity_recorded":true}
+{"step":"E98-no-sms-sent","target":"LOCAL","at":"2026-10-06T21:15:36.874Z","verdict":"pass","sms_send_lines":0}
+{"step":"E99-cleanup","target":"LOCAL","at":"2026-10-06T21:15:37.198Z","verdict":"pass","synthetic_users_left":0}

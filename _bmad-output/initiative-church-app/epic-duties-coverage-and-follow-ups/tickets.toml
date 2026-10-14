@@ -1,0 +1,202 @@
+# Whole duties, coverage and follow-ups epic plan; entries remain planned until a build writes its plan.
+# Table order is build order; ids are stable. Requirement ids D1–D12 live in the epic's Requirements.
+# Q2 follows owner-decisions-milestone-2.md (creator-set deadlines with lead-time defaults, creator-set reminders, snooze, no quiet hours).
+# Pilot department, leaders and live contact data stay synthetic or gated until Israel names and approves them.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Publish a one-position department duty and accept it on mobile"
+description = "Add the Duties owner module with departments, Duties-registered `department_leader` and `department_deputy` scope kinds and department members, a minimal occurrence, slot and assignment with a leader-entered response deadline, publish and accept/decline commands through the 1.4 envelope, a registered Duties source that enqueues the new-duty inbox item through 3.2, a staff web screen where the leader publishes and sees the response, and a mobile duty card where the assignee accepts."
+verify = "On staging with synthetic data, an Admin creates `SYNTHETIC Preaching Rota` and grants a leader, the leader publishes one duty to a member, the member sees it in the inbox and accepts it on mobile, and the leader sees Accepted on staff web, while another member, a non-leader and a direct table query are refused."
+covers = ["D1", "D2", "D4"]
+after = ["2.3", "3.2", "1.7"]
+hitl = false
+risk = "high"
+unknown = "The real pilot department and its leader are not chosen (Q2), so staging uses the SYNTHETIC department and members; nothing here may use real names."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-6--one-revisioned-assignment-engine-adopted", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#set-up-departments-and-duties", "docs/runbooks/identity-access.md"]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Revise assignments on material change and refuse stale responses"
+description = "Add immutable slot revisions and the assignment lifecycle (current, superseded, cancelled) so a material change creates a new pending assignment revision with a recalculated deadline even for the same assignee, preserves the old response with actor, time and provenance, cancels the old revision's jobs and sends a change notice, while a notes-only edit sends an update without resetting acceptance and a response to an old revision is refused with what changed."
+verify = "Through the API and both clients, accept a duty, change its time and show a new pending revision, the old acceptance kept in history and its reminders cancelled, then show that a late accept of the old revision is refused, a notes-only edit keeps Accepted, two leaders editing at once get one success and one conflict, and a replayed request returns the original result."
+covers = ["D3"]
+after = [1]
+hitl = false
+risk = "high"
+unknown = "Which slot fields count as material is fixed by the spec list (date, reporting/start/end time, location, duty, assignee); any other field the build adds must be classified explicitly in its migration."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#changes-and-completion", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-6--one-revisioned-assignment-engine-adopted"]
+external_check = "An independent reviewer repeats the stale-response and concurrent-edit races before entry 15."
+
+[[entry]]
+id = 3
+type = "story"
+title = "Generate recurring multi-position rotas with drafts and series edits"
+description = "Add Duties-owned rota series in church time through the 3.3 calculation, multi-position occurrences with slot fields (reporting/start/end, location, linked event reference, instructions, optional topic/scripture), drafts visible only to the managing leader, deputy and authorised Pastor/Admin, an explicit Publish N draft slots action, this occurrence or this and future edits and cancellation that preserve the past and update all positions together, with candidates including members without a login, on the staff web rota grid and its accessible list."
+verify = "On staff web, generate a quarterly Sunday series with three positions, assign some, publish the drafts, edit one occurrence and then this and future, cancel one occurrence, and show through the API that past occurrences are unchanged, each occurrence keeps its own responses, 2 of 3 confirmed is derived from current positions, and a member cannot see drafts."
+covers = ["D2", "D1"]
+after = [2, "3.3"]
+hitl = false
+risk = "high"
+unknown = "The grid follows the provisional Flutter Web selection from 1.6; the list alternative is required either way."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#create-and-publish-a-rota", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#staff-screens-and-flows", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-9--church-time-and-policy-versioned-schedules-adopted"]
+
+[[entry]]
+id = 4
+type = "story"
+title = "Warn on overlapping duties and record reasoned overrides"
+description = "Add a conflict query across all Duties occurrences (department and cell-owned) that tells a leader only what they may see, show each candidate's upcoming load in the assignment picker, and require an authorised override reason that is recorded with the assignment while the assignee still chooses whether to accept."
+verify = "Through the API and staff web, assign a member to overlapping duties in two departments and show the warning without the other team's instructions, a refused assignment without a reason, a recorded reason on override and the member still Awaiting response, and show that a non-overlapping assignment raises no warning."
+covers = ["D5"]
+after = [3]
+hitl = false
+risk = "medium"
+unknown = "Cell-programme parts appear in the conflict query only once epic 5 creates cell-owned occurrences; this entry proves the cell case with a SYNTHETIC cell-owned occurrence fixture."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#changes-and-completion", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations"]
+
+[[entry]]
+id = 5
+type = "story"
+title = "Respond from My duties with later decline and bulk acceptance"
+description = "Build mobile My duties (Needs a response, Upcoming, Past across every owning scope) with detail, Accept or Can't make it with an optional practical note, Can't make it anymore after acceptance that reopens coverage, bulk acceptance of selected listed dates after a confirmation step, Sending and Not sent states until the server confirms, Add to calendar with the stale-export caveat, a deep link back to the live assignment and the Home My duties card."
+verify = "On mobile against staging, accept, decline and later decline synthetic duties, bulk-accept three of four listed dates, and show that an airplane-mode attempt stays Not sent and never shows Accepted to the leader, a timeout is retried under the same request id, the empty and error states differ, and each response changes the leader's view at once."
+covers = ["D4", "D3"]
+after = [2]
+hitl = false
+risk = "medium"
+unknown = "Calendar export uses a generated .ics file or the platform handoff; whichever the build picks must state that the export does not update after a change."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#my-duties", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#state-fidelity-and-binding-prototype-overrides"]
+
+[[entry]]
+id = 6
+type = "story"
+title = "Open the Follow-ups registry with My follow-ups for every owner"
+description = "Add the Follow-ups owner module with one task per source_type/source_id/purpose (owner, supervisor and scope, next action, original due date, Open/In progress/Waiting with review date/Done/Closed with reason, outcomes, activity) and separately restricted private notes, source registration of purposes and legal lifecycle effects, owner and supervisor commands with attributed updates for owners without online access, Admin routing metadata only, and My follow-ups on mobile Home and staff web for every owner, proven with a SYNTHETIC source."
+verify = "Through the API and both clients, create synthetic tasks for an ordinary member, move them through every state, reassign one as its supervisor and record an update for an accountless owner, and show that the owner sees My follow-ups, a second task for the same source and purpose is refused, Admin sees no private notes, a Waiting task keeps its original due date and closing without a reason is refused."
+covers = ["D8"]
+after = ["2.3", "3.2"]
+hitl = false
+risk = "high"
+unknown = "The minimal source context each consumer may show on a task is registered by that consumer; this entry ships the registration and a synthetic context only."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-7--one-accountable-follow-up-registry-adopted", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#follow-up-tasks"]
+
+[[entry]]
+id = 7
+type = "story"
+title = "Remind follow-up owners and supervisors on the task schedule"
+description = "Schedule task reminders through Notifications: on assignment and at the actionable deadline (due time for Open/In progress, review time for Waiting) with creator-configured reminders when set, one supervisor alert a day after a missed deadline, a recorded review-date change rather than a silent reset, a source-specific schedule that replaces the generic one when the source registers it, removal of the old owner's future reminders on reassignment and cancellation on Done or Closed."
+verify = "Run the task reminder cases through the worker on staging: assign, miss a deadline, move to Waiting with a review date, reassign and close, and show one reminder per logical key, one supervisor alert per deadline, no old-owner reminder after reassignment, nothing after closure and a registered source-specific schedule used instead of the generic one."
+covers = ["D8", "D6"]
+after = [6, "3.4"]
+hitl = false
+risk = "medium"
+unknown = "Missing cell reports are the first source-specific schedule and arrive with epic 7; this entry proves the replacement rule with a synthetic source."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#follow-up-tasks", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-8--durable-notification-work-bounded-external-effects-assumption"]
+
+[[entry]]
+id = 8
+type = "story"
+title = "Set response deadlines and schedule creator-configured duty reminders"
+description = "Store each duty's creator-set deadline or the 3.3 lead-time default, mark passed deadlines Short notice with a response requested now and a leader direct-contact flag, let the creator choose reminders per duty or series (defaults when none: 24 hours before and at the response deadline, a leader overdue alert at the deadline, and one pre-service reminder 24 hours before reporting or start time), stop response reminders on accept or decline while keeping accepted pre-service reminders, and register Duties' direct-contact route so held or accountless assignees reach the leader's Needs contact list."
+verify = "Run the duty reminder suite through the worker on staging: a quarterly rota (14-day default), a mid-week assignment for Sunday (48-hour default), a same-day assignment (Short notice), a creator-set deadline and offsets, accept, decline, reassign, cancel and a held and an accountless assignee, and show the expected jobs only, no stale reminder after any change, snooze honoured and no quiet-hours deferral."
+covers = ["D6"]
+after = [5, "3.3", "3.5"]
+hitl = false
+risk = "high"
+unknown = "The deadline bands and defaults are the agent's reading of the owner's Q2 ranges (Decision in the epic Notes); the owner may adjust them in the policy value."
+references = ["_bmad-output/initiative-church-app/owner-decisions-milestone-2.md", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#proposed-duty-reminder-defaults"]
+
+[[entry]]
+id = 9
+type = "story"
+title = "Work the coverage queue with contact attempts and leader confirmation"
+description = "Build the scoped coverage queue on staff web and the leader's essential mobile actions (Unfilled, Awaiting with deadline, Overdue, Declined or changed, Confirmed against required, Needs contact; next seven days with date and duty filters), permitted contact routes, practical contact attempts with a next follow-up date that create or update a Follow-ups task, Confirmed by leader with actor, time, channel and reason kept distinct from member acceptance, reassignment that supersedes the old assignee and cancels their reminders, position cancellation, the leader Home Needs attention card and Pastor's church-wide gap view."
+verify = "On staff web and mobile, work a synthetic rota with an unanswered app member, an accountless member and a decline: record a contact attempt, confirm the accountless member by phone, reassign the decline, and show the follow-up task opened and closed with the assignment, the confirmation labelled Confirmed by leader with its reason, the old assignee's reminders cancelled, and a leader of another department and Admin without the scope seeing nothing private."
+covers = ["D7", "D3", "D8"]
+after = [4, 6, 8]
+hitl = false
+risk = "high"
+unknown = "Which contact fields a leader may see is a Q4 personal-data question; staging shows the labelled 2.5 contact routes through a scoped Identity read, and production follows the `q4_personal_data` gate."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#leader-follow-up-and-coverage", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations"]
+external_check = "An independent reviewer repeats the leader-confirmation provenance and cross-department scope cases before entry 15."
+
+[[entry]]
+id = 10
+type = "story"
+title = "Record duty completion outcomes and keep assignment history"
+description = "Let the managing leader record Completed, Excused or No-show after a duty with an optional short note and an attributed correction path, keep response, coverage and completion separate so passing time never sets an outcome, and show a member's assignment history to the member and their leaders for fair workload discussions without any public ranking."
+verify = "On staff web and mobile, record and correct outcomes for past synthetic duties and show that an unrecorded past duty stays unrecorded, a declined assignment cannot become a no-show, a cancelled accepted duty has no outcome, corrections keep the prior value and actor, and another member cannot read the history."
+covers = ["D9"]
+after = [9]
+hitl = false
+risk = "medium"
+unknown = "Outcome correction has no time limit in the spec; the build records every correction and does not invent one."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#changes-and-completion", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#state-fidelity-and-binding-prototype-overrides"]
+
+[[entry]]
+id = 11
+type = "story"
+title = "Expose Duties and Follow-ups owner operations for programmes and later owners"
+description = "Add owner operations that Cells calls inside its own transaction to create, revise and cancel cell-owned occurrences and positions with a unique stable part/position-to-slot link and cell-scope authority, to link an existing department duty as a display link without cloning it or transferring its authority, to flag an owner-review mismatch when a linked meeting or event changes, and to query conflicts, plus the linked-event reference, the sermon-draft topic/scripture read and a consumer guide with both-client fixtures for Follow-ups sources."
+verify = "With a SYNTHETIC Cells-like caller, create, revise and cancel a cell-owned position in one transaction, link a department duty and show it unchanged and still managed only by its department, flag and clear a mismatch, and show that a cell leader cannot edit the department duty, a second link for the same part/position is refused, and the fixtures pass in SQL, Dart and TypeScript."
+covers = ["D11", "D1"]
+after = [4, 6, 8]
+hitl = false
+risk = "high"
+unknown = "Epic 5 is the first real caller; any shape it needs beyond these operations is a contract change recorded here rather than a Cells-side workaround."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-6--one-revisioned-assignment-engine-adopted", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-18--contract-first-integration-and-release-gates-adopted", "docs/runbooks/contracts-and-owner-seams.md"]
+
+[[entry]]
+id = 12
+type = "story"
+title = "Apply membership lifecycle and handover to duties and follow-ups"
+description = "Register Duties and Follow-ups lifecycle hooks so church deactivation and removal from the owning department end future assignments, flag vacancies, cancel jobs and notify the leader, a login hold keeps duties and routes contact to the leader, and `scope_revoked` ends a removed leader's authority; register handover hooks for the last leader of an active department and for open task ownership, and deletion hooks that erase or anonymise Duties and Follow-ups personal data."
+verify = "Through staff web and the API, hold, deactivate, remove from the department and delete synthetic members with upcoming duties and open tasks, and show vacancies flagged with leader notices, jobs cancelled in the same transaction, a deactivation of the last department leader refused until handover, a held member's duty still listed with Needs contact, and the deletion check answering zero."
+covers = ["D10", "D8"]
+after = [7, 9, "2.10", "2.11"]
+hitl = false
+risk = "high"
+unknown = "What a deletion anonymises versus erases follows the unapproved Q4 `identity_deletion_retention` gate; staging uses its labelled fixture."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-14--atomic-local-lifecycle-resumable-external-deletion-assumption", "docs/runbooks/identity-access.md", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#important-edge-cases"]
+
+[[entry]]
+id = 13
+type = "story"
+title = "Write the duties runbooks and run the synthetic department pilot"
+description = "Write the leader and Admin runbooks for departments, rotas, coverage, direct-contact confirmation, leader handover and duty reminder problems, then run the full publish → remind → response → visible gap → direct contact → confirmation loop on staging with `SYNTHETIC Preaching Rota`, an app member and an accountless member, with Israel acting as the reviewing owner."
+verify = "Israel follows the runbooks on staging and confirms the loop for a quarterly rota and a short-notice Sunday assignment, that the accountless member's confirmation is labelled Confirmed by leader, that no stale reminder reaches a replaced assignee, and that no step shows private notes to a non-leader."
+covers = ["D12"]
+after = [10, 11, 12]
+hitl = true
+risk = "medium"
+unknown = "The live pilot with a real department and real leaders waits for Israel to name them (Q2) and for Q4 live personal data; this entry is the synthetic rehearsal."
+references = ["_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md#success-evidence", "_bmad-output/initiative-church-app/owner-decisions-milestone-2.md"]
+
+[[entry]]
+id = 14
+type = "story"
+title = "Refactor sweep"
+description = "Clean up duties, follow-ups and client duplication, boundary drift and maintainability findings recorded during the completed stories without changing scope or absorbing unfinished source behavior."
+verify = "Review the completed-story findings, apply only justified cleanup and rerun the affected permission, revision, reminder and client checks without weakening contracts or acceptance behavior."
+covers = ["D12"]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+hitl = false
+risk = "medium"
+unknown = "The cleanup scope is chosen from build records when this story starts; any missing behavior becomes its own entry."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-18--contract-first-integration-and-release-gates-adopted"]
+
+[[entry]]
+id = 15
+type = "story"
+title = "Verify duties and follow-ups end to end and promote them to production"
+description = "Run the closing mobile and staff web suite over departments, rotas, revisions, responses, conflicts, deadlines and reminders, coverage, direct confirmation, completion, follow-ups, lifecycle and the owner operations, with the role and scope permission matrix (app and accountless members, scope loss, accepted-duty reminders) on staging, then promote to the production baseline with the pilot department, its leaders and live contact data either approved by Israel or left fail-closed."
+verify = "A clean build of both clients passes the integrated duty and follow-up scenarios (AC-03, AC-08, AC-09, AC-10, AC-12, AC-13, AC-18) and the independent reviewer's reruns on staging, Israel witnesses the mobile/staff demonstration, and production shows the deployed workflows with unapproved gates (scheduling, live personal data, pilot names) visibly disabled."
+covers = ["D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10", "D11", "D12"]
+after = [14, "3.10"]
+hitl = true
+risk = "high"
+unknown = "Production needs the production project, the approved `q2_church_time` gate from 3.10, the named pilot department and leaders and the Q4 personal-data decision; while any is missing this entry delivers staging evidence and stays open."
+references = ["_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#launch-checks", "_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#verification-boundaries"]
+external_check = "An independent reviewer reruns the stale-response, provenance and scope-matrix cases before promotion."

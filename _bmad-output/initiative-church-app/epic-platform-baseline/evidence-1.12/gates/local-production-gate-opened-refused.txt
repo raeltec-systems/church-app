@@ -1,0 +1,38 @@
+$ psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f /tmp/claude-0/-home-user-church-app/53f9d846-6f17-5fcb-9db8-59c7e3ac6bf0/scratchpad/prod-gates-open.sql
+# started 2026-10-03T16:59:14Z at 2b3ad1824ea255bf2b59b196c239de2d25f4fdcf
+BEGIN
+ platform_set_environment 
+--------------------------
+ 
+(1 row)
+
+ policy_approve 
+----------------
+ 
+(1 row)
+
+ private_access_open_after_simulated_approval 
+----------------------------------------------
+ t
+(1 row)
+
+--- verify-hosted.sql with expected_env=production (expected to REFUSE):
+ set_config 
+------------
+ production
+(1 row)
+
+psql:tools/ci/verify-hosted.sql:51: ERROR:  verify-hosted: private_access gate is open in production
+CONTEXT:  PL/pgSQL function inline_code_block line 19 at RAISE
+ROLLBACK
+ local_marker_rows_after_rollback 
+----------------------------------
+                                0
+(1 row)
+
+      gate      |   state    
+----------------+------------
+ private_access | unresolved
+(1 row)
+
+# exit=0 finished 2026-10-03T16:59:14Z

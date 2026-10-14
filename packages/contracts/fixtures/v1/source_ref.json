@@ -1,0 +1,34 @@
+{
+  "kind": "source_ref",
+  "contract_version": 1,
+  "valid": [
+    {"name": "first revision", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1}},
+    {"name": "largest JS-safe revision", "value": {"source_type": "a", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 9007199254740991}},
+    {"name": "longest token (63 chars)", "value": {"source_type": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1}},
+    {"name": "integral value written with an exponent (1e3)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1e3}},
+    {"name": "integral value written with a fraction (1.0)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1.0}},
+    {"name": "integral value written as 2E1", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 2E1}}
+  ],
+  "invalid": [
+    {"name": "everything missing", "value": {}, "field_errors": {"source_type": "required", "source_id": "required", "source_revision": "required"}},
+    {"name": "revision zero", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 0}, "field_errors": {"source_revision": "invalid"}},
+    {"name": "negative revision", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": -1}, "field_errors": {"source_revision": "invalid"}},
+    {"name": "fractional revision", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1.5}, "field_errors": {"source_revision": "invalid"}},
+    {"name": "revision as string", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": "1"}, "field_errors": {"source_revision": "invalid"}},
+    {"name": "revision beyond JS-safe range", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 9007199254740992}, "field_errors": {"source_revision": "invalid"}},
+    {"name": "source_type with capitals", "value": {"source_type": "FixtureCounter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1}, "field_errors": {"source_type": "invalid"}},
+    {"name": "source_type with dot", "value": {"source_type": "fixture.counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1}, "field_errors": {"source_type": "invalid"}},
+    {"name": "source_type starting with digit", "value": {"source_type": "1counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1}, "field_errors": {"source_type": "invalid"}},
+    {"name": "source_type longer than 63", "value": {"source_type": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1}, "field_errors": {"source_type": "invalid"}},
+    {"name": "empty source_type", "value": {"source_type": "", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1}, "field_errors": {"source_type": "invalid"}},
+    {"name": "null source_id", "value": {"source_type": "fixture_counter", "source_id": null, "source_revision": 1}, "field_errors": {"source_id": "required"}},
+    {"name": "unknown key", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "title": "x"}, "field_errors": {"title": "unknown_field"}},
+    {"name": "non-integral exponent (1e-1)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1e-1}, "field_errors": {"source_revision": "invalid"}},
+    {"name": "very large exponent (1e300)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1e300}, "field_errors": {"source_revision": "invalid"}},
+    {"name": "beyond JS-safe written as exponent (1e16)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1e16}, "field_errors": {"source_revision": "invalid"}},
+    {"name": "prototype-named key constructor", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "constructor": "x"}, "field_errors": {"constructor": "unknown_field"}},
+    {"name": "prototype-named key __proto__", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "__proto__": "x"}, "field_errors": {"__proto__": "unknown_field"}},
+    {"name": "prototype-named key toString", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "toString": "x"}, "field_errors": {"toString": "unknown_field"}},
+    {"name": "source content never rides on a reference (story 3.2)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "title": "x", "note": "x"}, "field_errors": {"title": "unknown_field", "note": "unknown_field"}}
+  ]
+}

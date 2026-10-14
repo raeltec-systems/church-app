@@ -1,0 +1,188 @@
+# Whole identity/access epic plan; entries remain planned until a build writes its plan.
+# Table order is build order; ids are stable. Requirement ids I1–I11 live in the epic's Requirements.
+# Unresolved Q1/Q4 values are labelled staging fixtures and production gates, never inferred policy.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Sign in with a phone username and reach a live-access-checked read"
+description = "Add the Identity owner schema for member records, account links with a versioned approved phone binding and holds, plus the one server live-access predicate, so a synthetic approved member signs up or signs in with phone and password (no SMS) on mobile and the selected staff web client against hosted staging and sees their own member summary through an allowlisted api read, while an unlinked account is denied."
+verify = "On hosted staging, sign in as the seeded approved member on a native target and on the staff web client and see the same member summary, then show that an unlinked account, a signed-out client and a direct table query are denied and that no SMS configuration exists."
+covers = ["I1", "I2"]
+after = ["1.2", "1.7"]
+hitl = true
+risk = "high"
+unknown = "Hosted staging Auth settings (phone provider on, phone confirmation off, no SMS provider or hook) must be applied as config-as-code or, where the agent cannot apply them, by Israel; the 1.2 evidence decides which Auth claims the predicate reads."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-3--person-identity-and-live-account-trust-adopted", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-20--phonepassword-with-optional-verified-email-recovery-no-sms-adopted", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#sign-in-and-continued-access"]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Enforce live session trust across alternate Auth routes"
+description = "Harden the entry 1 predicate and both clients so OTP, magic-link and recovery-only sessions, revoked or signed-out sessions, a verified email/password alias and a direct Auth phone or email change (detected by the 1.3 mechanism) all fail closed or resolve to the same account under the same checks, while normal reopening and token refresh keep a valid session without a password prompt and sign-out clears protected memory state."
+verify = "Run the permission suite through the real API with direct native Auth calls for each alternate route, a revoked session, a stale token after a direct binding change and a dormant fixture account, and show on both clients that refresh keeps access, sign-out clears protected state and every non-password or changed-binding case is denied without an activity update."
+covers = ["I1", "I2", "I8"]
+after = [1, "1.3"]
+hitl = false
+risk = "high"
+unknown = "The dormancy period is an unapproved Q1 value, so staging uses a labelled fixture and the check must read prior activity before any refresh; the provider's exact session-revocation behaviour comes from the 1.2 and 1.3 evidence."
+references = ["_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#auth-verification-detail", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-13--public-caching-private-session-state-and-file-gates-assumption"]
+external_check = "An independent security reviewer repeats the alternate-route and stale-binding cases before entry 14."
+
+[[entry]]
+id = 3
+type = "story"
+title = "Grant scoped roles with audited, immediate effect"
+description = "Add the Identity grant model and Admin commands for independently held church-wide roles (Admin, Pastor, Media, lead pastor) and owner-registered scoped grants, bootstrap the first Admin through the restricted operator procedure, add Identity church settings that stay unset and fail closed, and drive navigation on mobile and the staff web client from current server grants with stale-tab and stale-token rejection."
+verify = "Grant and revoke roles on staff web and show the effect on an already signed-in mobile session and an open browser tab at the next protected request, with audit rows, a refused removal of the last Admin, and fixtures proving a combined-role member and an Admin-only member cannot reach care or finance fixture surfaces."
+covers = ["I6", "I1"]
+after = [2, "1.9"]
+hitl = false
+risk = "high"
+unknown = "Department, service, care, finance and prayer-team scope kinds are registered by later owners; this entry proves the registration contract with synthetic scope fixtures and must not invent their business rules."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-4--authority-applies-at-every-data-surface-adopted", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#roles-and-permissions", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-19--bounded-system-principals-assumption"]
+
+[[entry]]
+id = 4
+type = "story"
+title = "Register and apply for membership with a safe cell choice"
+description = "Build the full mobile sign-up flow (unverified-username label, password visibility, autofill and paste, generic conflict and failure states, privacy notice) and a correctable membership application with name and a cell choice from a Cells-owned safe signup projection or I'm not sure or I'm not in a cell yet, showing church approval and cell status separately while the pending account reaches only its own status and public content."
+verify = "Register a new synthetic applicant on mobile with each cell choice and no email, correct the request, and show through the API that a duplicate username is rejected without overwrite, the cell projection exposes only names and broad areas, and the pending account cannot read any member, cell or private surface."
+covers = ["I2", "I3", "I5"]
+after = [2]
+hitl = false
+risk = "medium"
+unknown = "Cell records come from a synthetic seed until entry 6 adds Admin cell setup; youth or minor applicants follow Q4, so no youth-specific fields or contact features are collected."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#joining-from-the-app", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations"]
+
+[[entry]]
+id = 5
+type = "story"
+title = "Review applications and link existing or accountless members"
+description = "Give Admin a staff web applications and members queue to approve, reject with an optional reason or ask for details after a recorded identity check, review duplicate candidates without disclosure to the applicant, explicitly link an account to an existing member ID, add consented accountless member records with provenance and labelled contact routes, and later link a personal account to that record preserving its member ID and history."
+verify = "On staff web, approve one applicant, link a second applicant to an existing synthetic member, create an accountless member and later link a new account to it, and show through the API that the member ID and history are unchanged, a matching phone or name never links automatically and a shared contact number gives no access."
+covers = ["I4", "I3"]
+after = [3, 4]
+hitl = false
+risk = "high"
+unknown = "Duplicate-candidate matching signals are a staff aid only; their exact fields are chosen at build from the member record and must not reveal candidate data to the applicant."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#members-without-a-usable-personal-account", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#staff-screens-and-flows"]
+
+[[entry]]
+id = 6
+type = "story"
+title = "Confirm and transfer primary cell membership"
+description = "Add Admin cell setup with cell-leader and assistant scopes, leader or Admin confirmation of a requested cell separate from church approval, an Admin follow-up queue for unresolved choices, member change-cell requests, and an atomic confirmed transfer that ends the old primary membership and its cell-private access, activates the new one and calls registered owner transfer hooks."
+verify = "On staff web, confirm a synthetic member's cell as its leader, transfer them to another cell, and show through the API that only one primary cell exists, the old cell's private fixture surface is denied at once, the new one opens, a fixture transfer hook ran in the same transaction and church membership is unchanged."
+covers = ["I5", "I6"]
+after = [5]
+hitl = false
+risk = "high"
+unknown = "Future owners (duties, chat, follow-ups, programmes) register their own transfer effects; this entry delivers the hook contract with synthetic hooks and must not fabricate those workflows."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-14--atomic-local-lifecycle-resumable-external-deletion-assumption", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#joining-from-the-app"]
+
+[[entry]]
+id = 7
+type = "story"
+title = "Recover a password through a verified same-account email"
+description = "Let a member add an optional recovery email to the same Auth account and verify it, let Admin approve it into the credential binding, and provide forgot-password with a neutral acknowledgement, reset to only that approved email through allowlisted mobile and web redirects, a recovery session limited to setting the password, a required fresh password sign-in and preserved holds."
+verify = "Using owner-approved test inboxes on staging, verify and approve a recovery email, reset the password from mobile and web links, and show that unverified, unapproved, changed, expired and reused cases fail neutrally, the recovery session cannot read private data, older sessions lose private access and an existing hold stays in force."
+covers = ["I7", "I2"]
+after = [5]
+hitl = false
+risk = "high"
+unknown = "Staging uses the owner-approved israelmuyoba+<tag>@gmail.com inboxes; production SMTP, sender and redirect domains are Q1 owner gates handled at entry 14."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#changed-credentials-and-secure-recovery", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-20--phonepassword-with-optional-verified-email-recovery-no-sms-adopted"]
+
+[[entry]]
+id = 8
+type = "story"
+title = "Change credentials under review and hold access"
+description = "Add reviewed phone-username change and recovery-email replacement or removal through the approved-binding workflow, security holds and accepted ownership disputes that put an account into Access review required with a generic help screen on both clients, authorised hold removal after identity checks, and lost-device handling that revokes sessions and calls registered device-registration hooks."
+verify = "Through the API and both clients, change a username and a recovery email under review, place and remove a hold, and show that a direct Auth change, a public forgot-password request, login, reset or email verification never clears a hold or approves a binding, while held sessions see only the help screen and revoked sessions lose private access."
+covers = ["I8", "I1"]
+after = [7]
+hitl = false
+risk = "high"
+unknown = "Device tokens belong to the inbox epic, so this entry calls a registered revocation hook proven with a synthetic fixture."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#changed-credentials-and-secure-recovery", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#sign-in-and-continued-access"]
+
+[[entry]]
+id = 9
+type = "story"
+title = "Recover access with staff assistance and a single-use grant"
+description = "Add the I need help accessing my account route and a staff recovery case that records identity evidence, reviewer and outcome, issues a short-lived single-use setup grant bound to case, member, account, link revision and generation (stored as a digest), lets the member choose a password privately applied by server-side Auth Admin under serialized and fenced external operations, and blocks relinking while an earlier reset is unresolved."
+verify = "Run the adversarial suite against staging Auth: an unused grant after reissue, a direct password change, relink or deactivation, concurrent redemption, cross-member use and an uncertain or late Auth result all fail closed or keep the account held, a valid grant works once, fresh password sign-in is required, and no password or usable grant appears in staff screens, responses or logs."
+covers = ["I9", "I8"]
+after = [8]
+hitl = false
+risk = "high"
+unknown = "The named recovery reviewers and the written procedure are Q1 owner choices; staging uses synthetic reviewers and entry 12 records the procedure for owner approval."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-20--phonepassword-with-optional-verified-email-recovery-no-sms-adopted", "_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#auth-verification-detail"]
+external_check = "An independent security reviewer repeats an unused-grant/direct-change case and an uncertain-reset/relink race before entry 14."
+
+[[entry]]
+id = 10
+type = "story"
+title = "Hold, deactivate and restore membership with handover obligations"
+description = "Add the lifecycle commands that keep a login hold distinct from church deactivation and reviewed restoration, deny access and revoke sessions in the same transaction, invalidate outstanding recovery grants, record pending handover obligations through registered owner hooks, and refuse to remove the last Admin or a last responsible staff member without a handover."
+verify = "Through staff web and the API, hold, deactivate and restore synthetic members and show that access is denied at once on both clients, membership, cell and fixture duty facts survive a hold, deactivation records handover obligations and invalidates a pending grant, and removing the last Admin is refused."
+covers = ["I10", "I6"]
+after = [6, 9]
+hitl = false
+risk = "high"
+unknown = "Directory, duties, follow-ups, chat and custody effects arrive from later owners through hooks; synthetic hook fixtures prove ordering and atomicity here."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#membership-and-account-lifecycle", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-14--atomic-local-lifecycle-resumable-external-deletion-assumption"]
+
+[[entry]]
+id = 11
+type = "story"
+title = "Delete a member fully through a resumable workflow"
+description = "Add an in-app deletion request and a staff-assisted route for members with no login that record an access-denied tombstone and a deletion manifest in the 1.10 recovery journal, then run idempotent system-principal steps that delete the Auth user and identities, Identity and Cells personal data and registered owner data, anonymise retained facts and mark completion only after every store is checked."
+verify = "Delete a synthetic member with and without a login, interrupt the worker mid-way and resume it, and show that sign-in fails from the first step, every step is recorded and retried idempotently, the journal holds only opaque identifiers, and a synthetic restore replays the deletion before access opens."
+covers = ["I10"]
+after = [10, "1.10"]
+hitl = false
+risk = "high"
+unknown = "Q4 retention and backup periods are unapproved, so retention rules stay labelled fixtures and live personal data remains gated."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-14--atomic-local-lifecycle-resumable-external-deletion-assumption", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-19--bounded-system-principals-assumption"]
+
+[[entry]]
+id = 12
+type = "story"
+title = "Write and rehearse the restricted identity runbooks"
+description = "Write the restricted support runbooks for applications and linking, email and assisted recovery, holds and disputes, deactivation and handover, deletion, first-Admin setup and the identity-checked last-Admin fallback, and rehearse each with synthetic records with Israel reviewing them as the restricted operator."
+verify = "Israel follows each runbook against staging with synthetic records and confirms that no step shows a password or usable grant, Admin-only support reaches no care or finance fixture, and the last-Admin fallback restores Admin access without a credential shortcut."
+covers = ["I10", "I9"]
+after = [11]
+hitl = true
+risk = "medium"
+unknown = "Named recovery and approval owners are Q1 choices; the runbooks name roles and leave owner names for Israel to fill in at entry 14."
+references = ["_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md#delivery-commitment", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#changed-credentials-and-secure-recovery"]
+
+[[entry]]
+id = 13
+type = "story"
+title = "Refactor sweep"
+description = "Clean up identity, cells and client duplication, boundary drift and maintainability findings recorded during the completed stories without changing scope or absorbing unfinished source behavior."
+verify = "Review the completed-story findings, apply only justified cleanup and rerun the affected permission, lifecycle and client checks without weakening contracts or acceptance behavior."
+covers = ["I11"]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+hitl = false
+risk = "medium"
+unknown = "The cleanup scope is chosen from build records when this story starts; any missing behavior becomes its own entry."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-18--contract-first-integration-and-release-gates-adopted"]
+
+[[entry]]
+id = 14
+type = "story"
+title = "Verify identity end to end and promote it to production"
+description = "Run the closing mobile and staff web suite over registration, review and linking, cells, both recovery routes, credential changes, holds, lifecycle, deletion and the full role/combined-role permission matrix on staging, then promote the workflows to the production baseline with each Q1 and Q4 gate either approved by Israel or left fail-closed."
+verify = "A clean build of both clients passes the integrated identity scenarios and independent security checks on staging, Israel witnesses the mobile/staff demonstration, and production shows the deployed workflows with unapproved gates (email sender, dormancy, password policy, first real Admin, live personal data) visibly disabled."
+covers = ["I1", "I2", "I3", "I4", "I5", "I6", "I7", "I8", "I9", "I10", "I11"]
+after = [13, "1.12"]
+hitl = true
+risk = "high"
+unknown = "The production Supabase project, production SMTP sender and the first real Admin wait for Israel; while any of them is missing, this entry delivers staging evidence and stays open."
+references = ["_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#verification-boundaries", "_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md#decision-register"]
+external_check = "An independent reviewer reruns the alternate-route, stale-grant and reset-race cases from entries 2 and 9 before promotion."

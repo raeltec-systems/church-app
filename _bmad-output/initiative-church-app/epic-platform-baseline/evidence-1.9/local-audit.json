@@ -1,0 +1,132 @@
+[
+  {
+    "outcome": "succeeded",
+    "reason": "ok",
+    "code": null,
+    "caller_role": "anon",
+    "command": "system.synthetic_probe",
+    "principal_is_smoke": true,
+    "has_request_id": true,
+    "initiating_member_id": null
+  },
+  {
+    "outcome": "replayed",
+    "reason": "replay",
+    "code": null,
+    "caller_role": "anon",
+    "command": "system.synthetic_probe",
+    "principal_is_smoke": true,
+    "has_request_id": true,
+    "initiating_member_id": null
+  },
+  {
+    "outcome": "rejected",
+    "reason": "request_conflict",
+    "code": "conflict",
+    "caller_role": "anon",
+    "command": "system.synthetic_probe",
+    "principal_is_smoke": true,
+    "has_request_id": true,
+    "initiating_member_id": null
+  },
+  {
+    "outcome": "rejected",
+    "reason": "credential_missing",
+    "code": "unauthenticated",
+    "caller_role": "anon",
+    "command": "system.synthetic_probe",
+    "principal_is_smoke": null,
+    "has_request_id": true,
+    "initiating_member_id": null
+  },
+  {
+    "outcome": "rejected",
+    "reason": "credential_malformed",
+    "code": "unauthenticated",
+    "caller_role": "anon",
+    "command": "system.synthetic_probe",
+    "principal_is_smoke": null,
+    "has_request_id": true,
+    "initiating_member_id": null
+  },
+  {
+    "outcome": "rejected",
+    "reason": "credential_unknown",
+    "code": "unauthenticated",
+    "caller_role": "anon",
+    "command": "system.synthetic_probe",
+    "principal_is_smoke": null,
+    "has_request_id": true,
+    "initiating_member_id": null
+  },
+  {
+    "outcome": "rejected",
+    "reason": "wrong_environment",
+    "code": "unauthenticated",
+    "caller_role": "anon",
+    "command": "system.synthetic_probe",
+    "principal_is_smoke": null,
+    "has_request_id": true,
+    "initiating_member_id": null
+  },
+  {
+    "outcome": "rejected",
+    "reason": "wrong_environment",
+    "code": "unauthenticated",
+    "caller_role": "anon",
+    "command": "system.synthetic_probe",
+    "principal_is_smoke": null,
+    "has_request_id": true,
+    "initiating_member_id": null
+  },
+  {
+    "outcome": "rejected",
+    "reason": "user_session_rejected",
+    "code": "forbidden",
+    "caller_role": "authenticated",
+    "command": "system.synthetic_probe",
+    "principal_is_smoke": null,
+    "has_request_id": true,
+    "initiating_member_id": null
+  },
+  {
+    "outcome": "rejected",
+    "reason": "envelope_invalid",
+    "code": "validation_failed",
+    "caller_role": "anon",
+    "command": "system.synthetic_probe",
+    "principal_is_smoke": true,
+    "has_request_id": true,
+    "initiating_member_id": null
+  },
+  {
+    "outcome": "rejected",
+    "reason": "envelope_invalid",
+    "code": "validation_failed",
+    "caller_role": "anon",
+    "command": "system.synthetic_probe",
+    "principal_is_smoke": true,
+    "has_request_id": true,
+    "initiating_member_id": null
+  },
+  {
+    "outcome": "succeeded",
+    "reason": "ok",
+    "code": null,
+    "caller_role": "anon",
+    "command": "system.synthetic_probe",
+    "principal_is_smoke": true,
+    "has_request_id": true,
+    "initiating_member_id": null
+  },
+  {
+    "outcome": "rejected",
+    "reason": "command_not_allowed",
+    "code": "forbidden",
+    "caller_role": "anon",
+    "command": null,
+    "principal_is_smoke": true,
+    "has_request_id": true,
+    "initiating_member_id": null
+  }
+]

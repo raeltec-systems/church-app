@@ -1,0 +1,366 @@
+[
+  {
+    "n": 1,
+    "where": "page Tab order",
+    "control": "tab: Rota grid trial",
+    "box": {
+      "w": 675,
+      "h": 58
+    },
+    "requiredPixels": 2932,
+    "contrastChangePixels": 4342,
+    "baseline": "step 3 (textbox: Filter positions e.g. door)",
+    "pass": true
+  },
+  {
+    "n": 2,
+    "where": "page Tab order",
+    "control": "tab: Platform status",
+    "box": {
+      "w": 675,
+      "h": 58
+    },
+    "requiredPixels": 2932,
+    "contrastChangePixels": 4342,
+    "baseline": "step 3 (textbox: Filter positions e.g. door)",
+    "pass": true
+  },
+  {
+    "n": 3,
+    "where": "page Tab order",
+    "control": "textbox: Filter positions e.g. door",
+    "box": {
+      "w": 280,
+      "h": 56
+    },
+    "requiredPixels": 1344,
+    "contrastChangePixels": 2197,
+    "baseline": "step 2 (tab: Platform status)",
+    "pass": true
+  },
+  {
+    "n": 4,
+    "where": "page Tab order",
+    "control": "button: Filter by status All statuses",
+    "box": {
+      "w": 260,
+      "h": 56
+    },
+    "requiredPixels": 1264,
+    "contrastChangePixels": 1715,
+    "baseline": "step 5 (radio: Grid)",
+    "pass": true
+  },
+  {
+    "n": 5,
+    "where": "page Tab order",
+    "control": "radio: Grid",
+    "box": {
+      "w": 92,
+      "h": 48
+    },
+    "requiredPixels": 560,
+    "contrastChangePixels": 868,
+    "baseline": "step 4 (button: Filter by status All statuses)",
+    "pass": true
+  },
+  {
+    "n": 6,
+    "where": "page Tab order",
+    "control": "radio: List",
+    "box": {
+      "w": 89,
+      "h": 48
+    },
+    "requiredPixels": 548,
+    "contrastChangePixels": 850,
+    "baseline": "step 7 (button: Export CSV…)",
+    "pass": true
+  },
+  {
+    "n": 7,
+    "where": "page Tab order",
+    "control": "button: Export CSV…",
+    "box": {
+      "w": 145,
+      "h": 48
+    },
+    "requiredPixels": 772,
+    "contrastChangePixels": 1150,
+    "baseline": "step 6 (radio: List)",
+    "pass": true
+  },
+  {
+    "n": 8,
+    "where": "page Tab order",
+    "control": "button: Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+    "box": {
+      "w": 170,
+      "h": 69
+    },
+    "requiredPixels": 956,
+    "contrastChangePixels": 1298,
+    "baseline": "step 7 (button: Export CSV…)",
+    "pass": true
+  },
+  {
+    "n": 9,
+    "where": "slot dialog",
+    "control": "button: Member Test Mwila A",
+    "box": {
+      "w": 412,
+      "h": 56
+    },
+    "requiredPixels": 1872,
+    "contrastChangePixels": 2652,
+    "baseline": "step 3 (button: Cancel)",
+    "pass": true
+  },
+  {
+    "n": 10,
+    "where": "slot dialog",
+    "control": "button: Status Confirmed",
+    "box": {
+      "w": 412,
+      "h": 56
+    },
+    "requiredPixels": 1872,
+    "contrastChangePixels": 2683,
+    "baseline": "step 3 (button: Cancel)",
+    "pass": true
+  },
+  {
+    "n": 11,
+    "where": "slot dialog",
+    "control": "button: Cancel",
+    "box": {
+      "w": 67,
+      "h": 48
+    },
+    "requiredPixels": 461,
+    "contrastChangePixels": 626,
+    "baseline": "step 2 (button: Status Confirmed)",
+    "pass": true
+  },
+  {
+    "n": 12,
+    "where": "slot dialog",
+    "control": "button: Save",
+    "box": {
+      "w": 78,
+      "h": 48
+    },
+    "requiredPixels": 505,
+    "contrastChangePixels": 736,
+    "baseline": "step 3 (button: Cancel)",
+    "pass": true
+  },
+  {
+    "n": 13,
+    "where": "status menu options",
+    "control": "menuitem: Confirmed",
+    "box": {
+      "w": 452,
+      "h": 48
+    },
+    "requiredPixels": 2000,
+    "contrastChangePixels": 21303,
+    "baseline": "step 2 (menuitem: Awaiting response)",
+    "pass": true
+  },
+  {
+    "n": 14,
+    "where": "status menu options",
+    "control": "menuitem: Confirmed by leader",
+    "box": {
+      "w": 452,
+      "h": 48
+    },
+    "requiredPixels": 2000,
+    "contrastChangePixels": 20965,
+    "baseline": "step 3 (menuitem: Needs contact)",
+    "pass": true
+  },
+  {
+    "n": 15,
+    "where": "status menu options",
+    "control": "menuitem: Awaiting response",
+    "box": {
+      "w": 452,
+      "h": 48
+    },
+    "requiredPixels": 2000,
+    "contrastChangePixels": 21021,
+    "baseline": "step 0 (menuitem: Confirmed)",
+    "pass": true
+  },
+  {
+    "n": 16,
+    "where": "status menu options",
+    "control": "menuitem: Needs contact",
+    "box": {
+      "w": 452,
+      "h": 48
+    },
+    "requiredPixels": 2000,
+    "contrastChangePixels": 21176,
+    "baseline": "step 1 (menuitem: Confirmed by leader)",
+    "pass": true
+  },
+  {
+    "n": 17,
+    "where": "status menu options",
+    "control": "menuitem: Declined",
+    "box": {
+      "w": 452,
+      "h": 48
+    },
+    "requiredPixels": 2000,
+    "contrastChangePixels": 21359,
+    "baseline": "step 2 (menuitem: Awaiting response)",
+    "pass": true
+  },
+  {
+    "n": 18,
+    "where": "status menu options",
+    "control": "menuitem: Draft",
+    "box": {
+      "w": 452,
+      "h": 48
+    },
+    "requiredPixels": 2000,
+    "contrastChangePixels": 21508,
+    "baseline": "step 3 (menuitem: Needs contact)",
+    "pass": true
+  },
+  {
+    "n": 19,
+    "where": "export dialog",
+    "control": "button: Cancel",
+    "box": {
+      "w": 67,
+      "h": 48
+    },
+    "requiredPixels": 461,
+    "contrastChangePixels": 518,
+    "baseline": "step 0 (heading: Export rota CSV)",
+    "pass": true
+  },
+  {
+    "n": 20,
+    "where": "export dialog",
+    "control": "button: Download CSV",
+    "box": {
+      "w": 159,
+      "h": 48
+    },
+    "requiredPixels": 829,
+    "contrastChangePixels": 925,
+    "baseline": "step 1 (button: Cancel)",
+    "pass": true
+  },
+  {
+    "n": 21,
+    "where": "list Change buttons (first 6 of 48)",
+    "control": "radio: List",
+    "box": {
+      "w": 89,
+      "h": 48
+    },
+    "requiredPixels": 548,
+    "contrastChangePixels": 850,
+    "baseline": "step 1 (button: Export CSV…)",
+    "pass": true
+  },
+  {
+    "n": 22,
+    "where": "list Change buttons (first 6 of 48)",
+    "control": "button: Export CSV…",
+    "box": {
+      "w": 145,
+      "h": 48
+    },
+    "requiredPixels": 772,
+    "contrastChangePixels": 1150,
+    "baseline": "step 0 (radio: List)",
+    "pass": true
+  },
+  {
+    "n": 23,
+    "where": "list Change buttons (first 6 of 48)",
+    "control": "button: Change Main door, Sun 4 Oct",
+    "box": {
+      "w": 96,
+      "h": 48
+    },
+    "requiredPixels": 576,
+    "contrastChangePixels": 814,
+    "baseline": "step 1 (button: Export CSV…)",
+    "pass": true
+  },
+  {
+    "n": 24,
+    "where": "list Change buttons (first 6 of 48)",
+    "control": "button: Change Main door, Sun 11 Oct",
+    "box": {
+      "w": 96,
+      "h": 48
+    },
+    "requiredPixels": 576,
+    "contrastChangePixels": 818,
+    "baseline": "step 2 (button: Change Main door, Sun 4 Oct)",
+    "pass": true
+  },
+  {
+    "n": 25,
+    "where": "list Change buttons (first 6 of 48)",
+    "control": "button: Change Main door, Sun 18 Oct",
+    "box": {
+      "w": 96,
+      "h": 48
+    },
+    "requiredPixels": 576,
+    "contrastChangePixels": 900,
+    "baseline": "step 3 (button: Change Main door, Sun 11 Oct)",
+    "pass": true
+  },
+  {
+    "n": 26,
+    "where": "list Change buttons (first 6 of 48)",
+    "control": "button: Change Main door, Sun 25 Oct",
+    "box": {
+      "w": 96,
+      "h": 48
+    },
+    "requiredPixels": 576,
+    "contrastChangePixels": 822,
+    "baseline": "step 4 (button: Change Main door, Sun 18 Oct)",
+    "pass": true
+  },
+  {
+    "n": 27,
+    "where": "list Change buttons (first 6 of 48)",
+    "control": "button: Change Main door, Sun 1 Nov",
+    "box": {
+      "w": 96,
+      "h": 48
+    },
+    "requiredPixels": 576,
+    "contrastChangePixels": 896,
+    "baseline": "step 5 (button: Change Main door, Sun 25 Oct)",
+    "pass": true
+  },
+  {
+    "n": 28,
+    "where": "list Change buttons (first 6 of 48)",
+    "control": "button: Change Main door, Sun 8 Nov",
+    "box": {
+      "w": 96,
+      "h": 48
+    },
+    "requiredPixels": 576,
+    "contrastChangePixels": 814,
+    "baseline": "step 6 (button: Change Main door, Sun 1 Nov)",
+    "pass": true
+  }
+]

@@ -1,0 +1,16 @@
+$ npm run db:test
+# started 2026-10-03T16:56:14Z at 2b3ad1824ea255bf2b59b196c239de2d25f4fdcf
+
+> db:test
+> supabase test db
+
+Connecting to local database...
+/home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/supabase/tests/command_foundation_test.sql .... ok
+/home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/supabase/tests/cross_epic_contracts_test.sql .. ok
+/home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/supabase/tests/platform_status_test.sql ....... ok
+/home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/supabase/tests/recovery_journal_test.sql ...... ok
+/home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/supabase/tests/system_access_test.sql ......... ok
+All tests successful.
+Files=5, Tests=357,  1 wallclock secs ( 0.08 usr  0.00 sys +  0.05 cusr  0.05 csys =  0.18 CPU)
+Result: PASS
+# exit=0 finished 2026-10-03T16:56:17Z

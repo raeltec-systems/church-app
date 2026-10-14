@@ -1,0 +1,54 @@
+{
+  "filename": "bic-kafue-rota-trial-SYNTHETIC.csv",
+  "bom": true,
+  "crlfRows": 25,
+  "header": [
+    "Date",
+    "Position",
+    "Member",
+    "Status",
+    "Note"
+  ],
+  "rows": 24,
+  "columnsPerRow": [
+    5
+  ],
+  "identicalToGolden": true,
+  "memberStatusMismatchesVsGrid": [],
+  "rawTriggerFields": [],
+  "neutralisedFields": [
+    "'=1+2",
+    "'\tTab-led note",
+    "'\rCR-led note",
+    "'=HYPERLINK(\"https://example.invalid\",\"Injected\")",
+    "'  =SUM(1,2) after spaces",
+    "'+Test Plus G",
+    "'=1+2",
+    "'\tTab-led note",
+    "'=HYPERLINK(\"https://example.invalid\",\"Injected\")",
+    "'+Test Plus G",
+    "'\rCR-led note",
+    "'-Test Minus H",
+    "'  =SUM(1,2) after spaces",
+    "'@Test At I",
+    "'  -Test Space K",
+    "'\rCR-led note",
+    "'  =SUM(1,2) after spaces",
+    "'=HYPERLINK(\"https://example.invalid\",\"Injected\")",
+    "'+Test Plus G",
+    "'-Test Minus H",
+    "'=1+2",
+    "'@Test At I",
+    "'\tTab-led note",
+    "'  -Test Space K",
+    "'\rCR-led note"
+  ],
+  "privateLeak": false,
+  "editedSlot": [
+    "2026-10-04",
+    "Main door",
+    "Test Mwila A",
+    "Declined",
+    ""
+  ]
+}

@@ -1,0 +1,87 @@
+$ (cd packages/client_core && flutter test)
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+Resolving dependencies...
+Downloading packages...
+  material_color_utilities 0.13.0 (0.13.1 available)
+  test_api 0.7.12 (0.7.14 available)
+Got dependencies!
+2 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart
+00:00 +0: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: pending: Sending…, inputs read-only, no success claimed
+00:00 +1: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: pending: Sending…, inputs read-only, no success claimed
+00:01 +2: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: pending: Sending…, inputs read-only, no success claimed
+00:01 +3: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: pending: Sending…, inputs read-only, no success claimed
+00:01 +4: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/platform_status/platform_status_screen_test.dart: a server error is reported differently from no network
+00:01 +5: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: success: only a server success envelope shows Saved
+00:01 +6: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: success: only a server success envelope shows Saved
+00:01 +7: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: success: only a server success envelope shows Saved
+00:01 +8: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: validation: field message, input kept and editable
+00:01 +9: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: local validation never sends
+00:01 +10: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: conflict: input kept, expected_revision never silently replaced, reload
+00:02 +11: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unavailable: nothing changed, Try again resends the same request
+00:02 +12: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unknown outcome: locked, never success, Check again resends the same id
+00:02 +13: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unknown outcome: Stop checking keeps the outcome open
+00:03 +14: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: a malformed success body is unknown outcome, not success
+00:03 +15: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: denied unauthenticated: specific text, input kept
+00:03 +16: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: denied forbidden: specific text, input kept
+00:03 +17: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: denied not_found: specific text, input kept
+00:03 +18: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: create conflict (duplicate intent key) does not block changes
+00:03 +19: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: create conflict (duplicate intent key) does not block changes
+00:03 +20: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: create conflict (duplicate intent key) does not block changes
+00:03 +21: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/platform_status/supabase_platform_status_repository_test.dart: each fetch sends a fresh request
+00:03 +22: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: account switch clears protected state and input, with notice
+00:03 +23: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: account switch clears protected state and input, with notice
+00:03 +24: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: account switch clears protected state and input, with notice
+00:03 +25: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: account switch clears protected state and input, with notice
+00:03 +26: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: sign-out mid-request: late response is discarded
+00:04 +27: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: keyboard: Tab reaches field then button; Enter submits
+00:04 +28: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: focus follows the request state submit moves focus to Sending…, then to the outcome
+00:04 +29: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: focus follows the request state Stop checking and Reload move focus to their result
+00:04 +30: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: focus follows the request state Stop checking and Reload move focus to their result
+00:04 +31: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: focus follows the request state Stop checking and Reload move focus to their result
+00:04 +32: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: focus follows the request state account notice takes focus; Dismiss returns to the form
+00:04 +33: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: announcements outcomes, failed reload, reloaded and stopped checking
+00:05 +34: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: announcements account switch and sign-out are announced
+00:05 +35: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unavailable then edited: Try again is withdrawn, never stale
+00:05 +36: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unavailable then edited: Try again is withdrawn, never stale
+00:05 +37: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unavailable then edited: Try again is withdrawn, never stale
+00:05 +38: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unavailable then edited: Try again is withdrawn, never stale
+00:05 +39: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unavailable then edited: Try again is withdrawn, never stale
+00:05 +40: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unavailable then edited: Try again is withdrawn, never stale
+00:05 +41: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unavailable then edited: Try again is withdrawn, never stale
+00:05 +42: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unavailable then edited: Try again is withdrawn, never stale
+00:05 +43: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unavailable then edited: Try again is withdrawn, never stale
+00:05 +44: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unavailable then edited: Try again is withdrawn, never stale
+00:05 +45: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unavailable then edited: Try again is withdrawn, never stale
+00:05 +46: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unavailable then edited: Try again is withdrawn, never stale
+00:05 +47: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unavailable then edited: Try again is withdrawn, never stale
+00:05 +48: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/adapters/supabase_command_gateway_test.dart: API refusals are definite an unknown function is unavailable
+00:05 +49: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: after Stop checking, the same input keeps its request id
+00:05 +50: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: after Stop checking, the same input keeps its request id
+00:05 +51: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: after Stop checking, the same input keeps its request id
+00:06 +52: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: after Stop checking, the same input keeps its request id
+00:06 +53: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: after Stop checking, the same input keeps its request id
+00:06 +54: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: after Stop checking, the same input keeps its request id
+00:06 +55: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: after Stop checking, the same input keeps its request id
+00:06 +56: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: unconfigured build: the command is reported as not sent
+00:06 +57: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: 2x text, Brightness.dark: every state renders without overflow
+00:06 +58: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: 2x text, Brightness.light: every state renders without overflow
+00:06 +59: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: 2x text, Brightness.light: every state renders without overflow
+00:06 +60: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: 2x text, Brightness.light: every state renders without overflow
+00:06 +61: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: 2x text, Brightness.light: every state renders without overflow
+00:06 +62: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: 2x text, Brightness.light: every state renders without overflow
+00:06 +63: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: 2x text, Brightness.light: every state renders without overflow
+00:06 +64: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: 2x text, Brightness.light: every state renders without overflow
+00:06 +65: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: 2x text, Brightness.light: every state renders without overflow
+00:06 +66: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: 2x text, Brightness.light: every state renders without overflow
+00:06 +67: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: 2x text, Brightness.light: every state renders without overflow
+00:06 +68: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: 2x text, Brightness.light: every state renders without overflow
+00:06 +69: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: 2x text, Brightness.light: every state renders without overflow
+00:06 +70: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: 2x text, Brightness.light: every state renders without overflow
+00:06 +71: /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/client_core/test/fixture/fixture_command_screen_test.dart: 2x text, Brightness.light: every state renders without overflow
+00:07 +72: All tests passed!
+# exit=0

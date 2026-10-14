@@ -1,0 +1,163 @@
+# Whole cell meetings and programmes epic plan; entries remain planned until a build writes its plan.
+# Table order is build order; ids are stable. Requirement ids C1–C10 live in the epic's Requirements.
+# Pilot cells are SYNTHETIC stand-ins off production (owner-decisions-milestone-2.md); no quiet hours.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Generate a cell's weekly meetings and show the next one on My cell"
+description = "Add the Cells meeting schedule (day, time, venue with optional map pin) that Admin sets on a cell, generate stable meeting ids from the schedule and a nominal occurrence key in Africa/Lusaka time through the 3.3 calculation, let the scoped leader or Admin cancel or move one occurrence through an explicit exception on staff web, and show the next meeting with its venue on mobile My cell to confirmed members only, using `cells_member_has_private_access`."
+verify = "On staging with `SYNTHETIC Shikoswe Cell`, set a weekly schedule, move one occurrence and cancel another on staff web, and show through the API that meeting ids are stable across regeneration, the moved and cancelled occurrences keep their ids, a confirmed member sees the next meeting and venue on mobile, and a member of `SYNTHETIC Estates C5/C7 Cell`, a pending applicant and Admin-only access see no venue."
+covers = ["C1", "C9"]
+after = ["2.6", "3.3"]
+hitl = false
+risk = "high"
+unknown = "Real cell names and home venues are production configuration behind Q4; staging uses SYNTHETIC cells and venues only."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-6--one-revisioned-assignment-engine-adopted", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#cell-groups", "docs/runbooks/identity-access.md"]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Remind confirmed members of meetings and notify them of changes"
+description = "Register the Cells meeting source with Notifications (source check, generic text, deep link to My cell), schedule a leader-configurable meeting reminder that defaults to 24 hours before the start for currently confirmed members, and make a move or cancellation cancel obsolete reminders and send a generic change notice in the same transaction, with held and accountless members routed through the registered direct-contact route."
+verify = "Run the meeting reminder cases through the worker on staging: a normal week, a leader-changed reminder, a move, a cancellation, a member who snoozes, a member transferred out before the reminder and an accountless member, and show the expected inbox items only, no reminder for a cancelled or moved-away time and no venue or member names in any payload."
+covers = ["C2", "C1"]
+after = [1, "3.5"]
+hitl = false
+risk = "medium"
+unknown = "Who sets a cell's default reminder (Admin with the schedule or the leader) is the agent's Decision in the epic Notes; the owner may move it."
+references = ["_bmad-output/initiative-church-app/owner-decisions-milestone-2.md", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-8--durable-notification-work-bounded-external-effects-assumption"]
+
+[[entry]]
+id = 3
+type = "story"
+title = "Draft a meeting programme with validated parts and visible gaps"
+description = "Add revisioned programme records for a meeting occurrence (topic, scripture, date, start/end, venue, ordered parts with label, start, duration or end and optional assignee from the confirmed roster including members without a login) with Draft, Published and Cancelled states, server validation of order and fit inside the meeting, visible unassigned gaps, drafts readable only by the cell's leader and assistant and authorised oversight, and the staff web meeting-plan editor with an accessible list."
+verify = "On staff web, draft a programme with an unassigned part, try overlapping and out-of-meeting parts and see them refused, save under a stale revision and get a conflict, and show through the API that a cell member, a leader of another cell and Admin-only access cannot read the draft while Pastor oversight can."
+covers = ["C3"]
+after = [1]
+hitl = false
+risk = "medium"
+unknown = "Whether Pastor oversight of drafts needs a new oversight scope or uses the Pastor role is decided at build from the 2.3 grant model; Admin alone gets metadata only either way."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#meeting-programmes", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#staff-screens-and-flows"]
+
+[[entry]]
+id = 4
+type = "story"
+title = "Preview and publish a safe programme that creates or links duty slots"
+description = "Add the member preview and a dedicated safe published-programme projection readable only by currently confirmed members with approved active accounts (named part leaders, private venue, no response ledger or private notes), and make Publish call the 4.11 owner operations in one transaction to create one cell-owned Duties slot per stable part/position, or link an existing department duty without cloning or changing it, and request explicit responses."
+verify = "Publish a synthetic programme with assigned, unassigned and department-linked parts and show one current slot per part/position with Awaiting responses, the department duty unchanged and still owned by its department, a republish creating no duplicate slot, the preview matching the member read, and a member's API read containing no response, note or history fields."
+covers = ["C4"]
+after = [3, "4.11"]
+hitl = false
+risk = "high"
+unknown = "If publishing needs an owner operation shape 4.11 does not offer, the change goes into Duties as a contract change, not a Cells workaround."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-5--publish-separate-safe-projections-adopted", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-6--one-revisioned-assignment-engine-adopted"]
+external_check = "An independent reviewer repeats the safe-projection read cases before entry 12."
+
+[[entry]]
+id = 5
+type = "story"
+title = "Show You're on and respond to programme parts on My cell and Home"
+description = "Show the published programme on mobile My cell with the member's own part highlighted and its actual Awaiting, Accepted or Declined status, reporting time and instructions, add the Home My cell card, keep programme parts in My duties, let the member respond through the Duties response commands, and let the cell leader or assistant record attributed direct confirmation for a member without a login through the 4.9 coverage queue under the cell scope."
+verify = "On mobile against staging, a confirmed member accepts their part from My cell and declines another from My duties, and the leader confirms an accountless member's part by phone, showing Confirmed by leader distinct from member acceptance, the plan showing names but never statuses to other members, and a stale response refused after a change."
+covers = ["C6"]
+after = [4, "4.5", "4.9"]
+hitl = false
+risk = "medium"
+unknown = "The 4.9 coverage queue is built for department scope first; showing cell-owned parts in it relies on the cell-scope authority added by 4.11."
+references = ["_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#meeting-programmes"]
+
+[[entry]]
+id = 6
+type = "story"
+title = "Publish material programme revisions atomically and flag department mismatches"
+description = "Flag linked parts when a meeting's time or venue or a part's time, label or assignee changes, let the leader publish the revised programme so cell-owned assignments are revised through Duties in one transaction (prior consent superseded, obsolete jobs cancelled, change notices sent), create an owner-review mismatch instead for a linked department duty, leave responses untouched on a study-notes-only change, and reconcile linked work when a meeting is moved or cancelled."
+verify = "Through staff web and the API, change a published programme's time, swap an assignee, edit only the study notes, move the meeting and cancel another, and show new pending revisions only where material, old acceptances kept in history, no stale reminders, the department duty unchanged with a mismatch for its leader, and a late response to an old revision refused."
+covers = ["C5", "C1"]
+after = [2, 4]
+hitl = false
+risk = "high"
+unknown = "Material fields follow the spec list; a field the build adds to parts must be classified explicitly."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#meeting-programmes", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#changes-and-completion"]
+external_check = "An independent reviewer repeats the material-revision and stale-response cases before entry 12."
+
+[[entry]]
+id = 7
+type = "story"
+title = "Send Cannot attend notices separately from duty responses"
+description = "Add Cells attendance notices for one member and occurrence with an optional practical note, withdraw and change actions and recorded actor and time, notify the leader through the inbox, raise a coverage warning and ask for a separate duty response when the member holds a part, and never set the duty response, Excused or any actual attendance."
+verify = "On mobile, send, change and withdraw a Cannot attend notice as a member with and without an assigned part, and show through the API that the leader is notified, the part stays Awaiting or Accepted until the member responds separately, no attendance record exists, and another member cannot read the notice or its note."
+covers = ["C7"]
+after = [5]
+hitl = false
+risk = "medium"
+unknown = "Actual attendance registers arrive in epic 7; this entry stores only notices and proves no attendance row is written."
+references = ["_bmad-output/initiative-church-app/spec-church-app/design-contract.md#state-fidelity-and-binding-prototype-overrides", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#important-edge-cases"]
+
+[[entry]]
+id = 8
+type = "story"
+title = "Mark meetings held and record actual programme leaders with corrections"
+description = "Let the cell leader or assistant mark a meeting held and record the actual programme leaders and substitutions as separate attributed records with reasoned corrections that keep the prior value, and expose a canonical meeting reference (held or cancelled, actual leaders) for later attendance, recap and offering owners."
+verify = "On staff web and mobile, mark a synthetic meeting held, record a substitute for a planned part leader, correct it, and show through the API that the plan and the duty response are unchanged, the correction keeps the earlier record and actor, a cancelled meeting cannot be marked held, and another cell's leader is refused."
+covers = ["C8", "C1"]
+after = [6]
+hitl = false
+risk = "medium"
+unknown = "Whether a duty's Completed outcome (4.10) is suggested from the actual-leader record is left to epic 7 and the leader; this entry keeps them separate and sets neither from the other."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-12--recorded-observations-and-comparable-metrics-adopted", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#meeting-programmes"]
+
+[[entry]]
+id = 9
+type = "story"
+title = "Apply cell transfer, removal and deletion to programmes and cell duties"
+description = "Extend the Cells transfer and membership-end commands to end the member's future cell-owned assignments through the Duties owner operations with vacancy flags and close their open notices in the same transaction, register a handover hook for the last leader of a cell with published programmes ahead and extend the Cells deletion hook to meetings, notices and actual-leader records, and make both clients drop private programme and venue state when scope loss is observed."
+verify = "Transfer a synthetic member with an accepted part and an open notice from `SYNTHETIC Shikoswe Cell` to `SYNTHETIC Estates C5/C7 Cell` and show old-cell programme and venue reads denied at once, the part vacant with a leader notice, the notice closed, new-cell access open, nothing private persisted on either client, and a deletion check answering zero."
+covers = ["C9"]
+after = [7, 8, "4.12"]
+hitl = false
+risk = "high"
+unknown = "What deletion anonymises versus erases follows the unapproved Q4 `identity_deletion_retention` gate; staging uses its labelled fixture."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-14--atomic-local-lifecycle-resumable-external-deletion-assumption", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-13--public-caching-private-session-state-and-file-gates-assumption", "docs/runbooks/identity-access.md"]
+external_check = "An independent reviewer repeats the old-cell access loss case on both clients before entry 12."
+
+[[entry]]
+id = 10
+type = "story"
+title = "Write the programme runbooks and run the synthetic cell pilot"
+description = "Write the leader runbooks for meeting schedules, programmes, revisions, notices and actual leaders, then run the cell pilot on staging with `SYNTHETIC Shikoswe Cell` and `SYNTHETIC Estates C5/C7 Cell`, an app member and an accountless member and chat absent, with Israel acting as the reviewing owner."
+verify = "Israel follows the runbooks on staging and confirms that a published programme creates responses, a time change asks for fresh responses, a Cannot attend notice changes no response or attendance, a substitute is recorded as the actual leader, and nothing depends on chat."
+covers = ["C10"]
+after = [9]
+hitl = true
+risk = "medium"
+unknown = "The live pilot with the real Shikoswe and Estates C5/C7 cells and their named leaders waits for Israel (Q2 leaders) and the Q4 live-data decision; this entry is the synthetic rehearsal."
+references = ["_bmad-output/initiative-church-app/owner-decisions-milestone-2.md", "_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md#delivery-commitment"]
+
+[[entry]]
+id = 11
+type = "story"
+title = "Refactor sweep"
+description = "Clean up cells, programme and client duplication, boundary drift and maintainability findings recorded during the completed stories without changing scope or absorbing unfinished source behavior."
+verify = "Review the completed-story findings, apply only justified cleanup and rerun the affected permission, projection, revision, lifecycle and client checks without weakening contracts or acceptance behavior."
+covers = ["C10"]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+hitl = false
+risk = "medium"
+unknown = "The cleanup scope is chosen from build records when this story starts; any missing behavior becomes its own entry."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-18--contract-first-integration-and-release-gates-adopted"]
+
+[[entry]]
+id = 12
+type = "story"
+title = "Verify cell programmes end to end and promote them to production"
+description = "Run the closing mobile and staff web suite over schedules, meeting reminders, drafts, safe publication, linked and cell-owned duties, material revisions, responses, notices, actual leaders and transfer/deletion with the scope and safe-projection matrix and chat absent on staging, then promote to the production baseline with the real pilot cells, their leaders and live venues either approved by Israel or left fail-closed."
+verify = "A clean build of both clients passes the integrated programme scenarios (AC-02, AC-10, AC-13, AC-14, AC-15) and the independent reviewer's reruns on staging, Israel witnesses the mobile/staff demonstration, and production shows the deployed workflows with unapproved gates (live personal data, real cell configuration, scheduling) visibly disabled."
+covers = ["C1", "C2", "C3", "C4", "C5", "C6", "C7", "C8", "C9", "C10"]
+after = [11, "4.15"]
+hitl = true
+risk = "high"
+unknown = "Production needs duties and reminders in production (4.15), Israel's Q4 live-data decision and the named pilot leaders; while any is missing this entry delivers staging evidence and stays open."
+references = ["_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#launch-checks", "_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#verification-boundaries"]
+external_check = "An independent reviewer reruns the safe-projection, material-revision and old-cell access cases before promotion."

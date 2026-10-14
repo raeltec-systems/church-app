@@ -1,0 +1,1164 @@
+[
+  {
+    "key": "Tab",
+    "note": "focus audit: page Tab order",
+    "role": "tab",
+    "name": "Rota grid trial",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: page Tab order",
+    "role": "tab",
+    "name": "Platform status",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: page Tab order",
+    "role": "textbox",
+    "name": "Filter positions e.g. door",
+    "tag": "INPUT"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: page Tab order",
+    "role": "button",
+    "name": "Filter by status All statuses",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: page Tab order",
+    "role": "radio",
+    "name": "Grid",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: page Tab order",
+    "role": "radio",
+    "name": "List",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: page Tab order",
+    "role": "button",
+    "name": "Export CSV…",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: page Tab order",
+    "role": "button",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: page Tab order",
+    "role": "generic",
+    "name": "",
+    "tag": "BODY"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "back into grid",
+    "role": "button",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowLeft",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowUp",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowRight",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Main door, Sun 11 Oct: Test Joseph B, Confirmed by leader",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Side door, Sun 11 Oct: Test Naomi E, Declined",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "End",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Side door, Sun 22 Nov: -Test Space K, Needs contact",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowRight",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Side door, Sun 22 Nov: -Test Space K, Needs contact",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Control+End",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Children's door, Sun 22 Nov: Test Mwila A, Confirmed by leader",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Children's door, Sun 22 Nov: Test Mwila A, Confirmed by leader",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Home",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Children's door, Sun 4 Oct: Test Naomi E, Confirmed by leader",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Control+Home",
+    "note": "grid navigation",
+    "role": "button",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open slot",
+    "role": "heading",
+    "name": "Main door — Sun 4 Oct",
+    "tag": "H2"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: slot dialog",
+    "role": "button",
+    "name": "Member Test Mwila A",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: slot dialog",
+    "role": "button",
+    "name": "Status Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: slot dialog",
+    "role": "button",
+    "name": "Cancel",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: slot dialog",
+    "role": "button",
+    "name": "Save",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: slot dialog",
+    "role": "button",
+    "name": "Member Test Mwila A",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to Status",
+    "role": "button",
+    "name": "Status Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open status menu",
+    "role": "menuitem",
+    "name": "Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "focus audit: status menu options",
+    "role": "menuitem",
+    "name": "Confirmed by leader",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "focus audit: status menu options",
+    "role": "menuitem",
+    "name": "Awaiting response",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "focus audit: status menu options",
+    "role": "menuitem",
+    "name": "Needs contact",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "focus audit: status menu options",
+    "role": "menuitem",
+    "name": "Declined",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "focus audit: status menu options",
+    "role": "menuitem",
+    "name": "Draft",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "focus audit: status menu options",
+    "role": "menuitem",
+    "name": "Draft",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Escape",
+    "note": "close menu",
+    "role": "button",
+    "name": "Status Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to /Member/",
+    "role": "button",
+    "name": "Member Test Mwila A",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open menu",
+    "role": "menuitem",
+    "name": "Test Mwila A",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Test Ruth D",
+    "role": "menuitem",
+    "name": "Test Joseph B",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Test Ruth D",
+    "role": "menuitem",
+    "name": "Test Esther C",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Test Ruth D",
+    "role": "menuitem",
+    "name": "Test Ruth D",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "choose Test Ruth D",
+    "role": "button",
+    "name": "Member Test Ruth D",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to /Status/",
+    "role": "button",
+    "name": "Status Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open menu",
+    "role": "menuitem",
+    "name": "Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Needs contact",
+    "role": "menuitem",
+    "name": "Confirmed by leader",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Needs contact",
+    "role": "menuitem",
+    "name": "Awaiting response",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Needs contact",
+    "role": "menuitem",
+    "name": "Needs contact",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "choose Needs contact",
+    "role": "button",
+    "name": "Status Needs contact",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Escape",
+    "note": "Escape after editing",
+    "role": "button",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "reopen slot",
+    "role": "heading",
+    "name": "Main door — Sun 4 Oct",
+    "tag": "H2"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to /Member/",
+    "role": "button",
+    "name": "Save",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to /Member/",
+    "role": "button",
+    "name": "Cancel",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to /Member/",
+    "role": "button",
+    "name": "Status Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to /Member/",
+    "role": "button",
+    "name": "Member Test Mwila A",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open menu",
+    "role": "menuitem",
+    "name": "Test Mwila A",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Test Ruth D",
+    "role": "menuitem",
+    "name": "Test Joseph B",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Test Ruth D",
+    "role": "menuitem",
+    "name": "Test Esther C",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Test Ruth D",
+    "role": "menuitem",
+    "name": "Test Ruth D",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "choose Test Ruth D",
+    "role": "button",
+    "name": "Member Test Ruth D",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to /Status/",
+    "role": "button",
+    "name": "Status Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open menu",
+    "role": "menuitem",
+    "name": "Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Needs contact",
+    "role": "menuitem",
+    "name": "Confirmed by leader",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Needs contact",
+    "role": "menuitem",
+    "name": "Awaiting response",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Needs contact",
+    "role": "menuitem",
+    "name": "Needs contact",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "choose Needs contact",
+    "role": "button",
+    "name": "Status Needs contact",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to Cancel",
+    "role": "button",
+    "name": "Cancel",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "Cancel after editing",
+    "role": "button",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open slot to edit",
+    "role": "heading",
+    "name": "Main door — Sun 4 Oct",
+    "tag": "H2"
+  },
+  {
+    "key": "Tab",
+    "note": "to /Status/",
+    "role": "button",
+    "name": "Member Test Mwila A",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to /Status/",
+    "role": "button",
+    "name": "Status Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open menu",
+    "role": "menuitem",
+    "name": "Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Declined",
+    "role": "menuitem",
+    "name": "Confirmed by leader",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Declined",
+    "role": "menuitem",
+    "name": "Awaiting response",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Declined",
+    "role": "menuitem",
+    "name": "Needs contact",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Declined",
+    "role": "menuitem",
+    "name": "Declined",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "choose Declined",
+    "role": "button",
+    "name": "Status Declined",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to Save",
+    "role": "button",
+    "name": "Cancel",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to Save",
+    "role": "button",
+    "name": "Save",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "Save",
+    "role": "button",
+    "name": "Main door, Sun 4 Oct: Test Mwila A, Declined",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to /Filter by status/",
+    "role": "button",
+    "name": "Export CSV…",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to /Filter by status/",
+    "role": "radio",
+    "name": "List",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to /Filter by status/",
+    "role": "radio",
+    "name": "Grid",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to /Filter by status/",
+    "role": "button",
+    "name": "Filter by status All statuses",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open menu",
+    "role": "menuitem",
+    "name": "All statuses",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Unfilled",
+    "role": "menuitem",
+    "name": "Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Unfilled",
+    "role": "menuitem",
+    "name": "Confirmed by leader",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Unfilled",
+    "role": "menuitem",
+    "name": "Awaiting response",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Unfilled",
+    "role": "menuitem",
+    "name": "Needs contact",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Unfilled",
+    "role": "menuitem",
+    "name": "Declined",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Unfilled",
+    "role": "menuitem",
+    "name": "Draft",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Unfilled",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "choose Unfilled",
+    "role": "button",
+    "name": "Filter by status Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to position filter",
+    "role": "textbox",
+    "name": "Filter positions e.g. door",
+    "tag": "INPUT"
+  },
+  {
+    "key": "Tab",
+    "note": "to /Filter by status/",
+    "role": "button",
+    "name": "Filter by status Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open menu",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Draft",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Draft",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Draft",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Draft",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Draft",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Draft",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Draft",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Draft",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Draft",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Draft",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Draft",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Draft",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Draft",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find Draft",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowUp",
+    "note": "find Draft",
+    "role": "menuitem",
+    "name": "Draft",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "choose Draft",
+    "role": "button",
+    "name": "Filter by status Draft",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open menu",
+    "role": "menuitem",
+    "name": "Draft",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowDown",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Unfilled",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowUp",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Draft",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowUp",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Declined",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowUp",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Needs contact",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowUp",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Awaiting response",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowUp",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Confirmed by leader",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowUp",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "Confirmed",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "ArrowUp",
+    "note": "find All statuses",
+    "role": "menuitem",
+    "name": "All statuses",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "choose All statuses",
+    "role": "button",
+    "name": "Filter by status All statuses",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to position filter",
+    "role": "textbox",
+    "name": "Filter positions",
+    "tag": "INPUT"
+  },
+  {
+    "key": "Tab",
+    "note": "to export",
+    "role": "button",
+    "name": "Filter by status All statuses",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to export",
+    "role": "radio",
+    "name": "Grid",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to export",
+    "role": "radio",
+    "name": "List",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to export",
+    "role": "button",
+    "name": "Export CSV…",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open export",
+    "role": "heading",
+    "name": "Export rota CSV",
+    "tag": "H2"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: export dialog",
+    "role": "button",
+    "name": "Cancel",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: export dialog",
+    "role": "button",
+    "name": "Download CSV",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: export dialog",
+    "role": "button",
+    "name": "Cancel",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to Download",
+    "role": "button",
+    "name": "Download CSV",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "download",
+    "role": "button",
+    "name": "Export CSV…",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to filter",
+    "role": "radio",
+    "name": "List",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to filter",
+    "role": "radio",
+    "name": "Grid",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to filter",
+    "role": "button",
+    "name": "Filter by status All statuses",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to filter",
+    "role": "textbox",
+    "name": "Filter positions",
+    "tag": "INPUT"
+  },
+  {
+    "key": "Tab",
+    "note": "to List",
+    "role": "button",
+    "name": "Filter by status All statuses",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to List",
+    "role": "radio",
+    "name": "Grid",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "to List",
+    "role": "radio",
+    "name": "List",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Space",
+    "note": "switch to list",
+    "role": "radio",
+    "name": "List",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: list Change buttons (first 6 of 48)",
+    "role": "button",
+    "name": "Export CSV…",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: list Change buttons (first 6 of 48)",
+    "role": "button",
+    "name": "Change Main door, Sun 4 Oct",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: list Change buttons (first 6 of 48)",
+    "role": "button",
+    "name": "Change Main door, Sun 11 Oct",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: list Change buttons (first 6 of 48)",
+    "role": "button",
+    "name": "Change Main door, Sun 18 Oct",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: list Change buttons (first 6 of 48)",
+    "role": "button",
+    "name": "Change Main door, Sun 25 Oct",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: list Change buttons (first 6 of 48)",
+    "role": "button",
+    "name": "Change Main door, Sun 1 Nov",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Tab",
+    "note": "focus audit: list Change buttons (first 6 of 48)",
+    "role": "button",
+    "name": "Change Main door, Sun 8 Nov",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to first Change",
+    "role": "button",
+    "name": "Change Main door, Sun 1 Nov",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to first Change",
+    "role": "button",
+    "name": "Change Main door, Sun 25 Oct",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to first Change",
+    "role": "button",
+    "name": "Change Main door, Sun 18 Oct",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to first Change",
+    "role": "button",
+    "name": "Change Main door, Sun 11 Oct",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Shift+Tab",
+    "note": "to first Change",
+    "role": "button",
+    "name": "Change Main door, Sun 4 Oct",
+    "tag": "FLT-SEMANTICS"
+  },
+  {
+    "key": "Enter",
+    "note": "open from list",
+    "role": "heading",
+    "name": "Main door — Sun 4 Oct",
+    "tag": "H2"
+  },
+  {
+    "key": "Escape",
+    "note": "close",
+    "role": "button",
+    "name": "Change Main door, Sun 4 Oct",
+    "tag": "FLT-SEMANTICS"
+  }
+]

@@ -1,0 +1,145 @@
+$ node --test tools/auth-harness/lib.test.mjs tools/auth-harness/recovery.test.mjs
+# started 2026-10-03T16:55:31Z at 2b3ad1824ea255bf2b59b196c239de2d25f4fdcf
+TAP version 13
+# Subtest: scrub redacts secret keys at any depth and token-shaped strings
+ok 1 - scrub redacts secret keys at any depth and token-shaped strings
+  ---
+  duration_ms: 1.779137
+  type: 'test'
+  ...
+# Subtest: summarizeJwt keeps header and trust claims, digests ids, drops identifiers
+ok 2 - summarizeJwt keeps header and trust claims, digests ids, drops identifiers
+  ---
+  duration_ms: 1.984693
+  type: 'test'
+  ...
+# Subtest: summarizeSession never carries the raw tokens
+ok 3 - summarizeSession never carries the raw tokens
+  ---
+  duration_ms: 0.705937
+  type: 'test'
+  ...
+# Subtest: amrHasPassword: only an explicit password entry is trusted
+ok 4 - amrHasPassword: only an explicit password entry is trusted
+  ---
+  duration_ms: 0.253885
+  type: 'test'
+  ...
+# Subtest: parseVerifyLink extracts token/type/redirect and rejects other URLs
+ok 5 - parseVerifyLink extracts token/type/redirect and rejects other URLs
+  ---
+  duration_ms: 0.694829
+  type: 'test'
+  ...
+# Subtest: parseRedirectLocation distinguishes session, error, pkce and empty redirects
+ok 6 - parseRedirectLocation distinguishes session, error, pkce and empty redirects
+  ---
+  duration_ms: 0.432452
+  type: 'test'
+  ...
+# Subtest: maskIdentifier keeps only plus-tag or last digits
+ok 7 - maskIdentifier keeps only plus-tag or last digits
+  ---
+  duration_ms: 0.230717
+  type: 'test'
+  ...
+# Subtest: assertAllowedOrigin accepts only https://<auth-test ref>.supabase.co
+ok 8 - assertAllowedOrigin accepts only https://<auth-test ref>.supabase.co
+  ---
+  duration_ms: 0.644508
+  type: 'test'
+  ...
+# Subtest: AuthClient refuses any other project before sending a request
+ok 9 - AuthClient refuses any other project before sending a request
+  ---
+  duration_ms: 0.447
+  type: 'test'
+  ...
+# Subtest: parseVerifyLink rejects look-alike link hosts and paths
+ok 10 - parseVerifyLink rejects look-alike link hosts and paths
+  ---
+  duration_ms: 0.52561
+  type: 'test'
+  ...
+# Subtest: function serves only its own project URL
+ok 11 - function serves only its own project URL
+  ---
+  duration_ms: 1.113327
+  type: 'test'
+  ...
+# Subtest: requests naming another project or URL are refused
+ok 12 - requests naming another project or URL are refused
+  ---
+  duration_ms: 0.383068
+  type: 'test'
+  ...
+# Subtest: caller classification accepts only own anon key or own user sessions
+ok 13 - caller classification accepts only own anon key or own user sessions
+  ---
+  duration_ms: 0.351526
+  type: 'test'
+  ...
+# Subtest: member and operator actions need the anon key; staff actions need a user session
+ok 14 - member and operator actions need the anon key; staff actions need a user session
+  ---
+  duration_ms: 2.17418
+  type: 'test'
+  ...
+# Subtest: provisioning only ever targets owner-approved synthetic plus-addresses
+ok 15 - provisioning only ever targets owner-approved synthetic plus-addresses
+  ---
+  duration_ms: 0.835444
+  type: 'test'
+  ...
+# Subtest: the function reports Auth facts only; the DB decides success
+ok 16 - the function reports Auth facts only; the DB decides success
+  ---
+  duration_ms: 0.53196
+  type: 'test'
+  ...
+# Subtest: Auth calls time out instead of hanging (reported as lost, i.e. uncertain)
+ok 17 - Auth calls time out instead of hanging (reported as lost, i.e. uncertain)
+  ---
+  duration_ms: 51.150727
+  type: 'test'
+  ...
+# Subtest: instrumented deletion only targets synthetic plus-addresses
+ok 18 - instrumented deletion only targets synthetic plus-addresses
+  ---
+  duration_ms: 0.629818
+  type: 'test'
+  ...
+# Subtest: function and harness compute the same grant digest
+ok 19 - function and harness compute the same grant digest
+  ---
+  duration_ms: 6.157894
+  type: 'test'
+  ...
+# Subtest: grant secrets, operator tokens and grant fields never survive redaction
+ok 20 - grant secrets, operator tokens and grant fields never survive redaction
+  ---
+  duration_ms: 1.496393
+  type: 'test'
+  ...
+# Subtest: evidence ids are digests, never raw UUIDs
+ok 21 - evidence ids are digests, never raw UUIDs
+  ---
+  duration_ms: 1.22283
+  type: 'test'
+  ...
+# Subtest: committed scenarios only use the r13 synthetic accounts and known commands
+ok 22 - committed scenarios only use the r13 synthetic accounts and known commands
+  ---
+  duration_ms: 3.494035
+  type: 'test'
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 164.869578
+# exit=0 finished 2026-10-03T16:55:31Z

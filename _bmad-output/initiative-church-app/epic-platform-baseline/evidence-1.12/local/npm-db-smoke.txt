@@ -1,0 +1,65 @@
+$ npm run db:smoke
+# started 2026-10-03T16:56:21Z at 2b3ad1824ea255bf2b59b196c239de2d25f4fdcf
+
+> db:smoke
+> bash supabase/tests/api_smoke.sh && bash supabase/tests/command_api_smoke.sh && bash supabase/tests/contract_fixtures_check.sh && bash supabase/tests/system_api_smoke.sh
+
+ok   - anon reads api.platform_status (200)
+ok   - app schema is not exposed (PGRST106) (406)
+ok   - public schema is not exposed (406)
+ok   - anon INSERT through api is denied (401)
+ok   - anon UPDATE through api is denied (401)
+ok   - anon DELETE through api is denied (401)
+ok   - anon cannot execute the command RPC (401)
+ok   - actor without fixture authority is forbidden (forbidden)
+ok   - direct table insert into app is not reachable (PGRST106) (406)
+ok   - the app kernel is not reachable over HTTP (406)
+ok   - create returns revision 1 (1)
+ok   - changed-payload replay conflicts (conflict)
+ok   - duplicates were in flight together (5 waiting on locks)
+ok   - all 5 duplicates return one identical result (1)
+ok   - duplicate result is the first increment (2)
+ok   - duplicates applied once (1|2)
+ok   - one receipt for the duplicated request (1)
+ok   - writers were in flight together (8 waiting on locks)
+ok   - exactly one simultaneous writer wins (1)
+ok   - the other 7 get conflict with current_revision 3 (7)
+ok   - counter advanced exactly once (2|3)
+ok   - stale revision conflicts (conflict|3)
+ok   - failing write returns validation_failed (validation_failed)
+ok   - error carries no SQL detail
+ok   - failed write rolled back the aggregate (2|3)
+ok   - failed write committed no receipt (0)
+ok   - another actor's counter is not_found (not_found)
+ok   - malformed request_id is a validation_failed envelope (200|validation_failed|invalid)
+ok   - omitted request_id is a validation_failed envelope (200|validation_failed|required)
+ok   - malformed expected_revision is a validation_failed envelope (200|validation_failed|invalid)
+ok   - omitted version is a validation_failed envelope (200|validation_failed|required)
+ok   - malformed envelopes changed nothing (2|3)
+ok   - revocation waited on the in-flight command's grant lock (1)
+ok   - the command authorised before the revocation completed (4)
+ok   - the revocation committed afterwards (1)
+ok   - revoked authority blocks receipt replay (forbidden)
+ok   - revoked authority blocks new writes (forbidden)
+ok   - nothing changed after revocation (3|4)
+ok   - account_ref: 6 fixture cases match app.contract_check
+ok   - actor: 17 fixture cases match app.contract_check
+ok   - command_request: 25 fixture cases match app.contract_check
+ok   - command_response: 30 fixture cases match app.contract_check
+ok   - instant: 26 fixture cases match app.contract_check
+ok   - lifecycle_event: 10 fixture cases match app.contract_check
+ok   - member_ref: 13 fixture cases match app.contract_check
+ok   - money: 30 fixture cases match app.contract_check
+ok   - notification_key: 4 fixture cases match app.contract_check
+ok   - source_ref: 25 fixture cases match app.contract_check
+ok   - task_source: 5 fixture cases match app.contract_check
+ok   - zoned_local: 32 fixture cases match app.contract_check
+# 223 fixture cases checked against SQL
+ok   - command_request: 25 fixture envelopes agree with api.fixture_counter_command
+matrix: 15 cases passed
+ok   - system route HTTP matrix (15 cases)
+ok   - one audit row per call that reached the route (13)
+ok   - only the valid and forged-header probes succeeded
+ok   - no forged principal or member in the audit
+ok   - the user session was refused and audited as authenticated
+# exit=0 finished 2026-10-03T16:56:43Z

@@ -1,0 +1,28 @@
+﻿"Date","Position","Member","Status","Note"
+"2026-10-04","Main door","Test Mwila A","Declined",""
+"2026-10-11","Main door","Test Joseph B","Confirmed by leader","Bring the ""spare"" lanyard, then lock up"
+"2026-10-18","Main door","Test Esther C","Declined","'=1+2"
+"2026-10-25","Main door","Test Ruth D","Awaiting response","'	Tab-led note"
+"2026-11-01","Main door","Test Naomi E","Awaiting response","Line one
+Line two"
+"2026-11-08","Main door","Test Moses F","Declined","'CR-led note"
+"2026-11-15","Main door","'=HYPERLINK(""https://example.invalid"",""Injected"")","Confirmed by leader","'  =SUM(1,2) after spaces"
+"2026-11-22","Main door","'+Test Plus G","Confirmed",""
+"2026-10-04","Side door","Test Ruth D","Needs contact","Bring the ""spare"" lanyard, then lock up"
+"2026-10-11","Side door","Test Naomi E","Declined","'=1+2"
+"2026-10-18","Side door","Test Moses F","Confirmed","'	Tab-led note"
+"2026-10-25","Side door","'=HYPERLINK(""https://example.invalid"",""Injected"")","Draft","Line one
+Line two"
+"2026-11-01","Side door","'+Test Plus G","Draft","'CR-led note"
+"2026-11-08","Side door","'-Test Minus H","Confirmed","'  =SUM(1,2) after spaces"
+"2026-11-15","Side door","'@Test At I","Declined",""
+"2026-11-22","Side door","'  -Test Space K","Needs contact","Bring the ""spare"" lanyard, then lock up"
+"2026-10-04","Children's door","Test Naomi E","Confirmed by leader","'CR-led note"
+"2026-10-11","Children's door","Test Moses F","Awaiting response","'  =SUM(1,2) after spaces"
+"2026-10-18","Children's door","'=HYPERLINK(""https://example.invalid"",""Injected"")","Draft",""
+"2026-10-25","Children's door","'+Test Plus G","Needs contact","Bring the ""spare"" lanyard, then lock up"
+"2026-11-01","Children's door","'-Test Minus H","Needs contact","'=1+2"
+"2026-11-08","Children's door","'@Test At I","Draft","'	Tab-led note"
+"2026-11-15","Children's door","'  -Test Space K","Awaiting response","Line one
+Line two"
+"2026-11-22","Children's door","Test Mwila A","Confirmed by leader","'CR-led note"

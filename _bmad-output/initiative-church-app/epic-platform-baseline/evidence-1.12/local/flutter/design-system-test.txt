@@ -1,0 +1,29 @@
+$ (cd packages/design_system && flutter test)
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+Resolving dependencies...
+Downloading packages...
+  material_color_utilities 0.13.0 (0.13.1 available)
+  test_api 0.7.12 (0.7.14 available)
+Got dependencies!
+2 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /home/user/church-app/.claude/worktrees/agent-aaad35aa40aa05997/packages/design_system/test/design_system_test.dart
+00:00 +0: tokens light text pairs meet 4.5:1
+00:00 +1: tokens light focus ring is >=3:1 against bg and surface
+00:00 +2: tokens dark text pairs meet 4.5:1
+00:00 +3: tokens dark focus ring is >=3:1 against bg and surface
+00:00 +4: tokens staff chrome (light only) meets contrast on navy
+00:00 +5: tokens design-contract values are carried verbatim
+00:00 +6: tokens themes expose the tokens; staff is light only
+00:00 +7: FocusRing shows a ring only while its control has focus
+00:00 +8: pointer or touch focus shows no ring; keyboard focus does
+00:00 +9: a focusable banner is a named focus target, not a Tab stop
+00:00 +10: ChurchDialog is a dialog named by its title
+00:00 +11: RadioSegments exposes a named radio group with checked state
+00:01 +12: NavItem is a selectable tab with a 44px target
+00:01 +13: banner and status label survive 2x text without overflow
+00:01 +14: All tests passed!
+# exit=0

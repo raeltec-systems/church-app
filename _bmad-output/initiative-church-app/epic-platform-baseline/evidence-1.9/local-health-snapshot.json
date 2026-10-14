@@ -1,0 +1,36 @@
+{
+  "alerts": {
+    "alerting": "disabled",
+    "dispatcher": "none",
+    "unresolved_gates": [
+      "q12_operations",
+      "ops_alert_destination"
+    ]
+  },
+  "environment": "local",
+  "generated_at": "2026-10-03T15:42:00.645589Z",
+  "system_route": {
+    "rejected": 20,
+    "replayed": 2,
+    "succeeded": 4,
+    "rejected_by_reason": {
+      "envelope_invalid": 4,
+      "request_conflict": 2,
+      "wrong_environment": 4,
+      "credential_missing": 2,
+      "credential_unknown": 2,
+      "command_not_allowed": 2,
+      "credential_malformed": 2,
+      "user_session_rejected": 2
+    }
+  },
+  "system_access": "open",
+  "window_seconds": 600,
+  "synthetic_probe": {
+    "revision": 4,
+    "last_probe_at": "2026-10-03T15:42:00.495389Z"
+  },
+  "principals_active": 2,
+  "credentials_active": 2,
+  "credentials_expiring_7d": 2
+}

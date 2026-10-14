@@ -1,0 +1,7 @@
+# Story 1.3, second review (function v5, hosted 009), part G setup.
+# Before: init, rc-operator-token + register, steps 400-403 (fingerprints and
+# the LOCAL container assertion test). After: sql/enroll_staff.sql for
+# r13-x-staff2 (out of band), attached as step 412.
+rc-provision staff2 --tag r13-x-staff2 --role none --step 410-provision-staff2-account
+rc-provision n1 --tag r13-x-n1 --role member --step 411-provision-member-n1
+rc-provision n2 --tag r13-x-n2 --role member --step 411-provision-member-n2

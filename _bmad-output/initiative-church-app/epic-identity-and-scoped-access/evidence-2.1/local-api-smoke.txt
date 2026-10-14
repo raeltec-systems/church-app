@@ -1,0 +1,13 @@
+ok   - linked synthetic member reads own summary (200)
+ok   - summary is the caller's own record
+ok   - unlinked account is forbidden (403)
+ok   - unlinked denial is generic (forbidden/not_linked)
+ok   - signed-out client is refused (401)
+ok   - direct query of the app schema is refused (not exposed) (406)
+ok   - no api relation named identity_members (404)
+ok   - no api relation named identity_account_links (404)
+ok   - no api relation named identity_holds (404)
+ok   - revoked session's unexpired JWT is refused (401)
+ok   - revoked session reason
+ok   - revoked session cannot refresh (400)
+ok   - no SMS provider configured

@@ -1,0 +1,8 @@
+$ npm run env:check
+# started 2026-10-03T16:55:13Z at 2b3ad1824ea255bf2b59b196c239de2d25f4fdcf
+
+> env:check
+> node tools/env/environments.mjs check
+
+environments: 3 configs valid (separate refs, synthetic non-production recipients, production private/sending disabled, bounded system route, alerting/scheduler off, isolated restores with real-data backups off)
+# exit=0 finished 2026-10-03T16:55:14Z

@@ -1,0 +1,6 @@
+matrix: 15 cases passed
+ok   - system route HTTP matrix (15 cases)
+ok   - one audit row per call that reached the route (13)
+ok   - only the valid and forged-header probes succeeded
+ok   - no forged principal or member in the audit
+ok   - the user session was refused and audited as authenticated

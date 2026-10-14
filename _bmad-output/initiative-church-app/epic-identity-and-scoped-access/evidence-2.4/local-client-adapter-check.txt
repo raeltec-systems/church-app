@@ -1,0 +1,9 @@
+== adapters: phone sign-up, chooser, submit/correct, access still denied, duplicate refused
+PASS L2 safe chooser: SYNTHETIC Riverside / SYNTHETIC North side; SYNTHETIC Hilltop / SYNTHETIC East side; SYNTHETIC Market / SYNTHETIC Town centre
+PASS L3 no request yet: notice draft-2026-10-07
+PASS L4 submit (cell): ChurchStatus.awaitingApproval / CellStatus.requested rev 1
+PASS L5 correct (not sure): ChurchStatus.awaitingApproval / CellStatus.followUp rev 2
+PASS L6 stale revision: conflict
+PASS L7 still no member access: summary Instance of 'MemberAccessDenied', access Instance of 'AccessReadDenied<MemberGrants>'
+PASS L8 duplicate username refused: usernameUnavailable
+synthetic users left: 0

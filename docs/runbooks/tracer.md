@@ -16,8 +16,8 @@ Never pass a secret/service-role key to a client and never commit one.
 
 ```sh
 npm run db:start      # supabase start: applies supabase/migrations and supabase/seed.sql
-npm run db:test       # pgTAP permission tests (supabase/tests/*.sql)
-npm run db:smoke      # HTTP checks: api readable, app/public not exposed, writes denied
+npm run db:test       # all pgTAP suites (supabase/tests/*.sql), including the tracer permissions
+npm run db:smoke      # HTTP smoke scripts plus the contract fixture check (psql); api_smoke.sh is the tracer's (api readable, app/public not exposed, writes denied)
 npx supabase status   # prints API_URL and PUBLISHABLE_KEY
 npm run db:reset      # re-create the database from migrations + seed
 ```
@@ -35,7 +35,12 @@ export SUPABASE_PUBLISHABLE_KEY=<PUBLISHABLE_KEY from `npx supabase status`>
   --dart-define=SUPABASE_URL=$SUPABASE_URL \
   --dart-define=SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY)
 
-# Disposable staff web trial
+# Staff web portal shell (Flutter Web, provisionally selected by story 1.6)
+(cd apps/staff && flutter run -d web-server --web-port 8081 \
+  --dart-define=SUPABASE_URL=$SUPABASE_URL \
+  --dart-define=SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY)
+
+# Disposable staff web trial (1.6 evidence app)
 (cd trials/staff_web && flutter run -d web-server --web-port 8080 \
   --dart-define=SUPABASE_URL=$SUPABASE_URL \
   --dart-define=SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY)
@@ -50,7 +55,8 @@ A build without both defines shows an "App not configured" screen rather than fa
 
 `bic-kafue-platform-test` (ref `tmurpotfluignacfueki`, eu-central-1) holds synthetic data only.
 URL `https://tmurpotfluignacfueki.supabase.co`; take the publishable key from the dashboard
-(Project Settings → API Keys) or the Supabase connector. It is not staging or production.
+(Project Settings → API Keys) or the Supabase connector. Since story 1.8 it is the **staging** environment (database marker
+`staging`); it is not production. See `environments-and-promotion.md`.
 
 **Owner step (required once):** Dashboard → Project Settings → Data API → *Exposed schemas*: add
 `api` and remove `public` and `graphql_public`; set *Extra search path* to `api`. Until then the API
@@ -76,8 +82,8 @@ docker exec supabase_db_church-app psql -U postgres -c \
   "update app.platform_status set status = 'degraded', message = 'SYNTHETIC: changed by SQL', updated_at = now() where id = 1;"
 ```
 
-Hosted: run the same `update` in the dashboard SQL editor. Then press **Reload** (top-right) in
-either client; the new value appears. To see the empty state: `delete from app.platform_status;`
+Hosted: run the same `update` in the dashboard SQL editor. Then press **Reload** (top-right of the
+**Platform status** destination) in any client; the new value appears. To see the empty state: `delete from app.platform_status;`
 then reload ("No platform status recorded"); restore with `npm run db:reset` or re-run `supabase/seed.sql`.
 
 ## 4. Simulate a failure

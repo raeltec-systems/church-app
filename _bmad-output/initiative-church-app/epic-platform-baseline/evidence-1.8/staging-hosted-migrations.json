@@ -1,0 +1,1 @@
+{"migrations":[{"version":"20261003112319","name":"platform_status_tracer"},{"version":"20261003114608","name":"revoke_public_default_privileges"},{"version":"20261003123459","name":"command_foundation"},{"version":"20261003131021","name":"command_foundation_hardening"},{"version":"20261003134340","name":"cross_epic_contracts"}]}

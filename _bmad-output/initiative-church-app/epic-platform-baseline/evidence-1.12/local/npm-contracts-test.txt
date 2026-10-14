@@ -1,0 +1,1373 @@
+$ npm run contracts:test
+# started 2026-10-03T16:55:12Z at 2b3ad1824ea255bf2b59b196c239de2d25f4fdcf
+
+> contracts:test
+> node --test packages/contracts/ts/contracts.test.ts
+
+TAP version 13
+# Subtest: fixture set is present
+ok 1 - fixture set is present
+  ---
+  duration_ms: 2.580387
+  type: 'test'
+  ...
+# Subtest: account_ref valid: lowercase uuid
+ok 2 - account_ref valid: lowercase uuid
+  ---
+  duration_ms: 1.82518
+  type: 'test'
+  ...
+# Subtest: account_ref invalid: missing auth_user_id
+ok 3 - account_ref invalid: missing auth_user_id
+  ---
+  duration_ms: 0.444275
+  type: 'test'
+  ...
+# Subtest: account_ref invalid: braced uuid
+ok 4 - account_ref invalid: braced uuid
+  ---
+  duration_ms: 0.195264
+  type: 'test'
+  ...
+# Subtest: account_ref invalid: uuid without hyphens
+ok 5 - account_ref invalid: uuid without hyphens
+  ---
+  duration_ms: 0.281391
+  type: 'test'
+  ...
+# Subtest: account_ref invalid: member_id is not an account
+ok 6 - account_ref invalid: member_id is not an account
+  ---
+  duration_ms: 0.123467
+  type: 'test'
+  ...
+# Subtest: account_ref invalid: array
+ok 7 - account_ref invalid: array
+  ---
+  duration_ms: 0.270883
+  type: 'test'
+  ...
+# Subtest: actor valid: member acting through an account
+ok 8 - actor valid: member acting through an account
+  ---
+  duration_ms: 0.178747
+  type: 'test'
+  ...
+# Subtest: actor valid: system principal, no initiating member
+ok 9 - actor valid: system principal, no initiating member
+  ---
+  duration_ms: 0.359619
+  type: 'test'
+  ...
+# Subtest: actor valid: system principal, explicit null initiating member
+ok 10 - actor valid: system principal, explicit null initiating member
+  ---
+  duration_ms: 0.392485
+  type: 'test'
+  ...
+# Subtest: actor valid: system principal with an initiating member recorded separately
+ok 11 - actor valid: system principal with an initiating member recorded separately
+  ---
+  duration_ms: 0.190326
+  type: 'test'
+  ...
+# Subtest: actor invalid: missing kind
+ok 12 - actor invalid: missing kind
+  ---
+  duration_ms: 0.100044
+  type: 'test'
+  ...
+# Subtest: actor invalid: unknown kind
+ok 13 - actor invalid: unknown kind
+  ---
+  duration_ms: 0.068167
+  type: 'test'
+  ...
+# Subtest: actor invalid: kind not a string
+ok 14 - actor invalid: kind not a string
+  ---
+  duration_ms: 0.079506
+  type: 'test'
+  ...
+# Subtest: actor invalid: member without account
+ok 15 - actor invalid: member without account
+  ---
+  duration_ms: 0.118404
+  type: 'test'
+  ...
+# Subtest: actor invalid: member with null member_id
+ok 16 - actor invalid: member with null member_id
+  ---
+  duration_ms: 0.081575
+  type: 'test'
+  ...
+# Subtest: actor invalid: member cannot carry system fields
+ok 17 - actor invalid: member cannot carry system fields
+  ---
+  duration_ms: 0.068062
+  type: 'test'
+  ...
+# Subtest: actor invalid: system without job
+ok 18 - actor invalid: system without job
+  ---
+  duration_ms: 0.168683
+  type: 'test'
+  ...
+# Subtest: actor invalid: system cannot select an arbitrary member actor
+ok 19 - actor invalid: system cannot select an arbitrary member actor
+  ---
+  duration_ms: 0.098055
+  type: 'test'
+  ...
+# Subtest: actor invalid: system with malformed initiating member
+ok 20 - actor invalid: system with malformed initiating member
+  ---
+  duration_ms: 0.072527
+  type: 'test'
+  ...
+# Subtest: actor invalid: not an object
+ok 21 - actor invalid: not an object
+  ---
+  duration_ms: 0.110417
+  type: 'test'
+  ...
+# Subtest: actor invalid: prototype-named key constructor
+ok 22 - actor invalid: prototype-named key constructor
+  ---
+  duration_ms: 1.074494
+  type: 'test'
+  ...
+# Subtest: actor invalid: prototype-named key __proto__
+ok 23 - actor invalid: prototype-named key __proto__
+  ---
+  duration_ms: 0.122305
+  type: 'test'
+  ...
+# Subtest: actor invalid: prototype-named key toString
+ok 24 - actor invalid: prototype-named key toString
+  ---
+  duration_ms: 0.065786
+  type: 'test'
+  ...
+# Subtest: command_request valid: create (expected_revision null)
+ok 25 - command_request valid: create (expected_revision null)
+  ---
+  duration_ms: 0.249755
+  type: 'test'
+  ...
+# Subtest: command_request valid: create with expected_revision omitted
+ok 26 - command_request valid: create with expected_revision omitted
+  ---
+  duration_ms: 0.129348
+  type: 'test'
+  ...
+# Subtest: command_request valid: mutation of an existing aggregate
+ok 27 - command_request valid: mutation of an existing aggregate
+  ---
+  duration_ms: 0.112987
+  type: 'test'
+  ...
+# Subtest: command_request valid: version written as 1.0
+ok 28 - command_request valid: version written as 1.0
+  ---
+  duration_ms: 0.059773
+  type: 'test'
+  ...
+# Subtest: command_request valid: expected_revision written with an exponent
+ok 29 - command_request valid: expected_revision written with an exponent
+  ---
+  duration_ms: 0.071221
+  type: 'test'
+  ...
+# Subtest: command_request valid: longest command (127 chars)
+ok 30 - command_request valid: longest command (127 chars)
+  ---
+  duration_ms: 0.057388
+  type: 'test'
+  ...
+# Subtest: command_request invalid: not an object
+ok 31 - command_request invalid: not an object
+  ---
+  duration_ms: 0.062174
+  type: 'test'
+  ...
+# Subtest: command_request invalid: everything missing
+ok 32 - command_request invalid: everything missing
+  ---
+  duration_ms: 0.054985
+  type: 'test'
+  ...
+# Subtest: command_request invalid: unsupported version
+ok 33 - command_request invalid: unsupported version
+  ---
+  duration_ms: 0.053732
+  type: 'test'
+  ...
+# Subtest: command_request invalid: version as string
+ok 34 - command_request invalid: version as string
+  ---
+  duration_ms: 0.116617
+  type: 'test'
+  ...
+# Subtest: command_request invalid: command without owner namespace
+ok 35 - command_request invalid: command without owner namespace
+  ---
+  duration_ms: 0.184385
+  type: 'test'
+  ...
+# Subtest: command_request invalid: command not a string
+ok 36 - command_request invalid: command not a string
+  ---
+  duration_ms: 0.101064
+  type: 'test'
+  ...
+# Subtest: command_request invalid: malformed request_id
+ok 37 - command_request invalid: malformed request_id
+  ---
+  duration_ms: 0.064373
+  type: 'test'
+  ...
+# Subtest: command_request invalid: expected_revision as string
+ok 38 - command_request invalid: expected_revision as string
+  ---
+  duration_ms: 0.064658
+  type: 'test'
+  ...
+# Subtest: command_request invalid: expected_revision zero
+ok 39 - command_request invalid: expected_revision zero
+  ---
+  duration_ms: 0.051649
+  type: 'test'
+  ...
+# Subtest: command_request invalid: payload array
+ok 40 - command_request invalid: payload array
+  ---
+  duration_ms: 0.052229
+  type: 'test'
+  ...
+# Subtest: command_request invalid: client-supplied actor is refused
+ok 41 - command_request invalid: client-supplied actor is refused
+  ---
+  duration_ms: 0.052402
+  type: 'test'
+  ...
+# Subtest: command_request invalid: uppercase request_id
+ok 42 - command_request invalid: uppercase request_id
+  ---
+  duration_ms: 0.063457
+  type: 'test'
+  ...
+# Subtest: command_request invalid: version 1.5
+ok 43 - command_request invalid: version 1.5
+  ---
+  duration_ms: 0.066423
+  type: 'test'
+  ...
+# Subtest: command_request invalid: command too long (128 chars)
+ok 44 - command_request invalid: command too long (128 chars)
+  ---
+  duration_ms: 0.062275
+  type: 'test'
+  ...
+# Subtest: command_request invalid: uppercase command
+ok 45 - command_request invalid: uppercase command
+  ---
+  duration_ms: 0.058348
+  type: 'test'
+  ...
+# Subtest: command_request invalid: null command
+ok 46 - command_request invalid: null command
+  ---
+  duration_ms: 0.055706
+  type: 'test'
+  ...
+# Subtest: command_request invalid: prototype-named key constructor
+ok 47 - command_request invalid: prototype-named key constructor
+  ---
+  duration_ms: 0.061413
+  type: 'test'
+  ...
+# Subtest: command_request invalid: prototype-named key __proto__
+ok 48 - command_request invalid: prototype-named key __proto__
+  ---
+  duration_ms: 0.083627
+  type: 'test'
+  ...
+# Subtest: command_request invalid: prototype-named key toString
+ok 49 - command_request invalid: prototype-named key toString
+  ---
+  duration_ms: 0.060499
+  type: 'test'
+  ...
+# Subtest: command_response valid: success
+ok 50 - command_response valid: success
+  ---
+  duration_ms: 0.152414
+  type: 'test'
+  ...
+# Subtest: command_response valid: success with null data
+ok 51 - command_response valid: success with null data
+  ---
+  duration_ms: 0.07065
+  type: 'test'
+  ...
+# Subtest: command_response valid: validation error with field errors
+ok 52 - command_response valid: validation error with field errors
+  ---
+  duration_ms: 0.196154
+  type: 'test'
+  ...
+# Subtest: command_response valid: error before request_id was readable
+ok 53 - command_response valid: error before request_id was readable
+  ---
+  duration_ms: 0.08307
+  type: 'test'
+  ...
+# Subtest: command_response valid: conflict with readable current revision
+ok 54 - command_response valid: conflict with readable current revision
+  ---
+  duration_ms: 0.089884
+  type: 'test'
+  ...
+# Subtest: command_response valid: unauthenticated
+ok 55 - command_response valid: unauthenticated
+  ---
+  duration_ms: 0.067648
+  type: 'test'
+  ...
+# Subtest: command_response valid: forbidden
+ok 56 - command_response valid: forbidden
+  ---
+  duration_ms: 0.113358
+  type: 'test'
+  ...
+# Subtest: command_response valid: not_found
+ok 57 - command_response valid: not_found
+  ---
+  duration_ms: 0.07716
+  type: 'test'
+  ...
+# Subtest: command_response valid: rate_limited
+ok 58 - command_response valid: rate_limited
+  ---
+  duration_ms: 0.123155
+  type: 'test'
+  ...
+# Subtest: command_response valid: unavailable
+ok 59 - command_response valid: unavailable
+  ---
+  duration_ms: 0.077714
+  type: 'test'
+  ...
+# Subtest: command_response valid: server-only field error codes
+ok 60 - command_response valid: server-only field error codes
+  ---
+  duration_ms: 0.096542
+  type: 'test'
+  ...
+# Subtest: command_response valid: closed policy gate (public field, no internal gate name)
+ok 61 - command_response valid: closed policy gate (public field, no internal gate name)
+  ---
+  duration_ms: 0.121913
+  type: 'test'
+  ...
+# Subtest: command_response valid: success revision written with an exponent
+ok 62 - command_response valid: success revision written with an exponent
+  ---
+  duration_ms: 0.06313
+  type: 'test'
+  ...
+# Subtest: command_response invalid: unknown error code
+ok 63 - command_response invalid: unknown error code
+  ---
+  duration_ms: 0.07141
+  type: 'test'
+  ...
+# Subtest: command_response invalid: error without field_errors
+ok 64 - command_response invalid: error without field_errors
+  ---
+  duration_ms: 0.06886
+  type: 'test'
+  ...
+# Subtest: command_response invalid: error without request_id key
+ok 65 - command_response invalid: error without request_id key
+  ---
+  duration_ms: 0.072993
+  type: 'test'
+  ...
+# Subtest: command_response invalid: error with null message
+ok 66 - command_response invalid: error with null message
+  ---
+  duration_ms: 0.093825
+  type: 'test'
+  ...
+# Subtest: command_response invalid: error message not a string
+ok 67 - command_response invalid: error message not a string
+  ---
+  duration_ms: 0.060521
+  type: 'test'
+  ...
+# Subtest: command_response invalid: field error value not a string
+ok 68 - command_response invalid: field error value not a string
+  ---
+  duration_ms: 0.061442
+  type: 'test'
+  ...
+# Subtest: command_response invalid: error leaking SQL detail key
+ok 69 - command_response invalid: error leaking SQL detail key
+  ---
+  duration_ms: 0.064912
+  type: 'test'
+  ...
+# Subtest: command_response invalid: error with fractional current revision
+ok 70 - command_response invalid: error with fractional current revision
+  ---
+  duration_ms: 0.064045
+  type: 'test'
+  ...
+# Subtest: command_response invalid: success without revision
+ok 71 - command_response invalid: success without revision
+  ---
+  duration_ms: 0.055872
+  type: 'test'
+  ...
+# Subtest: command_response invalid: success without data key
+ok 72 - command_response invalid: success without data key
+  ---
+  duration_ms: 0.05478
+  type: 'test'
+  ...
+# Subtest: command_response invalid: success with null request_id
+ok 73 - command_response invalid: success with null request_id
+  ---
+  duration_ms: 0.052934
+  type: 'test'
+  ...
+# Subtest: command_response invalid: not an object
+ok 74 - command_response invalid: not an object
+  ---
+  duration_ms: 0.095395
+  type: 'test'
+  ...
+# Subtest: command_response invalid: field error code outside the vocabulary
+ok 75 - command_response invalid: field error code outside the vocabulary
+  ---
+  duration_ms: 0.074302
+  type: 'test'
+  ...
+# Subtest: command_response invalid: success with error fields mixed in
+ok 76 - command_response invalid: success with error fields mixed in
+  ---
+  duration_ms: 0.060947
+  type: 'test'
+  ...
+# Subtest: command_response invalid: prototype-named key constructor
+ok 77 - command_response invalid: prototype-named key constructor
+  ---
+  duration_ms: 0.076306
+  type: 'test'
+  ...
+# Subtest: command_response invalid: prototype-named key __proto__
+ok 78 - command_response invalid: prototype-named key __proto__
+  ---
+  duration_ms: 0.078947
+  type: 'test'
+  ...
+# Subtest: command_response invalid: prototype-named key toString
+ok 79 - command_response invalid: prototype-named key toString
+  ---
+  duration_ms: 0.059729
+  type: 'test'
+  ...
+# Subtest: instant valid: server canonical form (microseconds)
+ok 80 - instant valid: server canonical form (microseconds)
+  ---
+  duration_ms: 1.094102
+  type: 'test'
+  ...
+# Subtest: instant valid: whole seconds
+ok 81 - instant valid: whole seconds
+  ---
+  duration_ms: 0.0881
+  type: 'test'
+  ...
+# Subtest: instant valid: milliseconds
+ok 82 - instant valid: milliseconds
+  ---
+  duration_ms: 0.154561
+  type: 'test'
+  ...
+# Subtest: instant valid: leap day
+ok 83 - instant valid: leap day
+  ---
+  duration_ms: 0.041845
+  type: 'test'
+  ...
+# Subtest: instant valid: century leap day
+ok 84 - instant valid: century leap day
+  ---
+  duration_ms: 0.070715
+  type: 'test'
+  ...
+# Subtest: instant valid: end of year
+ok 85 - instant valid: end of year
+  ---
+  duration_ms: 0.035404
+  type: 'test'
+  ...
+# Subtest: instant valid: year one
+ok 86 - instant valid: year one
+  ---
+  duration_ms: 0.036709
+  type: 'test'
+  ...
+# Subtest: instant invalid: offset instead of Z
+ok 87 - instant invalid: offset instead of Z
+  ---
+  duration_ms: 0.113258
+  type: 'test'
+  ...
+# Subtest: instant invalid: no zone
+ok 88 - instant invalid: no zone
+  ---
+  duration_ms: 0.08045
+  type: 'test'
+  ...
+# Subtest: instant invalid: lowercase z
+ok 89 - instant invalid: lowercase z
+  ---
+  duration_ms: 0.05202
+  type: 'test'
+  ...
+# Subtest: instant invalid: space separator
+ok 90 - instant invalid: space separator
+  ---
+  duration_ms: 0.043898
+  type: 'test'
+  ...
+# Subtest: instant invalid: date only
+ok 91 - instant invalid: date only
+  ---
+  duration_ms: 0.039422
+  type: 'test'
+  ...
+# Subtest: instant invalid: nanoseconds
+ok 92 - instant invalid: nanoseconds
+  ---
+  duration_ms: 0.040708
+  type: 'test'
+  ...
+# Subtest: instant invalid: empty fraction
+ok 93 - instant invalid: empty fraction
+  ---
+  duration_ms: 0.040139
+  type: 'test'
+  ...
+# Subtest: instant invalid: not a leap year
+ok 94 - instant invalid: not a leap year
+  ---
+  duration_ms: 0.041776
+  type: 'test'
+  ...
+# Subtest: instant invalid: century not a leap year
+ok 95 - instant invalid: century not a leap year
+  ---
+  duration_ms: 0.039287
+  type: 'test'
+  ...
+# Subtest: instant invalid: month 13
+ok 96 - instant invalid: month 13
+  ---
+  duration_ms: 0.039755
+  type: 'test'
+  ...
+# Subtest: instant invalid: day zero
+ok 97 - instant invalid: day zero
+  ---
+  duration_ms: 0.046142
+  type: 'test'
+  ...
+# Subtest: instant invalid: april 31
+ok 98 - instant invalid: april 31
+  ---
+  duration_ms: 0.039703
+  type: 'test'
+  ...
+# Subtest: instant invalid: hour 24
+ok 99 - instant invalid: hour 24
+  ---
+  duration_ms: 0.111842
+  type: 'test'
+  ...
+# Subtest: instant invalid: leap second
+ok 100 - instant invalid: leap second
+  ---
+  duration_ms: 0.052119
+  type: 'test'
+  ...
+# Subtest: instant invalid: year zero
+ok 101 - instant invalid: year zero
+  ---
+  duration_ms: 0.0436
+  type: 'test'
+  ...
+# Subtest: instant invalid: five digit year
+ok 102 - instant invalid: five digit year
+  ---
+  duration_ms: 0.039782
+  type: 'test'
+  ...
+# Subtest: instant invalid: epoch number
+ok 103 - instant invalid: epoch number
+  ---
+  duration_ms: 0.043236
+  type: 'test'
+  ...
+# Subtest: instant invalid: null
+ok 104 - instant invalid: null
+  ---
+  duration_ms: 0.038919
+  type: 'test'
+  ...
+# Subtest: instant invalid: object
+ok 105 - instant invalid: object
+  ---
+  duration_ms: 0.058765
+  type: 'test'
+  ...
+# Subtest: lifecycle_event valid: hold applied
+ok 106 - lifecycle_event valid: hold applied
+  ---
+  duration_ms: 0.076851
+  type: 'test'
+  ...
+# Subtest: lifecycle_event valid: hold released
+ok 107 - lifecycle_event valid: hold released
+  ---
+  duration_ms: 0.04832
+  type: 'test'
+  ...
+# Subtest: lifecycle_event valid: scope revoked
+ok 108 - lifecycle_event valid: scope revoked
+  ---
+  duration_ms: 0.046014
+  type: 'test'
+  ...
+# Subtest: lifecycle_event valid: account deactivated
+ok 109 - lifecycle_event valid: account deactivated
+  ---
+  duration_ms: 0.046193
+  type: 'test'
+  ...
+# Subtest: lifecycle_event valid: deletion requested
+ok 110 - lifecycle_event valid: deletion requested
+  ---
+  duration_ms: 0.045461
+  type: 'test'
+  ...
+# Subtest: lifecycle_event valid: cell transferred
+ok 111 - lifecycle_event valid: cell transferred
+  ---
+  duration_ms: 0.043684
+  type: 'test'
+  ...
+# Subtest: lifecycle_event invalid: unregistered event
+ok 112 - lifecycle_event invalid: unregistered event
+  ---
+  duration_ms: 0.050494
+  type: 'test'
+  ...
+# Subtest: lifecycle_event invalid: missing event
+ok 113 - lifecycle_event invalid: missing event
+  ---
+  duration_ms: 0.047245
+  type: 'test'
+  ...
+# Subtest: lifecycle_event invalid: bad instant and revision
+ok 114 - lifecycle_event invalid: bad instant and revision
+  ---
+  duration_ms: 0.05906
+  type: 'test'
+  ...
+# Subtest: lifecycle_event invalid: private context is not part of the event
+ok 115 - lifecycle_event invalid: private context is not part of the event
+  ---
+  duration_ms: 0.047626
+  type: 'test'
+  ...
+# Subtest: member_ref valid: lowercase uuid
+ok 116 - member_ref valid: lowercase uuid
+  ---
+  duration_ms: 0.054024
+  type: 'test'
+  ...
+# Subtest: member_ref invalid: missing member_id
+ok 117 - member_ref invalid: missing member_id
+  ---
+  duration_ms: 0.048017
+  type: 'test'
+  ...
+# Subtest: member_ref invalid: null member_id
+ok 118 - member_ref invalid: null member_id
+  ---
+  duration_ms: 0.040368
+  type: 'test'
+  ...
+# Subtest: member_ref invalid: uppercase uuid is not canonical
+ok 119 - member_ref invalid: uppercase uuid is not canonical
+  ---
+  duration_ms: 0.040198
+  type: 'test'
+  ...
+# Subtest: member_ref invalid: not a uuid
+ok 120 - member_ref invalid: not a uuid
+  ---
+  duration_ms: 0.065498
+  type: 'test'
+  ...
+# Subtest: member_ref invalid: number
+ok 121 - member_ref invalid: number
+  ---
+  duration_ms: 0.057109
+  type: 'test'
+  ...
+# Subtest: member_ref invalid: phone number is never an identity
+ok 122 - member_ref invalid: phone number is never an identity
+  ---
+  duration_ms: 0.043627
+  type: 'test'
+  ...
+# Subtest: member_ref invalid: unknown key
+ok 123 - member_ref invalid: unknown key
+  ---
+  duration_ms: 0.04626
+  type: 'test'
+  ...
+# Subtest: member_ref invalid: not an object
+ok 124 - member_ref invalid: not an object
+  ---
+  duration_ms: 0.039501
+  type: 'test'
+  ...
+# Subtest: member_ref invalid: null
+ok 125 - member_ref invalid: null
+  ---
+  duration_ms: 0.052018
+  type: 'test'
+  ...
+# Subtest: member_ref invalid: prototype-named key constructor
+ok 126 - member_ref invalid: prototype-named key constructor
+  ---
+  duration_ms: 0.083726
+  type: 'test'
+  ...
+# Subtest: member_ref invalid: prototype-named key __proto__
+ok 127 - member_ref invalid: prototype-named key __proto__
+  ---
+  duration_ms: 0.045131
+  type: 'test'
+  ...
+# Subtest: member_ref invalid: prototype-named key toString
+ok 128 - member_ref invalid: prototype-named key toString
+  ---
+  duration_ms: 0.042314
+  type: 'test'
+  ...
+# Subtest: money valid: two decimals (XTS is the ISO 4217 testing code, not church policy)
+ok 129 - money valid: two decimals (XTS is the ISO 4217 testing code, not church policy)
+  ---
+  duration_ms: 0.161911
+  type: 'test'
+  ...
+# Subtest: money valid: integer amount
+ok 130 - money valid: integer amount
+  ---
+  duration_ms: 0.041665
+  type: 'test'
+  ...
+# Subtest: money valid: zero
+ok 131 - money valid: zero
+  ---
+  duration_ms: 0.062622
+  type: 'test'
+  ...
+# Subtest: money valid: zero with decimals
+ok 132 - money valid: zero with decimals
+  ---
+  duration_ms: 0.04143
+  type: 'test'
+  ...
+# Subtest: money valid: beyond float precision
+ok 133 - money valid: beyond float precision
+  ---
+  duration_ms: 0.03951
+  type: 'test'
+  ...
+# Subtest: money valid: classic float trap
+ok 134 - money valid: classic float trap
+  ---
+  duration_ms: 0.036174
+  type: 'test'
+  ...
+# Subtest: money invalid: JSON number (float) amount
+ok 135 - money invalid: JSON number (float) amount
+  ---
+  duration_ms: 0.049355
+  type: 'test'
+  ...
+# Subtest: money invalid: JSON integer amount
+ok 136 - money invalid: JSON integer amount
+  ---
+  duration_ms: 0.042803
+  type: 'test'
+  ...
+# Subtest: money invalid: comma decimal
+ok 137 - money invalid: comma decimal
+  ---
+  duration_ms: 0.040529
+  type: 'test'
+  ...
+# Subtest: money invalid: thousands separator
+ok 138 - money invalid: thousands separator
+  ---
+  duration_ms: 0.040331
+  type: 'test'
+  ...
+# Subtest: money invalid: leading zero
+ok 139 - money invalid: leading zero
+  ---
+  duration_ms: 0.038491
+  type: 'test'
+  ...
+# Subtest: money invalid: leading plus
+ok 140 - money invalid: leading plus
+  ---
+  duration_ms: 0.038744
+  type: 'test'
+  ...
+# Subtest: money invalid: negative zero
+ok 141 - money invalid: negative zero
+  ---
+  duration_ms: 0.041515
+  type: 'test'
+  ...
+# Subtest: money invalid: trailing point
+ok 142 - money invalid: trailing point
+  ---
+  duration_ms: 0.042513
+  type: 'test'
+  ...
+# Subtest: money invalid: leading point
+ok 143 - money invalid: leading point
+  ---
+  duration_ms: 0.039281
+  type: 'test'
+  ...
+# Subtest: money invalid: exponent
+ok 144 - money invalid: exponent
+  ---
+  duration_ms: 0.041029
+  type: 'test'
+  ...
+# Subtest: money invalid: too many integer digits
+ok 145 - money invalid: too many integer digits
+  ---
+  duration_ms: 0.040008
+  type: 'test'
+  ...
+# Subtest: money invalid: too many fraction digits
+ok 146 - money invalid: too many fraction digits
+  ---
+  duration_ms: 0.040248
+  type: 'test'
+  ...
+# Subtest: money invalid: whitespace
+ok 147 - money invalid: whitespace
+  ---
+  duration_ms: 0.038429
+  type: 'test'
+  ...
+# Subtest: money invalid: currency symbol
+ok 148 - money invalid: currency symbol
+  ---
+  duration_ms: 0.046703
+  type: 'test'
+  ...
+# Subtest: money invalid: lowercase currency
+ok 149 - money invalid: lowercase currency
+  ---
+  duration_ms: 0.064492
+  type: 'test'
+  ...
+# Subtest: money invalid: missing currency
+ok 150 - money invalid: missing currency
+  ---
+  duration_ms: 0.057955
+  type: 'test'
+  ...
+# Subtest: money invalid: missing amount
+ok 151 - money invalid: missing amount
+  ---
+  duration_ms: 0.041588
+  type: 'test'
+  ...
+# Subtest: money invalid: unknown key
+ok 152 - money invalid: unknown key
+  ---
+  duration_ms: 0.044515
+  type: 'test'
+  ...
+# Subtest: money invalid: not an object
+ok 153 - money invalid: not an object
+  ---
+  duration_ms: 0.041288
+  type: 'test'
+  ...
+# Subtest: money invalid: negative amount (signs belong to owner rules)
+ok 154 - money invalid: negative amount (signs belong to owner rules)
+  ---
+  duration_ms: 0.041051
+  type: 'test'
+  ...
+# Subtest: money invalid: negative integer
+ok 155 - money invalid: negative integer
+  ---
+  duration_ms: 0.04391
+  type: 'test'
+  ...
+# Subtest: money invalid: prototype-named key constructor
+ok 156 - money invalid: prototype-named key constructor
+  ---
+  duration_ms: 0.041
+  type: 'test'
+  ...
+# Subtest: money invalid: prototype-named key __proto__
+ok 157 - money invalid: prototype-named key __proto__
+  ---
+  duration_ms: 0.039478
+  type: 'test'
+  ...
+# Subtest: money invalid: prototype-named key toString
+ok 158 - money invalid: prototype-named key toString
+  ---
+  duration_ms: 0.040675
+  type: 'test'
+  ...
+# Subtest: notification_key valid: full logical key
+ok 159 - notification_key valid: full logical key
+  ---
+  duration_ms: 1.418992
+  type: 'test'
+  ...
+# Subtest: notification_key invalid: everything missing
+ok 160 - notification_key invalid: everything missing
+  ---
+  duration_ms: 0.128781
+  type: 'test'
+  ...
+# Subtest: notification_key invalid: local time without zone
+ok 161 - notification_key invalid: local time without zone
+  ---
+  duration_ms: 0.06649
+  type: 'test'
+  ...
+# Subtest: notification_key invalid: account is not a recipient member
+ok 162 - notification_key invalid: account is not a recipient member
+  ---
+  duration_ms: 0.059623
+  type: 'test'
+  ...
+# Subtest: source_ref valid: first revision
+ok 163 - source_ref valid: first revision
+  ---
+  duration_ms: 0.050425
+  type: 'test'
+  ...
+# Subtest: source_ref valid: largest JS-safe revision
+ok 164 - source_ref valid: largest JS-safe revision
+  ---
+  duration_ms: 0.046961
+  type: 'test'
+  ...
+# Subtest: source_ref valid: longest token (63 chars)
+ok 165 - source_ref valid: longest token (63 chars)
+  ---
+  duration_ms: 0.044206
+  type: 'test'
+  ...
+# Subtest: source_ref valid: integral value written with an exponent (1e3)
+ok 166 - source_ref valid: integral value written with an exponent (1e3)
+  ---
+  duration_ms: 0.037477
+  type: 'test'
+  ...
+# Subtest: source_ref valid: integral value written with a fraction (1.0)
+ok 167 - source_ref valid: integral value written with a fraction (1.0)
+  ---
+  duration_ms: 0.037537
+  type: 'test'
+  ...
+# Subtest: source_ref valid: integral value written as 2E1
+ok 168 - source_ref valid: integral value written as 2E1
+  ---
+  duration_ms: 0.03799
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: everything missing
+ok 169 - source_ref invalid: everything missing
+  ---
+  duration_ms: 0.043734
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: revision zero
+ok 170 - source_ref invalid: revision zero
+  ---
+  duration_ms: 0.098977
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: negative revision
+ok 171 - source_ref invalid: negative revision
+  ---
+  duration_ms: 0.050983
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: fractional revision
+ok 172 - source_ref invalid: fractional revision
+  ---
+  duration_ms: 0.049184
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: revision as string
+ok 173 - source_ref invalid: revision as string
+  ---
+  duration_ms: 0.041129
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: revision beyond JS-safe range
+ok 174 - source_ref invalid: revision beyond JS-safe range
+  ---
+  duration_ms: 0.040307
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: source_type with capitals
+ok 175 - source_ref invalid: source_type with capitals
+  ---
+  duration_ms: 0.067342
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: source_type with dot
+ok 176 - source_ref invalid: source_type with dot
+  ---
+  duration_ms: 0.059173
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: source_type starting with digit
+ok 177 - source_ref invalid: source_type starting with digit
+  ---
+  duration_ms: 0.075317
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: source_type longer than 63
+ok 178 - source_ref invalid: source_type longer than 63
+  ---
+  duration_ms: 0.051011
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: empty source_type
+ok 179 - source_ref invalid: empty source_type
+  ---
+  duration_ms: 0.042942
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: null source_id
+ok 180 - source_ref invalid: null source_id
+  ---
+  duration_ms: 0.043966
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: unknown key
+ok 181 - source_ref invalid: unknown key
+  ---
+  duration_ms: 0.043355
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: non-integral exponent (1e-1)
+ok 182 - source_ref invalid: non-integral exponent (1e-1)
+  ---
+  duration_ms: 0.040859
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: very large exponent (1e300)
+ok 183 - source_ref invalid: very large exponent (1e300)
+  ---
+  duration_ms: 0.038775
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: beyond JS-safe written as exponent (1e16)
+ok 184 - source_ref invalid: beyond JS-safe written as exponent (1e16)
+  ---
+  duration_ms: 0.03961
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: prototype-named key constructor
+ok 185 - source_ref invalid: prototype-named key constructor
+  ---
+  duration_ms: 0.039406
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: prototype-named key __proto__
+ok 186 - source_ref invalid: prototype-named key __proto__
+  ---
+  duration_ms: 0.038534
+  type: 'test'
+  ...
+# Subtest: source_ref invalid: prototype-named key toString
+ok 187 - source_ref invalid: prototype-named key toString
+  ---
+  duration_ms: 0.044221
+  type: 'test'
+  ...
+# Subtest: task_source valid: source and purpose
+ok 188 - task_source valid: source and purpose
+  ---
+  duration_ms: 0.048239
+  type: 'test'
+  ...
+# Subtest: task_source invalid: missing purpose
+ok 189 - task_source invalid: missing purpose
+  ---
+  duration_ms: 0.045724
+  type: 'test'
+  ...
+# Subtest: task_source invalid: purpose with spaces
+ok 190 - task_source invalid: purpose with spaces
+  ---
+  duration_ms: 0.039648
+  type: 'test'
+  ...
+# Subtest: task_source invalid: revision does not belong to a task identity
+ok 191 - task_source invalid: revision does not belong to a task identity
+  ---
+  duration_ms: 0.040583
+  type: 'test'
+  ...
+# Subtest: task_source invalid: not an object
+ok 192 - task_source invalid: not an object
+  ---
+  duration_ms: 0.037119
+  type: 'test'
+  ...
+# Subtest: zoned_local valid: UTC (TEST FIXTURE zone, not church policy)
+ok 193 - zoned_local valid: UTC (TEST FIXTURE zone, not church policy)
+  ---
+  duration_ms: 0.27823
+  type: 'test'
+  ...
+# Subtest: zoned_local valid: area/location zone, wall time in a DST gap stays intent
+ok 194 - zoned_local valid: area/location zone, wall time in a DST gap stays intent
+  ---
+  duration_ms: 0.047242
+  type: 'test'
+  ...
+# Subtest: zoned_local valid: area/region/location zone
+ok 195 - zoned_local valid: area/region/location zone
+  ---
+  duration_ms: 0.041994
+  type: 'test'
+  ...
+# Subtest: zoned_local valid: another area
+ok 196 - zoned_local valid: another area
+  ---
+  duration_ms: 0.049219
+  type: 'test'
+  ...
+# Subtest: zoned_local valid: 64-char zone (shape only; existence is a server check)
+ok 197 - zoned_local valid: 64-char zone (shape only; existence is a server check)
+  ---
+  duration_ms: 0.04041
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: local with Z is an instant, not local intent
+ok 198 - zoned_local invalid: local with Z is an instant, not local intent
+  ---
+  duration_ms: 0.047268
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: local with offset
+ok 199 - zoned_local invalid: local with offset
+  ---
+  duration_ms: 0.040272
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: local with fraction
+ok 200 - zoned_local invalid: local with fraction
+  ---
+  duration_ms: 0.039635
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: local without seconds
+ok 201 - zoned_local invalid: local without seconds
+  ---
+  duration_ms: 0.037787
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: impossible date
+ok 202 - zoned_local invalid: impossible date
+  ---
+  duration_ms: 0.040264
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: missing zone (never inferred)
+ok 203 - zoned_local invalid: missing zone (never inferred)
+  ---
+  duration_ms: 0.045346
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: offset is not a zone
+ok 204 - zoned_local invalid: offset is not a zone
+  ---
+  duration_ms: 0.04227
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: path traversal
+ok 205 - zoned_local invalid: path traversal
+  ---
+  duration_ms: 0.040012
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: empty zone
+ok 206 - zoned_local invalid: empty zone
+  ---
+  duration_ms: 0.039434
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: trailing slash
+ok 207 - zoned_local invalid: trailing slash
+  ---
+  duration_ms: 0.090834
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: zone not a string
+ok 208 - zoned_local invalid: zone not a string
+  ---
+  duration_ms: 0.047864
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: 65-char zone
+ok 209 - zoned_local invalid: 65-char zone
+  ---
+  duration_ms: 0.04503
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: Etc alias
+ok 210 - zoned_local invalid: Etc alias
+  ---
+  duration_ms: 0.041022
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: signed Etc zone
+ok 211 - zoned_local invalid: signed Etc zone
+  ---
+  duration_ms: 0.040931
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: legacy POSIX-style zone
+ok 212 - zoned_local invalid: legacy POSIX-style zone
+  ---
+  duration_ms: 0.044842
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: Factory
+ok 213 - zoned_local invalid: Factory
+  ---
+  duration_ms: 0.04126
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: posix/ tree
+ok 214 - zoned_local invalid: posix/ tree
+  ---
+  duration_ms: 0.041664
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: right/ tree
+ok 215 - zoned_local invalid: right/ tree
+  ---
+  duration_ms: 0.042959
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: legacy country alias
+ok 216 - zoned_local invalid: legacy country alias
+  ---
+  duration_ms: 0.040472
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: UCT alias
+ok 217 - zoned_local invalid: UCT alias
+  ---
+  duration_ms: 0.039935
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: GMT alias
+ok 218 - zoned_local invalid: GMT alias
+  ---
+  duration_ms: 0.042423
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: too many segments
+ok 219 - zoned_local invalid: too many segments
+  ---
+  duration_ms: 0.082269
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: lowercase area
+ok 220 - zoned_local invalid: lowercase area
+  ---
+  duration_ms: 0.049644
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: not an object
+ok 221 - zoned_local invalid: not an object
+  ---
+  duration_ms: 0.043406
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: prototype-named key constructor
+ok 222 - zoned_local invalid: prototype-named key constructor
+  ---
+  duration_ms: 0.044679
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: prototype-named key __proto__
+ok 223 - zoned_local invalid: prototype-named key __proto__
+  ---
+  duration_ms: 0.040985
+  type: 'test'
+  ...
+# Subtest: zoned_local invalid: prototype-named key toString
+ok 224 - zoned_local invalid: prototype-named key toString
+  ---
+  duration_ms: 0.082086
+  type: 'test'
+  ...
+# Subtest: the lifecycle event list equals the valid lifecycle fixtures
+ok 225 - the lifecycle event list equals the valid lifecycle fixtures
+  ---
+  duration_ms: 0.229992
+  type: 'test'
+  ...
+# Subtest: unknown kind is a programming error
+ok 226 - unknown kind is a programming error
+  ---
+  duration_ms: 0.077362
+  type: 'test'
+  ...
+1..226
+# tests 226
+# suites 0
+# pass 226
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 288.653192
+# exit=0 finished 2026-10-03T16:55:13Z

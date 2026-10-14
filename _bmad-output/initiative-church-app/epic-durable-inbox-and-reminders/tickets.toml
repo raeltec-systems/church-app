@@ -1,0 +1,137 @@
+# Whole durable inbox and reminders epic plan; entries remain planned until a build writes its plan.
+# Table order is build order; ids are stable. Requirement ids N1–N8 live in the epic's Requirements.
+# Q2 follows owner-decisions-milestone-2.md (Africa/Lusaka, creator-set reminders, member snooze, no quiet hours).
+# Production scheduling and push stay gated until Israel approves q2_church_time and supplies the Firebase/APNs setup.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Deliver a synthetic due reminder to the durable inbox on both clients"
+description = "Add the Notifications owner module (registry prefix, jobs with logical key, source revision and policy version, inbox items) with enqueue and cancel owner operations that run inside a calling source command's transaction, a SYNTHETIC source type that enqueues a due job, a first worker step run through the bounded system route that turns a due job into exactly one inbox item, and an inbox read on mobile and the staff web client behind the live-access predicate."
+verify = "On hosted staging, run the synthetic source command for a seeded member, run the worker once through the system route and see one inbox item on mobile and on staff web, then show that repeating the command or the worker run adds no second item, a cancelled job never becomes an item, and another member and a signed-out client see nothing."
+covers = ["N1", "N4", "N6"]
+after = ["1.9", "1.7", "2.1"]
+hitl = true
+risk = "high"
+unknown = "The staging worker needs its own system principal (new purpose `notifications_worker`) and credential; Israel mints and registers it and sets the Edge Function secret, as in 2.9, and the agent never sees it."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-8--durable-notification-work-bounded-external-effects-assumption", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-19--bounded-system-principals-assumption", "docs/runbooks/system-access-and-operations.md", "docs/runbooks/contracts-and-owner-seams.md"]
+
+[[entry]]
+id = 2
+type = "story"
+title = "Register source contracts with generic payloads and authorised deep links"
+description = "Let a source owner register, in its own migration, its source check (current, revision, actionable, recipient eligible), purposes, reminder kinds, generic notification text without private content and an authorised deep-link target, and make opening an inbox item re-read the source through that check so a superseded or revoked item shows the latest authorised state; publish SYNTHETIC adapters (current, stale revision, cancelled, revoked scope, expired) and a consumer guide that Duties, Cells and later owners follow."
+verify = "Through the API, register the synthetic adapters and show that an unregistered source or kind is refused, a payload with a private field is rejected, opening an item for a stale, cancelled or revoked source returns the generic superseded state with no source content, and the contract fixtures pass in SQL, Dart and TypeScript."
+covers = ["N1", "N2"]
+after = [1]
+hitl = false
+risk = "high"
+unknown = "Whether the payload template and deep-link target need new wire-contract kinds (a contract version change under contracts-and-owner-seams.md) or fit inside the v1 `notification_key` and `source_ref` kinds is decided at build from the 1.5 rules."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-5--publish-separate-safe-projections-adopted", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#reminder-reliability", "docs/runbooks/contracts-and-owner-seams.md"]
+
+[[entry]]
+id = 3
+type = "story"
+title = "Calculate church-time reminder schedules from a versioned policy"
+description = "Build the one shared scheduling calculation in the Africa/Lusaka zone under a recorded policy version: creator-configured reminder offsets with the owner defaults (24 hours before and at the response deadline), the lead-time response-deadline default, short notice that skips passed offsets and asks for a response now, merging of simultaneous reminders for one source, expiry, Waiting review dates, recurrence exceptions, member snooze deferral and no quiet hours, plus transactional reconciliation of future jobs on a policy or schedule change; move the `q2_church_time` staging fixture to Africa/Lusaka with the decided defaults."
+verify = "Run table-driven SQL tests across the four deadline bands, DST-free and month-end local dates, a creator deadline after the start (refused), a passed offset, two reminders due together, a snooze past expiry (clamped), a Waiting review date and a policy change that moves future jobs without enqueuing past-due ones, and show that production with the gate unapproved refuses to schedule."
+covers = ["N3"]
+after = [1]
+hitl = false
+risk = "high"
+unknown = "The deadline bands and default offsets are the agent's reading of the owner's ranges (Decision in the epic Notes); the owner may refine them, so they live in the policy value, not in code."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-9--church-time-and-policy-versioned-schedules-adopted", "_bmad-output/initiative-church-app/owner-decisions-milestone-2.md", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#proposed-duty-reminder-defaults"]
+
+[[entry]]
+id = 4
+type = "story"
+title = "Claim, recheck and retry jobs with a leased and fenced worker"
+description = "Turn the tracer's worker step into the scheduled worker: Cron calls the authenticated Edge worker with a server credential, the worker claims bounded batches with leases and fencing tokens, reclaims expired leases, rechecks lease, source revision, recipient binding and grants, actionability, schedule and expiry before every attempt, retries with bounded backoff, expires obsolete jobs, never dispatches cancelled work and records each attempt, with one enabled scheduler per environment and the lease, retry and expiry policy configured centrally."
+verify = "Run the worker suite locally and on staging: two workers racing one batch, a worker killed mid-lease and reclaimed, a stale fencing token, a job cancelled after claim, a source revised after enqueue, a revoked recipient grant, an expired job and a transient failure each end in one logical outcome with recorded attempts, and Cron runs the worker with the app closed."
+covers = ["N4"]
+after = [2, 3]
+hitl = true
+risk = "high"
+unknown = "The Cron job must read the worker credential from a server secret store (Supabase Vault) that Israel sets on staging; the agent writes the schedule migration and never handles the credential."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-17--separated-environments-and-recoverable-operation-assumption", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#reminder-reliability"]
+external_check = "An independent reviewer repeats the duplicate-worker, lease-expiry and stale-revision cases before entry 10."
+
+[[entry]]
+id = 5
+type = "story"
+title = "Route recipients by current access and retire their work on lifecycle events"
+description = "Resolve each recipient through current Identity state so an active linked account gets its inbox item and push-eligible work while a held, deactivated or accountless member gets no member-push job and the need goes to the direct-contact route that the source owner registers with its source contract (added here; Duties' Needs contact list is its first real consumer); add per-account device-token registration and push settings by category, and register Notifications' lifecycle hooks (`sessions_revoked`, `access_hold_applied`, `membership_deactivated`, `account_deactivated`) and deletion hook so tokens are retired and member-push jobs cancelled in Identity's transaction."
+verify = "Through the API, enqueue synthetic reminders for an active member, a held member, a deactivated member and an accountless member and show inbox items only for the first, direct-contact needs for the others and no job for a relative's contact, then place a hold, revoke sessions and delete a member and show their tokens retired, member-push jobs cancelled and the deletion check answering zero."
+covers = ["N5"]
+after = [4, "2.8", "2.10", "2.11"]
+hitl = false
+risk = "high"
+unknown = "Group mutes belong to the conditional chat epic, so push settings cover categories only; the category list is the reminder kinds registered so far and grows with each source owner."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-14--atomic-local-lifecycle-resumable-external-deletion-assumption", "docs/runbooks/identity-access.md", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#proposed-duty-reminder-defaults"]
+external_check = "An independent reviewer repeats the held and accountless routing cases before entry 10."
+
+[[entry]]
+id = 6
+type = "story"
+title = "Send generic expiring push through FCM and retire invalid tokens"
+description = "Add the FCM HTTP v1 adapter to the worker with iOS delivery configured, mobile token registration and push-tap handling, generic expiring payloads with a stable notification id, honouring of push settings, bounded retry on transient errors, invalid-token retirement and per-attempt records of provider acceptance or failure only, so a push opens the item after sign-in and a current permission check."
+verify = "With the owner's Firebase project on staging and a real Android device (and iOS where available), receive a generic push for a synthetic reminder with the app closed, tap it to open the current item, then show that denied push still leaves the inbox item, an invalid token is retired after the provider's answer, a retried attempt keeps the same notification id and no attempt is shown as delivered or read."
+covers = ["N7", "N4"]
+after = [5]
+hitl = true
+risk = "high"
+unknown = "Israel creates the Firebase project, keeps the FCM service credential in server secrets, adds the APNs key and runs the real-device check; the installed AOSP emulator is not evidence, and until this lands push stays off."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-18--contract-first-integration-and-release-gates-adopted", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-13--public-caching-private-session-state-and-file-gates-assumption"]
+
+[[entry]]
+id = 7
+type = "story"
+title = "Show the inbox, notification settings and snooze on mobile and staff web"
+description = "Build the full inbox on mobile and staff web (unread and opened markers that never claim push delivery, recoverable loading and error states, deep links back to the item after sign-in), the push-settings screen by category, the member snooze action (1 hour, 24 hours, 2 days from policy) that defers only that recipient's reminder, and a server-published per-account generic refresh signal with no private payload that makes open inboxes re-read."
+verify = "On both clients, open, snooze and follow items from a synthetic source, turn push off and show in-app items remain, show that a snooze past the source's expiry is clamped and a response or cancellation removes the snoozed reminder, and capture the refresh-signal payload to prove it has no ids, text or source type."
+covers = ["N6", "N3"]
+after = [3, 5]
+hitl = false
+risk = "medium"
+unknown = "Staff web uses the provisional Flutter Web selection from 1.6; if the owner's outstanding browser spot-check reverses it, the screens move with the staff client and the server contract stays."
+references = ["_bmad-output/initiative-church-app/spec-church-app/design-contract.md#state-fidelity-and-binding-prototype-overrides", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-5--publish-separate-safe-projections-adopted", "docs/runbooks/client-shells.md"]
+
+[[entry]]
+id = 8
+type = "story"
+title = "Show reminder health to staff and write the notification-failure runbook"
+description = "Add a content-free reminder health read and staff web view for Admin and the restricted operator (last scheduler success, job age and delayed jobs, failed leases and attempts, retired tokens, direct-contact backlog counts) and write the notification-failure and reminder-recovery runbook, including how to pause sending through the `outbound_sending` gate."
+verify = "On staging, cause a delayed job, a failed attempt and a stopped scheduler with synthetic data and show each in the health view with counts and times only, show that a non-Admin is refused, and follow the runbook to pause and resume sending."
+covers = ["N8"]
+after = [5, "2.3"]
+hitl = false
+risk = "medium"
+unknown = "Alert thresholds and an alert destination are Q12 and `ops_alert_destination` owner gates, so the view shows state and no alert is sent."
+references = ["docs/runbooks/system-access-and-operations.md", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#reminder-reliability"]
+
+[[entry]]
+id = 9
+type = "story"
+title = "Refactor sweep"
+description = "Clean up notifications, worker and client duplication, boundary drift and maintainability findings recorded during the completed stories without changing scope or absorbing unfinished source behavior."
+verify = "Review the completed-story findings, apply only justified cleanup and rerun the affected worker, scheduling, permission and client checks without weakening contracts or acceptance behavior."
+covers = ["N8"]
+after = [1, 2, 3, 4, 5, 6, 7, 8]
+hitl = false
+risk = "medium"
+unknown = "The cleanup scope is chosen from build records when this story starts; any missing behavior becomes its own entry."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-18--contract-first-integration-and-release-gates-adopted"]
+
+[[entry]]
+id = 10
+type = "story"
+title = "Verify the inbox and reminders end to end and promote them to production"
+description = "Run the closing mobile and staff web suite over enqueue, scheduling, worker leases and retries, recipient routing, lifecycle retirement, push, inbox, snooze and health with the synthetic adapters (app closed, push denied, invalid token, short notice, recurrence edit, cancellation, stale revision, revoked scope, duplicate worker) on staging, then promote to the production baseline with `q2_church_time`, Firebase/APNs, the worker credential and sending either approved by Israel or left fail-closed."
+verify = "A clean build of both clients passes the integrated reminder scenarios and the independent reviewer's reruns on staging, Israel witnesses the mobile/staff demonstration, and production shows the deployed workflows with every unapproved gate (scheduling, push, outbound sending, alert destination) visibly disabled."
+covers = ["N1", "N2", "N3", "N4", "N5", "N6", "N7", "N8"]
+after = [9, "2.14"]
+hitl = true
+risk = "high"
+unknown = "Production needs the production Supabase project (1.8), Israel's approval of `q2_church_time` with Africa/Lusaka, the production worker credential, the Firebase/APNs production setup and a Q12 timing tolerance; while any is missing this entry delivers staging evidence and stays open."
+references = ["_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#verification-boundaries", "_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md#success-evidence"]
+external_check = "An independent reviewer reruns the duplicate-worker, stale-revision and held/accountless routing cases before promotion."

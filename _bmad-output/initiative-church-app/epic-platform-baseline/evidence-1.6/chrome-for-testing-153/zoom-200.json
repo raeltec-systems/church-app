@@ -1,0 +1,44 @@
+{
+  "vp": {
+    "width": 683,
+    "height": 378,
+    "dpr": 2,
+    "rootFontSize": "16px"
+  },
+  "slots": 48,
+  "gridCut": [],
+  "listCut": [],
+  "pageScrollsHorizontally": false,
+  "farVisible": true,
+  "slotDlg": {
+    "ok": true,
+    "name": "Main door — Sun 22 Nov",
+    "geo": {
+      "left": 111.5,
+      "right": 571.5,
+      "vw": 683,
+      "cut": []
+    },
+    "buttons": [
+      "Cancel",
+      "Save",
+      "Member +Test Plus G",
+      "Status Confirmed"
+    ]
+  },
+  "exportDlg": {
+    "ok": true,
+    "name": "Export rota CSV",
+    "geo": {
+      "left": 111.5,
+      "right": 571.5,
+      "vw": 683,
+      "cut": []
+    },
+    "buttons": [
+      "Cancel",
+      "Download CSV"
+    ]
+  },
+  "listInside": true
+}

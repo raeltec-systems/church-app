@@ -1,0 +1,19 @@
+$ FLUTTER_ROOT=<flutter 3.47.6> bash tools/identity-e2e/live-adapter-check.sh     (LOCAL, phone switch on, 2026-10-06, after merging ccr-93e730dd-89lbvg)
+(flutter root-user banners and "Running build hooks..." lines removed)
+== signup (unlinked)
+signup: session (amr=password)
+read: denied notLinked
+read after sign-out: signedOut
+PASS
+== operator seeds a SYNTHETIC link (database marked local for the run)
+t
+== session (refresh, reopen, revoke elsewhere, sign-out)
+S1 sign-in + read: session (amr=password); granted SYNTHETIC 2.2 Adapter Member ok
+S2 token refresh: new token, amr=password; granted SYNTHETIC 2.2 Adapter Member ok
+S3 reopen with stored session: no sign-in call; granted SYNTHETIC 2.2 Adapter Member ok
+S4 revoked elsewhere: device 1: denied untrustedSession; device 2: granted SYNTHETIC 2.2 Adapter Member ok
+S5 revoked session cannot refresh: refresh refused=true, local session cleared=true ok
+S6 sign-out: denied signedOut ok
+PASS
+== cleanup
+synthetic users left: 0

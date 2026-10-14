@@ -1,0 +1,10 @@
+== adapters: staff-web Admin grants/revokes; member session reads
+PASS L1 member session starts without roles: 
+PASS L2 Admin roster (staff web adapter): appAccount
+PASS L3 grant Pastor (command gateway): CommandConfirmed
+PASS L4 same member session sees Pastor at its next read: pastor, same token: true
+PASS L5 stale revision is a conflict: conflict
+PASS L6 revoke Pastor: CommandConfirmed
+PASS L7 member session loses Pastor at its next read: 
+PASS L8 a non-Admin session cannot read the roster: notGranted
+synthetic users left: 0

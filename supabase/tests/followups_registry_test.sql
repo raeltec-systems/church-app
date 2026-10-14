@@ -368,8 +368,8 @@ select is((select jsonb_array_length(v -> 'tasks') || '|' || jsonb_array_length(
 select is((select string_agg(x ->> 'member_id', ',' order by x ->> 'member_id')
              from jsonb_array_elements(pg_temp.readj(2, 'select api.followups_supervision()') #> '{scopes,0,candidates}') x),
   (select string_agg(v::text, ',' order by v::text) from unnest(array[pg_temp.mid(2), pg_temp.mid(3), pg_temp.mid(4),
-     pg_temp.mid(5), pg_temp.mid(7), pg_temp.mid(11)]) v),
-  'the candidates are D''s members and leaders only (no Pastor, no other department''s deputy)');
+     pg_temp.mid(5), pg_temp.mid(7), pg_temp.mid(8), pg_temp.mid(11)]) v),
+  'the candidates are D''s members and leaders plus the Pastor (owner decision Q4, story 4.7); no other department''s deputy');
 select is((select string_agg(x ->> 'task_id', ',' order by x ->> 'task_id')
              from jsonb_array_elements(pg_temp.readj(3, 'select api.followups_supervision()') -> 'tasks') x),
           (select string_agg(x ->> 'task_id', ',' order by x ->> 'task_id')
@@ -481,12 +481,12 @@ select is((select v ->> 'view' || '|' || (v #>> '{task,capacity}')
   'full|supervisor', 'an Admin who also leads D sees D''s tasks in full, as a supervisor');
 select is(pg_temp.upd(11, 4, '{"note": "SYNTHETIC: as leader"}') #>> '{data,state}', 'waiting',
   'and records on them (the scope capacity wins over Admin routing)');
-select is(pg_temp.reassign(1, 4, jsonb_build_object('owner_member_id', pg_temp.mid(8))) #>> '{field_errors,owner_member_id}',
-  'not_in_scope', 'an Admin reassigns only within the task''s scope roster');
+select is(pg_temp.reassign(1, 4, jsonb_build_object('owner_member_id', pg_temp.mid(9))) #>> '{field_errors,owner_member_id}',
+  'not_in_scope', 'an Admin reassigns only within the task''s scope roster (and the Pastors, story 4.7)');
 select is((select string_agg(x ->> 'scope_id', ',') from jsonb_array_elements(
              pg_temp.readj(1, 'select api.followups_admin_routing()') -> 'scopes') x
             where x ->> 'scope_id' = pg_temp.d()::text and x ->> 'family' = 'department'
-              and jsonb_array_length(x -> 'candidates') = 6), pg_temp.d()::text,
+              and jsonb_array_length(x -> 'candidates') = 7), pg_temp.d()::text,
   'Admin routing carries each active task scope''s roster, not the whole church');
 
 -- Registration hardening (review S3, N1) ------------------------------------------------------

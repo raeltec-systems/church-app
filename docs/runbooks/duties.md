@@ -871,3 +871,134 @@ Record the outcome of each step in `evidence-4.9/owner-check.md`: pass or fail, 
 - A case of a started duty closes lazily (at the next coverage command of the department's leaders), not at the start itself; its task sends nothing after the duty. A reminder the owner snoozes past the duty can still arrive once.
 - A leader's own duty is answered in My duties; the queue shows no contact actions on it.
 - The board's history list shows ended assignments with their provenance; a cancelled position's earlier assignment is in its history.
+
+## Story 4.10: record duty completion outcomes and keep assignment history
+
+Migration: `supabase/migrations/20261014231512_duties_outcomes.sql`.
+- Forward only: the 4.1-4.9 files are not edited. The replaced function bodies are listed in its header (`duties_state_ok`, `duties_authorize_command`, `duties_command`, `duties_my_assignment_json`, `duties_deletion_remaining`, `duties_erase_member`, all copied from `20261014212507`, 4.9, with every earlier review fix kept).
+- No destructive statements, no row deletions and no `_rows` file.
+- New client grants: `api.duties_outcomes(date, date, uuid, text)` and `api.duties_member_history(uuid, timestamptz, uuid)` with their `app` bodies (authenticated only). The two new commands go through `api.duties_command`.
+
+Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-record-duty-completion-outcomes-and-keep-assignment-history-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.10/`.
+
+### Response, coverage and completion stay separate
+
+- An outcome is only what a leader records after the duty: **Completed**, **Excused** or **No-show**, with an optional short note. Nothing records an outcome when time passes: every read says `unrecorded` ("Not recorded") until someone records it.
+- Recording or correcting an outcome never changes the assignment row, its response or its revision.
+- Only the **current** assignment of a **published** duty whose reporting (or start) time has passed may have an outcome. A superseded assignment (reassigned or changed) and a cancelled position, assignment or duty have none: a cancelled accepted duty has no outcome.
+- **No-show** only for an accepted assignment (the member's acceptance or Confirmed by leader). A declined or never-answered assignment may be Completed or Excused, never No-show.
+- A leader never records or corrects the outcome of their own duty: another leader or deputy of the department does.
+
+### Who sees what
+
+| Reader | Outcomes (`api.duties_outcomes`) | A member's history (`api.duties_member_history`) |
+|---|---|---|
+| The member | none (unless they lead a department) | their own, every department, with notes, corrections and reasons; My duties shows their own outcome |
+| A department's leader or deputy | that department's started duties with outcomes, notes, trail and reasons | a member who is or was in that department: that department's assignments only |
+| Admin (role alone), Pastor | `403 not_granted` | `403 not_granted` |
+| Another department's leader, another member | only their own departments; `403 not_granted` for a department filter they do not lead | `403 not_granted` (also for an unknown member: nothing is disclosed) |
+
+No read returns figures about more than one member: department counts are totals only, and a history summary is one member's own figures. There is no ranking or league table. The board, rota, coverage queue and Admin overview carry no outcome. The audit holds codes only (`outcome_recorded`, `outcome_corrected`, the outcome value); receipts hold ids, codes and revisions; no notification is sent.
+
+### Commands (`api.duties_command`)
+
+| Command | `expected_revision` | Payload | Effect |
+|---|---|---|---|
+| `duties.record_outcome` | the assignment revision (the answer the leader saw) | `{assignment_id, outcome: completed\|excused\|no_show, note?}` | the first outcome (revision 1), with the leader and the time |
+| `duties.correct_outcome` | the current outcome revision | `{assignment_id, outcome, note?, reason}` | a new revision that names the one it replaces, with the leader, the time and the reason (1-200); every earlier value, note, actor and time stay |
+
+Notes are short (1-200, single line, practical). There is no time limit on corrections (the spec sets none) and no way back to Unrecorded.
+
+Refusals:
+
+| Case | Answer |
+|---|---|
+| Admin (role alone) | `forbidden` |
+| Pastor, another department's leader, a member, an unknown, draft or cell-owned assignment | `not_found` (Pastor and members may be refused `forbidden` by the authorizer) |
+| The leader's own duty | `validation_failed {"assignment_id": "own"}` |
+| A superseded assignment; a cancelled position, assignment or duty | `conflict {"assignment_id": "superseded" \| "cancelled"}` |
+| The duty has not started | `validation_failed {"assignment_id": "not_started"}` |
+| An erased assignee | `validation_failed {"member_id": "erased"}` |
+| Record when one exists | `conflict {"assignment_id": "recorded"}` |
+| Correct when none exists | `validation_failed {"assignment_id": "unrecorded"}` |
+| Stale revision | `conflict` with `current_revision` |
+| No-show without an acceptance | `validation_failed {"outcome": "not_accepted"}` |
+| A correction that changes nothing; without a reason | `{"outcome": "unchanged"}`; `{"reason": "required"}` |
+| Gate closed (production without Q4); untrusted session | `unavailable {"policy": "gate_closed"}`; `unauthenticated` |
+
+A replay rechecks that the actor still manages the occurrence's department.
+
+### The reads
+
+- `api.duties_outcomes(from_date?, to_date?, department_id?, duty?)`: church dates (Africa/Lusaka), default the last 14 days up to today, at most 31 days, never after today (any past window: no time limit). Per position of a started published duty: the assignment (name, `own`, response and provenance), `outcome_state` (`unrecorded` or the value), `outcome` `{outcome, revision, note, recorded_at, recorded_by, corrected, trail}` (trail newest first, at most 20) and `allowed`. Per department: `counts` `{positions, unfilled, unrecorded, completed, excused, no_show}`. At most 1000 positions (latest first, `truncated`). Errors: `400 validation_failed` (`window`, `duty`), `403 not_granted`, `403 unavailable`.
+- `api.duties_member_history(member_id?, before_at?, before_id?)`: one row per position held (a material change that re-asks the same person is one row: the latest revision), newest first, 100 per page (`has_more`; the next page passes the last row's `starts_at` and `assignment_id`; a half cursor is `400 validation_failed cursor`). Each row: department, duty, position, times, `state` (`current`, `reassigned`, `cancelled`), response and provenance, `outcome_state` (`upcoming`, `unrecorded`, a value, or `none` for an ended row) and `outcome`. `summary` (the last 365 days, past duties): `held`, `accepted`, `confirmed_by_leader`, `declined`, `unanswered`, `completed`, `excused`, `no_show`, `unrecorded`, `ended`; and `upcoming`.
+- Cost: set-based, the current outcome by index. `supabase/tests/duties_outcomes_scale_test.sql` (under `statement_timeout = '8s'`): a member with fifteen years of weekly duties (780 positions, corrections and same-person revisions) read by the member, by their leader and at a late page about 0.05-0.1 s each; a department of 300 members with 80 positions a day: the leader's fortnight (over 1000 positions) and the 31-day window about 0.4-0.5 s each (local).
+
+### Gates and locks
+
+- Every read and command needs the Q4 personal-data gate (production stays inert). Nothing is scheduled, so the Q2 policy is not needed.
+- Lock order: grants -> receipt -> department -> series -> occurrence (FOR SHARE) -> assignment (FOR UPDATE, which also serialises the outcome log of that assignment) -> outcome log. No Follow-ups, no Notifications.
+
+### Member deletion
+
+`app.duties_erase_member` and `app.duties_deletion_remaining` are replaced: the outcome notes and correction reasons about an erased assignee are cleared (the values stay on the anonymised assignment); the recorder of an outcome is anonymised with the nil UUID. `_remaining` counts both. No rows are deleted. `app.duties_outcomes` is append-only (a trigger refuses every other update).
+
+### Clients
+
+- **Staff web, Outcomes** (`/duties/outcomes`, sidebar **Outcomes** for department leaders and deputies): **From**, 7/14/31 days, **Duty name contains**, a department choice, **Show**, and **Not recorded only**. Per department "N positions: ... completed, ... excused, ... no-show, ... not recorded". A card per position: duty, time, place, the member, **Answer: Accepted / Declined / Never answered / Confirmed by leader** (apart from the outcome), **Not recorded** or **Outcome: ...** with who recorded it, when, the note, **Corrected** and every earlier value with its recorder, time and reason. Actions **Record outcome** (chips for the allowed values: No-show only after an acceptance, a short note) or **Correct outcome** (a required reason), and **History of <member>**. On the leader's own duty: "another leader or deputy of the department records its outcome", no action.
+- **Staff web, My duty history** (`/duties/history`, every member) and a member's history (`/duties/history?member=<id>`, opened from Outcomes): the summary for the last 12 months, the upcoming count, each duty with its answer and outcome, **Older** / **Newer**, and "Seen only by the member and their department's leaders and deputies, for fair workload conversations. It is not a ranking."
+- **Mobile**: the same screens. The leader's **Needs attention** card on **Home** has **Record outcomes of past duties**; **My duties** has **My duty history**, and a past duty shows **Outcome: ...** (with the note and corrections) or "Outcome: not recorded yet."
+- Every action shows **Sending…**, and **Not sent yet** with **Check again** when the outcome is unknown; nothing is shown as recorded until the server answers. Refusals are explained (already recorded, not a No-show, not started, your own duty, changed elsewhere).
+
+### Local runs
+
+```bash
+npx supabase db reset
+npm run -s db:test                           # supabase/tests/duties_outcomes_test.sql, duties_outcomes_scale_test.sql (+ 4.1-4.9)
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/duties-outcomes.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+node --test tools/identity-e2e/duties-outcomes.test.mjs
+(cd packages/client_core && flutter test test/duties/duties_outcomes_test.dart)
+```
+
+Fictional numbers: pgTAP `+44 7700 900130-900139`, E2E `900140-900149`. Past duties are made by publishing them ahead and moving their start into the past with SQL (test-only time shift).
+
+### Hosted staging (parent session, then the owner)
+
+1. **Parent session:**
+   - Apply `20261014231512_duties_outcomes.sql` to staging (`tmurpotfluignacfueki`) after `20261014212507` (rename the local file to the recorded hosted version if the apply records another one).
+   - Run `tools/ci/verify-hosted.sql` with `expected_env=staging`.
+   - Compare the md5 of each new or replaced `app.duties_*` and `api.duties_outcomes` / `api.duties_member_history` function with the local one (the migration has no backslashes).
+   - Grants: among the new functions `authenticated` executes only `api.duties_outcomes`, `app.duties_outcomes`, `api.duties_member_history` and `app.duties_member_history`; `anon` none.
+   - Right after the apply: `select count(*) from app.duties_outcomes;` is 0.
+   - No Edge Function change, no rows file, no owner SQL paste.
+2. **Staging clients:** rebuild the staff web and the staging APK (new screens; no new dependency).
+3. **Production:** nothing in this story (Q4 stays closed; every Duties command and read needs Q4).
+
+### Owner manual checks (staging, phone and web, story 4.10)
+
+Use synthetic members only. You need the 4.9 setup: Admin A, leader L and a deputy D of `SYNTHETIC Preaching Rota` (L with the staging APK on an Android phone, and staff web), members M, O and R with the app, the second department `SYNTHETIC 4.9 Ushers` with leader K, and a member P with the Pastor role.
+
+1. **Past synthetic duties.** As L publish three one-off duties a day or two ahead: M (M accepts on the phone), O (O declines), R (R does not answer), and a fourth for M that M accepts and that L then cancels (**Coverage** > **Cancel position**). Wait until they have started (or ask the parent session to move their start into the past with SQL on staging; test-only).
+2. **Unrecorded stays unrecorded.** Staff web as L, **Outcomes**: the three duties show **Not recorded**; nothing changes after waiting (passing time never records an outcome). The cancelled duty is not listed.
+3. **Record.** On M's card **Record outcome** > **Completed**, note `SYNTHETIC: on time`, **Save outcome**: **Outcome recorded**; the card reads **Outcome: Completed** with L and the time. M's card still reads **Answer: Accepted**.
+4. **Declined is never a No-show.** On O's card **Record outcome**: no **No-show** chip; choose **Excused**, save.
+5. **Correct (mobile).** On D's phone (or L's): **Home** > **Record outcomes of past duties** > M's card > **Correct outcome** > **No-show**, reason `SYNTHETIC: checked the sign-in sheet`, **Save correction**: **Outcome corrected**; the card shows **Corrected** and "Earlier: Completed ... recorded by L ...".
+6. **Own duty.** If L has a past duty of their own, its card says another leader or deputy records it and offers no action.
+7. **The member's history.** On M's phone: **My duties** > **Past**: the duty reads **Outcome: No-show** with the note and the earlier value; **My duty history** shows the summary and "It is not a ranking". On staff web as L, **History of M** shows the same for this department only.
+8. **Nothing for others.** As R: **My duty history** shows only R's own duties; R cannot open M's history (a refusal, nothing shown). As K: **Outcomes** lists only the Ushers; M's history is refused. As A (Admin, no scope) and as P (Pastor): **Outcomes** and M's history are refused; **Duties**, **Rota** and **Coverage** show no outcome or note.
+9. **Clean up** as in 4.9, step 10, plus (SQL editor) the `app.duties_outcomes` rows of the synthetic assignments, before the assignments.
+
+Record the outcome of each step in `evidence-4.10/owner-check.md`: pass or fail, device model, Android version and browser. Include no numbers, ids or keys.
+
+### Owner questions
+
+- **Q4 (open, fail-closed default; unchanged from 4.9):** personal data in production. Outcomes and history are behind the Q4 gate, so production shows nothing until it is approved.
+- None new: the ticket's unknown (no time limit on corrections) is built as stated: every correction is recorded, none is limited.
+
+### Known limits (later entries)
+
+- Outcomes are for department-owned duties; cell-owned programme parts are entry 11. Leaving a department or the church (entry 12) does not remove outcomes; erasure clears their text.
+- An outcome cannot be cleared back to Unrecorded; a mistaken record is corrected to the right value with a reason.
+- The history counts one row per position held; the 12-month summary covers past duties only (upcoming duties are counted apart).

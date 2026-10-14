@@ -63,6 +63,10 @@ abstract final class ClientPaths {
   /// is one assignment (the reminder's deep link).
   static const myDuties = DutyPaths.mine;
 
+  /// Story 4.5 (mobile): the member Home (the My duties card; later
+  /// features add their cards).
+  static const home = DutyPaths.home;
+
   /// Story 4.1, staff web: department leaders and deputies (Admin; Pastor
   /// read only): publish a duty and see the responses.
   static const dutyLeader = DutyPaths.leader;
@@ -211,6 +215,7 @@ GoRouter buildClientRouter({
   bool membershipRequests = false,
   bool assistedRecovery = false,
   bool reminderHealth = false,
+  bool memberHome = false,
 }) {
   final afterCreateAccount = membershipRequests
       ? ClientPaths.membership
@@ -302,6 +307,12 @@ GoRouter buildClientRouter({
         path: ClientPaths.myCell,
         pageBuilder: (_, state) => page(state, const MyCellScreen()),
       ),
+      // Story 4.5: the member Home is a mobile destination only.
+      if (memberHome)
+        GoRoute(
+          path: ClientPaths.home,
+          pageBuilder: (_, state) => page(state, const MemberHomeScreen()),
+        ),
       GoRoute(
         path: ClientPaths.myDuties,
         pageBuilder: (_, state) => page(state, const MyDutiesScreen()),

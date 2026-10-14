@@ -9,6 +9,7 @@ import '../application/duties_controllers.dart';
 import '../domain/access_grants.dart';
 import '../domain/church_time.dart';
 import '../domain/duties.dart';
+import '../domain/duty_calendar.dart';
 
 part 'duties_rota_screens.dart';
 
@@ -43,6 +44,9 @@ abstract final class DutyPaths {
 
   /// Staff web, Admin only: departments, leaders, deputies and members.
   static const adminDepartments = '/admin/departments';
+
+  /// Story 4.5 (mobile): the member Home with the My duties card.
+  static const home = '/home';
 }
 
 (StatusTone, String, String) _noticeText(
@@ -222,6 +226,22 @@ abstract final class DutyPaths {
       'Already answered',
       'This duty already has an answer. The list was reloaded.',
     ),
+    DutyNotice.withdrawn => (
+      StatusTone.success,
+      'Answer sent',
+      'Your leader now sees that you can\'t make $what anymore.',
+    ),
+    DutyNotice.bulkAccepted => (
+      StatusTone.success,
+      'Accepted',
+      'Your leader now sees that you accepted $what.',
+    ),
+    DutyNotice.bulkChanged => (
+      StatusTone.warning,
+      'Nothing accepted',
+      'Some of the dates you chose changed or were already answered, so none '
+          'were accepted. The list was reloaded; check it and choose again.',
+    ),
     DutyNotice.started => (
       StatusTone.neutral,
       'Already started',
@@ -324,6 +344,7 @@ class _DutiesPage<T> extends ConsumerStatefulWidget {
     required this.needs,
     required this.loading,
     required this.body,
+    this.footer,
   });
 
   final String title;
@@ -332,6 +353,11 @@ class _DutiesPage<T> extends ConsumerStatefulWidget {
   final String loading;
   final Widget Function(BuildContext context, T value, DutiesState<T> state)
   body;
+
+  /// Story 4.5: a sticky footer below the scrolling content (the duty
+  /// detail's answer buttons); null when there is none.
+  final Widget? Function(BuildContext context, T value, DutiesState<T> state)?
+  footer;
 
   @override
   ConsumerState<_DutiesPage<T>> createState() => _DutiesPageState<T>();
@@ -350,9 +376,12 @@ class _DutiesPageState<T> extends ConsumerState<_DutiesPage<T>> {
   }
 
   // Resume and revisit reloads wait while a command is in flight (its own
-  // answer reloads the list).
+  // answer reloads the list). Story 4.5: and while a read is already under
+  // way, so screens mounted together (the Home card, a list under a pushed
+  // detail) read once on resume.
   void _reload() {
-    if (mounted && !ref.read(widget.provider).busy) {
+    final s = ref.read(widget.provider);
+    if (mounted && !s.busy && !s.loading) {
       ref.read(widget.provider.notifier).reload();
     }
   }
@@ -461,8 +490,13 @@ class _DutiesPageState<T> extends ConsumerState<_DutiesPage<T>> {
         ),
       ),
     ]);
+    final footer = switch ((widget.footer, result)) {
+      (final f?, AccessReadOk(:final value)) => f(context, value, s),
+      _ => null,
+    };
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
+      bottomNavigationBar: footer,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: layout.pagePadding,
@@ -1019,7 +1053,10 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
                   ),
                   Builder(
                     builder: (context) {
-                      final (label, tone) = _responseLabel(a.response);
+                      final (label, tone) = _answerLabel(
+                        a.response,
+                        a.priorAcceptedAt,
+                      );
                       return StatusLabel(
                         key: Key('response-${a.assignmentId}'),
                         label: label,
@@ -1027,6 +1064,11 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
                       );
                     },
                   ),
+                  if (a.priorAcceptedAt case final t?)
+                    _muted(
+                      context,
+                      'Had accepted ${_when(context, t)}; needs cover',
+                    ),
                   if (a.changes case final c?)
                     StatusLabel(
                       key: Key('changed-${a.assignmentId}'),
@@ -1108,7 +1150,7 @@ class _History extends StatelessWidget {
                 context,
                 [
                   '${h.displayName ?? 'Removed member'}: '
-                      '${_responseLabel(h.response).$1}',
+                      '${_answerLabel(h.response, h.priorAcceptedAt).$1}',
                   if (h.respondedAt case final r?)
                     'answered ${_when(context, r)}',
                   if (h.provenance == 'member') 'by the member',
@@ -1777,14 +1819,62 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
 // Mobile: the member's duties
 // ---------------------------------------------------------------------------
 
-/// Story 4.1, mobile: the member's duties across departments: Needs a
-/// response, Upcoming and Past. Accept or Can't make it (with an optional
-/// note) shows as done only after the server confirmed it.
+/// Story 4.5: the member's answer as they and their leader read it ("Can't
+/// make it anymore" after an earlier acceptance).
+(String, StatusTone) _answerLabel(DutyResponse r, DateTime? priorAcceptedAt) =>
+    r == DutyResponse.declined && priorAcceptedAt != null
+    ? ('Can\'t make it anymore', StatusTone.warning)
+    : _responseLabel(r);
+
+/// The church date as a small badge ("4" over "Jan").
+class _DateBadge extends StatelessWidget {
+  const _DateBadge({required this.at});
+  final DateTime at;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final w = ChurchTime.wall(at);
+    final month = MaterialLocalizations.of(context)
+        .formatMediumDate(w)
+        .split(' ')
+        .firstWhere((p) => RegExp(r'^[A-Za-z]').hasMatch(p), orElse: () => '');
+    return ExcludeSemantics(
+      child: Container(
+        width: 52,
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          color: c.blueBg,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          children: [
+            Text(
+              '${w.day}',
+              style: ChurchType.cardTitle.copyWith(color: c.blueFg),
+            ),
+            Text(
+              month.replaceAll(',', ''),
+              style: ChurchType.secondary.copyWith(color: c.blueFg),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Story 4.1, mobile: the member's duties across departments. Story 4.5:
+/// segments (Needs a response, Upcoming, Past), a detail screen with a
+/// sticky answer footer, Can't make it (anymore) through a sheet with an
+/// optional practical note, accepting several listed dates together after a
+/// confirmation, and Add to calendar. Answers show as done only after the
+/// server confirmed them.
 class MyDutiesScreen extends StatelessWidget {
   const MyDutiesScreen({super.key, this.assignmentId});
 
-  /// Set when opened from a reminder (`/duties/assignments/<id>`): only that
-  /// duty is shown, in full.
+  /// Set when opened from a reminder or the list (`/duties/assignments/<id>`):
+  /// only that duty is shown, in full.
   final String? assignmentId;
 
   @override
@@ -1794,53 +1884,215 @@ class MyDutiesScreen extends StatelessWidget {
     needs: 'Your duties are shown once you have member access.',
     loading: 'Loading your duties…',
     body: (context, v, s) => assignmentId == null
-        ? _MyDutiesList(duties: v, busy: s.busy)
-        : _OneDuty(duties: v, assignmentId: assignmentId!, busy: s.busy),
+        ? _MyDutiesList(
+            key: const ValueKey('my-duties-list'),
+            duties: v,
+            busy: s.busy,
+          )
+        : _OneDuty(
+            key: const ValueKey('my-duty-detail'),
+            duties: v,
+            assignmentId: assignmentId!,
+            busy: s.busy,
+          ),
+    footer: assignmentId == null
+        ? null
+        : (context, v, s) => switch (v.findCurrent(assignmentId)) {
+            final d? => _DutyFooter(duty: d, busy: s.busy),
+            null => null,
+          },
   );
 }
 
-class _MyDutiesList extends StatelessWidget {
-  const _MyDutiesList({required this.duties, required this.busy});
+enum _Segment { needs, upcoming, past }
+
+class _MyDutiesList extends ConsumerStatefulWidget {
+  const _MyDutiesList({super.key, required this.duties, required this.busy});
   final MyDuties duties;
   final bool busy;
 
   @override
-  Widget build(BuildContext context) {
+  ConsumerState<_MyDutiesList> createState() => _MyDutiesListState();
+}
+
+class _MyDutiesListState extends ConsumerState<_MyDutiesList> {
+  _Segment? _chosen;
+  final _selected = <String>{};
+
+  // Only dates that still need an answer stay selected: an answered or
+  // changed date drops out once the list is read again.
+  @override
+  void didUpdateWidget(covariant _MyDutiesList old) {
+    super.didUpdateWidget(old);
     final now = DateTime.now();
-    final needs = duties.assignments
-        .where((a) => a.needsResponse(now))
-        .toList();
-    final upcoming = duties.assignments
-        .where((a) => !a.needsResponse(now) && !a.startedAt(now))
-        .toList();
-    final past = duties.assignments.where((a) => a.startedAt(now)).toList()
-      ..sort((a, b) => b.times.startsAt.compareTo(a.times.startsAt));
-    if (needs.isEmpty && upcoming.isEmpty && past.isEmpty) {
+    final open = {
+      for (final d in widget.duties.assignments)
+        if (d.needsResponse(now)) d.assignmentId,
+    };
+    _selected.retainWhere(open.contains);
+  }
+
+  Future<void> _confirmBulk(List<MyDuty> chosen) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => ChurchDialog(
+        title:
+            'Accept ${chosen.length} '
+            '${chosen.length == 1 ? 'duty' : 'duties'}?',
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('You are accepting these dates:'),
+            const SizedBox(height: 8),
+            for (final d in chosen)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  '${_when(context, d.times.arriveBy)}: ${d.title} '
+                  '(${d.departmentName})',
+                  key: Key('bulk-date-${d.assignmentId}'),
+                ),
+              ),
+            const SizedBox(height: 8),
+            const Text(
+              'If any of them changed since you opened this list, nothing '
+              'is accepted and the list is shown again.',
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Notes are not sent when accepting several dates. To add a '
+              'note, accept that date on its own.',
+              key: Key('duties-bulk-no-note'),
+            ),
+          ],
+        ),
+        actions: [
+          FocusRing(
+            child: TextButton(
+              key: const Key('duties-bulk-cancel'),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+          ),
+          FocusRing(
+            child: FilledButton(
+              key: const Key('duties-bulk-confirm'),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(
+                'Accept ${chosen.length} '
+                '${chosen.length == 1 ? 'duty' : 'duties'}',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      await ref.read(myDutiesProvider.notifier).acceptMany(chosen);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final seg = MyDutySegments.of(widget.duties.assignments, DateTime.now());
+    if (seg.needsResponse.isEmpty && seg.upcoming.isEmpty && seg.past.isEmpty) {
       return const Text(
         'You have no upcoming duties.',
         key: Key('my-duties-empty'),
       );
     }
-    List<Widget> section(String title, List<MyDuty> list, bool full) => [
-      _heading(context, '$title (${list.length})'),
-      if (list.isEmpty) _muted(context, 'None.'),
-      for (final a in list) ...[
-        _DutyCard(duty: a, busy: busy, full: full),
-        const SizedBox(height: 12),
-      ],
-      const SizedBox(height: 8),
+    final current =
+        _chosen ??
+        (seg.needsResponse.isNotEmpty ? _Segment.needs : _Segment.upcoming);
+    final chosen = [
+      for (final d in seg.needsResponse)
+        if (_selected.contains(d.assignmentId)) d,
     ];
+    final list = switch (current) {
+      _Segment.needs => seg.needsResponse,
+      _Segment.upcoming => seg.upcoming,
+      _Segment.past => seg.past,
+    };
+    final selectable =
+        current == _Segment.needs && seg.needsResponse.length > 1;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (duties.truncated)
-          Text(
+        if (widget.duties.truncated)
+          const Text(
             'Only your next 200 duties are shown.',
-            key: const Key('my-duties-truncated'),
+            key: Key('my-duties-truncated'),
           ),
-        ...section('Needs a response', needs, false),
-        ...section('Upcoming', upcoming, false),
-        if (past.isNotEmpty) ...section('Past', past, false),
+        RadioSegments<_Segment>(
+          key: const Key('my-duties-segments'),
+          label: 'Show',
+          options: [
+            SegmentOption(
+              _Segment.needs,
+              'Needs a response (${seg.needsResponse.length})',
+            ),
+            SegmentOption(
+              _Segment.upcoming,
+              'Upcoming (${seg.upcoming.length})',
+            ),
+            SegmentOption(_Segment.past, 'Past (${seg.past.length})'),
+          ],
+          selected: current,
+          onChanged: (v) => setState(() => _chosen = v),
+        ),
+        const SizedBox(height: 12),
+        if (selectable) ...[
+          _muted(
+            context,
+            'Select the dates you can do, then accept them together.',
+          ),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FocusRing(
+              child: FilledButton.icon(
+                key: const Key('duties-accept-selected'),
+                onPressed:
+                    widget.busy ||
+                        chosen.isEmpty ||
+                        chosen.length > DutyCommands.maxBulk
+                    ? null
+                    : () => _confirmBulk(chosen),
+                icon: const Icon(Icons.done_all),
+                label: Text('Accept selected (${chosen.length})'),
+              ),
+            ),
+          ),
+          if (chosen.length > DutyCommands.maxBulk)
+            _muted(
+              context,
+              'Select at most ${DutyCommands.maxBulk} dates at a time.',
+            ),
+          const SizedBox(height: 12),
+        ],
+        if (list.isEmpty)
+          Text(switch (current) {
+            _Segment.needs => 'Nothing waiting for your response.',
+            _Segment.upcoming => 'You have no upcoming duties.',
+            _Segment.past => 'No past duties yet.',
+          }, key: Key('my-duties-empty-${current.name}')),
+        for (final a in list) ...[
+          _DutyCard(
+            duty: a,
+            busy: widget.busy,
+            full: false,
+            selected: selectable ? _selected.contains(a.assignmentId) : null,
+            onSelected: selectable
+                ? (v) => setState(() {
+                    if (v) {
+                      _selected.add(a.assignmentId);
+                    } else {
+                      _selected.remove(a.assignmentId);
+                    }
+                  })
+                : null,
+          ),
+          const SizedBox(height: 12),
+        ],
       ],
     );
   }
@@ -1848,6 +2100,7 @@ class _MyDutiesList extends StatelessWidget {
 
 class _OneDuty extends StatelessWidget {
   const _OneDuty({
+    super.key,
     required this.duties,
     required this.assignmentId,
     required this.busy,
@@ -1894,20 +2147,79 @@ class _OneDuty extends StatelessWidget {
   }
 }
 
-class _DutyCard extends ConsumerStatefulWidget {
-  const _DutyCard({required this.duty, required this.busy, required this.full});
-  final MyDuty duty;
-  final bool busy;
+/// Story 4.5: is a command for [a] in flight, or sent with an unknown
+/// outcome while the server still shows [a] as that command found it? Once
+/// a read shows the duty answered (the server did record it) or changed,
+/// the server's state wins over Not sent.
+(bool sending, bool unsent) _commandState(WidgetRef ref, MyDuty a) => (
+  ref.watch(
+    myDutiesProvider.select((s) => s.pending?.touches(a.assignmentId) ?? false),
+  ),
+  ref.watch(
+    myDutiesProvider.select(
+      (s) => switch (s.unconfirmed) {
+        final u? => MyDutiesController.awaits(u, a),
+        null => false,
+      },
+    ),
+  ),
+);
 
-  /// Show every detail (the deep-linked view); the list shows a summary.
-  final bool full;
+/// The status a member reads: Sending… while a command for this duty is
+/// out, Not sent while its outcome is unknown and the duty still waits for
+/// it, otherwise the server's.
+(String, StatusTone) _shownStatus(MyDuty a, bool sending, bool unsent) =>
+    sending
+    ? ('Sending…', StatusTone.info)
+    : unsent
+    ? ('Not sent', StatusTone.warning)
+    : _answerLabel(a.response, a.priorAcceptedAt);
 
-  @override
-  ConsumerState<_DutyCard> createState() => _DutyCardState();
+/// Story 4.5: Can't make it (a pending duty) or Can't make it anymore (an
+/// accepted one): a sheet with an optional practical note and Cancel. The
+/// command goes only when the member confirms.
+Future<void> _showDeclineSheet(
+  BuildContext context,
+  WidgetRef ref,
+  MyDuty duty,
+) async {
+  final later = duty.response == DutyResponse.accepted;
+  // A note already typed on the card carries into Can't make it.
+  final draft = later
+      ? null
+      : ref.read(dutyAnswerNotesProvider)[duty.assignmentId];
+  final note = await showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (context) =>
+        _DeclineSheet(duty: duty, later: later, initialNote: draft),
+  );
+  if (note == null) return;
+  final ctl = ref.read(myDutiesProvider.notifier);
+  if (later) {
+    await ctl.withdraw(duty, note: note);
+  } else {
+    await ctl.respond(duty, DutyResponse.declined, note: note);
+  }
 }
 
-class _DutyCardState extends ConsumerState<_DutyCard> {
-  final _note = TextEditingController();
+class _DeclineSheet extends StatefulWidget {
+  const _DeclineSheet({
+    required this.duty,
+    required this.later,
+    this.initialNote,
+  });
+  final MyDuty duty;
+  final bool later;
+  final String? initialNote;
+
+  @override
+  State<_DeclineSheet> createState() => _DeclineSheetState();
+}
+
+class _DeclineSheetState extends State<_DeclineSheet> {
+  late final _note = TextEditingController(text: widget.initialNote ?? '');
 
   @override
   void dispose() {
@@ -1917,155 +2229,679 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
 
   @override
   Widget build(BuildContext context) {
+    final d = widget.duty;
+    final title = widget.later ? 'Can\'t make it anymore?' : 'Can\'t make it?';
+    return Semantics(
+      scopesRoute: true,
+      namesRoute: true,
+      explicitChildNodes: true,
+      label: title,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          0,
+          20,
+          20 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _heading(context, title),
+              Text('${d.title}, ${_when(context, d.times.arriveBy)}'),
+              const SizedBox(height: 8),
+              Text(
+                widget.later
+                    ? 'You accepted this duty. Your leader sees at once that '
+                          'this position needs cover again.'
+                    : 'Your leader sees at once that this position needs '
+                          'cover.',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                key: const Key('decline-note'),
+                controller: _note,
+                maxLength: 280,
+                maxLines: 3,
+                minLines: 1,
+                decoration: const InputDecoration(
+                  labelText: 'Note for your leader (optional)',
+                  helperText:
+                      'Practical details only, for example "travelling '
+                      'that weekend".',
+                  helperMaxLines: 2,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FocusRing(
+                    child: TextButton(
+                      key: const Key('decline-cancel'),
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                  FocusRing(
+                    child: FilledButton(
+                      key: const Key('decline-confirm'),
+                      onPressed: () =>
+                          Navigator.of(context).pop(_note.text.trim()),
+                      child: Text(
+                        widget.later
+                            ? 'Send: can\'t make it anymore'
+                            : 'Send: can\'t make it',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Story 4.5: the detail screen's sticky answer footer: Accept and Can't
+/// make it while an answer is needed; Can't make it anymore after accepting
+/// (until the duty starts); nothing otherwise.
+class _DutyFooter extends ConsumerWidget {
+  const _DutyFooter({required this.duty, required this.busy});
+  final MyDuty duty;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ChurchColors.of(context);
+    final now = DateTime.now();
+    final id = duty.assignmentId;
+    final buttons = <Widget>[
+      if (duty.needsResponse(now)) ...[
+        FocusRing(
+          child: FilledButton(
+            key: Key('duty-accept-$id'),
+            onPressed: busy
+                ? null
+                : () => ref
+                      .read(myDutiesProvider.notifier)
+                      .respond(
+                        duty,
+                        DutyResponse.accepted,
+                        note: ref.read(dutyAnswerNotesProvider)[id],
+                      ),
+            child: const Text('Accept'),
+          ),
+        ),
+        FocusRing(
+          child: OutlinedButton(
+            key: Key('duty-decline-$id'),
+            onPressed: busy
+                ? null
+                : () => _showDeclineSheet(context, ref, duty),
+            child: const Text('Can\'t make it'),
+          ),
+        ),
+      ] else if (duty.canWithdraw(now))
+        FocusRing(
+          child: OutlinedButton(
+            key: Key('duty-withdraw-$id'),
+            onPressed: busy
+                ? null
+                : () => _showDeclineSheet(context, ref, duty),
+            child: const Text('Can\'t make it anymore'),
+          ),
+        ),
+    ];
+    if (buttons.isEmpty) return const SizedBox.shrink();
+    return DecoratedBox(
+      key: const Key('duty-footer'),
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border(top: BorderSide(color: c.line)),
+      ),
+      // Clear of the home indicator and gesture bar.
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Wrap(spacing: 8, runSpacing: 8, children: buttons),
+        ),
+      ),
+    );
+  }
+}
+
+class _DutyCard extends ConsumerStatefulWidget {
+  const _DutyCard({
+    required this.duty,
+    required this.busy,
+    required this.full,
+    this.selected,
+    this.onSelected,
+  });
+  final MyDuty duty;
+  final bool busy;
+
+  /// Show every detail (the detail screen); the list shows a summary.
+  final bool full;
+
+  /// Story 4.5: selection for accepting several dates together (null: not
+  /// selectable here).
+  final bool? selected;
+  final ValueChanged<bool>? onSelected;
+
+  @override
+  ConsumerState<_DutyCard> createState() => _DutyCardState();
+}
+
+class _DutyCardState extends ConsumerState<_DutyCard> {
+  CalendarHandoff? _calendar;
+  bool _exporting = false;
+
+  // The optional note for Accept (shared with the detail footer).
+  late final TextEditingController _note;
+
+  @override
+  void initState() {
+    super.initState();
+    _note = TextEditingController(
+      text: ref.read(dutyAnswerNotesProvider)[widget.duty.assignmentId] ?? '',
+    );
+  }
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  Future<void> _addToCalendar(MyDuty a, BuildContext button) async {
+    // The share sheet points at the button (an iPad popover needs it).
+    final box = button.findRenderObject();
+    ShareOrigin? origin;
+    if (box is RenderBox && box.hasSize) {
+      final o = box.localToGlobal(Offset.zero);
+      origin = ShareOrigin(o.dx, o.dy, box.size.width, box.size.height);
+    }
+    setState(() => _exporting = true);
+    final result = await ref
+        .read(dutyCalendarExportProvider)
+        .export(
+          fileName: DutyCalendar.fileName(a),
+          ics: DutyCalendar.ics(a, now: DateTime.now()),
+          origin: origin,
+        );
+    if (!mounted) return;
+    setState(() {
+      _exporting = false;
+      _calendar = result;
+    });
+    announce(context, _calendarText(result));
+  }
+
+  static String _calendarText(CalendarHandoff r) => switch (r) {
+    CalendarHandoff.shared =>
+      'Calendar file shared. Check the calendar app you chose; this copy '
+          'won\'t update if the duty changes.',
+    CalendarHandoff.handedOver =>
+      'Calendar file handed to your phone. We can\'t tell whether it was '
+          'saved; this copy won\'t update if the duty changes.',
+    CalendarHandoff.dismissed => 'Not added: the share sheet was closed.',
+    CalendarHandoff.unavailable =>
+      'Add to calendar isn\'t available in this version of the app.',
+    CalendarHandoff.failed =>
+      'Couldn\'t hand over the calendar file. Try again.',
+  };
+
+  @override
+  Widget build(BuildContext context) {
     final a = widget.duty;
     final id = a.assignmentId;
-    final ctl = ref.read(myDutiesProvider.notifier);
     final now = DateTime.now();
-    final (label, tone) = _responseLabel(a.response);
+    final (sending, unsent) = _commandState(ref, a);
+    final (shown, shownTone) = _shownStatus(a, sending, unsent);
     final canAnswer = a.needsResponse(now);
-    // Honest states (FR My duties): Sending while the request is out, Not
-    // sent while its outcome is unknown; Accepted only from the server.
-    final sending = ref.watch(
-      myDutiesProvider.select(
-        (s) => s.pending?.request.payload['assignment_id'] == id,
+    final details = <Widget>[
+      _heading(context, a.title),
+      Text(a.departmentName),
+      Text(_timesText(context, a.times)),
+      if (a.location case final l?) Text('Where: $l'),
+      if (a.changes case final c?) ...[
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            StatusLabel(
+              key: Key('duty-changed-$id'),
+              label: 'Changed',
+              tone: StatusTone.info,
+            ),
+            Text('What changed: ${DutyFields.describe(c)}.'),
+          ],
+        ),
+        if (a.previousResponse case final p? when p != DutyResponse.pending)
+          _muted(
+            context,
+            'Your earlier answer was "${_responseLabel(p).$1}". '
+                    '${a.response == DutyResponse.pending ? 'Please answer again.' : ''}'
+                .trim(),
+          ),
+      ],
+      if (a.notesUpdatedAt case final u?)
+        _muted(
+          context,
+          'Details updated ${_when(context, u)}. Your answer stands.',
+        ),
+      if (a.topic case final t?) Text('Topic: $t'),
+      if (a.scripture case final sc?) Text('Scripture: $sc'),
+      if (widget.full)
+        if (a.instructions case final i?) ...[
+          const SizedBox(height: 4),
+          Text('Instructions: $i', key: Key('duty-instructions-$id')),
+        ],
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          StatusLabel(
+            key: Key('my-duty-status-$id'),
+            label: shown,
+            tone: shownTone,
+          ),
+          if (a.response == DutyResponse.pending)
+            _muted(context, 'Answer by ${_when(context, a.responseDeadline)}'),
+        ],
       ),
-    );
-    final unsent = ref.watch(
-      myDutiesProvider.select(
-        (s) => s.unconfirmed?.request.payload['assignment_id'] == id,
-      ),
-    );
-    final (shown, shownTone) = !canAnswer
-        ? (label, tone)
-        : sending
-        ? ('Sending…', StatusTone.info)
-        : unsent
-        ? ('Not sent', StatusTone.warning)
-        : (label, tone);
+      if (a.declinedLater)
+        _muted(
+          context,
+          'You had accepted on ${_when(context, a.priorAcceptedAt!)}, then '
+          'told your leader you can\'t make it.',
+        ),
+      if (a.note case final n?) Text('Your note: $n'),
+      if (canAnswer) ...[
+        const SizedBox(height: 8),
+        TextField(
+          key: Key('duty-note-$id'),
+          controller: _note,
+          enabled: !widget.busy,
+          maxLength: 280,
+          onChanged: (v) =>
+              ref.read(dutyAnswerNotesProvider.notifier).set(id, v),
+          decoration: const InputDecoration(
+            labelText: 'Note for your leader (optional)',
+            helperText: 'Sent with Accept or Can\'t make it.',
+          ),
+        ),
+      ],
+      if (widget.full) ...[
+        if (a.leaders.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            [
+              for (final l in a.leaders)
+                '${l.isDeputy ? 'Deputy' : 'Leader'}: ${l.displayName}',
+            ].join('. '),
+            key: Key('duty-leaders-$id'),
+          ),
+          _muted(
+            context,
+            'Contact your leader through the church if you have questions.',
+          ),
+        ],
+        if (!a.startedAt(now) && a.response != DutyResponse.declined) ...[
+          const SizedBox(height: 8),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FocusRing(
+              child: Builder(
+                builder: (button) => OutlinedButton.icon(
+                  key: Key('duty-calendar-$id'),
+                  onPressed: _exporting
+                      ? null
+                      : () => _addToCalendar(a, button),
+                  icon: const Icon(Icons.event_outlined),
+                  label: const Text('Add to calendar'),
+                ),
+              ),
+            ),
+          ),
+          _muted(context, DutyCalendar.staleCaveat),
+          if (_calendar case final r?)
+            Text(_calendarText(r), key: Key('duty-calendar-result-$id')),
+        ],
+      ],
+    ];
+    final actions = <Widget>[
+      if (!widget.full && canAnswer) ...[
+        FocusRing(
+          child: FilledButton(
+            key: Key('duty-accept-$id'),
+            onPressed: widget.busy
+                ? null
+                : () => ref
+                      .read(myDutiesProvider.notifier)
+                      .respond(
+                        a,
+                        DutyResponse.accepted,
+                        note: ref.read(dutyAnswerNotesProvider)[id],
+                      ),
+            child: const Text('Accept'),
+          ),
+        ),
+        FocusRing(
+          child: OutlinedButton(
+            key: Key('duty-decline-$id'),
+            onPressed: widget.busy
+                ? null
+                : () => _showDeclineSheet(context, ref, a),
+            child: const Text('Can\'t make it'),
+          ),
+        ),
+      ],
+      if (!widget.full)
+        FocusRing(
+          child: TextButton(
+            key: Key('duty-open-$id'),
+            onPressed: () => context.push(DutyPaths.assignment(id)),
+            child: const Text('Details'),
+          ),
+        ),
+    ];
     return _Card(
       key: Key('my-duty-$id'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _heading(
-            context,
-            a.positionName == null
-                ? a.dutyName
-                : '${a.dutyName}: ${a.positionName}',
-          ),
-          Text(a.departmentName),
-          Text(_timesText(context, a.times)),
-          if (a.location case final l?) Text('Where: $l'),
-          if (a.changes case final c?) ...[
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                StatusLabel(
-                  key: Key('duty-changed-$id'),
-                  label: 'Changed',
-                  tone: StatusTone.info,
-                ),
-                Text('What changed: ${DutyFields.describe(c)}.'),
-              ],
-            ),
-            if (a.previousResponse case final p? when p != DutyResponse.pending)
-              _muted(
-                context,
-                'Your earlier answer was "${_responseLabel(p).$1}". '
-                        '${a.response == DutyResponse.pending ? 'Please answer again.' : ''}'
-                    .trim(),
-              ),
-          ],
-          if (a.notesUpdatedAt case final u?)
-            _muted(
-              context,
-              'Details updated ${_when(context, u)}. Your answer stands.',
-            ),
-          if (a.topic case final t?) Text('Topic: $t'),
-          if (a.scripture case final sc?) Text('Scripture: $sc'),
-          if (widget.full)
-            if (a.instructions case final i?) ...[
-              const SizedBox(height: 4),
-              Text('Instructions: $i', key: Key('duty-instructions-$id')),
-            ],
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              StatusLabel(
-                key: Key('my-duty-status-$id'),
-                label: shown,
-                tone: shownTone,
-              ),
-              if (a.response == DutyResponse.pending)
-                _muted(
-                  context,
-                  'Answer by ${_when(context, a.responseDeadline)}',
+              if (widget.selected case final sel?)
+                Semantics(
+                  label:
+                      'Select ${a.title}, ${_when(context, a.times.arriveBy)}',
+                  child: Checkbox(
+                    key: Key('duty-select-$id'),
+                    value: sel,
+                    onChanged: widget.busy
+                        ? null
+                        : (v) => widget.onSelected?.call(v ?? false),
+                  ),
                 ),
+              _DateBadge(at: a.times.arriveBy),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: details,
+                ),
+              ),
             ],
           ),
-          if (a.note case final n?) Text('Your note: $n'),
-          if (canAnswer) ...[
+          if (actions.isNotEmpty) ...[
             const SizedBox(height: 8),
-            TextField(
-              key: Key('duty-note-$id'),
-              controller: _note,
-              enabled: !widget.busy,
-              maxLength: 280,
-              decoration: const InputDecoration(
-                labelText: 'Note for your leader (optional)',
+            Wrap(spacing: 8, runSpacing: 8, children: actions),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Story 4.5: the Home My duties card and the member Home
+// ---------------------------------------------------------------------------
+
+/// Story 4.5, mobile: the member Home. It holds the My duties card; later
+/// features add their own cards here.
+class MemberHomeScreen extends StatelessWidget {
+  const MemberHomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final layout = ChurchLayout.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Home')),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: layout.pagePadding,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [MyDutiesHomeCard()],
               ),
             ),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                FocusRing(
-                  child: FilledButton(
-                    key: Key('duty-accept-$id'),
-                    onPressed: widget.busy
-                        ? null
-                        : () => ctl.respond(
-                            a,
-                            DutyResponse.accepted,
-                            note: _note.text,
-                          ),
-                    child: const Text('Accept'),
-                  ),
-                ),
-                FocusRing(
-                  child: OutlinedButton(
-                    key: Key('duty-decline-$id'),
-                    onPressed: widget.busy
-                        ? null
-                        : () => ctl.respond(
-                            a,
-                            DutyResponse.declined,
-                            note: _note.text,
-                          ),
-                    child: const Text('Can\'t make it'),
-                  ),
-                ),
-              ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Story 4.5: the navy My duties card: how many duties await an answer, the
+/// next one (date, duty, department, report time, place) with inline Accept
+/// and Can't make it, and See all. A failed read never looks empty.
+class MyDutiesHomeCard extends ConsumerStatefulWidget {
+  const MyDutiesHomeCard({super.key});
+
+  @override
+  ConsumerState<MyDutiesHomeCard> createState() => _MyDutiesHomeCardState();
+}
+
+class _MyDutiesHomeCardState extends ConsumerState<MyDutiesHomeCard> {
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _reload);
+    if (ref.read(myDutiesProvider).result != null) Future.microtask(_reload);
+  }
+
+  void _reload() {
+    final s = ref.read(myDutiesProvider);
+    if (mounted && !s.busy && !s.loading) {
+      ref.read(myDutiesProvider.notifier).reload();
+    }
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final s = ref.watch(myDutiesProvider);
+    final ctl = ref.read(myDutiesProvider.notifier);
+    final on = c.onPrimary;
+    final text = ChurchType.body.copyWith(color: on);
+    final children = <Widget>[
+      Semantics(
+        header: true,
+        child: Text(
+          'My duties',
+          style: ChurchType.cardTitle.copyWith(color: on),
+        ),
+      ),
+      const SizedBox(height: 8),
+    ];
+    if (s.notice case final n? when s.pending == null) {
+      final (_, title, message) = _noticeText(n, s.noticeAction, s.fieldErrors);
+      children.addAll([
+        Text(
+          '$title. $message',
+          key: Key('home-duties-notice-${n.name}'),
+          style: text,
+        ),
+        Wrap(
+          spacing: 8,
+          children: [
+            if (n == DutyNotice.unconfirmed)
+              TextButton(
+                key: const Key('home-duties-check-again'),
+                style: TextButton.styleFrom(foregroundColor: on),
+                onPressed: ctl.checkAgain,
+                child: const Text('Check again'),
+              ),
+            TextButton(
+              key: const Key('home-duties-dismiss'),
+              style: TextButton.styleFrom(foregroundColor: on),
+              onPressed: ctl.dismissNotice,
+              child: const Text('Dismiss'),
             ),
           ],
-          if (!widget.full)
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: FocusRing(
-                child: TextButton(
-                  key: Key('duty-open-$id'),
-                  onPressed: () => context.push(DutyPaths.assignment(id)),
-                  child: const Text('Details'),
-                ),
-              ),
+        ),
+        const SizedBox(height: 8),
+      ]);
+    }
+    switch (s.result) {
+      case null:
+        children.add(
+          Text(
+            'Loading your duties…',
+            key: const Key('home-duties-loading'),
+            style: text,
+          ),
+        );
+      case AccessReadDenied():
+        children.add(
+          Text(
+            'Your duties are shown once you have member access.',
+            key: const Key('home-duties-denied'),
+            style: text,
+          ),
+        );
+      case AccessReadFailed(:final unreachable):
+        children.add(
+          Text(
+            unreachable
+                ? 'No connection: we couldn\'t reach the church server. This '
+                      'is not an empty list.'
+                : 'Couldn\'t load your duties. Try again later.',
+            key: const Key('home-duties-failed'),
+            style: text,
+          ),
+        );
+      case AccessReadOk(:final value):
+        final seg = MyDutySegments.of(value.assignments, DateTime.now());
+        final next = seg.next;
+        final awaiting = seg.needsResponse.length;
+        children.add(
+          Text(
+            awaiting == 0
+                ? 'Nothing waiting for your response.'
+                : '$awaiting awaiting your response',
+            key: const Key('home-duties-awaiting'),
+            style: text,
+          ),
+        );
+        if (next == null) {
+          children.add(
+            Text(
+              'You have no upcoming duties.',
+              key: const Key('home-duties-empty'),
+              style: text,
             ),
-        ],
+          );
+        } else {
+          final (sending, unsent) = _commandState(ref, next);
+          final (shown, tone) = _shownStatus(next, sending, unsent);
+          final id = next.assignmentId;
+          children.addAll([
+            const SizedBox(height: 8),
+            Text(
+              'Next: ${next.title}',
+              key: Key('home-duty-$id'),
+              style: text.copyWith(fontWeight: FontWeight.w600),
+            ),
+            Text(
+              '${next.departmentName}. ${_timesText(context, next.times)}'
+              '${next.location == null ? '' : '. ${next.location}'}',
+              style: text,
+            ),
+            const SizedBox(height: 4),
+            StatusLabel(
+              key: Key('home-duty-status-$id'),
+              label: shown,
+              tone: tone,
+            ),
+            if (next.needsResponse(DateTime.now())) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FocusRing(
+                    child: FilledButton(
+                      key: Key('home-duty-accept-$id'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: c.surface,
+                        foregroundColor: c.link,
+                      ),
+                      onPressed: s.busy
+                          ? null
+                          : () => ctl.respond(next, DutyResponse.accepted),
+                      child: const Text('Accept'),
+                    ),
+                  ),
+                  FocusRing(
+                    child: OutlinedButton(
+                      key: Key('home-duty-decline-$id'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: on,
+                        side: BorderSide(color: on),
+                      ),
+                      onPressed: s.busy
+                          ? null
+                          : () => _showDeclineSheet(context, ref, next),
+                      child: const Text('Can\'t make it'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ]);
+        }
+    }
+    children.addAll([
+      const SizedBox(height: 8),
+      Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: FocusRing(
+          child: TextButton(
+            key: const Key('home-duties-see-all'),
+            style: TextButton.styleFrom(foregroundColor: on),
+            onPressed: () => context.go(DutyPaths.mine),
+            child: const Text('See all'),
+          ),
+        ),
+      ),
+    ]);
+    return Material(
+      key: const Key('home-duties-card'),
+      color: c.hero,
+      borderRadius: BorderRadius.circular(ChurchGeometry.mobileCardRadius),
+      child: Padding(
+        padding: const EdgeInsets.all(ChurchGeometry.cardPadding),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: children,
+        ),
       ),
     );
   }

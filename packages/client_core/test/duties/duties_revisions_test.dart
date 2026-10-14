@@ -540,6 +540,10 @@ void main() {
             h.duties.mine = mineWith([myDutyData(assignmentId: _old)]),
       );
       await tapKey(tester, 'duty-decline-$_old');
+      // Story 4.5: Can't make it asks in a sheet first.
+      await settle(tester);
+      await tapKey(tester, 'decline-confirm');
+      await settle(tester);
       h.duties.mine = mineWith(const []);
       h.gateway.sent.single.refuse(
         ErrorCode.conflict,

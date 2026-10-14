@@ -53,7 +53,8 @@ String _positionText(RotaOccurrence o, RotaPosition p) {
   }
   final a = p.assignment;
   if (a == null) return 'Unfilled';
-  return '${_personName(a.displayName)}: ${_responseLabel(a.response).$1}'
+  return '${_personName(a.displayName)}: '
+      '${_answerLabel(a.response, a.priorAcceptedAt).$1}'
       '${a.available ? '' : ' (can\'t serve now)'}'
       '${o.started ? '' : _overlapText(a.overlaps, a.override != null)}';
 }

@@ -288,7 +288,9 @@ select is((select (j -> 'assignments' -> 0) - 'occurrence_id' - 'department_id' 
                   - 'response_deadline' - 'duty_name' - 'department_name' - 'location' - 'instructions'
                   - 'reporting_at' - 'responded_at' - 'note'
                   -- Story 4.3 keys are checked in duties_rota_test.sql.
-                  - 'position_name' - 'topic' - 'scripture' from mine),
+                  - 'position_name' - 'topic' - 'scripture'
+                  -- Story 4.5 keys are checked in duties_responses_test.sql.
+                  - 'owner_kind' - 'prior_accepted_at' - 'leaders' - 'slot_id' from mine),
   jsonb_build_object('assignment_id', pg_temp.asg2(), 'revision', 1, 'response', 'pending', 'slot_revision', 2,
                      'changes', jsonb_build_array('starts_at', 'ends_at'), 'previous_response', 'accepted',
                      'previous_assignment_ids', jsonb_build_array(pg_temp.asg1()), 'notes_updated_at', null),
@@ -298,7 +300,9 @@ create temp table board as select jsonb_path_query_first(pg_temp.readj(2, 'selec
 select is((select (p ->> 'slot_revision') || '|' || (p #>> '{assignment,response}') || '|'
                   || (p #>> '{assignment,changes}') || '|' || jsonb_array_length(p -> 'history') from board),
   '2|pending|["starts_at", "ends_at"]|1', 'the leader sees the new pending revision and one history entry');
-select is((select (p -> 'history' -> 0) - 'ended_at' - 'responded_at' - 'display_name' from board),
+select is((select (p -> 'history' -> 0) - 'ended_at' - 'responded_at' - 'display_name'
+                  -- Story 4.5 key, checked in duties_responses_test.sql.
+                  - 'prior_accepted_at' from board),
   jsonb_build_object('assignment_id', pg_temp.asg1(), 'member_id', pg_temp.mid(4), 'state', 'superseded',
                      'end_reason', 'revised', 'response', 'accepted', 'response_provenance', 'member',
                      'note', 'SYNTHETIC note one.', 'slot_revision', 1),

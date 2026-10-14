@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/access_grants.dart';
 import '../domain/commands.dart';
 import '../domain/duties.dart';
+import '../domain/duty_calendar.dart';
 import 'access_controllers.dart' show noteProtectedDenial;
 import 'providers.dart';
 
@@ -78,6 +79,16 @@ enum DutyNotice {
   /// The duty was already answered.
   alreadyAnswered,
 
+  /// Story 4.5: "Can't make it anymore" was recorded.
+  withdrawn,
+
+  /// Story 4.5: several dates were accepted together.
+  bulkAccepted,
+
+  /// Story 4.5: some selected dates changed or were answered; nothing was
+  /// accepted.
+  bulkChanged,
+
   /// The duty has started: it can no longer be answered here.
   started,
 
@@ -117,6 +128,23 @@ class DutyAction {
   final String subject;
 
   String get command => request.command;
+
+  /// Story 4.5: the assignments this command answers (one, or every date
+  /// of a bulk acceptance).
+  List<String> get assignmentIds {
+    final p = request.payload;
+    final one = p['assignment_id'];
+    final many = p['assignments'];
+    return [
+      if (one is String) one,
+      if (many is List)
+        for (final x in many)
+          if (x is Map && x['assignment_id'] is String)
+            x['assignment_id'] as String,
+    ];
+  }
+
+  bool touches(String assignmentId) => assignmentIds.contains(assignmentId);
 }
 
 class DutiesState<T> {
@@ -198,17 +226,37 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
     if (!_current(epoch)) return;
     // A denial or failure drops everything protected from the screen. A
     // request still in flight stays pending, so its buttons stay disabled
-    // and it cannot be sent twice.
+    // and it cannot be sent twice. Story 4.5: an unknown outcome is let go
+    // once the fresh read shows no target still waiting for that command
+    // (the server did record it, or the duty changed): the server's state
+    // is shown, never a stale Not sent.
+    var unconfirmed = state.unconfirmed;
+    var notice = state.notice;
+    var noticeAction = state.noticeAction;
+    if (unconfirmed != null &&
+        r is AccessReadOk<T> &&
+        !stillUnconfirmed(unconfirmed, r.value)) {
+      unconfirmed = null;
+      if (notice == DutyNotice.unconfirmed) {
+        notice = null;
+        noticeAction = null;
+      }
+    }
     state = DutiesState<T>(
       result: r,
       pending: state.pending,
-      notice: state.notice,
-      noticeAction: state.noticeAction,
-      unconfirmed: state.unconfirmed,
+      notice: notice,
+      noticeAction: noticeAction,
+      unconfirmed: unconfirmed,
       fieldErrors: state.fieldErrors,
     );
     if (r is AccessReadDenied<T>) noteProtectedDenial(ref);
   }
+
+  /// Story 4.5: whether [action], whose outcome was never learned, may still
+  /// be unanswered according to the fresh read [value]. By default it is
+  /// kept until Check again learns the outcome.
+  bool stillUnconfirmed(DutyAction action, T value) => true;
 
   void dismissNotice() =>
       state = state.copyWith(clearNotice: true, fieldErrors: const {});
@@ -272,6 +320,8 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
         GrantCommands.grantScope => DutyNotice.staffAssigned,
         GrantCommands.revokeScope => DutyNotice.staffRemoved,
         DutyCommands.publish => DutyNotice.published,
+        DutyCommands.withdrawAcceptance => DutyNotice.withdrawn,
+        DutyCommands.acceptMany => DutyNotice.bulkAccepted,
         _ =>
           action.request.payload['response'] == DutyResponse.declined.wire
               ? DutyNotice.declined
@@ -281,6 +331,8 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
   static DutyNotice _refusal(CommandError error) {
     final f = error.fieldErrors;
     return switch (error.code) {
+      ErrorCode.conflict when f['assignments'] == 'changed' =>
+        DutyNotice.bulkChanged,
       ErrorCode.conflict when f['assignment_id'] == 'responded' =>
         DutyNotice.alreadyAnswered,
       ErrorCode.conflict when f['assignment_id'] == 'superseded' =>
@@ -550,11 +602,26 @@ final dutyRotaProvider =
       DutyRotaController.new,
     );
 
-/// Mobile: the member's own duties; Accept or Can't make it.
+/// Mobile: the member's own duties; Accept or Can't make it, Can't make it
+/// anymore (story 4.5) and accepting several listed dates together.
 class MyDutiesController extends DutiesController<MyDuties> {
   @override
   Future<AccessRead<MyDuties>> fetch() =>
       ref.read(dutiesRepositoryProvider).fetchMyDuties();
+
+  /// Story 4.5: [duty] is still in the state [action] expected (withdrawing
+  /// expects an acceptance; answering and bulk acceptance expect a pending
+  /// duty). Once it is not, the server's answer is what the member sees.
+  static bool awaits(DutyAction action, MyDuty duty) =>
+      action.touches(duty.assignmentId) &&
+      duty.response ==
+          (action.command == DutyCommands.withdrawAcceptance
+              ? DutyResponse.accepted
+              : DutyResponse.pending);
+
+  @override
+  bool stillUnconfirmed(DutyAction action, MyDuties value) =>
+      value.assignments.any((d) => awaits(action, d));
 
   Future<void> respond(MyDuty duty, DutyResponse response, {String? note}) {
     final n = note?.trim();
@@ -564,12 +631,61 @@ class MyDutiesController extends DutiesController<MyDuties> {
       if (n != null && n.isNotEmpty) 'note': n,
     }, duty.dutyName);
   }
+
+  /// Story 4.5: "Can't make it anymore" for an accepted duty.
+  Future<void> withdraw(MyDuty duty, {String? note}) {
+    final n = note?.trim();
+    return send(DutyCommands.withdrawAcceptance, Optional.of(duty.revision), {
+      'assignment_id': duty.assignmentId,
+      if (n != null && n.isNotEmpty) 'note': n,
+    }, duty.dutyName);
+  }
+
+  /// Story 4.5: accept the confirmed selection, all or nothing, each at the
+  /// revision the member saw. The order is the list's (soonest first), so
+  /// a retry of the same selection is the same request body.
+  Future<void> acceptMany(List<MyDuty> duties) {
+    if (duties.isEmpty || duties.length > DutyCommands.maxBulk) {
+      return Future.value();
+    }
+    return send(DutyCommands.acceptMany, const Optional.of(null), {
+      'assignments': [
+        for (final d in duties)
+          {'assignment_id': d.assignmentId, 'revision': d.revision},
+      ],
+    }, duties.length == 1 ? duties.single.dutyName : '${duties.length} duties');
+  }
 }
 
 final myDutiesProvider =
     NotifierProvider<MyDutiesController, DutiesState<MyDuties>>(
       MyDutiesController.new,
     );
+
+/// Story 4.5: the optional note a member is typing for Accept, per
+/// assignment, so the list card, the detail card and the detail footer share
+/// it. Memory only, dropped on an account change.
+class DutyAnswerNotes extends Notifier<Map<String, String>> {
+  @override
+  Map<String, String> build() {
+    ref.watch(accountGenerationProvider);
+    return const {};
+  }
+
+  void set(String assignmentId, String text) =>
+      state = {...state, assignmentId: text};
+
+  void clear(String assignmentId) => state = {...state}..remove(assignmentId);
+}
+
+final dutyAnswerNotesProvider =
+    NotifierProvider<DutyAnswerNotes, Map<String, String>>(DutyAnswerNotes.new);
+
+/// Story 4.5: hands a duty's calendar file to the platform. Unavailable by
+/// default; the mobile composition root supplies the share-sheet handoff.
+final dutyCalendarExportProvider = Provider<DutyCalendarExport>(
+  (ref) => const UnavailableCalendarExport(),
+);
 
 /// Story 4.4, staff web: each roster member's upcoming load and the
 /// overlapping duties the caller may see, for a position or a prospective

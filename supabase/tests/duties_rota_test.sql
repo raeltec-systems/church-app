@@ -559,8 +559,11 @@ select is(pg_temp.duties(2, 'duties.cancel_occurrence', pg_temp.orev(6), jsonb_b
 select is(pg_temp.duties(2, 'duties.revise_duty', pg_temp.orev(6), jsonb_build_object('occurrence_id', pg_temp.o(6),
             'instructions', 'x')) -> 'field_errors', '{"occurrence_id": "cancelled"}'::jsonb, 'nor changed');
 create temp table oneoff as select pg_temp.duties(2, 'duties.publish_duty', null, jsonb_build_object(
-  'department_id', pg_temp.d(), 'duty_name', 'One-off', 'starts_at', pg_temp.at('10 days'), 'member_id', pg_temp.mid(4),
-  'response_deadline', pg_temp.at('7 days'))) as r;
+  -- A Wednesday noon in church time, never on the series' Sunday 00:30 dates (a time relative to
+  -- now() could land on one and need an overlap reason).
+  'department_id', pg_temp.d(), 'duty_name', 'One-off', 'member_id', pg_temp.mid(4),
+  'starts_at', app.cmd_utc(((pg_temp.sunday(3) + 3) + time '12:00') at time zone 'Africa/Lusaka'),
+  'response_deadline', app.cmd_utc(((pg_temp.sunday(3) + 1) + time '12:00') at time zone 'Africa/Lusaka'))) as r;
 select is(pg_temp.duties(2, 'duties.cancel_occurrence', 1, jsonb_build_object('occurrence_id',
             (select r #>> '{data,occurrence_id}' from oneoff))) -> 'field_errors',
   '{"occurrence_id": "not_in_series"}'::jsonb, 'a one-off duty is not cancelled here (entry 9)');

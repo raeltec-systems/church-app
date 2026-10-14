@@ -8,12 +8,17 @@ import '../domain/access_grants.dart';
 import '../domain/church_time.dart';
 import '../domain/duties.dart';
 
+part 'duties_rota_screens.dart';
+
 // Story 4.1: departments (Admin) and publishing with responses (leaders) on
 // staff web, and the member's duties with Accept / Can't make it on mobile.
 // Story 4.2: leaders change a published duty (a material change asks the
 // member again and keeps the earlier answer in history; an instructions-only
 // change keeps the answer), and an answer to an old version is refused with
 // what changed.
+// Story 4.3: the rota grid (duties_rota_screens.dart): repeating multi-position
+// rotas as drafts, Publish N draft slots, this-date and this-and-later edits
+// and cancellation.
 // Every list comes from a server-checked read and every action is a
 // server-checked command; hiding a button is never the control. An answer
 // shows as Accepted only after the server confirmed it.
@@ -29,6 +34,10 @@ abstract final class DutyPaths {
 
   /// Staff web: leaders, deputies, Admin (and Pastor, read only).
   static const leader = '/duties/leader';
+
+  /// Story 4.3, staff web: the rota grid (leaders, deputies, Admin; Pastor
+  /// read only).
+  static const rota = '/duties/rota';
 
   /// Staff web, Admin only: departments, leaders, deputies and members.
   static const adminDepartments = '/admin/departments';
@@ -125,6 +134,65 @@ abstract final class DutyPaths {
       StatusTone.neutral,
       'Nothing changed',
       'The duty already has these details.',
+    ),
+    DutyNotice.seriesCreated => (
+      StatusTone.success,
+      'Rota created',
+      '$what was made as draft dates. Members see nothing until you '
+          'publish.',
+    ),
+    DutyNotice.draftAssigned => (
+      StatusTone.success,
+      'Plan saved',
+      'The plan for $what was saved. Nobody is told until you publish.',
+    ),
+    DutyNotice.draftUpdated => (
+      StatusTone.success,
+      'Draft updated',
+      'The draft $what was changed. Nobody is told until you publish.',
+    ),
+    DutyNotice.positionGiven => (
+      StatusTone.success,
+      'Position given',
+      '$what was sent. The member is asked to accept or say they can\'t '
+          'make it.',
+    ),
+    DutyNotice.draftsPublished => (
+      StatusTone.success,
+      'Drafts published',
+      '$what was published. Each planned person is asked to answer; '
+          'positions without anyone show as unfilled.',
+    ),
+    DutyNotice.seriesRevised => (
+      StatusTone.success,
+      'Rota changed',
+      'This and the later dates of $what were changed; earlier and started '
+          'dates were not. Anyone asked again keeps their earlier answer in '
+          'the history.',
+    ),
+    DutyNotice.occurrenceCancelled => (
+      StatusTone.success,
+      'Cancelled',
+      '$what was cancelled for the chosen dates. Everyone assigned is told; '
+          'their earlier answers are kept.',
+    ),
+    DutyNotice.draftCountChanged => (
+      StatusTone.warning,
+      'Drafts changed',
+      'The number of draft slots changed since you looked. The rota was '
+          'reloaded; check it and publish again.',
+    ),
+    DutyNotice.leadPassed => (
+      StatusTone.warning,
+      'Answer-by already passed',
+      'For at least one date that answer-by time has already passed. Choose '
+          'a shorter time before the duty.',
+    ),
+    DutyNotice.plannedUnavailable => (
+      StatusTone.warning,
+      'Someone can\'t serve',
+      'A planned person can no longer serve in this department (marked '
+          '"can\'t serve now"). Plan someone else first.',
     ),
     DutyNotice.changedElsewhere => (
       StatusTone.warning,
@@ -915,14 +983,23 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
             '${duty.accepted} of ${duty.positions.length} confirmed',
             key: Key('coverage-$id'),
           ),
+          if (duty.topic case final t?) Text('Topic: $t'),
+          if (duty.scripture case final sc?) Text('Scripture: $sc'),
           for (final p in duty.positions) ...[
+            if (p.assignment == null && p.positionName != null)
+              Text('${p.positionName}: Unfilled'),
             if (p.assignment case final a?)
               Wrap(
                 spacing: 8,
                 runSpacing: 4,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Text(a.displayName ?? 'Removed member'),
+                  Text(
+                    p.positionName == null
+                        ? (a.displayName ?? 'Removed member')
+                        : '${p.positionName}: '
+                              '${a.displayName ?? 'Removed member'}',
+                  ),
                   Builder(
                     builder: (context) {
                       final (label, tone) = _responseLabel(a.response);
@@ -1202,7 +1279,9 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
             'Changing the duty, date, times, place or person asks the member '
             'to answer again by a new answer-by time; their earlier answer is '
             'kept. Changing only the instructions keeps their answer. Times '
-            'are church time (Lusaka).',
+            'are church time (Lusaka).${duty.positions.length == 1 ? '' : ' '
+                      'Every position of this date changes together; give a '
+                      'position to someone on the Rota page.'}',
           ),
           const SizedBox(height: 8),
           field('edit-name', _name, 'Duty', wire: 'duty_name'),
@@ -1259,26 +1338,27 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
             maxLength: 1000,
             maxLines: 3,
           ),
-          DropdownButton<String>(
-            key: Key('edit-member-$id'),
-            hint: const Text('Who'),
-            value: inRoster ? _memberId : null,
-            isExpanded: true,
-            items: [
-              for (final m in widget.department.members)
-                DropdownMenuItem(
-                  value: m.memberId,
-                  child: Text(
-                    m.account == AccountStanding.noLogin
-                        ? '${m.displayName} (no login: contact them directly)'
-                        : m.displayName,
+          if (duty.positions.length == 1)
+            DropdownButton<String>(
+              key: Key('edit-member-$id'),
+              hint: const Text('Who'),
+              value: inRoster ? _memberId : null,
+              isExpanded: true,
+              items: [
+                for (final m in widget.department.members)
+                  DropdownMenuItem(
+                    value: m.memberId,
+                    child: Text(
+                      m.account == AccountStanding.noLogin
+                          ? '${m.displayName} (no login: contact them directly)'
+                          : m.displayName,
+                    ),
                   ),
-                ),
-            ],
-            onChanged: widget.busy
-                ? null
-                : (v) => setState(() => _memberId = v),
-          ),
+              ],
+              onChanged: widget.busy
+                  ? null
+                  : (v) => setState(() => _memberId = v),
+            ),
           if (err('member_id') case final e?)
             Text(e, style: TextStyle(color: ChurchColors.of(context).redFg)),
           const SizedBox(height: 8),
@@ -1776,7 +1856,12 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _heading(context, a.dutyName),
+          _heading(
+            context,
+            a.positionName == null
+                ? a.dutyName
+                : '${a.dutyName}: ${a.positionName}',
+          ),
           Text(a.departmentName),
           Text(_timesText(context, a.times)),
           if (a.location case final l?) Text('Where: $l'),
@@ -1808,6 +1893,8 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
               context,
               'Details updated ${_when(context, u)}. Your answer stands.',
             ),
+          if (a.topic case final t?) Text('Topic: $t'),
+          if (a.scripture case final sc?) Text('Scripture: $sc'),
           if (widget.full)
             if (a.instructions case final i?) ...[
               const SizedBox(height: 4),

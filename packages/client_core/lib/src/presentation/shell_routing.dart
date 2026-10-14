@@ -67,6 +67,9 @@ abstract final class ClientPaths {
   /// read only): publish a duty and see the responses.
   static const dutyLeader = DutyPaths.leader;
 
+  /// Story 4.3 (staff web): the rota grid.
+  static const dutyRota = DutyPaths.rota;
+
   /// Story 4.1, staff web, Admin only: departments, leaders, deputies and
   /// members.
   static const adminDepartments = DutyPaths.adminDepartments;
@@ -306,6 +309,10 @@ GoRouter buildClientRouter({
           GoRoute(
             path: 'leader',
             pageBuilder: (_, state) => page(state, const DutyLeaderScreen()),
+          ),
+          GoRoute(
+            path: 'rota',
+            pageBuilder: (_, state) => page(state, const DutyRotaScreen()),
           ),
           GoRoute(
             path: 'assignments/:assignmentId',

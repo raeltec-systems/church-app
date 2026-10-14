@@ -521,9 +521,11 @@ class FakeDuties implements DutiesRepository {
   AccessRead<DutyAdminOverview> admin = const AccessReadDenied(
     AccessDenial.notGranted,
   );
+  AccessRead<DutyRota> rota = const AccessReadDenied(AccessDenial.notGranted);
   int mineCalls = 0;
   int boardCalls = 0;
   int adminCalls = 0;
+  int rotaCalls = 0;
 
   @override
   Future<AccessRead<MyDuties>> fetchMyDuties() async {
@@ -541,6 +543,12 @@ class FakeDuties implements DutiesRepository {
   Future<AccessRead<DutyAdminOverview>> fetchAdminOverview() async {
     adminCalls++;
     return admin;
+  }
+
+  @override
+  Future<AccessRead<DutyRota>> fetchRota() async {
+    rotaCalls++;
+    return rota;
   }
 }
 

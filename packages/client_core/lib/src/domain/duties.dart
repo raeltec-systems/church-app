@@ -1,12 +1,14 @@
-/// Stories 4.1-4.2: departments and assigned duties as the server reports
+/// Stories 4.1-4.3: departments and assigned duties as the server reports
 /// them, with revisions (a material change replaces an assignment with a new
-/// pending one; the earlier answer is kept in history).
+/// pending one; the earlier answer is kept in history) and rota series
+/// (drafts, Publish N draft slots, this-occurrence and this-and-future edits).
 /// Department setup (Admin), publishing (the department's leader or deputy,
 /// or an Admin) and the assignee's explicit answer are all decided by the
 /// server; these reads are presentation only. Free of widgets and SDKs.
 library;
 
 import 'access_grants.dart';
+import 'church_time.dart';
 
 /// Duties-registered scope kinds in the Identity grant model (story 2.3).
 abstract final class DutyScopeKinds {
@@ -25,6 +27,14 @@ abstract final class DutyCommands {
   static const publish = 'duties.publish_duty';
   static const respond = 'duties.respond';
   static const revise = 'duties.revise_duty';
+
+  /// Story 4.3: rota series, drafts and series edits.
+  static const createSeries = 'duties.create_series';
+  static const assignSlot = 'duties.assign_slot';
+  static const publishDrafts = 'duties.publish_drafts';
+  static const reviseSeries = 'duties.revise_series';
+  static const cancelOccurrence = 'duties.cancel_occurrence';
+  static const cancelSeries = 'duties.cancel_series';
 }
 
 /// Story 4.2: the revisable fields (wire names) in display order, and the
@@ -39,6 +49,13 @@ abstract final class DutyFields {
   static const memberId = 'member_id';
   static const instructions = 'instructions';
 
+  /// Story 4.3 notes fields (an update notice; answers stand).
+  static const topic = 'topic';
+  static const scripture = 'scripture';
+
+  /// Story 4.3: a linked-event reference (recorded, no notice).
+  static const eventRef = 'event_ref';
+
   static const order = [
     dutyName,
     startsAt,
@@ -47,6 +64,9 @@ abstract final class DutyFields {
     location,
     memberId,
     instructions,
+    topic,
+    scripture,
+    eventRef,
   ];
 
   static String label(String field) => switch (field) {
@@ -57,6 +77,9 @@ abstract final class DutyFields {
     location => 'place',
     memberId => 'who is assigned',
     instructions => 'instructions',
+    topic => 'topic',
+    scripture => 'scripture',
+    eventRef => 'linked event',
     _ => 'details',
   };
 
@@ -202,6 +225,9 @@ class MyDuty {
     this.previousResponse,
     this.previousAssignmentIds = const [],
     this.notesUpdatedAt,
+    this.positionName,
+    this.topic,
+    this.scripture,
   });
 
   factory MyDuty.fromJson(Object? json) {
@@ -232,8 +258,18 @@ class MyDuty {
           : DutyResponse.fromWire(m['previous_response']),
       previousAssignmentIds: _ids(m, 'previous_assignment_ids'),
       notesUpdatedAt: _optInstant(m, 'notes_updated_at'),
+      positionName: _opt<String>(m, 'position_name'),
+      topic: _opt<String>(m, 'topic'),
+      scripture: _opt<String>(m, 'scripture'),
     );
   }
+
+  /// Story 4.3: the named position of a rota (null for a one-position duty).
+  final String? positionName;
+
+  /// Story 4.3: optional topic and scripture of the occurrence.
+  final String? topic;
+  final String? scripture;
 
   final String assignmentId;
 
@@ -450,6 +486,7 @@ class DutyPosition {
     this.assignment,
     this.slotRevision = 1,
     this.history = const [],
+    this.positionName,
   });
 
   factory DutyPosition.fromJson(Object? json) {
@@ -463,6 +500,7 @@ class DutyPosition {
           ? null
           : PositionAssignment.fromJson(m['assignment']),
       slotRevision: _slotRevision(m),
+      positionName: _opt<String>(m, 'position_name'),
       history: m['history'] == null
           ? const []
           : List.unmodifiable(
@@ -474,6 +512,9 @@ class DutyPosition {
   final String slotId;
   final int positionNo;
   final PositionAssignment? assignment;
+
+  /// Story 4.3: the named position of a rota (null for a one-position duty).
+  final String? positionName;
 
   /// Story 4.2: the slot's current revision.
   final int slotRevision;
@@ -493,6 +534,8 @@ class LeaderDuty {
     required this.positions,
     this.location,
     this.instructions,
+    this.topic,
+    this.scripture,
   });
 
   factory LeaderDuty.fromJson(Object? json) {
@@ -507,6 +550,8 @@ class LeaderDuty {
       times: DutyTimes.fromJson(m),
       location: _opt<String>(m, 'location'),
       instructions: _opt<String>(m, 'instructions'),
+      topic: _opt<String>(m, 'topic'),
+      scripture: _opt<String>(m, 'scripture'),
       revision: _revision(m),
       positions: List.unmodifiable(
         _req<List>(m, 'positions').map(DutyPosition.fromJson),
@@ -520,6 +565,10 @@ class LeaderDuty {
   final DutyTimes times;
   final String? location;
   final String? instructions;
+
+  /// Story 4.3: optional topic and scripture.
+  final String? topic;
+  final String? scripture;
   final int revision;
   final List<DutyPosition> positions;
 
@@ -528,9 +577,10 @@ class LeaderDuty {
       .where((p) => p.assignment?.response == DutyResponse.accepted)
       .length;
 
-  /// The assignee of the first position (one position per duty until 4.3).
+  /// The assignee of a one-position duty (null with several positions: a
+  /// rota position is given with duties.assign_slot).
   String? get memberId =>
-      positions.isEmpty ? null : positions.first.assignment?.memberId;
+      positions.length != 1 ? null : positions.first.assignment?.memberId;
 }
 
 /// One member of a department's roster.
@@ -869,12 +919,629 @@ class DutyEdit {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Story 4.3: rota series (`api.duties_rota`)
+// ---------------------------------------------------------------------------
+
+/// A planned (draft) assignee of a rota position. [displayName] is null for
+/// an erased member; [available] is false when the person can no longer serve
+/// in the department (no reason is disclosed).
+class RotaPerson {
+  const RotaPerson({
+    required this.memberId,
+    required this.available,
+    this.displayName,
+  });
+
+  factory RotaPerson.fromJson(Object? json) {
+    final m = _map(json, 'rota person');
+    return RotaPerson(
+      memberId: _req<String>(m, 'member_id'),
+      displayName: _opt<String>(m, 'display_name'),
+      available: _req<bool>(m, 'available'),
+    );
+  }
+
+  final String memberId;
+  final String? displayName;
+  final bool available;
+}
+
+/// The current assignment of a published rota position.
+class RotaAssignment {
+  const RotaAssignment({
+    required this.assignmentId,
+    required this.memberId,
+    required this.response,
+    required this.responseDeadline,
+    required this.revision,
+    required this.available,
+    this.displayName,
+  });
+
+  factory RotaAssignment.fromJson(Object? json) {
+    final m = _map(json, 'rota assignment');
+    return RotaAssignment(
+      assignmentId: _req<String>(m, 'assignment_id'),
+      memberId: _req<String>(m, 'member_id'),
+      displayName: _opt<String>(m, 'display_name'),
+      response: DutyResponse.fromWire(m['response']),
+      responseDeadline: _instant(m, 'response_deadline'),
+      revision: _revision(m),
+      available: _req<bool>(m, 'available'),
+    );
+  }
+
+  final String assignmentId;
+  final String memberId;
+  final String? displayName;
+  final DutyResponse response;
+  final DateTime responseDeadline;
+  final int revision;
+  final bool available;
+}
+
+class RotaPosition {
+  const RotaPosition({
+    required this.slotId,
+    required this.positionNo,
+    this.positionName,
+    this.draft,
+    this.assignment,
+  });
+
+  factory RotaPosition.fromJson(Object? json) {
+    final m = _map(json, 'rota position');
+    final no = _req<int>(m, 'position_no');
+    if (no < 1) throw const FormatException('unexpected position_no');
+    return RotaPosition(
+      slotId: _req<String>(m, 'slot_id'),
+      positionNo: no,
+      positionName: _opt<String>(m, 'position_name'),
+      draft: m['draft'] == null ? null : RotaPerson.fromJson(m['draft']),
+      assignment: m['assignment'] == null
+          ? null
+          : RotaAssignment.fromJson(m['assignment']),
+    );
+  }
+
+  final String slotId;
+  final int positionNo;
+  final String? positionName;
+  final RotaPerson? draft;
+  final RotaAssignment? assignment;
+
+  String get label => positionName ?? 'Position $positionNo';
+}
+
+enum RotaState {
+  draft('draft'),
+  published('published'),
+  cancelled('cancelled');
+
+  const RotaState(this.wire);
+  final String wire;
+
+  static RotaState fromWire(Object? v) {
+    for (final s in values) {
+      if (s.wire == v) return s;
+    }
+    throw FormatException('unexpected state $v');
+  }
+}
+
+/// One occurrence of a series as the rota grid shows it.
+class RotaOccurrence {
+  const RotaOccurrence({
+    required this.occurrenceId,
+    required this.seriesDate,
+    required this.state,
+    required this.revision,
+    required this.dutyName,
+    required this.times,
+    required this.started,
+    required this.required,
+    required this.confirmed,
+    required this.positions,
+    this.location,
+    this.instructions,
+    this.topic,
+    this.scripture,
+  });
+
+  factory RotaOccurrence.fromJson(Object? json) {
+    final m = _map(json, 'rota occurrence');
+    final positions = List<RotaPosition>.unmodifiable(
+      _req<List>(m, 'positions').map(RotaPosition.fromJson),
+    );
+    final required = _req<int>(m, 'required');
+    final confirmed = _req<int>(m, 'confirmed');
+    if (required != positions.length || confirmed < 0 || confirmed > required) {
+      throw const FormatException('unexpected coverage');
+    }
+    return RotaOccurrence(
+      occurrenceId: _req<String>(m, 'occurrence_id'),
+      seriesDate: _req<String>(m, 'series_date'),
+      state: RotaState.fromWire(m['state']),
+      revision: _revision(m),
+      dutyName: _req<String>(m, 'duty_name'),
+      times: DutyTimes.fromJson(m),
+      location: _opt<String>(m, 'location'),
+      instructions: _opt<String>(m, 'instructions'),
+      topic: _opt<String>(m, 'topic'),
+      scripture: _opt<String>(m, 'scripture'),
+      started: _req<bool>(m, 'started'),
+      required: required,
+      confirmed: confirmed,
+      positions: positions,
+    );
+  }
+
+  final String occurrenceId;
+
+  /// The church-local date the series made it for (YYYY-MM-DD).
+  final String seriesDate;
+  final RotaState state;
+  final int revision;
+  final String dutyName;
+  final DutyTimes times;
+  final String? location;
+  final String? instructions;
+  final String? topic;
+  final String? scripture;
+  final bool started;
+
+  /// Positions in total, and current positions the member accepted.
+  final int required;
+  final int confirmed;
+  final List<RotaPosition> positions;
+
+  /// Changeable: not started and not cancelled.
+  bool get open => !started && state != RotaState.cancelled;
+}
+
+class RotaSeries {
+  const RotaSeries({
+    required this.seriesId,
+    required this.departmentId,
+    required this.dutyName,
+    required this.every,
+    required this.interval,
+    required this.fromDate,
+    required this.untilDate,
+    required this.startTime,
+    required this.positions,
+    required this.revision,
+    required this.draftSlots,
+    required this.occurrences,
+    this.endTime,
+    this.reportingTime,
+    this.location,
+    this.instructions,
+    this.topic,
+    this.scripture,
+  });
+
+  factory RotaSeries.fromJson(Object? json) {
+    final m = _map(json, 'rota series');
+    const everies = {'day', 'week', 'month'};
+    final every = _req<String>(m, 'every');
+    if (!everies.contains(every)) {
+      throw const FormatException('unexpected every');
+    }
+    final draftSlots = _req<int>(m, 'draft_slots');
+    if (draftSlots < 0) throw const FormatException('unexpected draft_slots');
+    return RotaSeries(
+      seriesId: _req<String>(m, 'series_id'),
+      departmentId: _req<String>(m, 'department_id'),
+      dutyName: _req<String>(m, 'duty_name'),
+      every: every,
+      interval: _req<int>(m, 'interval'),
+      fromDate: _req<String>(m, 'from_date'),
+      untilDate: _req<String>(m, 'until_date'),
+      startTime: _req<String>(m, 'start_time'),
+      endTime: _opt<String>(m, 'end_time'),
+      reportingTime: _opt<String>(m, 'reporting_time'),
+      location: _opt<String>(m, 'location'),
+      instructions: _opt<String>(m, 'instructions'),
+      topic: _opt<String>(m, 'topic'),
+      scripture: _opt<String>(m, 'scripture'),
+      positions: _ids(m, 'positions'),
+      revision: _revision(m),
+      draftSlots: draftSlots,
+      occurrences: List.unmodifiable(
+        _req<List>(m, 'occurrences').map(RotaOccurrence.fromJson),
+      ),
+    );
+  }
+
+  final String seriesId;
+  final String departmentId;
+  final String dutyName;
+
+  /// `day`, `week` or `month`, every [interval] of them.
+  final String every;
+  final int interval;
+  final String fromDate;
+  final String untilDate;
+  final String startTime;
+  final String? endTime;
+  final String? reportingTime;
+  final String? location;
+  final String? instructions;
+  final String? topic;
+  final String? scripture;
+  final List<String> positions;
+
+  /// The series revision (expected_revision of the series commands).
+  final int revision;
+
+  /// Positions of draft occurrences that have not started: the N of
+  /// "Publish N draft slots".
+  final int draftSlots;
+  final List<RotaOccurrence> occurrences;
+
+  String get repeatLabel {
+    final unit = switch (every) {
+      'day' => interval == 1 ? 'day' : 'days',
+      'month' => interval == 1 ? 'month' : 'months',
+      _ => interval == 1 ? 'week' : 'weeks',
+    };
+    return interval == 1 ? 'Every $unit' : 'Every $interval $unit';
+  }
+}
+
+class RotaDepartment {
+  const RotaDepartment({
+    required this.departmentId,
+    required this.name,
+    required this.capacity,
+    required this.canManage,
+    required this.members,
+    required this.series,
+    this.seriesTruncated = false,
+  });
+
+  factory RotaDepartment.fromJson(Object? json) {
+    final m = _map(json, 'rota department');
+    return RotaDepartment(
+      departmentId: _req<String>(m, 'department_id'),
+      name: _req<String>(m, 'name'),
+      capacity: _req<String>(m, 'capacity'),
+      canManage: _req<bool>(m, 'can_manage'),
+      members: List.unmodifiable(
+        _req<List>(m, 'members').map(DepartmentMember.fromJson),
+      ),
+      series: List.unmodifiable(
+        _req<List>(m, 'series').map(RotaSeries.fromJson),
+      ),
+      seriesTruncated: _opt<bool>(m, 'series_truncated') ?? false,
+    );
+  }
+
+  final String departmentId;
+  final String name;
+  final String capacity;
+  final bool canManage;
+  final List<DepartmentMember> members;
+  final List<RotaSeries> series;
+  final bool seriesTruncated;
+}
+
+/// `api.duties_rota`.
+class DutyRota {
+  const DutyRota({required this.departments});
+
+  factory DutyRota.fromJson(Object? json) {
+    final m = _map(json, 'rota');
+    return DutyRota(
+      departments: List.unmodifiable(
+        _req<List>(m, 'departments').map(RotaDepartment.fromJson),
+      ),
+    );
+  }
+
+  final List<RotaDepartment> departments;
+}
+
+/// The answer-by lead times a leader picks (before the reporting or start
+/// time, in church time). Wire values of `deadline_before`.
+abstract final class DutyLeads {
+  static const choices = <(String, String)>[
+    ('2 hours', '2 hours before'),
+    ('12 hours', '12 hours before'),
+    ('1 day', '1 day before'),
+    ('2 days', '2 days before'),
+    ('3 days', '3 days before'),
+    ('7 days', '1 week before'),
+    ('14 days', '2 weeks before'),
+    ('30 days', '30 days before'),
+  ];
+
+  /// [at] moved earlier by [lead] (`<n> hours` or `<n> days`). Church time has no
+  /// daylight saving, so whole days are 24 hours.
+  static DateTime before(DateTime at, String lead) {
+    final parts = lead.split(' ');
+    final n = int.parse(parts[0]);
+    return parts[1].startsWith('day')
+        ? at.subtract(Duration(days: n))
+        : at.subtract(Duration(hours: n));
+  }
+}
+
+String? _clean(String? s, {bool multiline = false}) {
+  final t = multiline ? s?.trim() : s?.replaceAll(RegExp(r'\s+'), ' ').trim();
+  return t == null || t.isEmpty ? null : t;
+}
+
+bool _hhmm(String s) => RegExp(r'^([01][0-9]|2[0-3]):[0-5][0-9]$').hasMatch(s);
+
+/// What a leader enters to generate a rota series (church-local dates and
+/// times; the server expands it in church time).
+class SeriesDraft {
+  const SeriesDraft({
+    required this.departmentId,
+    required this.dutyName,
+    required this.every,
+    required this.fromDate,
+    required this.untilDate,
+    required this.startTime,
+    required this.positions,
+    this.interval = 1,
+    this.endTime,
+    this.reportingTime,
+    this.location,
+    this.instructions,
+    this.topic,
+    this.scripture,
+  });
+
+  final String departmentId;
+  final String dutyName;
+  final String every;
+  final int interval;
+  final String fromDate;
+  final String untilDate;
+  final String startTime;
+  final String? endTime;
+  final String? reportingTime;
+  final String? location;
+  final String? instructions;
+  final String? topic;
+  final String? scripture;
+  final List<String> positions;
+
+  /// Null while a field cannot be read (the server checks everything again).
+  /// [positions] is a comma-separated list of position names.
+  static SeriesDraft? parse({
+    required String departmentId,
+    required String dutyName,
+    required String every,
+    required String interval,
+    required String fromDate,
+    required String untilDate,
+    required String startTime,
+    required String endTime,
+    required String reportingTime,
+    required String location,
+    required String instructions,
+    required String topic,
+    required String scripture,
+    required String positions,
+  }) {
+    final names = [for (final p in positions.split(',')) ?_clean(p)];
+    final n = int.tryParse(interval.trim().isEmpty ? '1' : interval.trim());
+    bool date(String d) => ChurchTime.parse(d, '00:00') != null;
+    final end = endTime.trim(), rep = reportingTime.trim();
+    if (_clean(dutyName) == null ||
+        names.isEmpty ||
+        n == null ||
+        n < 1 ||
+        n > 52 ||
+        !date(fromDate) ||
+        !date(untilDate) ||
+        !_hhmm(startTime.trim()) ||
+        (end.isNotEmpty && !_hhmm(end)) ||
+        (rep.isNotEmpty && !_hhmm(rep))) {
+      return null;
+    }
+    return SeriesDraft(
+      departmentId: departmentId,
+      dutyName: dutyName,
+      every: every,
+      interval: n,
+      fromDate: fromDate.trim(),
+      untilDate: untilDate.trim(),
+      startTime: startTime.trim(),
+      endTime: end.isEmpty ? null : end,
+      reportingTime: rep.isEmpty ? null : rep,
+      location: location,
+      instructions: instructions,
+      topic: topic,
+      scripture: scripture,
+      positions: names,
+    );
+  }
+
+  Map<String, Object?> toPayload() => {
+    'department_id': departmentId,
+    'duty_name': _clean(dutyName),
+    'every': every,
+    if (interval != 1) 'interval': interval,
+    'from_date': fromDate,
+    'until_date': untilDate,
+    'start_time': startTime,
+    'end_time': ?endTime,
+    'reporting_time': ?reportingTime,
+    'location': ?_clean(location),
+    'instructions': ?_clean(instructions, multiline: true),
+    'topic': ?_clean(topic),
+    'scripture': ?_clean(scripture),
+    'positions': positions,
+  };
+}
+
+/// Story 4.3: a leader's change of a rota occurrence, applied to "this
+/// occurrence" (`duties.revise_duty`, instants on the occurrence's own
+/// church date) or "this and future" (`duties.revise_series`, church-local
+/// times). Only fields that differ from [occurrence] are sent.
+class RotaEdit {
+  const RotaEdit({
+    required this.occurrence,
+    required this.dutyName,
+    required this.startTime,
+    this.endTime,
+    this.reportingTime,
+    this.location,
+    this.instructions,
+    this.topic,
+    this.scripture,
+    this.lead,
+  });
+
+  final RotaOccurrence occurrence;
+  final String dutyName;
+  final String startTime;
+  final String? endTime;
+  final String? reportingTime;
+  final String? location;
+  final String? instructions;
+  final String? topic;
+  final String? scripture;
+
+  /// `deadline_before` for published occurrences whose material fields change.
+  final String? lead;
+
+  /// Church-local "HH:MM" of an instant.
+  static String hm(DateTime at) {
+    final w = ChurchTime.wall(at);
+    return '${w.hour.toString().padLeft(2, '0')}:'
+        '${w.minute.toString().padLeft(2, '0')}';
+  }
+
+  static String? _time(String? s) {
+    final t = s?.trim();
+    return t == null || t.isEmpty ? null : t;
+  }
+
+  /// Every entered time can be read.
+  bool get readable =>
+      _clean(dutyName) != null &&
+      _hhmm(startTime.trim()) &&
+      (_time(endTime) == null || _hhmm(_time(endTime)!)) &&
+      (_time(reportingTime) == null || _hhmm(_time(reportingTime)!));
+
+  String? get _oldEnd => switch (occurrence.times.endsAt) {
+    final e? => hm(e),
+    null => null,
+  };
+  String? get _oldReporting => switch (occurrence.times.reportingAt) {
+    final r? => hm(r),
+    null => null,
+  };
+
+  List<String> get changed => [
+    if (_clean(dutyName) != occurrence.dutyName) DutyFields.dutyName,
+    if (startTime.trim() != hm(occurrence.times.startsAt)) DutyFields.startsAt,
+    if (_time(endTime) != _oldEnd) DutyFields.endsAt,
+    if (_time(reportingTime) != _oldReporting) DutyFields.reportingAt,
+    if (_clean(location) != occurrence.location) DutyFields.location,
+    if (_clean(instructions, multiline: true) != occurrence.instructions)
+      DutyFields.instructions,
+    if (_clean(topic) != occurrence.topic) DutyFields.topic,
+    if (_clean(scripture) != occurrence.scripture) DutyFields.scripture,
+  ];
+
+  /// Asks assignees again (published occurrences only).
+  bool get material => changed.any(
+    (f) =>
+        f != DutyFields.instructions &&
+        f != DutyFields.topic &&
+        f != DutyFields.scripture,
+  );
+
+  /// A published occurrence with an assignee needs [lead] for a material
+  /// change.
+  bool get needsLead =>
+      material &&
+      occurrence.state == RotaState.published &&
+      occurrence.positions.any((p) => p.assignment != null);
+
+  DateTime _at(String hhmm, {DateTime? after}) {
+    final w = ChurchTime.wall(occurrence.times.startsAt);
+    final parts = hhmm.split(':');
+    var t = ChurchTime.instant(
+      w.year,
+      w.month,
+      w.day,
+      int.parse(parts[0]),
+      int.parse(parts[1]),
+    );
+    if (after != null && !t.isAfter(after)) {
+      t = t.add(const Duration(days: 1));
+    }
+    return t;
+  }
+
+  /// `duties.revise_duty` (this occurrence).
+  Map<String, Object?> thisPayload() {
+    String utc(DateTime t) => t.toUtc().toIso8601String();
+    final c = changed;
+    final starts = _at(startTime.trim());
+    final rep = _time(reportingTime);
+    final end = _time(endTime);
+    final reporting = rep == null ? null : _at(rep);
+    return {
+      'occurrence_id': occurrence.occurrenceId,
+      if (c.contains(DutyFields.dutyName)) 'duty_name': _clean(dutyName),
+      if (c.contains(DutyFields.startsAt)) 'starts_at': utc(starts),
+      if (c.contains(DutyFields.endsAt) ||
+          (c.contains(DutyFields.startsAt) && end != null))
+        'ends_at': end == null ? null : utc(_at(end, after: starts)),
+      if (c.contains(DutyFields.reportingAt))
+        'reporting_at': reporting == null ? null : utc(reporting),
+      if (c.contains(DutyFields.location)) 'location': _clean(location),
+      if (c.contains(DutyFields.instructions))
+        'instructions': _clean(instructions, multiline: true),
+      if (c.contains(DutyFields.topic)) 'topic': _clean(topic),
+      if (c.contains(DutyFields.scripture)) 'scripture': _clean(scripture),
+      if (needsLead && lead != null)
+        'response_deadline': utc(DutyLeads.before(reporting ?? starts, lead!)),
+    };
+  }
+
+  /// `duties.revise_series` (this and future).
+  Map<String, Object?> futurePayload(String seriesId) {
+    final c = changed;
+    return {
+      'series_id': seriesId,
+      'from_occurrence_id': occurrence.occurrenceId,
+      if (c.contains(DutyFields.dutyName)) 'duty_name': _clean(dutyName),
+      if (c.contains(DutyFields.startsAt)) 'start_time': startTime.trim(),
+      if (c.contains(DutyFields.endsAt) ||
+          (c.contains(DutyFields.startsAt) && _time(endTime) != null))
+        'end_time': _time(endTime),
+      if (c.contains(DutyFields.reportingAt))
+        'reporting_time': _time(reportingTime),
+      if (c.contains(DutyFields.location)) 'location': _clean(location),
+      if (c.contains(DutyFields.instructions))
+        'instructions': _clean(instructions, multiline: true),
+      if (c.contains(DutyFields.topic)) 'topic': _clean(topic),
+      if (c.contains(DutyFields.scripture)) 'scripture': _clean(scripture),
+      if (material && lead != null) 'deadline_before': lead,
+    };
+  }
+}
+
 /// Application port for the duties reads. Never throws; a fresh request
 /// every call.
 abstract interface class DutiesRepository {
   Future<AccessRead<MyDuties>> fetchMyDuties();
   Future<AccessRead<DutyLeaderBoard>> fetchLeaderBoard();
   Future<AccessRead<DutyAdminOverview>> fetchAdminOverview();
+
+  /// Story 4.3: `api.duties_rota`.
+  Future<AccessRead<DutyRota>> fetchRota();
 }
 
 class UnconfiguredDutiesRepository implements DutiesRepository {
@@ -890,6 +1557,10 @@ class UnconfiguredDutiesRepository implements DutiesRepository {
 
   @override
   Future<AccessRead<DutyAdminOverview>> fetchAdminOverview() async =>
+      const AccessReadDenied(AccessDenial.unavailable);
+
+  @override
+  Future<AccessRead<DutyRota>> fetchRota() async =>
       const AccessReadDenied(AccessDenial.unavailable);
 }
 

@@ -970,6 +970,8 @@ void main() {
       );
       expect(byKey('home-attention-conflicts'), findsOneWidget);
       expect(byKey('home-attention-follow-ups'), findsOneWidget);
+      // Story 4.10: the mobile leader's way to the outcomes of past duties.
+      expect(byKey('home-attention-outcomes'), findsOneWidget);
       await tapKey(tester, 'home-attention-open');
       expect(byKey('coverage-counts-$_dept'), findsOneWidget);
     });

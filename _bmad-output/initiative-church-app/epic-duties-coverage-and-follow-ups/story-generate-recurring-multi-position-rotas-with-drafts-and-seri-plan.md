@@ -91,6 +91,21 @@ context:
 - Matrix audit: Generate, Assign drafts, Publish N, Edit this, Edit this and future, Cancel, Coverage, Refusals (member, other department, Pastor, gate closed, untrusted session, revoked scope incl. replay), Races, Deletion: each has pgTAP checks in `duties_rota_test.sql`; Generate, drafts hidden, planning, Publish N, coverage, both edits, cancel, races, refusals and replay also run over HTTP in the E2E.
 - Owner/staging steps remaining (not blocking): the parent applies the migration to staging and checks function md5s; the owner runs `docs/runbooks/duties.md`, story 4.3, "Owner manual checks" and records `evidence-4.3/owner-check.md`.
 
+- Review fixes (independent review; the migration was edited in place, as it is applied nowhere hosted):
+  - S1: `app.duties_audit_series_event` takes the assignment. Revised positions record the new assignment, or the superseded one when there is no new one. Publishing records each assignment, and cancelling records one row per cancelled assignment.
+  - S2: the expansion window starts at the series' first date (or now, when later). A valid year-long series starting up to two years ahead is no longer refused with `window`.
+  - S3: a refusal for one date of `publish_drafts` or `revise_series` (answer-by passed or required, someone who can no longer serve, times) also names that date as `occurrence:<id>`, ids only. The Rota page shows answer-by errors on the lead pickers and person errors on the position or form, with an **Open** button for the named date.
+  - S4: grid date cells carry a semantics tap action.
+  - N1: `revise_series` and `cancel_series` lock all target occurrences up front, in date order.
+  - N2: publishing share-locks memberships before checking them.
+  - N3: a cancelled draft keeps no planned people.
+  - N4: an `event_ref`-only change is a `reference` revision, not reported as a details update. The client notice says no notice was sent.
+  - N5: a series reporting time after the new start time is a field error.
+  - N6: the runbook lists the known limit.
+  - N7, N8: the cancellation copy now names who is notified, and the button is labelled **Cancel date(s)…**.
+  - N9: list dates are headings, and their buttons name the date.
+  - N10: added pgTAP (131 checks) and Flutter tests (16 rota tests).
+
 ## Plan Change Log
 
 ## Review Triage Log

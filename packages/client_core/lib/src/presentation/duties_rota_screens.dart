@@ -56,6 +56,44 @@ String _positionText(RotaOccurrence o, RotaPosition p) {
       '${a.available ? '' : ' (can\'t serve now)'}';
 }
 
+/// What a refused rota command's field code means, in words.
+String _rotaError(String code) => switch (code) {
+  'required' => 'Required',
+  'past' => 'This is in the past: choose a later time',
+  'passed' =>
+    'For at least one date this answer-by time has already passed: choose a '
+        'shorter time before the duty',
+  'after_start' => 'Must be before the start',
+  'before_start' => 'Must be after the start',
+  'invalid' => 'Use HH:MM',
+  'not_in_department' => 'Not a member of this department',
+  'unknown' => 'This person can no longer serve',
+  'unavailable' =>
+    'Someone planned can no longer serve: plan someone else first',
+  'required_reassign' =>
+    'Someone assigned can no longer serve: give that position to someone '
+        'else first',
+  _ => 'Check this',
+};
+
+/// The date a refusal names (`occurrence:<id>`), if it is in [series].
+RotaOccurrence? _namedDate(RotaSeries series, Map<String, String> errors) {
+  for (final k in errors.keys) {
+    if (!k.startsWith('occurrence:')) continue;
+    final id = k.substring('occurrence:'.length);
+    for (final o in series.occurrences) {
+      if (o.occurrenceId == id) return o;
+    }
+  }
+  return null;
+}
+
+Widget _errorLine(BuildContext context, String text, {Key? key}) => Text(
+  text,
+  key: key,
+  style: TextStyle(color: ChurchColors.of(context).redFg),
+);
+
 String _stateText(RotaOccurrence o) => switch (o.state) {
   RotaState.cancelled => 'Cancelled',
   RotaState.draft when o.started => 'Draft, not published (started)',
@@ -243,6 +281,7 @@ class _SeriesViewState extends ConsumerState<_SeriesView> {
               department: widget.department,
               busy: widget.busy,
               onClose: () => setState(() => _selected = null),
+              onOpen: (id) => setState(() => _selected = id),
             ),
         ],
       ),
@@ -257,6 +296,13 @@ class _SeriesViewState extends ConsumerState<_SeriesView> {
         .expand((o) => o.positions)
         .where((p) => p.draft != null)
         .length;
+    final st = ref.watch(dutyRotaProvider);
+    final mine =
+        st.noticeAction?.command == DutyCommands.publishDrafts &&
+        st.noticeAction?.request.payload['series_id'] == id;
+    final errors = mine ? st.fieldErrors : const <String, String>{};
+    final named = _namedDate(r, errors);
+    final problem = errors['deadline_before'] ?? errors['member_id'];
     return _Card(
       key: Key('rota-publish-panel-$id'),
       child: Column(
@@ -287,6 +333,25 @@ class _SeriesViewState extends ConsumerState<_SeriesView> {
               const Text(' the reporting or start time'),
             ],
           ),
+          if (problem != null)
+            _errorLine(
+              context,
+              '${_rotaError(problem)}'
+              '${named == null ? '' : ' (${_when(context, named.times.startsAt)})'}.',
+              key: Key('rota-publish-error-$id'),
+            ),
+          if (named != null)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: FocusRing(
+                child: TextButton(
+                  key: Key('rota-publish-open-${named.occurrenceId}'),
+                  onPressed: () =>
+                      setState(() => _selected = named.occurrenceId),
+                  child: Text('Open ${_when(context, named.times.startsAt)}'),
+                ),
+              ),
+            ),
           Wrap(
             spacing: 8,
             children: [
@@ -360,6 +425,7 @@ class _RotaGrid extends StatelessWidget {
                     label:
                         '${_when(context, o.times.startsAt)}, '
                         '${_stateText(o)}. Open this date',
+                    onTap: () => onSelect(o),
                     excludeSemantics: true,
                     child: FocusRing(
                       child: TextButton(
@@ -433,9 +499,12 @@ class _RotaList extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                '${_timesText(context, o.times)}: ${_stateText(o)}',
-                style: ChurchType.cardTitle,
+              Semantics(
+                header: true,
+                child: Text(
+                  '${_timesText(context, o.times)}: ${_stateText(o)}',
+                  style: ChurchType.cardTitle,
+                ),
               ),
               if (o.state == RotaState.published)
                 Text('${o.confirmed} of ${o.required} confirmed'),
@@ -446,9 +515,8 @@ class _RotaList extends StatelessWidget {
                   key: Key('rota-open-${o.occurrenceId}'),
                   onPressed: () => onSelect(o),
                   child: Text(
-                    o.occurrenceId == selected
-                        ? 'Close'
-                        : (manage && o.open ? 'Manage this date' : 'Details'),
+                    '${o.occurrenceId == selected ? 'Close' : (manage && o.open ? 'Manage' : 'Details for')} '
+                    '${_when(context, o.times.startsAt)}',
                   ),
                 ),
               ),
@@ -469,12 +537,16 @@ class _OccurrencePanel extends ConsumerStatefulWidget {
     required this.department,
     required this.busy,
     required this.onClose,
+    required this.onOpen,
   });
   final RotaSeries series;
   final RotaOccurrence occurrence;
   final RotaDepartment department;
   final bool busy;
   final VoidCallback onClose;
+
+  /// Opens another date of the series (one a refusal named).
+  final void Function(String occurrenceId) onOpen;
 
   @override
   ConsumerState<_OccurrencePanel> createState() => _OccurrencePanelState();
@@ -548,22 +620,42 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
     lead: _lead,
   );
 
-  Widget _leadPicker(String key) => Row(
+  Widget _leadPicker(String key, {String? error}) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Text('Answer by: '),
-      DropdownButton<String>(
-        key: Key(key),
-        value: _lead,
-        items: [
-          for (final (wire, label) in DutyLeads.choices)
-            DropdownMenuItem(value: wire, child: Text(label)),
+      Row(
+        children: [
+          const Text('Answer by: '),
+          DropdownButton<String>(
+            key: Key(key),
+            value: _lead,
+            items: [
+              for (final (wire, label) in DutyLeads.choices)
+                DropdownMenuItem(value: wire, child: Text(label)),
+            ],
+            onChanged: widget.busy
+                ? null
+                : (v) => setState(() => _lead = v ?? _lead),
+          ),
+          const Text(' the reporting or start time'),
         ],
-        onChanged: widget.busy
-            ? null
-            : (v) => setState(() => _lead = v ?? _lead),
       ),
+      if (error != null) _errorLine(context, error, key: Key('$key-error')),
     ],
   );
+
+  /// The field errors of this panel's last refused command of [commands].
+  Map<String, String> _errorsFor(Set<String> commands, {String? slotId}) {
+    final s = ref.watch(dutyRotaProvider);
+    final a = s.noticeAction;
+    if (a == null || !commands.contains(a.command)) return const {};
+    final id = widget.occurrence.occurrenceId;
+    final payload = a.request.payload;
+    final ours = slotId != null
+        ? payload['slot_id'] == slotId
+        : payload['occurrence_id'] == id || payload['from_occurrence_id'] == id;
+    return ours ? s.fieldErrors : const {};
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -589,7 +681,18 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
           const SizedBox(height: 8),
           for (final p in o.positions) _positionRow(context, o, p, manage),
           if (manage && o.state == RotaState.published)
-            _leadPicker('rota-assign-lead-$id'),
+            _leadPicker(
+              'rota-assign-lead-$id',
+              error: switch ([
+                for (final p in o.positions)
+                  ?_errorsFor({
+                    DutyCommands.assignSlot,
+                  }, slotId: p.slotId)['response_deadline'],
+              ]) {
+                [final e, ...] => _rotaError(e),
+                _ => null,
+              },
+            ),
           const SizedBox(height: 8),
           if (manage && _mode == _Mode.view)
             Wrap(
@@ -616,7 +719,7 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
                             _mode = _Mode.cancel;
                             _future = false;
                           }),
-                    child: const Text('Cancel this date…'),
+                    child: const Text('Cancel date(s)…'),
                   ),
                 ),
               ],
@@ -734,6 +837,15 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
                 child: Text(draft ? 'Save plan' : 'Give this position'),
               ),
             ),
+            if (_errorsFor({
+                  DutyCommands.assignSlot,
+                }, slotId: p.slotId)['member_id']
+                case final e?)
+              _errorLine(
+                context,
+                _rotaError(e),
+                key: Key('rota-position-error-${p.slotId}'),
+              ),
           ],
         ],
       ),
@@ -742,31 +854,17 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
 
   Widget _changeForm(BuildContext context, DutyRotaController ctl) {
     final id = widget.occurrence.occurrenceId;
-    final s = ref.watch(dutyRotaProvider);
-    final cmd = s.noticeAction?.command;
-    final mine =
-        (cmd == DutyCommands.revise || cmd == DutyCommands.reviseSeries) &&
-        (s.noticeAction?.request.payload['occurrence_id'] == id ||
-            s.noticeAction?.request.payload['from_occurrence_id'] == id);
-    final errors = mine ? s.fieldErrors : const <String, String>{};
+    final errors = _errorsFor({DutyCommands.revise, DutyCommands.reviseSeries});
     String? err(List<String> wires) {
       for (final w in wires) {
-        final e = errors[w];
-        if (e == null) continue;
-        return switch (e) {
-          'required' => 'Required',
-          'past' => 'This is in the past',
-          'after_start' => 'Must be before the start',
-          'before_start' => 'Must be after the start',
-          'invalid' => 'Use HH:MM',
-          'required_reassign' =>
-            'Someone planned can no longer serve: give that position to '
-                'someone else first',
-          _ => 'Check this',
-        };
+        if (errors[w] case final e?) return _rotaError(e);
       }
       return null;
     }
+
+    final named = _namedDate(widget.series, errors);
+    final leadError = err(['deadline_before', 'response_deadline']);
+    final memberError = err(['member_id']);
 
     Widget field(
       String key,
@@ -866,13 +964,36 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
                         : asks
                         ? 'Everyone assigned is asked to answer again '
                               '(changed: ${DutyFields.describe(changed)}); '
-                              'their earlier answers are kept.'
+                              'their earlier answers are kept. People who '
+                              'declined are asked again too.'
                         : 'Only ${DutyFields.describe(changed)} change: '
                               'answers stand.',
                     key: Key('rota-edit-summary-$id'),
                   ),
-                if (asks || (_future && edit.readable && edit.material))
-                  _leadPicker('rota-edit-lead-$id'),
+                if (asks ||
+                    (_future && edit.readable && edit.material) ||
+                    leadError != null)
+                  _leadPicker('rota-edit-lead-$id', error: leadError),
+                if (memberError != null)
+                  _errorLine(
+                    context,
+                    memberError,
+                    key: Key('rota-edit-member-error-$id'),
+                  ),
+                if (named != null && named.occurrenceId != id)
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: FocusRing(
+                      child: TextButton(
+                        key: Key('rota-edit-open-${named.occurrenceId}'),
+                        onPressed: () => widget.onOpen(named.occurrenceId),
+                        child: Text(
+                          'The problem is on '
+                          '${_when(context, named.times.startsAt)}: open it',
+                        ),
+                      ),
+                    ),
+                  ),
                 Wrap(
                   spacing: 8,
                   children: [
@@ -923,12 +1044,12 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          _future
-              ? 'Cancel $later ${later == 1 ? 'date' : 'dates'} from '
-                    '${_when(context, o.times.startsAt)}? Everyone assigned '
-                    'is told; earlier dates are kept.'
-              : 'Cancel ${_when(context, o.times.startsAt)}? Everyone '
-                    'assigned is told; their earlier answers are kept.',
+          '${_future ? 'Cancel $later ${later == 1 ? 'date' : 'dates'} from '
+                    '${_when(context, o.times.startsAt)}? Earlier dates are '
+                    'kept.' : 'Cancel ${_when(context, o.times.startsAt)} only?'} '
+          'People who were waiting to answer or had accepted get a "Duty '
+          'cancelled" notice; people who declined and draft dates get none. '
+          'Answers are kept in the history.',
           key: Key('rota-cancel-summary-$id'),
         ),
         Wrap(

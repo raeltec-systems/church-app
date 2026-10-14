@@ -7,7 +7,7 @@
 -- tools/identity-e2e/duties-rota.mjs. Every account, phone and name is SYNTHETIC (fictional range
 -- +44 7700 900990-900999).
 begin;
-select plan(117);
+select plan(131);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000043' || lpad(n::text, 2, '0'))::uuid $$;
@@ -333,7 +333,8 @@ $$;
 select is(pg_temp.publish(2, 38, '1 day') - 'request_id' - 'message',
   jsonb_build_object('code', 'conflict', 'field_errors', '{"slot_count": "changed"}'::jsonb, 'current_revision', 1),
   'Publish N refuses when N is not the number of draft slots');
-select is(pg_temp.publish(2, 39, '30 days') -> 'field_errors', '{"deadline_before": "passed"}'::jsonb,
+select is(pg_temp.publish(2, 39, '30 days') -> 'field_errors',
+  jsonb_build_object('deadline_before', 'passed', 'occurrence:' || pg_temp.o(1), 'passed'),
   'an answer-by that has already passed is refused');
 select is(pg_temp.publish(7, 39, '1 day') ->> 'code', 'forbidden', 'the Pastor cannot publish');
 create temp table pub_req as select gen_random_uuid() as id;
@@ -382,7 +383,9 @@ select pg_temp.duties(2, 'duties.assign_slot',
 update app.duties_department_members set ended_at = now() where department_id = pg_temp.d() and member_id = pg_temp.mid(5);
 select is(pg_temp.duties(2, 'duties.publish_drafts', 1, jsonb_build_object('series_id', (select r #>> '{data,series_id}' from gen3),
             'slot_count', 2, 'deadline_before', '1 day')) -> 'field_errors',
-  '{"member_id": "unavailable"}'::jsonb, 'a planned assignee who can no longer serve is refused');
+  jsonb_build_object('member_id', 'unavailable', 'occurrence:' || (select o.occurrence_id from app.duties_occurrences o
+    where o.series_id = (select (r #>> '{data,series_id}')::uuid from gen3) order by o.series_date limit 1), 'unavailable'),
+  'a planned assignee who can no longer serve is refused, naming the date');
 select is((select o #>> '{positions,0,draft,available}' from jsonb_array_elements(pg_temp.rota(2) -> 'series') s,
                   jsonb_array_elements(s -> 'occurrences') o
             where s ->> 'series_id' = (select r #>> '{data,series_id}' from gen3) order by o ->> 'series_date' limit 1),
@@ -432,8 +435,18 @@ select is((select x ->> 'topic' || '|' || (x ->> 'scripture') from jsonb_array_e
   'the member reads the topic and scripture');
 create temp table ref1 as select pg_temp.duties(2, 'duties.revise_duty', pg_temp.orev(1), jsonb_build_object(
   'occurrence_id', pg_temp.o(1), 'event_ref', gen_random_uuid())) as r;
-select is((select (r #>> '{data,change}') || '|' || (r #>> '{data,notice_queued}') from ref1), 'notes|false',
+select is((select (r #>> '{data,change}') || '|' || (r #>> '{data,notice_queued}') from ref1), 'reference|false',
   'a linked-event reference is recorded without a notice');
+select is((select change_class from app.duties_slot_revisions r join app.duties_slots s using (slot_id)
+            where s.occurrence_id = pg_temp.o(1) and s.position_no = 1
+            order by r.slot_revision desc limit 1) || '|' ||
+          coalesce((select x ->> 'notes_updated_at' from jsonb_array_elements(pg_temp.readj(4, 'select api.duties_my_duties()') -> 'assignments') x
+                     where x ->> 'assignment_id' = pg_temp.cur(1, 1)::text), 'none') ||
+          '|' || ((select count(*) from app.duties_slot_revisions r join app.duties_slots s using (slot_id)
+                    where s.occurrence_id = pg_temp.o(1) and r.change_class = 'notes') > 0)::text,
+  'reference|' || coalesce((select app.cmd_utc(max(r.created_at)) from app.duties_slot_revisions r join app.duties_slots s using (slot_id)
+                             where s.occurrence_id = pg_temp.o(1) and s.position_no = 1 and r.change_class = 'notes'), 'none') || '|true',
+  'it is a reference revision, so My duties still reports only the earlier notes update');
 
 -- This and future ------------------------------------------------------------------------------------
 -- Occurrence 5 has started (its time came while the rota was being edited).
@@ -444,7 +457,8 @@ language sql as $$
   select pg_temp.duties(n, 'duties.revise_series', coalesce(p_expected, pg_temp.srev()),
     jsonb_build_object('series_id', pg_temp.sr(), 'from_occurrence_id', pg_temp.o(p_from)) || p_extra)
 $$;
-select is(pg_temp.future(2, 3, '{"start_time": "10:00"}') -> 'field_errors', '{"deadline_before": "required"}'::jsonb,
+select is(pg_temp.future(2, 3, '{"start_time": "10:00"}') -> 'field_errors',
+  jsonb_build_object('deadline_before', 'required', 'occurrence:' || pg_temp.o(3), 'required'),
   'a material this-and-future change of published duties needs the answer-by lead time');
 select is(pg_temp.future(2, 5, '{"start_time": "10:00"}') -> 'field_errors', '{"from_occurrence_id": "started"}'::jsonb,
   'a started occurrence cannot be the anchor');
@@ -486,6 +500,26 @@ create temp table give as select pg_temp.assign(2, 4, 1, pg_temp.mid(5), jsonb_b
 select is((select (r #>> '{data,state}') || '|' || (r #>> '{data,response}') || '|' || (r #>> '{data,notice_queued}') from give),
   'published|pending|true', 'an unfilled published position is given with a new-duty notice');
 select is(pg_temp.jobs(pg_temp.cur(4, 1)), 'duty_assigned:pending:-', 'with one job');
+
+-- A later date's assignee left the department: a series time change names that date.
+update app.duties_department_members set ended_at = now() where department_id = pg_temp.d() and member_id = pg_temp.mid(5);
+select is(pg_temp.future(3, 4, '{"start_time": "12:00", "deadline_before": "1 day"}') -> 'field_errors',
+  jsonb_build_object('member_id', 'required_reassign', 'occurrence:' || pg_temp.o(4), 'required_reassign'),
+  'a this-and-future change that would ask someone who left names the date to fix first (ids only)');
+select is((select to_char(starts_at at time zone 'Africa/Lusaka', 'HH24:MI') from app.duties_occurrences
+            where occurrence_id = pg_temp.o(3)), '10:00', 'and nothing was changed');
+update app.duties_department_members set ended_at = null where department_id = pg_temp.d() and member_id = pg_temp.mid(5);
+select is(pg_temp.future(3, 4, '{"start_time": "07:00", "reporting_time": "08:00"}') -> 'field_errors',
+  '{"reporting_time": "after_start"}'::jsonb, 'a reporting time after the new start is a field error');
+
+-- Audit carries the assignment ids ---------------------------------------------------------------------
+select is((select count(*)::int from app.duties_audit where series_id = pg_temp.sr() and action = 'duty_published'
+            and code is null and assignment_id is null), 0, 'every published assignment is audited with its id');
+select is((select count(*)::int from app.duties_audit where series_id = pg_temp.sr() and action = 'duty_published'
+            and assignment_id is not null), 9, 'nine published assignments are audited');
+select ok((select bool_and(assignment_id is not null) from app.duties_audit
+            where occurrence_id = pg_temp.o(2) and action = 'duty_revised' and member_id is not null),
+  'each revised position is audited with its assignment');
 
 -- Cancel one occurrence ------------------------------------------------------------------------------
 create temp table c6_asg as select pg_temp.cur(6, 1) as m_asg, pg_temp.cur(6, 2) as o_asg;
@@ -541,6 +575,12 @@ select is((select string_agg(occurrence_state, ',' order by series_date) from ap
 select is((select revision || '|' || occurrence_state from app.duties_occurrences where occurrence_id = pg_temp.o(9)),
   (select revision || '|' || occurrence_state from o9_before), 'unchanged');
 
+select is((select string_agg(coalesce(assignment_id::text, 'none'), ',' order by assignment_id::text)
+             from app.duties_audit where occurrence_id = pg_temp.o(6) and action = 'occurrence_cancelled'
+              and assignment_id is not null),
+  (select string_agg(x::text, ',' order by x::text) from (select m_asg as x from c6_asg union all select o_asg from c6_asg) y),
+  'the cancellation is audited per cancelled assignment');
+
 -- Receipts and audit hold ids, counts and codes only ---------------------------------------------------
 select is((select count(*)::int from app.cmd_receipts c where c.command in ('duties.create_series',
             'duties.assign_slot', 'duties.publish_drafts', 'duties.revise_series', 'duties.cancel_occurrence',
@@ -575,6 +615,59 @@ select is(split_part(pg_temp.read(2, 'select api.duties_rota()'), '|', 3), 'not_
   'and they no longer read the rota');
 select is(pg_temp.future(3, 3, '{"instructions": "Deputy text."}') #>> '{data,material}', '0',
   'the deputy still manages the rota');
+
+-- A started draft is not published and not counted in N --------------------------------------------
+update app.duties_occurrences set starts_at = now() - interval '1 minute', ends_at = null
+ where occurrence_id = pg_temp.g2(1);
+select is(pg_temp.duties(3, 'duties.publish_drafts',
+            (select revision from app.duties_series where series_id = (select (r #>> '{data,series_id}')::uuid from gen2)),
+            jsonb_build_object('series_id', (select r #>> '{data,series_id}' from gen2), 'slot_count', 3,
+                               'deadline_before', '1 day')) ->> 'code',
+  'conflict', 'a draft that has started is not one of the N draft slots');
+create temp table pub2 as select pg_temp.duties(3, 'duties.publish_drafts',
+  (select revision from app.duties_series where series_id = (select (r #>> '{data,series_id}')::uuid from gen2)),
+  jsonb_build_object('series_id', (select r #>> '{data,series_id}' from gen2), 'slot_count', 2,
+                     'deadline_before', '1 day')) as r;
+select is((select (r #>> '{data,occurrences}') || '|' ||
+                  (select occurrence_state from app.duties_occurrences where occurrence_id = pg_temp.g2(1)) from pub2),
+  '2|draft', 'the two future drafts publish; the started one stays an unpublished draft');
+
+-- Window: a valid year-long series far ahead is generated (the 400-day window starts at the first date).
+create temp table far as select pg_temp.duties(6, 'duties.create_series', null, jsonb_build_object(
+  'department_id', pg_temp.e(), 'duty_name', 'Welcome', 'every', 'week', 'start_time', '09:00',
+  'from_date', to_char(pg_temp.sunday(0) + 300, 'YYYY-MM-DD'),
+  'until_date', to_char(pg_temp.sunday(0) + 300 + 364, 'YYYY-MM-DD'),
+  'positions', jsonb_build_array('Door'))) as r;
+select is((select (r #>> '{data,occurrences}')::int from far), 53,
+  'a weekly series a year long starting 300 days ahead is generated (not refused for the window)');
+select is(pg_temp.duties(6, 'duties.create_series', null, jsonb_build_object(
+            'department_id', pg_temp.e(), 'duty_name', 'Welcome', 'every', 'week', 'start_time', '09:00',
+            'from_date', to_char(pg_temp.sunday(0) + 800, 'YYYY-MM-DD'),
+            'until_date', to_char(pg_temp.sunday(0) + 801, 'YYYY-MM-DD'),
+            'positions', jsonb_build_array('Door'))) -> 'field_errors',
+  '{"from_date": "out_of_range"}'::jsonb, 'a first date more than two years ahead is a field error');
+
+-- Cancel this and future over drafts: no notices, planned people cleared.
+create temp table gen5 as select pg_temp.duties(6, 'duties.create_series', null, jsonb_build_object(
+  'department_id', pg_temp.e(), 'duty_name', 'Usher rota', 'every', 'week', 'start_time', '09:00',
+  'from_date', to_char(pg_temp.sunday(0), 'YYYY-MM-DD'), 'until_date', to_char(pg_temp.sunday(1), 'YYYY-MM-DD'),
+  'positions', jsonb_build_array('Door'))) as r;
+select pg_temp.duties(6, 'duties.assign_slot', 1, jsonb_build_object('slot_id',
+  (select s.slot_id from app.duties_slots s join app.duties_occurrences o using (occurrence_id)
+    where o.series_id = (select (r #>> '{data,series_id}')::uuid from gen5) order by o.series_date limit 1),
+  'member_id', pg_temp.mid(9)));
+create temp table can5 as select pg_temp.duties(6, 'duties.cancel_series', 1, jsonb_build_object(
+  'series_id', (select r #>> '{data,series_id}' from gen5),
+  'from_occurrence_id', (select o.occurrence_id from app.duties_occurrences o
+                          where o.series_id = (select (r #>> '{data,series_id}')::uuid from gen5)
+                          order by o.series_date limit 1))) as r;
+select is((select (r -> 'data') - 'series_id' - 'from_occurrence_id' - 'revision' from can5),
+  '{"occurrences": 2, "assignments_cancelled": 0, "notices_queued": 0}'::jsonb,
+  'cancelling drafts this and future cancels both without a notice');
+select is((select count(*)::int || '|' || count(s.draft_member_id)::int from app.duties_occurrences o
+             join app.duties_slots s using (occurrence_id)
+            where o.series_id = (select (r #>> '{data,series_id}')::uuid from gen5) and o.occurrence_state = 'cancelled'),
+  '2|0', 'and a cancelled draft keeps no planned person');
 
 -- Deletion ------------------------------------------------------------------------------------------
 create temp table gen4 as select pg_temp.duties(3, 'duties.create_series', null, pg_temp.series(jsonb_build_object(

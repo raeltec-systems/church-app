@@ -7,6 +7,7 @@ import 'package:church_client_core/church_client_core.dart';
 import 'package:church_client_core/testing.dart';
 import 'package:church_contracts/church_contracts.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -529,7 +530,7 @@ void main() {
       // Cancel this date only.
       await tapKey(tester, 'rota-edit-close-$_o1');
       await tapKey(tester, 'rota-cancel-$_o1');
-      expect(find.textContaining('Everyone assigned is told'), findsOneWidget);
+      expect(find.textContaining('People who were waiting to answer or had accepted'), findsOneWidget);
       await tapKey(tester, 'rota-cancel-confirm-$_o1');
       final cancel = h.gateway.sent.last;
       expect(cancel.wire['command'], 'duties.cancel_occurrence');
@@ -542,6 +543,163 @@ void main() {
       await settle(tester);
       expect(byKey('duties-notice-occurrenceCancelled'), findsOneWidget);
       expect(find.text('Cancelled'), findsWidgets);
+    });
+
+    testWidgets('a refused answer-by shows on the lead picker', (tester) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.dutyRota,
+        setUp: (h) => h.duties.rota = rotaWith(draftSlots: 0, [
+          occurrence(
+            _o1,
+            state: 'published',
+            revision: 4,
+            positions: [
+              position(_o1, 1, 'Preacher'),
+              position(_o1, 2, 'Reader'),
+              position(_o1, 3, 'Usher'),
+            ],
+          ),
+        ]),
+      );
+      await tapKey(tester, 'rota-date-$_o1');
+      await tapKey(tester, 'rota-pick-${_slot(_o1, 1)}');
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.tap(find.text('SYNTHETIC Ruth').last);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tapKey(tester, 'rota-save-${_slot(_o1, 1)}');
+      h.gateway.sent.single.refuse(
+        ErrorCode.validationFailed,
+        fieldErrors: const {'response_deadline': 'past'},
+      );
+      await settle(tester);
+      expect(byKey('rota-assign-lead-$_o1-error'), findsOneWidget);
+      expect(
+        find.text('This is in the past: choose a later time'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a series edit refused for a later date names and opens it', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.dutyRota,
+        setUp: (h) => h.duties.rota = rotaWith(draftSlots: 0, revision: 3, [
+          occurrence(
+            _o1,
+            state: 'published',
+            revision: 4,
+            positions: [
+              position(_o1, 1, 'Preacher', assignment: assignment('accepted')),
+              position(_o1, 2, 'Reader'),
+              position(_o1, 3, 'Usher'),
+            ],
+          ),
+          occurrence(
+            _o2,
+            state: 'published',
+            date: '2099-01-11',
+            startsAt: '2099-01-11T08:00:00.000000Z',
+          ),
+        ]),
+      );
+      await tapKey(tester, 'rota-date-$_o1');
+      await tapKey(tester, 'rota-change-$_o1');
+      await tapKey(tester, 'rota-scope-future-$_o1');
+      await enter(tester, 'rota-edit-start-$_o1', '09:00');
+      await tapKey(tester, 'rota-edit-save-$_o1');
+      h.gateway.sent.single.refuse(
+        ErrorCode.validationFailed,
+        fieldErrors: const {
+          'member_id': 'required_reassign',
+          'occurrence:$_o2': 'required_reassign',
+        },
+      );
+      await settle(tester);
+      expect(byKey('rota-edit-member-error-$_o1'), findsOneWidget);
+      expect(
+        find.textContaining('Someone assigned can no longer serve'),
+        findsOneWidget,
+      );
+      await tapKey(tester, 'rota-edit-open-$_o2');
+      await settle(tester);
+      expect(byKey('rota-change-$_o2'), findsOneWidget);
+    });
+
+    testWidgets('a publish refused for one date names it', (tester) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.dutyRota,
+        setUp: (h) => h.duties.rota = rotaWith([occurrence(_o1)]),
+      );
+      await tapKey(tester, 'rota-publish-$_series');
+      await tapKey(tester, 'rota-publish-confirm-$_series');
+      h.gateway.sent.single.refuse(
+        ErrorCode.validationFailed,
+        fieldErrors: const {
+          'member_id': 'unavailable',
+          'occurrence:$_o1': 'unavailable',
+        },
+      );
+      await settle(tester);
+      expect(byKey('rota-publish-error-$_series'), findsOneWidget);
+      expect(byKey('duties-notice-plannedUnavailable'), findsOneWidget);
+      await tapKey(tester, 'rota-publish-open-$_o1');
+      expect(byKey('rota-change-$_o1'), findsOneWidget);
+    });
+
+    testWidgets('screen readers can open a date from the grid and the list', (
+      tester,
+    ) async {
+      final handle = tester.ensureSemantics();
+      await pumpAt(
+        tester,
+        ClientPaths.dutyRota,
+        setUp: (h) => h.duties.rota = rotaWith([occurrence(_o1)]),
+      );
+      final date = find.bySemanticsLabel(RegExp('Open this date'));
+      expect(date, findsOneWidget);
+      expect(
+        tester
+            .getSemantics(date)
+            .getSemanticsData()
+            .hasAction(SemanticsAction.tap),
+        isTrue,
+      );
+      tester.semantics.tap(find.semantics.byLabel(RegExp('Open this date')));
+      await tester.pump();
+      expect(byKey('rota-close-$_o1'), findsOneWidget);
+      await tapKey(tester, 'rota-close-$_o1');
+      await tapKey(tester, 'rota-view-$_series');
+      // The list names the date on its button, and each date is a header.
+      expect(find.textContaining('Manage '), findsOneWidget);
+      expect(
+        tester
+            .getSemantics(find.textContaining('(church time): Draft'))
+            .getSemanticsData()
+            .flagsCollection.isHeader,
+        isTrue,
+      );
+      handle.dispose();
+    });
+
+    testWidgets('a linked-event-only change says no notice was sent', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.dutyRota,
+        setUp: (h) => h.duties.rota = rotaWith([occurrence(_o1)]),
+      );
+      await tapKey(tester, 'rota-date-$_o1');
+      await tapKey(tester, 'rota-change-$_o1');
+      await enter(tester, 'rota-edit-topic-$_o1', 'SYNTHETIC Hope');
+      await tapKey(tester, 'rota-edit-save-$_o1');
+      h.gateway.sent.single.confirm(const {'change': 'reference'}, 2);
+      await settle(tester);
+      expect(byKey('duties-notice-referenceUpdated'), findsOneWidget);
     });
 
     testWidgets('Pastor oversight is read only', (tester) async {

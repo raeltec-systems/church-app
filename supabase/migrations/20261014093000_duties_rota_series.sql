@@ -65,7 +65,7 @@ as $$
     when 'response' then p_value in ('pending', 'accepted', 'declined')
     when 'response_provenance' then p_value in ('member')
     when 'capacity' then p_value in ('admin', 'department_leader', 'department_deputy', 'member')
-    when 'change_class' then p_value in ('published', 'material', 'notes', 'cancelled')
+    when 'change_class' then p_value in ('published', 'material', 'notes', 'reference', 'cancelled')
     when 'slot_field' then p_value in ('duty_name', 'starts_at', 'ends_at', 'reporting_at',
                                        'location', 'member_id', 'instructions', 'topic',
                                        'scripture', 'event_ref', 'position_name')
@@ -322,6 +322,7 @@ create function app.duties_audit_series_event(
   p_department uuid,
   p_series uuid,
   p_occurrence uuid,
+  p_assignment uuid,
   p_member uuid,
   p_code text,
   p_revision bigint
@@ -331,10 +332,10 @@ set search_path = ''
 as $$
   insert into app.duties_audit (action, actor_member_id, actor_account_id, actor_capacity,
                                 command_request_id, department_id, series_id, occurrence_id,
-                                member_id, code, revision_after)
+                                assignment_id, member_id, code, revision_after)
   values (p_action, p_actor_member, p_actor_account, p_capacity,
           app.cmd_current_request_id(p_actor_account, p_command), p_department, p_series,
-          p_occurrence, p_member, p_code, p_revision);
+          p_occurrence, p_assignment, p_member, p_code, p_revision);
 $$;
 
 -- The fields changed on a slot after revision p_after (replaced: the 4.3 fields in order).
@@ -524,7 +525,9 @@ begin
     perform app.cmd_fail('validation_failed', '{"occurrence_id": "unchanged"}');
   end if;
   v_notify := v_changed && array['instructions', 'topic', 'scripture'];
-  v_class := case when v_material then 'material' else 'notes' end;
+  -- A change of reference fields only (the linked event) is recorded as `reference`: no notice,
+  -- and My duties does not report it as a details update.
+  v_class := case when v_material then 'material' when v_notify then 'notes' else 'reference' end;
 
   -- A new pending assignment needs the leader's answer-by (entry 8 adds the 3.3 default).
   v_need_deadline := v_member_changed
@@ -635,14 +638,15 @@ begin
                                            assignment_id, response_deadline, created_by_member,
                                            created_by_account, command_request_id)
     values (v_slot.slot_id, v_slot_revision, p_old.occurrence_id, v_revision,
-            case when v_slot_material then 'material' else 'notes' end, v_slot_changed,
+            case when v_slot_material then 'material' else v_class end, v_slot_changed,
             p_new.duty_name, p_new.starts_at, p_new.ends_at, p_new.reporting_at, p_new.location,
             p_new.instructions, p_new.topic, p_new.scripture, p_new.event_ref, v_current_member,
             v_current, v_current_deadline, p_actor_member, p_actor_account, v_request);
     perform app.duties_audit_series_event('duty_revised', p_actor_member, p_actor_account,
                                           p_capacity, p_command, p_old.department_id,
-                                          p_old.series_id, p_old.occurrence_id, v_current_member,
-                                          case when v_slot_material then 'material' else 'notes' end,
+                                          p_old.series_id, p_old.occurrence_id,
+                                          coalesce(v_current, v_superseded), v_current_member,
+                                          case when v_slot_material then 'material' else v_class end,
                                           v_revision);
 
     -- Notification work (run by the caller after every Duties row is written).
@@ -748,10 +752,14 @@ begin
      set occurrence_state = 'cancelled', revision = o.revision + 1
    where o.occurrence_id = p_occ.occurrence_id
   returning o.revision into v_revision;
-  perform app.duties_audit_series_event('occurrence_cancelled', p_actor_member, p_actor_account,
-                                        p_capacity, p_command, p_occ.department_id, p_occ.series_id,
-                                        p_occ.occurrence_id, null, p_occ.occurrence_state, v_revision);
   if p_occ.occurrence_state <> 'published' then
+    -- A cancelled draft keeps no planned people.
+    update app.duties_slots s set draft_member_id = null
+     where s.occurrence_id = p_occ.occurrence_id and s.draft_member_id is not null;
+    perform app.duties_audit_series_event('occurrence_cancelled', p_actor_member, p_actor_account,
+                                          p_capacity, p_command, p_occ.department_id, p_occ.series_id,
+                                          p_occ.occurrence_id, null, null, p_occ.occurrence_state,
+                                          v_revision);
     return jsonb_build_object('assignments_cancelled', 0, 'ops', '[]'::jsonb);
   end if;
   for v_slot in select s.* from app.duties_slots s where s.occurrence_id = p_occ.occurrence_id
@@ -786,6 +794,10 @@ begin
             p_occ.duty_name, p_occ.starts_at, p_occ.ends_at, p_occ.reporting_at, p_occ.location,
             p_occ.instructions, p_occ.topic, p_occ.scripture, p_occ.event_ref, null, null, null,
             p_actor_member, p_actor_account, v_request);
+    perform app.duties_audit_series_event('occurrence_cancelled', p_actor_member, p_actor_account,
+                                          p_capacity, p_command, p_occ.department_id, p_occ.series_id,
+                                          p_occ.occurrence_id, v_old.assignment_id, v_old.member_id,
+                                          p_occ.occurrence_state, v_revision);
     -- Every pending job of the position's assignments (current, superseded) ends with it.
     for v_id in select a.assignment_id from app.duties_assignments a where a.slot_id = v_slot.slot_id loop
       v_cancels := v_cancels || jsonb_build_array(jsonb_build_object(
@@ -1378,7 +1390,10 @@ begin
                                  'every', p_payload ->> 'every', 'interval', v_interval,
                                  'exceptions', to_jsonb(array(select to_char(e, 'YYYY-MM-DD')
                                                                from unnest(v_exceptions) e))),
-              now(), app.duties_wall(v_until, v_start, v_zone));
+              -- The window starts at the first date (or now, when later): at most 367 days, so
+              -- the shared calculation's 400-day bound is never reached by a valid series.
+              greatest(now(), app.duties_wall(v_from, '00:00', v_zone)),
+              app.duties_wall(v_until, v_start, v_zone));
   select coalesce(jsonb_agg(e order by e ->> 'starts_at'), '[]'::jsonb) into v_list
     from jsonb_array_elements(v_list) e
    where app.duties_wall(left(e ->> 'local', 10)::date, coalesce(v_reporting, v_start), v_zone) > now();
@@ -1420,7 +1435,7 @@ begin
   end loop;
   perform app.duties_audit_series_event('series_created', v_actor.member_id, v_actor.account_id,
                                         v_capacity, 'duties.create_series', v_department_id, v_series,
-                                        null, null, null, 1);
+                                        null, null, null, null, 1);
   return jsonb_build_object(
     'aggregate_type', 'duties_series', 'aggregate_id', v_series, 'revision', 1,
     -- Ids, revisions and counts only; clients read the rota again.
@@ -1547,7 +1562,7 @@ begin
      where o.occurrence_id = v_occ.occurrence_id returning o.revision into v_revision;
     perform app.duties_audit_series_event('draft_assigned', v_actor.member_id, v_actor.account_id,
                                           v_lock.capacity, 'duties.assign_slot', v_occ.department_id,
-                                          v_occ.series_id, v_occ.occurrence_id, v_member, null,
+                                          v_occ.series_id, v_occ.occurrence_id, null, v_member, null,
                                           v_revision);
     return jsonb_build_object(
       'aggregate_type', 'duties_occurrence', 'aggregate_id', v_occ.occurrence_id,
@@ -1636,6 +1651,7 @@ declare
   v_assignments integer := 0;
   v_notified jsonb;
   v_request uuid;
+  v_unavailable uuid;
 begin
   select a.* into v_actor from app.duties_command_actor(p_actor) a;
   v_errors := app.contract_unknown_keys(p_payload, array['series_id', 'slot_count', 'deadline_before']);
@@ -1666,26 +1682,31 @@ begin
   if v_count <> (p_payload ->> 'slot_count')::integer then
     perform app.cmd_fail('conflict', '{"slot_count": "changed"}', v_series.revision);
   end if;
-  -- Checks before anything is written.
-  for v_occ in select o.* from app.duties_occurrences o
-                where o.series_id = v_series_id and o.occurrence_state = 'draft'
-                  and app.duties_occurrence_start(o) > now()
-                order by o.series_date loop
-    if app.notifications_shift(app.duties_occurrence_start(v_occ), v_lead, -1, v_series.zone) <= now() then
-      perform app.cmd_fail('validation_failed', '{"deadline_before": "passed"}');
-    end if;
-    if exists (select 1 from app.duties_slots s
-                where s.occurrence_id = v_occ.occurrence_id and s.draft_member_id is not null
-                  and not app.duties_can_serve(s.draft_member_id, v_series.department_id)) then
-      perform app.cmd_fail('validation_failed', '{"member_id": "unavailable"}');
-    end if;
-  end loop;
+  -- The planned people's memberships are share-locked first, then everything is checked
+  -- before anything is written.
   perform 1 from app.duties_department_members dm
    where dm.department_id = v_series.department_id and dm.ended_at is null
      and dm.member_id in (select s.draft_member_id from app.duties_occurrences o
                             join app.duties_slots s on s.occurrence_id = o.occurrence_id
                            where o.series_id = v_series_id and o.occurrence_state = 'draft')
    order by dm.member_id for share;
+  for v_occ in select o.* from app.duties_occurrences o
+                where o.series_id = v_series_id and o.occurrence_state = 'draft'
+                  and app.duties_occurrence_start(o) > now()
+                order by o.series_date loop
+    if app.notifications_shift(app.duties_occurrence_start(v_occ), v_lead, -1, v_series.zone) <= now() then
+      perform app.cmd_fail('validation_failed', jsonb_build_object(
+        'deadline_before', 'passed', 'occurrence:' || v_occ.occurrence_id, 'passed'));
+    end if;
+    select s.draft_member_id into v_unavailable from app.duties_slots s
+     where s.occurrence_id = v_occ.occurrence_id and s.draft_member_id is not null
+       and not app.duties_can_serve(s.draft_member_id, v_series.department_id)
+     order by s.position_no limit 1;
+    if v_unavailable is not null then
+      perform app.cmd_fail('validation_failed', jsonb_build_object(
+        'member_id', 'unavailable', 'occurrence:' || v_occ.occurrence_id, 'unavailable'));
+    end if;
+  end loop;
 
   v_request := app.cmd_current_request_id(v_actor.account_id, 'duties.publish_drafts');
   for v_occ in select o.* from app.duties_occurrences o
@@ -1730,7 +1751,7 @@ begin
       perform app.duties_audit_series_event('duty_published', v_actor.member_id, v_actor.account_id,
                                             v_lock.capacity, 'duties.publish_drafts',
                                             v_series.department_id, v_series_id, v_occ.occurrence_id,
-                                            v_slot.draft_member_id,
+                                            v_assignment, v_slot.draft_member_id,
                                             case when v_assignment is null then 'unfilled' end,
                                             v_revision);
     end loop;
@@ -1899,7 +1920,7 @@ begin
     returning o.revision into v_revision;
     perform app.duties_audit_series_event('draft_revised', v_actor.member_id, v_actor.account_id,
                                           v_lock.capacity, 'duties.revise_duty', v_occ.department_id,
-                                          v_occ.series_id, v_occurrence_id, null, null, v_revision);
+                                          v_occ.series_id, v_occurrence_id, null, null, null, v_revision);
     return jsonb_build_object(
       'aggregate_type', 'duties_occurrence', 'aggregate_id', v_occurrence_id, 'revision', v_revision,
       'data', jsonb_build_object('occurrence_id', v_occurrence_id, 'revision', v_revision,
@@ -1971,6 +1992,9 @@ declare
   v_created integer := 0;
   v_revision bigint;
   v_capacity text;
+  v_fail_code text;
+  v_fail_detail text;
+  v_fail_errors jsonb;
 begin
   select a.* into v_actor from app.duties_command_actor(p_actor) a;
   v_errors := app.contract_unknown_keys(p_payload,
@@ -2033,11 +2057,22 @@ begin
   elsif app.duties_occurrence_start(v_anchor) <= now() then
     perform app.cmd_fail('validation_failed', '{"from_occurrence_id": "started"}');
   end if;
+  -- The series keeps a reporting time no later than its start time.
+  if coalesce(case when p_payload ? 'reporting_time' then v_reporting else v_series.reporting_time end,
+              '00:00'::time)
+     > coalesce(case when p_payload ? 'start_time' then v_start else v_series.start_time end, '23:59'::time) then
+    perform app.cmd_fail('validation_failed', '{"reporting_time": "after_start"}');
+  end if;
+  -- Lock every target occurrence up front, in series date order (AD-2 lock order).
+  perform 1 from app.duties_occurrences o
+   where o.series_id = v_series_id and o.series_date >= v_anchor.series_date
+     and o.occurrence_state <> 'cancelled'
+   order by o.series_date for update;
 
   for v_occ in select o.* from app.duties_occurrences o
                 where o.series_id = v_series_id and o.series_date >= v_anchor.series_date
                   and o.occurrence_state <> 'cancelled' and app.duties_occurrence_start(o) > now()
-                order by o.series_date for update loop
+                order by o.series_date loop
     -- The occurrence's own church-local date (an occurrence moved on its own keeps its date).
     v_date := (v_occ.starts_at at time zone v_series.zone)::date;
     v_new := v_occ;
@@ -2065,7 +2100,9 @@ begin
       v_errors := app.duties_times_errors(v_new.starts_at, v_new.ends_at, v_new.reporting_at,
                                           array['start_time', 'end_time', 'reporting_time']);
       if v_errors <> '{}'::jsonb then
-        perform app.cmd_fail('validation_failed', v_errors);
+        -- The date that cannot take the change is named (ids only).
+        perform app.cmd_fail('validation_failed', v_errors || jsonb_build_object(
+          'occurrence:' || v_occ.occurrence_id, (select e.value #>> '{}' from jsonb_each(v_errors) e limit 1)));
       end if;
     end if;
     if v_occ.occurrence_state = 'draft' then
@@ -2088,9 +2125,22 @@ begin
     v_deadline := case when v_lead is not null
                        then app.notifications_shift(coalesce(v_new.reporting_at, v_new.starts_at),
                                                     v_lead, -1, v_series.zone) end;
-    v_change := app.duties_apply_change(v_occ, v_new, null, null, false, v_deadline,
-                                        'deadline_before', v_actor.member_id, v_actor.account_id,
-                                        v_capacity, 'duties.revise_series', true);
+    begin
+      v_change := app.duties_apply_change(v_occ, v_new, null, null, false, v_deadline,
+                                          'deadline_before', v_actor.member_id, v_actor.account_id,
+                                          v_capacity, 'duties.revise_series', true);
+    exception when sqlstate 'PCMD1' then
+      -- A refusal for one date (an assignee who can no longer serve, an answer-by that has
+      -- passed) names that date (ids only) so the leader can fix it.
+      get stacked diagnostics v_fail_code = message_text, v_fail_detail = pg_exception_detail;
+      v_fail_errors := coalesce(v_fail_detail::jsonb -> 'field_errors', '{}'::jsonb);
+      if v_fail_code = 'validation_failed' and v_fail_errors <> '{}'::jsonb then
+        perform app.cmd_fail('validation_failed', v_fail_errors || jsonb_build_object(
+          'occurrence:' || v_occ.occurrence_id,
+          (select e.value #>> '{}' from jsonb_each(v_fail_errors) e limit 1)));
+      end if;
+      raise;
+    end;
     if v_change is not null then
       v_changed := v_changed + 1;
       if v_change ->> 'change' = 'material' then
@@ -2118,7 +2168,7 @@ begin
   returning r.revision into v_revision;
   perform app.duties_audit_series_event('series_revised', v_actor.member_id, v_actor.account_id,
                                         v_capacity, 'duties.revise_series', v_series.department_id,
-                                        v_series_id, v_anchor_id, null, null, v_revision);
+                                        v_series_id, v_anchor_id, null, null, null, v_revision);
   v_notified := app.duties_notify(v_ops);
   return jsonb_build_object(
     'aggregate_type', 'duties_series', 'aggregate_id', v_series_id, 'revision', v_revision,
@@ -2218,10 +2268,15 @@ begin
   elsif app.duties_occurrence_start(v_anchor) <= now() then
     perform app.cmd_fail('validation_failed', '{"from_occurrence_id": "started"}');
   end if;
+  -- Lock every target occurrence up front, in series date order (AD-2 lock order).
+  perform 1 from app.duties_occurrences o
+   where o.series_id = v_series_id and o.series_date >= v_anchor.series_date
+     and o.occurrence_state <> 'cancelled'
+   order by o.series_date for update;
   for v_occ in select o.* from app.duties_occurrences o
                 where o.series_id = v_series_id and o.series_date >= v_anchor.series_date
                   and o.occurrence_state <> 'cancelled' and app.duties_occurrence_start(o) > now()
-                order by o.series_date for update loop
+                order by o.series_date loop
     v_result := app.duties_cancel_one(v_occ, v_actor.member_id, v_actor.account_id,
                                       v_lock.capacity, 'duties.cancel_series');
     v_count := v_count + 1;
@@ -2450,7 +2505,7 @@ revoke all on function
   app.duties_lead(jsonb, text, boolean, jsonb),
   app.duties_wall(date, time, text),
   app.duties_can_serve(uuid, uuid),
-  app.duties_audit_series_event(text, uuid, uuid, text, text, uuid, uuid, uuid, uuid, text, bigint),
+  app.duties_audit_series_event(text, uuid, uuid, text, text, uuid, uuid, uuid, uuid, uuid, text, bigint),
   app.duties_notify(jsonb),
   app.duties_apply_change(app.duties_occurrences, app.duties_occurrences, uuid, uuid, boolean,
                           timestamptz, text, uuid, uuid, text, text, boolean),

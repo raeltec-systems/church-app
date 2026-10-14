@@ -68,6 +68,9 @@ enum DutyNotice {
   /// Story 4.3: a draft edit (no one is asked yet).
   draftUpdated,
 
+  /// Story 4.3: only the linked-event reference changed (no notice).
+  referenceUpdated,
+
   /// The duty was already answered.
   alreadyAnswered,
 
@@ -249,6 +252,7 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
         DutyCommands.revise => switch (data) {
           {'change': 'notes'} => DutyNotice.notesUpdated,
           {'change': 'draft'} => DutyNotice.draftUpdated,
+          {'change': 'reference'} => DutyNotice.referenceUpdated,
           _ => DutyNotice.revised,
         },
         DutyCommands.createSeries => DutyNotice.seriesCreated,

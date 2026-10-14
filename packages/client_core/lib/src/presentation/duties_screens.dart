@@ -151,6 +151,12 @@ abstract final class DutyPaths {
       'Draft updated',
       'The draft $what was changed. Nobody is told until you publish.',
     ),
+    DutyNotice.referenceUpdated => (
+      StatusTone.success,
+      'Link updated',
+      'The linked event of $what was updated. Answers stand and nobody is '
+          'sent a notice.',
+    ),
     DutyNotice.positionGiven => (
       StatusTone.success,
       'Position given',
@@ -173,7 +179,9 @@ abstract final class DutyPaths {
     DutyNotice.occurrenceCancelled => (
       StatusTone.success,
       'Cancelled',
-      '$what was cancelled for the chosen dates. Everyone assigned is told; '
+      '$what was cancelled for the chosen dates. People who were waiting to '
+          'answer or had accepted get a notice (not those who declined, and '
+          'not for drafts); '
           'their earlier answers are kept.',
     ),
     DutyNotice.draftCountChanged => (

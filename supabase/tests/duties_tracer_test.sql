@@ -112,16 +112,16 @@ select is((select array_agg(column_name::text order by column_name::text)
             where table_schema = 'app' and table_name = 'duties_audit'),
   array['action', 'actor_account_id', 'actor_capacity', 'actor_member_id', 'assignment_id', 'code',
         'command_request_id', 'department_id', 'environment', 'event_id', 'member_id',
-        'occurred_at', 'occurrence_id', 'revision_after'],
+        'occurred_at', 'occurrence_id', 'revision_after', 'series_id'],
   'the audit holds ids, codes and revisions only (no names, notes or free text)');
 select ok(not exists (
   select 1 from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace
    cross join unnest(array['anon', 'authenticated', 'service_role']) r
    where n.nspname in ('app', 'api') and p.proname ~ '^duties_'
      and not (p.proname in ('duties_command', 'duties_my_duties', 'duties_leader_board',
-                            'duties_admin_overview') and r = 'authenticated')
+                            'duties_admin_overview', 'duties_rota') and r = 'authenticated')
      and has_function_privilege(r, p.oid, 'EXECUTE')),
-  'only the command and the three reads are client-executable, and only by authenticated');
+  'only the command and the reads (with the 4.3 rota) are client-executable, and only by authenticated');
 select is((select count(*)::int from app.contract_unowned_objects()), 0, 'no unowned objects');
 select is((select count(*)::int from app.contract_unpinned_functions()), 0, 'every function is pinned');
 select is((select count(*)::int from app.contract_boundary_violations()), 0, 'no boundary violations');
@@ -285,7 +285,9 @@ select is(pg_temp.readj(4, 'select api.duties_my_duties()') #>> '{assignments,0,
 select is((pg_temp.readj(4, 'select api.duties_my_duties()') -> 'assignments' -> 0) - 'assignment_id' - 'occurrence_id'
             - 'department_id' - 'starts_at' - 'ends_at' - 'response_deadline'
             -- Story 4.2 keys (revisions) are checked in duties_revisions_test.sql.
-            - 'slot_revision' - 'changes' - 'previous_response' - 'previous_assignment_ids' - 'notes_updated_at',
+            - 'slot_revision' - 'changes' - 'previous_response' - 'previous_assignment_ids' - 'notes_updated_at'
+            -- Story 4.3 keys are checked in duties_rota_test.sql.
+            - 'position_name' - 'topic' - 'scripture',
   '{"revision": 1, "duty_name": "Sunday preaching", "department_name": "SYNTHETIC Preaching Rota", "reporting_at": null, "location": "SYNTHETIC Main hall", "instructions": "Arrive early.", "response": "pending", "responded_at": null, "note": null}'::jsonb,
   'with its detail, deadline and pending response');
 select is(jsonb_array_length(pg_temp.readj(5, 'select api.duties_my_duties()') -> 'assignments'), 1,

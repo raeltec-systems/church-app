@@ -365,6 +365,35 @@ void main() {
   );
 
   testWidgets(
+    'story 4.3: Rota follows the department scope and opens the rota grid',
+    (tester) async {
+      final h = await pumpStaff(tester);
+      expect(find.byKey(const Key('nav-/duties/rota')), findsNothing);
+      h.grants.myAccess = AccessReadOk(
+        syntheticGrants(
+          scopes: const [
+            ScopeGrant(
+              scopeKind: 'department_deputy',
+              scopeId: '44444444-4444-4444-8444-444444444444',
+            ),
+          ],
+        ),
+      );
+      h.duties.rota = AccessReadOk(
+        DutyRota.fromJson({'departments': const <Object?>[]}),
+      );
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'nav-/duties/rota');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('rota-no-departments')), findsOneWidget);
+      expect(h.duties.rotaCalls, greaterThan(0));
+    },
+  );
+
+  testWidgets(
     'story 2.5: Members & applications follows the Admin grant and opens the '
     'review queue',
     (tester) async {

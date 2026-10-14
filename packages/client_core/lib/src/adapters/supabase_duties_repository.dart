@@ -7,7 +7,7 @@ import 'supabase_api_reader.dart';
 /// Supabase adapter for [DutiesRepository] (story 4.1): the member's own
 /// duties (`api.duties_my_duties`), the leader board
 /// (`api.duties_leader_board`) and the Admin overview
-/// (`api.duties_admin_overview`). The server checks live access and the
+/// (`api.duties_admin_overview`); story 4.3 adds the rota (`api.duties_rota`). The server checks live access and the
 /// current grants on every call; this adapter only maps the answer.
 class SupabaseDutiesRepository implements DutiesRepository {
   SupabaseDutiesRepository(
@@ -31,4 +31,8 @@ class SupabaseDutiesRepository implements DutiesRepository {
     const {},
     DutyAdminOverview.fromJson,
   );
+
+  @override
+  Future<AccessRead<DutyRota>> fetchRota() =>
+      _reader.read('duties_rota', const {}, DutyRota.fromJson);
 }

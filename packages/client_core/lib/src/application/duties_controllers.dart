@@ -38,6 +38,39 @@ enum DutyNotice {
   /// Changed in another tab or by someone else: reloaded.
   changedElsewhere,
 
+  /// Story 4.3: a rota series was generated as drafts.
+  seriesCreated,
+
+  /// Story 4.3: a draft position was planned or cleared.
+  draftAssigned,
+
+  /// Story 4.3: a published position was given to someone.
+  positionGiven,
+
+  /// Story 4.3: Publish N draft slots succeeded.
+  draftsPublished,
+
+  /// Story 4.3: a this-and-future edit succeeded.
+  seriesRevised,
+
+  /// Story 4.3: an occurrence (or this and future) was cancelled.
+  occurrenceCancelled,
+
+  /// Story 4.3: the number of draft slots changed before publishing.
+  draftCountChanged,
+
+  /// Story 4.3: the chosen answer-by time has already passed for a duty.
+  leadPassed,
+
+  /// Story 4.3: a planned person can no longer serve.
+  plannedUnavailable,
+
+  /// Story 4.3: a draft edit (no one is asked yet).
+  draftUpdated,
+
+  /// Story 4.3: only the linked-event reference changed (no notice).
+  referenceUpdated,
+
   /// The duty was already answered.
   alreadyAnswered,
 
@@ -216,10 +249,21 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
   static DutyNotice _success(DutyAction action, Object? data) =>
       switch (action.command) {
         DutyCommands.createDepartment => DutyNotice.departmentCreated,
-        DutyCommands.revise =>
-          data is Map && data['change'] == 'notes'
-              ? DutyNotice.notesUpdated
-              : DutyNotice.revised,
+        DutyCommands.revise => switch (data) {
+          {'change': 'notes'} => DutyNotice.notesUpdated,
+          {'change': 'draft'} => DutyNotice.draftUpdated,
+          {'change': 'reference'} => DutyNotice.referenceUpdated,
+          _ => DutyNotice.revised,
+        },
+        DutyCommands.createSeries => DutyNotice.seriesCreated,
+        DutyCommands.assignSlot =>
+          data is Map && data['state'] == 'draft'
+              ? DutyNotice.draftAssigned
+              : DutyNotice.positionGiven,
+        DutyCommands.publishDrafts => DutyNotice.draftsPublished,
+        DutyCommands.reviseSeries => DutyNotice.seriesRevised,
+        DutyCommands.cancelOccurrence ||
+        DutyCommands.cancelSeries => DutyNotice.occurrenceCancelled,
         DutyCommands.addMember => DutyNotice.memberAdded,
         GrantCommands.grantScope => DutyNotice.staffAssigned,
         GrantCommands.revokeScope => DutyNotice.staffRemoved,
@@ -240,13 +284,28 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
       ErrorCode.conflict when f['assignment_id'] == 'cancelled' =>
         DutyNotice.dutyCancelled,
       ErrorCode.conflict when f['name'] == 'taken' => DutyNotice.nameTaken,
+      ErrorCode.conflict when f['slot_count'] == 'changed' =>
+        DutyNotice.draftCountChanged,
       ErrorCode.conflict => DutyNotice.changedElsewhere,
       ErrorCode.validationFailed when f['assignment_id'] == 'started' =>
         DutyNotice.started,
       ErrorCode.validationFailed when f['occurrence_id'] == 'started' =>
         DutyNotice.dutyStarted,
-      ErrorCode.validationFailed when f['occurrence_id'] == 'unchanged' =>
+      ErrorCode.validationFailed
+          when f['occurrence_id'] == 'unchanged' ||
+              f['series_id'] == 'unchanged' ||
+              f['slot_id'] == 'unchanged' =>
         DutyNotice.unchanged,
+      ErrorCode.validationFailed
+          when f['occurrence_id'] == 'cancelled' ||
+              f['from_occurrence_id'] == 'cancelled' =>
+        DutyNotice.dutyCancelled,
+      ErrorCode.validationFailed when f['from_occurrence_id'] == 'started' =>
+        DutyNotice.dutyStarted,
+      ErrorCode.validationFailed when f['deadline_before'] == 'passed' =>
+        DutyNotice.leadPassed,
+      ErrorCode.validationFailed when f['member_id'] == 'unavailable' =>
+        DutyNotice.plannedUnavailable,
       ErrorCode.validationFailed when f['member_id'] == 'not_in_department' =>
         DutyNotice.notInDepartment,
       ErrorCode.validationFailed => DutyNotice.invalid,
@@ -400,6 +459,82 @@ class DutyLeaderController extends DutiesController<DutyLeaderBoard> {
 final dutyLeaderProvider =
     NotifierProvider<DutyLeaderController, DutiesState<DutyLeaderBoard>>(
       DutyLeaderController.new,
+    );
+
+/// Story 4.3, staff web: rota series of the departments the caller manages
+/// (Pastor read only): generate drafts, plan and give positions, Publish N
+/// draft slots, change this occurrence or this and future, cancel.
+class DutyRotaController extends DutiesController<DutyRota> {
+  @override
+  Future<AccessRead<DutyRota>> fetch() =>
+      ref.read(dutiesRepositoryProvider).fetchRota();
+
+  Future<void> createSeries(SeriesDraft draft) => send(
+    DutyCommands.createSeries,
+    const Optional.of(null),
+    draft.toPayload(),
+    draft.dutyName.trim(),
+  );
+
+  /// A draft position: [memberId] is the planned person (null clears). A
+  /// published position needs [lead] for the answer-by time.
+  Future<void> assignSlot(
+    RotaOccurrence occurrence,
+    RotaPosition position,
+    String? memberId, {
+    String? lead,
+    String? subject,
+  }) => send(DutyCommands.assignSlot, Optional.of(occurrence.revision), {
+    'slot_id': position.slotId,
+    'member_id': memberId,
+    if (occurrence.state == RotaState.published && lead != null)
+      'response_deadline': DutyLeads.before(
+        occurrence.times.arriveBy,
+        lead,
+      ).toUtc().toIso8601String(),
+  }, subject ?? position.label);
+
+  /// "Publish N draft slots": N is what the leader confirmed; the server
+  /// refuses when it no longer matches.
+  Future<void> publishDrafts(RotaSeries series, int slots, String lead) =>
+      send(DutyCommands.publishDrafts, Optional.of(series.revision), {
+        'series_id': series.seriesId,
+        'slot_count': slots,
+        'deadline_before': lead,
+      }, series.dutyName);
+
+  Future<void> reviseThis(RotaEdit edit) => send(
+    DutyCommands.revise,
+    Optional.of(edit.occurrence.revision),
+    edit.thisPayload(),
+    edit.occurrence.dutyName,
+  );
+
+  Future<void> reviseFuture(RotaSeries series, RotaEdit edit) => send(
+    DutyCommands.reviseSeries,
+    Optional.of(series.revision),
+    edit.futurePayload(series.seriesId),
+    series.dutyName,
+  );
+
+  Future<void> cancelThis(RotaOccurrence occurrence) => send(
+    DutyCommands.cancelOccurrence,
+    Optional.of(occurrence.revision),
+    {'occurrence_id': occurrence.occurrenceId},
+    occurrence.dutyName,
+  );
+
+  Future<void> cancelFuture(RotaSeries series, RotaOccurrence from) => send(
+    DutyCommands.cancelSeries,
+    Optional.of(series.revision),
+    {'series_id': series.seriesId, 'from_occurrence_id': from.occurrenceId},
+    series.dutyName,
+  );
+}
+
+final dutyRotaProvider =
+    NotifierProvider<DutyRotaController, DutiesState<DutyRota>>(
+      DutyRotaController.new,
     );
 
 /// Mobile: the member's own duties; Accept or Can't make it.

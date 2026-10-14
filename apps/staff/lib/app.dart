@@ -117,6 +117,13 @@ const staffDutyLeaderDestination = (
   icon: Icons.assignment_outlined,
 );
 
+/// Story 4.3: the rota grid, shown with the Duties entry.
+const staffDutyRotaDestination = (
+  path: ClientPaths.dutyRota,
+  label: 'Rota',
+  icon: Icons.calendar_view_week_outlined,
+);
+
 /// Story 4.1: shown while the server's current answer includes Admin.
 const staffDepartmentsDestination = (
   path: ClientPaths.adminDepartments,
@@ -136,6 +143,7 @@ List<StaffDestination> staffDestinationsFor(
   if (grants != null) staffAccessDestination,
   if (servesACell(grants)) staffCellLeaderDestination,
   if (seesDutyBoard(grants)) staffDutyLeaderDestination,
+  if (seesDutyBoard(grants)) staffDutyRotaDestination,
   if (grants?.isAdmin ?? false) staffMembersDestination,
   if (grants?.isAdmin ?? false) staffRecoveryEmailsDestination,
   if (grants?.isAdmin ?? false) staffCredentialReviewsDestination,

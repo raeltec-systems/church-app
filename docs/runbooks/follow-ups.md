@@ -267,7 +267,7 @@ Nothing separate: see duties.md, story 4.11 (the SYNTHETIC caller's follow-up is
 
 ## Story 4.12: lifecycle and handover of follow-up tasks
 
-Migration: `supabase/migrations/20261015043644_duties_lifecycle.sql` (with Duties; no `_rows` file, so **no owner SQL paste**). The Duties side and the owner manual checks are in [duties.md](duties.md) (story 4.12).
+Migration: `supabase/migrations/20261015110202_duties_lifecycle.sql` (with Duties; no `_rows` file, so **no owner SQL paste**). The Duties side and the owner manual checks are in [duties.md](duties.md) (story 4.12).
 
 ### Handover under the Q4 owner-scope rule
 

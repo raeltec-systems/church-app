@@ -1084,7 +1084,7 @@ Record the outcome of each step in `evidence-4.11/owner-check.md`: pass or fail,
 
 ## Story 4.12: apply membership lifecycle and handover to duties and follow-ups
 
-Migration: `supabase/migrations/20261015043644_duties_lifecycle.sql` (forward only; the 4.1-4.11 files are not edited; no destructive statements, no row deletions, no `_rows` file, so **no owner SQL paste**; no new client grant: both new commands go through `api.duties_command`). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-apply-membership-lifecycle-and-handover-to-duties-and-follow-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.12/`. The Follow-ups side is in [follow-ups.md](follow-ups.md) (story 4.12); the Identity seams in [identity-access.md](identity-access.md) (stories 2.10, 2.11 and the 4.12 note there).
+Migration: `supabase/migrations/20261015110202_duties_lifecycle.sql` (forward only; the 4.1-4.11 files are not edited; no destructive statements, no row deletions, no `_rows` file, so **no owner SQL paste**; no new client grant: both new commands go through `api.duties_command`). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-apply-membership-lifecycle-and-handover-to-duties-and-follow-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.12/`. The Follow-ups side is in [follow-ups.md](follow-ups.md) (story 4.12); the Identity seams in [identity-access.md](identity-access.md) (stories 2.10, 2.11 and the 4.12 note there).
 
 ### What each lifecycle change does to Duties (inside Identity's transaction, AD-14)
 
@@ -1159,7 +1159,7 @@ Fictional numbers: pgTAP `+44 7700 900460-900469`, scale `900480-900489`, E2E `9
 ### Hosted staging (parent session, then the owner)
 
 1. **Parent session:**
-   - Apply `20261015043644_duties_lifecycle.sql` to staging (`tmurpotfluignacfueki`) after `20261015035112` (rename the local file to the recorded hosted version if the apply records another one).
+   - Apply `20261015110202_duties_lifecycle.sql` to staging (`tmurpotfluignacfueki`) after `20261015035112` (rename the local file to the recorded hosted version if the apply records another one).
    - Run `tools/ci/verify-hosted.sql` with `expected_env=staging`.
    - Compare the md5 of each new or replaced `app.duties_*` and `app.followups_*` function with the local one (the migration has no backslashes).
    - Grants: no new function is executable by `anon`, `authenticated` or `service_role`.

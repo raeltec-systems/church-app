@@ -69,7 +69,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261015043644_duties_lifecycle.sql` -- hooks, commands, vacancy kind and flag, Follow-ups handover, replaced bodies, privileges.
+- [x] `supabase/migrations/20261015110202_duties_lifecycle.sql` -- hooks, commands, vacancy kind and flag, Follow-ups handover, replaced bodies, privileges.
 - [x] `supabase/tests/duties_lifecycle_test.sql`, `duties_lifecycle_scale_test.sql`; ledgers and earlier tests updated.
 - [x] `packages/client_core` -- remove member, handovers and resolve, `vacated` flag, handover refusal text, task handover attribution; tests.
 - [x] `tools/identity-e2e/duties-lifecycle.mjs` + `.test.mjs`.
@@ -81,7 +81,7 @@ context:
 ## Implementation Notes
 
 - Implemented directly (no implementation subagent inside this builder run), as 4.1-4.11. CHECKPOINT 1 pre-approved by the owner (owner-decisions-milestone-1.md, -2.md); the frozen block's decisions are the agent's under that pre-approval.
-- Server: `supabase/migrations/20261015043644_duties_lifecycle.sql` (ASCII, no backslashes, no DROP/TRUNCATE/`delete from`, `search_path = ''` everywhere; every new function revoked from public, anon, authenticated and service_role; no new client grant).
+- Server: `supabase/migrations/20261015110202_duties_lifecycle.sql` (ASCII, no backslashes, no DROP/TRUNCATE/`delete from`, `search_path = ''` everywhere; every new function revoked from public, anon, authenticated and service_role; no new client grant).
   - New: columns `duties_department_members.ended_by_member/ended_by_account` (with a check); functions `duties_lifecycle_actor`, `duties_vacated_since`, `duties_lifecycle_notify` (Q2 guard), `duties_vacate_member` (the one ending routine), `duties_hold_contact`, `duties_scope_revoked`, `duties_on_member_lifecycle` (hook), `duties_report_handover` (hook), `duties_vacancy_alert_check`, `duties_remove_member`, `duties_pending_handovers`, `duties_has_reachable_leader`, `duties_resolve_handover`; `followups_reachable`, `followups_handover_candidate`, `followups_supervisor_candidate`, `followups_handover_task`, `followups_handover_member`, `followups_on_member_lifecycle` (hook), `followups_report_handover` (hook), trigger `followups_tasks_handover_sync` (`followups_task_handover_sync`). Reminder kind `duties_coverage/duty_vacated`. Registrations: Duties lifecycle hooks on four events, Follow-ups on three, both handover hooks.
   - Replaced bodies (each copied from its latest version, changes marked "Story 4.12", every earlier review fix kept):
     - from `20261015035112` (4.11): `duties_state_ok` (end reason and change class `vacated`, capacity `lifecycle`, four audit actions), `duties_authorize_command` and `duties_command` (two commands), `duties_deletion_remaining` and `duties_erase_member` (4.10 S1 lock-first order kept; `ended_by_*` anonymised and counted).

@@ -3,7 +3,7 @@ title: 'Expose Duties and Follow-ups owner operations for programmes and later o
 type: 'feature'
 ticket: '11'
 created: '2026-10-15'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '2f8cf1d2b4624a905f2a7f1920526d3ab86de888'
 route: 'full'
 route_source: 'auto'
@@ -77,19 +77,47 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261015120000_duties_owner_operations.sql` -- registry, link and flag tables, owner operations, clear command, replaced bodies, synthetic caller, privileges.
-- [ ] `supabase/tests/duties_owner_operations_test.sql`, `duties_owner_operations_scale_test.sql`; earlier tests updated for cell parts and the ledger.
-- [ ] `packages/contracts/fixtures/v1/source_ref.json`, `task_source.json`, regenerated Dart fixtures.
-- [ ] `packages/client_core` cell parts in My duties, review flag and linked count on board/rota with Mark reviewed; tests.
-- [ ] `tools/identity-e2e/duties-owner-ops.mjs` + `.test.mjs`.
-- [ ] `docs/runbooks/contracts-and-owner-seams.md`, `duties.md`, `follow-ups.md`; `evidence-4.11/`; CI evidence step.
+- [x] `supabase/migrations/20261015120000_duties_owner_operations.sql` -- registry, link and flag tables, owner operations, clear command, replaced bodies, synthetic caller, privileges.
+- [x] `supabase/tests/duties_owner_operations_test.sql`, `duties_owner_operations_scale_test.sql`; earlier tests updated for cell parts and the ledger.
+- [x] `packages/contracts/fixtures/v1/source_ref.json`, `task_source.json`, regenerated Dart fixtures.
+- [x] `packages/client_core` cell parts in My duties, review flag and linked count on board/rota with Mark reviewed; tests.
+- [x] `tools/identity-e2e/duties-owner-ops.mjs` + `.test.mjs`.
+- [x] `docs/runbooks/contracts-and-owner-seams.md`, `duties.md`, `follow-ups.md`; `evidence-4.11/`; CI evidence step.
 
 **Acceptance Criteria:**
 - Given the synthetic caller, when it creates, revises and cancels a cell-owned position in one transaction, links a department duty, flags and clears a mismatch, then the department duty is unchanged and managed only by its department, a cell leader cannot edit it, a second link for the same part/position is refused, and the fixtures pass in SQL, Dart and TypeScript.
 
 ## Implementation Notes
 
+- Implemented directly (no implementation subagent inside this builder run), as 4.1-4.10. CHECKPOINT 1 pre-approved by the owner (owner-decisions-milestone-1.md, -2.md); the frozen block's decisions are the agent's under that pre-approval.
+- Server: `supabase/migrations/20261015120000_duties_owner_operations.sql` (ASCII, no backslashes, no DROP/TRUNCATE/`delete from`, `search_path = ''` everywhere; every new function revoked from public, anon, authenticated and service_role; **no new client grant**: `duties.clear_review` goes through the existing `api.duties_command`).
+  - New tables: `app.duties_link_sources` (registry), `app.duties_part_links` (stable part/position-to-slot links; partial unique index on the active key; owned slot unique; guard trigger `app.duties_part_link_guard`: only a display link ends, the caller's revision moves forward and erasure anonymises; a direct DELETE is refused, the FK cascade from slot/occurrence is allowed for local clean-ups), `app.duties_review_flags` (one open flag per occurrence and source; codes only), SYNTHETIC `app.fixture_programme_parts` and `app.fixture_events`; index `duties_occurrences_event_ref`.
+  - New functions: registration `duties_register_link_source`; helpers `duties_review_fields_ok`, `duties_owner_ref_errors`, `duties_position_key_error`, `duties_owner_session`, `duties_owner_source`, `duties_owner_positions`, `duties_owner_cancel_slot`, `duties_owner_positions_json`, `duties_owner_part_answer`, `duties_review_json`, `duties_linked_parts`; operations `duties_owner_put_part`, `duties_owner_cancel_part`, `duties_owner_link_duty`, `duties_owner_unlink`, `duties_owner_flag_review`; reads `duties_owner_part`, `duties_owner_conflicts`, `duties_owner_event_links`, `duties_owner_topic`; command `duties_clear_review`; SYNTHETIC caller `fixture_programme_part_check`, `fixture_event_check`, `fixture_programme_begin`, `fixture_programme_publish`, `fixture_programme_cancel`, `fixture_programme_link`, `fixture_programme_unlink`, `fixture_programme_changed`, `fixture_programme_open_followup`, `fixture_event_changed`; edges `fixture -> duties`, `fixture -> followups`.
+  - Replaced bodies (each copied from its latest version, changes marked "Story 4.11", every earlier review fix kept):
+    - from `20261015002121` (4.10): `duties_state_ok` (capacities `cell_leader`/`cell_assistant`; `link_kind`, `link_role`, `review_field`; seven audit actions), `duties_authorize_command` and `duties_command` (`duties.clear_review`), `duties_my_assignment_json` (owner `cell`, `cell_id`, left join on departments, the cell's leaders/assistants), `duties_deletion_remaining` and `duties_erase_member` (4.10 S1 lock order kept; link and flag actors anonymised and counted).
+    - from `20261014212507` (4.9): `duties_respond` (cell refusal removed), `duties_accept_many` (cell refusal removed; the 4.5 lock order unchanged), `duties_apply_change` (cell branch: an active member is asked, a null member leaves a gap and needs no deadline; department path unchanged), `duties_plan_reminders` (member reminders for cell parts; leader alerts stay department-only; 4.8 memoised policy, reachable leaders, fresh keys and passed-deadline alerts, and the 4.9 decline-alert rule kept), `duties_occurrence_json` 3-argument (B1 reason gating kept; `reviews`, `linked_parts` added), `duties_rota_occurrence_json` 2-argument (`reviews`, `linked_parts`).
+    - from `20261014171038` (4.8): `duties_withdraw_acceptance` (cell refusal removed).
+    - from `20261014052239` (4.4): `duties_my_duties` (cell parts listed).
+    - from `20261014001142` (4.2): `duties_update_reminder_check`; from `20261013220239` (4.1): `duties_assignment_reminder_check` (a cell part's recipient is eligible while the assignee is an active member).
+  - Not replaced: `duties_cancel_one` (4.9) and the 4.4 overlap gate are called as they are; Follow-ups and Notifications functions are unchanged; 4.9 coverage/confirmation/contact and 4.10 outcomes stay department-only.
+- Decision (agent, under owner pre-approval): **the actor is the live session.** Owner operations read the acting member and account from `app.identity_evaluate_grant` (the caller's request), never from the payload (stricter than `followups_open_task`, which takes actor ids). A system-principal caller is a later contract change. Duties takes no new Identity lock in an operation: the caller's authorizer holds the actor's grant rows FOR SHARE first (AD-2), as the SYNTHETIC caller does; Duties rechecks the scope on current rows. This replaces the frozen block's "(Identity grants, FOR SHARE)" wording for the operations.
+- Decision (agent, under owner pre-approval): `duties.clear_review` refuses anyone who does not manage the department with `forbidden` (as every other department command through `duties_lock_occurrence`), not `not_found` as the frozen block says; an unknown flag is `not_found`. Recorded in the Plan Change Log.
+- Decision (agent, under owner pre-approval): a revise releases the member of each position whose member changes before the occurrence's own fields change, then asks the new members, so nobody being replaced is re-asked in between (no phantom assignment, the right notice kinds: `duty_released` to the old member, `duty_assigned` to the new one).
+- Decision (agent, under owner pre-approval): an identical put answers `changed: false` without writing (Cells can republish without duplicates); a put that changes nothing but carries `response_deadline` is refused `not_material` (4.2 rule).
+- Decision (agent, under owner pre-approval): no contract version change and no new wire kind. Parts and events are v1 `source_ref` values; the fixtures gain later owners' source references and task identities plus private-field refusals; `supabase/tests/contract_fixtures_check.sh` also runs the `source_ref` fixtures through the operations' own reference validator (`app.duties_owner_ref_errors`).
+- Decision (agent, under owner pre-approval): registrations of the SYNTHETIC caller happen only in tests and the E2E (not in the migration), so staging and production have no link source until Cells or Content registers one.
+- Decision (agent, under owner pre-approval): flags send no notification (the board and rota show them); they are codes only; flags on a cancelled or started duty are not raised.
+- Clients (`packages/client_core`): `MyDuty` (`departmentId`/`departmentName` nullable, `cellId`, `ownerLabel`), `DutyOwnerKind.cell` (answerable), `DutyLeaderName.isAssistant`/`roleLabel`, new `DutyReview`, `LeaderDuty`/`RotaOccurrence` `reviews` and `linkedParts`, `DutyCommands.clearReview`, controller `clearReview` on the board and rota, notices `reviewCleared`/`reviewAlreadyCleared`, widget `_OwnerReviews` on the board row and the rota date panel, calendar text for a cell part. `testing.dart` `myDutyData(ownerKind: 'cell')` sends the cell shape. Tests: new `test/duties/duties_owner_ops_test.dart` (8); `duties_responses_test.dart` (a cell part is now answerable).
+- Earlier tests changed for the new behaviour (no merged migration edited): `duties_tracer_test.sql`, `duties_revisions_test.sql` (My duties key subsets drop `cell_id`), `duties_overlaps_test.sql` (the cell part is listed in My duties), `duties_responses_test.sql` (cell parts are answered since 4.11).
+- Matrix audit: Create (pgTAP "Create a cell-owned part" and "Who may create"; E2E X10), Revise (pgTAP "Revise" incl. stale, renamed, cancelled key, identical put, not_material; E2E X12), Cancel (pgTAP cancel and one-transaction blocks; E2E X40, X41), Link (pgTAP link block incl. second link, owned key, cell-owned/unknown targets; E2E X20, X21 incl. a two-transaction race), Mismatch (pgTAP flag/merge/clear incl. stale, replay, cleared twice, Pastor/cell leader refused; E2E X30, X31; widget tests), Authority (pgTAP "A cell leader cannot edit"; E2E X22, X90), Member (pgTAP member block; E2E X11, X12; widget test), Erasure (pgTAP erasure block). All ran and passed (see Verification).
+- Fictional numbers: pgTAP +44 7700 900160-900169, E2E +44 7700 900240-900249 (grepped: unused before).
+- Open owner questions: Q4 unchanged (fail closed). New, with the fail-closed default built: may a cell programme name the assignee of a linked department duty? Built: no.
+- Contract changes expected from epic 5 (recorded here per the ticket's unknown): cell-scope leader alerts, coverage queue, Confirmed by leader, contact attempts and outcomes for cell parts; a discovery read of linkable department duties; the creator's reminders for a part; a system-principal caller; naming a linked duty's assignee (owner question above).
+- Remaining (not builder steps): staging apply of the migration with per-function md5 parity (parent; no owner SQL paste; no Edge Function redeploy); rebuild the staging staff web and APK; owner manual checks in `docs/runbooks/duties.md`, story 4.11.
+
 ## Plan Change Log
+
+- 2026-10-15 (build): two details of the frozen decisions were built differently, fail closed, recorded under Implementation Notes: owner operations take no new Identity lock (the caller's authorizer holds the grant rows first; Duties rechecks the scope on current rows), and `duties.clear_review` answers `forbidden` (not `not_found`) to anyone who does not manage the department, as every department command does. The frozen block is unchanged.
 
 ## Review Triage Log
 
@@ -101,3 +129,10 @@ context:
 - `npm run -s contracts:test`, `dart test` in `packages/contracts/dart`, node tool tests, `npm run -s ci:policy-test` -- expected: pass.
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/staff`, `apps/mobile`; `TZ=America/New_York` for `test/duties` and mobile -- expected: pass.
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/main && npm run -s ci:function-imports`; evidence scan -- expected: clean.
+
+**Results (2026-10-15, after merging `ccr-93e730dd-89lbvg` with 187f0d1):**
+- db reset 0; db:test PASS (41 files, 3534 tests; `duties_owner_operations_test.sql` 148, `duties_owner_operations_scale_test.sql` 12: flag 400 = 520 ms, event links 9 ms, board with 400 reviews 331 ms, create 10-position part 450 ms, revise 296 ms, owner read 8 ms, My duties with 200 parts 142 ms); db:smoke pass (fixtures 260 SQL cases + 25 envelopes + 29 `source_ref` cases through the owner operations).
+- Every E2E `exit=0` (28 scripts, reset before each, one at a time; `duties-owner-ops` 13/13 including a two-transaction link race); `duties-responses` V40 updated for cell parts and rerun 12/12 (`evidence-4.11/e2e-suite-summary.txt`).
+- contracts:test 265/0; Dart contracts 282 pass; node tool tests (CI set) 219/0; ci:policy-test 56/0.
+- flutter analyze clean in client_core, apps/staff, apps/mobile; flutter test client_core 619 (`duties_owner_ops_test.dart` 8), apps/staff 40, apps/mobile 55; under `TZ=America/New_York` client_core `test/duties` + `test/followups` 191 and apps/mobile 55.
+- ci:secrets clean; ci:migrations (`--base origin/main`) ordered, unique, non-destructive; ci:function-imports ok; evidence scan clean.

@@ -10,8 +10,9 @@
 //   * a real race: the member accepts three dates together while a leader moves one of them; in
 //     every round either all three were accepted (and the moved one is asked again) or none was;
 //     never a partial acceptance;
-//   * refusals: someone else's assignment, a cell-owned (SYNTHETIC fixture) assignment, direct
-//     table queries; receipts and audit rows hold no note text.
+//   * refusals: someone else's assignment, direct table queries; receipts and audit rows hold no
+//     note text. A cell-owned (SYNTHETIC fixture) assignment was refused until story 4.11; since
+//     then the member answers it like a department duty (it is listed in My duties).
 //
 // Needs the local phone switch: `node tools/auth-harness/local-phone-auth.mjs on`, then `off`
 // afterwards. Needs a database with no usable Admin (`npx supabase db reset` first). LOCAL only
@@ -333,8 +334,10 @@ async function main() {
         tables.push({ t, profile, status: r.status, refused: r.status >= 400 && !Array.isArray(r.json) });
       }
     }
-    check('V40-cell-owned-and-tables-refused', cellRespond.code === 'not_found' && cellBulk.code === 'not_found'
-      && !cellListed && tables.every((x) => x.refused),
+    // Story 4.11: a cell programme part is answered like a department duty.
+    check('V40-cell-parts-answered-and-tables-refused', !cellRespond.code && cellRespond.data?.response === 'accepted'
+      && cellBulk.code === 'conflict' && cellBulk.field_errors?.[`assignment:${cellAssignment}`] === 'responded'
+      && cellListed && tables.every((x) => x.refused),
       { respond: cellRespond.code, bulk: cellBulk.code, listed: cellListed,
         tables: tables.map((x) => `${x.profile}.${x.t}:${x.status}`) });
 

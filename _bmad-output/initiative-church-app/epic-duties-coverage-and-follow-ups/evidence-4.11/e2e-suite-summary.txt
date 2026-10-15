@@ -1,0 +1,33 @@
+# Story 4.11: every local E2E, one at a time, `npx supabase db reset` before each (2026-10-15).
+run exit=0  77s
+grants exit=0  53s
+apply exit=0 27/27 checks passed  49s
+review exit=0 18/18 checks passed  79s
+cells exit=0 13/13 checks passed  57s
+recovery exit=0 20/20 checks passed  117s
+credentials exit=0 15/15 checks passed  150s
+assisted exit=0 16/16 checks passed  108s
+lifecycle exit=0 9/9 checks passed  81s
+deletion exit=0 12/12 checks passed  84s
+runbooks exit=0 16/16 checks passed  141s
+inbox exit=0 13/13 checks passed  50s
+source-contracts exit=0 10/10 checks passed  51s
+worker exit=0 17/17 checks passed  83s
+routing exit=0 18/18 checks passed  60s
+push exit=0 12/12 checks passed  66s
+inbox-screens exit=0 12/12 checks passed  82s
+duties exit=0 13/13 checks passed  52s
+duties-revisions exit=0 13/13 checks passed  53s
+duties-rota exit=0 17/17 checks passed  53s
+duties-overlaps exit=0 13/13 checks passed  54s
+duties-responses exit=1 11/12 checks passed FAILED: V40-cell-owned-and-tables-refused  54s
+followups exit=0 15/15 checks passed  54s
+followups-reminders exit=0 12/12 checks passed  57s
+duties-reminders exit=0 17/17 checks passed  144s
+duties-coverage exit=0 12/12 checks passed  66s
+duties-outcomes exit=0 11/11 checks passed  62s
+duties-owner-ops exit=0 13/13 checks passed  66s
+# duties-responses V40 still expected the 4.5 refusal of cell-owned parts. Story 4.11 makes cell
+# parts answerable, so the check was updated (V40-cell-parts-answered-and-tables-refused) and the
+# script rerun alone after a reset:
+duties-responses exit=0 12/12 checks passed  55s

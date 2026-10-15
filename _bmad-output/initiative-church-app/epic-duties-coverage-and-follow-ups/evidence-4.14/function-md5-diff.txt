@@ -1,5 +1,5 @@
 # Story 4.14: every app/api/public function on the local database before (baseline e398b5f)
-# and after 20261015130404_duties_comment_refresh.sql (805 functions both times).
+# and after 20261015143102_duties_comment_refresh.sql (805 functions both times).
 # Columns: signature|md5(pg_get_functiondef)|ACL|md5(comment). Only the comment column of the
 # four refreshed functions differs; every body md5 and ACL is identical.
 

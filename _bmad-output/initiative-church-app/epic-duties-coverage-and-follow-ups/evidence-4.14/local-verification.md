@@ -26,6 +26,6 @@ Mutation checks:
 - Removing the C5 line makes the new Follow-ups test fail; removing the review fix line in `CellsController._reload` makes the new Cells test fail.
 - With the old comments, `duties_comments_test.sql` fails tests 2 and 4 (rechecked after the word-boundary match).
 
-Not run here: the staging apply of `20261015130404_duties_comment_refresh.sql` (parent session).
+Not run here: the staging apply of `20261015143102_duties_comment_refresh.sql` (parent session).
 
 Review fixes (same day): pgTAP rerun 44 files / 3737 PASS; client_core analyze clean, 645 tests; staff 40, mobile 55.

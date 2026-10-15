@@ -1,6 +1,6 @@
 -- Story 4.14 (refactor sweep, S1): the comments of the Duties and Follow-ups command entry points
 -- name every command their router sends, so a story that adds a command also updates the comment
--- (a later story left both stale before 20261015130404_duties_comment_refresh.sql).
+-- (a later story left both stale before 20261015143102_duties_comment_refresh.sql).
 begin;
 select plan(4);
 

@@ -87,7 +87,7 @@ context:
 - [x] `church_time.dart` + callers + `test/duties/duties_refactor_sweep_test.dart` -- C2.
 - [x] `followups_screens.dart` -- C3. `commands.dart`, both controllers + test -- C4. `followups_controllers.dart` + test -- C5.
 - [x] `tools/identity-e2e/duties-shared.mjs` (+ test) and the E2Es -- E1.
-- [x] `supabase/migrations/20261015130404_duties_comment_refresh.sql` (+ `supabase/tests/duties_comments_test.sql`) -- S1.
+- [x] `supabase/migrations/20261015143102_duties_comment_refresh.sql` (+ `supabase/tests/duties_comments_test.sql`) -- S1.
 - [x] `docs/runbooks/duties.md`, `follow-ups.md` -- D1, D2 (+ a 4.14 section with the staging step); `deferred-work.md` -- F2.
 - [x] `evidence-4.14/`, `.github/workflows/ci.yml` scan step.
 
@@ -103,7 +103,7 @@ context:
 - C4: `resendOrNewRequest` in `commands.dart`, used by both controller bases. `dart:convert` is no longer imported by either controller.
 - C5: one line, `pending: state.pending` in `FollowUpsController._reload`. A new widget test in `followups_test.dart` checks that a reload mid-send stays busy, sends nothing a second time, and that Check again reuses the request id. Mutation check: without the line the test fails (`followups-pending` not found).
 - E1: `tools/identity-e2e/duties-shared.mjs` (+ 5 tests in `duties-shared.test.mjs`). The 8 worker blocks keep their principal names and labels. Scripts re-export the helpers their offline tests import. Imports that became unused were removed (`node:crypto`, `node:path`, `node:url`, `node:util`, `node:child_process`, `ROOT`, `CHURCH_OFFSET_MS`). `duties-lifecycle.mjs` keeps `execFile` and `promisify` for its docker psql. The pilot's and 4.8's `churchInstant` (`+02:00` form) were replaced by the offset form; the two forms give identical output, which a test checks across 2026.
-- S1: `supabase/migrations/20261015130404_duties_comment_refresh.sql`, comment-only. It touches no function body: all four functions keep their 4.12 bodies from `20261015110202_duties_lifecycle.sql`. Local md5 of `pg_get_functiondef`, the ACLs and the comments for all 805 app/api/public functions, before and after: only the four comment hashes differ (`evidence-4.14/function-md5-diff.txt`). New `supabase/tests/duties_comments_test.sql` (4 tests): every command routed by `app.duties_command` / `app.followups_command` is named in its api wrapper's comment. Mutation check: with the old comments, tests 2 and 4 fail.
+- S1: `supabase/migrations/20261015143102_duties_comment_refresh.sql`, comment-only. It touches no function body: all four functions keep their 4.12 bodies from `20261015110202_duties_lifecycle.sql`. Local md5 of `pg_get_functiondef`, the ACLs and the comments for all 805 app/api/public functions, before and after: only the four comment hashes differ (`evidence-4.14/function-md5-diff.txt`). New `supabase/tests/duties_comments_test.sql` (4 tests): every command routed by `app.duties_command` / `app.followups_command` is named in its api wrapper's comment. Mutation check: with the old comments, tests 2 and 4 fail.
 - D1/D2: 18 annotations in `duties.md` and 1 in `follow-ups.md` (each checked against the later story's section; the cell-part queue and outcomes point to epic 5 as 4.11 says), plus a new `duties.md` "Story 4.14" section with the staging step. Review fixes: the 4.5 note on a member-to-leader Call and the 4.8 note on marking released/cancelled notices done were rewritten with the coordinator's wording (not built, not planned in epic 4).
 - F2: `deferred-work.md` entry added.
 - CI: `.github/workflows/ci.yml` gains the 4.14 scan-evidence step.
@@ -141,4 +141,4 @@ context:
   - Follow-ups reload mid-send: the new `followups_test` case (mutation-checked).
   - E2E: suite summary.
 
-**Staging (parent session, no owner action):** apply `20261015130404_duties_comment_refresh.sql` after `20261015110202`. Check that the per-function md5 is unchanged against local and that the four comments match. No Edge Function change. The Follow-ups client fix ships with the next staging staff/APK build.
+**Staging (parent session, no owner action):** apply `20261015143102_duties_comment_refresh.sql` after `20261015110202`. Check that the per-function md5 is unchanged against local and that the four comments match. No Edge Function change. The Follow-ups client fix ships with the next staging staff/APK build.

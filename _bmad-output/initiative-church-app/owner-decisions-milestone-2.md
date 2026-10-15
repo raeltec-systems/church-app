@@ -56,3 +56,7 @@ change is scheduled as a follow-up build.
 | 12 | Reminder defaults (bands 14 days / 48 h / 24 h; reminders 24 h before and at the deadline, plus 24 h before the start) | **Accept** | As built (policy settings, tunable after the pilot). |
 | 13 | Minimum answer window before Short notice | **Accept 1 hour** | As built. |
 | 14 | Pilot department | **Music Department** | Named. Its leaders (a Music Director, a Vice-Music Director, a Secretary and a Treasurer) were named by the owner in the session; their names are production configuration only and are not stored in this repository. Staging keeps `SYNTHETIC Preaching Rota`. |
+
+Pilot department roles (owner, 2026-10-15): the Music Director is the department **leader**; the
+Vice-Music Director, the Secretary and the Treasurer are department **deputies**. Entered in
+production by the Admin at the pilot; names are not stored in this repository.

@@ -74,6 +74,12 @@ create function pg_temp.sunday(k int) returns date language sql as $$
 $$;
 create function pg_temp.lt(p_date date, p_time text) returns timestamptz language sql as
 $$ select (p_date + p_time::time) at time zone 'Africa/Lusaka' $$;
+-- A fixed church-time clock time p_days church days from today. One-off duties of M and O, who
+-- also hold rota dates (Sundays 10:00, later 09:00, and O's 18:00 duties), use it: a time
+-- relative to now() could overlap one of those dates on some weekdays and hours and need an
+-- overlap reason.
+create function pg_temp.day_at(p_days int, p_time text) returns timestamptz language sql as
+$$ select pg_temp.lt((now() at time zone 'Africa/Lusaka')::date + p_days, p_time) $$;
 
 -- Accounts: 1 Admin; 2 leader L of D (also serves in D); 3 deputy P of D; 4 member M; 5 member O;
 -- 6 member H (an account, later held); 7 Pastor; 8 accountless member X (no account); 9 a member
@@ -219,9 +225,9 @@ select is(app.notifications_policy() -> 'value' -> 'quiet_hours', 'null'::jsonb,
   'the Q2 policy has no quiet hours');
 
 -- A mid-week assignment for Sunday: the 48-hour default ----------------------------------------------
-create temp table b as select pg_temp.pub('B', 4, pg_temp.t('4 days')) as r;
+create temp table b as select pg_temp.pub('B', 4, pg_temp.day_at(4, '15:00')) as r;
 select is((select r #>> '{data,response}' from b), 'pending', 'a duty published without an answer-by');
-select is((select (x.response_deadline = pg_temp.t('4 days') - interval '48 hours')::text || '|'
+select is((select (x.response_deadline = pg_temp.day_at(4, '15:00') - interval '48 hours')::text || '|'
                   || x.deadline_source || '|' || x.short_notice from pg_temp.row(pg_temp.a('B')) x),
   'true|default|false', 'starting in 4 days, it takes the 48-hour default (stored, default, not short notice)');
 select is(pg_temp.jobs(pg_temp.a('B')),
@@ -416,7 +422,7 @@ select is(pg_temp.jobs(pg_temp.sa(1)) || ' / ' || pg_temp.jobs(pg_temp.sa(2)),
   'm:duty_starting:5:24 / m:duty_starting:5:24', 'each keeps only its pre-service reminder');
 
 -- Reassign A -> B -> A: fresh reminders every time ---------------------------------------------------
-create temp table r0 as select pg_temp.pub('R', 4, pg_temp.t('10 days')) as r;
+create temp table r0 as select pg_temp.pub('R', 4, pg_temp.day_at(10, '15:00')) as r;
 create temp table chain (step int, assignment_id uuid);
 insert into chain values (0, pg_temp.a('R'));
 create function pg_temp.give(n int) returns jsonb language plpgsql as $$
@@ -501,7 +507,7 @@ select is((select string_agg(distinct pg_temp.who(recipient_member_id), ',') fro
   'a duty given to the leader alerts only the deputy');
 
 -- Snooze: honoured, and stopped by the answer ------------------------------------------------------------
-create temp table sz as select pg_temp.pub('S', 4, pg_temp.t('8 days')) as r;
+create temp table sz as select pg_temp.pub('S', 4, pg_temp.day_at(8, '15:00')) as r;
 select is(pg_temp.due_now(pg_temp.a('S'), 'duty_response_due'), 3, 'S''s response reminders fall due');
 select pg_temp.run();
 create temp table it as select i.item_id from app.notifications_inbox_items i join app.notifications_jobs j on j.job_id = i.job_id
@@ -580,8 +586,8 @@ select is(pg_temp.duties(3, 'duties.create_series', null, jsonb_build_object(
   '{"reminders": "invalid"}'::jsonb, 'malformed series reminders are refused');
 
 -- A deadline passed before a re-plan: the leaders' alert is not lost ---------------------------------
-create temp table lp as select pg_temp.pub('P', 5, pg_temp.t('11 days'), jsonb_build_object(
-  'response_deadline', app.cmd_utc(pg_temp.t('5 days')))) as r;
+create temp table lp as select pg_temp.pub('P', 5, pg_temp.day_at(11, '15:00'), jsonb_build_object(
+  'response_deadline', app.cmd_utc(pg_temp.day_at(5, '15:00')))) as r;
 -- Time passes beyond the deadline before the alert ran, and the alert job was lost (a test-only
 -- stand-in for an operator re-plan that moved it into the past).
 update app.duties_assignments set response_deadline = now() - interval '1 hour' where assignment_id = pg_temp.a('P');
@@ -620,7 +626,7 @@ select is((select string_agg(distinct pg_temp.who(recipient_member_id), ',') fro
   'a held deputy is not chosen for new alerts');
 
 -- Review 3: notices to pass on in person (released, cancelled) --------------------------------------
-create temp table rx as select pg_temp.pub('RX', 8, pg_temp.t('16 days'), '{"override_reason": "SYNTHETIC: agreed"}') as r;
+create temp table rx as select pg_temp.pub('RX', 8, pg_temp.day_at(16, '15:00'), '{"override_reason": "SYNTHETIC: agreed"}') as r;
 select is(pg_temp.duties(2, 'duties.revise_duty', pg_temp.orev(pg_temp.occ('RX')),
             jsonb_build_object('occurrence_id', pg_temp.occ('RX'), 'member_id', pg_temp.mid(5))) #>> '{data,change}',
   'material', 'the accountless member''s duty goes to O');
@@ -713,8 +719,8 @@ select is((select count(*)::int from app.duties_audit where action = 'reminders_
   'every reminder change is audited (ids and codes only)');
 
 -- Review 4: an answer is always recorded, also with the Q2 policy unavailable ---------------------
-create temp table q4a as select pg_temp.pub('QA', 5, pg_temp.t('19 days')) as r;
-create temp table q4b as select pg_temp.pub('QB', 5, pg_temp.t('19 days 4 hours')) as r;
+create temp table q4a as select pg_temp.pub('QA', 5, pg_temp.day_at(19, '13:00')) as r;
+create temp table q4b as select pg_temp.pub('QB', 5, pg_temp.day_at(19, '16:00')) as r;
 update app.policy_gates set fixture_value = fixture_value || '{"zone": "Mars/Base"}' where gate = 'q2_church_time';
 select is(pg_temp.answer(5, pg_temp.a('QA'), 'accepted') #>> '{data,response}', 'accepted',
   'with an invalid Q2 policy, O can still accept');

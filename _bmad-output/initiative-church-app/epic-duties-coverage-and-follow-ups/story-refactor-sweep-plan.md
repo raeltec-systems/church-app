@@ -55,6 +55,7 @@ context:
 | C3 | `_newSourceId` in follow-ups screens = `SecureRequestIds.next` | apply | Same algorithm, one copy. |
 | C4 | Same-input/same-request-id rule in both controllers | apply | `resendOrNewRequest` in `commands.dart`, duties + follow-ups only. |
 | C5 | `FollowUpsController._reload` drops `pending` (duties keeps it since 4.5) | apply (fix) | One line + test; recorded under Decisions. |
+| C5b | `CellsController._reload` drops `pending` (same bug as C5; review should-fix 1) | apply (fix) | One line + widget test in `cell_membership_test.dart`; recorded in the Plan Change Log. |
 | C6 | Merge `DutiesController`/`FollowUpsController` into one generic base | reject | Different reload rules (`stillUnconfirmed`, candidates invalidation, grant function), notice/action types; public state types used by both apps. |
 | E1 | Worker principal/credential/run-once block x8; `churchSunday` x3, `churchInstant` x5, `oneWinner` x2, `refusedTableQuery` x2, `sessionClaims`/`jsonLiteral` x2, `summarize` x3, generic-item check x4 | apply | `tools/identity-e2e/duties-shared.mjs` + test; files re-export names their tests import. |
 | E2 | Per-E2E cleanup SQL, `envelope/rpc/read` closures | reject | Differ per story (tables grow); one-liners. |
@@ -83,7 +84,7 @@ context:
 
 **Execution:**
 - [x] `packages/client_core/lib/src/domain/wire_json.dart`, `duties.dart`, `followups.dart` -- C1.
-- [x] `church_time.dart` + callers + `test/domain/church_time_format_test.dart` -- C2.
+- [x] `church_time.dart` + callers + `test/duties/duties_refactor_sweep_test.dart` -- C2.
 - [x] `followups_screens.dart` -- C3. `commands.dart`, both controllers + test -- C4. `followups_controllers.dart` + test -- C5.
 - [x] `tools/identity-e2e/duties-shared.mjs` (+ test) and the E2Es -- E1.
 - [x] `supabase/migrations/20261015130404_duties_comment_refresh.sql` (+ `supabase/tests/duties_comments_test.sql`) -- S1.
@@ -103,11 +104,18 @@ context:
 - C5: one line, `pending: state.pending` in `FollowUpsController._reload`. A new widget test in `followups_test.dart` checks that a reload mid-send stays busy, sends nothing a second time, and that Check again reuses the request id. Mutation check: without the line the test fails (`followups-pending` not found).
 - E1: `tools/identity-e2e/duties-shared.mjs` (+ 5 tests in `duties-shared.test.mjs`). The 8 worker blocks keep their principal names and labels. Scripts re-export the helpers their offline tests import. Imports that became unused were removed (`node:crypto`, `node:path`, `node:url`, `node:util`, `node:child_process`, `ROOT`, `CHURCH_OFFSET_MS`). `duties-lifecycle.mjs` keeps `execFile` and `promisify` for its docker psql. The pilot's and 4.8's `churchInstant` (`+02:00` form) were replaced by the offset form; the two forms give identical output, which a test checks across 2026.
 - S1: `supabase/migrations/20261015130404_duties_comment_refresh.sql`, comment-only. It touches no function body: all four functions keep their 4.12 bodies from `20261015110202_duties_lifecycle.sql`. Local md5 of `pg_get_functiondef`, the ACLs and the comments for all 805 app/api/public functions, before and after: only the four comment hashes differ (`evidence-4.14/function-md5-diff.txt`). New `supabase/tests/duties_comments_test.sql` (4 tests): every command routed by `app.duties_command` / `app.followups_command` is named in its api wrapper's comment. Mutation check: with the old comments, tests 2 and 4 fail.
-- D1/D2: 18 annotations in `duties.md` and 1 in `follow-ups.md` (each checked against the later story's section; the cell-part queue and outcomes point to epic 5 as 4.11 says), plus a new `duties.md` "Story 4.14" section with the staging step. Left as is: `duties.md` 4.5 "No phone or Call action for the leader" (the 4.9 contact routes are the leader's view of members; a member-to-leader call is not built, and it is unclear whether one is owed) and the 4.8 "cannot be marked done yet" (not verified as built).
+- D1/D2: 18 annotations in `duties.md` and 1 in `follow-ups.md` (each checked against the later story's section; the cell-part queue and outcomes point to epic 5 as 4.11 says), plus a new `duties.md` "Story 4.14" section with the staging step. Review fixes: the 4.5 note on a member-to-leader Call and the 4.8 note on marking released/cancelled notices done were rewritten with the coordinator's wording (not built, not planned in epic 4).
 - F2: `deferred-work.md` entry added.
 - CI: `.github/workflows/ci.yml` gains the 4.14 scan-evidence step.
 
 ## Plan Change Log
+
+- 2026-10-15, independent review of 4.14 (no blockers; coordinator relayed):
+  - **Should-fix 1:** `CellsController._reload` dropped `pending`, the same bug as C5. Amended: `pending: state.pending` plus the widget test "a reload while a confirmation is in flight cannot send it twice" in `test/identity/cell_membership_test.dart`. Without the line the test fails (`cells-pending` is not found). This is a correctness fix outside Duties and Follow-ups, made at the reviewer's request. The F2 deferred entry now notes that it is done.
+  - **Should-fix 2 and nit 1:** the `duties.md` 4.5 Call note and the 4.8 "marked done" note now use the reviewer's wording.
+  - **Nit 2:** `duties_comments_test.sql` matches commands on word boundaries (`\m...\M`).
+  - **Nit 3:** the C2 test file name in the task list is corrected.
+  - **Nit 4:** the `duties-shared.mjs` name is kept.
 
 ## Review Triage Log
 
@@ -125,7 +133,7 @@ context:
 - All 30 E2Es, each after a reset: every `exit=0` with the same N/N counts as `evidence-4.13/e2e-suite-summary.txt`.
 - Function md5s: all 805 bodies and ACLs are identical; only the 4 refreshed comments changed.
 - Tool and contract checks: contracts:test 265, Dart contracts 282, node tool tests 244 (baseline 239, +5), ci:policy-test 56; ci:secrets, ci:function-imports and the evidence scans are clean; ci:migrations reports 49 migrations.
-- Flutter: client_core analyze is clean, with 644 tests (baseline 637, +7) and TZ=America/New_York runs of 176 (duties) and 37 (follow-ups); staff 40, mobile 55, both analyze clean.
+- Flutter: client_core analyze is clean, with 645 tests after the review fixes (baseline 637, +8) and TZ=America/New_York runs of 176 (duties) and 37 (follow-ups); staff 40, mobile 55, both analyze clean.
 - Matrix audit:
   - Wire parse: `duties_refactor_sweep_test` wire readers, plus every existing duties and follow-ups parse test.
   - Church time: quarter-hour comparison and midnight cases, also run in New York time.

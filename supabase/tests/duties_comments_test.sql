@@ -17,12 +17,12 @@ create temp view routed as
 select cmp_ok((select count(*) from routed where fn = 'duties_command'), '>=', 22::bigint,
   'the Duties router is read (every 4.1-4.12 command)');
 select is_empty(
-  $$select command from routed where fn = 'duties_command' and position(command in comment) = 0$$,
+  $$select command from routed where fn = 'duties_command' and comment !~ ('\m' || command || '\M')$$,
   'api.duties_command''s comment names every routed command');
 select cmp_ok((select count(*) from routed where fn = 'followups_command'), '>=', 4::bigint,
   'the Follow-ups router is read (every 4.6-4.12 command)');
 select is_empty(
-  $$select command from routed where fn = 'followups_command' and position(command in comment) = 0$$,
+  $$select command from routed where fn = 'followups_command' and comment !~ ('\m' || command || '\M')$$,
   'api.followups_command''s comment names every routed command');
 
 select * from finish();

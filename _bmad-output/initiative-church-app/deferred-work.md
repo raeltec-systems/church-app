@@ -80,4 +80,4 @@
 
 - source_plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-refactor-sweep-plan.md`
   summary: Use the story 4.14 shared client helpers outside Duties and Follow-ups: `resendOrNewRequest` (`commands.dart`) in the nine identity and cells controllers that still copy the same-input/same-request-id rule, and `wire_json.dart` in `cell_membership.dart` (its private `_req/_opt/_map` copies).
-  evidence: 4.14 shared them between Duties and Follow-ups only (the epic's scope); the identity sweep (2.13) is done and Cells is epic 5, so their owners should adopt the helpers with their own tests.
+  evidence: 4.14 shared them between Duties and Follow-ups only (the epic's scope); the identity sweep (2.13) is done and Cells is epic 5, so their owners should adopt the helpers with their own tests. This is a refactor only: the one behaviour drift among those controllers (`CellsController._reload` dropping an in-flight request) was fixed and tested in 4.14 after review.

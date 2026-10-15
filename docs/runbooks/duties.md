@@ -607,7 +607,7 @@ Record the outcome of each step in `evidence-4.5/owner-check.md`: pass or fail, 
 
 - Leaders get no push or inbox alert for a decline yet; the board shows it at once. The leader decline alert and the coverage queue arrive with entry 9 (built in story 4.9, below).
 - Cell programme parts are not answerable or listed in My duties until entry 11 (built in story 4.11, below).
-- No phone or Call action for the leader on the detail screen (Q4, entry 9 contact routes).
+- No phone or Call action for the leader on the member's duty detail screen. Story 4.9's contact routes go one way only (the leader's Call/Message for members' labelled 2.5 routes, on Coverage); a member-to-leader call is not built and not planned in this epic.
 - Accepting several dates together is without a note; accept a date on its own to add one. The Home card's Accept sends no note.
 - The calendar export is a copy. The iOS share sheet (iPad popover anchor) is unverified on a device until an iOS build exists.
 
@@ -723,7 +723,7 @@ Record the outcome of each step in `evidence-4.8/owner-check.md`: pass or fail, 
 - Leaders and deputies are chosen when an assignment is planned (or re-planned by `duties.set_reminders`): a leader granted later gets no alert for an earlier assignment until it is re-planned; one whose scope is revoked or who is held is not alerted (rechecked at delivery).
 - Cell-owned occurrences get no reminders until entry 11 builds their member view (built in story 4.11, below: cell parts get the church default reminders).
 - A very large publish (hundreds of slots) is planned in one transaction (about 4 s locally for 200 slots). On an almost empty database an autovacuum ANALYZE during it can make it much slower; publish a big rota in parts if a timeout is seen.
-- Released and cancelled notices are listed until the old start and cannot be marked done yet. Contact attempts, leader confirmation and the coverage queue arrive with entry 9 (built in story 4.9, below).
+- Released and cancelled notices are listed until the old start and cannot be marked done (no story in epic 4 adds this). Contact attempts, leader confirmation and the coverage queue: built in story 4.9, below.
 - An operator re-plan after a policy change (`app.notifications_replan_all`) cannot call Duties: a leader alert it moves into the past is not re-sent until the assignment is next re-planned.
 - Duties published before 4.8 keep their 4.1-4.5 jobs; there is no back-fill of reminders. **On staging**, duties published before this migration get the new reminders and leader alerts only after their next change (a reassignment, a material change, an answer or `duties.set_reminders`); test with duties published after the apply.
 

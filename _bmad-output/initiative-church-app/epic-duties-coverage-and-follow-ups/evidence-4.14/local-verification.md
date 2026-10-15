@@ -16,14 +16,16 @@ The worktree branch builds on the integration branch `ccr-93e730dd-89lbvg`, with
 | `npm run -s ci:secrets` | clean | clean |
 | `npm run -s ci:migrations -- --base origin/main` | 48 | 49 ordered, unique, non-destructive |
 | `npm run -s ci:function-imports` | ok | ok |
-| client_core `flutter analyze` / `flutter test` | clean / 637 | clean / 644 (+6 sweep tests, +1 Follow-ups in-flight reload test) |
+| client_core `flutter analyze` / `flutter test` | clean / 637 | clean / 645 (+6 sweep tests, +1 Follow-ups and +1 Cells in-flight reload test) |
 | client_core, `TZ=America/New_York` on `test/duties` and `test/followups` | pass | 176 and 37 pass |
 | staff `flutter analyze` / `flutter test` | - | clean / 40 |
 | mobile `flutter analyze` / `flutter test` | - | clean / 55 |
 | `scan-evidence.sh` on `evidence-4.14/`, `duties-shared.mjs`, the migration and the runbooks (the new CI step) | - | clean |
 
 Mutation checks:
-- Removing the C5 line makes the new Follow-ups test fail.
-- With the old comments, `duties_comments_test.sql` fails tests 2 and 4.
+- Removing the C5 line makes the new Follow-ups test fail; removing the review fix line in `CellsController._reload` makes the new Cells test fail.
+- With the old comments, `duties_comments_test.sql` fails tests 2 and 4 (rechecked after the word-boundary match).
 
 Not run here: the staging apply of `20261015130404_duties_comment_refresh.sql` (parent session).
+
+Review fixes (same day): pgTAP rerun 44 files / 3737 PASS; client_core analyze clean, 645 tests; staff 40, mobile 55.

@@ -11,7 +11,7 @@
 -- Every account, phone and name is SYNTHETIC (fictional range +44 7700 900460-900469). Duty times
 -- are fixed church-time (Africa/Lusaka) clock times on whole days, never the current clock time.
 begin;
-select plan(122);
+select plan(136);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000004120' || lpad(n::text, 2, '0'))::uuid $$;
@@ -651,12 +651,88 @@ insert into app.identity_grants (member_id, role, granted_by_operator) values (p
 -- followups.complete_handover (Admin): continues a capped handover -------------------------------------
 select is(pg_temp.err(pg_temp.call(2, 'followups_command', 'followups.complete_handover', null,
             jsonb_build_object('member_id', pg_temp.mid(4)))), 'forbidden', 'a leader cannot run it');
-select is(pg_temp.err(pg_temp.call(1, 'followups_command', 'followups.complete_handover', null,
-            jsonb_build_object('member_id', pg_temp.mid(2)))), 'validation_failed|member_id=active',
-  'an active member hands over through their scopes and the commands');
+select is((pg_temp.call(1, 'followups_command', 'followups.complete_handover', null,
+            jsonb_build_object('member_id', pg_temp.mid(2))) -> 'data') - 'member_id',
+  '{"handed_over": 0, "remaining": 0}'::jsonb,
+  'an active member still in every task''s group has nothing to hand over (review B1)');
 select is((pg_temp.call(1, 'followups_command', 'followups.complete_handover', null,
             jsonb_build_object('member_id', pg_temp.mid(9))) -> 'data') - 'member_id',
   '{"handed_over": 0, "remaining": 0}'::jsonb, 'for a deactivated member with nothing left it reports zero');
+
+-- Review B1: a revoked scope over the cap. O (reachable, not a member of G) deputises G and owns
+-- 30 open tasks there (supervised by CL); the scope is revoked: 25 are handed over at once, the
+-- other 5 wait. O loses owner authority over them at once (a), they are listed for the Admin with
+-- the obligation kind (b), and complete_handover moves them though O is still active (c) ------------
+select pg_temp.grant_scope(5, 'department_deputy', (select g from g));
+create temp table b1 as
+  select k, pg_temp.call(1, 'followups_command', 'followups.create_task', null, jsonb_build_object(
+           'source_type', 'fixture_followup', 'source_id', gen_random_uuid(), 'source_revision', 1,
+           'purpose', 'synthetic_check_in', 'owner_member_id', pg_temp.mid(5),
+           'supervisor_member_id', pg_temp.mid(11), 'scope_kind', 'department_leader',
+           'scope_id', (select g from g), 'next_action', 'SYNTHETIC: phone and check in',
+           'due_at', app.cmd_utc(pg_temp.at(9)))) as r
+    from generate_series(1, 30) k;
+select is((select count(*)::int from b1 where r ->> 'code' is null), 30, 'setup: O owns 30 open tasks in G');
+select is(pg_temp.err(pg_temp.call(1, 'identity_grant_command', 'identity.revoke_scope', pg_temp.grev(5),
+            jsonb_build_object('member_id', pg_temp.mid(5), 'scope_kind', 'department_deputy',
+                               'scope_id', (select g from g)))), 'ok', 'the Admin revokes O''s deputy scope of G');
+create function pg_temp.b1_left() returns setof uuid language sql as $$
+  select t.task_id from app.followups_tasks t
+   where t.task_id in (select (r #>> '{data,task_id}')::uuid from b1) and t.owner_member_id = pg_temp.mid(5)
+   order by t.task_id
+$$;
+select is((select count(*)::int from pg_temp.b1_left()), 5, 'the hook hands over 25 (its cap); 5 are left with O');
+select is(pg_temp.read(5, format('select api.followups_task(%L::uuid)', (select pg_temp.b1_left() limit 1))),
+  'not_granted', '(a) O can no longer open a task left with them');
+select is(pg_temp.err(pg_temp.call(5, 'followups_command', 'followups.update_task',
+            (select revision from app.followups_tasks where task_id = (select pg_temp.b1_left() limit 1)),
+            jsonb_build_object('task_id', (select pg_temp.b1_left() limit 1), 'next_action', 'SYNTHETIC: changed'))),
+  'not_found', '(a) nor update it');
+select is((select count(*)::int from jsonb_array_elements(pg_temp.readj(5, 'select api.followups_my_tasks()') -> 'tasks') x
+            where (x ->> 'task_id')::uuid in (select pg_temp.b1_left())), 0,
+  '(a) and My follow-ups no longer lists them');
+select is((select string_agg(obligation_kind || '=' || n, ',') from (
+             select h.obligation_kind, count(*) as n from app.followups_pending_handovers() h
+              where h.member_id = pg_temp.mid(5) group by h.obligation_kind) x), 'followup_task=5',
+  '(b) the 5 wait as followup_task handovers');
+select is((select (h ->> 'tasks') || '|' || (h ->> 'membership_state')
+             from jsonb_array_elements(pg_temp.readj(1, 'select api.followups_admin_routing()') -> 'handovers') h
+            where h ->> 'member_id' = pg_temp.mid(5)::text), '5|approved', '(b) and the Admin sees them on Follow-ups');
+select is((pg_temp.call(1, 'followups_command', 'followups.complete_handover', null,
+            jsonb_build_object('member_id', pg_temp.mid(5))) -> 'data') - 'member_id',
+  '{"handed_over": 5, "remaining": 0}'::jsonb, '(c) complete_handover moves them though O is still active');
+select is((select count(*)::int from pg_temp.b1_left()) + (select count(*)::int from app.followups_pending_handovers() h
+            where h.member_id = pg_temp.mid(5)), 0, '(c) nothing of O waits any more');
+-- An accountless member still in the task's group keeps owner authority (the 4.6 design).
+with ins as (insert into app.identity_members (display_name, membership_state, is_synthetic)
+             values ('SYNTHETIC 4.12 Accountless Z', 'approved', true) returning member_id)
+insert into m select 12, member_id from ins;
+select pg_temp.add(12, pg_temp.d());
+create temp table tz as select pg_temp.newtask(1, 12, 2, pg_temp.d()) as src;
+select is(app.followups_capacity(pg_temp.mid(12), pg_temp.task((select src from tz))), 'owner',
+  'an accountless owner still in the group keeps owner capacity');
+
+-- Review N10: a named supervisor's grants are share-locked by the authorizer (the payload is read
+-- from the dispatcher's setting). The lock is seen on the grant row (xmax set).
+create function pg_temp.grant_xmax(n int) returns text language sql as $$
+  select string_agg(g.xmax::text, ',') from app.identity_grants g
+   where g.member_id = pg_temp.mid(n) and g.revoked_at is null and g.scope_kind = 'department_deputy'
+$$;
+select pg_temp.grant_scope(3, 'department_deputy', pg_temp.d());
+select is(pg_temp.grant_xmax(3), '0', 'setup: P''s new deputy grant is not locked');
+create function pg_temp.authorize_as(n int, p_payload jsonb) returns boolean language plpgsql as $$
+declare v boolean;
+begin
+  perform set_config('request.jwt.claims', pg_temp.c(n)::text, true);
+  perform set_config('followups.command_payload', p_payload::text, true);
+  v := app.followups_authorize_command('{"command": "followups.reassign"}'::jsonb);
+  perform set_config('followups.command_payload', '', true);
+  return v;
+end;
+$$;
+select is(pg_temp.authorize_as(2, jsonb_build_object('supervisor_member_id', pg_temp.mid(3))), true,
+  'the leader''s reassign naming P as supervisor is authorized');
+select isnt(pg_temp.grant_xmax(3), '0', 'and P''s grant was share-locked first (review N10)');
 
 -- Review S2: the members a command may notify, read from its payload (locked FOR KEY SHARE by the
 -- authorizer before any Duties or Follow-ups row; HTTP race evidence in duties-lifecycle.mjs) ----------
@@ -685,7 +761,8 @@ select is((select count(*)::int from information_schema.routine_privileges
                                    'duties_vacancy_alert_check', 'duties_remove_member',
                                    'duties_pending_handovers', 'duties_has_reachable_leader',
                                    'duties_resolve_handover', 'duties_lock_people', 'duties_command_people',
-                                   'duties_jsonb_uuid', 'followups_jsonb_uuid',
+                                   'duties_jsonb_uuid', 'followups_jsonb_uuid', 'followups_in_group',
+                                   'followups_pending_handovers',
                                    'followups_reachable', 'followups_handover_plan',
                                    'followups_handover_member', 'followups_resolve_obligations',
                                    'followups_complete_handover', 'followups_lock_people',

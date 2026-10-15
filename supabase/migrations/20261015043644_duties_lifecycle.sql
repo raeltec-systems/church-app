@@ -1118,14 +1118,17 @@ begin
   if r.outcome <> 'granted' then
     return false;
   end if;
-  -- Story 4.12 review S2: the members this command may notify, before any Duties row.
-  perform app.duties_lock_people(app.duties_command_people(
-    jsonb_build_object('payload', nullif(pg_catalog.current_setting('duties.command_payload', true), '')::jsonb),
-    r.member_id));
+  -- Story 4.12 review S2 (N9 order): the actor's member row first (as Identity: member, then
+  -- grants), then the actor's grants, then the other members this command may notify, all
+  -- before any Duties row.
+  perform app.duties_lock_people(array[r.member_id]);
   perform 1 from app.identity_grants g
    where g.member_id = r.member_id and g.revoked_at is null
      and (g.role = 'admin' or g.scope_kind in ('department_leader', 'department_deputy'))
      for share;
+  perform app.duties_lock_people(app.duties_command_people(
+    jsonb_build_object('payload', nullif(pg_catalog.current_setting('duties.command_payload', true), '')::jsonb),
+    r.member_id));
   return true;
 end;
 $$;
@@ -1837,26 +1840,52 @@ declare
   v_done integer := 0;
   v_task jsonb;
   v_ready boolean;
+  v_try integer;
 begin
-  select coalesce(jsonb_agg(jsonb_build_object(
-           'task_id', p.task_id,
-           'owner_from', p.owner_from,
-           'owner_to', case when p.owner_due then p.owner_to end,
-           'supervisor_from', p.supervisor_from,
-           'supervisor_to', case when p.supervisor_due and p.supervisor_to <> p.supervisor_from
-                                 then p.supervisor_to end)
-           order by p.sort_at, p.task_id), '[]'::jsonb)
-    into v_rows
-    from app.followups_handover_plan(p_member, p_leaving) p
-   where (p.owner_due and p.owner_to is not null)
-      or (p.supervisor_due and p.supervisor_to is not null and p.supervisor_to <> p.supervisor_from);
-  v_total := jsonb_array_length(v_rows);
-  if v_total = 0 then
-    return '{"handed_over": 0, "remaining": 0}'::jsonb;
-  end if;
-  select coalesce(jsonb_agg(r.x order by r.n), '[]'::jsonb) into v_sel
-    from jsonb_array_elements(v_rows) with ordinality as r(x, n)
-   where r.n <= p_limit;
+  -- Review S5: the people chosen are share-locked (member-id order) and checked again; a person
+  -- deactivated or put on hold meanwhile (the lock waited for that change) makes the plan be
+  -- computed again; after three tries the rows naming such a person are left for later.
+  for v_try in 1 .. 3 loop
+    select coalesce(jsonb_agg(jsonb_build_object(
+             'task_id', p.task_id,
+             'owner_from', p.owner_from,
+             'owner_to', case when p.owner_due then p.owner_to end,
+             'supervisor_from', p.supervisor_from,
+             'supervisor_to', case when p.supervisor_due and p.supervisor_to <> p.supervisor_from
+                                   then p.supervisor_to end)
+             order by p.sort_at, p.task_id), '[]'::jsonb)
+      into v_rows
+      from app.followups_handover_plan(p_member, p_leaving) p
+     where (p.owner_due and p.owner_to is not null)
+        or (p.supervisor_due and p.supervisor_to is not null and p.supervisor_to <> p.supervisor_from);
+    v_total := jsonb_array_length(v_rows);
+    if v_total = 0 then
+      return '{"handed_over": 0, "remaining": 0}'::jsonb;
+    end if;
+    select coalesce(jsonb_agg(r.x order by r.n), '[]'::jsonb) into v_sel
+      from jsonb_array_elements(v_rows) with ordinality as r(x, n)
+     where r.n <= p_limit;
+    perform app.followups_lock_people(array(
+      select distinct (x ->> k)::uuid from jsonb_array_elements(v_sel) x,
+             unnest(array['owner_to', 'supervisor_to']) k
+       where x ->> k is not null));
+    exit when not exists (
+      select 1 from jsonb_array_elements(v_sel) x
+       where (x ->> 'owner_to' is not null
+              and not (app.followups_member_active((x ->> 'owner_to')::uuid)
+                       and app.followups_reachable((x ->> 'owner_to')::uuid)))
+          or (x ->> 'supervisor_to' is not null
+              and not app.followups_member_active((x ->> 'supervisor_to')::uuid)));
+    if v_try = 3 then
+      select coalesce(jsonb_agg(x order by n), '[]'::jsonb) into v_sel
+        from jsonb_array_elements(v_sel) with ordinality as r(x, n)
+       where (x ->> 'owner_to' is null
+              or (app.followups_member_active((x ->> 'owner_to')::uuid)
+                  and app.followups_reachable((x ->> 'owner_to')::uuid)))
+         and (x ->> 'supervisor_to' is null
+              or app.followups_member_active((x ->> 'supervisor_to')::uuid));
+    end if;
+  end loop;
   -- Identity before Follow-ups (AD-2): a Pastor chosen as owner keeps their grant meanwhile.
   perform 1 from app.identity_grants g
    where g.member_id in (select (x ->> 'owner_to')::uuid from jsonb_array_elements(v_sel) x)
@@ -1976,6 +2005,7 @@ declare
   v_setting text := current_setting('followups.handover_budget', true);
   v_budget integer := 25;
   v_result jsonb;
+  v_task uuid;
 begin
   if v_setting like v_member::text || ':%' then
     v_budget := split_part(v_setting, ':', 2)::integer;
@@ -1984,6 +2014,25 @@ begin
     v_result := app.followups_handover_member(v_member, p_event ->> 'event' <> 'scope_revoked', v_budget);
     v_budget := v_budget - (v_result ->> 'handed_over')::integer;
     perform set_config('followups.handover_budget', v_member::text || ':' || v_budget::text, true);
+  end if;
+  -- Review N12: a member who left gets no more reminders for the tasks still waiting for a new
+  -- owner or supervisor (they are planned again for whoever takes them over).
+  if p_event ->> 'event' in ('membership_deactivated', 'deletion_requested') then
+    for v_task in
+      select t.task_id from app.followups_tasks t
+       where t.owner_member_id = v_member and app.followups_state_ok('active_state', t.task_state)
+       order by t.task_id
+    loop
+      perform app.followups_cancel_reminders(v_task, 'followups_task', v_member, 'owner_inactive');
+    end loop;
+    for v_task in
+      select t.task_id from app.followups_tasks t
+       where t.supervisor_member_id = v_member and app.followups_state_ok('active_state', t.task_state)
+       order by t.task_id
+    loop
+      perform app.followups_cancel_reminders(v_task, 'followups_supervision', v_member,
+                                             'no_supervisor_alert');
+    end loop;
   end if;
   perform app.followups_resolve_obligations(v_member);
 end;
@@ -2064,10 +2113,11 @@ create trigger followups_tasks_handover_sync
   for each row execute function app.followups_task_handover_sync();
 
 -- followups.complete_handover {member_id} (Admin; expected null): hands over the next 100 open
--- tasks and supervisions of a member who has left (deactivated or being deleted), as the lifecycle
--- hook does. Refusals: `forbidden` (not Admin), `validation_failed {"member_id": "active"}` (an
--- active member hands over through their scopes and the commands). Answer {member_id,
--- handed_over, remaining}.
+-- tasks and supervisions the member may no longer hold, as the lifecycle hooks do: every one of a
+-- member who left (deactivated or being deleted), and, for an active member (review B1), those
+-- whose group they are no longer in or whose scope they no longer hold (for example after a
+-- revoked scope whose hook reached its cap). Refusals: `forbidden` (not Admin), `not_found`.
+-- Answer {member_id, handed_over, remaining}.
 create function app.followups_complete_handover(p_actor uuid, p_expected_revision bigint, p_payload jsonb)
 returns jsonb
 language plpgsql
@@ -2093,10 +2143,7 @@ begin
   if not exists (select 1 from app.identity_members m where m.member_id = v_member) then
     perform app.cmd_fail('not_found');
   end if;
-  if app.followups_member_active(v_member) then
-    perform app.cmd_fail('validation_failed', '{"member_id": "active"}');
-  end if;
-  v_result := app.followups_handover_member(v_member, true, 100);
+  v_result := app.followups_handover_member(v_member, not app.followups_member_active(v_member), 100);
   perform app.followups_resolve_obligations(v_member);
   return jsonb_build_object(
     'aggregate_type', 'followups_handover', 'aggregate_id', v_member, 'revision', 1,
@@ -2201,6 +2248,7 @@ set search_path = ''
 as $$
 declare
   r record;
+  v_payload jsonb;
 begin
   if coalesce(p_request ->> 'command', '') not in (
        'followups.create_task', 'followups.update_task', 'followups.reassign',
@@ -2215,20 +2263,24 @@ begin
   if r.outcome <> 'granted' then
     return false;
   end if;
-  -- Story 4.12 review S2: Identity member rows first (key share, member-id order).
-  perform app.followups_lock_people(app.followups_command_people(
-    jsonb_build_object('payload', nullif(pg_catalog.current_setting('followups.command_payload', true), '')::jsonb),
-    r.member_id));
+  v_payload := nullif(pg_catalog.current_setting('followups.command_payload', true), '')::jsonb;
+  -- Story 4.12 review S2 (N9 order): the actor's member row first (as Identity: member, then
+  -- grants), then the actor's grants, then the other members this command may notify.
+  perform app.followups_lock_people(array[r.member_id]);
   perform 1 from app.identity_grants g
    where g.member_id = r.member_id and g.revoked_at is null
      and (g.role = 'admin' or g.scope_kind is not null)
      for share;
-  -- Review N5: a named supervisor's grants too, before the receipt (AD-2 lock order).
-  if jsonb_typeof(p_request -> 'payload') = 'object'
-     and app.contract_uuid_error(p_request #> '{payload,supervisor_member_id}') is null then
+  perform app.followups_lock_people(app.followups_command_people(
+    jsonb_build_object('payload', v_payload), r.member_id));
+  -- Review N5: a named supervisor's grants too, before the receipt (AD-2 lock order). Story
+  -- 4.12 review N10: read from the payload the dispatcher hands over (the 1.4 seam passes no
+  -- payload, so the 4.6 check never fired).
+  if app.followups_jsonb_uuid(v_payload -> 'supervisor_member_id') is not null then
     perform 1 from app.identity_grants g
-     where g.member_id = (p_request #>> '{payload,supervisor_member_id}')::uuid
+     where g.member_id = app.followups_jsonb_uuid(v_payload -> 'supervisor_member_id')
        and g.revoked_at is null
+     order by g.grant_id
        for share;
   end if;
   return true;
@@ -2275,6 +2327,178 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------------------------
+-- Review B1: owner authority is live, and what waits for a new owner or supervisor is visible
+-- ---------------------------------------------------------------------------------------------
+
+-- Is the member in the task's group now (the roster of the owner decision Q4 rule: the target's
+-- members through its owner's roster hook, the holders of the family's scope kinds and the live
+-- Pastors, all active)? An accountless member of the group is in it.
+create function app.followups_in_group(p_member_id uuid, p_task app.followups_tasks)
+returns boolean
+language sql
+set search_path = ''
+as $$
+  select p_member_id is not null
+     and p_member_id = any (app.followups_scope_roster(p_task.scope_kind, p_task.scope_id));
+$$;
+
+-- (Replaced, story 4.12; copied from 20261014110258_followups_registry.sql.) Review B1: owner
+-- capacity needs the owner to be in the task's group now; an owner who left the group (a revoked
+-- scope, a removal) or lost the Pastor role loses it at once, whether or not the task was handed
+-- over yet. Supervisor and Admin capacities are unchanged.
+create or replace function app.followups_capacity(p_member_id uuid, p_task app.followups_tasks)
+returns text
+language sql
+stable
+set search_path = ''
+as $$
+  select case
+    when p_member_id is null then null
+    when p_task.owner_member_id = p_member_id and app.followups_in_group(p_member_id, p_task)
+      then 'owner'
+    when app.followups_holds_scope(p_member_id, p_task) then 'supervisor'
+    when app.identity_member_has_role(p_member_id, 'admin') then 'admin'
+  end;
+$$;
+
+-- (Replaced, story 4.12; copied from 20261014110258_followups_registry.sql.) Review B1: only the
+-- tasks whose group the member is still in (one roster per scope).
+create or replace function app.followups_my_tasks()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_member uuid;
+  v_link uuid;
+  v_result jsonb;
+begin
+  select a.member_id, a.link_id into v_member, v_link from app.identity_require_access() a;
+  perform app.followups_require_open_read();
+  with scopes as materialized (
+    select s.scope_kind, s.scope_id,
+           v_member = any (app.followups_scope_roster(s.scope_kind, s.scope_id)) as in_group
+      from (select distinct t.scope_kind, t.scope_id from app.followups_tasks t
+             where t.owner_member_id = v_member) s
+  ), ranked as (
+    select t.task_id,
+           row_number() over (order by (t.finished_at is not null),
+                                       coalesce(t.review_at, t.due_at), t.finished_at desc,
+                                       t.task_id) as rn
+      from app.followups_tasks t
+      join scopes s on s.scope_kind = t.scope_kind and s.scope_id = t.scope_id and s.in_group
+     where t.owner_member_id = v_member
+       and (t.finished_at is null or t.finished_at > now() - interval '30 days'))
+  select jsonb_build_object(
+           'member_id', v_member,
+           'tasks', coalesce(jsonb_agg(app.followups_task_json(r.task_id, v_member) order by r.rn)
+                             filter (where r.rn <= 200), '[]'::jsonb),
+           'truncated', count(*) > 200)
+    into v_result
+    from ranked r;
+  perform app.identity_record_activity(v_link);
+  return v_result;
+end;
+$$;
+
+-- What waits for a new owner or supervisor, per member (review B1): every active task whose
+-- owner is no longer in its group (`followup_task`) or whose supervisor no longer holds its scope
+-- or left (`followup_supervision`), the same kinds as the handover obligations Identity records
+-- for a deactivation or deletion. A revoked scope records no Identity obligation (Identity's
+-- obligations belong to a deactivation or deletion), so this is where the Admin sees what such a
+-- change could not hand over within its cap. Erased (former) members are left out: their tasks
+-- are reassigned one by one, as in 4.6. One roster per scope.
+create function app.followups_pending_handovers()
+returns table (member_id uuid, obligation_kind text, task_id uuid)
+language sql
+set search_path = ''
+as $$
+  with t as materialized (
+    select t.task_id, t.owner_member_id, t.supervisor_member_id, t.scope_kind, t.scope_id,
+           t.source_type, t.purpose
+      from app.followups_tasks t
+     where app.followups_state_ok('active_state', t.task_state)
+  ), r as materialized (
+    select s.scope_kind, s.scope_id, app.followups_scope_roster(s.scope_kind, s.scope_id) as roster
+      from (select distinct t.scope_kind, t.scope_id from t) s
+  )
+  select t.owner_member_id, 'followup_task', t.task_id
+    from t join r on r.scope_kind = t.scope_kind and r.scope_id = t.scope_id
+   where not (t.owner_member_id = any (r.roster))
+     and t.owner_member_id <> '00000000-0000-0000-0000-000000000000'::uuid
+  union all
+  select t.supervisor_member_id, 'followup_supervision', t.task_id
+    from t
+   where t.supervisor_member_id is not null
+     and t.supervisor_member_id <> '00000000-0000-0000-0000-000000000000'::uuid
+     and (not app.followups_member_active(t.supervisor_member_id)
+          or not app.followups_member_holds(t.supervisor_member_id, t.scope_kind, t.scope_id,
+                                            app.followups_purpose_kinds(t.source_type, t.purpose)));
+$$;
+
+-- (Replaced, story 4.12; copied from 20261014110258_followups_registry.sql.) Review B1: adds
+-- `handovers`, per member with anything waiting for a new owner or supervisor ({member_id,
+-- display_name, membership_state, tasks, supervisions}); the Admin continues each with
+-- `followups.complete_handover`. Routing metadata only, as before.
+create or replace function app.followups_admin_routing()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_member uuid;
+  v_link uuid;
+  v_result jsonb;
+begin
+  select g.member_id, g.link_id into v_member, v_link from app.identity_require_grant('admin', null, null) g;
+  perform app.followups_require_open_read();
+  with ranked as (
+    select t.task_id,
+           row_number() over (order by (t.finished_at is not null),
+                                       coalesce(t.review_at, t.due_at), t.finished_at desc,
+                                       t.task_id) as rn
+      from app.followups_tasks t
+     where t.finished_at is null or t.finished_at > now() - interval '30 days'),
+  -- Review S2: an Admin reassigns within each active task's scope (its roster), not the roster
+  -- of the whole church.
+  families as (
+    select distinct on (app.followups_family(t.scope_kind), t.scope_id) t.scope_kind, t.scope_id
+      from app.followups_tasks t join ranked r on r.task_id = t.task_id
+     where r.rn <= 500 and t.finished_at is null
+     order by app.followups_family(t.scope_kind), t.scope_id, t.scope_kind),
+  waiting as (
+    select h.member_id,
+           count(*) filter (where h.obligation_kind = 'followup_task')::integer as tasks,
+           count(*) filter (where h.obligation_kind = 'followup_supervision')::integer as supervisions
+      from app.followups_pending_handovers() h
+     group by h.member_id)
+  select jsonb_build_object(
+    'tasks', coalesce((select jsonb_agg(app.followups_routing_json(r.task_id) order by r.rn)
+                         from ranked r where r.rn <= 500), '[]'::jsonb),
+    'truncated', (select count(*) > 500 from ranked),
+    'scopes', coalesce((select jsonb_agg(app.followups_scope_json(f.scope_kind, f.scope_id, true)
+                                         order by f.scope_kind, f.scope_id) from families f), '[]'::jsonb),
+    'handovers', coalesce((select jsonb_agg(jsonb_build_object(
+                             'member_id', w.member_id,
+                             'display_name', app.followups_display_name(w.member_id),
+                             'membership_state', case
+                               when exists (select 1 from app.identity_deletions d
+                                             where d.member_id = w.member_id) then 'deleting'
+                               else (select m.membership_state from app.identity_members m
+                                      where m.member_id = w.member_id) end,
+                             'tasks', w.tasks,
+                             'supervisions', w.supervisions)
+                           order by app.followups_display_name(w.member_id), w.member_id)
+                             from waiting w), '[]'::jsonb))
+    into v_result;
+  perform app.identity_record_activity(v_link);
+  return v_result;
+end;
+$$;
+
+-- ---------------------------------------------------------------------------------------------
 -- Privileges: nothing new is client-executable
 -- ---------------------------------------------------------------------------------------------
 
@@ -2283,6 +2507,8 @@ revoke all on function
   app.duties_jsonb_uuid(jsonb),
   app.followups_jsonb_uuid(jsonb),
   app.followups_lock_people(uuid[]),
+  app.followups_in_group(uuid, app.followups_tasks),
+  app.followups_pending_handovers(),
   app.duties_command_people(jsonb, uuid),
   app.duties_lifecycle_actor(),
   app.duties_vacated_since(uuid),

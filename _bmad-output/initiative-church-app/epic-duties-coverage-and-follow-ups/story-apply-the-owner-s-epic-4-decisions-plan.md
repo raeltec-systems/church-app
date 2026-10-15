@@ -10,7 +10,7 @@ route_source: 'auto'
 review: ''
 review_source: ''
 lenses_ran: []
-review_loop_iteration: 0
+review_loop_iteration: 1
 context:
   - '{project-root}/docs/runbooks/identity-access.md'
   - '{project-root}/docs/runbooks/duties.md'
@@ -100,12 +100,28 @@ context:
 - Rule note: one E2E batch was started while the full suite was still running on the shared stack; those results were discarded and the scripts rerun alone (evidence-4.16/e2e-suite-summary.txt).
 - Remaining (not builder steps): staging apply with per-function md5 parity (parent session; no owner SQL paste, no Edge Function); staging staff web and APK rebuild; owner manual checks (duties.md, story 4.16); at production promotion the operator applies G3, G4 and G11 as documented.
 
+### Review amendments (2026-10-15, round 1; the unmerged migration was edited in place)
+
+- Decision (agent, under owner pre-approval; S1): **`identity.unlink_account` names item 10 explicitly.** Unlinking is a security action and is never refused. `identity_unlink_account` (replaced, copied from `20261007063340`, 2.5) ends each scope grant through `identity_end_grant_record`, collects the handover hooks for it (`identity_collect_revocation_handover`), records every reported obligation pending against that grant (`identity_record_revocation_obligations`, a Duties `department_leader` one included) and dispatches `scope_revoked`; roles end through `identity_end_grant` as before; validation, the last-Admin rule, link end, audit and `account_deactivated` are unchanged. The Admin sees the handover on **Membership status** and **Handover pending** on **Departments**, and resolves it with `duties.resolve_handover` once the department has a reachable leader. A later `deactivate_membership` of that member follows the 4.12 rules unchanged (they hold no scope any more). `identity_revoke_scope` uses the same two helpers plus `identity_scope_revoked_event`.
+- Decision (S2): **a review notice stays while its change is open.** `duties_review_key_open(flag, revision)`: the key's flag is at that revision (and open), or another open flag of the same source in the same department remains on a published duty that has not started. `duties_review_alert_check` and `duties_review_source_check` use it for `current`; `actionable` additionally needs any open flag on a published duty that has not started. Because the 3.2 contract requires a current answer to carry the key's revision, `revision` is the key's while current and the flag's own otherwise. Consequence: an older change's notice still waiting stays current while the department has open flags of that source (one notice per change). The migration header now says this.
+- Decision (S3): the G4 section was rewritten from Supabase's docs (checked 2026-10-15): password sign-in (`/token?grant_type=password`) shares the token bucket (`rate_limit_token_refresh`) with refreshes, so that is the limit tightened (150 -> 120 per 5 minutes, per IP); the "sign-ups and sign-ins" bucket covers `/signup`, `/recover`, `/resend`, `/magiclink`, `/otp`, `/user` (30 -> 20 per 5 min). Its Management API key is not stated in the current docs (it may be `rate_limit_otp`), so the steps read the keys and units from `GET .../config/auth` first. The clients call `/user` only for `updateUser` (password or recovery email change), never `getUser` polling; refreshes are about hourly per open session plus one retry on a rejected token.
+- N1: **Hand over first** now says "This department has no other leader or deputy who can use the app" (also true for a held sole leader), on Roles & access and Departments.
+- N2: the pilot header and duties.md (story 4.13) say that a reused staging department's leader persona keeps the leader scope after P98, and how an Admin removes it (give another reachable member the role first, then remove the persona's).
+- N3: timing assertion unchanged (99-131 ms against a 3 s bound).
+- N4: the person making the change is excluded from the review notice (`duties_alert_recipients(department, actor)`).
+- N5: `duties_leader_board` (replaced, copied from `20261014171038`, 4.8) lists its first 200 duties plus every duty with an open review that has not started; overlap counts are computed once over the listed duties; `duties_truncated` is unchanged. The reviews view hides the 200 note; the full board's note says "and every duty that needs review".
+- Tests: `duties_owner_decisions_test.sql` 105 (+17: S2 stays current while EV2 is open and ends once both are reviewed, source check; N4; N5 with 144 more duties pushing linked ones past 200; S1 unlink of a member who was the last leader of two departments, both handovers recorded against the grants, shown on Departments and Membership status, deactivation allowed afterwards, resolve; G3 now uses the Pastor for the dormancy check). Dart: the new copy asserted.
+
 ## Plan Change Log
+
+- 2026-10-15 (review round 1): S1 unlink records (never refuses) the handovers its ended scopes leave; S2 a review notice stays current while any flag of its source in the department is open; S3 G4 rewritten (the token bucket throttles password sign-in); N1, N2, N4, N5 as above. `duties_leader_board` and `identity_unlink_account` are newly replaced bodies. Recorded under Review amendments. The frozen block is unchanged.
 
 - 2026-10-15 (build): the review notice's link is `/duties/leader/reviews`, not `/duties/leader?needs=review` as the frozen Decisions say: the 3.2 reminder contract only accepts path segments (no query string). The client gained the `leader/reviews` route. The frozen block is unchanged.
 - 2026-10-15 (build): the review notice is current while the keyed flag is at its revision (as the frozen text says), so a review of the keyed duty ends it even if another duty of the same change is still open (the 3.2 contract requires `revision` to equal the key's when current). Recorded under Implementation Notes. The frozen block is unchanged.
 
 ## Review Triage Log
+
+- 2026-10-15, independent review: 0 blockers, 3 should-fix (S1-S3), 5 nits (N1-N5). S1, S2, S3 fixed; N1, N2, N4, N5 fixed; N3 no change (as asked).
 
 ## Verification
 

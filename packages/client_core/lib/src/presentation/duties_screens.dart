@@ -414,9 +414,9 @@ abstract final class DutyPaths {
     DutyNotice.staffHandoverRequired => (
       StatusTone.warning,
       'Hand over first',
-      '$what is this department\'s last leader or deputy who can use the '
-          'app. Give the leader or deputy role to someone else first, then '
-          'remove it. Nothing was changed.',
+      'This department has no other leader or deputy who can use the app. '
+          'Give the leader or deputy role to someone else first, then remove '
+          'it from $what. Nothing was changed.',
     ),
     DutyNotice.leaderRequired => (
       StatusTone.warning,
@@ -1258,8 +1258,14 @@ class _LeaderDepartmentCard extends StatelessWidget {
                 ? 'Needs review (${duties.length})'
                 : 'Duties (${d.duties.length})',
           ),
-          if (d.dutiesTruncated)
-            _muted(context, 'Only the first 200 duties are shown.'),
+          // Story 4.16 (review N5): every duty needing review is listed
+          // even past the first 200, so the reviews view is complete.
+          if (d.dutiesTruncated && !reviewsOnly)
+            _muted(
+              context,
+              'Only the first 200 duties (and every duty that needs review) '
+              'are shown.',
+            ),
           if (duties.isEmpty)
             Text(
               reviewsOnly ? 'Nothing needs review here.' : 'No duties yet.',

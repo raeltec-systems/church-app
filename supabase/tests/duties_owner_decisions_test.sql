@@ -19,7 +19,7 @@
 -- Every account, phone and name is SYNTHETIC (fictional range +44 7700 900850-900859). Duty times
 -- are fixed church-time (Africa/Lusaka) clock times on whole days, never the current clock time.
 begin;
-select plan(88);
+select plan(106);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000004160' || lpad(n::text, 2, '0'))::uuid $$;
@@ -104,6 +104,7 @@ $$ select (((now() at time zone 'Africa/Lusaka')::date + p_days) + p_time::time)
 create function pg_temp.day(p_days int) returns text language sql as
 $$ select to_char((now() at time zone 'Africa/Lusaka')::date + p_days, 'YYYY-MM-DD') $$;
 
+-- (Review fixes S1, S2, N4 and N5 are tested below.)
 -- Accounts: 1 Admin A (no scope); 2 leader L of D; 3 deputy P of D (not a member of D); 4 member M
 -- (removed from D); 5 member N (deactivated); 6 member Q (deleted); 7 Pastor; 8 deputy H of D (login
 -- hold); 9 leader K, the only leader of E; 10 leader J of G (another department).
@@ -267,21 +268,29 @@ select is((app.notifications_enqueue(jsonb_build_object('source_type', 'duties_r
                                 and recipient_member_id = pg_temp.mid(2)))) ->> 'created'), 'false',
   'the same change never queues a second notice to the same leader');
 select is((app.duties_review_alert_check(jsonb_build_object('source_id', (pg_temp.flag('EV1')).flag_id,
-            'source_revision', 1, 'recipient_member_id', pg_temp.mid(2))) ->> 'current'), 'false',
-  'the first change''s notice is no longer current once the next change moved the flag on');
+            'source_revision', 1, 'recipient_member_id', pg_temp.mid(2))) ->> 'current'), 'true',
+  'review S2: the first change''s notice stays current while a duty of that source in D is still open');
 
--- The department reviews its duties: the notice is no longer current.
+-- The department reviews its duties: the notice stays while any duty of the change is open (S2).
 select is((app.duties_review_alert_check(jsonb_build_object('source_id', (pg_temp.flag('EV1')).flag_id,
             'source_revision', 2, 'recipient_member_id', pg_temp.mid(3))) ->> 'actionable'), 'true',
   'before the review, D''s current notice is actionable');
 create temp table ev1flag as select (pg_temp.flag('EV1')).flag_id;
 select is(pg_temp.err(pg_temp.duties(2, 'duties.clear_review', (pg_temp.flag('EV1')).revision,
             jsonb_build_object('flag_id', (pg_temp.flag('EV1')).flag_id))), 'ok', 'L marks the first duty reviewed');
-select is((app.duties_review_alert_check(jsonb_build_object('source_id', (select flag_id from ev1flag),
-            'source_revision', 2, 'recipient_member_id', pg_temp.mid(3))) ->> 'current'), 'false',
-  'the review ends D''s notice (not delivered if still waiting)');
+select is((select (c ->> 'current') || '|' || (c ->> 'actionable') || '|' || (c ->> 'revision')
+             from (select app.duties_review_alert_check(jsonb_build_object('source_id', (select flag_id from ev1flag),
+                     'source_revision', 2, 'recipient_member_id', pg_temp.mid(3))) as c) x), 'true|true|2',
+  'review S2: with the second duty of the change still open, D''s notice stays current and actionable');
+select is((app.duties_review_source_check(jsonb_build_object('source_type', 'duties_review',
+            'source_id', (select flag_id from ev1flag), 'source_revision', 2)) ->> 'current'), 'true',
+  'and its inbox item is still current');
 select is(pg_temp.err(pg_temp.duties(3, 'duties.clear_review', (pg_temp.flag('EV2')).revision,
             jsonb_build_object('flag_id', (pg_temp.flag('EV2')).flag_id))), 'ok', 'P marks the second duty reviewed');
+select is((select (c ->> 'current') || '|' || (c ->> 'actionable')
+             from (select app.duties_review_alert_check(jsonb_build_object('source_id', (select flag_id from ev1flag),
+                     'source_revision', 2, 'recipient_member_id', pg_temp.mid(3))) as c) x), 'false|false',
+  'with every duty of the change reviewed, D''s notice is no longer current');
 select is((app.duties_review_alert_check(jsonb_build_object('source_id', (pg_temp.flag('EV3')).flag_id,
             'source_revision', 2, 'recipient_member_id', pg_temp.mid(9))) ->> 'actionable'), 'true',
   'E''s notice is not affected');
@@ -301,6 +310,19 @@ select is((select string_agg(code || ':' || case department_id when pg_temp.d() 
               and department_id in (pg_temp.d(), pg_temp.e()) and member_id is null),
   'policy_unavailable:D,policy_unavailable:E', 'the skip is audited once per department');
 update app.policy_gates set fixture_value = fixture_value || '{"zone": "Africa/Lusaka"}' where gate = 'q2_church_time';
+
+-- Review N4: a change made by D's leader is not notified to that leader.
+create temp table n4 as select (select count(*)::int from app.notifications_jobs
+                                  where source_type = 'duties_review' and recipient_member_id = pg_temp.mid(2)) as l,
+                               (select count(*)::int from app.notifications_jobs
+                                  where source_type = 'duties_review' and recipient_member_id = pg_temp.mid(3)) as p;
+select is(pg_temp.fx(2, 'fixture_event_changed', jsonb_build_object('event_id', pg_temp.ev(),
+            'changed', '["time"]'::jsonb)) ->> 'flagged', '3', 'L reports the event change');
+select is(array[(select count(*)::int from app.notifications_jobs where source_type = 'duties_review'
+                   and recipient_member_id = pg_temp.mid(2)) - (select l from n4),
+                (select count(*)::int from app.notifications_jobs where source_type = 'duties_review'
+                   and recipient_member_id = pg_temp.mid(3)) - (select p from n4)],
+  array[0, 1], 'the deputy is told; L, who made the change, is not');
 
 -- Timing: one change over 60 linked duties in D (one notice per leader).
 create temp table many as
@@ -325,6 +347,39 @@ select diag('timing: flag 63 duties and queue their notices: '
             || round(extract(epoch from (select t from t1) - (select t from t0)) * 1000) || ' ms');
 select is((select count(*)::int from app.notifications_jobs where source_type = 'duties_review') - (select jobs from t0), 3,
   'still one notice per leader and department (D: L and P; E: K)');
+
+-- Review N5: 144 more duties of D before the linked ones push them past the board's first 200; every
+-- duty with an open review is still listed.
+select is((select count(*)::int from (
+             select pg_temp.duties(2, 'duties.publish_duty', null, jsonb_build_object(
+                      'department_id', pg_temp.d(), 'member_id', pg_temp.mid(2), 'duty_name', 'SYNTHETIC filler',
+                      'location', 'SYNTHETIC hall',
+                      'starts_at', app.cmd_utc(pg_temp.at(14 + n / 12, lpad((6 + n % 12)::text, 2, '0') || ':00')),
+                      'ends_at', app.cmd_utc(pg_temp.at(14 + n / 12, lpad((6 + n % 12)::text, 2, '0') || ':50')))) as r
+               from generate_series(0, 143) n) x where r ->> 'code' is null), 144,
+  'setup: 144 more duties of D come before the linked ones');
+create temp table n5t0 as select clock_timestamp() as t;
+create temp table n5 as select pg_temp.readj(2, 'select api.duties_leader_board()') as b;
+create temp table n5t1 as select clock_timestamp() as t;
+select ok((select t from n5t1) - (select t from n5t0) < interval '3 seconds',
+  'the board with 200 duties plus the reviewed ones stays well under the 8 s statement timeout');
+select diag('timing: leader board with ' || (select jsonb_array_length(dep -> 'duties') from n5,
+              jsonb_array_elements(b -> 'departments') dep where dep ->> 'department_id' = pg_temp.d()::text)
+            || ' duties in D: ' || round(extract(epoch from (select t from n5t1) - (select t from n5t0)) * 1000) || ' ms');
+select is((select (dep ->> 'duties_truncated') || '|' || jsonb_array_length(dep -> 'duties')
+             from n5, jsonb_array_elements(b -> 'departments') dep where dep ->> 'department_id' = pg_temp.d()::text),
+  'true|' || (200 + (select count(*) from app.duties_occurrences o
+                      where o.department_id = pg_temp.d() and o.event_ref = pg_temp.ev()
+                        and o.occurrence_id not in (select occurrence_id from app.duties_occurrences
+                                                     where department_id = pg_temp.d() and occurrence_state = 'published'
+                                                     order by starts_at limit 200)))::text,
+  'the board lists its first 200 duties plus every later duty with an open review');
+select is((select count(*)::int from app.duties_review_flags f join app.duties_occurrences o on o.occurrence_id = f.occurrence_id
+            where f.cleared_at is null and o.department_id = pg_temp.d()
+              and f.occurrence_id::text not in (select dd ->> 'occurrence_id' from n5,
+                                                  jsonb_array_elements(b -> 'departments') dep,
+                                                  jsonb_array_elements(dep -> 'duties') dd)), 0,
+  'no open review of D is missing from the board');
 
 -- ===================================================================================================
 -- Item 8: the vacancy reason (the department's leaders and deputies only)
@@ -375,7 +430,12 @@ select is(array[pg_temp.hist(1, 'VI') ? 'vacancy_reason', (pg_temp.hist(1, 'VI')
 select is(pg_temp.hist(7, 'VI') ->> 'vacancy_reason', null, 'so does Pastor');
 select is((select count(*)::int from jsonb_array_elements(pg_temp.readj(10, 'select api.duties_leader_board()') -> 'departments') dep
             where dep ->> 'department_id' = pg_temp.d()::text), 0, 'another department''s leader does not see D at all');
-select is(pg_temp.hist(2, 'RV') ? 'vacancy_reason', false, 'a revised history entry is unchanged (no reason key)');
+select is((select h ? 'vacancy_reason'
+             from jsonb_array_elements(pg_temp.readj(2, 'select api.duties_leader_board()') -> 'departments') dep,
+                  jsonb_array_elements(dep -> 'duties') o, jsonb_array_elements(o -> 'positions') p,
+                  jsonb_array_elements(p -> 'history') h
+            where o ->> 'occurrence_id' = pg_temp.occ('RV')::text and h ->> 'end_reason' = 'revised'), false,
+  'a revised history entry is unchanged (no reason key)');
 select ok(position('moved_away' in pg_temp.readj(2, 'select api.duties_leader_board()')::text) = 0
           and position('member_left' in pg_temp.readj(2, 'select api.duties_leader_board()')::text) = 0,
   'no Identity reason code or audit code reaches the leader');
@@ -477,6 +537,40 @@ select is(pg_temp.err(pg_temp.revoke_scope(2, 'department_deputy', pg_temp.d()))
 select is(pg_temp.holds(2, 'department_deputy', pg_temp.d()), true, 'and L keeps it');
 select is(pg_temp.err(pg_temp.revoke_scope(10, 'department_leader', pg_temp.g())), 'conflict|member_id=handover_required',
   'the same rule protects another department''s only leader');
+-- Review S1: unlinking G's only leader is never refused (a security action), but records the
+-- department's handover against the ended grant; a later deactivation follows the 4.12 rules.
+create temp table jgrant as select grant_id from app.identity_grants
+ where member_id = pg_temp.mid(10) and scope_kind = 'department_leader' and scope_id = pg_temp.g() and revoked_at is null;
+select is(pg_temp.err(pg_temp.call(1, 'identity_review_command', 'identity.unlink_account', pg_temp.mrev(10),
+            jsonb_build_object('member_id', pg_temp.mid(10), 'reason', 'account_lost'))), 'ok',
+  'unlinking the department''s only leader is not refused');
+select is((select string_agg(owner_module || ':' || obligation_kind || ':' || obligation_state || ':'
+                             || case subject_id when pg_temp.g() then 'G' when pg_temp.e() then 'E' end || ':'
+                             || (revoked_grant_id is not null and lifecycle_event_id is null)::text, ','
+                             order by case subject_id when pg_temp.g() then 'G' when pg_temp.e() then 'E' end)
+             from app.identity_handover_obligations where member_id = pg_temp.mid(10)),
+  'duties:department_leader:pending:E:true,duties:department_leader:pending:G:true',
+  'both departments J was the last reachable leader of (E and G) get a handover recorded against the ended grants');
+select is((select count(*)::int from app.identity_handover_obligations
+            where member_id = pg_temp.mid(10) and subject_id = pg_temp.g() and revoked_grant_id = (select grant_id from jgrant)), 1,
+  'G''s against G''s grant');
+select is((select (d ->> 'needs_leader') || '|' || jsonb_array_length(d -> 'handovers')
+             from jsonb_array_elements(pg_temp.readj(1, 'select api.duties_admin_overview()') -> 'departments') d
+            where d ->> 'department_id' = pg_temp.g()::text), 'true|1', 'Departments shows G needs a leader and a pending handover');
+select is((select count(*)::int from jsonb_array_elements(pg_temp.readj(1, 'select api.identity_admin_membership_lifecycle()') -> 'handovers') h
+            where h ->> 'member_id' = pg_temp.mid(10)::text), 2, 'Membership status shows them too');
+select is(pg_temp.err(pg_temp.call(1, 'identity_lifecycle_command', 'identity.deactivate_membership', pg_temp.mrev(10),
+            jsonb_build_object('member_id', pg_temp.mid(10), 'reason_code', 'church_decision'))), 'ok',
+  'a later deactivation of J follows the 4.12 rules (J holds no scope any more)');
+select is((select count(*)::int from app.identity_handover_obligations where member_id = pg_temp.mid(10)
+              and obligation_state = 'pending'), 2, 'the departments'' handovers stay pending');
+select is(pg_temp.err(pg_temp.grant_scope(9, 'department_leader', pg_temp.g())), 'ok', 'the Admin makes K the leader of G');
+select is(pg_temp.err(pg_temp.duties(1, 'duties.resolve_handover', pg_temp.drev(pg_temp.g()),
+            jsonb_build_object('department_id', pg_temp.g()))), 'ok', 'and marks the handover done');
+select is((select string_agg(case subject_id when pg_temp.g() then 'G' else 'E' end || ':' || obligation_state, ','
+                             order by case subject_id when pg_temp.g() then 'G' else 'E' end)
+             from app.identity_handover_obligations where member_id = pg_temp.mid(10)),
+  'E:pending,G:resolved', 'G''s is resolved; E''s waits for E''s own leader');
 select is(app.identity_revoked_scope() is null, true, 'outside a revocation no revoked scope is readable');
 select is((select count(*)::int from app.identity_handover_obligations where revoked_grant_id is not null
               and lifecycle_event_id is not null), 0, 'an obligation has exactly one origin');
@@ -503,7 +597,7 @@ select throws_ok($$select app.identity_approve_setting('dormancy_days', '{"days"
 select throws_ok($$select app.identity_approve_setting('dormancy_days', '{"days": "180"}', 'israel', 'Owner decision')$$,
   '22023', null, 'a string is not a number of days');
 -- A member last active 120 days ago is dormant under the 90-day fixture.
-update app.identity_account_links set last_member_activity_at = now() - interval '120 days' where member_id = pg_temp.mid(10);
+update app.identity_account_links set last_member_activity_at = now() - interval '120 days' where member_id = pg_temp.mid(7);
 create function pg_temp.outcome(n int) returns text language plpgsql as $$
 declare
   v text;
@@ -513,11 +607,11 @@ begin
   return v;
 end;
 $$;
-select is(pg_temp.outcome(10), 'review_required', 'under the labelled 90-day fixture J is dormant');
+select is(pg_temp.outcome(7), 'review_required', 'under the labelled 90-day fixture the Pastor is dormant');
 select is(app.identity_approve_setting('dormancy_days', '{"days": 180}', 'israel',
             'Owner decision 2026-10-15: 180 days (SYNTHETIC test approval)'), 2, 'the operator approves version 2');
 select is(app.identity_setting('dormancy_days'), '{"days": 180}'::jsonb, 'the approved version is in force');
-select is(pg_temp.outcome(10), 'granted', 'and honoured: 120 days is within 180');
+select is(pg_temp.outcome(7), 'granted', 'and honoured: 120 days is within 180');
 select is((select string_agg(version || ':' || source || ':' || (value ->> 'days'), ',' order by version)
              from app.identity_settings where setting = 'dormancy_days'),
   '1:fixture:90,2:approved:180', 'the labelled fixture row is left as it was');
@@ -532,6 +626,8 @@ select is((select count(*)::int from app.ops_operator_actions where action = 'ch
 select is((select count(*)::int from information_schema.routine_privileges
             where routine_schema = 'app' and grantee in ('anon', 'authenticated', 'PUBLIC', 'service_role')
               and routine_name in ('duties_vacancy_reason', 'duties_review_source_check', 'duties_review_alert_check',
+                                   'duties_review_key_open', 'identity_scope_revoked_event',
+                                   'identity_collect_revocation_handover', 'identity_record_revocation_obligations',
                                    'identity_revoked_scope', 'identity_end_grant_record', 'identity_approve_setting')), 0,
   'nothing new is client-executable');
 select is((select count(*)::int from app.contract_unowned_objects()), 0, 'no unowned objects');

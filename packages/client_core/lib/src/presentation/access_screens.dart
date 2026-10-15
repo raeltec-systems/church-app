@@ -393,9 +393,9 @@ class _GrantAdminScreenState extends ConsumerState<GrantAdminScreen> {
       GrantNotice.handoverRequired => (
         StatusTone.warning,
         'Hand over first',
-        '$who is the last leader or deputy of this department who can use '
-            'the app. Give the role to someone else first, then remove it '
-            'from $who. Nothing was changed.',
+        'This department has no other leader or deputy who can use the app. '
+            'Give the role to someone else first, then remove it from $who. '
+            'Nothing was changed.',
       ),
       GrantNotice.refused => (
         StatusTone.warning,

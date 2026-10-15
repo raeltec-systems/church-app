@@ -403,6 +403,12 @@ void main() {
       await settle(tester);
       expect(byKey('grant-notice-handoverRequired'), findsOneWidget);
       expect(find.text('Hand over first'), findsOneWidget);
+      expect(
+        find.textContaining(
+          'has no other leader or deputy who can use the app',
+        ),
+        findsOneWidget,
+      );
       expect(byKey('grant-notice-changedElsewhere'), findsNothing);
     });
 
@@ -445,6 +451,12 @@ void main() {
       await settle(tester);
       expect(byKey('duties-notice-staffHandoverRequired'), findsOneWidget);
       expect(find.text('Hand over first'), findsOneWidget);
+      expect(
+        find.textContaining(
+          'has no other leader or deputy who can use the app',
+        ),
+        findsOneWidget,
+      );
     });
   });
 }

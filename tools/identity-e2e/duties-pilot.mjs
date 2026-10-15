@@ -13,6 +13,10 @@
 //   P80 reassignment: a reminder falling due after the change reaches the new person only
 //   P90 nothing private (leader notes, attempt notes, reasons, numbers) reaches a non-leader
 //   P98 cleanup through the API (duties cancelled, members removed, leader scope revoked)
+//       (story 4.16: when the run reuses a department whose only reachable leader is the leader
+//       persona, the revocation is refused handover_required and recorded kept_last_leader; the
+//       persona stays its leader. To remove it, an Admin first gives someone else who uses the app
+//       the leader or deputy role, then removes the persona's role; see duties.md, story 4.13)
 //
 // Two targets, chosen explicitly (`--target local|staging` or DUTIES_PILOT_TARGET; default local):
 //

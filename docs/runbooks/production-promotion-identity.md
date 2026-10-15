@@ -148,25 +148,42 @@ that this table does not name.**
 
 #### G4 Auth rate limits (proposed by the agent for the owner's "tighten modestly", story 4.16)
 
-Supabase's per-IP limits are token buckets (bursts up to 30). Members on the same mobile network
-can share one public address (carrier NAT), and a whole congregation opens the app at the same
-time on a Sunday, so the limits stay well above what one church's members need together and below
-the defaults an attacker could use from one address. Phone sign-in uses a password (no SMS, no
-OTP), so OTP and SMS limits do not apply.
+How Supabase limits Auth (Supabase docs, "Auth rate limits", checked 2026-10-15): per-IP limits
+are token buckets (bursts up to 30, then the configured refill rate). **Every `/auth/v1/token`
+request shares one bucket**, the "token refresh" limit (default 1800 per hour, 150 per 5 minutes,
+Management API `rate_limit_token_refresh`): a refresh (`grant_type=refresh_token`) **and a
+password sign-in** (`grant_type=password`, how members sign in by phone). So this is the limit
+that slows password guessing from one address. The dashboard's other per-IP field, "sign-ups and
+sign-ins", covers the endpoints that start a flow (`/signup`, `/recover`, `/resend`,
+`/magiclink`, `/otp`, `/user`); its Management API key is **not stated in the current docs**
+(it may be stored as `rate_limit_otp`, which the docs also describe as the project-wide OTP
+sender limit). Read the actual keys and units from `GET .../config/auth` before patching (below).
 
-| Limit (dashboard **Authentication > Rate Limits**; Management API key as listed by `GET`) | Supabase default | Production value | Why |
-|---|---|---|---|
-| Sign-ups and sign-ins, per IP | 30 per 5 min | **20 per 5 min** (240 per hour) | Sessions persist on the phone, so a member signs in rarely; 20 every 5 minutes behind one shared address still lets a full Sunday of new installs through over the morning, and a burst of 30 covers a group signing in together. Slows password guessing from one address by a third. |
-| Token refresh (`rate_limit_token_refresh`), per IP | 150 per 5 min (1800 per hour) | **120 per 5 min** (1440 per hour) | Each open app refreshes about once an hour; 1440 per hour behind one shared address covers far more than the church's members at once. Only refreshes of stolen or scripted tokens are slowed. |
-| Token verification (`rate_limit_verify`), per IP | 30 per 5 min | **20 per 5 min** | Only email links (recovery, email confirmation) use it, and those stay closed until G1/G2. |
-| OTP (`rate_limit_otp`) and SMS (`rate_limit_sms_sent`) | 30 per hour | **unchanged** | Not used: no SMS, no OTP. Never configure an SMS provider. |
-| Anonymous sign-ins (`rate_limit_anonymous_users`) | 30 per hour | **unchanged** | Anonymous sign-ins stay off (`external_anonymous_users_enabled: false`). |
+What the clients call: the SDK refreshes each open session about once an hour and again when the
+server rejects a token (one retry), and members sign in rarely (sessions persist on the phone).
+`/auth/v1/user` is called only to change a password or recovery email (`updateUser`, rare); no
+client polls `getUser`. Members on one mobile network can share one public address (carrier NAT),
+and a congregation opens the app together after a Sunday service.
 
-Steps (owner, Management API; the dashboard page shows the same values): `GET .../config/auth`,
-keep the response, set the keys above (the sign-in value as the dashboard names it, if `GET` shows
-no separate key), `PATCH` with every other field unchanged, then `GET` again and record the
-`rate_limit_*` values (no token) in the promotion evidence. If members on one network report
-**Too many requests** (`429`) on a Sunday, raise sign-ins to the default (30) first.
+| Limit (dashboard **Authentication > Rate Limits**) | Endpoints | Supabase default | Production value | Why |
+|---|---|---|---|---|
+| Token refresh (`rate_limit_token_refresh`), per IP | `/auth/v1/token`: refresh **and password sign-in** | 150 per 5 min (1800 per hour) | **120 per 5 min** (1440 per hour) | The limit that throttles password guessing, tightened by a fifth. A few hundred members behind one address refresh well under 1440 times an hour; a post-service burst is absorbed by the 30-request bucket plus 24 refills a minute. Not lower: refreshes and sign-ins of everyone behind the address share it. |
+| Sign-ups and sign-ins (key per `GET`; see above), per IP | `/signup`, `/recover`, `/resend`, `/magiclink`, `/otp`, `/user` | 30 per 5 min | **20 per 5 min** | Used for a member's one-time sign-up and the rare `updateUser`; recovery and OTP are closed (G1/G2, no SMS). 20 every 5 minutes behind one address still lets a registration morning through (240 an hour plus the burst). |
+| Token verification (`rate_limit_verify`), per IP | `/verify` | 30 per 5 min | **20 per 5 min** | Only email links use it (recovery, email confirmation), closed until G1/G2. |
+| OTP sent (`rate_limit_otp` per the docs), SMS (`rate_limit_sms_sent`), anonymous (`rate_limit_anonymous_users`) | `/otp`, SMS, anonymous sign-up | docs defaults | **unchanged** | Not used: no SMS, no OTP, anonymous sign-ins off. Never configure an SMS provider. If `GET` shows that `rate_limit_otp` is the dashboard's "sign-ups and sign-ins" value, set it as the row above says. |
+
+Steps (owner, Management API):
+1. `GET https://api.supabase.com/v1/projects/<production ref>/config/auth` and keep the response.
+   List the `rate_limit_*` keys and compare them with **Authentication > Rate Limits** to learn
+   each key's dashboard field and unit (per hour or per 5 minutes); convert the values above to
+   that unit.
+2. `PATCH` the same URL with `password_min_length: 8`, `password_required_characters: ""`, the
+   three tightened limits under the keys found in step 1, and every other field unchanged (keep
+   `disable_signup` as it is).
+3. `GET` again and record the `rate_limit_*` values (no token) in the promotion evidence.
+
+If members on one network report **Too many requests** (`429`) on a Sunday, set the token limit
+back to its default (150 per 5 minutes) first.
 
 **Gate prerequisite (story 4.7): approve Q4 only together with or after Q2.** Follow-ups (tasks,
 My follow-ups, supervision, Admin routing and the source owner operations) needs BOTH

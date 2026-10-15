@@ -6,12 +6,15 @@
 --   * Item 7, mismatch notice: when a linked meeting or event change flags department duties for
 --     review (4.11 app.duties_owner_flag_review), each reachable, active leader and deputy of each
 --     flagged department (app.duties_alert_recipients: held or in-review leaders are left out)
---     gets one `duties_review` / `duty_review_flagged` notice per department and change ("Duty
---     needs review", link /duties/leader/reviews). Keyed by the department's soonest flagged duty
---     at its flag revision (fresh keys per change, as the 4.12 `duty_vacated`). Delivered while
---     any flag of that source in that department is open on a published duty that has not
---     started. With the Q2 policy unavailable the flags are kept and the notice is skipped and
---     audited (`reminders_skipped`, `policy_unavailable`).
+--     other than the person making the change gets one `duties_review` / `duty_review_flagged`
+--     notice per department and change ("Duty needs review", link /duties/leader/reviews). Keyed
+--     by the department's soonest flagged duty at its flag revision (fresh keys per change, as the
+--     4.12 `duty_vacated`). Current while the keyed flag is at that revision or another flag of the
+--     same source in the department is still open (reviewing the soonest duty alone does not end
+--     it); delivered while any of those open flags is on a published duty that has not started.
+--     With the Q2 policy unavailable the flags are kept and the notice is skipped and audited
+--     (`reminders_skipped`, `policy_unavailable`). The leader board also lists every duty with an
+--     open review beyond its first 200 (review N5).
 --   * Item 8, vacancy reason (supersedes the 4.12 "no reason" decision because the owner decided
 --     so): app.duties_assignments.vacancy_reason in (removed_from_department, member_inactive,
 --     member_deleted), set only with end reason `vacated`. Shown as `vacancy_reason` on the
@@ -27,7 +30,9 @@
 --     grant (identity_handover_obligations.revoked_grant_id; lifecycle_event_id becomes nullable,
 --     exactly one of the two is set), then dispatches scope_revoked as before.
 --     app.identity_end_grant keeps its behaviour (its record step is now
---     app.identity_end_grant_record). Duties reports a revoked leader or deputy scope of an active
+--     app.identity_end_grant_record). identity.unlink_account (review S1) runs the same collection
+--     for each scope grant it ends but is never refused (a security action): every reported
+--     obligation, a Duties `department_leader` included, is recorded pending against the grant. Duties reports a revoked leader or deputy scope of an active
 --     department left without any current, active, reachable leader or deputy; Follow-ups reports
 --     what the member may no longer hold, never last responsible; the SYNTHETIC fixture reports
 --     nothing for a revocation. Deactivation, deletion, unlink and role revocation are unchanged.
@@ -42,7 +47,9 @@
 --   from 20261015110202 (4.12): duties_vacate_member, duties_coverage, duties_report_handover,
 --     followups_report_handover.
 --   from 20261015035112 (4.11): duties_occurrence_json (3-argument), duties_owner_flag_review.
+--   from 20261014171038 (4.8): duties_leader_board.
 --   from 20261006234820 (2.3): identity_end_grant, identity_revoke_scope.
+--   from 20261007063340 (2.5): identity_unlink_account.
 --   from 20261007151523 (2.10): fixture_report_handover.
 --
 -- Lock order (AD-2): Identity rows (the grant set and grant, locked by the revocation; hooks only
@@ -656,27 +663,58 @@ $$;
 -- Item 7: the leaders' review notice (3.2 contract on a new source type `duties_review`)
 -- ---------------------------------------------------------------------------------------------
 
--- Source check: current while the flag is at that revision (a later change merged into it, or the
--- department's review, moves it on).
-create function app.duties_review_source_check(p_source jsonb)
-returns jsonb
+-- Is anything of a review notice's change still open? The key's flag is at that revision, or
+-- (review S2) another open flag of the same source in the same department remains on a published
+-- duty that has not started. Reviewing the soonest duty alone does not end the department's
+-- notice.
+create function app.duties_review_key_open(p_flag app.duties_review_flags, p_revision bigint)
+returns boolean
 language sql
 stable
 set search_path = ''
 as $$
-  select coalesce(
-    (select jsonb_build_object('current', f.revision = (p_source ->> 'source_revision')::numeric::bigint,
-                               'revision', f.revision)
-       from app.duties_review_flags f
-      where f.flag_id::text = p_source ->> 'source_id'),
-    '{"current": false, "revision": null}'::jsonb);
+  select (p_flag.revision = p_revision and p_flag.cleared_at is null)
+      or exists (select 1
+                   from app.duties_review_flags g
+                   join app.duties_occurrences o on o.occurrence_id = g.occurrence_id
+                  where g.source_type = p_flag.source_type and g.source_id = p_flag.source_id
+                    and g.cleared_at is null and g.flag_id <> p_flag.flag_id
+                    and o.department_id = (select o2.department_id from app.duties_occurrences o2
+                                            where o2.occurrence_id = p_flag.occurrence_id)
+                    and o.occurrence_state = 'published'
+                    and app.duties_occurrence_start(o) > now());
+$$;
+
+-- Source check: current while the change is still open (above). The 3.2 contract requires a
+-- current answer to carry the key's revision, so `revision` is the key's while current and the
+-- flag's own otherwise.
+create function app.duties_review_source_check(p_source jsonb)
+returns jsonb
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  v_flag app.duties_review_flags;
+  v_revision bigint := (p_source ->> 'source_revision')::numeric::bigint;
+begin
+  select f.* into v_flag from app.duties_review_flags f where f.flag_id::text = p_source ->> 'source_id';
+  if not found then
+    return '{"current": false, "revision": null}'::jsonb;
+  end if;
+  if app.duties_review_key_open(v_flag, v_revision) then
+    return jsonb_build_object('current', true, 'revision', v_revision);
+  end if;
+  return jsonb_build_object('current', false, 'revision', v_flag.revision);
+end;
 $$;
 
 -- duty_review_flagged (one per department and change, keyed by the department's soonest flagged
--- duty): current while that flag is at that revision (a later change sends its own notice; the
--- department's review of that duty ends it); actionable while, in addition, a flag of the same
--- source in that department is open on a published duty that has not started; the recipient leads
--- or deputises the department now, is an active member and is reachable in the app.
+-- duty): current while the change is still open (app.duties_review_key_open: the key's flag at
+-- that revision, or another open flag of the source in the department; review S2); actionable
+-- while any open flag of the source in that department is on a published duty that has not
+-- started; the recipient leads or deputises the department now, is an active member and is
+-- reachable in the app.
 create function app.duties_review_alert_check(p_key jsonb)
 returns jsonb
 language plpgsql
@@ -695,11 +733,13 @@ begin
   end if;
   select o.department_id into v_department from app.duties_occurrences o
    where o.occurrence_id = v_flag.occurrence_id;
-  v_current := v_flag.revision = (p_key ->> 'source_revision')::numeric::bigint;
+  v_current := app.duties_review_key_open(v_flag, (p_key ->> 'source_revision')::numeric::bigint);
   v_recipient := (p_key ->> 'recipient_member_id')::uuid;
   return jsonb_build_object(
     'current', v_current,
-    'revision', v_flag.revision,
+    -- The 3.2 contract: a current answer carries the key's revision.
+    'revision', case when v_current then (p_key ->> 'source_revision')::numeric::bigint
+                     else v_flag.revision end,
     'actionable', v_current and exists (
       select 1
         from app.duties_review_flags g
@@ -847,7 +887,7 @@ begin
                                           null, v_occ, null, null, null, v_flag.revision);
   end loop;
   -- Story 4.16 (owner item 7): one notice per department and change to each reachable leader and
-  -- deputy (held or in-review leaders are left out, 4.8), keyed by the department's soonest
+  -- deputy other than the actor (held or in-review leaders are left out, 4.8), keyed by the department's soonest
   -- flagged duty at its flag revision (fresh keys), Notifications last. With the Q2 policy
   -- unavailable the flags stay and the notice is skipped and audited (`reminders_skipped`).
   v_capacity := case when v_role = 'cell_part' then v_actor.capacity else 'member' end;
@@ -859,7 +899,8 @@ begin
      order by x ->> 'department_id', (x ->> 'starts_at')::timestamptz, x ->> 'flag_id'
   loop
     v_enqueues := '[]'::jsonb;
-    foreach v_leader in array app.duties_alert_recipients(v_first.department_id, null) loop
+    -- Review N4: never the person whose change it is.
+    foreach v_leader in array app.duties_alert_recipients(v_first.department_id, v_actor.member_id) loop
       v_enqueues := v_enqueues || jsonb_build_array(jsonb_build_object('op', 'enqueue', 'counts', false,
         'key', jsonb_build_object(
           'source_type', 'duties_review', 'source_id', v_first.flag_id,
@@ -870,6 +911,91 @@ begin
                                         v_capacity, v_cmd, v_first.department_id, null);
   end loop;
   return jsonb_build_object('flagged', v_flags);
+end;
+$$;
+
+-- (Replaced, story 4.16; copied from 20261014171038_duties_reminders.sql.) Review N5: the board
+-- also lists every duty with an open owner review beyond the first 200 (the reviews view opened by
+-- the review notice is complete). Everything else, the viewer setting and `duties_truncated`, is
+-- unchanged.
+create or replace function app.duties_leader_board()
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_member uuid;
+  v_link uuid;
+  v_admin boolean;
+  v_pastor boolean;
+  v_result jsonb;
+begin
+  select a.member_id, a.link_id into v_member, v_link from app.identity_require_access() a;
+  v_admin := app.identity_member_has_role(v_member, 'admin');
+  v_pastor := app.identity_member_has_role(v_member, 'pastor');
+  if not v_admin and not v_pastor
+     and not exists (select 1 from app.identity_grants g
+                      where g.member_id = v_member and g.revoked_at is null
+                        and g.scope_kind in ('department_leader', 'department_deputy')) then
+    raise exception using errcode = 'PT403', message = 'forbidden', detail = 'not_granted';
+  end if;
+  perform app.duties_require_open_read();
+  -- Story 4.4: an override about the viewer's own assignment hides its reason.
+  perform pg_catalog.set_config('app.duties_viewer', v_member::text, true);
+  select jsonb_build_object('departments', coalesce(jsonb_agg(x.obj order by x.name, x.department_id),
+                                                    '[]'::jsonb))
+    into v_result
+    from (
+      select d.department_id, d.name, c.capacity, jsonb_build_object(
+               'department_id', d.department_id,
+               'name', d.name,
+               'capacity', coalesce(c.capacity, 'pastor'),
+               'can_publish', c.capacity is not null,
+               'members', app.duties_roster(d.department_id, false),
+               -- Story 4.8 review fix 3: notices still to pass on in person (managers only).
+               'contact_notices', case when c.capacity is not null
+                                       then app.duties_contact_notices(d.department_id)
+                                       else '[]'::jsonb end,
+               -- Story 4.16 (review N5): the first 200 duties as before, plus every duty with an
+               -- open owner review that has not started (the review notice's list is complete);
+               -- the overlap counts are computed once over the duties listed.
+               'duties', coalesce((
+                 select jsonb_agg(app.duties_occurrence_json(o.occurrence_id, c.capacity is not null,
+                                                             sel.counts)
+                                  order by o.starts_at, o.occurrence_id)
+                   from app.duties_occurrences o
+                  where o.occurrence_id = any (sel.ids)), '[]'::jsonb),
+               'duties_truncated', (select count(*) > 200 from app.duties_occurrences o3
+                                     where o3.department_id = d.department_id
+                                       and o3.occurrence_state = 'published'
+                                       and o3.starts_at > now() - interval '30 days')) as obj
+        from app.duties_departments d
+        cross join lateral (select app.duties_manage_capacity(v_member, d.department_id) as capacity) c
+        cross join lateral (
+          select s.ids, app.duties_overlap_counts(s.ids) as counts
+            from (select array(
+                    select x.occurrence_id from (
+                      (select o2.occurrence_id from app.duties_occurrences o2
+                        where o2.department_id = d.department_id
+                          and o2.occurrence_state = 'published'
+                          and o2.starts_at > now() - interval '30 days'
+                        order by o2.starts_at limit 200)
+                      union
+                      select o5.occurrence_id from app.duties_occurrences o5
+                       where o5.department_id = d.department_id
+                         and o5.occurrence_state = 'published'
+                         and app.duties_occurrence_start(o5) > now()
+                         and exists (select 1 from app.duties_review_flags f
+                                      where f.occurrence_id = o5.occurrence_id
+                                        and f.cleared_at is null)) x) as ids) s
+           -- A fence: the counts are computed once per department, never per listed duty.
+           offset 0) sel
+       where (c.capacity is not null or v_pastor)
+         and (not d.is_synthetic or app.platform_current_environment() in ('local', 'staging'))
+    ) x;
+  perform app.identity_record_activity(v_link);
+  return v_result;
 end;
 $$;
 
@@ -971,6 +1097,60 @@ begin
 end;
 $$;
 
+-- Story 4.16: the scope_revoked lifecycle event of a member at a grant-set revision.
+create function app.identity_scope_revoked_event(p_member_id uuid, p_revision bigint)
+returns jsonb
+language sql
+stable
+set search_path = ''
+as $$
+  select jsonb_build_object('event', 'scope_revoked', 'member_id', p_member_id,
+                            'occurred_at', app.cmd_utc(now()), 'identity_revision', p_revision);
+$$;
+
+-- Story 4.16: asks every registered handover hook what an ENDED scope grant leaves (the grant was
+-- recorded as ended, not yet dispatched), with the grant readable through
+-- app.identity_revoked_scope() during the call. Returns the obligations (the 2.10 shape).
+create function app.identity_collect_revocation_handover(p_grant app.identity_grants,
+                                                         p_revision bigint)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_obligations jsonb;
+begin
+  perform pg_catalog.set_config('identity.revoked_grant', p_grant.grant_id::text, true);
+  v_obligations := app.identity_collect_handover(
+    app.identity_scope_revoked_event(p_grant.member_id, p_revision));
+  perform pg_catalog.set_config('identity.revoked_grant', '', true);
+  return v_obligations;
+end;
+$$;
+
+-- Story 4.16: records reported obligations pending against the revoked grant (one pending
+-- obligation per member, owner, kind and subject). Returns how many were recorded.
+create function app.identity_record_revocation_obligations(p_grant app.identity_grants,
+                                                           p_obligations jsonb)
+returns integer
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_count integer;
+begin
+  insert into app.identity_handover_obligations (member_id, revoked_grant_id, owner_module,
+                                                 obligation_kind, subject_id)
+  select p_grant.member_id, p_grant.grant_id, x.value ->> 'module', x.value ->> 'kind',
+         (x.value ->> 'subject_id')::uuid
+    from jsonb_array_elements(coalesce(p_obligations, '[]'::jsonb)) x
+  on conflict (member_id, owner_module, obligation_kind, subject_id)
+     where obligation_state = 'pending' do nothing;
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
 -- (Replaced, story 4.16; copied from 20261006234820_identity_grants.sql.) Story 4.16: the
 -- revocation collects the registered handover hooks (owner item 10). The lock order, the
 -- conflict on a missing grant and the outcome are unchanged.
@@ -985,7 +1165,6 @@ declare
   v_scope record;
   v_grant app.identity_grants;
   v_revision bigint;
-  v_event jsonb;
   v_obligations jsonb;
 begin
   select a.* into v_actor from app.identity_command_actor(p_actor) a;
@@ -1006,25 +1185,13 @@ begin
   -- dispatched (AD-14), as identity_end_grant does.
   v_revision := app.identity_end_grant_record(p_actor, v_actor.member_id, 'identity.revoke_scope',
                                               v_grant);
-  v_event := jsonb_build_object('event', 'scope_revoked',
-                                'member_id', v_grant.member_id,
-                                'occurred_at', app.cmd_utc(now()),
-                                'identity_revision', v_revision);
-  perform pg_catalog.set_config('identity.revoked_grant', v_grant.grant_id::text, true);
-  v_obligations := app.identity_collect_handover(v_event);
-  perform pg_catalog.set_config('identity.revoked_grant', '', true);
+  v_obligations := app.identity_collect_revocation_handover(v_grant, v_revision);
   if exists (select 1 from jsonb_array_elements(v_obligations) x
               where (x.value ->> 'last_responsible')::boolean) then
     perform app.cmd_fail('conflict', '{"member_id": "handover_required"}', v_set.revision);
   end if;
-  insert into app.identity_handover_obligations (member_id, revoked_grant_id, owner_module,
-                                                 obligation_kind, subject_id)
-  select v_grant.member_id, v_grant.grant_id, x.value ->> 'module', x.value ->> 'kind',
-         (x.value ->> 'subject_id')::uuid
-    from jsonb_array_elements(v_obligations) x
-  on conflict (member_id, owner_module, obligation_kind, subject_id)
-     where obligation_state = 'pending' do nothing;
-  perform app.contract_dispatch_lifecycle(v_event);
+  perform app.identity_record_revocation_obligations(v_grant, v_obligations);
+  perform app.contract_dispatch_lifecycle(app.identity_scope_revoked_event(v_grant.member_id, v_revision));
   return app.identity_grant_outcome(v_set.member_id);
 end;
 $$;
@@ -1115,6 +1282,117 @@ as $$
          and p.supervisor_to is null) x;
 $$;
 
+-- (Replaced, story 4.16; copied from 20261007063340_membership_review.sql.) Review S1: each
+-- ended scope grant records what it leaves through the handover hooks (never refused); roles end
+-- as before. Everything else (validation, the last-Admin rule, link end, audit, dispatch) is
+-- unchanged.
+create or replace function app.identity_unlink_account(
+  p_actor uuid,
+  p_expected_revision bigint,
+  p_payload jsonb
+) returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_actor record;
+  v_errors jsonb;
+  v_err text;
+  v_member app.identity_members;
+  v_link app.identity_account_links;
+  v_grant app.identity_grants;
+  v_revision bigint;
+  v_grant_revision bigint;
+begin
+  select a.* into v_actor from app.identity_command_actor(p_actor) a;
+  if jsonb_typeof(p_payload) is distinct from 'object' then
+    perform app.cmd_fail('validation_failed', '{"payload": "must_be_object"}');
+  end if;
+  v_errors := app.contract_unknown_keys(p_payload, array['member_id', 'reason']);
+  v_err := app.contract_uuid_error(p_payload -> 'member_id');
+  if v_err is not null then
+    v_errors := v_errors || jsonb_build_object('member_id', v_err);
+  end if;
+  if coalesce(jsonb_typeof(p_payload -> 'reason'), 'null') = 'null' then
+    v_errors := v_errors || '{"reason": "required"}';
+  elsif jsonb_typeof(p_payload -> 'reason') <> 'string'
+        or p_payload ->> 'reason' not in ('account_lost', 'ownership_dispute', 'member_request',
+                                          'phone_reclaim') then
+    v_errors := v_errors || '{"reason": "invalid"}';
+  end if;
+  if v_errors <> '{}'::jsonb then
+    perform app.cmd_fail('validation_failed', v_errors);
+  end if;
+  if (p_payload ->> 'member_id')::uuid = v_actor.member_id then
+    perform app.cmd_fail('forbidden', '{"member_id": "unsupported"}');
+  end if;
+  select m.* into v_member from app.identity_members m
+   where m.member_id = (p_payload ->> 'member_id')::uuid
+     for update;
+  if not found then
+    perform app.cmd_fail('not_found');
+  end if;
+  if v_member.revision <> p_expected_revision then
+    perform app.cmd_fail('conflict', null, v_member.revision);
+  end if;
+  select l.* into v_link from app.identity_account_links l
+   where l.member_id = v_member.member_id and l.link_state <> 'ended'
+     for update;
+  if not found then
+    perform app.cmd_fail('conflict', '{"member_id": "not_linked"}', v_member.revision);
+  end if;
+  -- The church is never left without a usable Admin (bootstrap is the recovery route).
+  if exists (select 1 from app.identity_grants g
+              where g.member_id = v_member.member_id and g.role = 'admin' and g.revoked_at is null)
+     and app.identity_usable_admin_count(v_member.member_id) = 0 then
+    perform app.cmd_fail('forbidden', '{"member_id": "last_admin"}');
+  end if;
+  -- Grants never travel with a link: every active grant ends through the 2.3 path (role_revoked
+  -- / scope_revoked audit with this Admin, scope_revoked dispatched).
+  for v_grant in
+    select g.* from app.identity_grants g
+     where g.member_id = v_member.member_id and g.revoked_at is null
+     order by g.granted_at, g.grant_id
+       for update
+  loop
+    if v_grant.scope_kind is null then
+      perform app.identity_end_grant(p_actor, v_actor.member_id, 'identity.unlink_account', v_grant);
+    else
+      -- Story 4.16 (review S1): an unlink is a security action and is never refused, but what an
+      -- ended scope leaves (a department with no reachable leader or deputy, tasks the member may
+      -- no longer hold) is recorded as pending obligations against the grant, as a deletion
+      -- records them, so the Admin sees the department needs a leader (Membership status,
+      -- Departments). Then scope_revoked is dispatched as before.
+      v_grant_revision := app.identity_end_grant_record(p_actor, v_actor.member_id,
+                                                        'identity.unlink_account', v_grant);
+      perform app.identity_record_revocation_obligations(
+        v_grant, app.identity_collect_revocation_handover(v_grant, v_grant_revision));
+      perform app.contract_dispatch_lifecycle(
+        app.identity_scope_revoked_event(v_grant.member_id, v_grant_revision));
+    end if;
+  end loop;
+  update app.identity_account_links l
+     set link_state = 'ended', ended_at = now(), updated_at = now()
+   where l.link_id = v_link.link_id;
+  update app.identity_members m
+     set revision = m.revision + 1, updated_at = now()
+   where m.member_id = v_member.member_id
+  returning m.revision into v_revision;
+  insert into app.identity_membership_audit (action, actor_member_id, actor_account_id, request_id,
+                                             member_id, link_id, target_account_id, reason_code,
+                                             revision_after)
+  values ('account_unlinked', v_actor.member_id, v_actor.account_id,
+          app.cmd_current_request_id(p_actor, 'identity.unlink_account'), v_member.member_id,
+          v_link.link_id, v_link.auth_user_id, p_payload ->> 'reason', v_revision);
+  perform app.contract_dispatch_lifecycle(jsonb_build_object(
+    'event', 'account_deactivated',
+    'member_id', v_member.member_id,
+    'occurred_at', app.cmd_utc(now()),
+    'identity_revision', v_revision));
+  return app.identity_member_outcome(v_member.member_id);
+end;
+$$;
+
 -- ---------------------------------------------------------------------------------------------
 -- G3: the operator path to approve an Identity setting (dormancy_days)
 -- ---------------------------------------------------------------------------------------------
@@ -1178,6 +1456,10 @@ comment on function app.identity_approve_setting(text, jsonb, text, text) is
 
 revoke all on function
   app.duties_vacancy_reason(uuid),
+  app.duties_review_key_open(app.duties_review_flags, bigint),
+  app.identity_scope_revoked_event(uuid, bigint),
+  app.identity_collect_revocation_handover(app.identity_grants, bigint),
+  app.identity_record_revocation_obligations(app.identity_grants, jsonb),
   app.duties_review_source_check(jsonb),
   app.duties_review_alert_check(jsonb),
   app.identity_revoked_scope(),

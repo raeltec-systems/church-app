@@ -20,10 +20,12 @@
 --     the membership ends (attributed), the member's current assignments of the department's future
 --     published duties end (`vacated`) with `duty_released` to the member, and their draft plans
 --     there are cleared.
---   * The leaders' vacancy notice `duties_coverage` / `duty_vacated` ("Position needs cover"), sent
---     now to each reachable leader and deputy of the department (never the member) for each ended
---     position whose member had not declined; keyed by the ended assignment's revision (fresh keys);
---     delivered while the position is still unfilled, not cancelled and not started. The coverage
+--   * The leaders' vacancy notice `duties_coverage` / `duty_vacated` ("Positions need cover"): one
+--     per department and change (not one per position), sent now to each reachable leader and
+--     deputy of the department (never the member) when the change ended at least one position the
+--     member had not declined; keyed by the soonest such ended assignment at its ended revision
+--     (fresh keys); delivered while any position the change ended there is still unfilled, not
+--     cancelled and not started. The coverage
 --     queue shows `vacated: {since}` (and a `vacated` count); the board shows the ended assignment in
 --     the position's history with end reason `vacated`. One generic flag: no hold, deactivation,
 --     deletion or removal reason is ever disclosed.
@@ -279,8 +281,8 @@ declare
   v_slot_rev bigint;
   v_cancels jsonb := '[]'::jsonb;
   v_enqueues jsonb := '[]'::jsonb;
-  v_recipients jsonb := '{}'::jsonb;
-  v_leaders uuid[];
+  v_firsts jsonb := '{}'::jsonb;
+  v_first record;
   v_leader uuid;
   v_vacated integer := 0;
   v_alerts integer := 0;
@@ -392,24 +394,25 @@ begin
           'reminder_kind', 'duty_released', 'scheduled_at', app.cmd_utc(now()))));
       v_released := v_released + 1;
     end if;
-    -- The department's leaders and deputies the app can reach (never the member); cell parts get
-    -- no leader alert (4.11: cell-scope alerts are a later contract change).
-    if v_o.department_id is not null and v_a.response <> 'declined' then
-      if not v_recipients ? v_o.department_id::text then
-        v_recipients := v_recipients || jsonb_build_object(v_o.department_id::text,
-          to_jsonb(app.duties_alert_recipients(v_o.department_id, p_member)));
-      end if;
-      select coalesce(array_agg((e #>> '{}')::uuid), '{}') into v_leaders
-        from jsonb_array_elements(v_recipients -> v_o.department_id::text) e;
-      foreach v_leader in array v_leaders loop
-        v_enqueues := v_enqueues || jsonb_build_array(jsonb_build_object('op', 'enqueue', 'counts', false,
-          'key', jsonb_build_object(
-            'source_type', 'duties_coverage', 'source_id', v_a.assignment_id,
-            'source_revision', v_end, 'recipient_member_id', v_leader,
-            'reminder_kind', 'duty_vacated', 'scheduled_at', app.cmd_utc(now()))));
-        v_alerts := v_alerts + 1;
-      end loop;
+    -- One leaders' notice per department and change (not one per position): keyed by the
+    -- soonest ended position the member had not declined. Cell parts get no leader alert (4.11:
+    -- cell-scope alerts are a later contract change).
+    if v_o.department_id is not null and v_a.response <> 'declined'
+       and (not v_firsts ? v_o.department_id::text
+            or (v_firsts -> v_o.department_id::text ->> 'starts_at')::timestamptz > v_o.starts_at) then
+      v_firsts := v_firsts || jsonb_build_object(v_o.department_id::text, jsonb_build_object(
+        'assignment_id', v_a.assignment_id, 'revision', v_end, 'starts_at', v_o.starts_at));
     end if;
+  end loop;
+  for v_first in select x.key, x.value from jsonb_each(v_firsts) x order by x.key loop
+    foreach v_leader in array app.duties_alert_recipients(v_first.key::uuid, p_member) loop
+      v_enqueues := v_enqueues || jsonb_build_array(jsonb_build_object('op', 'enqueue', 'counts', false,
+        'key', jsonb_build_object(
+          'source_type', 'duties_coverage', 'source_id', v_first.value ->> 'assignment_id',
+          'source_revision', (v_first.value ->> 'revision')::bigint, 'recipient_member_id', v_leader,
+          'reminder_kind', 'duty_vacated', 'scheduled_at', app.cmd_utc(now()))));
+      v_alerts := v_alerts + 1;
+    end loop;
   end loop;
 
   -- The member's planned (draft) positions become unplanned, with their planned reason.
@@ -581,10 +584,11 @@ select app.identity_register_handover_hook('duties', 'app.duties_report_handover
 -- The leaders' vacancy notice (3.2 contract on `duties_coverage`)
 -- ---------------------------------------------------------------------------------------------
 
--- duty_vacated: current while this assignment ended `vacated` at that revision, its position is
--- still unfilled and not cancelled, and the duty is published; actionable until the duty starts;
--- the recipient leads or deputises the department now, is reachable in the app and is not the
--- member.
+-- duty_vacated (one per department and lifecycle change, keyed by the soonest position it ended):
+-- current while that assignment ended `vacated` at that revision and its duty is published;
+-- actionable while any position the same change ended in that department (same member, same end
+-- time) is still unfilled, not cancelled and has not started; the recipient leads or deputises the
+-- department now, is reachable in the app and is not the member.
 create function app.duties_vacancy_alert_check(p_key jsonb)
 returns jsonb
 language plpgsql
@@ -594,7 +598,6 @@ as $$
 declare
   v_assignment app.duties_assignments;
   v_occurrence app.duties_occurrences;
-  v_slot app.duties_slots;
   v_current boolean;
 begin
   select a.* into v_assignment from app.duties_assignments a
@@ -602,20 +605,28 @@ begin
   if not found then
     return '{"current": false, "revision": null, "actionable": false, "recipient_eligible": false}'::jsonb;
   end if;
-  select s.* into v_slot from app.duties_slots s where s.slot_id = v_assignment.slot_id;
-  select o.* into v_occurrence from app.duties_occurrences o
-   where o.occurrence_id = v_slot.occurrence_id;
+  select o.* into v_occurrence
+    from app.duties_slots s join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
+   where s.slot_id = v_assignment.slot_id;
   v_current := v_assignment.assignment_state = 'superseded'
                and v_assignment.end_reason = 'vacated'
                and v_assignment.revision = (p_key ->> 'source_revision')::numeric::bigint
-               and v_occurrence.occurrence_state = 'published'
-               and v_slot.cancelled_at is null
-               and not exists (select 1 from app.duties_assignments c
-                                where c.slot_id = v_slot.slot_id and c.assignment_state = 'current');
+               and v_occurrence.occurrence_state = 'published';
   return jsonb_build_object(
     'current', v_current,
     'revision', v_assignment.revision,
-    'actionable', v_current and app.duties_occurrence_start(v_occurrence) > now(),
+    'actionable', v_current and exists (
+      select 1
+        from app.duties_assignments g
+        join app.duties_slots s on s.slot_id = g.slot_id
+        join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
+       where g.member_id = v_assignment.member_id and g.end_reason = 'vacated'
+         and g.ended_at = v_assignment.ended_at
+         and o.department_id = v_occurrence.department_id
+         and o.occurrence_state = 'published' and s.cancelled_at is null
+         and app.duties_occurrence_start(o) > now()
+         and not exists (select 1 from app.duties_assignments c
+                          where c.slot_id = s.slot_id and c.assignment_state = 'current')),
     'recipient_eligible', v_occurrence.department_id is not null
                           and v_assignment.member_id::text is distinct from p_key ->> 'recipient_member_id'
                           and (app.identity_member_has_scope((p_key ->> 'recipient_member_id')::uuid,
@@ -629,8 +640,8 @@ $$;
 -- (Replaced, story 4.12; copied from 20261014171038_duties_reminders.sql.) The leaders' alert
 -- source `duties_coverage`: current while the assignment is current at that revision and its
 -- occurrence is published; story 4.12: also while an assignment that ended `vacated` is at that
--- revision, its position is still unfilled and not cancelled and its occurrence is published (the
--- vacancy notice's source). Each kind's own check still decides delivery.
+-- revision and its occurrence is published (the vacancy notice's source). Each kind's own check
+-- still decides delivery.
 create or replace function app.duties_coverage_source_check(p_source jsonb)
 returns jsonb
 language plpgsql
@@ -640,8 +651,7 @@ as $$
 declare
   v_row record;
 begin
-  select a.revision, a.assignment_state, a.end_reason, a.slot_id, s.cancelled_at, o.occurrence_state
-    into v_row
+  select a.revision, a.assignment_state, a.end_reason, o.occurrence_state into v_row
     from app.duties_assignments a
     join app.duties_slots s on s.slot_id = a.slot_id
     join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
@@ -654,11 +664,7 @@ begin
                and v_row.revision = (p_source ->> 'source_revision')::numeric::bigint
                and (v_row.assignment_state = 'current'
                     -- Story 4.12.
-                    or (v_row.assignment_state = 'superseded' and v_row.end_reason = 'vacated'
-                        and v_row.cancelled_at is null
-                        and not exists (select 1 from app.duties_assignments c
-                                         where c.slot_id = v_row.slot_id
-                                           and c.assignment_state = 'current'))),
+                    or (v_row.assignment_state = 'superseded' and v_row.end_reason = 'vacated')),
     'revision', v_row.revision);
 end;
 $$;
@@ -667,8 +673,8 @@ select app.contract_register_reminder_kind('duties', 'duties_coverage', 'duty_va
 select app.contract_register_reminder_contract(
   'duties', 'duties_coverage', 'duty_vacated',
   'app.duties_vacancy_alert_check(jsonb)'::regprocedure,
-  '{"title": "Position needs cover",
-    "body": "A position in your department no longer has anyone assigned. Open Coverage to find cover.",
+  '{"title": "Positions need cover",
+    "body": "One or more positions in your department no longer have anyone assigned. Open Coverage to find cover.",
     "link": "/duties/coverage"}'::jsonb);
 
 -- ---------------------------------------------------------------------------------------------

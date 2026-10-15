@@ -11,7 +11,7 @@
 -- Every account, phone and name is SYNTHETIC (fictional range +44 7700 900460-900469). Duty times
 -- are fixed church-time (Africa/Lusaka) clock times on whole days, never the current clock time.
 begin;
-select plan(107);
+select plan(109);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000004120' || lpad(n::text, 2, '0'))::uuid $$;
@@ -330,9 +330,9 @@ select is((select string_agg(change_class || ':' || array_to_string(changed_fiel
              from app.duties_slot_revisions where slot_id = pg_temp.slot('MP')
               and slot_revision = (select revision from app.duties_slots where slot_id = pg_temp.slot('MP'))),
   'vacated:member_id:-', 'the position records a vacated slot revision without an assignee');
-select is(pg_temp.pending(pg_temp.a('MA')), '2:duty_vacated,3:duty_vacated',
-  'M''s reminders end; the leader and the deputy get the vacancy notice (same transaction)');
-select is(pg_temp.pending(pg_temp.a('MP')), '2:duty_vacated,3:duty_vacated', 'the same for the pending duty');
+select is(pg_temp.pending(pg_temp.a('MA')), '', 'M''s reminders end');
+select is(pg_temp.pending(pg_temp.a('MP')), '2:duty_vacated,3:duty_vacated',
+  'the leader and the deputy get one vacancy notice for the department (same transaction), keyed by the soonest position');
 select is(pg_temp.pending(pg_temp.a('MD')), '', 'a duty M had declined sends no new notice (the leaders already know)');
 select is(pg_temp.pending(pg_temp.a('ME')), '9:duty_vacated', 'department E''s leader is told about E''s duty');
 select is(pg_temp.pending(pg_temp.part_a()), '', 'a cell part gets no leader alert (the owner read shows the gap)');
@@ -397,12 +397,12 @@ select is((select string_agg(distinct h ->> 'end_reason', ',')
             where o ->> 'occurrence_id' = pg_temp.occ('MP')::text), 'vacated',
   'the board''s history shows one generic end reason');
 select is((select title || '|' || link from app.contract_reminder_contracts where reminder_kind = 'duty_vacated'),
-  'Position needs cover|/duties/coverage', 'the vacancy notice has a fixed generic text and opens Coverage');
+  'Positions need cover|/duties/coverage', 'the vacancy notice has a fixed generic text and opens Coverage');
 select pg_temp.run();
 select is((select count(*)::int from app.notifications_inbox_items i
              join app.notifications_jobs j on j.job_id = i.job_id
-            where j.reminder_kind = 'duty_vacated' and i.recipient_member_id = pg_temp.mid(2)), 2,
-  'the leader''s inbox has the two vacancy notices');
+            where j.reminder_kind = 'duty_vacated' and i.recipient_member_id = pg_temp.mid(2)), 1,
+  'the leader''s inbox has one vacancy notice (not one per position)');
 -- A vacancy filled before its notice is delivered: the notice is obsolete.
 select pg_temp.pub('MQ', 5, 26);
 select is(pg_temp.err(pg_temp.duties(1, 'duties.remove_member', pg_temp.drev(pg_temp.d()),
@@ -411,23 +411,34 @@ select is(pg_temp.err(pg_temp.duties(1, 'duties.remove_member', pg_temp.drev(pg_
 select is(array[pg_temp.st(pg_temp.a('OP')), pg_temp.st(pg_temp.a('OA')), pg_temp.st(pg_temp.a('MQ'))],
   array['superseded:vacated', 'superseded:vacated', 'superseded:vacated'], 'O''s future duties in D end');
 update app.notifications_jobs set scheduled_at = now() + interval '1 hour'
- where source_id = pg_temp.a('MQ') and job_state = 'pending' and reminder_kind = 'duty_vacated';
-select is(pg_temp.pending(pg_temp.a('OA')), '2:duty_vacated,3:duty_vacated,5:duty_released',
-  'O is told the duty is no longer theirs; the leaders get the vacancy notice');
+ where source_id = pg_temp.a('OP') and job_state = 'pending' and reminder_kind = 'duty_vacated';
+select is(pg_temp.pending(pg_temp.a('OA')), '5:duty_released', 'O is told each duty is no longer theirs');
+select is(pg_temp.pending(pg_temp.a('OP')), '2:duty_vacated,3:duty_vacated,5:duty_released',
+  'and the leaders get one vacancy notice for the removal');
 select is((select pg_temp.who(ended_by_member) from app.duties_department_members
             where department_id = pg_temp.d() and member_id = pg_temp.mid(5)), 1,
   'the membership ends, attributed to the Admin');
 select is((select string_agg(code, ',') from app.duties_audit where action = 'assignment_vacated'
               and assignment_id = pg_temp.a('OA')), 'removed', 'audited with the removal code');
+create function pg_temp.vkey() returns jsonb language sql as $$
+  select jsonb_build_object('source_type', 'duties_coverage', 'source_id', pg_temp.a('OP'),
+           'source_revision', pg_temp.rev(pg_temp.a('OP')), 'recipient_member_id', pg_temp.mid(2),
+           'reminder_kind', 'duty_vacated')
+$$;
 select is(pg_temp.err(pg_temp.duties(1, 'duties.assign_slot', pg_temp.orev(pg_temp.occ('MQ')),
             jsonb_build_object('slot_id', pg_temp.slot('MQ'), 'member_id', pg_temp.mid(2)))), 'ok',
-  'the leader fills one position again');
+  'the Admin fills one of the three positions again');
+select is((app.duties_vacancy_alert_check(pg_temp.vkey()) ->> 'actionable')::boolean, true,
+  'the notice still stands while another position of the change is unfilled');
+select pg_temp.duties(1, 'duties.assign_slot', pg_temp.orev(pg_temp.occ(t)),
+                      jsonb_build_object('slot_id', pg_temp.slot(t), 'member_id', pg_temp.mid(2)))
+  from unnest(array['OP', 'OA']) t;
 update app.notifications_jobs set scheduled_at = now()
- where source_id = pg_temp.a('MQ') and job_state = 'pending' and reminder_kind = 'duty_vacated';
+ where source_id = pg_temp.a('OP') and job_state = 'pending' and reminder_kind = 'duty_vacated';
 select pg_temp.run();
 select is((select string_agg(distinct job_state || ':' || coalesce(finish_reason, cancel_reason, '-'), ',')
-             from app.notifications_jobs where source_id = pg_temp.a('MQ') and reminder_kind = 'duty_vacated'),
-  'obsolete:source_changed', 'its vacancy notice is no longer delivered once the position is filled');
+             from app.notifications_jobs where source_id = pg_temp.a('OP') and reminder_kind = 'duty_vacated'),
+  'obsolete:not_actionable', 'once every position is filled the notice is no longer delivered');
 select is(pg_temp.err(pg_temp.duties(1, 'duties.remove_member', pg_temp.drev(pg_temp.d()),
             jsonb_build_object('department_id', pg_temp.d(), 'member_id', pg_temp.mid(5)))),
   'validation_failed|member_id=not_in_department', 'removing O again is refused');

@@ -48,7 +48,7 @@
 --   from 20261015035112 (4.11): duties_state_ok, duties_authorize_command, duties_command,
 --     duties_deletion_remaining, duties_erase_member (the 4.10 S1 lock-first order kept).
 --   from 20261014212507 (4.9): duties_coverage.
---   from 20261014171038 (4.8): duties_needs_contact.
+--   from 20261014171038 (4.8): duties_needs_contact, duties_coverage_source_check.
 --   from 20261014130535 (4.7): followups_state_ok.
 --   from 20261013220239 (4.1): duties_department_json.
 --
@@ -623,6 +623,43 @@ begin
                                or app.identity_member_has_scope((p_key ->> 'recipient_member_id')::uuid,
                                                                 'department_deputy', v_occurrence.department_id))
                           and app.duties_leader_reachable((p_key ->> 'recipient_member_id')::uuid));
+end;
+$$;
+
+-- (Replaced, story 4.12; copied from 20261014171038_duties_reminders.sql.) The leaders' alert
+-- source `duties_coverage`: current while the assignment is current at that revision and its
+-- occurrence is published; story 4.12: also while an assignment that ended `vacated` is at that
+-- revision, its position is still unfilled and not cancelled and its occurrence is published (the
+-- vacancy notice's source). Each kind's own check still decides delivery.
+create or replace function app.duties_coverage_source_check(p_source jsonb)
+returns jsonb
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  v_row record;
+begin
+  select a.revision, a.assignment_state, a.end_reason, a.slot_id, s.cancelled_at, o.occurrence_state
+    into v_row
+    from app.duties_assignments a
+    join app.duties_slots s on s.slot_id = a.slot_id
+    join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
+   where a.assignment_id::text = p_source ->> 'source_id';
+  if not found then
+    return '{"current": false, "revision": null}'::jsonb;
+  end if;
+  return jsonb_build_object(
+    'current', v_row.occurrence_state = 'published'
+               and v_row.revision = (p_source ->> 'source_revision')::numeric::bigint
+               and (v_row.assignment_state = 'current'
+                    -- Story 4.12.
+                    or (v_row.assignment_state = 'superseded' and v_row.end_reason = 'vacated'
+                        and v_row.cancelled_at is null
+                        and not exists (select 1 from app.duties_assignments c
+                                         where c.slot_id = v_row.slot_id
+                                           and c.assignment_state = 'current'))),
+    'revision', v_row.revision);
 end;
 $$;
 

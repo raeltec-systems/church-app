@@ -278,7 +278,7 @@ select is(pg_temp.qpos(2, pg_temp.a('X')) #>> '{assignment,account}', 'no_login'
 select is(pg_temp.answer(5, pg_temp.a('O'), 'declined') #>> '{data,response}', 'declined', 'O declines duty O');
 select is(pg_temp.qpos(2, pg_temp.a('O')) ->> 'status', 'declined', 'the decline is under Declined');
 select is(pg_temp.qdep(2, pg_temp.d()) -> 'counts',
-  '{"required": 7, "confirmed": 0, "unfilled": 2, "awaiting": 4, "overdue": 0, "declined": 1, "needs_contact": 1, "conflicts": 0, "overdue_follow_ups": 0}'::jsonb,
+  '{"required": 7, "confirmed": 0, "unfilled": 2, "awaiting": 4, "overdue": 0, "declined": 1, "needs_contact": 1, "conflicts": 0, "overdue_follow_ups": 0, "vacated": 0}'::jsonb,
   'the department''s counts cover the next seven days (the duty 20 days ahead is outside the window)');
 select is(pg_temp.qdep(2, pg_temp.d()) ->> 'view', 'full', 'the leader gets the full view');
 select is(pg_temp.qdep(2, pg_temp.d()) #> array['contact_routes', pg_temp.mid(8)::text],
@@ -446,10 +446,12 @@ select is(pg_temp.call(1, 'identity_grant_command', 'identity.revoke_scope',
             jsonb_build_object('member_id', pg_temp.mid(10), 'scope_kind', 'department_deputy',
                                'scope_id', pg_temp.d())) ->> 'code', null, 'the second deputy''s scope is revoked');
 create temp table n3b as select pg_temp.attempt(2, pg_temp.a('N3'), 'no_answer', '1 day') as r;
-select is((select (r #>> '{data,replaced_case}') from n3b)
-          || '|' || (pg_temp.task((select (r #>> '{data,case_id}')::uuid from n3a))).close_code
-          || '|' || ((pg_temp.task((select (r #>> '{data,case_id}')::uuid from n3b))).owner_member_id = pg_temp.mid(2))::text,
-  'true|source_resolved|true', 'the old task closes and the leader owns the fresh one');
+-- Story 4.12: the revocation hands the deputy's task to its supervisor (the leader) at once
+-- (Follow-ups scope_revoked hook), so the leader's next attempt continues the same case and task.
+select is(coalesce((select (r #>> '{data,replaced_case}') from n3b), 'false')
+          || '|' || ((select r #>> '{data,case_id}' from n3b) = (select r #>> '{data,case_id}' from n3a))::text
+          || '|' || ((pg_temp.task((select (r #>> '{data,case_id}')::uuid from n3a))).owner_member_id = pg_temp.mid(2))::text,
+  'false|true|true', 'the revoked deputy''s task is the leader''s at once and the next attempt continues it');
 
 -- Review N9: an assignee who left the department is reassigned, not contacted.
 select pg_temp.pub('N9', 6, pg_temp.t('5 days 10 hours'));

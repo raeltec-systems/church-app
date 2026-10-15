@@ -64,6 +64,6 @@ Legend: reads 200 / 401 / 403 with detail (ng not_granted, nl not_linked, rr rev
 
 ## Not run on this target
 
-- S97 linked-event mismatch flag: owner operations are SQL-only (no client route); proven locally (S97 and duties-decisions D10-D13). For the owner demonstration the parent session raises one flag with the SQL in evidence-4.15/owner-demonstration.md.
+- S97 linked-event mismatch flag: owner operations are SQL-only (no client route); proven locally (S97 and duties-decisions D10-D13). For the owner demonstration the parent session raises one flag as owner-demonstration.md B1 describes.
 - Deletion (erase or anonymise Duties and Follow-ups data): needs the deletion worker; proven locally by duties-lifecycle L60.
 - Two-connection races (stale answer vs edit, bulk vs edit, deactivation vs publish): proven locally by duties-revisions R70, duties-responses V30, duties-lifecycle L23-L25.

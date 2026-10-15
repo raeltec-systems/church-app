@@ -22,6 +22,23 @@ department's leader answers `forbidden` (owner decision 2026-10-15 item 4); a fo
 assignment notice is retired when the owner acts before delivery (so the suite waits for
 delivery first). **No product defect was found; no migration.**
 
+## After the independent review (2026-10-15)
+
+The review found nothing blocking. Fixes: S01 or S02 failing now stops the run before any duty is
+written; a reused department must be SYNTHETIC and the reused accountless record must be the
+suite's; the cleanup SQL refuses any database not marked `staging` (the `--staging-path` proof
+uses the same guard for `local`), touches only SYNTHETIC `SYNTHETIC Closing Suite...` departments
+and also removes schedules keyed on occurrences, cases, flags and departments; state, temporary
+and cleanup files are chmod 0600 after each write; S96 asserts `404 PGRST202` (function not in
+the `api` schema) and `406 PGRST106` (the `app` schema is not exposed); per-run departments leave
+the state once a cleanup removed them. Docs: the owner runs the staging suite (it needs the
+Admin's password); runs never overlap; audit and lifecycle history stays on purpose; the
+`ops_system_access` value is written out; the q12 tolerance is recorded only; the APK build log's
+proxy line was removed. Reruns after the fixes, one at a time, no pgTAP running: offline tests
+`tools/identity-e2e/*.test.mjs` 166 pass (suite 9/9); closing suite local **22/22, 253/253**;
+`--staging-path` **22/22, 253/253**, cleanup SQL rows left 0. The evidence files in this folder
+are from these reruns.
+
 ## Database and E2E (a reset before each E2E, one at a time; pgTAP never concurrent)
 
 - `npx supabase db reset` exit 0; `npm run db:test` **Files=45, Tests=3845, PASS**; `npm run db:smoke` exit 0.

@@ -3,7 +3,7 @@ title: 'Apply the owner''s epic 4 decisions'
 type: 'feature'
 ticket: '16'
 created: '2026-10-15'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '4352fbb2258201cad9cd280768d3c628c1062c36'
 route: 'full'
 route_source: 'auto'
@@ -95,6 +95,9 @@ context:
 - Clients (`packages/client_core`): `DutyVacancyReasons`, `AssignmentHistoryEntry.vacancyReason`, `DutyPosition.vacancyReason`, `CoveragePosition.vacancyReason`; **Reason: ...** lines on the board and in Coverage (both apps share the screens); `DutyPaths.leaderReviews` (`/duties/leader/reviews`, a known deep link) opening `DutyLeaderScreen(reviewsOnly: true)` (**Duties to review**, **Show all duties**); `GrantNotice.handoverRequired` and `DutyNotice.staffHandoverRequired` (**Hand over first**). Test: `test/duties/duties_owner_decisions_test.dart` (10); `duties_lifecycle_test.dart` wording.
 - E2E: `tools/identity-e2e/duties-decisions.mjs` (11 checks) + `.test.mjs` (8); CI evidence step for `evidence-4.16`.
 - Runbooks: `duties.md` (story 4.16 section; 4.12 "never a reason", known limit S4 and owner question marked superseded or fixed), `identity-access.md` (revocation handover, obligation origin, `identity_approve_setting`), `follow-ups.md` (revocation obligations), `production-promotion-identity.md` (G3 exact call, "no operator function" note removed; G4 values; G11).
+- Earlier E2Es changed for the new behaviour: `duties-owner-ops.mjs` X30 (a flag adds only the leaders' review notice: its job count excludes `duty_review_flagged`), `duties-pilot.mjs` P98 (the API cleanup's revocation of the department's only reachable leader is now refused `handover_required`; it is recorded `kept_last_leader`, and the cleanup SQL removes a department the pilot created). The pilot runs against staging too: its cleanup now leaves the leader persona's scope when the persona is the department's last reachable leader.
+- Matrix audit: Event change (pgTAP item 7 block: recipients, held deputy, Admin, Pastor, other leader, dedup, second change, Q2 closed; E2E D10-D13), Vacancy reason (pgTAP item 8 block: three codes, board and coverage per reader, erasure; E2E D20), Revoke last leader (pgTAP item 10 block: refused with nothing changed, allowed after a reachable leader, held deputy not counted, own remaining grant counts; E2E D30-D32), Revoke with tasks (pgTAP: obligation recorded against the grant with budget 0, listed by `followups_pending_handovers`, shown on Membership status, completed by `followups.complete_handover`), Dormancy approval (pgTAP G3 block: client roles, non-operator 42501, validation, approved version honoured by the live-access predicate, fixture kept). All ran and passed.
+- Rule note: one E2E batch was started while the full suite was still running on the shared stack; those results were discarded and the scripts rerun alone (evidence-4.16/e2e-suite-summary.txt).
 - Remaining (not builder steps): staging apply with per-function md5 parity (parent session; no owner SQL paste, no Edge Function); staging staff web and APK rebuild; owner manual checks (duties.md, story 4.16); at production promotion the operator applies G3, G4 and G11 as documented.
 
 ## Plan Change Log
@@ -112,3 +115,10 @@ context:
 - `npm run -s contracts:test`, Dart contracts, node tool tests, `npm run -s ci:policy-test` -- expected: pass.
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/staff`, `apps/mobile`; TZ=America/New_York runs -- expected: pass.
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/main && npm run -s ci:function-imports`; evidence scan -- expected: clean.
+
+**Results (2026-10-15):**
+- db reset 0; db:test PASS (45 files, 3827 tests; `duties_owner_decisions_test.sql` 88, timing 115-131 ms); db:smoke pass (139 ok).
+- Every E2E `exit=0` on its final run (31 scripts, reset before each, one at a time; `duties-decisions` 11/11) (`evidence-4.16/e2e-suite-summary.txt`).
+- contracts:test 265/0; Dart contracts 282; node tool tests (CI set) 252/0; ci:policy-test 56/0.
+- flutter analyze clean in client_core, apps/staff, apps/mobile; flutter test client_core 655, apps/staff 40, apps/mobile 55; `TZ=America/New_York` client_core duties + followups + membership lifecycle 241, apps/mobile 55.
+- ci:secrets clean; ci:migrations (`--base origin/main`) 50 ordered, unique, non-destructive; ci:function-imports ok; evidence scan (the 4.16 CI step) clean.

@@ -1,0 +1,39 @@
+# Story 4.16 E2E suite (local stack, one script at a time, db reset before each)
+# Run 1 (every script):
+run exit=0 
+grants exit=0 
+apply exit=0 27/27 checks passed 
+review exit=0 18/18 checks passed 
+cells exit=0 13/13 checks passed 
+recovery exit=0 20/20 checks passed 
+credentials exit=0 15/15 checks passed 
+assisted exit=0 16/16 checks passed 
+lifecycle exit=0 9/9 checks passed 
+deletion exit=0 12/12 checks passed 
+runbooks exit=0 16/16 checks passed 
+inbox exit=0 13/13 checks passed 
+source-contracts exit=0 10/10 checks passed 
+worker exit=0 17/17 checks passed 
+routing exit=0 18/18 checks passed 
+push exit=0 12/12 checks passed 
+inbox-screens exit=0 12/12 checks passed 
+duties exit=0 13/13 checks passed 
+duties-revisions exit=0 13/13 checks passed 
+duties-rota exit=0 17/17 checks passed 
+duties-overlaps exit=0 13/13 checks passed 
+duties-responses exit=0 12/12 checks passed 
+followups exit=0 15/15 checks passed 
+followups-reminders exit=0 12/12 checks passed 
+duties-reminders exit=0 17/17 checks passed 
+duties-coverage exit=0 12/12 checks passed 
+duties-outcomes exit=0 11/11 checks passed 
+duties-owner-ops exit=1 12/13 (X30 counted every new job; story 4.16 adds the leaders' review notice by design; the assertion now excludes duty_review_flagged)
+# Run 2 (after the X30 fix; the last four scripts alone, reset before each):
+duties-owner-ops exit=0 13/13 checks passed
+duties-lifecycle exit=0 16/16 checks passed
+duties-pilot exit=1 12/13 (P98 cleanup revoked the department's last reachable leader: refused handover_required by design; the cleanup now accepts kept_last_leader)
+duties-decisions exit=0 11/11 checks passed
+# Run 3:
+duties-pilot exit=0 13/13 checks passed
+Result: 31 scripts, each exit=0 on its final run.
+duties-decisions exit=0 11/11 checks passed (run 4, after renaming one evidence key; evidence file from this run)

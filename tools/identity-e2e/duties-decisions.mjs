@@ -358,7 +358,7 @@ async function main() {
     const allowedK = await revoke(sole, 'department_leader', otherId);
     check('D31-with-another-reachable-leader-the-revocation-is-allowed', done(granted) && done(allowedK)
       && !holds(sole.member, 'department_leader', otherId),
-      { grant: granted.code ?? 'done', revoke: allowedK.code ?? 'done', still_holds: holds(sole.member, 'department_leader', otherId) });
+      { leader_given: granted.code ?? 'done', revoke: allowedK.code ?? 'done', still_holds: holds(sole.member, 'department_leader', otherId) });
     const deputyGone = await revoke(deputy, 'department_deputy', departmentId);
     const leaderKept = await revoke(leader, 'department_leader', departmentId);
     check('D32-a-deputy-may-go-while-the-leader-stays-the-last-may-not', done(deputyGone)

@@ -363,7 +363,8 @@ async function main() {
       { ...edits, department_still_manages: deptStill.code ?? 'done' });
 
     // ------------------------------------------------------- flag and clear a mismatch (verify)
-    const jobsBefore = Number(psql('select count(*) from app.notifications_jobs'));
+    // Story 4.16: the flag adds only the leaders' review notice (duties-decisions.mjs); nothing else.
+    const jobsBefore = Number(psql("select count(*) from app.notifications_jobs where reminder_kind <> 'duty_review_flagged'"));
     const revBefore = occRev(ddOcc);
     const flagged = owner(cellLeader, 'fixture_programme_changed', { part_id: p2?.part_id, changed: ['time'] });
     const seen = await boardDuty(leader, ddOcc);
@@ -374,10 +375,10 @@ async function main() {
     const after = await boardDuty(deputy, ddOcc);
     check('X30-a-meeting-change-flags-a-mismatch-the-department-clears', flagged?.flagged === 1
       && review?.source === 'cell_part' && (review?.changed ?? []).join(',') === 'time'
-      && occRev(ddOcc) === revBefore && Number(psql('select count(*) from app.notifications_jobs')) === jobsBefore
+      && occRev(ddOcc) === revBefore && Number(psql("select count(*) from app.notifications_jobs where reminder_kind <> 'duty_review_flagged'")) === jobsBefore
       && byCell.code === 'forbidden' && stale.code === 'conflict' && done(cleared) && (after?.reviews ?? []).length === 0,
       { flagged: flagged?.flagged ?? null, review: review ? { source: review.source, changed: review.changed } : null,
-        duty_revision_unchanged: occRev(ddOcc) === revBefore, new_jobs: Number(psql('select count(*) from app.notifications_jobs')) - jobsBefore,
+        duty_revision_unchanged: occRev(ddOcc) === revBefore, new_jobs: Number(psql("select count(*) from app.notifications_jobs where reminder_kind <> 'duty_review_flagged'")) - jobsBefore,
         clear_by_cell: byCell.code ?? 'done', stale_clear: stale.code ?? 'done', cleared: cleared.code ?? 'done',
         open_after: (after?.reviews ?? []).length });
 

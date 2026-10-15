@@ -388,7 +388,9 @@ async function main() {
     const hold = await envelope('identity_credential_command', admin.token, 'identity.place_hold', memberRev,
       { member_id: held.member, reason_code: 'security_concern' });
     const runH = await worker();
-    const needs = Number(psql(`select count(*) from app.duties_contact_needs where assignment_id in ('${x.data?.assignment_id}', '${h.data?.assignment_id}')`));
+    // Story 4.12: the hold itself also lists H's duty at once (kind access_hold); these are the routed reminder needs.
+    const needs = Number(psql(`select count(*) from app.duties_contact_needs where assignment_id in ('${x.data?.assignment_id}', '${h.data?.assignment_id}')
+      and reminder_kind <> 'access_hold'`));
     const xBoard = await boardAssignment(leader, x.data?.assignment_id);
     const hBoard = await boardAssignment(deputy, h.data?.assignment_id);
     const heldItems = Number(psql(`select count(*) from app.notifications_inbox_items where recipient_member_id in ('${held.member}', '${accountless.member}')`));

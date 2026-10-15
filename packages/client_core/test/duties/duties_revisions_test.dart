@@ -233,10 +233,19 @@ void main() {
         }),
         throwsFormatException,
       );
+      // Story 4.12: a Confirmed by leader assignment can end (its member
+      // left), so `leader` is a valid history provenance; anything else is not.
+      expect(
+        AssignmentHistoryEntry.fromJson({
+          ...historyEntry(),
+          'response_provenance': 'leader',
+        }).provenance,
+        'leader',
+      );
       expect(
         () => AssignmentHistoryEntry.fromJson({
           ...historyEntry(),
-          'response_provenance': 'leader',
+          'response_provenance': 'system',
         }),
         throwsFormatException,
       );

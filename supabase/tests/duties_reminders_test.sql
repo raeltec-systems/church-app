@@ -198,8 +198,9 @@ select is((select string_agg(reminder_kind || '=' || title, '; ' order by source
   'the reminder contracts carry fixed generic titles');
 select is((select string_agg(distinct link, ',') from app.contract_reminder_contracts
             where source_type = 'duties_coverage'
-              -- Story 4.9: the decline alert opens the coverage queue (duties_coverage_test.sql).
-              and reminder_kind <> 'duty_declined'), '/duties/leader',
+              -- Story 4.9: the decline alert opens the coverage queue (duties_coverage_test.sql);
+              -- story 4.12: so does the vacancy alert (duties_lifecycle_test.sql).
+              and reminder_kind not in ('duty_declined', 'duty_vacated')), '/duties/leader',
   'the leaders'' alerts open the Duties board (which reads the duty again)');
 select is((select string_agg(reminder_kind, ',' order by reminder_kind) from app.contract_direct_contact_routes
             where source_type = 'duties_assignment' and handler = 'app.duties_record_contact_need(jsonb)'),
@@ -478,7 +479,10 @@ select is((select string_agg(j.job_state || ':' || j.finish_reason, ',' order by
   (select string_agg('ineligible:direct_contact', ',') from generate_series(1, 2)),
   'neither the accountless nor the held assignee gets an inbox item: both are direct-contact needs');
 select is(pg_temp.items(6, 'duty_assigned') + pg_temp.items(8, 'duty_assigned'), 0, 'no inbox item for either');
-select is((select count(*)::int from app.duties_contact_needs where assignment_id in (pg_temp.a('X'), pg_temp.a('H'))), 2,
+-- Story 4.12: the hold itself also puts H's duty on the list at once (kind access_hold,
+-- duties_lifecycle_test.sql); these are the two routed reminder needs.
+select is((select count(*)::int from app.duties_contact_needs where assignment_id in (pg_temp.a('X'), pg_temp.a('H'))
+              and reminder_kind <> 'access_hold'), 2,
   'both needs are on the Duties list');
 select is((select count(*)::int from app.notifications_direct_contact_needs
             where source_id in (pg_temp.a('X'), pg_temp.a('H')) and route_state = 'routed'), 2,
@@ -678,7 +682,8 @@ select pg_temp.call(1, 'identity_grant_command', 'identity.revoke_scope',
 select pg_temp.run();
 select is((select string_agg(pg_temp.who(recipient_member_id) || ':' || job_state, ',' order by pg_temp.who(recipient_member_id))
              from app.notifications_jobs where source_id = pg_temp.a('N') and reminder_kind = 'duty_response_overdue'),
-  '2:delivered,3:ineligible', 'the leader is alerted; the former deputy is not');
+  -- Story 4.12: the revocation itself cancels the former deputy's alert (scope_revoked hook).
+  '2:delivered,3:cancelled', 'the leader is alerted; the former deputy is not');
 
 -- No stale reminder after any change -----------------------------------------------------------------
 select is((select count(*)::int from app.notifications_jobs j join app.duties_assignments a on a.assignment_id = j.source_id

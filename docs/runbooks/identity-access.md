@@ -805,7 +805,14 @@ select app.identity_resolve_handover_obligation('duties', '<obligation_id>', 'ha
 
 - The hook must be read-only: it runs before Identity decides. Owners make their own changes (flag, cancel, reroute) in a lifecycle hook on `membership_deactivated`, which runs in the same transaction after the deactivation.
 - Obligations hold the owner, a kind and an opaque subject id only (`app.identity_handover_obligations`). They survive a restoration.
-- Today only the SYNTHETIC `app.fixture_report_handover` (over `app.fixture_duties`) exists; tests and the E2E register it and remove it again.
+- The SYNTHETIC `app.fixture_report_handover` (over `app.fixture_duties`) is registered only by tests and the E2E, which remove it again.
+- **Since story 4.12** Duties and Follow-ups register real hooks by migration (`20261015043644_duties_lifecycle.sql`):
+  - Handover: `app.duties_report_handover` (`department_leader`, last responsible when the member is the last approved leader or deputy of an active department the app can reach) and `app.followups_report_handover` (`followup_task` per open task the member owns, last responsible when nobody else may own it under the Q4 owner-scope rule). A deactivation of such a member is refused `handover_required`.
+  - Lifecycle (`app.contract_register_lifecycle_hook`): Duties on `membership_deactivated`, `deletion_requested`, `access_hold_applied` and `scope_revoked`; Follow-ups on `membership_deactivated`, `deletion_requested` and `scope_revoked`. They end future duties (vacancies flagged, jobs cancelled, leaders told), put a held member's duties on the leaders' Needs contact list, cancel a removed leader's alerts and hand open tasks and supervision over, all in the lifecycle transaction, and resolve the obligations they handled. See [duties.md](duties.md) and [follow-ups.md](follow-ups.md), story 4.12.
+  - A deletion's pending Duties handover is resolved with `duties.resolve_handover` (**Departments**, **Mark handover done**) once the department has a leader again; a pending Follow-ups handover by reassigning or closing the task, or by **Hand over the next 100 follow-up tasks** on **Membership status** (`followups.complete_handover`: a lifecycle change hands over at most 25 tasks itself). Follow-ups also reports `followup_supervision` (never last responsible) for a task nobody else can supervise.
+  - Duties and Follow-ups commands that may notify a member take `FOR KEY SHARE` on that member's row before their own rows (review S2), so they wait for a lifecycle change instead of deadlocking with it; Identity's `FOR UPDATE` is unchanged.
+  - A revoked scope records no Identity obligation; what Follow-ups' hook could not hand over within its cap is listed on **Follow-up routing** (Waiting for handover), and the former owner loses owner authority over those tasks at once (follow-ups.md, story 4.12, review B1).
+  - Known limit (review S4): `identity.revoke_scope` calls no handover hook, so revoking a department's last leader first and then deactivating them is not refused; Departments then flags the missing leader. Follow-up item: a grant-revocation handover hook in Identity.
 
 ### Reads
 
@@ -917,7 +924,7 @@ Seven system commands, allowlisted for the purpose `identity_deletion` only:
 select app.identity_register_deletion_hook('chat', 'app.chat_erase_member(jsonb)'::regprocedure);
 ```
 
-A missing handler or an answer of another shape raises: the step is retried and nothing completes. Today Cells (`app.cells_erase_member`), Notifications (`app.notifications_erase_member`, story 3.5) and the SYNTHETIC `app.fixture_erase_member` exist; since story 3.5 the fixture hook is registered by migration (it also erases the SYNTHETIC reminder sources), and the tests and the E2E keep it registered.
+A missing handler or an answer of another shape raises: the step is retried and nothing completes. Today Cells (`app.cells_erase_member`), Notifications (`app.notifications_erase_member`, story 3.5), Duties (`app.duties_erase_member`, stories 4.1-4.12), Follow-ups (`app.followups_erase_member`, story 4.6) and the SYNTHETIC `app.fixture_erase_member` exist; since story 3.5 the fixture hook is registered by migration (it also erases the SYNTHETIC reminder sources), and the tests and the E2E keep it registered.
 
 ### The worker and the Edge Function
 
@@ -993,3 +1000,19 @@ node tools/auth-harness/local-phone-auth.mjs off
    3. Keep the token only in the worker's environment (the operator's shell or a CI secret): `IDENTITY_DELETION_CREDENTIAL_FILE=.ops-state/identity-deletion/staging.credential`. Rotate it before 30 days as in `system-access-and-operations.md`.
 5. **Run the worker on staging** (operator, synthetic members only): `SUPABASE_URL=https://tmurpotfluignacfueki.supabase.co SUPABASE_PUBLISHABLE_KEY=<publishable key> IDENTITY_DELETION_CREDENTIAL_FILE=<file> node tools/identity-deletion/worker.mjs run --journal-dir <the staging journal folder>`. The staging journal is the 1.10 one: a local segment folder mirrored to the owner's restricted Drive folder through the connector after each run (as in the 1.10 rehearsal), or, once the owner creates the folder-restricted token, `RECOVERY_DRIVE_FOLDER_ID` + `RECOVERY_DRIVE_ACCESS_TOKEN` (DriveRestClient).
 6. **Production** (entry 14): the Q4 approval of `identity_deletion_retention` (and `q4_personal_data`), the production journal store, the production credential and a scheduled worker. Until then production requests deny access and the erasure waits.
+
+## Story 4.12: what the lifecycle changes do in Duties and Follow-ups
+
+Identity is unchanged; story 4.12 registers the Duties and Follow-ups lifecycle and handover hooks described under 2.10 and 2.11 above. In short:
+
+| Identity change | Duties and Follow-ups |
+|---|---|
+| Login hold (`identity.place_hold`) | duties kept; listed under the leaders' Needs contact at once; no alert; the hold never named |
+| Church deactivation | refused `handover_required` for the last reachable leader or deputy of an active department, or the only possible owner of an open task; otherwise future duties end (positions flagged **Needs a new person**, jobs cancelled, one leaders' notice per department), open tasks and supervision handed over, all in the same transaction |
+| Scope removed (`identity.revoke_scope`, or as part of a deactivation) | authority ends at once (current grants are checked everywhere); pending leader alerts cancelled; supervision moved |
+| Deletion request | as a deactivation, never refused; a pending handover makes erasure wait (`handover_pending`); the Duties and Follow-ups deletion check answers 0 after the erase phase |
+| Restoration | nothing comes back: give duties and tasks again |
+
+No hold, deactivation or deletion reason reaches a leader, a notice or the evidence. Owner manual checks: [duties.md](duties.md), story 4.12 (they include the **Hand over first** notice on **Membership status**, whose text now names a department's last leader or deputy and the only possible owner of an open follow-up task).
+
+E2E: `tools/identity-e2e/duties-lifecycle.mjs` (+44 7700 900470-900479). The 2.10 `lifecycle.mjs` and 2.11 `deletion.mjs` E2Es keep passing with the real hooks registered (their synthetic members hold no duties or tasks).

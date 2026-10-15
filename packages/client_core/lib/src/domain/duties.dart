@@ -60,6 +60,22 @@ abstract final class DutyCommands {
   /// Story 4.11: the department marks an owner-review mismatch reviewed
   /// (expected revision = the review's revision).
   static const clearReview = 'duties.clear_review';
+
+  /// Story 4.12 (Admin): take a member out of a department (expected
+  /// revision = the department's). Their future duties there end, each
+  /// position is flagged for cover and the leaders are told.
+  static const removeMember = 'duties.remove_member';
+
+  /// Story 4.12 (Admin): mark a department's leader handover done once it
+  /// has a leader or deputy again (expected revision = the department's).
+  static const resolveHandover = 'duties.resolve_handover';
+}
+
+/// Story 4.12: the one end reason a leader reads when the person given a
+/// position can no longer serve (left the department or the church, or was
+/// deleted). Never why.
+abstract final class DutyEndReasons {
+  static const vacated = 'vacated';
 }
 
 /// Story 4.2: the revisable fields (wire names) in display order, and the
@@ -735,7 +751,11 @@ class AssignmentHistoryEntry {
       throw const FormatException('unexpected state');
     }
     final provenance = _opt<String>(m, 'response_provenance');
-    if (provenance != null && provenance != 'member') {
+    // Story 4.12: a Confirmed by leader assignment can end too (the member
+    // left), so its history keeps the `leader` provenance.
+    if (provenance != null &&
+        provenance != 'member' &&
+        provenance != 'leader') {
       throw const FormatException('unexpected response_provenance');
     }
     final response = DutyResponse.fromWire(m['response']);
@@ -770,8 +790,8 @@ class AssignmentHistoryEntry {
   final DutyResponse response;
   final DateTime? respondedAt;
 
-  /// Who recorded the answer (`member` until entry 9 adds leader
-  /// confirmation).
+  /// Who recorded the answer (`member`, or `leader` for Confirmed by
+  /// leader).
   final String? provenance;
   final String? note;
   final int slotRevision;
@@ -827,6 +847,15 @@ class DutyPosition {
 
   /// Ended assignments, newest first (at most 20).
   final List<AssignmentHistoryEntry> history;
+
+  /// Story 4.12: nobody holds the position because the person given it can
+  /// no longer serve (the newest ended assignment ended `vacated`). Never
+  /// why.
+  bool get vacated =>
+      assignment == null &&
+      !cancelled &&
+      history.isNotEmpty &&
+      history.first.endReason == DutyEndReasons.vacated;
 }
 
 /// One published occurrence on the leader board.
@@ -1136,6 +1165,8 @@ class AdminDepartment {
     required this.leaders,
     required this.deputies,
     required this.members,
+    this.handovers = const [],
+    this.needsLeader = false,
   });
 
   factory AdminDepartment.fromJson(Object? json) {
@@ -1155,12 +1186,26 @@ class AdminDepartment {
       members: List.unmodifiable(
         _req<List>(m, 'members').map(DepartmentMember.fromJson),
       ),
+      // Story 4.12 (absent from older servers: none pending).
+      handovers: m['handovers'] == null
+          ? const []
+          : List.unmodifiable(
+              _req<List>(m, 'handovers').map(DepartmentHandover.fromJson),
+            ),
+      needsLeader: _opt<bool>(m, 'needs_leader') ?? false,
     );
   }
 
   final String departmentId;
   final String name;
   final bool isSynthetic;
+
+  /// Story 4.12: pending leader handovers (the last leader or deputy left
+  /// while being deleted); resolved with duties.resolve_handover.
+  final List<DepartmentHandover> handovers;
+
+  /// Story 4.12: no approved leader or deputy the app can reach.
+  final bool needsLeader;
 
   /// The department's revision (expected_revision of duties.add_member).
   final int revision;
@@ -1169,6 +1214,25 @@ class AdminDepartment {
   final List<DepartmentMember> members;
 
   bool hasMember(String memberId) => members.any((m) => m.memberId == memberId);
+}
+
+/// Story 4.12: one pending department handover (ids and time only).
+class DepartmentHandover {
+  const DepartmentHandover({
+    required this.obligationId,
+    required this.recordedAt,
+  });
+
+  factory DepartmentHandover.fromJson(Object? json) {
+    final m = _map(json, 'handover');
+    return DepartmentHandover(
+      obligationId: _req<String>(m, 'obligation_id'),
+      recordedAt: _instant(m, 'recorded_at'),
+    );
+  }
+
+  final String obligationId;
+  final DateTime recordedAt;
 }
 
 /// One approved member the Admin may add or give a role (no contact data).

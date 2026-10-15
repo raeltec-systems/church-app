@@ -14,6 +14,10 @@ abstract final class FollowUpCommands {
   static const createTask = 'followups.create_task';
   static const updateTask = 'followups.update_task';
   static const reassign = 'followups.reassign';
+
+  /// Story 4.12 (Admin): hands over the next 100 open tasks of a member who
+  /// left (a lifecycle change hands over at most 25 itself).
+  static const completeHandover = 'followups.complete_handover';
 }
 
 /// A task's state (wire codes).
@@ -551,13 +555,17 @@ class FollowUpActivity {
     'supervisor_changed' =>
       'Supervisor changed to ${toMember ?? 'a former member'}',
     'closed_by_source' => 'Closed by its source (${code ?? 'event'})',
+    // Story 4.12: a handover whose reminders could not be planned.
+    'reminders_skipped' => 'Reminders not planned (scheduling unavailable)',
     _ => followUpCodeLabel(action),
   };
 
   /// "by X for Y", "by X", or "by its source".
   String get attribution {
     if (capacity == FollowUpCapacity.source && actor == null) {
-      return 'by its source';
+      // Story 4.12: handed over when its owner or supervisor could no
+      // longer act on it (never why).
+      return code == 'handover' ? 'handed over automatically' : 'by its source';
     }
     final who = actor ?? 'a former member';
     return onBehalfOf == null ? 'by $who' : 'recorded by $who for $onBehalfOf';
@@ -746,12 +754,45 @@ class FollowUpSupervision {
   final bool truncated;
 }
 
+/// Story 4.12 (review B1): a member whose open tasks or supervision wait for
+/// someone in each task's group (they left it, lost the scope, or left the
+/// church); the Admin continues with `followups.complete_handover`.
+class FollowUpHandoverWaiting {
+  const FollowUpHandoverWaiting({
+    required this.memberId,
+    required this.displayName,
+    required this.membershipState,
+    required this.tasks,
+    required this.supervisions,
+  });
+
+  factory FollowUpHandoverWaiting.fromJson(Object? json) {
+    final m = _map(json, 'handover');
+    return FollowUpHandoverWaiting(
+      memberId: _req<String>(m, 'member_id'),
+      displayName: _opt<String>(m, 'display_name'),
+      membershipState: _opt<String>(m, 'membership_state'),
+      tasks: _req<int>(m, 'tasks'),
+      supervisions: _req<int>(m, 'supervisions'),
+    );
+  }
+
+  final String memberId;
+  final String? displayName;
+
+  /// `approved` (still a member), `deactivated` or `deleting`.
+  final String? membershipState;
+  final int tasks;
+  final int supervisions;
+}
+
 /// `api.followups_admin_routing`.
 class FollowUpAdminRouting {
   const FollowUpAdminRouting({
     required this.tasks,
     required this.scopes,
     required this.truncated,
+    this.handovers = const [],
   });
 
   factory FollowUpAdminRouting.fromJson(Object? json) {
@@ -764,10 +805,19 @@ class FollowUpAdminRouting {
         _req<List>(m, 'scopes').map(FollowUpScopeRoster.fromJson),
       ),
       truncated: _req<bool>(m, 'truncated'),
+      // Story 4.12; absent from older servers.
+      handovers: List.unmodifiable(
+        (_opt<List>(m, 'handovers') ?? const []).map(
+          FollowUpHandoverWaiting.fromJson,
+        ),
+      ),
     );
   }
 
   final List<FollowUpRouting> tasks;
+
+  /// Story 4.12: members whose tasks wait for a new owner or supervisor.
+  final List<FollowUpHandoverWaiting> handovers;
 
   /// Each active task's scope with the members it may be reassigned to.
   final List<FollowUpScopeRoster> scopes;

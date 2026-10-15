@@ -15,6 +15,13 @@ enum FollowUpNotice {
   updated,
   reassigned,
 
+  /// Story 4.12: tasks of a member who left were handed over.
+  handoverContinued,
+
+  /// Story 4.12: nobody the app can reach may take what is left; it stays
+  /// listed for handover.
+  handoverNoneMoved,
+
   /// Changed in another tab or by someone else: reloaded.
   changedElsewhere,
 
@@ -200,10 +207,15 @@ abstract class FollowUpsController<T> extends Notifier<FollowUpsState<T>> {
   /// After a confirmed change: other reads that show the task ask again.
   void onConfirmed() {}
 
-  static FollowUpNotice _success(FollowUpAction action) =>
+  static FollowUpNotice _success(FollowUpAction action, Object? data) =>
       switch (action.command) {
         FollowUpCommands.createTask => FollowUpNotice.created,
         FollowUpCommands.reassign => FollowUpNotice.reassigned,
+        // Review N11: only say "handed over" when something moved.
+        FollowUpCommands.completeHandover =>
+          data is Map && data['handed_over'] is int && data['handed_over'] > 0
+              ? FollowUpNotice.handoverContinued
+              : FollowUpNotice.handoverNoneMoved,
         _ => FollowUpNotice.updated,
       };
 
@@ -236,11 +248,11 @@ abstract class FollowUpsController<T> extends Notifier<FollowUpsState<T>> {
         .send(FollowUpCommands.function, action.request);
     if (!_current(epoch)) return;
     switch (outcome) {
-      case CommandConfirmed():
+      case CommandConfirmed(:final success):
         state = state.copyWith(
           clearPending: true,
           clearUnconfirmed: true,
-          notice: _success(action),
+          notice: _success(action, success.data),
           noticeAction: action,
         );
         onConfirmed();
@@ -340,6 +352,15 @@ class FollowUpRoutingController
   @override
   Future<AccessRead<FollowUpAdminRouting>> fetch() =>
       ref.read(followUpsRepositoryProvider).fetchAdminRouting();
+
+  /// Story 4.12 (review B1): hands over the next 100 tasks and supervisions
+  /// that wait for someone in their group (expected revision null).
+  Future<void> completeHandover(FollowUpHandoverWaiting w) => send(
+    FollowUpCommands.completeHandover,
+    const Optional.of(null),
+    {'member_id': w.memberId},
+    w.displayName ?? 'a former member',
+  );
 }
 
 final followUpRoutingProvider =

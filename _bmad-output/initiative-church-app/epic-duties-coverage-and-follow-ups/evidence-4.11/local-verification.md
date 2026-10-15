@@ -4,7 +4,7 @@ Worktree of story 4.11 merged with `ccr-93e730dd-89lbvg` (including 187f0d1), wi
 
 | Check | Result |
 |---|---|
-| `npx supabase db reset` | exit 0 (migration `20261015120000_duties_owner_operations.sql` applied after `20261015002121`) |
+| `npx supabase db reset` | exit 0 (migration `20261015035112_duties_owner_operations.sql` applied after `20261015002121`) |
 | `npm run -s db:test` | PASS: 41 files, 3554 tests, 64 s. New: `duties_owner_operations_test.sql` 167 (review block: S1 cross-cell put and link `not_found`, S4 accept then withdraw a cell part, N1, N2, N3, N5, N7), `duties_owner_operations_scale_test.sql` 13 |
 | Scale (under `statement_timeout = '8s'`, each threshold 2,000 ms) | flag 400 duties of one event 470 ms; event links read 10 ms; leader board with 400 open reviews 356 ms; create a 10-position part over 4,000 commitments 488 ms; revise it (all ten re-asked) 534 ms; owner read 11 ms; My duties with 200 cell parts 190 ms. Unchanged 4.8 scale: publish 200 slots 4,094 ms |
 | `npm run -s db:smoke` | pass; contract fixtures 260 cases against `app.contract_check`, 25 envelopes, and the 29 `source_ref` cases through the Duties owner operations' reference check (`app.duties_owner_ref_errors`) |

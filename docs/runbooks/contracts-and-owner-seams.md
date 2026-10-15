@@ -89,7 +89,7 @@ A source owner registers each Follow-ups purpose in its own migration with `app.
 
 ## Duties owner operations: consumer guide (story 4.11)
 
-Migration: `supabase/migrations/20261015120000_duties_owner_operations.sql`. Cells (programmes, epic 5) and Content (events and sermon drafts, epic 6) reach Duties only through these operations, called **inside their own command's transaction**, after their own authorizer has locked the actor's grant rows (Identity first) and after they have written and locked their own source row. Never clone a duty and never write `app.duties_*` tables. The SYNTHETIC `fixture_programme_part` and `fixture_event` sources (`app.fixture_programme_*`, `app.fixture_event_changed`) are the worked example; `supabase/tests/duties_owner_operations_test.sql` and `tools/identity-e2e/duties-owner-ops.mjs` exercise every step.
+Migration: `supabase/migrations/20261015035112_duties_owner_operations.sql`. Cells (programmes, epic 5) and Content (events and sermon drafts, epic 6) reach Duties only through these operations, called **inside their own command's transaction**, after their own authorizer has locked the actor's grant rows (Identity first) and after they have written and locked their own source row. Never clone a duty and never write `app.duties_*` tables. The SYNTHETIC `fixture_programme_part` and `fixture_event` sources (`app.fixture_programme_*`, `app.fixture_event_changed`) are the worked example; `supabase/tests/duties_owner_operations_test.sql` and `tools/identity-e2e/duties-owner-ops.mjs` exercise every step.
 
 1. **Register** (your own migration): your source type with its check hook (1.5, `contract_register_source_type`), a dependency edge to `duties` (Cells and Content already have one), then
    ```sql

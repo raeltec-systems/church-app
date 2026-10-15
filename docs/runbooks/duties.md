@@ -1009,7 +1009,7 @@ Record the outcome of each step in `evidence-4.10/owner-check.md`: pass or fail,
 
 ## Story 4.11: expose Duties owner operations for programmes and later owners
 
-Migration: `supabase/migrations/20261015120000_duties_owner_operations.sql` (forward only; no destructive statements, no row deletions, no `_rows` file, so **no owner SQL paste**). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-expose-duties-and-follow-ups-owner-operations-for-programmes-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.11/`. The consumer guide for owners (Cells, Content and later) is in [contracts-and-owner-seams.md](contracts-and-owner-seams.md#duties-owner-operations-consumer-guide-story-411).
+Migration: `supabase/migrations/20261015035112_duties_owner_operations.sql` (forward only; no destructive statements, no row deletions, no `_rows` file, so **no owner SQL paste**). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-expose-duties-and-follow-ups-owner-operations-for-programmes-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.11/`. The consumer guide for owners (Cells, Content and later) is in [contracts-and-owner-seams.md](contracts-and-owner-seams.md#duties-owner-operations-consumer-guide-story-411).
 
 ### What changed for Duties
 
@@ -1044,7 +1044,7 @@ node tools/auth-harness/local-phone-auth.mjs off
 ### Hosted staging (parent session, then the owner)
 
 1. **Parent session:**
-   - Apply `20261015120000_duties_owner_operations.sql` to staging (`tmurpotfluignacfueki`) after `20261015002121` (rename the local file to the recorded hosted version if the apply records another one).
+   - Apply `20261015035112_duties_owner_operations.sql` to staging (`tmurpotfluignacfueki`) after `20261015002121` (rename the local file to the recorded hosted version if the apply records another one).
    - Run `tools/ci/verify-hosted.sql` with `expected_env=staging`.
    - Compare the md5 of each new or replaced `app.duties_*` and `app.fixture_*` function with the local one (the migration has no backslashes).
    - Grants: no new function is executable by `anon`, `authenticated` or `service_role`.

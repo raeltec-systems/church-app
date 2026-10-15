@@ -146,9 +146,9 @@ context:
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/staff`, `apps/mobile`; `TZ=America/New_York` for `test/duties` and mobile -- expected: pass.
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/main && npm run -s ci:function-imports`; evidence scan -- expected: clean.
 
-**Results (2026-10-15):**
-- db reset 0; db:test PASS (43 files, 3679 tests, 74 s; `duties_lifecycle_test.sql` 109, `duties_lifecycle_scale_test.sql` 16: hold over 150 duties 18-31 ms, removal of 30 duties 154-249 ms, deactivation ending 120 duties and handing over 130 tasks 2.3-3.4 s under `statement_timeout = '8s'`); db:smoke pass (139 ok).
-- Every E2E `exit=0` (29 scripts, reset before each, one at a time; `duties-lifecycle` 11/11; lifecycle, runbooks and duties-reminders rerun after their expectation updates) (`evidence-4.12/e2e-suite-summary.txt`).
-- contracts:test 265/0; Dart contracts 282 pass; node tool tests (CI set) 225/0; ci:policy-test 56/0.
-- flutter analyze clean in client_core, apps/staff, apps/mobile; flutter test client_core 630, apps/staff 40, apps/mobile 55; under `TZ=America/New_York` client_core `test/duties` + `test/followups` 202 and apps/mobile 55.
-- ci:secrets clean (1583 files); ci:migrations (`--base origin/main`) 48 ordered, unique, non-destructive; ci:function-imports ok; evidence scan clean.
+**Results (2026-10-15, after review round 1; repeated in full after a container restart):**
+- db reset 0; db:test PASS (43 files, 3701 tests; `duties_lifecycle_test.sql` 122, `duties_lifecycle_scale_test.sql` 20, `duties_coverage_test.sql` 162). Scale: hold over 230 duties 29-41 ms; removal of 30 duties 151-230 ms; deactivation ending 200 duties with 1030 open tasks (25 handed over) 1.06-1.75 s; one `followups.complete_handover` step (100 tasks) 1.6-2.5 s; all under `statement_timeout = '8s'`. db:smoke pass (139 ok).
+- Every E2E `exit=0` (29 scripts, reset before each, one at a time; `duties-lifecycle` 14/14 incl. races L23-L25) (`evidence-4.12/e2e-suite-summary.txt`).
+- contracts:test 265/0; Dart contracts 282 pass; node tool tests (CI set) 229/0; ci:policy-test 56/0.
+- flutter analyze clean in client_core, apps/staff, apps/mobile; flutter test client_core 634, apps/staff 40, apps/mobile 55; under `TZ=America/New_York` client_core duties + followups + membership lifecycle 221 and apps/mobile 55.
+- ci:secrets clean (1586 files); ci:migrations (`--base origin/main`) 48 ordered, unique, non-destructive; ci:function-imports ok; evidence scan (the 4.12 CI step) clean.

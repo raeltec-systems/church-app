@@ -3,7 +3,7 @@ title: 'Write the duties runbooks and run the synthetic department pilot'
 type: 'chore'
 ticket: '13'
 created: '2026-10-15'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '9ae2b6762c56772ad5bd75aadaafadd805d3375b'
 route: 'full'
 route_source: 'auto'
@@ -63,17 +63,28 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `tools/identity-e2e/duties-pilot.mjs` -- the rehearsal: personas, quarterly rota, worker delivery, answers, gap, contact, Confirmed by leader, Short notice, reassignment probe, privacy, API cleanup; local SQL checks and cleanup; staging mode.
-- [ ] `tools/identity-e2e/duties-pilot.test.mjs` -- offline: target parsing and guards, church dates (fixed instants), rota and probe placement, privacy and generic-text detectors, cleanup SQL builder.
-- [ ] `docs/runbooks/duties-guides.md` -- leader/deputy, Admin and troubleshooting guides, owner walkthrough.
-- [ ] `docs/runbooks/duties.md`, `follow-ups.md`, `identity-access.md`, `contracts-and-owner-seams.md` -- pointers; story 4.13 section (runs, staging command, cleanup).
-- [ ] `_bmad-output/.../evidence-4.13/` -- owner walkthrough with blanks, local run evidence, suite summary; CI scan step.
+- [x] `tools/identity-e2e/duties-pilot.mjs` -- the rehearsal: personas, quarterly rota, worker delivery, answers, gap, contact, Confirmed by leader, Short notice, reassignment probe, privacy, API cleanup; local SQL checks and cleanup; staging mode.
+- [x] `tools/identity-e2e/duties-pilot.test.mjs` -- offline: target parsing and guards, church dates (fixed instants), rota and probe placement, privacy and generic-text detectors, cleanup SQL builder.
+- [x] `docs/runbooks/duties-guides.md` -- leader/deputy, Admin and troubleshooting guides, owner walkthrough.
+- [x] `docs/runbooks/duties.md`, `follow-ups.md`, `identity-access.md`, `contracts-and-owner-seams.md` -- pointers; story 4.13 section (runs, staging command, cleanup).
+- [x] `_bmad-output/.../evidence-4.13/` -- owner walkthrough with blanks, local run evidence, suite summary; CI scan step.
 
 **Acceptance Criteria:**
 - Given a reset local stack, when `duties-pilot.mjs` runs, then the whole loop passes and nothing of the run is left.
 - Given the guides, when a leader, a deputy or an Admin follows a task, then each step names the screen and button and links the maintainer section.
 
 ## Implementation Notes
+
+- Implemented directly (no implementation subagent inside this builder run), as 4.1-4.12. CHECKPOINT 1 pre-approved by the owner (owner-decisions-milestone-1.md, -2.md); the frozen block's decisions are the agent's under that pre-approval.
+- No migration, no client change, no server change: the rehearsal found no bug.
+- `tools/identity-e2e/duties-pilot.mjs` (P00-P99, 13 checks locally, 14 with `--staging-path`): the loop runs through the public API in both targets; local adds persona seeding, the run's own worker credential, job-table checks and the P80 time shift (test-only), and deletes everything. Staging: publishable key only, exact staging origin, persona and Admin files outside the repo (the 2.14 guards are imported from `staging-suite.mjs`), polls for the scheduled worker, API cleanup in `finally`, cleanup SQL written to `--cleanup-sql`.
+- Decision (agent, under owner pre-approval): a `--staging-path` local option runs the staging branch (sign-up, application, approval, no SQL checks, the real 5-minute wait for the P80 reminder) against the local stack and executes the generated staging cleanup SQL, checking that it removed the run (P99). It passed 14/14 (`evidence-4.13/duties-pilot-staging-path-local.jsonl`). It is not in the E2E list (about 6 minutes); the default local run is.
+- Decision (agent, under owner pre-approval): new inbox items are told apart by item id (a baseline per step), not by delivery time, so a server clock that differs from the runner's cannot miscount; staging personas persist between runs.
+- Decision (agent, under owner pre-approval): `SYNTHETIC leader-only` marks the leader's attempt note and confirmation reason so P90 can prove they never reach a member, the Admin's view or an inbox item; the leader's own view is the positive control.
+- Guides: `docs/runbooks/duties-guides.md` (Guide 1 leader and deputy, 10 tasks; Guide 2 Admin, 6 tasks; Guide 3 duty reminder problems: stale reminder, member not reached, Needs contact, Q2 gate closed, Reminder health; the owner walkthrough). Every link anchor checked with a slug script (0 broken). `duties.md` gains a pointer at the top and the story 4.13 section (pilot steps, local runs, the staging command and cleanup, owner walkthrough); `follow-ups.md`, `identity-access.md`, `contracts-and-owner-seams.md` one link each.
+- CI: a scan-evidence step for `evidence-4.13/`, the script and the runbooks; the offline test runs in the existing node tool test step (glob).
+- The E2E list is the scratchpad suite script (`e2e-main.sh`); the worktree copy appends `duties-pilot` (no repo file lists the E2Es).
+- Remaining (not builder steps): the parent session may run the rehearsal on staging (duties.md, story 4.13, "Against staging") and paste the cleanup SQL; the owner walkthrough (HITL) in `evidence-4.13/owner-walkthrough.md`.
 
 ## Plan Change Log
 

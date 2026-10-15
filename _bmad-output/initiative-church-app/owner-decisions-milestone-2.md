@@ -60,3 +60,22 @@ change is scheduled as a follow-up build.
 Pilot department roles (owner, 2026-10-15): the Music Director is the department **leader**; the
 Vice-Music Director, the Secretary and the Treasurer are department **deputies**. Entered in
 production by the Admin at the pilot; names are not stored in this repository.
+
+## Membership (Q1) production settings and owner steps (2026-10-15)
+
+| Gate | Owner's choice | Next step |
+|---|---|---|
+| G3 dormancy (`dormancy_days`) | **180 days** | Needs the reviewed operator migration that inserts the approved setting (no operator function exists yet); built in the epic 4 decisions follow-up, then promoted. |
+| G4 password policy | **Minimum 8 characters, no character-class rules** (the clients' 8-72 already applies); leaked-password protection not bought | Set at production promotion (Auth config). |
+| G4 abuse limits | **Tighten modestly** below Supabase's defaults, still workable for members sharing one mobile-network address | The agent proposes the exact Auth rate-limit values in the promotion package; recorded with them. |
+| G11 public sign-up | **Open** once G5 (`q4_personal_data` with the privacy notice) and the first-Admin procedure are done; membership application review still gates every member surface | After G5 and G8. |
+| G8 first real Admin | **The owner (Israel)** | Follow the first-Admin procedure at production promotion. |
+
+Owner timing decisions: PR #6 is merged into `main`, and production is promoted, only after
+epic 4 (Duties and Follow-ups) is fully done. The owner mints the production notifications worker
+credential now and sends only its digest; it is registered right after the first production
+promotion.
+
+Owner staging checks: the membership (epic 2) demonstration and the inbox and reminder (epic 3)
+checks are done by the owner (2026-10-15). Remaining: the duties (epic 4) walkthrough and the
+4.13 pilot rehearsal command, after the staging client rebuild.

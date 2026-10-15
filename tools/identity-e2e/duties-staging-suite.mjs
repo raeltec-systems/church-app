@@ -50,7 +50,8 @@
 //            cell leader are the identity suite's personas (story 2.14), read from its state file
 //            and only signed in (never changed). The scheduled worker delivers (the run polls).
 //            The API cleanup runs at the end; `--cleanup-sql <file>` writes the SQL that removes
-//            the run's rows (run by the parent session after the suite).
+//            the run's rows (run by the parent session after the suite). The owner runs the
+//            staging target: it needs the synthetic Admin's password (duties.md, story 4.15).
 //
 // Evidence is redacted JSONL (statuses, codes, counts, states): never a token, password, number,
 // name, note or reason. `--summary <file.md>` writes the readable summary with both matrices.
@@ -1510,7 +1511,7 @@ async function main() {
           link: opened?.target ?? null, other_leader: byOther.code ?? 'done', cleared: outcome(cleared) });
     } else {
       notRun.push('S97 linked-event mismatch flag: owner operations are SQL-only (no client route); proven locally (S97 and duties-decisions D10-D13). '
-        + 'For the owner demonstration the parent session raises one flag with the SQL in evidence-4.15/owner-demonstration.md.');
+        + 'For the owner demonstration the parent session raises one flag as owner-demonstration.md B1 describes.');
     }
 
     // ====================================================================== S99 privacy

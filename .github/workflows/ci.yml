@@ -166,7 +166,7 @@ jobs:
       - name: Story 4.16 evidence (the owner's epic 4 decisions), its E2E, migration and the duties, identity and promotion runbooks hold no credentials
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.16 tools/identity-e2e/duties-decisions.mjs supabase/migrations/20261015190139_duties_owner_decisions.sql docs/runbooks/duties.md docs/runbooks/identity-access.md docs/runbooks/production-promotion-identity.md
       - name: Story 4.15 evidence (closing suite, builds, owner demonstration), the closing suite and the production package hold no credentials
-        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.15 tools/identity-e2e/duties-staging-suite.mjs docs/runbooks/production-promotion-duties.md docs/runbooks/production-promotion-identity.md docs/runbooks/duties.md
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.15 tools/identity-e2e/duties-staging-suite.mjs tools/identity-e2e/duties-staging-suite.test.mjs docs/runbooks/production-promotion-duties.md docs/runbooks/production-promotion-identity.md docs/runbooks/duties.md
 
   flutter:
     name: flutter (analyze, test, web build)

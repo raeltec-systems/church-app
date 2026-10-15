@@ -234,9 +234,9 @@ names, numbers, keys or tokens).
 
 ## Staging gate (before the owner promotes)
 
-1. The closing suite passes on staging on the commit to promote (duties.md, story 4.15):
-   `DUTIES_SUITE_TARGET=staging ... node tools/identity-e2e/duties-staging-suite.mjs`, and an
-   independent rerun by the reviewer.
+1. The closing suite passes on staging on the commit to promote, run by the owner (it needs the
+   synthetic Admin's password; duties.md, story 4.15, and owner-demonstration.md section 0), its
+   cleanup SQL run by the parent session, and the independent rerun after that cleanup.
 2. The 4.13 pilot rehearsal on staging (`duties-pilot.mjs --target staging`, owner decision 11).
 3. The owner's demonstration (`evidence-4.15/owner-demonstration.md`) is witnessed.
 4. PR #6 is merged into `main`; the owner runs **promote** (staging, then production).

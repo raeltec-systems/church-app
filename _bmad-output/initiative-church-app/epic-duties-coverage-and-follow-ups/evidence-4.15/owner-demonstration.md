@@ -6,10 +6,10 @@ from the fictional `+1 202 555 0100-0199` range. Write **pass** or **fail** and 
 step; never write a number, id, key, real name or the text of a note or reason. Screenshots are
 welcome if they show no password.
 
-The automated closing suite already ran every path below through the API
-(`tools/identity-e2e/duties-staging-suite.mjs`, run on staging by the parent session; its summary
-goes next to this file as `staging-suite-summary.md`). This walkthrough is the human check of the
-two clients.
+The automated closing suite runs every path below through the API
+(`tools/identity-e2e/duties-staging-suite.mjs`). You run it on staging first (section 0 below),
+because it signs in as the synthetic Admin and only you hold that password. This walkthrough is
+then the human check of the two clients.
 
 | Run detail | Value |
 |---|---|
@@ -18,7 +18,7 @@ two clients.
 | APK build (sha256 first 8) | ______ |
 | Phone model / Android version (L) | ______ |
 | Phone model / Android version (M) | ______ |
-| Closing suite on staging run by the parent session first (evidence file name, verdict) | ______ |
+| Closing suite on staging run by you first (section 0: summary file sent, verdict) | ______ |
 | 4.13 pilot rehearsal run first (evidence file name, verdict) | ______ |
 
 ## Before you start
@@ -32,8 +32,37 @@ two clients.
 3. **People.** The same synthetic people as the 4.13 walkthrough: Admin **A**; leader **L** of
    `SYNTHETIC Preaching Rota` with the APK and staff web; deputy **P** of the same department
    (staff web); members **M** (APK) and **O** (APK or web); **X** with no login and a SYNTHETIC
-   household number; and **K**, the only leader of a second synthetic department (ask the parent
-   session to set up P and K if they do not exist; it uses the Admin through the API).
+   household number; and **K**, the only leader of a second synthetic department (if P or K does
+   not exist yet, set them up as A on staff web: **Departments** and **Roles & access**).
+
+## 0. Run the closing suite on staging (before the walkthrough, about 15 minutes)
+
+You run this once, from the same computer and folder as the 4.13 pilot command, the same way.
+
+1. Make sure nothing else is running the suite (two runs must never overlap).
+2. Keep the three files **outside** the project folder, for example in your home folder:
+   `admin.json` (the synthetic Admin's password, as for the pilot: `{"pw": "..."}`),
+   `staging-suite-state.json` (from the identity checks; it is only read) and
+   `duties-suite-state.json` (the suite creates it the first time).
+3. In the project folder, run (one line; put your own paths in place of the `<...>`):
+
+   ```sh
+   DUTIES_SUITE_TARGET=staging STAGING_PUBLISHABLE_KEY=<staging publishable key> STAGING_SUITE_ADMIN=<home>/admin.json STAGING_SUITE_STATE=<home>/staging-suite-state.json DUTIES_SUITE_STATE=<home>/duties-suite-state.json node tools/identity-e2e/duties-staging-suite.mjs --evidence <home>/staging-suite.jsonl --summary <home>/staging-suite-summary.md --cleanup-sql <home>/cleanup.sql
+   ```
+
+4. It ends with a line such as `scenarios 22/22, matrix cells 253/253`. If it stops early with a
+   message (for example a number that already has an account), send the message.
+5. **Send back** `staging-suite-summary.md` (it holds only codes and counts) and `cleanup.sql` (it
+   holds only ids; the parent session runs it to remove the run's rows). Do not send the state
+   files, `admin.json` or the `.jsonl` file.
+6. **Independent rerun** (the reviewer's check): after the parent session confirms the cleanup ran,
+   run the same command again, with `independent-rerun-summary.md` in place of
+   `staging-suite-summary.md`, and send that summary and the new `cleanup.sql` the same way.
+
+| # | Step | Result | Notes |
+|---|---|---|---|
+| 0.1 | Closing suite run, summary sent (scenarios and matrix counts) | ______ | ______ |
+| 0.2 | Independent rerun after the cleanup, summary sent | ______ | ______ |
 
 ## A. The 4.13 walkthrough (the whole loop)
 
@@ -50,20 +79,16 @@ private for a non-leader. Then come back here.
 
 | # | Step | What you should see | Result | Notes |
 |---|---|---|---|---|
-| B1 | **Mismatch notice.** As L, staff web **Duties**: give one upcoming duty of the Preaching Rota a linked event (ask the parent session; it links a SYNTHETIC event and changes it with the SQL below). Wait about a minute. | L's and P's Inbox show one **Duty needs review** each (generic text only). **Open** goes to **Duties to review**, listing only that duty with **Needs review**. **Mark reviewed** clears it; the list says **Nothing needs review here.** M, O and A got no such notice. | ______ | ______ |
+| B1 | **Mismatch notice.** As L, staff web **Duties**: give one upcoming duty of the Preaching Rota a linked event (ask the parent session; it links a SYNTHETIC event and changes it, as below). Wait about a minute. | L's and P's Inbox show one **Duty needs review** each (generic text only). **Open** goes to **Duties to review**, listing only that duty with **Needs review**. **Mark reviewed** clears it; the list says **Nothing needs review here.** M, O and A got no such notice. | ______ | ______ |
 | B2 | **Vacancy reason.** As A, staff web **Departments** > Preaching Rota > O > **Remove from department** (O must have an upcoming duty there; give O one first if needed). | A sees **Removed from the department**. As L (phone **Open coverage**) and P (staff web **Coverage**): O's position reads **Needs a new person** with **Reason: Removed from the department**. As A (**Coverage**, "Gaps across the church"): the position is listed **without** a reason. As K (the other department): the position is not listed at all. Then **Add a member** O back. | ______ | ______ |
 | B3 | **Hand over first.** As A, staff web **Roles & access** (or **Departments** > K's department): remove K's leader role. | **Hand over first**: "This department has no other leader or deputy who can use the app ... Nothing was changed." K still leads it. Give another synthetic member who uses the app the deputy role there, then remove K's role: it works. Give K the leader role back and remove the stand-in. | ______ | ______ |
-| B4 | **Unlinking is never refused.** Optional (the suite covers it): ask the parent session for the result of suite check S95 instead. | S95 passed in the closing suite summary. | ______ | ______ |
+| B4 | **Unlinking is never refused.** Optional (the suite covers it): look up check S95 in the summary from section 0. | S95 reads pass. | ______ | ______ |
 
-Prepared by the parent session for B1 (staging, SYNTHETIC rows only; owner operations have no
-client route, and no client field sets an event):
-
-1. SQL: `insert into app.fixture_events (title) values ('SYNTHETIC 4.15 demo event') returning event_id;`
-2. API as L: `duties.revise_duty {"occurrence_id": "<the duty L chose>", "event_ref": "<event_id>"}`
-   (answers `change: "reference"`; nothing is re-asked).
-3. SQL inside the synthetic Admin's session claims (the 4.11 owner call, as `ownerCallSql` in
-   `tools/identity-e2e/duties-decisions.mjs`):
-   `select app.fixture_event_changed('{"event_id": "<event_id>", "changed": ["time"]}');`
+Prepared by the parent session for B1 (staging SQL only, SYNTHETIC rows; no client field sets an
+event and owner operations have no client route): the same preparation as the 4.16 owner checks,
+step 1 (duties.md, story 4.16): a SYNTHETIC event linked to the duty you name, then the
+`fixture_event_changed` owner call. Tell the parent session which duty (its date and name); it
+needs no password of yours.
 
 ## C. Visible disabled gates and refusals
 

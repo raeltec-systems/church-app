@@ -388,6 +388,24 @@ abstract final class DutyPaths {
       'Name in use',
       'A department with that name already exists.',
     ),
+    DutyNotice.memberRemoved => (
+      StatusTone.success,
+      'Removed from the department',
+      '$what no longer serves in this department. Their future duties here '
+          'ended: each position shows Needs a new person and its leaders were '
+          'told. Past duties are kept.',
+    ),
+    DutyNotice.handoverResolved => (
+      StatusTone.success,
+      'Handover done',
+      '$what has a responsible leader again; the handover is marked done.',
+    ),
+    DutyNotice.leaderRequired => (
+      StatusTone.warning,
+      'Give it a leader first',
+      '$what has no leader or deputy who can use the app. Give one the role '
+          'above, then mark the handover done.',
+    ),
     DutyNotice.notInDepartment => (
       StatusTone.warning,
       'Not in this department',
@@ -809,6 +827,43 @@ class _DepartmentCardState extends ConsumerState<_DepartmentCard> {
   String _kind = DutyScopeKinds.leader;
   String? _memberId;
 
+  /// Story 4.12: removing a member ends their future duties in the
+  /// department, so it is confirmed first.
+  Future<void> _confirmRemove(AdminDepartment d, DepartmentMember m) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => ChurchDialog(
+        title: 'Remove ${m.displayName} from ${d.name}?',
+        content: const Text(
+          'Their future duties in this department end now: each position '
+          'shows Needs a new person and the department\'s leaders are told. '
+          'They are told the duties are no longer theirs. Past duties and '
+          'answers are kept.',
+          key: Key('remove-member-explain'),
+        ),
+        actions: [
+          FocusRing(
+            child: TextButton(
+              key: const Key('remove-member-cancel'),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+          ),
+          FocusRing(
+            child: FilledButton(
+              key: const Key('remove-member-confirm'),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Remove from department'),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      await ref.read(dutyAdminProvider.notifier).removeMember(d, m);
+    }
+  }
+
   DutyCandidate? _candidate(String? id) {
     for (final m in widget.overview.members) {
       if (m.memberId == id) return m;
@@ -914,6 +969,44 @@ class _DepartmentCardState extends ConsumerState<_DepartmentCard> {
               ),
             ],
           ),
+          // Story 4.12: the last leader left (a member deletion): give the
+          // department a leader, then mark the handover done.
+          if (d.handovers.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              key: Key('department-handover-$id'),
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const StatusLabel(
+                  label: 'Handover pending',
+                  tone: StatusTone.warning,
+                ),
+                Text(
+                  d.needsLeader
+                      ? 'Its last leader left. Give it a leader or deputy, '
+                            'then mark the handover done.'
+                      : 'It has a leader again: mark the handover done.',
+                ),
+                FocusRing(
+                  child: OutlinedButton(
+                    key: Key('resolve-handover-$id'),
+                    onPressed: busy || d.needsLeader
+                        ? null
+                        : () => ctl.resolveHandover(d),
+                    child: const Text('Mark handover done'),
+                  ),
+                ),
+              ],
+            ),
+          ] else if (d.needsLeader &&
+              (d.leaders.isNotEmpty || d.deputies.isNotEmpty))
+            _muted(
+              context,
+              'No leader or deputy can use the app right now: alerts reach '
+              'nobody.',
+            ),
           const SizedBox(height: 12),
           _heading(context, 'Members (${d.members.length})'),
           if (d.members.isEmpty) const Text('No members yet.'),
@@ -929,6 +1022,16 @@ class _DepartmentCardState extends ConsumerState<_DepartmentCard> {
                     label: _accountLabel(m.account),
                     tone: StatusTone.neutral,
                   ),
+                FocusRing(
+                  child: TextButton(
+                    key: Key('remove-member-$id-${m.memberId}'),
+                    onPressed: busy ? null : () => _confirmRemove(d, m),
+                    child: Text(
+                      'Remove from department',
+                      semanticsLabel: 'Remove ${m.displayName} from ${d.name}',
+                    ),
+                  ),
+                ),
               ],
             ),
           const SizedBox(height: 8),
@@ -1192,6 +1295,23 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
               Text(
                 '${p.positionName ?? 'Position ${p.positionNo}'}: Cancelled',
                 key: Key('position-cancelled-${p.slotId}'),
+              )
+            // Story 4.12: the person given it can no longer serve (never
+            // why).
+            else if (p.vacated)
+              Wrap(
+                key: Key('position-vacated-${p.slotId}'),
+                spacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    '${p.positionName ?? 'Position ${p.positionNo}'}: Unfilled',
+                  ),
+                  const StatusLabel(
+                    label: 'Needs a new person',
+                    tone: StatusTone.warning,
+                  ),
+                ],
               )
             else if (p.assignment == null && p.positionName != null)
               Text('${p.positionName}: Unfilled'),

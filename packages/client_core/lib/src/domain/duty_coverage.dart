@@ -330,6 +330,7 @@ class CoveragePosition {
     this.overlaps = 0,
     this.assignment,
     this.followUp,
+    this.vacatedSince,
   });
 
   factory CoveragePosition.fromJson(Object? json) {
@@ -343,6 +344,11 @@ class CoveragePosition {
     }
     final left = _req<int>(m, 'positions_left');
     if (left < 1) throw const FormatException('unexpected positions_left');
+    // Story 4.12: only an unfilled position can be vacated.
+    final vacated = m['vacated'] == null ? null : _map(m['vacated'], 'vacated');
+    if (vacated != null && status != CoverageStatus.unfilled) {
+      throw const FormatException('unexpected vacated');
+    }
     return CoveragePosition(
       slotId: _req<String>(m, 'slot_id'),
       positionNo: _req<int>(m, 'position_no'),
@@ -359,6 +365,7 @@ class CoveragePosition {
       overlaps: _overlaps(m),
       assignment: assignment,
       followUp: CoverageFollowUp.fromJsonOrNull(m['follow_up']),
+      vacatedSince: vacated == null ? null : _instant(vacated, 'since'),
     );
   }
 
@@ -380,6 +387,12 @@ class CoveragePosition {
   final int overlaps;
   final CoverageAssignment? assignment;
   final CoverageFollowUp? followUp;
+
+  /// Story 4.12: when the person given this unfilled position stopped being
+  /// able to serve (null otherwise). Never why.
+  final DateTime? vacatedSince;
+
+  bool get vacated => vacatedSince != null;
 
   String get title =>
       positionName == null ? dutyName : '$dutyName: $positionName';
@@ -404,6 +417,7 @@ class CoverageCounts {
     this.needsContact = 0,
     this.conflicts = 0,
     this.overdueFollowUps = 0,
+    this.vacated = 0,
   });
 
   factory CoverageCounts.fromJson(Object? json) {
@@ -424,6 +438,8 @@ class CoverageCounts {
       needsContact: n('needs_contact'),
       conflicts: n('conflicts'),
       overdueFollowUps: n('overdue_follow_ups'),
+      // Story 4.12 (absent from older servers).
+      vacated: m['vacated'] == null ? 0 : n('vacated'),
     );
   }
 
@@ -437,6 +453,9 @@ class CoverageCounts {
   final int conflicts;
   final int overdueFollowUps;
 
+  /// Story 4.12: unfilled positions whose person can no longer serve.
+  final int vacated;
+
   CoverageCounts operator +(CoverageCounts o) => CoverageCounts(
     required: required + o.required,
     confirmed: confirmed + o.confirmed,
@@ -447,6 +466,7 @@ class CoverageCounts {
     needsContact: needsContact + o.needsContact,
     conflicts: conflicts + o.conflicts,
     overdueFollowUps: overdueFollowUps + o.overdueFollowUps,
+    vacated: vacated + o.vacated,
   );
 
   /// Anything for a leader to act on.

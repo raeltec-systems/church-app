@@ -36,6 +36,7 @@ String _countsText(CoverageCounts c) => [
   '${c.needsContact} need contact',
   if (c.conflicts > 0) '${c.conflicts} with overlapping duties',
   if (c.overdueFollowUps > 0) '${c.overdueFollowUps} follow-ups overdue',
+  if (c.vacated > 0) '${c.vacated} need a new person',
 ].join(', ');
 
 /// Story 4.9: `/duties/coverage`.
@@ -428,6 +429,13 @@ class _CoverageCardState extends ConsumerState<_CoverageCard> {
           ),
           if (a?.shortNotice ?? false)
             const StatusLabel(label: 'Short notice', tone: StatusTone.warning),
+          // Story 4.12: the person given it can no longer serve (never why).
+          if (p.vacated)
+            StatusLabel(
+              key: Key('coverage-vacated-${p.slotId}'),
+              label: 'Needs a new person',
+              tone: StatusTone.warning,
+            ),
           if (p.needsContact != null)
             StatusLabel(
               key: Key('coverage-needs-contact-${p.slotId}'),
@@ -443,6 +451,15 @@ class _CoverageCardState extends ConsumerState<_CoverageCard> {
         ],
       ),
     ];
+    if (p.vacated) {
+      lines.add(
+        _muted(
+          context,
+          'The person given this position can no longer serve it. Give it to '
+          'someone else.',
+        ),
+      );
+    }
     if (a != null) {
       lines.addAll([
         const SizedBox(height: 4),

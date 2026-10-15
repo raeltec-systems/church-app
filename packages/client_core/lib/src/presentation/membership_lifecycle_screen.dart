@@ -430,8 +430,11 @@ class _MembershipLifecycleScreenState
       LifecycleNotice.handoverRequired => (
         StatusTone.warning,
         'Hand over first',
-        '$who is the last person responsible for something in another '
-            'section. Hand it over there first, then deactivate.',
+        '$who is the last person responsible for something: the last leader '
+            'or deputy of a department (Departments: give it another leader '
+            'or deputy who uses the app), or the only person who may own an '
+            'open follow-up task (Follow-ups: reassign or close it). Hand it '
+            'over there first, then deactivate. Nothing was changed.',
       ),
       LifecycleNotice.alreadyHeld => (
         StatusTone.info,

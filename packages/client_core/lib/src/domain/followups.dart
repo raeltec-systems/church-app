@@ -551,13 +551,17 @@ class FollowUpActivity {
     'supervisor_changed' =>
       'Supervisor changed to ${toMember ?? 'a former member'}',
     'closed_by_source' => 'Closed by its source (${code ?? 'event'})',
+    // Story 4.12: a handover whose reminders could not be planned.
+    'reminders_skipped' => 'Reminders not planned (scheduling unavailable)',
     _ => followUpCodeLabel(action),
   };
 
   /// "by X for Y", "by X", or "by its source".
   String get attribution {
     if (capacity == FollowUpCapacity.source && actor == null) {
-      return 'by its source';
+      // Story 4.12: handed over when its owner or supervisor could no
+      // longer act on it (never why).
+      return code == 'handover' ? 'handed over automatically' : 'by its source';
     }
     final who = actor ?? 'a former member';
     return onBehalfOf == null ? 'by $who' : 'recorded by $who for $onBehalfOf';

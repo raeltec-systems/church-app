@@ -129,6 +129,17 @@ enum DutyNotice {
   /// Story 4.11: someone else marked the review first (reloaded).
   reviewAlreadyCleared,
 
+  /// Story 4.12: a member was taken out of a department (their future duties
+  /// there ended and were flagged for cover).
+  memberRemoved,
+
+  /// Story 4.12: a department's leader handover was marked done.
+  handoverResolved,
+
+  /// Story 4.12: the handover cannot be marked done until the department has
+  /// a leader or deputy the app can reach.
+  leaderRequired,
+
   /// Story 4.5: "Can't make it anymore" was recorded.
   withdrawn,
 
@@ -390,6 +401,8 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
         DutyOutcomeCommands.recordOutcome => DutyNotice.outcomeRecorded,
         DutyOutcomeCommands.correctOutcome => DutyNotice.outcomeCorrected,
         DutyCommands.clearReview => DutyNotice.reviewCleared,
+        DutyCommands.removeMember => DutyNotice.memberRemoved,
+        DutyCommands.resolveHandover => DutyNotice.handoverResolved,
         _ =>
           action.request.payload['response'] == DutyResponse.declined.wire
               ? DutyNotice.declined
@@ -449,6 +462,17 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
       return f['flag_id'] == 'cleared'
           ? DutyNotice.reviewAlreadyCleared
           : DutyNotice.changedElsewhere;
+    }
+    // Story 4.12: a department's handover without a reachable leader yet;
+    // one resolved elsewhere reloads the list.
+    if (action?.command == DutyCommands.resolveHandover) {
+      if (error.code == ErrorCode.conflict &&
+          f['department_id'] == 'leader_required') {
+        return DutyNotice.leaderRequired;
+      }
+      if (f['department_id'] == 'no_handover') {
+        return DutyNotice.changedElsewhere;
+      }
     }
     return switch (error.code) {
       ErrorCode.conflict when f['assignments'] == 'changed' =>
@@ -573,6 +597,25 @@ class DutyAdminController extends DutiesController<DutyAdminOverview> {
         'department_id': department.departmentId,
         'member_id': member.memberId,
       }, member.displayName);
+
+  /// Story 4.12: takes [member] out of [department]; their future duties
+  /// there end and each position is flagged for cover.
+  Future<void> removeMember(
+    AdminDepartment department,
+    DepartmentMember member,
+  ) => send(DutyCommands.removeMember, Optional.of(department.revision), {
+    'department_id': department.departmentId,
+    'member_id': member.memberId,
+  }, member.displayName);
+
+  /// Story 4.12: marks [department]'s leader handover done (it has a leader
+  /// or deputy again).
+  Future<void> resolveHandover(AdminDepartment department) => send(
+    DutyCommands.resolveHandover,
+    Optional.of(department.revision),
+    {'department_id': department.departmentId},
+    department.name,
+  );
 
   /// Gives [member] the leader or deputy scope of [department] through the
   /// audited Identity grant command (story 2.3).

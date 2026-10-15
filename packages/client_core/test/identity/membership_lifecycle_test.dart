@@ -222,6 +222,15 @@ void main() {
       );
       await settle(tester);
       expect(byKey('lifecycle-notice-handoverRequired'), findsOneWidget);
+      // Story 4.12: the notice says what to hand over and where.
+      expect(
+        find.textContaining('the last leader or deputy of a department'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Follow-ups: reassign or close it'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('an unknown outcome is checked again with the same request', (

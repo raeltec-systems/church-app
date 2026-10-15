@@ -246,3 +246,21 @@ Replaced (same signature and answers): closing or keeping a source's tasks only 
 ### Staging and owner checks
 
 Nothing separate: the parent session applies the Duties 4.9 migration (see duties.md, story 4.9); the owner's checks 4, 6 and 7 there cover the task's opening, update and closing.
+
+## Story 4.11: Follow-ups source operations for later owners
+
+No Follow-ups function changes in this story. It adds the consumer checklist below, both-client fixtures for the later owners' task sources (`packages/contracts/fixtures/v1/task_source.json` and `source_ref.json`, passing in SQL, Dart and TypeScript), and a SYNTHETIC Cells-like caller that uses the operations end to end (`app.fixture_programme_open_followup` opens a `fill_part` task for a part with a gap; `app.fixture_programme_publish` resolves it when the gap is filled, `app.fixture_programme_cancel` cancels it; `supabase/tests/duties_owner_operations_test.sql`).
+
+### Checklist for a source owner (programmes, visitors, care, missing reports and counts, custody)
+
+1. **Register in your own migration:** your source type and check hook (1.5), each purpose with `contract_register_purpose`, then `app.followups_register_purpose(module, source_type, purpose, {label, scope_kinds, outcomes?, on_source_resolved, on_source_cancelled}, context_hook?)` (story 4.6). `label` is generic printable text; never a name or care detail. Only SYNTHETIC `fixture_` sources may allow `manual_create`.
+2. **Open tasks inside your own command** after locking your source row: `app.followups_open_task({source_type, source_id, source_revision, purpose, owner_member_id, supervisor_member_id, scope_kind, scope_id, next_action, due_at, actor_member_id, actor_account_id, reminders?})`. One task per source and purpose. The owner comes from your scope family's roster (Cells and Duties register theirs).
+3. **Apply your lifecycle:** `app.followups_source_event({source_type, source_id, event: resolved | cancelled})` applies the registered effect (`close` or `keep`); it needs only the Q4 gate (4.9 S1). `app.followups_source_review` (4.9) moves an active task to Waiting with a review date and an outcome.
+4. **Schedules:** Follow-ups schedules task reminders itself; replace the generic schedule for a purpose only with `app.followups_register_reminder_schedule` (missing reports are the first).
+5. **What never rides on a task identity:** the identity is `{source_type, source_id, purpose}` (`task_source`). The fixtures refuse a note, an amount, a prayer text, a revision or an owner on it (`unknown_field`). Private context stays in your source and reaches the task only through your context hook's minimal `{label}`.
+
+Fixture source types named in the shared fixtures (for the later owners to register under these names or record a contract change): `cells_programme_part` / `fill_part`, `cells_visitor` / `visitor_follow_up`, `care_visit_request` / `care_follow_up`, `cells_meeting` / `missing_report`, `services_count` / `missing_count`, `offerings_collection` / `custody_follow_up`, and Duties' own `duties_coverage_case` / `coverage_follow_up`.
+
+### Staging and owner checks
+
+Nothing separate: see duties.md, story 4.11 (the SYNTHETIC caller's follow-up is exercised in pgTAP only).

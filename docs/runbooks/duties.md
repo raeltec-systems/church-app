@@ -1006,3 +1006,73 @@ Record the outcome of each step in `evidence-4.10/owner-check.md`: pass or fail,
 - Outcomes are for department-owned duties; cell-owned programme parts are entry 11. Leaving a department or the church (entry 12) does not remove outcomes; erasure clears their text.
 - An outcome cannot be cleared back to Unrecorded; a mistaken record is corrected to the right value with a reason.
 - The history counts one row per position held; the 12-month summary covers past duties only (upcoming duties are counted apart).
+
+## Story 4.11: expose Duties owner operations for programmes and later owners
+
+Migration: `supabase/migrations/20261015120000_duties_owner_operations.sql` (forward only; no destructive statements, no row deletions, no `_rows` file, so **no owner SQL paste**). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-expose-duties-and-follow-ups-owner-operations-for-programmes-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.11/`. The consumer guide for owners (Cells, Content and later) is in [contracts-and-owner-seams.md](contracts-and-owner-seams.md#duties-owner-operations-consumer-guide-story-411).
+
+### What changed for Duties
+
+- **Cell-owned parts.** A registered `cell_part` source (Cells; the SYNTHETIC `fixture_programme_part` in tests) creates, revises and cancels a published cell-owned occurrence through `app.duties_owner_put_part` / `app.duties_owner_cancel_part`, inside its own command. Each part position has a stable key and one permanent owned link to its slot (`app.duties_part_links`). The 4.2 engine revises it (material changes ask again, notes-only changes keep the answer); a removed position is cancelled (4.9 rules); a renamed position or a cancelled key is refused; an identical put changes nothing.
+- **Members answer cell parts.** My duties lists them (owner **Cell programme**, the cell's leader and assistant by name); `duties.respond`, `duties.withdraw_acceptance` and `duties.accept_many` answer them (the 4.5 refusal ends); notices and member reminders (4.8) are sent and checked as for department duties (eligibility: the assignee, still an active member).
+- **Department-only (fail closed, the first contract change Cells needs):** leader alerts (overdue, short notice, declined), the coverage queue, Confirmed by leader, contact attempts, Needs contact list and outcomes stay department-only. The cell's owner read (`app.duties_owner_part`) shows each position's answer, Short notice and needs-contact flag meanwhile.
+- **Display links.** `app.duties_owner_link_duty` links a part position to a published, not started department position. Nothing of the duty changes (no revision, answer, reminder or notice); only its department manages it. The board and the rota say "Shown on N cell programme part(s)".
+- **Owner-review mismatches.** `app.duties_owner_flag_review` flags the department duties a changed meeting (display links) or event (`event_ref`) is linked to, with codes `time`, `place`, `label`, `assignee`, `cancelled`. The duty is never rescheduled or republished and no answer is reset. The board and the rota show **Needs review** with the change; the department's leader, deputy or Admin marks it reviewed (`duties.clear_review {flag_id}`, expected = the review revision; Pastor and everyone else `forbidden`; a second clear `conflict {"flag_id": "cleared"}`).
+- **Who may.** Owner operations are never client-executable; the actor is the live session; only the cell's leader or assistant acts for a cell (the Admin role alone, Pastor, department scopes and other cells' leaders are `forbidden`). A cell leader's department commands stay `forbidden`.
+- **Privacy.** No response note, override or confirmation reason, contact data, or person of the department crosses to the cell (display links show `filled` only). Audit rows hold codes; answers hold ids, revisions, states and counts.
+- **Deletion.** The hook anonymises who linked, unlinked, flagged or cleared; `_remaining` counts them.
+
+### Gates and locks
+
+Q4 on every operation, read and on `duties.clear_review`; Q2 through the notification calls (production inert). Lock order: the caller's Identity grant rows and its own source row, then Duties (department, series, occurrence, slots, member locks, assignments, links or flags), then Follow-ups, Notifications last.
+
+### Clients
+
+Staff web and mobile (shared screens): My duties shows a cell part with **Cell programme** and its leaders; the leader board and the rota date panel show **Needs review** with **Mark reviewed** (managers only) and the linked-parts line. Notices: **Marked reviewed**, **Already reviewed**.
+
+### Local runs
+
+```bash
+npx supabase db reset && npm run -s db:test   # duties_owner_operations_test.sql, duties_owner_operations_scale_test.sql
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/duties-owner-ops.mjs --evidence /tmp/duties-owner-ops.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+### Hosted staging (parent session, then the owner)
+
+1. **Parent session:**
+   - Apply `20261015120000_duties_owner_operations.sql` to staging (`tmurpotfluignacfueki`) after `20261015002121` (rename the local file to the recorded hosted version if the apply records another one).
+   - Run `tools/ci/verify-hosted.sql` with `expected_env=staging`.
+   - Compare the md5 of each new or replaced `app.duties_*` and `app.fixture_*` function with the local one (the migration has no backslashes).
+   - Grants: no new function is executable by `anon`, `authenticated` or `service_role`.
+   - Right after the apply: `select count(*) from app.duties_part_links;` and `select count(*) from app.duties_review_flags;` are 0, and `app.duties_link_sources` is empty (nothing is registered until Cells, or a test).
+   - No Edge Function change, no rows file, no owner SQL paste.
+2. **Staging clients:** rebuild the staff web and the staging APK (no new dependency).
+3. **Production:** nothing in this story.
+
+### Owner manual checks (staging, phone and web, story 4.11)
+
+Cells' screens do not exist yet (epic 5), so the cell side is driven by the parent session in the SQL editor with the SYNTHETIC caller, inside a signed-in cell leader's session (the E2E's `ownerCallSql`). Use synthetic members only.
+
+1. **Parent session setup:** register the SYNTHETIC sources as in the E2E (`contract_register_source_type` and `duties_register_link_source` for `fixture_programme_part` and `fixture_event`), give a synthetic member C the `cell_leader` scope of a SYNTHETIC cell, and create a part for member M (with the app) with `app.fixture_programme_publish`.
+2. **M's phone:** **My duties** shows the part with **Cell programme** and C as leader; **Accept** works.
+3. **Revise:** the parent session moves the part 30 minutes later; M sees **Changed** and is asked again; the earlier acceptance is in the history.
+4. **Link and review:** L publishes a department duty on staff web; the parent session links a part position to it and flags `time`. On staff web as L the duty reads **Shown on 1 cell programme part** and **Needs review: A linked cell meeting changed (time)**; the duty's time and answer are unchanged. **Mark reviewed**: **Marked reviewed**; the review is gone. As P (Pastor) the review shows without **Mark reviewed**.
+5. **Cancel:** the parent session cancels the part; M gets **Duty cancelled**; the department duty is unchanged.
+6. **Clean up** as in 4.10, step 9, plus the `app.fixture_programme_parts` rows; links and flags go with their slots and occurrences.
+
+Record the outcome of each step in `evidence-4.11/owner-check.md`: pass or fail, device model, Android version and browser. Include no numbers, ids or keys.
+
+### Owner questions
+
+- **Q4 (open, fail-closed default; unchanged):** personal data in production. Every operation and read is behind the Q4 gate.
+- **New (fail-closed default chosen):** may a cell programme name the person a linked department duty is assigned to? Built: no (the cell sees the duty, its times and whether it is filled, never who). Changing it is a contract change.
+
+### Known limits (later entries)
+
+- Cell-scope leader alerts, coverage queue, Confirmed by leader, contact attempts and outcomes for cell parts: the first contract change epic 5 needs (entries 5.5, 5.6).
+- No discovery read of linkable department duties for cells (epic 5 asks for one if needed; a contract change).
+- The creator's reminder choice for a part (`reminders`) is not taken; cell parts use the church defaults.
+- A system-principal caller (no live session) is not supported; owner operations need the acting member's session.
+- Lifecycle effects on cell parts (transfer, removal) are Cells' calls to these operations (epic 5.9) and entry 12.

@@ -1,12 +1,12 @@
-# Story 4.12 local verification (2026-10-15, after review round 2)
+# Story 4.12 local verification (2026-10-15, after review round 3)
 
-Worktree of story 4.12 merged with `ccr-93e730dd-89lbvg` (baseline `269acf1`). Local stack only, SYNTHETIC data, fictional numbers (+44 7700 900460-900469 pgTAP, 900480-900489 scale, 900470-900479 E2E). No hosted project, GitHub or production was touched; no SMS provider is configured. Full re-run after review round 2 (E2Es one at a time, reset before each).
+Worktree of story 4.12 merged with `ccr-93e730dd-89lbvg` (baseline `269acf1`). Local stack only, SYNTHETIC data, fictional numbers (+44 7700 900460-900469 pgTAP, 900480-900489 scale, 900470-900479 E2E). No hosted project, GitHub or production was touched; no SMS provider is configured. Full re-run after review round 3 (E2Es one at a time, reset before each).
 
 | Check | Result |
 |---|---|
 | `npx supabase db reset` | exit 0 (migration `20261015043644_duties_lifecycle.sql`, amended in place, applied after `20261015035112`) |
-| `npm run -s db:test` | PASS: 43 files, 3715 tests. `duties_lifecycle_test.sql` 136 (round 2: B1 a/b/c, N10), `duties_lifecycle_scale_test.sql` 20, `duties_coverage_test.sql` 162 (review N7 restored) |
-| Scale (under `statement_timeout = '8s'`) | 230 future duties, 1030 open tasks. Login hold over 230 duties 29-34 ms; removal ending 30 duties 172-191 ms; **deactivation ending 200 duties with 1030 open tasks (25 handed over, the rest pending, their reminders cancelled) 2,112-2,287 ms** (asserted < 3 s); one `followups.complete_handover` step of 100 tasks 1,838-1,863 ms (asserted < 4 s); eleven steps leave no open task and no pending obligation |
+| `npm run -s db:test` | PASS: 43 files, 3733 tests. `duties_lifecycle_test.sql` 154 (round 2: B1 a/b/c, N10; round 3: held and dormant Pastor, failing roster hook), `duties_lifecycle_scale_test.sql` 20, `duties_coverage_test.sql` 162 (review N7 restored) |
+| Scale (under `statement_timeout = '8s'`) | 230 future duties, 1030 open tasks. Login hold over 230 duties 31-34 ms; removal ending 30 duties 171-184 ms; **deactivation ending 200 duties with 1030 open tasks (25 handed over, the rest pending, their reminders cancelled) 2,093-2,582 ms** (asserted < 3 s; the upper value with the Flutter suites running alongside); one `followups.complete_handover` step of 100 tasks 1,859-2,080 ms (asserted < 4 s); eleven steps leave no open task and no pending obligation |
 | `npm run -s db:smoke` | pass (139 ok, 0 not ok) |
 | `npm run -s contracts:test` (TypeScript) | 265 pass, 0 fail |
 | Dart contracts (`packages/contracts/dart`, `dart test`) | 282 pass |

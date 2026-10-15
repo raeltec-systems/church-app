@@ -166,9 +166,9 @@ context:
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/staff`, `apps/mobile`; `TZ=America/New_York` for `test/duties` and mobile -- expected: pass.
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/main && npm run -s ci:function-imports`; evidence scan -- expected: clean.
 
-**Results (2026-10-15, after review round 2):**
-- db reset 0; db:test PASS (43 files, 3715 tests; `duties_lifecycle_test.sql` 136, `duties_lifecycle_scale_test.sql` 20, `duties_coverage_test.sql` 162). Scale: hold over 230 duties 29-34 ms; removal of 30 duties 172-191 ms; deactivation ending 200 duties with 1030 open tasks (25 handed over, the rest's reminders cancelled) 2.1-2.3 s; one `followups.complete_handover` step (100 tasks) 1.8-1.9 s; all under `statement_timeout = '8s'`. db:smoke pass (139 ok).
-- Every E2E `exit=0` (29 scripts, reset before each, one at a time; `duties-lifecycle` 16/16 incl. races L23-L25 and L26-L27) (`evidence-4.12/e2e-suite-summary.txt`). Negative control: with the S5 lock disabled, L27 fails (tasks given to the member being deactivated).
+**Results (2026-10-15, after review round 3):**
+- db reset 0; db:test PASS (43 files, 3733 tests; `duties_lifecycle_test.sql` 154, `duties_lifecycle_scale_test.sql` 20, `duties_coverage_test.sql` 162). Scale: hold over 230 duties 31-34 ms; removal of 30 duties 171-184 ms; deactivation ending 200 duties with 1030 open tasks (25 handed over, the rest's reminders cancelled) 2.09-2.58 s (the upper value with the Flutter suites running alongside); one `followups.complete_handover` step (100 tasks) 1.86-2.08 s; all under `statement_timeout = '8s'`. db:smoke pass (139 ok).
+- Every E2E `exit=0` (29 scripts, reset before each, one at a time; `duties-lifecycle` 16/16 incl. races L23-L27) (`evidence-4.12/e2e-suite-summary.txt`).
 - contracts:test 265/0; Dart contracts 282 pass; node tool tests (CI set) 229/0; ci:policy-test 56/0.
 - flutter analyze clean in client_core, apps/staff, apps/mobile; flutter test client_core 637, apps/staff 40, apps/mobile 55; under `TZ=America/New_York` client_core duties + followups + membership lifecycle 224 and apps/mobile 55.
 - ci:secrets clean (1586 files); ci:migrations (`--base origin/main`) 48 ordered, unique, non-destructive; ci:function-imports ok; evidence scan (the 4.12 CI step) clean.

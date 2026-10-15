@@ -293,7 +293,7 @@ Every Follow-ups command that may queue a notice to a member (`followups.create_
 
 ### Cost
 
-A handed-over task costs about 15-20 ms locally (Notifications cancels and plans its reminders per task, as a reassignment does); one plan over 1000 tasks about 50 ms; cancelling a waiting task's reminders about 0.5 ms. `supabase/tests/duties_lifecycle_scale_test.sql`: a deactivation of a member owning 1000 and supervising 30 tasks (and serving 200 future duties) about 1.5-2.3 s with 25 handed over and the rest's reminders cancelled; each `followups.complete_handover` step (100 tasks) about 1.7-2.5 s; eleven steps leave nothing pending (see duties.md, story 4.12).
+A handed-over task costs about 15-20 ms locally (Notifications cancels and plans its reminders per task, as a reassignment does); one plan over 1000 tasks about 50 ms; cancelling a waiting task's reminders about 0.5 ms. `supabase/tests/duties_lifecycle_scale_test.sql`: a deactivation of a member owning 1000 and supervising 30 tasks (and serving 200 future duties) about 1.5-2.6 s with 25 handed over and the rest's reminders cancelled; each `followups.complete_handover` step (100 tasks) about 1.7-2.5 s; eleven steps leave nothing pending (see duties.md, story 4.12).
 
 ### Staging and owner checks
 

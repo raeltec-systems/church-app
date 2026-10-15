@@ -172,6 +172,38 @@ void main() {
     );
   });
 
+  test('story 4.10: Outcomes for department leaders, history for members', () {
+    final leader = syntheticGrants(
+      scopes: const [
+        ScopeGrant(
+          scopeKind: 'department_leader',
+          scopeId: '44444444-4444-4444-8444-444444444444',
+        ),
+      ],
+    );
+    expect(
+      staffDestinationsFor(leader),
+      contains(staffDutyOutcomesDestination),
+    );
+    expect(staffDestinationsFor(leader), contains(staffDutyHistoryDestination));
+    final member = syntheticGrants();
+    expect(
+      staffDestinationsFor(member),
+      isNot(contains(staffDutyOutcomesDestination)),
+    );
+    expect(staffDestinationsFor(member), contains(staffDutyHistoryDestination));
+    // The Admin role alone records no outcomes (the department's leaders do).
+    final admin = syntheticGrants(roles: const ['admin']);
+    expect(
+      staffDestinationsFor(admin),
+      isNot(contains(staffDutyOutcomesDestination)),
+    );
+    expect(
+      staffDestinationsFor(null),
+      isNot(contains(staffDutyHistoryDestination)),
+    );
+  });
+
   testWidgets(
     'reminder health renders aggregate status for an authorized read',
     (tester) async {

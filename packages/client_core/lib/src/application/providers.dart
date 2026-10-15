@@ -81,6 +81,12 @@ final dutyCoverageRepositoryProvider = Provider<DutyCoverageRepository>(
   (ref) => const UnconfiguredDutyCoverageRepository(),
 );
 
+/// Story 4.10: completion outcomes (department leaders and deputies) and a
+/// member's assignment history (the member and their department's leaders).
+final dutyOutcomesRepositoryProvider = Provider<DutyOutcomesRepository>(
+  (ref) => const UnconfiguredDutyOutcomesRepository(),
+);
+
 /// Story 4.9: opens the phone or messaging app for a labelled contact route.
 /// Unavailable by default; the app composition roots supply the platform
 /// launcher (the app never sends a call or message itself).

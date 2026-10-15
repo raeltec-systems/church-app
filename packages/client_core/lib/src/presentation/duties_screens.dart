@@ -15,6 +15,7 @@ import '../domain/duty_calendar.dart';
 import 'followups_screens.dart' show FollowUpPaths, MyFollowUpsHomeCard;
 
 part 'duties_coverage_screens.dart';
+part 'duties_outcome_screens.dart';
 part 'duties_reminder_widgets.dart';
 part 'duties_rota_screens.dart';
 
@@ -57,6 +58,17 @@ abstract final class DutyPaths {
   /// deputies; Admin and Pastor oversight). The leaders' decline alert
   /// opens it.
   static const coverage = '/duties/coverage';
+
+  /// Story 4.10 (staff web and mobile): record and correct the outcomes of
+  /// started duties (the department's leaders and deputies).
+  static const outcomes = '/duties/outcomes';
+
+  /// Story 4.10: the reader's own assignment history.
+  static const history = '/duties/history';
+
+  /// Story 4.10: a member's history, for their department's leaders.
+  static String memberHistory(String memberId) =>
+      Uri(path: history, queryParameters: {'member': memberId}).toString();
 }
 
 (StatusTone, String, String) _noticeText(
@@ -271,6 +283,47 @@ abstract final class DutyPaths {
       'They declined',
       'A decline is not overwritten: give the position to someone (Reassign). '
           'Nothing was recorded.',
+    ),
+    DutyNotice.outcomeRecorded => (
+      StatusTone.success,
+      'Outcome recorded',
+      'The outcome for $what is recorded with you and the time. It is seen '
+          'only by them and this department\'s leaders and deputies.',
+    ),
+    DutyNotice.outcomeCorrected => (
+      StatusTone.success,
+      'Outcome corrected',
+      'The outcome for $what is corrected. The earlier value, who recorded it '
+          'and when are kept, with your reason.',
+    ),
+    DutyNotice.outcomeAlreadyRecorded => (
+      StatusTone.warning,
+      'Already recorded',
+      'Someone recorded an outcome for $what first, so nothing was recorded. '
+          'The list was reloaded: correct it if it is wrong.',
+    ),
+    DutyNotice.outcomeNotAccepted => (
+      StatusTone.warning,
+      'Not a No-show',
+      '$what never accepted this duty, so it cannot be a No-show. Choose '
+          'Completed or Excused. Nothing was recorded.',
+    ),
+    DutyNotice.outcomeNotStarted => (
+      StatusTone.neutral,
+      'Not started yet',
+      'An outcome is recorded after the duty starts. Nothing was recorded.',
+    ),
+    DutyNotice.outcomeMemberGone => (
+      StatusTone.neutral,
+      'No longer a member',
+      'This member was removed or is leaving the church, so no outcome is '
+          'recorded about them. Nothing was recorded.',
+    ),
+    DutyNotice.ownOutcome => (
+      StatusTone.neutral,
+      'Your own duty',
+      'Another leader or deputy of the department records the outcome of your '
+          'own duty. Nothing was recorded.',
     ),
     DutyNotice.ownAssignment => (
       StatusTone.neutral,
@@ -2157,6 +2210,15 @@ class _MyDutiesListState extends ConsumerState<_MyDutiesList> {
             'Only your next 200 duties are shown.',
             key: Key('my-duties-truncated'),
           ),
+        // Story 4.10: the member's own assignment history.
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton(
+            key: const Key('my-duties-history'),
+            onPressed: () => context.go(DutyPaths.history),
+            child: const Text('My duty history'),
+          ),
+        ),
         RadioSegments<_Segment>(
           key: const Key('my-duties-segments'),
           label: 'Show',
@@ -2682,6 +2744,13 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
           'told your leader you can\'t make it.',
         ),
       if (a.note case final n?) Text('Your note: $n'),
+      // Story 4.10: what your leader recorded after the duty (never assumed
+      // from the time).
+      if (a.outcome case final o?)
+        _OutcomeLines(record: o, keyPrefix: 'my-duty-outcome-$id')
+      else if (!a.times.arriveBy.isAfter(now) &&
+          a.response != DutyResponse.declined)
+        _muted(context, 'Outcome: not recorded yet.'),
       if (canAnswer) ...[
         const SizedBox(height: 8),
         TextField(

@@ -157,10 +157,10 @@ select ok(not exists (
    where n.nspname in ('app', 'api') and p.proname ~ '^duties_'
      and not (p.proname in ('duties_command', 'duties_my_duties', 'duties_leader_board',
                             'duties_admin_overview', 'duties_rota', 'duties_candidates',
-                            'duties_coverage')
+                            'duties_coverage', 'duties_outcomes', 'duties_member_history')
                   and r = 'authenticated')
      and has_function_privilege(r, p.oid, 'EXECUTE')),
-  'still only the command and the reads (with the 4.3 rota, the 4.4 candidates and the 4.9 coverage queue) are client-executable');
+  'still only the command and the reads (with the 4.3 rota, the 4.4 candidates, the 4.9 coverage queue and the 4.10 outcomes and history) are client-executable');
 select is((select count(*)::int from app.contract_unowned_objects()), 0, 'no unowned objects');
 select is((select count(*)::int from app.contract_unpinned_functions()), 0, 'every function is pinned');
 select is((select count(*)::int from app.contract_boundary_violations()), 0, 'no boundary violations');
@@ -298,7 +298,9 @@ select is((select (j -> 'assignments' -> 0) - 'occurrence_id' - 'department_id' 
                   -- Story 4.8 keys are checked in duties_reminders_test.sql.
                   - 'deadline_source' - 'short_notice' - 'reminders'
                   -- Story 4.9 keys are checked in duties_coverage_test.sql.
-                  - 'response_provenance' - 'confirmed_channel' from mine),
+                  - 'response_provenance' - 'confirmed_channel'
+            -- Story 4.10 keys are checked in duties_outcomes_test.sql.
+            - 'outcome' from mine),
   jsonb_build_object('assignment_id', pg_temp.asg2(), 'revision', 1, 'response', 'pending', 'slot_revision', 2,
                      'changes', jsonb_build_array('starts_at', 'ends_at'), 'previous_response', 'accepted',
                      'previous_assignment_ids', jsonb_build_array(pg_temp.asg1()), 'notes_updated_at', null),

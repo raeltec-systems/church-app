@@ -14,6 +14,7 @@ import 'access_grants.dart';
 import 'church_time.dart';
 
 part 'duty_coverage.dart';
+part 'duty_outcomes.dart';
 
 /// Duties-registered scope kinds in the Identity grant model (story 2.3).
 abstract final class DutyScopeKinds {
@@ -262,6 +263,7 @@ class MyDuty {
     this.reminders,
     this.confirmedByLeader = false,
     this.confirmedChannel,
+    this.outcome,
   });
 
   factory MyDuty.fromJson(Object? json) {
@@ -306,6 +308,7 @@ class MyDuty {
       confirmedChannel: m['confirmed_channel'] == null
           ? null
           : ContactChannel.fromWire(m['confirmed_channel']),
+      outcome: DutyOutcomeRecord.fromJsonOrNull(m['outcome']),
     );
   }
 
@@ -315,6 +318,11 @@ class MyDuty {
 
   /// Story 4.9: how the leader reached the member (never the reason).
   final ContactChannel? confirmedChannel;
+
+  /// Story 4.10: what a leader recorded after the duty (with its note and
+  /// corrections), or null while nothing is recorded. Never inferred from
+  /// the time.
+  final DutyOutcomeRecord? outcome;
 
   /// Story 4.8: whose answer-by time this is (the leader's, or the church's
   /// lead-time default).

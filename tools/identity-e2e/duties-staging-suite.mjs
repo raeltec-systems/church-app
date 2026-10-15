@@ -62,7 +62,7 @@
 //   DUTIES_SUITE_STATE=/outside/repo/duties-suite-state.json \
 //   node tools/identity-e2e/duties-staging-suite.mjs --evidence <f.jsonl> --summary <f.md> --cleanup-sql <f.sql>
 import { randomBytes, randomUUID } from 'node:crypto';
-import { appendFileSync, existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { appendFileSync, chmodSync, existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { EPOCH_WAIT_MS, amrMethods, localHttp, localKey, psql, sleep } from './harness.mjs';
@@ -361,22 +361,40 @@ const uuidList = (ids) => {
 };
 
 /**
- * The SQL that removes a staging run's rows (the parent session runs it after the suite): every
- * occurrence, series, coverage case, contact attempt, outcome, review flag and follow-up task of
- * the kept departments A and B, their jobs and inbox items, and the per-run departments C (with
- * their grants, memberships and handover obligations). People, departments A and B, their
- * memberships and grants are kept for the next run.
+ * The SQL that removes a staging run's rows (the owner or parent session runs it after the
+ * suite): every occurrence, series, coverage case, contact attempt, outcome, review flag and
+ * follow-up task of the kept departments A and B, their jobs, schedules and inbox items, and the
+ * per-run departments C (with their grants, memberships and handover obligations). It refuses to
+ * run outside a database marked `staging`, and touches only SYNTHETIC departments named
+ * `SYNTHETIC Closing Suite...`, whatever ids it is given. People, departments A and B, their
+ * memberships and grants are kept for the next run. Audit and lifecycle history stays on purpose
+ * (identity audit and lifecycle rows, applications of the relinked account, released holds).
  */
-export function stagingCleanupSql({ keptDepartmentIds = [], runDepartmentIds = [] }) {
+export function stagingCleanupSql({ keptDepartmentIds = [], runDepartmentIds = [], environment = 'staging' }) {
+  // `environment` is 'local' only for the --staging-path proof on the local stack.
+  if (!['staging', 'local'].includes(environment)) throw new Error('cleanup runs on staging (or local for the proof)');
   if (keptDepartmentIds.length === 0) throw new Error('cleanup needs the kept department ids');
   const kept = uuidList(keptDepartmentIds);
-  const all = uuidList([...keptDepartmentIds, ...runDepartmentIds]);
   const runOnly = uuidList(runDepartmentIds);
+  const suiteDepartment = `d.is_synthetic and d.name like 'SYNTHETIC Closing Suite%'`;
   return [
     '-- Story 4.15 closing suite: remove one staging run\'s rows (SYNTHETIC data only).',
+    '-- Never run it while a suite run is in progress (runs must not overlap).',
     'begin;',
+    `do $guard$ begin
+  if app.platform_current_environment() is distinct from '${environment}' then
+    raise exception 'the closing-suite cleanup runs only on ${environment}';
+  end if;
+end $guard$;`,
+    `create temp table suite_kept on commit drop as
+  select d.department_id from app.duties_departments d where d.department_id in (${kept}) and ${suiteDepartment};`,
+    `create temp table suite_run on commit drop as
+  select d.department_id from app.duties_departments d where d.department_id in (${runOnly}) and ${suiteDepartment}
+     and d.department_id not in (select department_id from suite_kept);`,
+    `create temp table suite_departments on commit drop as
+  select department_id from suite_kept union select department_id from suite_run;`,
     `create temp table suite_occurrences on commit drop as
-  select o.occurrence_id from app.duties_occurrences o where o.department_id in (${all});`,
+  select o.occurrence_id from app.duties_occurrences o where o.department_id in (select department_id from suite_departments);`,
     `create temp table suite_assignments on commit drop as
   select a.assignment_id from app.duties_assignments a join app.duties_slots s on s.slot_id = a.slot_id
    where s.occurrence_id in (select occurrence_id from suite_occurrences);`,
@@ -385,24 +403,21 @@ export function stagingCleanupSql({ keptDepartmentIds = [], runDepartmentIds = [
     `create temp table suite_flags on commit drop as
   select f.flag_id from app.duties_review_flags f where f.occurrence_id in (select occurrence_id from suite_occurrences);`,
     `create temp table suite_tasks on commit drop as
-  select t.task_id from app.followups_tasks t where t.scope_id in (${all})
+  select t.task_id from app.followups_tasks t where t.scope_id in (select department_id from suite_departments)
       or (t.source_type = 'duties_coverage_case' and t.source_id in (select case_id from suite_cases));`,
+    `create temp table suite_sources on commit drop as
+  select assignment_id as id from suite_assignments union select occurrence_id from suite_occurrences
+  union select task_id from suite_tasks union select case_id from suite_cases union select flag_id from suite_flags
+  union select department_id from suite_departments;`,
     `create temp table suite_jobs on commit drop as
-  select j.job_id from app.notifications_jobs j
-   where j.source_id in (select assignment_id from suite_assignments)
-      or j.source_id in (select occurrence_id from suite_occurrences)
-      or j.source_id in (select task_id from suite_tasks)
-      or j.source_id in (select case_id from suite_cases)
-      or j.source_id in (select flag_id from suite_flags)
-      or j.source_id in (${all});`,
+  select j.job_id from app.notifications_jobs j where j.source_id in (select id from suite_sources);`,
     'delete from app.notifications_attempts a where a.job_id in (select job_id from suite_jobs);',
     'delete from app.notifications_direct_contact_needs n where n.job_id in (select job_id from suite_jobs);',
     'delete from app.notifications_push_jobs p where p.job_id in (select job_id from suite_jobs);',
     'update app.notifications_jobs j set snoozed_from_item_id = null where j.job_id in (select job_id from suite_jobs);',
     'delete from app.notifications_inbox_items i where i.job_id in (select job_id from suite_jobs);',
     'delete from app.notifications_jobs j where j.job_id in (select job_id from suite_jobs);',
-    `delete from app.notifications_schedules s where s.source_id in (select assignment_id from suite_assignments)
-   or s.source_id in (select task_id from suite_tasks);`,
+    'delete from app.notifications_schedules s where s.source_id in (select id from suite_sources);',
     'delete from app.followups_notes n where n.task_id in (select task_id from suite_tasks);',
     'delete from app.followups_activity a where a.task_id in (select task_id from suite_tasks);',
     'delete from app.followups_tasks t where t.task_id in (select task_id from suite_tasks);',
@@ -411,19 +426,20 @@ export function stagingCleanupSql({ keptDepartmentIds = [], runDepartmentIds = [
     'delete from app.duties_coverage_cases c where c.case_id in (select case_id from suite_cases);',
     'delete from app.duties_contact_needs n where n.assignment_id in (select assignment_id from suite_assignments);',
     `delete from app.duties_audit a where a.occurrence_id in (select occurrence_id from suite_occurrences)
-   or a.department_id in (${runOnly});`,
+   or a.department_id in (select department_id from suite_run);`,
     'delete from app.duties_slot_revisions r where r.occurrence_id in (select occurrence_id from suite_occurrences);',
     'delete from app.duties_assignments a where a.assignment_id in (select assignment_id from suite_assignments);',
     '-- Review flags go with their occurrences.',
     'delete from app.duties_slots s where s.occurrence_id in (select occurrence_id from suite_occurrences);',
     'delete from app.duties_occurrences o where o.occurrence_id in (select occurrence_id from suite_occurrences);',
-    `delete from app.duties_series r where r.department_id in (${all});`,
-    `delete from app.duties_department_members dm where dm.department_id in (${kept}) and dm.ended_at is not null;`,
-    `delete from app.identity_handover_obligations o where o.subject_id in (${runOnly});`,
-    `delete from app.duties_audit a where a.department_id in (${runOnly});`,
-    `delete from app.duties_department_members dm where dm.department_id in (${runOnly});`,
-    `delete from app.identity_grants g where g.scope_id in (${runOnly}) and g.scope_kind in ('department_leader', 'department_deputy');`,
-    `delete from app.duties_departments d where d.department_id in (${runOnly});`,
+    'delete from app.duties_series r where r.department_id in (select department_id from suite_departments);',
+    `delete from app.duties_department_members dm where dm.department_id in (select department_id from suite_kept)
+   and dm.ended_at is not null;`,
+    'delete from app.identity_handover_obligations o where o.subject_id in (select department_id from suite_run);',
+    'delete from app.duties_department_members dm where dm.department_id in (select department_id from suite_run);',
+    `delete from app.identity_grants g where g.scope_id in (select department_id from suite_run)
+   and g.scope_kind in ('department_leader', 'department_deputy');`,
+    'delete from app.duties_departments d where d.department_id in (select department_id from suite_run);',
     'commit;',
     '',
   ].join('\n');
@@ -517,7 +533,7 @@ async function main() {
       assertStateOutsideRepo(rerunState);
       if (existsSync(rerunState)) state = JSON.parse(readFileSync(rerunState, 'utf8'));
       state.personas ??= {};
-      saveState = () => writeFileSync(rerunState, JSON.stringify(state), { mode: 0o600 });
+      saveState = () => { writeFileSync(rerunState, JSON.stringify(state), { mode: 0o600 }); chmodSync(rerunState, 0o600); };
     }
   } else {
     origin = assertStagingOrigin(STAGING_ORIGIN);
@@ -541,7 +557,9 @@ async function main() {
       const { admin, ...kept } = state;
       const tmp = `${statePath}.tmp`;
       writeFileSync(tmp, JSON.stringify(kept), { mode: 0o600 });
+      chmodSync(tmp, 0o600);
       renameSync(tmp, statePath);
+      chmodSync(statePath, 0o600);
     };
     saveState();
     http = async (method, path, { token, body, profile } = {}) => {
@@ -954,12 +972,16 @@ async function main() {
       && access.cellL?.scopes?.includes('cell_leader') && !access.cellL?.roles?.includes('admin')
       && access.guest === 'not_linked' && access.held === 'review_required' && access.deact === 'not_linked',
       { access });
+    // Review: nothing is written when the people are not what the matrix expects.
+    if (!results.at(-1).ok) throw new Error('S01 failed: the people are not as the matrix expects; nothing was changed');
 
     // ====================================================================== S02 departments, scopes, members
     const ov = await overview();
     for (const [key, name] of Object.entries(DEPARTMENTS)) {
       const found = (ov?.departments ?? []).find((d) => d.name.toLowerCase() === name.toLowerCase());
       if (found) {
+        // Review: only a SYNTHETIC department of this suite is reused.
+        if (found.is_synthetic !== true) throw new Error(`department ${key} exists but is not synthetic; nothing was changed`);
         run.departments[key] = found.department_id;
       } else {
         const created = await duty(people.admin, 'duties.create_department', null, { name });
@@ -967,6 +989,12 @@ async function main() {
       }
     }
     state.departments = { A: run.departments.A, B: run.departments.B };
+    // A per-run department C leaves the list once a cleanup has removed it (the owner runs the
+    // cleanup SQL after the suite, so it is confirmed only here, by its absence).
+    if (state.runDepartments) {
+      const live = new Set((ov?.departments ?? []).map((d) => d.department_id));
+      state.runDepartments = state.runDepartments.filter((id) => live.has(id));
+    }
     saveState();
     // Heal a broken run: the scope-loss person holds no deputy scope at the start.
     if (await holdsScope(people.m2, 'department_deputy', run.departments.A)) {
@@ -979,6 +1007,11 @@ async function main() {
     };
     // The accountless member X: an Admin record with a labelled SYNTHETIC household number.
     if (state.accountless?.member) {
+      // Review: the reused record must still be this suite's SYNTHETIC accountless member.
+      const row = await memberRow(state.accountless.member);
+      if (!row || row.display_name !== accountless.name) {
+        throw new Error('the state file\'s accountless member is not this suite\'s SYNTHETIC record; fix the state file');
+      }
       accountless.member = state.accountless.member;
     } else {
       const x = await envelope('identity_review_command', await tok(people.admin), 'identity.create_member', null, {
@@ -999,6 +1032,7 @@ async function main() {
       && Object.values(scopes).every((s) => s === 'held' || s.status === 200)
       && added.every((a) => a === 'added' || a === 'already'),
       { scopes, members: added });
+    if (!results.at(-1).ok) throw new Error('S02 failed: the departments are not set up; no duty was written');
 
     // The started duties for completion (S70) are published first so they have started by then.
     const soon = minuteCeil(Date.now() + 4 * MINUTE);
@@ -1435,13 +1469,18 @@ async function main() {
         department_membership_kept: stillInA });
 
     // ====================================================================== S96 owner operations
+    // PostgREST answers 404 PGRST202 for a function the exposed `api` schema does not have, and
+    // 406 PGRST106 for any request naming the unexposed `app` schema.
     const direct = [];
     for (const fn of ['duties_owner_put_part', 'duties_owner_link_duty', 'duties_owner_flag_review', 'duties_owner_unlink']) {
-      direct.push((await rpc(fn, await tok(people.leadA), {})).status);
-      direct.push((await http('POST', `/rest/v1/rpc/${fn}`, { token: await tok(people.leadA), body: {}, profile: 'app' })).status);
+      const viaApi = await rpc(fn, await tok(people.leadA), {});
+      const viaApp = await http('POST', `/rest/v1/rpc/${fn}`, { token: await tok(people.leadA), body: {}, profile: 'app' });
+      direct.push({ api: `${viaApi.status} ${viaApi.json?.code ?? ''}`, app: `${viaApp.status} ${viaApp.json?.code ?? ''}` });
     }
-    const tableQuery = (await http('GET', '/rest/v1/duties_review_flags?select=*', { token: await tok(people.leadA), profile: 'app' })).status;
-    check('S96-owner-operations-are-not-reachable-by-clients', direct.every((x) => x >= 400) && tableQuery >= 400,
+    const table = await http('GET', '/rest/v1/duties_review_flags?select=*', { token: await tok(people.leadA), profile: 'app' });
+    const tableQuery = `${table.status} ${table.json?.code ?? ''}`;
+    check('S96-owner-operations-are-not-reachable-by-clients', direct.every((x) => x.api === '404 PGRST202' && x.app === '406 PGRST106')
+      && tableQuery === '406 PGRST106',
       { rpc: direct, table_query: tableQuery });
     if (sqlChecks) {
       // A SYNTHETIC Cells-like caller (the 4.11 fixture): a linked event changes, the duty is flagged.
@@ -1507,7 +1546,7 @@ async function main() {
     const keptIds = [run.departments.A, run.departments.B].filter(Boolean);
     if (stagingPath && keptIds.length) {
       // The staging cleanup SQL, executed here so it is proven before the parent session uses it.
-      psql(stagingCleanupSql({ keptDepartmentIds: keptIds, runDepartmentIds: [run.createdC].filter(Boolean) }));
+      psql(stagingCleanupSql({ keptDepartmentIds: keptIds, runDepartmentIds: [run.createdC].filter(Boolean), environment: 'local' }));
       const ids = keptIds.map((d) => `'${d}'`).join(',');
       const left = Number(psql(`select count(*) from app.duties_occurrences where department_id in (${ids})`))
         + Number(psql(`select count(*) from app.duties_series where department_id in (${ids})`))
@@ -1527,7 +1566,10 @@ async function main() {
         members_left: Number(psql(`select count(*) from app.identity_members where display_name like '${NAME_PREFIX}%'`)) });
     } else if (keptIds.length) {
       const runDepartmentIds = [...new Set(state.runDepartments ?? [])];
-      if (cleanupSqlPath) writeFileSync(cleanupSqlPath, stagingCleanupSql({ keptDepartmentIds: keptIds, runDepartmentIds }), { mode: 0o600 });
+      if (cleanupSqlPath) {
+        writeFileSync(cleanupSqlPath, stagingCleanupSql({ keptDepartmentIds: keptIds, runDepartmentIds }), { mode: 0o600 });
+        chmodSync(cleanupSqlPath, 0o600);
+      }
       log('S99-staging-cleanup-sql', { written: Boolean(cleanupSqlPath), run_departments: runDepartmentIds.length });
     }
     writeSummary();

@@ -134,12 +134,21 @@ test('the staging cleanup SQL removes the run\'s rows, keeps people and departme
   assert.match(sql, /^-- Story 4\.15/);
   assert.match(sql, /\nbegin;\n/);
   assert.match(sql, /commit;\n$/);
+  // It refuses to run anywhere but staging, before any row is touched.
+  assert.ok(sql.indexOf("app.platform_current_environment() is distinct from 'staging'") < sql.indexOf('delete from'));
+  assert.match(sql, /raise exception 'the closing-suite cleanup runs only on staging'/);
+  // Only SYNTHETIC departments of this suite are touched, whatever ids it is given.
+  assert.equal(sql.split("d.is_synthetic and d.name like 'SYNTHETIC Closing Suite%'").length - 1, 2);
   assert.doesNotMatch(sql.replaceAll('on commit drop', ''), /\b(drop|truncate|alter)\b/i);
-  assert.doesNotMatch(sql, /identity_members|auth\.users|identity_account_links|duties_outcomes x/);
-  assert.match(sql, new RegExp(`delete from app\\.duties_departments d where d\\.department_id in \\('${C}'\\);`));
-  assert.doesNotMatch(sql, new RegExp(`duties_departments d where d\\.department_id in \\([^)]*${A}`));
-  assert.match(sql, /dm\.department_id in \('aaaaaaaa[^)]*\) and dm\.ended_at is not null/);
-  assert.equal(stagingCleanupSql({ keptDepartmentIds: [A] }).includes('department_id in (null)'), true);
+  assert.doesNotMatch(sql, /identity_members|auth\.users|identity_account_links|duties_outcomes x|identity_access_audit|identity_membership_lifecycle/);
+  assert.match(sql, /delete from app\.duties_departments d where d\.department_id in \(select department_id from suite_run\);/);
+  assert.match(sql, /department_id not in \(select department_id from suite_kept\)/);
+  assert.match(sql, /dm\.department_id in \(select department_id from suite_kept\)\n\s+and dm\.ended_at is not null/);
+  assert.match(sql, /delete from app\.notifications_schedules s where s\.source_id in \(select id from suite_sources\);/);
+  assert.equal(sql.split(`'${C}'`).length - 1, 1);
+  assert.equal(stagingCleanupSql({ keptDepartmentIds: [A] }).includes('d.department_id in (null)'), true);
+  assert.match(stagingCleanupSql({ keptDepartmentIds: [A], environment: 'local' }), /is distinct from 'local'/);
+  assert.throws(() => stagingCleanupSql({ keptDepartmentIds: [A], environment: 'production' }), /staging/);
   assert.throws(() => stagingCleanupSql({ keptDepartmentIds: [] }), /kept department/);
   assert.throws(() => stagingCleanupSql({ keptDepartmentIds: [A], runDepartmentIds: ["1'; drop table x; --"] }), /uuids/);
 });

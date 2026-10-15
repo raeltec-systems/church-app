@@ -35,3 +35,49 @@ node render.mjs 16x9    # also 9x16 and 1x1 -> teaser-<fmt>.mp4 (60 fps capture 
 To edit copy or timing, change `video.html`; `./sheet.sh 9x16 6 4 12.5 30 41` renders a contact sheet of frames for review.
 Layouts for each format live in `LAYOUTS` at the top of the script in `video.html`.
 Scene times are shared with the music (`DROP`, `BREAK`, `WALL`, `END` in `music.mjs`), so change both together.
+
+---
+
+# Journey videos (overview + pastor, cell leader, member)
+
+Four films made with the **Motion Reel** pipeline (beat grid, signed-off shot list, critique loop, -14 LUFS
+mix) from **real clicks, typing and scrolls** recorded in the prototypes. Brief: `JOURNEYS-BRIEF.md`.
+Screens that had to be designed, the prototype bug fixed for recording, and all staging: `JOURNEYS-NEW-SCREENS.md`.
+
+| Film | Folder | Length | Beat grid |
+|---|---|---|---|
+| Overview | `overview/` | 60 s | 120 bpm, synth house in D |
+| Pastor: a pastoral visit | `pastor-visit/` | 65 s | 96 bpm, synth lo-fi in F |
+| Cell leader: plan the next meeting | `cell-meeting/` | 60 s | 112 bpm, synth lo-fi in G |
+| Member: a week in the app | `member-week/` | 72 s | 120 bpm, synth house in A |
+
+Each folder has `film.js` (the film, a pure function of time), `docs/shotlist.md` (what was approved, plus
+the changes made while building) and `docs/critique.md` (three critique rounds).
+
+```
+journeys/patch.mjs     builds journeys/proto/{App,Admin}.html: recording copies with the designed screens
+journeys/rec.mjs       the recorder (real input, slowed CSS animation capture, tap/click positions)
+journeys/rec-*.mjs     one script per journey -> rec/<clip>/ (frames + clip.json)
+journeys/kit.js        shared film parts: streamed clips, phone/laptop, cursor, taps, lock screen, pushes, type
+journeys/round.sh      one critique round: contact sheets (all formats), SFX, mix, hits, sync check
+journeys/final.sh      final picture (30 fps, motion blur) + mix + posters -> out/delivery/
+```
+
+## Re-render
+Needs Node 22, Playwright (Chromium), ffmpeg, uv and the Motion Reel plugin
+(`claude plugin install motion-reel@anthropic-plugin-directory`).
+
+```sh
+cd docs/teaser
+# vendor scripts + logos as in the first teaser above, then:
+mkdir -p journeys/assets && cp logo.png logo-white.png journeys/assets/
+mkdir -p node_modules && ln -sfn /opt/node22/lib/node_modules/playwright node_modules/playwright
+node journeys/patch.mjs
+npx http-server journeys/proto -p 8125 -s &        # the recorder drives these copies
+node journeys/rec-pastor.mjs && node journeys/rec-cell.mjs && node journeys/rec-member.mjs
+SK=~/.claude/plugins/cache/anthropic-plugin-directory/motion-reel/*/skills/motion-reel
+for f in overview pastor-visit cell-meeting member-week; do uv run $SK/scripts/beats.py $f --synth ...; done   # see beats.json; music.wav is gitignored
+for f in overview pastor-visit cell-meeting member-week; do journeys/final.sh $f; done
+```
+The exact `beats.py` settings are in the table above (`--flavor`, `--bpm`, `--tonic`, `--mode major`, and
+`--drop 5 / 2 / 2 / 4`, `--seed 7 / 3 / 5 / 11` for overview / pastor / cell / member).

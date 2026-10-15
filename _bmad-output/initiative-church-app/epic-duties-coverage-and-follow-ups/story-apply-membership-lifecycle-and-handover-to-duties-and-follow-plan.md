@@ -10,7 +10,7 @@ route_source: 'auto'
 review: ''
 review_source: ''
 lenses_ran: []
-review_loop_iteration: 1
+review_loop_iteration: 2
 context:
   - '{project-root}/docs/runbooks/identity-access.md'
   - '{project-root}/docs/runbooks/duties.md'
@@ -121,11 +121,23 @@ context:
 - Removed functions (never merged): `followups_handover_candidate`, `followups_supervisor_candidate`, `followups_handover_task`. New: `duties_lock_people`, `duties_command_people`, `duties_jsonb_uuid`, `followups_jsonb_uuid`, `followups_lock_people`, `followups_command_people`, `followups_handover_plan`, `followups_resolve_obligations`, `followups_complete_handover`. Newly replaced bodies: `duties_owner_session`, `duties_owner_positions` (from 4.11), `followups_in_scope`, `followups_authorize_command`, `followups_command` (from 4.6, review N5 kept).
 - Clients: notice `memberRemovedNoNotices`; the needs-leader label; **Hand over the next 100 follow-up tasks** on Membership status (`LifecycleNotice.handoverContinued`). Tests: `duties_lifecycle_test.dart` 11, `membership_lifecycle_test.dart` +2.
 - The per-department vacancy notice (a frozen-block deviation, Plan Change Log) is **pending owner acknowledgement**.
+
+### Review amendments (2026-10-15, round 2)
+
+- B1 (blocker, a revoked scope over the cap left tasks with the former leader): (a) `followups_capacity` replaced (from 4.6): owner capacity needs the owner in the task's group now (`followups_in_group`, the Q4 roster incl. live Pastors and accountless group members); `followups_my_tasks` replaced to match. (b) Decision (agent, under owner pre-approval): Identity's obligations table needs a lifecycle event and is Identity's, so Follow-ups cannot record obligations for a revoked scope; instead `followups_pending_handovers()` lists, with the same kinds, every task whose owner left its group or whose supervisor left or lost its scope, and `followups_admin_routing` (replaced, from 4.6) returns `handovers` per member, shown on Follow-up routing with **Hand over the next 100**. (c) `followups.complete_handover` acts on active members (only what they may no longer hold).
+- S5: `followups_handover_member` share-locks the chosen owners and supervisors (id order, before the tasks), rechecks them and recomputes the plan (up to three tries). E2E L27 (negative control: without the lock the tasks went to the member being deactivated). Two simultaneous deactivations handing to each other can still deadlock (detector; retry) - documented.
+- N9: authorizers lock the actor's member row, then the actor's grants, then the payload's people; the remaining pre-handler window is documented (duties.md).
+- N10: the 4.6 review N5 supervisor-grant lock now reads the dispatcher's payload; pgTAP shows the grant row locked.
+- N11: "handed over" only when something moved (`handoverNoneMoved` otherwise, both screens); the Membership status button shows whenever Follow-ups obligations remain.
+- N12: a deactivation or deletion cancels the member's reminders of the tasks still waiting (about 0.5 ms each; deactivation with 1030 tasks now 1.5-2.2 s); documented that after a revoked scope the reminders keep going to the still-reachable former owner until the Admin continues.
+- N13: none (e800a7d never reached staging).
+- Newly replaced bodies: `followups_capacity`, `followups_my_tasks`, `followups_admin_routing` (from 4.6). New: `followups_in_group`, `followups_pending_handovers`.
 - Rule slip to disclose: during the re-verification one `git fetch --dry-run` was run (output discarded, no refs updated) before `ci:migrations --base origin/main`; no other fetch, pull or push.
 
 ## Plan Change Log
 
 - 2026-10-15 (build): the vacancy notice is one per department and lifecycle change (title **Positions need cover**), not one per ended position as the frozen Decisions say; `duties_coverage_source_check` (4.8) is replaced too so the notice's source is current for a vacated assignment. Recorded under Implementation Notes. The frozen block is unchanged. **Pending owner acknowledgement.**
+- 2026-10-15 (review round 2): owner capacity is live (the owner must be in the task's group); what waits for handover is listed for the Admin on Follow-up routing; `followups.complete_handover` acts on active members too. Recorded under Implementation Notes (round 2). The frozen block is unchanged.
 - 2026-10-15 (review round 1): a lifecycle change hands over at most 25 follow-up tasks; the rest stay pending for the Admin, who continues with the new command `followups.complete_handover` (100 per step). Owner candidates must be reachable in the app. A `followup_supervision` obligation is added. Duties and Follow-ups commands share-lock the identity rows of the members they may notify first. Recorded under Implementation Notes (Review amendments). The frozen block is unchanged.
 
 ## Review Triage Log
@@ -136,6 +148,7 @@ context:
 - S3 (should, unreachable owner chosen): fixed (reachable candidates only, else last responsible); pgTAP.
 - S4 (should, needs-leader warning and revoke-first bypass): warning fixed; bypass recorded as a known limit with a follow-up item (an Identity grant-revocation handover hook).
 - N1-N8: fixed (N5 documented, N8 recorded in the runbook).
+- 2026-10-15, re-review of round 1: S2, S3, N1-N8 confirmed; 1 blocker (B1) and 1 should-fix (S5) from the cap, nits N9-N13. B1 fixed (a, c as asked; b as a Follow-ups list with the same kinds, because Identity's obligations need a lifecycle event). S5 fixed (lock and recheck; E2E L27). N9 reordered and documented; N10, N11, N12 fixed; N13 no action.
 
 ## Verification
 

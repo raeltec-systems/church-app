@@ -8,7 +8,9 @@ Related runbooks: [environments-and-promotion.md](environments-and-promotion.md)
 workflow, owner steps A-C), [identity-access.md](identity-access.md) (per-story mechanics and the
 "Hosted" sections), [identity-support.md](identity-support.md) (RB1-RB8),
 [system-access-and-operations.md](system-access-and-operations.md),
-[backup-and-restore.md](backup-and-restore.md). Staging evidence for this package:
+[backup-and-restore.md](backup-and-restore.md). Duties and Follow-ups (epic 4), the scheduling
+approvals and the pilot department continue in
+[production-promotion-duties.md](production-promotion-duties.md). Staging evidence for this package:
 `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.14/`.
 
 ## What "promoted" means here

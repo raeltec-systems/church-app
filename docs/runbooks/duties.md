@@ -1021,6 +1021,8 @@ Migration: `supabase/migrations/20261015120000_duties_owner_operations.sql` (for
 - **Who may.** Owner operations are never client-executable; the actor is the live session; only the cell's leader or assistant acts for a cell (the Admin role alone, Pastor, department scopes and other cells' leaders are `forbidden`). A cell leader's department commands stay `forbidden`.
 - **Privacy.** No response note, override or confirmation reason, contact data, or person of the department crosses to the cell (display links show `filled` only). Audit rows hold codes; answers hold ids, revisions, states and counts.
 - **Deletion.** The hook anonymises who linked, unlinked, flagged or cleared; `_remaining` counts them.
+- **Review fixes (2026-10-15).** A part is bound to the cell its first link named (another cell answers `not_found`); a create that asks nobody refuses an answer-by; an identical put still records the caller's part revision; the conflicts read covers at most 120 days; a review of a duty that started or was cancelled no longer shows as open; only the foreign-key cascade removes a link; My duties skips (and logs) a row the client cannot read; the member's notice for a cell part says the cell leader sees it in the programme.
+- **Release gate.** No `cell_part` registration in a migration and no cell-part data on staging until every client runs the 4.11 build or later (older builds cannot show My duties once a cell part exists). See [contracts-and-owner-seams.md](contracts-and-owner-seams.md#duties-owner-operations-consumer-guide-story-411), step 7.
 
 ### Gates and locks
 
@@ -1068,6 +1070,8 @@ Record the outcome of each step in `evidence-4.11/owner-check.md`: pass or fail,
 
 - **Q4 (open, fail-closed default; unchanged):** personal data in production. Every operation and read is behind the Q4 gate.
 - **New (fail-closed default chosen):** may a cell programme name the person a linked department duty is assigned to? Built: no (the cell sees the duty, its times and whether it is filled, never who). Changing it is a contract change.
+- **New (default built: board only):** should the department's leader be notified when a linked meeting or event changes (a mismatch flag)? Built: no notification; the board and rota show it until reviewed.
+- **Pending owner acknowledgement:** `duties.clear_review` answers `forbidden` (not `not_found` as planned) to anyone who does not manage the department, like every other department command.
 
 ### Known limits (later entries)
 
@@ -1075,4 +1079,5 @@ Record the outcome of each step in `evidence-4.11/owner-check.md`: pass or fail,
 - No discovery read of linkable department duties for cells (epic 5 asks for one if needed; a contract change).
 - The creator's reminder choice for a part (`reminders`) is not taken; cell parts use the church defaults.
 - A system-principal caller (no live session) is not supported; owner operations need the acting member's session.
+- A part holds at most 50 positions over its life (cancelled ones count); beyond that a programme starts a new part.
 - Lifecycle effects on cell parts (transfer, removal) are Cells' calls to these operations (epic 5.9) and entry 12.

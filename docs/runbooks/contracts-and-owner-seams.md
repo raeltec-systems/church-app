@@ -113,9 +113,15 @@ Migration: `supabase/migrations/20261015120000_duties_owner_operations.sql`. Cel
    | `app.duties_owner_event_links` | (event reference) | The department duties that name the event: ids, states, `review_open` (at most 200). |
    | `app.duties_owner_topic` | `occurrence_id` | The sermon-draft reference (duty, position, start, topic, scripture, event) for the duty's current assignee or its managers; `not_found` otherwise. The media team reviews the draft in Content before publication. |
 
+   - **`cell_id` is always the part's own cell** (review S1). A part belongs to the cell its first link named; naming another cell for it answers `not_found`, so pass the cell from your own part row, never from the request.
+   - **Conflicts** (`duties_owner_conflicts`) cover at most 120 days (one part's time, `{"ends_at": "out_of_range"}` beyond). Restrict `member_id` to your own roster before calling: Duties does not know your roster.
+   - **Content authorises its editors** before calling `duties_owner_flag_review` or `duties_owner_event_links` for an event: Duties only checks that the caller has a live session (review N4).
+   - **Mismatch flags are board-only:** no notification is sent; the department sees them on its board and rota until reviewed, or until the duty starts or is cancelled.
 5. **Position keys** are lower-case tokens or lower-case uuids (`^[a-z0-9][a-z0-9_-]{0,63}$`), stable for the life of the part: a key's slot never changes; a cancelled key is never reused; a renamed position needs a new key.
+   A part has at most 50 positions over its life, cancelled ones included (`{"positions": "too_many"}`); a programme that needs more starts a new part (a new source id).
 6. **Your roster is yours.** Duties checks that an assignee is an active member; you check that they belong to your cell, and you end their parts when they leave (your transfer command calls these operations).
-7. **Contract changes.** Epic 5 is the first real caller. A shape it needs beyond these operations (for example cell-scope leader alerts, coverage and confirmation, a discovery read of linkable duties, the creator's reminders, naming a linked duty's assignee) is a Duties contract change recorded in the 4.11 plan, never a Cells-side workaround.
+7. **Release gate and client compatibility (review S2).** A cell part reaches My duties as a row with `owner_kind: "cell"` and no department. Clients before the 4.11 build cannot read such a row (they required a department) and fail the whole My duties list; the 4.11 build reads it, and from 4.11 on any row a client cannot read is left out and logged instead of failing the list. So: **no `cell_part` registration in a migration (epic 5) and no cell-part data on staging until every client in use runs the 4.11 build or later.**
+8. **Contract changes.** Epic 5 is the first real caller. A shape it needs beyond these operations (for example cell-scope leader alerts, coverage and confirmation, a discovery read of linkable duties, the creator's reminders, naming a linked duty's assignee) is a Duties contract change recorded in the 4.11 plan, never a Cells-side workaround.
 
 ## Notifications owner operations (story 3.1)
 

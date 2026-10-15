@@ -54,6 +54,10 @@ abstract final class DutyCommands {
   /// Story 4.8: the member reminders of one date, or of a series from a date
   /// onwards.
   static const setReminders = 'duties.set_reminders';
+
+  /// Story 4.11: the department marks an owner-review mismatch reviewed
+  /// (expected revision = the review's revision).
+  static const clearReview = 'duties.clear_review';
 }
 
 /// Story 4.2: the revisable fields (wire names) in display order, and the
@@ -242,6 +246,7 @@ class MyDuty {
     required this.times,
     required this.response,
     required this.responseDeadline,
+    this.cellId,
     this.location,
     this.instructions,
     this.respondedAt,
@@ -273,12 +278,17 @@ class MyDuty {
     if ((response == DutyResponse.pending) != (respondedAt == null)) {
       throw const FormatException('unexpected responded_at');
     }
+    // Story 4.11: a department duty names its department; a cell programme
+    // part names its cell and no department.
+    final ownerKind = DutyOwnerKind.fromWire(m['owner_kind']);
+    final cell = ownerKind == DutyOwnerKind.cell;
     return MyDuty(
       assignmentId: _req<String>(m, 'assignment_id'),
       revision: _revision(m),
       occurrenceId: _req<String>(m, 'occurrence_id'),
-      departmentId: _req<String>(m, 'department_id'),
-      departmentName: _req<String>(m, 'department_name'),
+      departmentId: cell ? null : _req<String>(m, 'department_id'),
+      departmentName: cell ? null : _req<String>(m, 'department_name'),
+      cellId: cell ? _req<String>(m, 'cell_id') : null,
       dutyName: _req<String>(m, 'duty_name'),
       times: DutyTimes.fromJson(m),
       location: _opt<String>(m, 'location'),
@@ -300,7 +310,7 @@ class MyDuty {
       priorAcceptedAt: _priorAccepted(m, response),
       leaders: _leaders(m),
       slotId: _opt<String>(m, 'slot_id'),
-      ownerKind: DutyOwnerKind.fromWire(m['owner_kind']),
+      ownerKind: ownerKind,
       deadlineSource: DutyDeadlineSource.fromWire(m['deadline_source']),
       shortNotice: _shortNotice(m),
       reminders: DutyReminders.fromJsonIn(m),
@@ -340,12 +350,20 @@ class MyDuty {
   /// entry's id). Null from a server before 4.5.
   final String? slotId;
 
-  /// Story 4.5: who owns the duty. Only a department-owned duty can be
-  /// answered here (cell parts wait on entry 11; anything else fails closed).
+  /// Story 4.5: who owns the duty. Story 4.11: a department duty or a cell
+  /// programme part can be answered here; anything else fails closed.
   final DutyOwnerKind ownerKind;
 
   /// Story 4.5: the member may answer this duty from My duties.
-  bool get answerable => ownerKind == DutyOwnerKind.department;
+  bool get answerable =>
+      ownerKind == DutyOwnerKind.department || ownerKind == DutyOwnerKind.cell;
+
+  /// Story 4.11: the cell of a cell programme part (null for a department
+  /// duty).
+  final String? cellId;
+
+  /// Story 4.11: who the duty belongs to, as the member reads it.
+  String get ownerLabel => departmentName ?? 'Cell programme';
 
   /// Story 4.5: when the member had accepted before saying they can't make
   /// it anymore (null otherwise).
@@ -367,8 +385,10 @@ class MyDuty {
   /// The assignment's revision (expected_revision of duties.respond).
   final int revision;
   final String occurrenceId;
-  final String departmentId;
-  final String departmentName;
+
+  /// The owning department (null for a cell programme part, story 4.11).
+  final String? departmentId;
+  final String? departmentName;
   final String dutyName;
   final DutyTimes times;
   final String? location;
@@ -427,37 +447,54 @@ class MyDuty {
 
 /// Story 4.5: who owns a duty the member sees. A server before 4.5 sends no
 /// owner kind and lists department-owned duties only, so a missing value is
-/// a department; any other value (a cell part, or one this app does not
-/// know) is shown but cannot be answered here (fail closed).
+/// a department. Story 4.11: a cell programme part. Any other value (one
+/// this app does not know) is shown but cannot be answered here (fail
+/// closed).
 enum DutyOwnerKind {
   department,
+  cell,
   other;
 
   static DutyOwnerKind fromWire(Object? v) => switch (v) {
     null || 'department' => department,
+    'cell' => cell,
     String() => other,
     _ => throw const FormatException('unexpected owner_kind'),
   };
 }
 
 /// Story 4.5: a leader or deputy of the duty's department, by name only.
+/// Story 4.11: or a leader or assistant of a cell programme part's cell.
 class DutyLeaderName {
-  const DutyLeaderName({required this.displayName, required this.isDeputy});
+  const DutyLeaderName({
+    required this.displayName,
+    required this.isDeputy,
+    this.isAssistant = false,
+  });
 
   factory DutyLeaderName.fromJson(Object? json) {
     final m = _map(json, 'leader');
     final role = _req<String>(m, 'role');
-    if (role != 'leader' && role != 'deputy') {
+    if (role != 'leader' && role != 'deputy' && role != 'assistant') {
       throw const FormatException('unexpected role');
     }
     return DutyLeaderName(
       displayName: _req<String>(m, 'display_name'),
       isDeputy: role == 'deputy',
+      isAssistant: role == 'assistant',
     );
   }
 
   final String displayName;
   final bool isDeputy;
+  final bool isAssistant;
+
+  /// "Leader", "Deputy" or (a cell's) "Assistant".
+  String get roleLabel => isAssistant
+      ? 'Assistant'
+      : isDeputy
+      ? 'Deputy'
+      : 'Leader';
 }
 
 List<DutyLeaderName> _leaders(Map m) {
@@ -784,6 +821,8 @@ class LeaderDuty {
     this.topic,
     this.scripture,
     this.reminders,
+    this.reviews = const [],
+    this.linkedParts = 0,
   });
 
   factory LeaderDuty.fromJson(Object? json) {
@@ -805,12 +844,22 @@ class LeaderDuty {
         _req<List>(m, 'positions').map(DutyPosition.fromJson),
       ),
       reminders: DutyReminders.fromJsonIn(m),
+      reviews: DutyReview.listIn(m),
+      linkedParts: _linkedParts(m),
     );
   }
 
   /// Story 4.8: the member reminders of this duty (null from a server
   /// before 4.8).
   final DutyReminders? reminders;
+
+  /// Story 4.11: open owner-review mismatches (a linked meeting or event
+  /// changed); the duty itself did not change.
+  final List<DutyReview> reviews;
+
+  /// Story 4.11: how many cell programme parts show this duty (display
+  /// links; the department keeps sole authority).
+  final int linkedParts;
 
   final String occurrenceId;
   final String departmentId;
@@ -837,6 +886,91 @@ class LeaderDuty {
   /// rota position is given with duties.assign_slot).
   String? get memberId =>
       positions.length != 1 ? null : positions.first.assignment?.memberId;
+}
+
+/// Story 4.11: an owner-review mismatch on a department duty. A linked cell
+/// meeting or event changed; the duty, its answers and its reminders did not.
+/// Only codes travel (never the meeting's or event's details).
+class DutyReview {
+  const DutyReview({
+    required this.flagId,
+    required this.revision,
+    required this.source,
+    required this.changed,
+    required this.flaggedAt,
+  });
+
+  factory DutyReview.fromJson(Object? json) {
+    final m = _map(json, 'review');
+    final source = _req<String>(m, 'source');
+    if (source != 'cell_part' && source != 'event') {
+      throw const FormatException('unexpected review source');
+    }
+    final changed = _req<List>(m, 'changed');
+    if (changed.isEmpty || changed.any((c) => !reviewFields.contains(c))) {
+      throw const FormatException('unexpected review fields');
+    }
+    return DutyReview(
+      flagId: _req<String>(m, 'flag_id'),
+      revision: _revision(m),
+      source: source,
+      changed: List.unmodifiable(changed.cast<String>()),
+      flaggedAt: _instant(m, 'flagged_at'),
+    );
+  }
+
+  /// The open reviews in a duty answer (none from a server before 4.11).
+  static List<DutyReview> listIn(Map m) {
+    final v = m['reviews'];
+    if (v == null) return const [];
+    if (v is! List) throw const FormatException('unexpected reviews');
+    return List.unmodifiable(v.map(DutyReview.fromJson));
+  }
+
+  /// The change codes the server sends, in the order they are read.
+  static const reviewFields = [
+    'time',
+    'place',
+    'label',
+    'assignee',
+    'cancelled',
+  ];
+
+  final String flagId;
+
+  /// The review's revision (expected_revision of duties.clear_review).
+  final int revision;
+
+  /// `cell_part` (a linked cell meeting) or `event` (a linked event).
+  final String source;
+  final List<String> changed;
+  final DateTime flaggedAt;
+
+  /// "The linked cell meeting changed (time, place)".
+  String get summary {
+    const words = {
+      'time': 'time',
+      'place': 'place',
+      'label': 'name',
+      'assignee': 'person',
+      'cancelled': 'cancelled',
+    };
+    final what = [
+      for (final f in reviewFields)
+        if (changed.contains(f)) words[f]!,
+    ].join(', ');
+    return '${source == 'event' ? 'The linked event' : 'A linked cell meeting'} '
+        'changed ($what)';
+  }
+}
+
+int _linkedParts(Map m) {
+  final v = m['linked_parts'];
+  if (v == null) return 0;
+  if (v is! int || v < 0) {
+    throw const FormatException('unexpected linked_parts');
+  }
+  return v;
 }
 
 /// One member of a department's roster.
@@ -1378,6 +1512,8 @@ class RotaOccurrence {
     this.topic,
     this.scripture,
     this.reminders,
+    this.reviews = const [],
+    this.linkedParts = 0,
   });
 
   factory RotaOccurrence.fromJson(Object? json) {
@@ -1406,12 +1542,20 @@ class RotaOccurrence {
       confirmed: confirmed,
       positions: positions,
       reminders: DutyReminders.fromJsonIn(m),
+      reviews: DutyReview.listIn(m),
+      linkedParts: _linkedParts(m),
     );
   }
 
   /// Story 4.8: this date's member reminders (null from a server before
   /// 4.8).
   final DutyReminders? reminders;
+
+  /// Story 4.11: open owner-review mismatches of this date.
+  final List<DutyReview> reviews;
+
+  /// Story 4.11: how many cell programme parts show this date.
+  final int linkedParts;
 
   final String occurrenceId;
 

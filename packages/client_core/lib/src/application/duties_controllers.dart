@@ -123,6 +123,12 @@ enum DutyNotice {
   /// under deletion; no outcome is recorded about them.
   outcomeMemberGone,
 
+  /// Story 4.11: an owner-review mismatch was marked reviewed.
+  reviewCleared,
+
+  /// Story 4.11: someone else marked the review first (reloaded).
+  reviewAlreadyCleared,
+
   /// Story 4.5: "Can't make it anymore" was recorded.
   withdrawn,
 
@@ -375,6 +381,7 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
               : DutyNotice.positionCancelled,
         DutyOutcomeCommands.recordOutcome => DutyNotice.outcomeRecorded,
         DutyOutcomeCommands.correctOutcome => DutyNotice.outcomeCorrected,
+        DutyCommands.clearReview => DutyNotice.reviewCleared,
         _ =>
           action.request.payload['response'] == DutyResponse.declined.wire
               ? DutyNotice.declined
@@ -427,6 +434,13 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
       if (f['assignment_id'] == 'unrecorded') {
         return DutyNotice.changedElsewhere;
       }
+    }
+    // Story 4.11: a review cleared (or changed) elsewhere reloads the list.
+    if (action?.command == DutyCommands.clearReview &&
+        error.code == ErrorCode.conflict) {
+      return f['flag_id'] == 'cleared'
+          ? DutyNotice.reviewAlreadyCleared
+          : DutyNotice.changedElsewhere;
     }
     return switch (error.code) {
       ErrorCode.conflict when f['assignments'] == 'changed' =>
@@ -624,6 +638,15 @@ class DutyLeaderController extends DutiesController<DutyLeaderBoard> {
     'occurrence_id': duty.occurrenceId,
     'reminders': DutyReminders(reminders).toWire(),
   }, duty.dutyName);
+
+  /// Story 4.11: mark an owner-review mismatch of [duty] reviewed (the duty
+  /// itself does not change).
+  Future<void> clearReview(LeaderDuty duty, DutyReview review) => send(
+    DutyCommands.clearReview,
+    Optional.of(review.revision),
+    {'flag_id': review.flagId},
+    duty.dutyName,
+  );
 }
 
 final dutyLeaderProvider =
@@ -727,6 +750,12 @@ class DutyRotaController extends DutiesController<DutyRota> {
     {'series_id': series.seriesId, 'from_occurrence_id': from.occurrenceId},
     series.dutyName,
   );
+
+  /// Story 4.11: mark an owner-review mismatch of one date reviewed.
+  Future<void> clearReview(RotaOccurrence occurrence, DutyReview review) =>
+      send(DutyCommands.clearReview, Optional.of(review.revision), {
+        'flag_id': review.flagId,
+      }, occurrence.dutyName);
 }
 
 final dutyRotaProvider =

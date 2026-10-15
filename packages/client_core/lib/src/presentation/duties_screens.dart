@@ -248,6 +248,18 @@ abstract final class DutyPaths {
       'Already answered',
       'This duty already has an answer. The list was reloaded.',
     ),
+    DutyNotice.reviewCleared => (
+      StatusTone.success,
+      'Marked reviewed',
+      'The change to what $what is linked to is marked reviewed. The duty '
+          'itself was not changed: change it here if it should follow.',
+    ),
+    DutyNotice.reviewAlreadyCleared => (
+      StatusTone.neutral,
+      'Already reviewed',
+      'Someone else marked this change reviewed first. The list was '
+          'reloaded.',
+    ),
     DutyNotice.withdrawn => (
       StatusTone.success,
       'Answer sent',
@@ -1142,6 +1154,18 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
             '${duty.accepted} of ${duty.required} confirmed',
             key: Key('coverage-$id'),
           ),
+          // Story 4.11: linked programme parts and owner-review mismatches.
+          Consumer(
+            builder: (context, ref, _) => _OwnerReviews(
+              occurrenceId: id,
+              reviews: duty.reviews,
+              linkedParts: duty.linkedParts,
+              canClear: widget.department.canPublish,
+              busy: widget.busy,
+              onClear: (r) =>
+                  ref.read(dutyLeaderProvider.notifier).clearReview(duty, r),
+            ),
+          ),
           if (duty.topic case final t?) Text('Topic: $t'),
           if (duty.scripture case final sc?) Text('Scripture: $sc'),
           for (final p in duty.positions) ...[
@@ -1280,6 +1304,77 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Story 4.11: the cell programme parts that show a department duty (display
+/// links; the department keeps sole authority) and its open owner-review
+/// mismatches: a linked cell meeting or event changed, the duty did not. Its
+/// leaders and deputies (and an Admin) mark a mismatch reviewed after
+/// deciding whether to change the duty.
+class _OwnerReviews extends StatelessWidget {
+  const _OwnerReviews({
+    required this.occurrenceId,
+    required this.reviews,
+    required this.linkedParts,
+    required this.canClear,
+    required this.busy,
+    required this.onClear,
+  });
+  final String occurrenceId;
+  final List<DutyReview> reviews;
+  final int linkedParts;
+  final bool canClear;
+  final bool busy;
+  final void Function(DutyReview review) onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    if (linkedParts == 0 && reviews.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (linkedParts > 0)
+          Padding(
+            key: Key('linked-parts-$occurrenceId'),
+            padding: const EdgeInsets.only(top: 4),
+            child: _muted(
+              context,
+              'Shown on $linkedParts cell programme '
+              '${linkedParts == 1 ? 'part' : 'parts'}. Only this department '
+              'changes it.',
+            ),
+          ),
+        for (final r in reviews)
+          Padding(
+            key: Key('review-${r.flagId}'),
+            padding: const EdgeInsets.only(top: 4),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const StatusLabel(
+                  label: 'Needs review',
+                  tone: StatusTone.warning,
+                ),
+                Text(
+                  '${r.summary}. This duty was not changed; change it here if '
+                  'it should follow.',
+                ),
+                if (canClear)
+                  FocusRing(
+                    child: TextButton(
+                      key: Key('clear-review-${r.flagId}'),
+                      onPressed: busy ? null : () => onClear(r),
+                      child: const Text('Mark reviewed'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
@@ -2136,7 +2231,7 @@ class _MyDutiesListState extends ConsumerState<_MyDutiesList> {
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
                   '${_when(context, d.times.arriveBy)}: ${d.title} '
-                  '(${d.departmentName})',
+                  '(${d.ownerLabel})',
                   key: Key('bulk-date-${d.assignmentId}'),
                 ),
               ),
@@ -2668,7 +2763,7 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
     final canAnswer = a.needsResponse(now);
     final details = <Widget>[
       _heading(context, a.title),
-      Text(a.departmentName),
+      Text(a.ownerLabel, key: Key('duty-owner-$id')),
       Text(_timesText(context, a.times)),
       if (a.location case final l?) Text('Where: $l'),
       if (a.changes case final c?) ...[
@@ -2770,10 +2865,8 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
         if (a.leaders.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(
-            [
-              for (final l in a.leaders)
-                '${l.isDeputy ? 'Deputy' : 'Leader'}: ${l.displayName}',
-            ].join('. '),
+            [for (final l in a.leaders) '${l.roleLabel}: ${l.displayName}']
+                .join('. '),
             key: Key('duty-leaders-$id'),
           ),
           _muted(
@@ -3060,7 +3153,7 @@ class _MyDutiesHomeCardState extends ConsumerState<MyDutiesHomeCard> {
               style: text.copyWith(fontWeight: FontWeight.w600),
             ),
             Text(
-              '${next.departmentName}. ${_timesText(context, next.times)}'
+              '${next.ownerLabel}. ${_timesText(context, next.times)}'
               '${next.location == null ? '' : '. ${next.location}'}',
               style: text,
             ),

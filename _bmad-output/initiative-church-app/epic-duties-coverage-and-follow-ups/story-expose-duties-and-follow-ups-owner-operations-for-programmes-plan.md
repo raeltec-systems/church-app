@@ -3,7 +3,7 @@ title: 'Expose Duties and Follow-ups owner operations for programmes and later o
 type: 'feature'
 ticket: '11'
 created: '2026-10-15'
-status: 'built'
+status: 'done'
 baseline_revision: '2f8cf1d2b4624a905f2a7f1920526d3ab86de888'
 route: 'full'
 route_source: 'auto'

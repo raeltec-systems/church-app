@@ -30,7 +30,7 @@ delivery first). **No product defect was found; no migration.**
   deletion 12/12, runbooks 16/16, inbox 13/13, source-contracts 10/10, worker 17/17, routing
   18/18, push 12/12, inbox-screens 12/12, duties 13/13, duties-revisions 13/13, duties-rota 17/17,
   duties-overlaps 13/13, duties-responses 12/12, followups 15/15, followups-reminders 12/12,
-  duties-reminders 17/17, REST_OF_E2E, duties-staging-suite 44/44 (and `--staging-path` 44/44).
+  duties-reminders 17/17, duties-coverage 12/12, duties-outcomes 11/11, duties-owner-ops 13/13, duties-lifecycle 16/16, duties-pilot 13/13, duties-decisions 11/11 (these six after the second restart, each after a reset), duties-staging-suite 44/44 (and `--staging-path` 44/44).
 
 ## Node, contracts and policy
 

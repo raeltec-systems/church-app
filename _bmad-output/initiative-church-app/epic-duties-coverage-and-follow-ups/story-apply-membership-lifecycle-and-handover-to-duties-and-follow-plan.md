@@ -3,7 +3,7 @@ title: 'Apply membership lifecycle and handover to duties and follow-ups'
 type: 'feature'
 ticket: '12'
 created: '2026-10-15'
-status: 'in-progress'
+status: 'built'
 baseline_revision: '269acf1493ba632f647c10f74525eb583d411065'
 route: 'full'
 route_source: 'auto'
@@ -69,10 +69,10 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261015043644_duties_lifecycle.sql` -- hooks, commands, vacancy kind and flag, Follow-ups handover, replaced bodies, privileges.
-- [ ] `supabase/tests/duties_lifecycle_test.sql`, `duties_lifecycle_scale_test.sql`; ledgers and earlier tests updated.
-- [ ] `packages/client_core` -- remove member, handovers and resolve, `vacated` flag, handover refusal text, task handover attribution; tests.
-- [ ] `tools/identity-e2e/duties-lifecycle.mjs` + `.test.mjs`.
+- [x] `supabase/migrations/20261015043644_duties_lifecycle.sql` -- hooks, commands, vacancy kind and flag, Follow-ups handover, replaced bodies, privileges.
+- [x] `supabase/tests/duties_lifecycle_test.sql`, `duties_lifecycle_scale_test.sql`; ledgers and earlier tests updated.
+- [x] `packages/client_core` -- remove member, handovers and resolve, `vacated` flag, handover refusal text, task handover attribution; tests.
+- [x] `tools/identity-e2e/duties-lifecycle.mjs` + `.test.mjs`.
 - [ ] Runbooks `duties.md`, `follow-ups.md`, `identity-access.md`; `evidence-4.12/`; CI evidence step.
 
 **Acceptance Criteria:**
@@ -80,7 +80,33 @@ context:
 
 ## Implementation Notes
 
+- Implemented directly (no implementation subagent inside this builder run), as 4.1-4.11. CHECKPOINT 1 pre-approved by the owner (owner-decisions-milestone-1.md, -2.md); the frozen block's decisions are the agent's under that pre-approval.
+- Server: `supabase/migrations/20261015043644_duties_lifecycle.sql` (ASCII, no backslashes, no DROP/TRUNCATE/`delete from`, `search_path = ''` everywhere; every new function revoked from public, anon, authenticated and service_role; no new client grant).
+  - New: columns `duties_department_members.ended_by_member/ended_by_account` (with a check); functions `duties_lifecycle_actor`, `duties_vacated_since`, `duties_lifecycle_notify` (Q2 guard), `duties_vacate_member` (the one ending routine), `duties_hold_contact`, `duties_scope_revoked`, `duties_on_member_lifecycle` (hook), `duties_report_handover` (hook), `duties_vacancy_alert_check`, `duties_remove_member`, `duties_pending_handovers`, `duties_has_reachable_leader`, `duties_resolve_handover`; `followups_reachable`, `followups_handover_candidate`, `followups_supervisor_candidate`, `followups_handover_task`, `followups_handover_member`, `followups_on_member_lifecycle` (hook), `followups_report_handover` (hook), trigger `followups_tasks_handover_sync` (`followups_task_handover_sync`). Reminder kind `duties_coverage/duty_vacated`. Registrations: Duties lifecycle hooks on four events, Follow-ups on three, both handover hooks.
+  - Replaced bodies (each copied from its latest version, changes marked "Story 4.12", every earlier review fix kept):
+    - from `20261015035112` (4.11): `duties_state_ok` (end reason and change class `vacated`, capacity `lifecycle`, four audit actions), `duties_authorize_command` and `duties_command` (two commands), `duties_deletion_remaining` and `duties_erase_member` (4.10 S1 lock-first order kept; `ended_by_*` anonymised and counted).
+    - from `20261014212507` (4.9): `duties_coverage` (`vacated` per position and per department count; everything else unchanged).
+    - from `20261014171038` (4.8): `duties_needs_contact` (`access_hold` entries while the member is unreachable), `duties_coverage_source_check` (also current for an assignment that ended `vacated` at that revision).
+    - from `20261014130535` (4.7): `followups_state_ok` (activity `reminders_skipped`).
+    - from `20261013220239` (4.1): `duties_department_json` (`handovers`, `needs_leader`).
+  - Not replaced: `duties_notify`, `duties_close_cases`, `duties_alert_recipients`, the board/rota projections, every Identity and Notifications function, `followups_reassign` (the trigger resolves obligations instead).
+- Decision (agent, under owner pre-approval; **changes a frozen detail**, recorded in the Plan Change Log): the leaders' vacancy notice is **one per department and lifecycle change**, keyed by the soonest position the change ended, titled **Positions need cover**, actionable while any position of that change is still unfilled; not one per position. Why: per-position notices flooded a leader (a member with 120 future duties gave 120 notices per leader) and cost 2.3 ms each; the queue still flags every position.
+- Decision (agent, under owner pre-approval): a deputy counts as the department's responsible person (FR: "Admin assigns a deputy/replacement"); a held, in-review or accountless leader or deputy does not.
+- Decision (agent, under owner pre-approval): end reason `vacated` is one generic code for deactivation, deletion and removal (leaders read the board history); the audit keeps `member_left` / `removed`.
+- Decision (agent, under owner pre-approval): the scope_revoked hook works from the member's current grants (the v1 event carries no scope), so it acts on every department the member no longer leads; authority itself was already live-checked everywhere (pgTAP and E2E prove commands, replays, reads and supervision end).
+- Decision (agent, under owner pre-approval): a deletion's pending `department_leader` handover is resolved by an explicit Admin command (`duties.resolve_handover`, refused until a reachable leader or deputy exists), not by a hook on grants (Identity has no grant event).
+- Client fix found while building: `AssignmentHistoryEntry` refused `response_provenance: leader`, so a Confirmed by leader assignment that ended (now possible through a vacancy; earlier through a position cancellation) would have failed the whole board read. It now accepts `leader`; the 4.2 test that asserted the refusal was changed.
+- Clients (`packages/client_core`): `DutyCommands.removeMember`/`resolveHandover`, `DutyEndReasons`, `DepartmentHandover`, `AdminDepartment.handovers/needsLeader` (tolerant of older servers), `DutyPosition.vacated`, `CoveragePosition.vacatedSince`, `CoverageCounts.vacated`; controller `removeMember`, `resolveHandover`, notices `memberRemoved`, `handoverResolved`, `leaderRequired`; Departments: **Remove from department** (confirmed), **Handover pending** with **Mark handover done**; Coverage and board: **Needs a new person**; Membership status **Hand over first** text; follow-up activity "handed over automatically". Tests: new `test/duties/duties_lifecycle_test.dart` (9); changed `duties_revisions_test.dart` (leader provenance) and `membership_lifecycle_test.dart` (refusal text).
+- Earlier pgTAP files changed for the new behaviour (no merged migration edited): `cross_epic_contracts_test.sql`, `notifications_routing_test.sql`, `duties_reminders_test.sql`, `duties_coverage_test.sql` (details in duties.md, story 4.12, Local runs).
+- Matrix audit: Deactivate (pgTAP "Church deactivation" block incl. pending/accepted/declined/other department/cell part/past/draft/coverage case/task; E2E L20, L21), Last leader (pgTAP "The last leader" incl. held deputy; E2E L30), Remove (pgTAP removal incl. refusals; E2E L40), Hold (pgTAP hold block; E2E L10), scope_revoked (pgTAP revoked block incl. replay; E2E L50), Delete (pgTAP deletion block incl. pending handovers, resolve, erase/check 0; E2E L60), Q2 closed (pgTAP Q2 block). All ran and passed (Verification).
+- Fictional numbers: pgTAP +44 7700 900460-900469, scale 900480-900489, E2E 900470-900479 (grepped: unused before).
+- Earlier E2E scripts changed for the new behaviour: `tools/identity-e2e/lifecycle.mjs` and `runbooks.mjs` (their precondition counted every registered handover hook; it now counts the fixture's only), `duties-reminders.mjs` D50 (the hold's own `access_hold` entry is not one of the routed reminder needs it counts).
+- Open owner questions (fail-closed defaults built; also in duties.md, story 4.12): Q4 retention/anonymisation (unchanged); may leaders learn why a position became vacant (built: no); one vacancy notice per department and change (built); a reachable deputy counts as responsible (built: yes).
+- Remaining (not builder steps): staging apply of the migration with per-function md5 parity (parent; no owner SQL paste; no Edge Function redeploy); rebuild the staging staff web and APK; owner manual checks in `docs/runbooks/duties.md`, story 4.12.
+
 ## Plan Change Log
+
+- 2026-10-15 (build): the vacancy notice is one per department and lifecycle change (title **Positions need cover**), not one per ended position as the frozen Decisions say; `duties_coverage_source_check` (4.8) is replaced too so the notice's source is current for a vacated assignment. Recorded under Implementation Notes. The frozen block is unchanged.
 
 ## Review Triage Log
 
@@ -92,3 +118,10 @@ context:
 - `npm run -s contracts:test`, `dart test` in `packages/contracts/dart`, node tool tests, `npm run -s ci:policy-test` -- expected: pass.
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/staff`, `apps/mobile`; `TZ=America/New_York` for `test/duties` and mobile -- expected: pass.
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/main && npm run -s ci:function-imports`; evidence scan -- expected: clean.
+
+**Results (2026-10-15):**
+- db reset 0; db:test PASS (43 files, 3679 tests, 74 s; `duties_lifecycle_test.sql` 109, `duties_lifecycle_scale_test.sql` 16: hold over 150 duties 18-31 ms, removal of 30 duties 154-249 ms, deactivation ending 120 duties and handing over 130 tasks 2.3-3.4 s under `statement_timeout = '8s'`); db:smoke pass (139 ok).
+- Every E2E `exit=0` (29 scripts, reset before each, one at a time; `duties-lifecycle` 11/11; lifecycle, runbooks and duties-reminders rerun after their expectation updates) (`evidence-4.12/e2e-suite-summary.txt`).
+- contracts:test 265/0; Dart contracts 282 pass; node tool tests (CI set) 225/0; ci:policy-test 56/0.
+- flutter analyze clean in client_core, apps/staff, apps/mobile; flutter test client_core 630, apps/staff 40, apps/mobile 55; under `TZ=America/New_York` client_core `test/duties` + `test/followups` 202 and apps/mobile 55.
+- ci:secrets clean (1583 files); ci:migrations (`--base origin/main`) 48 ordered, unique, non-destructive; ci:function-imports ok; evidence scan clean.

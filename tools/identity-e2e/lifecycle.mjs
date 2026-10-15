@@ -155,7 +155,7 @@ async function main() {
     throw new Error('the local database already has a usable Admin; run `npx supabase db reset` first');
   }
   if (Number(psql(`select (select count(*) from app.contract_lifecycle_hooks where module = 'fixture')
-                        + (select count(*) from app.identity_handover_hooks)`)) !== 0) {
+                        + (select count(*) from app.identity_handover_hooks where module = 'fixture')`)) !== 0) {
     throw new Error('a fixture lifecycle or handover hook is already registered');
   }
 

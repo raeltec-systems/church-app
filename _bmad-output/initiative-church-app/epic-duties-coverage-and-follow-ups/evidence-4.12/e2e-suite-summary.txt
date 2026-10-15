@@ -1,0 +1,38 @@
+# Story 4.12: every local E2E, one at a time, `npx supabase db reset` before each (2026-10-15).
+# First full pass; lifecycle, runbooks and duties-reminders failed on test expectations that 4.12
+# changed (a guard counted every handover hook, not only the fixture's; a hold now adds an
+# access_hold Needs contact entry). Their scripts were updated and the three were rerun (below).
+run exit=0  78s
+grants exit=0  53s
+apply exit=0 27/27 checks passed  51s
+review exit=0 18/18 checks passed  86s
+cells exit=0 13/13 checks passed  64s
+recovery exit=0 20/20 checks passed  124s
+credentials exit=0 15/15 checks passed  154s
+assisted exit=0 16/16 checks passed  110s
+lifecycle exit=1 (guard: a handover hook other than the fixture's is registered)  48s
+deletion exit=0 12/12 checks passed  85s
+runbooks exit=1 (same guard)  51s
+inbox exit=0 13/13 checks passed  54s
+source-contracts exit=0 10/10 checks passed  52s
+worker exit=0 17/17 checks passed  86s
+routing exit=0 18/18 checks passed  62s
+push exit=0 12/12 checks passed  65s
+inbox-screens exit=0 12/12 checks passed  83s
+duties exit=0 13/13 checks passed  51s
+duties-revisions exit=0 13/13 checks passed  53s
+duties-rota exit=0 17/17 checks passed  55s
+duties-overlaps exit=0 13/13 checks passed  54s
+duties-responses exit=0 12/12 checks passed  57s
+followups exit=0 15/15 checks passed  53s
+followups-reminders exit=0 12/12 checks passed  59s
+duties-reminders exit=1 16/17 checks passed FAILED: D50 (counted the new access_hold entry)  145s
+duties-coverage exit=0 12/12 checks passed  71s
+duties-outcomes exit=0 11/11 checks passed  64s
+duties-owner-ops exit=0 13/13 checks passed  69s
+duties-lifecycle exit=0 11/11 checks passed  69s
+# Rerun after the script updates (reset before each):
+lifecycle exit=0 9/9 checks passed  84s
+runbooks exit=0 16/16 checks passed  147s
+duties-reminders exit=0 17/17 checks passed  148s
+# Local auth: GOTRUE_EXTERNAL_PHONE_ENABLED=false; no SMS provider (LOCAL only).

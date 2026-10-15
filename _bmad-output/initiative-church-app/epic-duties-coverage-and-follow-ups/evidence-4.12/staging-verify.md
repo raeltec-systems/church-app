@@ -4,7 +4,7 @@ Synthetic data only. Merged `f5fc5d9` after three review rounds (round 1: S1 han
 lifecycle/command deadlock, S3 unreachable owners, S4 last-leader screen and revoke-first limit,
 N1-N8; round 2: B1 capped handover left authority with a revoked leader, S5 candidate being
 deactivated, N9-N12; round 3: R1 held or dormant Pastors, R2 failing roster hook, R3 runbook).
-PR #6 CI green on `8365b9f`.
+PR #6 CI green on `8365b9f` and `0bace76`. Local verification: db:test 43 files / 3733 tests, db:smoke, Flutter client_core 637 / staff 40 / mobile 55, all 29 E2Es exit 0 (`duties-lifecycle` 16/16).
 
 | Version | Name | How applied |
 |---|---|---|
@@ -13,7 +13,7 @@ PR #6 CI green on `8365b9f`.
 | Check | Result |
 |---|---|
 | The 48 functions the migration creates or replaces | `md5(prosrc)` on staging equal to the local parts |
-| The 392 `app`/`api` `duties_*`, `notifications_*`, `followups_*`, `identity_scoped*` and `fixture*` functions | staging aggregate `5fc1c65b...`; comparison with local pending the local verification run |
+| The 392 `app`/`api` `duties_*`, `notifications_*`, `followups_*`, `identity_scoped*` and `fixture*` functions | per-function `md5(pg_get_functiondef)` identical to local: aggregate `5fc1c65b...`, 392 rows each side |
 | Backslashes | none |
 | Client grants | unchanged: `anon` and `service_role` none; `authenticated` only the existing Duties and Follow-ups entry points; no new function client-executable |
 | Hooks | lifecycle: `duties` (access_hold_applied, deletion_requested, membership_deactivated, scope_revoked), `followups` (deletion_requested, membership_deactivated, scope_revoked); handover: `duties_report_handover`, `followups_report_handover` |

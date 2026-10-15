@@ -145,9 +145,9 @@ context:
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/staff`, `apps/mobile`; `TZ=America/New_York` for `test/duties` and mobile -- expected: pass.
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/main && npm run -s ci:function-imports`; evidence scan -- expected: clean.
 
-**Results (2026-10-15, after merging `ccr-93e730dd-89lbvg` with 187f0d1):**
-- db reset 0; db:test PASS (41 files, 3534 tests; `duties_owner_operations_test.sql` 148, `duties_owner_operations_scale_test.sql` 12: flag 400 = 520 ms, event links 9 ms, board with 400 reviews 331 ms, create 10-position part 450 ms, revise 296 ms, owner read 8 ms, My duties with 200 parts 142 ms); db:smoke pass (fixtures 260 SQL cases + 25 envelopes + 29 `source_ref` cases through the owner operations).
-- Every E2E `exit=0` (28 scripts, reset before each, one at a time; `duties-owner-ops` 13/13 including a two-transaction link race); `duties-responses` V40 updated for cell parts and rerun 12/12 (`evidence-4.11/e2e-suite-summary.txt`).
+**Results (2026-10-15, rerun after the review amendments; merged with `ccr-93e730dd-89lbvg` incl. 187f0d1):**
+- db reset 0; db:test PASS (41 files, 3554 tests, 64 s; `duties_owner_operations_test.sql` 167, `duties_owner_operations_scale_test.sql` 13, each threshold 2 s: flag 400 = 470 ms, event links 10 ms, board with 400 reviews 356 ms, create 10-position part 488 ms, revise 534 ms, owner read 11 ms, My duties with 200 parts 190 ms); db:smoke pass (fixtures 260 SQL cases + 25 envelopes + 29 `source_ref` cases through the owner operations).
+- Every E2E `exit=0` (28 scripts, reset before each, one at a time; `duties-owner-ops` 13/13 including a two-transaction link race; `duties-responses` 12/12 with V40 for answerable cell parts) (`evidence-4.11/e2e-suite-summary.txt`).
 - contracts:test 265/0; Dart contracts 282 pass; node tool tests (CI set) 219/0; ci:policy-test 56/0.
-- flutter analyze clean in client_core, apps/staff, apps/mobile; flutter test client_core 619 (`duties_owner_ops_test.dart` 8), apps/staff 40, apps/mobile 55; under `TZ=America/New_York` client_core `test/duties` + `test/followups` 191 and apps/mobile 55.
-- ci:secrets clean; ci:migrations (`--base origin/main`) ordered, unique, non-destructive; ci:function-imports ok; evidence scan clean.
+- flutter analyze clean in client_core, apps/staff, apps/mobile; flutter test client_core 621 (`duties_owner_ops_test.dart` 10), apps/staff 40, apps/mobile 55; under `TZ=America/New_York` client_core `test/duties` + `test/followups` 193 and apps/mobile 55.
+- ci:secrets clean (1575 files); ci:migrations (`--base origin/main`) 47 ordered, unique, non-destructive; ci:function-imports ok; evidence scan clean.

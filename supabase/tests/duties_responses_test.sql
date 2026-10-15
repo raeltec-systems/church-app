@@ -1,6 +1,6 @@
 -- Respond from My duties with later decline and bulk acceptance (story 4.5; AD-2, AD-6):
 -- duties.withdraw_acceptance ("Can't make it anymore"), duties.accept_many (all or nothing),
--- the cell-owned refusal on every member response path, the My duties keys (owner kind, earlier
+-- cell-owned assignments (refused until story 4.11, answered since), the My duties keys (owner kind, earlier
 -- acceptance, leader names), the leader projections, receipts, audit, jobs and the history
 -- guard. HTTP evidence (including the concurrent race): tools/identity-e2e/duties-responses.mjs.
 -- Every account, phone and name is SYNTHETIC (fictional range +44 7700 900550-900559).
@@ -368,7 +368,7 @@ select is((select string_agg((d #>> '{positions,0,assignment,response}')
                                             pg_temp.occ(4, 6)::text, pg_temp.occ(4, 7)::text)),
   'accepted,declined*,accepted,pending', 'the leader board shows each answer at once');
 
--- Cell-owned assignments stay unreachable to members (fail closed, until entry 11) -------------
+-- Cell-owned assignments: unreachable until entry 11; since story 4.11 answered like any duty ----
 create temp table cell_asg (id uuid);
 do $$
 declare
@@ -388,19 +388,22 @@ begin
   insert into cell_asg select assignment_id from a;
 end;
 $$;
-select is(pg_temp.answer(4, (select id from cell_asg), 'accepted') ->> 'code', 'not_found',
-  'duties.respond refuses a cell-owned assignment as not found');
-select is(pg_temp.many(4, array[pg_temp.a(4, 7), (select id from cell_asg)]) ->> 'code', 'not_found',
-  'duties.accept_many refuses a selection with a cell-owned assignment');
-update app.duties_assignments set response = 'accepted', responded_at = now(), responded_by_member = pg_temp.mid(4),
-                                  responded_by_account = pg_temp.u(4), response_provenance = 'member'
- where assignment_id = (select id from cell_asg);
-select is(pg_temp.withdraw(4, (select id from cell_asg)) ->> 'code', 'not_found',
-  'duties.withdraw_acceptance refuses a cell-owned assignment');
+select is(pg_temp.many(4, array[pg_temp.a(4, 7), (select id from cell_asg)]) #>> '{data,count}', '2',
+  'story 4.11: duties.accept_many accepts a selection with a cell programme part');
 select is((pg_temp.row((select id from cell_asg))).response || '|' || (pg_temp.row(pg_temp.a(4, 7))).response,
-  'accepted|pending', 'nothing changed');
-select is((select count(*)::int from jsonb_array_elements(pg_temp.readj(4, 'select api.duties_my_duties()') -> 'assignments') x
-            where x ->> 'assignment_id' = (select id from cell_asg)::text), 0, 'My duties does not list it');
+  'accepted|accepted', 'both are accepted by the member');
+select is(pg_temp.answer(4, (select id from cell_asg), 'declined') -> 'field_errors',
+  '{"assignment_id": "responded"}'::jsonb,
+  'story 4.11: duties.respond reaches the cell part (already answered here)');
+select is((select x ->> 'owner_kind' || '|' || coalesce(x ->> 'department_name', 'none')
+             from jsonb_array_elements(pg_temp.readj(4, 'select api.duties_my_duties()') -> 'assignments') x
+            where x ->> 'assignment_id' = (select id from cell_asg)::text),
+  'cell|none', 'story 4.11: My duties lists it as a cell part (no department)');
+select is((select x -> 'leaders'
+             from jsonb_array_elements(pg_temp.readj(4, 'select api.duties_my_duties()') -> 'assignments') x
+            where x ->> 'assignment_id' = (select id from cell_asg)::text),
+  jsonb_build_array(jsonb_build_object('display_name', 'SYNTHETIC 4.5 Member 6', 'role', 'leader')),
+  'with the cell''s leader by name');
 
 -- Grants, history guard, vocabulary ---------------------------------------------------------------
 select is((select count(*)::int from information_schema.routine_privileges

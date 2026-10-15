@@ -3,7 +3,7 @@
 Architecture: AD-3, AD-4, AD-13, AD-20. Migration: `supabase/migrations/20261006215842_identity_live_access.sql`.
 Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.1/`.
 
-This file holds the per-story mechanics. The restricted support runbooks that staff and the operator follow (applications and linking, email and staff-assisted recovery, holds and disputes, deactivation and handover, deletion, first-Admin setup and the last-Admin fallback) are in [identity-support.md](identity-support.md) (story 2.12).
+This file holds the per-story mechanics. The restricted support runbooks that staff and the operator follow (applications and linking, email and staff-assisted recovery, holds and disputes, deactivation and handover, deletion, first-Admin setup and the last-Admin fallback) are in [identity-support.md](identity-support.md) (story 2.12). What holds, deactivation, deletion and handovers do to duties and follow-up tasks, written for Admins in task order, is in [duties-guides.md](duties-guides.md#guide-2-admin) (story 4.13).
 
 ## What exists
 
@@ -43,6 +43,7 @@ This file holds the per-story mechanics. The restricted support runbooks that st
 - Exception: a `SYNTHETIC` member (`is_synthetic`) in a database marked `local` or `staging` that is not a held restore. This lets staging demonstrate the tracer while `verify-hosted.sql` keeps the gate itself closed.
 - `dormancy_days` has a labelled fixture: `TEST FIXTURE - proposed 90-day dormancy, not church policy`. It is honoured only in `local` and `staging`.
 - Production has no approved row, so access there is `unavailable` until the owner approves the Q1 values (entry 14). An approved row is a new `version` with `source = 'approved'`.
+- **Since story 4.16** the restricted operator approves a setting with `app.identity_approve_setting(setting, value, approver, note)` (no client grant, like `app.policy_approve`; `approver` must be an active row of `app.ops_operators`, else `42501`; an owner decision note is required and may not start `TEST FIXTURE`; `dormancy_days` needs `{"days": 1..3650}`; else `22023`). It inserts the next version with `source = 'approved'` and leaves the labelled fixture row as it is; audited `church_setting_approved` with the setting name in `app.identity_access_audit` and the operator journal. No migration approves a value: the owner's production value (180 days) is applied at promotion ([production-promotion-identity.md](production-promotion-identity.md), gate G3).
 
 ## Sign-in on the clients (no SMS)
 
@@ -219,12 +220,14 @@ Send `POST /rest/v1/rpc/identity_grant_command` with `Content-Profile: api` and 
   | Not an Admin, or Admin removed | `forbidden` |
   | Untrusted session | `unauthenticated` |
   | Last usable Admin | `forbidden`, `{"role": "unsupported"}` |
+  | Scope of a department's last reachable leader or deputy (story 4.16) | `conflict`, `{"member_id": "handover_required"}`, `current_revision` |
   | Role whose setting is unset | `unavailable`, `{"policy": "gate_closed"}` |
   | Unregistered kind or unknown target | `validation_failed` (`scope_kind: unregistered`, `scope_id: unknown`) |
 
 - **Requirements**: a role needs an approved member with a live account link. A scope needs an approved member.
 - **Separation of duty**: no grant command (role or scope) may target the acting Admin's own member record: `forbidden`, `{"member_id": "unsupported"}`, with nothing audited. An Admin may still revoke its own grants, subject to the last-Admin rule. `identity.grant_role` with `lead_pastor` returns `forbidden`, `{"role": "unsupported"}`.
 - **Side effects**: every revocation dispatches the `scope_revoked` lifecycle event to registered owner hooks inside the same transaction.
+- **Handover on scope revocation (story 4.16)**: `identity.revoke_scope` ends the grant (record step `app.identity_end_grant_record`: attribution, revision, audit), then calls every registered owner handover hook with a `scope_revoked` event while `app.identity_revoked_scope()` names the revoked `{scope_kind, scope_id}`, then dispatches `scope_revoked`. When a hook reports a last responsible person (Duties: the department's last approved leader or deputy the app can reach) the revocation is refused `conflict {"member_id": "handover_required"}` with the current grant revision, and nothing changes (the command's savepoint rolls the grant end back; no audit row). Other reported obligations are recorded pending with `revoked_grant_id` (and no lifecycle event) and are resolved by their owner as for a deactivation. **`identity.unlink_account`** (review S1) runs the same collection for every scope grant it ends but is never refused for a handover obligation (a security action; a missing or malformed owner hook still fails it closed with `unavailable`, as for a deletion): every reported obligation, a Duties `department_leader` one included, is recorded pending against the ended grant, so **Membership status** and **Departments** show the department needs a leader. Role revocation, deactivation and deletion are unchanged.
 - **Usable Admin**: an active Admin grant whose account passes every non-session condition of the predicate (`app.identity_account_standing` = `ok`, and `app.identity_link_dormancy` is null).
   - Those conditions are: the Auth user is not deleted, banned or anonymous; the member is approved; the link is active with no binding review; the Auth phone and email equal the approved binding; there is no open hold; and the account is not dormant.
   - The predicate itself is built from the same two helpers.
@@ -804,8 +807,16 @@ select app.identity_resolve_handover_obligation('duties', '<obligation_id>', 'ha
 ```
 
 - The hook must be read-only: it runs before Identity decides. Owners make their own changes (flag, cancel, reroute) in a lifecycle hook on `membership_deactivated`, which runs in the same transaction after the deactivation.
-- Obligations hold the owner, a kind and an opaque subject id only (`app.identity_handover_obligations`). They survive a restoration.
-- Today only the SYNTHETIC `app.fixture_report_handover` (over `app.fixture_duties`) exists; tests and the E2E register it and remove it again.
+- **Since story 4.16** the hooks are also called by `identity.revoke_scope` with a `scope_revoked` event, after the grant has ended (so they see the member without that scope); `app.identity_revoked_scope()` names the scope being revoked (no row outside a revocation). A hook that does not depend on a scope should report nothing for `scope_revoked` (the SYNTHETIC fixture hook does so).
+- Obligations hold the owner, a kind and an opaque subject id only (`app.identity_handover_obligations`), and their origin: the lifecycle event (`lifecycle_event_id`) or, since story 4.16, the revoked grant (`revoked_grant_id`); exactly one is set. They survive a restoration.
+- The SYNTHETIC `app.fixture_report_handover` (over `app.fixture_duties`) is registered only by tests and the E2E, which remove it again.
+- **Since story 4.12** Duties and Follow-ups register real hooks by migration (`20261015110202_duties_lifecycle.sql`):
+  - Handover: `app.duties_report_handover` (`department_leader`, last responsible when the member is the last approved leader or deputy of an active department the app can reach) and `app.followups_report_handover` (`followup_task` per open task the member owns, last responsible when nobody else may own it under the Q4 owner-scope rule). A deactivation of such a member is refused `handover_required`.
+  - Lifecycle (`app.contract_register_lifecycle_hook`): Duties on `membership_deactivated`, `deletion_requested`, `access_hold_applied` and `scope_revoked`; Follow-ups on `membership_deactivated`, `deletion_requested` and `scope_revoked`. They end future duties (vacancies flagged, jobs cancelled, leaders told), put a held member's duties on the leaders' Needs contact list, cancel a removed leader's alerts and hand open tasks and supervision over, all in the lifecycle transaction, and resolve the obligations they handled. See [duties.md](duties.md) and [follow-ups.md](follow-ups.md), story 4.12.
+  - A deletion's pending Duties handover is resolved with `duties.resolve_handover` (**Departments**, **Mark handover done**) once the department has a leader again; a pending Follow-ups handover by reassigning or closing the task, or by **Hand over the next 100 follow-up tasks** on **Membership status** (`followups.complete_handover`: a lifecycle change hands over at most 25 tasks itself). Follow-ups also reports `followup_supervision` (never last responsible) for a task nobody else can supervise.
+  - Duties and Follow-ups commands that may notify a member take `FOR KEY SHARE` on that member's row before their own rows (review S2), so they wait for a lifecycle change instead of deadlocking with it; Identity's `FOR UPDATE` is unchanged.
+  - Story 4.12: a revoked scope recorded no Identity obligation. **Since story 4.16** it records the Follow-ups obligations it leaves (`followup_task`, `followup_supervision`, never last responsible: a revocation narrows access) against the revoked grant; the hook hands over up to 25 at once and resolves those; the rest stay pending, shown on **Membership status** and still listed on **Follow-up routing** (Waiting for handover) as in 4.12 (follow-ups.md, review B1).
+  - Story 4.12 known limit (review S4), **fixed in story 4.16** (owner decision 10): `identity.revoke_scope` now calls the handover hooks, so revoking the scope of a department's last reachable leader or deputy is refused `handover_required` until another reachable leader or deputy is granted (a held one does not count; the member's own remaining leader or deputy grant of that department does).
 
 ### Reads
 
@@ -917,7 +928,7 @@ Seven system commands, allowlisted for the purpose `identity_deletion` only:
 select app.identity_register_deletion_hook('chat', 'app.chat_erase_member(jsonb)'::regprocedure);
 ```
 
-A missing handler or an answer of another shape raises: the step is retried and nothing completes. Today Cells (`app.cells_erase_member`), Notifications (`app.notifications_erase_member`, story 3.5) and the SYNTHETIC `app.fixture_erase_member` exist; since story 3.5 the fixture hook is registered by migration (it also erases the SYNTHETIC reminder sources), and the tests and the E2E keep it registered.
+A missing handler or an answer of another shape raises: the step is retried and nothing completes. Today Cells (`app.cells_erase_member`), Notifications (`app.notifications_erase_member`, story 3.5), Duties (`app.duties_erase_member`, stories 4.1-4.12), Follow-ups (`app.followups_erase_member`, story 4.6) and the SYNTHETIC `app.fixture_erase_member` exist; since story 3.5 the fixture hook is registered by migration (it also erases the SYNTHETIC reminder sources), and the tests and the E2E keep it registered.
 
 ### The worker and the Edge Function
 
@@ -993,3 +1004,19 @@ node tools/auth-harness/local-phone-auth.mjs off
    3. Keep the token only in the worker's environment (the operator's shell or a CI secret): `IDENTITY_DELETION_CREDENTIAL_FILE=.ops-state/identity-deletion/staging.credential`. Rotate it before 30 days as in `system-access-and-operations.md`.
 5. **Run the worker on staging** (operator, synthetic members only): `SUPABASE_URL=https://tmurpotfluignacfueki.supabase.co SUPABASE_PUBLISHABLE_KEY=<publishable key> IDENTITY_DELETION_CREDENTIAL_FILE=<file> node tools/identity-deletion/worker.mjs run --journal-dir <the staging journal folder>`. The staging journal is the 1.10 one: a local segment folder mirrored to the owner's restricted Drive folder through the connector after each run (as in the 1.10 rehearsal), or, once the owner creates the folder-restricted token, `RECOVERY_DRIVE_FOLDER_ID` + `RECOVERY_DRIVE_ACCESS_TOKEN` (DriveRestClient).
 6. **Production** (entry 14): the Q4 approval of `identity_deletion_retention` (and `q4_personal_data`), the production journal store, the production credential and a scheduled worker. Until then production requests deny access and the erasure waits.
+
+## Story 4.12: what the lifecycle changes do in Duties and Follow-ups
+
+Identity is unchanged; story 4.12 registers the Duties and Follow-ups lifecycle and handover hooks described under 2.10 and 2.11 above. In short:
+
+| Identity change | Duties and Follow-ups |
+|---|---|
+| Login hold (`identity.place_hold`) | duties kept; listed under the leaders' Needs contact at once; no alert; the hold never named |
+| Church deactivation | refused `handover_required` for the last reachable leader or deputy of an active department, or the only possible owner of an open task; otherwise future duties end (positions flagged **Needs a new person**, jobs cancelled, one leaders' notice per department), open tasks and supervision handed over, all in the same transaction |
+| Scope removed (`identity.revoke_scope`, or as part of a deactivation) | authority ends at once (current grants are checked everywhere); pending leader alerts cancelled; supervision moved |
+| Deletion request | as a deactivation, never refused; a pending handover makes erasure wait (`handover_pending`); the Duties and Follow-ups deletion check answers 0 after the erase phase |
+| Restoration | nothing comes back: give duties and tasks again |
+
+No hold, deactivation or deletion reason reaches a leader, a notice or the evidence. Owner manual checks: [duties.md](duties.md), story 4.12 (they include the **Hand over first** notice on **Membership status**, whose text now names a department's last leader or deputy and the only possible owner of an open follow-up task).
+
+E2E: `tools/identity-e2e/duties-lifecycle.mjs` (+44 7700 900470-900479). The 2.10 `lifecycle.mjs` and 2.11 `deletion.mjs` E2Es keep passing with the real hooks registered (their synthetic members hold no duties or tasks).

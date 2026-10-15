@@ -7,7 +7,15 @@
     {"name": "longest token (63 chars)", "value": {"source_type": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1}},
     {"name": "integral value written with an exponent (1e3)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1e3}},
     {"name": "integral value written with a fraction (1.0)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1.0}},
-    {"name": "integral value written as 2E1", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 2E1}}
+    {"name": "integral value written as 2E1", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 2E1}},
+    {"name": "a programme part (story 4.11, Cells)", "value": {"source_type": "cells_programme_part", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 3}},
+    {"name": "a linked event (story 4.11, Content)", "value": {"source_type": "content_event", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 2}},
+    {"name": "a duty occurrence for a sermon draft (story 4.11)", "value": {"source_type": "duties_occurrence", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 5}},
+    {"name": "a meeting with a missing report (story 4.11, Cells)", "value": {"source_type": "cells_meeting", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 1}},
+    {"name": "a visitor (story 4.11, Cells)", "value": {"source_type": "cells_visitor", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 1}},
+    {"name": "a visit request (story 4.11, Care)", "value": {"source_type": "care_visit_request", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 4}},
+    {"name": "a service with a missing count (story 4.11, Services)", "value": {"source_type": "services_count", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 1}},
+    {"name": "an offering collection in custody (story 4.11, Offerings)", "value": {"source_type": "offerings_collection", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 2}}
   ],
   "invalid": [
     {"name": "everything missing", "value": {}, "field_errors": {"source_type": "required", "source_id": "required", "source_revision": "required"}},
@@ -29,6 +37,9 @@
     {"name": "prototype-named key constructor", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "constructor": "x"}, "field_errors": {"constructor": "unknown_field"}},
     {"name": "prototype-named key __proto__", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "__proto__": "x"}, "field_errors": {"__proto__": "unknown_field"}},
     {"name": "prototype-named key toString", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "toString": "x"}, "field_errors": {"toString": "unknown_field"}},
-    {"name": "source content never rides on a reference (story 3.2)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "title": "x", "note": "x"}, "field_errors": {"title": "unknown_field", "note": "unknown_field"}}
+    {"name": "source content never rides on a reference (story 3.2)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "title": "x", "note": "x"}, "field_errors": {"title": "unknown_field", "note": "unknown_field"}},
+    {"name": "a part reference carries no position key; it travels beside the reference (story 4.11)", "value": {"source_type": "cells_programme_part", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 3, "position_key": "lead"}, "field_errors": {"position_key": "unknown_field"}},
+    {"name": "a duty reference carries no topic or scripture text (story 4.11)", "value": {"source_type": "duties_occurrence", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 5, "topic": "x", "scripture": "x"}, "field_errors": {"topic": "unknown_field", "scripture": "unknown_field"}},
+    {"name": "an event reference carries no venue or time (story 4.11)", "value": {"source_type": "content_event", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 2, "venue": "x", "starts_at": "2026-10-21T16:00:00Z"}, "field_errors": {"venue": "unknown_field", "starts_at": "unknown_field"}}
   ]
 }

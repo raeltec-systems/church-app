@@ -1,0 +1,36 @@
+Story 4.6 full local verification after the review fixes (S1-S4, N1-N8, N10), 2026-10-14 (worktree branch worktree-agent-a61d1dc79d7408ea5, LOCAL stack, SYNTHETIC data).
+reset=0
+db:test=0 Files=32, Tests=2783 Result: PASS
+db:smoke=0 ok   - no SMS provider configured
+run exit=0 
+grants exit=0 
+apply exit=0 27/27 checks passed 
+review exit=0 18/18 checks passed 
+cells exit=0 13/13 checks passed 
+recovery exit=0 20/20 checks passed 
+credentials exit=0 15/15 checks passed 
+assisted exit=0 16/16 checks passed 
+lifecycle exit=0 9/9 checks passed 
+deletion exit=0 12/12 checks passed 
+runbooks exit=0 16/16 checks passed 
+inbox exit=0 13/13 checks passed 
+source-contracts exit=0 10/10 checks passed 
+worker exit=0 17/17 checks passed 
+routing exit=0 18/18 checks passed 
+push exit=0 12/12 checks passed 
+inbox-screens exit=0 12/12 checks passed 
+duties exit=0 13/13 checks passed 
+duties-revisions exit=0 13/13 checks passed 
+duties-rota exit=0 17/17 checks passed 
+duties-overlaps exit=0 13/13 checks passed 
+duties-responses exit=0 12/12 checks passed 
+followups exit=0 15/15 checks passed 
+supabase_auth_church-app: GOTRUE_EXTERNAL_PHONE_ENABLED=false, GOTRUE_SMS_AUTOCONFIRM=true; no SMS provider (LOCAL only)
+pgTAP: supabase/tests/followups_registry_test.sql 143 checks (within the 2783 above)
+contracts:test pass 242 fail 0
+node tool tests (CI set) pass 189 fail 0
+ci:policy-test pass 56 fail 0
+ci:secrets clean; ci:migrations --base origin/main: 42 ordered, unique and non-destructive; ci:function-imports ok
+flutter analyze: no issues (packages/client_core, apps/staff, apps/mobile)
+flutter test: client_core 536 passed (test/followups 20), apps/staff 36 passed, apps/mobile 51 passed
+TZ=America/New_York: client_core test/followups 20 passed; apps/mobile 51 passed

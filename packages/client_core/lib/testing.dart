@@ -17,6 +17,7 @@ import 'src/domain/cell_membership.dart';
 import 'src/domain/commands.dart';
 import 'src/domain/credential_review.dart';
 import 'src/domain/duties.dart';
+import 'src/domain/followups.dart';
 import 'src/domain/member_access.dart';
 import 'src/domain/membership_application.dart';
 import 'src/domain/member_deletion.dart';
@@ -511,6 +512,126 @@ class FakeCells implements CellsRepository {
   }
 }
 
+/// [FollowUpsRepository] answered by the test (story 4.6). Each field
+/// answers every read at once; the counters record how often each was asked.
+class FakeFollowUps implements FollowUpsRepository {
+  AccessRead<MyFollowUps> mine = const AccessReadDenied(AccessDenial.notLinked);
+  AccessRead<FollowUpDetail> task = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  AccessRead<FollowUpSupervision> supervision = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  AccessRead<FollowUpAdminRouting> routing = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  final List<String> taskReads = [];
+  int mineCalls = 0;
+  int supervisionCalls = 0;
+  int routingCalls = 0;
+
+  @override
+  Future<AccessRead<MyFollowUps>> fetchMyTasks() async {
+    mineCalls++;
+    return mine;
+  }
+
+  @override
+  Future<AccessRead<FollowUpDetail>> fetchTask(String taskId) async {
+    taskReads.add(taskId);
+    return task;
+  }
+
+  @override
+  Future<AccessRead<FollowUpSupervision>> fetchSupervision() async {
+    supervisionCalls++;
+    return supervision;
+  }
+
+  @override
+  Future<AccessRead<FollowUpAdminRouting>> fetchAdminRouting() async {
+    routingCalls++;
+    return routing;
+  }
+}
+
+/// The wire form of a follow-up person (story 4.6).
+Map<String, Object?> followUpPersonData({
+  String memberId = '22222222-2222-4222-8222-222222222222',
+  String? displayName = 'SYNTHETIC Member M',
+  String account = 'app_account',
+}) => {'member_id': memberId, 'display_name': displayName, 'account': account};
+
+/// The wire form of a follow-up task as its owner or a scope holder sees it
+/// (story 4.6); [routing] drops the private fields (Admin).
+Map<String, Object?> followUpTaskData({
+  String taskId = '46464646-4646-4646-8646-464646464646',
+  int revision = 1,
+  String state = 'open',
+  String dueAt = '2099-01-04T08:00:00.000000Z',
+  String? reviewAt,
+  bool overdue = false,
+  bool duePassed = false,
+  String? finishedAt,
+  String nextAction = 'SYNTHETIC: phone and check in',
+  String? context = 'SYNTHETIC check-in source',
+  String? latestOutcome,
+  String? closeCode,
+  String? closeReason,
+  String capacity = 'owner',
+  bool? canUpdate,
+  bool canReassign = false,
+  Map<String, Object?>? owner,
+  Map<String, Object?>? supervisor,
+  bool routing = false,
+  Map<String, Object?>? reminders,
+}) {
+  final active =
+      state == 'open' || state == 'in_progress' || state == 'waiting';
+  final meta = <String, Object?>{
+    'task_id': taskId,
+    'revision': revision,
+    'source_type': 'fixture_followup',
+    'purpose': 'synthetic_check_in',
+    'purpose_label': 'SYNTHETIC check-in',
+    'owner': owner ?? followUpPersonData(),
+    'supervisor':
+        supervisor ??
+        followUpPersonData(
+          memberId: '33333333-3333-4333-8333-333333333333',
+          displayName: 'SYNTHETIC Leader',
+        ),
+    'scope': {
+      'scope_kind': 'department_leader',
+      'scope_id': '44444444-4444-4444-8444-444444444444',
+    },
+    'state': state,
+    'due_at': dueAt,
+    'review_at': reviewAt,
+    'overdue': overdue,
+    'due_passed': duePassed,
+    'finished_at':
+        finishedAt ?? (active ? null : '2026-10-14T09:00:00.000000Z'),
+    'created_at': '2026-10-14T08:00:00.000000Z',
+    'updated_at': '2026-10-14T08:00:00.000000Z',
+  };
+  if (routing) return meta;
+  return {
+    ...meta,
+    'source_id': '45454545-4545-4545-8545-454545454545',
+    'context': context == null ? null : {'label': context},
+    'next_action': nextAction,
+    'latest_outcome': latestOutcome,
+    'outcomes': ['contacted', 'no_longer_needed', 'unreachable'],
+    'close_code': closeCode ?? (state == 'closed' ? 'manual' : null),
+    'close_reason': closeReason,
+    'capacity': capacity,
+    'can_update': canUpdate ?? (active && capacity != 'admin'),
+    'can_reassign': canReassign,
+    'reminders': ?reminders,
+  };
+}
+
 /// [DutiesRepository] answered by the test (story 4.1). Each field answers
 /// every read at once; the counters record how often each was asked.
 class FakeDuties implements DutiesRepository {
@@ -521,9 +642,17 @@ class FakeDuties implements DutiesRepository {
   AccessRead<DutyAdminOverview> admin = const AccessReadDenied(
     AccessDenial.notGranted,
   );
+  AccessRead<DutyRota> rota = const AccessReadDenied(AccessDenial.notGranted);
+
+  /// Story 4.4: the candidates read (every query gets this answer).
+  AccessRead<DutyCandidates> candidates = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  final List<CandidateQuery> candidateQueries = [];
   int mineCalls = 0;
   int boardCalls = 0;
   int adminCalls = 0;
+  int rotaCalls = 0;
 
   @override
   Future<AccessRead<MyDuties>> fetchMyDuties() async {
@@ -542,9 +671,84 @@ class FakeDuties implements DutiesRepository {
     adminCalls++;
     return admin;
   }
+
+  @override
+  Future<AccessRead<DutyRota>> fetchRota() async {
+    rotaCalls++;
+    return rota;
+  }
+
+  @override
+  Future<AccessRead<DutyCandidates>> fetchCandidates(
+    CandidateQuery query,
+  ) async {
+    candidateQueries.add(query);
+    return candidates;
+  }
 }
 
-/// The wire form of one of the member's duties (stories 4.1, 4.2).
+/// [DutyCoverageRepository] answered by the test (story 4.9).
+class FakeDutyCoverage implements DutyCoverageRepository {
+  AccessRead<DutyCoverage> coverage = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  final List<CoverageQuery> queries = [];
+
+  @override
+  Future<AccessRead<DutyCoverage>> fetchCoverage(CoverageQuery query) async {
+    queries.add(query);
+    return coverage;
+  }
+}
+
+/// [DutyOutcomesRepository] answered by the test (story 4.10).
+class FakeDutyOutcomes implements DutyOutcomesRepository {
+  AccessRead<DutyOutcomes> outcomes = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  AccessRead<MemberHistory> history = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  final List<OutcomesQuery> queries = [];
+  final List<HistoryQuery> historyQueries = [];
+
+  @override
+  Future<AccessRead<DutyOutcomes>> fetchOutcomes(OutcomesQuery query) async {
+    queries.add(query);
+    return outcomes;
+  }
+
+  @override
+  Future<AccessRead<MemberHistory>> fetchHistory(HistoryQuery query) async {
+    historyQueries.add(query);
+    return history;
+  }
+}
+
+/// [ContactLauncher] that records what the screen asked for (story 4.9).
+class FakeContactLauncher implements ContactLauncher {
+  FakeContactLauncher([this.result = ContactLaunch.opened]);
+  ContactLaunch result;
+  final List<String> calls = [];
+  final List<String> messages = [];
+
+  @override
+  Future<ContactLaunch> call(String phone) async {
+    calls.add(phone);
+    return result;
+  }
+
+  @override
+  Future<ContactLaunch> message(String phone) async {
+    messages.add(phone);
+    return result;
+  }
+}
+
+/// The wire form of one of the member's duties (stories 4.1, 4.2; 4.5 adds
+/// the slot id, the owner kind, the earlier acceptance and the leader
+/// names; 4.8 keys go in [extra]). Story 4.11: a `cell` owner kind is a cell
+/// programme part (its cell, no department).
 Map<String, Object?> myDutyData({
   String assignmentId = '42424242-4242-4242-8242-424242424242',
   int revision = 1,
@@ -560,18 +764,36 @@ Map<String, Object?> myDutyData({
   String? previousResponse,
   List<String> previousAssignmentIds = const [],
   String? notesUpdatedAt,
+  String? reportingAt,
+  String? location = 'SYNTHETIC Main hall',
+  String? positionName,
+  String? priorAcceptedAt,
+  List<Map<String, Object?>> leaders = const [],
+  String slotId = '45454545-4545-4545-8545-454545454545',
+  String ownerKind = 'department',
+  // Story 4.8: deadline_source, short_notice, reminders (absent = a server
+  // before 4.8).
+  Map<String, Object?> extra = const {},
 }) => {
   'assignment_id': assignmentId,
   'revision': revision,
   'occurrence_id': '43434343-4343-4343-8343-434343434343',
-  'department_id': '44444444-4444-4444-8444-444444444444',
-  'department_name': 'SYNTHETIC Preaching Rota',
+  'slot_id': slotId,
+  'owner_kind': ownerKind,
+  'department_id': ownerKind == 'cell'
+      ? null
+      : '44444444-4444-4444-8444-444444444444',
+  'department_name': ownerKind == 'cell' ? null : 'SYNTHETIC Preaching Rota',
+  if (ownerKind == 'cell') 'cell_id': '47474747-4747-4747-8747-474747474747',
   'duty_name': dutyName,
+  'position_name': positionName,
   'starts_at': startsAt,
   'ends_at': endsAt,
-  'reporting_at': null,
-  'location': 'SYNTHETIC Main hall',
+  'reporting_at': reportingAt,
+  'location': location,
   'instructions': 'Arrive early.',
+  'prior_accepted_at': priorAcceptedAt,
+  'leaders': leaders,
   'response': response,
   'response_deadline': responseDeadline,
   'responded_at': respondedAt,
@@ -581,6 +803,7 @@ Map<String, Object?> myDutyData({
   'previous_response': previousResponse,
   'previous_assignment_ids': previousAssignmentIds,
   'notes_updated_at': notesUpdatedAt,
+  ...extra,
 };
 
 /// The wire form of a synthetic cell as the Admin sees it (story 2.6).
@@ -1140,12 +1363,13 @@ Map<String, Object?> handoverData({
   String name = 'SYNTHETIC Esther Banda',
   String state = 'deactivated',
   String kind = 'fixture_door_duty',
+  String module = 'fixture',
 }) => {
   'obligation_id': id,
   'member_id': memberId,
   'display_name': name,
   'membership_state': state,
-  'owner_module': 'fixture',
+  'owner_module': module,
   'obligation_kind': kind,
   'recorded_at': '2026-10-07T10:00:00Z',
 };
@@ -1475,6 +1699,10 @@ class ClientTestHarness {
   final review = FakeReview();
   final cells = FakeCells();
   final duties = FakeDuties();
+  final coverage = FakeDutyCoverage();
+  final outcomes = FakeDutyOutcomes();
+  final contact = FakeContactLauncher();
+  final followUps = FakeFollowUps();
   final recovery = FakePasswordRecovery();
   final recoveryEmail = FakeRecoveryEmail();
   final credentials = FakeCredentialReview();
@@ -1509,6 +1737,10 @@ class ClientTestHarness {
       reviewRepositoryProvider.overrideWithValue(review),
       cellsRepositoryProvider.overrideWithValue(cells),
       dutiesRepositoryProvider.overrideWithValue(duties),
+      dutyCoverageRepositoryProvider.overrideWithValue(coverage),
+      dutyOutcomesRepositoryProvider.overrideWithValue(outcomes),
+      contactLauncherProvider.overrideWithValue(contact),
+      followUpsRepositoryProvider.overrideWithValue(followUps),
       passwordRecoveryGatewayProvider.overrideWithValue(recovery),
       recoveryEmailRepositoryProvider.overrideWithValue(recoveryEmail),
       credentialReviewRepositoryProvider.overrideWithValue(credentials),

@@ -115,7 +115,22 @@ class _MembershipLifecycleScreenState
         ..addAll(
           _section(
             'Pending handovers',
-            [for (final h in o.handovers) _handover(context, h)],
+            [
+              for (final (i, h) in o.handovers.indexed)
+                _handover(
+                  context,
+                  h,
+                  s.busy,
+                  // One Continue button per member who left (Follow-ups).
+                  first: !o.handovers
+                      .take(i)
+                      .any(
+                        (x) =>
+                            x.memberId == h.memberId &&
+                            x.ownerModule == h.ownerModule,
+                      ),
+                ),
+            ],
             'Nothing is waiting to be handed over.',
             'lifecycle-no-handovers',
           ),
@@ -291,18 +306,36 @@ class _MembershipLifecycleScreenState
     ]);
   }
 
-  Widget _handover(BuildContext context, HandoverItem h) =>
-      _card(context, Key('lifecycle-handover-${h.obligationId}'), [
-        _name(context, h.displayName),
-        const SizedBox(height: 4),
-        Text('${_label(h.obligationKind)} (owner: ${_label(h.ownerModule)})'),
-        Text(
-          h.membershipState == 'deactivated'
-              ? 'Membership deactivated'
-              : 'Membership restored; the handover is still open',
+  Widget _handover(
+    BuildContext context,
+    HandoverItem h,
+    bool busy, {
+    required bool first,
+  }) => _card(context, Key('lifecycle-handover-${h.obligationId}'), [
+    _name(context, h.displayName),
+    const SizedBox(height: 4),
+    Text('${_label(h.obligationKind)} (owner: ${_label(h.ownerModule)})'),
+    Text(
+      h.membershipState == 'deactivated'
+          ? 'Membership deactivated'
+          : 'Membership restored; the handover is still open',
+    ),
+    const Text('Resolved in the owning section, not here.'),
+    // Story 4.12 (review S1): a lifecycle change hands over at most 25
+    // follow-up tasks; the Admin continues the rest from here.
+    // Review N11: whenever Follow-ups handovers remain, also for a member
+    // being deleted or one who is still a member.
+    if (first && h.ownerModule == 'followups') ...[
+      const SizedBox(height: 8),
+      FocusRing(
+        child: OutlinedButton(
+          key: Key('lifecycle-continue-handover-${h.memberId}'),
+          onPressed: busy ? null : () => _ctl.continueFollowUpHandover(h),
+          child: const Text('Hand over the next 100 follow-up tasks'),
         ),
-        const Text('Resolved in the owning section, not here.'),
-      ]);
+      ),
+    ],
+  ]);
 
   static String _label(String code) => code.replaceAll('_', ' ');
 
@@ -430,8 +463,23 @@ class _MembershipLifecycleScreenState
       LifecycleNotice.handoverRequired => (
         StatusTone.warning,
         'Hand over first',
-        '$who is the last person responsible for something in another '
-            'section. Hand it over there first, then deactivate.',
+        '$who is the last person responsible for something: the last leader '
+            'or deputy of a department (Departments: give it another leader '
+            'or deputy who uses the app), or the only person who may own an '
+            'open follow-up task (Follow-ups: reassign or close it). Hand it '
+            'over there first, then deactivate. Nothing was changed.',
+      ),
+      LifecycleNotice.handoverContinued => (
+        StatusTone.success,
+        'Follow-up tasks handed over',
+        'Up to 100 open follow-up tasks of $who went to someone in each '
+            'task\'s group. Any still pending stay listed below.',
+      ),
+      LifecycleNotice.handoverNoneMoved => (
+        StatusTone.warning,
+        'Nobody could take them',
+        'No one the app can reach may take the follow-up tasks of $who yet. '
+            'They stay listed: give the group a leader, then try again.',
       ),
       LifecycleNotice.alreadyHeld => (
         StatusTone.info,

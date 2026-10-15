@@ -17,6 +17,24 @@ abstract final class ChurchTime {
   static DateTime instant(int year, int month, int day, int hour, int minute) =>
       DateTime.utc(year, month, day, hour, minute).subtract(offset);
 
+  /// Story 4.14: the church date of [instant] as `YYYY-MM-DD` (the form
+  /// value every date field and query uses).
+  static String dateText(DateTime instant) => ymd(wall(instant));
+
+  /// Story 4.14: the church time of day of [instant] as 24-hour `HH:MM`.
+  static String timeText(DateTime instant) {
+    final w = wall(instant);
+    return '${_two(w.hour)}:${_two(w.minute)}';
+  }
+
+  /// Story 4.14: [date]'s own year, month and day as `YYYY-MM-DD`. No zone
+  /// is applied: pass a church wall reading ([wall]) or a calendar date.
+  static String ymd(DateTime date) =>
+      '${date.year.toString().padLeft(4, '0')}-${_two(date.month)}-'
+      '${_two(date.day)}';
+
+  static String _two(int v) => v.toString().padLeft(2, '0');
+
   /// Parses `YYYY-MM-DD` and `HH:MM` as church-local wall time; null when
   /// either is malformed or names a day that does not exist.
   static DateTime? parse(String date, String time) {

@@ -23,6 +23,7 @@ Future<Harness> pumpStaff(
   bool configured = true,
   NotificationHealthRepository? healthRepository,
   String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  void Function(Harness h)? setUp,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
@@ -30,12 +31,15 @@ Future<Harness> pumpStaff(
   addTearDown(tester.view.reset);
   addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
   final h = ClientTestHarness(account: account);
+  setUp?.call(h);
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         ...h.overrides(configured: configured),
         if (healthRepository != null)
-          notificationHealthRepositoryProvider.overrideWithValue(healthRepository),
+          notificationHealthRepositoryProvider.overrideWithValue(
+            healthRepository,
+          ),
       ],
       child: StaffApp(initialLocation: location),
     ),
@@ -74,18 +78,33 @@ void main() {
     tester,
   ) async {
     const cases = <AccessDenial, (String, String)>{
-      AccessDenial.notGranted: ('Reminder health unavailable',
-          'This account is not authorized to view reminder health.'),
-      AccessDenial.notLinked: ('Reminder health unavailable',
-          'This account is not authorized to view reminder health.'),
-      AccessDenial.signedOut: ('Not signed in', 'Sign in to view reminder health.'),
-      AccessDenial.untrustedSession: ('Please sign in again', 'This sign-in is no longer valid.'),
-      AccessDenial.reviewRequired: ('Access review required',
-          'Your access needs a check by the church before it can continue.'),
-      AccessDenial.unavailable: ('Reminder health not available here',
-          'The server does not offer reminder health here yet.'),
+      AccessDenial.notGranted: (
+        'Reminder health unavailable',
+        'This account is not authorized to view reminder health.',
+      ),
+      AccessDenial.notLinked: (
+        'Reminder health unavailable',
+        'This account is not authorized to view reminder health.',
+      ),
+      AccessDenial.signedOut: (
+        'Not signed in',
+        'Sign in to view reminder health.',
+      ),
+      AccessDenial.untrustedSession: (
+        'Please sign in again',
+        'This sign-in is no longer valid.',
+      ),
+      AccessDenial.reviewRequired: (
+        'Access review required',
+        'Your access needs a check by the church before it can continue.',
+      ),
+      AccessDenial.unavailable: (
+        'Reminder health not available here',
+        'The server does not offer reminder health here yet.',
+      ),
     };
-    for (final MapEntry(key: denial, value: (title, message)) in cases.entries) {
+    for (final MapEntry(key: denial, value: (title, message))
+        in cases.entries) {
       // A fresh app per reason: overrides apply only to a new ProviderScope.
       await tester.pumpWidget(const SizedBox.shrink());
       await pumpStaff(
@@ -93,57 +112,118 @@ void main() {
         location: ClientPaths.notificationHealth,
         healthRepository: _HealthRepository(AccessReadDenied(denial)),
       );
-      expect(find.byKey(const Key('nav-${ClientPaths.notificationHealth}')), findsOneWidget);
-      expect(find.byKey(Key('notification-health-denied-${denial.name}')), findsOneWidget,
-          reason: denial.name);
+      expect(
+        find.byKey(const Key('nav-${ClientPaths.notificationHealth}')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(Key('notification-health-denied-${denial.name}')),
+        findsOneWidget,
+        reason: denial.name,
+      );
       expect(find.text(title), findsOneWidget, reason: denial.name);
       expect(find.text(message), findsOneWidget, reason: denial.name);
     }
   });
 
-  testWidgets('reminder health reports a failed read separately from a refusal', (
-    tester,
-  ) async {
-    await pumpStaff(
-      tester,
-      location: ClientPaths.notificationHealth,
-      healthRepository: _HealthRepository(const AccessReadFailed(unreachable: true)),
-    );
-    expect(find.byKey(const Key('notification-health-failed')), findsOneWidget);
-    expect(find.text('No connection'), findsOneWidget);
-    expect(find.text('This account is not authorized to view reminder health.'), findsNothing);
-  });
+  testWidgets(
+    'reminder health reports a failed read separately from a refusal',
+    (tester) async {
+      await pumpStaff(
+        tester,
+        location: ClientPaths.notificationHealth,
+        healthRepository: _HealthRepository(
+          const AccessReadFailed(unreachable: true),
+        ),
+      );
+      expect(
+        find.byKey(const Key('notification-health-failed')),
+        findsOneWidget,
+      );
+      expect(find.text('No connection'), findsOneWidget);
+      expect(
+        find.text('This account is not authorized to view reminder health.'),
+        findsNothing,
+      );
+    },
+  );
 
   testWidgets('reminder health is not in the navigation while signed out', (
     tester,
   ) async {
     await pumpStaff(tester, account: null);
-    expect(find.byKey(const Key('nav-${ClientPaths.notificationHealth}')), findsNothing);
-    expect(staffDestinationsFor(null), isNot(contains(staffReminderHealthDestination)));
-    expect(staffDestinationsFor(null, signedIn: true), contains(staffReminderHealthDestination));
     expect(
-      {for (final d in staffDestinationsFor(null, signedIn: true)) d.icon}.length,
+      find.byKey(const Key('nav-${ClientPaths.notificationHealth}')),
+      findsNothing,
+    );
+    expect(
+      staffDestinationsFor(null),
+      isNot(contains(staffReminderHealthDestination)),
+    );
+    expect(
+      staffDestinationsFor(null, signedIn: true),
+      contains(staffReminderHealthDestination),
+    );
+    expect(
+      {for (final d in staffDestinationsFor(null, signedIn: true)) d.icon}
+          .length,
       staffDestinationsFor(null, signedIn: true).length,
       reason: 'every destination has its own icon',
     );
   });
 
-  testWidgets('reminder health renders aggregate status for an authorized read', (
-    tester,
-  ) async {
-    await pumpStaff(
-      tester,
-      location: ClientPaths.notificationHealth,
-      healthRepository: _HealthRepository(),
+  test('story 4.10: Outcomes for department leaders, history for members', () {
+    final leader = syntheticGrants(
+      scopes: const [
+        ScopeGrant(
+          scopeKind: 'department_leader',
+          scopeId: '44444444-4444-4444-8444-444444444444',
+        ),
+      ],
     );
-    expect(find.text('Due and pending'), findsOneWidget);
-    expect(find.text('Without a route in 24 hours'), findsOneWidget);
-    expect(find.text('Failed push attempts in 24 hours'), findsOneWidget);
-    expect(find.text('2'), findsOneWidget);
-    expect(find.text('Last successful scheduler handoff'), findsOneWidget);
-    expect(find.text('2026-10-13T11:59:00.000Z'), findsNWidgets(2));
-    expect(find.textContaining('no reminder content or recipient details'), findsOneWidget);
+    expect(
+      staffDestinationsFor(leader),
+      contains(staffDutyOutcomesDestination),
+    );
+    expect(staffDestinationsFor(leader), contains(staffDutyHistoryDestination));
+    final member = syntheticGrants();
+    expect(
+      staffDestinationsFor(member),
+      isNot(contains(staffDutyOutcomesDestination)),
+    );
+    expect(staffDestinationsFor(member), contains(staffDutyHistoryDestination));
+    // The Admin role alone records no outcomes (the department's leaders do).
+    final admin = syntheticGrants(roles: const ['admin']);
+    expect(
+      staffDestinationsFor(admin),
+      isNot(contains(staffDutyOutcomesDestination)),
+    );
+    expect(
+      staffDestinationsFor(null),
+      isNot(contains(staffDutyHistoryDestination)),
+    );
   });
+
+  testWidgets(
+    'reminder health renders aggregate status for an authorized read',
+    (tester) async {
+      await pumpStaff(
+        tester,
+        location: ClientPaths.notificationHealth,
+        healthRepository: _HealthRepository(),
+      );
+      expect(find.text('Due and pending'), findsOneWidget);
+      expect(find.text('Without a route in 24 hours'), findsOneWidget);
+      expect(find.text('Failed push attempts in 24 hours'), findsOneWidget);
+      expect(find.text('2'), findsOneWidget);
+      expect(find.text('Last successful scheduler handoff'), findsOneWidget);
+      expect(find.text('2026-10-13T11:59:00.000Z'), findsNWidgets(2));
+      expect(
+        find.textContaining('no reminder content or recipient details'),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets(
     'story 2.1: account tab -> member summary; sign out; phone sign-in again',
@@ -361,6 +441,203 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       expect(find.byKey(const Key('nav-/admin/departments')), findsOneWidget);
       expect(find.byKey(const Key('nav-/duties/leader')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'story 4.6: My follow-ups follows member access, Follow-ups a leader '
+    'scope and Follow-up routing the Admin grant',
+    (tester) async {
+      final h = await pumpStaff(tester, size: const Size(1280, 1600));
+      expect(find.byKey(const Key('nav-/followups')), findsNothing);
+      h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.followUps.mine = AccessReadOk(
+        MyFollowUps.fromJson({
+          'member_id': '22222222-2222-4222-8222-222222222222',
+          'tasks': [followUpTaskData()],
+          'truncated': false,
+        }),
+      );
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('nav-/followups/supervision')), findsNothing);
+      expect(find.byKey(const Key('nav-/admin/followups')), findsNothing);
+      await tapKey(tester, 'nav-/followups');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('SYNTHETIC: phone and check in'), findsOneWidget);
+      h.grants.myAccess = AccessReadOk(
+        syntheticGrants(
+          roles: ['admin'],
+          scopes: const [
+            ScopeGrant(
+              scopeKind: 'cell_leader',
+              scopeId: '44444444-4444-4444-8444-444444444444',
+            ),
+          ],
+        ),
+      );
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(
+        find.byKey(const Key('nav-/followups/supervision')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('nav-/admin/followups')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'story 4.7: a supervisor\'s overdue alert opens the follow-up task',
+    (tester) async {
+      const item = '33333333-3333-4333-8333-323232323232';
+      const task = '46464646-4646-4646-8646-464646464646';
+      final h = await pumpStaff(
+        tester,
+        size: const Size(1280, 2000),
+        location: '/inbox/$item',
+        setUp: (h) {
+          h.grants.myAccess = AccessReadOk(syntheticGrants());
+          h.inbox.opened[item] = AccessReadOk(
+            OpenedInboxItem.fromJson({
+              ...inboxItemData(
+                id: item,
+                kind: 'followup_overdue',
+                title: 'Follow-up task overdue',
+                body:
+                    'A follow-up task you supervise is overdue. Open it to '
+                    'follow up with its owner.',
+              ),
+              'state': 'current',
+              'target': '/followups/tasks/$task',
+            }),
+          );
+          h.followUps.task = AccessReadOk(
+            FollowUpDetail.fromJson({
+              'view': 'full',
+              'task': followUpTaskData(capacity: 'supervisor', overdue: true),
+              'activity': const <Object?>[],
+              'notes': const <Object?>[],
+            }),
+          );
+        },
+      );
+      expect(find.text('Follow-up task overdue'), findsOneWidget);
+      await tapKey(tester, 'inbox-item-open-target');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(h.followUps.taskReads, contains(task));
+      expect(find.byKey(const Key('followup-summary')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('story 4.8: a leader\'s overdue alert opens the Duties board', (
+    tester,
+  ) async {
+    const item = '35353535-3535-4535-8535-353535353535';
+    final h = await pumpStaff(
+      tester,
+      size: const Size(1280, 2000),
+      location: '/inbox/$item',
+      setUp: (h) {
+        h.grants.myAccess = AccessReadOk(
+          syntheticGrants(
+            scopes: const [
+              ScopeGrant(
+                scopeKind: 'department_leader',
+                scopeId: '44444444-4444-4444-8444-444444444444',
+              ),
+            ],
+          ),
+        );
+        h.inbox.opened[item] = AccessReadOk(
+          OpenedInboxItem.fromJson({
+            ...inboxItemData(
+              id: item,
+              kind: 'duty_response_overdue',
+              title: 'Duty answer overdue',
+              body:
+                  'A duty in your department passed its answer-by time '
+                  'without an answer. Open Duties to follow it up.',
+            ),
+            'state': 'current',
+            'target': '/duties/leader',
+          }),
+        );
+        h.duties.board = AccessReadOk(
+          DutyLeaderBoard.fromJson({'departments': const <Object?>[]}),
+        );
+      },
+    );
+    expect(find.text('Duty answer overdue'), findsOneWidget);
+    await tapKey(tester, 'inbox-item-open-target');
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(h.duties.boardCalls, greaterThan(0));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'story 4.3: Rota follows the department scope and opens the rota grid',
+    (tester) async {
+      final h = await pumpStaff(tester);
+      expect(find.byKey(const Key('nav-/duties/rota')), findsNothing);
+      h.grants.myAccess = AccessReadOk(
+        syntheticGrants(
+          scopes: const [
+            ScopeGrant(
+              scopeKind: 'department_deputy',
+              scopeId: '44444444-4444-4444-8444-444444444444',
+            ),
+          ],
+        ),
+      );
+      h.duties.rota = AccessReadOk(
+        DutyRota.fromJson({'departments': const <Object?>[]}),
+      );
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'nav-/duties/rota');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('rota-no-departments')), findsOneWidget);
+      expect(h.duties.rotaCalls, greaterThan(0));
+    },
+  );
+
+  testWidgets(
+    'story 4.9: Coverage follows the department scope and opens the queue',
+    (tester) async {
+      final h = await pumpStaff(tester);
+      expect(find.byKey(const Key('nav-/duties/coverage')), findsNothing);
+      h.grants.myAccess = AccessReadOk(
+        syntheticGrants(
+          scopes: const [
+            ScopeGrant(
+              scopeKind: 'department_leader',
+              scopeId: '44444444-4444-4444-8444-444444444444',
+            ),
+          ],
+        ),
+      );
+      h.coverage.coverage = AccessReadOk(
+        DutyCoverage.fromJson({
+          'window': {'from': '2099-01-01', 'to': '2099-01-07'},
+          'departments': const <Object?>[],
+        }),
+      );
+      await tapKey(tester, 'nav-/account');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'nav-/duties/coverage');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(find.text('No departments to show.'), findsOneWidget);
+      expect(h.coverage.queries, isNotEmpty);
     },
   );
 
@@ -976,7 +1253,9 @@ class _HealthRepository implements NotificationHealthRepository {
   final AccessRead<ReminderHealth>? answer;
 
   @override
-  Future<AccessRead<ReminderHealth>> fetchHealth() async => answer ?? AccessReadOk(
+  Future<AccessRead<ReminderHealth>> fetchHealth() async =>
+      answer ??
+      AccessReadOk(
         ReminderHealth.fromJson({
           'captured_at': '2026-10-13T12:00:00Z',
           'scheduler': {

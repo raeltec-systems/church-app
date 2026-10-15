@@ -51,13 +51,14 @@ void main() {
   // Each test starts as a fresh app: no input seen yet.
   setUp(FocusVisibility.instance.reset);
 
-  testWidgets('story 3.8: the staff reminder-health route does not exist on mobile', (
-    tester,
-  ) async {
-    await pumpMobile(tester, location: ClientPaths.notificationHealth);
-    expect(find.byType(NotificationHealthScreen), findsNothing);
-    expect(find.text('Reminder health'), findsNothing);
-  });
+  testWidgets(
+    'story 3.8: the staff reminder-health route does not exist on mobile',
+    (tester) async {
+      await pumpMobile(tester, location: ClientPaths.notificationHealth);
+      expect(find.byType(NotificationHealthScreen), findsNothing);
+      expect(find.text('Reminder health'), findsNothing);
+    },
+  );
 
   testWidgets(
     'story 3.6: a tapped notification opens its inbox item; denied push registers nothing',
@@ -386,6 +387,11 @@ void main() {
       for (var i = 0; i < 3; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
+      // Story 4.5: the answered duty is under Upcoming.
+      await tester.tap(find.text('Upcoming (1)'));
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
       expect(
         find.descendant(
           of: find.byKey(const Key('my-duty-status-$id')),
@@ -393,6 +399,217 @@ void main() {
         ),
         findsOneWidget,
       );
+    },
+  );
+
+  testWidgets(
+    'story 4.5: Home follows member access and shows the My duties card',
+    (tester) async {
+      final h = await pumpMobile(tester, size: const Size(390, 1600));
+      expect(find.byKey(const Key('nav-/home')), findsNothing);
+      h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.duties.mine = AccessReadOk(
+        MyDuties.fromJson({
+          'member_id': '22222222-2222-4222-8222-222222222222',
+          'assignments': [myDutyData()],
+        }),
+      );
+      await tapKey(tester, 'nav-/account');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tapKey(tester, 'nav-/home');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('home-duties-card')), findsOneWidget);
+      expect(find.text('1 awaiting your response'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'story 4.6: Home shows My follow-ups for an ordinary owner with open work '
+    'and opens the task',
+    (tester) async {
+      final h = await pumpMobile(tester, size: const Size(390, 2000));
+      h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.duties.mine = AccessReadOk(
+        MyDuties.fromJson({
+          'member_id': '22222222-2222-4222-8222-222222222222',
+          'assignments': const <Object?>[],
+        }),
+      );
+      h.followUps.mine = AccessReadOk(
+        MyFollowUps.fromJson({
+          'member_id': '22222222-2222-4222-8222-222222222222',
+          'tasks': [followUpTaskData()],
+          'truncated': false,
+        }),
+      );
+      h.followUps.task = AccessReadOk(
+        FollowUpDetail.fromJson({
+          'view': 'full',
+          'task': followUpTaskData(),
+          'activity': const <Object?>[],
+          'notes': const <Object?>[],
+        }),
+      );
+      await tapKey(tester, 'nav-/account');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tapKey(tester, 'nav-/home');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('home-followups-card')), findsOneWidget);
+      await tapKey(tester, 'home-followups-see-all');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tapKey(
+        tester,
+        'followup-open-46464646-4646-4646-8646-464646464646',
+      );
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('followup-actions')), findsOneWidget);
+      await tapKey(tester, 'followup-done');
+      final sent = h.gateway.sent.single;
+      expect(sent.wire['command'], 'followups.update_task');
+      expect(sent.wire['payload'], {
+        'task_id': '46464646-4646-4646-8646-464646464646',
+        'status': 'done',
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'story 4.7: a tapped follow-up reminder opens its item, then the task',
+    (tester) async {
+      const item = '32323232-3232-4232-8232-323232323232';
+      const task = '46464646-4646-4646-8646-464646464646';
+      final push = FakePushMessaging(
+        deviceToken: 'synthetic-AAAAAAAAAAAAAAAAAAAAAAAA:APA91b',
+        answer: PushPermission.denied,
+      );
+      final h = await pumpMobile(
+        tester,
+        size: const Size(390, 2000),
+        setUp: (h) {
+          h.push = push;
+          h.grants.myAccess = AccessReadOk(syntheticGrants());
+          h.inbox.opened[item] = AccessReadOk(
+            OpenedInboxItem.fromJson({
+              ...inboxItemData(
+                id: item,
+                kind: 'followup_due',
+                title: 'Follow-up task due',
+                body:
+                    'A follow-up task is due. Open it to record progress or '
+                    'set a review date.',
+              ),
+              'state': 'current',
+              'target': '/followups/tasks/$task',
+            }),
+          );
+          h.followUps.task = AccessReadOk(
+            FollowUpDetail.fromJson({
+              'view': 'full',
+              'task': followUpTaskData(
+                reminders: {
+                  'schedule': 'default',
+                  'owner': null,
+                  'supervisor': [
+                    {'anchor': 'deadline', 'after': '1 day'},
+                  ],
+                  'on_assignment': true,
+                },
+              ),
+              'activity': const <Object?>[],
+              'notes': const <Object?>[],
+            }),
+          );
+        },
+      );
+      push.tap(item);
+      await tester.pumpAndSettle();
+      expect(find.text('Follow-up task due'), findsOneWidget);
+      expect(
+        find.textContaining('SYNTHETIC: phone'),
+        findsNothing,
+        reason: 'the reminder carries no task content',
+      );
+      await tapKey(tester, 'inbox-item-open-target');
+      await tester.pumpAndSettle();
+      expect(h.followUps.taskReads, contains(task));
+      expect(find.byKey(const Key('followup-summary')), findsOneWidget);
+      expect(find.byKey(const Key('followup-reminders-text')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'story 4.8: a duty answer reminder opens the duty, marked Short notice',
+    (tester) async {
+      const item = '34343434-3434-4434-8434-343434343434';
+      const duty = '42424242-4242-4242-8242-424242424242';
+      final push = FakePushMessaging(
+        deviceToken: 'synthetic-AAAAAAAAAAAAAAAAAAAAAAAA:APA91b',
+        answer: PushPermission.denied,
+      );
+      final h = await pumpMobile(
+        tester,
+        size: const Size(390, 2400),
+        setUp: (h) {
+          h.push = push;
+          h.grants.myAccess = AccessReadOk(syntheticGrants());
+          h.inbox.opened[item] = AccessReadOk(
+            OpenedInboxItem.fromJson({
+              ...inboxItemData(
+                id: item,
+                kind: 'duty_response_due',
+                title: 'Duty answer needed',
+                body:
+                    'One of your duties is waiting for your answer. Open it '
+                    'to accept or say you cannot make it.',
+              ),
+              'state': 'current',
+              'target': '/duties/assignments/$duty',
+            }),
+          );
+          h.duties.mine = AccessReadOk(
+            MyDuties.fromJson({
+              'member_id': '66666666-6666-4666-8666-666666666666',
+              'assignments': [
+                myDutyData(
+                  extra: const {
+                    'deadline_source': 'default',
+                    'short_notice': true,
+                    'reminders': null,
+                  },
+                ),
+              ],
+            }),
+          );
+        },
+      );
+      push.tap(item);
+      await tester.pumpAndSettle();
+      expect(find.text('Duty answer needed'), findsOneWidget);
+      expect(
+        find.textContaining('SYNTHETIC Main hall'),
+        findsNothing,
+        reason: 'the reminder carries no duty content',
+      );
+      await tapKey(tester, 'inbox-item-open-target');
+      await tester.pumpAndSettle();
+      expect(h.duties.mineCalls, greaterThan(0));
+      expect(find.byKey(const Key('duty-short-notice-$duty')), findsWidgets);
+      expect(tester.takeException(), isNull);
     },
   );
 

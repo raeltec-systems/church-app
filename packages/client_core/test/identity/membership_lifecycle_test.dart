@@ -126,6 +126,82 @@ void main() {
       expect(find.text('fixture door duty (owner: fixture)'), findsOneWidget);
     });
 
+    testWidgets('a capped Follow-ups handover is continued by the Admin '
+        '(story 4.12)', (tester) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.adminMembershipLifecycle,
+        setUp: (h) => h.lifecycle.overview = overviewWith(
+          handovers: [
+            handoverData(module: 'followups', kind: 'followup_task'),
+            handoverData(
+              id: '84848484-8484-4484-8484-848484848485',
+              module: 'followups',
+              kind: 'followup_task',
+            ),
+          ],
+        ),
+      );
+      // One button per member who left, not one per task.
+      expect(
+        byKey('lifecycle-continue-handover-$_deactivated'),
+        findsOneWidget,
+      );
+      await tapKey(tester, 'lifecycle-continue-handover-$_deactivated');
+      final sent = h.gateway.sent.single;
+      expect(sent.function, 'followups_command');
+      expect(sent.wire['command'], 'followups.complete_handover');
+      expect(sent.wire['expected_revision'], isNull);
+      expect(sent.wire['payload'], {'member_id': _deactivated});
+      sent.confirm({
+        'member_id': _deactivated,
+        'handed_over': 2,
+        'remaining': 0,
+      }, 1);
+      await settle(tester);
+      expect(byKey('lifecycle-notice-handoverContinued'), findsOneWidget);
+    });
+
+    testWidgets('a step that moved nothing says so (review N11)', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.adminMembershipLifecycle,
+        setUp: (h) => h.lifecycle.overview = overviewWith(
+          handovers: [
+            handoverData(
+              module: 'followups',
+              kind: 'followup_task',
+              state: 'approved',
+            ),
+          ],
+        ),
+      );
+      // Shown for a member still in the church too (a revoked scope).
+      await tapKey(tester, 'lifecycle-continue-handover-$_deactivated');
+      h.gateway.sent.single.confirm({
+        'member_id': _deactivated,
+        'handed_over': 0,
+        'remaining': 0,
+      }, 1);
+      await settle(tester);
+      expect(byKey('lifecycle-notice-handoverNoneMoved'), findsOneWidget);
+      expect(byKey('lifecycle-notice-handoverContinued'), findsNothing);
+    });
+
+    testWidgets('other modules\' handovers have no Continue button', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.adminMembershipLifecycle,
+        setUp: (h) =>
+            h.lifecycle.overview = overviewWith(handovers: [handoverData()]),
+      );
+      expect(byKey('lifecycle-continue-handover-$_deactivated'), findsNothing);
+    });
+
     testWidgets('an empty overview says so', (tester) async {
       await pumpAt(
         tester,
@@ -222,6 +298,15 @@ void main() {
       );
       await settle(tester);
       expect(byKey('lifecycle-notice-handoverRequired'), findsOneWidget);
+      // Story 4.12: the notice says what to hand over and where.
+      expect(
+        find.textContaining('the last leader or deputy of a department'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Follow-ups: reassign or close it'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('an unknown outcome is checked again with the same request', (

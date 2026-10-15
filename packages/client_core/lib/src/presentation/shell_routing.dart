@@ -8,6 +8,7 @@ import 'account_screen.dart';
 import 'cell_screens.dart';
 import 'credential_screens.dart';
 import 'duties_screens.dart';
+import 'followups_screens.dart';
 import 'fixture_command_screen.dart';
 import 'fixture_reminder_screens.dart';
 import 'notification_settings_screen.dart';
@@ -63,13 +64,40 @@ abstract final class ClientPaths {
   /// is one assignment (the reminder's deep link).
   static const myDuties = DutyPaths.mine;
 
+  /// Story 4.5 (mobile): the member Home (the My duties card; later
+  /// features add their cards).
+  static const home = DutyPaths.home;
+
   /// Story 4.1, staff web: department leaders and deputies (Admin; Pastor
   /// read only): publish a duty and see the responses.
   static const dutyLeader = DutyPaths.leader;
 
+  /// Story 4.3 (staff web): the rota grid.
+  static const dutyRota = DutyPaths.rota;
+
+  /// Story 4.9 (staff web and mobile): the coverage queue.
+  static const dutyCoverage = DutyPaths.coverage;
+
+  /// Story 4.10 (staff web and mobile): record and correct duty outcomes.
+  static const dutyOutcomes = DutyPaths.outcomes;
+
+  /// Story 4.10: the reader's own duty history (a leader opens a member's
+  /// with `?member=<id>`).
+  static const dutyHistory = DutyPaths.history;
+
   /// Story 4.1, staff web, Admin only: departments, leaders, deputies and
   /// members.
   static const adminDepartments = DutyPaths.adminDepartments;
+
+  /// Story 4.6: My follow-ups (every owner; mobile from the Home card, staff
+  /// web in the sidebar); `/followups/tasks/<id>` is one task.
+  static const myFollowUps = FollowUpPaths.mine;
+
+  /// Story 4.6, staff web: the tasks in the scopes the caller holds.
+  static const followUpSupervision = FollowUpPaths.supervision;
+
+  /// Story 4.6, staff web, Admin only: routing metadata of every task.
+  static const adminFollowUps = FollowUpPaths.adminRouting;
 
   /// Story 2.7: forgot password (neutral acknowledgement).
   static const forgotPassword = '/forgot-password';
@@ -144,6 +172,19 @@ abstract final class ClientPaths {
     ),
     // Story 4.2: the duty_released notice opens My duties.
     RegExp(r'^/duties$'),
+    // Story 4.8: the leaders' overdue and short-notice alerts open the
+    // Duties board, which reads the duty again (a pointer, not a grant).
+    RegExp(r'^/duties/leader$'),
+    // Story 4.16: the leaders' review notice opens the board's reviews.
+    RegExp(r'^/duties/leader/reviews$'),
+    // Story 4.9: the leaders' decline alert opens the coverage queue, which
+    // reads every position again.
+    RegExp(r'^/duties/coverage$'),
+    // Story 4.7: the follow-up reminders (followups_task and
+    // followups_supervision contracts) open the task, which reads it again.
+    RegExp(
+      r'^/followups/tasks/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    ),
   ];
 
   static bool isKnownDeepLink(String target) =>
@@ -208,6 +249,7 @@ GoRouter buildClientRouter({
   bool membershipRequests = false,
   bool assistedRecovery = false,
   bool reminderHealth = false,
+  bool memberHome = false,
 }) {
   final afterCreateAccount = membershipRequests
       ? ClientPaths.membership
@@ -299,6 +341,12 @@ GoRouter buildClientRouter({
         path: ClientPaths.myCell,
         pageBuilder: (_, state) => page(state, const MyCellScreen()),
       ),
+      // Story 4.5: the member Home is a mobile destination only.
+      if (memberHome)
+        GoRoute(
+          path: ClientPaths.home,
+          pageBuilder: (_, state) => page(state, const MemberHomeScreen()),
+        ),
       GoRoute(
         path: ClientPaths.myDuties,
         pageBuilder: (_, state) => page(state, const MyDutiesScreen()),
@@ -306,6 +354,38 @@ GoRouter buildClientRouter({
           GoRoute(
             path: 'leader',
             pageBuilder: (_, state) => page(state, const DutyLeaderScreen()),
+            routes: [
+              // Story 4.16: the review notice's link (both apps).
+              GoRoute(
+                path: 'reviews',
+                pageBuilder: (_, state) =>
+                    page(state, const DutyLeaderScreen(reviewsOnly: true)),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: 'rota',
+            pageBuilder: (_, state) => page(state, const DutyRotaScreen()),
+          ),
+          // Story 4.9: both apps (the leader's essential actions on mobile).
+          GoRoute(
+            path: 'coverage',
+            pageBuilder: (_, state) => page(state, const DutyCoverageScreen()),
+          ),
+          // Story 4.10: both apps.
+          GoRoute(
+            path: 'outcomes',
+            pageBuilder: (_, state) => page(state, const DutyOutcomesScreen()),
+          ),
+          GoRoute(
+            path: 'history',
+            pageBuilder: (_, state) => page(
+              state,
+              DutyHistoryScreen(
+                key: ValueKey(state.uri.queryParameters['member']),
+                memberId: _memberParam(state.uri.queryParameters['member']),
+              ),
+            ),
           ),
           GoRoute(
             path: 'assignments/:assignmentId',
@@ -321,6 +401,28 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.adminDepartments,
         pageBuilder: (_, state) => page(state, const DutyAdminScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.myFollowUps,
+        pageBuilder: (_, state) => page(state, const MyFollowUpsScreen()),
+        routes: [
+          GoRoute(
+            path: 'supervision',
+            pageBuilder: (_, state) =>
+                page(state, const FollowUpSupervisionScreen()),
+          ),
+          GoRoute(
+            path: 'tasks/:taskId',
+            pageBuilder: (_, state) => page(
+              state,
+              FollowUpTaskScreen(taskId: state.pathParameters['taskId']!),
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: ClientPaths.adminFollowUps,
+        pageBuilder: (_, state) => page(state, const FollowUpRoutingScreen()),
       ),
       GoRoute(
         path: ClientPaths.membership,
@@ -430,3 +532,13 @@ void goFromNav(BuildContext context, String path) => context.go(
   path,
   extra: keyboardFocusVisible ? const NavFocusRequest() : null,
 );
+
+/// Story 4.10: a history link's member id (a UUID only; anything else opens
+/// the reader's own history).
+String? _memberParam(String? v) =>
+    v != null &&
+        RegExp(
+          r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+        ).hasMatch(v)
+    ? v
+    : null;

@@ -2,12 +2,24 @@
   "kind": "task_source",
   "contract_version": 1,
   "valid": [
-    {"name": "source and purpose", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "purpose": "fixture_review"}}
+    {"name": "source and purpose", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "purpose": "fixture_review"}},
+    {"name": "a programme part to fill (story 4.11, Cells)", "value": {"source_type": "cells_programme_part", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "fill_part"}},
+    {"name": "a visitor to follow up (story 4.11, Cells)", "value": {"source_type": "cells_visitor", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "visitor_follow_up"}},
+    {"name": "a visit request needing care (story 4.11, Care)", "value": {"source_type": "care_visit_request", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "care_follow_up"}},
+    {"name": "a missing meeting report (story 4.11, Cells)", "value": {"source_type": "cells_meeting", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "missing_report"}},
+    {"name": "a missing service count (story 4.11, Services)", "value": {"source_type": "services_count", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "missing_count"}},
+    {"name": "an offering collection in custody (story 4.11, Offerings)", "value": {"source_type": "offerings_collection", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "custody_follow_up"}},
+    {"name": "a duty coverage case (story 4.11 guide; registered in 4.9)", "value": {"source_type": "duties_coverage_case", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "coverage_follow_up"}}
   ],
   "invalid": [
     {"name": "missing purpose", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001"}, "field_errors": {"purpose": "required"}},
     {"name": "purpose with spaces", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "purpose": "fixture review"}, "field_errors": {"purpose": "invalid"}},
     {"name": "revision does not belong to a task identity", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "purpose": "fixture_review", "source_revision": 1}, "field_errors": {"source_revision": "unknown_field"}},
-    {"name": "not an object", "value": 3, "field_errors": {"$": "must_be_object"}}
+    {"name": "not an object", "value": 3, "field_errors": {"$": "must_be_object"}},
+    {"name": "a care task identity carries no private note (story 4.11)", "value": {"source_type": "care_visit_request", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "care_follow_up", "note": "x"}, "field_errors": {"note": "unknown_field"}},
+    {"name": "a custody task identity carries no amount (story 4.11)", "value": {"source_type": "offerings_collection", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "custody_follow_up", "amount": "10.00"}, "field_errors": {"amount": "unknown_field"}},
+    {"name": "a prayer never rides on a task identity (story 4.11)", "value": {"source_type": "care_visit_request", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "care_follow_up", "prayer_text": "x"}, "field_errors": {"prayer_text": "unknown_field"}},
+    {"name": "the owner is not part of a task identity (story 4.11)", "value": {"source_type": "cells_visitor", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "visitor_follow_up", "owner_member_id": "00000000-0000-4000-8000-000000000411"}, "field_errors": {"owner_member_id": "unknown_field"}},
+    {"name": "a purpose is a token (story 4.11)", "value": {"source_type": "cells_meeting", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "Missing-Report"}, "field_errors": {"purpose": "invalid"}}
   ]
 }

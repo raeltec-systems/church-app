@@ -575,7 +575,9 @@ void main() {
       h.gateway.sent.last.confirm(const {}, 2);
       await settle(tester);
       expect(byKey('duties-notice-accepted'), findsOneWidget);
-      expect(find.text('Upcoming (1)'), findsOneWidget);
+      // Story 4.5: with nothing left to answer, Upcoming is shown.
+      await tester.tap(find.text('Upcoming (1)'));
+      await settle(tester);
       expect(
         find.descendant(
           of: byKey('my-duty-status-$_assignment'),
@@ -637,6 +639,11 @@ void main() {
         setUp: (h) => h.duties.mine = mineWith([myDutyData()]),
       );
       await tapKey(tester, 'duty-decline-$_assignment');
+      await settle(tester);
+      // Story 4.5: a sheet with an optional note and Cancel comes first.
+      expect(h.gateway.sent, isEmpty);
+      await tapKey(tester, 'decline-confirm');
+      await settle(tester);
       final sent = h.gateway.sent.single;
       expect(sent.wire['payload'], {
         'assignment_id': _assignment,

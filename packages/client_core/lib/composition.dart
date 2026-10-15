@@ -92,6 +92,15 @@ Future<List<Override>> compositionOverrides(
     dutiesRepositoryProvider.overrideWithValue(
       SupabaseDutiesRepository(client),
     ),
+    dutyCoverageRepositoryProvider.overrideWithValue(
+      SupabaseDutyCoverageRepository(client),
+    ),
+    dutyOutcomesRepositoryProvider.overrideWithValue(
+      SupabaseDutyOutcomesRepository(client),
+    ),
+    followUpsRepositoryProvider.overrideWithValue(
+      SupabaseFollowUpsRepository(client),
+    ),
     recoveryEmailRepositoryProvider.overrideWithValue(
       SupabaseRecoveryEmailRepository(client, redirects: redirects),
     ),

@@ -5,7 +5,7 @@
 -- refusals, replay and the deletion hook. HTTP evidence: tools/identity-e2e/duties.mjs. Every
 -- account, phone and name here is SYNTHETIC (fictional range +44 7700 900950-900959).
 begin;
-select plan(94);
+select plan(95);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000041' || lpad(n::text, 2, '0'))::uuid $$;
@@ -112,16 +112,18 @@ select is((select array_agg(column_name::text order by column_name::text)
             where table_schema = 'app' and table_name = 'duties_audit'),
   array['action', 'actor_account_id', 'actor_capacity', 'actor_member_id', 'assignment_id', 'code',
         'command_request_id', 'department_id', 'environment', 'event_id', 'member_id',
-        'occurred_at', 'occurrence_id', 'revision_after'],
+        'occurred_at', 'occurrence_id', 'revision_after', 'series_id'],
   'the audit holds ids, codes and revisions only (no names, notes or free text)');
 select ok(not exists (
   select 1 from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid = p.pronamespace
    cross join unnest(array['anon', 'authenticated', 'service_role']) r
    where n.nspname in ('app', 'api') and p.proname ~ '^duties_'
      and not (p.proname in ('duties_command', 'duties_my_duties', 'duties_leader_board',
-                            'duties_admin_overview') and r = 'authenticated')
+                            'duties_admin_overview', 'duties_rota', 'duties_candidates',
+                            'duties_coverage', 'duties_outcomes', 'duties_member_history')
+                  and r = 'authenticated')
      and has_function_privilege(r, p.oid, 'EXECUTE')),
-  'only the command and the three reads are client-executable, and only by authenticated');
+  'only the command and the reads (with the 4.3 rota, the 4.4 candidates, the 4.9 coverage queue and the 4.10 outcomes and history) are client-executable, and only by authenticated');
 select is((select count(*)::int from app.contract_unowned_objects()), 0, 'no unowned objects');
 select is((select count(*)::int from app.contract_unpinned_functions()), 0, 'every function is pinned');
 select is((select count(*)::int from app.contract_boundary_violations()), 0, 'no boundary violations');
@@ -231,8 +233,9 @@ select is(pg_temp.duties(2, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(
             -> 'field_errors',
   '{"response_deadline": "after_start"}'::jsonb, 'the deadline is never after the (reporting) start');
 select is(pg_temp.duties(2, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(), 4,
-            jsonb_build_object('response_deadline', null))) -> 'field_errors',
-  '{"response_deadline": "required"}'::jsonb, 'the leader enters the deadline (no default in 4.1)');
+            jsonb_build_object('response_deadline', 1))) -> 'field_errors',
+  '{"response_deadline": "invalid"}'::jsonb,
+  'a malformed deadline is refused (story 4.8: a missing one takes the 3.3 default; duties_reminders_test.sql)');
 select is(pg_temp.duties(2, 'duties.publish_duty', 1, pg_temp.duty(pg_temp.d(), 4)) -> 'field_errors',
   '{"expected_revision": "must_be_null"}'::jsonb, 'publishing is a create (expected_revision null)');
 select is((select count(*)::int from app.duties_occurrences) + (select count(*)::int from app.notifications_jobs
@@ -246,11 +249,12 @@ $$ select (r #>> '{data,assignment_id}')::uuid from pub $$;
 select is((select (r ->> 'revision') || '|' || (r #>> '{data,response}') || '|'
                   || (r #>> '{data,notice_queued}') || '|'
                   || (select string_agg(k, ',' order by k) from jsonb_object_keys(r -> 'data') k) from pub),
-  '1|pending|true|assignment_id,assignment_revision,department_id,notice_queued,occurrence_id,response,revision,slot_id',
+  '1|pending|true|assignment_id,assignment_revision,department_id,notice_queued,occurrence_id,override_recorded,response,revision,slot_id',
   'the leader publishes one position with a pending assignment; the answer holds ids and states only');
 select is((select string_agg(job_state || ':' || reminder_kind || ':' || source_revision, ',')
-             from app.notifications_jobs where source_type = 'duties_assignment' and source_id = pg_temp.asg()),
-  'pending:duty_assigned:1', 'publishing enqueued one duty_assigned job in the same transaction');
+             from app.notifications_jobs where source_type = 'duties_assignment' and source_id = pg_temp.asg()
+              and reminder_kind = 'duty_assigned'),
+  'pending:duty_assigned:1', 'publishing enqueued one duty_assigned job in the same transaction (story 4.8 adds its reminders)');
 select is(pg_temp.duties(2, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(), 4), (select id from pub_req)),
   (select r from pub), 'replaying the same request returns the stored result');
 select is((select count(*)::int from app.duties_occurrences), 1, 'and adds nothing');
@@ -263,9 +267,9 @@ select is(pg_temp.duties(3, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(
 select is(pg_temp.run() ->> 'delivered', '1', 'the worker delivers the app member''s new-duty item');
 select is((select string_agg(job_state || '|' || coalesce(finish_reason, '-'), ',' order by enqueued_at)
              from app.notifications_jobs where source_type = 'duties_assignment'
-               and recipient_member_id = pg_temp.mid(8)),
-  'ineligible|no_direct_contact_route',
-  'the accountless member gets no inbox item (a direct-contact need, unrouted until 4.8)');
+               and recipient_member_id = pg_temp.mid(8) and reminder_kind = 'duty_assigned'),
+  'ineligible|direct_contact',
+  'the accountless member gets no inbox item (story 4.8: a direct-contact need on the leader''s list)');
 create temp table item as select (pg_temp.readj(4, 'select api.notifications_my_inbox()') #>> '{items,0,item_id}')::uuid as id;
 select is((pg_temp.readj(4, format('select api.notifications_open_item(%L::uuid)', (select id from item)))) ->> 'target',
   '/duties/assignments/' || pg_temp.asg(), 'opening the item gives the duty''s deep link');
@@ -285,7 +289,19 @@ select is(pg_temp.readj(4, 'select api.duties_my_duties()') #>> '{assignments,0,
 select is((pg_temp.readj(4, 'select api.duties_my_duties()') -> 'assignments' -> 0) - 'assignment_id' - 'occurrence_id'
             - 'department_id' - 'starts_at' - 'ends_at' - 'response_deadline'
             -- Story 4.2 keys (revisions) are checked in duties_revisions_test.sql.
-            - 'slot_revision' - 'changes' - 'previous_response' - 'previous_assignment_ids' - 'notes_updated_at',
+            - 'slot_revision' - 'changes' - 'previous_response' - 'previous_assignment_ids' - 'notes_updated_at'
+            -- Story 4.3 keys are checked in duties_rota_test.sql.
+            - 'position_name' - 'topic' - 'scripture'
+            -- Story 4.5 keys are checked in duties_responses_test.sql.
+            - 'owner_kind' - 'prior_accepted_at' - 'leaders' - 'slot_id'
+            -- Story 4.8 keys are checked in duties_reminders_test.sql.
+            - 'deadline_source' - 'short_notice' - 'reminders'
+            -- Story 4.9 keys are checked in duties_coverage_test.sql.
+            - 'response_provenance' - 'confirmed_channel'
+            -- Story 4.10 keys are checked in duties_outcomes_test.sql.
+            - 'outcome'
+            -- Story 4.11 keys are checked in duties_owner_operations_test.sql.
+            - 'cell_id',
   '{"revision": 1, "duty_name": "Sunday preaching", "department_name": "SYNTHETIC Preaching Rota", "reporting_at": null, "location": "SYNTHETIC Main hall", "instructions": "Arrive early.", "response": "pending", "responded_at": null, "note": null}'::jsonb,
   'with its detail, deadline and pending response');
 select is(jsonb_array_length(pg_temp.readj(5, 'select api.duties_my_duties()') -> 'assignments'), 1,
@@ -351,10 +367,12 @@ create temp table dec as select pg_temp.duties(5, 'duties.respond', 1, jsonb_bui
   'assignment_id', (select r #>> '{data,assignment_id}' from pub_admin),
   'response', 'declined')) as r;
 select is((select r #>> '{data,response}' from dec), 'declined', 'O says they cannot make it');
-select is((select string_agg(job_state || '|' || coalesce(cancel_reason, '-'), ',')
-             from app.notifications_jobs where source_type = 'duties_assignment'
-              and source_id = (select (r #>> '{data,assignment_id}')::uuid from pub_admin)),
-  'cancelled|responded', 'an answer before delivery cancels the pending job');
+select is((select string_agg(distinct job_state || '|' || coalesce(cancel_reason, '-'), ',')
+             from app.notifications_jobs where source_type in ('duties_assignment', 'duties_coverage')
+              and source_id = (select (r #>> '{data,assignment_id}')::uuid from pub_admin)
+              -- Story 4.9: a decline then alerts the leaders (duties_coverage_test.sql).
+              and reminder_kind <> 'duty_declined'),
+  'cancelled|responded', 'an answer before delivery cancels the pending jobs (story 4.8: reminders and leader alerts too)');
 select is((select string_agg(code, ',' order by event_id) from app.duties_audit where action = 'response_recorded'),
   'accepted,declined', 'responses are audited with their code only');
 -- A duty that has started cannot be answered.
@@ -383,7 +401,15 @@ select is(pg_temp.duties(2, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(
 select is(pg_temp.read(2, 'select api.duties_leader_board()'), 'PT403|forbidden|not_granted',
   'and the leader board is gone at once');
 
--- Deputy loss: a new publish and a replay of the deputy's earlier publish are refused.
+-- Deputy loss: a new publish and a replay of the deputy's earlier publish are refused. Story 4.16:
+-- the deputy is now the department's last reachable leader or deputy, so the revocation is refused
+-- until another one is granted (here member 2 again).
+select is(pg_temp.cmd(pg_temp.c(1), 'api.identity_grant_command', 'identity.revoke_scope',
+  (select s.revision from app.identity_grant_sets s where s.member_id = pg_temp.mid(3)),
+  jsonb_build_object('member_id', pg_temp.mid(3), 'scope_kind', 'department_deputy', 'scope_id', pg_temp.d()))
+    -> 'field_errors', '{"member_id": "handover_required"}'::jsonb,
+  'story 4.16: the last reachable deputy''s scope cannot be revoked before handover');
+select pg_temp.grant_scope(2, 'department_leader', pg_temp.d());
 select pg_temp.cmd(pg_temp.c(1), 'api.identity_grant_command', 'identity.revoke_scope',
   (select s.revision from app.identity_grant_sets s where s.member_id = pg_temp.mid(3)),
   jsonb_build_object('member_id', pg_temp.mid(3), 'scope_kind', 'department_deputy', 'scope_id', pg_temp.d()));

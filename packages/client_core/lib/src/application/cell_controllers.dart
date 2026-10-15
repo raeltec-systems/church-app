@@ -140,9 +140,12 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
     state = state.copyWith(loading: true);
     final r = await fetch();
     if (!_current(epoch)) return;
-    // A denial or failure drops everything protected from the screen.
+    // A denial or failure drops everything protected from the screen. A
+    // request still in flight stays pending, so its buttons stay disabled
+    // and it cannot be sent twice (story 4.14 review: the Duties rule).
     state = CellsState<T>(
       result: r,
+      pending: state.pending,
       notice: state.notice,
       noticeAction: state.noticeAction,
       unconfirmed: state.unconfirmed,

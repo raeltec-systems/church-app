@@ -117,11 +117,65 @@ const staffDutyLeaderDestination = (
   icon: Icons.assignment_outlined,
 );
 
+/// Story 4.3: the rota grid, shown with the Duties entry.
+const staffDutyRotaDestination = (
+  path: ClientPaths.dutyRota,
+  label: 'Rota',
+  icon: Icons.calendar_view_week_outlined,
+);
+
+/// Story 4.9: the coverage queue, shown with the Duties entry (Pastor and
+/// Admin: the church-wide view of gaps).
+const staffDutyCoverageDestination = (
+  path: ClientPaths.dutyCoverage,
+  label: 'Coverage',
+  icon: Icons.fact_check_outlined,
+);
+
+/// Story 4.10: shown while the caller leads or deputises a department:
+/// record and correct the outcomes of started duties.
+const staffDutyOutcomesDestination = (
+  path: ClientPaths.dutyOutcomes,
+  label: 'Outcomes',
+  icon: Icons.task_alt_outlined,
+);
+
+/// Story 4.10: the caller's own duty history (every member).
+const staffDutyHistoryDestination = (
+  path: ClientPaths.dutyHistory,
+  label: 'My duty history',
+  icon: Icons.history_outlined,
+);
+
 /// Story 4.1: shown while the server's current answer includes Admin.
 const staffDepartmentsDestination = (
   path: ClientPaths.adminDepartments,
   label: 'Departments',
   icon: Icons.workspaces_outline,
+);
+
+/// Story 4.6: shown while the server grants the caller member access; every
+/// owner's own follow-up tasks.
+const staffMyFollowUpsDestination = (
+  path: ClientPaths.myFollowUps,
+  label: 'My follow-ups',
+  icon: Icons.checklist_outlined,
+);
+
+/// Story 4.6: shown while the caller leads or deputises a department or
+/// leads or assists a cell: the tasks in those scopes.
+const staffFollowUpSupervisionDestination = (
+  path: ClientPaths.followUpSupervision,
+  label: 'Follow-ups',
+  icon: Icons.fact_check_outlined,
+);
+
+/// Story 4.6: shown while the server's current answer includes Admin;
+/// routing metadata only.
+const staffFollowUpRoutingDestination = (
+  path: ClientPaths.adminFollowUps,
+  label: 'Follow-up routing',
+  icon: Icons.alt_route_outlined,
 );
 
 /// The sidebar for the caller's current grants. Presentation only: hiding an
@@ -136,6 +190,13 @@ List<StaffDestination> staffDestinationsFor(
   if (grants != null) staffAccessDestination,
   if (servesACell(grants)) staffCellLeaderDestination,
   if (seesDutyBoard(grants)) staffDutyLeaderDestination,
+  if (seesDutyBoard(grants)) staffDutyRotaDestination,
+  if (seesDutyBoard(grants)) staffDutyCoverageDestination,
+  if (leadsADepartment(grants)) staffDutyOutcomesDestination,
+  if (grants != null) staffDutyHistoryDestination,
+  if (grants != null) staffMyFollowUpsDestination,
+  if (supervisesFollowUps(grants)) staffFollowUpSupervisionDestination,
+  if (grants?.isAdmin ?? false) staffFollowUpRoutingDestination,
   if (grants?.isAdmin ?? false) staffMembersDestination,
   if (grants?.isAdmin ?? false) staffRecoveryEmailsDestination,
   if (grants?.isAdmin ?? false) staffCredentialReviewsDestination,

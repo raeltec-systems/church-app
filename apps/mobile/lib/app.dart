@@ -43,6 +43,14 @@ const mobileInboxDestination = (
   icon: Icons.inbox_outlined,
 );
 
+/// Story 4.5: shown while the server grants the caller member access; the
+/// member Home with the My duties card (later features add their cards).
+const mobileHomeDestination = (
+  path: ClientPaths.home,
+  label: 'Home',
+  icon: Icons.home_outlined,
+);
+
 /// Story 4.1: shown while the server grants the caller member access; the
 /// member's duties (Accept / Can't make it).
 const mobileDutiesDestination = (
@@ -54,6 +62,7 @@ const mobileDutiesDestination = (
 /// The tabs for the caller's current grants (presentation only).
 List<MobileDestination> mobileDestinationsFor(MemberGrants? grants) => [
   ...mobileDestinations,
+  if (grants != null) mobileHomeDestination,
   if (grants != null) mobileInboxDestination,
   if (grants != null) mobileDutiesDestination,
   if (grants != null) mobileAccessDestination,
@@ -83,6 +92,8 @@ class _MobileAppState extends State<MobileApp> {
     membershipRequests: true,
     // Story 2.9: sign-in help links to staff-assisted recovery on this phone.
     assistedRecovery: true,
+    // Story 4.5: the member Home with the My duties card.
+    memberHome: true,
     shell: (location, focusSelectedNav, child) => MobileShell(
       location: location,
       focusSelectedNav: focusSelectedNav,

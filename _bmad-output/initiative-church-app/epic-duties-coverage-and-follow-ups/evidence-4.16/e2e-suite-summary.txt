@@ -1,5 +1,6 @@
-# Story 4.16 E2E suite (local stack, one script at a time, db reset before each)
-# Run 1 (every script):
+# Story 4.16 E2E suite after review round 1 (local stack, one script at a time, db reset before each,
+# nothing else using the stack). The build-time runs (X30 and P98 assertions changed for the new
+# behaviour) are in the plan's Implementation Notes.
 run exit=0 
 grants exit=0 
 apply exit=0 27/27 checks passed 
@@ -27,13 +28,8 @@ followups-reminders exit=0 12/12 checks passed
 duties-reminders exit=0 17/17 checks passed 
 duties-coverage exit=0 12/12 checks passed 
 duties-outcomes exit=0 11/11 checks passed 
-duties-owner-ops exit=1 12/13 (X30 counted every new job; story 4.16 adds the leaders' review notice by design; the assertion now excludes duty_review_flagged)
-# Run 2 (after the X30 fix; the last four scripts alone, reset before each):
-duties-owner-ops exit=0 13/13 checks passed
-duties-lifecycle exit=0 16/16 checks passed
-duties-pilot exit=1 12/13 (P98 cleanup revoked the department's last reachable leader: refused handover_required by design; the cleanup now accepts kept_last_leader)
-duties-decisions exit=0 11/11 checks passed
-# Run 3:
-duties-pilot exit=0 13/13 checks passed
-Result: 31 scripts, each exit=0 on its final run.
-duties-decisions exit=0 11/11 checks passed (run 4, after renaming one evidence key; evidence file from this run)
+duties-owner-ops exit=0 13/13 checks passed 
+duties-lifecycle exit=0 16/16 checks passed 
+duties-pilot exit=0 13/13 checks passed 
+duties-decisions exit=0 11/11 checks passed 
+Result: 31 scripts, every one exit=0 in this single run.

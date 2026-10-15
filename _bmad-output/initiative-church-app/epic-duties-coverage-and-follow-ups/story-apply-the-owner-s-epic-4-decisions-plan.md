@@ -108,9 +108,10 @@ context:
 - N1: **Hand over first** now says "This department has no other leader or deputy who can use the app" (also true for a held sole leader), on Roles & access and Departments.
 - N2: the pilot header and duties.md (story 4.13) say that a reused staging department's leader persona keeps the leader scope after P98, and how an Admin removes it (give another reachable member the role first, then remove the persona's).
 - N3: timing assertion unchanged (99-131 ms against a 3 s bound).
+- Found while re-verifying N5: without a fence the planner pulled the board's per-department lateral up and computed the overlap counts once per listed duty (a 270-duty board read ran for minutes). The lateral now ends in `offset 0`, so the counts are computed once per department; pgTAP asserts the 206-duty board read under 3 s (471 ms).
 - N4: the person making the change is excluded from the review notice (`duties_alert_recipients(department, actor)`).
 - N5: `duties_leader_board` (replaced, copied from `20261014171038`, 4.8) lists its first 200 duties plus every duty with an open review that has not started; overlap counts are computed once over the listed duties; `duties_truncated` is unchanged. The reviews view hides the 200 note; the full board's note says "and every duty that needs review".
-- Tests: `duties_owner_decisions_test.sql` 105 (+17: S2 stays current while EV2 is open and ends once both are reviewed, source check; N4; N5 with 144 more duties pushing linked ones past 200; S1 unlink of a member who was the last leader of two departments, both handovers recorded against the grants, shown on Departments and Membership status, deactivation allowed afterwards, resolve; G3 now uses the Pastor for the dormancy check). Dart: the new copy asserted.
+- Tests: `duties_owner_decisions_test.sql` 106 (+18: board timing; S2 stays current while EV2 is open and ends once both are reviewed, source check; N4; N5 with 144 more duties pushing linked ones past 200; S1 unlink of a member who was the last leader of two departments, both handovers recorded against the grants, shown on Departments and Membership status, deactivation allowed afterwards, resolve; G3 now uses the Pastor for the dormancy check). Dart: the new copy asserted.
 
 ## Plan Change Log
 
@@ -132,7 +133,14 @@ context:
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/staff`, `apps/mobile`; TZ=America/New_York runs -- expected: pass.
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/main && npm run -s ci:function-imports`; evidence scan -- expected: clean.
 
-**Results (2026-10-15):**
+**Results after review round 1 (2026-10-15):**
+- db reset 0; db:test PASS (45 files, 3845 tests; `duties_owner_decisions_test.sql` 106); db:smoke pass (139 ok).
+- Every E2E `exit=0` in one run (31 scripts, reset before each, one at a time, nothing else on the stack; `duties-decisions` 11/11).
+- contracts:test 265/0; Dart contracts 282; node tool tests 252/0; ci:policy-test 56/0.
+- flutter analyze clean in client_core, apps/staff, apps/mobile; tests 655, 40, 55; `TZ=America/New_York` client_core 241, apps/mobile 55.
+- ci:secrets clean; ci:migrations (`--base origin/main`) 50 ordered, unique, non-destructive; ci:function-imports ok; evidence scan clean.
+
+**Results (2026-10-15, build):**
 - db reset 0; db:test PASS (45 files, 3827 tests; `duties_owner_decisions_test.sql` 88, timing 115-131 ms); db:smoke pass (139 ok).
 - Every E2E `exit=0` on its final run (31 scripts, reset before each, one at a time; `duties-decisions` 11/11) (`evidence-4.16/e2e-suite-summary.txt`).
 - contracts:test 265/0; Dart contracts 282; node tool tests (CI set) 252/0; ci:policy-test 56/0.

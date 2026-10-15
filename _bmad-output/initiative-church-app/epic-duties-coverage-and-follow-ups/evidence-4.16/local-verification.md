@@ -4,7 +4,7 @@ Worktree of story 4.16 merged with `ccr-93e730dd-89lbvg` (baseline `4352fbb`). L
 
 | Check | Result |
 |---|---|
-| `npx supabase db reset` | exit 0 (migration `20261015180000_duties_owner_decisions.sql` applied after `20261015143102`) |
+| `npx supabase db reset` | exit 0 (migration `20261015190139_duties_owner_decisions.sql` applied after `20261015143102`) |
 | `npm run -s db:test` | PASS: 45 files, 3845 tests. New `duties_owner_decisions_test.sql` 106; changed `duties_tracer_test.sql` 95, `duties_lifecycle_test.sql` 155, `duties_owner_operations_test.sql` 167, `membership_lifecycle_test.sql` 86, `duties_revisions_test.sql` 93 (unchanged count) |
 | Timing (under `statement_timeout = '8s'`) | one event change flagging 63 linked duties and queueing their notices: 96-131 ms; the leader board with 206 duties in a department (200 plus the reviewed ones, review N5): 471 ms (both asserted < 3 s) |
 | `npm run -s db:smoke` | pass (139 ok, 0 not ok) |

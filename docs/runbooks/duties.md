@@ -1282,7 +1282,7 @@ Migration: `supabase/migrations/20261015143102_duties_comment_refresh.sql` (comm
 
 ## Story 4.16: apply the owner's epic 4 decisions
 
-Migration: `supabase/migrations/20261015180000_duties_owner_decisions.sql` (forward only; no destructive statements, no row deletions, no `_rows` file, so **no owner SQL paste**; one `drop not null` relaxes Identity's obligation origin, as 20261014052239 did; no new client grant). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-apply-the-owner-s-epic-4-decisions-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.16/`. Source: `owner-decisions-milestone-2.md`, decisions 7, 8 and 10, and the Q1 G3 setting.
+Migration: `supabase/migrations/20261015190139_duties_owner_decisions.sql` (forward only; no destructive statements, no row deletions, no `_rows` file, so **no owner SQL paste**; one `drop not null` relaxes Identity's obligation origin, as 20261014052239 did; no new client grant). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-apply-the-owner-s-epic-4-decisions-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.16/`. Source: `owner-decisions-milestone-2.md`, decisions 7, 8 and 10, and the Q1 G3 setting.
 
 ### Decision 7: the review notice (a linked meeting or event changed)
 
@@ -1317,7 +1317,7 @@ Fictional numbers: pgTAP `+44 7700 900850-900859`, E2E `900720-900729`. Earlier 
 ### Hosted staging (parent session, then the owner)
 
 1. **Parent session:**
-   - Apply `20261015180000_duties_owner_decisions.sql` to staging after `20261015143102` (rename the local file to the recorded hosted version if the apply records another one).
+   - Apply `20261015190139_duties_owner_decisions.sql` to staging after `20261015143102` (rename the local file to the recorded hosted version if the apply records another one).
    - Run `tools/ci/verify-hosted.sql` with `expected_env=staging`.
    - Compare the md5 of each new or replaced function (the list above; `app.duties_*`, `app.followups_report_handover`, `app.identity_end_grant`, `app.identity_end_grant_record`, `app.identity_revoke_scope`, `app.identity_revoked_scope`, `app.identity_approve_setting`, `app.fixture_report_handover`) with the local one (the migration has no backslashes).
    - Grants: no new function is executable by `anon`, `authenticated` or `service_role`.

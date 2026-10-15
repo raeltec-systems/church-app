@@ -63,7 +63,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261015180000_duties_owner_decisions.sql` -- everything above, replaced bodies listed in its header.
+- [x] `supabase/migrations/20261015190139_duties_owner_decisions.sql` -- everything above, replaced bodies listed in its header.
 - [x] `supabase/tests/duties_owner_decisions_test.sql` (+ timing check) and the earlier pgTAP files whose assertions change (4.12 "no reason", ledgers).
 - [x] `packages/client_core` -- reason line (board, coverage), deep link and reviews-only view, revoke refusal text; tests.
 - [x] `tools/identity-e2e/duties-decisions.mjs` + `.test.mjs`.
@@ -85,7 +85,7 @@ context:
 - Decision (agent, under owner pre-approval): for a revoked scope Follow-ups never reports last responsible (a revocation narrows access; a task nobody can take stays listed for the Admin, as 4.12). Duties reports the revoked department when no current, active, reachable leader or deputy remains (the member's own remaining grant counts, so revoking one of two scopes of the same person is allowed). A revoked leader's pending review notice is refused at delivery (recipient check), not cancelled at once (`duties_scope_revoked` is not replaced).
 - Decision (agent, under owner pre-approval; G3): `app.identity_approve_setting` requires an active restricted operator (`ops_require_operator`, as `identity_approve_church_setting`), has no client grant (as `policy_approve`), validates `dormancy_days` (1-3650), serialises versions per setting with a transaction advisory lock, and audits with the existing `church_setting_approved` action (both action lists already allow it; widening them would need another retire-and-recreate). Production: version 2 (the labelled fixture row v1 exists everywhere and is never honoured there).
 - G4: the agent proposed modest limits (sign-ins and sign-ups 20 per 5 min per IP, token refresh 120 per 5 min, verification 20 per 5 min; OTP, SMS and anonymous unchanged) with the shared-mobile-address reasoning in `production-promotion-identity.md`; password minimum 8, no character rules. G11: open after G5 and G8.
-- Server: `supabase/migrations/20261015180000_duties_owner_decisions.sql` (ASCII, no backslashes, no TRUNCATE or `delete from`, `search_path = ''` on all 15 functions, every new function revoked from public, anon, authenticated and service_role). Replaced bodies, each copied from its latest version with every earlier review fix, changes marked "Story 4.16":
+- Server: `supabase/migrations/20261015190139_duties_owner_decisions.sql` (ASCII, no backslashes, no TRUNCATE or `delete from`, `search_path = ''` on all 15 functions, every new function revoked from public, anon, authenticated and service_role). Replaced bodies, each copied from its latest version with every earlier review fix, changes marked "Story 4.16":
   - from `20261015110202` (4.12): `duties_vacate_member` (reason code; S1 set-based work and N5 lock order kept), `duties_coverage` (`vacated.reason`; everything else unchanged), `duties_report_handover` (revoked-scope branch; the lifecycle query unchanged, restructured into a union), `followups_report_handover` (active plan and never last responsible for `scope_revoked`).
   - from `20261015035112` (4.11): `duties_occurrence_json` (3-argument; B1 gating kept), `duties_owner_flag_review` (the notice after the flags; S1, N5 kept).
   - from `20261006234820` (2.3): `identity_end_grant`, `identity_revoke_scope`.

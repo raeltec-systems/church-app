@@ -217,3 +217,4 @@ Unchanged: `duties_in_scope`, `duties_my_duties`, the client grants, deletion. A
 - Evidence: `evidence-4.5/duties-responses-e2e.jsonl`, `evidence-4.5/e2e-suite-summary.txt`.
 - Remaining (not builder steps): staging apply and md5 parity (parent session), staging APK rebuild for `share_plus`, owner manual checks in `docs/runbooks/duties.md` story 4.5.
 - 2026-10-14, owner acknowledged the accept_many lock-order amendment (review S2) with "go with this". The calendar UID amendment (review N4) is still pending owner acknowledgement.
+- 2026-10-15, owner acknowledged the amendment that supersedes the frozen-block wording (see owner-decisions-milestone-2.md, "Duties and Follow-ups decisions").

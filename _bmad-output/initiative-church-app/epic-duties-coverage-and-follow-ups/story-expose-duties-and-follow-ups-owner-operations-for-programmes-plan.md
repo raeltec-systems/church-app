@@ -151,3 +151,4 @@ context:
 - contracts:test 265/0; Dart contracts 282 pass; node tool tests (CI set) 219/0; ci:policy-test 56/0.
 - flutter analyze clean in client_core, apps/staff, apps/mobile; flutter test client_core 621 (`duties_owner_ops_test.dart` 10), apps/staff 40, apps/mobile 55; under `TZ=America/New_York` client_core `test/duties` + `test/followups` 193 and apps/mobile 55.
 - ci:secrets clean (1575 files); ci:migrations (`--base origin/main`) 47 ordered, unique, non-destructive; ci:function-imports ok; evidence scan clean.
+- 2026-10-15, owner acknowledged the amendment that supersedes the frozen-block wording (see owner-decisions-milestone-2.md, "Duties and Follow-ups decisions").

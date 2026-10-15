@@ -74,4 +74,27 @@ else
   while IFS= read -r line; do echo "FAIL - api envelope: $line"; done <<<"$bad"
   fail=1
 fi
+
+# Story 4.11: the Duties owner operations read a part or event reference exactly as the v1
+# source_ref fixtures say (app.duties_owner_ref_errors). Cases whose errors name a key outside the
+# reference (unknown keys) are the operation's own unknown-key check and are left out here.
+cases=$(jq -c '[(.valid[] | {name, value, expected: {}}),
+                (.invalid[] | select((.field_errors | keys) - ["source_type", "source_id", "source_revision"] == [])
+                            | {name, value, expected: .field_errors})]' "$FIXTURES/source_ref.json")
+results=$(pg -v cases="$cases" <<'SQL'
+select coalesce(jsonb_agg(jsonb_build_object(
+         'name', c ->> 'name',
+         'ok', app.duties_owner_ref_errors(c -> 'value', true) = c -> 'expected',
+         'actual', app.duties_owner_ref_errors(c -> 'value', true))), '[]'::jsonb)
+  from jsonb_array_elements(:'cases'::jsonb) c;
+SQL
+)
+bad=$(jq -c '.[] | select(.ok | not)' <<<"$results")
+count=$(jq length <<<"$results")
+if [[ -z "$bad" ]]; then
+  echo "ok   - source_ref: $count fixture references agree with the Duties owner operations"
+else
+  while IFS= read -r line; do echo "FAIL - owner operations: $line"; done <<<"$bad"
+  fail=1
+fi
 exit "$fail"

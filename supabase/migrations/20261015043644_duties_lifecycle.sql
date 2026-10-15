@@ -1703,10 +1703,71 @@ as $$
   select coalesce((select r.route = 'member' from app.notifications_recipient_route(p_member_id) r), false);
 $$;
 
+-- Review R1, R2: the members who still belong to a task's group for keeping it (owner access,
+-- what waits for handover, the handover of an active member): the target's members through its
+-- owner's roster hook, the holders of the family's scope kinds and every member holding the
+-- Pastor role, all active. A Pastor counts while they hold the role, also on a login hold or
+-- dormant (the live-Pastor rule of 4.7 is only for choosing NEW owners, in
+-- `followups_scope_roster`). Null when the scope's roster hook is missing, raises or answers
+-- anything but {"member_ids": [uuid, ...]}: callers then move nothing for that scope and owner
+-- access stays closed until the hook answers again.
+create function app.followups_owner_roster(p_scope_kind text, p_scope_id uuid)
+returns uuid[]
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_hook text;
+  v_proc regprocedure;
+  v_answer jsonb;
+  v_ids uuid[] := '{}';
+  v_state text;
+begin
+  select f.roster_hook into v_hook from app.followups_scope_families f
+   where f.scope_kind = p_scope_kind;
+  if v_hook is not null then
+    v_proc := pg_catalog.to_regprocedure(v_hook);
+    if v_proc is null then
+      return null;
+    end if;
+    begin
+      execute format('select %s($1)', v_proc::regproc) into v_answer
+        using jsonb_build_object('scope_kind', p_scope_kind, 'scope_id', p_scope_id);
+    exception when others then
+      get stacked diagnostics v_state = returned_sqlstate;
+      raise log 'followups roster hook failed: %', v_state;
+      return null;
+    end;
+    if not (jsonb_typeof(v_answer) = 'object'
+            and app.contract_unknown_keys(v_answer, array['member_ids']) = '{}'::jsonb
+            and jsonb_typeof(v_answer -> 'member_ids') = 'array'
+            and not exists (select 1 from jsonb_array_elements(v_answer -> 'member_ids') e
+                             where app.contract_uuid_error(e) is not null)) then
+      return null;
+    end if;
+    select coalesce(array_agg((e #>> '{}')::uuid), '{}') into v_ids
+      from jsonb_array_elements(v_answer -> 'member_ids') e;
+  end if;
+  return (select coalesce(array_agg(distinct x order by x), '{}')
+            from (select unnest(v_ids) as x
+                  union
+                  select g.member_id from app.identity_grants g
+                   where g.revoked_at is null and g.scope_id = p_scope_id
+                     and app.followups_family(g.scope_kind) = app.followups_family(p_scope_kind)
+                  union
+                  select g.member_id from app.identity_grants g
+                   where g.revoked_at is null and g.role = 'pastor'
+                     and app.identity_member_has_role(g.member_id, 'pastor')) y
+           where app.followups_member_active(y.x));
+end;
+$$;
+
 -- The handover plan for every active task p_member owns or supervises, computed set-based (one
 -- roster per distinct scope, reachability once per person):
 --   owner_due        the member must stop owning it (p_leaving: deactivation or deletion; else
---                    they are no longer in the task's group);
+--                    they are no longer in the task's group by `followups_owner_roster`, which
+--                    keeps a held or dormant Pastor (review R1); never while that roster is
+--                    unknown because its hook failed (review R2));
 --   owner_to         the first candidate of owner decision Q4 (the task's own group or a current
 --                    Pastor) the app can reach (review S3): its supervisor (holding the task's
 --                    scope), then another holder of its scope (the purpose's kinds in order), then
@@ -1724,6 +1785,7 @@ as $$
 #variable_conflict use_column
 declare
   v_rosters jsonb := '{}'::jsonb;
+  v_keep jsonb := '{}'::jsonb;
   v_reach jsonb;
   v_scope record;
 begin
@@ -1734,6 +1796,11 @@ begin
   loop
     v_rosters := v_rosters || jsonb_build_object(v_scope.scope_kind || '|' || v_scope.scope_id,
                    to_jsonb(app.followups_scope_roster(v_scope.scope_kind, v_scope.scope_id)));
+    -- An active member keeps what they still belong to (null: unknown, keep).
+    if not p_leaving then
+      v_keep := v_keep || jsonb_build_object(v_scope.scope_kind || '|' || v_scope.scope_id,
+                  to_jsonb(app.followups_owner_roster(v_scope.scope_kind, v_scope.scope_id)));
+    end if;
   end loop;
   select coalesce(jsonb_object_agg(y.m::text, app.followups_reachable(y.m)), '{}'::jsonb) into v_reach
     from (select distinct (e #>> '{}')::uuid as m
@@ -1745,7 +1812,11 @@ begin
     select g.owner_member_id, g.supervisor_member_id, g.scope_kind, g.scope_id, g.source_type, g.purpose,
            app.followups_purpose_kinds(g.source_type, g.purpose) as kinds,
            array(select (e #>> '{}')::uuid
-                   from jsonb_array_elements(v_rosters -> (g.scope_kind || '|' || g.scope_id)) e) as roster
+                   from jsonb_array_elements(v_rosters -> (g.scope_kind || '|' || g.scope_id)) e) as roster,
+           case when jsonb_typeof(v_keep -> (g.scope_kind || '|' || g.scope_id)) = 'array' then
+             array(select (e #>> '{}')::uuid
+                     from jsonb_array_elements(v_keep -> (g.scope_kind || '|' || g.scope_id)) e) end
+             as keep_roster
       from (select distinct t.owner_member_id, t.supervisor_member_id, t.scope_kind, t.scope_id,
                             t.source_type, t.purpose
               from app.followups_tasks t
@@ -1754,7 +1825,7 @@ begin
   ), o as (
     select t.*,
            t.owner_member_id = p_member
-             and (p_leaving or not (p_member = any (t.roster))) as o_due,
+             and (p_leaving or coalesce(not (p_member = any (t.keep_roster)), false)) as o_due,
            t.supervisor_member_id = p_member
              and (p_leaving or not app.followups_member_holds(p_member, t.scope_kind, t.scope_id, t.kinds))
              as s_gone
@@ -2330,16 +2401,18 @@ $$;
 -- Review B1: owner authority is live, and what waits for a new owner or supervisor is visible
 -- ---------------------------------------------------------------------------------------------
 
--- Is the member in the task's group now (the roster of the owner decision Q4 rule: the target's
--- members through its owner's roster hook, the holders of the family's scope kinds and the live
--- Pastors, all active)? An accountless member of the group is in it.
+-- Is the member in the task's group now (`followups_owner_roster`: the target's members through
+-- its owner's roster hook, the holders of the family's scope kinds and every active member
+-- holding the Pastor role, also held or dormant (review R1))? An accountless member of the group
+-- is in it. False while the roster hook fails (fail closed, review R2).
 create function app.followups_in_group(p_member_id uuid, p_task app.followups_tasks)
 returns boolean
 language sql
 set search_path = ''
 as $$
   select p_member_id is not null
-     and p_member_id = any (app.followups_scope_roster(p_task.scope_kind, p_task.scope_id));
+     and coalesce(p_member_id = any (app.followups_owner_roster(p_task.scope_kind, p_task.scope_id)),
+                  false);
 $$;
 
 -- (Replaced, story 4.12; copied from 20261014110258_followups_registry.sql.) Review B1: owner
@@ -2378,7 +2451,8 @@ begin
   perform app.followups_require_open_read();
   with scopes as materialized (
     select s.scope_kind, s.scope_id,
-           v_member = any (app.followups_scope_roster(s.scope_kind, s.scope_id)) as in_group
+           coalesce(v_member = any (app.followups_owner_roster(s.scope_kind, s.scope_id)), false)
+             as in_group
       from (select distinct t.scope_kind, t.scope_id from app.followups_tasks t
              where t.owner_member_id = v_member) s
   ), ranked as (
@@ -2420,12 +2494,15 @@ as $$
       from app.followups_tasks t
      where app.followups_state_ok('active_state', t.task_state)
   ), r as materialized (
-    select s.scope_kind, s.scope_id, app.followups_scope_roster(s.scope_kind, s.scope_id) as roster
+    select s.scope_kind, s.scope_id, app.followups_owner_roster(s.scope_kind, s.scope_id) as roster
       from (select distinct t.scope_kind, t.scope_id from t) s
   )
+  -- Review R1, R2: the keeping roster (a held or dormant Pastor stays); a scope whose roster hook
+  -- failed lists nothing.
   select t.owner_member_id, 'followup_task', t.task_id
     from t join r on r.scope_kind = t.scope_kind and r.scope_id = t.scope_id
-   where not (t.owner_member_id = any (r.roster))
+   where r.roster is not null
+     and not (t.owner_member_id = any (r.roster))
      and t.owner_member_id <> '00000000-0000-0000-0000-000000000000'::uuid
   union all
   select t.supervisor_member_id, 'followup_supervision', t.task_id
@@ -2508,6 +2585,7 @@ revoke all on function
   app.followups_jsonb_uuid(jsonb),
   app.followups_lock_people(uuid[]),
   app.followups_in_group(uuid, app.followups_tasks),
+  app.followups_owner_roster(text, uuid),
   app.followups_pending_handovers(),
   app.duties_command_people(jsonb, uuid),
   app.duties_lifecycle_actor(),

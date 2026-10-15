@@ -10,7 +10,7 @@ route_source: 'auto'
 review: ''
 review_source: ''
 lenses_ran: []
-review_loop_iteration: 2
+review_loop_iteration: 3
 context:
   - '{project-root}/docs/runbooks/identity-access.md'
   - '{project-root}/docs/runbooks/duties.md'
@@ -132,6 +132,12 @@ context:
 - N12: a deactivation or deletion cancels the member's reminders of the tasks still waiting (about 0.5 ms each; deactivation with 1030 tasks now 1.5-2.3 s); documented that after a revoked scope the reminders keep going to the still-reachable former owner until the Admin continues.
 - N13: none (e800a7d never reached staging).
 - Newly replaced bodies: `followups_capacity`, `followups_my_tasks`, `followups_admin_routing` (from 4.6). New: `followups_in_group`, `followups_pending_handovers`.
+
+### Review amendments (2026-10-15, round 3)
+
+- R1: new `followups_owner_roster` (the keeping roster: group members through the hook, family scope holders, and every active member holding the Pastor role, held or dormant). `followups_in_group` (owner capacity), `followups_my_tasks`, `followups_pending_handovers` and the handover plan of an active member (`p_leaving = false`, also the scope_revoked hook) use it; the live-Pastor rule stays for choosing new owners. pgTAP: a held Pastor keeps the task through a revoked scope, is not listed, complete_handover moves nothing, still owns it after release; a dormant Pastor the same.
+- R2: `followups_owner_roster` is null when the roster hook is missing, raises or answers badly; then that scope lists nothing and hands nothing over for an active member, and owner access stays closed. pgTAP with a raising fixture hook.
+- R3: runbook line on the S5 lock running after Duties rows inside the hook and the self-requested-deletion deadlock (detector, retry).
 - Rule slip to disclose: during the re-verification one `git fetch --dry-run` was run (output discarded, no refs updated) before `ci:migrations --base origin/main`; no other fetch, pull or push.
 
 ## Plan Change Log
@@ -148,6 +154,7 @@ context:
 - S3 (should, unreachable owner chosen): fixed (reachable candidates only, else last responsible); pgTAP.
 - S4 (should, needs-leader warning and revoke-first bypass): warning fixed; bypass recorded as a known limit with a follow-up item (an Identity grant-revocation handover hook).
 - N1-N8: fixed (N5 documented, N8 recorded in the runbook).
+- 2026-10-15, focused check of round 2: no blockers; R1 (should, held or dormant Pastor) fixed, R2 and R3 (nits) fixed.
 - 2026-10-15, re-review of round 1: S2, S3, N1-N8 confirmed; 1 blocker (B1) and 1 should-fix (S5) from the cap, nits N9-N13. B1 fixed (a, c as asked; b as a Follow-ups list with the same kinds, because Identity's obligations need a lifecycle event). S5 fixed (lock and recheck; E2E L27). N9 reordered and documented; N10, N11, N12 fixed; N13 no action.
 
 ## Verification

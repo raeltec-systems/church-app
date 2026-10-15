@@ -11,7 +11,7 @@
 -- Every account, phone and name is SYNTHETIC (fictional range +44 7700 900460-900469). Duty times
 -- are fixed church-time (Africa/Lusaka) clock times on whole days, never the current clock time.
 begin;
-select plan(136);
+select plan(154);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000004120' || lpad(n::text, 2, '0'))::uuid $$;
@@ -712,6 +712,64 @@ create temp table tz as select pg_temp.newtask(1, 12, 2, pg_temp.d()) as src;
 select is(app.followups_capacity(pg_temp.mid(12), pg_temp.task((select src from tz))), 'owner',
   'an accountless owner still in the group keeps owner capacity');
 
+-- Review R1: a held or dormant Pastor keeps their pastoral task (the live-Pastor rule only picks
+-- new owners). Pastor PS (7) deputises D and owns a task there (supervisor L) ---------------------
+select pg_temp.grant_scope(7, 'department_deputy', pg_temp.d());
+create temp table tp as select pg_temp.newtask(1, 7, 2, pg_temp.d()) as src;
+create function pg_temp.tp() returns app.followups_tasks language sql as
+$$ select pg_temp.task((select src from tp)) $$;
+select is(pg_temp.err(pg_temp.call(1, 'identity_credential_command', 'identity.place_hold', pg_temp.mrev(7),
+            jsonb_build_object('member_id', pg_temp.mid(7), 'reason_code', 'login_disabled'))), 'ok',
+  'setup: a login hold on the Pastor');
+select is(pg_temp.err(pg_temp.call(1, 'identity_grant_command', 'identity.revoke_scope', pg_temp.grev(7),
+            jsonb_build_object('member_id', pg_temp.mid(7), 'scope_kind', 'department_deputy',
+                               'scope_id', pg_temp.d()))), 'ok',
+  'the held Pastor''s deputy scope is revoked (the scope_revoked hook runs)');
+select is(pg_temp.who((pg_temp.tp()).owner_member_id), 7, 'the hook leaves the held Pastor''s task with them');
+select is(app.followups_capacity(pg_temp.mid(7), pg_temp.tp()), 'owner', 'they keep owner capacity while held');
+select is((select count(*)::int from app.followups_pending_handovers() h where h.member_id = pg_temp.mid(7)), 0,
+  'nothing of theirs is listed as waiting');
+select is((pg_temp.call(1, 'followups_command', 'followups.complete_handover', null,
+            jsonb_build_object('member_id', pg_temp.mid(7))) -> 'data') - 'member_id',
+  '{"handed_over": 0, "remaining": 0}'::jsonb, 'and complete_handover moves nothing');
+select is(pg_temp.err(pg_temp.call(1, 'identity_credential_command', 'identity.release_hold', pg_temp.mrev(7),
+            jsonb_build_object('member_id', pg_temp.mid(7), 'identity_check', 'in_person',
+              'hold_id', (select h.hold_id from app.identity_holds h
+                           where h.member_id = pg_temp.mid(7) and h.released_at is null)))), 'ok',
+  'the hold is released');
+select is(pg_temp.who((pg_temp.tp()).owner_member_id) || ':' || app.followups_capacity(pg_temp.mid(7), pg_temp.tp()),
+  '7:owner', 'they still own it afterwards');
+update app.identity_account_links set last_member_activity_at = now() - interval '3000 days',
+       approved_at = least(approved_at, now() - interval '3000 days')
+ where member_id = pg_temp.mid(7);
+select ok(not app.followups_pastor_live(pg_temp.mid(7)), 'setup: the Pastor is now dormant (not live)');
+select is(app.followups_capacity(pg_temp.mid(7), pg_temp.tp()), 'owner', 'a dormant Pastor keeps owner capacity');
+select is((pg_temp.call(1, 'followups_command', 'followups.complete_handover', null,
+            jsonb_build_object('member_id', pg_temp.mid(7))) -> 'data') - 'member_id',
+  '{"handed_over": 0, "remaining": 0}'::jsonb, 'and their task is not handed away');
+select is((select count(*)::int from app.followups_pending_handovers() h where h.member_id = pg_temp.mid(7)), 0,
+  'nor listed as waiting');
+update app.identity_account_links set last_member_activity_at = now() where member_id = pg_temp.mid(7);
+
+-- Review R2: a roster hook that fails moves nothing for good (owner access stays closed meanwhile).
+create function pg_temp.bad_roster(p jsonb) returns jsonb language plpgsql as
+$$ begin raise exception 'SYNTHETIC roster failure'; end $$;
+create temp table fam as select scope_kind, roster_hook from app.followups_scope_families;
+update app.followups_scope_families set roster_hook = 'pg_temp.bad_roster(jsonb)'
+ where app.followups_family(scope_kind) = app.followups_family('department_leader');
+select is(app.followups_owner_roster('department_leader', pg_temp.d()), null, 'setup: D''s roster hook fails');
+select is((select count(*)::int from app.followups_pending_handovers() h where h.member_id = pg_temp.mid(12)), 0,
+  'a department member''s task is not listed as waiting while the hook fails');
+select is((pg_temp.call(1, 'followups_command', 'followups.complete_handover', null,
+            jsonb_build_object('member_id', pg_temp.mid(12))) -> 'data') - 'member_id',
+  '{"handed_over": 0, "remaining": 0}'::jsonb, 'complete_handover moves nothing');
+select is(pg_temp.who((pg_temp.task((select src from tz))).owner_member_id), 12, 'the task stays with its owner');
+select is(app.followups_capacity(pg_temp.mid(12), pg_temp.task((select src from tz))), null,
+  'owner access stays closed while the roster is unknown');
+update app.followups_scope_families f set roster_hook = x.roster_hook from fam x where x.scope_kind = f.scope_kind;
+select is(app.followups_capacity(pg_temp.mid(12), pg_temp.task((select src from tz))), 'owner',
+  'once the hook answers again the owner has their task back');
+
 -- Review N10: a named supervisor's grants are share-locked by the authorizer (the payload is read
 -- from the dispatcher's setting). The lock is seen on the grant row (xmax set).
 create function pg_temp.grant_xmax(n int) returns text language sql as $$
@@ -762,7 +820,7 @@ select is((select count(*)::int from information_schema.routine_privileges
                                    'duties_pending_handovers', 'duties_has_reachable_leader',
                                    'duties_resolve_handover', 'duties_lock_people', 'duties_command_people',
                                    'duties_jsonb_uuid', 'followups_jsonb_uuid', 'followups_in_group',
-                                   'followups_pending_handovers',
+                                   'followups_pending_handovers', 'followups_owner_roster',
                                    'followups_reachable', 'followups_handover_plan',
                                    'followups_handover_member', 'followups_resolve_obligations',
                                    'followups_complete_handover', 'followups_lock_people',

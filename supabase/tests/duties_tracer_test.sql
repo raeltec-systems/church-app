@@ -5,7 +5,7 @@
 -- refusals, replay and the deletion hook. HTTP evidence: tools/identity-e2e/duties.mjs. Every
 -- account, phone and name here is SYNTHETIC (fictional range +44 7700 900950-900959).
 begin;
-select plan(94);
+select plan(95);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000041' || lpad(n::text, 2, '0'))::uuid $$;
@@ -401,7 +401,15 @@ select is(pg_temp.duties(2, 'duties.publish_duty', null, pg_temp.duty(pg_temp.d(
 select is(pg_temp.read(2, 'select api.duties_leader_board()'), 'PT403|forbidden|not_granted',
   'and the leader board is gone at once');
 
--- Deputy loss: a new publish and a replay of the deputy's earlier publish are refused.
+-- Deputy loss: a new publish and a replay of the deputy's earlier publish are refused. Story 4.16:
+-- the deputy is now the department's last reachable leader or deputy, so the revocation is refused
+-- until another one is granted (here member 2 again).
+select is(pg_temp.cmd(pg_temp.c(1), 'api.identity_grant_command', 'identity.revoke_scope',
+  (select s.revision from app.identity_grant_sets s where s.member_id = pg_temp.mid(3)),
+  jsonb_build_object('member_id', pg_temp.mid(3), 'scope_kind', 'department_deputy', 'scope_id', pg_temp.d()))
+    -> 'field_errors', '{"member_id": "handover_required"}'::jsonb,
+  'story 4.16: the last reachable deputy''s scope cannot be revoked before handover');
+select pg_temp.grant_scope(2, 'department_leader', pg_temp.d());
 select pg_temp.cmd(pg_temp.c(1), 'api.identity_grant_command', 'identity.revoke_scope',
   (select s.revision from app.identity_grant_sets s where s.member_id = pg_temp.mid(3)),
   jsonb_build_object('member_id', pg_temp.mid(3), 'scope_kind', 'department_deputy', 'scope_id', pg_temp.d()));

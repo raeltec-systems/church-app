@@ -754,12 +754,45 @@ class FollowUpSupervision {
   final bool truncated;
 }
 
+/// Story 4.12 (review B1): a member whose open tasks or supervision wait for
+/// someone in each task's group (they left it, lost the scope, or left the
+/// church); the Admin continues with `followups.complete_handover`.
+class FollowUpHandoverWaiting {
+  const FollowUpHandoverWaiting({
+    required this.memberId,
+    required this.displayName,
+    required this.membershipState,
+    required this.tasks,
+    required this.supervisions,
+  });
+
+  factory FollowUpHandoverWaiting.fromJson(Object? json) {
+    final m = _map(json, 'handover');
+    return FollowUpHandoverWaiting(
+      memberId: _req<String>(m, 'member_id'),
+      displayName: _opt<String>(m, 'display_name'),
+      membershipState: _opt<String>(m, 'membership_state'),
+      tasks: _req<int>(m, 'tasks'),
+      supervisions: _req<int>(m, 'supervisions'),
+    );
+  }
+
+  final String memberId;
+  final String? displayName;
+
+  /// `approved` (still a member), `deactivated` or `deleting`.
+  final String? membershipState;
+  final int tasks;
+  final int supervisions;
+}
+
 /// `api.followups_admin_routing`.
 class FollowUpAdminRouting {
   const FollowUpAdminRouting({
     required this.tasks,
     required this.scopes,
     required this.truncated,
+    this.handovers = const [],
   });
 
   factory FollowUpAdminRouting.fromJson(Object? json) {
@@ -772,10 +805,19 @@ class FollowUpAdminRouting {
         _req<List>(m, 'scopes').map(FollowUpScopeRoster.fromJson),
       ),
       truncated: _req<bool>(m, 'truncated'),
+      // Story 4.12; absent from older servers.
+      handovers: List.unmodifiable(
+        (_opt<List>(m, 'handovers') ?? const []).map(
+          FollowUpHandoverWaiting.fromJson,
+        ),
+      ),
     );
   }
 
   final List<FollowUpRouting> tasks;
+
+  /// Story 4.12: members whose tasks wait for a new owner or supervisor.
+  final List<FollowUpHandoverWaiting> handovers;
 
   /// Each active task's scope with the members it may be reassigned to.
   final List<FollowUpScopeRoster> scopes;

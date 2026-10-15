@@ -57,6 +57,18 @@ abstract final class FollowUpPaths {
       'Reassigned',
       '$what was moved. The new owner sees it in My follow-ups.',
     ),
+    FollowUpNotice.handoverContinued => (
+      StatusTone.success,
+      'Handed over',
+      'Open tasks of $what went to someone in each task\'s group. Anything '
+          'still waiting stays listed.',
+    ),
+    FollowUpNotice.handoverNoneMoved => (
+      StatusTone.warning,
+      'Nobody could take them',
+      'No one the app can reach may take what $what had. It stays listed: '
+          'give the group a leader or reassign the tasks one by one.',
+    ),
     FollowUpNotice.changedElsewhere => (
       StatusTone.warning,
       'Changed elsewhere',
@@ -1608,6 +1620,19 @@ class _ReassignButtonState extends ConsumerState<_ReassignButton> {
 // Staff web, Admin: routing metadata only
 // ---------------------------------------------------------------------------
 
+String _waitingText(FollowUpHandoverWaiting w) {
+  final parts = [
+    if (w.tasks > 0) '${w.tasks} open task(s)',
+    if (w.supervisions > 0) '${w.supervisions} supervision(s)',
+  ];
+  final why = switch (w.membershipState) {
+    'deactivated' => 'membership deactivated',
+    'deleting' => 'being deleted',
+    _ => 'no longer in the task\'s group',
+  };
+  return '${parts.join(' and ')} wait for someone else ($why).';
+}
+
 /// Story 4.6, staff web, Admin only: every task's owner, supervisor, scope,
 /// state and dates, and reassignment. No next action, outcome, source
 /// context or private note is ever shown here.
@@ -1631,6 +1656,40 @@ class FollowUpRoutingScreen extends StatelessWidget {
           'leaders.',
         ),
         const SizedBox(height: 8),
+        // Story 4.12 (review B1): what waits for a new owner or supervisor.
+        if (value.handovers.isNotEmpty) ...[
+          Text(
+            'Waiting for handover',
+            style: ChurchType.body.copyWith(fontWeight: FontWeight.w600),
+          ),
+          for (final w in value.handovers)
+            _Card(
+              key: Key('routing-handover-${w.memberId}'),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(w.displayName ?? 'A former member'),
+                  Text(_waitingText(w)),
+                  Consumer(
+                    builder: (context, ref, _) => FocusRing(
+                      child: OutlinedButton(
+                        key: Key('routing-continue-handover-${w.memberId}'),
+                        onPressed: s.busy
+                            ? null
+                            : () => ref
+                                  .read(followUpRoutingProvider.notifier)
+                                  .completeHandover(w),
+                        child: const Text('Hand over the next 100'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 8),
+        ],
         if (value.tasks.isEmpty)
           _muted(
             context,

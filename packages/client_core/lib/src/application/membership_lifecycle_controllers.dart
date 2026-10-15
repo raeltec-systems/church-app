@@ -66,6 +66,9 @@ enum LifecycleNotice {
   /// Story 4.12: the next open follow-up tasks of a member who left were
   /// handed over (any left stay listed).
   handoverContinued,
+
+  /// Review N11: nobody the app can reach could take what is left.
+  handoverNoneMoved,
   alreadyHeld,
 
   /// The member is not an approved member (already deactivated, pending...).
@@ -332,13 +335,17 @@ class MembershipLifecycleController extends Notifier<MembershipLifecycleState> {
     };
   }
 
-  static LifecycleNotice _success(String command) => switch (command) {
-    CredentialCommands.placeHold => LifecycleNotice.loginHeld,
-    CredentialCommands.releaseHold => LifecycleNotice.holdReleased,
-    LifecycleCommands.deactivate => LifecycleNotice.deactivated,
-    FollowUpCommands.completeHandover => LifecycleNotice.handoverContinued,
-    _ => LifecycleNotice.restored,
-  };
+  static LifecycleNotice _success(String command, [Object? data]) =>
+      switch (command) {
+        CredentialCommands.placeHold => LifecycleNotice.loginHeld,
+        CredentialCommands.releaseHold => LifecycleNotice.holdReleased,
+        LifecycleCommands.deactivate => LifecycleNotice.deactivated,
+        FollowUpCommands.completeHandover =>
+          data is Map && data['handed_over'] is int && data['handed_over'] > 0
+              ? LifecycleNotice.handoverContinued
+              : LifecycleNotice.handoverNoneMoved,
+        _ => LifecycleNotice.restored,
+      };
 
   Future<void> _dispatch(
     String function,
@@ -361,8 +368,8 @@ class MembershipLifecycleController extends Notifier<MembershipLifecycleState> {
     CommandRequest? unconfirmed;
     var reload = true;
     switch (outcome) {
-      case CommandConfirmed():
-        notice = _success(request.command);
+      case CommandConfirmed(:final success):
+        notice = _success(request.command, success.data);
       case CommandRefused(:final error):
         notice = refusal(error);
         if (error.code == ErrorCode.forbidden ||

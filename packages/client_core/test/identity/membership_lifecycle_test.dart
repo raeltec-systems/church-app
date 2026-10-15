@@ -162,6 +162,34 @@ void main() {
       expect(byKey('lifecycle-notice-handoverContinued'), findsOneWidget);
     });
 
+    testWidgets('a step that moved nothing says so (review N11)', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.adminMembershipLifecycle,
+        setUp: (h) => h.lifecycle.overview = overviewWith(
+          handovers: [
+            handoverData(
+              module: 'followups',
+              kind: 'followup_task',
+              state: 'approved',
+            ),
+          ],
+        ),
+      );
+      // Shown for a member still in the church too (a revoked scope).
+      await tapKey(tester, 'lifecycle-continue-handover-$_deactivated');
+      h.gateway.sent.single.confirm({
+        'member_id': _deactivated,
+        'handed_over': 0,
+        'remaining': 0,
+      }, 1);
+      await settle(tester);
+      expect(byKey('lifecycle-notice-handoverNoneMoved'), findsOneWidget);
+      expect(byKey('lifecycle-notice-handoverContinued'), findsNothing);
+    });
+
     testWidgets('other modules\' handovers have no Continue button', (
       tester,
     ) async {

@@ -323,9 +323,9 @@ class _MembershipLifecycleScreenState
     const Text('Resolved in the owning section, not here.'),
     // Story 4.12 (review S1): a lifecycle change hands over at most 25
     // follow-up tasks; the Admin continues the rest from here.
-    if (first &&
-        h.ownerModule == 'followups' &&
-        h.membershipState != 'approved') ...[
+    // Review N11: whenever Follow-ups handovers remain, also for a member
+    // being deleted or one who is still a member.
+    if (first && h.ownerModule == 'followups') ...[
       const SizedBox(height: 8),
       FocusRing(
         child: OutlinedButton(
@@ -474,6 +474,12 @@ class _MembershipLifecycleScreenState
         'Follow-up tasks handed over',
         'Up to 100 open follow-up tasks of $who went to someone in each '
             'task\'s group. Any still pending stay listed below.',
+      ),
+      LifecycleNotice.handoverNoneMoved => (
+        StatusTone.warning,
+        'Nobody could take them',
+        'No one the app can reach may take the follow-up tasks of $who yet. '
+            'They stay listed: give the group a leader, then try again.',
       ),
       LifecycleNotice.alreadyHeld => (
         StatusTone.info,

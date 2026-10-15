@@ -584,6 +584,63 @@ void main() {
     },
   );
 
+  testWidgets(
+    'Admin routing lists what waits for handover and continues it (story 4.12)',
+    (tester) async {
+      final h = await pumpAt(
+        tester,
+        FollowUpPaths.adminRouting,
+        setUp: (h) => h.followUps.routing = AccessReadOk(
+          FollowUpAdminRouting.fromJson({
+            'tasks': [followUpTaskData(routing: true)],
+            'scopes': [rosterData()],
+            'truncated': false,
+            'handovers': [
+              {
+                'member_id': _x,
+                'display_name': 'SYNTHETIC Member X',
+                'membership_state': 'approved',
+                'tasks': 5,
+                'supervisions': 0,
+              },
+            ],
+          }),
+        ),
+      );
+      expect(byKey('routing-handover-$_x'), findsOneWidget);
+      expect(
+        find.textContaining('no longer in the task\'s group'),
+        findsOneWidget,
+      );
+      await tapKey(tester, 'routing-continue-handover-$_x');
+      final sent = h.gateway.sent.single;
+      expect(sent.wire['command'], 'followups.complete_handover');
+      expect(sent.wire['expected_revision'], isNull);
+      expect(sent.wire['payload'], {'member_id': _x});
+      sent.confirm({'member_id': _x, 'handed_over': 0, 'remaining': 0}, 1);
+      await settle(tester);
+      // Review N11: nothing moved, so it does not say "handed over".
+      expect(byKey('followups-notice-handoverNoneMoved'), findsOneWidget);
+      await tapKey(tester, 'routing-continue-handover-$_x');
+      h.gateway.sent.last.confirm({
+        'member_id': _x,
+        'handed_over': 5,
+        'remaining': 0,
+      }, 1);
+      await settle(tester);
+      expect(byKey('followups-notice-handoverContinued'), findsOneWidget);
+    },
+  );
+
+  test('an older server without handovers still reads', () {
+    final r = FollowUpAdminRouting.fromJson({
+      'tasks': const <Object?>[],
+      'scopes': const <Object?>[],
+      'truncated': false,
+    });
+    expect(r.handovers, isEmpty);
+  });
+
   testWidgets('the Home card is hidden without open work', (tester) async {
     await pumpAt(
       tester,

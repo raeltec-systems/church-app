@@ -3,7 +3,7 @@
 Architecture: AD-3, AD-4, AD-13, AD-20. Migration: `supabase/migrations/20261006215842_identity_live_access.sql`.
 Evidence: `_bmad-output/initiative-church-app/epic-identity-and-scoped-access/evidence-2.1/`.
 
-This file holds the per-story mechanics. The restricted support runbooks that staff and the operator follow (applications and linking, email and staff-assisted recovery, holds and disputes, deactivation and handover, deletion, first-Admin setup and the last-Admin fallback) are in [identity-support.md](identity-support.md) (story 2.12).
+This file holds the per-story mechanics. The restricted support runbooks that staff and the operator follow (applications and linking, email and staff-assisted recovery, holds and disputes, deactivation and handover, deletion, first-Admin setup and the last-Admin fallback) are in [identity-support.md](identity-support.md) (story 2.12). What holds, deactivation, deletion and handovers do to duties and follow-up tasks, written for Admins in task order, is in [duties-guides.md](duties-guides.md#guide-2-admin) (story 4.13).
 
 ## What exists
 

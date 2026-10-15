@@ -159,6 +159,8 @@ jobs:
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.11 tools/identity-e2e/duties-owner-ops.mjs docs/runbooks/contracts-and-owner-seams.md docs/runbooks/duties.md docs/runbooks/follow-ups.md
       - name: Story 4.12 evidence (membership lifecycle and handover in Duties and Follow-ups), its E2E and the duties, follow-ups and identity runbooks hold no credentials
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.12 tools/identity-e2e/duties-lifecycle.mjs docs/runbooks/duties.md docs/runbooks/follow-ups.md docs/runbooks/identity-access.md
+      - name: Story 4.13 evidence (duties guides, the synthetic pilot rehearsal and the owner walkthrough), its E2E and the duties guides and runbooks hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.13 tools/identity-e2e/duties-pilot.mjs docs/runbooks/duties-guides.md docs/runbooks/duties.md docs/runbooks/follow-ups.md docs/runbooks/identity-access.md docs/runbooks/contracts-and-owner-seams.md
 
   flutter:
     name: flutter (analyze, test, web build)

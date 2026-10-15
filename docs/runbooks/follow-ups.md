@@ -2,6 +2,8 @@
 
 Follow-ups is the one accountable task registry (architecture AD-7). Sources (duties coverage, visitors, missing reports, care, custody) do not keep their own trackers: they open one task per source and purpose in Follow-ups and register what their source events do to it. Reminders arrived with story 4.7 (below); lifecycle and handover hooks with story 4.12 (below).
 
+Leaders and Admins: the task-ordered guides (coverage follow-ups, Follow-up routing, handovers) are in [duties-guides.md](duties-guides.md) (story 4.13); this file is the maintainer detail.
+
 ## Story 4.6: open the Follow-ups registry with My follow-ups for every owner
 
 Migration: `supabase/migrations/20261014110258_followups_registry.sql` (forward only; no destructive statements, no row deletions, no `_rows` file, so **no owner SQL paste**). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-open-the-follow-ups-registry-with-my-follow-ups-for-every-ow-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.6/`.

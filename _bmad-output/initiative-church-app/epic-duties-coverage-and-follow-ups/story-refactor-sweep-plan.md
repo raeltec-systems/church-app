@@ -3,7 +3,7 @@ title: 'Refactor sweep'
 type: 'refactor'
 ticket: '14'
 created: '2026-10-15'
-status: 'in-progress'
+status: 'built'
 baseline_revision: 'e398b5fc8dcbbb1d3c515538cb534ee2d094c886'
 route: 'full'
 route_source: 'auto'
@@ -82,18 +82,30 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `packages/client_core/lib/src/domain/wire_json.dart`, `duties.dart`, `followups.dart` -- C1.
-- [ ] `church_time.dart` + callers + `test/domain/church_time_format_test.dart` -- C2.
-- [ ] `followups_screens.dart` -- C3. `commands.dart`, both controllers + test -- C4. `followups_controllers.dart` + test -- C5.
-- [ ] `tools/identity-e2e/duties-shared.mjs` (+ test) and the E2Es -- E1.
-- [ ] `supabase/migrations/20261015130404_duties_comment_refresh.sql` -- S1.
-- [ ] `docs/runbooks/duties.md`, `follow-ups.md` -- D1, D2; `deferred-work.md` -- F2.
-- [ ] `evidence-4.14/`, `.github/workflows/ci.yml` scan step.
+- [x] `packages/client_core/lib/src/domain/wire_json.dart`, `duties.dart`, `followups.dart` -- C1.
+- [x] `church_time.dart` + callers + `test/domain/church_time_format_test.dart` -- C2.
+- [x] `followups_screens.dart` -- C3. `commands.dart`, both controllers + test -- C4. `followups_controllers.dart` + test -- C5.
+- [x] `tools/identity-e2e/duties-shared.mjs` (+ test) and the E2Es -- E1.
+- [x] `supabase/migrations/20261015130404_duties_comment_refresh.sql` (+ `supabase/tests/duties_comments_test.sql`) -- S1.
+- [x] `docs/runbooks/duties.md`, `follow-ups.md` -- D1, D2 (+ a 4.14 section with the staging step); `deferred-work.md` -- F2.
+- [x] `evidence-4.14/`, `.github/workflows/ci.yml` scan step.
 
 **Acceptance Criteria:**
 - Given the baseline and the change, when the full check set runs, then every result matches (counts grow only by new tests) and every `app`/`api` function md5 is unchanged.
 
 ## Implementation Notes
+
+- No coding subagent was available in this run; implemented directly from the plan.
+- C1: `lib/src/domain/wire_json.dart` (`wireReq/wireOpt/wireMap/wireInstant/wireOptInstant/wireRevision/wireAccount`, not exported). `duties.dart` (and its parts) and `followups.dart` keep their short private names as `const _req = wireReq;` and so on, so about 440 call sites are unchanged. The error messages are the same, and a test pins them.
+- C2: `ChurchTime.dateText`, `timeText` and `ymd` (additive public API). `_dateField`/`_timeField` are removed (their callers use ChurchTime). `RotaEdit.hm` stays public and delegates. `OutcomesQuery` and `CoverageQuery` use `ChurchTime.ymd`. A test checks the new helpers against the replaced formulas at every quarter hour of 2026.
+- C3: `_newSourceId()` is `SecureRequestIds().next()`. The existing test that a new draft gets a new source id still passes.
+- C4: `resendOrNewRequest` in `commands.dart`, used by both controller bases. `dart:convert` is no longer imported by either controller.
+- C5: one line, `pending: state.pending` in `FollowUpsController._reload`. A new widget test in `followups_test.dart` checks that a reload mid-send stays busy, sends nothing a second time, and that Check again reuses the request id. Mutation check: without the line the test fails (`followups-pending` not found).
+- E1: `tools/identity-e2e/duties-shared.mjs` (+ 5 tests in `duties-shared.test.mjs`). The 8 worker blocks keep their principal names and labels. Scripts re-export the helpers their offline tests import. Imports that became unused were removed (`node:crypto`, `node:path`, `node:url`, `node:util`, `node:child_process`, `ROOT`, `CHURCH_OFFSET_MS`). `duties-lifecycle.mjs` keeps `execFile` and `promisify` for its docker psql. The pilot's and 4.8's `churchInstant` (`+02:00` form) were replaced by the offset form; the two forms give identical output, which a test checks across 2026.
+- S1: `supabase/migrations/20261015130404_duties_comment_refresh.sql`, comment-only. It touches no function body: all four functions keep their 4.12 bodies from `20261015110202_duties_lifecycle.sql`. Local md5 of `pg_get_functiondef`, the ACLs and the comments for all 805 app/api/public functions, before and after: only the four comment hashes differ (`evidence-4.14/function-md5-diff.txt`). New `supabase/tests/duties_comments_test.sql` (4 tests): every command routed by `app.duties_command` / `app.followups_command` is named in its api wrapper's comment. Mutation check: with the old comments, tests 2 and 4 fail.
+- D1/D2: 18 annotations in `duties.md` and 1 in `follow-ups.md` (each checked against the later story's section; the cell-part queue and outcomes point to epic 5 as 4.11 says), plus a new `duties.md` "Story 4.14" section with the staging step. Left as is: `duties.md` 4.5 "No phone or Call action for the leader" (the 4.9 contact routes are the leader's view of members; a member-to-leader call is not built, and it is unclear whether one is owed) and the 4.8 "cannot be marked done yet" (not verified as built).
+- F2: `deferred-work.md` entry added.
+- CI: `.github/workflows/ci.yml` gains the 4.14 scan-evidence step.
 
 ## Plan Change Log
 
@@ -107,3 +119,18 @@ context:
 - `npm run -s contracts:test`, `dart test` (contracts), node tool tests (baseline 239), `ci:policy-test`, `ci:secrets`, `ci:migrations -- --base origin/main`, `ci:function-imports` -- expected: pass.
 - `flutter analyze` + `flutter test` in client_core (baseline 637), staff, mobile; `TZ=America/New_York flutter test test/duties test/followups` -- expected: pass.
 - `bash tools/auth-harness/scan-evidence.sh <evidence-4.14> ...` -- expected: clean.
+
+**Results (2026-10-15, local stack, after the change; `evidence-4.14/local-verification.md`):**
+- db reset 0; pgTAP 44 files / 3737 PASS (baseline 43 / 3733, +4); db:smoke exit 0.
+- All 30 E2Es, each after a reset: every `exit=0` with the same N/N counts as `evidence-4.13/e2e-suite-summary.txt`.
+- Function md5s: all 805 bodies and ACLs are identical; only the 4 refreshed comments changed.
+- Tool and contract checks: contracts:test 265, Dart contracts 282, node tool tests 244 (baseline 239, +5), ci:policy-test 56; ci:secrets, ci:function-imports and the evidence scans are clean; ci:migrations reports 49 migrations.
+- Flutter: client_core analyze is clean, with 644 tests (baseline 637, +7) and TZ=America/New_York runs of 176 (duties) and 37 (follow-ups); staff 40, mobile 55, both analyze clean.
+- Matrix audit:
+  - Wire parse: `duties_refactor_sweep_test` wire readers, plus every existing duties and follow-ups parse test.
+  - Church time: quarter-hour comparison and midnight cases, also run in New York time.
+  - Resend: `resendOrNewRequest` tests, plus the existing duties and follow-ups Check again tests.
+  - Follow-ups reload mid-send: the new `followups_test` case (mutation-checked).
+  - E2E: suite summary.
+
+**Staging (parent session, no owner action):** apply `20261015130404_duties_comment_refresh.sql` after `20261015110202`. Check that the per-function md5 is unchanged against local and that the four comments match. No Edge Function change. The Follow-ups client fix ships with the next staging staff/APK build.

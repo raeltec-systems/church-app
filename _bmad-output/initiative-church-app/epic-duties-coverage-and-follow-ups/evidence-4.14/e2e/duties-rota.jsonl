@@ -1,0 +1,19 @@
+{"step":"O00-precondition","target":"LOCAL","at":"2026-10-15T13:52:27.184Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"O01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-15T13:52:30.151Z","verdict":"pass","amr":["password"]}
+{"step":"O02-department-roles-and-members","target":"LOCAL","at":"2026-10-15T13:52:30.293Z","verdict":"pass","added":[2,3,4]}
+{"step":"O10-quarterly-sunday-series-generated-as-drafts","target":"LOCAL","at":"2026-10-15T13:52:30.460Z","verdict":"pass","status":200,"occurrences":13,"draft_slots":39,"all_sundays_at_10_church_time":true}
+{"step":"O11-generation-replay-is-idempotent","target":"LOCAL","at":"2026-10-15T13:52:30.643Z","verdict":"pass","same":true,"series":1}
+{"step":"O12-member-cannot-see-drafts","target":"LOCAL","at":"2026-10-15T13:52:30.704Z","verdict":"pass","my_duties":0,"rota":403,"statuses":["app.duties_series:406","api.duties_series:404","app.duties_occurrences:406","api.duties_occurrences:404","app.duties_slots:406","api.duties_slots:404"]}
+{"step":"O13-two-leaders-planning-at-once-one-wins","target":"LOCAL","at":"2026-10-15T13:52:30.922Z","verdict":"pass","answers":[200,"conflict"],"planned":"leader"}
+{"step":"O14-drafts-planned-without-notices","target":"LOCAL","at":"2026-10-15T13:52:31.307Z","verdict":"pass","jobs":0,"accountless_label":"no_login"}
+{"step":"O20-publish-n-draft-slots-once","target":"LOCAL","at":"2026-10-15T13:52:31.966Z","verdict":"pass","answers":[200,"conflict"],"data":{"slots":39,"revision":2,"overrides":0,"series_id":"2a2613a2-5706-4fd2-b42a-7a08dff4a966","assignments":5,"occurrences":13,"notices_queued":5},"member_items":3,"accountless_job":"duty_assigned:ineligible:direct_contact,duty_response_due:pending:-,duty_response_due:pending:-","unfilled_example":true}
+{"step":"O21-publish-replay-returns-the-original-result","target":"LOCAL","at":"2026-10-15T13:52:31.985Z","verdict":"pass","replay":"same"}
+{"step":"O30-two-of-three-confirmed-from-current-positions","target":"LOCAL","at":"2026-10-15T13:52:32.295Z","verdict":"pass","coverage":"2 of 3","board_duties":13}
+{"step":"O40-edit-this-date-only","target":"LOCAL","at":"2026-10-15T13:52:32.461Z","verdict":"pass","change":"material","first_unchanged":true}
+{"step":"O41-this-and-later-dates-keep-the-past","target":"LOCAL","at":"2026-10-15T13:52:32.904Z","verdict":"pass","data":{"drafts":0,"material":10,"revision":3,"overrides":0,"series_id":"2a2613a2-5706-4fd2-b42a-7a08dff4a966","assignments":1,"occurrences":10,"notices_queued":1,"from_occurrence_id":"a4fce0ff-b699-47a9-9a23-e6285e2d7f39"},"earlier_unchanged":true,"started_unchanged":true}
+{"step":"O42-each-occurrence-keeps-its-own-responses","target":"LOCAL","at":"2026-10-15T13:52:32.905Z","verdict":"pass","distinct_assignments":5,"positions_assigned":5,"first_coverage":2}
+{"step":"O43-answer-racing-a-series-edit-is-consistent","target":"LOCAL","at":"2026-10-15T13:52:33.291Z","verdict":"pass","order":"edit_first","answer":"conflict","kept":"pending"}
+{"step":"O50-cancel-one-date-cancels-its-jobs","target":"LOCAL","at":"2026-10-15T13:52:33.765Z","verdict":"pass","jobs":"duty_changed:cancelled:source_cancelled,duty_response_due:cancelled:source_cancelled,duty_response_due:cancelled:source_cancelled,duty_response_due:cancelled:source_cancelled,duty_cancelled:pending:-","notice":"Duty cancelled","late":"cancelled"}
+{"step":"O60-non-managers-and-revoked-replay-refused","target":"LOCAL","at":"2026-10-15T13:52:34.067Z","verdict":"pass","member":"forbidden","other":"forbidden","revoked_replay":"forbidden","revoked_read":403}
+{"step":"O70-receipts-content-free","target":"LOCAL","at":"2026-10-15T13:52:34.222Z","verdict":"pass","receipts_with_text":0}
+{"step":"O99-cleanup","target":"LOCAL","at":"2026-10-15T13:52:34.919Z","users_left":0,"credential_revoked":true,"principal_disabled":true,"unmarked":true,"departments_left":0}

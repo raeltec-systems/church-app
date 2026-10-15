@@ -1,0 +1,15 @@
+{"step":"V00-precondition","target":"LOCAL","at":"2026-10-15T13:53:25.544Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"V01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-15T13:53:27.893Z","verdict":"pass","amr":["password"]}
+{"step":"V02-departments-roles-and-members","target":"LOCAL","at":"2026-10-15T13:53:29.330Z","verdict":"pass","grants":[200,200,200],"added":[200,200,200,200]}
+{"step":"V10-first-duty-overlaps-nothing","target":"LOCAL","at":"2026-10-15T13:53:29.619Z","verdict":"pass","status":200,"override_recorded":false}
+{"step":"V11-warning-without-the-other-teams-details","target":"LOCAL","at":"2026-10-15T13:53:29.656Z","verdict":"pass","status":200,"conflict":{"to":"2026-10-25T10:00:00.000000Z","from":"2026-10-25T08:00:00.000000Z","owner_kind":"department","visibility":"limited"},"load":{"here":0,"total":2},"other_conflicts":0}
+{"step":"V12-refused-without-a-reason","target":"LOCAL","at":"2026-10-15T13:53:29.828Z","verdict":"pass","code":"validation_failed","field_errors":{"member_id":"overlap","override_reason":"required"},"written":0}
+{"step":"V13-override-recorded-member-still-awaiting","target":"LOCAL","at":"2026-10-15T13:53:30.168Z","verdict":"pass","status":200,"override_recorded":true,"member_sees":["pending","pending","pending"],"board_override":true,"board_overlaps":1,"other_board_has_reason":false}
+{"step":"V14-non-overlapping-raises-no-warning","target":"LOCAL","at":"2026-10-15T13:53:30.274Z","verdict":"pass","conflicts":0,"status":200,"code":null}
+{"step":"V15-cell-part-conflicts-disclosed-by-scope","target":"LOCAL","at":"2026-10-15T13:53:30.316Z","verdict":"pass","leader_d":"limited","cell_leader":"full","refused":"overlap"}
+{"step":"V20-concurrent-assignments-one-wins","target":"LOCAL","at":"2026-10-15T13:53:30.648Z","verdict":"pass","rounds":[["ok","overlap"],["overlap","ok"],["ok","overlap"]]}
+{"step":"V21-rota-position-and-one-off-race-one-wins","target":"LOCAL","at":"2026-10-15T13:53:30.855Z","verdict":"pass","answers":["ok","overlap"]}
+{"step":"V22-asking-a-declined-member-again-needs-a-reason","target":"LOCAL","at":"2026-10-15T13:53:31.277Z","verdict":"pass","other_department":false,"place_change":{"member_id":"overlap","override_reason":"required"}}
+{"step":"V30-member-other-leader-and-tables-refused","target":"LOCAL","at":"2026-10-15T13:53:31.301Z","verdict":"pass","member":403,"other_leader":403,"tables":["app.duties_assignments:406","api.duties_assignments:404","app.duties_occurrences:406","api.duties_occurrences:404"]}
+{"step":"V40-reason-stays-out-of-receipts-jobs-and-audit","target":"LOCAL","at":"2026-10-15T13:53:31.621Z","verdict":"pass","leaks":0,"audited":1}
+{"step":"V99-cleanup","target":"LOCAL","at":"2026-10-15T13:53:32.400Z","users_left":0,"unmarked":true,"departments_left":0,"cells_left":0}

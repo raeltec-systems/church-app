@@ -511,8 +511,10 @@ select is(pg_temp.fx(6, 'fixture_programme_changed', jsonb_build_object('part_id
     'changed', '["time"]'::jsonb)) ->> 'flagged', '1', 'the meeting moved: the linked department duty is flagged');
 select is((select to_jsonb(o) from app.duties_occurrences o where o.occurrence_id = pg_temp.docc()),
           (select occ from dbefore2), 'the duty itself is not rescheduled or republished');
-select is((select count(*) from app.notifications_jobs), (select jobs from dbefore2),
-  'no reminder or notice is created or reset');
+-- Story 4.16 (owner item 7): only the leaders' review notice is added (duties_owner_decisions_test.sql).
+select is((select count(*) from app.notifications_jobs where reminder_kind <> 'duty_review_flagged'),
+          (select jobs from dbefore2),
+  'no member reminder or notice is created or reset');
 select is(pg_temp.fx(6, 'fixture_programme_changed', jsonb_build_object('part_id', pg_temp.p2(),
     'changed', '["place"]'::jsonb)) ->> 'flagged', '1', 'a second change');
 create function pg_temp.reviews(n int) returns jsonb language sql as $$

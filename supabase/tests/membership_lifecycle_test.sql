@@ -162,8 +162,9 @@ select is((select count(*)::int from app.contract_boundary_violations()), 0, 'no
 select is((select array_agg(column_name::text order by column_name::text)
              from information_schema.columns
             where table_schema = 'app' and table_name = 'identity_handover_obligations'),
+  -- Story 4.16: `revoked_grant_id` (an obligation a scope revocation recorded).
   array['lifecycle_event_id', 'member_id', 'obligation_id', 'obligation_kind', 'obligation_state',
-        'owner_module', 'recorded_at', 'resolution', 'resolved_at', 'subject_id'],
+        'owner_module', 'recorded_at', 'resolution', 'resolved_at', 'revoked_grant_id', 'subject_id'],
   'an obligation holds owner, kind and an opaque subject only');
 select ok((select count(*) from app.contract_lifecycle_events
             where event in ('membership_deactivated', 'membership_restored')) = 2,

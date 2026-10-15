@@ -6,12 +6,14 @@
 -- leader's alerts, commands, replays and supervision; the last reachable leader of an active
 -- department cannot be deactivated until handover; open follow-up tasks are handed over under
 -- the Q4 owner-scope rule; a deletion records its handovers, waits for them, and its check then
--- answers zero. Also: no reason reaches leaders, the Q2-closed path, restoration, privileges.
+-- answers zero. Also: no Identity reason code reaches leaders (story 4.16 superseded the 4.12 "no
+-- reason" decision: the department's leaders and deputies read a coarse category, tested in
+-- duties_owner_decisions_test.sql), the Q2-closed path, restoration, privileges.
 -- HTTP evidence: tools/identity-e2e/duties-lifecycle.mjs.
 -- Every account, phone and name is SYNTHETIC (fictional range +44 7700 900460-900469). Duty times
 -- are fixed church-time (Africa/Lusaka) clock times on whole days, never the current clock time.
 begin;
-select plan(154);
+select plan(155);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000004120' || lpad(n::text, 2, '0'))::uuid $$;
@@ -378,7 +380,7 @@ select is((select count(*)::int from app.notifications_jobs j
               and j.recipient_member_id = pg_temp.mid(2) and j.reminder_kind = 'followup_assigned'), 1,
   'the new owner is told');
 
--- The vacancy flag and the leaders' notice (no reason ever) -------------------------------------------
+-- The vacancy flag and the leaders' notice (story 4.16: a coarse category only, never a reason code) --
 select is(pg_temp.cpos(2, pg_temp.slot('MP')) ->> 'status', 'unfilled', 'the coverage queue shows the position as unfilled');
 select ok((pg_temp.cpos(2, pg_temp.slot('MP')) #>> '{vacated,since}') is not null, 'flagged as vacated');
 select is((select (dep #>> '{counts,vacated}')::int from jsonb_array_elements(pg_temp.coverage(2) -> 'departments') dep
@@ -386,6 +388,9 @@ select is((select (dep #>> '{counts,vacated}')::int from jsonb_array_elements(pg
 select is((select count(*)::int from jsonb_array_elements(pg_temp.coverage(1) -> 'departments') dep,
                                      jsonb_array_elements(dep -> 'positions') p
             where jsonb_typeof(p -> 'vacated') = 'object'), 4, 'Admin''s operational view shows the same flags');
+select is((pg_temp.cpos(2, pg_temp.slot('MP')) #>> '{vacated,reason}') || '|'
+          || coalesce(pg_temp.cpos(1, pg_temp.slot('MP')) #>> '{vacated,reason}', 'none'), 'member_inactive|none',
+  'story 4.16: the leader reads the coarse category; the Admin role alone does not');
 select ok(position('moved_away' in pg_temp.coverage(2)::text) = 0
           and position('member_left' in pg_temp.coverage(2)::text) = 0
           and position('deactivat' in pg_temp.coverage(2)::text) = 0

@@ -13,6 +13,10 @@
 //   P80 reassignment: a reminder falling due after the change reaches the new person only
 //   P90 nothing private (leader notes, attempt notes, reasons, numbers) reaches a non-leader
 //   P98 cleanup through the API (duties cancelled, members removed, leader scope revoked)
+//       (story 4.16: when the run reuses a department whose only reachable leader is the leader
+//       persona, the revocation is refused handover_required and recorded kept_last_leader; the
+//       persona stays its leader. To remove it, an Admin first gives someone else who uses the app
+//       the leader or deputy role, then removes the persona's role; see duties.md, story 4.13)
 //
 // Two targets, chosen explicitly (`--target local|staging` or DUTIES_PILOT_TARGET; default local):
 //
@@ -556,11 +560,13 @@ async function main() {
       const g = await grantsRevision(people.leader.member);
       const r = await envelope('identity_grant_command', people.admin.token, 'identity.revoke_scope', g?.revision,
         { member_id: people.leader.member, scope_kind: 'department_leader', scope_id: run.departmentId });
-      out.revoked = outcome(r);
+      // Story 4.16: the department's last reachable leader keeps the scope (handover_required):
+      // the persona stays its leader, and the cleanup SQL removes a department the pilot created.
+      out.revoked = r.code === 'conflict' && r.field_errors?.member_id === 'handover_required' ? 'kept_last_leader' : outcome(r);
     }
     const ok = out.series.every((x) => x.status === 200) && out.positions.every((x) => x.status === 200)
       && out.removed.every((x) => x === 'not_member' || x.status === 200)
-      && (!run.leaderGranted || out.revoked?.status === 200);
+      && (!run.leaderGranted || out.revoked === 'kept_last_leader' || out.revoked?.status === 200);
     check('P98-api-cleanup-cancels-removes-and-revokes', ok, out);
   };
 

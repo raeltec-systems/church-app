@@ -23,15 +23,13 @@
 // created is removed; the run's credential is revoked and its principal disabled.
 //
 // Usage: node tools/identity-e2e/duties-rota.mjs [--evidence <file.jsonl>]
-import { execFile } from 'node:child_process';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
+import { randomUUID } from 'node:crypto';
 
 import { amrMethods, localHttp, localKey, password, psql, runMain, startRun } from './harness.mjs';
+import { churchClock, churchInstant, churchSunday, notificationsWorker, oneWinner } from './duties-shared.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+export { churchSunday, churchInstant, churchClock, oneWinner } from './duties-shared.mjs';
+
 const OPERATOR = 'israel';
 const NAME_PREFIX = 'SYNTHETIC 4.3 E2E';
 export const DEPARTMENT = 'SYNTHETIC Preaching Rota 4.3';
@@ -39,35 +37,6 @@ export const DEPARTMENT = 'SYNTHETIC Preaching Rota 4.3';
 /** The reserved fictional numbers this run uses (+44 7700 900740-900749). */
 export function isFictionalRotaPhone(phone) {
   return /^\+44770090074[0-9]$/.test(phone);
-}
-
-/** Church time (Africa/Lusaka) is UTC+02:00 all year. */
-const CHURCH_OFFSET_MS = 2 * 3_600_000;
-
-/** The church-local date (YYYY-MM-DD) of the k-th Sunday at least four days after `nowMs`. */
-export function churchSunday(nowMs, k) {
-  const local = new Date(nowMs + CHURCH_OFFSET_MS + 4 * 86_400_000);
-  const day = local.getUTCDay();
-  const first = new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + ((7 - day) % 7)));
-  const d = new Date(first.getTime() + k * 7 * 86_400_000);
-  return d.toISOString().slice(0, 10);
-}
-
-/** The UTC instant of a church-local date and "HH:MM". */
-export function churchInstant(date, hhmm) {
-  return new Date(Date.parse(`${date}T${hhmm}:00Z`) - CHURCH_OFFSET_MS).toISOString();
-}
-
-/** The church-local "HH:MM" of a UTC instant. */
-export function churchClock(iso) {
-  return new Date(Date.parse(iso) + CHURCH_OFFSET_MS).toISOString().slice(11, 16);
-}
-
-/** Exactly one success and one conflict among concurrent answers. */
-export function oneWinner(answers) {
-  const ok = answers.filter((a) => a.status === 200 && !a.code).length;
-  const conflicts = answers.filter((a) => a.code === 'conflict').length;
-  return ok === 1 && conflicts === answers.length - 1;
 }
 
 /** The occurrences of a series in a rota read, in date order. */
@@ -177,21 +146,8 @@ async function main() {
   });
 
   const run = randomUUID().slice(0, 8);
-  const credential = `sysc_local_${randomBytes(32).toString('base64url')}`;
-  const principal = psql(`select app.sys_create_principal('notifications-worker-rota-${run}', 'notifications_worker', '${OPERATOR}')`);
-  const credentialId = JSON.parse(psql(`select app.sys_register_credential('${principal}',
-    '${createHash('sha256').update(credential).digest('hex')}', 'duties rota e2e ${run}', interval '2 hours', '${OPERATOR}')`)).credential_id;
-  const worker = async () => {
-    try {
-      const { stdout } = await promisify(execFile)('node', [join(ROOT, 'tools/notifications/worker.mjs'), 'run-once'], {
-        encoding: 'utf8',
-        env: { PATH: process.env.PATH, SUPABASE_URL: origin, SUPABASE_PUBLISHABLE_KEY: key, NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL: credential } });
-      const line = stdout.split('\n').find((l) => l.startsWith('{'));
-      return { exit: 0, ...(line ? JSON.parse(line) : {}) };
-    } catch (e) {
-      return { exit: e.code ?? 1, error: String(e.stderr ?? '').trim().slice(-160) };
-    }
-  };
+  const { principal, credentialId, worker } = notificationsWorker({ origin, key, operator: OPERATOR,
+    principalName: `notifications-worker-rota-${run}`, label: `duties rota e2e ${run}` });
   const jobs = (assignmentId) => psql(`select coalesce(string_agg(reminder_kind || ':' || job_state || ':'
       || coalesce(cancel_reason, finish_reason, '-'), ',' order by enqueued_at, reminder_kind, job_state), '')
     from app.notifications_jobs where source_type = 'duties_assignment' and source_id = '${assignmentId}'`);

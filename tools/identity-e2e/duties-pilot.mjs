@@ -45,9 +45,12 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import { EPOCH_WAIT_MS, amrMethods, localHttp, localKey, psql, sleep } from './harness.mjs';
+import { genericItemCheck } from './duties-shared.mjs';
 import {
   ADMIN_PHONE, STAGING_ORIGIN, assertPublishableKey, assertStagingOrigin, assertStateOutsideRepo, redactEvidence,
 } from './staging-suite.mjs';
+
+export { churchInstant } from './duties-shared.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const OPERATOR = 'israel';
@@ -107,11 +110,6 @@ export function addDays(date, n) {
   return d.toISOString().slice(0, 10);
 }
 
-/** The instant of a church-local date and HH:MM time, as UTC RFC3339. */
-export function churchInstant(date, hhmm) {
-  return new Date(`${date}T${hhmm}:00+02:00`).toISOString();
-}
-
 /** The first Sunday (church calendar) on or after the church date `minDays` from now. */
 export function nextSunday(nowMs, minDays) {
   const date = churchDate(nowMs + minDays * DAY);
@@ -162,11 +160,8 @@ export const GENERIC_TEXT = {
   followup_assigned: ['New follow-up task', 'A follow-up task was assigned to you. Open it to see the next action.'],
 };
 
-/** Is an opened inbox item exactly its contract's generic text? */
-export function isGenericItem(item) {
-  const text = GENERIC_TEXT[item?.reminder_kind];
-  return Boolean(text) && item.title === text[0] && item.body === text[1];
-}
+/** An inbox item that carries exactly the generic text of its reminder kind. */
+export const isGenericItem = genericItemCheck(GENERIC_TEXT);
 
 const NUMBER_PATTERN = /\+?447700900\d{3}|\+?1202555\d{4}/;
 /** Does any JSON hold a leader-only text or a fictional contact number? */

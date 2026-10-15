@@ -27,15 +27,11 @@
 // created is removed; the run's credential is revoked and its principal disabled.
 //
 // Usage: node tools/identity-e2e/duties-outcomes.mjs [--evidence <file.jsonl>]
-import { execFile } from 'node:child_process';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
+import { randomUUID } from 'node:crypto';
 
 import { amrMethods, localHttp, localKey, password, psql, runMain, startRun } from './harness.mjs';
+import { notificationsWorker } from './duties-shared.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const OPERATOR = 'israel';
 const NAME_PREFIX = 'SYNTHETIC 4.10 E2E';
 export const DEPARTMENT = 'SYNTHETIC Preaching Rota';
@@ -185,21 +181,8 @@ async function main() {
   });
 
   const run = randomUUID().slice(0, 8);
-  const credential = `sysc_local_${randomBytes(32).toString('base64url')}`;
-  const principal = psql(`select app.sys_create_principal('notifications-worker-outcomes-${run}', 'notifications_worker', '${OPERATOR}')`);
-  const credentialId = JSON.parse(psql(`select app.sys_register_credential('${principal}',
-    '${createHash('sha256').update(credential).digest('hex')}', 'duties outcomes e2e ${run}', interval '2 hours', '${OPERATOR}')`)).credential_id;
-  const worker = async () => {
-    try {
-      const { stdout } = await promisify(execFile)('node', [join(ROOT, 'tools/notifications/worker.mjs'), 'run-once'], {
-        encoding: 'utf8',
-        env: { PATH: process.env.PATH, SUPABASE_URL: origin, SUPABASE_PUBLISHABLE_KEY: key, NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL: credential } });
-      const line = stdout.split('\n').find((l) => l.startsWith('{'));
-      return { exit: 0, ...(line ? JSON.parse(line) : {}) };
-    } catch (e) {
-      return { exit: e.code ?? 1, error: String(e.stderr ?? '').trim().slice(-160) };
-    }
-  };
+  const { principal, credentialId, worker } = notificationsWorker({ origin, key, operator: OPERATOR,
+    principalName: `notifications-worker-outcomes-${run}`, label: `duties outcomes e2e ${run}` });
   const asgRevision = (id) => Number(psql(`select revision from app.duties_assignments where assignment_id = '${id}'`));
   const outcomeRevision = (id) => Number(psql(`select coalesce(max(revision), 0) from app.duties_outcomes where assignment_id = '${id}'`));
   const outcomesRead = (p, body = {}) => rpc('duties_outcomes', p.token, body);

@@ -22,15 +22,13 @@
 // operator-journal rows stay).
 //
 // Usage: node tools/identity-e2e/duties.mjs [--evidence <file.jsonl>]
-import { execFile } from 'node:child_process';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
+import { randomUUID } from 'node:crypto';
 
 import { amrMethods, localHttp, localKey, password, psql, runMain, startRun } from './harness.mjs';
+import { notificationsWorker, refusedTableQuery } from './duties-shared.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+export { refusedTableQuery } from './duties-shared.mjs';
+
 const OPERATOR = 'israel';
 const NAME_PREFIX = 'SYNTHETIC 4.1 E2E';
 export const DEPARTMENT = 'SYNTHETIC Preaching Rota';
@@ -48,11 +46,6 @@ export function dutyLink(assignmentId) {
 /** The first position's assignment of a duty (leader board or publish answer). */
 export function firstAssignment(duty) {
   return duty?.positions?.[0]?.assignment ?? null;
-}
-
-/** A refused direct table query: an error status and no rows in the body. */
-export function refusedTableQuery(r) {
-  return r.status >= 400 && !Array.isArray(r.json);
 }
 
 async function main() {
@@ -156,21 +149,8 @@ async function main() {
 
   // The run's worker principal and credential (only the digest is registered).
   const run = randomUUID().slice(0, 8);
-  const credential = `sysc_local_${randomBytes(32).toString('base64url')}`;
-  const principal = psql(`select app.sys_create_principal('notifications-worker-duties-${run}', 'notifications_worker', '${OPERATOR}')`);
-  const credentialId = JSON.parse(psql(`select app.sys_register_credential('${principal}',
-    '${createHash('sha256').update(credential).digest('hex')}', 'duties e2e ${run}', interval '2 hours', '${OPERATOR}')`)).credential_id;
-  const worker = async () => {
-    try {
-      const { stdout } = await promisify(execFile)('node', [join(ROOT, 'tools/notifications/worker.mjs'), 'run-once'], {
-        encoding: 'utf8',
-        env: { PATH: process.env.PATH, SUPABASE_URL: origin, SUPABASE_PUBLISHABLE_KEY: key, NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL: credential } });
-      const line = stdout.split('\n').find((l) => l.startsWith('{'));
-      return { exit: 0, ...(line ? JSON.parse(line) : {}) };
-    } catch (e) {
-      return { exit: e.code ?? 1, error: String(e.stderr ?? '').trim().slice(-160) };
-    }
-  };
+  const { principal, credentialId, worker } = notificationsWorker({ origin, key, operator: OPERATOR,
+    principalName: `notifications-worker-duties-${run}`, label: `duties e2e ${run}` });
 
   try {
     const { admin, leader, member, other, plain } = people;

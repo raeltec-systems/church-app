@@ -22,15 +22,13 @@
 // created is removed; the run's credential is revoked and its principal disabled.
 //
 // Usage: node tools/identity-e2e/duties-revisions.mjs [--evidence <file.jsonl>]
-import { execFile } from 'node:child_process';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
+import { randomUUID } from 'node:crypto';
 
 import { amrMethods, localHttp, localKey, password, psql, runMain, startRun } from './harness.mjs';
+import { notificationsWorker, oneWinner } from './duties-shared.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+export { oneWinner } from './duties-shared.mjs';
+
 const OPERATOR = 'israel';
 const NAME_PREFIX = 'SYNTHETIC 4.2 E2E';
 export const DEPARTMENT = 'SYNTHETIC Preaching Rota 4.2';
@@ -43,13 +41,6 @@ export function isFictionalRevisionPhone(phone) {
 /** The changed fields of a stale-response refusal, in order of the field_errors. */
 export function changedFields(fieldErrors) {
   return Object.entries(fieldErrors ?? {}).filter(([, v]) => v === 'changed').map(([k]) => k).sort();
-}
-
-/** Exactly one success and one conflict among concurrent answers. */
-export function oneWinner(answers) {
-  const ok = answers.filter((a) => a.status === 200 && !a.code).length;
-  const conflicts = answers.filter((a) => a.code === 'conflict').length;
-  return ok === 1 && conflicts === answers.length - 1;
 }
 
 /** The first position of a duty on the leader board. */
@@ -158,21 +149,8 @@ async function main() {
   });
 
   const run = randomUUID().slice(0, 8);
-  const credential = `sysc_local_${randomBytes(32).toString('base64url')}`;
-  const principal = psql(`select app.sys_create_principal('notifications-worker-revisions-${run}', 'notifications_worker', '${OPERATOR}')`);
-  const credentialId = JSON.parse(psql(`select app.sys_register_credential('${principal}',
-    '${createHash('sha256').update(credential).digest('hex')}', 'duties revisions e2e ${run}', interval '2 hours', '${OPERATOR}')`)).credential_id;
-  const worker = async () => {
-    try {
-      const { stdout } = await promisify(execFile)('node', [join(ROOT, 'tools/notifications/worker.mjs'), 'run-once'], {
-        encoding: 'utf8',
-        env: { PATH: process.env.PATH, SUPABASE_URL: origin, SUPABASE_PUBLISHABLE_KEY: key, NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL: credential } });
-      const line = stdout.split('\n').find((l) => l.startsWith('{'));
-      return { exit: 0, ...(line ? JSON.parse(line) : {}) };
-    } catch (e) {
-      return { exit: e.code ?? 1, error: String(e.stderr ?? '').trim().slice(-160) };
-    }
-  };
+  const { principal, credentialId, worker } = notificationsWorker({ origin, key, operator: OPERATOR,
+    principalName: `notifications-worker-revisions-${run}`, label: `duties revisions e2e ${run}` });
   const jobs = (assignmentId) => psql(`select coalesce(string_agg(reminder_kind || ':' || job_state || ':'
       || coalesce(cancel_reason, finish_reason, '-'), ',' order by enqueued_at, reminder_kind, job_state), '')
     from app.notifications_jobs where source_type = 'duties_assignment' and source_id = '${assignmentId}'

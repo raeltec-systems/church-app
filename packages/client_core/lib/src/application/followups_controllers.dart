@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:church_contracts/church_contracts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -131,9 +129,13 @@ abstract class FollowUpsController<T> extends Notifier<FollowUpsState<T>> {
     state = state.copyWith(loading: true);
     final r = await fetch();
     if (!_current(epoch)) return;
-    // A denial or failure drops everything protected from the screen.
+    // A denial or failure drops everything protected from the screen. A
+    // request still in flight stays pending, so its buttons stay disabled
+    // and it cannot be sent twice (story 4.14: the rule Duties has kept
+    // since 4.5).
     state = FollowUpsState<T>(
       result: r,
+      pending: state.pending,
       notice: state.notice,
       noticeAction: state.noticeAction,
       unconfirmed: state.unconfirmed,
@@ -159,21 +161,16 @@ abstract class FollowUpsController<T> extends Notifier<FollowUpsState<T>> {
     String subject,
   ) async {
     if (state.busy) return;
-    final u = state.unconfirmed?.request;
     // An input whose outcome was never learned is resent under its original
     // request id; anything else is a new request.
-    final same =
-        u != null &&
-        u.command == command &&
-        u.expectedRevision.value == expected.value &&
-        jsonEncode(u.payload) == jsonEncode(payload);
     await _dispatch(
       FollowUpAction(
-        request: CommandRequest(
+        request: resendOrNewRequest(
+          unconfirmed: state.unconfirmed?.request,
           command: command,
-          requestId: same ? u.requestId : ref.read(requestIdsProvider).next(),
-          expectedRevision: expected,
+          expected: expected,
           payload: payload,
+          ids: ref.read(requestIdsProvider),
         ),
         subject: subject,
       ),

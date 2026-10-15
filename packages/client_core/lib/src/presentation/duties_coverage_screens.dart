@@ -331,10 +331,8 @@ class _CoverageCardState extends ConsumerState<_CoverageCard> {
         var next = DateTime.now().toUtc().add(const Duration(days: 1));
         final latest = start.subtract(const Duration(hours: 1));
         if (next.isAfter(latest)) next = latest;
-        final w = ChurchTime.wall(next);
-        _date.text = _dateField(next);
-        _time.text =
-            '${w.hour.toString().padLeft(2, '0')}:${w.minute.toString().padLeft(2, '0')}';
+        _date.text = ChurchTime.dateText(next);
+        _time.text = ChurchTime.timeText(next);
       }
     });
   }

@@ -14,6 +14,7 @@ import 'dart:developer' as developer;
 
 import 'access_grants.dart';
 import 'church_time.dart';
+import 'wire_json.dart';
 
 part 'duty_coverage.dart';
 part 'duty_outcomes.dart';
@@ -161,33 +162,15 @@ enum DutyResponse {
   };
 }
 
-T _req<T>(Map json, String key) {
-  final v = json[key];
-  if (v is! T) throw FormatException('unexpected $key');
-  return v;
-}
-
-T? _opt<T>(Map json, String key) {
-  final v = json[key];
-  if (v == null) return null;
-  if (v is! T) throw FormatException('unexpected $key');
-  return v;
-}
-
-Map _map(Object? json, String what) {
-  if (json is! Map) throw FormatException('$what is not an object');
-  return json;
-}
-
-DateTime _instant(Map json, String key) {
-  final v = _req<String>(json, key);
-  final t = DateTime.tryParse(v);
-  if (t == null || !t.isUtc) throw FormatException('unexpected $key');
-  return t;
-}
-
-DateTime? _optInstant(Map json, String key) =>
-    json[key] == null ? null : _instant(json, key);
+// Story 4.14: the shared wire readers (wire_json.dart), under the short
+// names this library has always used.
+const _req = wireReq;
+const _opt = wireOpt;
+const _map = wireMap;
+const _instant = wireInstant;
+const _optInstant = wireOptInstant;
+const _revision = wireRevision;
+const _account = wireAccount;
 
 /// Story 4.2: an optional list of changed field names (null when absent).
 List<String>? _optFields(Map json, String key) {
@@ -214,25 +197,12 @@ int _slotRevision(Map json) {
   return r;
 }
 
-int _revision(Map json, [String key = 'revision']) {
-  final r = _req<int>(json, key);
-  if (r < 1) throw FormatException('unexpected $key');
-  return r;
-}
-
 /// Story 4.4: an optional non-negative overlap count (0 when absent).
 int _overlaps(Map json) {
   final v = _opt<int>(json, 'overlaps') ?? 0;
   if (v < 0) throw const FormatException('unexpected overlaps');
   return v;
 }
-
-AccountStanding _account(Object? v) => switch (v) {
-  'app_account' => AccountStanding.appAccount,
-  'no_login' => AccountStanding.noLogin,
-  'access_review' => AccountStanding.accessReview,
-  _ => throw const FormatException('unexpected account'),
-};
 
 /// The time fields every duty carries.
 class DutyTimes {
@@ -2014,11 +1984,7 @@ class RotaEdit {
   final String? lead;
 
   /// Church-local "HH:MM" of an instant.
-  static String hm(DateTime at) {
-    final w = ChurchTime.wall(at);
-    return '${w.hour.toString().padLeft(2, '0')}:'
-        '${w.minute.toString().padLeft(2, '0')}';
-  }
+  static String hm(DateTime at) => ChurchTime.timeText(at);
 
   static String? _time(String? s) {
     final t = s?.trim();

@@ -7,6 +7,7 @@
 library;
 
 import 'access_grants.dart';
+import 'wire_json.dart';
 
 /// The follow-ups command function and command names (1.4 envelope).
 abstract final class FollowUpCommands {
@@ -67,46 +68,15 @@ enum FollowUpCapacity {
   }
 }
 
-T _req<T>(Map json, String key) {
-  final v = json[key];
-  if (v is! T) throw FormatException('unexpected $key');
-  return v;
-}
-
-T? _opt<T>(Map json, String key) {
-  final v = json[key];
-  if (v == null) return null;
-  if (v is! T) throw FormatException('unexpected $key');
-  return v;
-}
-
-Map _map(Object? json, String what) {
-  if (json is! Map) throw FormatException('$what is not an object');
-  return json;
-}
-
-DateTime _instant(Map json, String key) {
-  final v = _req<String>(json, key);
-  final t = DateTime.tryParse(v);
-  if (t == null || !t.isUtc) throw FormatException('unexpected $key');
-  return t;
-}
-
-DateTime? _optInstant(Map json, String key) =>
-    json[key] == null ? null : _instant(json, key);
-
-int _revision(Map json, [String key = 'revision']) {
-  final r = _req<int>(json, key);
-  if (r < 1) throw FormatException('unexpected $key');
-  return r;
-}
-
-AccountStanding _account(Object? v) => switch (v) {
-  'app_account' => AccountStanding.appAccount,
-  'no_login' => AccountStanding.noLogin,
-  'access_review' => AccountStanding.accessReview,
-  _ => throw const FormatException('unexpected account'),
-};
+// Story 4.14: the shared wire readers (wire_json.dart), under the short
+// names this library has always used.
+const _req = wireReq;
+const _opt = wireOpt;
+const _map = wireMap;
+const _instant = wireInstant;
+const _optInstant = wireOptInstant;
+const _revision = wireRevision;
+const _account = wireAccount;
 
 List<String> _tokens(Map json, String key) => List.unmodifiable(
   _req<List>(json, key).map((v) {

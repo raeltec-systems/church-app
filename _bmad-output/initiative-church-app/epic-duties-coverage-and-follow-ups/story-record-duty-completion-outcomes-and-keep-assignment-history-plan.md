@@ -65,7 +65,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261014231512_duties_outcomes.sql` -- outcome log, vocabularies, commands, reads, replaced bodies, privileges.
+- [x] `supabase/migrations/20261015002121_duties_outcomes.sql` -- outcome log, vocabularies, commands, reads, replaced bodies, privileges.
 - [x] `supabase/tests/duties_outcomes_test.sql`, `duties_outcomes_scale_test.sql`; earlier tests' ledgers and key subsets.
 - [x] `packages/client_core` outcomes domain, port, adapter, controllers, screens (Outcomes, history), routes, fakes, tests; staff and mobile nav.
 - [x] `tools/identity-e2e/duties-outcomes.mjs` + `.test.mjs`.
@@ -78,7 +78,7 @@ context:
 ## Implementation Notes
 
 - Implemented directly (no implementation subagent inside this builder run), as 4.1-4.9. CHECKPOINT 1 pre-approved by the owner (owner-decisions-milestone-1.md, -2.md); the frozen block's decisions are the agent's under that pre-approval.
-- Server: `supabase/migrations/20261014231512_duties_outcomes.sql` (ASCII, no backslashes, no DROP/TRUNCATE/`delete from`, `search_path = ''` everywhere; new functions revoked from public, anon, authenticated and service_role; client grants only `api.duties_outcomes`/`app.duties_outcomes` and `api.duties_member_history`/`app.duties_member_history` to authenticated).
+- Server: `supabase/migrations/20261015002121_duties_outcomes.sql` (ASCII, no backslashes, no DROP/TRUNCATE/`delete from`, `search_path = ''` everywhere; new functions revoked from public, anon, authenticated and service_role; client grants only `api.duties_outcomes`/`app.duties_outcomes` and `api.duties_member_history`/`app.duties_member_history` to authenticated).
   - New: table `app.duties_outcomes` (append-only log: `revision` per assignment, `supersedes_outcome_id`, `correction_reason`, `recorded_by_member/account`, `recorded_at` = `clock_timestamp()`; unique (assignment, revision); FK to the assignment `on delete cascade` so earlier E2E clean-ups keep working; RLS on, no client privilege; trigger `duties_outcomes_append_only` refuses every update except erasure clearing text and anonymising the recorder).
   - New functions: `duties_outcome_guard`, `duties_outcomes_allowed`, `duties_outcome_trail`, `duties_outcome_json`, `duties_lock_for_outcome`, `duties_record_outcome`, `duties_correct_outcome`, `duties_church_zone`, the reads `duties_outcomes` and `duties_member_history` (app and api).
   - Replaced bodies (copied from `20261014212507`, 4.9, the latest version of each; every earlier review fix kept; changes marked "Story 4.10"): `duties_state_ok` (vocabulary `completion_outcome`; audit actions `outcome_recorded`, `outcome_corrected`), `duties_authorize_command` and `duties_command` (the two commands), `duties_my_assignment_json` (the member's own `outcome`), `duties_deletion_remaining` and `duties_erase_member` (outcome text and recorders). Not replaced: the board, rota, coverage, Admin overview, `duties_my_duties`, any Follow-ups or Notifications function, the 4.5 `accept_many` (its lock order untouched), the 4.8 reminder plan.
@@ -93,7 +93,7 @@ context:
 - Matrix audit: Record (pgTAP recording block; E2E O20; widget "record an outcome"), Unrecorded (pgTAP "passing time" block with the worker run; E2E O10; widget "Not recorded"), Declined (pgTAP; E2E O21; widget "no No-show chip"), Cancelled accepted (pgTAP; E2E O22), Correct (pgTAP corrections block incl. stale, reason, unchanged, append-only trigger; E2E O30; widget correction), Own / others (pgTAP who-may-record and privacy sweep over every Duties read; E2E O31, O40; widget own duty), History (pgTAP history block; E2E O40; widget history). All ran and passed (see Verification).
 - Fictional numbers: pgTAP +44 7700 900130-900139, E2E 900140-900149 (grepped: no earlier suite uses them). Tests use fixed church-time clock times on whole days (coordinator's note on 3f8e1bf).
 - Open owner questions: none new. Q4 (production personal data) stays the fail-closed default: every outcome read and command is behind the Q4 gate.
-- Review amendments (independent review, 2026-10-14; the migration was unmerged and unapplied, so `20261014231512_duties_outcomes.sql` was amended in place; the frozen block is unchanged):
+- Review amendments (independent review, 2026-10-14; the migration was unmerged and unapplied, so `20261015002121_duties_outcomes.sql` was amended in place; the frozen block is unchanged):
   - Decision S1 (erasure race): `duties_erase_member` first locks, in the commands' AD-2 order, the departments and series the member created, then the occurrences they created or hold a position in, then their assignments, all `FOR UPDATE`. It then clears outcome notes, correction reasons and 4.9 contact-attempt notes by the captured assignment ids. `duties_lock_for_outcome` refuses an assignee who is no longer active or is under deletion with `validation_failed {"member_id": "inactive"}`, as `confirm_by_leader` does. Tests: pgTAP refusal for record and correct; two-session probe `evidence-4.10/erase-race-probe.txt` (the erase waited about 2.1 s, then cleared the note; remaining 0). `_remaining` is unchanged: once erase holds the locks no outcome text can be committed after the clear, so counting by member id stays correct within the erase transaction.
   - Decision S2 (window): the client always sends both dates. Without From, the window ends at church today and reaches back `days - 1`; with From, it ends `days - 1` later or at today, whichever is sooner. A From after today is refused in the form ("Must not be after today"). Tests: `OutcomesQuery.toParams(now:)` cases, plus widget tests for the shown From with 31 days and for From cleared.
   - Decision N1: the history summary reads "N past duties assigned".
@@ -106,7 +106,7 @@ context:
   - Decision N5: both new reads check the Q4 gate before the caller's grants (4.9's reads are unchanged). The erase hook's `comment on function` is replaced so it names stories 4.1-4.10; the 4.9 comment had not been carried over. The function name `app.duties_outcomes` still equals the table name; it is kept, because a rename touches the API name.
   - Decision N6: the history paging buttons are wrapped in `FocusRing`.
   - Fictional numbers: pgTAP also uses +44 7700 900151-900153 for the three added users (900130-900139 were all in use; grepped free).
-- Remaining (not builder steps): staging apply of `20261014231512_duties_outcomes.sql` and per-function md5 parity (parent; no owner SQL paste; no Edge Function redeploy); rebuild the staging staff web and APK; owner manual checks in `docs/runbooks/duties.md`, story 4.10 (record in `evidence-4.10/owner-check.md`).
+- Remaining (not builder steps): staging apply of `20261015002121_duties_outcomes.sql` and per-function md5 parity (parent; no owner SQL paste; no Edge Function redeploy); rebuild the staging staff web and APK; owner manual checks in `docs/runbooks/duties.md`, story 4.10 (record in `evidence-4.10/owner-check.md`).
 
 ## Plan Change Log
 

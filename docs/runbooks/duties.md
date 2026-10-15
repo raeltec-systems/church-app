@@ -874,7 +874,7 @@ Record the outcome of each step in `evidence-4.9/owner-check.md`: pass or fail, 
 
 ## Story 4.10: record duty completion outcomes and keep assignment history
 
-Migration: `supabase/migrations/20261014231512_duties_outcomes.sql`.
+Migration: `supabase/migrations/20261015002121_duties_outcomes.sql`.
 - Forward only: the 4.1-4.9 files are not edited. The replaced function bodies are listed in its header (`duties_state_ok`, `duties_authorize_command`, `duties_command`, `duties_my_assignment_json`, `duties_deletion_remaining`, `duties_erase_member`, all copied from `20261014212507`, 4.9, with every earlier review fix kept).
 - No destructive statements, no row deletions and no `_rows` file.
 - New client grants: `api.duties_outcomes(date, date, uuid, text)` and `api.duties_member_history(uuid, timestamptz, uuid)` with their `app` bodies (authenticated only). The two new commands go through `api.duties_command`.
@@ -971,7 +971,7 @@ Fictional numbers: pgTAP `+44 7700 900130-900139` and `900151-900153`, E2E `9001
 ### Hosted staging (parent session, then the owner)
 
 1. **Parent session:**
-   - Apply `20261014231512_duties_outcomes.sql` to staging (`tmurpotfluignacfueki`) after `20261014212507` (rename the local file to the recorded hosted version if the apply records another one).
+   - Apply `20261015002121_duties_outcomes.sql` to staging (`tmurpotfluignacfueki`) after `20261014212507` (rename the local file to the recorded hosted version if the apply records another one).
    - Run `tools/ci/verify-hosted.sql` with `expected_env=staging`.
    - Compare the md5 of each new or replaced `app.duties_*` and `api.duties_outcomes` / `api.duties_member_history` function with the local one (the migration has no backslashes).
    - Grants: among the new functions `authenticated` executes only `api.duties_outcomes`, `app.duties_outcomes`, `api.duties_member_history` and `app.duties_member_history`; `anon` none.

@@ -23,6 +23,9 @@
 import { randomUUID } from 'node:crypto';
 
 import { amrMethods, localHttp, localKey, password, psql, runMain, startRun } from './harness.mjs';
+import { churchInstant, churchSunday } from './duties-shared.mjs';
+
+export { churchSunday, churchInstant } from './duties-shared.mjs';
 
 const NAME_PREFIX = 'SYNTHETIC 4.5 E2E';
 export const DEPARTMENT = 'SYNTHETIC Preaching Rota 4.5';
@@ -33,22 +36,6 @@ const NOTE = 'SYNTHETIC: travelling that weekend';
 /** The reserved fictional numbers this run uses (+44 7700 900560-900569). */
 export function isFictionalResponsesPhone(phone) {
   return /^\+44770090056[0-9]$/.test(phone);
-}
-
-/** Church time (Africa/Lusaka) is UTC+02:00 all year. */
-const CHURCH_OFFSET_MS = 2 * 3_600_000;
-
-/** The church-local date (YYYY-MM-DD) of the k-th Sunday at least four days after `nowMs`. */
-export function churchSunday(nowMs, k) {
-  const local = new Date(nowMs + CHURCH_OFFSET_MS + 4 * 86_400_000);
-  const day = local.getUTCDay();
-  const first = new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + ((7 - day) % 7)));
-  return new Date(first.getTime() + k * 7 * 86_400_000).toISOString().slice(0, 10);
-}
-
-/** The UTC instant of a church-local date and "HH:MM". */
-export function churchInstant(date, hhmm) {
-  return new Date(Date.parse(`${date}T${hhmm}:00Z`) - CHURCH_OFFSET_MS).toISOString();
 }
 
 /** The accept_many payload for assignments at the revisions the member saw. */

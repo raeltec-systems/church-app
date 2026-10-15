@@ -138,7 +138,7 @@ Migration: `supabase/migrations/20261014001142_duties_revisions.sql` (forward on
 
 `{occurrence_id, duty_name?, starts_at?, ends_at?, reporting_at?, location?, instructions?, member_id?, response_deadline?}` with `expected_revision` = the occurrence revision. The department's leader or deputy, or an Admin (not Pastor, not another department's leader, not a cell leader). The payload is a patch: present keys are the change, `null` clears an optional field, a value equal to the current one is no change.
 
-- **Material change** (any material field differs): needs a new `response_deadline` (the leader's until entry 8 adds the 3.3 default), checked against the new times. The current assignment becomes `superseded` (answer kept), a new `pending` assignment is created for the same member or the new one, the old assignment's pending jobs are cancelled `source_revised` and a generic notice is queued: `duty_changed` to the same member, or `duty_assigned` to a new member plus `duty_released` to the old one.
+- **Material change** (any material field differs): needs a new `response_deadline` (the leader's until entry 8 adds the 3.3 default; built in story 4.8, below), checked against the new times. The current assignment becomes `superseded` (answer kept), a new `pending` assignment is created for the same member or the new one, the old assignment's pending jobs are cancelled `source_revised` and a generic notice is queued: `duty_changed` to the same member, or `duty_assigned` to a new member plus `duty_released` to the old one.
 - **Notes-only change** (only `instructions`): the answer stands (no new assignment, no revision change of the assignment); one generic notice goes to a pending or accepted assignee: any notice of the assignment not yet sent (`duty_assigned`, `duty_changed`, `duty_updated`) is cancelled `replaced` and re-sent once as the most telling kind (a new duty stays a new duty), otherwise `duty_updated`.
 - **Erased or departed assignee**: no notice is ever addressed to an erased member (nil UUID). A material change that keeps an assignee who was erased, left the department or is under deletion is refused `{"member_id": "required_reassign"}`: choose a new assignee. An instructions-only change still saves (no notice).
 - Answer: `{occurrence_id, revision, change: material | notes, slot_id, slot_revision, assignment_id, assignment_revision, superseded_assignment_id, response, notice_queued}`: ids, revisions and states only.
@@ -226,8 +226,8 @@ Record the outcome per step in `evidence-4.2/owner-check.md` (pass/fail, device 
 ### Known limits (later entries)
 
 - One position per occurrence: `member_id` in a revision is refused (`unsupported`) once occurrences have several positions (4.3 adds per-position edits, series edits and cancellation).
-- The new deadline is the leader's; the 3.3 default deadline, Short notice and response or pre-service reminders arrive with entry 8 (a material change will then re-plan them).
-- A declined assignment stays current until the leader changes or reassigns it; the coverage queue and leader confirmation arrive with entry 9.
+- The new deadline is the leader's; the 3.3 default deadline, Short notice and response or pre-service reminders arrive with entry 8 (a material change will then re-plan them; built in story 4.8, below).
+- A declined assignment stays current until the leader changes or reassigns it; the coverage queue and leader confirmation arrive with entry 9 (built in story 4.9, below).
 
 ## Story 4.3: generate recurring multi-position rotas with drafts and series edits
 
@@ -272,7 +272,7 @@ Refusals with their field codes:
 | A person who is not a current department member | `{"member_id": "not_in_department" \| "unknown"}` |
 | An answer-by on a draft | `{"response_deadline": "draft"}` |
 | Started or cancelled occurrence; anchor not in the series | `{"occurrence_id" \| "from_occurrence_id": "started" \| "cancelled"}`, `{"from_occurrence_id": "not_in_series"}` |
-| A one-off duty cancelled here | `{"occurrence_id": "not_in_series"}` (entry 9 brings position cancellation) |
+| A one-off duty cancelled here | `{"occurrence_id": "not_in_series"}` (entry 9 brings position cancellation: `duties.cancel_position`, built in story 4.9, below) |
 | Nothing changes | `{"occurrence_id" \| "series_id" \| "slot_id": "unchanged"}` |
 | Gate closed (production without Q4, or without Q2 for generation and publishing); untrusted session | `unavailable {"policy": "gate_closed"}`; `unauthenticated` |
 
@@ -286,7 +286,7 @@ A replay with the same request id returns the stored answer after the kernel rec
 |---|---|---|---|
 | `duty_cancelled` | **Duty cancelled** / "One of your duties was cancelled. Open My duties to see what is still yours." | `/duties` | the cancelled assignment is at its final revision and the duty would not yet have started; sent to assignees who were pending or had accepted |
 
-Publishing a rota uses the 4.1 `duty_assigned` contract for every generated assignment; changes use the 4.2 kinds. Cancelling an occurrence cancels every pending job of its assignments (`source_cancelled`). An accountless or held assignee's notice is recorded `ineligible`/`no_direct_contact_route` until entry 8 adds the leader's Needs contact list.
+Publishing a rota uses the 4.1 `duty_assigned` contract for every generated assignment; changes use the 4.2 kinds. Cancelling an occurrence cancels every pending job of its assignments (`source_cancelled`). An accountless or held assignee's notice is recorded `ineligible`/`no_direct_contact_route` until entry 8 adds the leader's Needs contact list (built in story 4.8, below).
 
 ### Reads
 
@@ -343,7 +343,7 @@ Record the outcome per step in `evidence-4.3/owner-check.md` (pass/fail, device 
 ### Known limits (later entries)
 
 - Positions are fixed when a rota is generated (no adding, removing or renaming in 4.3), and a series is not extended after creation (make a new rota for the next quarter).
-- Overlap warnings and each candidate's upcoming load arrive with entry 4; default deadlines, Short notice and response or pre-service reminders with entry 8; the coverage queue, position cancellation of one-off duties and leader confirmation with entry 9.
+- Overlap warnings and each candidate's upcoming load arrive with entry 4; default deadlines, Short notice and response or pre-service reminders with entry 8; the coverage queue, position cancellation of one-off duties and leader confirmation with entry 9 (built in stories 4.4, 4.8 and 4.9, below).
 - A this-and-future edit overwrites the given fields on later dates, including dates changed one at a time before; fields not given keep each date's own value.
 - Series times are on one church-local date: a reporting time must be at or before the start time on the same day, so a duty starting just after midnight with reporting the evening before cannot be expressed in a series (publish it as a one-off duty with instants instead).
 
@@ -353,7 +353,7 @@ Migration: `supabase/migrations/20261014052239_duties_overlaps.sql` (forward onl
 
 ### Model
 
-- **Owning scope.** Every occurrence is owned by exactly one department or one cell (`app.duties_occurrences.cell_id`; check `duties_occurrences_one_owner`). No command creates a cell-owned occurrence yet: entry 11 adds the Cells owner operations. Until then cell-owned occurrences exist only as SYNTHETIC fixtures in pgTAP and the local E2E, and My duties lists department-owned duties only.
+- **Owning scope.** Every occurrence is owned by exactly one department or one cell (`app.duties_occurrences.cell_id`; check `duties_occurrences_one_owner`). No command creates a cell-owned occurrence yet: entry 11 adds the Cells owner operations (built in story 4.11, below). Until then cell-owned occurrences exist only as SYNTHETIC fixtures in pgTAP and the local E2E, and My duties lists department-owned duties only.
 - **Commitment.** A current assignment the member has not declined (`pending` or `accepted`) on a published occurrence of any owner. Declined, superseded and cancelled assignments and cancelled occurrences are not commitments.
 - **Busy time** (`app.duties_busy_range`): from the reporting time (or the start) to the end time; with no end time, **two hours** from the start (an adjustable assumption in one function). Ranges are half-open: a duty ending at 10:00 does not overlap one starting at 10:00.
 - **The conflict query** (`app.duties_busy_items(member, range, exclude_slot, department)`): the member's commitments overlapping the range, other than the position itself, plus (when a department is given) the member's planned draft positions in that department. **No conflict never means free**: availability is not collected, and the screens say so.
@@ -436,11 +436,11 @@ Record the outcome per step in `evidence-4.4/owner-check.md` (pass/fail, device 
 
 ### Known limits (later entries)
 
-- Cell-owned occurrences arrive with entry 11 (the Cells owner operations); until then they are fixtures only, and a cell conflict never shows the cell's name (Duties never reads Cells).
+- Cell-owned occurrences arrive with entry 11 (the Cells owner operations; built in story 4.11, below); until then they are fixtures only, and a cell conflict never shows the cell's name (Duties never reads Cells).
 - A duty without an end time is assumed to take two hours; every warning shows the busy time used.
 - An overlap created later by someone else is recorded on the later assignment (with its reason); the earlier one only shows the overlap count.
 - Draft edits (this date or this and later dates on drafts) ask no reason; Publish N checks and names the date.
-- The member never sees the reason; the coverage queue, leader confirmation and the Home "upcoming conflicts" count arrive with entry 9.
+- The member never sees the reason; the coverage queue, leader confirmation and the Home "upcoming conflicts" count arrive with entry 9 (built in story 4.9, below: the count is the overlapping duties line of the leader's **Needs attention** card).
 
 ## Story 4.5: respond from My duties with later decline and bulk acceptance
 
@@ -455,7 +455,7 @@ Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/st
 
 - **Earlier acceptance.** `app.duties_assignments.prior_accepted_at` holds the time the member had accepted before saying they can't make it anymore. The `duties_assignments_prior_accepted` check allows it only on a `declined` answer. Ended assignments keep it unchanged (the history guard is replaced to cover it).
 - **Audit.** A later decline is `acceptance_withdrawn` with code `declined`. Each date of a bulk acceptance is a `response_recorded` row with code `accepted`, all under the one request id. Ids and codes only, never the note.
-- **Cell-owned assignments fail closed.** Members cannot answer a cell-owned assignment until entry 11 builds the member view for cell parts. `duties.respond`, `duties.withdraw_acceptance` and `duties.accept_many` all answer `not_found` for an assignment of a cell-owned occurrence. My duties still lists department-owned duties only.
+- **Cell-owned assignments fail closed.** Members cannot answer a cell-owned assignment until entry 11 builds the member view for cell parts (built in story 4.11, below: the refusal ends there). `duties.respond`, `duties.withdraw_acceptance` and `duties.accept_many` all answer `not_found` for an assignment of a cell-owned occurrence. My duties still lists department-owned duties only.
 
 ### Commands (`api.duties_command`)
 
@@ -605,9 +605,9 @@ Record the outcome of each step in `evidence-4.5/owner-check.md`: pass or fail, 
 
 ### Known limits (later entries)
 
-- Leaders get no push or inbox alert for a decline yet; the board shows it at once. The leader decline alert and the coverage queue arrive with entry 9.
-- Cell programme parts are not answerable or listed in My duties until entry 11.
-- No phone or Call action for the leader on the detail screen (Q4, entry 9 contact routes).
+- Leaders get no push or inbox alert for a decline yet; the board shows it at once. The leader decline alert and the coverage queue arrive with entry 9 (built in story 4.9, below).
+- Cell programme parts are not answerable or listed in My duties until entry 11 (built in story 4.11, below).
+- No phone or Call action for the leader on the member's duty detail screen. Story 4.9's contact routes go one way only (the leader's Call/Message for members' labelled 2.5 routes, on Coverage); a member-to-leader call is not built and not planned in this epic.
 - Accepting several dates together is without a note; accept a date on its own to add one. The Home card's Accept sends no note.
 - The calendar export is a copy. The iOS share sheet (iPad popover anchor) is unverified on a device until an iOS build exists.
 
@@ -662,7 +662,7 @@ Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/st
 - `app.duties_record_contact_need` is registered for every kind an assignee is sent (`duty_assigned`, `duty_changed`, `duty_updated`, `duty_released`, `duty_cancelled`, `duty_response_due`, `duty_starting`). A held, in-review, accountless or deactivated assignee gets no inbox item; the worker records the need in `app.duties_contact_needs` (need id, assignment id, revision, kind, time; idempotent; no member id, no reason) and Notifications marks it `routed` (no longer `unrouted` in Reminder health).
 - `api.duties_leader_board` and `api.duties_rota` add, per current assignment, `deadline_source`, `short_notice` and `needs_contact` (`{reasons: ["short_notice" | "not_reached"], since}` or null) and, per occurrence, `reminders`. `api.duties_my_duties` adds `deadline_source`, `short_notice` and `reminders`. The reason a member was not reached is never given (a hold is never disclosed).
 - **Released and cancelled notices** (`app.duties_contact_notices`, in `api.duties_leader_board` as `contact_notices` per department for its leaders, deputies and Admins; empty for Pastor oversight): a member the app cannot reach whose duty was given to someone else or whose date was cancelled is listed (`notice`: `released` | `cancelled`, the duty, date and position, `since`) until the duty would have started, so the leader tells them in person. Never why. A released notice disappears when the position is theirs again.
-- Contact attempts, leader confirmation and the coverage queue arrive with entry 9.
+- Contact attempts, leader confirmation and the coverage queue arrive with entry 9 (built in story 4.9, below).
 
 ### Clients
 
@@ -721,9 +721,9 @@ Record the outcome of each step in `evidence-4.8/owner-check.md`: pass or fail, 
 ### Known limits (later entries)
 
 - Leaders and deputies are chosen when an assignment is planned (or re-planned by `duties.set_reminders`): a leader granted later gets no alert for an earlier assignment until it is re-planned; one whose scope is revoked or who is held is not alerted (rechecked at delivery).
-- Cell-owned occurrences get no reminders until entry 11 builds their member view.
+- Cell-owned occurrences get no reminders until entry 11 builds their member view (built in story 4.11, below: cell parts get the church default reminders).
 - A very large publish (hundreds of slots) is planned in one transaction (about 4 s locally for 200 slots). On an almost empty database an autovacuum ANALYZE during it can make it much slower; publish a big rota in parts if a timeout is seen.
-- Released and cancelled notices are listed until the old start and cannot be marked done yet. Contact attempts, leader confirmation and the coverage queue arrive with entry 9.
+- Released and cancelled notices are listed until the old start and cannot be marked done (no story in epic 4 adds this). Contact attempts, leader confirmation and the coverage queue: built in story 4.9, below.
 - An operator re-plan after a policy change (`app.notifications_replan_all`) cannot call Duties: a leader alert it moves into the past is not re-sent until the assignment is next re-planned.
 - Duties published before 4.8 keep their 4.1-4.5 jobs; there is no back-fill of reminders. **On staging**, duties published before this migration get the new reminders and leader alerts only after their next change (a reassignment, a material change, an answer or `duties.set_reminders`); test with duties published after the apply.
 
@@ -866,7 +866,7 @@ Record the outcome of each step in `evidence-4.9/owner-check.md`: pass or fail, 
 
 ### Known limits (later entries)
 
-- The queue lists duties that have not started; completion outcomes (Completed, Excused, No-show) are entry 10; cell-owned positions are entry 11; lifecycle and handover hooks are entry 12.
+- The queue lists duties that have not started; completion outcomes (Completed, Excused, No-show) are entry 10 (built in story 4.10, below); cell-owned positions are entry 11 (story 4.11 keeps them out of the queue: epic 5, see its known limits); lifecycle and handover hooks are entry 12 (built in story 4.12, below).
 - Confirmed by leader is for a member who has not answered: a decline is reassigned, not overwritten, and the same member cannot be given the position back without first giving it to someone else (the 4.3 command refuses an unchanged assignee).
 - Contact details are the labelled 2.5 routes only (no phone usernames); members with an app account usually have none, so the leader contacts them through other agreed means.
 - "Needs contact" does not yet include "no active push device" (the 3.6 device state is not disclosed to leaders).
@@ -1005,7 +1005,7 @@ Record the outcome of each step in `evidence-4.10/owner-check.md`: pass or fail,
 
 ### Known limits (later entries)
 
-- Outcomes are for department-owned duties; cell-owned programme parts are entry 11. Leaving a department or the church (entry 12) does not remove outcomes; erasure clears their text.
+- Outcomes are for department-owned duties; cell-owned programme parts are entry 11 (story 4.11 leaves cell-part outcomes to epic 5, see its known limits). Leaving a department or the church (entry 12, built in story 4.12, below) does not remove outcomes; erasure clears their text.
 - An outcome cannot be cleared back to Unrecorded; a mistaken record is corrected to the right value with a reason.
 - The history counts one row per position held; the 12-month summary covers past duties only (upcoming duties are counted apart).
 
@@ -1082,7 +1082,7 @@ Record the outcome of each step in `evidence-4.11/owner-check.md`: pass or fail,
 - The creator's reminder choice for a part (`reminders`) is not taken; cell parts use the church defaults.
 - A system-principal caller (no live session) is not supported; owner operations need the acting member's session.
 - A part holds at most 50 positions over its life (cancelled ones count); beyond that a programme starts a new part.
-- Lifecycle effects on cell parts (transfer, removal) are Cells' calls to these operations (epic 5.9) and entry 12.
+- Lifecycle effects on cell parts (transfer, removal) are Cells' calls to these operations (epic 5.9) and entry 12 (built in story 4.12, below: a deactivated member's cell parts end).
 
 ## Story 4.12: apply membership lifecycle and handover to duties and follow-ups
 
@@ -1270,3 +1270,11 @@ Israel's run-through on the staging web and APK is in [duties-guides.md](duties-
 - **Q2 (open, unchanged):** the real pilot department and its leaders; the live pilot waits for Israel to name them, and for Q4 for live personal data. This story is the synthetic rehearsal.
 - None new.
 
+
+## Story 4.14: refactor sweep
+
+Migration: `supabase/migrations/20261015130404_duties_comment_refresh.sql` (comments only: the comments of `api.duties_command`, `api.followups_command`, `app.duties_state_ok` and `app.followups_state_ok` name the stories and commands up to 4.12; no function body, grant, table or row changes; no `_rows` file, so **no owner SQL paste**). `supabase/tests/duties_comments_test.sql` fails when a command is routed that the api comment does not name: a story that adds a command updates the comment in its own migration. Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-refactor-sweep-plan.md` (findings table: what was cleaned up, rejected or deferred). Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.14/`.
+
+- **No behaviour change** for members, leaders or Admins, except one client fix: a Follow-ups screen keeps an in-flight update pending while a reload finishes (its buttons stay disabled), as Duties screens have since 4.5.
+- **E2E helpers:** the notifications-worker credential block and the church-time and answer helpers of the Duties and Follow-ups E2Es live in `tools/identity-e2e/duties-shared.mjs`; a new E2E imports them from there.
+- **Hosted staging (parent session):** apply `20261015130404_duties_comment_refresh.sql` after `20261015110202`; per-function md5 must be unchanged against the local database, and the four comments must match. No Edge Function change; no client rebuild is needed for the comments (the Follow-ups fix ships with the next staging client build).

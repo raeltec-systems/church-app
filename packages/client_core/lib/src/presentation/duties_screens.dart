@@ -747,19 +747,6 @@ String _timesText(BuildContext context, DutyTimes t) {
   ].join(' ');
 }
 
-// Church-time form values for a stored instant (Africa/Lusaka).
-String _dateField(DateTime at) {
-  final w = ChurchTime.wall(at);
-  String two(int v) => v.toString().padLeft(2, '0');
-  return '${w.year.toString().padLeft(4, '0')}-${two(w.month)}-${two(w.day)}';
-}
-
-String _timeField(DateTime at) {
-  final w = ChurchTime.wall(at);
-  String two(int v) => v.toString().padLeft(2, '0');
-  return '${two(w.hour)}:${two(w.minute)}';
-}
-
 (String, StatusTone) _responseLabel(DutyResponse r) => switch (r) {
   DutyResponse.accepted => ('Accepted', StatusTone.success),
   DutyResponse.declined => ('Can\'t make it', StatusTone.warning),
@@ -1604,27 +1591,29 @@ class _EditDutyForm extends ConsumerStatefulWidget {
 class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
   late final _name = TextEditingController(text: widget.duty.dutyName);
   late final _date = TextEditingController(
-    text: _dateField(widget.duty.times.startsAt),
+    text: ChurchTime.dateText(widget.duty.times.startsAt),
   );
   late final _start = TextEditingController(
-    text: _timeField(widget.duty.times.startsAt),
+    text: ChurchTime.timeText(widget.duty.times.startsAt),
   );
   late final _end = TextEditingController(
     text: switch (widget.duty.times.endsAt) {
-      final e? => _timeField(e),
+      final e? => ChurchTime.timeText(e),
       null => '',
     },
   );
   late final _endDate = TextEditingController(
     text: switch (widget.duty.times.endsAt) {
-      final e? when _dateField(e) != _dateField(widget.duty.times.startsAt) =>
-        _dateField(e),
+      final e?
+          when ChurchTime.dateText(e) !=
+              ChurchTime.dateText(widget.duty.times.startsAt) =>
+        ChurchTime.dateText(e),
       _ => '',
     },
   );
   late final _reporting = TextEditingController(
     text: switch (widget.duty.times.reportingAt) {
-      final r? => _timeField(r),
+      final r? => ChurchTime.timeText(r),
       null => '',
     },
   );

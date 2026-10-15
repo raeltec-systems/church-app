@@ -615,9 +615,7 @@ class CoverageQuery {
         int.parse(start.substring(5, 7)),
         int.parse(start.substring(8, 10)),
       ).add(Duration(days: days.clamp(1, maxDays) - 1));
-      String two(int v) => v.toString().padLeft(2, '0');
-      end =
-          '${day.year.toString().padLeft(4, '0')}-${two(day.month)}-${two(day.day)}';
+      end = ChurchTime.ymd(day);
     }
     return {
       'from_date': ?start,

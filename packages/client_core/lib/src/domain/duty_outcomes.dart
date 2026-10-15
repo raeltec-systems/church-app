@@ -383,14 +383,9 @@ class OutcomesQuery {
     return DateTime.utc(w.year, w.month, w.day);
   }
 
-  static String _ymdOf(DateTime d) {
-    String two(int v) => v.toString().padLeft(2, '0');
-    return '${d.year.toString().padLeft(4, '0')}-${two(d.month)}-${two(d.day)}';
-  }
-
   /// Is [ymd] (`YYYY-MM-DD`) after today's church date?
   static bool afterToday(String ymd, [DateTime? now]) =>
-      ymd.compareTo(_ymdOf(churchToday(now))) > 0;
+      ymd.compareTo(ChurchTime.ymd(churchToday(now))) > 0;
 
   /// Review S2: the window never reaches past today. Without a From date it
   /// ends today and starts [days] - 1 days earlier; with one it starts there
@@ -410,8 +405,8 @@ class OutcomesQuery {
     var end = start.add(Duration(days: n - 1));
     if (end.isAfter(today)) end = today;
     return {
-      'from_date': _ymdOf(start),
-      'to_date': _ymdOf(end),
+      'from_date': ChurchTime.ymd(start),
+      'to_date': ChurchTime.ymd(end),
       if (departmentId != null) 'department_id': departmentId,
       if (d != null && d.isNotEmpty) 'duty': d,
     };

@@ -371,6 +371,36 @@ void main() {
       expect(h.cells.leaderCalls, 2);
     });
 
+    // Story 4.14 review: a reload while a confirmation is in flight keeps it
+    // pending (the C5 rule), so it cannot be sent twice.
+    testWidgets('a reload while a confirmation is in flight cannot send it '
+        'twice', (tester) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.cellLeader,
+        setUp: (h) => h.cells.leader = leaderWith([leaderRequest()]),
+      );
+      await tapKey(tester, 'leader-confirm-$_request');
+      final sent = h.gateway.sent.single;
+      final calls = h.cells.leaderCalls;
+      final container = ProviderScope.containerOf(
+        tester.element(byKey('leader-confirm-$_request')),
+      );
+      await container.read(cellLeaderProvider.notifier).reload();
+      await settle(tester);
+      expect(h.cells.leaderCalls, calls + 1);
+      expect(byKey('cells-pending'), findsOneWidget);
+      expect(enabled(tester, 'leader-confirm-$_request'), isFalse);
+      await tester.tap(byKey('leader-confirm-$_request'), warnIfMissed: false);
+      await tester.pump();
+      expect(h.gateway.sent, hasLength(1));
+      sent.unknown();
+      await settle(tester);
+      await tapKey(tester, 'cells-check-again');
+      expect(h.gateway.sent, hasLength(2));
+      expect(h.gateway.sent.last.wire['request_id'], sent.wire['request_id']);
+    });
+
     testWidgets('passes an unknown person to the church office', (
       tester,
     ) async {

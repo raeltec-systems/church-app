@@ -28,15 +28,13 @@
 // credential is revoked and its principal disabled.
 //
 // Usage: node tools/identity-e2e/followups-reminders.mjs [--evidence <file.jsonl>]
-import { execFile } from 'node:child_process';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
+import { randomUUID } from 'node:crypto';
 
 import { amrMethods, localHttp, localKey, password, psql, runMain, startRun } from './harness.mjs';
+import { genericItemCheck, notificationsWorker, summarize } from './duties-shared.mjs';
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+export { summarize } from './duties-shared.mjs';
+
 const OPERATOR = 'israel';
 const NAME_PREFIX = 'SYNTHETIC 4.7 E2E';
 export const DEPARTMENT = 'SYNTHETIC Preaching Rota';
@@ -51,6 +49,9 @@ export const GENERIC_TEXT = {
   followup_overdue: ['Follow-up task overdue', 'A follow-up task you supervise is overdue. Open it to follow up with its owner.'],
 };
 
+/** An inbox item that carries exactly the generic text of its reminder kind. */
+export const isGenericFollowupItem = genericItemCheck(GENERIC_TEXT);
+
 /** The reserved fictional numbers this run uses (+44 7700 900370-900379). */
 export function isFictionalRemindersPhone(phone) {
   return /^\+44770090037[0-9]$/.test(phone);
@@ -59,17 +60,6 @@ export function isFictionalRemindersPhone(phone) {
 /** The deep link a follow-up reminder opens. */
 export function taskLink(taskId) {
   return `/followups/tasks/${taskId}`;
-}
-
-/** Is an inbox item a follow-up reminder that carries exactly its contract's generic text? */
-export function isGenericFollowupItem(item) {
-  const text = GENERIC_TEXT[item?.reminder_kind];
-  return Boolean(text) && item.title === text[0] && item.body === text[1];
-}
-
-/** "<kind>:<count>" for the pending jobs summary, sorted. */
-export function summarize(rows) {
-  return [...rows].sort().join(',');
 }
 
 async function main() {
@@ -171,21 +161,8 @@ async function main() {
 
   // The run's worker principal and credential (only the digest is registered).
   const run = randomUUID().slice(0, 8);
-  const credential = `sysc_local_${randomBytes(32).toString('base64url')}`;
-  const principal = psql(`select app.sys_create_principal('notifications-worker-followups-${run}', 'notifications_worker', '${OPERATOR}')`);
-  const credentialId = JSON.parse(psql(`select app.sys_register_credential('${principal}',
-    '${createHash('sha256').update(credential).digest('hex')}', 'followups reminders e2e ${run}', interval '2 hours', '${OPERATOR}')`)).credential_id;
-  const worker = async () => {
-    try {
-      const { stdout } = await promisify(execFile)('node', [join(ROOT, 'tools/notifications/worker.mjs'), 'run-once'], {
-        encoding: 'utf8',
-        env: { PATH: process.env.PATH, SUPABASE_URL: origin, SUPABASE_PUBLISHABLE_KEY: key, NOTIFICATIONS_WORKER_SYSTEM_CREDENTIAL: credential } });
-      const line = stdout.split('\n').find((l) => l.startsWith('{'));
-      return { exit: 0, ...(line ? JSON.parse(line) : {}) };
-    } catch (e) {
-      return { exit: e.code ?? 1, error: String(e.stderr ?? '').trim().slice(-160) };
-    }
-  };
+  const { principal, credentialId, worker } = notificationsWorker({ origin, key, operator: OPERATOR,
+    principalName: `notifications-worker-followups-${run}`, label: `followups reminders e2e ${run}` });
   // The task's pending jobs as "<kind>@<recipient>" (recipient by role name).
   const roleOf = (memberId) => Object.entries(people).find(([, p]) => p.member === memberId)?.[0] ?? 'other_member';
   const pending = (taskId) => summarize(psql(`select coalesce(string_agg(reminder_kind || '@' || recipient_member_id, ','), '')

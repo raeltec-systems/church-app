@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../application/followups_controllers.dart';
 import '../domain/access_grants.dart';
 import '../domain/church_time.dart';
+import '../domain/commands.dart' show SecureRequestIds;
 import '../domain/followups.dart';
 
 // Story 4.6: follow-up tasks. My follow-ups for every owner (the mobile Home
@@ -1339,15 +1340,8 @@ class _CreateTaskFormState extends ConsumerState<_CreateTaskForm> {
     );
   }
 
-  static String _newSourceId() {
-    final r = Random.secure();
-    final b = List<int>.generate(16, (_) => r.nextInt(256));
-    b[6] = (b[6] & 0x0f) | 0x40;
-    b[8] = (b[8] & 0x3f) | 0x80;
-    final h = b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
-    return '${h.substring(0, 8)}-${h.substring(8, 12)}-${h.substring(12, 16)}-'
-        '${h.substring(16, 20)}-${h.substring(20)}';
-  }
+  // Story 4.14: the same RFC 4122 version 4 generator as request ids.
+  static String _newSourceId() => SecureRequestIds().next();
 
   @override
   Widget build(BuildContext context) {

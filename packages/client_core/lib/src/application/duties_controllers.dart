@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:church_contracts/church_contracts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -348,22 +346,17 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
     DutyOwnerKind? ownerKind,
   }) async {
     if (state.busy) return;
-    final u = state.unconfirmed?.request;
     // An input whose outcome was never learned is resent under its original
     // request id; anything else is a new request.
-    final same =
-        u != null &&
-        u.command == command &&
-        u.expectedRevision.value == expected.value &&
-        jsonEncode(u.payload) == jsonEncode(payload);
     await _dispatch(
       DutyAction(
         function: function,
-        request: CommandRequest(
+        request: resendOrNewRequest(
+          unconfirmed: state.unconfirmed?.request,
           command: command,
-          requestId: same ? u.requestId : ref.read(requestIdsProvider).next(),
-          expectedRevision: expected,
+          expected: expected,
           payload: payload,
+          ids: ref.read(requestIdsProvider),
         ),
         subject: subject,
         ownerKind: ownerKind,

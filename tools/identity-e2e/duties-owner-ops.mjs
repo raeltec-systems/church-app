@@ -30,6 +30,9 @@ import { randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
 
 import { amrMethods, dbContainer, localHttp, localKey, password, psql, runMain, startRun } from './harness.mjs';
+import { jsonLiteral, sessionClaims } from './duties-shared.mjs';
+
+export { sessionClaims, jsonLiteral } from './duties-shared.mjs';
 
 const OPERATOR = 'israel';
 const NAME_PREFIX = 'SYNTHETIC 4.11 E2E';
@@ -47,20 +50,6 @@ export function isFictionalOwnerOpsPhone(phone) {
 export function holdsDepartmentText(answer) {
   const json = JSON.stringify(answer ?? {});
   return DEPARTMENT_TEXT.some((t) => json.includes(t));
-}
-
-/** The JWT claims of a signed-in session (what PostgREST hands the database), without the token. */
-export function sessionClaims(jwt) {
-  const part = String(jwt ?? '').split('.')[1];
-  if (!part) throw new Error('no session token');
-  return JSON.parse(Buffer.from(part, 'base64url').toString('utf8'));
-}
-
-/** A SQL literal for a JSON value (dollar-quoted; the tag never occurs in this run's values). */
-export function jsonLiteral(value) {
-  const text = JSON.stringify(value);
-  if (text.includes('$j$')) throw new Error('unexpected quote tag');
-  return `$j$${text}$j$::jsonb`;
 }
 
 /** The ISO instant of church date `ymd` at `hh:mm` Africa/Lusaka (UTC+2, no daylight saving). */

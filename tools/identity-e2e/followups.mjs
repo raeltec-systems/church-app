@@ -27,6 +27,9 @@
 import { randomUUID } from 'node:crypto';
 
 import { amrMethods, localHttp, localKey, password, psql, runMain, startRun } from './harness.mjs';
+import { refusedTableQuery } from './duties-shared.mjs';
+
+export { refusedTableQuery } from './duties-shared.mjs';
 
 const OPERATOR = 'israel';
 const NAME_PREFIX = 'SYNTHETIC 4.6 E2E';
@@ -50,11 +53,6 @@ export function hasPrivateKey(obj) {
 /** A task of a list by id. */
 export function findTask(list, taskId) {
   return (list ?? []).find((t) => t?.task_id === taskId) ?? null;
-}
-
-/** A refused direct table query: an error status and no rows in the body. */
-export function refusedTableQuery(r) {
-  return r.status >= 400 && !Array.isArray(r.json);
 }
 
 async function main() {

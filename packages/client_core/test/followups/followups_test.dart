@@ -765,4 +765,37 @@ void main() {
       isEmpty,
     );
   });
+
+  // Story 4.14 (C5): Follow-ups keeps an in-flight request pending across a
+  // reload, as Duties has since 4.5, so it cannot be sent twice.
+  testWidgets('a reload while an update is in flight cannot send it twice', (
+    tester,
+  ) async {
+    final h = await pumpAt(
+      tester,
+      FollowUpPaths.task(_task),
+      setUp: (h) => h.followUps.task = full(followUpTaskData()),
+    );
+    await choose(tester, 'followup-outcome', 'Unreachable');
+    await tapKey(tester, 'followup-record-outcome');
+    final sent = h.gateway.sent.single;
+    final reads = h.followUps.taskReads.length;
+    final container = ProviderScope.containerOf(
+      tester.element(byKey('followup-record-outcome')),
+    );
+    await container.read(followUpTaskProvider(_task).notifier).reload();
+    await settle(tester);
+    expect(h.followUps.taskReads, hasLength(reads + 1));
+    expect(byKey('followups-pending'), findsOneWidget);
+    expect(enabled(tester, 'followup-record-outcome'), isFalse);
+    await tester.tap(byKey('followup-record-outcome'), warnIfMissed: false);
+    await tester.pump();
+    expect(h.gateway.sent, hasLength(1));
+    sent.unknown();
+    await settle(tester);
+    // The unconfirmed update is resent under the same request id.
+    await tapKey(tester, 'followups-check-again');
+    expect(h.gateway.sent, hasLength(2));
+    expect(h.gateway.sent.last.wire['request_id'], sent.wire['request_id']);
+  });
 }

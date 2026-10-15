@@ -406,7 +406,9 @@ select is((select t.owner_member_id = pg_temp.mid(10) and t.supervisor_member_id
   'a deputy records: the leader supervises (a leader first)');
 create temp table pe as select pg_temp.duties(9, 'duties.publish_duty', null, jsonb_build_object(
   'department_id', pg_temp.e(), 'member_id', pg_temp.mid(4), 'duty_name', 'Duty E',
-  'starts_at', app.cmd_utc(pg_temp.t('5 days 6 hours')))) as r;
+  -- A fixed afternoon in church time, clear of M's 10:00 series dates (a time relative to now()
+  -- could overlap one and need an overlap reason).
+  'starts_at', app.cmd_utc((pg_temp.lusaka_date('30 days') + time '15:00') at time zone 'Africa/Lusaka'))) as r;
 create temp table ate as select pg_temp.attempt(9, (select (r #>> '{data,assignment_id}')::uuid from pe),
                                                 'no_answer', '1 day') as r;
 select is((select (r #>> '{data,supervisor_fallback}')::boolean from ate), true,

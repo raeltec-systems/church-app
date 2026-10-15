@@ -4,7 +4,8 @@ Built 2026-10-15 by scratchpad `build-4.15.sh` (the 3.7 and 2.14 pattern) from c
 `3dda0747b2d34be72e2179444e87c4cbb845b930` (`builds/commit.txt`), after `flutter clean`, with
 `SUPABASE_URL=https://tmurpotfluignacfueki.supabase.co` and the staging **publishable** key from
 the environment (never printed; every log in `builds/` has it replaced by
-`sb_publishable_<redacted>`). Later commits of this story change only evidence and the plan (no
+`sb_publishable_<redacted>`, and the JVM's `Picked up JAVA_TOOL_OPTIONS` line, which named this
+build machine's proxy, is removed; `build-4.15.sh` now filters it). Later commits of this story change only evidence and the plan (no
 client code, no package).
 
 | Artifact (scratchpad) | Check | Result |

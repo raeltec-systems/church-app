@@ -123,7 +123,7 @@ Record the outcome per step in `evidence-4.6/owner-check.md` (pass/fail, device 
 
 - Reminders: done in story 4.7 (below).
 - No lifecycle or handover hooks: built in story 4.12 (below).
-- No real source yet: duties coverage (entry 9; built in story 4.9, below) and the consumer guide with both-client fixtures (entry 11) follow. Care and finance note grants arrive with their owners.
+- No real source in 4.6: duties coverage (entry 9; built in story 4.9, below) and the consumer guide with both-client fixtures (entry 11; built in story 4.11, below) came later. Care and finance note grants arrive with their owners.
 - No due-date change and no reopen of a Done or Closed task.
 
 ## Story 4.7: remind follow-up owners and supervisors on the task schedule

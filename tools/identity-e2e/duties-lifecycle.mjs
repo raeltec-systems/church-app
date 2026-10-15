@@ -20,7 +20,10 @@
 //     the deactivation succeeds and the leader's commands wait, then succeed or are refused cleanly
 //     (never `unavailable`, never a deadlock). And the reverse orders, with the leader's revise_duty
 //     or publish_duty paused mid-command by a third connection while the Admin deactivates the
-//     member over HTTP: both succeed and the duty is vacated.
+//     member over HTTP: both succeed and the duty is vacated;
+//   * review B1 and S5: a revoked scope over the hook's cap leaves tasks the former deputy can no
+//     longer open; the Admin's complete_handover, raced with the deactivation of the person it
+//     would choose, gives them to someone still active (never to the member being deactivated).
 //
 // Needs the local phone switch: `node tools/auth-harness/local-phone-auth.mjs on`, then `off`
 // afterwards. Needs a database with no usable Admin (`npx supabase db reset` first). LOCAL only
@@ -546,6 +549,53 @@ async function main() {
       && erase.duties === 0 && erase.followups === 0 && checkAnswer.duties === 0 && checkAnswer.followups === 0,
       { request: del.code ?? 'done', state: asgState(a.RP), task_handed_over: taskOwner(t3) === leader.member,
         pending_obligations: pendingObligations(accountless), blocker, erase, check: checkAnswer });
+
+    // ------------------------------------------------------- review B1 and S5: a capped handover, raced
+    // In the Ushers department: O and the held H become its deputies, L its leader; X (its deputy
+    // since L30) owns 27 open tasks supervised by H. X's scope is revoked: the hook hands over up to
+    // 25 (its cap; X's older task in D counts too) to O, the first reachable holder (deputies come
+    // first for this purpose); the rest stay with X, who can no longer open them.
+    const b1Grants = [];
+    for (const [p, kind] of [[removed, 'department_deputy'], [leader, 'department_leader'], [held, 'department_deputy']]) {
+      b1Grants.push((await envelope('identity_grant_command', admin.token, 'identity.grant_scope', grantRevision(p.member),
+        { member_id: p.member, scope_kind: kind, scope_id: otherId })).code ?? 'done');
+    }
+    const b1Tasks = [];
+    for (let k = 0; k < 27; k += 1) {
+      const r = await envelope('followups_command', admin.token, 'followups.create_task', null, {
+        source_type: 'fixture_followup', source_id: randomUUID(), source_revision: 1, purpose: 'synthetic_check_in',
+        owner_member_id: spare.member, supervisor_member_id: held.member, scope_kind: 'department_leader', scope_id: otherId,
+        next_action: 'SYNTHETIC: phone and check in', due_at: churchTen(churchDate(9 * DAY)) });
+      if (r.data?.task_id) b1Tasks.push(r.data.task_id);
+    }
+    const xRevoke = await envelope('identity_grant_command', admin.token, 'identity.revoke_scope', grantRevision(spare.member),
+      { member_id: spare.member, scope_kind: 'department_deputy', scope_id: otherId });
+    const ownedBy = (memberId) => Number(psql(`select count(*) from app.followups_tasks
+      where task_id in (${b1Tasks.map((t) => `'${t}'`).join(',')}) and owner_member_id = '${memberId}'`));
+    const leftWithX = psql(`select coalesce(string_agg(task_id::text, ','), '') from app.followups_tasks
+      where task_id in (${b1Tasks.map((t) => `'${t}'`).join(',')}) and owner_member_id = '${spare.member}'`).split(',').filter(Boolean);
+    const xOpens = leftWithX.length ? (await rpc('followups_task', spare.token, { p_task_id: leftWithX[0] })).status : null;
+    const waiting = ((await read('followups_admin_routing', admin.token))?.handovers ?? [])
+      .find((h) => h.member_id === spare.member);
+    check('L26-a-revoked-scope-over-the-cap-is-visible-and-closed-to-the-former-owner',
+      b1Grants.every((s) => s === 'done') && b1Tasks.length === 27 && done(xRevoke)
+      && ownedBy(removed.member) >= 20 && ownedBy(removed.member) + leftWithX.length === 27 && leftWithX.length >= 2
+      && xOpens === 403 && waiting?.tasks >= leftWithX.length,
+      { grants: b1Grants, tasks: b1Tasks.length, revoke: xRevoke.code ?? 'done', handed_to_first_holder: ownedBy(removed.member),
+        left_with_former_deputy: leftWithX.length, former_deputy_opens: xOpens, admin_sees_waiting: waiting?.tasks ?? null });
+    // The Admin continues while O (the first candidate) is being deactivated in another connection.
+    const oDeact = heldCall(admin, 'identity_lifecycle_command', 'identity.deactivate_membership', memberRevision(removed.member),
+      { member_id: removed.member, reason_code: 'moved_away' }, 2.5);
+    await pause(600);
+    const more = await envelope('followups_command', admin.token, 'followups.complete_handover', null, { member_id: spare.member });
+    const oHeld = await oDeact;
+    const xOwners = psql(`select coalesce(string_agg(distinct owner_member_id::text, ','), '') from app.followups_tasks
+      where task_id in (${leftWithX.map((t) => `'${t}'`).join(',')})`);
+    check('L27-complete-handover-never-picks-a-member-being-deactivated', done(oHeld) && done(more)
+      && more.data?.handed_over >= leftWithX.length && xOwners === leader.member,
+      { deactivation: oHeld.code ?? 'done', complete_handover: more.code ?? 'done', handed_over: more.data?.handed_over ?? null,
+        new_owner_is_the_next_holder: xOwners === leader.member,
+        never_the_member_being_deactivated: !xOwners.includes(removed.member) });
 
     // ------------------------------------------------------- codes only; tables refused
     const auditCodes = psql(`select coalesce(string_agg(distinct action || ':' || coalesce(code, '-'), ',' order by action || ':' || coalesce(code, '-')), '')

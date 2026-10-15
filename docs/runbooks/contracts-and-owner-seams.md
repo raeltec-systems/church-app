@@ -2,6 +2,8 @@
 
 Migration: `supabase/migrations/20261003134340_cross_epic_contracts.sql`.
 
+The people-facing duties guides built on these seams (leaders, deputies, Admins, duty reminder problems) are in [duties-guides.md](duties-guides.md) (story 4.13).
+
 ## Wire contract v1
 
 - **Fixtures.** `packages/contracts/fixtures/v1/*.json` holds the valid and invalid cases for each kind, with the exact `field_errors` each invalid case must produce. Three implementations must pass them:

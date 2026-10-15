@@ -1,6 +1,8 @@
 # Runbook: assigned duties (epic 4)
 
-Architecture: AD-1, AD-2, AD-4, AD-6, AD-8, AD-14. Owner decisions: `_bmad-output/initiative-church-app/owner-decisions-milestone-2.md` (Q2: Africa/Lusaka, creator-set deadlines, creator-configured reminders, member snooze, no quiet hours; the pilot department is not chosen, so staging uses `SYNTHETIC Preaching Rota`). Related runbooks: [contracts-and-owner-seams.md](contracts-and-owner-seams.md) (owner registry, reminder contracts, deletion hooks), [identity-access.md](identity-access.md) (story 2.3 grants and scope kinds, 2.5 accountless members), [notifications.md](notifications.md) (the inbox, the worker, reminder health).
+Architecture: AD-1, AD-2, AD-4, AD-6, AD-8, AD-14. Owner decisions: `_bmad-output/initiative-church-app/owner-decisions-milestone-2.md` (Q2: Africa/Lusaka, creator-set deadlines, creator-configured reminders, member snooze, no quiet hours; the pilot department is not chosen, so staging uses `SYNTHETIC Preaching Rota`). **Leaders, deputies and Admins:** start with the task-ordered guides in [duties-guides.md](duties-guides.md) (story 4.13): setting up a department, publishing duties and rotas, coverage, contact and Confirmed by leader, outcomes, handover, Admin tasks and duty reminder problems. The sections below are the per-story detail for maintainers.
+
+Related runbooks: [contracts-and-owner-seams.md](contracts-and-owner-seams.md) (owner registry, reminder contracts, deletion hooks), [identity-access.md](identity-access.md) (story 2.3 grants and scope kinds, 2.5 accountless members), [notifications.md](notifications.md) (the inbox, the worker, reminder health).
 
 ## Story 4.1: publish a one-position department duty and accept it on mobile
 
@@ -1197,3 +1199,74 @@ Record the outcome of each step in `evidence-4.12/owner-check.md`: pass or fail,
 - The vacancy notice is cancelled with its key position (when that position is cancelled the notice goes even if other vacancies of the same change remain; the queue still shows them).
 - Released notices to a member removed from a department stay queued if the member is deactivated afterwards (they route to Needs contact).
 - A removal of a member with very many future duties sends one released notice per duty.
+
+## Story 4.13: duties runbooks and the synthetic department pilot
+
+No migration and no client change. Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-write-the-duties-runbooks-and-run-the-synthetic-department-p-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.13/`.
+
+### The guides
+
+[duties-guides.md](duties-guides.md) holds three task-ordered guides in plain language (department leader and deputy; Admin; duty reminder problems) and the owner walkthrough. Each task links back to the story section here. Keep both in step: a story that changes a screen or a rule updates its section here and the guide task that names it.
+
+### The pilot rehearsal (`tools/identity-e2e/duties-pilot.mjs`)
+
+It runs the success-evidence loop (spec `delivery-and-decisions.md`, Success evidence) through the API with `SYNTHETIC Preaching Rota`, an app member M, a second app member O and an accountless member X with a SYNTHETIC household number:
+
+| Step | What it proves |
+|---|---|
+| P10 | a quarterly rota (13 weekly Sundays, Preacher and Reader) is generated; M, X and O are planned; **Publish 26 draft slots** at the church default asks three people and leaves 23 positions unfilled |
+| P20 | reminders are queued (M's answer reminders and the leaders' overdue alert, church-default answer-by) and the worker delivers M's **New duty assigned** (generic text, opens the duty); X is on **Needs contact** |
+| P30 | M accepts and O declines, each with a note; the leader's board shows both; the leaders get **Duty declined** (opens Coverage); M's accepted duty keeps its pre-service reminder |
+| P40 | Coverage shows the gap: unfilled positions, the decline, X awaiting with Needs contact and the labelled household route (leader only) |
+| P50 | a direct contact attempt on X opens the coverage follow-up task |
+| P60 | **Confirmed by leader** for X: provenance `leader` with channel and recorder, the task closes, X's answer reminders stop (only the pre-service reminder stays) |
+| P70 | a short-notice Sunday assignment (a duty three hours ahead with no answer-by time; the server judges Short notice by lead time, not weekday): Short notice, one **New duty assigned** to M, **Short-notice duty** to the leader, Needs contact `short_notice` |
+| P80 | reassignment with no stale reminder: a probe duty for M with a creator reminder due ten minutes before an answer-by time 15 minutes away is given to O at once; when the reminder falls due, O gets **Duty answer needed** (the control) and M gets only **Duty changed** (released), never the reminder; M's old item opens out of date; locally no pending job is stale |
+| P90 | nothing private for a non-leader: M and O get 403 on the board, Coverage and Rota; their My duties hold no leader-only text, no number and not each other's notes; the Admin's Coverage is operational (no route, note, reason or task) and the board hides the confirmation reason; every Inbox item of the run is its fixed generic text |
+| P98, P99 | cleanup through the API (the rota cancelled from its first date, the one-off duties' positions cancelled, M, O and X removed from the department, the leader's scope revoked); nothing of the run is left open |
+
+Fictional numbers: local `+44 7700 900410-900419`; staging `+1 202 555 0166-0168` (personas) and `0159` (X's household route). Leader-only texts start `SYNTHETIC leader-only` so a leak is detectable.
+
+### Local runs
+
+```bash
+npx supabase db reset
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/duties-pilot.mjs --evidence <file>.jsonl                  # about 10 s
+node tools/identity-e2e/duties-pilot.mjs --staging-path --evidence <file>.jsonl   # about 6 min (see below)
+node tools/auth-harness/local-phone-auth.mjs off
+node --test tools/identity-e2e/duties-pilot.test.mjs
+```
+
+- The default local run makes its personas with the local Auth admin route and the synthetic seed link, drives `tools/notifications/worker.mjs run-once` with its own credential (revoked at the end), reads the job tables for the extra checks and moves the P80 reminder forward with SQL (test-only). It deletes everything it created.
+- `--staging-path` takes the staging route against the local stack: personas sign up, apply and are approved by the Admin; no job-table check; P80 waits for the real due time; at the end the staging cleanup SQL is generated and executed, and the run checks it removed the run's rows. Use it after changing the staging branch of the script.
+
+### Against staging (parent session only; never from a builder)
+
+Prerequisites: every 4.x migration on staging, the scheduled worker running (Reminder health fresh), the synthetic Admin `+1 202 555 0150` with its password in a JSON file outside the repository (the 2.14 suite's `STAGING_SUITE_ADMIN`), the staging publishable key. No secret or service-role key, no SQL during the run.
+
+```bash
+DUTIES_PILOT_TARGET=staging \
+STAGING_PUBLISHABLE_KEY=sb_publishable_... \
+STAGING_SUITE_ADMIN=/path/outside/repo/admin.json \
+DUTIES_PILOT_STATE=/path/outside/repo/duties-pilot-state.json \
+node tools/identity-e2e/duties-pilot.mjs --evidence /path/outside/repo/duties-pilot-staging.jsonl \
+  --cleanup-sql /path/outside/repo/duties-pilot-cleanup.sql
+```
+
+- The script refuses any origin but `https://tmurpotfluignacfueki.supabase.co`, any key but an `sb_publishable_` key and any state, Admin or cleanup file inside the repository, before any call.
+- First run: it signs up the three personas (`+1 202 555 0166-0168`), sends their applications and approves them as the synthetic Admin (passwords are written to the state file, mode 0600), and creates X with `identity.create_member`. Later runs reuse them. A persona left on hold or deactivated stops the run with "heal it by hand".
+- `SYNTHETIC Preaching Rota` is used if it exists, otherwise created (the state file remembers that the pilot created it).
+- It waits for the scheduled worker (polling every 15 s, up to 4 minutes per step; P80 waits for the reminder's due time, about 5 minutes). A whole run takes about 10-15 minutes.
+- **Cleanup:** the API cleanup runs at the end, also after a failure (P98). The run's remaining rows (cancelled duties, their jobs, items and follow-up tasks, the ended department memberships of M, O and X, and the department when the pilot created it) are removed by the SQL written to `--cleanup-sql`: run it in the staging SQL editor (or through the connector) after the run. It names only the run's series, occurrences and members, keeps the personas and the Admin, and changes no schema. `--staging-path` proves it locally.
+- Evidence: copy the JSONL (it holds statuses, codes, counts and states only) to `evidence-4.13/` and run `bash tools/auth-harness/scan-evidence.sh` on it.
+
+### Owner walkthrough (HITL, open)
+
+Israel's run-through on the staging web and APK is in [duties-guides.md](duties-guides.md#owner-walkthrough-on-staging-hitl); results go into `evidence-4.13/owner-walkthrough.md`. It is batched to the end of milestone 2.
+
+### Owner questions
+
+- **Q2 (open, unchanged):** the real pilot department and its leaders; the live pilot waits for Israel to name them, and for Q4 for live personal data. This story is the synthetic rehearsal.
+- None new.
+

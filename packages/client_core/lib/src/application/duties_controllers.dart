@@ -123,6 +123,12 @@ enum DutyNotice {
   /// under deletion; no outcome is recorded about them.
   outcomeMemberGone,
 
+  /// Story 4.11: an owner-review mismatch was marked reviewed.
+  reviewCleared,
+
+  /// Story 4.11: someone else marked the review first (reloaded).
+  reviewAlreadyCleared,
+
   /// Story 4.5: "Can't make it anymore" was recorded.
   withdrawn,
 
@@ -163,6 +169,7 @@ class DutyAction {
     required this.function,
     required this.request,
     required this.subject,
+    this.ownerKind,
   });
 
   final String function;
@@ -170,6 +177,11 @@ class DutyAction {
 
   /// What was acted on (display only).
   final String subject;
+
+  /// Story 4.11 (review S3): who owns the member's duty or duties this
+  /// answer is about (null when mixed or not a member's answer), so the
+  /// notice names who sees the answer.
+  final DutyOwnerKind? ownerKind;
 
   String get command => request.command;
 
@@ -318,6 +330,7 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
     Map<String, Object?> payload,
     String subject, {
     String function = DutyCommands.function,
+    DutyOwnerKind? ownerKind,
   }) async {
     if (state.busy) return;
     final u = state.unconfirmed?.request;
@@ -338,6 +351,7 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
           payload: payload,
         ),
         subject: subject,
+        ownerKind: ownerKind,
       ),
     );
   }
@@ -375,6 +389,7 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
               : DutyNotice.positionCancelled,
         DutyOutcomeCommands.recordOutcome => DutyNotice.outcomeRecorded,
         DutyOutcomeCommands.correctOutcome => DutyNotice.outcomeCorrected,
+        DutyCommands.clearReview => DutyNotice.reviewCleared,
         _ =>
           action.request.payload['response'] == DutyResponse.declined.wire
               ? DutyNotice.declined
@@ -427,6 +442,13 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
       if (f['assignment_id'] == 'unrecorded') {
         return DutyNotice.changedElsewhere;
       }
+    }
+    // Story 4.11: a review cleared (or changed) elsewhere reloads the list.
+    if (action?.command == DutyCommands.clearReview &&
+        error.code == ErrorCode.conflict) {
+      return f['flag_id'] == 'cleared'
+          ? DutyNotice.reviewAlreadyCleared
+          : DutyNotice.changedElsewhere;
     }
     return switch (error.code) {
       ErrorCode.conflict when f['assignments'] == 'changed' =>
@@ -624,6 +646,15 @@ class DutyLeaderController extends DutiesController<DutyLeaderBoard> {
     'occurrence_id': duty.occurrenceId,
     'reminders': DutyReminders(reminders).toWire(),
   }, duty.dutyName);
+
+  /// Story 4.11: mark an owner-review mismatch of [duty] reviewed (the duty
+  /// itself does not change).
+  Future<void> clearReview(LeaderDuty duty, DutyReview review) => send(
+    DutyCommands.clearReview,
+    Optional.of(review.revision),
+    {'flag_id': review.flagId},
+    duty.dutyName,
+  );
 }
 
 final dutyLeaderProvider =
@@ -727,6 +758,12 @@ class DutyRotaController extends DutiesController<DutyRota> {
     {'series_id': series.seriesId, 'from_occurrence_id': from.occurrenceId},
     series.dutyName,
   );
+
+  /// Story 4.11: mark an owner-review mismatch of one date reviewed.
+  Future<void> clearReview(RotaOccurrence occurrence, DutyReview review) =>
+      send(DutyCommands.clearReview, Optional.of(review.revision), {
+        'flag_id': review.flagId,
+      }, occurrence.dutyName);
 }
 
 final dutyRotaProvider =
@@ -757,20 +794,32 @@ class MyDutiesController extends DutiesController<MyDuties> {
 
   Future<void> respond(MyDuty duty, DutyResponse response, {String? note}) {
     final n = note?.trim();
-    return send(DutyCommands.respond, Optional.of(duty.revision), {
-      'assignment_id': duty.assignmentId,
-      'response': response.wire,
-      if (n != null && n.isNotEmpty) 'note': n,
-    }, duty.dutyName);
+    return send(
+      DutyCommands.respond,
+      Optional.of(duty.revision),
+      {
+        'assignment_id': duty.assignmentId,
+        'response': response.wire,
+        if (n != null && n.isNotEmpty) 'note': n,
+      },
+      duty.dutyName,
+      ownerKind: duty.ownerKind,
+    );
   }
 
   /// Story 4.5: "Can't make it anymore" for an accepted duty.
   Future<void> withdraw(MyDuty duty, {String? note}) {
     final n = note?.trim();
-    return send(DutyCommands.withdrawAcceptance, Optional.of(duty.revision), {
-      'assignment_id': duty.assignmentId,
-      if (n != null && n.isNotEmpty) 'note': n,
-    }, duty.dutyName);
+    return send(
+      DutyCommands.withdrawAcceptance,
+      Optional.of(duty.revision),
+      {
+        'assignment_id': duty.assignmentId,
+        if (n != null && n.isNotEmpty) 'note': n,
+      },
+      duty.dutyName,
+      ownerKind: duty.ownerKind,
+    );
   }
 
   /// Story 4.5: accept the confirmed selection, all or nothing, each at the
@@ -780,12 +829,20 @@ class MyDutiesController extends DutiesController<MyDuties> {
     if (duties.isEmpty || duties.length > DutyCommands.maxBulk) {
       return Future.value();
     }
-    return send(DutyCommands.acceptMany, const Optional.of(null), {
-      'assignments': [
-        for (final d in duties)
-          {'assignment_id': d.assignmentId, 'revision': d.revision},
-      ],
-    }, duties.length == 1 ? duties.single.dutyName : '${duties.length} duties');
+    return send(
+      DutyCommands.acceptMany,
+      const Optional.of(null),
+      {
+        'assignments': [
+          for (final d in duties)
+            {'assignment_id': d.assignmentId, 'revision': d.revision},
+        ],
+      },
+      duties.length == 1 ? duties.single.dutyName : '${duties.length} duties',
+      ownerKind: duties.every((d) => d.ownerKind == duties.first.ownerKind)
+          ? duties.first.ownerKind
+          : null,
+    );
   }
 }
 

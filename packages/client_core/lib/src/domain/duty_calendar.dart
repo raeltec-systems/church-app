@@ -43,7 +43,11 @@ abstract final class DutyCalendar {
     final start = duty.times.arriveBy;
     final end = duty.times.endsAt ?? duty.times.startsAt.add(defaultLength);
     final description = [
-      'Department: ${duty.departmentName}.',
+      // Story 4.11: a cell programme part names no department.
+      if (duty.departmentName case final d?)
+        'Department: $d.'
+      else
+        'Cell programme part.',
       if (duty.times.reportingAt != null)
         'Report by ${_wallClock(duty.times.reportingAt!)}, starts '
             '${_wallClock(duty.times.startsAt)} (church time).',

@@ -711,6 +711,16 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
               '${o.confirmed} of ${o.required} confirmed',
               key: Key('rota-coverage-$id'),
             ),
+          // Story 4.11: linked programme parts and owner-review mismatches.
+          _OwnerReviews(
+            occurrenceId: id,
+            dutyName: o.dutyName,
+            reviews: o.reviews,
+            linkedParts: o.linkedParts,
+            canClear: widget.department.canManage,
+            busy: widget.busy,
+            onClear: (r) => ctl.clearReview(o, r),
+          ),
           const SizedBox(height: 8),
           for (final p in o.positions) _positionRow(context, o, p, manage),
           if (manage && o.state == RotaState.published)

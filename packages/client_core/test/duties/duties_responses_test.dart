@@ -170,7 +170,7 @@ void main() {
       }
     });
 
-    test('only a department-owned duty can be answered (fail closed)', () {
+    test('a department duty or a cell part can be answered (fail closed)', () {
       final now = DateTime.utc(2099, 1, 1);
       final dept = MyDuty.fromJson(myDutyData());
       expect(dept.ownerKind, DutyOwnerKind.department);
@@ -180,7 +180,11 @@ void main() {
         MyDuty.fromJson({...myDutyData()}..remove('owner_kind')).answerable,
         isTrue,
       );
-      for (final kind in ['cell', 'care']) {
+      // Story 4.11: a cell programme part is answered like a department duty.
+      final cell = MyDuty.fromJson(myDutyData(ownerKind: 'cell'));
+      expect(cell.answerable, isTrue);
+      expect(cell.needsResponse(now), isTrue);
+      for (final kind in ['care']) {
         final d = MyDuty.fromJson(myDutyData(ownerKind: kind));
         expect(d.answerable, isFalse, reason: kind);
         expect(d.needsResponse(now), isFalse, reason: kind);

@@ -256,7 +256,7 @@ select is((select string_agg(reminder_kind || ':' || job_state, ',') from app.no
 select ok((select r::text not like '%SYNTHETIC: M agreed%' from d1), 'the reason is not in the answer (receipts stay content-free)');
 select is((select string_agg(a ->> 'response', ',' order by a ->> 'starts_at')
              from jsonb_array_elements(pg_temp.readj(4, 'select api.duties_my_duties()') -> 'assignments') a),
-  'pending,pending', 'M still chooses: both duties await M''s answer (the cell part is not listed yet)');
+  'pending,pending,pending', 'M still chooses: every duty awaits M''s answer (story 4.11: the cell part is listed too)');
 select ok(pg_temp.readj(4, 'select api.duties_my_duties()')::text not like '%SYNTHETIC: M agreed%',
   'the member never sees the leader''s reason');
 

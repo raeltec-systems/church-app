@@ -747,7 +747,8 @@ class FakeContactLauncher implements ContactLauncher {
 
 /// The wire form of one of the member's duties (stories 4.1, 4.2; 4.5 adds
 /// the slot id, the owner kind, the earlier acceptance and the leader
-/// names; 4.8 keys go in [extra]).
+/// names; 4.8 keys go in [extra]). Story 4.11: a `cell` owner kind is a cell
+/// programme part (its cell, no department).
 Map<String, Object?> myDutyData({
   String assignmentId = '42424242-4242-4242-8242-424242424242',
   int revision = 1,
@@ -779,8 +780,11 @@ Map<String, Object?> myDutyData({
   'occurrence_id': '43434343-4343-4343-8343-434343434343',
   'slot_id': slotId,
   'owner_kind': ownerKind,
-  'department_id': '44444444-4444-4444-8444-444444444444',
-  'department_name': 'SYNTHETIC Preaching Rota',
+  'department_id': ownerKind == 'cell'
+      ? null
+      : '44444444-4444-4444-8444-444444444444',
+  'department_name': ownerKind == 'cell' ? null : 'SYNTHETIC Preaching Rota',
+  if (ownerKind == 'cell') 'cell_id': '47474747-4747-4747-8747-474747474747',
   'duty_name': dutyName,
   'position_name': positionName,
   'starts_at': startsAt,

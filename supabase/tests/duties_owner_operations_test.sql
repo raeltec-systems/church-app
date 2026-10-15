@@ -12,7 +12,7 @@
 -- part times are fixed church-time (Africa/Lusaka) clock times on whole days, never the current
 -- clock time.
 begin;
-select plan(148);
+select plan(167);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-00000041a1' || lpad(n::text, 2, '0'))::uuid $$;
@@ -720,6 +720,98 @@ select is((select p ->> 'position_key' || ':' || (p #>> '{assignment,needs_conta
                     'source_type', 'fixture_programme_part', 'source_id', (select (r ->> 'part_id')::uuid from p4),
                     'cell_id', pg_temp.cell())) -> 'positions') p), 'welcome:true',
   'the cell sees that X needs direct contact (never why)');
+
+-- Review fixes (independent review of 4.11) ----------------------------------------------------------
+-- S1: a part belongs to its cell; another cell's leader naming their own cell finds nothing.
+create temp table pc as select pg_temp.fx(6, 'fixture_programme_publish', jsonb_build_object(
+  'cell_id', pg_temp.cell(), 'duty_name', 'SYNTHETIC C1 part',
+  'starts_at', app.cmd_utc(pg_temp.at(11, '18:00')),
+  'positions', jsonb_build_array(jsonb_build_object('position_key', 'host', 'member_id', pg_temp.mid(4))))) as r;
+create function pg_temp.pc() returns uuid language sql as $$ select (r ->> 'part_id')::uuid from pc $$;
+create function pg_temp.pcrev() returns bigint language sql as
+$$ select revision from app.fixture_programme_parts where part_id = pg_temp.pc() $$;
+select is(pg_temp.err(pg_temp.fx(10, 'duties_owner_put_part', jsonb_build_object(
+    'source_type', 'fixture_programme_part', 'source_id', pg_temp.pc(), 'source_revision', pg_temp.pcrev(),
+    'cell_id', pg_temp.cell2(), 'expected_revision', pg_temp.orev((select (r ->> 'occurrence_id')::uuid from pc)),
+    'duty_name', 'SYNTHETIC taken over', 'starts_at', app.cmd_utc(pg_temp.at(11, '18:00')),
+    'positions', '[{"position_key": "host"}]'::jsonb))), 'not_found',
+  'review S1: another cell''s leader cannot revise a cell''s part by naming their own cell');
+select is(pg_temp.err(pg_temp.fx(10, 'duties_owner_link_duty', jsonb_build_object(
+    'source_type', 'fixture_programme_part', 'source_id', pg_temp.pc(), 'source_revision', pg_temp.pcrev(),
+    'cell_id', pg_temp.cell2(), 'position_key', 'other', 'slot_id', pg_temp.dslot()))), 'not_found',
+  'review S1: nor link a position of it');
+select is((select count(*)::int || '|' || bool_and(cell_id = pg_temp.cell()) from app.duties_part_links
+            where source_id = pg_temp.pc()), '1|true', 'the part and its links stay with its own cell');
+select is((select duty_name from app.duties_occurrences where occurrence_id = (select (r ->> 'occurrence_id')::uuid from pc)),
+  'SYNTHETIC C1 part', 'and its occurrence is unchanged');
+
+-- S4: accepting, then withdrawing a cell part.
+create function pg_temp.pca() returns app.duties_assignments language sql as
+$$ select pg_temp.cur(pg_temp.slot_of(pg_temp.pc(), 'host')) $$;
+select is(pg_temp.duties(4, 'duties.respond', (pg_temp.pca()).revision,
+            jsonb_build_object('assignment_id', (pg_temp.pca()).assignment_id, 'response', 'accepted')) #>> '{data,response}',
+  'accepted', 'review S4: M accepts the cell part');
+select is(pg_temp.jobs((pg_temp.pca()).assignment_id, array['duty_starting']), 'duty_starting:pending',
+  'its pre-service reminder is planned');
+select is(pg_temp.duties(4, 'duties.withdraw_acceptance', (pg_temp.pca()).revision,
+            jsonb_build_object('assignment_id', (pg_temp.pca()).assignment_id,
+                               'note', 'SYNTHETIC private withdrawal note')) #>> '{data,response}',
+  'declined', 'M says they can''t make it anymore');
+select is(pg_temp.jobs((pg_temp.pca()).assignment_id, array['duty_starting']), 'duty_starting:cancelled',
+  'the pre-service reminder is cancelled');
+select is((select count(*)::int from app.notifications_jobs
+            where source_type = 'duties_coverage' and source_id = (pg_temp.pca()).assignment_id), 0,
+  'no leader alert is raised for a cell part');
+select ok(pg_temp.fx(6, 'duties_owner_part', jsonb_build_object('source_type', 'fixture_programme_part',
+            'source_id', pg_temp.pc(), 'cell_id', pg_temp.cell()))::text not like '%private withdrawal%',
+  'the cell sees the answer, never the member''s note');
+select is((select p #>> '{assignment,response}' from jsonb_array_elements(pg_temp.fx(6, 'duties_owner_part',
+             jsonb_build_object('source_type', 'fixture_programme_part', 'source_id', pg_temp.pc(),
+                                'cell_id', pg_temp.cell())) -> 'positions') p), 'declined',
+  'it sees Declined');
+
+-- N1, N2, N3.
+select is(pg_temp.err(pg_temp.fx(6, 'fixture_programme_publish', jsonb_build_object(
+    'cell_id', pg_temp.cell(), 'duty_name', 'SYNTHETIC nobody asked', 'starts_at', app.cmd_utc(pg_temp.at(12, '18:00')),
+    'response_deadline', app.cmd_utc(pg_temp.at(11, '18:00')),
+    'positions', '[{"position_key": "gap"}]'::jsonb))), 'validation_failed|response_deadline=not_material',
+  'review N1: a create that asks nobody refuses an answer-by');
+select is((pg_temp.put(6, pg_temp.pc(), jsonb_build_object(
+    'expected_revision', pg_temp.orev((select (r ->> 'occurrence_id')::uuid from pc)), 'duty_name', 'SYNTHETIC C1 part',
+    'starts_at', app.cmd_utc(pg_temp.at(11, '18:00')),
+    'positions', jsonb_build_array(jsonb_build_object('position_key', 'host', 'member_id', pg_temp.mid(4))))) ->> 'changed'),
+  'false', 'review N2: an identical put changes nothing');
+select is((select source_revision from app.duties_part_links where source_id = pg_temp.pc() and position_key = 'host'),
+  pg_temp.pcrev(), 'and the link still records the caller''s latest part revision');
+select is(pg_temp.err(pg_temp.fx(6, 'duties_owner_conflicts', jsonb_build_object(
+    'cell_id', pg_temp.cell(), 'member_id', pg_temp.mid(4),
+    'starts_at', app.cmd_utc(pg_temp.at(1, '18:00')), 'ends_at', app.cmd_utc(pg_temp.at(200, '18:00'))))),
+  'validation_failed|ends_at=out_of_range', 'review N3: the conflicts read covers one part''s time, at most 120 days');
+
+-- N5: a review of a duty that started is no longer open.
+create temp table dn as select pg_temp.duties(2, 'duties.publish_duty', null, jsonb_build_object(
+  'department_id', pg_temp.d(), 'member_id', pg_temp.mid(11), 'duty_name', 'SYNTHETIC Morning ushering',
+  'starts_at', app.cmd_utc(pg_temp.at(12, '07:00')))) as r;
+insert into app.duties_review_flags (occurrence_id, source_type, source_id, source_revision, changed,
+                                     flagged_by_member, flagged_by_account)
+select (r #>> '{data,occurrence_id}')::uuid, 'fixture_event', pg_temp.ev(), 1, '{time}', pg_temp.mid(1), pg_temp.u(1) from dn;
+select is(jsonb_array_length(app.duties_review_json((select (r #>> '{data,occurrence_id}')::uuid from dn))), 1,
+  'review N5: an open review of an upcoming duty shows');
+update app.duties_occurrences set starts_at = pg_temp.at(-1, '07:00')
+ where occurrence_id = (select (r #>> '{data,occurrence_id}')::uuid from dn);
+select is(app.duties_review_json((select (r #>> '{data,occurrence_id}')::uuid from dn)), '[]'::jsonb,
+  'once the duty has started it no longer shows as open');
+
+-- N7: only the foreign-key cascade removes a link.
+create temp table pz as select pg_temp.fx(6, 'fixture_programme_publish', jsonb_build_object(
+  'cell_id', pg_temp.cell(), 'duty_name', 'SYNTHETIC cascade part', 'starts_at', app.cmd_utc(pg_temp.at(12, '19:00')),
+  'positions', '[{"position_key": "gap"}]'::jsonb)) as r;
+select throws_ok(format('delete from app.duties_part_links where source_id = %L', (select r ->> 'part_id' from pz)),
+  'P0001', 'duties part links are permanent', 'review N7: a direct delete is still refused');
+delete from app.duties_slot_revisions where slot_id = pg_temp.slot_of((select (r ->> 'part_id')::uuid from pz), 'gap');
+delete from app.duties_slots where slot_id = pg_temp.slot_of((select (r ->> 'part_id')::uuid from pz), 'gap');
+select is((select count(*)::int from app.duties_part_links where source_id = (select (r ->> 'part_id')::uuid from pz)), 0,
+  'the cascade from its slot removes it');
 
 -- Privileges, guards, vocabulary ------------------------------------------------------------------------
 select is((select count(*)::int from information_schema.routine_privileges

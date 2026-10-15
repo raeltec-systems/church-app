@@ -7,7 +7,7 @@
 -- duties_owner_operations_test.sql). Every account, phone and name is SYNTHETIC (fictional range
 -- +44 7700 900160-900169). Duty times are whole church days at fixed clock times.
 begin;
-select plan(12);
+select plan(13);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-00000041b1' || lpad(n::text, 2, '0'))::uuid $$;
@@ -175,12 +175,14 @@ select is((select r ->> 'overrides_recorded' from part), '10',
 select is((select r ->> 'overrides_recorded' from revised), '10', 'a material change asks all ten again');
 select is((select jsonb_array_length(r -> 'positions') from ownread), 10, 'the owner reads all ten positions');
 select is((select jsonb_array_length(r -> 'assignments') from mine), 200, 'M sees 200 cell parts in My duties');
-select ok(pg_temp.ms((select t from t0), (select t from t1)) < 3000, 'flagging 400 duties is well inside the timeout');
-select ok(pg_temp.ms((select t from t1), (select t from t2)) < 3000, 'the event links read is well inside the timeout');
-select ok(pg_temp.ms((select t from t2), (select t from t3)) < 3000, 'the board with 400 open reviews is well inside the timeout');
-select ok(pg_temp.ms((select t from t3), (select t from t5)) < 6000,
-  'creating and revising the ten-position part over 4,000 commitments is well inside the timeout');
-select ok(pg_temp.ms((select t from t5), (select t from t7)) < 3000, 'the owner read and My duties are well inside the timeout');
+select ok(pg_temp.ms((select t from t0), (select t from t1)) < 2000, 'flagging 400 duties is well inside the timeout');
+select ok(pg_temp.ms((select t from t1), (select t from t2)) < 2000, 'the event links read is well inside the timeout');
+select ok(pg_temp.ms((select t from t2), (select t from t3)) < 2000, 'the board with 400 open reviews is well inside the timeout');
+select ok(pg_temp.ms((select t from t3), (select t from t4)) < 2000,
+  'creating the ten-position part over 4,000 commitments is well inside the timeout');
+select ok(pg_temp.ms((select t from t4), (select t from t5)) < 2000,
+  'revising it (all ten asked again) is well inside the timeout');
+select ok(pg_temp.ms((select t from t5), (select t from t7)) < 2000, 'the owner read and My duties are well inside the timeout');
 select diag('timings (ms): flag 400 = ' || pg_temp.ms((select t from t0), (select t from t1))
             || ', event links = ' || pg_temp.ms((select t from t1), (select t from t2))
             || ', board = ' || pg_temp.ms((select t from t2), (select t from t3))

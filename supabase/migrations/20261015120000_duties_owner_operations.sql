@@ -50,6 +50,17 @@
 -- Gates: the Q4 personal-data gate on every operation and read; Q2 through the Notifications
 -- calls (production stays inert).
 --
+-- Review fixes (independent review of 4.11, 2026-10-15; this migration was unmerged and unapplied,
+-- so it is amended in place):
+--   S1 a part belongs to the cell its first link named (app.duties_owner_part_cell_ok): put_part
+--      and link_duty answer not_found when another cell is named for it.
+--   N1 put_part refuses an answer-by on a create that asks nobody (`not_material`).
+--   N2 an identical put still records the caller's latest part revision on the links.
+--   N3 the conflicts read covers at most 120 days.
+--   N5 a review of a duty that started or was cancelled no longer shows as open.
+--   N7 the link guard lets a delete pass only when the parent slot or occurrence is gone (the
+--      foreign-key cascade).
+--
 -- Replaced bodies (each copied from its latest version, keeping every earlier review fix; changes
 -- are marked "Story 4.11"):
 --   from 20261015002121 (4.10): duties_state_ok, duties_authorize_command, duties_command,
@@ -208,8 +219,9 @@ revoke all on table app.duties_part_links from public, anon, authenticated, serv
 
 -- Links never change, except that a display link ends once, the caller's part revision moves
 -- forward and erasure anonymises the actors.
--- A direct DELETE is refused; only the cascade from the slot or occurrence (the local test
--- clean-ups) may remove a row.
+-- A direct DELETE is refused; only the foreign-key cascade from the slot or occurrence (the local
+-- test clean-ups) may remove a row: the delete passes only when that parent row is already gone
+-- (review N7).
 create function app.duties_part_link_guard()
 returns trigger
 language plpgsql
@@ -219,7 +231,8 @@ declare
   v_nil constant uuid := '00000000-0000-0000-0000-000000000000';
 begin
   if tg_op = 'DELETE' then
-    if pg_catalog.pg_trigger_depth() > 1 then
+    if not exists (select 1 from app.duties_slots s where s.slot_id = old.slot_id)
+       or not exists (select 1 from app.duties_occurrences o where o.occurrence_id = old.occurrence_id) then
       return old;
     end if;
     raise exception using errcode = 'P0001', message = 'duties part links are permanent';
@@ -433,6 +446,19 @@ begin
   end if;
   return v_ref;
 end;
+$$;
+
+-- Review S1: a part belongs to the cell its first link named. Another cell's leader naming
+-- their own cell for it finds nothing (not_found), so no part can be taken over.
+create function app.duties_owner_part_cell_ok(p_source_type text, p_source_id uuid, p_cell_id uuid)
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select not exists (select 1 from app.duties_part_links l
+                      where l.source_type = p_source_type and l.source_id = p_source_id
+                        and l.cell_id is distinct from p_cell_id);
 $$;
 
 -- The part's positions from the input, in input order, or field errors.
@@ -796,6 +822,9 @@ begin
   v_source_id := (v_ref ->> 'source_id')::uuid;
   v_source_revision := (v_ref ->> 'source_revision')::numeric::bigint;
   v_n := cardinality(v_pos.keys);
+  if not app.duties_owner_part_cell_ok(v_source_type, v_source_id, v_cell) then
+    perform app.cmd_fail('not_found');
+  end if;
 
   select l.occurrence_id into v_occ_id from app.duties_part_links l
    where l.source_type = v_source_type and l.source_id = v_source_id and l.link_kind = 'owned'
@@ -813,6 +842,11 @@ begin
      order by l.position_key limit 1;
     if v_key is not null then
       perform app.cmd_fail('conflict', jsonb_build_object('position:' || v_key, 'linked'));
+    end if;
+    -- Review N1: an answer-by with nobody to ask is refused, as on a revise (4.2 rule).
+    if v_deadline is not null
+       and not exists (select 1 from unnest(v_pos.members) x where x is not null) then
+      perform app.cmd_fail('validation_failed', '{"response_deadline": "not_material"}');
     end if;
     perform app.duties_lock_members(v_pos.members);
     v_errors := '{}'::jsonb;
@@ -987,6 +1021,10 @@ begin
       perform app.cmd_fail('validation_failed', '{"response_deadline": "not_material"}');
     end if;
     if not v_changed_any then
+      -- Review N2: the links still remember the caller's latest part revision.
+      update app.duties_part_links l set source_revision = v_source_revision
+       where l.source_type = v_source_type and l.source_id = v_source_id and l.link_kind = 'owned'
+         and l.source_revision < v_source_revision;
       return jsonb_build_object('created', false, 'changed', false, 'notices_queued', 0,
                                 'overrides_recorded', 0)
              || app.duties_owner_part_answer(v_source_type, v_source_id, v_occ_id);
@@ -1234,6 +1272,9 @@ begin
   perform app.duties_require_open();
   select s.* into v_actor from app.duties_owner_session(v_cell) s;
   v_ref := app.duties_owner_source(p_input, 'cell_part');
+  if not app.duties_owner_part_cell_ok(v_ref ->> 'source_type', (v_ref ->> 'source_id')::uuid, v_cell) then
+    perform app.cmd_fail('not_found');
+  end if;
   select o.occurrence_id, o.department_id, o.series_id into v_target
     from app.duties_slots s join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
    where s.slot_id = v_slot_id;
@@ -1574,6 +1615,12 @@ begin
   if v_errors = '{}'::jsonb and v_reporting is not null and v_reporting > v_starts then
     v_errors := '{"reporting_at": "after_start"}';
   end if;
+  -- Review N3: one part's time, not a member's calendar: at most 120 days.
+  if v_errors = '{}'::jsonb
+     and upper(app.duties_busy_range_of(v_starts, v_ends, v_reporting))
+         - lower(app.duties_busy_range_of(v_starts, v_ends, v_reporting)) > interval '120 days' then
+    v_errors := '{"ends_at": "out_of_range"}';
+  end if;
   if v_errors <> '{}'::jsonb then
     perform app.cmd_fail('validation_failed', v_errors);
   end if;
@@ -1802,7 +1849,10 @@ as $$
          order by f.flagged_at, f.flag_id), '[]'::jsonb)
     from app.duties_review_flags f
     join app.duties_link_sources s on s.source_type = f.source_type
-   where f.occurrence_id = p_occurrence_id and f.cleared_at is null;
+    join app.duties_occurrences o on o.occurrence_id = f.occurrence_id
+   where f.occurrence_id = p_occurrence_id and f.cleared_at is null
+     -- Review N5: a review of a duty that started or was cancelled is no longer open.
+     and o.occurrence_state = 'published' and app.duties_occurrence_start(o) > now();
 $$;
 
 -- How many programme parts display-link the occurrence's positions now.
@@ -3500,6 +3550,7 @@ revoke all on function
   app.duties_position_key_error(jsonb),
   app.duties_owner_session(uuid),
   app.duties_owner_source(jsonb, text),
+  app.duties_owner_part_cell_ok(text, uuid, uuid),
   app.duties_owner_positions(jsonb),
   app.duties_owner_cancel_slot(app.duties_occurrences, uuid, uuid, uuid, text, text),
   app.duties_owner_positions_json(text, uuid),

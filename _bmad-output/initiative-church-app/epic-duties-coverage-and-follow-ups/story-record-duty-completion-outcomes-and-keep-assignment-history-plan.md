@@ -93,11 +93,35 @@ context:
 - Matrix audit: Record (pgTAP recording block; E2E O20; widget "record an outcome"), Unrecorded (pgTAP "passing time" block with the worker run; E2E O10; widget "Not recorded"), Declined (pgTAP; E2E O21; widget "no No-show chip"), Cancelled accepted (pgTAP; E2E O22), Correct (pgTAP corrections block incl. stale, reason, unchanged, append-only trigger; E2E O30; widget correction), Own / others (pgTAP who-may-record and privacy sweep over every Duties read; E2E O31, O40; widget own duty), History (pgTAP history block; E2E O40; widget history). All ran and passed (see Verification).
 - Fictional numbers: pgTAP +44 7700 900130-900139, E2E 900140-900149 (grepped: no earlier suite uses them). Tests use fixed church-time clock times on whole days (coordinator's note on 3f8e1bf).
 - Open owner questions: none new. Q4 (production personal data) stays the fail-closed default: every outcome read and command is behind the Q4 gate.
+- Review amendments (independent review, 2026-10-14; the migration was unmerged and unapplied, so `20261014231512_duties_outcomes.sql` was amended in place; the frozen block is unchanged):
+  - Decision S1 (erasure race): `duties_erase_member` first locks, in the commands' AD-2 order, the departments and series the member created, then the occurrences they created or hold a position in, then their assignments, all `FOR UPDATE`. It then clears outcome notes, correction reasons and 4.9 contact-attempt notes by the captured assignment ids. `duties_lock_for_outcome` refuses an assignee who is no longer active or is under deletion with `validation_failed {"member_id": "inactive"}`, as `confirm_by_leader` does. Tests: pgTAP refusal for record and correct; two-session probe `evidence-4.10/erase-race-probe.txt` (the erase waited about 2.1 s, then cleared the note; remaining 0). `_remaining` is unchanged: once erase holds the locks no outcome text can be committed after the clear, so counting by member id stays correct within the erase transaction.
+  - Decision S2 (window): the client always sends both dates. Without From, the window ends at church today and reaches back `days - 1`; with From, it ends `days - 1` later or at today, whichever is sooner. A From after today is refused in the form ("Must not be after today"). Tests: `OutcomesQuery.toParams(now:)` cases, plus widget tests for the shown From with 31 days and for From cleared.
+  - Decision N1: the history summary reads "N past duties assigned".
+  - Decision N2: an erased assignee (nil id) gets no record, correct or history action, and shows "This member's record was removed". The refusals `member_id: erased | inactive` map to the notice `outcomeMemberGone` ("No longer a member").
+  - Decision N3: the guard trigger now also runs before insert and delete. An insert must name the same assignment's previous revision, and a direct DELETE is refused; only the cascade from the assignment (`pg_trigger_depth() > 1`) may remove a row. The E2E clean-up no longer deletes outcomes directly. This exception is documented in the runbook.
+  - Decision N4 (tests added):
+    - pgTAP: a revoked deputy (`not_found`); a deputy on hold (`forbidden`); exact codes for Pastor, member and another member (`not_found`, from the kernel's no-disclosure rule); an Admin who also holds the deputy scope (recorded, audited as `department_deputy`); a replay (same receipt, no second row); an unfilled started position (`unfilled` 1, listed without an assignment); the guard's insert and delete refusals.
+    - Scale: a consecutive walk of M's 8 history pages with the cursor each page hands out (784 rows, no repeats, every page under 0.1 s).
+    - Flutter: Not sent and Check again for an outcome command (same request id and body).
+  - Decision N5: both new reads check the Q4 gate before the caller's grants (4.9's reads are unchanged). The erase hook's `comment on function` is replaced so it names stories 4.1-4.10; the 4.9 comment had not been carried over. The function name `app.duties_outcomes` still equals the table name; it is kept, because a rename touches the API name.
+  - Decision N6: the history paging buttons are wrapped in `FocusRing`.
+  - Fictional numbers: pgTAP also uses +44 7700 900151-900153 for the three added users (900130-900139 were all in use; grepped free).
 - Remaining (not builder steps): staging apply of `20261014231512_duties_outcomes.sql` and per-function md5 parity (parent; no owner SQL paste; no Edge Function redeploy); rebuild the staging staff web and APK; owner manual checks in `docs/runbooks/duties.md`, story 4.10 (record in `evidence-4.10/owner-check.md`).
 
 ## Plan Change Log
 
+- 2026-10-14: independent review amendments S1, S2, N1-N6 applied to the unmerged migration, clients, tests, E2E clean-up and runbook. They are recorded under Implementation Notes, "Review amendments". The frozen block is unchanged.
+
 ## Review Triage Log
+
+- S1 (should, erasure race leaves outcome text): fixed (locks in AD-2 order, then clear by the captured ids; `inactive` refusal; pgTAP and a two-session probe).
+- S2 (should, the 31-day window reached past today): fixed (the window is bounded by church today; both dates are sent; client tests).
+- N1 (summary copy): fixed.
+- N2 (erased assignee actions): fixed (actions hidden; notice).
+- N3 (guard gaps): fixed (insert-chain check; direct delete refused, cascade allowed).
+- N4 (test gaps): added (revoked, held, exact codes, Admin with scope, replay, page walk, unfilled count, Not sent / Check again).
+- N5 (gate order, comment, name clash): gate first in the new reads; erase hook comment fixed; name clash kept and noted.
+- N6 (FocusRing on paging): fixed.
 
 ## Verification
 
@@ -108,7 +132,15 @@ context:
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/staff`, `apps/mobile`; `TZ=America/New_York` for `test/duties` and mobile -- expected: pass.
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/main && npm run -s ci:function-imports`; evidence scan -- expected: clean.
 
-**Results (2026-10-14):**
+**Results after the review fixes (2026-10-15):**
+- db reset 0; db:test PASS (39 files, 3374 tests; `duties_outcomes_test.sql` 138, `duties_outcomes_scale_test.sql` 16: member history 36-52 ms, a walk of all 8 pages at most 56 ms a page, leader's fortnight 427 ms, 31 days 375 ms); db:smoke pass.
+- Every E2E `exit=0` (27 scripts, reset before each, one at a time; `duties-outcomes` 11/11).
+- contracts:test 242/0; node tool tests (CI set) 211/0; ci:policy-test 56/0.
+- flutter analyze clean in client_core, apps/staff, apps/mobile; flutter test client_core 611 (`duties_outcomes_test.dart` 19), apps/staff 40, apps/mobile 55; under `TZ=America/New_York` client_core `test/duties` + `test/followups` 183 and apps/mobile 55.
+- ci:secrets clean; ci:migrations (`--base origin/main`) ordered, unique, non-destructive; ci:function-imports ok; evidence scan clean.
+- S1 probe: `evidence-4.10/erase-race-probe.txt`.
+
+**Results of the first build (2026-10-14):**
 - db reset 0; db:test PASS (39 files, 3358 tests; `duties_outcomes_test.sql` 126, `duties_outcomes_scale_test.sql` 12: member history 33-44 ms, leader's fortnight 336 ms, 31 days 267 ms under `statement_timeout = '8s'`); passed after a reset three times; db:smoke pass.
 - Every E2E `exit=0` (27 scripts, reset before each, one at a time; `duties-outcomes` 11/11) (`evidence-4.10/e2e-suite-summary.txt`).
 - contracts:test 242/0; node tool tests (CI set) 211/0; ci:policy-test 56/0.

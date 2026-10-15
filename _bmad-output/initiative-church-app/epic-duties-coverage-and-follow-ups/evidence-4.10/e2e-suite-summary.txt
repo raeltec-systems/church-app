@@ -1,4 +1,4 @@
-# Story 4.10 (2026-10-14); reset before each script, run one at a time
+# Story 4.10 after the independent review fixes (2026-10-15); reset before each script, run one at a time
 run exit=0
 grants exit=0
 apply exit=0 27/27 checks passed

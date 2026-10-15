@@ -105,8 +105,8 @@ Content-Type: application/json
 - `site_url`: the production staff web origin. `uri_allow_list`: append (never replace)
   `zm.bickafue.mobile://callback/auth/recovery,zm.bickafue.mobile://callback/auth/email-confirmed`
   and, if staff web is on another host than `site_url`, `https://<staff host>/**`.
-- Password policy and Auth rate limits: set only the values the owner approved for gate G3/G4
-  (below); otherwise leave Supabase's defaults (the clients already require 8-72 bytes).
+- Password policy and Auth rate limits: set the values the owner approved for gate G4 (below:
+  minimum 8, no character rules, the G4 rate limits); the clients already require 8-72 bytes.
 - Email: leave the built-in sender until gate G1 is approved. With G1 closed no flow needs email.
 
 ### 4. Edge Functions (owner or parent session; the promote workflow has no function step yet)
@@ -136,15 +136,37 @@ that this table does not name.**
 |---|---|---|---|
 | G1 | Email sender / SMTP and the send-email hook (Q1; owner decision 2026-10-07 #2) | Owner creates the sender account (e.g. Resend) and its domain, sets Auth **SMTP** in the dashboard (Authentication → Emails → SMTP settings). The send-email hook that makes `/recover` answers identical for registered and unknown addresses is **not built yet** (deferred-work entry from 2.14); build, test and deploy it before approving G2. | Built-in sender, not used by any production flow; email recovery stays closed by G2. |
 | G2 | `q1_auth_recovery` (Q1: recovery owners, the tested assisted procedure, email recovery) | After G1 and the named reviewers: `select app.policy_approve('q1_auth_recovery', '{"email_recovery": true, "assisted_procedure": "identity-support.md RB4", "reviewers": ["<names>"]}', 'israel', '<decision note>');` | Recovery email proposals and approvals answer `unavailable {"policy": "gate_closed"}`; the reset gate refuses every recovery link; the assisted-recovery function answers `closed`/`unavailable`; staff web **Account recovery** shows `accepting: false`. |
-| G3 | Dormancy period (Q1) | Needs an approved `app.identity_settings` row (`dormancy_days`, `source = 'approved'`). There is **no operator function** for it yet: add a reviewed migration (or operator function) that inserts version 2 with the owner's value and decision label, promoted like any migration. | No approved row: the predicate answers `unavailable` to every member (fail closed). |
-| G4 | Password and abuse policy (Q1) | Auth: `password_min_length` (and required characters) and Auth rate limits for sign-in/sign-up/token refresh by Management API `PATCH .../config/auth`; leaked-password protection needs a paid plan. The assisted-recovery limits are already decided (10/client/10 min, 5/number/h, 120/church/10 min). | Supabase defaults; clients still require 8-72 bytes. No member access exists while G3/G5 are closed. |
+| G3 | Dormancy period (Q1) | **Owner decision (2026-10-15): 180 days.** After the database step (story 4.16 adds the operator function), the restricted operator runs once in the production SQL editor: `select app.identity_approve_setting('dormancy_days', '{"days": 180}', 'israel', 'Owner decision 2026-10-15: dormancy 180 days (Q1 G3)');` It answers the new version (`2`: version 1 is the labelled fixture row every database carries, never honoured in production) and is audited `church_setting_approved` with `setting = 'dormancy_days'`. Check: `select app.identity_setting('dormancy_days');` is `{"days": 180}`. No migration approves it. | No approved row: the predicate answers `unavailable` to every member (fail closed). |
+| G4 | Password and abuse policy (Q1) | **Owner decision (2026-10-15): minimum 8 characters, no character-class rules; abuse limits tightened modestly; leaked-password protection not bought.** Management API `GET` then `PATCH .../config/auth` with every other field unchanged: `password_min_length: 8`, `password_required_characters: ""` and the rate limits in **G4 Auth rate limits** below. The assisted-recovery limits are already decided (10/client/10 min, 5/number/h, 120/church/10 min). | Supabase defaults; clients still require 8-72 bytes. No member access exists while G3/G5 are closed. |
 | G5 | Live personal data `q4_personal_data` (Q4: privacy notice wording, youth/contact safeguards) | Approve the privacy notice (a new version needs a migration and client text), then `select app.policy_approve('q4_personal_data', '{"privacy_notice": "<version>"}', 'israel', '<decision note>');` | Applications closed (`accepting_applications: false`), chooser lists nothing, Cells reads/commands `unavailable`; only `SYNTHETIC` names and fictional numbers would be accepted, and synthetic seeding refuses production. |
 | G6 | Deletion retention `identity_deletion_retention` (Q4: retention and backup periods) | Owner approves what is erased/anonymised and journal/backup retention, chooses the production journal and object store (backup-and-restore.md), then `select app.policy_approve('identity_deletion_retention', '{"retention": "<decision>"}', 'israel', '<note>');`, registers the deletion worker's production credential and schedules the worker. | Deletion requests still end access at once; the Auth and erase steps wait (`policy_gate_closed`); staff web **Member deletions** shows `accepting: false`. |
 | G7 | System route `ops_system_access` (1.9) | `select app.policy_approve('ops_system_access', '{"commands": [...]}', 'israel', '<note>');`, then mint and register the two production credentials (assisted recovery, deletion worker) per system-access-and-operations.md; set the function secret. | Both Edge Functions answer `unavailable`. |
 | G8 | First real Admin (Q1 approval owners) | **Open question below.** | No usable Admin: no staff screen works; nothing can be approved. |
 | G9 | `private_access` / `outbound_sending` (release) | `private_access`: not approved in this package. `outbound_sending`: `select app.policy_approve('outbound_sending', '{"environment": "production"}', 'israel', '<note>');` only when the owner activates production push (`notifications.md`, Story 3.8). | Closed; promotions verify `private_access` closed and `outbound_sending` closed unless approved for production. |
 | G10 | Church settings: `operational_contact` (Q1), `lead_pastor_designation` (Q4) | `select app.identity_approve_church_setting('operational_contact', '{"route": "<church office route>"}', 'israel', '<note>');`; the lead pastor only after Q4 (`app.identity_designate_lead_pastor`). | Help screens say "contact the church office"; the lead-pastor role cannot be assigned or used. |
-| G11 | Public sign-up (`disable_signup`, tied to G5/Q4) | Only after G5 is approved (and G8's first-Admin procedure is decided, since the first Admin also needs an account): `GET` the Auth config, then `PATCH` it with `disable_signup: false` and every other field unchanged. | `disable_signup: true`: `POST /auth/v1/signup` is refused (`422`, `signup_disabled`) and **Create account** fails generically on both clients; nobody can register a number. |
+| G11 | Public sign-up (`disable_signup`, tied to G5/Q4) | **Owner decision (2026-10-15): open**, only after G5 (`q4_personal_data` with the privacy notice) and G8 (the first-Admin procedure, the owner as first Admin) are done; membership application review still gates every member surface. Then `GET` the Auth config, and `PATCH` it with `disable_signup: false` and every other field unchanged (the G4 values stay). | `disable_signup: true`: `POST /auth/v1/signup` is refused (`422`, `signup_disabled`) and **Create account** fails generically on both clients; nobody can register a number. |
+
+#### G4 Auth rate limits (proposed by the agent for the owner's "tighten modestly", story 4.16)
+
+Supabase's per-IP limits are token buckets (bursts up to 30). Members on the same mobile network
+can share one public address (carrier NAT), and a whole congregation opens the app at the same
+time on a Sunday, so the limits stay well above what one church's members need together and below
+the defaults an attacker could use from one address. Phone sign-in uses a password (no SMS, no
+OTP), so OTP and SMS limits do not apply.
+
+| Limit (dashboard **Authentication > Rate Limits**; Management API key as listed by `GET`) | Supabase default | Production value | Why |
+|---|---|---|---|
+| Sign-ups and sign-ins, per IP | 30 per 5 min | **20 per 5 min** (240 per hour) | Sessions persist on the phone, so a member signs in rarely; 20 every 5 minutes behind one shared address still lets a full Sunday of new installs through over the morning, and a burst of 30 covers a group signing in together. Slows password guessing from one address by a third. |
+| Token refresh (`rate_limit_token_refresh`), per IP | 150 per 5 min (1800 per hour) | **120 per 5 min** (1440 per hour) | Each open app refreshes about once an hour; 1440 per hour behind one shared address covers far more than the church's members at once. Only refreshes of stolen or scripted tokens are slowed. |
+| Token verification (`rate_limit_verify`), per IP | 30 per 5 min | **20 per 5 min** | Only email links (recovery, email confirmation) use it, and those stay closed until G1/G2. |
+| OTP (`rate_limit_otp`) and SMS (`rate_limit_sms_sent`) | 30 per hour | **unchanged** | Not used: no SMS, no OTP. Never configure an SMS provider. |
+| Anonymous sign-ins (`rate_limit_anonymous_users`) | 30 per hour | **unchanged** | Anonymous sign-ins stay off (`external_anonymous_users_enabled: false`). |
+
+Steps (owner, Management API; the dashboard page shows the same values): `GET .../config/auth`,
+keep the response, set the keys above (the sign-in value as the dashboard names it, if `GET` shows
+no separate key), `PATCH` with every other field unchanged, then `GET` again and record the
+`rate_limit_*` values (no token) in the promotion evidence. If members on one network report
+**Too many requests** (`429`) on a Sunday, raise sign-ins to the default (30) first.
 
 **Gate prerequisite (story 4.7): approve Q4 only together with or after Q2.** Follow-ups (tasks,
 My follow-ups, supervision, Admin routing and the source owner operations) needs BOTH

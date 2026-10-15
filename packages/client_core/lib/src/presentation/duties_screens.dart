@@ -392,8 +392,15 @@ abstract final class DutyPaths {
       StatusTone.success,
       'Removed from the department',
       '$what no longer serves in this department. Their future duties here '
-          'ended: each position shows Needs a new person and its leaders were '
-          'told. Past duties are kept.',
+          'ended: each position shows Needs a new person and its leaders and '
+          'the member are being told. Past duties are kept.',
+    ),
+    DutyNotice.memberRemovedNoNotices => (
+      StatusTone.warning,
+      'Removed, but nobody was told',
+      '$what no longer serves in this department and their future duties '
+          'here ended (each position shows Needs a new person). Notices could '
+          'not be sent right now: tell its leaders and the member directly.',
     ),
     DutyNotice.handoverResolved => (
       StatusTone.success,
@@ -834,10 +841,12 @@ class _DepartmentCardState extends ConsumerState<_DepartmentCard> {
       context: context,
       builder: (context) => ChurchDialog(
         title: 'Remove ${m.displayName} from ${d.name}?',
+        // Review N4: the notices are promised only as far as they can go.
         content: const Text(
-          'Their future duties in this department end now: each position '
-          'shows Needs a new person and the department\'s leaders are told. '
-          'They are told the duties are no longer theirs. Past duties and '
+          'Their future duties in this department end now and each position '
+          'shows Needs a new person. The department\'s leaders and the member '
+          'are told when notices can be sent; a member the app cannot reach '
+          'is listed for the leaders to tell directly. Past duties and '
           'answers are kept.',
           key: Key('remove-member-explain'),
         ),
@@ -1000,12 +1009,17 @@ class _DepartmentCardState extends ConsumerState<_DepartmentCard> {
                 ),
               ],
             ),
-          ] else if (d.needsLeader &&
-              (d.leaders.isNotEmpty || d.deputies.isNotEmpty))
-            _muted(
-              context,
-              'No leader or deputy can use the app right now: alerts reach '
-              'nobody.',
+          ] else if (d.needsLeader)
+            // Review S4: shown whenever no leader or deputy the app can reach
+            // is in place (also before any is given the role).
+            Padding(
+              key: Key('department-needs-leader-$id'),
+              padding: const EdgeInsets.only(top: 8),
+              child: const StatusLabel(
+                label:
+                    'No leader or deputy can use the app: alerts reach nobody',
+                tone: StatusTone.warning,
+              ),
             ),
           const SizedBox(height: 12),
           _heading(context, 'Members (${d.members.length})'),

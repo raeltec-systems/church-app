@@ -372,6 +372,46 @@ void main() {
       expect(find.textContaining('Needs a new person'), findsOneWidget);
     });
 
+    testWidgets('a removal whose notices were skipped says so (review N4)', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.adminDepartments,
+        setUp: (h) => h.duties.admin = adminWith(departmentData()),
+      );
+      await tapKey(tester, 'remove-member-$_dept-$_ruth');
+      expect(find.textContaining('when notices can be sent'), findsOneWidget);
+      await tapKey(tester, 'remove-member-confirm');
+      h.gateway.sent.single.confirm({
+        'department_id': _dept,
+        'revision': 5,
+        'vacated': 1,
+        'drafts_cleared': 0,
+        'notices_skipped': true,
+      }, 5);
+      await settle(tester);
+      expect(byKey('duties-notice-memberRemovedNoNotices'), findsOneWidget);
+      expect(byKey('duties-notice-memberRemoved'), findsNothing);
+      expect(
+        find.textContaining('tell its leaders and the member directly'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('no reachable leader is flagged whenever true (review S4)', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.adminDepartments,
+        setUp: (h) =>
+            h.duties.admin = adminWith(departmentData(needsLeader: true)),
+      );
+      expect(byKey('department-needs-leader-$_dept'), findsOneWidget);
+      expect(find.textContaining('alerts reach nobody'), findsOneWidget);
+    });
+
     testWidgets('a pending handover is marked done only with a leader', (
       tester,
     ) async {

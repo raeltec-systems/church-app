@@ -11,7 +11,7 @@
 -- Every account, phone and name is SYNTHETIC (fictional range +44 7700 900460-900469). Duty times
 -- are fixed church-time (Africa/Lusaka) clock times on whole days, never the current clock time.
 begin;
-select plan(109);
+select plan(122);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000004120' || lpad(n::text, 2, '0'))::uuid $$;
@@ -364,10 +364,12 @@ select is((select count(*)::int from app.duties_department_members
   'department membership rows are kept (a restoration restores no assignment)');
 -- Follow-ups: M's task is handed over to its supervisor.
 select is(pg_temp.who((pg_temp.task(pg_temp.t(1))).owner_member_id), 2, 'M''s open task is handed to its supervisor L');
-select is((select action || ':' || actor_capacity || ':' || code || ':' || (actor_member_id is null)::text
-             from app.followups_activity where task_id = (pg_temp.task(pg_temp.t(1))).task_id
-            order by activity_id desc limit 1),
-  'reassigned:source:handover:true', 'recorded as a handover, with no reason');
+select is((select string_agg(action || ':' || actor_capacity || ':' || code || ':' || (actor_member_id is null)::text,
+                         ',' order by action)
+             from app.followups_activity where task_id = (pg_temp.task(pg_temp.t(1))).task_id and code = 'handover'),
+  'reassigned:source:handover:true,supervisor_changed:source:handover:true', 'recorded as a handover, with no reason');
+select is(pg_temp.who((pg_temp.task(pg_temp.t(1))).supervisor_member_id), 3,
+  'review N3: L now owns it, so another holder of D (the deputy) supervises it');
 select is((select string_agg(obligation_kind || ':' || coalesce(resolution, 'pending'), ',')
              from app.identity_handover_obligations where member_id = pg_temp.mid(4)),
   'followup_task:handed_over', 'the obligation Identity recorded is resolved in the same transaction');
@@ -544,8 +546,10 @@ update app.identity_grants set revoked_at = now(), revoked_by_member = pg_temp.m
  where role = 'pastor' and revoked_at is null;
 select is(app.followups_report_handover(jsonb_build_object('member_id', pg_temp.mid(10))),
   jsonb_build_object('obligations', jsonb_build_array(jsonb_build_object(
-    'kind', 'followup_task', 'subject_id', (pg_temp.task((select src from t4))).task_id, 'last_responsible', true))),
-  'nobody else may own R''s task (no other member of its group, no live Pastor)');
+    'kind', 'followup_task', 'subject_id', (pg_temp.task((select src from t4))).task_id, 'last_responsible', true),
+    jsonb_build_object('kind', 'followup_supervision', 'subject_id', (pg_temp.task((select src from t4))).task_id,
+                       'last_responsible', false))),
+  'nobody else may own or supervise R''s task (no other member of its group, no live Pastor; review N2)');
 select is(pg_temp.err(pg_temp.lc(1, 'identity.deactivate_membership', 10, '{"reason_code": "church_decision"}')),
   'conflict|member_id=handover_required', 'so R cannot be deactivated');
 create temp table del as select pg_temp.call(1, 'identity_deletion_command', 'identity.request_member_deletion',
@@ -555,9 +559,9 @@ create function pg_temp.del() returns app.identity_deletions language sql as
 $$ select d.* from app.identity_deletions d where d.member_id = pg_temp.mid(10) $$;
 select is(pg_temp.st(pg_temp.a('RP')), 'superseded:vacated', 'R''s future duty ends');
 select is(pg_temp.pending(pg_temp.a('RP')), '2:duty_vacated', 'and the leader is told');
-select is((select string_agg(owner_module || ':' || obligation_kind, ',' order by owner_module)
+select is((select string_agg(owner_module || ':' || obligation_kind, ',' order by owner_module, obligation_kind)
              from app.identity_handover_obligations where member_id = pg_temp.mid(10) and obligation_state = 'pending'),
-  'duties:department_leader,followups:followup_task', 'both handovers are recorded pending');
+  'duties:department_leader,followups:followup_supervision,followups:followup_task', 'the handovers are recorded pending');
 select is(app.identity_deletion_blocker(pg_temp.del(), 'erase_owners'), 'handover_pending', 'erasure waits for them');
 select is(pg_temp.err(pg_temp.duties(1, 'duties.resolve_handover', pg_temp.drev(pg_temp.f()),
             jsonb_build_object('department_id', pg_temp.f()))), 'conflict|department_id=leader_required',
@@ -576,9 +580,13 @@ select is(pg_temp.err(pg_temp.duties(1, 'duties.resolve_handover', pg_temp.drev(
 select is(app.identity_deletion_blocker(pg_temp.del(), 'erase_owners'), 'handover_pending', 'the task''s handover still waits');
 select is(pg_temp.err(pg_temp.call(1, 'followups_command', 'followups.reassign',
             (pg_temp.task((select src from t4))).revision,
-            jsonb_build_object('task_id', (pg_temp.task((select src from t4))).task_id, 'owner_member_id', pg_temp.mid(2)))),
-  'ok', 'the Admin reassigns R''s task to L');
-select is(pg_temp.pending_obligations(10), 0, 'the reassignment resolves the task''s obligation');
+            jsonb_build_object('task_id', (pg_temp.task((select src from t4))).task_id, 'owner_member_id', pg_temp.mid(2),
+                               'supervisor_member_id', pg_temp.mid(2)))),
+  'ok', 'the Admin reassigns R''s task to L and names L as its supervisor');
+select is((select string_agg(obligation_kind || ':' || resolution, ',' order by obligation_kind)
+             from app.identity_handover_obligations where member_id = pg_temp.mid(10) and owner_module = 'followups'),
+  'followup_supervision:handed_over,followup_task:handed_over', 'the reassignment resolves both of the task''s obligations');
+select is(pg_temp.pending_obligations(10), 0, 'nothing of R is pending');
 select is(app.identity_deletion_blocker(pg_temp.del(), 'erase_owners'), null, 'erasure may run now');
 select is((select string_agg((r ->> 'module') || '=' || (r ->> 'remaining'), ',' order by r ->> 'module')
              from jsonb_array_elements(app.identity_call_deletion_hooks(pg_temp.mid(10), null, (pg_temp.del()).deletion_id, 'erase')) r
@@ -607,6 +615,62 @@ select is((select count(*)::int from app.notifications_jobs j where j.source_id 
               and j.reminder_kind = 'duty_vacated' and j.job_state = 'pending'), 0,
   'and the old vacancy notices no longer stand');
 
+-- Review N4: a removed member the app cannot reach (H, held): the released notices become the
+-- leaders' contact notices ---------------------------------------------------------------------------
+create temp table hx as select pg_temp.duties(1, 'duties.remove_member', pg_temp.drev(pg_temp.d()),
+  jsonb_build_object('department_id', pg_temp.d(), 'member_id', pg_temp.mid(6))) as r;
+select is(pg_temp.err((select r from hx)) || '|' || ((select r from hx) #>> '{data,notices_skipped}'), 'ok|false',
+  'the Admin removes held H from D (notices are planned)');
+select is(pg_temp.pending(pg_temp.a('HA')), '6:duty_released', 'H''s released notice is queued');
+select pg_temp.run();
+select is((select string_agg(n ->> 'notice', ',' order by n ->> 'starts_at')
+             from jsonb_array_elements(pg_temp.readj(2, 'select api.duties_leader_board()') -> 'departments') dep,
+                  jsonb_array_elements(dep -> 'contact_notices') n
+            where dep ->> 'department_id' = pg_temp.d()::text and n ->> 'member_id' = pg_temp.mid(6)::text
+              and n ->> 'assignment_id' in (pg_temp.a('HP')::text, pg_temp.a('HA')::text)),
+  'released,released', 'the leader is asked to tell H directly (contact notices on the board)');
+
+-- Review S3: handover candidates are reachable members only ------------------------------------------
+create temp table g as select pg_temp.dep('SYNTHETIC 4.12 Welcome') as g;
+select pg_temp.grant_scope(11, 'department_leader', (select g from g));
+select pg_temp.grant_scope(8, 'department_deputy', (select g from g));
+create temp table t5 as select pg_temp.newtask(1, 11, 8, (select g from g)) as src;
+select is((select pg_temp.who(p.owner_to) from app.followups_handover_plan(pg_temp.mid(11), true) p
+            where p.task_id = (pg_temp.task((select src from t5))).task_id), 7,
+  'the unreachable supervisor (accountless X) is passed over for a reachable Pastor');
+update app.identity_grants set revoked_at = now(), revoked_by_member = pg_temp.mid(1), revoked_by_account = pg_temp.u(1)
+ where role = 'pastor' and revoked_at is null;
+select is((select o from jsonb_array_elements(app.followups_report_handover(
+             jsonb_build_object('member_id', pg_temp.mid(11))) -> 'obligations') o
+            where o ->> 'subject_id' = (pg_temp.task((select src from t5))).task_id::text),
+  jsonb_build_object('kind', 'followup_task', 'subject_id', (pg_temp.task((select src from t5))).task_id,
+                     'last_responsible', true),
+  'with no reachable candidate left, CL is the last responsible owner');
+insert into app.identity_grants (member_id, role, granted_by_operator) values (pg_temp.mid(7), 'pastor', 'israel');
+
+-- followups.complete_handover (Admin): continues a capped handover -------------------------------------
+select is(pg_temp.err(pg_temp.call(2, 'followups_command', 'followups.complete_handover', null,
+            jsonb_build_object('member_id', pg_temp.mid(4)))), 'forbidden', 'a leader cannot run it');
+select is(pg_temp.err(pg_temp.call(1, 'followups_command', 'followups.complete_handover', null,
+            jsonb_build_object('member_id', pg_temp.mid(2)))), 'validation_failed|member_id=active',
+  'an active member hands over through their scopes and the commands');
+select is((pg_temp.call(1, 'followups_command', 'followups.complete_handover', null,
+            jsonb_build_object('member_id', pg_temp.mid(9))) -> 'data') - 'member_id',
+  '{"handed_over": 0, "remaining": 0}'::jsonb, 'for a deactivated member with nothing left it reports zero');
+
+-- Review S2: the members a command may notify, read from its payload (locked FOR KEY SHARE by the
+-- authorizer before any Duties or Follow-ups row; HTTP race evidence in duties-lifecycle.mjs) ----------
+select ok(app.duties_command_people(jsonb_build_object('payload', jsonb_build_object('occurrence_id', pg_temp.occ('LP'))),
+            pg_temp.mid(1)) @> array[pg_temp.mid(1), pg_temp.mid(2)],
+  'a Duties command on an occurrence names the actor, its assignee and its department''s leaders');
+select is(app.duties_command_people('{"payload": {"occurrence_id": "not-a-uuid"}}'::jsonb, pg_temp.mid(1)),
+  array[pg_temp.mid(1)], 'a malformed payload names only the actor (the handler refuses it later)');
+select is((select array_agg(x order by x) from unnest(app.followups_command_people(
+             jsonb_build_object('payload', jsonb_build_object('task_id', (pg_temp.task(pg_temp.t(2))).task_id)),
+             pg_temp.mid(1))) x),
+  (select array_agg(x order by x) from unnest(array[pg_temp.mid(1), pg_temp.mid(8), pg_temp.mid(2)]) x),
+  'a Follow-ups command on a task names the actor, its owner and its supervisor');
+
 -- Handover hooks are read only and well formed ------------------------------------------------------
 select is((app.identity_collect_handover(jsonb_build_object('event', 'membership_deactivated',
             'member_id', pg_temp.mid(5), 'occurred_at', '2026-10-15T00:00:00Z', 'identity_revision', 1))),
@@ -620,9 +684,12 @@ select is((select count(*)::int from information_schema.routine_privileges
                                    'duties_on_member_lifecycle', 'duties_report_handover',
                                    'duties_vacancy_alert_check', 'duties_remove_member',
                                    'duties_pending_handovers', 'duties_has_reachable_leader',
-                                   'duties_resolve_handover', 'followups_reachable',
-                                   'followups_handover_candidate', 'followups_supervisor_candidate',
-                                   'followups_handover_task', 'followups_handover_member',
+                                   'duties_resolve_handover', 'duties_lock_people', 'duties_command_people',
+                                   'duties_jsonb_uuid', 'followups_jsonb_uuid',
+                                   'followups_reachable', 'followups_handover_plan',
+                                   'followups_handover_member', 'followups_resolve_obligations',
+                                   'followups_complete_handover', 'followups_lock_people',
+                                   'followups_command_people',
                                    'followups_on_member_lifecycle', 'followups_report_handover',
                                    'followups_task_handover_sync')), 0,
   'nothing new is client-executable');

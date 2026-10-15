@@ -14,7 +14,13 @@
 //   * removal from the department ends that department's future duties and tells the member;
 //   * a revoked deputy loses their pending alerts, commands and supervision at once;
 //   * a deletion hands the member's task over, records no pending handover, and the Duties and
-//     Follow-ups deletion check answers zero after the erase phase.
+//     Follow-ups deletion check answers zero after the erase phase;
+//   * review S2: two-connection races. A deactivation held open in its own transaction (psql, the
+//     Admin's session claims) while the leader revises and publishes the member's duties over HTTP:
+//     the deactivation succeeds and the leader's commands wait, then succeed or are refused cleanly
+//     (never `unavailable`, never a deadlock). And the reverse orders, with the leader's revise_duty
+//     or publish_duty paused mid-command by a third connection while the Admin deactivates the
+//     member over HTTP: both succeed and the duty is vacated.
 //
 // Needs the local phone switch: `node tools/auth-harness/local-phone-auth.mjs on`, then `off`
 // afterwards. Needs a database with no usable Admin (`npx supabase db reset` first). LOCAL only
@@ -30,7 +36,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
-import { amrMethods, localHttp, localKey, password, psql, runMain, startRun } from './harness.mjs';
+import { amrMethods, dbContainer, localHttp, localKey, password, psql, runMain, startRun } from './harness.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const OPERATOR = 'israel';
@@ -68,6 +74,41 @@ export function coverageCounts(answer, departmentId) {
 /** The ISO start of church date `ymd` at 10:00 Africa/Lusaka (UTC+2, no daylight saving). */
 export function churchTen(ymd) {
   return `${ymd}T08:00:00Z`;
+}
+
+/** A SQL literal for a JSON value (dollar-quoted; the tag never occurs in this run's values). */
+export function jsonLiteral(value) {
+  const text = JSON.stringify(value);
+  if (text.includes('$j$')) throw new Error('unexpected quote tag');
+  return `$j$${text}$j$::jsonb`;
+}
+
+/** The JWT claims of a signed-in session (what PostgREST hands the database), without the token. */
+export function sessionClaims(jwt) {
+  const part = String(jwt ?? '').split('.')[1];
+  if (!part) throw new Error('no session token');
+  return JSON.parse(Buffer.from(part, 'base64url').toString('utf8'));
+}
+
+/**
+ * One SQL text that runs an api command as the signed-in caller (their session claims, role
+ * authenticated) in its own transaction and keeps it open `sleepSeconds` before committing, so a
+ * second connection meets its locks.
+ */
+export function heldCommandSql(claims, endpoint, envelope, sleepSeconds) {
+  if (!/^[a-z_]+$/.test(endpoint)) throw new Error('unexpected endpoint');
+  return `begin;
+select set_config('request.jwt.claims', ${jsonLiteral(claims).replace('::jsonb', '')}, true) is not null;
+set local role authenticated;
+select api.${endpoint}(${jsonLiteral(envelope)});
+select pg_sleep(${Number(sleepSeconds)});
+commit;`;
+}
+
+/** A raced command's outcome is clean: it went through or was refused with a plain refusal code. */
+export function cleanOutcome(r) {
+  if (done(r)) return true;
+  return r?.status < 500 && ['conflict', 'validation_failed', 'not_found'].includes(r?.code);
 }
 
 /** A command answer that went through (no refusal code). */
@@ -235,6 +276,23 @@ async function main() {
     where member_id = '${memberId}' and obligation_state = 'pending'`));
   const refused = (r, code, field, value) => r.code === code && (!field || r.field_errors?.[field] === value);
   const coverage = (p, from, to) => read('duties_coverage', p.token, { from_date: from, to_date: to });
+  const occRevision = (o) => Number(psql(`select revision from app.duties_occurrences where occurrence_id = '${o}'`));
+  const heldCall = async (p, endpoint, cmd, expected, payload, sleepSeconds) => {
+    const sql = heldCommandSql(sessionClaims(p.token), endpoint,
+      { version: 1, command: cmd, request_id: randomUUID(), expected_revision: expected, payload }, sleepSeconds);
+    try {
+      const { stdout } = await promisify(execFile)('docker',
+        ['exec', '-i', dbContainer(), 'psql', '-U', 'postgres', '-X', '-qtA', '-v', 'ON_ERROR_STOP=1', '-c', sql], { encoding: 'utf8' });
+      const line = stdout.split('\n').find((l) => l.trim().startsWith('{'));
+      return { status: 200, ...(line ? JSON.parse(line) : {}) };
+    } catch (e) {
+      return { status: 500, code: /40P01|deadlock/.test(String(e.stderr)) ? 'deadlock' : 'error' };
+    }
+  };
+  const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  const psqlAsync = (sql) => promisify(execFile)('docker',
+    ['exec', '-i', dbContainer(), 'psql', '-U', 'postgres', '-X', '-qtA', '-v', 'ON_ERROR_STOP=1', '-c', sql], { encoding: 'utf8' })
+    .then(() => 'released', () => 'error');
 
   try {
     const { admin, leader, deputy, member, removed, held, sole, spare } = people;
@@ -339,11 +397,14 @@ async function main() {
         future_current_left: futureCurrent(member.member),
         leader_notices: [pendingFor(leader.member, 'duty_vacated'), pendingFor(deputy.member, 'duty_vacated'),
           pendingFor(sole.member, 'duty_vacated')] });
+    // Review N3: the supervisor became the owner, so another holder of the scope (the deputy) supervises.
+    const t1Activity = psql(`select string_agg(action || ':' || actor_capacity || ':' || code, ',' order by action)
+      from app.followups_activity where task_id = '${t1}' and code = 'handover'`);
     check('L21-the-open-task-is-handed-to-its-supervisor', taskOwner(t1) === leader.member
-      && pendingObligations(member.member) === 0
-      && psql(`select action || ':' || actor_capacity || ':' || code from app.followups_activity where task_id = '${t1}'
-           order by activity_id desc limit 1`) === 'reassigned:source:handover',
-      { owner_is_supervisor: taskOwner(t1) === leader.member, pending_obligations: pendingObligations(member.member) });
+      && taskSupervisor(t1) === deputy.member && pendingObligations(member.member) === 0
+      && t1Activity === 'reassigned:source:handover,supervisor_changed:source:handover',
+      { owner_is_supervisor: taskOwner(t1) === leader.member, new_supervisor_is_deputy: taskSupervisor(t1) === deputy.member,
+        activity: t1Activity.split(','), pending_obligations: pendingObligations(member.member) });
     const runA = await worker();
     const lInbox = ((await read('notifications_my_inbox', leader.token))?.items ?? []).filter((i) => i.reminder_kind === 'duty_vacated');
     const c2 = await coverage(leader, from, to);
@@ -356,6 +417,73 @@ async function main() {
       { worker: runA.exit, leader_inbox: lInbox.map((i) => i.reminder_kind), status: mp?.status ?? null,
         flagged: Boolean(mp?.vacated?.since), vacated_count: coverageCounts(c2, departmentId)?.vacated ?? null,
         reason_in_reads: holdsReason(pastorlessReads) });
+
+    // ------------------------------------------------------- review S2: two-connection races, no deadlock
+    // Accountless SYNTHETIC members Y, Z and W in D; Y and Z with a duty.
+    const raceMembers = psql(`insert into app.identity_members (display_name, membership_state, is_synthetic)
+      values ('${NAME_PREFIX} Member Y', 'approved', true), ('${NAME_PREFIX} Member Z', 'approved', true),
+             ('${NAME_PREFIX} Member W', 'approved', true)
+      returning member_id`).split('\n');
+    const [yMember, zMember, wMember] = raceMembers;
+    for (const m of raceMembers) await duty(admin.token, 'duties.add_member', departmentRevision(departmentId), { department_id: departmentId, member_id: m });
+    const yDuty = await publish(yMember, 20);
+    const zDuty = await publish(zMember, 21);
+    const yOcc = yDuty.data?.occurrence_id;
+    const zOcc = zDuty.data?.occurrence_id;
+    // Deactivation first (held open 2 s), then the leader's revision and new duty for Y over HTTP.
+    const yDeact = heldCall(admin, 'identity_lifecycle_command', 'identity.deactivate_membership', memberRevision(yMember),
+      { member_id: yMember, reason_code: 'moved_away' }, 2);
+    await pause(600);
+    const yStarted = Date.now();
+    const [yRevise, yPublish] = await Promise.all([
+      duty(leader.token, 'duties.revise_duty', occRevision(yOcc), { occurrence_id: yOcc, location: 'SYNTHETIC annex' }),
+      publish(yMember, 22),
+    ]);
+    const yWaited = Date.now() - yStarted;
+    const yHeld = await yDeact;
+    check('L23-a-held-deactivation-and-the-leaders-commands-never-deadlock', done(yHeld)
+      && cleanOutcome(yRevise) && cleanOutcome(yPublish) && !done(yPublish) && yWaited >= 800
+      && futureCurrent(yMember) === 0 && asgState(yDuty.data?.assignment_id) === 'superseded:vacated',
+      { deactivation: yHeld.code ?? 'done', revise_duty: yRevise.code ?? 'done', publish_duty: yPublish.code ?? 'done',
+        statuses: [yRevise.status, yPublish.status], waited_for_the_lock: yWaited >= 800, future_current_left: futureCurrent(yMember) });
+    // The reverse orders, paused mid-command (the reviewer's deadlocks): a third connection holds a
+    // lock the leader's command needs after it has started (Z's pending jobs, which revise_duty
+    // cancels after locking the duty; W's member advisory lock, which publish_duty takes before
+    // queueing the notice), the Admin then deactivates the member over HTTP, and the third
+    // connection lets go. Without the S2 key-share lock both cycles end in 40P01 (`unavailable`).
+    const zA = zDuty.data?.assignment_id;
+    const zStart = zDuty.data ? churchTen(churchDate(21 * DAY)).replace('T08:00', 'T09:00') : null;
+    const zGate = psqlAsync(`begin;
+      select count(*) from (select 1 from app.notifications_jobs where source_id = '${zA}' and job_state = 'pending' for update) x;
+      select pg_sleep(2.5);
+      commit;`);
+    await pause(500);
+    const zRevise = duty(leader.token, 'duties.revise_duty', occRevision(zOcc), { occurrence_id: zOcc, starts_at: zStart });
+    await pause(600);
+    const zDeact = envelope('identity_lifecycle_command', admin.token, 'identity.deactivate_membership',
+      memberRevision(zMember), { member_id: zMember, reason_code: 'moved_away' });
+    const [zRevised, zDeactivated] = await Promise.all([zRevise, zDeact, zGate]);
+    const zVacated = Number(psql(`select count(*) from app.duties_assignments where member_id = '${zMember}'
+      and assignment_state = 'superseded' and end_reason = 'vacated'`));
+    check('L24-a-revision-paused-mid-command-and-the-deactivation-never-deadlock', done(zRevised) && done(zDeactivated)
+      && zVacated === 1 && futureCurrent(zMember) === 0,
+      { revise_duty: zRevised.code ?? 'done', deactivation: zDeactivated.code ?? 'done',
+        statuses: [zRevised.status, zDeactivated.status], vacated: zVacated, future_current_left: futureCurrent(zMember) });
+    const wGate = psqlAsync(`begin;
+      select pg_advisory_xact_lock(hashtextextended('app.duties_member ${wMember}', 0)) is null;
+      select pg_sleep(2.5);
+      commit;`);
+    await pause(500);
+    const wPublish = publish(wMember, 23);
+    await pause(600);
+    const wDeact = envelope('identity_lifecycle_command', admin.token, 'identity.deactivate_membership',
+      memberRevision(wMember), { member_id: wMember, reason_code: 'moved_away' });
+    const [wPublished, wDeactivated] = await Promise.all([wPublish, wDeact, wGate]);
+    check('L25-a-publish-paused-mid-command-and-the-deactivation-never-deadlock', cleanOutcome(wPublished)
+      && done(wDeactivated) && futureCurrent(wMember) === 0,
+      { publish_duty: wPublished.code ?? 'done', deactivation: wDeactivated.code ?? 'done',
+        statuses: [wPublished.status, wDeactivated.status],
+        state: done(wPublished) ? asgState(wPublished.data?.assignment_id) : null, future_current_left: futureCurrent(wMember) });
 
     // ------------------------------------------------------- the last leader of an active department
     const k1 = await envelope('identity_lifecycle_command', admin.token, 'identity.deactivate_membership',

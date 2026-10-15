@@ -10,7 +10,7 @@
 -- closed (nothing); erasure; privileges. HTTP evidence: tools/identity-e2e/duties-coverage.mjs.
 -- Every account, phone and name is SYNTHETIC (fictional range +44 7700 900780-900789).
 begin;
-select plan(157);
+select plan(162);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000050' || lpad(n::text, 2, '0'))::uuid $$;
@@ -452,6 +452,24 @@ select is(coalesce((select (r #>> '{data,replaced_case}') from n3b), 'false')
           || '|' || ((select r #>> '{data,case_id}' from n3b) = (select r #>> '{data,case_id}' from n3a))::text
           || '|' || ((pg_temp.task((select (r #>> '{data,case_id}')::uuid from n3a))).owner_member_id = pg_temp.mid(2))::text,
   'false|true|true', 'the revoked deputy''s task is the leader''s at once and the next attempt continues it');
+
+-- Story 4.12 review N7: the 4.9 replacement still applies when the former deputy stays a member
+-- of D (they stay in the task's group, so Follow-ups leaves them the task; the leader's next
+-- attempt replaces the case and its task).
+select is(pg_temp.err(pg_temp.pub('N7', 5, pg_temp.t('6 days 3 hours'))), 'ok', 'setup: duty N7 for O');
+select is(pg_temp.grant_scope(4, 'department_deputy', pg_temp.d()) ->> 'code', null, 'member M (in D) becomes a deputy of D');
+create temp table n7a as select pg_temp.attempt(4, pg_temp.a('N7'), 'no_answer', '1 day') as r;
+select is(pg_temp.call(1, 'identity_grant_command', 'identity.revoke_scope',
+            (select s.revision from app.identity_grant_sets s where s.member_id = pg_temp.mid(4)),
+            jsonb_build_object('member_id', pg_temp.mid(4), 'scope_kind', 'department_deputy',
+                               'scope_id', pg_temp.d())) ->> 'code', null, 'M''s deputy scope is revoked');
+select is((pg_temp.task((select (r #>> '{data,case_id}')::uuid from n7a))).owner_member_id, pg_temp.mid(4),
+  'M is still in D''s group, so M keeps the task');
+create temp table n7b as select pg_temp.attempt(2, pg_temp.a('N7'), 'no_answer', '1 day') as r;
+select is((select (r #>> '{data,replaced_case}') from n7b)
+          || '|' || (pg_temp.task((select (r #>> '{data,case_id}')::uuid from n7a))).close_code
+          || '|' || ((pg_temp.task((select (r #>> '{data,case_id}')::uuid from n7b))).owner_member_id = pg_temp.mid(2))::text,
+  'true|source_resolved|true', 'the leader''s next attempt replaces the case: the old task closes and the leader owns the fresh one');
 
 -- Review N9: an assignee who left the department is reassigned, not contacted.
 select pg_temp.pub('N9', 6, pg_temp.t('5 days 10 hours'));

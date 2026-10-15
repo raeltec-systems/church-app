@@ -10,7 +10,7 @@ route_source: 'auto'
 review: ''
 review_source: ''
 lenses_ran: []
-review_loop_iteration: 0
+review_loop_iteration: 1
 context:
   - '{project-root}/docs/runbooks/identity-access.md'
   - '{project-root}/docs/runbooks/duties.md'
@@ -104,11 +104,38 @@ context:
 - Open owner questions (fail-closed defaults built; also in duties.md, story 4.12): Q4 retention/anonymisation (unchanged); may leaders learn why a position became vacant (built: no); one vacancy notice per department and change (built); a reachable deputy counts as responsible (built: yes).
 - Remaining (not builder steps): staging apply of the migration with per-function md5 parity (parent; no owner SQL paste; no Edge Function redeploy); rebuild the staging staff web and APK; owner manual checks in `docs/runbooks/duties.md`, story 4.12.
 
+### Review amendments (2026-10-15, round 1; the unmerged migration was edited in place)
+
+- Decision (agent, under owner pre-approval; S1): **cap, not unbounded work.** Ending duties is now set-based (`duties_vacate_member`: one assignments update, one occurrence bump, slot revisions and audit in single inserts, one `duty_vacated` per department, cancels only for jobs or schedules that exist). The Follow-ups plan is one set-based function (`followups_handover_plan`: rosters once per scope, reachability once per person, candidates once per distinct owner, supervisor, scope and purpose, materialized), shared by the handover hook (`followups_report_handover`, now SQL over the plan) and the handover (`followups_handover_member`: one update, one activity insert, bulk `reminders_skipped`). The per-task cost left is Notifications' own (cancel and plan a task's reminders, about 15-20 ms), so **one lifecycle change hands over at most 25 tasks** (one transaction budget shared by its events, soonest first); the rest keep pending obligations, listed for the Admin on Membership status, and the new Admin command `followups.complete_handover` continues 100 per step. Why the cap: 1000 tasks at 15-20 ms each is 15-20 s, over the 8 s statement timeout, and the per-task cost sits in Notifications' API. Measured: deactivation with 200 duties and 1030 open tasks 1.1-1.8 s; a 100-task step 1.7-2.5 s.
+- Decision (S2): Duties and Follow-ups commands take `FOR KEY SHARE` on the identity rows of the members they may notify, member-id order, one helper per module (`duties_lock_people`, `followups_lock_people`, plpgsql so every row is locked), in the authorizer before any owner row. The 1.4 authorizer seam sees only the actor and the command, so each dispatcher hands the payload over in a transaction-local setting (`duties.command_payload`, `followups.command_payload`, cleared after; it decides only what is locked). `duties_command_people` / `followups_command_people` read the people (safe uuid parsing: a malformed payload is still refused by the handler). The 4.11 owner operations lock in `duties_owner_session` and `duties_owner_positions` (bodies replaced, copied from `20261015035112`). Identity's `FOR UPDATE` is unchanged. Proven by E2E L23 (deactivation first: the leader's revise and publish wait, then `conflict` and `validation_failed`), L24 and L25 (revise and publish paused mid-command by a third connection while the Admin deactivates: both succeed). L24 and L25 failed with `40P01` before the payload hand-over (the authorizer then locked only the actor) and pass after it. L20 stays strict.
+- Decision (S3): owner candidates are only members the app can reach; with none, the task's obligation is `last_responsible` (a deactivation is refused). pgTAP: an accountless supervisor is passed over for a reachable Pastor; with no Pastor the owner is last responsible.
+- Decision (S4): the Departments warning shows whenever `needs_leader` is true. The revoke-first bypass (`identity.revoke_scope` calls no handover hook) is a **known limit**, with a follow-up item: an Identity grant-revocation handover hook. Identity's seams were not used: `revoke_scope` does not call the hooks.
+- N1: the vacancy check's `current` no longer looks at the duty's state; `actionable` decides.
+- N2: `followup_supervision` obligation (never last responsible) for a task nobody else can supervise; resolved by the sync trigger when the supervisor changes.
+- N3: a task handed to its supervisor gets a new supervisor from the other holders (reachable first), else self-supervision when the new owner holds the scope (4.9 fallback), else the N2 obligation.
+- N4: `notices_skipped: true` gives **Removed, but nobody was told**; the dialog promises notices only when they can be sent; pgTAP proves a held member's `duty_released` need reaches the leaders' contact notices.
+- N5: in the vacate, the advisory lock comes first and occurrences found then are locked before their assignments (documented).
+- N6: `duties_scope_revoked` finds the pending alerts in one query and cancels only those.
+- N7: `duties_coverage_test.sql` restores the 4.9 `replaced_case` path (a revoked deputy who stays a department member keeps the task; the leader's next attempt replaces the case).
+- N8: deploy order recorded (migration, then staff web and APK in the same rollout).
+- Removed functions (never merged): `followups_handover_candidate`, `followups_supervisor_candidate`, `followups_handover_task`. New: `duties_lock_people`, `duties_command_people`, `duties_jsonb_uuid`, `followups_jsonb_uuid`, `followups_lock_people`, `followups_command_people`, `followups_handover_plan`, `followups_resolve_obligations`, `followups_complete_handover`. Newly replaced bodies: `duties_owner_session`, `duties_owner_positions` (from 4.11), `followups_in_scope`, `followups_authorize_command`, `followups_command` (from 4.6, review N5 kept).
+- Clients: notice `memberRemovedNoNotices`; the needs-leader label; **Hand over the next 100 follow-up tasks** on Membership status (`LifecycleNotice.handoverContinued`). Tests: `duties_lifecycle_test.dart` 11, `membership_lifecycle_test.dart` +2.
+- The per-department vacancy notice (a frozen-block deviation, Plan Change Log) is **pending owner acknowledgement**.
+- Rule slip to disclose: during the re-verification one `git fetch --dry-run` was run (output discarded, no refs updated) before `ci:migrations --base origin/main`; no other fetch, pull or push.
+
 ## Plan Change Log
 
-- 2026-10-15 (build): the vacancy notice is one per department and lifecycle change (title **Positions need cover**), not one per ended position as the frozen Decisions say; `duties_coverage_source_check` (4.8) is replaced too so the notice's source is current for a vacated assignment. Recorded under Implementation Notes. The frozen block is unchanged.
+- 2026-10-15 (build): the vacancy notice is one per department and lifecycle change (title **Positions need cover**), not one per ended position as the frozen Decisions say; `duties_coverage_source_check` (4.8) is replaced too so the notice's source is current for a vacated assignment. Recorded under Implementation Notes. The frozen block is unchanged. **Pending owner acknowledgement.**
+- 2026-10-15 (review round 1): a lifecycle change hands over at most 25 follow-up tasks; the rest stay pending for the Admin, who continues with the new command `followups.complete_handover` (100 per step). Owner candidates must be reachable in the app. A `followup_supervision` obligation is added. Duties and Follow-ups commands share-lock the identity rows of the members they may notify first. Recorded under Implementation Notes (Review amendments). The frozen block is unchanged.
 
 ## Review Triage Log
+
+- 2026-10-15, independent review (probes in the coordinator's scratchpad `rv412/`): 0 blockers, 4 should-fix (S1-S4), 8 nits (N1-N8).
+- S1 (should, unbounded handover cost): fixed by set-based work plus a cap (25 per change; `followups.complete_handover` for the rest). Scale test: 200 duties and 1030 tasks in one deactivation, under 3 s.
+- S2 (should, deadlock with a leader's command): fixed (people `FOR KEY SHARE` first, payload handed to the authorizer); E2E L23-L25; L20 strict.
+- S3 (should, unreachable owner chosen): fixed (reachable candidates only, else last responsible); pgTAP.
+- S4 (should, needs-leader warning and revoke-first bypass): warning fixed; bypass recorded as a known limit with a follow-up item (an Identity grant-revocation handover hook).
+- N1-N8: fixed (N5 documented, N8 recorded in the runbook).
 
 ## Verification
 

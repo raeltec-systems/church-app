@@ -133,6 +133,10 @@ enum DutyNotice {
   /// there ended and were flagged for cover).
   memberRemoved,
 
+  /// Story 4.12 (review N4): the removal was recorded but its notices could
+  /// not be planned (the church time policy was unavailable).
+  memberRemovedNoNotices,
+
   /// Story 4.12: a department's leader handover was marked done.
   handoverResolved,
 
@@ -401,7 +405,10 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
         DutyOutcomeCommands.recordOutcome => DutyNotice.outcomeRecorded,
         DutyOutcomeCommands.correctOutcome => DutyNotice.outcomeCorrected,
         DutyCommands.clearReview => DutyNotice.reviewCleared,
-        DutyCommands.removeMember => DutyNotice.memberRemoved,
+        DutyCommands.removeMember =>
+          data is Map && data['notices_skipped'] == true
+              ? DutyNotice.memberRemovedNoNotices
+              : DutyNotice.memberRemoved,
         DutyCommands.resolveHandover => DutyNotice.handoverResolved,
         _ =>
           action.request.payload['response'] == DutyResponse.declined.wire

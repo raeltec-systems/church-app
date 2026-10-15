@@ -1363,12 +1363,13 @@ Map<String, Object?> handoverData({
   String name = 'SYNTHETIC Esther Banda',
   String state = 'deactivated',
   String kind = 'fixture_door_duty',
+  String module = 'fixture',
 }) => {
   'obligation_id': id,
   'member_id': memberId,
   'display_name': name,
   'membership_state': state,
-  'owner_module': 'fixture',
+  'owner_module': module,
   'obligation_kind': kind,
   'recorded_at': '2026-10-07T10:00:00Z',
 };

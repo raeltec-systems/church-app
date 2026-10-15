@@ -259,10 +259,13 @@ $$;
 -- p_department only when given), clears the member's planned draft positions there and, for a
 -- removal (p_department given), ends the membership row. Each ended position is left unfilled
 -- (`superseded`, end reason `vacated`, a `vacated` slot revision), its jobs and alerts are
--- cancelled and its coverage case closes; the leaders get `duty_vacated` unless the member had
--- declined; p_release sends `duty_released` to the member. Lock order: departments, series,
+-- cancelled and its coverage case closes; the leaders get one `duty_vacated` per department
+-- unless the member had declined every ended position there; p_release sends `duty_released` to
+-- the member. Set-based (review S1): one statement per table, and Notifications are called only
+-- for assignments that have pending jobs or active schedules. Lock order: departments, series,
 -- occurrences, slots, the member's advisory lock, the membership row, assignments, then
--- Follow-ups and Notifications. Answers counts only.
+-- Follow-ups and Notifications (review N5: an occurrence found again under the member's lock is
+-- locked before any assignment). Answers counts only.
 create function app.duties_vacate_member(p_member uuid, p_department uuid, p_code text,
                                          p_release boolean, p_actor_member uuid,
                                          p_actor_account uuid, p_capacity text, p_command text)
@@ -274,17 +277,14 @@ declare
   v_occ uuid[];
   v_draft uuid[];
   v_all uuid[];
-  v_bumped uuid[] := '{}';
-  v_a record;
-  v_o app.duties_occurrences;
-  v_end bigint;
-  v_slot_rev bigint;
+  v_more uuid[];
+  v_ids uuid[];
+  v_ended jsonb;
+  v_jobs uuid[];
   v_cancels jsonb := '[]'::jsonb;
   v_enqueues jsonb := '[]'::jsonb;
-  v_firsts jsonb := '{}'::jsonb;
   v_first record;
   v_leader uuid;
-  v_vacated integer := 0;
   v_alerts integer := 0;
   v_released integer := 0;
   v_drafts integer := 0;
@@ -292,7 +292,6 @@ declare
   v_request uuid := case when p_command is not null
                          then app.cmd_current_request_id(p_actor_account, p_command) end;
   v_notified jsonb;
-  v_d record;
 begin
   select coalesce(array_agg(distinct o.occurrence_id), '{}') into v_occ
     from app.duties_assignments a
@@ -324,6 +323,24 @@ begin
   perform 1 from app.duties_slots s where s.occurrence_id = any (v_all)
    order by s.occurrence_id, s.position_no for update;
   perform app.duties_lock_members(array[p_member]);
+  -- Review N5: an assignment committed while we waited (a removal; a lifecycle change holds the
+  -- member row, so none can appear) has its occurrence and slots locked before any assignment.
+  select coalesce(array_agg(distinct s.occurrence_id), '{}') into v_more
+    from app.duties_assignments a
+    join app.duties_slots s on s.slot_id = a.slot_id
+    join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
+   where a.member_id = p_member and a.assignment_state = 'current'
+     and o.occurrence_state = 'published' and app.duties_occurrence_start(o) > now()
+     and (p_department is null or o.department_id = p_department)
+     and not (s.occurrence_id = any (v_all));
+  if cardinality(v_more) > 0 then
+    perform 1 from app.duties_occurrences o where o.occurrence_id = any (v_more)
+     order by o.series_id nulls last, o.series_date nulls last, o.starts_at, o.occurrence_id
+       for update;
+    perform 1 from app.duties_slots s where s.occurrence_id = any (v_more)
+     order by s.occurrence_id, s.position_no for update;
+    v_all := v_all || v_more;
+  end if;
   if p_department is not null then
     select dm.membership_id into v_membership from app.duties_department_members dm
      where dm.department_id = p_department and dm.member_id = p_member and dm.ended_at is null
@@ -335,114 +352,121 @@ begin
        set ended_at = now(), ended_by_member = p_actor_member, ended_by_account = p_actor_account
      where dm.membership_id = v_membership;
   end if;
+  select coalesce(array_agg(x.assignment_id order by x.assignment_id), '{}') into v_ids
+    from (select a.assignment_id
+            from app.duties_assignments a
+            join app.duties_slots s on s.slot_id = a.slot_id
+            join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
+           where a.member_id = p_member and a.assignment_state = 'current'
+             and o.occurrence_state = 'published' and app.duties_occurrence_start(o) > now()
+             and (p_department is null or o.department_id = p_department)
+           order by a.assignment_id
+             for update of a) x;
 
-  -- Re-read under the member's lock: an assignment committed while we waited is ended too.
-  for v_a in
-    select a.assignment_id, a.slot_id, a.response, s.occurrence_id
-      from app.duties_assignments a
-      join app.duties_slots s on s.slot_id = a.slot_id
-      join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
-     where a.member_id = p_member and a.assignment_state = 'current'
-       and o.occurrence_state = 'published' and app.duties_occurrence_start(o) > now()
-       and (p_department is null or o.department_id = p_department)
-     order by a.assignment_id
-       for update of a
-  loop
-    if not (v_a.occurrence_id = any (v_all)) then
-      perform 1 from app.duties_occurrences o where o.occurrence_id = v_a.occurrence_id for update;
-      perform 1 from app.duties_slots s where s.slot_id = v_a.slot_id for update;
-      v_all := v_all || v_a.occurrence_id;
-    end if;
+  -- One statement per table.
+  with e as (
     update app.duties_assignments a
        set assignment_state = 'superseded', ended_at = now(), end_reason = 'vacated',
            revision = a.revision + 1
-     where a.assignment_id = v_a.assignment_id
-    returning a.revision into v_end;
-    update app.duties_slots s set revision = s.revision + 1 where s.slot_id = v_a.slot_id
-    returning s.revision into v_slot_rev;
-    if not (v_a.occurrence_id = any (v_bumped)) then
-      update app.duties_occurrences o set revision = o.revision + 1
-       where o.occurrence_id = v_a.occurrence_id;
-      v_bumped := v_bumped || v_a.occurrence_id;
-    end if;
-    select o.* into v_o from app.duties_occurrences o where o.occurrence_id = v_a.occurrence_id;
-    insert into app.duties_slot_revisions (slot_id, slot_revision, occurrence_id,
-                                           occurrence_revision, change_class, changed_fields,
-                                           duty_name, starts_at, ends_at, reporting_at, location,
-                                           instructions, topic, scripture, event_ref, member_id,
-                                           assignment_id, response_deadline, created_by_member,
-                                           created_by_account, command_request_id)
-    values (v_a.slot_id, v_slot_rev, v_o.occurrence_id, v_o.revision, 'vacated', array['member_id'],
-            v_o.duty_name, v_o.starts_at, v_o.ends_at, v_o.reporting_at, v_o.location,
-            v_o.instructions, v_o.topic, v_o.scripture, v_o.event_ref, null, null, null,
-            p_actor_member, p_actor_account, v_request);
-    perform app.duties_audit_series_event('assignment_vacated', p_actor_member, p_actor_account,
-                                          p_capacity, p_command, v_o.department_id, v_o.series_id,
-                                          v_o.occurrence_id, v_a.assignment_id, p_member, p_code,
-                                          v_end);
-    v_vacated := v_vacated + 1;
-    -- Every pending job of the ended assignment ends with it (its coverage case closes
-    -- `superseded`, its Follow-ups task resolved).
-    v_cancels := v_cancels || jsonb_build_array(jsonb_build_object(
-      'op', 'cancel', 'source_id', v_a.assignment_id, 'reason', 'source_revised'));
-    if p_release and v_a.response in ('pending', 'accepted')
-       and app.duties_notice_recipient(p_member) then
-      v_enqueues := v_enqueues || jsonb_build_array(jsonb_build_object('op', 'enqueue', 'counts', true,
-        'key', jsonb_build_object(
-          'source_type', 'duties_assignment', 'source_id', v_a.assignment_id,
-          'source_revision', v_end, 'recipient_member_id', p_member,
-          'reminder_kind', 'duty_released', 'scheduled_at', app.cmd_utc(now()))));
-      v_released := v_released + 1;
-    end if;
-    -- One leaders' notice per department and change (not one per position): keyed by the
-    -- soonest ended position the member had not declined. Cell parts get no leader alert (4.11:
-    -- cell-scope alerts are a later contract change).
-    if v_o.department_id is not null and v_a.response <> 'declined'
-       and (not v_firsts ? v_o.department_id::text
-            or (v_firsts -> v_o.department_id::text ->> 'starts_at')::timestamptz > v_o.starts_at) then
-      v_firsts := v_firsts || jsonb_build_object(v_o.department_id::text, jsonb_build_object(
-        'assignment_id', v_a.assignment_id, 'revision', v_end, 'starts_at', v_o.starts_at));
-    end if;
-  end loop;
-  for v_first in select x.key, x.value from jsonb_each(v_firsts) x order by x.key loop
-    foreach v_leader in array app.duties_alert_recipients(v_first.key::uuid, p_member) loop
+     where a.assignment_id = any (v_ids)
+    returning a.assignment_id, a.slot_id, a.revision, a.response)
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'assignment_id', e.assignment_id, 'slot_id', e.slot_id, 'revision', e.revision,
+           'response', e.response, 'occurrence_id', s.occurrence_id, 'department_id', o.department_id,
+           'series_id', o.series_id, 'starts_at', o.starts_at) order by e.assignment_id), '[]'::jsonb)
+    into v_ended
+    from e
+    join app.duties_slots s on s.slot_id = e.slot_id
+    join app.duties_occurrences o on o.occurrence_id = s.occurrence_id;
+  update app.duties_occurrences o set revision = o.revision + 1
+   where o.occurrence_id in (select (x ->> 'occurrence_id')::uuid from jsonb_array_elements(v_ended) x)
+      or o.occurrence_id in (select s.occurrence_id from app.duties_slots s
+                              where s.draft_member_id = p_member and s.occurrence_id = any (v_draft));
+  with sr as (
+    update app.duties_slots s set revision = s.revision + 1
+     where s.slot_id in (select (x ->> 'slot_id')::uuid from jsonb_array_elements(v_ended) x)
+    returning s.slot_id, s.revision, s.occurrence_id)
+  insert into app.duties_slot_revisions (slot_id, slot_revision, occurrence_id, occurrence_revision,
+                                         change_class, changed_fields, duty_name, starts_at, ends_at,
+                                         reporting_at, location, instructions, topic, scripture,
+                                         event_ref, member_id, assignment_id, response_deadline,
+                                         created_by_member, created_by_account, command_request_id)
+  select sr.slot_id, sr.revision, o.occurrence_id, o.revision, 'vacated', array['member_id'],
+         o.duty_name, o.starts_at, o.ends_at, o.reporting_at, o.location, o.instructions, o.topic,
+         o.scripture, o.event_ref, null, null, null, p_actor_member, p_actor_account, v_request
+    from sr join app.duties_occurrences o on o.occurrence_id = sr.occurrence_id;
+  insert into app.duties_audit (action, actor_member_id, actor_account_id, actor_capacity,
+                                command_request_id, department_id, series_id, occurrence_id,
+                                assignment_id, member_id, code, revision_after)
+  select 'assignment_vacated', p_actor_member, p_actor_account, p_capacity, v_request,
+         (x ->> 'department_id')::uuid, (x ->> 'series_id')::uuid, (x ->> 'occurrence_id')::uuid,
+         (x ->> 'assignment_id')::uuid, p_member, p_code, (x ->> 'revision')::bigint
+    from jsonb_array_elements(v_ended) x;
+  -- The member's planned (draft) positions become unplanned, with their planned reason.
+  with d as (
+    update app.duties_slots s
+       set draft_member_id = null, draft_override_reason = null, draft_override_by_member = null,
+           draft_override_by_account = null, draft_override_at = null
+     where s.draft_member_id = p_member and s.occurrence_id = any (v_draft)
+    returning s.occurrence_id)
+  insert into app.duties_audit (action, actor_member_id, actor_account_id, actor_capacity,
+                                command_request_id, department_id, series_id, occurrence_id,
+                                member_id, code)
+  select 'draft_cleared', p_actor_member, p_actor_account, p_capacity, v_request, o.department_id,
+         o.series_id, o.occurrence_id, p_member, p_code
+    from d join app.duties_occurrences o on o.occurrence_id = d.occurrence_id;
+  get diagnostics v_drafts = row_count;
+
+  -- Follow-ups: the open coverage cases close `superseded` (their tasks resolved).
+  perform pg_catalog.set_config('app.duties_actor', jsonb_build_object(
+    'member', p_actor_member, 'account', p_actor_account, 'capacity', p_capacity,
+    'command', p_command)::text, true);
+  perform app.duties_close_cases(v_ids, 'superseded', p_actor_member, p_actor_account, p_capacity,
+                                 p_command);
+  -- Notifications last: cancellations only where something is pending.
+  select coalesce(array_agg(distinct y.id order by y.id), '{}') into v_jobs
+    from (select j.source_id as id from app.notifications_jobs j
+           where j.source_type in ('duties_assignment', 'duties_coverage')
+             and j.source_id = any (v_ids) and j.job_state = 'pending'
+          union
+          select sc.source_id from app.notifications_schedules sc
+           where sc.source_type = 'duties_assignment' and sc.source_id = any (v_ids)
+             and sc.schedule_state = 'active') y;
+  select coalesce(jsonb_agg(jsonb_build_object('op', 'cancel', 'source_id', x, 'reason', 'source_revised')
+                            order by x), '[]'::jsonb)
+    into v_cancels from unnest(v_jobs) x;
+  if p_release and app.duties_notice_recipient(p_member) then
+    select coalesce(jsonb_agg(jsonb_build_object('op', 'enqueue', 'counts', true,
+             'key', jsonb_build_object(
+               'source_type', 'duties_assignment', 'source_id', x ->> 'assignment_id',
+               'source_revision', (x ->> 'revision')::bigint, 'recipient_member_id', p_member,
+               'reminder_kind', 'duty_released', 'scheduled_at', app.cmd_utc(now())))), '[]'::jsonb),
+           count(*)
+      into v_enqueues, v_released
+      from jsonb_array_elements(v_ended) x
+     where x ->> 'response' in ('pending', 'accepted');
+  end if;
+  -- One leaders' notice per department and change, keyed by the soonest ended position the
+  -- member had not declined (cell parts get no leader alert: a later contract change).
+  for v_first in
+    select distinct on (x ->> 'department_id') (x ->> 'department_id')::uuid as department_id,
+           x ->> 'assignment_id' as assignment_id, (x ->> 'revision')::bigint as revision
+      from jsonb_array_elements(v_ended) x
+     where x ->> 'department_id' is not null and x ->> 'response' <> 'declined'
+     order by x ->> 'department_id', (x ->> 'starts_at')::timestamptz, x ->> 'assignment_id'
+  loop
+    foreach v_leader in array app.duties_alert_recipients(v_first.department_id, p_member) loop
       v_enqueues := v_enqueues || jsonb_build_array(jsonb_build_object('op', 'enqueue', 'counts', false,
         'key', jsonb_build_object(
-          'source_type', 'duties_coverage', 'source_id', v_first.value ->> 'assignment_id',
-          'source_revision', (v_first.value ->> 'revision')::bigint, 'recipient_member_id', v_leader,
+          'source_type', 'duties_coverage', 'source_id', v_first.assignment_id,
+          'source_revision', v_first.revision, 'recipient_member_id', v_leader,
           'reminder_kind', 'duty_vacated', 'scheduled_at', app.cmd_utc(now()))));
       v_alerts := v_alerts + 1;
     end loop;
   end loop;
-
-  -- The member's planned (draft) positions become unplanned, with their planned reason.
-  for v_d in
-    select s.slot_id, o.occurrence_id, o.department_id, o.series_id
-      from app.duties_slots s
-      join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
-     where s.draft_member_id = p_member and o.occurrence_id = any (v_draft)
-       and o.occurrence_state = 'draft'
-     order by o.occurrence_id, s.position_no
-  loop
-    update app.duties_slots s
-       set draft_member_id = null, draft_override_reason = null, draft_override_by_member = null,
-           draft_override_by_account = null, draft_override_at = null
-     where s.slot_id = v_d.slot_id;
-    if not (v_d.occurrence_id = any (v_bumped)) then
-      update app.duties_occurrences o set revision = o.revision + 1
-       where o.occurrence_id = v_d.occurrence_id;
-      v_bumped := v_bumped || v_d.occurrence_id;
-    end if;
-    perform app.duties_audit_series_event('draft_cleared', p_actor_member, p_actor_account,
-                                          p_capacity, p_command, v_d.department_id, v_d.series_id,
-                                          v_d.occurrence_id, null, p_member, p_code, null);
-    v_drafts := v_drafts + 1;
-  end loop;
-
-  -- Follow-ups (coverage cases closing), then Notifications last.
   v_notified := app.duties_lifecycle_notify(v_cancels, v_enqueues, p_actor_member, p_actor_account,
                                             p_capacity, p_command, p_department, p_member);
-  return jsonb_build_object('vacated', v_vacated, 'drafts_cleared', v_drafts,
+  return jsonb_build_object('vacated', jsonb_array_length(v_ended), 'drafts_cleared', v_drafts,
                             'leader_alerts', v_alerts, 'released', v_released,
                             'notices_skipped', (v_notified ->> 'skipped')::boolean);
 end;
@@ -476,7 +500,9 @@ end;
 $$;
 
 -- A removed leader or deputy: their pending leader alerts of every department they no longer lead
--- or deputise end (`not_recipient`). Their authority is checked on current grants anyway.
+-- or deputise end (`not_recipient`). Review N6: the pending alerts are found in one query (the
+-- recipient's pending `duties_coverage` jobs of those departments' duties that have not started);
+-- the Notifications API then cancels each one found (usually none or a few).
 create function app.duties_scope_revoked(p_member uuid)
 returns integer
 language plpgsql
@@ -487,21 +513,19 @@ declare
   v_count integer := 0;
 begin
   for v_id in
-    select a.assignment_id
-      from app.duties_occurrences o
-      join app.duties_slots s on s.occurrence_id = o.occurrence_id
-      join app.duties_assignments a on a.slot_id = s.slot_id
-     where o.department_id in (
-             select g.scope_id from app.identity_grants g
-              where g.member_id = p_member and g.revoked_at is not null
-                and g.scope_kind in ('department_leader', 'department_deputy')
-             except
-             select g.scope_id from app.identity_grants g
-              where g.member_id = p_member and g.revoked_at is null
-                and g.scope_kind in ('department_leader', 'department_deputy'))
-       and o.occurrence_state = 'published' and app.duties_occurrence_start(o) > now()
-       and (a.assignment_state = 'current' or a.end_reason = 'vacated')
-     order by a.assignment_id
+    select distinct j.source_id
+      from app.notifications_jobs j
+      join app.duties_assignments a on a.assignment_id = j.source_id
+      join app.duties_slots s on s.slot_id = a.slot_id
+      join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
+     where j.source_type = 'duties_coverage' and j.job_state = 'pending'
+       and j.recipient_member_id = p_member
+       and o.department_id is not null
+       and not exists (select 1 from app.identity_grants g
+                        where g.member_id = p_member and g.revoked_at is null
+                          and g.scope_id = o.department_id
+                          and g.scope_kind in ('department_leader', 'department_deputy'))
+     order by j.source_id
   loop
     v_count := v_count + (app.notifications_cancel(jsonb_build_object(
       'source_type', 'duties_coverage', 'source_id', v_id, 'reason', 'not_recipient',
@@ -585,7 +609,7 @@ select app.identity_register_handover_hook('duties', 'app.duties_report_handover
 -- ---------------------------------------------------------------------------------------------
 
 -- duty_vacated (one per department and lifecycle change, keyed by the soonest position it ended):
--- current while that assignment ended `vacated` at that revision and its duty is published;
+-- current while that assignment ended `vacated` at that revision;
 -- actionable while any position the same change ended in that department (same member, same end
 -- time) is still unfilled, not cancelled and has not started; the recipient leads or deputises the
 -- department now, is reachable in the app and is not the member.
@@ -608,10 +632,11 @@ begin
   select o.* into v_occurrence
     from app.duties_slots s join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
    where s.slot_id = v_assignment.slot_id;
+  -- Review N1: current is the ended assignment at that revision; whether anything still needs
+  -- cover (published, not cancelled, not started, unfilled) is for actionable.
   v_current := v_assignment.assignment_state = 'superseded'
                and v_assignment.end_reason = 'vacated'
-               and v_assignment.revision = (p_key ->> 'source_revision')::numeric::bigint
-               and v_occurrence.occurrence_state = 'published';
+               and v_assignment.revision = (p_key ->> 'source_revision')::numeric::bigint;
   return jsonb_build_object(
     'current', v_current,
     'revision', v_assignment.revision,
@@ -660,10 +685,9 @@ begin
     return '{"current": false, "revision": null}'::jsonb;
   end if;
   return jsonb_build_object(
-    'current', v_row.occurrence_state = 'published'
-               and v_row.revision = (p_source ->> 'source_revision')::numeric::bigint
-               and (v_row.assignment_state = 'current'
-                    -- Story 4.12.
+    'current', v_row.revision = (p_source ->> 'source_revision')::numeric::bigint
+               and ((v_row.assignment_state = 'current' and v_row.occurrence_state = 'published')
+                    -- Story 4.12 (review N1): the vacancy notice's source, whatever the duty's state.
                     or (v_row.assignment_state = 'superseded' and v_row.end_reason = 'vacated')),
     'revision', v_row.revision);
 end;
@@ -841,6 +865,226 @@ end;
 $$;
 
 -- ---------------------------------------------------------------------------------------------
+-- Review S2 (AD-2, Identity first): the members a command may notify are share-locked first
+-- ---------------------------------------------------------------------------------------------
+
+-- Key-share locks on the given Identity member rows, in member-id order. A lifecycle change holds
+-- its member's row FOR UPDATE and then locks that member's duties; a command that may queue a
+-- notice to that member takes this lock before any Duties row, so one waits for the other and they
+-- never deadlock (Identity's own FOR UPDATE is unchanged).
+create function app.duties_lock_people(p_members uuid[])
+returns void
+language plpgsql
+set search_path = ''
+as $$
+begin
+  -- PERFORM reads every row (a SQL function's final SELECT would stop at the first one).
+  perform 1 from app.identity_members m
+   where m.member_id = any (p_members)
+   order by m.member_id
+     for key share;
+end;
+$$;
+
+-- A payload value as a uuid, or null when it is not one (never an error: the handler refuses it).
+create function app.duties_jsonb_uuid(p_value jsonb)
+returns uuid
+language plpgsql
+immutable
+set search_path = ''
+as $$
+begin
+  if app.contract_uuid_error(p_value) is null then
+    return (p_value #>> '{}')::uuid;
+  end if;
+  return null;
+end;
+$$;
+
+-- The members a Duties command may notify or alert, from its payload (read without locks, before
+-- any Duties row): the actor, a named member, every current assignee and planned member of the
+-- occurrences it names (directly, through a slot, assignment, assignments, series or review
+-- flag), and the current leaders and deputies of their departments (or of a named department).
+create function app.duties_command_people(p_request jsonb, p_actor uuid)
+returns uuid[]
+language sql
+stable
+set search_path = ''
+as $$
+  with pl as (
+    select case when jsonb_typeof(p_request -> 'payload') = 'object' then p_request -> 'payload'
+                else '{}'::jsonb end as p
+  ), ids as (
+    select app.duties_jsonb_uuid(pl.p -> 'occurrence_id') as occurrence_id,
+           app.duties_jsonb_uuid(pl.p -> 'from_occurrence_id') as from_occurrence_id,
+           app.duties_jsonb_uuid(pl.p -> 'slot_id') as slot_id,
+           app.duties_jsonb_uuid(pl.p -> 'assignment_id') as assignment_id,
+           app.duties_jsonb_uuid(pl.p -> 'series_id') as series_id,
+           app.duties_jsonb_uuid(pl.p -> 'flag_id') as flag_id,
+           app.duties_jsonb_uuid(pl.p -> 'department_id') as department_id,
+           app.duties_jsonb_uuid(pl.p -> 'member_id') as member_id,
+           array(select app.duties_jsonb_uuid(e -> 'assignment_id')
+                   from jsonb_array_elements(case when jsonb_typeof(pl.p -> 'assignments') = 'array'
+                                                  then pl.p -> 'assignments' else '[]'::jsonb end) e
+                  where jsonb_typeof(e) = 'object') as assignment_ids
+      from pl
+  ), occ as (
+    select ids.occurrence_id as o from ids
+    union
+    select ids.from_occurrence_id from ids
+    union
+    select s.occurrence_id from ids join app.duties_slots s on s.slot_id = ids.slot_id
+    union
+    select s.occurrence_id from ids
+      join app.duties_assignments a on a.assignment_id = ids.assignment_id or a.assignment_id = any (ids.assignment_ids)
+      join app.duties_slots s on s.slot_id = a.slot_id
+    union
+    select o.occurrence_id from ids join app.duties_occurrences o on o.series_id = ids.series_id
+     where o.occurrence_state <> 'cancelled' and app.duties_occurrence_start(o) > now()
+    union
+    select f.occurrence_id from ids join app.duties_review_flags f on f.flag_id = ids.flag_id
+  ), dep as (
+    select ids.department_id as d from ids
+    union
+    select o.department_id from occ join app.duties_occurrences o on o.occurrence_id = occ.o
+  )
+  select coalesce(array_agg(distinct x.m order by x.m), '{}')
+    from (
+      select p_actor as m
+      union all
+      select ids.member_id from ids
+      union all
+      select a.member_id from occ
+        join app.duties_slots s on s.occurrence_id = occ.o
+        join app.duties_assignments a on a.slot_id = s.slot_id and a.assignment_state = 'current'
+      union all
+      select s.draft_member_id from occ join app.duties_slots s on s.occurrence_id = occ.o
+      union all
+      select g.member_id from dep join app.identity_grants g
+          on g.scope_id = dep.d and g.revoked_at is null
+         and g.scope_kind in ('department_leader', 'department_deputy')) x
+   where x.m is not null;
+$$;
+
+-- (Replaced, story 4.12; copied from 20261015035112_duties_owner_operations.sql.) Review S2: the
+-- people a cell part's owner operation may notify (the actor and the current assignees of the
+-- cell's duties that have not started) are share-locked before any Duties row.
+create or replace function app.duties_owner_session(p_cell_id uuid, OUT member_id uuid, OUT account_id uuid,
+                                         OUT capacity text)
+returns record
+language plpgsql
+set search_path = ''
+as $$
+declare
+  r record;
+begin
+  select e.* into r from app.identity_evaluate_grant(null, null, null) e;
+  if r.outcome is null or r.outcome in ('unauthenticated', 'untrusted_session') then
+    perform app.cmd_fail('unauthenticated');
+  end if;
+  if r.outcome <> 'granted' then
+    perform app.cmd_fail('forbidden');
+  end if;
+  member_id := r.member_id;
+  select l.auth_user_id into account_id from app.identity_account_links l
+   where l.link_id = r.link_id and l.member_id = r.member_id and l.link_state = 'active';
+  if account_id is null then
+    perform app.cmd_fail('forbidden');
+  end if;
+  capacity := 'member';
+  if p_cell_id is not null then
+    capacity := case
+      when app.identity_member_has_scope(member_id, 'cell_leader', p_cell_id) then 'cell_leader'
+      when app.identity_member_has_scope(member_id, 'cell_assistant', p_cell_id) then 'cell_assistant'
+    end;
+    if capacity is null then
+      perform app.cmd_fail('forbidden');
+    end if;
+  end if;
+  -- Story 4.12 review S2.
+  perform app.duties_lock_people(array(
+    select member_id
+    union
+    select a.member_id
+      from app.duties_occurrences o
+      join app.duties_slots s on s.occurrence_id = o.occurrence_id
+      join app.duties_assignments a on a.slot_id = s.slot_id and a.assignment_state = 'current'
+     where p_cell_id is not null and o.cell_id = p_cell_id
+       and o.occurrence_state = 'published' and app.duties_occurrence_start(o) > now()));
+end;
+$$;
+
+
+
+-- (Replaced, story 4.12; copied from 20261015035112_duties_owner_operations.sql.) Review S2: the
+-- members a part names are share-locked here (put_part parses them before any Duties row).
+create or replace function app.duties_owner_positions(p_input jsonb, OUT errors jsonb, OUT keys text[],
+                                           OUT names text[], OUT members uuid[])
+returns record
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_items jsonb := p_input -> 'positions';
+  v_item jsonb;
+  v_key text;
+  v_errs jsonb;
+  v_name text;
+  v_member uuid;
+begin
+  errors := '{}'::jsonb;
+  keys := '{}';
+  names := '{}';
+  members := '{}';
+  if jsonb_typeof(v_items) is distinct from 'array' then
+    errors := jsonb_build_object('positions',
+                case when coalesce(jsonb_typeof(v_items), 'null') = 'null' then 'required' else 'invalid' end);
+    return;
+  end if;
+  if jsonb_array_length(v_items) not between 1 and 10 then
+    errors := '{"positions": "out_of_range"}';
+    return;
+  end if;
+  for v_item in select x from jsonb_array_elements(v_items) x loop
+    if jsonb_typeof(v_item) is distinct from 'object'
+       or app.contract_unknown_keys(v_item, array['position_key', 'position_name', 'member_id']) <> '{}'::jsonb
+       or app.duties_position_key_error(v_item -> 'position_key') is not null then
+      errors := '{"positions": "invalid"}';
+      return;
+    end if;
+    v_key := v_item ->> 'position_key';
+    if v_key = any (keys) then
+      errors := '{"positions": "duplicate"}';
+      return;
+    end if;
+    select t.errors, t.value into v_errs, v_name
+      from app.duties_text(v_item, 'position_name', false, 60, false, '{}'::jsonb) t;
+    v_member := null;
+    if coalesce(jsonb_typeof(v_item -> 'member_id'), 'null') <> 'null' then
+      if app.contract_uuid_error(v_item -> 'member_id') is not null then
+        v_errs := v_errs || '{"member_id": "invalid"}';
+      else
+        v_member := (v_item ->> 'member_id')::uuid;
+      end if;
+    end if;
+    if v_errs <> '{}'::jsonb then
+      errors := errors || jsonb_build_object('position:' || v_key, 'invalid');
+    end if;
+    keys := keys || v_key;
+    names := names || v_name;
+    members := members || v_member;
+  end loop;
+  if errors = '{}'::jsonb
+     and (select count(distinct lower(n)) from unnest(names) n where n is not null)
+         <> (select count(*) from unnest(names) n where n is not null) then
+    errors := '{"positions": "duplicate_name"}';
+  end if;
+  -- Story 4.12 review S2: the members the part names, share-locked before any Duties row.
+  perform app.duties_lock_people(members);
+end;
+$$;
+
+-- ---------------------------------------------------------------------------------------------
 -- Replaced: the command entry point and authorizer (two new commands)
 -- ---------------------------------------------------------------------------------------------
 
@@ -874,6 +1118,10 @@ begin
   if r.outcome <> 'granted' then
     return false;
   end if;
+  -- Story 4.12 review S2: the members this command may notify, before any Duties row.
+  perform app.duties_lock_people(app.duties_command_people(
+    jsonb_build_object('payload', nullif(pg_catalog.current_setting('duties.command_payload', true), '')::jsonb),
+    r.member_id));
   perform 1 from app.identity_grants g
    where g.member_id = r.member_id and g.revoked_at is null
      and (g.role = 'admin' or g.scope_kind in ('department_leader', 'department_deputy'))
@@ -891,11 +1139,17 @@ set search_path = ''
 as $$
 declare
   v_command text;
+  v_result jsonb;
 begin
   if jsonb_typeof(p_envelope) = 'object' and jsonb_typeof(p_envelope -> 'command') = 'string' then
     v_command := p_envelope ->> 'command';
   end if;
-  return app.cmd_execute(
+  -- Story 4.12 review S2: the authorizer sees only the actor and the command, so the payload is
+  -- handed to it (transaction-local, cleared after) to share-lock the members it may notify.
+  perform pg_catalog.set_config('duties.command_payload',
+    case when jsonb_typeof(p_envelope) = 'object' then coalesce(p_envelope -> 'payload', 'null'::jsonb)::text
+         else 'null' end, true);
+  v_result := app.cmd_execute(
     p_envelope,
     case v_command
       when 'duties.create_department'
@@ -947,6 +1201,8 @@ begin
       and v_command is distinct from 'duties.create_series'
       and v_command is distinct from 'duties.accept_many'
   );
+  perform pg_catalog.set_config('duties.command_payload', '', true);
+  return v_result;
 end;
 $$;
 
@@ -1431,7 +1687,7 @@ comment on function app.duties_erase_member(jsonb) is
   'Duties deletion hook (stories 4.1-4.12): erase or check the member''s Duties personal data.';
 
 -- ---------------------------------------------------------------------------------------------
--- Follow-ups: handover of open tasks (Q4 owner-scope rule) and supervision
+-- Follow-ups: handover of open tasks and supervision (Q4 owner-scope rule), set-based
 -- ---------------------------------------------------------------------------------------------
 
 -- Can Notifications reach the member in the app now (a live, reviewed link, no hold)?
@@ -1444,158 +1700,259 @@ as $$
   select coalesce((select r.route = 'member' from app.notifications_recipient_route(p_member_id) r), false);
 $$;
 
--- Who takes over an active task when p_leaving can no longer own it (owner decision Q4: the task's
--- own group or a current Pastor): its supervisor, then another holder of its scope (the purpose's
--- kinds in order, reachable first), then a live Pastor, then another member of its own group.
--- Null when nobody may.
-create function app.followups_handover_candidate(p_task app.followups_tasks, p_leaving uuid)
-returns uuid
+-- The handover plan for every active task p_member owns or supervises, computed set-based (one
+-- roster per distinct scope, reachability once per person):
+--   owner_due        the member must stop owning it (p_leaving: deactivation or deletion; else
+--                    they are no longer in the task's group);
+--   owner_to         the first candidate of owner decision Q4 (the task's own group or a current
+--                    Pastor) the app can reach (review S3): its supervisor (holding the task's
+--                    scope), then another holder of its scope (the purpose's kinds in order), then
+--                    a Pastor, then another member of its group; null = nobody may take it;
+--   supervisor_due   the member must stop supervising it (p_leaving, or they no longer hold its
+--                    scope), or its supervisor becomes its owner (review N3);
+--   supervisor_to    another active holder of its scope (reachable first), else the final owner
+--                    when they hold the scope (self-supervision, the 4.9 fallback); null = nobody.
+create function app.followups_handover_plan(p_member uuid, p_leaving boolean)
+returns table (task_id uuid, owner_from uuid, owner_to uuid, owner_due boolean,
+               supervisor_from uuid, supervisor_to uuid, supervisor_due boolean, sort_at timestamptz)
 language plpgsql
 set search_path = ''
 as $$
+#variable_conflict use_column
 declare
-  v_roster uuid[] := app.followups_scope_roster(p_task.scope_kind, p_task.scope_id);
-  v_kinds text[] := app.followups_purpose_kinds(p_task.source_type, p_task.purpose);
-  v uuid;
+  v_rosters jsonb := '{}'::jsonb;
+  v_reach jsonb;
+  v_scope record;
 begin
-  if p_task.supervisor_member_id is distinct from p_leaving
-     and p_task.supervisor_member_id = any (v_roster)
-     and app.followups_holds_scope(p_task.supervisor_member_id, p_task) then
-    return p_task.supervisor_member_id;
-  end if;
-  select g.member_id into v from app.identity_grants g
-   where g.revoked_at is null and g.scope_id = p_task.scope_id and g.scope_kind = any (v_kinds)
-     and app.followups_family(g.scope_kind) = app.followups_family(p_task.scope_kind)
-     and g.member_id <> p_leaving and g.member_id = any (v_roster)
-   order by array_position(v_kinds, g.scope_kind), app.followups_reachable(g.member_id) desc,
-            g.granted_at, g.member_id
-   limit 1;
-  if v is not null then
-    return v;
-  end if;
-  select g.member_id into v from app.identity_grants g
-   where g.revoked_at is null and g.role = 'pastor' and g.member_id <> p_leaving
-     and g.member_id = any (v_roster)
-   order by g.granted_at, g.member_id
-   limit 1;
-  if v is not null then
-    return v;
-  end if;
-  select x into v from unnest(v_roster) x where x <> p_leaving order by x limit 1;
-  return v;
+  for v_scope in
+    select distinct t.scope_kind, t.scope_id from app.followups_tasks t
+     where (t.owner_member_id = p_member or t.supervisor_member_id = p_member)
+       and app.followups_state_ok('active_state', t.task_state)
+  loop
+    v_rosters := v_rosters || jsonb_build_object(v_scope.scope_kind || '|' || v_scope.scope_id,
+                   to_jsonb(app.followups_scope_roster(v_scope.scope_kind, v_scope.scope_id)));
+  end loop;
+  select coalesce(jsonb_object_agg(y.m::text, app.followups_reachable(y.m)), '{}'::jsonb) into v_reach
+    from (select distinct (e #>> '{}')::uuid as m
+            from jsonb_each(v_rosters) r, jsonb_array_elements(r.value) e) y;
+  -- The candidates depend only on the task's owner, supervisor, scope and purpose, so they are
+  -- chosen once per distinct combination (usually a handful) and joined back to the tasks.
+  return query
+  with t as materialized (
+    select g.owner_member_id, g.supervisor_member_id, g.scope_kind, g.scope_id, g.source_type, g.purpose,
+           app.followups_purpose_kinds(g.source_type, g.purpose) as kinds,
+           array(select (e #>> '{}')::uuid
+                   from jsonb_array_elements(v_rosters -> (g.scope_kind || '|' || g.scope_id)) e) as roster
+      from (select distinct t.owner_member_id, t.supervisor_member_id, t.scope_kind, t.scope_id,
+                            t.source_type, t.purpose
+              from app.followups_tasks t
+             where (t.owner_member_id = p_member or t.supervisor_member_id = p_member)
+               and app.followups_state_ok('active_state', t.task_state)) g
+  ), o as (
+    select t.*,
+           t.owner_member_id = p_member
+             and (p_leaving or not (p_member = any (t.roster))) as o_due,
+           t.supervisor_member_id = p_member
+             and (p_leaving or not app.followups_member_holds(p_member, t.scope_kind, t.scope_id, t.kinds))
+             as s_gone
+      from t
+  ), c as (
+    select o.*,
+           case when o.o_due then (
+             select x.m from (
+               select o.supervisor_member_id as m, 0 as tier, 0 as k, null::timestamptz as g
+                where o.supervisor_member_id <> p_member and o.supervisor_member_id = any (o.roster)
+                  and app.followups_member_holds(o.supervisor_member_id, o.scope_kind, o.scope_id, o.kinds)
+               union all
+               select gr.member_id, 1, array_position(o.kinds, gr.scope_kind), gr.granted_at
+                 from app.identity_grants gr
+                where gr.revoked_at is null and gr.scope_id = o.scope_id and gr.scope_kind = any (o.kinds)
+                  and app.followups_family(gr.scope_kind) = app.followups_family(o.scope_kind)
+                  and gr.member_id <> p_member and gr.member_id = any (o.roster)
+               union all
+               select gr.member_id, 2, 0, gr.granted_at
+                 from app.identity_grants gr
+                where gr.revoked_at is null and gr.role = 'pastor' and gr.member_id <> p_member
+                  and gr.member_id = any (o.roster)
+               union all
+               select r.m, 3, 0, null::timestamptz from unnest(o.roster) r(m) where r.m <> p_member) x
+              where coalesce((v_reach ->> x.m::text)::boolean, false)
+              order by x.tier, x.k, x.g nulls last, x.m
+              limit 1) end as o_to
+      from o
+  ), s as (
+    select c.*,
+           coalesce(case when c.o_due then c.o_to end, c.owner_member_id) as o_final
+      from c
+  ), pl as materialized (
+    select s.*,
+           s.s_gone or (s.o_due and s.o_to = s.supervisor_member_id) as s_due,
+           case when s.s_gone or (s.o_due and s.o_to = s.supervisor_member_id) then (
+             select y.m from (
+               select gr.member_id as m, 0 as tier,
+                      coalesce((v_reach ->> gr.member_id::text)::boolean, app.followups_reachable(gr.member_id)) as reach,
+                      array_position(s.kinds, gr.scope_kind) as k, gr.granted_at as g
+                 from app.identity_grants gr
+                where gr.revoked_at is null and gr.scope_id = s.scope_id and gr.scope_kind = any (s.kinds)
+                  and app.followups_family(gr.scope_kind) = app.followups_family(s.scope_kind)
+                  and gr.member_id <> p_member and gr.member_id <> s.o_final
+                  and app.followups_member_active(gr.member_id)
+               union all
+               select s.o_final, 1, true, 0, null::timestamptz
+                where s.o_final <> p_member
+                  and app.followups_member_holds(s.o_final, s.scope_kind, s.scope_id, s.kinds)) y
+              order by y.tier, y.reach desc, y.k, y.g nulls last, y.m
+              limit 1) end as s_to
+      from s
+  )
+  select tk.task_id, tk.owner_member_id, pl.o_to, pl.o_due, tk.supervisor_member_id, pl.s_to, pl.s_due,
+         coalesce(tk.review_at, tk.due_at)
+    from app.followups_tasks tk
+    join pl on pl.owner_member_id = tk.owner_member_id
+           and pl.supervisor_member_id is not distinct from tk.supervisor_member_id
+           and pl.scope_kind = tk.scope_kind and pl.scope_id = tk.scope_id
+           and pl.source_type = tk.source_type and pl.purpose = tk.purpose
+   where (tk.owner_member_id = p_member or tk.supervisor_member_id = p_member)
+     and app.followups_state_ok('active_state', tk.task_state);
 end;
 $$;
 
--- Who supervises an active task when p_leaving can no longer: another active holder of its scope
--- (the purpose's kinds in order, reachable first). Null when nobody holds it.
-create function app.followups_supervisor_candidate(p_task app.followups_tasks, p_leaving uuid)
-returns uuid
-language sql
-stable
-set search_path = ''
-as $$
-  select g.member_id
-    from app.identity_grants g
-   where g.revoked_at is null and g.scope_id = p_task.scope_id
-     and g.scope_kind = any (app.followups_purpose_kinds(p_task.source_type, p_task.purpose))
-     and app.followups_family(g.scope_kind) = app.followups_family(p_task.scope_kind)
-     and g.member_id <> p_leaving and app.followups_member_active(g.member_id)
-   order by array_position(app.followups_purpose_kinds(p_task.source_type, p_task.purpose), g.scope_kind),
-            app.followups_reachable(g.member_id) desc, g.granted_at, g.member_id
-   limit 1;
-$$;
-
--- Hands one locked active task over (owner and/or supervisor; null = unchanged), with
--- content-free activity (capacity `source`, code `handover`, no person behind it), the old
--- recipients' reminders cancelled and the task's reminders planned again (skipped and recorded
--- `reminders_skipped` when the Q2 policy is unavailable). Notifications last.
-create function app.followups_handover_task(p_task app.followups_tasks, p_owner uuid, p_supervisor uuid)
-returns void
+-- Hands over at most p_limit tasks of the plan (soonest due or review date first), set-based: one
+-- update of owners and supervisors (a new schedule revision: fresh logical keys), one insert per
+-- activity kind (capacity `source`, no person, code `handover`), then per task the old recipients'
+-- reminders are cancelled and the task's reminders planned again (the Notifications API is per
+-- task; with the Q2 policy unavailable they are skipped and recorded `reminders_skipped`).
+-- Tasks left over keep their owner and supervisor (their handover obligations stay pending,
+-- visible to Admin; `followups.complete_handover` continues). Answers {handed_over, remaining}.
+create function app.followups_handover_member(p_member uuid, p_leaving boolean, p_limit integer)
+returns jsonb
 language plpgsql
 set search_path = ''
 as $$
 declare
-  v_revision bigint;
-  v_message text;
+  v_rows jsonb;
+  v_sel jsonb;
+  v_changed jsonb;
+  v_total integer;
+  v_done integer := 0;
+  v_task jsonb;
+  v_ready boolean;
 begin
-  if p_owner is not null then
-    perform app.followups_lock_pastor(p_owner);
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'task_id', p.task_id,
+           'owner_from', p.owner_from,
+           'owner_to', case when p.owner_due then p.owner_to end,
+           'supervisor_from', p.supervisor_from,
+           'supervisor_to', case when p.supervisor_due and p.supervisor_to <> p.supervisor_from
+                                 then p.supervisor_to end)
+           order by p.sort_at, p.task_id), '[]'::jsonb)
+    into v_rows
+    from app.followups_handover_plan(p_member, p_leaving) p
+   where (p.owner_due and p.owner_to is not null)
+      or (p.supervisor_due and p.supervisor_to is not null and p.supervisor_to <> p.supervisor_from);
+  v_total := jsonb_array_length(v_rows);
+  if v_total = 0 then
+    return '{"handed_over": 0, "remaining": 0}'::jsonb;
   end if;
-  update app.followups_tasks t
-     set owner_member_id = coalesce(p_owner, t.owner_member_id),
-         supervisor_member_id = coalesce(p_supervisor, t.supervisor_member_id),
-         -- Review B1 (4.7): new recipients get new logical keys.
-         schedule_revision = t.schedule_revision + 1,
-         revision = t.revision + 1, updated_at = now()
-   where t.task_id = p_task.task_id
-  returning t.revision into v_revision;
-  if p_owner is not null then
-    perform app.followups_activity_event(p_task.task_id, 'reassigned', null, null, 'source', null,
-                                         null, null, null, null, null, p_task.owner_member_id,
-                                         p_owner, 'handover', v_revision);
-  end if;
-  if p_supervisor is not null then
-    perform app.followups_activity_event(p_task.task_id, 'supervisor_changed', null, null, 'source',
-                                         null, null, null, null, null, null,
-                                         p_task.supervisor_member_id, p_supervisor, 'handover',
-                                         v_revision);
-  end if;
-  if p_owner is not null then
-    perform app.followups_cancel_reminders(p_task.task_id, 'followups_task', p_task.owner_member_id,
-                                           'reassigned');
-  end if;
-  if p_supervisor is not null then
-    perform app.followups_cancel_reminders(p_task.task_id, 'followups_supervision',
-                                           p_task.supervisor_member_id, 'supervisor_changed');
-  end if;
-  begin
-    perform app.followups_schedule_reminders(p_task.task_id, p_owner is not null, null);
-  exception when sqlstate 'PCMD1' then
-    get stacked diagnostics v_message = message_text;
-    if v_message is distinct from 'unavailable' then
-      raise;
+  select coalesce(jsonb_agg(r.x order by r.n), '[]'::jsonb) into v_sel
+    from jsonb_array_elements(v_rows) with ordinality as r(x, n)
+   where r.n <= p_limit;
+  -- Identity before Follow-ups (AD-2): a Pastor chosen as owner keeps their grant meanwhile.
+  perform 1 from app.identity_grants g
+   where g.member_id in (select (x ->> 'owner_to')::uuid from jsonb_array_elements(v_sel) x)
+     and g.role = 'pastor' and g.revoked_at is null
+   order by g.grant_id for share;
+  perform 1 from app.followups_tasks t
+   where t.task_id in (select (x ->> 'task_id')::uuid from jsonb_array_elements(v_sel) x)
+   order by t.task_id for update;
+  -- One update; only what is still as planned changes (a concurrent command may have moved it).
+  with w as (
+    select (x ->> 'task_id')::uuid as task_id, (x ->> 'owner_from')::uuid as owner_from,
+           (x ->> 'owner_to')::uuid as owner_to, (x ->> 'supervisor_from')::uuid as supervisor_from,
+           (x ->> 'supervisor_to')::uuid as supervisor_to
+      from jsonb_array_elements(v_sel) x
+  ), u as (
+    update app.followups_tasks t
+       set owner_member_id = coalesce(w.owner_to, t.owner_member_id),
+           supervisor_member_id = coalesce(w.supervisor_to, t.supervisor_member_id),
+           schedule_revision = t.schedule_revision + 1,
+           revision = t.revision + 1, updated_at = now()
+      from w
+     where t.task_id = w.task_id and app.followups_state_ok('active_state', t.task_state)
+       and t.owner_member_id = w.owner_from and t.supervisor_member_id = w.supervisor_from
+    returning t.task_id, t.revision)
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'task_id', w.task_id, 'owner_from', w.owner_from, 'owner_to', w.owner_to,
+           'supervisor_from', w.supervisor_from, 'supervisor_to', w.supervisor_to,
+           'revision', u.revision) order by w.task_id), '[]'::jsonb)
+    into v_changed
+    from u join w on w.task_id = u.task_id;
+  -- One insert for the content-free activity (capacity `source`, no person, code `handover`).
+  insert into app.followups_activity (task_id, action, actor_capacity, from_member, to_member, code,
+                                      revision_after)
+  select (x ->> 'task_id')::uuid, 'reassigned', 'source', (x ->> 'owner_from')::uuid,
+         (x ->> 'owner_to')::uuid, 'handover', (x ->> 'revision')::bigint
+    from jsonb_array_elements(v_changed) x where x ->> 'owner_to' is not null
+  union all
+  select (x ->> 'task_id')::uuid, 'supervisor_changed', 'source', (x ->> 'supervisor_from')::uuid,
+         (x ->> 'supervisor_to')::uuid, 'handover', (x ->> 'revision')::bigint
+    from jsonb_array_elements(v_changed) x where x ->> 'supervisor_to' is not null;
+  -- Notifications last: the Notifications API cancels and plans per task.
+  v_ready := app.followups_reminders_ready();
+  for v_task in select x from jsonb_array_elements(v_changed) x loop
+    if v_task ->> 'owner_to' is not null then
+      perform app.followups_cancel_reminders((v_task ->> 'task_id')::uuid, 'followups_task',
+                                             (v_task ->> 'owner_from')::uuid, 'reassigned');
     end if;
-    perform app.followups_activity_event(p_task.task_id, 'reminders_skipped', null, null, 'source',
-                                         null, null, null, null, null, null, null, null,
-                                         'policy_unavailable', v_revision);
-  end;
+    if v_task ->> 'supervisor_to' is not null then
+      perform app.followups_cancel_reminders((v_task ->> 'task_id')::uuid, 'followups_supervision',
+                                             (v_task ->> 'supervisor_from')::uuid, 'supervisor_changed');
+    end if;
+    if v_ready then
+      perform app.followups_schedule_reminders((v_task ->> 'task_id')::uuid,
+                                               v_task ->> 'owner_to' is not null, null);
+    end if;
+    v_done := v_done + 1;
+  end loop;
+  if not v_ready then
+    insert into app.followups_activity (task_id, action, actor_capacity, code, revision_after)
+    select (x ->> 'task_id')::uuid, 'reminders_skipped', 'source', 'policy_unavailable',
+           (x ->> 'revision')::bigint
+      from jsonb_array_elements(v_changed) x;
+  end if;
+  return jsonb_build_object('handed_over', v_done, 'remaining', v_total - v_done);
 end;
 $$;
 
--- Hands over the member's active tasks: as owner when p_leaving (deactivation, deletion) or when
--- they are no longer in the task's group; as supervisor when p_leaving or when they no longer hold
--- the task's scope. Tasks locked in task order (Follow-ups after Duties, before Notifications).
-create function app.followups_handover_member(p_member uuid, p_leaving boolean)
+-- Obligations of the member that need nothing more (the task finished, or the person was already
+-- replaced) are resolved.
+create function app.followups_resolve_obligations(p_member uuid)
 returns integer
 language plpgsql
 set search_path = ''
 as $$
 declare
-  v_task app.followups_tasks;
-  v_owner uuid;
-  v_supervisor uuid;
+  v_o record;
   v_count integer := 0;
 begin
-  for v_task in
-    select t.* from app.followups_tasks t
-     where (t.owner_member_id = p_member or t.supervisor_member_id = p_member)
-       and app.followups_state_ok('active_state', t.task_state)
-     order by t.task_id
-       for update
+  for v_o in
+    select o.obligation_id,
+           t.task_id is null or not app.followups_state_ok('active_state', t.task_state) as gone,
+           case o.obligation_kind
+             when 'followup_task' then t.owner_member_id <> p_member
+             else t.supervisor_member_id <> p_member end as handed
+      from app.identity_handover_obligations o
+      left join app.followups_tasks t on t.task_id = o.subject_id
+     where o.member_id = p_member and o.owner_module = 'followups'
+       and o.obligation_kind in ('followup_task', 'followup_supervision')
+       and o.obligation_state = 'pending'
+     order by o.obligation_id
   loop
-    v_owner := null;
-    v_supervisor := null;
-    if v_task.owner_member_id = p_member
-       and (p_leaving
-            or not (p_member = any (app.followups_scope_roster(v_task.scope_kind, v_task.scope_id)))) then
-      v_owner := app.followups_handover_candidate(v_task, p_member);
-    end if;
-    if v_task.supervisor_member_id = p_member
-       and (p_leaving or not app.followups_holds_scope(p_member, v_task)) then
-      v_supervisor := app.followups_supervisor_candidate(v_task, p_member);
-    end if;
-    if v_owner is not null or v_supervisor is not null then
-      perform app.followups_handover_task(v_task, v_owner, v_supervisor);
+    if v_o.gone then
+      perform app.identity_resolve_handover_obligation('followups', v_o.obligation_id, 'no_longer_needed');
+      v_count := v_count + 1;
+    elsif v_o.handed then
+      perform app.identity_resolve_handover_obligation('followups', v_o.obligation_id, 'handed_over');
       v_count := v_count + 1;
     end if;
   end loop;
@@ -1603,7 +1960,12 @@ begin
 end;
 $$;
 
--- Runs inside Identity's lifecycle transaction (after Duties, before Notifications).
+-- Runs inside Identity's lifecycle transaction (after Duties, before Notifications). Review S1: at
+-- most 25 tasks are handed over per lifecycle change of a member (one budget for the transaction,
+-- shared by the change's events, e.g. a deactivation and the scope revocations it causes): the
+-- Notifications API cancels and plans a task's reminders per task, about 15-20 ms each. The rest
+-- keep their pending handover obligations, visible to Admin, and `followups.complete_handover`
+-- continues (100 per step).
 create function app.followups_on_member_lifecycle(p_event jsonb)
 returns void
 language plpgsql
@@ -1611,114 +1973,317 @@ set search_path = ''
 as $$
 declare
   v_member uuid := (p_event ->> 'member_id')::uuid;
-  v_obligation record;
+  v_setting text := current_setting('followups.handover_budget', true);
+  v_budget integer := 25;
+  v_result jsonb;
 begin
-  if p_event ->> 'event' in ('membership_deactivated', 'deletion_requested') then
-    perform app.followups_handover_member(v_member, true);
-  elsif p_event ->> 'event' = 'scope_revoked' then
-    perform app.followups_handover_member(v_member, false);
+  if v_setting like v_member::text || ':%' then
+    v_budget := split_part(v_setting, ':', 2)::integer;
   end if;
-  -- An obligation recorded for a task that was handed over earlier in this transaction (a revoked
-  -- scope) or has finished needs nothing more.
-  for v_obligation in
-    select o.obligation_id, t.task_id is not null and t.owner_member_id <> v_member as handed,
-           t.task_id is null or not app.followups_state_ok('active_state', t.task_state) as gone
-      from app.identity_handover_obligations o
-      left join app.followups_tasks t on t.task_id = o.subject_id
-     where o.member_id = v_member and o.owner_module = 'followups'
-       and o.obligation_kind = 'followup_task' and o.obligation_state = 'pending'
-     order by o.obligation_id
-  loop
-    if v_obligation.gone then
-      perform app.identity_resolve_handover_obligation('followups', v_obligation.obligation_id,
-                                                       'no_longer_needed');
-    elsif v_obligation.handed then
-      perform app.identity_resolve_handover_obligation('followups', v_obligation.obligation_id,
-                                                       'handed_over');
-    end if;
-  end loop;
+  if v_budget > 0 and p_event ->> 'event' in ('membership_deactivated', 'deletion_requested', 'scope_revoked') then
+    v_result := app.followups_handover_member(v_member, p_event ->> 'event' <> 'scope_revoked', v_budget);
+    v_budget := v_budget - (v_result ->> 'handed_over')::integer;
+    perform set_config('followups.handover_budget', v_member::text || ':' || v_budget::text, true);
+  end if;
+  perform app.followups_resolve_obligations(v_member);
 end;
 $$;
 
 comment on function app.followups_on_member_lifecycle(jsonb) is
   'Follow-ups lifecycle hook (story 4.12): hand open tasks and supervision over under the Q4 '
-  'owner-scope rule when the member leaves or loses the task''s scope.';
+  'owner-scope rule when the member leaves or loses the task''s scope (at most 25 per change).';
 
 select app.contract_register_lifecycle_hook('followups', e,
          'app.followups_on_member_lifecycle(jsonb)'::regprocedure)
   from unnest(array['membership_deactivated', 'deletion_requested', 'scope_revoked']) e;
 
--- Read only (it runs before Identity decides): one `followup_task` obligation per active task the
--- member owns; the last responsible person when nobody else may own it.
+-- Read only (it runs before Identity decides), set-based: `followup_task` per active task the
+-- member owns (last responsible when nobody the app can reach may own it), and
+-- `followup_supervision` per task they supervise that nobody else can (never last responsible:
+-- a supervision gap never blocks a lifecycle change; it stays pending for an Admin).
 create function app.followups_report_handover(p_event jsonb)
 returns jsonb
-language plpgsql
+language sql
 set search_path = ''
 as $$
-declare
-  v_member uuid := (p_event ->> 'member_id')::uuid;
-  v_task app.followups_tasks;
-  v_out jsonb := '[]'::jsonb;
-begin
-  for v_task in
-    select t.* from app.followups_tasks t
-     where t.owner_member_id = v_member and app.followups_state_ok('active_state', t.task_state)
-     order by t.task_id
-  loop
-    v_out := v_out || jsonb_build_array(jsonb_build_object(
-      'kind', 'followup_task', 'subject_id', v_task.task_id,
-      'last_responsible', app.followups_handover_candidate(v_task, v_member) is null));
-  end loop;
-  return jsonb_build_object('obligations', v_out);
-end;
+  with p as (select * from app.followups_handover_plan((p_event ->> 'member_id')::uuid, true))
+  select jsonb_build_object('obligations', coalesce(jsonb_agg(x.o order by x.kind, x.task_id), '[]'::jsonb))
+    from (
+      select 1 as kind, p.task_id,
+             jsonb_build_object('kind', 'followup_task', 'subject_id', p.task_id,
+                                'last_responsible', p.owner_to is null) as o
+        from p where p.owner_due
+      union all
+      select 2, p.task_id,
+             jsonb_build_object('kind', 'followup_supervision', 'subject_id', p.task_id,
+                                'last_responsible', false)
+        from p
+       where p.supervisor_due and p.supervisor_from = (p_event ->> 'member_id')::uuid
+         and p.supervisor_to is null) x;
 $$;
 
 comment on function app.followups_report_handover(jsonb) is
-  'Follow-ups handover hook (story 4.12): the member''s open tasks, last responsible when nobody '
-  'else may own them.';
+  'Follow-ups handover hook (story 4.12): the member''s open tasks (last responsible when nobody '
+  'else may own them) and the supervision nobody else can take.';
 
 select app.identity_register_handover_hook('followups',
          'app.followups_report_handover(jsonb)'::regprocedure);
 
--- A task's pending handover obligation is resolved when its owner changes (handed over) or it
--- finishes (no longer needed), whichever command or hook did it.
+-- A task's pending obligations are resolved when its owner (`followup_task`) or its supervisor
+-- (`followup_supervision`) changes (handed over), or it finishes (no longer needed), whichever
+-- command or hook did it.
 create function app.followups_task_handover_sync()
 returns trigger
 language plpgsql
 set search_path = ''
 as $$
 declare
-  v_id uuid;
-  v_resolution text;
+  v_o record;
+  v_finished boolean := app.followups_state_ok('active_state', old.task_state)
+                        and not app.followups_state_ok('active_state', new.task_state);
 begin
-  if new.owner_member_id is distinct from old.owner_member_id then
-    v_resolution := 'handed_over';
-  elsif app.followups_state_ok('active_state', old.task_state)
-        and not app.followups_state_ok('active_state', new.task_state) then
-    v_resolution := 'no_longer_needed';
-  else
-    return null;
-  end if;
-  for v_id in select o.obligation_id from app.identity_handover_obligations o
-               where o.owner_module = 'followups' and o.obligation_kind = 'followup_task'
-                 and o.subject_id = new.task_id and o.member_id = old.owner_member_id
-                 and o.obligation_state = 'pending'
-               order by o.obligation_id loop
-    perform app.identity_resolve_handover_obligation('followups', v_id, v_resolution);
+  for v_o in
+    select o.obligation_id, o.obligation_kind from app.identity_handover_obligations o
+     where o.owner_module = 'followups' and o.subject_id = new.task_id
+       and o.obligation_state = 'pending'
+       and ((o.obligation_kind = 'followup_task' and o.member_id = old.owner_member_id
+             and (v_finished or new.owner_member_id is distinct from old.owner_member_id))
+         or (o.obligation_kind = 'followup_supervision' and o.member_id = old.supervisor_member_id
+             and (v_finished or new.supervisor_member_id is distinct from old.supervisor_member_id)))
+     order by o.obligation_id
+  loop
+    perform app.identity_resolve_handover_obligation('followups', v_o.obligation_id,
+      case when v_finished then 'no_longer_needed' else 'handed_over' end);
   end loop;
   return null;
 end;
 $$;
 
 create trigger followups_tasks_handover_sync
-  after update of owner_member_id, task_state on app.followups_tasks
+  after update of owner_member_id, supervisor_member_id, task_state on app.followups_tasks
   for each row execute function app.followups_task_handover_sync();
+
+-- followups.complete_handover {member_id} (Admin; expected null): hands over the next 100 open
+-- tasks and supervisions of a member who has left (deactivated or being deleted), as the lifecycle
+-- hook does. Refusals: `forbidden` (not Admin), `validation_failed {"member_id": "active"}` (an
+-- active member hands over through their scopes and the commands). Answer {member_id,
+-- handed_over, remaining}.
+create function app.followups_complete_handover(p_actor uuid, p_expected_revision bigint, p_payload jsonb)
+returns jsonb
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_actor record;
+  v_errors jsonb;
+  v_member uuid;
+  v_result jsonb;
+begin
+  select a.* into v_actor from app.followups_command_actor(p_actor) a;
+  if not v_actor.is_admin then
+    perform app.cmd_fail('forbidden');
+  end if;
+  v_errors := app.contract_unknown_keys(p_payload, array['member_id']);
+  select t.errors, t.value into v_errors, v_member
+    from app.followups_uuid(p_payload, 'member_id', true, v_errors) t;
+  if v_errors <> '{}'::jsonb then
+    perform app.cmd_fail('validation_failed', v_errors);
+  end if;
+  perform app.followups_require_open();
+  if not exists (select 1 from app.identity_members m where m.member_id = v_member) then
+    perform app.cmd_fail('not_found');
+  end if;
+  if app.followups_member_active(v_member) then
+    perform app.cmd_fail('validation_failed', '{"member_id": "active"}');
+  end if;
+  v_result := app.followups_handover_member(v_member, true, 100);
+  perform app.followups_resolve_obligations(v_member);
+  return jsonb_build_object(
+    'aggregate_type', 'followups_handover', 'aggregate_id', v_member, 'revision', 1,
+    'data', jsonb_build_object('member_id', v_member,
+                               'handed_over', (v_result ->> 'handed_over')::integer,
+                               'remaining', (v_result ->> 'remaining')::integer));
+end;
+$$;
+
+-- (Replaced, story 4.12; copied from 20261014110258_followups_registry.sql.) Story 4.12: the
+-- Admin's `followups.complete_handover` (aggregate `followups_handover`, the member: a replay
+-- rechecks that the actor is still an Admin).
+create or replace function app.followups_in_scope(p_actor uuid, p_aggregate_type text, p_aggregate_id uuid)
+returns boolean
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_member uuid;
+  v_task app.followups_tasks;
+begin
+  select e.member_id into v_member from app.identity_evaluate_grant(null, null, null) e
+   where e.outcome = 'granted';
+  if v_member is null or p_aggregate_id is null then
+    return false;
+  end if;
+  -- Story 4.12.
+  if p_aggregate_type = 'followups_handover' then
+    return app.identity_member_has_role(v_member, 'admin');
+  end if;
+  if p_aggregate_type <> 'followups_task' then
+    return false;
+  end if;
+  select t.* into v_task from app.followups_tasks t where t.task_id = p_aggregate_id for share;
+  if not found then
+    return false;
+  end if;
+  return app.followups_capacity(v_member, v_task) is not null;
+end;
+$$;
+
+-- Story 4.12 review S2 (AD-2, Identity first): the members a Follow-ups command may notify (the
+-- actor, the task's owner and supervisor, a named owner or supervisor) are share-locked on their
+-- Identity member rows, in member-id order, before any Follow-ups row, so a lifecycle change of
+-- one of them (which holds the member row FOR UPDATE and then locks their tasks) waits or is
+-- waited for, never deadlocks.
+create function app.followups_lock_people(p_members uuid[])
+returns void
+language plpgsql
+set search_path = ''
+as $$
+begin
+  -- PERFORM reads every row (a SQL function's final SELECT would stop at the first one).
+  perform 1 from app.identity_members m
+   where m.member_id = any (p_members)
+   order by m.member_id
+     for key share;
+end;
+$$;
+
+-- A payload value as a uuid, or null when it is not one (never an error: the handler refuses it).
+create function app.followups_jsonb_uuid(p_value jsonb)
+returns uuid
+language plpgsql
+immutable
+set search_path = ''
+as $$
+begin
+  if app.contract_uuid_error(p_value) is null then
+    return (p_value #>> '{}')::uuid;
+  end if;
+  return null;
+end;
+$$;
+
+create function app.followups_command_people(p_request jsonb, p_actor uuid)
+returns uuid[]
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce(array_agg(distinct x.m order by x.m), '{}')
+    from (
+      select p_actor as m
+      union all
+      select app.followups_jsonb_uuid(p_request #> array['payload', k])
+        from unnest(array['owner_member_id', 'supervisor_member_id', 'member_id']) k
+      union all
+      select unnest(array[t.owner_member_id, t.supervisor_member_id])
+        from app.followups_tasks t
+       where t.task_id = app.followups_jsonb_uuid(p_request #> '{payload,task_id}')) x
+   where x.m is not null;
+$$;
+
+-- (Replaced, story 4.12; copied from 20261014110258_followups_registry.sql, review N5 kept.)
+-- Story 4.12: `followups.complete_handover`, and the members the command may notify are
+-- share-locked first (review S2).
+create or replace function app.followups_authorize_command(p_request jsonb)
+returns boolean
+language plpgsql
+set search_path = ''
+as $$
+declare
+  r record;
+begin
+  if coalesce(p_request ->> 'command', '') not in (
+       'followups.create_task', 'followups.update_task', 'followups.reassign',
+       -- Story 4.12.
+       'followups.complete_handover') then
+    return false;
+  end if;
+  select e.* into r from app.identity_evaluate_grant(null, null, null) e;
+  if r.outcome in ('unauthenticated', 'untrusted_session') then
+    perform app.cmd_fail('unauthenticated');
+  end if;
+  if r.outcome <> 'granted' then
+    return false;
+  end if;
+  -- Story 4.12 review S2: Identity member rows first (key share, member-id order).
+  perform app.followups_lock_people(app.followups_command_people(
+    jsonb_build_object('payload', nullif(pg_catalog.current_setting('followups.command_payload', true), '')::jsonb),
+    r.member_id));
+  perform 1 from app.identity_grants g
+   where g.member_id = r.member_id and g.revoked_at is null
+     and (g.role = 'admin' or g.scope_kind is not null)
+     for share;
+  -- Review N5: a named supervisor's grants too, before the receipt (AD-2 lock order).
+  if jsonb_typeof(p_request -> 'payload') = 'object'
+     and app.contract_uuid_error(p_request #> '{payload,supervisor_member_id}') is null then
+    perform 1 from app.identity_grants g
+     where g.member_id = (p_request #>> '{payload,supervisor_member_id}')::uuid
+       and g.revoked_at is null
+       for share;
+  end if;
+  return true;
+end;
+$$;
+
+-- (Replaced, story 4.12; copied from 20261014110258_followups_registry.sql.) Story 4.12:
+-- `followups.complete_handover` (expected null).
+create or replace function app.followups_command(p_envelope jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_command text;
+  v_result jsonb;
+begin
+  if jsonb_typeof(p_envelope) = 'object' and jsonb_typeof(p_envelope -> 'command') = 'string' then
+    v_command := p_envelope ->> 'command';
+  end if;
+  -- Story 4.12 review S2: the authorizer sees only the actor and the command, so the payload is
+  -- handed to it (transaction-local, cleared after) to share-lock the members it may notify.
+  perform pg_catalog.set_config('followups.command_payload',
+    case when jsonb_typeof(p_envelope) = 'object' then coalesce(p_envelope -> 'payload', 'null'::jsonb)::text
+         else 'null' end, true);
+  v_result := app.cmd_execute(
+    p_envelope,
+    case v_command
+      when 'followups.create_task' then 'app.followups_create_task(uuid, bigint, jsonb)'::regprocedure
+      when 'followups.update_task' then 'app.followups_update_task(uuid, bigint, jsonb)'::regprocedure
+      when 'followups.reassign' then 'app.followups_reassign(uuid, bigint, jsonb)'::regprocedure
+      -- Story 4.12.
+      when 'followups.complete_handover'
+        then 'app.followups_complete_handover(uuid, bigint, jsonb)'::regprocedure
+    end,
+    'app.followups_in_scope(uuid, text, uuid)'::regprocedure,
+    v_command is distinct from 'followups.create_task'
+      and v_command is distinct from 'followups.complete_handover'
+  );
+  perform pg_catalog.set_config('followups.command_payload', '', true);
+  return v_result;
+end;
+$$;
 
 -- ---------------------------------------------------------------------------------------------
 -- Privileges: nothing new is client-executable
 -- ---------------------------------------------------------------------------------------------
 
 revoke all on function
+  app.duties_lock_people(uuid[]),
+  app.duties_jsonb_uuid(jsonb),
+  app.followups_jsonb_uuid(jsonb),
+  app.followups_lock_people(uuid[]),
+  app.duties_command_people(jsonb, uuid),
   app.duties_lifecycle_actor(),
   app.duties_vacated_since(uuid),
   app.duties_lifecycle_notify(jsonb, jsonb, uuid, uuid, text, text, uuid, uuid),
@@ -1733,11 +2298,12 @@ revoke all on function
   app.duties_has_reachable_leader(uuid),
   app.duties_resolve_handover(uuid, bigint, jsonb),
   app.followups_reachable(uuid),
-  app.followups_handover_candidate(app.followups_tasks, uuid),
-  app.followups_supervisor_candidate(app.followups_tasks, uuid),
-  app.followups_handover_task(app.followups_tasks, uuid, uuid),
-  app.followups_handover_member(uuid, boolean),
+  app.followups_handover_plan(uuid, boolean),
+  app.followups_handover_member(uuid, boolean, integer),
+  app.followups_resolve_obligations(uuid),
   app.followups_on_member_lifecycle(jsonb),
   app.followups_report_handover(jsonb),
-  app.followups_task_handover_sync()
+  app.followups_task_handover_sync(),
+  app.followups_complete_handover(uuid, bigint, jsonb),
+  app.followups_command_people(jsonb, uuid)
   from public, anon, authenticated, service_role;

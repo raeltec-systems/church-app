@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import {
-  DEPARTMENT, OTHER_DEPARTMENT, REASON_CODES, churchTen, coverageCounts, coveragePosition, done, holdsReason,
-  isFictionalLifecyclePhone,
+  DEPARTMENT, OTHER_DEPARTMENT, REASON_CODES, churchTen, cleanOutcome, coverageCounts, coveragePosition, done,
+  heldCommandSql, holdsReason, isFictionalLifecyclePhone, jsonLiteral, sessionClaims,
 } from './duties-lifecycle.mjs';
 
 test('only the reserved fictional numbers of this run are accepted', () => {
@@ -42,4 +42,33 @@ test('a command went through only without a refusal code', () => {
 
 test('church 10:00 is 08:00 UTC (Africa/Lusaka, no daylight saving)', () => {
   assert.equal(churchTen('2026-10-15'), '2026-10-15T08:00:00Z');
+});
+
+test('a JSON literal is dollar-quoted and refuses its own tag', () => {
+  assert.equal(jsonLiteral({ a: 1 }), '$j${"a":1}$j$::jsonb');
+  assert.throws(() => jsonLiteral({ a: '$j$' }));
+});
+
+test('session claims are read from the token without verifying it', () => {
+  const payload = { sub: 'u1', role: 'authenticated', session_id: 's1' };
+  const token = `h.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.sig`;
+  assert.deepEqual(sessionClaims(token), payload);
+  assert.throws(() => sessionClaims(''));
+});
+
+test('a held command runs as the caller in its own transaction and sleeps before committing', () => {
+  const sql = heldCommandSql({ sub: 'u1' }, 'identity_lifecycle_command', { command: 'identity.deactivate_membership' }, 2);
+  assert.match(sql, /^begin;/);
+  assert.match(sql, /set local role authenticated;/);
+  assert.match(sql, /select api\.identity_lifecycle_command\(\$j\$/);
+  assert.match(sql, /pg_sleep\(2\);\ncommit;$/);
+  assert.throws(() => heldCommandSql({}, 'api.x; drop', {}, 1));
+});
+
+test('a raced outcome is clean only when done or plainly refused', () => {
+  assert.equal(cleanOutcome({ status: 200, data: {} }), true);
+  for (const code of ['conflict', 'validation_failed', 'not_found']) assert.equal(cleanOutcome({ status: 409, code }), true);
+  assert.equal(cleanOutcome({ status: 503, code: 'unavailable' }), false);
+  assert.equal(cleanOutcome({ status: 500, code: 'deadlock' }), false);
+  assert.equal(cleanOutcome({ status: 403, code: 'forbidden' }), false);
 });

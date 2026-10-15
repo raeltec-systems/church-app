@@ -14,6 +14,10 @@ abstract final class FollowUpCommands {
   static const createTask = 'followups.create_task';
   static const updateTask = 'followups.update_task';
   static const reassign = 'followups.reassign';
+
+  /// Story 4.12 (Admin): hands over the next 100 open tasks of a member who
+  /// left (a lifecycle change hands over at most 25 itself).
+  static const completeHandover = 'followups.complete_handover';
 }
 
 /// A task's state (wire codes).

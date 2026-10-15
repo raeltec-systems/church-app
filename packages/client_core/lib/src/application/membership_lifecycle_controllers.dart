@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/access_grants.dart';
 import '../domain/commands.dart';
 import '../domain/credential_review.dart';
+import '../domain/followups.dart' show FollowUpCommands;
 import '../domain/membership_lifecycle.dart';
 import '../domain/membership_review.dart' show IdentityCheck, MemberRecord;
 import 'access_controllers.dart';
@@ -61,6 +62,10 @@ enum LifecycleNotice {
   /// The member is the last responsible person for something an owning
   /// module manages: it must be handed over first.
   handoverRequired,
+
+  /// Story 4.12: the next open follow-up tasks of a member who left were
+  /// handed over (any left stay listed).
+  handoverContinued,
   alreadyHeld,
 
   /// The member is not an approved member (already deactivated, pending...).
@@ -245,6 +250,27 @@ class MembershipLifecycleController extends Notifier<MembershipLifecycleState> {
     m.displayName,
   );
 
+  /// Story 4.12 (review S1): hands over the next open follow-up tasks of a
+  /// member who left (expected revision null; a retry reuses the request id).
+  Future<void> continueFollowUpHandover(HandoverItem h) async {
+    if (state.busy) return;
+    final u = state.unconfirmed;
+    final same =
+        u != null &&
+        u.command == FollowUpCommands.completeHandover &&
+        u.payload['member_id'] == h.memberId;
+    await _dispatch(
+      FollowUpCommands.function,
+      CommandRequest(
+        command: FollowUpCommands.completeHandover,
+        requestId: same ? u.requestId : ref.read(requestIdsProvider).next(),
+        expectedRevision: const Optional.of(null),
+        payload: {'member_id': h.memberId},
+      ),
+      h.displayName,
+    );
+  }
+
   Future<void> checkAgain() async {
     final u = state.unconfirmed;
     final f = state.unconfirmedFunction;
@@ -310,6 +336,7 @@ class MembershipLifecycleController extends Notifier<MembershipLifecycleState> {
     CredentialCommands.placeHold => LifecycleNotice.loginHeld,
     CredentialCommands.releaseHold => LifecycleNotice.holdReleased,
     LifecycleCommands.deactivate => LifecycleNotice.deactivated,
+    FollowUpCommands.completeHandover => LifecycleNotice.handoverContinued,
     _ => LifecycleNotice.restored,
   };
 

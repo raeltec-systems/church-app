@@ -1,6 +1,6 @@
 # Runbook: follow-up tasks (epic 4, Follow-ups owner)
 
-Follow-ups is the one accountable task registry (architecture AD-7). Sources (duties coverage, visitors, missing reports, care, custody) do not keep their own trackers: they open one task per source and purpose in Follow-ups and register what their source events do to it. Reminders arrived with story 4.7 (below); lifecycle and handover hooks arrive with entry 12.
+Follow-ups is the one accountable task registry (architecture AD-7). Sources (duties coverage, visitors, missing reports, care, custody) do not keep their own trackers: they open one task per source and purpose in Follow-ups and register what their source events do to it. Reminders arrived with story 4.7 (below); lifecycle and handover hooks with story 4.12 (below).
 
 ## Story 4.6: open the Follow-ups registry with My follow-ups for every owner
 
@@ -71,7 +71,7 @@ select app.followups_register_purpose('cells', 'cells_visitor', 'visitor_contact
 
 ### Member deletion (2.11 hook)
 
-`app.followups_erase_member` is registered. Erase clears the text of every note the member wrote, that was written for them, or that sits on a task they own (`erased_at`), and replaces the member's and the account's ids with the nil UUID in tasks, activity and notes. No row is removed (no `_rows` file). A deleted owner's active task stays active, shows **Former member** and can be reassigned by its scope; the handover obligation for open tasks arrives with entry 12. Check answers 0 afterwards.
+`app.followups_erase_member` is registered. Erase clears the text of every note the member wrote, that was written for them, or that sits on a task they own (`erased_at`), and replaces the member's and the account's ids with the nil UUID in tasks, activity and notes. No row is removed (no `_rows` file). A deleted owner's active task stays active, shows **Former member** and can be reassigned by its scope; since story 4.12 open tasks are handed over before erasure (below). Check answers 0 afterwards.
 
 ### Clients
 
@@ -120,7 +120,7 @@ Record the outcome per step in `evidence-4.6/owner-check.md` (pass/fail, device 
 ### Known limits (later entries)
 
 - Reminders: done in story 4.7 (below).
-- No lifecycle or handover hooks: deactivation does not yet hand over open tasks (entry 12).
+- No lifecycle or handover hooks: built in story 4.12 (below).
 - No real source yet: duties coverage (entry 9; built in story 4.9, below) and the consumer guide with both-client fixtures (entry 11) follow. Care and finance note grants arrive with their owners.
 - No due-date change and no reopen of a Done or Closed task.
 
@@ -264,3 +264,24 @@ Fixture source types named in the shared fixtures (for the later owners to regis
 ### Staging and owner checks
 
 Nothing separate: see duties.md, story 4.11 (the SYNTHETIC caller's follow-up is exercised in pgTAP only).
+
+## Story 4.12: lifecycle and handover of follow-up tasks
+
+Migration: `supabase/migrations/20261015043644_duties_lifecycle.sql` (with Duties; no `_rows` file, so **no owner SQL paste**). The Duties side and the owner manual checks are in [duties.md](duties.md) (story 4.12).
+
+### Handover under the Q4 owner-scope rule
+
+- **Handover hook** (`app.followups_report_handover`, read only, before Identity decides): one obligation `followup_task` (subject = the task) per active task the member owns. It is the **last responsible** person when nobody else may own the task: a **deactivation** is then refused `handover_required` (reassign or close the task first); a **deletion** records it pending and erasure waits.
+- **Lifecycle hook** (`app.followups_on_member_lifecycle`, inside Identity's transaction, after Duties and before Notifications):
+  - `membership_deactivated` and `deletion_requested`: each active task the member **owns** goes to the first candidate of the owner decision Q4 rule (the task's own group or a current Pastor): its **supervisor** (when they hold the task's scope), then **another holder of the task's scope** (leader kinds first, reachable in the app first), then a **live Pastor**, then **another member of the task's group**. Each task the member **supervises** goes to another active holder of its scope. The obligation Identity recorded is resolved `handed_over` in the same transaction.
+  - `scope_revoked`: a leader or deputy who lost a scope stops supervising its tasks (supervision moves as above) and hands over the tasks they own once they are no longer in the task's group (for example a leader who is not a member of the department). Their authority already ended: every command, replay and read checks current grants.
+- **What changes on a task:** owner and/or supervisor, a new schedule revision (fresh logical keys), the old recipient's reminders cancelled, the new owner told (`followup_assigned`) and the reminders planned again. Activity: `reassigned` / `supervisor_changed` with capacity `source`, no person and code `handover` (clients: "handed over automatically"; never why). With the Q2 policy unavailable the handover still happens and the activity records `reminders_skipped` (`policy_unavailable`).
+- **Resolving later:** a trigger resolves a task's pending obligation when its owner changes (`followups.reassign` by its scope or an Admin: `handed_over`) or the task is Done or Closed (`no_longer_needed`). A deletion's erasure then continues at the next worker run.
+
+### Cost
+
+About 12 ms per handed-over task locally (its reminders are planned again; the same cost as a reassignment). `supabase/tests/duties_lifecycle_scale_test.sql` deactivates a member owning 100 and supervising 30 tasks within the timeout (see duties.md, story 4.12).
+
+### Staging and owner checks
+
+Applied with the Duties migration (duties.md, story 4.12, Hosted staging); owner checks 2 and 6 there cover the task handover.

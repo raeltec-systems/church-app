@@ -10,7 +10,7 @@ Migrations: `supabase/migrations/20261013220239_duties_department_tracer.sql` (n
 
 - **Departments** (`app.duties_departments`): created by an Admin. While Q4 (personal data) is unapproved, every name must start `SYNTHETIC ` and the department is marked synthetic. Names are unique (case-insensitive).
 - **Leader and deputy are Identity scope grants**: Duties registers the scope kinds `department_leader` and `department_deputy` (scope id = department id). Give or remove them with the audited 2.3 commands `identity.grant_scope` / `identity.revoke_scope`. A cell leader scope gives no department authority. Revoking a scope takes effect on the leader's next request (also for an open tab).
-- **Department members** (`app.duties_department_members`): approved members with or without a login, added by an Admin. Membership is a Duties record, not an Identity grant. One current row per department and member (ended rows arrive with entry 12).
+- **Department members** (`app.duties_department_members`): approved members with or without a login, added by an Admin. Membership is a Duties record, not an Identity grant. One current row per department and member; since story 4.12 an Admin ends a row with `duties.remove_member` (below).
 - **Occurrence, slot, assignment** (`app.duties_occurrences`, `app.duties_slots`, `app.duties_assignments`): one published occurrence with exactly one owning department, a duty name, a start, an optional end and reporting time, an optional location and instructions; one slot (position 1); and the slot's one current assignment with the leader's response deadline (never after the reporting time or start) and the member's explicit answer (`pending`, `accepted`, `declined`) with the answering member, account, time and provenance (`member`).
 - **Audit** (`app.duties_audit`): action, actor member and account, capacity (`admin`, `department_leader`, `department_deputy`, `member`), request id, ids, a code and the revision. Never names, notes or free text.
 - **Vocabularies** are checked by `app.duties_state_ok(kind, value)`, not inline CHECK lists, so later stories widen them with `create or replace` (no constraint is dropped).
@@ -69,7 +69,7 @@ Refusals with their field codes:
 
 `app.duties_erase_member` is registered with `app.identity_register_deletion_hook('duties', ...)`. Erase deletes the member's department memberships (`app.duties_deletion_purge_rows`, body in the rows file) and keeps assignments, occurrences, departments and audit rows as anonymous facts: member and account ids become the nil UUID and the member's response note is cleared. Check counts what is left. Without the rows file the erase step answers `unavailable` and nothing is erased (fail closed).
 
-Not yet registered (entry 12): lifecycle hooks (deactivation or removal ending future assignments) and the handover hook (last leader of an active department). Until then a deactivated or held assignee keeps the assignment and the worker routes their reminder as above.
+Lifecycle hooks (deactivation or removal ending future assignments) and the handover hook (last leader of an active department) are registered since story 4.12 (below).
 
 ### Clients
 
@@ -120,7 +120,7 @@ Record the outcome per step in `evidence-4.1/owner-check.md` (pass/fail, device 
 - One position, one-off occurrences, no drafts, no cancellation (4.3). Edits arrive with 4.2 (below).
 - No later decline ("Can't make it anymore"), bulk acceptance or calendar export (4.5, now built; see below).
 - No default deadline, Short notice, response or pre-service reminders, snooze of duty reminders, or Needs contact list (4.8, 4.9).
-- No lifecycle or handover hooks (4.12).
+- No lifecycle or handover hooks (built in story 4.12, below).
 
 ## Story 4.2: revise assignments on material change and refuse stale responses
 
@@ -1081,3 +1081,105 @@ Record the outcome of each step in `evidence-4.11/owner-check.md`: pass or fail,
 - A system-principal caller (no live session) is not supported; owner operations need the acting member's session.
 - A part holds at most 50 positions over its life (cancelled ones count); beyond that a programme starts a new part.
 - Lifecycle effects on cell parts (transfer, removal) are Cells' calls to these operations (epic 5.9) and entry 12.
+
+## Story 4.12: apply membership lifecycle and handover to duties and follow-ups
+
+Migration: `supabase/migrations/20261015043644_duties_lifecycle.sql` (forward only; the 4.1-4.11 files are not edited; no destructive statements, no row deletions, no `_rows` file, so **no owner SQL paste**; no new client grant: both new commands go through `api.duties_command`). Plan: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-apply-membership-lifecycle-and-handover-to-duties-and-follow-plan.md`. Evidence: `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.12/`. The Follow-ups side is in [follow-ups.md](follow-ups.md) (story 4.12); the Identity seams in [identity-access.md](identity-access.md) (stories 2.10, 2.11 and the 4.12 note there).
+
+### What each lifecycle change does to Duties (inside Identity's transaction, AD-14)
+
+| Identity change | Duties effect |
+|---|---|
+| **Church deactivation** (`membership_deactivated`), and a **deletion** request (`deletion_requested`, also for a member deactivated earlier) | Every current assignment of the member on a published duty that has not started ends: department duties and cell parts, pending, accepted or declined. The assignment becomes `superseded` with end reason `vacated`, the position is left **unfilled** (a `vacated` slot revision), the member's reminders and notices for it and the leaders' alerts about it are cancelled, its coverage case closes (`superseded`, its follow-up task resolved). The member's planned draft positions are cleared. The member gets no notice (no access). Past and started duties, answers, outcomes and history are kept. Department membership rows are kept: a **restoration** brings back no assignment (give the duties again; a returning member gets new assignments and fresh notices). |
+| **Removal from a department** (`duties.remove_member`, below) | The same for that department's future duties only, and the member is told each duty is no longer theirs (`duty_released`; a member the app cannot reach is listed under **Needs contact** "Tell X: ... is no longer theirs"). The membership row ends (who and when). |
+| **Login hold** (or any hold, `access_hold_applied`) | Duties are **kept**. Each current, not declined duty that has not started goes on the leaders' **Needs contact** list at once ("Reminders cannot reach them in the app"), shown while the member still cannot be reached in the app (a released hold clears it). No leader alert: a hold is never disclosed. |
+| **Scope removed** (`scope_revoked`: a leader or deputy loses the department scope, also when they are deactivated) | Their authority already ended: every command, replay and read checks the current grants (coverage, contact attempts, Confirmed by leader, cancellations, outcomes, reviews). The hook also cancels their pending leader alerts of the departments they no longer lead or deputise (`not_recipient`), and Follow-ups moves their supervision (follow-ups.md). |
+
+**Vacancy flag and the leaders' notice.** A position whose person can no longer serve shows **Needs a new person** on the board and in **Coverage** (`vacated: {since}` per position and a `vacated` count per department in `api.duties_coverage`; on the board the newest history entry has end reason `vacated`). The department's reachable leaders and deputies (never the member; a held or in-review leader is skipped and refused at delivery) get **one** notice per department and change, `duties_coverage` / `duty_vacated`: **Positions need cover** / "One or more positions in your department no longer have anyone assigned. Open Coverage to find cover." (link `/duties/coverage`). It is keyed by the soonest position the change ended (a fresh key every time) and is delivered while any position that change ended in the department is still unfilled, not cancelled and not started. No notice when the member had declined every ended position (the leaders already know). Cell parts get no leader alert (4.11: cell-scope alerts are a later contract change); the cell's owner read shows the gap.
+
+**Never a reason.** Leaders see one generic end reason (`vacated`) and **Needs a new person**: never whether the member was held, deactivated, deleted or removed, and never a reason code. The audit keeps codes only (`assignment_vacated` with `member_left` or `removed`, `draft_cleared`, `member_removed`, `handover_resolved`), attributed to the Admin (or the deleting member) with capacity `lifecycle` for a lifecycle change.
+
+### Commands (`api.duties_command`, Admin only)
+
+| Command | `expected_revision` | Payload | Effect / refusals |
+|---|---|---|---|
+| `duties.remove_member` | department revision | `{department_id, member_id}` | as above; answer `{department_id, revision, vacated, drafts_cleared, notices_skipped}`. `forbidden` (not Admin), `validation_failed {"member_id": "not_in_department"}`, `conflict` (stale revision) |
+| `duties.resolve_handover` | department revision | `{department_id}` | marks the department's pending `department_leader` handovers done once it has an approved leader or deputy the app can reach; `conflict {"department_id": "leader_required"}` otherwise, `validation_failed {"department_id": "no_handover"}` when nothing is pending |
+
+A replay rechecks that the actor is still an Admin. With the Q2 policy unavailable a removal (and a lifecycle change) is still recorded: the notices are skipped and audited `reminders_skipped` (`policy_unavailable`).
+
+### Handover (the last leader of an active department)
+
+Duties' handover hook reports `department_leader` (subject = the department, last responsible) when the member leads or deputises an active department and nobody else approved and reachable in the app holds its leader or deputy scope. A **deactivation** is then refused `conflict {"member_id": "handover_required"}` and nothing changes: give the department another leader or deputy who uses the app (a held one does not count), then deactivate. A **deletion** is never refused: the obligation is recorded pending and the erase steps wait (`handover_pending`) until an Admin gives the department a leader and presses **Mark handover done** (`duties.resolve_handover`) on **Departments**. `api.duties_admin_overview` adds per department `handovers` (ids and times) and `needs_leader`.
+
+### Gates and locks
+
+Ending work needs neither Q2 nor Q4 (the hooks only reduce processing; production holds no duties while Q4 is closed). The commands need Q4 like every Duties command. Lock order: Identity rows (the lifecycle command's, or the Admin's grants) -> departments -> series -> occurrences -> slots -> the member's advisory lock -> the membership row -> assignments -> coverage cases -> Follow-ups -> Notifications last. A Duties command racing the lifecycle change either commits first (its new assignment is then ended too) or waits and is refused (the member is no longer active; E2E `L20`). Postgres' deadlock detector remains the backstop for the rare cycle where a leader's command already holds a duty and is queueing a notice to the member being deactivated: one of the two is refused and can be retried.
+
+**Cost.** Linear: about 7 ms per ended duty and 12 ms per handed-over task (its reminders are planned again) locally. `supabase/tests/duties_lifecycle_scale_test.sql`: a hold over 150 duties about 20 ms, a removal ending 30 duties about 0.2 s, a deactivation ending 120 duties and handing over 130 tasks about 2.3-3.2 s (statement timeout 8 s).
+
+### Member deletion
+
+`app.duties_erase_member` and `app.duties_deletion_remaining` are replaced: who removed a member from a department (`ended_by_member`, `ended_by_account`) is anonymised and counted; the 4.10 S1 lock-first order is kept. What a deletion anonymises versus erases follows Identity's `identity_deletion_retention` gate (labelled fixture in local and staging, closed in production).
+
+### Clients
+
+- **Staff web, Departments (Admin):** each member has **Remove from department** (confirmed first: "Their future duties in this department end now ..."); notice **Removed from the department**. A department with a pending handover shows **Handover pending** and **Mark handover done** (disabled until it has a leader or deputy who uses the app; **Give it a leader first** otherwise); one whose leaders cannot use the app says so.
+- **Staff web and mobile, Coverage and the board:** **Needs a new person** on a vacated position, "N need a new person" in the counts, and "The person given this position can no longer serve it. Give it to someone else." A board history entry of a Confirmed by leader assignment that ended now reads correctly (it used to fail the board read).
+- **Staff web, Membership status:** the **Hand over first** notice says what to hand over and where (a department's last leader or deputy, or the only possible owner of an open follow-up task).
+
+### Local runs
+
+```bash
+npx supabase db reset
+npm run -s db:test                           # duties_lifecycle_test.sql, duties_lifecycle_scale_test.sql (+ 4.1-4.11)
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/duties-lifecycle.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+node --test tools/identity-e2e/duties-lifecycle.test.mjs
+(cd packages/client_core && flutter test test/duties)
+```
+
+Fictional numbers: pgTAP `+44 7700 900460-900469`, scale `900480-900489`, E2E `900470-900479`. Earlier tests changed for the new behaviour: `cross_epic_contracts_test.sql` (it removes the real Duties and Follow-ups hooks too while testing its synthetic ones), `notifications_routing_test.sql` (three hooks on `deletion_requested`), `duties_reminders_test.sql` (a revoked deputy's alert is now cancelled at once; a hold adds an `access_hold` entry; the vacancy notice opens Coverage), `duties_coverage_test.sql` (the `vacated` count; a revoked deputy's coverage task is handed to the leader at once, so the leader's next attempt continues it).
+
+### Hosted staging (parent session, then the owner)
+
+1. **Parent session:**
+   - Apply `20261015043644_duties_lifecycle.sql` to staging (`tmurpotfluignacfueki`) after `20261015035112` (rename the local file to the recorded hosted version if the apply records another one).
+   - Run `tools/ci/verify-hosted.sql` with `expected_env=staging`.
+   - Compare the md5 of each new or replaced `app.duties_*` and `app.followups_*` function with the local one (the migration has no backslashes).
+   - Grants: no new function is executable by `anon`, `authenticated` or `service_role`.
+   - Right after the apply: `select string_agg(event || ':' || module, ',' order by event, module) from app.contract_lifecycle_hooks where module in ('duties', 'followups');` lists seven rows; `select string_agg(module, ',' order by module) from app.identity_handover_hooks where module in ('duties', 'followups');` is `duties,followups`; `select count(*) from app.contract_reminder_contracts where reminder_kind = 'duty_vacated';` is 1.
+   - Existing duties are not changed by the apply; the hooks act from the next lifecycle change.
+   - No Edge Function change, no rows file, no owner SQL paste.
+2. **Staging clients:** rebuild the staff web and the staging APK (no new dependency).
+3. **Production:** nothing in this story (Q4 and the deletion retention gate stay closed).
+
+### Owner manual checks (staging, phone and web, story 4.12)
+
+Use synthetic members only. You need: Admin A, leader L and deputy P of `SYNTHETIC Preaching Rota`, members M, O and H with the staging APK, an accountless member R in the department, and a second department `SYNTHETIC 4.12 Ushers` whose only leader is K. Publish duties about two weeks ahead: two for M (M accepts one), one for M in Ushers, two for H (H accepts one), two for O, one for R. As L create follow-up tasks owned by M and by R (supervisor L).
+
+1. **Login hold.** Staff web as A: **Membership status** > find H > **Disable login (hold)**. Staff web as L: **Coverage** (choose the two weeks): H's duties are still there, with **Needs contact** ("Reminders cannot reach them in the app"); nothing says why; L's Inbox gets no alert.
+2. **Deactivation.** As A: **Deactivate membership** for M (any reason). As L: **Coverage** shows M's positions as **Unfilled** with **Needs a new person** and "N need a new person"; within about a minute L's and P's Inbox show one **Positions need cover** (K gets one for Ushers); M's phone gets nothing more. **Follow-ups**: M's task is now L's ("Reassigned to L, handed over automatically"). Nothing anywhere names the reason.
+3. **Last leader.** As A: **Deactivate membership** for K: **Hand over first** (it names a department's last leader or deputy). As A: **Departments** > Ushers: give another member who uses the app the **Deputy** role; deactivate K again: done.
+4. **Removal.** As A: **Departments** > Preaching Rota > O > **Remove from department** > confirm: **Removed from the department**. O's phone gets **Duty changed** for each duty; the positions read **Needs a new person**.
+5. **Revoked deputy.** As A: remove P's **Deputy** role. P's open **Coverage** tab: the next action or reload is refused; P's pending notices do not arrive.
+6. **Deletion.** As A: **Member deletions** > R > identity check > **Delete member**. R's duty reads **Needs a new person**; R's task is L's. The deletion's steps show no handover wait.
+7. **Restore.** As A: **Restore membership** for M: M's earlier duties stay ended; give M a duty again: M gets **New duty assigned**.
+8. **Clean up** as in 4.9, step 10, plus (SQL editor) the `app.identity_handover_obligations`, `app.identity_membership_lifecycle` and deletion rows of the synthetic members.
+
+Record the outcome of each step in `evidence-4.12/owner-check.md`: pass or fail, device model, Android version and browser. Include no numbers, ids or keys.
+
+### Owner questions
+
+- **Q4 (open, fail-closed default; unchanged):** what a deletion anonymises versus erases, and personal data in production. Built: the `identity_deletion_retention` fixture locally and on staging; production erasure waits for the owner's approval.
+- **New (default built: one generic flag):** may leaders learn *why* a position became vacant (left the church, removed from the department, deleted)? Built: no; one generic **Needs a new person** and end reason `vacated`.
+- **New (default built: one notice per department and change):** one vacancy notice per position would flood a leader when a long-serving member leaves; built: one notice per department per change; the queue shows each position.
+- **New (default built: a deputy counts):** may a deputy alone be the responsible person of a department (so its last leader can be deactivated once a reachable deputy is in place)? Built: yes (functional requirements: "Admin assigns a deputy/replacement"); a held or accountless deputy does not count.
+
+### Known limits (later entries)
+
+- Cell parts: a deactivated member's cell parts end (the cell's owner read shows the gap), but there is no cell-scope leader alert and no Cells handover (epic 5: cell transfer and removal call the owner operations).
+- The vacancy notice is cancelled with its key position (when that position is cancelled the notice goes even if other vacancies of the same change remain; the queue still shows them).
+- Released notices to a member removed from a department stay queued if the member is deactivated afterwards (they route to Needs contact).
+- A removal of a member with very many future duties sends one released notice per duty.

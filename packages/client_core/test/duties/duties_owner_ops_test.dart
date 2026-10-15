@@ -246,6 +246,20 @@ void main() {
         () => MyDuty.fromJson({...myDutyData(), 'department_name': null}),
         throwsFormatException,
       );
+      // Review S2: the list reads each row on its own.
+      final list = MyDuties.fromJson({
+        'member_id': _ruth,
+        'assignments': [
+          {...myDutyData(ownerKind: 'cell')}..remove('cell_id'),
+          myDutyData(),
+        ],
+      });
+      expect(list.assignments, hasLength(1));
+      expect(list.skipped, 1);
+      expect(
+        () => MyDuties.fromJson({'member_id': _ruth, 'assignments': 'x'}),
+        throwsFormatException,
+      );
     });
 
     test('a cell part goes into the calendar without a department', () {
@@ -344,8 +358,85 @@ void main() {
           'assignment_id': _assignment,
           'response': 'accepted',
         });
+        // Review S3: the notice names who sees a cell part's answer (never
+        // "your leader now sees", the department's alert path).
+        h.duties.mine = AccessReadOk(
+          MyDuties.fromJson({
+            'member_id': _ruth,
+            'assignments': [
+              myDutyData(
+                ownerKind: 'cell',
+                dutyName: 'SYNTHETIC Worship part',
+                response: 'accepted',
+                respondedAt: '2026-10-15T09:00:00.000000Z',
+                revision: 2,
+              ),
+            ],
+          }),
+        );
+        sent.confirm(const {'response': 'accepted'}, 2);
+        await settle(tester);
+        expect(byKey('duties-notice-accepted'), findsOneWidget);
+        expect(
+          find.textContaining('Your cell leader sees it in the programme'),
+          findsOne,
+        );
+        expect(find.textContaining('Your leader now sees'), findsNothing);
       },
     );
+
+    testWidgets('a department duty keeps the leader wording', (tester) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.myDuties,
+        setUp: (h) => h.duties.mine = AccessReadOk(
+          MyDuties.fromJson({
+            'member_id': _ruth,
+            'assignments': [myDutyData()],
+          }),
+        ),
+      );
+      await tapKey(tester, 'duty-accept-$_assignment');
+      final sent = h.gateway.sent.single;
+      h.duties.mine = AccessReadOk(
+        MyDuties.fromJson({
+          'member_id': _ruth,
+          'assignments': [
+            myDutyData(
+              response: 'accepted',
+              respondedAt: '2026-10-15T09:00:00.000000Z',
+              revision: 2,
+            ),
+          ],
+        }),
+      );
+      sent.confirm(const {'response': 'accepted'}, 2);
+      await settle(tester);
+      expect(find.textContaining('Your leader now sees'), findsOne);
+      expect(find.textContaining('cell leader'), findsNothing);
+    });
+
+    testWidgets('a row this app cannot read is left out (review S2)', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.myDuties,
+        setUp: (h) => h.duties.mine = AccessReadOk(
+          MyDuties.fromJson({
+            'member_id': _ruth,
+            'assignments': [
+              {...myDutyData(ownerKind: 'cell')}
+                ..remove('cell_id')
+                ..['assignment_id'] = '42424242-4242-4242-8242-424242424299',
+              myDutyData(dutyName: 'SYNTHETIC Readable duty'),
+            ],
+          }),
+        ),
+      );
+      expect(byKey('my-duties-skipped'), findsOneWidget);
+      expect(find.textContaining('SYNTHETIC Readable duty'), findsWidgets);
+    });
   });
 
   group('staff web: a linked department duty and its review', () {
@@ -366,6 +457,11 @@ void main() {
       expect(
         find.textContaining('A linked cell meeting changed (time, place)'),
         findsOne,
+      );
+      // Review N6: the button's accessible label names the duty.
+      expect(
+        find.bySemanticsLabel('Mark reviewed: SYNTHETIC Cell preaching'),
+        findsOneWidget,
       );
       await tapKey(tester, 'clear-review-$_flag');
       final sent = h.gateway.sent.single;

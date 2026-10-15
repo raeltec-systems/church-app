@@ -10,6 +10,8 @@
 /// server; these reads are presentation only. Free of widgets and SDKs.
 library;
 
+import 'dart:developer' as developer;
+
 import 'access_grants.dart';
 import 'church_time.dart';
 
@@ -556,21 +558,41 @@ class MyDuties {
     required this.memberId,
     required this.assignments,
     this.truncated = false,
+    this.skipped = 0,
   });
 
   factory MyDuties.fromJson(Object? json) {
     final m = _map(json, 'my duties');
+    // Story 4.11 (review S2): each row is read on its own. A row this app
+    // cannot read (a kind of duty a later server adds) is left out and
+    // logged, never fatal to the whole list.
+    final rows = <MyDuty>[];
+    var skipped = 0;
+    for (final row in _req<List>(m, 'assignments')) {
+      try {
+        rows.add(MyDuty.fromJson(row));
+      } on FormatException catch (e) {
+        skipped++;
+        developer.log(
+          'My duties: a row this app cannot read was left out (${e.message})',
+          name: 'church.duties',
+        );
+      }
+    }
     return MyDuties(
       memberId: _req<String>(m, 'member_id'),
-      assignments: List.unmodifiable(
-        _req<List>(m, 'assignments').map(MyDuty.fromJson),
-      ),
+      assignments: List.unmodifiable(rows),
       truncated: _opt<bool>(m, 'truncated') ?? false,
+      skipped: skipped,
     );
   }
 
   final String memberId;
   final List<MyDuty> assignments;
+
+  /// Story 4.11 (review S2): rows of the answer this app could not read and
+  /// left out (a newer app shows them).
+  final int skipped;
 
   /// More duties exist than the server listed (future ones come first).
   final bool truncated;

@@ -714,6 +714,7 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
           // Story 4.11: linked programme parts and owner-review mismatches.
           _OwnerReviews(
             occurrenceId: id,
+            dutyName: o.dutyName,
             reviews: o.reviews,
             linkedParts: o.linkedParts,
             canClear: widget.department.canManage,

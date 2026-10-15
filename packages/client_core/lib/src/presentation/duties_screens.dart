@@ -78,6 +78,15 @@ abstract final class DutyPaths {
 ]) {
   final what = a?.subject ?? 'this';
   final changed = DutyFields.changedIn(fieldErrors);
+  // Story 4.11 (review S3): a cell programme part's answer is seen by the
+  // cell's leaders in the programme; no department leader is told.
+  final whoSees = switch (a?.ownerKind) {
+    DutyOwnerKind.cell =>
+      'Your answer is saved. Your cell leader sees it in '
+          'the programme',
+    DutyOwnerKind.department => 'Your leader now sees it',
+    _ => 'Your answer is saved. Whoever manages it sees it',
+  };
   return switch (n) {
     DutyNotice.departmentCreated => (
       StatusTone.success,
@@ -109,12 +118,16 @@ abstract final class DutyPaths {
     DutyNotice.accepted => (
       StatusTone.success,
       'Accepted',
-      'Your leader now sees that you accepted $what.',
+      a?.ownerKind == DutyOwnerKind.cell
+          ? 'You accepted $what. $whoSees.'
+          : 'Your leader now sees that you accepted $what.',
     ),
     DutyNotice.declined => (
       StatusTone.success,
       'Answer sent',
-      'Your leader now sees that you can\'t make $what.',
+      a?.ownerKind == DutyOwnerKind.cell
+          ? 'You can\'t make $what. $whoSees.'
+          : 'Your leader now sees that you can\'t make $what.',
     ),
     DutyNotice.revised => (
       StatusTone.success,
@@ -263,7 +276,9 @@ abstract final class DutyPaths {
     DutyNotice.withdrawn => (
       StatusTone.success,
       'Answer sent',
-      'Your leader now sees that you can\'t make $what anymore.',
+      a?.ownerKind == DutyOwnerKind.cell
+          ? 'You can\'t make $what anymore. $whoSees.'
+          : 'Your leader now sees that you can\'t make $what anymore.',
     ),
     DutyNotice.remindersSet => (
       StatusTone.success,
@@ -352,7 +367,9 @@ abstract final class DutyPaths {
     DutyNotice.bulkAccepted => (
       StatusTone.success,
       'Accepted',
-      'Your leader now sees that you accepted $what.',
+      a?.ownerKind == DutyOwnerKind.department
+          ? 'Your leader now sees that you accepted $what.'
+          : 'You accepted $what. $whoSees.',
     ),
     DutyNotice.bulkChanged => (
       StatusTone.warning,
@@ -1158,6 +1175,7 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
           Consumer(
             builder: (context, ref, _) => _OwnerReviews(
               occurrenceId: id,
+              dutyName: duty.dutyName,
               reviews: duty.reviews,
               linkedParts: duty.linkedParts,
               canClear: widget.department.canPublish,
@@ -1316,6 +1334,7 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
 class _OwnerReviews extends StatelessWidget {
   const _OwnerReviews({
     required this.occurrenceId,
+    required this.dutyName,
     required this.reviews,
     required this.linkedParts,
     required this.canClear,
@@ -1323,6 +1342,9 @@ class _OwnerReviews extends StatelessWidget {
     required this.onClear,
   });
   final String occurrenceId;
+
+  /// The duty's name, for the button's accessible label (review N6).
+  final String dutyName;
   final List<DutyReview> reviews;
   final int linkedParts;
   final bool canClear;
@@ -1364,11 +1386,16 @@ class _OwnerReviews extends StatelessWidget {
                   'it should follow.',
                 ),
                 if (canClear)
-                  FocusRing(
-                    child: TextButton(
-                      key: Key('clear-review-${r.flagId}'),
-                      onPressed: busy ? null : () => onClear(r),
-                      child: const Text('Mark reviewed'),
+                  Semantics(
+                    button: true,
+                    label: 'Mark reviewed: $dutyName',
+                    excludeSemantics: true,
+                    child: FocusRing(
+                      child: TextButton(
+                        key: Key('clear-review-${r.flagId}'),
+                        onPressed: busy ? null : () => onClear(r),
+                        child: const Text('Mark reviewed'),
+                      ),
                     ),
                   ),
               ],
@@ -2304,6 +2331,13 @@ class _MyDutiesListState extends ConsumerState<_MyDutiesList> {
           const Text(
             'Only your next 200 duties are shown.',
             key: Key('my-duties-truncated'),
+          ),
+        // Story 4.11 (review S2): rows this version cannot read are left out.
+        if (widget.duties.skipped > 0)
+          const Text(
+            'Some of your duties cannot be shown in this version of the app. '
+            'Update the app to see them.',
+            key: Key('my-duties-skipped'),
           ),
         // Story 4.10: the member's own assignment history.
         Align(

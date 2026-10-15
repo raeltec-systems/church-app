@@ -331,6 +331,7 @@ class CoveragePosition {
     this.assignment,
     this.followUp,
     this.vacatedSince,
+    this.vacancyReason,
   });
 
   factory CoveragePosition.fromJson(Object? json) {
@@ -366,6 +367,10 @@ class CoveragePosition {
       assignment: assignment,
       followUp: CoverageFollowUp.fromJsonOrNull(m['follow_up']),
       vacatedSince: vacated == null ? null : _instant(vacated, 'since'),
+      // Story 4.16: sent to the department's leaders and deputies only.
+      vacancyReason: vacated == null
+          ? null
+          : DutyVacancyReasons.parse(vacated['reason']),
     );
   }
 
@@ -389,8 +394,12 @@ class CoveragePosition {
   final CoverageFollowUp? followUp;
 
   /// Story 4.12: when the person given this unfilled position stopped being
-  /// able to serve (null otherwise). Never why.
+  /// able to serve (null otherwise).
   final DateTime? vacatedSince;
+
+  /// Story 4.16: why ([DutyVacancyReasons]); null unless the reader leads or
+  /// deputises the department.
+  final String? vacancyReason;
 
   bool get vacated => vacatedSince != null;
 

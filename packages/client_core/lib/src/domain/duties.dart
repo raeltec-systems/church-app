@@ -74,9 +74,33 @@ abstract final class DutyCommands {
 
 /// Story 4.12: the one end reason a leader reads when the person given a
 /// position can no longer serve (left the department or the church, or was
-/// deleted). Never why.
+/// deleted).
 abstract final class DutyEndReasons {
   static const vacated = 'vacated';
+}
+
+/// Story 4.16 (owner decision, superseding the 4.12 "never why"): the coarse
+/// reason category of a vacated position. The server sends it only to the
+/// department's leaders and deputies; never free text, never a hold.
+abstract final class DutyVacancyReasons {
+  static const removedFromDepartment = 'removed_from_department';
+  static const memberInactive = 'member_inactive';
+  static const memberDeleted = 'member_deleted';
+
+  /// The code as sent, or null for a code this version does not know (shown
+  /// without a reason).
+  static String? parse(Object? wire) => switch (wire) {
+    removedFromDepartment || memberInactive || memberDeleted => wire as String,
+    _ => null,
+  };
+
+  /// The words a leader reads.
+  static String label(String code) => switch (code) {
+    removedFromDepartment => 'Removed from the department',
+    memberInactive => 'No longer an active member',
+    memberDeleted => 'Member deleted',
+    _ => 'Unknown',
+  };
 }
 
 /// Story 4.2: the revisable fields (wire names) in display order, and the
@@ -712,6 +736,7 @@ class AssignmentHistoryEntry {
     this.provenance,
     this.note,
     this.priorAcceptedAt,
+    this.vacancyReason,
   });
 
   factory AssignmentHistoryEntry.fromJson(Object? json) {
@@ -742,6 +767,10 @@ class AssignmentHistoryEntry {
       provenance: provenance,
       note: _opt<String>(m, 'note'),
       slotRevision: _slotRevision(m),
+      // Story 4.16: only a vacated entry can carry a reason.
+      vacancyReason: _opt<String>(m, 'end_reason') == DutyEndReasons.vacated
+          ? DutyVacancyReasons.parse(m['vacancy_reason'])
+          : null,
     );
   }
 
@@ -768,6 +797,10 @@ class AssignmentHistoryEntry {
 
   /// Story 4.5: an acceptance the member later withdrew.
   final DateTime? priorAcceptedAt;
+
+  /// Story 4.16: why a vacated position was left ([DutyVacancyReasons]);
+  /// null unless the reader leads or deputises the department.
+  final String? vacancyReason;
 }
 
 class DutyPosition {
@@ -819,13 +852,16 @@ class DutyPosition {
   final List<AssignmentHistoryEntry> history;
 
   /// Story 4.12: nobody holds the position because the person given it can
-  /// no longer serve (the newest ended assignment ended `vacated`). Never
-  /// why.
+  /// no longer serve (the newest ended assignment ended `vacated`).
   bool get vacated =>
       assignment == null &&
       !cancelled &&
       history.isNotEmpty &&
       history.first.endReason == DutyEndReasons.vacated;
+
+  /// Story 4.16: the coarse reason of a vacated position, for the
+  /// department's leaders and deputies (null for anyone else).
+  String? get vacancyReason => vacated ? history.first.vacancyReason : null;
 }
 
 /// One published occurrence on the leader board.

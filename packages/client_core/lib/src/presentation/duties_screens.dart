@@ -44,6 +44,10 @@ abstract final class DutyPaths {
   /// Staff web: leaders, deputies, Admin (and Pastor, read only).
   static const leader = '/duties/leader';
 
+  /// Story 4.16 (both apps): the leader board showing only the duties with
+  /// an open review (the `duty_review_flagged` notice's link).
+  static const leaderReviews = '/duties/leader/reviews';
+
   /// Story 4.3, staff web: the rota grid (leaders, deputies, Admin; Pastor
   /// read only).
   static const rota = '/duties/rota';
@@ -406,6 +410,13 @@ abstract final class DutyPaths {
       StatusTone.success,
       'Handover done',
       '$what has a responsible leader again; the handover is marked done.',
+    ),
+    DutyNotice.staffHandoverRequired => (
+      StatusTone.warning,
+      'Hand over first',
+      '$what is this department\'s last leader or deputy who can use the '
+          'app. Give the leader or deputy role to someone else first, then '
+          'remove it. Nothing was changed.',
     ),
     DutyNotice.leaderRequired => (
       StatusTone.warning,
@@ -1158,21 +1169,46 @@ class _CreateDepartmentFormState extends ConsumerState<_CreateDepartmentForm> {
 /// to one department member with a response deadline and sees each
 /// position's answer.
 class DutyLeaderScreen extends StatelessWidget {
-  const DutyLeaderScreen({super.key});
+  const DutyLeaderScreen({super.key, this.reviewsOnly = false});
+
+  /// Story 4.16: opened from the "Duty needs review" notice: only the duties
+  /// with an open review are listed, with a way back to every duty. The
+  /// board is read again either way (the link is a pointer, not a grant).
+  final bool reviewsOnly;
 
   @override
   Widget build(BuildContext context) => _DutiesPage<DutyLeaderBoard>(
-    title: 'Duties',
+    title: reviewsOnly ? 'Duties to review' : 'Duties',
     provider: dutyLeaderProvider,
     needs: 'This page is for department leaders and deputies.',
     loading: 'Loading duties…',
     body: (context, b, s) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (reviewsOnly)
+          Wrap(
+            key: const Key('leader-reviews-only'),
+            spacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              const Text(
+                'Showing the duties whose linked meeting or event changed.',
+              ),
+              TextButton(
+                key: const Key('leader-show-all'),
+                onPressed: () => context.go(DutyPaths.leader),
+                child: const Text('Show all duties'),
+              ),
+            ],
+          ),
         if (b.departments.isEmpty)
           const Text('No departments yet.', key: Key('leader-no-departments')),
         for (final d in b.departments) ...[
-          _LeaderDepartmentCard(department: d, busy: s.busy),
+          _LeaderDepartmentCard(
+            department: d,
+            busy: s.busy,
+            reviewsOnly: reviewsOnly,
+          ),
           const SizedBox(height: 12),
         ],
       ],
@@ -1181,13 +1217,25 @@ class DutyLeaderScreen extends StatelessWidget {
 }
 
 class _LeaderDepartmentCard extends StatelessWidget {
-  const _LeaderDepartmentCard({required this.department, required this.busy});
+  const _LeaderDepartmentCard({
+    required this.department,
+    required this.busy,
+    this.reviewsOnly = false,
+  });
   final LeaderDepartment department;
   final bool busy;
+  final bool reviewsOnly;
 
   @override
   Widget build(BuildContext context) {
     final d = department;
+    // Story 4.16: the reviews view lists only duties with an open review.
+    final duties = reviewsOnly
+        ? [
+            for (final duty in d.duties)
+              if (duty.reviews.isNotEmpty) duty,
+          ]
+        : d.duties;
     return _Card(
       key: Key('leader-department-${d.departmentId}'),
       child: Column(
@@ -1203,20 +1251,28 @@ class _LeaderDepartmentCard extends StatelessWidget {
             ],
           ),
           // Story 4.8: who needs direct contact, before the duties.
-          _NeedsContactList(department: d),
-          _heading(context, 'Duties (${d.duties.length})'),
+          if (!reviewsOnly) _NeedsContactList(department: d),
+          _heading(
+            context,
+            reviewsOnly
+                ? 'Needs review (${duties.length})'
+                : 'Duties (${d.duties.length})',
+          ),
           if (d.dutiesTruncated)
             _muted(context, 'Only the first 200 duties are shown.'),
-          if (d.duties.isEmpty)
-            Text('No duties yet.', key: Key('no-duties-${d.departmentId}')),
-          for (final duty in d.duties)
+          if (duties.isEmpty)
+            Text(
+              reviewsOnly ? 'Nothing needs review here.' : 'No duties yet.',
+              key: Key('no-duties-${d.departmentId}'),
+            ),
+          for (final duty in duties)
             _LeaderDutyRow(
               key: Key('leader-duty-row-${duty.occurrenceId}'),
               duty: duty,
               department: d,
               busy: busy,
             ),
-          if (d.canPublish) ...[
+          if (d.canPublish && !reviewsOnly) ...[
             const SizedBox(height: 12),
             _PublishForm(
               key: Key('publish-${d.departmentId}'),
@@ -1297,8 +1353,9 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
                 '${p.positionName ?? 'Position ${p.positionNo}'}: Cancelled',
                 key: Key('position-cancelled-${p.slotId}'),
               )
-            // Story 4.12: the person given it can no longer serve (never
-            // why).
+            // Story 4.12: the person given it can no longer serve; story
+            // 4.16: with the coarse reason for the department's leaders and
+            // deputies (the server sends it to nobody else).
             else if (p.vacated)
               Wrap(
                 key: Key('position-vacated-${p.slotId}'),
@@ -1312,6 +1369,11 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
                     label: 'Needs a new person',
                     tone: StatusTone.warning,
                   ),
+                  if (p.vacancyReason case final r?)
+                    Text(
+                      'Reason: ${DutyVacancyReasons.label(r)}',
+                      key: Key('position-vacancy-reason-${p.slotId}'),
+                    ),
                 ],
               )
             else if (p.assignment == null && p.positionName != null)

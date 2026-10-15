@@ -427,7 +427,7 @@ class _CoverageCardState extends ConsumerState<_CoverageCard> {
           ),
           if (a?.shortNotice ?? false)
             const StatusLabel(label: 'Short notice', tone: StatusTone.warning),
-          // Story 4.12: the person given it can no longer serve (never why).
+          // Story 4.12: the person given it can no longer serve.
           if (p.vacated)
             StatusLabel(
               key: Key('coverage-vacated-${p.slotId}'),
@@ -457,6 +457,16 @@ class _CoverageCardState extends ConsumerState<_CoverageCard> {
           'someone else.',
         ),
       );
+      // Story 4.16: the coarse reason, for the department's leaders and
+      // deputies only (the server sends nothing to anyone else).
+      if (p.vacancyReason case final r?) {
+        lines.add(
+          Text(
+            'Reason: ${DutyVacancyReasons.label(r)}',
+            key: Key('coverage-vacancy-reason-${p.slotId}'),
+          ),
+        );
+      }
     }
     if (a != null) {
       lines.addAll([

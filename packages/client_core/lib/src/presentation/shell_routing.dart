@@ -175,6 +175,8 @@ abstract final class ClientPaths {
     // Story 4.8: the leaders' overdue and short-notice alerts open the
     // Duties board, which reads the duty again (a pointer, not a grant).
     RegExp(r'^/duties/leader$'),
+    // Story 4.16: the leaders' review notice opens the board's reviews.
+    RegExp(r'^/duties/leader/reviews$'),
     // Story 4.9: the leaders' decline alert opens the coverage queue, which
     // reads every position again.
     RegExp(r'^/duties/coverage$'),
@@ -352,6 +354,14 @@ GoRouter buildClientRouter({
           GoRoute(
             path: 'leader',
             pageBuilder: (_, state) => page(state, const DutyLeaderScreen()),
+            routes: [
+              // Story 4.16: the review notice's link (both apps).
+              GoRoute(
+                path: 'reviews',
+                pageBuilder: (_, state) =>
+                    page(state, const DutyLeaderScreen(reviewsOnly: true)),
+              ),
+            ],
           ),
           GoRoute(
             path: 'rota',

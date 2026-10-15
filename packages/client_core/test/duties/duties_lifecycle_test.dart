@@ -1,5 +1,7 @@
 // Story 4.12: membership lifecycle and handover in Duties and Follow-ups on
-// the clients: the vacancy flag (coverage queue and board, never a reason),
+// the clients: the vacancy flag (coverage queue and board; story 4.16 adds a
+// coarse reason the server sends only to the department's leaders and
+// deputies, see duties_owner_decisions_test.dart),
 // taking a member out of a department (confirmed first), a department's
 // pending leader handover (marked done only once it has a reachable leader),
 // a Confirmed by leader assignment that ended in the board's history, and a
@@ -277,7 +279,7 @@ void main() {
       );
     });
 
-    test('a vacated position on the board, never a reason', () {
+    test('a vacated position on the board (no reason sent, none read)', () {
       final b = (boardWith(boardDuty()) as AccessReadOk<DutyLeaderBoard>).value;
       final p = b.departments.single.duties.single.positions.single;
       expect(p.vacated, isTrue);
@@ -473,7 +475,7 @@ void main() {
   });
 
   group('staff web: the vacancy flag', () {
-    testWidgets('the coverage queue flags the position, without a reason', (
+    testWidgets('the coverage queue flags the position (no reason sent)', (
       tester,
     ) async {
       await pumpAt(

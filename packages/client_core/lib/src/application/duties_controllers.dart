@@ -142,6 +142,10 @@ enum DutyNotice {
   /// a leader or deputy the app can reach.
   leaderRequired,
 
+  /// Story 4.16: a leader or deputy role was not removed because its holder
+  /// is the department's last leader or deputy the app can reach.
+  staffHandoverRequired,
+
   /// Story 4.5: "Can't make it anymore" was recorded.
   withdrawn,
 
@@ -462,6 +466,13 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
       return f['flag_id'] == 'cleared'
           ? DutyNotice.reviewAlreadyCleared
           : DutyNotice.changedElsewhere;
+    }
+    // Story 4.16: removing the department's last reachable leader or deputy
+    // is refused until another one is given the role.
+    if (action?.command == GrantCommands.revokeScope &&
+        error.code == ErrorCode.conflict &&
+        f['member_id'] == 'handover_required') {
+      return DutyNotice.staffHandoverRequired;
     }
     // Story 4.12: a department's handover without a reachable leader yet;
     // one resolved elsewhere reloads the list.

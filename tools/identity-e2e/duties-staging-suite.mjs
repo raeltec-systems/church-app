@@ -475,6 +475,7 @@ async function main() {
   const summaryPath = argValue(argv, '--summary');
   const cleanupSqlPath = argValue(argv, '--cleanup-sql');
   const stagingPath = target === 'local' && argv.includes('--staging-path');
+  const rerunState = stagingPath ? argValue(argv, '--rerun-state') : null;
   const sqlChecks = target === 'local' && !stagingPath;
   const numbers = NUMBERS[target];
   for (const phone of Object.values(numbers)) if (!isSuitePhone(target, phone)) throw new Error(`not fictional: ${phone}`);
@@ -510,6 +511,14 @@ async function main() {
     publishableKey = keys.key;
     http = localHttp(keys);
     state = { personas: {} };
+    // Local --staging-path rehearsal of a second staging run: the state persists between two runs
+    // (the first with --keep), as DUTIES_SUITE_STATE does on staging.
+    if (rerunState) {
+      assertStateOutsideRepo(rerunState);
+      if (existsSync(rerunState)) state = JSON.parse(readFileSync(rerunState, 'utf8'));
+      state.personas ??= {};
+      saveState = () => writeFileSync(rerunState, JSON.stringify(state), { mode: 0o600 });
+    }
   } else {
     origin = assertStagingOrigin(STAGING_ORIGIN);
     publishableKey = assertPublishableKey(process.env.STAGING_PUBLISHABLE_KEY);
@@ -880,32 +889,43 @@ async function main() {
       } else if (marker !== 'local') {
         throw new Error(`local database is marked ${marker}`);
       }
+      const reuse = Boolean(state.local);
       log('S00-precondition', { phone_provider: settings.json?.external?.phone, sms_provider: settings.json?.sms_provider ?? null,
-        leftover_users_removed: localCleanup(), run: runId, staging_path: stagingPath });
+        leftover_users_removed: reuse ? 'kept for the rerun' : localCleanup(), run: runId, staging_path: stagingPath, rerun: reuse });
       workerHandle = notificationsWorker({ origin, key: publishableKey, operator: OPERATOR,
         principalName: `notifications-worker-closing-${runId}`, label: `duties closing suite ${runId}` });
       // The Admin and the people the identity suite provides on staging.
-      await seed(people.admin);
-      psql(`select app.identity_bootstrap_admin('${people.admin.member}', '${OPERATOR}')`);
-      await tok(people.admin, { fresh: true });
-      for (const label of ['pastor', 'held', 'deact', 'cellL']) await seed(people[label]);
-      await seed(people.guest, { link: false });
-      for (const label of DUTIES_PEOPLE) {
-        if (stagingPath) await ensureByApplication(people[label]);
-        else await seed(people[label]);
+      if (reuse) {
+        for (const label of ['admin', ...Object.keys(BORROWED)]) Object.assign(people[label], state.local[label]);
+        for (const label of DUTIES_PEOPLE) await ensureByApplication(people[label]);
+        for (const label of ['admin', ...Object.keys(BORROWED)]) await tok(people[label], { fresh: true });
+      } else {
+        await seed(people.admin);
+        psql(`select app.identity_bootstrap_admin('${people.admin.member}', '${OPERATOR}')`);
+        await tok(people.admin, { fresh: true });
+        for (const label of ['pastor', 'held', 'deact', 'cellL']) await seed(people[label]);
+        await seed(people.guest, { link: false });
+        for (const label of DUTIES_PEOPLE) {
+          if (stagingPath) await ensureByApplication(people[label]);
+          else await seed(people[label]);
+        }
+        const pastorGrant = await envelope('identity_grant_command', await tok(people.admin), 'identity.grant_role',
+          (await grantsRow(people.pastor.member))?.revision, { member_id: people.pastor.member, role: 'pastor' });
+        const cell = await envelope('cells_command', await tok(people.admin), 'cells.create_cell', null,
+          { name: `${NAME_PREFIX} Cell`, signup_label: `${NAME_PREFIX} Cell`, broad_area: 'SYNTHETIC North' });
+        const cellGrant = await grantCmd('identity.grant_scope', people.cellL, 'cell_leader', cell.data?.cell_id);
+        const hold = await envelope('identity_credential_command', await tok(people.admin), 'identity.place_hold',
+          await memberRevision(people.held.member), { member_id: people.held.member, reason_code: 'login_disabled' });
+        const deact = await envelope('identity_lifecycle_command', await tok(people.admin), 'identity.deactivate_membership',
+          await memberRevision(people.deact.member), { member_id: people.deact.member, reason_code: 'moved_away' });
+        log('S00-local-people', { pastor: outcome(pastorGrant), cell: outcome(cell), cell_leader: outcome(cellGrant), hold: outcome(hold),
+          deactivated: outcome(deact) });
+        for (const label of ['pastor', 'cellL', 'held', 'deact']) await afterEpoch(people[label]);
+        if (rerunState) {
+          state.local = Object.fromEntries(['admin', ...Object.keys(BORROWED)].map((l) => [l, { pw: people[l].pw, member: people[l].member }]));
+          saveState();
+        }
       }
-      const pastorGrant = await envelope('identity_grant_command', await tok(people.admin), 'identity.grant_role',
-        (await grantsRow(people.pastor.member))?.revision, { member_id: people.pastor.member, role: 'pastor' });
-      const cell = await envelope('cells_command', await tok(people.admin), 'cells.create_cell', null,
-        { name: `${NAME_PREFIX} Cell`, signup_label: `${NAME_PREFIX} Cell`, broad_area: 'SYNTHETIC North' });
-      const cellGrant = await grantCmd('identity.grant_scope', people.cellL, 'cell_leader', cell.data?.cell_id);
-      const hold = await envelope('identity_credential_command', await tok(people.admin), 'identity.place_hold',
-        await memberRevision(people.held.member), { member_id: people.held.member, reason_code: 'login_disabled' });
-      const deact = await envelope('identity_lifecycle_command', await tok(people.admin), 'identity.deactivate_membership',
-        await memberRevision(people.deact.member), { member_id: people.deact.member, reason_code: 'moved_away' });
-      log('S00-local-people', { pastor: outcome(pastorGrant), cell: outcome(cell), cell_leader: outcome(cellGrant), hold: outcome(hold),
-        deactivated: outcome(deact) });
-      for (const label of ['pastor', 'cellL', 'held', 'deact']) await afterEpoch(people[label]);
     } else {
       const A = people.admin;
       A.pw = state.admin.pw;
@@ -1498,11 +1518,11 @@ async function main() {
     if (target === 'local' && !argv.includes('--keep')) {
       const left = localCleanup();
       if (workerHandle) psql(`select app.sys_revoke_credential('${workerHandle.credentialId}', '${OPERATOR}'); select app.sys_disable_principal('${workerHandle.principal}', '${OPERATOR}');`);
-      if (marked) {
-        psql(`delete from app.platform_environment where set_by = 'duties-staging-suite';
-              delete from app.platform_environment_history where set_by = 'duties-staging-suite';`);
-      }
-      log('S99-local-cleanup', { users_left: Number(left), credential_revoked: Boolean(workerHandle), unmarked: marked,
+      // The marker this suite set (in this run, or in the first run of a --rerun-state rehearsal).
+      const unmarked = psql(`with h as (delete from app.platform_environment_history where set_by = 'duties-staging-suite' returning 1),
+        e as (delete from app.platform_environment where set_by = 'duties-staging-suite' returning 1)
+        select (select count(*) from e)`) !== '0';
+      log('S99-local-cleanup', { users_left: Number(left), credential_revoked: Boolean(workerHandle), unmarked: unmarked || !marked,
         departments_left: Number(psql(`select count(*) from app.duties_departments where name like 'SYNTHETIC Closing Suite%'`)),
         members_left: Number(psql(`select count(*) from app.identity_members where display_name like '${NAME_PREFIX}%'`)) });
     } else if (keptIds.length) {

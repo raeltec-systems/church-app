@@ -63,16 +63,36 @@ editor. Record each owner decision note verbatim.
      'Owner decision 2026-10-14 (Q12): a due reminder not delivered within 10 minutes is a fault');
    ```
 
-3. **`ops_system_access`** (identity G7): the commands the production system principals may run.
-   The notifications worker needs the `notifications_worker` purpose commands; the two identity
-   functions keep theirs as the identity package says (G7 there). Approve it in the same form as
-   on staging:
+   The 10 minutes are **recorded only**: no code reads the value. Opening the gate is what lets
+   the scheduler run in production; the tolerance is the yardstick the owner and operator use when
+   reading **Reminder health** (a reminder delivered later than 10 minutes after it was due is a
+   fault to report).
+
+3. **`ops_system_access`** (identity G7). Staging never approves this gate (system access is open
+   in `local` and `staging` without it), so there is no staging value to copy. No code reads the
+   approved value either: the gate only has to be open, and what each production principal may run
+   is fixed by its purpose in `app.sys_command_kinds`. The value records what the owner approved.
+   **This one approval replaces the value identity G7 would record** (`policy_approve` overwrites
+   the gate's value), so it names all three purposes:
 
    ```sql
-   select gate, approved_value from app.policy_gates where gate = 'ops_system_access';  -- on staging, to copy
-   select app.policy_approve('ops_system_access', '<the staging value>'::jsonb, 'israel',
-     'Owner decision 2026-10-13: system route for the notifications worker (and G7 when approved)');
+   select app.policy_approve('ops_system_access', '{
+     "notifications_worker": ["notifications.claim", "notifications.attempt", "notifications.release",
+       "notifications.deliver_due", "notifications.push_claim", "notifications.push_prepare",
+       "notifications.push_record", "notifications.push_release"],
+     "identity_assisted_recovery": ["identity.assisted_recovery_request", "identity.assisted_recovery_status",
+       "identity.assisted_reset_begin", "identity.assisted_reset_dispatch", "identity.assisted_reset_complete"],
+     "identity_deletion": ["identity.deletion_queue", "identity.deletion_next", "identity.deletion_advance",
+       "identity.deletion_auth_begin", "identity.deletion_auth_complete", "identity.deletion_journal_ack",
+       "identity.deletion_journal_catch_up"]}'::jsonb, 'israel',
+     'Owner decision 2026-10-13: the system route for the notifications worker, assisted recovery and deletion workers');
    ```
+
+   Opening the gate does not switch on the identity functions: each still answers `unavailable`
+   until its own production credential is registered and its Edge secret set (identity G2, G6 and
+   G7 in production-promotion-identity.md). Check the list against the database first:
+   `select purpose, array_agg(command order by command) from app.sys_command_kinds group by 1;`
+   (`synthetic_probe` is not approved for production).
 
 Check: `select app.policy_is_open(g) from unnest(array['q2_church_time','q12_operations','ops_system_access']) g;`
 answers three `true`.

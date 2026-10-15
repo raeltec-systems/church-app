@@ -3,8 +3,8 @@ title: 'Verify duties and follow-ups end to end and promote them to production'
 type: 'chore'
 ticket: '15'
 created: '2026-10-15'
-status: 'in-progress'
-blocked_reason: ''
+status: 'blocked'
+blocked_reason: 'Everything the builder can do without the owner is done and verified locally (closing suite local and staging-path 22/22 scenarios, 253/253 matrix cells; clean staging builds; owner demonstration; production package). Remaining OWNER and PARENT-SESSION items: (1) the parent session runs the closing suite on staging with the env vars in duties.md story 4.15, then runs its cleanup SQL, and the 4.13 pilot rehearsal on staging; (2) an independent reviewer reruns the suite on staging (evidence-4.15/independent-rerun.jsonl); (3) the owner witnesses the duties walkthrough (evidence-4.13/owner-walkthrough.md, still pending) and the 4.15 demonstration (evidence-4.15/owner-demonstration.md) with the 4.15 builds; (4) the owner merges PR #6 into main; (5) the owner runs promote (staging, then production); (6) the post-promotion approvals and setup in docs/runbooks/production-promotion-duties.md: q2_church_time, q12_operations (10 minutes), ops_system_access, the notifications worker digest, Edge secrets, trigger and schedule, q4_personal_data with the labelled-contact scope (with or after Q2), identity_deletion_retention = anonymise, G3/G4/G11 and the first Admin (production-promotion-identity.md), the Music Department with its leader and three deputies entered by the Admin, and the read-only production verification (evidence-4.15/production-verify.md).'
 baseline_revision: '4ca9fe25a7fbec0f4b882ceb83f5997fc3cc891c'
 route: 'full'
 route_source: 'auto'
@@ -66,6 +66,7 @@ Decision (agent, under owner pre-approval): `q4_personal_data` records the label
 - [x] `evidence-4.15/owner-demonstration.md` -- 4.13 walkthrough, 4.16 items, refusals and disabled gates.
 - [x] `docs/runbooks/production-promotion-duties.md` -- owner and operator steps after promotion, disabled baseline, read-only checklist.
 - [x] CI evidence scan; full local verification.
+- [ ] Owner and parent-session items (blocked_reason).
 
 **Acceptance Criteria:**
 - Given the local stack, when the suite runs (default and `--staging-path`), then every scenario passes and every matrix cell matches.
@@ -74,7 +75,11 @@ Decision (agent, under owner pre-approval): `q4_personal_data` records the label
 
 ## Implementation Notes
 
-See `evidence-4.15/README.md` and `evidence-4.15/local-verification.md`.
+- Suite `tools/identity-e2e/duties-staging-suite.mjs` (+ 9 offline tests, picked up by the existing CI glob): S10-S99 scenarios (22 checks) and the matrix (11 principals x 12 reads + 11 command probes = 253 cells); targets local / staging, `--staging-path`, `--rerun-state`, `--cleanup-sql`, `--summary`. On staging it borrows the 2.14 identity personas read-only and makes six Duties people (0153-0158) once.
+- Expectations from the SQL; three suite assumptions corrected by reading the code (own outcome reason and own duty instructions are the member's; `clear_review` by another department's leader is `forbidden`; the follow-up notice is retired when the owner acts first). **No product defect found, no migration.**
+- Builds from `3dda074` (later commits change only evidence and the plan): staff web sealed staging, refused as production; APK arm64 sha256 `722b6552...2e3f81`; bundle scans clean (`evidence-4.15/builds.md`).
+- `docs/runbooks/production-promotion-duties.md` (linked from the identity package and duties.md story 4.15); `evidence-4.15/owner-demonstration.md`; CI scan step for evidence-4.15.
+- Two container restarts during verification; the closing suite and the unfinished E2Es were rerun afterwards (local-verification.md).
 
 ## Plan Change Log
 

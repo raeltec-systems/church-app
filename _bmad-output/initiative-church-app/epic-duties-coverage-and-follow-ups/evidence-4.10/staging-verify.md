@@ -1,7 +1,7 @@
 # Story 4.10 - staging verification (tmurpotfluignacfueki, 2026-10-15)
 
 Synthetic data only. Merged `d81f1f2` after the independent review fixes (S1 erasure race on
-outcome text; S2 outcomes window past today; nits N1-N6).
+outcome text; S2 outcomes window past today; nits N1-N6). PR #6 CI green on `1586909` (after the coverage-test time-of-day fix `ea2e1f2`). Local verification: db:test 39 files / 3374 tests, db:smoke, Flutter client_core 611 / staff 40 / mobile 55, all 27 E2Es exit 0 (`duties-outcomes` 11/11).
 
 | Version | Name | How applied |
 |---|---|---|
@@ -9,7 +9,7 @@ outcome text; S2 outcomes window past today; nits N1-N6).
 
 | Check | Result |
 |---|---|
-| The 296 `app`/`api` `duties_*`, `notifications_*`, `followups_*` and `identity_scoped*` functions | staging aggregate `9d1ddf5c...`; comparison with local pending the local verification run |
+| The 296 `app`/`api` `duties_*`, `notifications_*`, `followups_*` and `identity_scoped*` functions | per-function `md5(pg_get_functiondef)` identical to local: aggregate `9d1ddf5c...`, 296 rows each side |
 | Backslashes | none |
 | Client grants | `anon` none; `authenticated` gains only `app`/`api.duties_outcomes` and `app`/`api.duties_member_history` |
 | After the apply | 0 rows in `app.duties_outcomes` |

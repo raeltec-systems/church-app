@@ -100,3 +100,5 @@ context:
 
 **Manual checks (if no CLI):**
 - HITL (open, owner): Israel's staging walkthrough, `evidence-4.13/owner-walkthrough.md`.
+
+**Results (2026-10-15):** db reset 0; db:test PASS (43 files, 3733 tests); db:smoke pass; every E2E exit=0 (30 scripts, reset before each; duties-pilot 13/13); duties-pilot --staging-path 14/14; contracts:test 265/0; Dart contracts 282; node tool tests 239/0; ci:policy-test 56/0; ci:secrets clean; ci:migrations 48 ordered, non-destructive; ci:function-imports ok; evidence scan clean. Details: evidence-4.13/local-verification.md.

@@ -209,9 +209,11 @@ Map<String, Object?> historyJson({
   bool self = true,
   bool hasMore = false,
   List<Map<String, Object?>>? entries,
+  Map<String, Object?>? kinds,
 }) => {
   'member': {'member_id': _ruth, 'display_name': 'SYNTHETIC Ruth'},
   'self': self,
+  'kinds': ?kinds,
   'departments': [
     {'department_id': _dept, 'name': 'SYNTHETIC Preaching Rota'},
   ],
@@ -680,6 +682,66 @@ void main() {
       expect(byKey('history-newer'), findsOneWidget);
     });
 
+    testWidgets('the member\'s cell parts are listed with a kind filter', (
+      tester,
+    ) async {
+      const cellAsg = '61616161-6161-4161-8161-616161616161';
+      final h = await pumpAt(
+        tester,
+        ClientPaths.dutyHistory,
+        setUp: (h) => h.outcomes.history = AccessReadOk(
+          MemberHistory.fromJson(
+            historyJson(
+              kinds: const {'department': 3, 'cell': 1},
+              entries: [
+                {
+                  'assignment_id': cellAsg,
+                  'occurrence_id': _occ,
+                  'owner_kind': 'cell',
+                  'department_id': null,
+                  'department_name': null,
+                  'cell_id': '62626262-6262-4262-8262-626262626262',
+                  'duty_name': 'Opening prayer',
+                  'position_name': null,
+                  'starts_at': '2026-10-14T16:00:00.000000Z',
+                  'reporting_at': null,
+                  'started': true,
+                  'state': 'current',
+                  'response': 'accepted',
+                  'response_provenance': 'member',
+                  'responded_at': '2026-10-10T09:00:00.000000Z',
+                  'outcome_state': 'not_tracked',
+                  'outcome': null,
+                },
+              ],
+            ),
+          ),
+        ),
+      );
+      expect(byKey('history-kinds'), findsOneWidget);
+      expect(find.text('Cell (1)'), findsOneWidget);
+      // The part reads as the cell programme; its one mark is the answer,
+      // never an outcome (a cell meeting record is not a duty outcome).
+      expect(find.textContaining('Cell programme · '), findsOneWidget);
+      expect(
+        find.descendant(
+          of: byKey('history-state-$cellAsg'),
+          matching: find.text('Accepted'),
+        ),
+        findsOneWidget,
+      );
+      expect(byKey('history-outcome-$cellAsg'), findsNothing);
+      expect(
+        find.textContaining('Cell programme parts show how they were answered'),
+        findsOneWidget,
+      );
+      await tapKey(tester, 'segment-Cell (1)');
+      final q = h.outcomes.historyQueries.last;
+      expect(q.kind, DutyOwnerKind.cell);
+      expect(q.toParams(), {'kind': 'cell'});
+      expect(q.pages, isEmpty);
+    });
+
     testWidgets('a leader opens a member\'s history from Outcomes', (
       tester,
     ) async {
@@ -698,6 +760,8 @@ void main() {
       expect(h.outcomes.historyQueries.last.memberId, _ruth);
       expect(find.text('SYNTHETIC Ruth'), findsWidgets);
       expect(find.textContaining('Departments you lead'), findsOneWidget);
+      // A leader sees department duties only: nothing to filter.
+      expect(byKey('history-kinds'), findsNothing);
     });
 
     testWidgets('a refused history shows nothing private', (tester) async {

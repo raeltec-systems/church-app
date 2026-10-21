@@ -45,7 +45,11 @@ enum OutcomeState {
   upcoming('upcoming', 'Upcoming'),
 
   /// History only: reassigned or cancelled, so it has no outcome.
-  none('none', 'No outcome');
+  none('none', 'No outcome'),
+
+  /// History only: a cell programme part, which keeps no completion outcome
+  /// (the 5.8 meeting record is never a duty outcome).
+  notTracked('not_tracked', 'No outcome kept');
 
   const OutcomeState(this.wire, this.label);
   final String wire;
@@ -472,14 +476,15 @@ class HistoryEntry {
   const HistoryEntry({
     required this.assignmentId,
     required this.occurrenceId,
-    required this.departmentId,
-    required this.departmentName,
     required this.dutyName,
     required this.times,
     required this.started,
     required this.state,
     required this.response,
     required this.outcomeState,
+    this.ownerKind = DutyOwnerKind.department,
+    this.departmentId,
+    this.departmentName,
     this.positionName,
     this.confirmedByLeader = false,
     this.respondedAt,
@@ -495,8 +500,10 @@ class HistoryEntry {
     return HistoryEntry(
       assignmentId: _req<String>(m, 'assignment_id'),
       occurrenceId: _req<String>(m, 'occurrence_id'),
-      departmentId: _req<String>(m, 'department_id'),
-      departmentName: _req<String>(m, 'department_name'),
+      // Before 2026-10-21 the server listed department duties only.
+      ownerKind: DutyOwnerKind.fromWire(m['owner_kind']),
+      departmentId: _opt<String>(m, 'department_id'),
+      departmentName: _opt<String>(m, 'department_name'),
       dutyName: _req<String>(m, 'duty_name'),
       positionName: _opt<String>(m, 'position_name'),
       times: DutyTimes.fromJson(m),
@@ -512,8 +519,9 @@ class HistoryEntry {
 
   final String assignmentId;
   final String occurrenceId;
-  final String departmentId;
-  final String departmentName;
+  final DutyOwnerKind ownerKind;
+  final String? departmentId;
+  final String? departmentName;
   final String dutyName;
   final String? positionName;
   final DutyTimes times;
@@ -530,13 +538,21 @@ class HistoryEntry {
   String get title =>
       positionName == null ? dutyName : '$dutyName: $positionName';
 
+  /// Who gave the duty: the department, or the cell programme (its cell's
+  /// name is the Cells module's; My duties labels it the same way).
+  String get ownerName => switch (ownerKind) {
+    DutyOwnerKind.cell => 'Cell programme',
+    _ => departmentName ?? 'Department',
+  };
+
   String get stateLabel => switch (state) {
     'reassigned' => 'Given to someone else',
     'cancelled' => 'Cancelled',
     _ => switch (response) {
       _ when confirmedByLeader => 'Confirmed by leader',
       DutyResponse.accepted => 'Accepted',
-      DutyResponse.declined => 'Declined',
+      // The member's words, as in My duties.
+      DutyResponse.declined => 'Can\'t make it',
       DutyResponse.pending => started ? 'Never answered' : 'Awaiting response',
     },
   };
@@ -603,6 +619,8 @@ class MemberHistory {
     this.entries = const [],
     this.hasMore = false,
     this.departmentNames = const [],
+    this.departmentCount = 0,
+    this.cellCount = 0,
   });
 
   factory MemberHistory.fromJson(Object? json) {
@@ -612,6 +630,13 @@ class MemberHistory {
     if (entries is! List) throw const FormatException('unexpected entries');
     final deps = m['departments'];
     if (deps is! List) throw const FormatException('unexpected departments');
+    final kinds = m['kinds'] == null ? null : _map(m['kinds'], 'kinds');
+    int count(String k) {
+      final v = kinds == null ? 0 : _req<int>(kinds, k);
+      if (v < 0) throw FormatException('unexpected $k');
+      return v;
+    }
+
     return MemberHistory(
       memberId: _req<String>(member, 'member_id'),
       displayName: _opt<String>(member, 'display_name'),
@@ -623,6 +648,8 @@ class MemberHistory {
       departmentNames: List.unmodifiable([
         for (final d in deps) _req<String>(_map(d, 'department'), 'name'),
       ]),
+      departmentCount: count('department'),
+      cellCount: count('cell'),
     );
   }
 
@@ -634,6 +661,11 @@ class MemberHistory {
   final List<HistoryEntry> entries;
   final bool hasMore;
   final List<String> departmentNames;
+
+  /// Positions of each kind the reader can see, whatever the filter (the
+  /// filter is offered only when both kinds are there).
+  final int departmentCount;
+  final int cellCount;
 
   /// The cursor of the next (older) page, when there is one.
   HistoryCursor? get next => hasMore && entries.isNotEmpty
@@ -657,11 +689,15 @@ class HistoryCursor {
   int get hashCode => Object.hash(beforeAt, beforeId);
 }
 
-/// Whose history and which page (null member: the reader's own).
+/// Whose history, which kind of duty and which page (null member: the
+/// reader's own; null kind: every kind).
 class HistoryQuery {
-  const HistoryQuery({this.memberId, this.pages = const []});
+  const HistoryQuery({this.memberId, this.kind, this.pages = const []});
 
   final String? memberId;
+
+  /// [DutyOwnerKind.department] or [DutyOwnerKind.cell]; null for both.
+  final DutyOwnerKind? kind;
 
   /// The cursors of the pages opened so far (empty: the newest page).
   final List<HistoryCursor> pages;
@@ -669,15 +705,21 @@ class HistoryQuery {
   HistoryCursor? get cursor => pages.isEmpty ? null : pages.last;
 
   HistoryQuery older(HistoryCursor c) =>
-      HistoryQuery(memberId: memberId, pages: [...pages, c]);
+      HistoryQuery(memberId: memberId, kind: kind, pages: [...pages, c]);
 
   HistoryQuery newer() => HistoryQuery(
     memberId: memberId,
+    kind: kind,
     pages: pages.isEmpty ? const [] : pages.sublist(0, pages.length - 1),
   );
 
+  /// The same member's newest page of [kind].
+  HistoryQuery ofKind(DutyOwnerKind? kind) =>
+      HistoryQuery(memberId: memberId, kind: kind);
+
   Map<String, Object?> toParams() => {
     if (memberId != null) 'member_id': memberId,
+    if (kind case final k?) 'kind': k.name,
     if (cursor case final c?) 'before_at': c.beforeAt.toUtc().toIso8601String(),
     if (cursor case final c?) 'before_id': c.beforeId,
   };
@@ -686,11 +728,12 @@ class HistoryQuery {
   bool operator ==(Object other) =>
       other is HistoryQuery &&
       other.memberId == memberId &&
+      other.kind == kind &&
       other.pages.length == pages.length &&
       Iterable.generate(pages.length).every((i) => other.pages[i] == pages[i]);
 
   @override
-  int get hashCode => Object.hash(memberId, Object.hashAll(pages));
+  int get hashCode => Object.hash(memberId, kind, Object.hashAll(pages));
 }
 
 /// Application port for the outcomes and history reads. Never throws.

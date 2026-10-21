@@ -1157,6 +1157,13 @@ class MemberHistoryController extends DutiesController<MemberHistory> {
         .set(HistoryQuery(memberId: memberId));
   }
 
+  /// Shows only [kind] (null: every kind), from the newest page.
+  void filter(DutyOwnerKind? kind) {
+    final q = ref.read(memberHistoryQueryProvider);
+    if (q.kind == kind && q.pages.isEmpty) return;
+    ref.read(memberHistoryQueryProvider.notifier).set(q.ofKind(kind));
+  }
+
   void older(HistoryCursor c) {
     final q = ref.read(memberHistoryQueryProvider);
     ref.read(memberHistoryQueryProvider.notifier).set(q.older(c));

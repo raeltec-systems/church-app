@@ -12,7 +12,7 @@ Related: [cells-meetings.md](cells-meetings.md) (stories 5.1-5.11), [cells-guide
 
 ## What is promoted
 
-Twelve migrations, in this order. Each was applied to staging under its hosted version, and its functions were checked identical to a fresh local reset (`evidence-5.x/staging-verify.md`):
+Thirteen migrations, in this order. Each was applied to staging under its hosted version, and its functions were checked identical to a fresh local reset (`evidence-5.x/staging-verify.md`):
 
 | Story | Migration (hosted version) |
 |---|---|
@@ -26,6 +26,9 @@ Twelve migrations, in this order. Each was applied to staging under its hosted v
 | 5.8 | `20261021115855_cells_meeting_records.sql` |
 | 5.9 | `20261021122802_cells_transfer_effects.sql` |
 | 5.12 | `20261021132636_cells_external_check_fixes.sql` |
+| History (owner decision 2026-10-21) | `20261021195642_duties_history_all_kinds.sql`: My duty history lists cell programme parts too, with a `kind` filter |
+
+The history migration replaces `api.duties_member_history` with a fourth argument, `kind`, and its entries may have no department (a cell part). A client older than this change fails to read a history that holds a cell part, so production clients must be built from `main` at promotion (the same rule as below).
 
 The 4.11 release gate carries over: `cell_part` is registered in 5.4. Every client in production must therefore run the 4.11 build or later; production clients are built from `main` at promotion.
 
@@ -53,12 +56,13 @@ While Q4 stays closed, stop here: production shows the baseline above.
    ```sql
    select count(*) from supabase_migrations.schema_migrations
     where version in ('20261021073514','20261021081026','20261021084446','20261021093943','20261021094249','20261021101314','20261021101323',
-                      '20261021104522','20261021111547','20261021115855','20261021122802','20261021132636');  -- 12
+                      '20261021104522','20261021111547','20261021115855','20261021122802','20261021132636',
+                      '20261021195642');  -- 13
    select source_type from app.contract_source_types where owner_module = 'cells' order by 1;
      -- cells_absence_notice, cells_meeting, cells_programme, cells_programme_part, cells_signup_option
    select module from app.identity_handover_hooks order by 1;                                -- cells, duties, followups
    ```
-   Compare `md5(replace(pg_get_functiondef(p.oid), chr(13), ''))` of every `app`/`api` `cells*` function with staging. Expect no difference other than the known `app.cells_text` drift (2.6).
+   Compare `md5(replace(pg_get_functiondef(p.oid), chr(13), ''))` of every `app`/`api` `cells*` function, and of `app.duties_member_history` and `api.duties_member_history`, with staging. Expect no difference other than the known `app.cells_text` drift (2.6).
 2. **The pilot cells** (Admin, staff web, **Admin cells**): create `Shikoswe Cell` and `Estates C5/C7 Cell`, with their real names, labels and broad areas. Grant their leaders and assistants as the owner names them (Q2). Confirm their members.
 3. **Schedules and venues** (Admin, **Cell meetings** > **Set the schedule**): the real weekday, times and venue. The venue is private to each cell's leader, assistant and confirmed members.
 4. **Reminders**: once Q2 and the scheduler are open, the cells' default reminder is the day before. A leader may change it on **Cell meetings**.
@@ -66,4 +70,4 @@ While Q4 stays closed, stop here: production shows the baseline above.
 
 ## Rollback
 
-The epic 5 migrations are additive: no destructive statement and no row deletion. To stop the feature without a schema change, close `q4_personal_data` again: every Cells read and command fails closed at once, and clients show **Not available yet**. Nothing in epic 5 needs a down migration.
+The epic 5 migrations are additive: no destructive statement and no row deletion. The history migration drops and recreates the two history functions (no data is touched); to undo it, recreate them from `20261015002121_duties_outcomes.sql` (the `duties_member_history` section and its grants), and old clients read history again. To stop the feature without a schema change, close `q4_personal_data` again: every Cells read and command fails closed at once, and clients show **Not available yet**. Nothing in epic 5 needs a down migration.

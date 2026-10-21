@@ -16,9 +16,11 @@ const _historyPrivacy =
     'Seen only by the member and their department\'s leaders and deputies, '
     'for fair workload conversations. It is not a ranking.';
 
-/// What the history covers (the server lists department duties only).
-const _historyScope =
-    'Department duties only. Cell programme parts are in My duties.';
+/// Why a cell part has no result (the 5.8 meeting record is not a duty
+/// outcome).
+const _historyCellNote =
+    'Leaders record outcomes for department duties. Cell programme parts '
+    'show how they were answered.';
 
 StatusTone _outcomeTone(OutcomeState s) => switch (s) {
   OutcomeState.completed => StatusTone.success,
@@ -27,6 +29,7 @@ StatusTone _outcomeTone(OutcomeState s) => switch (s) {
   OutcomeState.unrecorded => StatusTone.neutral,
   OutcomeState.upcoming => StatusTone.info,
   OutcomeState.none => StatusTone.neutral,
+  OutcomeState.notTracked => StatusTone.neutral,
 };
 
 OutcomeState _stateOf(DutyOutcome o) => switch (o) {
@@ -599,6 +602,14 @@ class _HistoryBody extends ConsumerWidget {
     final ctl = ref.read(memberHistoryProvider.notifier);
     final nothing = sum.held == 0 && v.entries.isEmpty && q.pages.isEmpty;
     final muted = ChurchType.secondary.copyWith(color: c.muted);
+    // The filter is offered only when the reader has both kinds to choose
+    // from (a leader reading a member never sees cell parts).
+    final both = v.departmentCount > 0 && v.cellCount > 0;
+    final what = switch (q.kind) {
+      DutyOwnerKind.cell => 'cell programme parts',
+      DutyOwnerKind.department => 'department duties',
+      _ => v.self ? 'duties' : 'duties in your departments',
+    };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -617,6 +628,23 @@ class _HistoryBody extends ConsumerWidget {
             ),
           const SizedBox(height: 16),
         ],
+        if (both || q.kind != null) ...[
+          RadioSegments<DutyOwnerKind?>(
+            key: const Key('history-kinds'),
+            label: 'Show',
+            options: [
+              SegmentOption(null, 'All (${v.departmentCount + v.cellCount})'),
+              SegmentOption(
+                DutyOwnerKind.department,
+                'Departments (${v.departmentCount})',
+              ),
+              SegmentOption(DutyOwnerKind.cell, 'Cell (${v.cellCount})'),
+            ],
+            selected: q.kind,
+            onChanged: state.busy ? null : ctl.filter,
+          ),
+          const SizedBox(height: 16),
+        ],
         if (nothing)
           _Card(
             key: const Key('history-summary'),
@@ -624,9 +652,7 @@ class _HistoryBody extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  v.self
-                      ? 'No department duties in the last 12 months'
-                      : 'No duties in your departments in the last 12 months',
+                  'No $what in the last 12 months',
                   style: ChurchType.itemTitle.copyWith(color: c.ink),
                 ),
                 const SizedBox(height: 4),
@@ -644,7 +670,12 @@ class _HistoryBody extends ConsumerWidget {
             ),
           )
         else
-          _HistorySummaryCard(summary: sum, upcoming: v.upcoming),
+          _HistorySummaryCard(
+            summary: sum,
+            upcoming: v.upcoming,
+            // Cell parts keep no outcome: no outcome figures for them alone.
+            outcomes: q.kind != DutyOwnerKind.cell,
+          ),
         if (v.entries.isNotEmpty) ...[
           const SizedBox(height: 16),
           ChurchCard(
@@ -692,20 +723,29 @@ class _HistoryBody extends ConsumerWidget {
         ],
         const SizedBox(height: 20),
         Text(_historyPrivacy, style: muted),
-        const SizedBox(height: 4),
-        Text(_historyScope, style: muted),
+        if (v.cellCount > 0) ...[
+          const SizedBox(height: 4),
+          Text(_historyCellNote, style: muted),
+        ],
       ],
     );
   }
 }
 
 /// The last 12 months as figures: three that answer "how have I done"
-/// (assigned, completed, upcoming), then how the member answered and what
-/// leaders recorded, a zero in grey.
+/// (assigned, completed or, for cell parts, accepted, and upcoming), then how
+/// the member answered and what leaders recorded, a zero in grey.
 class _HistorySummaryCard extends StatelessWidget {
-  const _HistorySummaryCard({required this.summary, required this.upcoming});
+  const _HistorySummaryCard({
+    required this.summary,
+    required this.upcoming,
+    this.outcomes = true,
+  });
   final HistorySummary summary;
   final int upcoming;
+
+  /// False for cell parts alone: they keep no outcome to count.
+  final bool outcomes;
 
   @override
   Widget build(BuildContext context) {
@@ -767,7 +807,9 @@ class _HistorySummaryCard extends StatelessWidget {
             children: [
               figure('Assigned', sum.held),
               divider(),
-              figure('Completed', sum.completed),
+              outcomes
+                  ? figure('Completed', sum.completed)
+                  : figure('Accepted', sum.accepted + sum.confirmedByLeader),
               divider(),
               figure('Upcoming', upcoming, key: const Key('history-upcoming')),
             ],
@@ -781,13 +823,15 @@ class _HistorySummaryCard extends StatelessWidget {
           row('Confirmed by a leader', sum.confirmedByLeader),
           row('Can\'t make it', sum.declined),
           row('Never answered', sum.unanswered),
-          const SizedBox(height: 12),
-          const CardLabel('What the leaders recorded'),
-          const SizedBox(height: 4),
-          row('Completed', sum.completed),
-          row('Excused', sum.excused),
-          row('No-show', sum.noShow),
-          row('Not recorded yet', sum.unrecorded),
+          if (outcomes) ...[
+            const SizedBox(height: 12),
+            const CardLabel('What the leaders recorded'),
+            const SizedBox(height: 4),
+            row('Completed', sum.completed),
+            row('Excused', sum.excused),
+            row('No-show', sum.noShow),
+            row('Not recorded yet', sum.unrecorded),
+          ],
           row('Reassigned or cancelled', sum.ended),
         ],
       ),
@@ -795,8 +839,9 @@ class _HistorySummaryCard extends StatelessWidget {
   }
 }
 
-/// One past duty: date, duty, department and time with the member's answer,
-/// and one mark for the result (the recorded outcome, or why there is none).
+/// One past duty: date, duty, who gave it and the time with the member's
+/// answer, and one mark for the result (the recorded outcome, or why there is
+/// none). A cell part keeps no outcome, so its mark is the answer.
 class _HistoryRow extends StatelessWidget {
   const _HistoryRow({required this.entry});
   final HistoryEntry entry;
@@ -808,6 +853,13 @@ class _HistoryRow extends StatelessWidget {
     final id = e.assignmentId;
     final muted = ChurchType.secondary.copyWith(color: c.muted);
     final ended = e.outcomeState == OutcomeState.none;
+    final answerOnly = e.outcomeState == OutcomeState.notTracked;
+    final answerTone = switch (e.response) {
+      _ when e.confirmedByLeader => StatusTone.success,
+      DutyResponse.accepted => StatusTone.success,
+      DutyResponse.declined => StatusTone.neutral,
+      DutyResponse.pending => StatusTone.warning,
+    };
     return Padding(
       key: Key('history-entry-$id'),
       padding: const EdgeInsets.all(16),
@@ -829,19 +881,19 @@ class _HistoryRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   [
-                    e.departmentName,
+                    e.ownerName,
                     _clock(context, e.times.reportingAt ?? e.times.startsAt),
-                    if (!ended) e.stateLabel,
+                    if (!ended && !answerOnly) e.stateLabel,
                   ].join(' · '),
-                  key: ended ? null : Key('history-state-$id'),
+                  key: ended || answerOnly ? null : Key('history-state-$id'),
                   style: muted,
                 ),
                 const SizedBox(height: 8),
-                if (ended)
+                if (ended || answerOnly)
                   StatusLabel(
                     key: Key('history-state-$id'),
                     label: e.stateLabel,
-                    tone: StatusTone.neutral,
+                    tone: ended ? StatusTone.neutral : answerTone,
                   )
                 else if (e.outcome case final o?)
                   _OutcomeLines(record: o, keyPrefix: 'history-outcome-$id')

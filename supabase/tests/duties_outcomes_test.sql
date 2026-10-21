@@ -563,7 +563,7 @@ select ok(not exists (select 1 from unnest(array['anon', 'authenticated', 'servi
 select ok((select c.relrowsecurity from pg_class c where c.oid = 'app.duties_outcomes'::regclass),
   'RLS is on for the outcome log');
 select ok(not has_function_privilege('anon', 'api.duties_outcomes(date, date, uuid, text)', 'EXECUTE')
-          and not has_function_privilege('anon', 'api.duties_member_history(uuid, timestamptz, uuid)', 'EXECUTE'),
+          and not has_function_privilege('anon', 'api.duties_member_history(uuid, timestamptz, uuid, text)', 'EXECUTE'),
   'anon cannot call the reads');
 select ok(not has_function_privilege('authenticated', 'app.duties_record_outcome(uuid, bigint, jsonb)', 'EXECUTE')
           and not has_function_privilege('authenticated', 'app.duties_outcome_json(uuid, integer)', 'EXECUTE')

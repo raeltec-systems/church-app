@@ -158,10 +158,12 @@ void main() {
           respondedAt: _accepted,
           priorAcceptedAt: _accepted,
         ),
+        // Special assignments: `pastor` is a known role now; an unknown
+        // one still fails.
         {
           ...myDutyData(),
           'leaders': [
-            {'display_name': 'x', 'role': 'pastor'},
+            {'display_name': 'x', 'role': 'bishop'},
           ],
         },
         {...myDutyData(), 'leaders': 'x'},

@@ -22,6 +22,11 @@ const _historyCellNote =
     'Leaders record outcomes for department duties. Cell programme parts '
     'show how they were answered.';
 
+/// Special assignments: who else sees them and records their outcome.
+const _historySpecialNote =
+    'Special assignments are given by the Pastors, who see them and record '
+    'their outcome.';
+
 StatusTone _outcomeTone(OutcomeState s) => switch (s) {
   OutcomeState.completed => StatusTone.success,
   OutcomeState.excused => StatusTone.info,
@@ -602,12 +607,14 @@ class _HistoryBody extends ConsumerWidget {
     final ctl = ref.read(memberHistoryProvider.notifier);
     final nothing = sum.held == 0 && v.entries.isEmpty && q.pages.isEmpty;
     final muted = ChurchType.secondary.copyWith(color: c.muted);
-    // The filter is offered only when the reader has both kinds to choose
-    // from (a leader reading a member never sees cell parts).
-    final both = v.departmentCount > 0 && v.cellCount > 0;
+    // The filter is offered only when the reader has more than one kind to
+    // choose from (a leader reading a member never sees cell parts or
+    // special assignments); each kind is offered while it has positions.
+    final several = v.kindsPresent > 1;
     final what = switch (q.kind) {
       DutyOwnerKind.cell => 'cell programme parts',
       DutyOwnerKind.department => 'department duties',
+      DutyOwnerKind.special => 'special assignments',
       _ => v.self ? 'duties' : 'duties in your departments',
     };
     return Column(
@@ -628,17 +635,24 @@ class _HistoryBody extends ConsumerWidget {
             ),
           const SizedBox(height: 16),
         ],
-        if (both || q.kind != null) ...[
+        if (several || q.kind != null) ...[
           RadioSegments<DutyOwnerKind?>(
             key: const Key('history-kinds'),
             label: 'Show',
             options: [
-              SegmentOption(null, 'All (${v.departmentCount + v.cellCount})'),
-              SegmentOption(
-                DutyOwnerKind.department,
-                'Departments (${v.departmentCount})',
-              ),
-              SegmentOption(DutyOwnerKind.cell, 'Cell (${v.cellCount})'),
+              SegmentOption(null, 'All (${v.allCount})'),
+              if (v.departmentCount > 0 || q.kind == DutyOwnerKind.department)
+                SegmentOption(
+                  DutyOwnerKind.department,
+                  'Departments (${v.departmentCount})',
+                ),
+              if (v.cellCount > 0 || q.kind == DutyOwnerKind.cell)
+                SegmentOption(DutyOwnerKind.cell, 'Cell (${v.cellCount})'),
+              if (v.specialCount > 0 || q.kind == DutyOwnerKind.special)
+                SegmentOption(
+                  DutyOwnerKind.special,
+                  'Special (${v.specialCount})',
+                ),
             ],
             selected: q.kind,
             onChanged: state.busy ? null : ctl.filter,
@@ -675,6 +689,13 @@ class _HistoryBody extends ConsumerWidget {
             upcoming: v.upcoming,
             // Cell parts keep no outcome: no outcome figures for them alone.
             outcomes: q.kind != DutyOwnerKind.cell,
+            // Special assignments: their outcome is the Pastors'.
+            recordedBy: switch (q.kind) {
+              DutyOwnerKind.special => 'What the Pastors recorded',
+              DutyOwnerKind.department => 'What the leaders recorded',
+              _ when v.specialCount > 0 => 'What was recorded',
+              _ => 'What the leaders recorded',
+            },
           ),
         if (v.entries.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -727,6 +748,10 @@ class _HistoryBody extends ConsumerWidget {
           const SizedBox(height: 4),
           Text(_historyCellNote, style: muted),
         ],
+        if (v.specialCount > 0) ...[
+          const SizedBox(height: 4),
+          Text(_historySpecialNote, style: muted),
+        ],
       ],
     );
   }
@@ -740,12 +765,16 @@ class _HistorySummaryCard extends StatelessWidget {
     required this.summary,
     required this.upcoming,
     this.outcomes = true,
+    this.recordedBy = 'What the leaders recorded',
   });
   final HistorySummary summary;
   final int upcoming;
 
   /// False for cell parts alone: they keep no outcome to count.
   final bool outcomes;
+
+  /// The outcome figures' label (special assignments: the Pastors record).
+  final String recordedBy;
 
   @override
   Widget build(BuildContext context) {
@@ -825,7 +854,7 @@ class _HistorySummaryCard extends StatelessWidget {
           row('Never answered', sum.unanswered),
           if (outcomes) ...[
             const SizedBox(height: 12),
-            const CardLabel('What the leaders recorded'),
+            CardLabel(recordedBy),
             const SizedBox(height: 4),
             row('Completed', sum.completed),
             row('Excused', sum.excused),
@@ -882,7 +911,11 @@ class _HistoryRow extends StatelessWidget {
                 Text(
                   [
                     e.ownerName,
-                    _clock(context, e.times.reportingAt ?? e.times.startsAt),
+                    // Special assignments: a due date, never a time.
+                    if (e.times.dueOn case final d?)
+                      DutySpecial.dueText(d)
+                    else
+                      _clock(context, e.times.reportingAt ?? e.times.startsAt),
                     if (!ended && !answerOnly) e.stateLabel,
                   ].join(' · '),
                   key: ended || answerOnly ? null : Key('history-state-$id'),

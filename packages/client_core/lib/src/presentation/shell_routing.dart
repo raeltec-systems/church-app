@@ -89,6 +89,10 @@ abstract final class ClientPaths {
   /// with `?member=<id>`).
   static const dutyHistory = DutyPaths.history;
 
+  /// Special assignments (staff web, the Pastors): give, change, cancel and
+  /// record the outcome of duties that belong to no department or cell.
+  static const dutySpecial = DutyPaths.special;
+
   /// Story 4.1, staff web, Admin only: departments, leaders, deputies and
   /// members.
   static const adminDepartments = DutyPaths.adminDepartments;
@@ -402,6 +406,12 @@ GoRouter buildClientRouter({
           GoRoute(
             path: 'outcomes',
             pageBuilder: (_, state) => page(state, const DutyOutcomesScreen()),
+          ),
+          // Special assignments: the Pastors (staff web's sidebar; the
+          // server checks every read and command).
+          GoRoute(
+            path: 'special',
+            pageBuilder: (_, state) => page(state, const DutySpecialScreen()),
           ),
           GoRoute(
             path: 'history',

@@ -18,6 +18,7 @@ import 'wire_json.dart';
 
 part 'duty_coverage.dart';
 part 'duty_outcomes.dart';
+part 'duty_special.dart';
 
 /// Duties-registered scope kinds in the Identity grant model (story 2.3).
 abstract final class DutyScopeKinds {
@@ -230,20 +231,48 @@ int _overlaps(Map json) {
 
 /// The time fields every duty carries.
 class DutyTimes {
-  const DutyTimes({required this.startsAt, this.endsAt, this.reportingAt});
+  const DutyTimes({
+    required this.startsAt,
+    this.endsAt,
+    this.reportingAt,
+    this.dueOn,
+  });
 
   factory DutyTimes.fromJson(Map m) => DutyTimes(
     startsAt: _instant(m, 'starts_at'),
     endsAt: _optInstant(m, 'ends_at'),
     reportingAt: _optInstant(m, 'reporting_at'),
+    dueOn: _optDate(m, 'due_on'),
   );
 
   final DateTime startsAt;
   final DateTime? endsAt;
   final DateTime? reportingAt;
 
+  /// Special assignments: the church date a "done by" assignment is due (a
+  /// date at UTC midnight, never shifted by a time zone); [startsAt] is then
+  /// its due moment (18:00 church time on that date). Null for a fixed time.
+  final DateTime? dueOn;
+
+  /// A "done by" assignment: shown as "Due 30 Nov", never as a time.
+  bool get isDue => dueOn != null;
+
   /// The moment the member must be there (reporting time when earlier).
   DateTime get arriveBy => reportingAt ?? startsAt;
+}
+
+/// Special assignments: an optional church date (`YYYY-MM-DD`) at [key], as
+/// a date at UTC midnight.
+DateTime? _optDate(Map json, String key) {
+  final v = _opt<String>(json, key);
+  if (v == null) return null;
+  final m = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(v);
+  if (m == null) throw FormatException('unexpected $key');
+  final d = DateTime.utc(int.parse(m[1]!), int.parse(m[2]!), int.parse(m[3]!));
+  if (d.month != int.parse(m[2]!) || d.day != int.parse(m[3]!)) {
+    throw FormatException('unexpected $key');
+  }
+  return d;
 }
 
 /// One of the signed-in member's assignments (`api.duties_my_duties`).
@@ -291,15 +320,16 @@ class MyDuty {
       throw const FormatException('unexpected responded_at');
     }
     // Story 4.11: a department duty names its department; a cell programme
-    // part names its cell and no department.
+    // part names its cell and no department. Special assignments: neither.
     final ownerKind = DutyOwnerKind.fromWire(m['owner_kind']);
     final cell = ownerKind == DutyOwnerKind.cell;
+    final department = !cell && ownerKind != DutyOwnerKind.special;
     return MyDuty(
       assignmentId: _req<String>(m, 'assignment_id'),
       revision: _revision(m),
       occurrenceId: _req<String>(m, 'occurrence_id'),
-      departmentId: cell ? null : _req<String>(m, 'department_id'),
-      departmentName: cell ? null : _req<String>(m, 'department_name'),
+      departmentId: department ? _req<String>(m, 'department_id') : null,
+      departmentName: department ? _req<String>(m, 'department_name') : null,
       cellId: cell ? _req<String>(m, 'cell_id') : null,
       dutyName: _req<String>(m, 'duty_name'),
       times: DutyTimes.fromJson(m),
@@ -364,18 +394,30 @@ class MyDuty {
 
   /// Story 4.5: who owns the duty. Story 4.11: a department duty or a cell
   /// programme part can be answered here; anything else fails closed.
+  /// Special assignments: a Pastor's special assignment too.
   final DutyOwnerKind ownerKind;
 
   /// Story 4.5: the member may answer this duty from My duties.
   bool get answerable =>
-      ownerKind == DutyOwnerKind.department || ownerKind == DutyOwnerKind.cell;
+      ownerKind == DutyOwnerKind.department ||
+      ownerKind == DutyOwnerKind.cell ||
+      ownerKind == DutyOwnerKind.special;
+
+  /// Special assignments: given by a Pastor (no department, no cell).
+  bool get isSpecial => ownerKind == DutyOwnerKind.special;
 
   /// Story 4.11: the cell of a cell programme part (null for a department
   /// duty).
   final String? cellId;
 
   /// Story 4.11: who the duty belongs to, as the member reads it.
-  String get ownerLabel => departmentName ?? 'Cell programme';
+  String get ownerLabel => switch (ownerKind) {
+    DutyOwnerKind.special => DutySpecial.ownerLabel,
+    _ => departmentName ?? 'Cell programme',
+  };
+
+  /// Who the member answers to, in words ("your leader", "the Pastor").
+  String get answersTo => isSpecial ? 'the Pastor' : 'your leader';
 
   /// Story 4.5: when the member had accepted before saying they can't make
   /// it anymore (null otherwise).
@@ -459,17 +501,20 @@ class MyDuty {
 
 /// Story 4.5: who owns a duty the member sees. A server before 4.5 sends no
 /// owner kind and lists department-owned duties only, so a missing value is
-/// a department. Story 4.11: a cell programme part. Any other value (one
-/// this app does not know) is shown but cannot be answered here (fail
-/// closed).
+/// a department. Story 4.11: a cell programme part. Special assignments
+/// (2026-10-21): a Pastor's special assignment (no department, no cell). Any
+/// other value (one this app does not know) is shown but cannot be answered
+/// here (fail closed).
 enum DutyOwnerKind {
   department,
   cell,
+  special,
   other;
 
   static DutyOwnerKind fromWire(Object? v) => switch (v) {
     null || 'department' => department,
     'cell' => cell,
+    'special' => special,
     String() => other,
     _ => throw const FormatException('unexpected owner_kind'),
   };
@@ -482,18 +527,23 @@ class DutyLeaderName {
     required this.displayName,
     required this.isDeputy,
     this.isAssistant = false,
+    this.isPastor = false,
   });
 
   factory DutyLeaderName.fromJson(Object? json) {
     final m = _map(json, 'leader');
     final role = _req<String>(m, 'role');
-    if (role != 'leader' && role != 'deputy' && role != 'assistant') {
+    if (role != 'leader' &&
+        role != 'deputy' &&
+        role != 'assistant' &&
+        role != 'pastor') {
       throw const FormatException('unexpected role');
     }
     return DutyLeaderName(
       displayName: _req<String>(m, 'display_name'),
       isDeputy: role == 'deputy',
       isAssistant: role == 'assistant',
+      isPastor: role == 'pastor',
     );
   }
 
@@ -501,8 +551,13 @@ class DutyLeaderName {
   final bool isDeputy;
   final bool isAssistant;
 
-  /// "Leader", "Deputy" or (a cell's) "Assistant".
-  String get roleLabel => isAssistant
+  /// Special assignments: one of the church's Pastors (who give them).
+  final bool isPastor;
+
+  /// "Leader", "Deputy", (a cell's) "Assistant" or "Pastor".
+  String get roleLabel => isPastor
+      ? 'Pastor'
+      : isAssistant
       ? 'Assistant'
       : isDeputy
       ? 'Deputy'
@@ -2207,7 +2262,7 @@ class DutyConflict {
     if (visibility != 'full' && visibility != 'limited') {
       throw const FormatException('unexpected visibility');
     }
-    if (kind != 'department' && kind != 'cell') {
+    if (kind != 'department' && kind != 'cell' && kind != 'special') {
       throw const FormatException('unexpected owner_kind');
     }
     final full = visibility == 'full';
@@ -2235,7 +2290,7 @@ class DutyConflict {
 
   final bool full;
 
-  /// `department` or `cell`.
+  /// `department`, `cell` or (special assignments) `special`.
   final String ownerKind;
 
   /// The busy time: reporting time (or start) to end time (or two hours).
@@ -2256,8 +2311,13 @@ class DutyConflict {
   bool get isCell => ownerKind == 'cell';
   bool get isDraft => state == 'draft';
 
+  /// Special assignments: a Pastor's special assignment (shown in full only
+  /// to the Pastors).
+  bool get isSpecial => ownerKind == 'special';
+
   /// Who owns it, in words.
   String get ownerLabel => switch ((full, isCell)) {
+    _ when isSpecial => DutySpecial.ownerLabel,
     (false, false) => 'Another department\'s duty',
     (false, true) => 'A cell programme part',
     (true, true) => 'Your cell\'s programme',
@@ -2341,7 +2401,8 @@ class DutyCandidates {
     final m = _map(json, 'candidates read');
     final w = _map(m['window'], 'window');
     return DutyCandidates(
-      departmentId: _req<String>(m, 'department_id'),
+      // Special assignments: a Pastor's church-wide check has no department.
+      departmentId: _opt<String>(m, 'department_id'),
       slotId: _opt<String>(m, 'slot_id'),
       from: _instant(w, 'from'),
       to: _instant(w, 'to'),
@@ -2351,7 +2412,7 @@ class DutyCandidates {
     );
   }
 
-  final String departmentId;
+  final String? departmentId;
   final String? slotId;
 
   /// The busy time asked about.
@@ -2384,6 +2445,13 @@ class CandidateQuery {
     this.endsAt,
     this.reportingAt,
   }) : slotId = null;
+
+  /// Special assignments: a Pastor's prospective special assignment at a
+  /// fixed time (every active member is a candidate; no department).
+  const CandidateQuery.special({required DateTime this.startsAt, this.endsAt})
+    : slotId = null,
+      departmentId = null,
+      reportingAt = null;
 
   final String? slotId;
   final String? departmentId;
@@ -2543,9 +2611,13 @@ class DutyReminderSpec {
   String get label => labelFor();
 
   /// Review: with a reporting time the start anchor is the reporting time.
-  String labelFor({bool reporting = false}) {
+  /// Special assignments: [due] names a due date's due moment ("before it
+  /// is due").
+  String labelFor({bool reporting = false, bool due = false}) {
     final what = anchor == DutyReminderAnchor.deadline
         ? 'the answer-by time'
+        : due
+        ? 'it is due'
         : (reporting ? 'the reporting time' : 'the start');
     final parts = offset.split(' ');
     if (parts.length != 2) return '$offset ${after ? 'after' : 'before'} $what';
@@ -2602,13 +2674,17 @@ class DutyReminders {
   String get text => textFor();
 
   /// Review: "before the reporting time" when the duty has one.
-  String textFor({bool reporting = false}) => switch (specs) {
+  String textFor({bool reporting = false, bool due = false}) => switch (specs) {
     null =>
       'Reminders: the defaults (24 hours before and at the answer-by time, '
-          'and 24 hours before ${reporting ? 'the reporting time' : 'the start'}).',
+          'and 24 hours before ${due
+              ? 'it is due'
+              : reporting
+              ? 'the reporting time'
+              : 'the start'}).',
     final s when s.isEmpty => 'Reminders: none.',
     final s =>
-      'Reminders: ${s.map((x) => x.labelFor(reporting: reporting)).join(', ')}.',
+      'Reminders: ${s.map((x) => x.labelFor(reporting: reporting, due: due)).join(', ')}.',
   };
 }
 

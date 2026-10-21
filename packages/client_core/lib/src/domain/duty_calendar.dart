@@ -42,10 +42,17 @@ abstract final class DutyCalendar {
   static String ics(MyDuty duty, {required DateTime now}) {
     final start = duty.times.arriveBy;
     final end = duty.times.endsAt ?? duty.times.startsAt.add(defaultLength);
+    // Special assignments: a due date is an all-day entry on that date (it
+    // has no time), titled "Due: ...".
+    final due = duty.times.dueOn;
     final description = [
       // Story 4.11: a cell programme part names no department.
       if (duty.departmentName case final d?)
         'Department: $d.'
+      else if (duty.isSpecial)
+        due == null
+            ? 'Special assignment.'
+            : 'Special assignment, ${DutySpecial.dueText(due).toLowerCase()}.'
       else
         'Cell programme part.',
       if (duty.times.reportingAt != null)
@@ -66,9 +73,15 @@ abstract final class DutyCalendar {
       // calendars that honour SEQUENCE (the slot revision only grows).
       'SEQUENCE:${duty.slotRevision}',
       'DTSTAMP:${_utc(now)}',
-      'DTSTART:${_utc(start)}',
-      'DTEND:${_utc(end.isAfter(start) ? end : start.add(defaultLength))}',
-      'SUMMARY:${_text(duty.title)}',
+      if (due != null) ...[
+        'DTSTART;VALUE=DATE:${_date(due)}',
+        'DTEND;VALUE=DATE:${_date(due.add(const Duration(days: 1)))}',
+        'SUMMARY:${_text('Due: ${duty.title}')}',
+      ] else ...[
+        'DTSTART:${_utc(start)}',
+        'DTEND:${_utc(end.isAfter(start) ? end : start.add(defaultLength))}',
+        'SUMMARY:${_text(duty.title)}',
+      ],
       if (duty.location case final l?) 'LOCATION:${_text(l)}',
       'DESCRIPTION:${_text(description)}',
       'END:VEVENT',
@@ -81,6 +94,12 @@ abstract final class DutyCalendar {
     final w = ChurchTime.wall(at);
     String two(int v) => v.toString().padLeft(2, '0');
     return '${two(w.hour)}:${two(w.minute)}';
+  }
+
+  /// `20991130` (a calendar date: its own year, month and day).
+  static String _date(DateTime d) {
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${d.year.toString().padLeft(4, '0')}${two(d.month)}${two(d.day)}';
   }
 
   /// `20990104T080000Z`.

@@ -759,6 +759,84 @@ class FakeDutyOutcomes implements DutyOutcomesRepository {
   }
 }
 
+/// [DutySpecialRepository] answered by the test (special assignments).
+class FakeDutySpecial implements DutySpecialRepository {
+  AccessRead<SpecialAssignments> special = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  int reads = 0;
+
+  @override
+  Future<AccessRead<SpecialAssignments>> fetchSpecialAssignments() async {
+    reads++;
+    return special;
+  }
+}
+
+/// The wire form of one special assignment as the Pastors read it. [dueOn]
+/// (YYYY-MM-DD) makes it a due date (its start is then the due moment,
+/// 18:00 church time); [assignment] null leaves it unheld (with [vacancy]);
+/// otherwise its keys override [specialHolderData].
+Map<String, Object?> specialAssignmentData({
+  String occurrenceId = '61616161-6161-4161-8161-616161616161',
+  int revision = 1,
+  String slotId = '62626262-6262-4262-8262-626262626262',
+  String dutyName = 'SYNTHETIC Lead the prayer meeting',
+  String startsAt = '2099-01-04T08:00:00.000000Z',
+  String? endsAt = '2099-01-04T10:00:00.000000Z',
+  String? dueOn,
+  String? location = 'SYNTHETIC Chapel',
+  String? instructions,
+  bool started = false,
+  Map<String, Object?>? assignment = const {},
+  Map<String, Object?>? vacancy,
+}) => {
+  'occurrence_id': occurrenceId,
+  'revision': revision,
+  'slot_id': slotId,
+  'duty_name': dutyName,
+  'timing': dueOn == null ? 'time' : 'due',
+  'starts_at': dueOn == null ? startsAt : '${dueOn}T16:00:00.000000Z',
+  'ends_at': dueOn == null ? endsAt : null,
+  'due_on': dueOn,
+  'location': location,
+  'instructions': instructions,
+  'given_by': 'SYNTHETIC Pastor Banda',
+  'given_at': '2098-12-01T08:00:00.000000Z',
+  'started': started,
+  'assignment': assignment == null
+      ? null
+      : specialHolderData(extra: assignment),
+  'vacancy': vacancy,
+};
+
+/// The wire form of a special assignment's holder ([extra] overrides keys).
+Map<String, Object?> specialHolderData({
+  Map<String, Object?> extra = const {},
+}) => {
+  'assignment_id': '63636363-6363-4363-8363-636363636363',
+  'revision': 1,
+  'member_id': '64646464-6464-4464-8464-646464646464',
+  'display_name': 'SYNTHETIC Ruth Mwale',
+  'account': 'app_account',
+  'own': false,
+  'erased': false,
+  'response': 'pending',
+  'response_provenance': null,
+  'confirmed_channel': null,
+  'responded_at': null,
+  'prior_accepted_at': null,
+  'note': null,
+  'response_deadline': '2099-01-02T16:00:00.000000Z',
+  'deadline_source': 'default',
+  'short_notice': false,
+  'needs_contact': null,
+  'override': null,
+  'outcome': null,
+  'allowed': <String>[],
+  ...extra,
+};
+
 /// [ContactLauncher] that records what the screen asked for (story 4.9).
 class FakeContactLauncher implements ContactLauncher {
   FakeContactLauncher([this.result = ContactLaunch.opened]);
@@ -814,10 +892,13 @@ Map<String, Object?> myDutyData({
   'occurrence_id': '43434343-4343-4343-8343-434343434343',
   'slot_id': slotId,
   'owner_kind': ownerKind,
-  'department_id': ownerKind == 'cell'
+  // Special assignments: a `special` owner kind has no department either.
+  'department_id': ownerKind == 'cell' || ownerKind == 'special'
       ? null
       : '44444444-4444-4444-8444-444444444444',
-  'department_name': ownerKind == 'cell' ? null : 'SYNTHETIC Preaching Rota',
+  'department_name': ownerKind == 'cell' || ownerKind == 'special'
+      ? null
+      : 'SYNTHETIC Preaching Rota',
   if (ownerKind == 'cell') 'cell_id': '47474747-4747-4747-8747-474747474747',
   'duty_name': dutyName,
   'position_name': positionName,
@@ -1735,6 +1816,7 @@ class ClientTestHarness {
   final duties = FakeDuties();
   final coverage = FakeDutyCoverage();
   final outcomes = FakeDutyOutcomes();
+  final special = FakeDutySpecial();
   final contact = FakeContactLauncher();
   final followUps = FakeFollowUps();
   final recovery = FakePasswordRecovery();
@@ -1773,6 +1855,7 @@ class ClientTestHarness {
       dutiesRepositoryProvider.overrideWithValue(duties),
       dutyCoverageRepositoryProvider.overrideWithValue(coverage),
       dutyOutcomesRepositoryProvider.overrideWithValue(outcomes),
+      dutySpecialRepositoryProvider.overrideWithValue(special),
       contactLauncherProvider.overrideWithValue(contact),
       followUpsRepositoryProvider.overrideWithValue(followUps),
       passwordRecoveryGatewayProvider.overrideWithValue(recovery),

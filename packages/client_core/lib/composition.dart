@@ -98,6 +98,9 @@ Future<List<Override>> compositionOverrides(
     dutyOutcomesRepositoryProvider.overrideWithValue(
       SupabaseDutyOutcomesRepository(client),
     ),
+    dutySpecialRepositoryProvider.overrideWithValue(
+      SupabaseDutySpecialRepository(client),
+    ),
     followUpsRepositoryProvider.overrideWithValue(
       SupabaseFollowUpsRepository(client),
     ),

@@ -305,6 +305,7 @@ class StaffMeetingCell {
     required this.meetings,
     this.cellRevision,
     this.schedule,
+    this.recent = const [],
   });
 
   factory StaffMeetingCell.fromJson(Object? json) {
@@ -333,6 +334,10 @@ class StaffMeetingCell {
       meetings: List.unmodifiable(
         _req<List>(m, 'meetings').map(CellMeeting.fromJson),
       ),
+      // Story 5.8 (absent from 5.7 servers).
+      recent: List.unmodifiable(
+        (_opt<List>(m, 'recent') ?? const []).map(RecentMeeting.fromJson),
+      ),
     );
   }
 
@@ -353,6 +358,43 @@ class StaffMeetingCell {
   final int? cellRevision;
   final MeetingSchedule? schedule;
   final List<CellMeeting> meetings;
+
+  /// Story 5.8: meetings that started in the last four weeks, newest first.
+  final List<RecentMeeting> recent;
+}
+
+/// Story 5.8: what is known of a meeting afterwards. Not recorded is its
+/// own state: it is never read as held, or as not held.
+enum MeetingStatus {
+  scheduled('scheduled'),
+  held('held'),
+  notHeld('not_held'),
+  unrecorded('unrecorded'),
+  cancelled('cancelled');
+
+  const MeetingStatus(this.wire);
+  final String wire;
+
+  static MeetingStatus parse(Object? v) => MeetingStatus.values.firstWhere(
+    (s) => s.wire == v,
+    orElse: () => throw const FormatException('unexpected status'),
+  );
+}
+
+/// Story 5.8: a meeting of the last four weeks and its status.
+class RecentMeeting {
+  const RecentMeeting({required this.meeting, required this.status});
+
+  factory RecentMeeting.fromJson(Object? json) {
+    final m = _map(json, 'recent meeting');
+    return RecentMeeting(
+      meeting: CellMeeting.fromJson(m),
+      status: MeetingStatus.parse(m['status']),
+    );
+  }
+
+  final CellMeeting meeting;
+  final MeetingStatus status;
 }
 
 /// `api.cells_meetings`.

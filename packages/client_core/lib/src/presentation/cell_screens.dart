@@ -225,10 +225,39 @@ import '../domain/membership_application.dart';
       'Glad you can come',
       'Your leader is told you can come after all.',
     ),
+    CellNotice.programmePartRefused
+        when a?.command == CellRecordCommands.recordLeaders =>
+      (
+        StatusTone.warning,
+        'Not saved',
+        'Check the part below: a change needs a reason, and only members of '
+            'this cell can be chosen (name anyone else as a guest).',
+      ),
     CellNotice.programmePartRefused => (
       StatusTone.warning,
       'Not published',
       'A part could not be given to its person. See the part below.',
+    ),
+    CellNotice.meetingRecorded => (
+      StatusTone.success,
+      'Recorded',
+      'The meeting record is saved with your name.',
+    ),
+    CellNotice.recordCorrected => (
+      StatusTone.success,
+      'Corrected',
+      'The earlier value is kept with its reason.',
+    ),
+    CellNotice.leadersRecorded => (
+      StatusTone.success,
+      'Saved',
+      'Who led is saved with your name. The plan and duty answers are '
+          'unchanged.',
+    ),
+    CellNotice.meetingNotStarted => (
+      StatusTone.warning,
+      'Not started yet',
+      'A meeting is recorded once it has started.',
     ),
   };
 }
@@ -1414,6 +1443,9 @@ class _MeetingCellCardState extends ConsumerState<_MeetingCellCard> {
       }
     }
     final changed = cell.meetings.where((m) => m.moved || m.cancelled).length;
+    final unrecorded = cell.recent
+        .where((r) => r.status == MeetingStatus.unrecorded)
+        .length;
     return _Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1436,6 +1468,15 @@ class _MeetingCellCardState extends ConsumerState<_MeetingCellCard> {
                 const StatusLabel(
                   label: 'Synthetic test record',
                   tone: StatusTone.neutral,
+                ),
+              // Story 5.8: past meetings waiting for their record.
+              if (unrecorded > 0)
+                StatusLabel(
+                  key: Key('meeting-unrecorded-$id'),
+                  label: unrecorded == 1
+                      ? '1 recent meeting not recorded'
+                      : '$unrecorded recent meetings not recorded',
+                  tone: StatusTone.warning,
                 ),
             ],
           ),
@@ -1579,6 +1620,40 @@ class _MeetingCellCardState extends ConsumerState<_MeetingCellCard> {
                   busy: busy,
                 ),
             ],
+          ],
+          // Story 5.8: the last four weeks, newest first: held or not, and who
+          // led (the leader or assistant records it on the meeting's page).
+          if (cell.recent.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _heading(context, 'Last 4 weeks'),
+            for (final r in cell.recent)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Wrap(
+                  key: Key('recent-${r.meeting.meetingId}'),
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(_meetingWhen(context, r.meeting)),
+                    ?_statusLabel(r.status),
+                    if (cell.role != MeetingRole.admin &&
+                        r.status != MeetingStatus.cancelled)
+                      FocusRing(
+                        child: TextButton(
+                          key: Key('recent-open-${r.meeting.meetingId}'),
+                          onPressed: () =>
+                              context.go(CellPaths.plan(r.meeting.meetingId)),
+                          child: Text(
+                            r.status == MeetingStatus.unrecorded
+                                ? 'Record'
+                                : 'Open',
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
           ],
           // Setting the weekly rule is rare (Admin): open only for a cell
           // without one, otherwise behind a button after the meetings.
@@ -2231,7 +2306,9 @@ class _PlanBody extends ConsumerWidget {
             const StatusLabel(
               label: 'Meeting cancelled',
               tone: StatusTone.danger,
-            ),
+            )
+          else
+            ?_statusLabel(read.status, key: const Key('plan-status')),
           if (p == null)
             const StatusLabel(
               key: Key('plan-state-none'),
@@ -2260,6 +2337,13 @@ class _PlanBody extends ConsumerWidget {
       ),
       const SizedBox(height: 12),
     ];
+    // Story 5.8: once the meeting has started, what happened comes first.
+    if (read.full && !ahead && !m.cancelled) {
+      children.addAll([
+        _RecordCard(meetingId: meetingId, read: read, state: state),
+        const SizedBox(height: 12),
+      ]);
+    }
     // Story 5.7: who can't attend comes before the plan (a coverage warning).
     if (read.canEdit && read.absences.isNotEmpty) {
       children.addAll([
@@ -4397,4 +4481,549 @@ class _AbsencesCard extends StatelessWidget {
       ],
     ),
   );
+}
+
+// ---------------------------------------------------------------------------
+// Story 5.8: after the meeting (held, who actually led each part)
+// ---------------------------------------------------------------------------
+
+/// "Held", "Not held", "Not recorded" or "Cancelled": the status is the data
+/// that matters afterwards, so it carries the colour. Null while ahead.
+StatusLabel? _statusLabel(MeetingStatus? status, {Key? key}) =>
+    switch (status) {
+      MeetingStatus.held => StatusLabel(
+        key: key,
+        label: 'Held',
+        tone: StatusTone.success,
+      ),
+      MeetingStatus.notHeld => StatusLabel(
+        key: key,
+        label: 'Not held',
+        tone: StatusTone.neutral,
+      ),
+      MeetingStatus.unrecorded => StatusLabel(
+        key: key,
+        label: 'Not recorded',
+        tone: StatusTone.warning,
+      ),
+      MeetingStatus.cancelled => StatusLabel(
+        key: key,
+        label: 'Cancelled',
+        tone: StatusTone.danger,
+      ),
+      MeetingStatus.scheduled || null => null,
+    };
+
+/// Story 5.8, Plan meeting once the meeting has started: was it held, and
+/// who actually led each part. Every value is the leader's explicit choice
+/// (the plan is never assumed), a change needs a reason, and the earlier
+/// value stays visible. The plan and the duty answers are not touched.
+class _RecordCard extends ConsumerStatefulWidget {
+  const _RecordCard({
+    required this.meetingId,
+    required this.read,
+    required this.state,
+  });
+  final String meetingId;
+  final ProgrammeRead read;
+  final CellsState<ProgrammeRead> state;
+
+  @override
+  ConsumerState<_RecordCard> createState() => _RecordCardState();
+}
+
+class _RecordCardState extends ConsumerState<_RecordCard> {
+  bool _correcting = false;
+  final _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final read = widget.read;
+    final m = read.meeting;
+    final record = read.record;
+    final s = widget.state;
+    final busy = s.busy;
+    final ctl = ref.read(cellProgrammeProvider(widget.meetingId).notifier);
+    final children = <Widget>[_heading(context, 'After the meeting')];
+    if (record == null) {
+      if (read.canRecord) {
+        children.addAll([
+          const Text('Was this meeting held?'),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FocusRing(
+                child: FilledButton(
+                  key: const Key('record-held'),
+                  onPressed: busy ? null : () => ctl.recordHeld(m, held: true),
+                  child: const Text('Yes, it was held'),
+                ),
+              ),
+              FocusRing(
+                child: OutlinedButton(
+                  key: const Key('record-not-held'),
+                  onPressed: busy ? null : () => ctl.recordHeld(m, held: false),
+                  child: const Text('It didn\'t happen'),
+                ),
+              ),
+            ],
+          ),
+        ]);
+      } else {
+        children.add(
+          const Text(
+            'Not recorded yet. The cell\'s leader or assistant records it.',
+            key: Key('record-none'),
+          ),
+        );
+      }
+      return _Card(
+        key: const Key('plan-record'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: children,
+        ),
+      );
+    }
+    final latest = record.history.isEmpty ? null : record.history.first;
+    children.add(
+      Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          _statusLabel(
+            record.held ? MeetingStatus.held : MeetingStatus.notHeld,
+            key: const Key('record-state'),
+          )!,
+          if (latest != null)
+            _muted(
+              context,
+              '${latest.by ?? 'Removed member'}, '
+              '${ChurchTime.dateText(latest.at)}',
+            ),
+        ],
+      ),
+    );
+    if (latest?.reason case final r?) {
+      children.add(_muted(context, 'Why it changed: $r'));
+    }
+    // Earlier values, newest first.
+    for (final h in record.history.skip(1)) {
+      children.add(
+        _muted(
+          context,
+          'Earlier: ${h.held ? 'held' : 'not held'} '
+          '(${h.by ?? 'Removed member'}, ${ChurchTime.dateText(h.at)})',
+        ),
+      );
+    }
+    if (read.canRecord) {
+      if (_correcting) {
+        // A correction closes once the server has it; a refusal keeps it.
+        if (s.notice == CellNotice.recordCorrected && !busy) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _correcting) {
+              setState(() => _correcting = false);
+              _reason.clear();
+            }
+          });
+        }
+        children.addAll([
+          const SizedBox(height: 8),
+          TextField(
+            key: const Key('record-reason'),
+            controller: _reason,
+            maxLength: CellRecordCommands.reasonMax,
+            enabled: !busy,
+            decoration: InputDecoration(
+              labelText: 'Why is this changing?',
+              errorText: s.fieldErrors['reason'] == null
+                  ? null
+                  : 'Say why, briefly.',
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          Wrap(
+            spacing: 8,
+            children: [
+              FocusRing(
+                child: FilledButton(
+                  key: const Key('record-correct-save'),
+                  onPressed: busy || _reason.text.trim().isEmpty
+                      ? null
+                      : () => ctl.correctHeld(
+                          m,
+                          record,
+                          held: !record.held,
+                          reason: _reason.text,
+                        ),
+                  child: Text(record.held ? 'Save: not held' : 'Save: held'),
+                ),
+              ),
+              FocusRing(
+                child: TextButton(
+                  key: const Key('record-correct-cancel'),
+                  onPressed: busy
+                      ? null
+                      : () => setState(() => _correcting = false),
+                  child: const Text('Keep it'),
+                ),
+              ),
+            ],
+          ),
+        ]);
+      } else {
+        children.add(
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FocusRing(
+              child: TextButton(
+                key: const Key('record-correct'),
+                onPressed: busy
+                    ? null
+                    : () => setState(() => _correcting = true),
+                child: Text(
+                  record.held ? 'It wasn\'t held' : 'It was held after all',
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+    final p = read.programme;
+    if (record.held) {
+      children.addAll([
+        const SizedBox(height: 12),
+        _heading(context, 'Who led each part'),
+      ]);
+      if (p == null || p.state == ProgrammeState.cancelled || p.parts.isEmpty) {
+        children.add(
+          const Text(
+            'This meeting had no programme, so there are no parts to record.',
+            key: Key('record-no-parts'),
+          ),
+        );
+      } else {
+        // The main job in one click: every part not yet recorded whose
+        // planned person is still in the cell, as planned (an explicit
+        // choice; nothing is assumed).
+        final asPlanned = [
+          for (final part in p.parts)
+            if (!record.actual.containsKey(part.partId) &&
+                part.assignee != null &&
+                part.assignee!.inCell)
+              ActualLeaderDraft(
+                partId: part.partId,
+                memberId: part.assignee!.memberId,
+              ),
+        ];
+        final missing = p.parts
+            .where((part) => !record.actual.containsKey(part.partId))
+            .length;
+        if (missing > 0) {
+          children.add(
+            _muted(
+              context,
+              '$missing of ${p.parts.length} '
+              '${p.parts.length == 1 ? 'part' : 'parts'} not recorded. '
+              'Record who actually led, not who was planned.',
+            ),
+          );
+        }
+        if (read.canRecord && asPlanned.isNotEmpty) {
+          children.add(
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: FocusRing(
+                  child: FilledButton(
+                    key: const Key('record-all-planned'),
+                    onPressed: busy
+                        ? null
+                        : () => ctl.recordLeaders(m, record, asPlanned),
+                    child: Text(
+                      asPlanned.length == 1
+                          ? '1 part was led as planned'
+                          : '${asPlanned.length} parts were led as planned',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+        for (final part in p.parts) {
+          children.add(
+            _ActualRow(
+              key: Key('record-part-${part.partId}'),
+              meetingId: widget.meetingId,
+              meeting: m,
+              record: record,
+              part: part,
+              roster: read.roster,
+              canRecord: read.canRecord,
+              state: s,
+            ),
+          );
+        }
+      }
+    }
+    return _Card(
+      key: const Key('plan-record'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
+    );
+  }
+}
+
+const _guestChoice = 'guest';
+const _nobodyChoice = 'nobody';
+
+/// One part afterwards: who was planned, who actually led (or that it is not
+/// recorded), earlier values, and the leader's change with a reason.
+class _ActualRow extends ConsumerStatefulWidget {
+  const _ActualRow({
+    super.key,
+    required this.meetingId,
+    required this.meeting,
+    required this.record,
+    required this.part,
+    required this.roster,
+    required this.canRecord,
+    required this.state,
+  });
+  final String meetingId;
+  final CellMeeting meeting;
+  final MeetingRecord record;
+  final ProgrammePart part;
+  final List<ProgrammeRosterMember> roster;
+  final bool canRecord;
+  final CellsState<ProgrammeRead> state;
+
+  @override
+  ConsumerState<_ActualRow> createState() => _ActualRowState();
+}
+
+class _ActualRowState extends ConsumerState<_ActualRow> {
+  bool _editing = false;
+
+  /// A member id, [_guestChoice] or [_nobodyChoice].
+  String? _choice;
+  final _guest = TextEditingController();
+  final _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _guest.dispose();
+    _reason.dispose();
+    super.dispose();
+  }
+
+  void _open(ActualLeader? current) {
+    final planned = widget.part.assignee;
+    setState(() {
+      _editing = true;
+      _choice = switch (current?.kind) {
+        ActualLeaderKind.member => current!.memberId,
+        ActualLeaderKind.guest => _guestChoice,
+        ActualLeaderKind.nobody => _nobodyChoice,
+        null => planned != null && planned.inCell ? planned.memberId : null,
+      };
+      _guest.text = current?.guestName ?? '';
+      _reason.clear();
+    });
+  }
+
+  /// Whether the server's current row is what this editor sent.
+  bool _matches(ActualLeader? current) => switch (_choice) {
+    _nobodyChoice => current?.kind == ActualLeaderKind.nobody,
+    _guestChoice =>
+      current?.kind == ActualLeaderKind.guest &&
+          current?.guestName == _guest.text.trim(),
+    final id => id != null && current?.memberId == id,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final part = widget.part;
+    final current = widget.record.actual[part.partId];
+    final s = widget.state;
+    final busy = s.busy;
+    final ctl = ref.read(cellProgrammeProvider(widget.meetingId).notifier);
+    // The editor closes once the server has saved this part's value; a
+    // refusal keeps what was typed (field errors are of the one part sent).
+    if (_editing &&
+        !busy &&
+        s.notice == CellNotice.leadersRecorded &&
+        _matches(current)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _editing) setState(() => _editing = false);
+      });
+    }
+    final planned = part.assignee?.displayName ?? part.linkedLabel;
+    final (label, tone) = switch (current) {
+      null => ('Not recorded', StatusTone.warning),
+      ActualLeader(kind: ActualLeaderKind.nobody) => (
+        'Nobody led it',
+        StatusTone.neutral,
+      ),
+      ActualLeader(substitute: true) => (
+        'Stood in: ${current.who}',
+        StatusTone.info,
+      ),
+      _ => ('Led by ${current.who}', StatusTone.success),
+    };
+    final errors = _editing ? s.fieldErrors : const <String, String>{};
+    final children = <Widget>[
+      Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text('${ChurchTime.timeText(part.startsAt)}  ${part.label}'),
+          StatusLabel(
+            key: Key('record-actual-${part.partId}'),
+            label: label,
+            tone: tone,
+          ),
+          if (widget.canRecord && !_editing)
+            FocusRing(
+              child: TextButton(
+                key: Key('record-edit-${part.partId}'),
+                onPressed: busy ? null : () => _open(current),
+                child: Text(current == null ? 'Record' : 'Change'),
+              ),
+            ),
+        ],
+      ),
+      _muted(context, 'Planned: ${planned ?? 'nobody (a gap)'}'),
+      if (current?.reason case final r?) _muted(context, 'Why it changed: $r'),
+      for (final e in current?.earlier ?? const <ActualLeader>[])
+        _muted(
+          context,
+          'Earlier: ${e.who} (${e.recordedBy ?? 'Removed member'})',
+        ),
+    ];
+    if (_editing) {
+      final choice = _choice;
+      final needsReason = current != null;
+      final ready =
+          choice != null &&
+          (choice != _guestChoice || _guest.text.trim().isNotEmpty) &&
+          (!needsReason || _reason.text.trim().isNotEmpty);
+      children.addAll([
+        DropdownButton<String>(
+          key: Key('record-who-${part.partId}'),
+          hint: const Text('Who led it?'),
+          value: choice,
+          items: [
+            for (final r in widget.roster)
+              DropdownMenuItem(
+                value: r.memberId,
+                child: Text(
+                  r.memberId == part.assignee?.memberId
+                      ? '${r.displayName} (planned)'
+                      : r.displayName,
+                ),
+              ),
+            const DropdownMenuItem(
+              value: _guestChoice,
+              child: Text('Someone else (a guest)'),
+            ),
+            const DropdownMenuItem(
+              value: _nobodyChoice,
+              child: Text('Nobody led it'),
+            ),
+          ],
+          onChanged: busy ? null : (v) => setState(() => _choice = v),
+        ),
+        if (choice == _guestChoice)
+          TextField(
+            key: Key('record-guest-${part.partId}'),
+            controller: _guest,
+            maxLength: CellRecordCommands.guestNameMax,
+            enabled: !busy,
+            decoration: InputDecoration(
+              labelText: 'Their name',
+              errorText: errors['parts.0.name'] == null
+                  ? null
+                  : 'Type their name.',
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        if (needsReason)
+          TextField(
+            key: Key('record-part-reason-${part.partId}'),
+            controller: _reason,
+            maxLength: CellRecordCommands.reasonMax,
+            enabled: !busy,
+            decoration: InputDecoration(
+              labelText: 'Why is this changing?',
+              errorText: errors['parts.0.reason'] == null
+                  ? null
+                  : 'Say why, briefly.',
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        if (errors['parts.0.member_id'] != null)
+          _muted(
+            context,
+            'They are no longer in this cell: name them as a guest.',
+          ),
+        Wrap(
+          spacing: 8,
+          children: [
+            FocusRing(
+              child: FilledButton(
+                key: Key('record-save-${part.partId}'),
+                onPressed: busy || !ready
+                    ? null
+                    : () => ctl.recordLeaders(widget.meeting, widget.record, [
+                        ActualLeaderDraft(
+                          partId: part.partId,
+                          memberId:
+                              choice == _guestChoice || choice == _nobodyChoice
+                              ? null
+                              : choice,
+                          guestName: choice == _guestChoice
+                              ? _guest.text
+                              : null,
+                          reason: needsReason ? _reason.text : null,
+                        ),
+                      ]),
+                child: const Text('Save'),
+              ),
+            ),
+            FocusRing(
+              child: TextButton(
+                key: Key('record-cancel-${part.partId}'),
+                onPressed: busy ? null : () => setState(() => _editing = false),
+                child: const Text('Cancel'),
+              ),
+            ),
+          ],
+        ),
+      ]);
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
+    );
+  }
 }

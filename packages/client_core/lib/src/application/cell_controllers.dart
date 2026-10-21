@@ -92,6 +92,14 @@ enum CellNotice {
   absenceSent,
   absenceChanged,
   absenceWithdrawn,
+
+  /// Story 5.8: the meeting record (held, a correction, who led).
+  meetingRecorded,
+  recordCorrected,
+  leadersRecorded,
+
+  /// The meeting has not started yet: it cannot be recorded.
+  meetingNotStarted,
 }
 
 /// One command in flight or just answered.
@@ -274,6 +282,9 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
     CellAbsenceCommands.send => CellNotice.absenceSent,
     CellAbsenceCommands.change => CellNotice.absenceChanged,
     CellAbsenceCommands.withdraw => CellNotice.absenceWithdrawn,
+    CellRecordCommands.recordHeld => CellNotice.meetingRecorded,
+    CellRecordCommands.correctHeld => CellNotice.recordCorrected,
+    CellRecordCommands.recordLeaders => CellNotice.leadersRecorded,
     _ => CellNotice.cancelled,
   };
 
@@ -288,6 +299,8 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
         CellNotice.alreadyCancelled,
       ErrorCode.validationFailed when f['meeting_id'] == 'started' =>
         CellNotice.meetingStarted,
+      ErrorCode.validationFailed when f['meeting_id'] == 'not_started' =>
+        CellNotice.meetingNotStarted,
       ErrorCode.validationFailed when f['meeting_id'] == 'cancelled' =>
         CellNotice.meetingCancelledAlready,
       ErrorCode.conflict when f['programme_id'] == 'not_draft' =>
@@ -684,6 +697,36 @@ class CellProgrammeController extends CellsController<ProgrammeRead> {
       function: DutyCommands.function,
     );
   }
+
+  /// Story 5.8: records whether the meeting was held (the first time).
+  Future<void> recordHeld(CellMeeting meeting, {required bool held}) => send(
+    CellRecordCommands.recordHeld,
+    const Optional.of(null),
+    {'meeting_id': meeting.meetingId, 'held': held},
+    'the meeting record',
+  );
+
+  /// Story 5.8: corrects held / not held; the earlier value is kept.
+  Future<void> correctHeld(
+    CellMeeting meeting,
+    MeetingRecord record, {
+    required bool held,
+    required String reason,
+  }) => send(CellRecordCommands.correctHeld, Optional.of(record.revision), {
+    'meeting_id': meeting.meetingId,
+    'held': held,
+    'reason': reason.trim(),
+  }, 'the meeting record');
+
+  /// Story 5.8: who actually led [parts] (a correction carries its reason).
+  Future<void> recordLeaders(
+    CellMeeting meeting,
+    MeetingRecord record,
+    List<ActualLeaderDraft> parts,
+  ) => send(CellRecordCommands.recordLeaders, Optional.of(record.revision), {
+    'meeting_id': meeting.meetingId,
+    'parts': [for (final p in parts) p.toJson()],
+  }, 'who led');
 
   Future<void> cancel(CellProgramme programme) => send(
     CellProgrammeCommands.cancel,

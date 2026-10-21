@@ -607,3 +607,63 @@ Record the outcome per step in `evidence-5.7/owner-check.md` (pass/fail, device,
 
 - Actual attendance (Present, Absent, Excused) is epic 7; a notice is never turned into one.
 - The cell coverage queue does not list notices (department-only); Plan meeting shows them.
+
+## Story 5.8: meeting records and actual leaders
+
+Migration: `supabase/migrations/20261021130000_cells_meeting_records.sql`.
+Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-mark-meetings-held-and-record-actual-programme-leaders-with-c-plan.md`.
+Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.8/`.
+
+### What it is
+
+What happened, recorded after the meeting starts and never assumed from the plan. The cell's leader or assistant records whether the meeting was held, and for a held meeting who actually led each programme part: a member of the cell, a named guest, or nobody. Every value keeps its actor and time. A correction needs a reason and keeps the earlier value. The plan (parts and planned people), every duty answer and duty outcome (4.10), and any attendance are untouched. Nothing here writes them, and nothing there writes these records.
+
+### Commands (`api.cells_command`, the cell's current leader or assistant)
+
+| Command | `expected_revision` | Payload | Refusals |
+|---|---|---|---|
+| `cells.record_meeting_held` | `null` | `{meeting_id, held}` | another cell, Admin alone, a member: `forbidden`; ahead: `validation_failed {"meeting_id": "not_started"}`; cancelled: `validation_failed {"meeting_id": "cancelled"}`; already recorded: `conflict {"meeting_id": "recorded"}` |
+| `cells.correct_meeting_held` | record `revision` | `{meeting_id, held, reason}` | no reason: `validation_failed {"reason": "required"}`; same value: `{"held": "unchanged"}`; stale: `conflict` |
+| `cells.record_actual_leaders` | record `revision` | `{meeting_id, parts: [{part_id, leader, reason?}]}` (1-20) | not held: `{"held": "not_held"}`; no programme or a cancelled one: `{"meeting_id": "no_programme"}`; `parts.N.part_id` `not_found`/`duplicate`; `parts.N.member_id` `not_in_cell`; a change without a reason: `parts.N.reason` `required` |
+
+`leader` is `{"member_id": <a current member of the cell>}`, `{"name": <a guest, 1-80>}` or `null` (nobody led it). An identical value adds nothing (`data.changed` says how many parts changed). Parts left out are unchanged. A changed part supersedes its current row, which is kept with `superseded_at`, and the new row carries the reason. A substitution is a guest, or a member other than the person planned when the row was written. Held and cancelled exclude each other: cancelling needs a meeting ahead, and recording needs one that has started.
+
+### Reads
+
+- `api.cells_programme` adds `status`, `can_record` and `record: {held, revision, history (every value, newest first, with reason and who), actual (current rows with earlier rows and reasons)}`. The leader, assistant and Pastor oversight read it. An Admin-only reader does not.
+- `api.cells_meetings` adds `recent` per cell: meetings that started in the last 28 days, newest first, each with `status`.
+- `app.cells_meeting_reference(meeting_id)` is the internal reference for later owners (see contracts-and-owner-seams.md).
+- Members read nothing new (recaps are epic 7).
+
+### Clients (staff web, and mobile through the same pages)
+
+- **Cell meetings**: "N recent meetings not recorded" beside the cell's name; **Last 4 weeks** with Held, Not held, Not recorded or Cancelled, and **Record** or **Open**.
+- **Plan meeting**, once the meeting has started: **After the meeting**. **Yes, it was held** or **It didn't happen**, then **It wasn't held** or **It was held after all** (with a reason). **Who led each part** offers **N parts were led as planned** (one click, explicit) and, per part, **Record** or **Change** (a member of the cell, **Someone else (a guest)** or **Nobody led it**; a change asks why). Each part shows its planned person, its current value (Led by, Stood in, Nobody led it, Not recorded), the reason and earlier values.
+
+### Local runs
+
+```bash
+npx supabase db reset
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/cells-meeting-records.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The E2E uses `+44 7700 900060-900069`, moves its meetings into the past directly in the database (the stand-in for time passing), and removes everything it created.
+
+### Owner manual checks (staging, web and phone, story 5.8)
+
+1. As L on staff web, after a SYNTHETIC meeting with a published programme has started: **Cell meetings** shows it under **Last 4 weeks** as Not recorded. **Record**, then **Yes, it was held**: Held, with your name.
+2. **2 parts were led as planned** (or per part): Led by the planned person. On one part, **Change**, choose another member, give a reason, **Save**: "Stood in", with the reason and the earlier value.
+3. **My duties** for the planned members still shows their own answers. Nothing changed there.
+4. As the leader of another cell, the meeting's page is refused. A cancelled meeting has no **After the meeting**.
+5. On your phone, as L, open the same Plan meeting page: the same record shows.
+
+Record the outcome per step in `evidence-5.8/owner-check.md` (pass/fail, device, browser; no numbers, ids or keys).
+
+### Known limits
+
+- Attendance (Present, Absent, Excused, visitors) is epic 7. A held meeting records no attendance.
+- A duty's Completed outcome (4.10) is never set or suggested from an actual leader record (the ticket's unknown, left to epic 7 and the leader).
+- No notification is sent for a record. An unrecorded meeting only shows on Cell meetings.
+- Transfers and removals (story 5.9) do not yet end anything here. Actual leader records are facts and stay.

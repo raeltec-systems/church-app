@@ -126,6 +126,180 @@ class StaffAbsence {
   final List<String> partIds;
 }
 
+/// Story 5.8: the meeting record commands (the cell's leader or assistant,
+/// once the meeting has started).
+abstract final class CellRecordCommands {
+  static const recordHeld = 'cells.record_meeting_held';
+  static const correctHeld = 'cells.correct_meeting_held';
+  static const recordLeaders = 'cells.record_actual_leaders';
+
+  /// The server's limits: a correction reason and a guest's name.
+  static const reasonMax = 280;
+  static const guestNameMax = 80;
+}
+
+enum ActualLeaderKind { member, guest, nobody }
+
+/// Story 5.8: who actually led a part (the current row, or an earlier one
+/// a correction replaced). [substitute]: not the person planned when it was
+/// recorded.
+class ActualLeader {
+  const ActualLeader({
+    required this.partId,
+    required this.kind,
+    required this.substitute,
+    required this.recordedAt,
+    this.memberId,
+    this.displayName,
+    this.guestName,
+    this.reason,
+    this.recordedBy,
+    this.earlier = const [],
+  });
+
+  factory ActualLeader.fromJson(Object? json) {
+    final m = _map(json, 'actual leader');
+    final kind = switch (m['kind']) {
+      'member' => ActualLeaderKind.member,
+      'guest' => ActualLeaderKind.guest,
+      'nobody' => ActualLeaderKind.nobody,
+      _ => throw const FormatException('unexpected kind'),
+    };
+    final memberId = _opt<String>(m, 'member_id');
+    final guestName = _opt<String>(m, 'guest_name');
+    if ((kind == ActualLeaderKind.member) != (memberId != null) ||
+        (kind == ActualLeaderKind.guest) != (guestName != null)) {
+      throw const FormatException('unexpected actual leader');
+    }
+    return ActualLeader(
+      partId: _req<String>(m, 'part_id'),
+      kind: kind,
+      memberId: memberId,
+      displayName: _opt<String>(m, 'display_name'),
+      guestName: guestName,
+      substitute: _req<bool>(m, 'substitute'),
+      reason: _opt<String>(m, 'reason'),
+      recordedAt: _instant(m, 'recorded_at'),
+      recordedBy: _opt<String>(m, 'recorded_by'),
+      earlier: List.unmodifiable(
+        (_opt<List>(m, 'earlier') ?? const []).map(ActualLeader.fromJson),
+      ),
+    );
+  }
+
+  final String partId;
+  final ActualLeaderKind kind;
+  final String? memberId;
+  final String? displayName;
+  final String? guestName;
+  final bool substitute;
+
+  /// Why this row replaced the one before (null for the first).
+  final String? reason;
+  final DateTime recordedAt;
+  final String? recordedBy;
+
+  /// The rows this one replaced, newest first.
+  final List<ActualLeader> earlier;
+
+  /// "Grace Banda", "Pastor John (guest)" or "Nobody led it".
+  String get who => switch (kind) {
+    ActualLeaderKind.member => displayName ?? 'Removed member',
+    ActualLeaderKind.guest => '$guestName (guest)',
+    ActualLeaderKind.nobody => 'Nobody led it',
+  };
+}
+
+/// Story 5.8: one held / not held value with who set it and why.
+class HeldEntry {
+  const HeldEntry({
+    required this.revision,
+    required this.held,
+    required this.at,
+    this.reason,
+    this.by,
+  });
+
+  factory HeldEntry.fromJson(Object? json) {
+    final m = _map(json, 'held entry');
+    return HeldEntry(
+      revision: _req<int>(m, 'revision'),
+      held: _req<bool>(m, 'held'),
+      reason: _opt<String>(m, 'reason'),
+      by: _opt<String>(m, 'by'),
+      at: _instant(m, 'at'),
+    );
+  }
+
+  final int revision;
+  final bool held;
+  final String? reason;
+  final String? by;
+  final DateTime at;
+}
+
+/// Story 5.8: the meeting record (staff read): held or not, every value
+/// newest first, and each part's actual leader by part id.
+class MeetingRecord {
+  const MeetingRecord({
+    required this.held,
+    required this.revision,
+    required this.history,
+    required this.actual,
+  });
+
+  factory MeetingRecord.fromJson(Object? json) {
+    final m = _map(json, 'meeting record');
+    final revision = _req<int>(m, 'revision');
+    if (revision < 1) throw const FormatException('unexpected revision');
+    return MeetingRecord(
+      held: _req<bool>(m, 'held'),
+      revision: revision,
+      history: List.unmodifiable(
+        _req<List>(m, 'history').map(HeldEntry.fromJson),
+      ),
+      actual: {
+        for (final a in _req<List>(m, 'actual').map(ActualLeader.fromJson))
+          a.partId: a,
+      },
+    );
+  }
+
+  final bool held;
+
+  /// expected_revision of every record command after the first.
+  final int revision;
+  final List<HeldEntry> history;
+  final Map<String, ActualLeader> actual;
+}
+
+/// Story 5.8: who led one part, as the leader chose it: a member of the cell
+/// ([memberId]), a guest ([guestName]) or nobody (both null). [reason] is
+/// required by the server when it replaces a recorded value.
+class ActualLeaderDraft {
+  const ActualLeaderDraft({
+    required this.partId,
+    this.memberId,
+    this.guestName,
+    this.reason,
+  });
+
+  final String partId;
+  final String? memberId;
+  final String? guestName;
+  final String? reason;
+
+  Map<String, Object?> toJson() => {
+    'part_id': partId,
+    'leader': memberId != null
+        ? {'member_id': memberId}
+        : guestName != null && guestName!.trim().isNotEmpty
+        ? {'name': guestName!.trim()}
+        : null,
+    if (reason != null && reason!.trim().isNotEmpty) 'reason': reason!.trim(),
+  };
+}
+
 /// At most this many parts per programme (the server's limit).
 const programmeMaxParts = 20;
 
@@ -339,6 +513,9 @@ class ProgrammeRead {
     this.duties = const {},
     this.linkable = const [],
     this.absences = const [],
+    this.status,
+    this.record,
+    this.canRecord = false,
   });
 
   factory ProgrammeRead.fromJson(Object? json) {
@@ -381,6 +558,10 @@ class ProgrammeRead {
       absences: List.unmodifiable(
         (_opt<List>(m, 'absences') ?? const []).map(StaffAbsence.fromJson),
       ),
+      // Story 5.8 (absent from 5.7 servers).
+      status: m['status'] == null ? null : MeetingStatus.parse(m['status']),
+      record: m['record'] == null ? null : MeetingRecord.fromJson(m['record']),
+      canRecord: _opt<bool>(m, 'can_record') ?? false,
     );
   }
 
@@ -410,6 +591,14 @@ class ProgrammeRead {
 
   /// Story 5.7: open Cannot attend notices (the cell's leader and assistant).
   final List<StaffAbsence> absences;
+
+  /// Story 5.8: what is known of the meeting afterwards (null from a 5.7
+  /// server), the record (leader, assistant and Pastor oversight) and
+  /// whether this reader may write it (the leader or assistant, once the
+  /// meeting has started and was not cancelled).
+  final MeetingStatus? status;
+  final MeetingRecord? record;
+  final bool canRecord;
 
   /// The notice of the person holding [partId], if they sent one.
   StaffAbsence? absenceFor(String partId) {

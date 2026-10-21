@@ -285,7 +285,7 @@ select is((select jsonb_array_length(r #> '{programme,parts}') || '|' || (r #>> 
                   || '|' || (r #>> '{meeting,venue}') from mr),
   '4|SYNTHETIC 5.4 Member 4|' || 'null|' || 'SYNTHETIC 5.4 Ushers: SYNTHETIC Evening ushering|SYNTHETIC 12 Shikoswe Road',
   'a member reads the parts, named leaders, the linked department and the private venue');
-select is((select (mr.r -> 'programme') - 'revision' - 'published_at' from mr), (select sr.r -> 'preview' from sr),
+select is((select (mr.r -> 'programme') - 'revision' - 'published_at' - 'meeting_changed' from mr), (select sr.r -> 'preview' from sr),
   'the staff preview equals what members read');
 select ok((select not (r::text ~ '(study_notes|response|note|history|instructions|private study)') from mr),
   'the member read holds no study notes, response, note, history or instructions');
@@ -299,14 +299,14 @@ select is((select jsonb_array_length(r -> 'duties') || '|' || (r #>> '{duties,0,
   '4|pending', 'the leader sees each part''s Duties state (Awaiting)');
 select is(pg_temp.readj(pg_temp.c(6), format('select api.cells_programme(%L)', pg_temp.mt())) -> 'duties',
   '[]'::jsonb, 'Pastor oversight sees no Duties state');
-select is(pg_temp.save(2, pg_temp.draft()) #>> '{field_errors,programme_id}', 'not_draft',
-  'a published programme is not edited as a draft');
-select is(pg_temp.cells(pg_temp.c(2), 'cells.move_meeting',
+select is(pg_temp.save(2, pg_temp.draft()) #>> '{data,unpublished_changes}', 'true',
+  'story 5.6: a published programme is saved as unpublished changes (members keep the publish)');
+select is(coalesce(pg_temp.cells(pg_temp.c(2), 'cells.move_meeting',
   (select revision from app.cells_meetings where meeting_id = pg_temp.mt()),
   jsonb_build_object('meeting_id', pg_temp.mt(),
     'starts_at', app.cmd_utc(pg_temp.at(pg_temp.mt(), '19:00')),
-    'ends_at', app.cmd_utc(pg_temp.at(pg_temp.mt(), '20:30')))) #>> '{field_errors,meeting_id}',
-  'programme_published', 'review fix 2: a meeting with a published programme is not moved');
+    'ends_at', app.cmd_utc(pg_temp.at(pg_temp.mt(), '20:30')))) #>> '{field_errors,meeting_id}', 'null'),
+  'null', 'story 5.6: the cell''s leader may move a meeting with a published programme');
 select is(pg_temp.cells(pg_temp.c(2), 'cells.cancel_meeting',
   (select revision from app.cells_meetings where meeting_id = pg_temp.mt()),
   jsonb_build_object('meeting_id', pg_temp.mt())) #>> '{field_errors,meeting_id}',

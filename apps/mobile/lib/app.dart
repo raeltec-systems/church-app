@@ -102,13 +102,14 @@ class _MobileAppState extends State<MobileApp> {
 /// values/colors.xml, splash_background), whatever the theme.
 const _launchNavy = Color(0xFF14246B);
 
-/// The launch screen carried into the app. The system splash (the seal on a
-/// white disc, on navy) ends at Flutter's first frame, which here draws the
-/// same picture, so the hand-over is invisible. While the app loads behind it
-/// the seal breathes and a soft ring ripples out; once the server has answered
-/// who this is (or no one is signed in) it fades away as the seal grows
-/// slightly. It shows for at least [minHold] (one breath) and never longer
-/// than [maxHold]. With reduced motion nothing pulses and it simply goes.
+/// The launch screen carried into the app. The system splash (the white seal
+/// on navy, navy system bars) ends at Flutter's first frame, which here draws
+/// the same picture, so the hand-over is invisible. While the app loads
+/// behind it the seal breathes; once the server has answered who this is (or
+/// no one is signed in) it fades away as the seal grows slightly, and the
+/// system bars return to the app's colours. It shows for at least [minHold]
+/// (one breath) and never longer than [maxHold]. With reduced motion the seal
+/// stays still and the screen simply goes.
 class LaunchCurtain extends ConsumerStatefulWidget {
   const LaunchCurtain({
     super.key,
@@ -129,7 +130,7 @@ class _LaunchCurtainState extends ConsumerState<LaunchCurtain>
     with TickerProviderStateMixin {
   late final AnimationController _pulse = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1100),
+    duration: const Duration(milliseconds: 800),
   );
   late final AnimationController _fade = AnimationController(
     vsync: this,
@@ -160,7 +161,7 @@ class _LaunchCurtainState extends ConsumerState<LaunchCurtain>
     if (still) {
       _pulse.stop();
     } else if (!_pulse.isAnimating && !_leaving) {
-      _pulse.repeat();
+      _pulse.repeat(reverse: true);
     }
   }
 
@@ -169,10 +170,28 @@ class _LaunchCurtainState extends ConsumerState<LaunchCurtain>
     _leaving = true;
     _pulse.stop();
     if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
-      setState(() => _gone = true);
+      _finish();
       return;
     }
-    _fade.forward().whenComplete(() => _mark(() => _gone = true));
+    _fade.forward().whenComplete(_finish);
+  }
+
+  /// The curtain is gone: the system bars take the app's colours again (the
+  /// curtain painted them navy, and nothing else would put them back).
+  void _finish() {
+    if (!mounted) return;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final icons = dark ? Brightness.light : Brightness.dark;
+    SystemChrome.setSystemUIOverlayStyle(
+      SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: icons,
+        statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+        systemNavigationBarColor: ChurchColors.of(context).surface,
+        systemNavigationBarIconBrightness: icons,
+      ),
+    );
+    setState(() => _gone = true);
   }
 
   @override
@@ -207,15 +226,15 @@ class _LaunchCurtainState extends ConsumerState<LaunchCurtain>
           animation: Listenable.merge([_pulse, _fade]),
           builder: (context, _) {
             final t = Curves.easeOutCubic.transform(_fade.value);
-            final beat = _pulse.value;
-            // The seal breathes in the first half of each beat; the ring
-            // spreads and fades across the whole beat.
-            final breath = Curves.easeInOut.transform(
-              beat < 0.5 ? beat * 2 : 2 - beat * 2,
-            );
-            final ring = Curves.easeOut.transform(beat);
+            final breath = Curves.easeInOut.transform(_pulse.value);
             return AnnotatedRegion<SystemUiOverlayStyle>(
-              value: SystemUiOverlayStyle.light,
+              value: const SystemUiOverlayStyle(
+                statusBarColor: _launchNavy,
+                statusBarIconBrightness: Brightness.light,
+                statusBarBrightness: Brightness.dark,
+                systemNavigationBarColor: _launchNavy,
+                systemNavigationBarIconBrightness: Brightness.light,
+              ),
               // Taps wait for the app; once it fades they reach it.
               child: AbsorbPointer(
                 absorbing: !_leaving,
@@ -225,33 +244,14 @@ class _LaunchCurtainState extends ConsumerState<LaunchCurtain>
                     key: const Key('launch-curtain'),
                     color: _launchNavy,
                     child: Center(
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          if (_pulse.isAnimating)
-                            ExcludeSemantics(
-                              child: Container(
-                                width: 160 + 90 * ring,
-                                height: 160 + 90 * ring,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white.withValues(
-                                      alpha: 0.35 * (1 - ring),
-                                    ),
-                                    width: 2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          Transform.scale(
-                            scale: 1 + 0.05 * breath + 0.06 * t,
-                            child: Semantics(
-                              label: 'BICC Kafue, loading',
-                              child: const ChurchLogo(size: 160),
-                            ),
-                          ),
-                        ],
+                      // The white seal, 180 across, as the system splash
+                      // draws it.
+                      child: Transform.scale(
+                        scale: 1 + 0.04 * breath + 0.06 * t,
+                        child: Semantics(
+                          label: 'BICC Kafue, loading',
+                          child: const ChurchLogo(size: 182, onNavy: true),
+                        ),
                       ),
                     ),
                   ),

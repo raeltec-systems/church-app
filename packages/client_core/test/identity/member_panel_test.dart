@@ -143,7 +143,7 @@ void main() {
     // Held roles are toggled on for assistive technology, not only filled.
     expect(
       tester.getSemantics(_tapTarget('member-panel-role-admin')),
-      containsSemantics(
+      isSemantics(
         label: 'Admin',
         isButton: true,
         hasToggledState: true,
@@ -152,7 +152,7 @@ void main() {
     );
     expect(
       tester.getSemantics(_tapTarget('member-panel-role-pastor')),
-      containsSemantics(
+      isSemantics(
         label: 'Pastor',
         hasToggledState: true,
         isToggled: false,

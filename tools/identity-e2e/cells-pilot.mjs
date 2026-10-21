@@ -42,13 +42,17 @@ export function isFictionalPilotPhone(phone) {
   return /^\+44770090008[0-9]$/.test(phone);
 }
 
-/** Moves a meeting (and, through its trigger, its programme) back by [days] (time passing). */
+/** Moves a meeting (and, through its trigger, its programme) back by [days], and its cell's
+ * current members' joining dates with it (time passing). */
 export function shiftSql(meetingId, days) {
   if (!/^[0-9a-f-]{36}$/.test(meetingId ?? '') || !Number.isInteger(days)) throw new Error('bad shift');
   const by = `interval '${days} days'`;
   return `update app.cells_meetings set starts_at = starts_at - ${by}, ends_at = ends_at - ${by},
             nominal_starts_at = nominal_starts_at - ${by}, nominal_ends_at = nominal_ends_at - ${by}
-           where meeting_id = '${meetingId}'`;
+           where meeting_id = '${meetingId}';
+          update app.cells_memberships set started_at = started_at - ${by}
+           where ended_at is null
+             and cell_id = (select cell_id from app.cells_meetings where meeting_id = '${meetingId}')`;
 }
 
 async function main() {

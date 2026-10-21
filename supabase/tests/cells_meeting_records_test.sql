@@ -201,6 +201,9 @@ update app.cells_meetings
    set starts_at = starts_at - interval '3 days', ends_at = ends_at - interval '3 days',
        nominal_starts_at = nominal_starts_at - interval '3 days', nominal_ends_at = nominal_ends_at - interval '3 days'
  where meeting_id = pg_temp.mt();
+-- Time passing: the cell's members joined before that meeting (story 5.12: actual leaders must have
+-- been members when it started).
+update app.cells_memberships set started_at = started_at - interval '60 days' where ended_at is null;
 
 select is(pg_temp.held(5, pg_temp.mt(), true) ->> 'code', 'forbidden', 'another cell''s leader is refused');
 select is(pg_temp.held(1, pg_temp.mt(), true) ->> 'code', 'forbidden', 'Admin alone does not record a cell meeting');

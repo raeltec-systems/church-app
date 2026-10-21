@@ -94,6 +94,24 @@ void main() {
     );
   });
 
+  testWidgets('story 5.12: a refusal for a member who leads their cell is '
+      'said as such', (tester) async {
+    final h = await pump(tester);
+    await tester.tap(find.byKey(const Key('cell-handover-done-$_cell')));
+    await tester.pump();
+    h.gateway.sent.single.refuse(
+      ErrorCode.conflict,
+      fieldErrors: {'member_id': 'leads_current_cell'},
+    );
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    expect(
+      find.byKey(const Key('cells-notice-leadsCurrentCell')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('no handover, no label', (tester) async {
     await pump(tester, pending: false);
     expect(find.byKey(const Key('cell-handover-$_cell')), findsNothing);

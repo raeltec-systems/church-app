@@ -264,6 +264,12 @@ import '../domain/membership_application.dart';
       'Still no leader',
       'Give $who a leader or assistant who can use the app first.',
     ),
+    CellNotice.leadsCurrentCell => (
+      StatusTone.warning,
+      'Leads their cell',
+      '$who leads or assists their current cell. Remove that role first '
+          '(Admin cells), then move them.',
+    ),
     CellNotice.meetingNotStarted => (
       StatusTone.warning,
       'Not started yet',

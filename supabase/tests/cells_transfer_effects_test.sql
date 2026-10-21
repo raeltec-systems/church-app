@@ -6,7 +6,7 @@
 -- published ahead is last responsible in a handover; Admin resolves a recorded one. HTTP evidence:
 -- tools/identity-e2e/cells-transfer.mjs. SYNTHETIC data only (fictional range +1 202 555 0181-0190).
 begin;
-select plan(54);
+select plan(58);
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000059' || lpad(n::text, 2, '0'))::uuid $$;
 create function pg_temp.s(n int) returns uuid language sql as
@@ -201,6 +201,9 @@ update app.cells_meetings
    set starts_at = starts_at - interval '21 days', ends_at = ends_at - interval '21 days',
        nominal_starts_at = nominal_starts_at - interval '21 days', nominal_ends_at = nominal_ends_at - interval '21 days'
  where meeting_id = pg_temp.mt3();
+-- Time passing: the cell's members joined before that meeting (story 5.12: actual leaders must have
+-- been members when it started).
+update app.cells_memberships set started_at = started_at - interval '60 days' where ended_at is null;
 select pg_temp.cells(pg_temp.c(2), 'cells.record_meeting_held', null, jsonb_build_object('meeting_id', pg_temp.mt3(), 'held', true));
 select is(pg_temp.cells(pg_temp.c(2), 'cells.record_actual_leaders',
   (select revision from app.cells_meeting_records where meeting_id = pg_temp.mt3()),
@@ -285,6 +288,21 @@ select is((select member_id from app.cells_actual_leaders
 -- The new cell -------------------------------------------------------------------------------------------
 select is(pg_temp.cells(pg_temp.c(4), 'cells.send_cannot_attend', null,
   jsonb_build_object('meeting_id', pg_temp.mt())) ->> 'code', 'not_found', 'no notice for the old cell''s meeting');
+
+-- Story 5.12 external check ----------------------------------------------------------------------------
+select is((select count(*)::int from app.cells_actual_leaders
+            where part_id = (pg_temp.part(pg_temp.mt3(), 'Bible study')).part_id), 0, 'setup: Bible study not recorded yet');
+select is(pg_temp.cells(pg_temp.c(2), 'cells.record_actual_leaders',
+  (select revision from app.cells_meeting_records where meeting_id = pg_temp.mt3()),
+  jsonb_build_object('meeting_id', pg_temp.mt3(), 'parts', jsonb_build_array(
+    jsonb_build_object('part_id', (pg_temp.part(pg_temp.mt3(), 'Bible study')).part_id,
+                       'leader', jsonb_build_object('member_id', pg_temp.mid(4)))))) #>> '{data,changed}', '1',
+  'finding 2: member 4 moved away but was a member when that meeting started: credited');
+select pg_temp.place(3, pg_temp.sh());
+select is(pg_temp.place(3, pg_temp.es()) #>> '{field_errors,member_id}', 'leads_current_cell',
+  'finding 1: moving the assistant out of the cell they assist is refused');
+select is((select cell_id from app.cells_memberships where member_id = pg_temp.mid(3) and ended_at is null), pg_temp.sh(),
+  'and nothing moved');
 
 -- Handover ------------------------------------------------------------------------------------------------
 select is(jsonb_array_length(app.cells_report_handover(jsonb_build_object('event', 'membership_deactivated',

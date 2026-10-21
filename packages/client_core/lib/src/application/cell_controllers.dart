@@ -104,6 +104,10 @@ enum CellNotice {
   /// Story 5.9: a cell's handover is done, or it still has no leader.
   handoverResolved,
   leaderRequired,
+
+  /// Story 5.12: the member leads or assists their current cell; an Admin
+  /// removes that role before they move.
+  leadsCurrentCell,
 }
 
 /// One command in flight or just answered.
@@ -296,6 +300,8 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
   static CellNotice _refusal(CommandError error) {
     final f = error.fieldErrors;
     return switch (error.code) {
+      ErrorCode.conflict when f['member_id'] == 'leads_current_cell' =>
+        CellNotice.leadsCurrentCell,
       ErrorCode.conflict when f['member_id'] == 'open_request' =>
         CellNotice.openRequest,
       ErrorCode.conflict when f['meeting_id'] == 'programme_published' =>

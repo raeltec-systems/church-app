@@ -486,11 +486,16 @@ void main() {
         findsOneWidget,
         reason: 'the finding under the title',
       );
-      // One mark per row; the due date reads as a date, never a time.
+      // One mark per row; the due date reads as a date, never a time (who
+      // and when have their own columns on a wide screen).
       expect(statusOf(tester, 'special-mark-$_occ'), 'Awaiting answer');
       expect(
         (tester.widget(byKey('special-sub-$_occ')) as Text).data,
-        'SYNTHETIC Ruth Mwale · Due 30 Nov',
+        'SYNTHETIC Ruth Mwale',
+      );
+      expect(
+        (tester.widget(byKey('special-when-$_occ')) as Text).data,
+        'Due 30 Nov',
       );
       expect(statusOf(tester, 'special-mark-$_occ2'), 'Needs someone');
       expect(statusOf(tester, 'special-mark-$_occ3'), 'Not recorded');
@@ -633,6 +638,48 @@ void main() {
       sent.confirm({'response': 'accepted', 'provenance': 'leader'}, 3);
       await settle(tester);
       expect(find.text('Confirmed by the Pastor'), findsWidgets);
+    });
+
+    testWidgets('giving sits in the page header; the phone keeps it inline', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.dutySpecial,
+        setUp: (h) => h.special.special = specialRead([
+          specialAssignmentData(dueOn: '2099-11-30'),
+        ]),
+      );
+      expect(
+        find.descendant(
+          of: find.byType(StaffPageHeader),
+          matching: byKey('special-give'),
+        ),
+        findsOneWidget,
+      );
+      await tapKey(tester, 'special-give');
+      expect(byKey('special-give-form'), findsOneWidget);
+      await tapKey(tester, 'special-give');
+      expect(byKey('special-give-form'), findsNothing);
+
+      await pumpAt(
+        tester,
+        ClientPaths.dutySpecial,
+        phone: true,
+        width: 390,
+        setUp: (h) => h.special.special = specialRead([
+          specialAssignmentData(dueOn: '2099-11-30'),
+        ]),
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.byType(StaffPageHeader), findsNothing);
+      expect(
+        (tester.widget(byKey('special-sub-$_occ')) as Text).data,
+        'SYNTHETIC Ruth Mwale · Due 30 Nov',
+      );
+      await tapKey(tester, 'special-give');
+      expect(byKey('special-give-form'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('anyone but a Pastor is refused by the server', (tester) async {

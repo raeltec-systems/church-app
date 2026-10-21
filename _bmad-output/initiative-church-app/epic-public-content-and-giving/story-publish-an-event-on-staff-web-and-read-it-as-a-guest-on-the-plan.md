@@ -3,22 +3,33 @@ title: 'Publish an event on staff web and read it as a guest on the mobile Calen
 type: 'feature'
 ticket: '1'
 created: '2026-10-21'
-status: in-progress
+status: 'built'
 baseline_revision: 'eca3960356217484f1ffd66a8bba1024359ce13a'
 route: 'full'
 route_source: 'auto'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - '{project-root}/docs/runbooks/contracts-and-owner-seams.md'
   - '{project-root}/docs/runbooks/command-foundation.md'
   - '{project-root}/docs/runbooks/client-shells.md'
   - '{project-root}/.agents/skills/design-taste-frontend/references/app-screens.md'
 warnings: ['oversized', 'multiple-goals']
-deferred: []
+deferred:
+  - summary: >-
+      The staff Events controller replaces the list with the failure when a refresh fails, as the
+      Duties and Cells staff controllers do.
+    evidence: |-
+      Reviewer finding 5 (second half). The public reads now keep the last good answer with a
+      "Couldn't refresh" notice; the staff screens share the established Duties/Cells pattern
+      (protected state dropped on any failure). Changing it belongs to a staff-wide pass, not to
+      one screen.
+    location: >-
+      packages/client_core/lib/src/application/content_controllers.dart (StaffEventsController._reload)
+    severity: low
 ---
 
 <intent-contract>
@@ -75,12 +86,12 @@ deferred: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/<ts>_content_events_tracer.sql` -- lifecycle, registries, events, commands, public and staff reads, deletion handler, privileges.
-- [ ] `supabase/tests/content_events_test.sql` + ledger update -- the matrix.
-- [ ] `tools/identity-e2e/content-events.mjs` + `.test.mjs` -- the verify at the API (fictional block +44 7700 900700-900709).
-- [ ] client_core: `domain/content_events.dart`, `adapters/supabase_content_repository.dart`, `application/content_controllers.dart`, `presentation/{home_screen,calendar_screens,content_screens}.dart`, routes, providers, composition, fakes, exports; tests under `test/content/`.
-- [ ] `apps/mobile/lib/app.dart` (Home + Calendar tabs for all), `apps/staff/lib/app.dart` (Events for Media, Pastor, Admin); app tests.
-- [ ] `docs/runbooks/content.md`, `docs/runbooks/production-promotion-content.md`; links from `contracts-and-owner-seams.md` and `client-shells.md`.
+- [x] `supabase/migrations/20261021233523_content_events_tracer.sql` -- lifecycle, registries, events, commands, public and staff reads, deletion handler, privileges.
+- [x] `supabase/tests/content_events_test.sql` + ledger update -- the matrix.
+- [x] `tools/identity-e2e/content-events.mjs` + `.test.mjs` -- the verify at the API (fictional block +44 7700 900100-900109; see Implementation Notes).
+- [x] client_core: `domain/content_events.dart`, `adapters/supabase_content_repository.dart`, `application/content_controllers.dart`, `presentation/{home_screen,calendar_screens,content_screens}.dart`, routes, providers, composition, fakes, exports; tests under `test/content/`.
+- [x] `apps/mobile/lib/app.dart` (Home + Calendar tabs for all), `apps/staff/lib/app.dart` (Events for Media, Pastor, Admin); app tests.
+- [x] `docs/runbooks/content.md`, `docs/runbooks/production-promotion-content.md`; links from `contracts-and-owner-seams.md` and `client-shells.md`.
 
 **Acceptance Criteria:**
 - Given the local stack, when the E2E runs, then a Media member drafts and publishes a two-day `SYNTHETIC Harvest Thanksgiving`, anon reads it with both endpoints, an edited draft leaves the live revision public until republished, withdrawal removes it, anon and Pending read no draft or editor identity, a plain member is refused every command, direct table queries are refused and an erased editor reads as `Former member`.
@@ -88,9 +99,74 @@ deferred: []
 
 ## Implementation Notes
 
+- Server implemented in this session; the Dart side (client_core, mobile, staff) by a forked
+  implementation agent with this plan and the wire contract, reviewed here. Plan to code: as
+  designed (generic `app.content_items` + `app.content_event_revisions`, registries for kinds,
+  commands and erase parts, definer public reads granted to anon).
+- Migration `supabase/migrations/20261021233523_content_events_tracer.sql` (staging's version; the
+  local file was `20261021233000` until applied). pgTAP `supabase/tests/content_events_test.sql`
+  (120). Ledgers: `command_foundation_test.sql` (anon and authenticated EXECUTE),
+  `notifications_routing_test.sql` (the deletion check now lists `content=0`).
+- E2E `tools/identity-e2e/content-events.mjs` (10/10, `evidence-6.1/content-events-e2e.jsonl`) and
+  `content-events.test.mjs` (5). The plan's block +44 7700 900700-900709 collides with
+  `runbooks.mjs` (900700-900719): the run uses the free block 900100-900109. The erased-editor check
+  calls Content's registered hook directly (as the 2.11 worker's erase step does), not the whole
+  deletion workflow.
+- Clients: `domain/content_events.dart`, `adapters/supabase_content_repository.dart` (public reads
+  through `SupabaseApiReader.read(public: true)`, which skips the signed-out short-circuit only),
+  `application/content_controllers.dart`, `presentation/home_screen.dart` (Home moved out of
+  `duties_screens.dart`), `calendar_screens.dart`, `content_screens.dart`; routes `/calendar`,
+  `/calendar/events/:id` (mobile, under `memberHome`) and `/content/events`. My duties and My cell
+  became pushed screens; Home card and Account menu links push.
+- Merged `story/5.8-meetings-held` at c789850 (the staff web redesign): Events sits in a new
+  **Content** sidebar group (Media, Pastor, Admin; the coordinator's note said Media and Admin, the
+  entry and K1 say Media, Pastor and Admin, which is what is built) and uses the redesign's
+  `ChurchPageScaffold` page header (title, the finding line, New event, Reload).
+- Flutter after the merge and the review fixes: design_system 14, client_core 778, mobile 60,
+  staff 48; analyze clean in all four. Full pgTAP suite PASS (58 files, 4490 tests) on a fresh
+  reset; check-migrations and scan-secrets pass.
 ## Plan Change Log
 
 ## Review Triage Log
+
+### 2026-10-21 — Review pass (independent reviewer: the entry's external check plus the quick lens)
+- verdicts: 13 findings — high 1, medium 3, low 8, false 0, maybe-false 0 (one finding grouped with
+  its root cause)
+- findings:
+  - `[high]` `[patch]` Whitespace-only text (tab, line breaks, U+00A0) was accepted as a value and
+    edge whitespace kept (`btrim` trims spaces only) — `app.content_free_text` now maps Unicode
+    spaces to spaces and trims all edge whitespace; the revision table refuses blank text; pgTAP
+    cases added. Fixed before staging.
+  - `[high]` `[patch]` (same root cause) One such event made both Dart list parsers refuse the whole
+    list, so every guest's Calendar and the editors' screen would fail — closed by the server fix;
+    the strict parse is kept (a malformed answer stays a failed read, never a guessed value).
+  - `[medium]` `[patch]` The staff finding and sections counted a published event with unpublished
+    changes as "not published" and left it off "On the calendar" — the finding now counts every
+    public event ("N waiting to publish · N on the public calendar"); the section is "Waiting to
+    publish".
+  - `[medium]` `[patch]` Home showed the guest copy to a signed-in member whose access read failed
+    and told Pending applicants to sign in — Home now keeps the member cards on a failed access
+    read (each card reports its own failure) and shows a neutral line to signed-in accounts without
+    member access; tests added.
+  - `[medium]` `[patch]` A failed refresh wiped the public events on screen (app-screens section 11)
+    — public reads keep the last good answer and show "Couldn't refresh ... as it was at HH:MM";
+    test added. The staff controller's same behaviour is deferred (house pattern of every staff
+    controller).
+  - `[low]` `[patch]` One-day rows were spoken without a date — the row's spoken label now carries
+    the date; test added.
+  - `[low]` `[patch]` "No events are published yet" also showed when published events had ended —
+    now "No upcoming events" (Calendar, Home, promotion runbook).
+  - `[low]` `[patch]` The detail read returned ended events although the matrix says unended items
+    only — the projection function now requires `ends_at > now()` for both reads; pgTAP updated.
+  - `[low]` `[patch]` Links from `contracts-and-owner-seams.md` and `client-shells.md` were missing —
+    added (deletion hook list, a Content registries section, the mobile tabs).
+  - `[low]` `[patch]` The E2E phone block differed from the plan with no note — recorded above (the
+    plan's block collides with `runbooks.mjs`).
+  - `[low]` `[patch]` A format-only change to the staff shell's `_RoleSwitch` — reverted.
+  - `[low]` `[patch]` The promotion runbook's rollback sentence mixed two actions — rewritten.
+  - `[low]` `[patch]` "a withdrawn event says so instead of an old copy" never loaded a copy — the
+    test now loads the event, withdraws it in the fake and reloads.
+- External check verdict: PASS (`evidence-6.1/external-check.md`).
 
 ## Design Notes
 
@@ -107,3 +183,31 @@ Wire contract (shared by SQL, Dart and the E2E):
 - `node tools/identity-e2e/content-events.mjs --evidence <file>` (phone switch on) and `node --test tools/identity-e2e/content-events.test.mjs` -- expected: all checks pass
 - `flutter analyze && flutter test` in `packages/design_system`, `packages/client_core`, `apps/mobile`, `apps/staff` -- expected: clean, pass
 - `node tools/ci/check-migrations.mjs --base origin/main` and `npm run -s ci:secrets` -- expected: pass
+
+## Auto Run Result
+
+- **Summary:** Content's publication lifecycle (private drafts, immutable published revisions live
+  until replaced, withdraw, archive, content-free audit, per-kind editor roles), registries for
+  kinds, commands and erase parts, the first anonymous read contract (events' published
+  projection), the editors' read, Content's deletion hook; staff web **Events** (Content group,
+  page header); mobile Home and Calendar tabs for everyone, Home in its own file, the public
+  Calendar with both endpoints of a multi-day event.
+- **Files:** `supabase/migrations/20261021233523_content_events_tracer.sql` (new owner),
+  `supabase/tests/content_events_test.sql` (120) and two ledger updates;
+  `tools/identity-e2e/content-events.mjs` + `.test.mjs`; client_core domain, adapter, controllers,
+  `home_screen.dart`, `calendar_screens.dart`, `content_screens.dart`, routes, fakes, exports;
+  `apps/mobile/lib/app.dart` (tabs), `apps/staff/lib/app.dart` (Content group); runbooks
+  `content.md`, `production-promotion-content.md`, links in `contracts-and-owner-seams.md` and
+  `client-shells.md`; evidence `evidence-6.1/`.
+- **Review:** 13 findings, 12 patched (1 high, 3 medium, 8 low), 1 deferred (staff controller keeps
+  the house pattern), none rejected.
+- **Follow-up review recommended:** true — a high was patched on the first pass. The specific
+  unverified risk: the new whitespace normalisation in `app.content_free_text` (Unicode space
+  classes) has pgTAP cases but no second reviewer has probed it.
+- **Verification:** full pgTAP PASS (4490) on a fresh reset; E2E 10/10; Flutter design_system 14,
+  client_core 778, mobile 60, staff 48, analyze clean; check-migrations and scan-secrets pass;
+  staging `20261021233523` with function, constraint and column hashes identical to the local reset
+  and guards 0 (`evidence-6.1/staging-verify.md`).
+- **Residual risks:** the owner's phone and staff-web walkthrough on staging is not done
+  (`content.md`, "Owner manual check"); two bottom tabs until entries 3, 6 and 9 add theirs.
+

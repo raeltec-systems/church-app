@@ -17,12 +17,25 @@ import 'providers.dart';
 
 /// One public read and whether it is under way.
 class PublicReadState<T> {
-  const PublicReadState({this.loading = false, this.result});
+  const PublicReadState({
+    this.loading = false,
+    this.result,
+    this.asOf,
+    this.refreshFailed,
+  });
 
   final bool loading;
 
-  /// The last answer (failures included); null before the first.
+  /// The last answer (failures included); null before the first. A failed
+  /// refresh keeps an earlier good answer here (see [refreshFailed]).
   final AccessRead<T>? result;
+
+  /// When the good answer in [result] arrived.
+  final DateTime? asOf;
+
+  /// Set when the latest refresh failed while an earlier good answer is
+  /// still shown: the screen says the data is from [asOf].
+  final AccessReadFailed<T>? refreshFailed;
 
   T? get value => switch (result) {
     AccessReadOk<T>(:final value) => value,
@@ -50,10 +63,28 @@ abstract class PublicReadController<T> extends Notifier<PublicReadState<T>> {
 
   Future<void> _reload(int epoch) async {
     if (!ref.mounted || epoch != _epoch) return;
-    state = PublicReadState<T>(loading: true, result: state.result);
+    state = PublicReadState<T>(
+      loading: true,
+      result: state.result,
+      asOf: state.asOf,
+      refreshFailed: state.refreshFailed,
+    );
     final r = await fetch();
     if (!ref.mounted || epoch != _epoch) return;
-    state = PublicReadState<T>(result: r);
+    // A failed refresh keeps what is on screen and says so (a denial or a
+    // first failure replaces it).
+    if (r is AccessReadFailed<T> && state.result is AccessReadOk<T>) {
+      state = PublicReadState<T>(
+        result: state.result,
+        asOf: state.asOf,
+        refreshFailed: r,
+      );
+      return;
+    }
+    state = PublicReadState<T>(
+      result: r,
+      asOf: r is AccessReadOk<T> ? DateTime.now() : null,
+    );
   }
 }
 

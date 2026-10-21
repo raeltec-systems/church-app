@@ -13,7 +13,7 @@ import 'church_widgets.dart';
 // Story 6.1, staff web: the editors (Media, Pastor, Admin) draft, publish,
 // withdraw and archive church events. The screen answers "what is waiting to
 // be published, and what is on the public calendar?" first: the finding line
-// and the Not published yet section, then what is on the calendar, then the
+// and the Waiting to publish section, then what is on the calendar, then the
 // rest. One status mark per row; the versions, who saved and published them
 // and every action are on the opened row. Every list comes from a
 // server-checked read and every action is a server-checked command; an
@@ -367,17 +367,14 @@ String _eventsFinding(StaffEvents value, DateTime now) {
   final waiting = events
       .where((e) => e.state == ContentState.draft || e.hasChanges)
       .length;
+  // Every published event that has not ended is public, unpublished
+  // changes or not (the published version is what the calendar shows).
   final onCalendar = events
-      .where(
-        (e) =>
-            e.state == ContentState.published &&
-            !e.hasChanges &&
-            !e.endedAt(now),
-      )
+      .where((e) => e.state == ContentState.published && !e.endedAt(now))
       .length;
   return [
-    waiting == 0 ? 'Nothing waiting to publish' : '$waiting not published yet',
-    '$onCalendar on the calendar',
+    waiting == 0 ? 'Nothing waiting to publish' : '$waiting waiting to publish',
+    '$onCalendar on the public calendar',
   ].join(' · ');
 }
 
@@ -507,7 +504,7 @@ class _EventsBodyState extends ConsumerState<_EventsBody> {
           ),
         ],
         if (waiting.isNotEmpty)
-          section('Not published yet', waiting, 'events-waiting'),
+          section('Waiting to publish', waiting, 'events-waiting'),
         if (onCalendar.isNotEmpty)
           section('On the calendar', onCalendar, 'events-on-calendar'),
         if (withdrawn.isNotEmpty)

@@ -5,7 +5,7 @@
 -- read and the deletion hook with its erase parts. Every account, phone and name is SYNTHETIC
 -- (fictional range +1 202 555 0151-0157). Times are church time (Africa/Lusaka).
 begin;
-select plan(115);
+select plan(120);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000081' || lpad(n::text, 2, '0'))::uuid $$;
@@ -213,6 +213,22 @@ select is(pg_temp.err(pg_temp.cmd(3, 'content.create_event', null,
              jsonb_build_object('location', 'SYNTHETIC ' || chr(7), 'starts_at', '2026-10-10 09:00')))),
   'validation_failed|location=invalid,starts_at=invalid,title=too_long', 'text and instant checks');
 select is(pg_temp.err(pg_temp.cmd(3, 'content.create_event', null,
+  pg_temp.ev(chr(9), pg_temp.at(3), pg_temp.at(3, '12:00'),
+             jsonb_build_object('description', chr(10) || chr(10), 'location', chr(160) || ' ')))),
+  'validation_failed|description=required,location=required,title=required',
+  'whitespace only (tabs, line breaks, no-break spaces) is blank');
+select is(pg_temp.err(pg_temp.cmd(3, 'content.create_event', null,
+  pg_temp.ev(chr(160) || 'SYNTHETIC Edges' || chr(9), pg_temp.at(3), pg_temp.at(3, '12:00'),
+             jsonb_build_object('description', chr(10) || ' SYNTHETIC body ' || chr(10))))),
+  'ok', 'edge whitespace is accepted');
+select is((select r.title || '|' || r.description from app.content_event_revisions r
+            where r.title like 'SYNTHETIC Edges%'), 'SYNTHETIC Edges|SYNTHETIC body', 'and trimmed');
+select throws_ok($$insert into app.content_event_revisions (item_id, revision_no, title, description, starts_at,
+                     ends_at, location, saved_by_member, saved_by_account)
+                   select item_id, 99, ' ', 'x', now(), now() + interval '1 hour', 'x', created_by_member,
+                          created_by_account from app.content_items limit 1$$,
+  '23514', null, 'the table refuses a blank title');
+select is(pg_temp.err(pg_temp.cmd(3, 'content.create_event', null,
   pg_temp.ev('SYNTHETIC Lines', pg_temp.at(3), pg_temp.at(3, '12:00'),
              jsonb_build_object('description', 'Line one' || chr(13) || chr(10) || 'Line two')))),
   'ok', 'a multiline description with Windows line endings is accepted');
@@ -371,8 +387,10 @@ select pg_temp.cmd(6, 'content.publish_event', 1, jsonb_build_object('event_id',
 select results_eq($$select e ->> 'title' from jsonb_array_elements(pg_temp.read(null, 'select api.content_public_events()') -> 'events') e$$,
   $$values ('SYNTHETIC Ongoing'::text), ('SYNTHETIC Soon')$$,
   'the public list holds ongoing and upcoming events, soonest first; an ended one is left out');
-select is(pg_temp.read(null, format('select api.content_public_event(%L::uuid)', (select r #>> '{data,event_id}' from e2))) #>> '{event,title}',
-  'SYNTHETIC Yesterday', 'an ended published event is still readable by id');
+select is(pg_temp.read(null, format('select api.content_public_event(%L::uuid)', (select r #>> '{data,event_id}' from e2))),
+  '{"event": null}'::jsonb, 'an ended event is not public by id either');
+select is(pg_temp.read(null, format('select api.content_public_event(%L::uuid)', (select r #>> '{data,event_id}' from e3))) #>> '{event,title}',
+  'SYNTHETIC Ongoing', 'an ongoing event is public by id');
 select is(pg_temp.read(null, 'select api.content_public_events()') ->> 'truncated', 'false', 'not truncated');
 
 -- Replay ----------------------------------------------------------------------------------------------

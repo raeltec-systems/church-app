@@ -15,7 +15,7 @@ Migrations, in this order. Each was applied to staging under its hosted version,
 
 | Story | Migration (hosted version) |
 |---|---|
-| 6.1 | `20261021233000_content_events_tracer.sql` (rename to the hosted version recorded in `evidence-6.1/staging-verify.md`): the Content lifecycle, registries, events, `api.content_command`, the public reads `api.content_public_events` / `api.content_public_event` (anon) and `api.content_staff_events`, the Content deletion hook |
+| 6.1 | `20261021233523_content_events_tracer.sql`: the Content lifecycle, registries, events, `api.content_command`, the public reads `api.content_public_events` / `api.content_public_event` (anon) and `api.content_staff_events`, the Content deletion hook |
 
 Client compatibility (6.1): production clients must be built from `main` at promotion. Older mobile builds keep the Duties and My cell tabs and have no Calendar; older staff web has no Events entry. Nothing breaks for them: the migration only adds objects.
 
@@ -23,7 +23,7 @@ Client compatibility (6.1): production clients must be built from `main` at prom
 
 | Item | Server answer | What the clients show |
 |---|---|---|
-| Events (6.1) | Church-authored content: no gate. No event exists until a Media member, Pastor or Admin creates and publishes one. | Calendar: "No events are published yet." Home: Coming up says the same. |
+| Events (6.1) | Church-authored content: no gate. No event exists until a Media member, Pastor or Admin creates and publishes one. | Calendar: "No upcoming events." Home: Coming up says the same. |
 | Editors (6.1) | Only members holding Media, Pastor or Admin (story 2.3) can edit; the first real Admin is the identity production gate. | Staff web shows **Events** only to them. |
 
 No epic 6 migration approves anything, and there are no fixture values in production.
@@ -32,7 +32,7 @@ No epic 6 migration approves anything, and there are no fixture values in produc
 
 1. **Verify the deploy** (operator, SQL editor). These answer as on staging:
    ```sql
-   select count(*) from supabase_migrations.schema_migrations where version in ('<6.1 hosted version>');  -- 1
+   select count(*) from supabase_migrations.schema_migrations where version in ('20261021233523');  -- 1
    select count(*) from app.contract_boundary_violations();                                                -- 0
    select count(*) from app.contract_unowned_objects();                                                     -- 0
    select kind, editor_roles from app.content_kinds order by 1;                    -- event | {admin,pastor,media}
@@ -52,4 +52,4 @@ No epic 6 migration approves anything, and there are no fixture values in produc
 
 ## Rollback
 
-6.1 is additive (no destructive statement, no row deletion). To stop publishing without a schema change, revoke the Media, Pastor and Admin roles' use by withdrawing every published event (`content.withdraw_event`): the public reads then answer empty at once. No down migration is needed.
+6.1 is additive (no destructive statement, no row deletion). To take every event off the public calendar without a schema change, an editor withdraws each published event (`content.withdraw_event`, **Events** > Withdraw): the public reads answer without it at once. To stop someone editing, an Admin removes their Media, Pastor or Admin role (**Roles & access**); it applies to their next command. No down migration is needed.

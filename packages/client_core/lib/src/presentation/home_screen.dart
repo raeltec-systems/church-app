@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/access_controllers.dart' show myAccessProvider;
 import '../application/account_controllers.dart'
     show memberSummaryControllerProvider;
+import '../application/providers.dart' show accountProvider;
 import '../domain/access_grants.dart';
 import '../domain/church_time.dart';
 import '../domain/member_access.dart' show MemberAccessGranted;
@@ -28,10 +29,19 @@ class HomeScreen extends ConsumerWidget {
     final c = ChurchColors.of(context);
     final layout = ChurchLayout.of(context);
     final access = ref.watch(myAccessProvider.select((s) => s.result));
+    final signedIn =
+        ref.watch(accountProvider.select((s) => s.accountId)) != null;
     final member = access is AccessReadOk<MemberGrants>;
-    // Not yet answered (a signed-in account waiting for the server): no
-    // member card and no guest line until it is known.
-    final guest = access != null && !member;
+    // A signed-in account whose access read failed (offline, a server
+    // problem) keeps its member cards: each card reports its own failure
+    // honestly, and none of them is treated as a guest's Home.
+    final unknown = signedIn && access is AccessReadFailed<MemberGrants>;
+    final cards = member || unknown;
+    // Signed out: the guest line. Signed in without member access (a Pending
+    // applicant, an account in review): a neutral line; their status is
+    // under Account. Not yet answered: nothing until it is known.
+    final guest = !signedIn;
+    final noMemberAccess = signedIn && access is AccessReadDenied<MemberGrants>;
     final summary = ref.watch(memberSummaryControllerProvider).result;
     final name = member && summary is MemberAccessGranted
         ? summary.summary.displayName
@@ -40,7 +50,7 @@ class HomeScreen extends ConsumerWidget {
               .firstOrNull
         : null;
     final hour = ChurchTime.wall(DateTime.now()).hour;
-    final greeting = !member
+    final greeting = !cards
         ? 'Welcome'
         : hour < 12
         ? 'Good morning'
@@ -72,9 +82,17 @@ class HomeScreen extends ConsumerWidget {
                     key: const Key('home-guest-line'),
                     style: ChurchType.body.copyWith(color: c.muted),
                   ),
+                ] else if (noMemberAccess) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'What\'s on at church is on the Calendar. Your membership '
+                    'status is under Account.',
+                    key: const Key('home-signed-in-line'),
+                    style: ChurchType.body.copyWith(color: c.muted),
+                  ),
                 ],
                 const SizedBox(height: 18),
-                if (member) ...[
+                if (cards) ...[
                   // Story 4.9: a department leader's Needs attention card
                   // comes first (hidden for everyone else). Story 4.6: My
                   // follow-ups shows while the member owns open work. Story

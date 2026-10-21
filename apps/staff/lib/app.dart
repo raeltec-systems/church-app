@@ -834,7 +834,9 @@ class _RoleSwitch extends StatelessWidget {
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      for (var i = 0; i < options.length; i++) ...[options[i]],
+                      for (var i = 0; i < options.length; i++) ...[
+                        options[i],
+                      ],
                     ],
                   ),
           ),

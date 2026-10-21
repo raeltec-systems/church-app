@@ -92,6 +92,32 @@ String eventSpanText(DateTime startsAt, DateTime endsAt) =>
     ? '${churchClockText(startsAt)}–${churchClockText(endsAt)}'
     : '${churchShortWhen(startsAt)} – ${churchShortWhen(endsAt)}';
 
+/// The notice over data kept from an earlier answer when the latest refresh
+/// failed: what is shown and from when. Null when the data is current.
+Widget? staleNotice<T>(
+  PublicReadState<T> s, {
+  required String what,
+  required String key,
+}) {
+  final failed = s.refreshFailed;
+  final at = s.asOf;
+  if (failed == null || at == null) return null;
+  final clock =
+      '${at.hour.toString().padLeft(2, '0')}:'
+      '${at.minute.toString().padLeft(2, '0')}';
+  return RequestStateBanner(
+    key: Key(key),
+    tone: StatusTone.warning,
+    icon: failed.unreachable ? Icons.cloud_off_outlined : Icons.error_outline,
+    title: 'Couldn\'t refresh',
+    message: failed.unreachable
+        ? 'No connection. This is the $what as it was at $clock; it may have '
+              'changed since.'
+        : 'The server answered in an unexpected way. This is the $what as it '
+              'was at $clock.',
+  );
+}
+
 /// One event row: the start's date badge, the title and when · where. Used
 /// by the Calendar and by Home's Coming up.
 class PublicEventRow extends StatelessWidget {
@@ -105,9 +131,14 @@ class PublicEventRow extends StatelessWidget {
     final c = ChurchColors.of(context);
     final e = event;
     final when = eventSpanText(e.startsAt, e.endsAt);
+    // The date badge is hidden from screen readers with the rest of the row,
+    // so the spoken label carries the date as well as the times.
+    final spoken = churchSameDay(e.startsAt, e.endsAt)
+        ? '${churchShortWhen(e.startsAt)} to ${churchClockText(e.endsAt)}'
+        : '${churchShortWhen(e.startsAt)} to ${churchShortWhen(e.endsAt)}';
     return Semantics(
       button: true,
-      label: '${e.title}, $when, ${e.location}',
+      label: '${e.title}, $spoken, ${e.location}',
       excludeSemantics: true,
       child: FocusRing(
         radius: 4,
@@ -250,13 +281,17 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           ),
         );
       case AccessReadOk(:final value):
+        if (staleNotice(s, what: 'calendar', key: 'calendar-stale')
+            case final n?) {
+          children.addAll([n, const SizedBox(height: 16)]);
+        }
         if (value.events.isEmpty) {
           children.add(
             ChurchCard(
               key: const Key('calendar-empty'),
               child: Text(
-                'No events are published yet. Church events appear here as '
-                'soon as the church publishes them.',
+                'No upcoming events. Church events appear here once the '
+                'church publishes them, until they end.',
                 style: ChurchType.body.copyWith(color: c.muted),
               ),
             ),
@@ -333,6 +368,9 @@ class EventDetailScreen extends ConsumerWidget {
           ),
         );
       case AccessReadOk(value: PublicEventRead(:final event)):
+        if (staleNotice(s, what: 'event', key: 'event-stale') case final n?) {
+          children.addAll([n, const SizedBox(height: 16)]);
+        }
         if (event == null) {
           children.addAll([
             RequestStateBanner(
@@ -445,7 +483,7 @@ class ComingUpSection extends ConsumerWidget {
         style: ChurchType.secondary.copyWith(color: c.muted),
       ),
       AccessReadOk(:final value) when value.events.isEmpty => Text(
-        'No events are published yet.',
+        'No upcoming events.',
         key: const Key('coming-up-empty'),
         style: ChurchType.body.copyWith(color: c.muted),
       ),

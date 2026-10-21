@@ -167,11 +167,12 @@ insert into app.content_kinds (kind, editor_roles, description) values
 create table app.content_event_revisions (
   item_id uuid not null references app.content_items (item_id),
   revision_no integer not null check (revision_no >= 1),
-  title text not null check (length(title) between 1 and 120),
-  description text not null check (length(description) between 1 and 2000),
+  title text not null check (length(title) between 1 and 120 and title ~ '[^[:space:]]'),
+  description text not null
+    check (length(description) between 1 and 2000 and description ~ '[^[:space:]]'),
   starts_at timestamptz not null,
   ends_at timestamptz not null,
-  location text not null check (length(location) between 1 and 160),
+  location text not null check (length(location) between 1 and 160 and location ~ '[^[:space:]]'),
   saved_by_member uuid not null,
   saved_by_account uuid not null,
   saved_at timestamptz not null default now(),
@@ -347,9 +348,12 @@ as $$
     'Former member');
 $$;
 
--- A text field: trimmed; single-line text has collapsed whitespace; multiline text keeps line
--- breaks (CRLF normalised). Too long: too_long; control or format characters: invalid. A missing
--- or blank value is null with no error (the caller decides whether it is required).
+-- A text field. Unicode spaces (no-break, en/em and the like) count as spaces. Single-line text
+-- has every run of whitespace collapsed to one space; multiline text keeps its line breaks (CRLF
+-- normalised). Both are trimmed of all leading and trailing whitespace, so a value of only
+-- spaces, tabs or line breaks is blank. Too long: too_long; control or format characters:
+-- invalid. A missing or blank value is null with no error (the caller decides whether it is
+-- required).
 create function app.content_free_text(p_value jsonb, p_max integer, p_multiline boolean,
                                       out error text, out value text)
 language plpgsql
@@ -364,12 +368,15 @@ begin
     error := 'invalid';
     return;
   end if;
-  value := btrim(p_value #>> '{}');
+  value := regexp_replace(p_value #>> '{}',
+             '[' || chr(160) || chr(5760) || chr(8192) || '-' || chr(8202) || chr(8239) || chr(8287)
+             || chr(12288) || ']', ' ', 'g');
   if p_multiline then
-    value := btrim(replace(value, chr(13) || chr(10), chr(10)));
+    value := replace(value, chr(13) || chr(10), chr(10));
   else
     value := regexp_replace(value, '[[:space:]]+', ' ', 'g');
   end if;
+  value := regexp_replace(value, '^[[:space:]]+|[[:space:]]+$', '', 'g');
   if value = '' then
     value := null;
     return;
@@ -986,7 +993,8 @@ comment on function api.content_command(jsonb) is
 -- The public read contract (anonymous): the current published projection only
 -- ---------------------------------------------------------------------------------------------
 
--- One published event as anyone may read it: no draft, editor identity or audit field.
+-- One published event that has not ended, as anyone may read it: no draft, editor identity or
+-- audit field. Null for anything else (unknown, draft only, withdrawn, archived or ended).
 create function app.content_public_event_json(p_item_id uuid)
 returns jsonb
 language sql
@@ -1004,7 +1012,8 @@ as $$
     'published_at', app.cmd_utc(i.published_at))
     from app.content_items i
     join app.content_event_revisions r on r.item_id = i.item_id and r.revision_no = i.live_revision_no
-   where i.item_id = p_item_id and i.kind = 'event' and i.lifecycle_state = 'published';
+   where i.item_id = p_item_id and i.kind = 'event' and i.lifecycle_state = 'published'
+     and r.ends_at > now();
 $$;
 
 -- The published events that have not ended, soonest first; at most 200 (`truncated` says more
@@ -1028,7 +1037,8 @@ as $$
     from live l;
 $$;
 
--- One published event, or {"event": null} for an unknown, draft-only, withdrawn or archived id.
+-- One published event that has not ended, or {"event": null} for an unknown, draft-only,
+-- withdrawn, archived or ended id.
 create function app.content_public_event(p_event_id uuid)
 returns jsonb
 language sql
@@ -1063,7 +1073,7 @@ as $$
 $$;
 
 comment on function api.content_public_event(uuid) is
-  'Story 6.1, public (anon and authenticated): one published event, or null.';
+  'Story 6.1, public (anon and authenticated): one published event that has not ended, or null.';
 
 -- ---------------------------------------------------------------------------------------------
 -- The editors' read

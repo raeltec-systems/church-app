@@ -273,7 +273,19 @@ void main() {
     testWidgets('a withdrawn event says so instead of an old copy', (
       tester,
     ) async {
-      await pumpAt(tester, ClientPaths.calendarEvent(_harvest), account: null);
+      final h = await pumpAt(
+        tester,
+        ClientPaths.calendarEvent(_harvest),
+        account: null,
+        setUp: (h) => h.content.publicEvent[_harvest] = AccessReadOk(
+          PublicEventRead.fromJson({'event': publicEventData()}),
+        ),
+      );
+      expect(textOf(tester, 'event-title'), 'SYNTHETIC Harvest Thanksgiving');
+      // Withdrawn on staff web: the next read answers null.
+      h.content.publicEvent.remove(_harvest);
+      await tapKey(tester, 'event-reload');
+      await settle(tester);
       expect(byKey('event-gone'), findsOneWidget);
       expect(find.text('This event is no longer on the calendar.'), findsOne);
       expect(byKey('event-title'), findsNothing);
@@ -307,6 +319,46 @@ void main() {
       );
       await tapKey(tester, 'calendar-reload');
       expect(h.content.publicEventsCalls, 2);
+    });
+
+    testWidgets('a failed refresh keeps the events shown and says from when', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.calendar,
+        account: null,
+        setUp: (h) => h.content.publicEvents = twoEvents(),
+      );
+      expect(byKey('event-row-$_harvest'), findsOneWidget);
+      h.content.publicEvents = const AccessReadFailed(unreachable: true);
+      await tapKey(tester, 'calendar-reload');
+      expect(byKey('calendar-stale'), findsOneWidget);
+      expect(find.textContaining('as it was at'), findsOneWidget);
+      expect(byKey('event-row-$_harvest'), findsOneWidget);
+      expect(byKey('calendar-failed'), findsNothing);
+      // The next good answer clears the notice.
+      h.content.publicEvents = twoEvents();
+      await tapKey(tester, 'calendar-reload');
+      expect(byKey('calendar-stale'), findsNothing);
+    });
+
+    testWidgets('a one-day row is spoken with its date', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpAt(
+        tester,
+        ClientPaths.calendar,
+        account: null,
+        setUp: (h) => h.content.publicEvents = twoEvents(),
+      );
+      expect(
+        find.bySemanticsLabel(
+          'SYNTHETIC Choir rehearsal, Thu 5 Nov 17:30 to 19:00, '
+          'SYNTHETIC Church hall',
+        ),
+        findsOneWidget,
+      );
+      handle.dispose();
     });
   });
 
@@ -348,6 +400,27 @@ void main() {
       expect(textOf(tester, 'home-greeting'), 'Welcome');
       expect(byKey('home-duties-card'), findsNothing);
       expect(byKey('coming-up-empty'), findsOneWidget);
+      // Already signed in: not told to sign in.
+      expect(byKey('home-guest-line'), findsNothing);
+      expect(byKey('home-signed-in-line'), findsOneWidget);
+    });
+
+    testWidgets('a member whose access read failed is not shown a guest Home', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.home,
+        setUp: (h) {
+          h.grants.myAccess = const AccessReadFailed(unreachable: true);
+          h.duties.mine = const AccessReadFailed(unreachable: true);
+        },
+      );
+      expect(byKey('home-guest-line'), findsNothing);
+      expect(byKey('home-signed-in-line'), findsNothing);
+      expect(textOf(tester, 'home-greeting'), isNot('Welcome'));
+      expect(byKey('home-duties-card'), findsOneWidget);
+      expect(byKey('home-duties-failed'), findsOneWidget);
     });
 
     testWidgets('a member keeps the cards, then Coming up', (tester) async {
@@ -447,7 +520,7 @@ void main() {
       await settle(tester);
       expect(byKey('events-notice-created'), findsOneWidget);
       expect(byKey('event-form-new'), findsNothing);
-      expect(textOf(tester, 'page-subtitle'), contains('1 not published yet'));
+      expect(textOf(tester, 'page-subtitle'), contains('1 waiting to publish'));
       expect(
         tester.widget<StatusLabel>(byKey('event-mark-$_harvest')).label,
         'Draft',

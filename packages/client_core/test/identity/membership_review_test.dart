@@ -393,12 +393,20 @@ void main() {
       );
       await tester.tap(find.text('All members'));
       await settle(tester);
-      expect(enabled(tester, 'unlink-$_member'), isFalse);
-      await tester.tap(byKey('unlink-reason-$_member'));
-      await settle(tester);
-      await tester.tap(find.text('Ownership dispute').last);
+      // Unlinking lives in the member's detail panel and asks first, with
+      // the reason, naming the member.
+      await tapKey(tester, 'member-record-$_member');
       await settle(tester);
       await tapKey(tester, 'unlink-$_member');
+      await settle(tester);
+      expect(
+        find.text('Unlink SYNTHETIC Ruth Mwale\'s app account?'),
+        findsOneWidget,
+      );
+      expect(enabled(tester, 'confirm-action'), isFalse);
+      await tapKey(tester, 'unlink-reason-$_member-ownership_dispute');
+      await tapKey(tester, 'confirm-action');
+      await settle(tester);
       final sent = h.gateway.sent.single;
       expect(sent.wire['command'], 'identity.unlink_account');
       expect(sent.wire['expected_revision'], 4);

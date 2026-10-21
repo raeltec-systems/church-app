@@ -430,131 +430,7 @@ class _MembershipLifecycleScreenState
   }
 
   Widget _noticeBanner(LifecycleNotice notice, MembershipLifecycleState s) {
-    final who = s.subject ?? 'the member';
-    final (tone, title, message) = switch (notice) {
-      LifecycleNotice.loginHeld => (
-        StatusTone.success,
-        'Login on hold',
-        'Every device of $who was signed out. Membership, cell and duties '
-            'are kept.',
-      ),
-      LifecycleNotice.holdReleased => (
-        StatusTone.success,
-        'Login hold released',
-        '$who signs in again to continue.',
-      ),
-      LifecycleNotice.deactivated => (
-        StatusTone.success,
-        'Membership deactivated',
-        'Every device of $who was signed out and their roles ended. Pending '
-            'handovers are listed below.',
-      ),
-      LifecycleNotice.restored => (
-        StatusTone.success,
-        'Membership restored',
-        '$who signs in again. Give roles again separately if needed.',
-      ),
-      LifecycleNotice.lastAdmin => (
-        StatusTone.danger,
-        'Last Admin',
-        '$who is the church\'s last usable Admin. Give another member the '
-            'Admin role first.',
-      ),
-      LifecycleNotice.handoverRequired => (
-        StatusTone.warning,
-        'Hand over first',
-        '$who is the last person responsible for something: the last leader '
-            'or deputy of a department (Departments: give it another leader '
-            'or deputy who uses the app), or the only person who may own an '
-            'open follow-up task (Follow-ups: reassign or close it). Hand it '
-            'over there first, then deactivate. Nothing was changed.',
-      ),
-      LifecycleNotice.handoverContinued => (
-        StatusTone.success,
-        'Follow-up tasks handed over',
-        'Up to 100 open follow-up tasks of $who went to someone in each '
-            'task\'s group. Any still pending stay listed below.',
-      ),
-      LifecycleNotice.handoverNoneMoved => (
-        StatusTone.warning,
-        'Nobody could take them',
-        'No one the app can reach may take the follow-up tasks of $who yet. '
-            'They stay listed: give the group a leader, then try again.',
-      ),
-      LifecycleNotice.alreadyHeld => (
-        StatusTone.info,
-        'Already on hold',
-        '$who\'s login is already on hold.',
-      ),
-      LifecycleNotice.notApproved => (
-        StatusTone.info,
-        'Not an active member',
-        '$who is not an approved member now.',
-      ),
-      LifecycleNotice.notDeactivated => (
-        StatusTone.info,
-        'Not deactivated',
-        '$who\'s membership is not deactivated.',
-      ),
-      LifecycleNotice.passwordResetRequired => (
-        StatusTone.warning,
-        'Password reset needed first',
-        '$who must reset the password themselves before this hold can be '
-            'released.',
-      ),
-      LifecycleNotice.changedElsewhere => (
-        StatusTone.info,
-        'Changed elsewhere',
-        'The record changed since you loaded it. The list was reloaded; '
-            'search again before acting.',
-      ),
-      LifecycleNotice.selfAction => (
-        StatusTone.warning,
-        'Not for your own record',
-        'Another Admin must decide.',
-      ),
-      LifecycleNotice.noLongerAdmin => (
-        StatusTone.danger,
-        'Not allowed',
-        'Your account no longer holds the Admin role.',
-      ),
-      LifecycleNotice.signInAgain => (
-        StatusTone.warning,
-        'Please sign in again',
-        'This sign-in is no longer valid.',
-      ),
-      LifecycleNotice.notAccepting => (
-        StatusTone.neutral,
-        'Not available here',
-        'This can\'t be done right now. Nothing was changed.',
-      ),
-      LifecycleNotice.invalid => (
-        StatusTone.danger,
-        'Check the form',
-        'Choose a reason or how you checked the member\'s identity.',
-      ),
-      LifecycleNotice.notFound => (
-        StatusTone.info,
-        'Not found',
-        'The record no longer exists.',
-      ),
-      LifecycleNotice.refused => (
-        StatusTone.danger,
-        'Refused',
-        'The server refused the request.',
-      ),
-      LifecycleNotice.unconfirmed => (
-        StatusTone.warning,
-        'Not confirmed yet',
-        'We couldn\'t confirm whether the decision arrived. Check again; it '
-            'is sent once.',
-      ),
-      LifecycleNotice.notSent => (
-        StatusTone.neutral,
-        'Not sent',
-        'This build has no server configured.',
-      ),
-    };
+    final (tone, title, message) = lifecycleNoticeText(notice, s.subject);
     return RequestStateBanner(
       key: Key('lifecycle-notice-${notice.name}'),
       tone: tone,
@@ -576,4 +452,137 @@ class _MembershipLifecycleScreenState
       ],
     );
   }
+}
+
+/// What a membership status outcome tells the Admin: tone, title and
+/// message (Membership status, and the member panel on Members).
+(StatusTone, String, String) lifecycleNoticeText(
+  LifecycleNotice notice,
+  String? subject,
+) {
+  final who = subject ?? 'the member';
+  return switch (notice) {
+    LifecycleNotice.loginHeld => (
+      StatusTone.success,
+      'Login on hold',
+      'Every device of $who was signed out. Membership, cell and duties '
+          'are kept.',
+    ),
+    LifecycleNotice.holdReleased => (
+      StatusTone.success,
+      'Login hold released',
+      '$who signs in again to continue.',
+    ),
+    LifecycleNotice.deactivated => (
+      StatusTone.success,
+      'Membership deactivated',
+      'Every device of $who was signed out and their roles ended. Pending '
+          'handovers are listed below.',
+    ),
+    LifecycleNotice.restored => (
+      StatusTone.success,
+      'Membership restored',
+      '$who signs in again. Give roles again separately if needed.',
+    ),
+    LifecycleNotice.lastAdmin => (
+      StatusTone.danger,
+      'Last Admin',
+      '$who is the church\'s last usable Admin. Give another member the '
+          'Admin role first.',
+    ),
+    LifecycleNotice.handoverRequired => (
+      StatusTone.warning,
+      'Hand over first',
+      '$who is the last person responsible for something: the last leader '
+          'or deputy of a department (Departments: give it another leader '
+          'or deputy who uses the app), or the only person who may own an '
+          'open follow-up task (Follow-ups: reassign or close it). Hand it '
+          'over there first, then deactivate. Nothing was changed.',
+    ),
+    LifecycleNotice.handoverContinued => (
+      StatusTone.success,
+      'Follow-up tasks handed over',
+      'Up to 100 open follow-up tasks of $who went to someone in each '
+          'task\'s group. Any still pending stay listed below.',
+    ),
+    LifecycleNotice.handoverNoneMoved => (
+      StatusTone.warning,
+      'Nobody could take them',
+      'No one the app can reach may take the follow-up tasks of $who yet. '
+          'They stay listed: give the group a leader, then try again.',
+    ),
+    LifecycleNotice.alreadyHeld => (
+      StatusTone.info,
+      'Already on hold',
+      '$who\'s login is already on hold.',
+    ),
+    LifecycleNotice.notApproved => (
+      StatusTone.info,
+      'Not an active member',
+      '$who is not an approved member now.',
+    ),
+    LifecycleNotice.notDeactivated => (
+      StatusTone.info,
+      'Not deactivated',
+      '$who\'s membership is not deactivated.',
+    ),
+    LifecycleNotice.passwordResetRequired => (
+      StatusTone.warning,
+      'Password reset needed first',
+      '$who must reset the password themselves before this hold can be '
+          'released.',
+    ),
+    LifecycleNotice.changedElsewhere => (
+      StatusTone.info,
+      'Changed elsewhere',
+      'The record changed since you loaded it. The list was reloaded; '
+          'search again before acting.',
+    ),
+    LifecycleNotice.selfAction => (
+      StatusTone.warning,
+      'Not for your own record',
+      'Another Admin must decide.',
+    ),
+    LifecycleNotice.noLongerAdmin => (
+      StatusTone.danger,
+      'Not allowed',
+      'Your account no longer holds the Admin role.',
+    ),
+    LifecycleNotice.signInAgain => (
+      StatusTone.warning,
+      'Please sign in again',
+      'This sign-in is no longer valid.',
+    ),
+    LifecycleNotice.notAccepting => (
+      StatusTone.neutral,
+      'Not available here',
+      'This can\'t be done right now. Nothing was changed.',
+    ),
+    LifecycleNotice.invalid => (
+      StatusTone.danger,
+      'Check the form',
+      'Choose a reason or how you checked the member\'s identity.',
+    ),
+    LifecycleNotice.notFound => (
+      StatusTone.info,
+      'Not found',
+      'The record no longer exists.',
+    ),
+    LifecycleNotice.refused => (
+      StatusTone.danger,
+      'Refused',
+      'The server refused the request.',
+    ),
+    LifecycleNotice.unconfirmed => (
+      StatusTone.warning,
+      'Not confirmed yet',
+      'We couldn\'t confirm whether the decision arrived. Check again; it '
+          'is sent once.',
+    ),
+    LifecycleNotice.notSent => (
+      StatusTone.neutral,
+      'Not sent',
+      'This build has no server configured.',
+    ),
+  };
 }

@@ -3727,7 +3727,9 @@ class _PlanSummary extends StatelessWidget {
     final pills = <Widget>[
       if (m.cancelled)
         const StatusLabel(label: 'Meeting cancelled', tone: StatusTone.danger)
-      else
+      // Once recorded, After the meeting carries Held or Not held: one
+      // status mark, not two.
+      else if (read.record == null || !read.full)
         ?_statusLabel(read.status, key: const Key('plan-status')),
       if (p == null)
         const StatusLabel(
@@ -4599,9 +4601,12 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
 }
 
 /// The work on the left and the member's phone on the right (about 340 px)
-/// on a wide screen; the phone under the work on a narrow one.
-Widget _planWithPreview(Widget work, Widget preview) => LayoutBuilder(
-  builder: (context, box) => box.maxWidth >= 900
+/// on a wide screen; the phone under the work on a narrow one. With nothing
+/// for members to see, the work takes the whole width (no empty column).
+Widget _planWithPreview(Widget work, Widget? preview) => LayoutBuilder(
+  builder: (context, box) => preview == null
+      ? work
+      : box.maxWidth >= 900
       ? Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -5437,7 +5442,7 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
     );
     final seen = read.membersSee;
     final preview = seen == null
-        ? const SizedBox.shrink()
+        ? null
         : _ProgrammePreview(
             meeting: read.meeting,
             topic: seen.topic,

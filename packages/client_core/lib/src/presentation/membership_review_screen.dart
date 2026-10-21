@@ -2,11 +2,13 @@ import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../application/access_controllers.dart';
 import '../application/review_controllers.dart';
 import '../domain/access_grants.dart';
 import '../domain/membership_application.dart';
 import '../domain/membership_review.dart';
 import '../domain/phone_username.dart';
+import 'member_detail_panel.dart';
 
 /// Story 2.5, staff web, Admin only: membership applications (approve as a
 /// new member, link to an existing member, ask for details, reject), member
@@ -932,7 +934,9 @@ class _MembersSectionState extends ConsumerState<_MembersSection> {
   String? _nameError;
   String? _phoneError;
   String? _consentError;
-  final Map<String, UnlinkReason> _unlinkReasons = {};
+
+  /// The member whose detail panel is open (as last listed).
+  MemberRecord? _selected;
 
   @override
   void dispose() {
@@ -984,6 +988,72 @@ class _MembersSectionState extends ConsumerState<_MembersSection> {
         : const <String, String>{};
     final result = s.searchResult;
     final shown = s.members.length;
+    // Roles for the Roles column and the detail panel come from the Roles &
+    // access roster, read page by page (a church of under 200 members).
+    final roster = ref.watch(grantAdminProvider);
+    if (roster.next != null && !roster.loading) {
+      Future.microtask(ref.read(grantAdminProvider.notifier).loadMore);
+    }
+    final rosterRead = roster.result is AccessReadOk<GrantRoster>;
+    final roles = {for (final r in roster.members) r.memberId: r.grants.roles};
+    final chosen = _selected;
+    final current = chosen == null
+        ? null
+        : s.members.where((x) => x.memberId == chosen.memberId).firstOrNull;
+    final listed = result is AccessReadOk<MemberSearchPage> && !s.searching;
+    final panel = chosen == null
+        ? null
+        : MemberDetailPanel(
+            key: ValueKey('member-panel-${chosen.memberId}'),
+            member: current ?? chosen,
+            gone: current == null && listed,
+            onClose: () => setState(() => _selected = null),
+          );
+    void search(String q) {
+      setState(() => _selected = null);
+      ctl.search(q);
+    }
+
+    final list = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (result != null && result is! AccessReadOk<MemberSearchPage>)
+          _readProblem(result)
+        else if (result != null && s.members.isEmpty)
+          ChurchCard(
+            radius: 12,
+            child: Text(
+              'No members match.',
+              key: const Key('member-none'),
+              style: ChurchType.staffBody.copyWith(color: c.muted),
+            ),
+          )
+        else if (shown > 0) ...[
+          _MemberTable(
+            members: s.members,
+            roles: rosterRead && roster.next == null ? roles : null,
+            selectedId: chosen?.memberId,
+            onSelect: (m) => setState(
+              () => _selected = _selected?.memberId == m.memberId ? null : m,
+            ),
+          ),
+        ],
+        if (s.membersNext != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: FocusRing(
+                child: OutlinedButton(
+                  key: const Key('member-more'),
+                  onPressed: s.searching ? null : ctl.loadMoreMembers,
+                  child: const Text('Show more members'),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1003,13 +1073,13 @@ class _MembersSectionState extends ConsumerState<_MembersSection> {
                   labelText: 'Search by name or contact number',
                   prefixIcon: Icon(Icons.search, size: 20),
                 ),
-                onSubmitted: (v) => ctl.search(v),
+                onSubmitted: search,
               ),
             ),
             FocusRing(
               child: OutlinedButton(
                 key: const Key('member-search'),
-                onPressed: s.searching ? null : () => ctl.search(_query.text),
+                onPressed: s.searching ? null : () => search(_query.text),
                 child: const Text('Search'),
               ),
             ),
@@ -1025,50 +1095,8 @@ class _MembersSectionState extends ConsumerState<_MembersSection> {
           ],
         ),
         const SizedBox(height: 16),
-        if (result != null && result is! AccessReadOk<MemberSearchPage>)
-          _readProblem(result)
-        else if (result != null && s.members.isEmpty)
-          ChurchCard(
-            radius: 12,
-            child: Text(
-              'No members match.',
-              key: const Key('member-none'),
-              style: ChurchType.staffBody.copyWith(color: c.muted),
-            ),
-          )
-        else if (shown > 0) ...[
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Text(
-              '$shown ${shown == 1 ? 'member' : 'members'} shown'
-              '${s.membersNext == null ? '' : ', more below'}',
-              style: ChurchType.secondary.copyWith(color: c.muted),
-            ),
-          ),
-          _MemberTable(
-            members: s.members,
-            busy: s.busy,
-            reasons: _unlinkReasons,
-            onReason: (m, r) => setState(() => _unlinkReasons[m.memberId] = r),
-            onUnlink: (m) => ctl.unlink(m, _unlinkReasons[m.memberId]!),
-          ),
-        ],
-        if (s.membersNext != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: FocusRing(
-                child: OutlinedButton(
-                  key: const Key('member-more'),
-                  onPressed: s.searching ? null : ctl.loadMoreMembers,
-                  child: const Text('Show more members'),
-                ),
-              ),
-            ),
-          ),
-        const SizedBox(height: ChurchGeometry.sectionGap),
-        if (_adding)
+        // The add form opens where it was asked for, above the list.
+        if (_adding) ...[
           _Card(
             key: const Key('add-member-form'),
             child: Column(
@@ -1185,6 +1213,40 @@ class _MembersSectionState extends ConsumerState<_MembersSection> {
               ],
             ),
           ),
+          const SizedBox(height: ChurchGeometry.sectionGap),
+        ],
+        if (result is AccessReadOk<MemberSearchPage> && shown > 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              '$shown ${shown == 1 ? 'member' : 'members'} shown'
+              '${s.membersNext == null ? '' : ', more below'}. Choose one '
+              'for their roles, holds and membership.',
+              style: ChurchType.secondary.copyWith(color: c.muted),
+            ),
+          ),
+        // The handoff's All members: the table, and the chosen member's
+        // panel on its right (above it when the window is narrow), both
+        // starting on one line.
+        LayoutBuilder(
+          builder: (context, box) {
+            if (panel == null) return list;
+            if (box.maxWidth >= 1000) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: list),
+                  const SizedBox(width: 24),
+                  SizedBox(width: 340, child: panel),
+                ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [panel, const SizedBox(height: 16), list],
+            );
+          },
+        ),
       ],
     );
   }
@@ -1288,62 +1350,42 @@ class _ReclaimSectionState extends ConsumerState<_ReclaimSection> {
 }
 
 /// All members as a table: rules and alignment, 12 px grey sentence-case
-/// headers, one status mark per row (the account), the one action where it
-/// applies (unlink an account). Below about 900 px each member is a
-/// two-line row instead.
+/// headers, one status mark per row (the account). A row opens the member's
+/// detail panel (roles, unlink, hold, membership). Below 640 px each member
+/// is a two-line row instead.
 class _MemberTable extends StatelessWidget {
   const _MemberTable({
     required this.members,
-    required this.busy,
-    required this.reasons,
-    required this.onReason,
-    required this.onUnlink,
+    required this.roles,
+    required this.selectedId,
+    required this.onSelect,
   });
 
   final List<MemberRecord> members;
-  final bool busy;
-  final Map<String, UnlinkReason> reasons;
-  final void Function(MemberRecord m, UnlinkReason r) onReason;
-  final void Function(MemberRecord m) onUnlink;
+
+  /// Each member's roles from the Roles & access roster; null while it is
+  /// read (or when it can't be), shown as a grey dash.
+  final Map<String, List<String>>? roles;
+  final String? selectedId;
+  final void Function(MemberRecord m) onSelect;
+
+  static const _columns = [
+    StaffColumn('Name', flex: 5),
+    StaffColumn('Roles', flex: 3),
+    StaffColumn('Account', flex: 2),
+    StaffColumn('', width: 20),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final c = ChurchColors.of(context);
-    final head = ChurchType.secondary.copyWith(color: c.muted, fontSize: 12);
-    return ChurchCard(
+    return KeyedSubtree(
       key: const Key('member-table'),
-      radius: 12,
-      padding: EdgeInsets.zero,
       child: LayoutBuilder(
         builder: (context, box) {
-          final wide = box.maxWidth >= 900;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          final wide = box.maxWidth >= 640;
+          return StaffTableFrame(
             children: [
-              if (wide)
-                Container(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
-                  decoration: BoxDecoration(
-                    border: Border(bottom: BorderSide(color: c.line)),
-                  ),
-                  child: ExcludeSemantics(
-                    child: Row(
-                      children: [
-                        Expanded(flex: 3, child: Text('Name', style: head)),
-                        Expanded(flex: 3, child: Text('Contact', style: head)),
-                        Expanded(flex: 2, child: Text('Account', style: head)),
-                        Expanded(
-                          flex: 6,
-                          child: Text(
-                            'Unlink an account',
-                            style: head,
-                            textAlign: TextAlign.end,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              if (wide) const StaffTableHeader(columns: _columns),
               for (var i = 0; i < members.length; i++)
                 _row(context, members[i], wide: wide, divider: i > 0),
             ],
@@ -1360,6 +1402,16 @@ class _MemberTable extends StatelessWidget {
     required bool divider,
   }) {
     final c = ChurchColors.of(context);
+    final routes = m.contactRoutes;
+    final subline = [
+      if (routes.isNotEmpty)
+        '${routes.first.phone}'
+            '${routes.first.owner == ContactOwner.member ? '' : ' (${routes.first.holderLabel ?? routes.first.owner.label})'}'
+            '${routes.length > 1 ? ' +${routes.length - 1}' : ''}'
+      else
+        'No contact number',
+      if (m.isSynthetic) 'Synthetic test record',
+    ].join(' · ');
     final name = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1370,118 +1422,73 @@ class _MemberTable extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        if (m.isSynthetic)
-          Text(
-            'Synthetic test record',
-            style: ChurchType.secondary.copyWith(color: c.muted, fontSize: 13),
+        Text(
+          subline,
+          style: ChurchType.secondary.copyWith(
+            color: c.muted,
+            fontSize: 13,
+            fontFeatures: const [FontFeature.tabularFigures()],
           ),
+        ),
       ],
     );
-    final contact = m.contactRoutes.isEmpty
+    final held = roles?[m.memberId];
+    final rolesText = roles == null
         ? Text('—', style: ChurchType.staffBody.copyWith(color: c.muted))
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // The number over whose it is (a contact route, never a login).
-              for (final r in m.contactRoutes) ...[
-                Text(r.phone, style: ChurchType.figures.copyWith(color: c.ink)),
-                Text(
-                  '${r.owner.label}'
-                  '${r.holderLabel == null ? '' : ': ${r.holderLabel}'}'
-                  ' · not a login',
-                  style: ChurchType.secondary.copyWith(
-                    color: c.muted,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ],
+        : Text(
+            held == null || held.isEmpty
+                ? 'Member'
+                : held.map(ChurchRoles.label).join(', '),
+            style: ChurchType.secondary.copyWith(
+              color: held == null || held.isEmpty ? c.muted : c.ink,
+            ),
           );
     final account = StatusLabel(
       label: _accountLabel(m.account),
       tone: _accountTone(m.account),
     );
-    final action = m.account == AccountStanding.noLogin
-        ? const SizedBox.shrink()
-        : Wrap(
-            alignment: WrapAlignment.end,
-            spacing: 8,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              SizedBox(
-                width: 230,
-                child: DropdownButton<UnlinkReason>(
-                  isExpanded: true,
-                  key: Key('unlink-reason-${m.memberId}'),
-                  hint: const Text('Reason to unlink'),
-                  value: reasons[m.memberId],
-                  items: [
-                    for (final r in UnlinkReason.values)
-                      DropdownMenuItem(value: r, child: Text(r.label)),
-                  ],
-                  onChanged: busy
-                      ? null
-                      : (v) {
-                          if (v != null) onReason(m, v);
-                        },
-                ),
-              ),
-              FocusRing(
-                child: OutlinedButton(
-                  key: Key('unlink-${m.memberId}'),
-                  onPressed: busy || reasons[m.memberId] == null
-                      ? null
-                      : () => onUnlink(m),
-                  child: const Text('Unlink account'),
-                ),
-              ),
-            ],
-          );
-    return Container(
-      key: Key('member-record-${m.memberId}'),
-      constraints: const BoxConstraints(minHeight: 56),
-      padding: const EdgeInsets.fromLTRB(20, 10, 16, 10),
-      decoration: BoxDecoration(
-        border: divider ? Border(top: BorderSide(color: c.line)) : null,
+    final selected = selectedId == m.memberId;
+    final chevron = ExcludeSemantics(
+      child: Icon(
+        selected ? Icons.chevron_left : Icons.chevron_right,
+        size: 20,
+        color: c.muted,
       ),
+    );
+    return StaffTableRow(
+      key: Key('member-record-${m.memberId}'),
+      divider: divider,
+      selected: selected,
+      onTap: () => onSelect(m),
+      semanticLabel:
+          '${m.displayName}, ${_accountLabel(m.account)}. '
+          '${selected ? 'Close details' : 'Open details'}',
+      padding: EdgeInsets.fromLTRB(wide ? 20 : 16, 10, 14, 10),
+      minHeight: 56,
       child: wide
-          ? Row(
-              children: [
-                Expanded(flex: 3, child: name),
-                Expanded(flex: 3, child: contact),
-                Expanded(
-                  flex: 2,
-                  child: Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: account,
-                  ),
-                ),
-                Expanded(
-                  flex: 6,
-                  child: Align(
-                    alignment: AlignmentDirectional.centerEnd,
-                    child: action,
-                  ),
-                ),
-              ],
+          ? StaffColumnsRow(
+              columns: _columns,
+              cells: [name, rolesText, account, chevron],
             )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          : Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(child: name),
-                    const SizedBox(width: 8),
-                    account,
-                  ],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      name,
+                      const SizedBox(height: 2),
+                      DefaultTextStyle.merge(
+                        style: const TextStyle(fontSize: 13),
+                        child: rolesText,
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 4),
-                contact,
-                if (m.account != AccountStanding.noLogin) ...[
-                  const SizedBox(height: 4),
-                  action,
-                ],
+                const SizedBox(width: 8),
+                account,
+                const SizedBox(width: 4),
+                chevron,
               ],
             ),
     );

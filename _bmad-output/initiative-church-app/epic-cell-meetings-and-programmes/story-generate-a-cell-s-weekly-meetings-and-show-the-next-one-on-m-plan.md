@@ -124,7 +124,7 @@ context:
 
 ## Review Triage Log
 
-Independent review of `179d805..bfa57ed` (2026-10-21, a separate reviewer agent; no high-severity privacy or authorization finding). 5.1 was already on staging, so the fixes ship in the 5.2 migration (`20261021120000_cells_meeting_reminders.sql`), which replaces the affected functions, with pgTAP cases:
+Independent review of `179d805..bfa57ed` (2026-10-21, a separate reviewer agent; no high-severity privacy or authorization finding). 5.1 was already on staging, so the fixes ship in the 5.2 migration (`20261021081026_cells_meeting_reminders.sql`), which replaces the affected functions, with pgTAP cases:
 
 1. High, fixed in 5.2: cancelling a meeting moved to another venue violated the table check (moved venue only on a moved meeting) and answered `unavailable`. Cancel now clears `moved_venue`.
 2. Medium, fixed in 5.2: a map pin missing `lat` or `lng` passed validation as unknown and failed at the table check; `{}` cleared the pin. Now `validation_failed {"map_pin": "invalid"}`.

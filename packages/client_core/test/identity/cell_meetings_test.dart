@@ -413,6 +413,120 @@ void main() {
     });
   });
 
+  group('story 5.2: reminders and members to tell directly', () {
+    Map<String, Object?> withReminders(List<String>? befores, int rev) => {
+      ...scheduleData(),
+      'reminders': [
+        for (final b in befores ?? const ['24 hours']) {'before': b},
+      ],
+      'reminders_default': befores == null,
+      'reminders_revision': rev,
+    };
+
+    testWidgets(
+      'the leader changes the cell\'s reminders under their revision',
+      (tester) async {
+        final h = await pumpAt(
+          tester,
+          ClientPaths.cellMeetings,
+          setUp: (h) =>
+              h.cells.meetings = boardWith(schedule: withReminders(null, 3)),
+        );
+        expect(
+          tester.widget<Text>(byKey('meeting-reminders-$_cell')).data,
+          'Reminders: 1 day before (usual)',
+        );
+        await tapKey(tester, 'reminders-edit-$_cell');
+        await settle(tester);
+        await tapKey(tester, 'reminder-choice-$_cell-24 hours');
+        await tapKey(tester, 'reminder-choice-$_cell-2 hours');
+        await settle(tester);
+        await tapKey(tester, 'reminders-save-$_cell');
+        final sent = h.gateway.sent.single;
+        expect(sent.wire['command'], 'cells.set_meeting_reminders');
+        expect(sent.wire['expected_revision'], 3);
+        expect(sent.wire['payload'], {
+          'cell_id': _cell,
+          'reminders': [
+            {'before': '2 hours'},
+          ],
+        });
+        sent.confirm({'cell_id': _cell}, 4);
+        await settle(tester);
+        expect(byKey('cells-notice-remindersSet'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'back to the usual sends null; an assistant cannot change them',
+      (tester) async {
+        final h = await pumpAt(
+          tester,
+          ClientPaths.cellMeetings,
+          setUp: (h) => h.cells.meetings = boardWith(
+            schedule: withReminders(['2 hours'], 5),
+          ),
+        );
+        expect(
+          tester.widget<Text>(byKey('meeting-reminders-$_cell')).data,
+          'Reminders: 2 hours before',
+        );
+        await tapKey(tester, 'reminders-edit-$_cell');
+        await settle(tester);
+        await tapKey(tester, 'reminders-default-$_cell');
+        expect(h.gateway.sent.single.wire['payload'], {
+          'cell_id': _cell,
+          'reminders': null,
+        });
+      },
+    );
+
+    testWidgets('an assistant reads the reminders but has no change button', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.cellMeetings,
+        setUp: (h) => h.cells.meetings = boardWith(
+          role: 'assistant',
+          canChange: false,
+          schedule: withReminders(['2 hours'], 5),
+        ),
+      );
+      expect(byKey('meeting-reminders-$_cell'), findsOneWidget);
+      expect(byKey('reminders-edit-$_cell'), findsNothing);
+    });
+
+    testWidgets('members the app could not reach are named on the meeting', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.cellMeetings,
+        setUp: (h) => h.cells.meetings = boardWith(
+          meetings: [
+            {
+              ...meetingData(),
+              'contact_needs': [
+                {
+                  'member_id': '56565656-5656-4656-8656-565656565656',
+                  'display_name': 'SYNTHETIC Grace Banda',
+                  'kinds': ['cells_meeting_reminder'],
+                },
+              ],
+            },
+          ],
+        ),
+      );
+      expect(find.text('Tell directly: SYNTHETIC Grace Banda'), findsOneWidget);
+    });
+
+    test('meeting reminders and notices open My cell', () {
+      expect(ClientPaths.isKnownDeepLink('/my-cell'), isTrue);
+      expect(ClientPaths.isKnownDeepLink('/my-cell/x'), isFalse);
+    });
+  });
+
   group('mobile: My cell', () {
     testWidgets('shows the next meeting with its venue and pin, and the '
         'cancelled meeting before it', (tester) async {

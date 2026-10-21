@@ -91,6 +91,22 @@ async function main() {
       select m.member_id from app.identity_members m where m.display_name like '${NAME_PREFIX}%';
     create temp table gone_cells as
       select c.cell_id from app.cells_cells c where c.name in ('${SHIKOSWE}', '${ESTATES}');
+    -- Since story 5.2 a schedule plans reminders: Notifications rows go first.
+    create temp table gone_jobs as
+      select j.job_id from app.notifications_jobs j
+       where j.recipient_member_id in (select member_id from gone_members)
+          or j.source_id in (select m.meeting_id from app.cells_meetings m where m.cell_id in (select cell_id from gone_cells));
+    delete from app.notifications_push_jobs p where p.recipient_member_id in (select member_id from gone_members);
+    delete from app.notifications_attempts a where a.job_id in (select job_id from gone_jobs);
+    delete from app.notifications_direct_contact_needs n where n.job_id in (select job_id from gone_jobs);
+    update app.notifications_jobs j set snoozed_from_item_id = null where j.job_id in (select job_id from gone_jobs);
+    delete from app.notifications_inbox_items i where i.job_id in (select job_id from gone_jobs)
+       or i.recipient_member_id in (select member_id from gone_members);
+    delete from app.notifications_jobs j where j.job_id in (select job_id from gone_jobs);
+    delete from app.notifications_schedules s where s.recipient_member_id in (select member_id from gone_members)
+       or s.source_id in (select m.meeting_id from app.cells_meetings m where m.cell_id in (select cell_id from gone_cells));
+    delete from app.cells_meeting_contact_needs n
+     where n.meeting_id in (select m.meeting_id from app.cells_meetings m where m.cell_id in (select cell_id from gone_cells));
     delete from app.cells_meeting_audit a where a.cell_id in (select cell_id from gone_cells)
        or a.actor_member_id in (select member_id from gone_members);
     delete from app.cells_meetings m where m.cell_id in (select cell_id from gone_cells);

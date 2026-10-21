@@ -65,16 +65,22 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261021120000_cells_meeting_reminders.sql`
-- [ ] `supabase/tests/cells_meeting_reminders_test.sql`
-- [ ] Clients: reminders on the staff Cell meetings card (leader/Admin), contact needs on meetings, `/my-cell` deep link.
-- [ ] `tools/identity-e2e/cells-meeting-reminders.mjs` + offline test.
-- [ ] Runbook section in `docs/runbooks/cells-meetings.md`.
+- [x] `supabase/migrations/20261021120000_cells_meeting_reminders.sql`
+- [x] `supabase/tests/cells_meeting_reminders_test.sql`
+- [x] Clients: reminders on the staff Cell meetings card (leader/Admin), contact needs on meetings, `/my-cell` deep link.
+- [x] `tools/identity-e2e/cells-meeting-reminders.mjs` + offline test.
+- [x] Runbook section in `docs/runbooks/cells-meetings.md`.
 
 **Acceptance Criteria:**
 - Given the local stack and the worker, when the E2E runs the seven cases (normal week, leader-changed reminder, move, cancellation, snooze, transfer out, accountless), then only the expected inbox items exist, nothing is reminded for a cancelled or moved-away time, and no payload carries a venue or a name.
 
 ## Implementation Notes
+
+- Server: `supabase/migrations/20261021120000_cells_meeting_reminders.sql`. Reminders use an answered `response` schedule with only a `starts_at` kind, so `app.notifications_response_kinds` is empty and members may snooze. Planning (`app.cells_plan_meeting`) ends every schedule of a meeting that is not on, re-plans each current member, ends schedules of former members (`not_recipient`), withdraws a waiting cancellation notice when the meeting is on again, and enqueues the given notice. `app.cells_sync_meeting_reminders` runs at the end of generation for meetings missing a plan at their current revision or still reminding a former member; generation also re-plans re-timed and withdrawn meetings (notice only within 14 days). Reads plan only when `app.cells_reminders_available()` (the Q2 value is usable); deleted members are skipped through `app.identity_deletions`.
+- Replaced from 5.1: `cells_generate_meetings`, `cells_set_schedule` (review fix 2), `cells_move_meeting`, `cells_cancel_meeting` (review fix 1), `cells_reinstate_meeting`, `cells_authorize_command`, `cells_in_scope` (new aggregate `cells_meeting_reminders` with a real recheck), `cells_command`, `cells_schedule_json`, `cells_meetings`, `cells_erase_member`. The audit action CHECK is widened by drop and add constraint (`reminders_set`).
+- pgTAP `supabase/tests/cells_meeting_reminders_test.sql` (41). The full db:test passes; no Notifications ledger needed a change.
+- Clients: `MeetingSchedule.reminders`, `remindersDefault`, `remindersRevision`, `CellMeeting.contactNeeds`, `CellMeetingsController.setReminders`, the reminders row and the "Tell directly" label on staff Cell meetings (taste rules: the job on the row it concerns, the rare setting behind a button), `/my-cell` in `ClientPaths.deepLinkTargets`. Tests: 5 more in `test/identity/cell_meetings_test.dart` (18).
+- E2E `tools/identity-e2e/cells-meeting-reminders.mjs` (9 checks, real worker) with offline `cells-meeting-reminders.test.mjs`; numbers `+44 7700 900390-900393`. The `cells-meetings.mjs` cleanup now removes Notifications rows (since 5.2 a schedule plans reminders).
 
 ## Plan Change Log
 

@@ -58,6 +58,9 @@ enum CellNotice {
 
   /// The meeting was already cancelled (by someone else).
   alreadyCancelled,
+
+  /// Story 5.2: the cell's reminders were saved.
+  remindersSet,
 }
 
 /// One command in flight or just answered.
@@ -224,6 +227,7 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
     CellMeetingCommands.move => CellNotice.meetingMoved,
     CellMeetingCommands.cancel => CellNotice.meetingCancelled,
     CellMeetingCommands.reinstate => CellNotice.meetingReinstated,
+    CellMeetingCommands.setReminders => CellNotice.remindersSet,
     _ => CellNotice.cancelled,
   };
 
@@ -529,6 +533,27 @@ class CellMeetingsController extends CellsController<CellMeetingsBoard> {
     {'meeting_id': meeting.meetingId},
     'the meeting of ${meeting.occurrenceDate}',
   );
+
+  /// Story 5.2: the cell's meeting reminders, as offsets before the start
+  /// (`24 hours`); null returns to the default (one day before), an empty
+  /// list means none. The leader or an Admin.
+  Future<void> setReminders(StaffMeetingCell cell, List<String>? befores) {
+    final schedule = cell.schedule;
+    if (schedule == null) return Future.value();
+    return send(
+      CellMeetingCommands.setReminders,
+      Optional.of(schedule.remindersRevision),
+      {
+        'cell_id': cell.cellId,
+        'reminders': befores == null
+            ? null
+            : [
+                for (final b in befores) {'before': b},
+              ],
+      },
+      cell.name,
+    );
+  }
 
   Future<void> reinstate(CellMeeting meeting) => send(
     CellMeetingCommands.reinstate,

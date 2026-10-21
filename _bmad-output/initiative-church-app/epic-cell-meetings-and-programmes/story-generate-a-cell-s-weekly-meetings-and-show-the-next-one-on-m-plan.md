@@ -124,6 +124,17 @@ context:
 
 ## Review Triage Log
 
+Independent review of `179d805..bfa57ed` (2026-10-21, a separate reviewer agent; no high-severity privacy or authorization finding). 5.1 was already on staging, so the fixes ship in the 5.2 migration (`20261021120000_cells_meeting_reminders.sql`), which replaces the affected functions, with pgTAP cases:
+
+1. High, fixed in 5.2: cancelling a meeting moved to another venue violated the table check (moved venue only on a moved meeting) and answered `unavailable`. Cancel now clears `moved_venue`.
+2. Medium, fixed in 5.2: a map pin missing `lat` or `lng` passed validation as unknown and failed at the table check; `{}` cleared the pin. Now `validation_failed {"map_pin": "invalid"}`.
+3. Low, accepted: a replay returns the stored result, which may carry the venue if the replaying Admin has since lost the cell's leader scope. The person saw it once; the kernel's stored-result replay is the platform rule. Recorded.
+4. Low, accepted as a decision: a schedule change re-times the nominal times of future moved and cancelled meetings (the move window and a bring back follow the current rule). Recorded in Design Notes.
+5. Low, accepted (known limit in the runbook): a weekday change leaves a moved meeting on its old day in place.
+6. Low, fixed in 5.2: a withdrawn meeting now comes back when its new time is still ahead.
+7. Low, fixed in 5.2: staff web offers **Bring it back** by the usual time, as the server checks.
+8. Low, not applicable: daylight-saving gaps cannot occur in Africa/Lusaka.
+
 ## Design Notes
 
 - Nominal occurrence key = the church-local date the rule produces (`occurrence_date`); the stable id is the row id of `(cell_id, occurrence_date)`. Later owners (programmes, attendance, recaps, offerings) reference `meeting_id`.

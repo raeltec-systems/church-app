@@ -52,6 +52,43 @@ abstract final class CellMeetingCommands {
   static const move = 'cells.move_meeting';
   static const cancel = 'cells.cancel_meeting';
   static const reinstate = 'cells.reinstate_meeting';
+
+  /// Story 5.2: the cell's meeting reminders (leader or Admin).
+  static const setReminders = 'cells.set_meeting_reminders';
+}
+
+/// Story 5.2: the reminder offsets a leader can choose from (3.3 durations,
+/// before the start; at most 3, at most 7 days).
+const meetingReminderChoices = [
+  '1 hour',
+  '2 hours',
+  '24 hours',
+  '2 days',
+  '7 days',
+];
+
+/// "24 hours" reads "1 day before", "2 hours" "2 hours before".
+String reminderLabel(String before) => switch (before) {
+  '24 hours' => '1 day before',
+  '1 hour' => '1 hour before',
+  _ => '$before before',
+};
+
+/// Story 5.2: a member the leader should tell directly about a meeting (no
+/// app access right now). Shown to the cell's leader and assistant only.
+class MeetingContactNeed {
+  const MeetingContactNeed({required this.memberId, required this.displayName});
+
+  factory MeetingContactNeed.fromJson(Object? json) {
+    final m = _map(json, 'contact need');
+    return MeetingContactNeed(
+      memberId: _req<String>(m, 'member_id'),
+      displayName: _req<String>(m, 'display_name'),
+    );
+  }
+
+  final String memberId;
+  final String displayName;
 }
 
 /// ISO weekday (1 = Monday) names for the schedule.
@@ -119,6 +156,7 @@ class CellMeeting {
     required this.revision,
     this.venue,
     this.mapPin,
+    this.contactNeeds = const [],
   });
 
   factory CellMeeting.fromJson(Object? json) {
@@ -140,6 +178,12 @@ class CellMeeting {
       mapPin: m['map_pin'] == null
           ? null
           : MeetingMapPin.fromJson(m['map_pin']),
+      // Story 5.2: on the staff read only (empty elsewhere).
+      contactNeeds: m['contact_needs'] == null
+          ? const []
+          : List.unmodifiable(
+              _req<List>(m, 'contact_needs').map(MeetingContactNeed.fromJson),
+            ),
     );
   }
 
@@ -162,6 +206,9 @@ class CellMeeting {
   final String? venue;
   final MeetingMapPin? mapPin;
 
+  /// Story 5.2: members to tell directly about this meeting.
+  final List<MeetingContactNeed> contactNeeds;
+
   bool get moved => state == MeetingState.moved;
   bool get cancelled => state == MeetingState.cancelled;
 }
@@ -179,13 +226,28 @@ class MeetingSchedule {
     required this.pinSet,
     this.venue,
     this.mapPin,
+    this.reminders = const ['24 hours'],
+    this.remindersDefault = true,
+    this.remindersRevision = 1,
   });
 
   factory MeetingSchedule.fromJson(Object? json) {
     final m = _map(json, 'schedule');
     final weekday = _req<int>(m, 'weekday');
     if (weekday < 1 || weekday > 7) throw const FormatException('weekday');
+    // Story 5.2 (absent from 5.1 servers: the default).
+    final reminders = m['reminders'] == null
+        ? const ['24 hours']
+        : List<String>.unmodifiable(
+            _req<List>(
+              m,
+              'reminders',
+            ).map((r) => _req<String>(_map(r, 'reminder'), 'before')),
+          );
     return MeetingSchedule(
+      reminders: reminders,
+      remindersDefault: _opt<bool>(m, 'reminders_default') ?? true,
+      remindersRevision: _opt<int>(m, 'reminders_revision') ?? 1,
       weekday: weekday,
       startTime: _clock(m, 'start_time'),
       endTime: _clock(m, 'end_time'),
@@ -213,7 +275,20 @@ class MeetingSchedule {
   final String? venue;
   final MeetingMapPin? mapPin;
 
+  /// Story 5.2: the cell's reminder offsets before the start (`24 hours`).
+  final List<String> reminders;
+
+  /// No offsets chosen: the default (one day before).
+  final bool remindersDefault;
+
+  /// expected_revision of cells.set_meeting_reminders.
+  final int remindersRevision;
+
   String get summary => '${weekdayName(weekday)}s, $startTime-$endTime';
+
+  String get remindersText => reminders.isEmpty
+      ? 'No reminders'
+      : reminders.map(reminderLabel).join(', ');
 }
 
 enum MeetingRole { leader, assistant, admin }

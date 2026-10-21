@@ -128,3 +128,114 @@ numbers, ids or keys).
   leaders (5.8), no transfer effects on meetings (5.9).
 - The map pin is shown as coordinates; opening a maps app needs a new launcher seam.
 - A moved meeting whose usual date the schedule no longer produces stays moved (it still happens).
+
+## Story 5.2: meeting reminders and change notices
+
+Migration: `supabase/migrations/20261021120000_cells_meeting_reminders.sql` (no row deletions; one file).
+Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-remind-confirmed-members-of-meetings-and-notify-them-of-cha-plan.md`.
+Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.2/`.
+
+### Source, kinds and text (Notifications 3.2 contracts)
+
+Source type `cells_meeting` (source id = meeting id, revision = meeting revision). Every kind links
+to `/my-cell` (My cell reads the meeting again; the link is a pointer, not a grant):
+
+| Kind | When | Title |
+|---|---|---|
+| `cells_meeting_reminder` | before the start, per the cell's reminders (default 24 hours) | Cell meeting coming up |
+| `cells_meeting_changed` | a move, a bring back, or a schedule change re-timing a meeting in the next 14 days | Cell meeting changed |
+| `cells_meeting_cancelled` | a cancellation, or a schedule change withdrawing a meeting in the next 14 days | Cell meeting cancelled |
+
+The text is generic: no time, venue or name ever travels in a notification.
+
+### Who is reminded
+
+- The cell's **current confirmed members** (primary membership), with or without a login. A leader
+  or assistant who is not a member of the cell is not reminded. The reminder check's
+  `recipient_eligible` is a current membership, so a member transferred out before the reminder
+  gets nothing (the worker ends the job `ineligible`; the next meetings read ends their schedule).
+- Held, in-review and accountless members get no inbox item: the need lands in
+  `app.cells_meeting_contact_needs`, and staff web **Cell meetings** shows "Tell directly: <names>"
+  on the meeting, to the cell's leader and assistant only.
+- Members can snooze a meeting reminder (**Remind me later**). There are no quiet hours.
+
+### Commands (`api.cells_command`)
+
+| Command | Who | `expected_revision` | Payload |
+|---|---|---|---|
+| `cells.set_meeting_reminders` | the cell's leader, or an Admin | `schedule.reminders_revision` | `{cell_id, reminders: [{before: "<n> minutes\|hours\|days"}] \| null}` (at most 3, at most 7 days, distinct; `null` = the default, `[]` = none) |
+
+Move, cancel and bring back (5.1) now re-plan the meeting's reminders and enqueue their notice to
+every confirmed member in the same transaction (Notifications last in the lock order). Planning
+also runs on every meetings read for meetings or members not yet planned at the current revision.
+Reads skip planning while the Q2 policy is not usable; commands then fail closed
+(`unavailable {"policy": "gate_closed"}`).
+
+### Reads
+
+`api.cells_meetings()` now also returns, per cell, `schedule.reminders`, `reminders_default` and
+`reminders_revision`, and per meeting `contact_needs: [{member_id, display_name, kinds}]` (empty
+for an Admin-only reader).
+
+### Member deletion
+
+`app.cells_erase_member` also replaces the member id on their contact needs with the nil UUID.
+Notifications' own hooks remove the member's jobs, items and schedules.
+
+### 5.1 review fixes carried here
+
+Cancelling a meeting moved to another venue now works (the moved venue is cleared); a map pin
+without `lat` or `lng` is `validation_failed {"map_pin": "invalid"}`; a withdrawn meeting comes
+back when its new time is still ahead; staff web offers **Bring it back** by the meeting's usual
+time, as the server checks.
+
+### Clients
+
+- **Staff web, Cell meetings**: "Reminders: 1 day before (usual)" under the schedule, with
+  **Change reminders** (leader or Admin: up to three of 1 hour, 2 hours, 1 day, 2 days, 7 days
+  before; **Use the usual**). "Tell directly: <names>" on a meeting the app could not announce to
+  someone.
+- **Both apps**: the reminder and notices open **My cell** from the Inbox.
+
+### Local runs
+
+```bash
+npx supabase db reset
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/cells-meeting-reminders.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The E2E uses `+44 7700 900390-900393`, runs the real worker, and removes everything it created.
+
+### Hosted staging (parent session, then the owner)
+
+Apply `20261021120000_cells_meeting_reminders.sql` after the 5.1 migration, then run
+`tools/ci/verify-hosted.sql` with `expected_env=staging`. No Edge Function change and no rows file.
+Staging's synthetic scheduler delivers the reminders.
+
+### Owner manual checks (staging, phone and web, story 5.2)
+
+Use the 5.1 setup (Admin A, leader L, member M with the app on your phone) plus a member X without
+a login confirmed in `SYNTHETIC Shikoswe Cell`.
+
+1. **Reminders.** Staff web as L: **Cell meetings** shows "Reminders: 1 day before (usual)".
+   **Change reminders**, choose **2 hours before**, **Save reminders**: **Reminders saved**.
+2. **Move.** As L, **Move** the next meeting by an hour. Within a few minutes M's phone Inbox shows
+   **Cell meeting changed**; opening it leads to **My cell** with the new time. The notice text
+   names no time or place.
+3. **Cancel.** As L, **Cancel this meeting** on a later meeting: M gets **Cell meeting cancelled**;
+   My cell shows it as cancelled.
+4. **Tell directly.** After the next notice, L's meeting row shows "Tell directly: X".
+5. **Snooze.** When the reminder **Cell meeting coming up** arrives, **Remind me later** > 1 hour:
+   it comes back an hour later.
+
+Record the outcome per step in `evidence-5.2/owner-check.md` (pass/fail, device, browser; no
+numbers, ids or keys).
+
+### Known limits
+
+- Reminders are per cell; one meeting cannot have its own reminders yet.
+- A schedule change notifies only for meetings in the next 14 days.
+- "Tell directly" lists names only; recording that the leader made contact comes with programme
+  responses (5.5).

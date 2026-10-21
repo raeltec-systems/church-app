@@ -32,10 +32,27 @@ comment on column app.cells_meeting_schedules.reminders is
   'Story 5.2: the cell''s meeting reminders as [{"before": "<n> minutes|hours|days"}] (at most 3, '
   'at most 7 days); null = one reminder 24 hours before the start.';
 
-alter table app.cells_meeting_audit drop constraint cells_meeting_audit_action_check;
-alter table app.cells_meeting_audit add constraint cells_meeting_audit_action_check
-  check (action in ('schedule_set', 'meeting_moved', 'meeting_cancelled', 'meeting_reinstated',
-                    'reminders_set'));
+-- Reminder changes have their own content-free audit (the 5.1 meeting audit's action CHECK is
+-- not widened: hosted migrations are non-destructive).
+create table app.cells_reminders_audit (
+  event_id bigint generated always as identity primary key,
+  cell_id uuid not null,
+  actor_member_id uuid not null,
+  actor_account_id uuid not null,
+  actor_capacity text not null check (actor_capacity in ('admin', 'cell_leader')),
+  command_request_id uuid,
+  revision_after bigint not null check (revision_after >= 1),
+  created_at timestamptz not null default now()
+);
+
+create index cells_reminders_audit_cell on app.cells_reminders_audit (cell_id, event_id);
+
+comment on table app.cells_reminders_audit is
+  'owner: cells. Content-free audit of a cell''s meeting reminder changes (story 5.2): ids, '
+  'capacity and revision. No offsets or names.';
+
+alter table app.cells_reminders_audit enable row level security;
+revoke all on table app.cells_reminders_audit from public, anon, authenticated, service_role;
 
 create table app.cells_meeting_contact_needs (
   need_id uuid primary key,
@@ -499,9 +516,10 @@ begin
   loop
     perform app.cells_plan_meeting(v_meeting, null);
   end loop;
-  perform app.cells_meeting_audit_row('reminders_set', v_schedule.cell_id, null, v_actor.member_id,
-                                      v_actor.account_id, v_capacity, 'cells.set_meeting_reminders',
-                                      v_revision);
+  insert into app.cells_reminders_audit (cell_id, actor_member_id, actor_account_id, actor_capacity,
+                                         command_request_id, revision_after)
+  values (v_schedule.cell_id, v_actor.member_id, v_actor.account_id, v_capacity,
+          app.cmd_current_request_id(v_actor.account_id, 'cells.set_meeting_reminders'), v_revision);
   return jsonb_build_object(
     'aggregate_type', 'cells_meeting_reminders',
     'aggregate_id', v_schedule.cell_id,
@@ -1056,11 +1074,14 @@ begin
        where m.changed_by_account = v_account;
       update app.cells_meeting_schedules s set set_by_account = v_nil
        where s.set_by_account = v_account;
+      update app.cells_reminders_audit a set actor_account_id = v_nil
+       where a.actor_account_id = v_account;
     end if;
     -- Story 5.1: meeting actors are attributed facts; the person is anonymised.
     update app.cells_meeting_audit a set actor_member_id = v_nil where a.actor_member_id = v_member;
     update app.cells_meetings m set changed_by_member = v_nil where m.changed_by_member = v_member;
     update app.cells_meeting_schedules s set set_by_member = v_nil where s.set_by_member = v_member;
+    update app.cells_reminders_audit a set actor_member_id = v_nil where a.actor_member_id = v_member;
     -- Story 5.2: a contact need is kept as an anonymous fact.
     update app.cells_meeting_contact_needs n set member_id = v_nil where n.member_id = v_member;
   end if;
@@ -1071,6 +1092,7 @@ begin
        + (select count(*) from app.cells_meetings m where m.changed_by_member = v_member)
        + (select count(*) from app.cells_meeting_schedules s where s.set_by_member = v_member)
        + (select count(*) from app.cells_meeting_contact_needs n where n.member_id = v_member)
+       + (select count(*) from app.cells_reminders_audit a where a.actor_member_id = v_member)
        + case when v_account is null then 0 else
            (select count(*) from app.cells_membership_audit a where a.actor_account_id = v_account)
          + (select count(*) from app.cells_memberships m where m.confirmed_by_account = v_account)
@@ -1079,6 +1101,7 @@ begin
          + (select count(*) from app.cells_meeting_audit a where a.actor_account_id = v_account)
          + (select count(*) from app.cells_meetings m where m.changed_by_account = v_account)
          + (select count(*) from app.cells_meeting_schedules s where s.set_by_account = v_account)
+         + (select count(*) from app.cells_reminders_audit a where a.actor_account_id = v_account)
          end
     into v_left;
   return jsonb_build_object('remaining', v_left);

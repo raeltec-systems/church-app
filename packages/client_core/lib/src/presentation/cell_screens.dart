@@ -156,6 +156,11 @@ import '../domain/membership_application.dart';
       'Already cancelled',
       'Someone cancelled that meeting already. The list was reloaded.',
     ),
+    CellNotice.remindersSet => (
+      StatusTone.success,
+      'Reminders saved',
+      '$who\'s members are reminded at the new times from the next meeting.',
+    ),
   };
 }
 
@@ -1396,6 +1401,9 @@ class _MeetingCellCardState extends ConsumerState<_MeetingCellCard> {
               SelectableText('Map pin: ${pin.text}')
             else if (schedule.pinSet && schedule.venue == null)
               const Text('Map pin: set'),
+            // Story 5.2: the cell's reminders; the leader or an Admin
+            // changes them.
+            _RemindersRow(cell: cell, schedule: schedule, busy: busy),
           ],
           if (schedule != null) ...[
             const SizedBox(height: 12),
@@ -1423,7 +1431,22 @@ class _MeetingCellCardState extends ConsumerState<_MeetingCellCard> {
                         tone: StatusTone.danger,
                       ),
                     if (m.venueMoved && m.venue != null) Text('at ${m.venue}'),
-                    if (cell.canChange && m.startsAt.isAfter(now)) ...[
+                    // Story 5.2: members the app could not reach about this
+                    // meeting; the leader tells them directly.
+                    if (m.contactNeeds.isNotEmpty)
+                      StatusLabel(
+                        key: Key('meeting-contact-${m.meetingId}'),
+                        label:
+                            'Tell directly: '
+                            '${m.contactNeeds.map((n) => n.displayName).join(', ')}',
+                        tone: StatusTone.warning,
+                      ),
+                    // The server checks a cancelled meeting against its usual
+                    // time (it comes back there), any other against its own.
+                    if (cell.canChange &&
+                        (m.cancelled ? m.nominalStartsAt : m.startsAt).isAfter(
+                          now,
+                        )) ...[
                       if (!m.cancelled) ...[
                         FocusRing(
                           child: TextButton(
@@ -1893,6 +1916,135 @@ class _NextMeetingCard extends StatelessWidget {
             'Church time. Only confirmed members of your cell see where it '
             'meets.',
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Story 5.2, staff web: the cell's meeting reminders. Everyone with the
+/// card reads them; the cell's leader or an Admin changes them (at most
+/// three offsets before the start, or the default of one day before).
+class _RemindersRow extends ConsumerStatefulWidget {
+  const _RemindersRow({
+    required this.cell,
+    required this.schedule,
+    required this.busy,
+  });
+  final StaffMeetingCell cell;
+  final MeetingSchedule schedule;
+  final bool busy;
+
+  @override
+  ConsumerState<_RemindersRow> createState() => _RemindersRowState();
+}
+
+class _RemindersRowState extends ConsumerState<_RemindersRow> {
+  bool _editing = false;
+  late Set<String> _chosen = widget.schedule.reminders.toSet();
+
+  @override
+  Widget build(BuildContext context) {
+    final cell = widget.cell;
+    final schedule = widget.schedule;
+    final busy = widget.busy;
+    final id = cell.cellId;
+    final ctl = ref.read(cellMeetingsProvider.notifier);
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                'Reminders: ${schedule.remindersText}'
+                '${schedule.remindersDefault ? ' (usual)' : ''}',
+                key: Key('meeting-reminders-$id'),
+              ),
+              if (cell.canChange && !_editing)
+                FocusRing(
+                  child: TextButton(
+                    key: Key('reminders-edit-$id'),
+                    onPressed: busy
+                        ? null
+                        : () => setState(() {
+                            _chosen = schedule.reminders.toSet();
+                            _editing = true;
+                          }),
+                    child: const Text('Change reminders'),
+                  ),
+                ),
+            ],
+          ),
+          if (_editing) ...[
+            _muted(context, 'Choose up to three. Members can snooze each one.'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                for (final c in meetingReminderChoices)
+                  FilterChip(
+                    key: Key('reminder-choice-$id-$c'),
+                    label: Text(reminderLabel(c)),
+                    selected: _chosen.contains(c),
+                    onSelected: busy
+                        ? null
+                        : (on) => setState(() {
+                            if (on && _chosen.length < 3) {
+                              _chosen.add(c);
+                            } else if (!on) {
+                              _chosen.remove(c);
+                            }
+                          }),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              children: [
+                FocusRing(
+                  child: FilledButton(
+                    key: Key('reminders-save-$id'),
+                    onPressed: busy
+                        ? null
+                        : () {
+                            setState(() => _editing = false);
+                            ctl.setReminders(cell, [
+                              for (final c in meetingReminderChoices)
+                                if (_chosen.contains(c)) c,
+                            ]);
+                          },
+                    child: Text(
+                      _chosen.isEmpty ? 'Save: no reminders' : 'Save reminders',
+                    ),
+                  ),
+                ),
+                FocusRing(
+                  child: TextButton(
+                    key: Key('reminders-default-$id'),
+                    onPressed: busy
+                        ? null
+                        : () {
+                            setState(() => _editing = false);
+                            ctl.setReminders(cell, null);
+                          },
+                    child: const Text('Use the usual (1 day before)'),
+                  ),
+                ),
+                FocusRing(
+                  child: TextButton(
+                    key: Key('reminders-cancel-$id'),
+                    onPressed: () => setState(() => _editing = false),
+                    child: const Text('Keep as is'),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

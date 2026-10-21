@@ -41,7 +41,7 @@ id = 6
 slug = "epic-public-content-and-giving"
 title = "Public church content and giving instructions"
 covers = ["CAP-1", "CAP-2"]
-after = [{ epic = 1, needs = "Public API/asset/cache boundary, client navigation/design primitives and build/test scaffold." }, { epic = 2, needs = "Current Media/Admin/worship publication grants and member-only favourite identity; public reading itself does not require sign-in." }, { epic = 3, needs = "Generic publication notification operations for optional announcement push; basic public reading can proceed independently." }, { epic = 4, needs = "Safe event-to-duty reference and owner-review mismatch contract, plus approved sermon-draft reference fields; not full duty UI completion." }]
+after = [{ epic = 1, needs = "Public API/asset/cache boundary, client navigation/design primitives and build/test scaffold." }, { epic = 2, needs = "Current Media/Admin/worship publication grants and member-only favourite identity; public reading itself does not require sign-in." }, { epic = 3, needs = "Generic publication notification operations for optional announcement push; basic public reading can proceed independently." }, { epic = 4, needs = "Safe event-to-duty reference and owner-review mismatch contract, plus approved sermon-draft reference fields; not full duty UI completion." }, { epic = 5, needs = "The member's cell meeting read for the Calendar's My cell overlay, and production promotion of cell programmes first, because migrations promote in order; programme screens are not a prerequisite." }]
 
 [[epic]]
 id = 7

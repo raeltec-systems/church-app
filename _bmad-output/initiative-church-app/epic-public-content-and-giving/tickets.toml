@@ -1,0 +1,258 @@
+# Whole public content and giving epic plan; entries remain planned until a build writes its plan.
+# Table order is build order; ids are stable. Requirement ids K1–K17 live in the epic's Requirements.
+# Off production all content is SYNTHETIC or public domain and every giving method is a labelled SAMPLE
+# (owner-decisions-milestone-1.md); Q3 and Q5 gate production publication until Israel approves them.
+
+[[entry]]
+id = 1
+type = "story"
+title = "Publish an event on staff web and read it as a guest on the mobile Calendar"
+description = "Add the Content owner module's shared publication lifecycle (private drafts, immutable published revisions with the current one live until a replacement is published, withdraw and archive, attributed audit, editor authority for Media, Pastor and Admin from 2.3) and Content's one registered deletion handler that anonymises editor attribution and runs the per-kind erase parts later entries add to it, the first unauthenticated public read contract exposing only the current published projection (both reused by every later content kind), events with title, description, church-time start and end and location, the staff web Content area with an Events editor and accessible list, and the mobile public shell where guests and Pending applicants get the Home and Calendar tabs without signing in and members get the same tabs with My duties, My follow-ups and My cell kept on Home cards and the Account menu, with Home moved into its own presentation file."
+verify = "On staging, a Media member drafts and publishes a two-day `SYNTHETIC Harvest Thanksgiving` event on staff web, a signed-out phone sees it on the Calendar with both endpoints, an edited draft leaves the published version live until it is republished, withdrawal removes it on refresh, and the API shows anonymous and Pending callers no draft, editor identity or private field while a plain member is refused every editor command, no client role can write a Content table and a deleted editor's attribution reads as a former member."
+covers = ["K1", "K5", "K12", "K17"]
+after = ["1.7", "2.11"]
+hitl = false
+risk = "high"
+unknown = "Whether public reads use `security_invoker` views with an anonymous policy (the 1.1 `platform_status` pattern) or audited read functions is decided at build within AD-2; moving Duties and My cell off the tab bar is an agent assumption in the epic Notes that Israel may reverse."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-2--one-transactional-command-and-read-contract-assumption", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-15--public-giving-and-optional-chat-stay-isolated-adopted", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#roles-and-permissions", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations", "docs/design-handoff/screenshots/app-14-calendar.png", "docs/runbooks/contracts-and-owner-seams.md", "docs/runbooks/client-shells.md"]
+external_check = "An independent reviewer repeats the anonymous, Pending and plain-member read and command matrix (drafts, withdrawn items, editor identity, direct table access) before entry 17."
+
+[[entry]]
+id = 2
+type = "story"
+title = "Publish Home banners with validated images through the public asset path"
+description = "Add the Content rights registry (holder, basis, cleared uses for display, offline and audio, evidence, verifier, date and revision) and a rights check that kinds with third-party material call beside the unchanged entry 1 lifecycle helper, a `q5_content_rights` gate that refuses third-party publication in production until Israel approves it, a private draft area where editors upload images through an authenticated route whose type, size and dimensions the server checks, publication that places a cleared file in a separate public bucket under a revision-keyed path and withdrawal that removes it (the asset path and staff file picking that entries 5, 6, 7, 9, 10 and 11 reuse), both buckets added to the object backup in the backup runbook, and Home banners (the yearly theme first, then campaigns, optionally linked to an event) with a staff web editor and a mobile Home 16:9 snap carousel with text alternatives and tap-to-open original."
+verify = "On staging, upload a `SYNTHETIC Theme 2026` image and a campaign image, see an oversized file and a disguised file type refused, publish both and see the carousel on a signed-out phone, and show through the API and Storage that a draft, an uncleared and a withdrawn file cannot be fetched by anonymous or member callers and that a third-party source missing from the q5 fixture value cannot be published."
+covers = ["K2", "K3", "K6"]
+after = [1]
+hitl = false
+risk = "high"
+unknown = "AD-2 adds no custom objects to the storage schema, so upload and the copy into the public bucket run through an authenticated route (an Edge function under the editor's live session) or, if the build shows that cannot work, a purpose-bound system credential (AD-19) that Israel mints, which would add a hitl step here."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-13--public-caching-private-session-state-and-file-gates-assumption", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-19--bounded-system-principals-assumption", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#assets", "_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md#decision-register", "docs/design-handoff/screenshots/app-01-home-member.png", "docs/runbooks/backup-and-restore.md"]
+external_check = "An independent reviewer tries to read draft, uncleared and withdrawn files and to upload a disallowed type before entry 17."
+
+[[entry]]
+id = 3
+type = "story"
+title = "Publish verified giving methods and show How to give to guests"
+description = "Add Admin-only giving methods (mobile money, bank and other instruction-only types) with type-specific destination fields, numbered instructions, an optional starting USSD code, purpose and currency, sort order and private drafts, a recorded church verification (verifier, tested date, how it was tested) required before first publication and after any destination change, immutable revisions with who changed and published them, publish, hide, archive and reorder on staff web, a `q3_giving` gate that refuses publication in production until Israel approves it, no amount, payer, proof or transaction field anywhere, and the mobile Give tab (How to give explanation, method list, method detail with a Copy button per value, numbered steps, beneficiary check, last verified date, church contact and the sample banner off production)."
+verify = "On staging, an Admin drafts, verifies, publishes and reorders SAMPLE mobile-money and bank methods, a signed-out phone copies each value, changing an account number refuses publication until it is verified again while the old revision stays live, and the API shows Media, Pastor and plain members refused every giving command, no draft or verification evidence readable anonymously and any amount or payer field rejected."
+covers = ["K15", "K16", "K1"]
+after = [1]
+hitl = false
+risk = "high"
+unknown = "The real methods, destinations, purposes, currency, publishing Admins and support contact are Q3; whether a second person must verify each destination change is an open question for Israel in the epic Notes."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#giving-instructions", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#core-data-model", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-15--public-giving-and-optional-chat-stay-isolated-adopted", "docs/design-handoff/screenshots/app-12-give.png", "docs/design-handoff/screenshots/app-13-give-instructions.png"]
+external_check = "An independent reviewer repeats the giving permission, re-verification and payer-field refusal cases before entry 17, and Israel verifies every real destination before production publication."
+
+[[entry]]
+id = 4
+type = "story"
+title = "Keep published public content readable offline with honest saved and withdrawn states"
+description = "Add one mobile public-content cache adapter, the only new persistence that `boundaries_test.dart` allows, that stores only allowlisted public reads whose projection marks them offline-allowed (church-authored, or rights cleared for offline use) with their publication and rights revision, caches poster and banner images under the same offline-allowed rule, shows a saved or offline label with the last update time, refreshes on reconnect and removes withdrawn or hidden items and their files, and apply it to the Calendar and the Home carousel, with entries 5, 6, 7 and 9 adding their own reads to the allowlist, while protected records stay in session memory."
+verify = "On an emulator against staging, load the Calendar and Home, go offline and see both with the saved label, withdraw an event and a banner on staff web, reconnect and see both gone with their images evicted, and show by test that the cache refuses a read outside its allowlist or one not marked offline-allowed and that signing out leaves only public entries."
+covers = ["K4"]
+after = [2]
+hitl = false
+risk = "medium"
+unknown = "The storage format and package (files under path_provider or an embedded database) are chosen and pinned at build; staff web keeps no persistent cache; whether a display-only item may sit in a short-lived cache is a Q5 question in the epic Notes, and until answered it is shown online only."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-13--public-caching-private-session-state-and-file-gates-assumption", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-16--shared-client-contract-and-accessible-surfaces-assumption", "packages/client_core/test/boundaries_test.dart"]
+
+[[entry]]
+id = 5
+type = "story"
+title = "Hand off to the dialler, keep giving instructions offline and warn about unsafe methods"
+description = "Add the dialler handoff that opens the phone dialler with the displayed starting USSD code where the platform supports it and otherwise keeps the code and manual steps visible and copyable, a return to the same instructions with no payment claim, optional provider logos through the entry 2 asset path, the last published instructions in the entry 4 cache with their verification date and an offline label, removal of hidden methods on refresh, and an Admin unsafe flag that shows an in-app warning as soon as a device refreshes."
+verify = "On an Android emulator against staging, open the dialler from a SAMPLE method and return to the same instructions, see the manual fallback where the handoff is unsupported, read the instructions offline with their verified date, then hide one method and flag another unsafe on staff web and see the first gone and the second warned after reconnecting."
+covers = ["K15", "K16", "K4", "K3"]
+after = [3, 4]
+hitl = false
+risk = "medium"
+unknown = "iOS refuses `*` and `#` in tel: links, so the handoff is expected on Android only; Israel confirms both platforms on his devices in entry 15."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#method-details", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#administration-and-safeguards", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#important-edge-cases", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#state-fidelity-and-binding-prototype-overrides"]
+
+[[entry]]
+id = 6
+type = "story"
+title = "Read a cleared Bible translation by book and chapter, online and offline"
+description = "Add Content Bible translations linked to rights records through the entry 2 rights check, a staff web import of a translation from a book, chapter, verse and text CSV, picked through the entry 2 staff file picking, that validates it and loads it as a draft (a re-import supersedes the draft by revision and deletes no rows), publication of a translation whose rights clear display, the anonymous chapter read, and the mobile Bible & Hymns tab with its Bible segment (book and chapter picker, cleared-translation switch, chapter heading, accent verse numbers in 18/1.6 text, previous and next; the Hymn book segment follows in entry 7) and an offline download through the entry 4 cache offered only where the translation's rights clear offline use."
+verify = "On staging, import and publish KJV and the World English Bible, then on a signed-out phone pick a book and chapter, switch translations, page across a book boundary and read a downloaded chapter offline, while a translation whose rights record lacks offline use offers no download and an unpublished translation is invisible to anonymous callers."
+covers = ["K7", "K2", "K4", "K5"]
+after = [4]
+hitl = false
+risk = "medium"
+unknown = "Which translations the church may distribute is Q5; KJV is public domain in most countries but under Crown patent in the UK, so production publication waits for Israel's clearance."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#bible-and-hymn-book", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#tokens-type-and-geometry", "docs/design-handoff/screenshots/app-09-bible.png"]
+
+[[entry]]
+id = 7
+type = "story"
+title = "Import, edit, search and read the hymn book with offline hymn text"
+description = "Add hymns (number, title, first line, ordered verses, chorus and optional key) linked to rights records through the entry 2 rights check, a staff web CSV or plain-text import through the entry 2 staff file picking with line-level validation and a preview that loads drafts (a re-import supersedes drafts by revision and deletes no rows), editing and publication by Media on staff web, anonymous search by number, title and first line, and the Hymn book segment of the entry 6 Bible & Hymns tab with list rows (large number, title, first line), detail (title, key, numbered verses, italic chorus in 19/1.55 text) and offline hymn text in the entry 4 cache with local search where its rights clear offline use."
+verify = "On staging, import a SYNTHETIC hymn book from CSV and from plain text with one malformed line reported, edit and publish a hymn, then on a signed-out phone find hymns by number, title words and first line online and offline and open one with its chorus, while a draft or uncleared hymn never appears to anonymous callers."
+covers = ["K8", "K2", "K4"]
+after = [6]
+hitl = false
+risk = "medium"
+unknown = "The church's hymn book and its lyric and recording rights are Q5; staging uses SYNTHETIC hymns only, and hymn audio arrives in entry 10."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#bible-and-hymn-book", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations", "docs/design-handoff/screenshots/app-10-hymn-book.png"]
+
+[[entry]]
+id = 8
+type = "story"
+title = "Save favourite hymns and set Hymns for this Sunday"
+description = "Add member-only hymn favourites (approved members with live access, private to the member, removal as a state change rather than a row deletion, a Sign in prompt for guests and Pending), a Content `worship_leader` scope kind targeting the church's single Sunday-list record that Admin grants through 2.3 so that a worship leader or a Media member sets the Hymns for this Sunday list for a church-time Sunday, the Sunday chip in the hymn list, the Home chips shown from Saturday in Africa/Lusaka time, and the favourites erase part added to the entry 1 Content deletion handler (its row deletion in a `_rows` migration under the hosted rule)."
+verify = "On staging, a member saves and removes favourites on two phones and another member cannot read them, a guest is asked to sign in, a SYNTHETIC worship leader and a Media member set next Sunday's list while a plain member is refused, and the Home chips appear on Saturday and not on Friday under a test clock; locally, a member deletion erases the favourites and the deletion check answers zero."
+covers = ["K9", "K6", "K17"]
+after = [7]
+hitl = false
+risk = "high"
+unknown = "Who keeps the Sunday list (Media only, or also a worship leader) is Q5 and the scope kind is an agent assumption Israel may drop; Israel applies the `_rows` file on staging by hand right after this entry's staging deploy, as for 4.1, because until then the fail-closed stub stalls every staging member deletion at its erase step, including the 4.15 and 5.12 deletion reruns."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#bible-and-hymn-book", "docs/runbooks/identity-access.md", "docs/runbooks/contracts-and-owner-seams.md", "_bmad-output/initiative-church-app/owner-decisions-milestone-2.md"]
+external_check = "The entry 17 suite reruns the favourites privacy and deletion cases on staging after the `_rows` file is applied."
+
+[[entry]]
+id = 9
+type = "story"
+title = "Publish and browse sermons with the YouTube player and safe notes"
+description = "Add series (with a poster through the entry 2 asset path) and sermons (title, speaker, date, series, scripture, notes in a server-validated rich-text subset with allowlisted https links, a validated YouTube video id) with a staff web editor whose draft list also shows the drafts entry 18 creates from duties, anonymous browsing by Latest, Series and Speaker and search by title, and the mobile Sermons tab (series hero, filter pills, 16:9 thumbnail rows, detail with the embedded YouTube player, scripture and notes) with the sermon lists in the entry 4 cache and an unavailable-video state that keeps the notes readable."
+verify = "On staging, publish SYNTHETIC sermons in two series, see script, image and non-allowlisted link markup refused in notes, browse and search them on a signed-out phone, play one video and see a removed or private video id show the unavailable message with the notes readable, and read the sermon list offline."
+covers = ["K10", "K5", "K4"]
+after = [4]
+hitl = false
+risk = "medium"
+unknown = "The YouTube embed package and its privacy-enhanced mode are chosen and pinned at build; the church's channel and sermon media rights are Q5."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#sermons", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#deferred", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations", "docs/design-handoff/screenshots/app-11-sermons.png"]
+
+[[entry]]
+id = 10
+type = "story"
+title = "Play sermon and hymn audio in the background with lock-screen controls"
+description = "Let editors attach an audio file to a sermon or a hymn through the entry 2 asset path with its rights record, stream published audio from the public bucket with seeking, keep it playing with the screen locked or the app in the background with lock-screen and notification controls on Android and iOS, and show an unavailable-audio state when the file is withdrawn or unreachable, without changing the mobile shell."
+verify = "On an Android emulator against staging, play a SYNTHETIC sermon's audio and a hymn's audio, lock the screen and pause and resume from the lock screen, background the app, then withdraw the file on staff web and see the unavailable-audio state on the next open, with the iOS check left for Israel's device in entry 15."
+covers = ["K10", "K8", "K3"]
+after = [8, 9]
+hitl = false
+risk = "medium"
+unknown = "Background audio needs native configuration (an Android foreground service, the iOS background mode) and pinned packages; iOS cannot be built or run from this Windows host, so its check waits for Israel's device."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#sermons", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-13--public-caching-private-session-state-and-file-gates-assumption"]
+
+[[entry]]
+id = 11
+type = "story"
+title = "Show event posters, export events to the phone calendar and RSVP within capacity"
+description = "Add an optional event poster through the entry 2 asset path, shown as a 16:9 thumbnail in the Calendar list and in full on the detail, Add to calendar that exports an iCalendar entry keeping both endpoints of a multi-day event with the stale-copy caveat, reusing the iCalendar rules of the 4.5 builder without changing the Duties export, and optional RSVP with a capacity for approved members with live access (transactional, Full when reached, a cancel or a release is a state change that frees a place without deleting a row, a Sign in prompt for guests, counts only for editors), with a 2.10 lifecycle hook that releases a deactivated member's future RSVPs and an RSVP erase part added to the entry 1 Content deletion handler (its row deletion in a `_rows` migration under the hosted rule)."
+verify = "On staging, publish a capacity-2 SYNTHETIC event with a poster, export it and a three-day event to the calendar, have two members RSVP and a third see Full, race two RSVPs for the last place and see one refused, cancel one and see the place free, deactivate an RSVPed member and see the place freed, and show that guests cannot RSVP and other members cannot see who answered; locally, a member deletion erases the RSVP and the deletion check answers zero."
+covers = ["K12", "K3", "K17"]
+after = [4, "4.5"]
+hitl = false
+risk = "high"
+unknown = "Whether organisers should see who is coming is a Q4 personal-data question for Israel, so this entry shows counts only; Israel applies the `_rows` file on staging by hand right after this entry's staging deploy, as for 4.1, because until then the fail-closed stub stalls every staging member deletion at its erase step."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#events-and-announcements", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#membership-and-account-lifecycle", "packages/client_core/lib/src/domain/duty_calendar.dart", "docs/runbooks/identity-access.md"]
+external_check = "An independent reviewer repeats the capacity race and the deactivation release before entry 17, and the entry 17 suite reruns the RSVP deletion case on staging after the `_rows` file is applied."
+
+[[entry]]
+id = 19
+type = "story"
+title = "Overlay a signed-in member's own duties and cell meetings on the Calendar"
+description = "Add My duties and My cell overlay switches to the Calendar for signed-in members with live access, showing only their own current duties (from the 4.5 My duties read) and their confirmed cell's meetings for the visible period with My duty and My cell chips, opening duty detail or My cell, hidden for guests and Pending, through a new bounded Cells function for the member's own upcoming meetings (dates, times and cancelled state, no venue) that leaves `api.cells_my_cell()` unchanged and is recorded in cells-meetings.md as a Cells contract change."
+verify = "On staging, a signed-in member switches on both overlays, sees only their own duties and their cell's meetings for the month with the right chips, opens each into duty detail or My cell, sees a cancelled meeting marked, and never sees another member's duties or another cell's meetings, while a guest and a Pending applicant see no overlay switch and the new Cells read refuses them."
+covers = ["K12", "K5"]
+after = [11, "5.1"]
+hitl = false
+risk = "medium"
+unknown = "Epic 7 may change Cells at the same time, so the new read is its own function and touches no existing Cells read; the visible period is bounded (a month view) and chosen at build."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#navigation-and-visual-style", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations", "docs/design-handoff/screenshots/app-14-calendar.png", "docs/runbooks/cells-meetings.md"]
+
+[[entry]]
+id = 12
+type = "story"
+title = "Link duties to published events and flag their review when an event changes"
+description = "Register `content_event` as a Duties link source with its check hook, let Duties accept only a published event as a slot's `event_ref` through a published-event picker in the staff web rota editor and show the event on duty detail, and flag linked duties for review through `duties_owner_flag_review` in Content's own transaction when a published event's time, place or cancellation changes (one notice per department, as 4.16 sends), after showing the editor how many duties are linked, with the 4.11 consumer guide corrected to say that flags notify."
+verify = "On staging, link a `SYNTHETIC Preaching Rota` slot to a published event, change the event's time and cancel another linked event, and show each linked department flagged once with one notice per reachable leader or deputy, no duty republished and no answer reset, the editor's linked-duty count shown before saving, an unpublished event refused as a link, and the public event read revealing no duty or rota."
+covers = ["K13"]
+after = [11, "4.16"]
+hitl = false
+risk = "high"
+unknown = "If Duties needs a contract change to validate `event_ref` through `contract_check_source`, it is recorded in the 4.11 consumer guide as epic 5 did, not worked around in Content."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-6--one-revisioned-assignment-engine-adopted", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#events-and-announcements", "docs/runbooks/contracts-and-owner-seams.md#duties-owner-operations-consumer-guide-story-411", "_bmad-output/initiative-church-app/owner-decisions-milestone-2.md"]
+external_check = "An independent reviewer repeats the event-change flag, notice and rota non-exposure cases before entry 17."
+
+[[entry]]
+id = 18
+type = "story"
+title = "Send a preaching duty's topic and scripture to Media as a sermon draft"
+description = "Add a Send to Media action, on mobile duty detail for the duty's current assignee and on the staff web duty panel for its managers, shown when the duty has a topic or scripture, that reads them through `duties_owner_topic` inside a Content command and creates one sermon draft per occurrence (title from the topic, scripture, date, no speaker or private field), which appears in the entry 9 sermon editor marked as from a duty for Media to complete, review and publish."
+verify = "On staging, the assignee of a `SYNTHETIC Preaching Rota` duty with a topic sends it to Media, a second send returns the same draft, a member without the duty and a leader of another department are refused, the draft is invisible to anonymous callers and members, and nothing is public until a Media member completes and publishes it."
+covers = ["K11"]
+after = [10, 12]
+hitl = false
+risk = "medium"
+unknown = "`duties_owner_topic` answers only the assignee or the duty's managers, so Media never reads a duty directly; if Media needs to pull drafts itself, that is a Duties contract change recorded in the 4.11 guide."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#set-up-departments-and-duties", "docs/runbooks/contracts-and-owner-seams.md#duties-owner-operations-consumer-guide-story-411", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-6--one-revisioned-assignment-engine-adopted"]
+
+[[entry]]
+id = 13
+type = "story"
+title = "Publish pinned announcements with an optional generic push"
+description = "Add announcements (a short title and body, pinned or not) with a staff web editor, anonymous reads with pinned items first, a mobile announcement list and detail opened from the inbox now and from the Home section of entry 14 (the guests' way in), and an optional push on publication registered with Notifications (generic text, a deep link to the announcement, an Announcements push category members can turn off, the inbox item kept) for every member whose current access allows it."
+verify = "On staging, publish a pinned and an unpinned SYNTHETIC announcement, one of them with push, and show through the inbox and the job and attempt rows that each eligible member gets one inbox item and one push job, a member who turned the category off gets the inbox item only, held and accountless members and guests get no push job, and no payload carries the body, with the anonymous read returning both, the pinned one first; receipt on a real phone is left to Israel in entry 15."
+covers = ["K14"]
+after = [1, "3.7"]
+hitl = false
+risk = "medium"
+unknown = "Notifications enqueues per recipient; if a church-wide fan-out needs a new owner operation, it is a Notifications contract change recorded in notifications.md, and production sending stays behind the closed `outbound_sending` gate."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#events-and-announcements", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-8--durable-notification-work-bounded-external-effects-assumption", "docs/runbooks/notifications.md"]
+
+[[entry]]
+id = 14
+type = "story"
+title = "Finish Home and search public content from the top bar"
+description = "Complete Home with the guest Join card, the Pending card with separate church-approval and cell-status chips, pinned announcements from entry 13 with a See all link to the full list, and Coming up 16:9 poster cards for events and sermon series that open the original poster, and add the top-bar search across published hymns, sermons, events and announcements through a bounded anonymous search read, with cached hymns searchable offline."
+verify = "On staging, a signed-out phone shows the theme, Join card, pinned announcement with See all, Sunday hymn chips and Coming up posters and finds a hymn, a sermon, an event and an announcement through search online and a cached hymn offline, a Pending applicant sees both status chips, and a signed-in member's Home keeps the My duties, My follow-ups and My cell cards."
+covers = ["K6", "K5"]
+after = [8, 9, 11, 13]
+hitl = false
+risk = "medium"
+unknown = "The search read's ranking and page size are chosen at build within the bounded-collection convention; Bible text is not searched (assumption in the epic Notes)."
+references = ["_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#navigation-and-visual-style", "docs/design-handoff/screenshots/app-18-home-guest.png", "docs/design-handoff/screenshots/app-01-home-member.png"]
+
+[[entry]]
+id = 15
+type = "story"
+title = "Write the media and giving runbooks and run the synthetic content pilot"
+description = "Write the media runbook (publishing, rights records and Q5 evidence, imports, broken-link and unavailable-media checks, withdrawal, Sunday hymns, sermon drafts from duties) and the giving runbook (destination verification, change and re-verification, hide, archive, the unsafe flag, support questions and the no-payment-claim rule), then run the content and giving pilot on staging with SYNTHETIC and public-domain content, SAMPLE giving methods and chat absent, with Israel checking the dialler handoff, background audio and announcement push on his Android and iOS devices."
+verify = "Israel follows the runbooks on staging and confirms that a guest can read, play and follow giving instructions without signing in, a withdrawn item and a hidden method disappear after refresh, an unavailable video keeps its notes, the dialler handoff, background audio and an announcement push behave on his phones, and nothing depends on chat."
+covers = ["K17"]
+after = [5, 14, 18, 19]
+hitl = true
+risk = "medium"
+unknown = "Real content, rights evidence and verified destinations are Q3 and Q5; this entry is the synthetic rehearsal."
+references = ["_bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md#external-lead-times-and-operating-constraints", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#sermons", "_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#administration-and-safeguards"]
+
+[[entry]]
+id = 16
+type = "story"
+title = "Refactor sweep"
+description = "Clean up content, giving and client duplication, boundary drift and maintainability findings recorded during the completed stories without changing scope or absorbing unfinished source behavior."
+verify = "Review the completed-story findings, apply only justified cleanup and rerun the affected permission, public-read, file, cache, giving and client checks without weakening contracts or acceptance behavior."
+covers = ["K17"]
+after = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 19, 12, 18, 13, 14, 15]
+hitl = false
+risk = "medium"
+unknown = "The cleanup scope is chosen from build records when this story starts; any missing behavior becomes its own entry."
+references = ["_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-18--contract-first-integration-and-release-gates-adopted"]
+
+[[entry]]
+id = 17
+type = "story"
+title = "Verify public content and giving end to end and promote them to production"
+description = "Run the closing mobile and staff web suite over publication, rights, files, cache, Bible, hymns, favourites, the Sunday list, sermons and audio, sermon drafts, events, RSVP, Calendar overlays, duty links, announcements and giving with the Guest, Pending, Member, Media, Pastor, Admin and combined-role matrix, unsafe input, media failures, deletion and handoff and return cases and chat absent on staging, then promote to the production baseline with Q3 destinations and Q5 rights either approved by Israel or left fail-closed."
+verify = "A clean build of both clients passes the integrated content and giving scenarios (AC-07, AC-14 and the CAP-1 and CAP-2 edge cases) and the independent reviewers' reruns on staging, Israel witnesses the mobile/staff demonstration, and production shows the deployed workflows with publication of unapproved giving methods and third-party material visibly refused."
+covers = ["K1", "K2", "K3", "K4", "K5", "K6", "K7", "K8", "K9", "K10", "K11", "K12", "K13", "K14", "K15", "K16", "K17"]
+after = [16, "5.12"]
+hitl = true
+risk = "high"
+unknown = "Production needs duties and cell programmes in production first (5.12, after 4.15), Israel's Q3 and Q5 approvals and the store-review caution on giving instructions; while any is missing this entry delivers staging evidence and stays open."
+references = ["_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#launch-checks", "_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#verification-boundaries", "docs/runbooks/environments-and-promotion.md", "docs/runbooks/production-promotion-cells.md"]
+external_check = "An independent reviewer reruns the public-read, file, giving and duty-link cases before promotion, and Israel approves the `q3_giving` and `q5_content_rights` values."

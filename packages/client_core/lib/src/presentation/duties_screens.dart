@@ -665,38 +665,64 @@ class _DutiesPageState<T> extends ConsumerState<_DutiesPage<T>> {
         children: children,
       );
     }
-    children.addAll([
-      const SizedBox(height: ChurchGeometry.sectionGap),
-      Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: FocusRing(
-          child: OutlinedButton.icon(
-            key: const Key('duties-reload'),
-            onPressed: s.loading || s.busy ? null : ctl.reload,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Reload'),
+    // On the phone a pushed screen refreshes from its bar (and by pulling);
+    // staff web keeps the Reload button under the content.
+    final phone = !identical(layout, ChurchLayout.staff);
+    final reload = s.loading || s.busy ? null : ctl.reload;
+    if (!phone) {
+      children.addAll([
+        const SizedBox(height: ChurchGeometry.sectionGap),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: FocusRing(
+            child: OutlinedButton.icon(
+              key: const Key('duties-reload'),
+              onPressed: s.loading || s.busy ? null : ctl.reload,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reload'),
+            ),
           ),
         ),
-      ),
-    ]);
+      ]);
+    }
     final footer = switch ((widget.footer, result)) {
       (final f?, AccessReadOk(:final value)) => f(context, value, s),
       _ => null,
     };
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(
+        title: Text(widget.title),
+        actions: [
+          if (phone)
+            FocusRing(
+              radius: 22,
+              child: IconButton(
+                key: const Key('duties-reload'),
+                tooltip: 'Reload',
+                onPressed: reload,
+                icon: const Icon(Icons.refresh),
+              ),
+            ),
+          const SizedBox(width: 4),
+        ],
+      ),
       bottomNavigationBar: footer,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: layout.pagePadding,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
-              child: DefaultTextStyle.merge(
-                style: layout.body.copyWith(color: c.ink),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: children,
+        child: RefreshIndicator(
+          notificationPredicate: (n) => phone && n.depth == 0,
+          onRefresh: () async => reload?.call(),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: layout.pagePadding,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
+                child: DefaultTextStyle.merge(
+                  style: layout.body.copyWith(color: c.ink),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: children,
+                  ),
                 ),
               ),
             ),

@@ -16,6 +16,10 @@ const _historyPrivacy =
     'Seen only by the member and their department\'s leaders and deputies, '
     'for fair workload conversations. It is not a ranking.';
 
+/// What the history covers (the server lists department duties only).
+const _historyScope =
+    'Department duties only. Cell programme parts are in My duties.';
+
 StatusTone _outcomeTone(OutcomeState s) => switch (s) {
   OutcomeState.completed => StatusTone.success,
   OutcomeState.excused => StatusTone.info,
@@ -588,103 +592,270 @@ class _HistoryBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final c = ChurchColors.of(context);
     final v = value;
     final sum = v.summary;
     final q = ref.watch(memberHistoryQueryProvider);
     final ctl = ref.read(memberHistoryProvider.notifier);
+    final nothing = sum.held == 0 && v.entries.isEmpty && q.pages.isEmpty;
+    final muted = ChurchType.secondary.copyWith(color: c.muted);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _heading(
-          context,
-          v.self ? 'Your duties' : (v.displayName ?? 'A member'),
-          key: const Key('history-who'),
-        ),
-        _muted(context, _historyPrivacy),
-        if (!v.self && v.departmentNames.isNotEmpty)
-          _muted(
+        // A leader reading a member's history: whose it is, and through
+        // which departments.
+        if (!v.self) ...[
+          _heading(
             context,
-            'Departments you lead: ${v.departmentNames.join(', ')}.',
+            v.displayName ?? 'A member',
+            key: const Key('history-who'),
           ),
-        const SizedBox(height: 8),
-        Text(
-          'Last 12 months: ${sum.held} past duties assigned '
-          '(${sum.accepted} accepted, ${sum.confirmedByLeader} confirmed by '
-          'leader, ${sum.declined} declined, ${sum.unanswered} never '
-          'answered). Outcomes: ${sum.completed} completed, ${sum.excused} '
-          'excused, ${sum.noShow} no-show, ${sum.unrecorded} not recorded. '
-          '${sum.ended} reassigned or cancelled.',
-          key: const Key('history-summary'),
-        ),
-        Text('${v.upcoming} upcoming.', key: const Key('history-upcoming')),
-        const SizedBox(height: ChurchGeometry.sectionGap),
-        if (v.entries.isEmpty)
-          _muted(context, 'No duties yet.')
+          if (v.departmentNames.isNotEmpty)
+            Text(
+              'Departments you lead: ${v.departmentNames.join(', ')}.',
+              style: muted,
+            ),
+          const SizedBox(height: 16),
+        ],
+        if (nothing)
+          _Card(
+            key: const Key('history-summary'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  v.self
+                      ? 'No department duties in the last 12 months'
+                      : 'No duties in your departments in the last 12 months',
+                  style: ChurchType.itemTitle.copyWith(color: c.ink),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  v.upcoming == 0
+                      ? 'Duties show here once their date has passed, with '
+                            'how ${v.self ? 'you' : 'they'} answered and what '
+                            'the leader recorded.'
+                      : '${v.upcoming} upcoming. They show here once their '
+                            'date has passed.',
+                  key: const Key('history-upcoming'),
+                  style: muted,
+                ),
+              ],
+            ),
+          )
         else
-          for (final e in v.entries) ...[
-            _Card(
-              key: Key('history-entry-${e.assignmentId}'),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    e.title,
-                    style: ChurchType.cardTitle.copyWith(
-                      color: ChurchColors.of(context).ink,
-                    ),
-                  ),
-                  Text('${e.departmentName}. ${_timesText(context, e.times)}'),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      StatusLabel(
-                        key: Key('history-state-${e.assignmentId}'),
-                        label: e.stateLabel,
-                        tone: StatusTone.neutral,
-                      ),
-                      if (e.outcome == null &&
-                          e.outcomeState != OutcomeState.none)
-                        StatusLabel(
-                          key: Key('history-outcome-${e.assignmentId}'),
-                          label: e.outcomeState.label,
-                          tone: _outcomeTone(e.outcomeState),
-                        ),
-                    ],
-                  ),
-                  if (e.outcome case final o?)
-                    _OutcomeLines(
-                      record: o,
-                      keyPrefix: 'history-outcome-${e.assignmentId}',
-                    ),
+          _HistorySummaryCard(summary: sum, upcoming: v.upcoming),
+        if (v.entries.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          ChurchCard(
+            padding: EdgeInsets.zero,
+            radius: identical(ChurchLayout.of(context), ChurchLayout.staff)
+                ? 12
+                : ChurchGeometry.mobileCardRadius,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final (i, e) in v.entries.indexed) ...[
+                  if (i > 0) Divider(height: 1, indent: 78, color: c.line),
+                  _HistoryRow(entry: e),
                 ],
+              ],
+            ),
+          ),
+        ],
+        if (q.pages.isNotEmpty || v.next != null) ...[
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              // Review N6: keyboard focus is visible on the paging buttons.
+              if (q.pages.isNotEmpty)
+                FocusRing(
+                  child: TextButton.icon(
+                    key: const Key('history-newer'),
+                    onPressed: state.busy ? null : ctl.newer,
+                    icon: const Icon(Icons.arrow_upward, size: 18),
+                    label: const Text('Newer duties'),
+                  ),
+                ),
+              if (v.next case final cursor?)
+                FocusRing(
+                  child: TextButton.icon(
+                    key: const Key('history-older'),
+                    onPressed: state.busy ? null : () => ctl.older(cursor),
+                    icon: const Icon(Icons.arrow_downward, size: 18),
+                    label: const Text('Older duties'),
+                  ),
+                ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 20),
+        Text(_historyPrivacy, style: muted),
+        const SizedBox(height: 4),
+        Text(_historyScope, style: muted),
+      ],
+    );
+  }
+}
+
+/// The last 12 months as figures: three that answer "how have I done"
+/// (assigned, completed, upcoming), then how the member answered and what
+/// leaders recorded, a zero in grey.
+class _HistorySummaryCard extends StatelessWidget {
+  const _HistorySummaryCard({required this.summary, required this.upcoming});
+  final HistorySummary summary;
+  final int upcoming;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final sum = summary;
+    Widget figure(String label, int n, {Key? key}) => Expanded(
+      child: Semantics(
+        label: '$label: $n',
+        excludeSemantics: true,
+        child: Column(
+          key: key,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$n',
+              style: ChurchType.mobileScreenTitle.copyWith(
+                color: c.ink,
+                fontWeight: FontWeight.w600,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
-            const SizedBox(height: 8),
-          ],
-        Wrap(
-          spacing: 8,
-          children: [
-            // Review N6: keyboard focus is visible on the paging buttons.
-            if (q.pages.isNotEmpty)
-              FocusRing(
-                child: OutlinedButton(
-                  key: const Key('history-newer'),
-                  onPressed: state.busy ? null : ctl.newer,
-                  child: const Text('Newer'),
-                ),
-              ),
-            if (v.next case final c?)
-              FocusRing(
-                child: OutlinedButton(
-                  key: const Key('history-older'),
-                  onPressed: state.busy ? null : () => ctl.older(c),
-                  child: const Text('Older'),
-                ),
-              ),
+            const SizedBox(height: 2),
+            Text(label, style: ChurchType.secondary.copyWith(color: c.muted)),
           ],
         ),
-      ],
+      ),
+    );
+    Widget divider() => Container(
+      width: 1,
+      height: 44,
+      margin: const EdgeInsets.symmetric(horizontal: 14),
+      color: c.line,
+    );
+    Widget row(String label, int n) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: ChurchType.secondary.copyWith(color: c.ink),
+            ),
+          ),
+          Text(
+            '$n',
+            style: ChurchType.figures.copyWith(color: n == 0 ? c.muted : c.ink),
+          ),
+        ],
+      ),
+    );
+    return _Card(
+      key: const Key('history-summary'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const CardLabel('Last 12 months'),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              figure('Assigned', sum.held),
+              divider(),
+              figure('Completed', sum.completed),
+              divider(),
+              figure('Upcoming', upcoming, key: const Key('history-upcoming')),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Divider(height: 1, color: c.line),
+          const SizedBox(height: 12),
+          const CardLabel('How the duties were answered'),
+          const SizedBox(height: 4),
+          row('Accepted', sum.accepted),
+          row('Confirmed by a leader', sum.confirmedByLeader),
+          row('Can\'t make it', sum.declined),
+          row('Never answered', sum.unanswered),
+          const SizedBox(height: 12),
+          const CardLabel('What the leaders recorded'),
+          const SizedBox(height: 4),
+          row('Completed', sum.completed),
+          row('Excused', sum.excused),
+          row('No-show', sum.noShow),
+          row('Not recorded yet', sum.unrecorded),
+          row('Reassigned or cancelled', sum.ended),
+        ],
+      ),
+    );
+  }
+}
+
+/// One past duty: date, duty, department and time with the member's answer,
+/// and one mark for the result (the recorded outcome, or why there is none).
+class _HistoryRow extends StatelessWidget {
+  const _HistoryRow({required this.entry});
+  final HistoryEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final e = entry;
+    final id = e.assignmentId;
+    final muted = ChurchType.secondary.copyWith(color: c.muted);
+    final ended = e.outcomeState == OutcomeState.none;
+    return Padding(
+      key: Key('history-entry-$id'),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ChurchDateBadge(at: e.times.arriveBy),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  e.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: ChurchType.itemTitle.copyWith(color: c.ink),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  [
+                    e.departmentName,
+                    _clock(context, e.times.reportingAt ?? e.times.startsAt),
+                    if (!ended) e.stateLabel,
+                  ].join(' · '),
+                  key: ended ? null : Key('history-state-$id'),
+                  style: muted,
+                ),
+                const SizedBox(height: 8),
+                if (ended)
+                  StatusLabel(
+                    key: Key('history-state-$id'),
+                    label: e.stateLabel,
+                    tone: StatusTone.neutral,
+                  )
+                else if (e.outcome case final o?)
+                  _OutcomeLines(record: o, keyPrefix: 'history-outcome-$id')
+                else
+                  StatusLabel(
+                    key: Key('history-outcome-$id'),
+                    label: e.outcomeState.label,
+                    tone: _outcomeTone(e.outcomeState),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

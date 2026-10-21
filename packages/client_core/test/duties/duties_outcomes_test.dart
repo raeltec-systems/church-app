@@ -630,7 +630,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.textContaining('past duties assigned'), findsOneWidget);
+      expect(byKey('history-summary'), findsOneWidget);
     });
   });
 
@@ -646,9 +646,30 @@ void main() {
         ),
       );
       expect(h.outcomes.historyQueries.last.memberId, isNull);
-      expect(find.text('Your duties'), findsOneWidget);
+      // The member's own page has no name heading; the figures lead.
+      expect(byKey('history-who'), findsNothing);
+      expect(find.text('Last 12 months'), findsOneWidget);
       expect(find.textContaining('It is not a ranking'), findsOneWidget);
-      expect(find.textContaining('1 no-show, 1 not recorded'), findsOneWidget);
+      String figure(String label) {
+        final row = find
+            .ancestor(
+              of: find.descendant(
+                of: byKey('history-summary'),
+                matching: find.text(label),
+              ),
+              matching: find.byType(Row),
+            )
+            .first;
+        return tester
+            .widgetList<Text>(
+              find.descendant(of: row, matching: find.byType(Text)),
+            )
+            .last
+            .data!;
+      }
+
+      expect(figure('No-show'), '1');
+      expect(figure('Not recorded yet'), '1');
       expect(find.text('Outcome: No-show'), findsOneWidget);
       expect(byKey('history-outcome-$_asgB'), findsOneWidget);
       expect(find.text('Not recorded'), findsOneWidget);

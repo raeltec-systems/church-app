@@ -442,33 +442,59 @@ class _CellsPageState<T> extends ConsumerState<_CellsPage<T>> {
         children: children,
       );
     }
-    children.addAll([
-      const SizedBox(height: ChurchGeometry.sectionGap),
-      Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: FocusRing(
-          child: OutlinedButton.icon(
-            key: const Key('cells-reload'),
-            onPressed: s.loading || s.busy ? null : ctl.reload,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Reload'),
+    // On the phone a pushed screen refreshes from its bar (and by pulling);
+    // staff web keeps the Reload button under the content.
+    final phone = !identical(layout, ChurchLayout.staff);
+    final reload = s.loading || s.busy ? null : ctl.reload;
+    if (!phone) {
+      children.addAll([
+        const SizedBox(height: ChurchGeometry.sectionGap),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: FocusRing(
+            child: OutlinedButton.icon(
+              key: const Key('cells-reload'),
+              onPressed: s.loading || s.busy ? null : ctl.reload,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reload'),
+            ),
           ),
         ),
-      ),
-    ]);
+      ]);
+    }
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(
+        title: Text(widget.title),
+        actions: [
+          if (phone)
+            FocusRing(
+              radius: 22,
+              child: IconButton(
+                key: const Key('cells-reload'),
+                tooltip: 'Reload',
+                onPressed: reload,
+                icon: const Icon(Icons.refresh),
+              ),
+            ),
+          const SizedBox(width: 4),
+        ],
+      ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: layout.pagePadding,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
-              child: DefaultTextStyle.merge(
-                style: layout.body.copyWith(color: c.ink),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: children,
+        child: RefreshIndicator(
+          notificationPredicate: (n) => phone && n.depth == 0,
+          onRefresh: () async => reload?.call(),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: layout.pagePadding,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
+                child: DefaultTextStyle.merge(
+                  style: layout.body.copyWith(color: c.ink),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: children,
+                  ),
                 ),
               ),
             ),
@@ -2259,13 +2285,14 @@ class _NextMeetingCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        weekdayName(ChurchTime.wall(next.startsAt).weekday),
+                        _meetingDay(context, next.startsAt),
                         style: ChurchType.itemTitle.copyWith(color: c.ink),
                       ),
                       Text(
-                        _meetingWhen(context, next),
+                        '${_meetingClock(context, next.startsAt)}'
+                        '–${_meetingClock(context, next.endsAt)}',
                         key: const Key('my-cell-next-when'),
-                        style: ChurchType.secondary.copyWith(color: c.muted),
+                        style: ChurchType.figures.copyWith(color: c.muted),
                       ),
                       if (next.moved) ...[
                         const SizedBox(height: 6),

@@ -239,3 +239,124 @@ numbers, ids or keys).
 - A schedule change notifies only for meetings in the next 14 days.
 - "Tell directly" lists names only; recording that the leader made contact comes with programme
   responses (5.5).
+- A weekday change notifies withdrawn dates but not the new ones; re-timing a cancelled meeting
+  drops its waiting cancellation notice (5.2 review, accepted).
+
+## Story 5.3: programme drafts with validated parts and visible gaps
+
+Migration: `supabase/migrations/20261021150000_cells_programmes.sql` (no row deletions; one file; it
+also carries the 5.2 review fixes).
+Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-draft-a-meeting-programme-with-validated-parts-and-visible-ga-plan.md`.
+Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.3/`.
+
+### Model (Cells owns it)
+
+- `app.cells_programmes`: one per meeting (`meeting_id` unique), `programme_state` `draft` or
+  `cancelled` (5.4 adds `published` through the `_ok()` check), topic and scripture (at most 120
+  characters), study notes (at most 2000, multi-line), `revision`, who created and last saved it.
+  The meeting's date, time and venue stay the meeting's own: changing them is a move (5.1).
+- `app.cells_programme_parts`: stable `part_id`, `position` 1-20, label (1-60 characters),
+  `starts_at`/`ends_at` (instants on the meeting's church date), optional `assignee_member_id`,
+  `removed_at` (parts are never deleted; a save leaves out a part by marking it removed, so 5.4
+  can link one Duties slot to each stable part).
+- `app.cells_programme_audit`: content-free (`programme_created`, `programme_saved`,
+  `programme_cancelled`, ids, capacity, revision).
+
+### Commands (`api.cells_command`)
+
+| Command | Who | `expected_revision` | Payload |
+|---|---|---|---|
+| `cells.create_programme` | the cell's leader or assistant | `null` | `{meeting_id}` (a meeting ahead, not cancelled; a second one is `conflict {"meeting_id": "exists"}`) |
+| `cells.save_programme` | the cell's leader or assistant | programme `revision` | `{programme_id, topic?, scripture?, study_notes?, parts: [{part_id?, label, start_time "HH:MM", end_time "HH:MM" \| duration_minutes, assignee_member_id?}]}` |
+| `cells.cancel_programme` | the cell's leader or assistant | programme `revision` | `{programme_id}` |
+
+A save replaces the whole draft. Parts must be in time order, inside the meeting and must not
+overlap; an assignee must be a current confirmed member of the cell (members without a login
+included). Refused parts are reported per part: `validation_failed {"parts.<index>": "<code>"}`
+with `label_required`, `label_too_long`, `label_invalid`, `start_invalid`, `end_invalid`,
+`end_or_duration`, `duration_invalid`, `end_before_start`, `outside_meeting`, `out_of_order`,
+`overlap`, `part_unknown`, `part_duplicate` or `assignee_not_in_cell`; nothing is written. A
+cancelled programme is `conflict {"programme_id": "not_draft"}`; a cancelled or started meeting is
+`validation_failed {"meeting_id": "cancelled" | "started"}`. Admin and Pastor do not edit.
+
+### Reads
+
+`api.cells_programme(meeting_id)`:
+
+| Caller | `view` | Gets |
+|---|---|---|
+| the cell's leader or assistant | `full`, `can_edit: true` | meeting (with venue), programme, roster `[{member_id, display_name, account}]` |
+| Pastor role (oversight) | `full`, `can_edit: false` | meeting without venue, programme, roster |
+| Admin only | `metadata` | state, revision, `part_count`, `gaps`; no topic, notes, parts or names |
+| anyone else | 403 `not_granted` | nothing |
+
+Each part reads `assignee: {member_id, display_name, in_cell}` or `null` (a gap); `in_cell` false
+means the person has left the cell (the draft keeps them; saving it that way is refused).
+
+### Member deletion
+
+`app.cells_erase_member` clears the member as an assignee and anonymises them as creator, saver
+and audit actor (nil UUID). The 5.2 reminders audit is covered too.
+
+### 5.2 review fixes carried here
+
+An empty reminder list now means no reminders (only `null` is the default); planning locks the
+meeting before calling Notifications; a read never fails because planning was refused; confirming
+or transferring a member plans their reminders at once; "Tell directly" lists current members only.
+Staff web keeps any reminder offset already set as a choice.
+
+### Clients
+
+- **Staff web, Cell meetings**: **Plan** on each meeting ahead, for the cell's leader and assistant.
+- **Staff web, Plan meeting** (`/cells/meetings/<meeting id>/plan`): first the meeting, its state
+  and "N parts, M gaps"; then topic, scripture, study notes and the parts (start, end, part, who:
+  "Nobody yet" is a gap; members without a login are marked); **Add a part** starts where the last
+  part ends; **Save draft**; **Cancel this programme** (asks once more). Beside the editor (below it
+  on a narrow window) a preview shows what members will see once the programme is published
+  (5.4); members see nothing of a draft. Pastor reads the draft without an editor; an Admin-only
+  reader sees the counts.
+
+### Local runs
+
+```bash
+npx supabase db reset
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/cells-programmes.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The E2E uses `+44 7700 900010-900019` and removes everything it created.
+
+### Hosted staging (parent session, then the owner)
+
+Apply the 5.3 migration after the 5.2 one, then run `tools/ci/verify-hosted.sql` with
+`expected_env=staging`. No Edge Function change and no rows file.
+
+### Owner manual checks (staging, web, story 5.3)
+
+Use the 5.1 setup (Admin A, leader L, assistant S, member M), the 5.2 member X without a login, and
+a Pastor P (role given by A).
+
+1. **Plan.** Staff web as L: **Cell meetings**, **Plan** on the next meeting, **Start the
+   programme**. Add three parts from 18:00 (opening prayer, worship, Bible study); give the first
+   two to M and X, leave the third with **Nobody yet**. **Save draft**: "3 parts, 1 gap", and the
+   preview shows the third part as "Open: nobody yet".
+2. **Refusals.** Set the second part to start before the first one ends, **Save draft**: the row
+   says "Overlaps the part above" and nothing is saved. Set a part to end after the meeting: "Keep
+   it inside the meeting". Put the times back.
+3. **Stale.** Open the same page as S in a second browser, save a change there, then save in the
+   first browser: **Changed elsewhere**, and the page shows S's version.
+4. **Who reads.** As P, open the page's address: the draft shows read-only, without the venue. As
+   A (Admin only), the same address shows only the counts. M cannot open it.
+5. **Cancel.** As L, **Cancel this programme**, **Yes, cancel the programme**: the page shows it
+   read-only as Cancelled.
+
+Record the outcome per step in `evidence-5.3/owner-check.md` (pass/fail, browser; no numbers, ids
+or keys).
+
+### Known limits
+
+- Members see nothing until publishing (5.4); responses come with 5.5, change notices with 5.6.
+- Pastor oversight has no list of programmes yet: a Pastor opens a meeting's plan by its address.
+- Parts are not reordered by dragging: the order is the time order, and the editor reports an
+  out-of-order part.

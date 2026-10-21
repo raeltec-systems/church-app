@@ -60,16 +60,21 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/<ts>_cells_programmes.sql`
-- [ ] `supabase/tests/cells_programmes_test.sql`
-- [ ] Clients: domain, controller, **Plan meeting** screen (`/cells/meetings/:meetingId/plan`) with member preview, **Plan** on each meeting row.
-- [ ] E2E `tools/identity-e2e/cells-programmes.mjs` + offline test.
-- [ ] Runbook section.
+- [x] `supabase/migrations/20261021150000_cells_programmes.sql`
+- [x] `supabase/tests/cells_programmes_test.sql`
+- [x] Clients: domain, controller, **Plan meeting** screen (`/cells/meetings/:meetingId/plan`) with member preview, **Plan** on each meeting row.
+- [x] E2E `tools/identity-e2e/cells-programmes.mjs` + offline test.
+- [x] Runbook section.
 
 **Acceptance Criteria:**
 - Given staff web, when a leader drafts a programme with an unassigned part, tries overlapping and out-of-meeting parts and saves under a stale revision, then the bad saves are refused, the stale save is a conflict, and through the API a cell member, a leader of another cell and Admin-only access cannot read the draft while Pastor oversight can.
 
 ## Implementation Notes
+
+- Server: one migration with three tables (programmes, parts with stable ids and `removed_at`, a content-free audit), `app.cells_free_text` for printable, length-limited text, three commands through the existing dispatch (`revision_required` false for `create_programme`), the in-scope recheck for aggregate `cells_programme`, and `api.cells_programme(meeting_id)` (full for leader/assistant and the Pastor role, metadata for an Admin-only reader, 403 `not_granted` otherwise). Part errors are keyed `parts.<index>` (the 1.4 envelope allows any snake_case token as a code and free-form keys). `cells_erase_member` extended. It also carries the 5.2 review fixes (see the 5.2 plan's triage log).
+- pgTAP `supabase/tests/cells_programmes_test.sql` (40); the 5.2 file gains the review-fix cases (45); the command-foundation ledger lists `api/app.cells_programme`.
+- Clients: `domain/cell_programmes.dart` (`ProgrammeRead`, `CellProgramme`, `ProgrammePart`, `ProgrammeRosterMember`, `ProgrammePartDraft`), `CellProgrammeController` (autoDispose family by meeting id), `PlanMeetingScreen` at `/cells/meetings/:meetingId/plan` (taste rules: the state and the gap count first, colour only on gaps and errors, the save one click away, honest read-only and metadata states), **Plan** on meeting rows. Tests: `test/identity/cell_programmes_test.dart` (16) and one 5.2 chip test.
+- E2E `tools/identity-e2e/cells-programmes.mjs` (11 checks) with offline `cells-programmes.test.mjs`; numbers `+44 7700 900010-900019`. Regression runs of the 5.1, 5.2 and 2.6 E2Es are in `evidence-5.3/`.
 
 ## Plan Change Log
 

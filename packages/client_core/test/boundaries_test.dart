@@ -50,7 +50,7 @@ void main() {
   test('only adapters and the composition root reach Supabase or adapters', () {
     final offenders = <String, List<String>>{};
     for (final f in _dart('lib')) {
-      final path = f.path.replaceAll(r'\\', '/');
+      final path = f.path.replaceAll('\\', '/');
       if (exempt(path)) continue;
       final v = boundaryViolations(path, f.readAsStringSync());
       if (v.isNotEmpty) offenders[path] = v;
@@ -120,9 +120,9 @@ void main() {
   test('no client persistence API anywhere else in the package', () {
     final offenders = [
       for (final f in _dart('lib'))
-        if (!authSessionStorageFiles.contains(f.path.replaceAll(r'\\', '/')) &&
-            !recoveryVerifierFiles.contains(f.path.replaceAll(r'\\', '/')) &&
-            f.path.replaceAll(r'\\', '/') != 'lib/composition.dart' &&
+        if (!authSessionStorageFiles.contains(f.path.replaceAll('\\', '/')) &&
+            !recoveryVerifierFiles.contains(f.path.replaceAll('\\', '/')) &&
+            f.path.replaceAll('\\', '/') != 'lib/composition.dart' &&
             _persistence.hasMatch(f.readAsStringSync()))
           f.path,
     ];

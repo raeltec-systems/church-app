@@ -581,9 +581,9 @@ void main() {
       expect(byKey('my-cell-next-meeting'), findsOneWidget);
       expect(
         tester.widget<Text>(byKey('my-cell-next-when')).data,
-        contains('18:00-19:30'),
+        contains('18:00–19:30'),
       );
-      expect(find.text('Venue: SYNTHETIC 12 Shikoswe Road'), findsOneWidget);
+      expect(find.text('SYNTHETIC 12 Shikoswe Road'), findsOneWidget);
       expect(find.text('Map pin: -15.77123, 28.18456'), findsOneWidget);
       expect(byKey('my-cell-cancelled-$_cancelled'), findsOneWidget);
     });

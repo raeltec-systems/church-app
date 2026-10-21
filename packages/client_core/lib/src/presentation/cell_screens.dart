@@ -13,6 +13,7 @@ import '../domain/cell_programmes.dart';
 import '../domain/church_time.dart';
 import '../domain/duties.dart';
 import '../domain/membership_application.dart';
+import 'church_widgets.dart';
 
 // Story 2.6: cell setup and confirmation on staff web (Admin, leaders) and
 // the member's own cell on mobile. Every list comes from a server-checked
@@ -317,12 +318,17 @@ class _CellsPage<T> extends ConsumerStatefulWidget {
     required this.needs,
     required this.loading,
     required this.body,
+    this.tabRoot = false,
   });
 
   final String title;
   final NotifierProvider<CellsController<T>, CellsState<T>> provider;
   final String needs;
   final String loading;
+
+  /// A member tab (My duties, My cell): the handoff's in-page title with a
+  /// refresh button and pull to refresh instead of an app bar and Reload.
+  final bool tabRoot;
   final Widget Function(BuildContext context, T value, CellsState<T> state)
   body;
 
@@ -428,6 +434,14 @@ class _CellsPageState<T> extends ConsumerState<_CellsPage<T>> {
     } else {
       children.add(_readProblem(result, widget.needs));
     }
+    if (widget.tabRoot) {
+      return MemberTabPage(
+        title: widget.title,
+        reloadKey: const Key('cells-reload'),
+        onReload: s.loading || s.busy ? null : ctl.reload,
+        children: children,
+      );
+    }
     children.addAll([
       const SizedBox(height: ChurchGeometry.sectionGap),
       Align(
@@ -470,20 +484,12 @@ class _Card extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    final c = ChurchColors.of(context);
-    return Material(
-      color: c.surface,
-      shape: RoundedRectangleBorder(
-        side: BorderSide(color: c.line),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(ChurchGeometry.cardPadding),
-        child: child,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => ChurchCard(
+    radius: identical(ChurchLayout.of(context), ChurchLayout.staff)
+        ? 12
+        : ChurchGeometry.mobileCardRadius,
+    child: child,
+  );
 }
 
 Widget _heading(BuildContext context, String text, {Key? key}) => Padding(
@@ -1202,6 +1208,7 @@ class MyCellScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _CellsPage<MyCellView>(
     title: 'My cell',
+    tabRoot: true,
     provider: myCellProvider,
     needs: 'Your cell is shown once you have member access.',
     loading: 'Loading your cell…',
@@ -1220,6 +1227,31 @@ class _MyCellBody extends ConsumerStatefulWidget {
 
 class _MyCellBodyState extends ConsumerState<_MyCellBody> {
   String? _optionId;
+  bool _changing = false;
+
+  /// A quiet pill on the navy hero.
+  Widget _heroPill(String text, {IconData? icon}) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(99),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 14, color: Colors.white),
+          const SizedBox(width: 4),
+        ],
+        Flexible(
+          child: Text(
+            text,
+            style: ChurchType.chip.copyWith(color: Colors.white),
+          ),
+        ),
+      ],
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -1237,14 +1269,90 @@ class _MyCellBodyState extends ConsumerState<_MyCellBody> {
     for (final o in choices) {
       if (o.cellId == _optionId) picked = o;
     }
+    final soft = Colors.white.withValues(alpha: 0.8);
+    // Story 2.6: no request form until the member asks for it (a member with
+    // no cell sees it straight away).
+    final showForm = primary == null || _changing;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        KeyedSubtree(
+          key: const Key('my-cell-current'),
+          child: primary == null
+              ? _Card(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _heading(context, 'Cell group'),
+                      const Text(
+                        'No confirmed cell yet.',
+                        key: Key('my-cell-none'),
+                      ),
+                      const SizedBox(height: 8),
+                      _muted(
+                        context,
+                        'Your church membership and your cell are confirmed '
+                        'separately.',
+                      ),
+                    ],
+                  ),
+                )
+              : HeroCard(
+                  ringAtTop: true,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'MY CELL',
+                        style: ChurchType.eyebrow.copyWith(color: soft),
+                      ),
+                      const SizedBox(height: 8),
+                      Semantics(
+                        header: true,
+                        child: Text(
+                          primary.label,
+                          key: const Key('my-cell-label'),
+                          style: ChurchType.mobileScreenTitle.copyWith(
+                            color: Colors.white,
+                            fontSize: 24,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        primary.broadArea,
+                        style: ChurchType.body.copyWith(color: soft),
+                      ),
+                      const SizedBox(height: 14),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: [
+                          _heroPill('Confirmed', icon: Icons.check),
+                          if (DateTime.tryParse(primary.since) case final at?)
+                            _heroPill(
+                              'Member since '
+                              '${_monthsShort[ChurchTime.wall(at).month - 1]} '
+                              '${ChurchTime.wall(at).year}',
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Your church membership and your cell are confirmed '
+                        'separately.',
+                        style: ChurchType.secondary.copyWith(color: soft),
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+        const SizedBox(height: 16),
         // Story 5.1: when and where the cell meets next is the member's
-        // first question, so it leads the screen.
+        // first question after which cell.
         if (cell.meetings case final meetings?) ...[
           _NextMeetingCard(meetings: meetings),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           // Story 5.5: the next meeting's programme, the member's own part
           // first ("You're on") with its real answer.
           if (meetings.next case final next?) ...[
@@ -1252,31 +1360,9 @@ class _MyCellBodyState extends ConsumerState<_MyCellBody> {
               key: ValueKey('my-cell-programme-${next.meetingId}'),
               meetingId: next.meetingId,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
           ],
         ],
-        _Card(
-          key: const Key('my-cell-current'),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _heading(context, 'Cell group'),
-              if (primary == null)
-                const Text('No confirmed cell yet.', key: Key('my-cell-none'))
-              else ...[
-                Text(primary.label, key: const Key('my-cell-label')),
-                Text('Area: ${primary.broadArea}'),
-                const StatusLabel(label: 'Confirmed', tone: StatusTone.success),
-              ],
-              const SizedBox(height: 8),
-              _muted(
-                context,
-                'Your church membership and your cell are confirmed '
-                'separately.',
-              ),
-            ],
-          ),
-        ),
         const SizedBox(height: 12),
         if (open != null)
           _Card(
@@ -1322,70 +1408,107 @@ class _MyCellBodyState extends ConsumerState<_MyCellBody> {
                 tone: StatusTone.neutral,
               ),
             ),
-          _Card(
-            key: const Key('my-cell-change'),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _heading(
-                  context,
-                  primary == null ? 'Ask to join a cell' : 'Ask to change cell',
+          if (!showForm)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: FocusRing(
+                child: OutlinedButton.icon(
+                  key: const Key('my-cell-change-open'),
+                  onPressed: widget.busy
+                      ? null
+                      : () => setState(() => _changing = true),
+                  icon: const Icon(Icons.swap_horiz),
+                  label: const Text('Ask to change cell'),
                 ),
-                if (optionsRead is! AccessReadOk<List<CellOption>>) ...[
-                  // The chooser read failed or was refused: say so, never
-                  // pretend that no cells are listed.
-                  KeyedSubtree(
-                    key: const Key('my-cell-options-problem'),
-                    child: _readProblem(
-                      optionsRead,
-                      'The cell list is not available to you.',
-                    ),
+              ),
+            )
+          else
+            _Card(
+              key: const Key('my-cell-change'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _heading(
+                    context,
+                    primary == null
+                        ? 'Ask to join a cell'
+                        : 'Ask to change cell',
                   ),
+                  if (optionsRead is! AccessReadOk<List<CellOption>>) ...[
+                    // The chooser read failed or was refused: say so, never
+                    // pretend that no cells are listed.
+                    KeyedSubtree(
+                      key: const Key('my-cell-options-problem'),
+                      child: _readProblem(
+                        optionsRead,
+                        'The cell list is not available to you.',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    FocusRing(
+                      child: OutlinedButton.icon(
+                        key: const Key('my-cell-options-retry'),
+                        onPressed: widget.busy ? null : ctl.reload,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Try again'),
+                      ),
+                    ),
+                  ] else if (choices.isEmpty)
+                    const Text(
+                      'No other cells are listed right now.',
+                      key: Key('my-cell-no-options'),
+                    )
+                  else
+                    RadioGroup<String>(
+                      groupValue: _optionId,
+                      onChanged: (v) {
+                        if (!widget.busy) setState(() => _optionId = v);
+                      },
+                      child: Column(
+                        children: [
+                          for (final o in choices)
+                            RadioListTile<String>(
+                              key: Key('my-cell-option-${o.cellId}'),
+                              value: o.cellId,
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(o.label),
+                              subtitle: Text(o.broadArea),
+                            ),
+                        ],
+                      ),
+                    ),
                   const SizedBox(height: 8),
-                  FocusRing(
-                    child: OutlinedButton.icon(
-                      key: const Key('my-cell-options-retry'),
-                      onPressed: widget.busy ? null : ctl.reload,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Try again'),
-                    ),
-                  ),
-                ] else if (choices.isEmpty)
-                  const Text(
-                    'No other cells are listed right now.',
-                    key: Key('my-cell-no-options'),
-                  )
-                else
-                  RadioGroup<String>(
-                    groupValue: _optionId,
-                    onChanged: (v) {
-                      if (!widget.busy) setState(() => _optionId = v);
-                    },
-                    child: Column(
-                      children: [
-                        for (final o in choices)
-                          RadioListTile<String>(
-                            key: Key('my-cell-option-${o.cellId}'),
-                            value: o.cellId,
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(o.label),
-                            subtitle: Text(o.broadArea),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FocusRing(
+                        child: FilledButton(
+                          key: const Key('my-cell-send'),
+                          onPressed: widget.busy || picked == null
+                              ? null
+                              : () => ctl.requestChange(cell, picked!),
+                          child: const Text('Send request'),
+                        ),
+                      ),
+                      if (primary != null)
+                        FocusRing(
+                          child: TextButton(
+                            key: const Key('my-cell-change-close'),
+                            onPressed: widget.busy
+                                ? null
+                                : () => setState(() {
+                                    _changing = false;
+                                    _optionId = null;
+                                  }),
+                            child: const Text('Not now'),
                           ),
-                      ],
-                    ),
+                        ),
+                    ],
                   ),
-                FocusRing(
-                  child: FilledButton(
-                    key: const Key('my-cell-send'),
-                    onPressed: widget.busy || picked == null
-                        ? null
-                        : () => ctl.requestChange(cell, picked!),
-                    child: const Text('Send request'),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
         ],
       ],
     );
@@ -1406,15 +1529,48 @@ String _meetingClock(BuildContext context, DateTime at) {
   );
 }
 
+const _monthsShort = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/// "Friday 27 Feb" in church time.
 String _meetingDay(BuildContext context, DateTime at) {
   final w = ChurchTime.wall(at);
-  return '${weekdayName(w.weekday)} '
-      '${MaterialLocalizations.of(context).formatMediumDate(w)}';
+  return '${weekdayName(w.weekday)} ${w.day} ${_monthsShort[w.month - 1]}';
 }
 
+/// "Friday 27 Feb · 18:00–19:30" in church time.
 String _meetingWhen(BuildContext context, CellMeeting m) =>
-    '${_meetingDay(context, m.startsAt)}, ${_meetingClock(context, m.startsAt)}'
-    '-${_meetingClock(context, m.endsAt)}';
+    '${_meetingDay(context, m.startsAt)} · ${_meetingClock(context, m.startsAt)}'
+    '–${_meetingClock(context, m.endsAt)}';
+
+/// An icon and a line (venue, map pin) in a meeting card.
+Widget _infoRow(BuildContext context, IconData icon, Widget text, {Key? key}) {
+  final c = ChurchColors.of(context);
+  return Padding(
+    key: key,
+    padding: const EdgeInsets.only(top: 10),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ExcludeSemantics(child: Icon(icon, size: 20, color: c.muted)),
+        const SizedBox(width: 10),
+        Expanded(child: text),
+      ],
+    ),
+  );
+}
 
 /// Story 5.1, staff web: each cell's weekly schedule and its meetings for
 /// the next 12 weeks. An Admin sets the schedule (and sees only that a
@@ -2073,21 +2229,23 @@ class _NextMeetingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
     final next = meetings.next;
     return _Card(
       key: const Key('my-cell-next-meeting'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _heading(context, 'Next meeting'),
-          for (final c in meetings.cancelled)
+          const CardLabel('Next meeting'),
+          const SizedBox(height: 12),
+          for (final m in meetings.cancelled)
             Padding(
-              padding: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.only(bottom: 8),
               child: StatusLabel(
-                key: Key('my-cell-cancelled-${c.meetingId}'),
+                key: Key('my-cell-cancelled-${m.meetingId}'),
                 label:
-                    'Cancelled: ${_meetingDay(context, c.nominalStartsAt)}, '
-                    '${_meetingClock(context, c.nominalStartsAt)}',
+                    'Cancelled: ${_meetingDay(context, m.nominalStartsAt)}, '
+                    '${_meetingClock(context, m.nominalStartsAt)}',
                 tone: StatusTone.neutral,
               ),
             ),
@@ -2097,27 +2255,55 @@ class _NextMeetingCard extends StatelessWidget {
               key: Key('my-cell-no-meeting'),
             )
           else ...[
-            Text(
-              _meetingWhen(context, next),
-              key: const Key('my-cell-next-when'),
-              style: ChurchType.sectionTitle.copyWith(
-                color: ChurchColors.of(context).ink,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ChurchDateBadge(at: next.startsAt, tone: DateBadgeTone.info),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        weekdayName(ChurchTime.wall(next.startsAt).weekday),
+                        style: ChurchType.itemTitle.copyWith(color: c.ink),
+                      ),
+                      Text(
+                        _meetingWhen(context, next),
+                        key: const Key('my-cell-next-when'),
+                        style: ChurchType.secondary.copyWith(color: c.muted),
+                      ),
+                      if (next.moved) ...[
+                        const SizedBox(height: 6),
+                        const StatusLabel(
+                          label: 'Moved from its usual time',
+                          tone: StatusTone.warning,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
-            if (next.moved)
-              const StatusLabel(
-                label: 'Moved from its usual time',
-                tone: StatusTone.warning,
-              ),
             if (next.venue case final v?)
-              Text('Venue: $v', key: const Key('my-cell-next-venue')),
+              _infoRow(
+                context,
+                Icons.place_outlined,
+                Text(v, style: ChurchType.body.copyWith(color: c.ink)),
+                key: const Key('my-cell-next-venue'),
+              ),
             if (next.mapPin case final pin?)
-              SelectableText(
-                'Map pin: ${pin.text}',
-                key: const Key('my-cell-next-pin'),
+              _infoRow(
+                context,
+                Icons.near_me_outlined,
+                SelectableText(
+                  'Map pin: ${pin.text}',
+                  key: const Key('my-cell-next-pin'),
+                  style: ChurchType.secondary.copyWith(color: c.ink),
+                ),
               ),
           ],
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           _muted(
             context,
             'Church time. Only confirmed members of your cell see where it '
@@ -3912,16 +4098,23 @@ class _MyCellProgrammeCardState extends ConsumerState<_MyCellProgrammeCard> {
           // The member's first question: am I on, and have I answered?
           for (final part in p.parts)
             if (read.occurrenceOf(part.partId) case final occ?) ...[
-              _YoureOn(
-                key: Key('my-cell-yours-${part.partId}'),
-                part: part,
-                own: _ownDuty(ref, occ),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: c.blueBg,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: _YoureOn(
+                  key: Key('my-cell-yours-${part.partId}'),
+                  part: part,
+                  own: _ownDuty(ref, occ),
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
             ],
-          absence,
-          const SizedBox(height: 12),
-          _heading(context, 'Programme'),
+          const CardLabel('Programme'),
+          const SizedBox(height: 8),
           if (p.meetingChanged)
             Text(
               'The meeting moved. Your leader is updating the programme; '
@@ -3930,24 +4123,28 @@ class _MyCellProgrammeCardState extends ConsumerState<_MyCellProgrammeCard> {
               style: ChurchType.secondary.copyWith(color: c.amberFg),
             ),
           if (p.topic case final t?)
-            Text(t, style: ChurchType.cardTitle.copyWith(color: c.ink)),
+            Text(t, style: ChurchType.itemTitle.copyWith(color: c.ink)),
           if (p.scripture case final sc?)
             Text(sc, style: ChurchType.secondary.copyWith(color: c.muted)),
-          const SizedBox(height: 8),
-          for (final part in p.parts)
-            Padding(
+          const SizedBox(height: 4),
+          for (final (i, part) in p.parts.indexed)
+            Container(
               key: Key('my-cell-part-${part.partId}'),
-              padding: const EdgeInsets.only(bottom: 6),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                border: i == 0 ? null : Border(top: BorderSide(color: c.line)),
+              ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   SizedBox(
-                    width: 52,
+                    width: 56,
                     child: Text(
                       ChurchTime.timeText(part.startsAt),
-                      style: ChurchType.secondary.copyWith(
+                      style: ChurchType.mono.copyWith(
                         color: c.muted,
-                        fontFeatures: const [FontFeature.tabularFigures()],
+                        fontWeight: FontWeight.w500,
+                        height: 1.6,
                       ),
                     ),
                   ),
@@ -3955,26 +4152,45 @@ class _MyCellProgrammeCardState extends ConsumerState<_MyCellProgrammeCard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(part.label),
                         Text(
-                          read.occurrenceOf(part.partId) != null
-                              ? 'You'
-                              : part.leader ?? part.department ?? 'Open',
-                          style: ChurchType.secondary.copyWith(
-                            color: read.occurrenceOf(part.partId) != null
-                                ? c.ink
-                                : c.muted,
-                            fontWeight: read.occurrenceOf(part.partId) != null
-                                ? FontWeight.w600
-                                : null,
+                          part.label,
+                          style: ChurchType.body.copyWith(
+                            color: c.ink,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
+                        if (read.occurrenceOf(part.partId) == null)
+                          Text(
+                            part.leader ?? part.department ?? 'Open',
+                            style: ChurchType.secondary.copyWith(
+                              color: c.muted,
+                            ),
+                          ),
                       ],
                     ),
                   ),
+                  if (read.occurrenceOf(part.partId) != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: c.blueBg,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Text(
+                        'You',
+                        style: ChurchType.chip.copyWith(color: c.blueFg),
+                      ),
+                    ),
                 ],
               ),
             ),
+          const SizedBox(height: 12),
+          Divider(height: 1, color: c.line),
+          const SizedBox(height: 12),
+          absence,
         ],
       ),
     );
@@ -4007,11 +4223,18 @@ class _YoureOnState extends ConsumerState<_YoureOn> {
     final ctl = ref.read(myDutiesProvider.notifier);
     final now = DateTime.now().toUtc();
     final children = <Widget>[
-      _heading(context, 'You\'re on'),
+      Semantics(
+        header: true,
+        child: Text(
+          'You\'re on',
+          style: ChurchType.label.copyWith(color: c.blueFg),
+        ),
+      ),
+      const SizedBox(height: 4),
       Text(
-        '${part.label}, ${ChurchTime.timeText(part.startsAt)}'
-        '-${ChurchTime.timeText(part.endsAt)}',
-        style: ChurchType.sectionTitle.copyWith(color: c.ink),
+        '${part.label} · ${ChurchTime.timeText(part.startsAt)}'
+        '–${ChurchTime.timeText(part.endsAt)}',
+        style: ChurchType.itemTitle.copyWith(color: c.ink),
       ),
     ];
     switch (widget.own) {
@@ -4194,32 +4417,67 @@ class MyCellHomeCard extends ConsumerWidget {
     if (view == null || view.cell.primary == null || next == null) {
       return const SizedBox.shrink();
     }
-    return Padding(
-      padding: const EdgeInsets.only(bottom: ChurchGeometry.sectionGap),
-      child: _Card(
-        key: const Key('home-my-cell'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _heading(context, 'My cell'),
-            Text(
-              _meetingWhen(context, next),
-              key: const Key('home-my-cell-when'),
-              style: ChurchType.sectionTitle.copyWith(
-                color: ChurchColors.of(context).ink,
+    final c = ChurchColors.of(context);
+    return _Card(
+      key: const Key('home-my-cell'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            header: true,
+            child: Text(
+              'My cell',
+              style: ChurchType.cardTitle.copyWith(color: c.ink),
+            ),
+          ),
+          Text(
+            view.cell.primary!.label,
+            style: ChurchType.secondary.copyWith(color: c.muted),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ChurchDateBadge(at: next.startsAt, tone: DateBadgeTone.info),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _meetingWhen(context, next),
+                      key: const Key('home-my-cell-when'),
+                      style: ChurchType.itemTitle.copyWith(color: c.ink),
+                    ),
+                    if (next.venue case final v?)
+                      Text(
+                        v,
+                        style: ChurchType.secondary.copyWith(color: c.muted),
+                      ),
+                    const SizedBox(height: 6),
+                    _HomeYoureOn(meetingId: next.meetingId),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          FocusRing(
+            child: TextButton(
+              key: const Key('home-my-cell-open'),
+              style: TextButton.styleFrom(padding: EdgeInsets.zero),
+              onPressed: () => context.go(CellPaths.myCell),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(child: Text('Open My cell')),
+                  SizedBox(width: 4),
+                  Icon(Icons.arrow_forward, size: 18),
+                ],
               ),
             ),
-            _HomeYoureOn(meetingId: next.meetingId),
-            const SizedBox(height: 8),
-            FocusRing(
-              child: TextButton(
-                key: const Key('home-my-cell-open'),
-                onPressed: () => context.go(CellPaths.myCell),
-                child: const Text('Open My cell'),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

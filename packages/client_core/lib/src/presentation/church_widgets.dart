@@ -42,6 +42,86 @@ class ChurchDateBadge extends StatelessWidget {
   }
 }
 
+/// A member tab's page (design handoff): no app bar, the 28/700 title in
+/// brand with a refresh button beside it, pull to refresh, 16 px gutters.
+/// Pushed detail screens keep their app bar and back chevron.
+class MemberTabPage extends StatelessWidget {
+  const MemberTabPage({
+    super.key,
+    required this.title,
+    required this.reloadKey,
+    required this.onReload,
+    required this.children,
+    this.bottom,
+  });
+
+  final String title;
+  final Key reloadKey;
+
+  /// Null while a read or command is under way.
+  final VoidCallback? onReload;
+  final List<Widget> children;
+  final Widget? bottom;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final layout = ChurchLayout.of(context);
+    return Scaffold(
+      bottomNavigationBar: bottom,
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          onRefresh: () async => onReload?.call(),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
+                child: DefaultTextStyle.merge(
+                  style: layout.body.copyWith(color: c.ink),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Semantics(
+                              header: true,
+                              child: Text(
+                                title,
+                                style: ChurchType.mobileScreenTitle.copyWith(
+                                  color: c.brand,
+                                ),
+                              ),
+                            ),
+                          ),
+                          FocusRing(
+                            radius: 22,
+                            child: IconButton(
+                              key: reloadKey,
+                              tooltip: 'Reload',
+                              onPressed: onReload,
+                              icon: const Icon(Icons.refresh),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      ...children,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Two initials for an avatar: first letters of the first and last words,
 /// skipping the "SYNTHETIC" marker of test records.
 String avatarInitials(String name) {

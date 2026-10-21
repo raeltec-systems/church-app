@@ -520,6 +520,7 @@ class _DutiesPage<T> extends ConsumerStatefulWidget {
     required this.needs,
     required this.loading,
     required this.body,
+    this.tabRoot = false,
     this.footer,
   });
 
@@ -527,6 +528,10 @@ class _DutiesPage<T> extends ConsumerStatefulWidget {
   final NotifierProvider<DutiesController<T>, DutiesState<T>> provider;
   final String needs;
   final String loading;
+
+  /// A member tab (My duties, My cell): the handoff's in-page title with a
+  /// refresh button and pull to refresh instead of an app bar and Reload.
+  final bool tabRoot;
   final Widget Function(BuildContext context, T value, DutiesState<T> state)
   body;
 
@@ -652,6 +657,14 @@ class _DutiesPageState<T> extends ConsumerState<_DutiesPage<T>> {
     } else {
       children.add(_readProblem(result, widget.needs));
     }
+    if (widget.tabRoot) {
+      return MemberTabPage(
+        title: widget.title,
+        reloadKey: const Key('duties-reload'),
+        onReload: s.loading || s.busy ? null : ctl.reload,
+        children: children,
+      );
+    }
     children.addAll([
       const SizedBox(height: ChurchGeometry.sectionGap),
       Align(
@@ -699,20 +712,12 @@ class _Card extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    final c = ChurchColors.of(context);
-    return Material(
-      color: c.surface,
-      shape: RoundedRectangleBorder(
-        side: BorderSide(color: c.line),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(ChurchGeometry.cardPadding),
-        child: child,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => ChurchCard(
+    radius: identical(ChurchLayout.of(context), ChurchLayout.staff)
+        ? 12
+        : ChurchGeometry.mobileCardRadius,
+    child: child,
+  );
 }
 
 Widget _heading(BuildContext context, String text, {Key? key}) => Padding(
@@ -2356,6 +2361,7 @@ class MyDutiesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _DutiesPage<MyDuties>(
     title: assignmentId == null ? 'My duties' : 'Duty',
+    tabRoot: assignmentId == null,
     provider: myDutiesProvider,
     needs: 'Your duties are shown once you have member access.',
     loading: 'Loading your duties…',
@@ -2506,15 +2512,6 @@ class _MyDutiesListState extends ConsumerState<_MyDutiesList> {
             'Update the app to see them.',
             key: Key('my-duties-skipped'),
           ),
-        // Story 4.10: the member's own assignment history.
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: TextButton(
-            key: const Key('my-duties-history'),
-            onPressed: () => context.go(DutyPaths.history),
-            child: const Text('My duty history'),
-          ),
-        ),
         RadioSegments<_Segment>(
           key: const Key('my-duties-segments'),
           label: 'Show',
@@ -2585,6 +2582,18 @@ class _MyDutiesListState extends ConsumerState<_MyDutiesList> {
           ),
           const SizedBox(height: 12),
         ],
+        // Story 4.10: the member's own assignment history, under the list.
+        const SizedBox(height: 4),
+        ChurchCard(
+          padding: EdgeInsets.zero,
+          child: MenuRow(
+            key: const Key('my-duties-history'),
+            label: 'My duty history',
+            meta: 'All past duties',
+            showDivider: false,
+            onTap: () => context.go(DutyPaths.history),
+          ),
+        ),
       ],
     );
   }

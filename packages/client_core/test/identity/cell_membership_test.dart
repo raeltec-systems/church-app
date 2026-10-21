@@ -470,6 +470,9 @@ void main() {
         ),
       );
       expect(byKey('my-cell-label'), findsOneWidget);
+      // The form opens on request for a member who already has a cell.
+      expect(byKey('my-cell-change'), findsNothing);
+      await tapKey(tester, 'my-cell-change-open');
       // The current cell is not offered again.
       expect(
         byKey('my-cell-option-${syntheticCellOptions.first.cellId}'),

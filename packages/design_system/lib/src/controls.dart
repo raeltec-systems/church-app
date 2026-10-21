@@ -112,8 +112,12 @@ class RadioSegments<T> extends StatelessWidget {
         ),
         child: Row(
           children: [
+            // Each segment's share follows its label, so a long label
+            // ("Needs a response (2)") is not squeezed to the width of a
+            // short one ("Past (1)").
             for (final o in options)
               Expanded(
+                flex: o.label.length < 6 ? 6 : o.label.length,
                 child: FocusRing(
                   radius: 13,
                   child: TextButton(

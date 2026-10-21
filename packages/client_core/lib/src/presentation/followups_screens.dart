@@ -363,23 +363,15 @@ class _Card extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    final c = ChurchColors.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: c.surface,
-        shape: RoundedRectangleBorder(
-          side: BorderSide(color: c.line),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(ChurchGeometry.cardPadding),
-          child: child,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: ChurchCard(
+      radius: identical(ChurchLayout.of(context), ChurchLayout.staff)
+          ? 12
+          : ChurchGeometry.mobileCardRadius,
+      child: child,
+    ),
+  );
 }
 
 Widget _heading(BuildContext context, String text, {Key? key}) => Padding(
@@ -626,43 +618,36 @@ class _MyFollowUpsHomeCardState extends ConsumerState<MyFollowUpsHomeCard> {
         );
       case AccessReadOk():
         // Review N6: nothing active, but finished work stays reachable.
-        return Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: FocusRing(
-              child: TextButton.icon(
-                key: const Key('home-followups-link'),
-                onPressed: () => context.go(FollowUpPaths.mine),
-                icon: const Icon(Icons.checklist_outlined),
-                label: const Text('My follow-ups'),
-              ),
-            ),
+        return ChurchCard(
+          padding: EdgeInsets.zero,
+          child: MenuRow(
+            key: const Key('home-followups-link'),
+            label: 'My follow-ups',
+            meta: 'Nothing open',
+            showDivider: false,
+            onTap: () => context.go(FollowUpPaths.mine),
           ),
         );
       default:
         // Loading or denied: nothing is shown.
         return const SizedBox.shrink(key: Key('home-followups-none'));
     }
-    return Padding(
-      padding: const EdgeInsets.only(top: ChurchGeometry.sectionGap),
-      child: _Card(
-        key: const Key('home-followups-card'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _heading(context, 'My follow-ups'),
-            ...lines,
-            const SizedBox(height: 8),
-            FocusRing(
-              child: TextButton(
-                key: const Key('home-followups-see-all'),
-                onPressed: () => context.go(FollowUpPaths.mine),
-                child: const Text('See all'),
-              ),
+    return _Card(
+      key: const Key('home-followups-card'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _heading(context, 'My follow-ups'),
+          ...lines,
+          const SizedBox(height: 8),
+          FocusRing(
+            child: TextButton(
+              key: const Key('home-followups-see-all'),
+              onPressed: () => context.go(FollowUpPaths.mine),
+              child: const Text('See all'),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

@@ -169,7 +169,7 @@ void main() {
       await tapKey(tester, 'submit-button');
       h.auth.succeed(_applicant);
       await settleShort(tester);
-      expect(find.text('My membership'), findsWidgets);
+      expect(find.text('Account'), findsWidgets);
     });
   });
 
@@ -455,7 +455,7 @@ void main() {
     await tapKey(tester, 'submit-button');
     h.auth.succeed(_applicant);
     await settleShort(tester);
-    expect(find.text('My membership'), findsWidgets);
+    expect(find.text('Account'), findsWidgets);
     h.memberAccess.answer(
       const MemberAccessDenied(MemberAccessDenial.notLinked),
     );

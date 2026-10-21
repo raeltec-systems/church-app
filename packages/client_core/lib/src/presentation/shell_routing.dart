@@ -323,6 +323,7 @@ GoRouter buildClientRouter({
           AccountScreen(
             linkMembershipRequest: membershipRequests,
             linkRecoveryEmail: membershipRequests,
+            memberMenu: memberHome,
           ),
         ),
       ),

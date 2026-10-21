@@ -293,6 +293,38 @@ void main() {
     handle.dispose();
   });
 
+  testWidgets(
+    'Account opens over Home with a back arrow and the member\'s places',
+    (tester) async {
+      await pumpMember(tester, size: const Size(390, 1400));
+      await tapKey(tester, 'nav-/account');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('member-summary')), findsOneWidget);
+      expect(find.text('+12025550101'), findsOneWidget);
+      for (final key in [
+        'go-my-duties',
+        'go-duty-history',
+        'go-my-cell',
+        'go-my-followups',
+        'go-notification-settings',
+        'go-sign-in-details',
+        'go-recovery-email',
+        'go-my-access',
+        'sign-out',
+        'go-delete-account',
+      ]) {
+        expect(find.byKey(Key(key)), findsOneWidget, reason: key);
+      }
+      // Pushed over Home: back returns there.
+      expect(find.byType(BackButton), findsOneWidget);
+      await tapKey(tester, 'go-duty-history');
+      await tester.pumpAndSettle();
+      expect(find.text('My duty history'), findsOneWidget);
+      expect(find.byType(BackButton), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('a member gets the Home, Duties and My cell tabs', (
     tester,
   ) async {
@@ -322,11 +354,11 @@ void main() {
       for (var i = 0; i < 3; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
-      expect(find.text('My membership'), findsWidgets);
+      expect(find.text('Account'), findsWidgets);
       h.memberAccess.answer(MemberAccessGranted(syntheticMemberSummary()));
       await tester.pumpAndSettle();
       expect(find.text('SYNTHETIC Member One'), findsOneWidget);
-      expect(find.text('Sign-in username: +12025550101'), findsOneWidget);
+      expect(find.text('+12025550101'), findsOneWidget);
 
       await tapKey(tester, 'sign-out');
       await tester.pumpAndSettle();

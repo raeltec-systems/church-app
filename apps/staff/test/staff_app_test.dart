@@ -233,11 +233,11 @@ void main() {
       for (var i = 0; i < 3; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
-      expect(find.text('My membership'), findsWidgets);
+      expect(find.text('Account'), findsWidgets);
       h.memberAccess.answer(MemberAccessGranted(syntheticMemberSummary()));
       await tester.pumpAndSettle();
       expect(find.text('SYNTHETIC Member One'), findsOneWidget);
-      expect(find.text('Sign-in username: +12025550101'), findsOneWidget);
+      expect(find.text('+12025550101'), findsOneWidget);
 
       await tapKey(tester, 'sign-out');
       await tester.pumpAndSettle();

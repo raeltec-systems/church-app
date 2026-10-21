@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../application/inbox_controllers.dart';
 import '../domain/access_grants.dart';
+import '../domain/church_time.dart';
 import '../domain/inbox.dart';
 import 'shell_routing.dart';
 
@@ -79,14 +80,23 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
       children.add(_problem(s.result!, 'inbox'));
     } else if (inbox.items.isEmpty) {
       children.add(
-        const RequestStateBanner(
-          key: Key('inbox-empty'),
-          tone: StatusTone.neutral,
-          icon: Icons.inbox_outlined,
-          title: 'Nothing waiting for you',
-          message:
-              'Reminders for you appear here, even when notifications '
-              'are turned off on this device.',
+        ChurchCard(
+          key: const Key('inbox-empty'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Nothing waiting for you',
+                style: ChurchType.itemTitle.copyWith(color: c.ink),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Reminders for you appear here, even when notifications are '
+                'turned off on this device.',
+                style: ChurchType.secondary.copyWith(color: c.muted),
+              ),
+            ],
+          ),
         ),
       );
     } else {
@@ -104,21 +114,33 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           const SizedBox(height: 12),
         ]);
       }
-      children.add(
-        Semantics(
-          header: true,
-          child: Text(
+      final unread = inbox.items.where((i) => i.opened == false).length;
+      children.addAll([
+        Text(
+          [
             inbox.items.length == 1
                 ? '1 reminder'
-                : '${inbox.items.length}${inbox.next == null ? '' : '+'} reminders',
-            key: const Key('inbox-count'),
-            style: ChurchType.cardTitle.copyWith(color: c.ink),
+                : '${inbox.items.length}${inbox.next == null ? '' : '+'} '
+                      'reminders',
+            if (unread > 0) '$unread new',
+          ].join(' · '),
+          key: const Key('inbox-count'),
+          style: ChurchType.secondary.copyWith(color: c.muted),
+        ),
+        const SizedBox(height: 10),
+        ChurchCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (final (i, item) in inbox.items.indexed) ...[
+                if (i > 0) Divider(height: 1, indent: 34, color: c.line),
+                _InboxTile(item: item),
+              ],
+            ],
           ),
         ),
-      );
-      for (final item in inbox.items) {
-        children.addAll([const SizedBox(height: 12), _InboxTile(item: item)]);
-      }
+      ]);
       if (s.olderFailed) {
         children.addAll([
           const SizedBox(height: 12),
@@ -137,7 +159,7 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: FocusRing(
-              child: OutlinedButton.icon(
+              child: TextButton.icon(
                 key: const Key('inbox-older'),
                 onPressed: s.loading
                     ? null
@@ -150,34 +172,32 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         ]);
       }
     }
-    children.addAll([
-      const SizedBox(height: ChurchGeometry.sectionGap),
-      Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: [
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Inbox'),
+        actions: [
           FocusRing(
-            child: OutlinedButton.icon(
+            radius: 22,
+            child: IconButton(
               key: const Key('refresh-inbox'),
+              tooltip: 'Check again',
               onPressed: s.loading ? null : _refresh,
               icon: const Icon(Icons.refresh),
-              label: const Text('Check again'),
             ),
           ),
           // Story 3.7: push settings by category.
           FocusRing(
-            child: OutlinedButton.icon(
+            radius: 22,
+            child: IconButton(
               key: const Key('open-notification-settings'),
+              tooltip: 'Notification settings',
               onPressed: () => context.push(ClientPaths.notificationSettings),
-              icon: const Icon(Icons.notifications_active_outlined),
-              label: const Text('Notification settings'),
+              icon: const Icon(Icons.tune),
             ),
           ),
+          const SizedBox(width: 4),
         ],
       ),
-    ]);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Inbox')),
       body: SafeArea(
         // Story 3.7: pull down to ask the server again (also on open, on
         // resume, on the server's refresh signal and every 2 minutes).
@@ -425,6 +445,43 @@ Widget _snoozeBanner(
   };
 }
 
+/// When a reminder arrived, short: the time today, "Yesterday", the weekday
+/// this week, else the date (church time).
+String _arrived(BuildContext context, DateTime at) {
+  final w = ChurchTime.wall(at);
+  final now = ChurchTime.wall(DateTime.now());
+  final day = DateTime(w.year, w.month, w.day);
+  final today = DateTime(now.year, now.month, now.day);
+  final days = today.difference(day).inDays;
+  final l10n = MaterialLocalizations.of(context);
+  if (days <= 0) {
+    return l10n.formatTimeOfDay(
+      TimeOfDay(hour: w.hour, minute: w.minute),
+      alwaysUse24HourFormat: true,
+    );
+  }
+  if (days == 1) return 'Yesterday';
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const months = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  if (days < 7) return weekdays[w.weekday - 1];
+  return '${w.day} ${months[w.month - 1]}';
+}
+
+/// One reminder as a row: a dot while it is new, the title (bold while new),
+/// two lines of what it is about, when it arrived, and a snooze if set.
 class _InboxTile extends StatelessWidget {
   const _InboxTile({required this.item});
 
@@ -435,86 +492,100 @@ class _InboxTile extends StatelessWidget {
     final c = ChurchColors.of(context);
     final l10n = MaterialLocalizations.of(context);
     String when(DateTime at) {
-      final local = at.toLocal();
-      return '${l10n.formatMediumDate(local)} '
-          '${l10n.formatTimeOfDay(TimeOfDay.fromDateTime(local))}';
+      final w = ChurchTime.wall(at);
+      return '${l10n.formatMediumDate(w)} '
+          '${l10n.formatTimeOfDay(TimeOfDay(hour: w.hour, minute: w.minute), alwaysUse24HourFormat: true)}';
     }
 
+    final isNew = item.opened == false;
     return Semantics(
       container: true,
       button: true,
       child: InkWell(
         key: Key('open-inbox-item-${item.itemId}'),
-        borderRadius: BorderRadius.circular(12),
         onTap: () => context.push(ClientPaths.inboxItem(item.itemId)),
-        child: DecoratedBox(
+        child: Padding(
           key: Key('inbox-item-${item.itemId}'),
-          decoration: BoxDecoration(
-            color: c.surface,
-            border: Border.all(color: c.line),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.notifications_outlined, color: c.muted),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item.title,
-                        style: ChurchType.cardTitle.copyWith(color: c.ink),
+          padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Story 3.7: what the member did in the app (opened or not),
+              // never whether a push arrived or was read.
+              if (isNew)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(top: 7, end: 12),
+                  child: Semantics(
+                    key: Key('inbox-item-new-${item.itemId}'),
+                    label: 'New',
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: c.accent,
+                        shape: BoxShape.circle,
                       ),
-                      // Story 3.7: what the member did in the app, never
-                      // whether a push arrived or was read.
-                      if (item.opened != null || item.snoozedUntil != null) ...[
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 6,
-                          children: [
-                            if (item.opened == false)
-                              StatusLabel(
-                                key: Key('inbox-item-new-${item.itemId}'),
-                                label: 'New',
-                                tone: StatusTone.info,
-                              ),
-                            if (item.opened == true)
-                              StatusLabel(
-                                key: Key('inbox-item-opened-${item.itemId}'),
-                                label: 'Opened',
-                                tone: StatusTone.neutral,
-                              ),
-                            if (item.snoozedUntil != null)
-                              StatusLabel(
-                                key: Key('inbox-item-snoozed-${item.itemId}'),
-                                label:
-                                    'Snoozed until ${when(item.snoozedUntil!)}',
-                                tone: StatusTone.warning,
-                              ),
-                          ],
+                    ),
+                  ),
+                )
+              else
+                const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            key: item.opened == true
+                                ? Key('inbox-item-opened-${item.itemId}')
+                                : null,
+                            style: ChurchType.itemTitle.copyWith(
+                              color: c.ink,
+                              fontWeight: isNew
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          _arrived(context, item.deliveredAt),
+                          semanticsLabel: 'Arrived ${when(item.deliveredAt)}',
+                          style: ChurchType.figures.copyWith(
+                            color: isNew ? c.ink : c.muted,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
-                      if (item.body != null) ...[
-                        const SizedBox(height: 4),
-                        Text(item.body!),
-                      ],
-                      const SizedBox(height: 4),
-                      Text('Due ${when(item.dueAt)}'),
+                    ),
+                    if (item.body != null) ...[
+                      const SizedBox(height: 2),
                       Text(
-                        'Arrived ${when(item.deliveredAt)}',
+                        item.body!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: ChurchType.secondary.copyWith(color: c.muted),
                       ),
                     ],
-                  ),
+                    if (item.snoozedUntil != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Snoozed until ${when(item.snoozedUntil!)}',
+                        key: Key('inbox-item-snoozed-${item.itemId}'),
+                        style: ChurchType.secondary.copyWith(
+                          color: c.amberFg,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                Icon(Icons.chevron_right, color: c.muted),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

@@ -255,7 +255,7 @@ class _InboxButton extends ConsumerWidget {
         child: InkResponse(
           key: const Key('nav-/inbox'),
           radius: 22,
-          onTap: () => goFromNav(context, ClientPaths.inbox),
+          onTap: () => context.push(ClientPaths.inbox),
           child: SizedBox.square(
             dimension: ChurchGeometry.minTarget,
             child: Stack(
@@ -315,7 +315,7 @@ class _AccountButton extends ConsumerWidget {
         child: InkResponse(
           key: const Key('nav-/account'),
           radius: 22,
-          onTap: () => goFromNav(context, ClientPaths.account),
+          onTap: () => context.push(ClientPaths.account),
           child: SizedBox.square(
             dimension: ChurchGeometry.minTarget,
             child: Center(

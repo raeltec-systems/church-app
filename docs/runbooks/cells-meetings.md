@@ -727,3 +727,38 @@ Record the outcome per step in `evidence-5.9/owner-check.md` (pass/fail, device,
 
 - There is no removal from a cell without a new cell (a later Cells feature). Deactivation and deletion end the member's duties through Duties (4.12) but leave the cell membership and plan names to the deletion hook.
 - The Duties department coverage queue does not list vacated cell parts (department-only). The Cells notice and Plan meeting show them.
+
+## Story 5.10: runbooks and the synthetic cell pilot
+
+There is no migration and no client change.
+- Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-write-the-programme-runbooks-and-run-the-synthetic-cell-pilot-plan.md`.
+- Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.10/`.
+
+### The guides
+
+[cells-guides.md](cells-guides.md) holds the guides in plain language, in the order the work is done: Admin; cell leader and assistant; what members see; and the owner pilot. Each task links back to its story section here. Keep the two files in step: when a story changes a screen or a rule, update its section here and the guide task that names it.
+
+### The pilot rehearsal (`tools/identity-e2e/cells-pilot.mjs`)
+
+| Step | What it proves |
+|---|---|
+| P10 | A published programme asks each person: M and O in My duties, and X (no login) on the leader's board. |
+| P20 | The meeting moves 30 minutes and the leader publishes again. M's earlier Accept becomes `superseded` and a new pending answer replaces it. Members are told the meeting changed. |
+| P30 | M's Cannot attend notice leaves M's answer and its revision unchanged. There is no attendance table. The leader sees the part warning. |
+| P40 | X is Confirmed by leader (provenance `leader`). |
+| P50 | After the meeting it is recorded as held. X stood in for M, which shows as a substitute in the canonical reference. The assistant corrects another part to nobody, with a reason. The plan and M's answer are unchanged. |
+| P60 | There is no chat table or function, and nothing in Cells, Duties, Follow-ups, Notifications or Identity depends on the planned chat module. O reads no leader-only text and cannot open the staff programme. |
+
+```bash
+npx supabase db reset
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/cells-pilot.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+node --test tools/identity-e2e/cells-pilot.test.mjs
+```
+
+The run uses fictional numbers `+44 7700 900080-900089`. Leader-only texts start with `SYNTHETIC leader-only`, so any leak can be detected. It removes everything it created.
+
+### Staging
+
+The staging pilot is run by the owner, using the synthetic staging accounts (cells-guides.md, Owner pilot on staging). No script runs against staging from here. Results go in `evidence-5.10/owner-pilot.md`.

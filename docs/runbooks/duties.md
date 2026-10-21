@@ -1378,11 +1378,11 @@ Builds for the owner's demonstration: `evidence-4.15/builds.md` (staff web seale
 
 ## Story 5.9 contract change: a transferred member's cell parts
 
-`app.duties_owner_vacate_member {cell_id, member_id}` is called by Cells' transfer (`cells.confirm_request`). It ends the member's current assignments on that cell's own future published parts, using the 4.12 vacate scoped to one cell (`app.duties_vacate_cell_member`):
+`app.duties_owner_vacate_member {cell_id, member_id, occurrence_ids}` is called by Cells' transfer (`cells.confirm_request`). It ends the member's current assignments on the named occurrences of that cell's own published parts that have not started (the parts of the meetings still ahead), using the 4.12 vacate scoped to one cell (`app.duties_vacate_cell_member`):
 - the assignments become `superseded` with end reason `vacated` and no vacancy reason;
 - the position is left unfilled, jobs are cancelled and coverage cases close;
 - the member gets **Duty released**, and the actor is audited with capacity `lifecycle`;
-- planned positions there are cleared;
+- planned positions there are cleared; the answer lists the occurrences it ended (`occurrence_ids`);
 - department duties and other cells are untouched, and no department alert is sent (Cells tells the cell's leaders, see cells-meetings.md, story 5.9).
 
 The contract text is in contracts-and-owner-seams.md, item 8 of the owner-operations guide.

@@ -77,10 +77,28 @@ Old-cell reads are already refused at once (current membership). Register a Cell
 ## Implementation Notes
 
 - Migration: `withdrawn_reason` on notices; Duties `app.duties_vacate_cell_member` (the 4.16 vacate scoped to a cell's own parts) behind `app.duties_owner_vacate_member`; Cells source `cells_programme` / `cells_part_vacated`; `app.cells_transfer_effects` called by the re-created `cells.confirm_request`; handover hook `app.cells_report_handover`, `app.cells_handover_pending`, `cells.resolve_handover`; `handover_pending` on `app.cells_cell_json`.
-- pgTAP `cells_transfer_effects_test.sql` (39).
+- pgTAP `cells_transfer_effects_test.sql` (54 after the review).
 - Clients: `AdminCell.handoverPending`, `CellAdminController.resolveHandover`, the Admin cells "Needs a leader" label and Mark handover done; scope-loss widget tests (My cell, Plan meeting) and `cell_transfer_test.dart` (3).
 - E2E `tools/identity-e2e/cells-transfer.mjs` (7) + offline test; numbers `+44 7700 900070-900079`. Regressions: cells 13/13, cells-meeting-reminders 9/9, cells-youre-on 7/7, cells-absence 5/5, cells-meeting-records 6/6, duties-lifecycle 16/16, duties-owner-ops 13/13, lifecycle 9/9.
 
 ## Plan Change Log
 
 ## Review Triage Log
+
+Independent review of `7ac0f18..0be7e83` (2026-10-21, a separate reviewer agent; the Duties copy diffed against the 4.16 vacate: only the intended removals; no deadlock cycle with publish, save, cancel, record_actual_leaders or the Duties lifecycle hooks; grants and ASCII clean). Not yet on staging, so fixed in place:
+
+1. Medium-high, fixed: the effects worked from the parts' current (possibly unpublished) assignee. A programme published with the member then changed to someone else kept the member's published name, and one published with someone else then changed to the member lost that person's name. The Duties operation now answers the occurrences it ended. Cells un-names exactly those parts in the projection, and clears the member from planned parts separately. pgTAP: both directions.
+2. Medium, fixed: Cells and Duties cut off "future" differently (meeting start vs part start), so a meeting under way lost the member's later part duty but kept the plan. Cells now names the part occurrences of its meetings still ahead, and Duties vacates only those (`occurrence_ids`, a contract detail). pgTAP: a meeting under way keeps duties, plan and notice.
+3. Medium, fixed: notices for any meeting were closed, and without audit rows. Now only meetings still ahead are affected, each with a `notice_withdrawn` audit row naming the transfer's actor. pgTAP added.
+4. Low-medium, fixed: notices are now written before Duties, which writes Notifications. Every Cells row written after Duties (parts, projections, programmes) is locked before it.
+5. Low, fixed: the transfer key-shares the moved member's Identity row first (AD-2), as publish and cancel lock people.
+6. Low, accepted: a patched projection keeps its revision. Clients read the projection whole on every read and keep nothing by revision. The programme's revision moves.
+7. Low, accepted: after a transfer a published programme shows unpublished changes (the gap). That is intended: the leader plans the part again and republishes.
+8. Low, accepted:
+   - `cells.resolve_handover` locks obligations after the cell row. Identity's resolve takes only the obligation row, and no Identity command locks a cell row, so no cycle exists.
+   - An archived cell's pending obligation is cleared once it has a leader again. Cells cannot be archived yet.
+   - No test runs a real deletion through to a resolve: Identity's deletion tests cover recording, and the Cells resolve is tested against a recorded row.
+9. Tests:
+   - Added: a transfer confirmed by the new cell's leader (Duties records them as the actor, capacity `lifecycle`), the unpublished-change, under-way and notice cases above.
+   - Not added: a concurrent publish and transfer, and moving back (reviewer found no defect). The notifications-policy-unavailable path is unchanged code. A Home scope-loss test: Home reads the same in-memory provider as My cell, which is tested.
+   - The 5.9 client code went into the 5.8 review-fix commit `d1faec7` and is reviewed with this triage: `handoverPending` read with a default, an Admin-only button, notices for done and still no leader. Widget tests are in `cell_transfer_test.dart`.

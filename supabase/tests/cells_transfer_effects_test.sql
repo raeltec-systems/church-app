@@ -6,7 +6,7 @@
 -- published ahead is last responsible in a handover; Admin resolves a recorded one. HTTP evidence:
 -- tools/identity-e2e/cells-transfer.mjs. SYNTHETIC data only (fictional range +1 202 555 0181-0190).
 begin;
-select plan(39);
+select plan(54);
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000059' || lpad(n::text, 2, '0'))::uuid $$;
 create function pg_temp.s(n int) returns uuid language sql as
@@ -318,6 +318,69 @@ select is(pg_temp.cells(pg_temp.c(1), 'cells.resolve_handover', pg_temp.crev(pg_
 select is(pg_temp.cells(pg_temp.c(1), 'cells.resolve_handover', pg_temp.crev(pg_temp.sh()),
   jsonb_build_object('cell_id', pg_temp.sh())) #>> '{data,resolved}', '1', 'Admin resolves it: the cell has its leader');
 select is((app.cells_cell_json(pg_temp.sh()) ->> 'handover_pending'), 'false', 'and it is no longer pending');
+
+-- Review gaps: unpublished changes both ways, a meeting under way, the new cell's leader moves them --
+create function pg_temp.mtn(k int) returns uuid language sql as
+$$ select meeting_id from app.cells_meetings where cell_id = pg_temp.sh() order by occurrence_date offset k limit 1 $$;
+create function pg_temp.save(p_meeting uuid, p_a uuid, p_b uuid) returns jsonb language sql as $$
+  select pg_temp.cells(pg_temp.c(2), 'cells.save_programme', pg_temp.prev(p_meeting),
+    jsonb_build_object('programme_id', pg_temp.prog(p_meeting), 'parts', jsonb_build_array(
+      jsonb_strip_nulls(jsonb_build_object('part_id', (pg_temp.part(p_meeting, 'Opening prayer')).part_id,
+        'label', 'Opening prayer', 'start_time', '18:00', 'end_time', '18:10', 'assignee_member_id', p_a)),
+      jsonb_strip_nulls(jsonb_build_object('part_id', (pg_temp.part(p_meeting, 'Bible study')).part_id,
+        'label', 'Bible study', 'start_time', '18:10', 'end_time', '19:00', 'assignee_member_id', p_b)))))
+$$;
+create function pg_temp.leader_of(p_meeting uuid, p_label text) returns jsonb language sql as $$
+  select e -> 'leader' from app.cells_programme_projections pr, jsonb_array_elements(pr.body -> 'parts') e
+   where pr.programme_id = pg_temp.prog(p_meeting) and pr.withdrawn_at is null and e ->> 'label' = p_label
+$$;
+-- A: the next meeting's Bible study was published for member 10; an unsaved... a saved but
+-- unpublished change gives it to member 7.
+select is(pg_temp.save(pg_temp.mt(), null, pg_temp.mid(7)) ->> 'code', null, 'setup: an unpublished change to member 7');
+-- B: the fourth meeting is published with member 7 on Opening prayer; a change gives it to member 10.
+select is(pg_temp.plan(pg_temp.mtn(3), pg_temp.parts2(7, 7), true) #>> '{data,state}', 'published', 'setup: published with member 7');
+select is(pg_temp.save(pg_temp.mtn(3), pg_temp.mid(10), pg_temp.mid(7)) ->> 'code', null,
+  'setup: an unpublished change to member 10');
+-- Under way: the fifth meeting is published with member 10 on Bible study and a notice, then starts.
+select is(pg_temp.plan(pg_temp.mtn(4), pg_temp.parts2(7, 10), true) #>> '{data,state}', 'published', 'setup: published');
+select is(pg_temp.cells(pg_temp.c(10), 'cells.send_cannot_attend', null,
+  jsonb_build_object('meeting_id', pg_temp.mtn(4))) #>> '{data,state}', 'open', 'setup: member 10 sent a notice');
+update app.cells_meetings
+   set starts_at = now() - interval '5 minutes', ends_at = now() + interval '85 minutes',
+       nominal_starts_at = now() - interval '5 minutes', nominal_ends_at = now() + interval '85 minutes'
+ where meeting_id = pg_temp.mtn(4);
+create temp table during as select (pg_temp.asg(pg_temp.mtn(4), 'Bible study')).assignment_id as id;
+-- The Estates leader confirms member 10's move (the new cell's leader, not an Admin).
+create temp table req10 as select pg_temp.cells(pg_temp.c(1), 'cells.request_change',
+  (select revision from app.cells_member_states where member_id = pg_temp.mid(10)),
+  jsonb_build_object('member_id', pg_temp.mid(10), 'cell_id', pg_temp.es(),
+                     'cell_revision', app.cells_option_revision(pg_temp.es()))) as r;
+select is(pg_temp.cells(pg_temp.c(5), 'cells.confirm_request',
+  (select revision from app.cells_member_states where member_id = pg_temp.mid(10)),
+  jsonb_build_object('request_id', (select r #>> '{data,open_request,request_id}' from req10))) ->> 'code', null,
+  'the Estates leader confirms member 10''s move');
+select is(pg_temp.leader_of(pg_temp.mt(), 'Bible study'), 'null'::jsonb,
+  'A: the name members were shown (member 10, published) goes');
+select is((pg_temp.part(pg_temp.mt(), 'Bible study')).assignee_member_id, pg_temp.mid(7),
+  'A: the unpublished change to member 7 stays');
+select is(pg_temp.leader_of(pg_temp.mtn(3), 'Opening prayer'), to_jsonb('SYNTHETIC 5.9 Accountless'::text),
+  'B: member 7 published there is still shown');
+select is((pg_temp.part(pg_temp.mtn(3), 'Opening prayer')).assignee_member_id, null,
+  'B: the unpublished change to member 10 is cleared');
+select is((select assignment_state from app.duties_assignments where assignment_id = (select id from during)), 'current',
+  'a meeting under way keeps its duties (the same cut-off as the plan)');
+select is((pg_temp.part(pg_temp.mtn(4), 'Bible study')).assignee_member_id, pg_temp.mid(10),
+  'and its plan');
+select is((select notice_state from app.cells_absence_notices where member_id = pg_temp.mid(10) and meeting_id = pg_temp.mtn(4)),
+  'open', 'and a notice for it stays as it was');
+select is((select actor_member_id::text || ':' || actor_capacity from app.duties_audit
+            where action = 'assignment_vacated' and member_id = pg_temp.mid(10)
+            order by event_id desc limit 1), pg_temp.mid(5)::text || ':lifecycle',
+  'Duties records the new cell''s leader as the actor');
+select is((select count(*)::int from app.cells_absence_audit a
+            join app.cells_absence_notices n using (notice_id)
+           where n.member_id = pg_temp.mid(4) and a.action = 'notice_withdrawn' and a.actor_member_id = pg_temp.mid(1)), 1,
+  'a notice closed by a transfer has its audit row (the Admin who moved member 4)');
 
 -- Deletion ------------------------------------------------------------------------------------------------
 select is((app.cells_erase_member(jsonb_build_object('member_id', pg_temp.mid(4), 'phase', 'erase')) ->> 'remaining'), '0',

@@ -131,11 +131,11 @@ Migration: `supabase/migrations/20261015035112_duties_owner_operations.sql`. Cel
 8. **Contract changes made for epic 5:**
    - `app.duties_owner_linkable` (5.4, the table above).
    - Cell-scope `duties.confirm_by_leader` (5.5): a current leader or assistant of the part's cell confirms its assignment directly, attributed. Cells' clients send it through `duties_command`.
-   - `app.duties_owner_vacate_member {cell_id, member_id}` (5.9):
+   - `app.duties_owner_vacate_member {cell_id, member_id, occurrence_ids}` (5.9):
      - It is called by Cells' transfer inside its own transaction. Its actor is the transfer's: the new cell's leader or an Admin, who need not lead the old cell. The session rule in point 3 is replaced for this operation only, and the function is not client-executable.
-     - The member's current assignments on the cell's own future published parts end. They become `superseded` and `vacated`, with no vacancy reason, and the position is left unfilled. Their jobs are cancelled, their coverage cases close and the member gets `duty_released`.
+     - The member's current assignments on the named occurrences of the cell's own published parts that have not started end (Cells names its meetings still ahead, so both sides cut off at the meeting's start). They become `superseded` and `vacated`, with no vacancy reason, and the position is left unfilled. Their jobs are cancelled, their coverage cases close and the member gets `duty_released`.
      - Their planned positions there are cleared. There is no department alert: Cells tells its own leaders.
-     - It answers `{vacated, drafts_cleared, leader_alerts, released, notices_skipped}`.
+     - It answers `{vacated, drafts_cleared, occurrence_ids, leader_alerts, released, notices_skipped}`: `occurrence_ids` are the occurrences it ended, so Cells un-names exactly what members were shown.
 9. **Contract changes.** Epic 5 is the first real caller. A shape it needs beyond these operations (for example cell-scope leader alerts, coverage and confirmation, a discovery read of linkable duties, the creator's reminders, naming a linked duty's assignee) is a Duties contract change recorded in the 4.11 plan, never a Cells-side workaround.
 
 ## Notifications owner operations (story 3.1)

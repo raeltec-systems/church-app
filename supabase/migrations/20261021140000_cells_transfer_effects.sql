@@ -34,12 +34,13 @@ comment on column app.cells_absence_notices.withdrawn_reason is
 -- ---------------------------------------------------------------------------------------------
 
 
--- The 4.16 app.duties_vacate_member scoped to one cell's own (cell-part) occurrences: the
+-- The 4.16 app.duties_vacate_member scoped to the given occurrences of one cell's own parts: the
 -- member's current assignments on the cell's future published parts end (`superseded`,
 -- `vacated`, no vacancy reason: Cells tells its leaders itself), their planned positions there are
 -- cleared, jobs cancelled, coverage cases closed, and p_release sends `duty_released`. Same lock
 -- order and set-based statements as the department version.
-create function app.duties_vacate_cell_member(p_member uuid, p_cell uuid, p_code text,
+create function app.duties_vacate_cell_member(p_member uuid, p_cell uuid, p_occurrences uuid[],
+                                              p_code text,
                                          p_release boolean, p_actor_member uuid,
                                          p_actor_account uuid, p_capacity text, p_command text)
 returns jsonb
@@ -72,13 +73,13 @@ begin
     join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
    where a.member_id = p_member and a.assignment_state = 'current'
      and o.occurrence_state = 'published' and app.duties_occurrence_start(o) > now()
-     and o.cell_id = p_cell;
+     and o.cell_id = p_cell and o.occurrence_id = any (p_occurrences);
   select coalesce(array_agg(distinct o.occurrence_id), '{}') into v_draft
     from app.duties_slots s
     join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
    where s.draft_member_id = p_member and o.occurrence_state = 'draft'
      and app.duties_occurrence_start(o) > now()
-     and o.cell_id = p_cell;
+     and o.cell_id = p_cell and o.occurrence_id = any (p_occurrences);
   v_all := v_occ || v_draft;
 
   -- Lock first, in the commands' AD-2 order (as the 4.10 S1 erase).
@@ -104,7 +105,7 @@ begin
     join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
    where a.member_id = p_member and a.assignment_state = 'current'
      and o.occurrence_state = 'published' and app.duties_occurrence_start(o) > now()
-     and o.cell_id = p_cell
+     and o.cell_id = p_cell and o.occurrence_id = any (p_occurrences)
      and not (s.occurrence_id = any (v_all));
   if cardinality(v_more) > 0 then
     perform 1 from app.duties_occurrences o where o.occurrence_id = any (v_more)
@@ -121,7 +122,7 @@ begin
             join app.duties_occurrences o on o.occurrence_id = s.occurrence_id
            where a.member_id = p_member and a.assignment_state = 'current'
              and o.occurrence_state = 'published' and app.duties_occurrence_start(o) > now()
-             and o.cell_id = p_cell
+             and o.cell_id = p_cell and o.occurrence_id = any (p_occurrences)
            order by a.assignment_id
              for update of a) x;
 
@@ -229,14 +230,17 @@ begin
   v_notified := app.duties_lifecycle_notify(v_cancels, v_enqueues, p_actor_member, p_actor_account,
                                             p_capacity, p_command, null, p_member);
   return jsonb_build_object('vacated', jsonb_array_length(v_ended), 'drafts_cleared', v_drafts,
+                            'occurrence_ids', (select coalesce(jsonb_agg(distinct x ->> 'occurrence_id'), '[]'::jsonb)
+                                                 from jsonb_array_elements(v_ended) x),
                             'leader_alerts', v_alerts, 'released', v_released,
                             'notices_skipped', (v_notified ->> 'skipped')::boolean);
 end;
 $$;
 
--- The Duties owner operation: {cell_id, member_id}. Ends the member's current assignments on the
--- cell's own future published parts and clears their planned positions there (the 4.12 vacate,
--- scoped to one cell). Not client-executable; the caller is Cells' transfer, inside its own
+-- The Duties owner operation: {cell_id, member_id, occurrence_ids}. Ends the member's current
+-- assignments on those of the cell's own published parts that have not started and clears their
+-- planned positions there (the 4.12 vacate, scoped to one cell and to the occurrences its owner
+-- names, so both sides agree on what is still ahead). Not client-executable; the caller is Cells' transfer, inside its own
 -- transaction after its own rows are locked, with the transfer's actor (who need not lead the
 -- old cell: the 4.11 session rule is replaced for this operation only). Answers counts.
 create function app.duties_owner_vacate_member(p_input jsonb)
@@ -249,11 +253,16 @@ declare
 begin
   if jsonb_typeof(p_input) is distinct from 'object'
      or app.contract_uuid_error(p_input -> 'cell_id') is not null
-     or app.contract_uuid_error(p_input -> 'member_id') is not null then
+     or app.contract_uuid_error(p_input -> 'member_id') is not null
+     or jsonb_typeof(p_input -> 'occurrence_ids') is distinct from 'array'
+     or exists (select 1 from jsonb_array_elements(p_input -> 'occurrence_ids') e
+                 where app.contract_uuid_error(e) is not null) then
     perform app.cmd_fail('validation_failed', '{"input": "invalid"}');
   end if;
   select a.* into v_actor from app.duties_lifecycle_actor() a;
   return app.duties_vacate_cell_member((p_input ->> 'member_id')::uuid, (p_input ->> 'cell_id')::uuid,
+                                       array(select (e #>> '{}')::uuid
+                                               from jsonb_array_elements(p_input -> 'occurrence_ids') e),
                                        'cell_transferred', true, v_actor.member_id, v_actor.account_id,
                                        'lifecycle', 'cells.confirm_request');
 end;
@@ -326,10 +335,13 @@ select app.contract_register_reminder_contract(
 -- The transfer's effects on the old cell
 -- ---------------------------------------------------------------------------------------------
 
--- Called by cells.confirm_request after the old membership ended, before Notifications. Lock
--- order: the old cell's future meetings (share), their programmes (update), then Duties, then the
--- notices, then Notifications. Answers counts.
-create function app.cells_transfer_effects(p_member uuid, p_old_cell uuid)
+-- Called by cells.confirm_request after the old membership ended. Only meetings that have not
+-- started count (review fix 2: the same cut-off on both sides). Lock order (AD-2): the meetings
+-- (share), their programmes and parts (update), the member's notices (update and audit, review fix
+-- 3 and 4), then Duties for exactly those meetings' part occurrences, then Notifications. Every Cells
+-- row it writes after Duties is already locked. Answers counts.
+create function app.cells_transfer_effects(p_member uuid, p_old_cell uuid, p_actor_member uuid,
+                                           p_actor_account uuid)
 returns jsonb
 language plpgsql
 set search_path = ''
@@ -337,10 +349,13 @@ as $$
 declare
   v_meetings uuid[];
   v_programmes uuid[];
-  v_published uuid[];
-  v_parts uuid[];
-  v_duties jsonb;
+  v_occurrences uuid[];
   v_notices uuid[];
+  v_cleared uuid[];
+  v_unnamed uuid[];
+  v_changed uuid[];
+  v_published uuid[];
+  v_duties jsonb;
   v_id uuid;
   v_leader uuid;
   v_told integer := 0;
@@ -354,38 +369,66 @@ begin
   select coalesce(array_agg(p.programme_id order by p.programme_id), '{}') into v_programmes
     from (select p.programme_id from app.cells_programmes p
            where p.meeting_id = any (v_meetings) and p.programme_state in ('draft', 'published')
-             and exists (select 1 from app.cells_programme_parts pt
-                          where pt.programme_id = p.programme_id and pt.removed_at is null
-                            and pt.assignee_member_id = p_member)
            order by p.programme_id for update) p;
-  select coalesce(array_agg(p.programme_id order by p.programme_id), '{}') into v_published
-    from app.cells_programmes p
-   where p.programme_id = any (v_programmes) and p.programme_state = 'published';
-  -- The member leaves the parts; the projection stops naming them; each programme moves on.
-  with c as (
-    update app.cells_programme_parts pt set assignee_member_id = null, updated_at = now()
-     where pt.programme_id = any (v_programmes) and pt.removed_at is null and pt.assignee_member_id = p_member
-    returning pt.part_id)
-  select coalesce(array_agg(c.part_id), '{}') into v_parts from c;
-  update app.cells_programme_projections pr
-     set body = jsonb_set(pr.body, '{parts}', coalesce((
-           select jsonb_agg(case when (t.e ->> 'part_id')::uuid = any (v_parts)
-                                 then t.e || '{"leader": null}'::jsonb else t.e end order by t.o)
-             from jsonb_array_elements(pr.body -> 'parts') with ordinality t(e, o)), '[]'::jsonb))
-   where pr.programme_id = any (v_published);
-  update app.cells_programmes p set revision = p.revision + 1, updated_at = now()
-   where p.programme_id = any (v_programmes);
-  -- Duties: the member's old-cell cell parts end (every future published one, any answer).
-  v_duties := app.duties_owner_vacate_member(jsonb_build_object('cell_id', p_old_cell, 'member_id', p_member));
-  -- The member's open notices in the old cell close.
+  select coalesce(array_agg(pt.duty_occurrence_id order by pt.part_id) filter (where pt.duty_occurrence_id is not null), '{}')
+    into v_occurrences
+    from (select pt.part_id, pt.duty_occurrence_id from app.cells_programme_parts pt
+           where pt.programme_id = any (v_programmes)
+           order by pt.programme_id, pt.part_id for update) pt;
+
+  -- The member's open notices for meetings still ahead close (meetings that happened keep theirs),
+  -- each with its audit row like any other change.
   with n as (
     update app.cells_absence_notices n
        set notice_state = 'withdrawn', withdrawn_reason = 'left_cell', withdrawn_at = now(),
            revision = n.revision + 1, updated_at = now()
-     where n.cell_id = p_old_cell and n.member_id = p_member and n.notice_state = 'open'
-    returning n.notice_id)
-  select coalesce(array_agg(n.notice_id order by n.notice_id), '{}') into v_notices from n;
-  -- Notifications last: the closed notices' waiting jobs are cancelled; the leaders are told.
+     where n.member_id = p_member and n.notice_state = 'open' and n.meeting_id = any (v_meetings)
+    returning n.*)
+  , a as (
+    insert into app.cells_absence_audit (action, notice_id, meeting_id, cell_id, actor_member_id,
+                                         actor_account_id, command_request_id, revision_after)
+    select 'notice_withdrawn', n.notice_id, n.meeting_id, n.cell_id, p_actor_member, p_actor_account,
+           app.cmd_current_request_id(p_actor_account, 'cells.confirm_request'), n.revision
+      from n
+    returning notice_id)
+  select coalesce(array_agg(a.notice_id order by a.notice_id), '{}') into v_notices from a;
+
+  -- Duties: the member's assignments on those parts end; the answer names the occurrences ended.
+  v_duties := app.duties_owner_vacate_member(jsonb_build_object(
+    'cell_id', p_old_cell, 'member_id', p_member, 'occurrence_ids', to_jsonb(v_occurrences)));
+
+  -- The plan: the member leaves every part they are planned for (draft text, published or not).
+  with c as (
+    update app.cells_programme_parts pt set assignee_member_id = null, updated_at = now()
+     where pt.programme_id = any (v_programmes) and pt.removed_at is null and pt.assignee_member_id = p_member
+    returning pt.programme_id)
+  select coalesce(array_agg(distinct c.programme_id), '{}') into v_cleared from c;
+  -- What members read: only the parts whose duty the member actually held (review fix 1), so a
+  -- name published for someone else stays and the member's published name goes.
+  select coalesce(array_agg(pt.part_id), '{}') into v_unnamed
+    from app.cells_programme_parts pt
+   where pt.programme_id = any (v_programmes)
+     and pt.duty_occurrence_id::text in (select jsonb_array_elements_text(coalesce(v_duties -> 'occurrence_ids', '[]'::jsonb)));
+  update app.cells_programme_projections pr
+     set body = jsonb_set(pr.body, '{parts}', coalesce((
+           select jsonb_agg(case when (t.e ->> 'part_id')::uuid = any (v_unnamed)
+                                 then t.e || '{"leader": null}'::jsonb else t.e end order by t.o)
+             from jsonb_array_elements(pr.body -> 'parts') with ordinality t(e, o)), '[]'::jsonb))
+   where pr.withdrawn_at is null
+     and pr.programme_id in (select pt.programme_id from app.cells_programme_parts pt where pt.part_id = any (v_unnamed));
+  v_changed := array(select distinct x from unnest(v_cleared || array(
+                       select pt.programme_id from app.cells_programme_parts pt where pt.part_id = any (v_unnamed))) x
+                     order by x);
+  update app.cells_programmes p set revision = p.revision + 1, updated_at = now()
+   where p.programme_id = any (v_changed);
+  v_published := array(select p.programme_id from app.cells_programmes p
+                        where p.programme_id = any (v_changed) and p.programme_state = 'published'
+                          and p.programme_id in (select pt.programme_id from app.cells_programme_parts pt
+                                                  where pt.part_id = any (v_unnamed))
+                        order by p.programme_id);
+
+  -- Notifications last: the closed notices' waiting jobs are cancelled; the leaders are told about
+  -- each published programme that lost its person.
   foreach v_id in array v_notices loop
     perform app.notifications_cancel(jsonb_build_object(
       'source_type', 'cells_absence_notice', 'source_id', v_id, 'reason', 'source_cancelled'));
@@ -416,7 +459,7 @@ begin
     end if;
     v_told := 0;
   end;
-  return jsonb_build_object('parts_cleared', cardinality(v_parts), 'programmes', cardinality(v_programmes),
+  return jsonb_build_object('parts_cleared', cardinality(v_cleared), 'programmes', cardinality(v_changed),
                             'duties_vacated', coalesce((v_duties ->> 'vacated')::integer, 0),
                             'notices_closed', cardinality(v_notices), 'leaders_told', v_told);
 end;
@@ -585,6 +628,13 @@ begin
     perform app.cmd_fail('validation_failed',
       jsonb_build_object('cell_id', app.contract_uuid_error(p_payload -> 'cell_id', true)));
   end if;
+  -- Story 5.9 review fix 5 (AD-2): the member the transfer may end work of, Identity first.
+  if app.contract_uuid_error(p_payload -> 'request_id') is null then
+    perform 1 from app.identity_members im
+     where im.member_id = (select r.member_id from app.cells_membership_requests r
+                            where r.request_id = (p_payload ->> 'request_id')::uuid)
+       for key share;
+  end if;
   v_request := app.cells_lock_open_request(p_payload, array['request_id', 'cell_id'],
                                            p_expected_revision);
   v_capacity := app.cells_decider(v_actor.member_id, v_actor.is_admin, v_request);
@@ -640,7 +690,8 @@ begin
   -- Story 5.9: the member's old-cell programme parts, cell duties and notices end now, and the old
   -- cell's leaders are told (Cells and Duties rows, then Notifications).
   if v_old.membership_id is not null then
-    perform app.cells_transfer_effects(v_request.member_id, v_old.cell_id);
+    perform app.cells_transfer_effects(v_request.member_id, v_old.cell_id, v_actor.member_id,
+                                       v_actor.account_id);
   end if;
   if v_old.membership_id is not null then
     -- AD-14: registered owners (duties, chat, follow-ups, programmes ...) move or end their
@@ -808,11 +859,11 @@ comment on function api.cells_command(jsonb) is
   '1.4 command envelope.';
 
 revoke all on function
-  app.duties_vacate_cell_member(uuid, uuid, text, boolean, uuid, uuid, text, text),
+  app.duties_vacate_cell_member(uuid, uuid, uuid[], text, boolean, uuid, uuid, text, text),
   app.duties_owner_vacate_member(jsonb),
   app.cells_programme_source_check(jsonb),
   app.cells_programme_reminder_check(jsonb),
-  app.cells_transfer_effects(uuid, uuid),
+  app.cells_transfer_effects(uuid, uuid, uuid, uuid),
   app.cells_has_reachable_leader(uuid, uuid),
   app.cells_programme_ahead(uuid),
   app.cells_report_handover(jsonb),

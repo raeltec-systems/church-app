@@ -247,22 +247,32 @@ class _SeriesViewState extends ConsumerState<_SeriesView> {
     for (final o in r.occurrences) {
       if (o.occurrenceId == _selected) selected = o;
     }
+    final c = ChurchColors.of(context);
     return Padding(
-      padding: const EdgeInsets.only(top: 12, bottom: 12),
+      padding: const EdgeInsets.only(top: 16, bottom: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(r.dutyName, style: ChurchType.cardTitle),
+          Text(
+            r.dutyName,
+            style: ChurchType.cardTitle.copyWith(color: c.ink, fontSize: 17),
+          ),
           Text(
             '${r.repeatLabel} from ${r.fromDate} to ${r.untilDate}, '
             '${r.startTime}${r.endTime == null ? '' : '-${r.endTime}'} '
             '(church time). Positions: ${r.positions.join(', ')}.',
+            style: ChurchType.secondary.copyWith(color: c.muted),
           ),
-          if (r.location case final l?) Text('Where: $l'),
+          if (r.location case final l?)
+            Text(
+              'Where: $l',
+              style: ChurchType.secondary.copyWith(color: c.muted),
+            ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               FocusRing(
                 child: TextButton(
@@ -406,8 +416,113 @@ class _SeriesViewState extends ConsumerState<_SeriesView> {
   }
 }
 
-/// The grid: one row per date, one column per position. Each cell is a
-/// labelled button (screen readers hear the date, position and status).
+/// How a rota position looks: the handoff's tile kinds. Every tile also
+/// says its state in words (the colour is never alone).
+enum _TileKind {
+  confirmed('Confirmed'),
+  leaderConfirmed('Confirmed by leader'),
+  awaiting('Awaiting response'),
+  declined('Declined'),
+  needsContact('Needs contact'),
+  unfilled('Unfilled'),
+  draft('Draft'),
+  notPlanned('Not planned'),
+  cancelled('Cancelled');
+
+  const _TileKind(this.label);
+  final String label;
+}
+
+_TileKind _tileKind(RotaOccurrence o, RotaPosition p) {
+  if (o.state == RotaState.cancelled || p.cancelled) {
+    return _TileKind.cancelled;
+  }
+  if (o.state == RotaState.draft) {
+    return p.draft == null ? _TileKind.notPlanned : _TileKind.draft;
+  }
+  final a = p.assignment;
+  if (a == null) return _TileKind.unfilled;
+  if (a.confirmedByLeader) return _TileKind.leaderConfirmed;
+  if (a.needsContact != null) return _TileKind.needsContact;
+  return switch (a.response) {
+    DutyResponse.accepted => _TileKind.confirmed,
+    DutyResponse.declined => _TileKind.declined,
+    DutyResponse.pending => _TileKind.awaiting,
+  };
+}
+
+/// Fill, ink and whether the edge is dashed (an empty or planned place).
+(Color, Color, Color?, bool) _tileColors(ChurchColors c, _TileKind k) =>
+    switch (k) {
+      _TileKind.confirmed ||
+      _TileKind.leaderConfirmed => (c.greenBg, c.greenFg, null, false),
+      _TileKind.awaiting ||
+      _TileKind.needsContact => (c.amberBg, c.amberFg, null, false),
+      _TileKind.declined => (c.redBg, c.redFg, null, false),
+      _TileKind.unfilled => (c.surface, c.redFg, c.redFg, true),
+      _TileKind.draft => (c.grayBg, c.ink, c.muted, true),
+      _TileKind.notPlanned => (c.surface, c.muted, c.line, true),
+      _TileKind.cancelled => (c.grayBg, c.muted, null, false),
+    };
+
+/// A rounded box with a dashed 1 px edge (empty and draft places only).
+class _DashedBox extends StatelessWidget {
+  const _DashedBox({
+    required this.color,
+    required this.fill,
+    required this.child,
+  });
+  final Color color;
+  final Color fill;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(
+    foregroundPainter: _DashPainter(color),
+    child: Container(
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: child,
+    ),
+  );
+}
+
+class _DashPainter extends CustomPainter {
+  const _DashPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          (Offset.zero & size).deflate(0.5),
+          const Radius.circular(8),
+        ),
+      );
+    for (final m in path.computeMetrics()) {
+      var d = 0.0;
+      while (d < m.length) {
+        canvas.drawPath(m.extractPath(d, d + 5), paint);
+        d += 9;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashPainter old) => old.color != color;
+}
+
+/// The handoff's rota grid: positions down the side, dates across (each
+/// with how many are confirmed), one tile per place coloured by its state
+/// and naming it. A date opens its panel; the list view says the same in
+/// plain text.
 class _RotaGrid extends StatelessWidget {
   const _RotaGrid({
     required this.series,
@@ -422,79 +537,187 @@ class _RotaGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
     final names = series.positions;
-    Widget cell(Widget child) =>
-        Padding(padding: const EdgeInsets.all(6), child: child);
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Table(
-        key: Key('rota-grid-${series.seriesId}'),
-        defaultColumnWidth: const IntrinsicColumnWidth(),
-        border: TableBorder.all(color: c.line),
-        children: [
-          TableRow(
-            children: [
-              cell(const Text('Date', style: ChurchType.cardTitle)),
-              for (final n in names) cell(Text(n, style: ChurchType.cardTitle)),
-              cell(const Text('Confirmed', style: ChurchType.cardTitle)),
-            ],
-          ),
-          for (final o in series.occurrences)
-            TableRow(
-              decoration: o.occurrenceId == selected
-                  ? BoxDecoration(color: c.line.withValues(alpha: 0.4))
-                  : null,
-              children: [
-                cell(
-                  Semantics(
-                    button: true,
-                    label:
-                        '${_when(context, o.times.startsAt)}, '
-                        '${_stateText(o)}. Open this date',
-                    onTap: () => onSelect(o),
-                    excludeSemantics: true,
-                    child: FocusRing(
-                      child: TextButton(
-                        key: Key('rota-date-${o.occurrenceId}'),
-                        onPressed: () => onSelect(o),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(_when(context, o.times.startsAt)),
-                            Text(_stateText(o)),
-                          ],
+    Widget pad(Widget child) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+      child: child,
+    );
+    final grid = Table(
+      key: Key('rota-grid-${series.seriesId}'),
+      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+      columnWidths: {
+        0: const FixedColumnWidth(150),
+        for (var i = 0; i < series.occurrences.length; i++)
+          i + 1: const FixedColumnWidth(196),
+      },
+      border: TableBorder(
+        horizontalInside: BorderSide(color: c.line),
+        verticalInside: BorderSide(color: c.line),
+      ),
+      children: [
+        TableRow(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+              child: Text(
+                'Position',
+                style: ChurchType.secondary.copyWith(
+                  color: c.muted,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            for (final o in series.occurrences)
+              pad(
+                Semantics(
+                  button: true,
+                  selected: o.occurrenceId == selected,
+                  label:
+                      '${_when(context, o.times.startsAt)}, '
+                      '${_stateText(o)}'
+                      '${o.state == RotaState.published ? ', ${o.confirmed} of ${o.required} confirmed' : ''}'
+                      '. Open this date',
+                  onTap: () => onSelect(o),
+                  excludeSemantics: true,
+                  child: FocusRing(
+                    radius: 10,
+                    child: TextButton(
+                      key: Key('rota-date-${o.occurrenceId}'),
+                      onPressed: () => onSelect(o),
+                      style: TextButton.styleFrom(
+                        alignment: AlignmentDirectional.centerStart,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
                         ),
+                        backgroundColor: o.occurrenceId == selected
+                            ? c.blueBg
+                            : Colors.transparent,
+                        foregroundColor: c.ink,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _when(context, o.times.startsAt),
+                            style: ChurchType.staffBody.copyWith(
+                              color: c.ink,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          DefaultTextStyle.merge(
+                            style: ChurchType.secondary.copyWith(
+                              color: c.muted,
+                              fontSize: 13,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                Text(
+                                  o.state == RotaState.published
+                                      ? '${o.confirmed} of ${o.required}'
+                                      : '-',
+                                  key: Key('rota-confirmed-${o.occurrenceId}'),
+                                ),
+                                Flexible(
+                                  child: Text(
+                                    o.state == RotaState.published
+                                        ? ' confirmed'
+                                              '${o.started ? ' · Started' : ''}'
+                                        : ' confirmed · ${_stateText(o)}',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
-                for (var i = 0; i < names.length; i++)
-                  cell(
-                    i < o.positions.length
-                        ? Semantics(
-                            label:
-                                '${o.positions[i].label}, '
-                                '${_when(context, o.times.startsAt)}: '
-                                '${_positionText(o, o.positions[i])}',
-                            excludeSemantics: true,
-                            child: Text(
-                              _positionText(o, o.positions[i]),
-                              key: Key('rota-cell-${o.positions[i].slotId}'),
-                            ),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-                cell(
-                  Text(
-                    o.state == RotaState.published
-                        ? '${o.confirmed} of ${o.required}'
-                        : '-',
-                    key: Key('rota-confirmed-${o.occurrenceId}'),
+              ),
+          ],
+        ),
+        for (var i = 0; i < names.length; i++)
+          TableRow(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+                child: Text(
+                  names[i],
+                  style: ChurchType.staffBody.copyWith(
+                    color: c.ink,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-              ],
-            ),
-        ],
+              ),
+              for (final o in series.occurrences)
+                pad(
+                  i < o.positions.length
+                      ? _tile(context, o, o.positions[i])
+                      : const SizedBox.shrink(),
+                ),
+            ],
+          ),
+      ],
+    );
+    // As wide as its dates (it scrolls sideways inside its frame when they
+    // do not fit), never stretched over empty space.
+    return Align(
+      alignment: AlignmentDirectional.centerStart,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: c.line),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: grid,
+        ),
       ),
+    );
+  }
+
+  Widget _tile(BuildContext context, RotaOccurrence o, RotaPosition p) {
+    final c = ChurchColors.of(context);
+    final kind = _tileKind(o, p);
+    final (fill, ink, edge, dashed) = _tileColors(c, kind);
+    final body = Container(
+      constraints: const BoxConstraints(minHeight: 44),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      alignment: AlignmentDirectional.centerStart,
+      child: Text(
+        _positionText(o, p),
+        key: Key('rota-cell-${p.slotId}'),
+        style: ChurchType.secondary.copyWith(
+          color: ink,
+          fontWeight: kind == _TileKind.notPlanned
+              ? FontWeight.w400
+              : FontWeight.w600,
+          fontSize: 13,
+        ),
+      ),
+    );
+    return Semantics(
+      label:
+          '${p.label}, ${_when(context, o.times.startsAt)}: '
+          '${_positionText(o, p)}',
+      excludeSemantics: true,
+      child: dashed
+          ? _DashedBox(color: edge!, fill: fill, child: body)
+          : Container(
+              decoration: BoxDecoration(
+                color: fill,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: body,
+            ),
     );
   }
 }

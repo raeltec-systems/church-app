@@ -1323,6 +1323,7 @@ class _LeaderDepartmentCard extends StatelessWidget {
           ),
           // Story 4.8: who needs direct contact, before the duties.
           if (!reviewsOnly) _NeedsContactList(department: d),
+          const SizedBox(height: 12),
           _heading(
             context,
             reviewsOnly
@@ -1350,11 +1351,18 @@ class _LeaderDepartmentCard extends StatelessWidget {
               busy: busy,
             ),
           if (d.canPublish && !reviewsOnly) ...[
-            const SizedBox(height: 12),
-            _PublishForm(
-              key: Key('publish-${d.departmentId}'),
-              department: d,
-              busy: busy,
+            const SizedBox(height: 20),
+            // A form reads best at about 640 px, not across the page.
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 680),
+                child: _PublishForm(
+                  key: Key('publish-${d.departmentId}'),
+                  department: d,
+                  busy: busy,
+                ),
+              ),
             ),
           ],
         ],
@@ -1394,20 +1402,49 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
     final duty = widget.duty;
     final id = duty.occurrenceId;
     final started = !duty.times.arriveBy.isAfter(DateTime.now());
-    return Padding(
+    final c = ChurchColors.of(context);
+    final meta = ChurchType.secondary.copyWith(color: c.muted);
+    // One duty: its name and how many are confirmed on the first line, when
+    // and where in grey, then each position and its answer.
+    return Container(
       key: Key('leader-duty-$id'),
-      padding: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        border: Border.all(color: c.line),
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(duty.dutyName, style: ChurchType.cardTitle),
-          Text(_timesText(context, duty.times)),
-          if (duty.location case final l?) Text('Where: $l'),
-          if (duty.instructions case final i?) Text('Instructions: $i'),
-          Text(
-            '${duty.accepted} of ${duty.required} confirmed',
-            key: Key('coverage-$id'),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  duty.dutyName,
+                  style: ChurchType.cardTitle.copyWith(
+                    color: c.ink,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                '${duty.accepted} of ${duty.required} confirmed',
+                key: Key('coverage-$id'),
+                style: ChurchType.figures.copyWith(
+                  color: duty.accepted < duty.required ? c.amberFg : c.greenFg,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
+          Text(_timesText(context, duty.times), style: meta),
+          if (duty.location case final l?) Text('Where: $l', style: meta),
+          if (duty.instructions case final i?)
+            Text('Instructions: $i', style: meta),
+          const SizedBox(height: 6),
           // Story 4.11: linked programme parts and owner-review mismatches.
           Consumer(
             builder: (context, ref, _) => _OwnerReviews(

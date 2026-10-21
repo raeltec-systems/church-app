@@ -195,6 +195,12 @@ import '../domain/membership_application.dart';
       'Members of the cell see it now. Everyone with a part is asked to '
           'accept it.',
     ),
+    CellNotice.meetingHasProgramme => (
+      StatusTone.warning,
+      'Programme published',
+      'This meeting\'s programme is published, so the meeting can\'t be moved '
+          'or cancelled here. Cancel the programme on Plan first.',
+    ),
     CellNotice.programmePartRefused => (
       StatusTone.warning,
       'Not published',
@@ -2397,12 +2403,29 @@ class _PartRow {
 
   String get snapshot => '$partId|${label.text}|${start.text}|${end.text}|$who';
 
+  /// What the server stores for this row (no ids, trimmed text).
+  String get content =>
+      '${_oneLine(label.text)}|${start.text.trim()}|${end.text.trim()}|$who';
+
   void dispose() {
     label.dispose();
     start.dispose();
     end.dispose();
   }
 }
+
+/// Text as a single-line server field keeps it (trimmed, spaces collapsed).
+String _oneLine(String v) => v.trim().replaceAll(RegExp(r'\s+'), ' ');
+
+/// [p]'s content as the editor compares it (no part ids).
+String _programmeContent(CellProgramme p) => [
+  _oneLine(p.topic ?? ''),
+  _oneLine(p.scripture ?? ''),
+  (p.studyNotes ?? '').trim(),
+  for (final part in p.parts)
+    '${part.label}|${ChurchTime.timeText(part.startsAt)}|'
+        '${ChurchTime.timeText(part.endsAt)}|${_whoOf(part)}',
+].join('\n');
 
 String? _whoOf(ProgrammePart p) => p.assignee != null
     ? 'm:${p.assignee!.memberId}'
@@ -2444,10 +2467,6 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
   /// The server has a newer revision while the typed draft has changes.
   bool _stale = false;
 
-  /// Names of people and department duties the parts name that are no longer
-  /// offered (kept so the row shows who).
-  final Map<String, String> _former = {};
-
   @override
   void initState() {
     super.initState();
@@ -2474,18 +2493,6 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
             who: _whoOf(part),
           ),
       ]);
-    _former
-      ..clear()
-      ..addAll({
-        for (final part in p.parts)
-          if (part.assignee case final a? when !a.inCell)
-            'm:${a.memberId}': '${a.displayName} (left the cell)',
-        for (final part in p.parts)
-          if (part.linkedSlotId case final slot?
-              when !widget.read.linkable.any((l) => l.slotId == slot))
-            'd:$slot':
-                '${part.linkedLabel ?? 'Department duty'} (no longer offered)',
-      });
     _base = p.revision;
     _baseSnapshot = _snapshot();
     _stale = false;
@@ -2500,17 +2507,27 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
 
   bool get _dirty => _snapshot() != _baseSnapshot;
 
+  /// The typed draft's content as the server would store it.
+  String _typedContent() => [
+    _oneLine(_topic.text),
+    _oneLine(_scripture.text),
+    _notes.text.replaceAll('\r\n', '\n').trim(),
+    for (final r in _rows) r.content,
+  ].join('\n');
+
   @override
   void didUpdateWidget(_ProgrammeEditor old) {
     super.didUpdateWidget(old);
     // A newer revision from the server (saved here, saved elsewhere, or the
     // meeting moved): start from it unless the typed draft has changes,
     // which are kept and flagged (5.3 review fix 10).
+    // The leader's own save comes back as a newer revision with the same
+    // content (5.4 review fix 1): that simply reloads.
     if (widget.programme.revision != _base) {
-      if (_dirty) {
-        _stale = true;
-      } else {
+      if (!_dirty || _typedContent() == _programmeContent(widget.programme)) {
         _load(widget.programme);
+      } else {
+        _stale = true;
       }
     }
   }
@@ -2575,7 +2592,20 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
       for (final l in read.linkable) 'd:${l.slotId}': l.label,
     };
     final dirty = _dirty;
-    final overrideAsked = needsOverrideReason(errors);
+    final overrideAsked =
+        needsOverrideReason(errors) || errors.containsKey('override_reason');
+    // Who the saved parts name that is no longer offered (kept so the row
+    // shows who), from the current offer.
+    final former = <String, String>{
+      for (final part in widget.programme.parts)
+        if (part.assignee case final a? when !a.inCell)
+          'm:${a.memberId}': '${a.displayName} (left the cell)',
+      for (final part in widget.programme.parts)
+        if (part.linkedSlotId case final slot?
+            when !read.linkable.any((l) => l.slotId == slot))
+          'd:$slot':
+              '${part.linkedLabel ?? 'Department duty'} (no longer offered)',
+    };
     final editor = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -2663,7 +2693,7 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
                   row: r,
                   roster: read.roster,
                   linkable: read.linkable,
-                  former: _former,
+                  former: former,
                   busy: busy,
                   error: _partErrorText(errors, i, window),
                   onChanged: () => setState(() {}),
@@ -2745,6 +2775,7 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
                 onPressed:
                     busy ||
                         dirty ||
+                        _stale ||
                         _rows.isEmpty ||
                         (overrideAsked && _reason.text.trim().isEmpty)
                     ? null
@@ -2805,7 +2836,7 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
             start: r.start.text.trim(),
             end: r.end.text.trim(),
             label: r.label.text.trim().isEmpty ? 'Untitled part' : r.label.text,
-            who: r.who == null ? null : names[r.who] ?? _former[r.who],
+            who: r.who == null ? null : names[r.who] ?? former[r.who],
             leftCell: r.who != null && !names.containsKey(r.who),
           ),
       ],
@@ -3131,7 +3162,11 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
                       children: [
                         StatusLabel(
                           key: Key('published-status-${part.partId}'),
-                          label: d.label,
+                          label:
+                              part.linkedSlotId != null &&
+                                  d.status == PartDutyStatus.open
+                              ? 'Department duty: link ended'
+                              : d.label,
                           tone: switch (d.status) {
                             PartDutyStatus.accepted ||
                             PartDutyStatus.departmentFilled =>

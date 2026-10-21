@@ -83,3 +83,17 @@ context:
 ## Plan Change Log
 
 ## Review Triage Log
+
+Independent review of `52d8ff0..1c8a62d` (2026-10-21, a separate reviewer agent). The safe-projection read cases were repeated and hold (body fields, access via `identity_require_access` plus a current membership, withdrawal on cancel, names removed on deletion; publish is all or nothing through the kernel's rollback). 5.4 was not yet on staging, so the fixes are in the same migration:
+
+1. High, fixed (client): the leader's own save came back as a newer revision and the editor called it "Changed elsewhere", blocking Publish. The editor now compares the typed content with the server's (ids aside) and simply reloads when they match. Widget test added.
+2. Medium, fixed: cancelling or moving a meeting left its published programme's duties live. While a programme is published, `cells.move_meeting` and `cells.cancel_meeting` answer `conflict {"meeting_id": "programme_published"}` (a trigger keyed on the running command, set by the Cells dispatcher). Generation by a schedule change is not refused; reconciliation is 5.6 (runbook known limit).
+3. Medium, fixed: a department position gone between save and publish answered a bare `not_found`; it is now `parts.<i>.linked_slot_id: link_unavailable`.
+4. Medium/low, fixed: the authorizer now key-share-locks the actor's member row before the grants (Identity's order), so a deactivation during a publish waits instead of deadlocking.
+5. Low, fixed: publish rechecks part times against the meeting (`parts.<i>: outside_meeting`).
+6. Low, fixed: a Duties conflict during a publish carries the programme's revision.
+7. Low, accepted: a projection names the leader as published until a republish or deletion (transfer and removal effects are 5.9).
+8. Low, accepted: notices are queued per part as each Duties call runs; no lock cycle found (Notifications is still after every Duties row of that part).
+9. Low, fixed (client): former names follow the current offer; the reason field also shows when the reason itself is refused; Publish waits while the draft is stale; an ended department link reads "Department duty: link ended".
+10. Low, fixed: cancelling a programme whose duty has started answers `meeting_id: started`.
+11. Tests added: no Duties rows after a refused publish, the meeting guard (move and cancel), the member read after a transfer, the save-then-publish flow. Not added: a department position cancelled between save and publish (covered by the mapping; Duties' own refusal is tested in 4.11).

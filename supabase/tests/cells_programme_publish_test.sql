@@ -6,7 +6,7 @@
 -- or history. HTTP evidence: tools/identity-e2e/cells-programme-publish.mjs. Every account, phone
 -- and name here is SYNTHETIC (fictional range +1 202 555 0181-0192).
 begin;
-select plan(45);
+select plan(48);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000054' || lpad(n::text, 2, '0'))::uuid $$;
@@ -232,8 +232,10 @@ select is((select count(*)::int from app.duties_part_links l
 select is(pg_temp.publish(2) -> 'field_errors',
   '{"parts.2.member_id": "overlap", "parts.2.override_reason": "required"}'::jsonb,
   'the assignee''s overlap with their department duty is refused on that part');
-select is((select programme_state from app.cells_programmes where programme_id = pg_temp.pid()), 'draft',
-  'and nothing was published');
+select is((select programme_state from app.cells_programmes where programme_id = pg_temp.pid())
+          || '|' || (select count(*) from app.duties_part_links l join app.cells_programme_parts pt on pt.part_id = l.source_id
+                      where pt.programme_id = pg_temp.pid()), 'draft|0',
+  'and nothing was published, nothing left in Duties');
 create temp table pb as select pg_temp.publish(2, '{"override_reason": "SYNTHETIC leads study after ushering starts"}') as r;
 select is((select (r #>> '{data,state}') || '|' || (r ->> 'revision') || '|' || jsonb_array_length(r #> '{data,duties}') from pb),
   'published|' || pg_temp.rev() || '|4', 'the leader publishes with a reason: four parts reach Duties');
@@ -299,6 +301,16 @@ select is(pg_temp.readj(pg_temp.c(6), format('select api.cells_programme(%L)', p
   '[]'::jsonb, 'Pastor oversight sees no Duties state');
 select is(pg_temp.save(2, pg_temp.draft()) #>> '{field_errors,programme_id}', 'not_draft',
   'a published programme is not edited as a draft');
+select is(pg_temp.cells(pg_temp.c(2), 'cells.move_meeting',
+  (select revision from app.cells_meetings where meeting_id = pg_temp.mt()),
+  jsonb_build_object('meeting_id', pg_temp.mt(),
+    'starts_at', app.cmd_utc(pg_temp.at(pg_temp.mt(), '19:00')),
+    'ends_at', app.cmd_utc(pg_temp.at(pg_temp.mt(), '20:30')))) #>> '{field_errors,meeting_id}',
+  'programme_published', 'review fix 2: a meeting with a published programme is not moved');
+select is(pg_temp.cells(pg_temp.c(2), 'cells.cancel_meeting',
+  (select revision from app.cells_meetings where meeting_id = pg_temp.mt()),
+  jsonb_build_object('meeting_id', pg_temp.mt())) #>> '{field_errors,meeting_id}',
+  'programme_published', 'nor cancelled');
 
 -- 5.3 review fixes ------------------------------------------------------------------------------------
 create temp table cp2 as select pg_temp.cells(pg_temp.c(2), 'cells.create_programme', null,
@@ -352,6 +364,9 @@ select is(pg_temp.readj(pg_temp.c(4), format('select api.cells_meeting_programme
 select is((select string_agg(distinct action, ',' order by action) from app.cells_programme_audit
             where programme_id = pg_temp.pid()),
   'programme_cancelled,programme_created,programme_published,programme_saved', 'the audit records the publish');
+select pg_temp.place(4, pg_temp.es());
+select is(pg_temp.read(pg_temp.c(4), format('select api.cells_meeting_programme(%L)', pg_temp.mt())),
+  'PT403|forbidden|not_granted', 'a member who moved to another cell no longer reads it');
 select app.cells_erase_member(jsonb_build_object('member_id', pg_temp.mid(4), 'phase', 'erase'));
 select ok((select not (body::text like '%SYNTHETIC 5.4 Member 4%') from app.cells_programme_projections
             where programme_id = pg_temp.pid()), 'deletion takes the member''s name out of the projection');

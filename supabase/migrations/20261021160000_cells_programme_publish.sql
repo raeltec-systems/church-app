@@ -16,7 +16,10 @@
 --     read app.duties_owner_linkable (the meeting's window).
 --   * Cancelling a published programme cancels its cell-owned duties and ends its display links.
 --   * Registers the `cells_programme_part` source (1.5) and its Duties `cell_part` role (4.11).
---   * Carries the 5.3 review fixes (5.3 is on staging).
+--   * While a programme is published, its meeting is not moved or cancelled through the meeting
+--     commands (`conflict {"meeting_id": "programme_published"}`): cancel the programme first.
+--     Reconciling published duties with a changed meeting is story 5.6.
+--   * Carries the 5.3 review fixes (5.3 is on staging) and the 5.4 review fixes.
 --
 -- No destructive statements and no row deletions. No anon grant. ASCII only.
 
@@ -887,6 +890,7 @@ declare
   v_reason record;
   v_msg text;
   v_detail text;
+  v_before bigint;
 begin
   select a.* into v_actor from app.cells_command_actor(p_actor) a;
   v_errors := app.contract_unknown_keys(p_payload, array['programme_id', 'override_reason']);
@@ -918,6 +922,7 @@ begin
   select l.programme, l.capacity into v_lock
     from app.cells_lock_programme(p_payload, p_expected_revision, v_actor.member_id) l;
   v_programme := v_lock.programme;
+  v_before := v_programme.revision;
   if v_programme.programme_state = 'cancelled' then
     perform app.cmd_fail('conflict', '{"programme_id": "cancelled"}', v_programme.revision);
   end if;
@@ -931,15 +936,19 @@ begin
                   where pt.programme_id = v_programme.programme_id and pt.removed_at is null) then
     perform app.cmd_fail('validation_failed', '{"parts": "required"}');
   end if;
-  -- An assignee who left the cell since the last save is refused on their part.
-  select coalesce(jsonb_object_agg('parts.' || (pt.position - 1), 'assignee_not_in_cell'), '{}'::jsonb)
+  -- A part outside the meeting (it was shortened since the last save), or an assignee who left
+  -- the cell, is refused on its part (5.4 review fix 5).
+  select coalesce(jsonb_object_agg('parts.' || (pt.position - 1),
+                    case when pt.starts_at < v_meeting.starts_at or pt.ends_at > v_meeting.ends_at
+                         then 'outside_meeting' else 'assignee_not_in_cell' end), '{}'::jsonb)
     into v_errors
     from app.cells_programme_parts pt
    where pt.programme_id = v_programme.programme_id and pt.removed_at is null
-     and pt.assignee_member_id is not null
-     and not exists (select 1 from app.cells_memberships cm
-                      where cm.cell_id = v_programme.cell_id and cm.ended_at is null
-                        and cm.member_id = pt.assignee_member_id);
+     and (pt.starts_at < v_meeting.starts_at or pt.ends_at > v_meeting.ends_at
+          or (pt.assignee_member_id is not null
+              and not exists (select 1 from app.cells_memberships cm
+                               where cm.cell_id = v_programme.cell_id and cm.ended_at is null
+                                 and cm.member_id = pt.assignee_member_id)));
   if v_errors <> '{}'::jsonb then
     perform app.cmd_fail('validation_failed', v_errors);
   end if;
@@ -963,7 +972,14 @@ begin
                      app.cells_publish_part(v_part, v_programme, v_venue, v_reason.value));
     exception when sqlstate 'PCMD1' then
       get stacked diagnostics v_msg = message_text, v_detail = pg_exception_detail;
-      if v_msg <> 'validation_failed' then
+      -- 5.4 review fixes 3 and 6: a department position that is gone is answered on its part; a
+      -- Duties conflict (changed meanwhile) carries the programme's revision, not the duty's.
+      if v_msg = 'not_found' and v_part.linked_slot_id is not null then
+        perform app.cmd_fail('validation_failed', jsonb_build_object(
+          'parts.' || (v_part.position - 1) || '.linked_slot_id', 'link_unavailable'));
+      elsif v_msg = 'conflict' then
+        perform app.cmd_fail('conflict', null, v_before);
+      elsif v_msg <> 'validation_failed' then
         raise;
       end if;
       perform app.cmd_fail('validation_failed', coalesce((
@@ -1044,6 +1060,9 @@ begin
       v_existing := app.duties_owner_part(v_ref);
       if v_existing -> 'occurrence' is not null and jsonb_typeof(v_existing -> 'occurrence') = 'object'
          and v_existing #>> '{occurrence,state}' <> 'cancelled' then
+        if (v_existing #>> '{occurrence,started}')::boolean then
+          perform app.cmd_fail('validation_failed', '{"meeting_id": "started"}');
+        end if;
         perform app.duties_owner_cancel_part(v_ref || jsonb_build_object(
           'expected_revision', v_existing #> '{occurrence,revision}'));
       elsif exists (select 1 from jsonb_array_elements(v_existing -> 'positions') e
@@ -1088,6 +1107,10 @@ begin
   if r.outcome <> 'granted' then
     return false;
   end if;
+  -- 5.4 review fix 4 (AD-2, as Identity locks): the actor's member row, then its grants. Publish
+  -- and cancel later share-lock people through Duties; a lifecycle change holding the member row
+  -- then waits here instead of deadlocking.
+  perform 1 from app.identity_members m where m.member_id = r.member_id for key share;
   perform 1 from app.identity_grants g
    where g.member_id = r.member_id and g.revoked_at is null
      and (g.role = 'admin' or g.scope_kind in ('cell_leader', 'cell_assistant'))
@@ -1104,11 +1127,14 @@ set search_path = ''
 as $$
 declare
   v_command text;
+  v_result jsonb;
 begin
   if jsonb_typeof(p_envelope) = 'object' and jsonb_typeof(p_envelope -> 'command') = 'string' then
     v_command := p_envelope ->> 'command';
   end if;
-  return app.cmd_execute(
+  -- The running command, for app.cells_meeting_guard (transaction-local, cleared after).
+  perform set_config('cells.command', coalesce(v_command, ''), true);
+  v_result := app.cmd_execute(
     p_envelope,
     case v_command
       when 'cells.create_cell' then 'app.cells_create_cell(uuid, bigint, jsonb)'::regprocedure
@@ -1130,8 +1156,34 @@ begin
     'app.cells_in_scope(uuid, text, uuid)'::regprocedure,
     v_command is distinct from 'cells.create_cell' and v_command is distinct from 'cells.create_programme'
   );
+  perform set_config('cells.command', '', true);
+  return v_result;
 end;
 $$;
+
+-- 5.4 review fix 2: a meeting whose programme is published is not moved or cancelled by the
+-- meeting commands (its duties would keep the old time). Generation (a schedule change or a read)
+-- is not refused: that reconciliation is story 5.6.
+create function app.cells_meeting_guard()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if coalesce(current_setting('cells.command', true), '') in ('cells.move_meeting', 'cells.cancel_meeting')
+     and (new.starts_at, new.ends_at, new.meeting_state, new.moved_venue)
+         is distinct from (old.starts_at, old.ends_at, old.meeting_state, old.moved_venue)
+     and exists (select 1 from app.cells_programmes p
+                  where p.meeting_id = new.meeting_id and p.programme_state = 'published') then
+    perform app.cmd_fail('conflict', '{"meeting_id": "programme_published"}', old.revision);
+  end if;
+  return new;
+end;
+$$;
+
+create trigger cells_meetings_published_guard
+  before update on app.cells_meetings
+  for each row execute function app.cells_meeting_guard();
 
 comment on function api.cells_command(jsonb) is
   'Stories 2.6 and 5.1-5.4: cell setup and membership, meeting schedules and exceptions with '
@@ -1382,6 +1434,7 @@ comment on function app.cells_erase_member(jsonb) is
 
 revoke all on function
   app.cells_programme_follow_meeting(),
+  app.cells_meeting_guard(),
   app.cells_programme_projection(uuid),
   app.cells_part_ref(uuid, bigint, uuid),
   app.cells_linkable(app.cells_meetings),

@@ -209,7 +209,7 @@ Map<String, Object?> projectionData({int? revision}) => {
       'department': null,
     },
   ],
-  if (revision != null) 'revision': revision,
+  'revision': ?revision,
   if (revision != null) 'published_at': '2099-03-01T10:00:00Z',
 };
 
@@ -500,6 +500,43 @@ void main() {
       expect(byKey('plan-stale'), findsNothing);
     });
 
+    testWidgets('the leader\'s own save reloads cleanly and can be published '
+        '(5.4 review fix 1)', (tester) async {
+      final h = await pumpPlan(tester, read: readWith());
+      await tester.enterText(byKey('plan-topic'), '  New   topic ');
+      await tapKey(tester, 'plan-add-part');
+      await settle(tester);
+      await tester.enterText(byKey('part-label-2'), 'Closing prayer');
+      await settle(tester);
+      await tapKey(tester, 'plan-save');
+      h.cells.programme = readWith(
+        programme: {
+          ...programmeData(
+            revision: 3,
+            parts: [
+              ...(programmeData()['parts'] as List)
+                  .cast<Map<String, Object?>>(),
+              part(
+                '6c6c6c6c-6c6c-4c6c-8c6c-6c6c6c6c6c6c',
+                3,
+                'Closing prayer',
+                '2099-03-06T16:50:00Z',
+                '2099-03-06T17:05:00Z',
+              ),
+            ],
+          ),
+          'topic': 'New topic',
+        },
+      );
+      h.gateway.sent.single.confirm(programmeData(revision: 3), 3);
+      await settle(tester);
+      expect(byKey('cells-notice-programmeSaved'), findsOneWidget);
+      expect(byKey('plan-stale'), findsNothing);
+      await tapKey(tester, 'plan-publish');
+      expect(h.gateway.sent.last.wire['command'], 'cells.publish_programme');
+      expect(h.gateway.sent.last.wire['expected_revision'], 3);
+    });
+
     testWidgets('a newer revision with nothing typed simply reloads', (
       tester,
     ) async {
@@ -628,7 +665,8 @@ void main() {
       await settle(tester);
       expect(byKey('part-gap-1'), findsNothing);
       await tapKey(tester, 'plan-save');
-      final parts = (h.gateway.sent.single.wire['payload'] as Map)['parts'] as List;
+      final parts =
+          (h.gateway.sent.single.wire['payload'] as Map)['parts'] as List;
       expect(parts[1]['linked_slot_id'], _slot);
       expect(parts[1]['assignee_member_id'], isNull);
     });

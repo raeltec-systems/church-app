@@ -79,6 +79,10 @@ enum CellNotice {
 
   /// Story 5.4: a part's Duties side was refused (an overlap, for example).
   programmePartRefused,
+
+  /// Story 5.4: the meeting's programme is published, so the meeting is not
+  /// moved or cancelled from Cell meetings.
+  meetingHasProgramme,
 }
 
 /// One command in flight or just answered.
@@ -265,6 +269,8 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
     return switch (error.code) {
       ErrorCode.conflict when f['member_id'] == 'open_request' =>
         CellNotice.openRequest,
+      ErrorCode.conflict when f['meeting_id'] == 'programme_published' =>
+        CellNotice.meetingHasProgramme,
       ErrorCode.conflict when f['meeting_id'] == 'cancelled' =>
         CellNotice.alreadyCancelled,
       ErrorCode.validationFailed when f['meeting_id'] == 'started' =>

@@ -7,7 +7,7 @@ data until Q4 is approved).
 
 ## Story 5.1: a cell's weekly meetings and the next one on My cell
 
-Migration: `supabase/migrations/20261021090000_cells_meetings.sql` (no row deletions; one file).
+Migration: `supabase/migrations/20261021073514_cells_meetings.sql` (no row deletions; one file).
 Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-generate-a-cell-s-weekly-meetings-and-show-the-next-one-on-m-plan.md`.
 Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.1/`.
 
@@ -89,7 +89,7 @@ The E2E uses `+44 7700 900200-900206` and removes everything it created.
 
 ### Hosted staging (parent session, then the owner)
 
-Apply `20261021090000_cells_meetings.sql` to staging after `20261015190139`, then run
+Apply `20261021073514_cells_meetings.sql` to staging after `20261015190139`, then run
 `tools/ci/verify-hosted.sql` with `expected_env=staging`. No Edge Function changes and no rows file.
 
 ### Owner manual checks (staging, phone and web, story 5.1)

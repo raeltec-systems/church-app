@@ -3,7 +3,7 @@ title: 'Generate a cell''s weekly meetings and show the next one on My cell'
 type: 'feature'
 ticket: '1'
 created: '2026-10-21'
-status: 'in-progress'
+status: 'done'
 baseline_revision: '179d805'
 route: 'full'
 route_source: 'auto'
@@ -75,7 +75,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261021090000_cells_meetings.sql` -- schedule, meeting and audit tables; generation; `cells.set_schedule`, `cells.move_meeting`, `cells.cancel_meeting`, `cells.reinstate_meeting`; authorizer, dispatch and in-scope replaced; `api.cells_meetings`; `api.cells_my_cell` with `meetings`; deletion hook replaced; privileges.
+- [x] `supabase/migrations/20261021073514_cells_meetings.sql` -- schedule, meeting and audit tables; generation; `cells.set_schedule`, `cells.move_meeting`, `cells.cancel_meeting`, `cells.reinstate_meeting`; authorizer, dispatch and in-scope replaced; `api.cells_meetings`; `api.cells_my_cell` with `meetings`; deletion hook replaced; privileges.
 - [x] `supabase/tests/cells_meetings_test.sql` -- pgTAP for the matrix; extend `command_foundation_test.sql`.
 - [x] Client: `domain/cell_meetings.dart`, controller, staff **Cell meetings** screen (`/cells/meetings`), My cell next-meeting card, adapter, fakes, exports, routes; staff destination for Admin and cell leaders/assistants.
 - [x] Tests: `packages/client_core/test/identity/cell_meetings_test.dart`, app tests.
@@ -89,7 +89,7 @@ context:
 ## Implementation Notes
 
 - Implemented directly in this session (no implementation subagent).
-- Server: `supabase/migrations/20261021090000_cells_meetings.sql`. Generation uses
+- Server: `supabase/migrations/20261021073514_cells_meetings.sql`. Generation uses
   `app.notifications_occurrences` with `{zone}` from the stored schedule, so reads do not depend on
   the Q2 gate; only `set_schedule` calls `app.notifications_policy()`. Ids are kept by an upsert on
   `(cell_id, occurrence_date)` that touches a row only when it is in the future and its nominal
@@ -149,5 +149,5 @@ Windows paths at baseline too; ci:secrets, ci:migrations (base origin/ccr-93e730
 ci:function-imports pass.
 
 **Manual checks (if no CLI):**
-- Parent session: apply `20261021090000_cells_meetings.sql` to staging after `20261015190139`, run `tools/ci/verify-hosted.sql` (`expected_env=staging`). No Edge Function change.
+- Parent session: apply `20261021073514_cells_meetings.sql` to staging after `20261015190139`, run `tools/ci/verify-hosted.sql` (`expected_env=staging`). No Edge Function change.
 - Owner staging walkthrough (`docs/runbooks/cells-meetings.md`, "Owner manual checks").

@@ -81,6 +81,10 @@ At inception, each consuming story pins the provider entry that delivers this ou
 
 - Unknown: Q3 gates actual giving details/publication and Q5 gates each intended content use, including offline distribution. No prototype beneficiary, Bible choice or assumed compilation license is production approval.
 - Constraint: External giving handoff does not demonstrate a completed gift or guarantee store approval. Keep manual/unavailable states explicit.
+- Decision (owner, 2026-10-21): the mobile bottom tabs are the design's five: Home, Bible & Hymns, Sermons, Give, Calendar. My duties and My cell are reached from their Home cards and the Account menu, and Calendar shows the member's duties and cell meetings (entry 19). Entry 1's navigation assumption is confirmed.
+- Decision (owner, 2026-10-21): a giving destination added or changed by one Admin is verified by a different Admin before members see it; until then it stays a draft (entry 3).
+- Decision (owner, 2026-10-21): an event's organisers and Admin see the names of members who RSVP; everyone else sees only the count and spaces left (entry 11).
+- Decision (owner, 2026-10-21): Media and members given a worship-leader scope set Hymns for this Sunday (entry 8).
 - Constraint: This owner implements its required mobile/staff screens, source-specific safe projections, files and refresh signals, and registers its real lifecycle/handover/deletion effects before activation; shared platform stubs are not completed feature behavior.
 - Risk: high because this epic changes shared application behavior or protected state; require the independent permission/contract regression suite and owner release review in addition to story checks.
 - Constraint: `packages/client_core/test/boundaries_test.dart` bans persistence APIs outside the auth-session and recovery storage adapters (AD-13). Entry 4 changes it deliberately to allow exactly one public-content cache adapter; no other entry adds persistence.

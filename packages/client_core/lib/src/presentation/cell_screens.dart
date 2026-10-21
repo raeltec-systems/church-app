@@ -4188,7 +4188,18 @@ class _AbsenceSectionState extends ConsumerState<_AbsenceSection> {
         s.noticeAction?.command.startsWith('cells.') == true &&
         s.noticeAction!.command.contains('cannot_attend');
     final children = <Widget>[_heading(context, 'Can\'t come?')];
-    if (s.pending != null) {
+    final sending = s.pending?.command.contains('cannot_attend') ?? false;
+    // A form closes once the server has the notice; a refusal keeps what was
+    // typed (5.7 review fix 8).
+    if (_editing && !busy && absenceAction) {
+      final n = s.notice;
+      if (n == CellNotice.absenceSent || n == CellNotice.absenceChanged) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _editing) setState(() => _editing = false);
+        });
+      }
+    }
+    if (sending) {
       children.add(_muted(context, 'Sending…'));
     } else if (s.notice case final n? when absenceAction) {
       final (_, title, message) = _noticeText(n, s.noticeAction);
@@ -4247,7 +4258,6 @@ class _AbsenceSectionState extends ConsumerState<_AbsenceSection> {
                 onPressed: busy
                     ? null
                     : () {
-                        setState(() => _editing = false);
                         if (notice == null) {
                           ctl.sendCannotAttend(_note.text);
                         } else {

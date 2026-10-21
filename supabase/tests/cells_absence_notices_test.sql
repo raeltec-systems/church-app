@@ -4,7 +4,7 @@
 -- nobody else reads it. HTTP evidence: tools/identity-e2e/cells-absence.mjs. SYNTHETIC data only
 -- (fictional range +1 202 555 0181-0192).
 begin;
-select plan(26);
+select plan(33);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000057' || lpad(n::text, 2, '0'))::uuid $$;
@@ -223,6 +223,9 @@ select is(pg_temp.change(4, 1, 'again') ->> 'code', 'conflict', 'a stale change 
 select is(pg_temp.change(10, 2, 'not mine') ->> 'code', 'not_found', 'another member cannot change it');
 select is(pg_temp.cells(pg_temp.c(10), 'cells.withdraw_cannot_attend', 2, jsonb_build_object('notice_id', pg_temp.nid())) ->> 'code',
   'not_found', 'another member cannot withdraw it');
+-- The leaders' inbox got the notice (the worker delivered it).
+update app.notifications_jobs set job_state = 'delivered', finished_at = now(), processed_by_principal = gen_random_uuid()
+ where source_id = pg_temp.nid() and reminder_kind = 'cells_absence_sent' and job_state = 'pending';
 create temp table wd as select pg_temp.cells(pg_temp.c(4), 'cells.withdraw_cannot_attend', 2,
   jsonb_build_object('notice_id', pg_temp.nid())) as r;
 select is((select (r #>> '{data,state}') || '|' || (r #>> '{data,notified}') from wd), 'withdrawn|2',
@@ -237,12 +240,39 @@ select is((select count(*)::int from jsonb_array_elements(
             where a ->> 'member_id' = pg_temp.mid(4)::text), 0, 'the leader no longer sees it');
 select is(pg_temp.send(4, null, null) #>> '{data,state}', 'open', 'the member can send a new one');
 
+-- Review gaps: a cancelled meeting, a quick withdrawal, two senders erased -------------------------------
+select is(pg_temp.cells(pg_temp.c(4), 'cells.send_cannot_attend', null,
+  jsonb_build_object('meeting_id', (select meeting_id from app.cells_meetings where cell_id = pg_temp.sh()
+                                     order by occurrence_date offset 2 limit 1))) #>> '{data,state}',
+  'open', 'setup: a notice for a later meeting');
+create temp table later as select (select meeting_id from app.cells_meetings where cell_id = pg_temp.sh()
+  order by occurrence_date offset 2 limit 1) as id;
+select is((select count(*)::int from app.notifications_jobs j join app.cells_absence_notices n on n.notice_id = j.source_id
+            where n.meeting_id = (select id from later) and j.reminder_kind = 'cells_absence_withdrawn'), 0,
+  'setup: nothing announced yet');
+select is(pg_temp.cells(pg_temp.c(4), 'cells.withdraw_cannot_attend', 1,
+  jsonb_build_object('notice_id', (select notice_id from app.cells_absence_notices
+                                    where meeting_id = (select id from later) and member_id = pg_temp.mid(4)))) #>> '{data,notified}',
+  '0', 'a withdrawal before the leaders got the notice is not announced (both cancelled)');
+select is((select count(*)::int from app.notifications_jobs j join app.cells_absence_notices n on n.notice_id = j.source_id
+            where n.meeting_id = (select id from later) and j.job_state = 'pending'), 0,
+  'and nothing is left waiting');
+select pg_temp.cells(pg_temp.c(2), 'cells.cancel_meeting',
+  (select revision from app.cells_meetings where meeting_id = pg_temp.mt2()), jsonb_build_object('meeting_id', pg_temp.mt2()));
+select is(pg_temp.cells(pg_temp.c(4), 'cells.send_cannot_attend', null,
+  jsonb_build_object('meeting_id', pg_temp.mt2())) #>> '{field_errors,meeting_id}', 'cancelled',
+  'no notice for a cancelled meeting');
+
 -- Audit and deletion -----------------------------------------------------------------------------------------
 select ok((select not (coalesce(string_agg(a::text, ' '), '') ~ '(travelling|back late)') from app.cells_absence_audit a),
   'the audit never holds a note');
-select app.cells_erase_member(jsonb_build_object('member_id', pg_temp.mid(10), 'phase', 'erase'));
-select is((select count(*)::int from app.cells_absence_notices where member_id = pg_temp.mid(10)), 0,
-  'deletion anonymises the member''s notices');
+select lives_ok($$ select app.cells_erase_member(jsonb_build_object('member_id', pg_temp.mid(10), 'phase', 'erase')) $$,
+  'deleting one sender works');
+select lives_ok($$ select app.cells_erase_member(jsonb_build_object('member_id', pg_temp.mid(4), 'phase', 'erase')) $$,
+  'and a second sender with a notice for the same meeting (no collision)');
+select is((select count(*)::int from app.cells_absence_notices
+            where member_id in (pg_temp.mid(4), pg_temp.mid(10)) or (member_id = '00000000-0000-0000-0000-000000000000' and notice_state = 'open')), 0,
+  'deletion anonymises and withdraws the members'' notices');
 
 select * from finish();
 rollback;

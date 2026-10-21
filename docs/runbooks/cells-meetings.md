@@ -568,14 +568,14 @@ An intention, not attendance: a confirmed member tells the cell they cannot come
 | Command | `expected_revision` | Payload | Refusals |
 |---|---|---|---|
 | `cells.send_cannot_attend` | `null` | `{meeting_id, note?}` | not a current member of the meeting's cell: `not_found`; one already open: `conflict {"meeting_id": "exists"}`; cancelled or started meeting: `validation_failed` |
-| `cells.change_cannot_attend` | notice `revision` | `{notice_id, note?}` | someone else's: `not_found`; withdrawn: `conflict {"notice_id": "withdrawn"}`; stale: `conflict` |
+| `cells.change_cannot_attend` | notice `revision` | `{notice_id, note?}` | someone else's, or the sender no longer in the cell: `not_found`; withdrawn: `conflict {"notice_id": "withdrawn"}`; stale: `conflict`; cancelled or started meeting: `validation_failed` |
 | `cells.withdraw_cannot_attend` | notice `revision` | `{notice_id}` | as change |
 
-Each one tells the cell's current leaders and assistants through the inbox (`cells_absence_sent` "Someone can't attend", or `cells_absence_withdrawn` "Can come after all"; generic text, no name; the link opens **Cell meetings**). A change replaces a notice still waiting.
+Each one tells the cell's current leaders and assistants through the inbox (a withdrawal they never heard about the first time is not announced) (`cells_absence_sent` "Someone can't attend", or `cells_absence_withdrawn` "Can come after all"; generic text, no name; the link opens **Cell meetings**). A change replaces a notice still waiting.
 
 ### Reads
 
-- `api.cells_programme` adds `absences: [{notice_id, member_id, display_name, note, sent_at, updated_at, part_ids}]` for the cell's leader and assistant only (not Pastor oversight).
+- `api.cells_programme` adds `absences: [{notice_id, member_id, display_name, note, sent_at, updated_at, part_ids}]` for the cell's leader and assistant only (not Pastor oversight), from current members of the cell. Deleting a member withdraws and anonymises their notices.
 - `api.cells_meeting_programme` adds `my_absence` (the reader's own open notice). No member reads another's notice or note.
 
 ### Clients

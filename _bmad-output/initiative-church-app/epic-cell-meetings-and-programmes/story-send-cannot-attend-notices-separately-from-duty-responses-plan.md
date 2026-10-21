@@ -76,3 +76,16 @@ context:
 - The single `send` command with an optional revision became `send` (expected null) and `change` (expected revision): the 1.4 kernel refuses an expected revision on a command that does not require one.
 
 ## Review Triage Log
+
+Independent review of `d783437..c6dfcbe` (2026-10-21, a separate reviewer agent; re-created functions diffed against their previous definitions: nothing dropped; privacy holds). Not yet on staging, so fixed in place:
+
+1. High, fixed: deleting a member left their open notice open under the nil id, so deleting a second sender for the same meeting hit the open-notice unique index and the deletion hook failed. Erasure now also withdraws the notice. pgTAP: two senders erased.
+2. Medium, fixed: a member who left the cell could still change or withdraw a notice, and leaders kept seeing it. Change and withdraw need a current membership (`app.cells_lock_absence`); the staff read lists notices of current members only. Ending notices on transfer is story 5.9.
+3. Medium, fixed: change and withdraw now refuse a cancelled, withdrawn or started meeting like send (the intention record is fixed once the meeting starts).
+4. Low, fixed: the leaders' notice is actionable only while the meeting is on (scheduled or moved).
+5. Low, fixed: a withdrawal before the leaders got the first notice cancels it and announces nothing. pgTAP added.
+6. Low, fixed: send holds the membership row (`for key share`) while writing.
+7. Low, fixed (client): "Sending..." in Can't come? shows only for a notice command.
+8. Low, fixed (client): the note form closes only when the server has the notice; a refusal keeps what was typed.
+9. Low, accepted: the client hides the controls by its clock; the server decides (a refusal is shown).
+10. Tests added: cancelled-meeting refusal, the quick withdrawal, the deletion collision. Not added: recipient-set edge cases (revoked grant, a sender who leads) beyond the code review.

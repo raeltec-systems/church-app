@@ -275,6 +275,9 @@ async function main() {
     // ------------------------------------------------------------------ change and withdraw
     const byOther = await cells(other.token, 'cells.change_cannot_attend', 1, { notice_id: notice, note: 'not mine' });
     const changed = await cells(member.token, 'cells.change_cannot_attend', 1, { notice_id: notice, note: NOTE2 });
+    // The leaders' inbox got it (stands in for the worker's delivery): a withdrawal is then announced.
+    psql(`update app.notifications_jobs set job_state = 'delivered', finished_at = now(), processed_by_principal = gen_random_uuid()
+           where source_id = '${notice}' and reminder_kind = 'cells_absence_sent' and job_state = 'pending'`);
     const otherWithdraw = await cells(other.token, 'cells.withdraw_cannot_attend', changed.revision, { notice_id: notice });
     const withdrawn = await cells(member.token, 'cells.withdraw_cannot_attend', changed.revision, { notice_id: notice });
     const told = psql(`select count(*) from app.notifications_jobs where source_id = '${notice}'

@@ -426,6 +426,9 @@ void main() {
       expect(h.gateway.sent.single.wire['expected_revision'], 2);
       h.gateway.sent.single.unknown();
       await settle(tester);
+      // An unknown outcome keeps the form; the member closes it.
+      await tapKey(tester, 'my-cell-absence-keep');
+      await settle(tester);
       await tapKey(tester, 'my-cell-absence-withdraw');
       await settle(tester);
       expect(h.gateway.sent, hasLength(1));

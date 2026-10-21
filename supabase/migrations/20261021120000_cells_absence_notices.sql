@@ -101,7 +101,8 @@ begin
                   and v_notice.notice_state = case when p_key ->> 'reminder_kind' = 'cells_absence_withdrawn'
                                                    then 'withdrawn' else 'open' end
                   and exists (select 1 from app.cells_meetings m
-                               where m.meeting_id = v_notice.meeting_id and m.starts_at > now()),
+                               where m.meeting_id = v_notice.meeting_id and m.starts_at > now()
+                                 and m.meeting_state in ('scheduled', 'moved')),
     'recipient_eligible', app.cells_programme_capacity((p_key ->> 'recipient_member_id')::uuid,
                                                        v_notice.cell_id) is not null);
 end;
@@ -134,6 +135,16 @@ declare
   v_member uuid;
   v_count integer := 0;
 begin
+  -- A withdrawal the leaders never heard about the first time is not announced (5.7 review fix 5).
+  if p_kind = 'cells_absence_withdrawn'
+     and not exists (select 1 from app.notifications_jobs j
+                      where j.source_type = 'cells_absence_notice' and j.source_id = p_notice.notice_id
+                        and j.reminder_kind = 'cells_absence_sent'
+                        and j.job_state not in ('pending', 'cancelled')) then
+    perform app.notifications_cancel(jsonb_build_object(
+      'source_type', 'cells_absence_notice', 'source_id', p_notice.notice_id, 'reason', 'source_revised'));
+    return 0;
+  end if;
   -- A change replaces any notice still waiting for the leaders.
   perform app.notifications_cancel(jsonb_build_object(
     'source_type', 'cells_absence_notice', 'source_id', p_notice.notice_id, 'reason', 'source_revised'));
@@ -181,6 +192,44 @@ $$;
 -- Commands (the member themself)
 -- ---------------------------------------------------------------------------------------------
 
+-- Locks the actor's own open-or-withdrawn notice for a change or a withdrawal: the meeting first,
+-- then the notice. The sender must still be a confirmed member of the meeting's cell and the meeting
+-- on and ahead (5.7 review fixes 2 and 3).
+create function app.cells_lock_absence(p_payload jsonb, p_member_id uuid)
+returns app.cells_absence_notices
+language plpgsql
+set search_path = ''
+as $$
+declare
+  v_notice app.cells_absence_notices;
+  v_meeting app.cells_meetings;
+begin
+  select n.* into v_notice from app.cells_absence_notices n
+   where n.notice_id = (p_payload ->> 'notice_id')::uuid;
+  if v_notice.notice_id is null or v_notice.member_id <> p_member_id then
+    perform app.cmd_fail('not_found');
+  end if;
+  select m.* into v_meeting from app.cells_meetings m where m.meeting_id = v_notice.meeting_id for share;
+  perform 1 from app.cells_memberships cm
+   where cm.cell_id = v_meeting.cell_id and cm.ended_at is null and cm.member_id = p_member_id
+     for key share;
+  if not found then
+    perform app.cmd_fail('not_found');
+  end if;
+  select n.* into v_notice from app.cells_absence_notices n where n.notice_id = v_notice.notice_id for update;
+  if v_notice.notice_state = 'withdrawn' then
+    perform app.cmd_fail('conflict', '{"notice_id": "withdrawn"}', v_notice.revision);
+  end if;
+  if v_meeting.meeting_state in ('cancelled', 'withdrawn') then
+    perform app.cmd_fail('validation_failed', '{"meeting_id": "cancelled"}');
+  end if;
+  if v_meeting.starts_at <= now() then
+    perform app.cmd_fail('validation_failed', '{"meeting_id": "started"}');
+  end if;
+  return v_notice;
+end;
+$$;
+
 -- cells.send_cannot_attend {meeting_id, note?}: a current confirmed member of the meeting's cell,
 -- for a meeting on and ahead; expected = null. A second notice while one is open:
 -- conflict {"meeting_id": "exists"} (change it with cells.change_cannot_attend).
@@ -212,10 +261,14 @@ begin
   perform app.cells_require_open();
   select m.* into v_meeting from app.cells_meetings m
    where m.meeting_id = (p_payload ->> 'meeting_id')::uuid for share;
-  if v_meeting.meeting_id is null or v_meeting.meeting_state = 'withdrawn'
-     or not exists (select 1 from app.cells_memberships cm
-                     where cm.cell_id = v_meeting.cell_id and cm.ended_at is null
-                       and cm.member_id = v_actor.member_id) then
+  if v_meeting.meeting_id is null or v_meeting.meeting_state = 'withdrawn' then
+    perform app.cmd_fail('not_found');
+  end if;
+  -- The membership is held while the notice is written (5.7 review fix 6).
+  perform 1 from app.cells_memberships cm
+   where cm.cell_id = v_meeting.cell_id and cm.ended_at is null and cm.member_id = v_actor.member_id
+     for key share;
+  if not found then
     perform app.cmd_fail('not_found');
   end if;
   if v_meeting.meeting_state = 'cancelled' then
@@ -257,7 +310,6 @@ declare
   v_errors jsonb;
   v_note record;
   v_notice app.cells_absence_notices;
-  v_meeting app.cells_meetings;
   v_notified integer;
 begin
   select a.* into v_actor from app.cells_command_actor(p_actor) a;
@@ -273,22 +325,9 @@ begin
     perform app.cmd_fail('validation_failed', v_errors);
   end if;
   perform app.cells_require_open();
-  select n.* into v_notice from app.cells_absence_notices n
-   where n.notice_id = (p_payload ->> 'notice_id')::uuid;
-  if v_notice.notice_id is null or v_notice.member_id <> v_actor.member_id then
-    perform app.cmd_fail('not_found');
-  end if;
-  -- Meeting before notice.
-  select m.* into v_meeting from app.cells_meetings m where m.meeting_id = v_notice.meeting_id for share;
-  select n.* into v_notice from app.cells_absence_notices n where n.notice_id = v_notice.notice_id for update;
-  if v_notice.notice_state = 'withdrawn' then
-    perform app.cmd_fail('conflict', '{"notice_id": "withdrawn"}', v_notice.revision);
-  end if;
+  v_notice := app.cells_lock_absence(p_payload, v_actor.member_id);
   if v_notice.revision <> p_expected_revision then
     perform app.cmd_fail('conflict', null, v_notice.revision);
-  end if;
-  if v_meeting.starts_at <= now() then
-    perform app.cmd_fail('validation_failed', '{"meeting_id": "started"}');
   end if;
   update app.cells_absence_notices n
      set note = v_note.value, revision = n.revision + 1, updated_at = now()
@@ -325,14 +364,7 @@ begin
     perform app.cmd_fail('validation_failed', v_errors);
   end if;
   perform app.cells_require_open();
-  select n.* into v_notice from app.cells_absence_notices n
-   where n.notice_id = (p_payload ->> 'notice_id')::uuid for update;
-  if v_notice.notice_id is null or v_notice.member_id <> v_actor.member_id then
-    perform app.cmd_fail('not_found');
-  end if;
-  if v_notice.notice_state = 'withdrawn' then
-    perform app.cmd_fail('conflict', '{"notice_id": "withdrawn"}', v_notice.revision);
-  end if;
+  v_notice := app.cells_lock_absence(p_payload, v_actor.member_id);
   if v_notice.revision <> p_expected_revision then
     perform app.cmd_fail('conflict', null, v_notice.revision);
   end if;
@@ -563,7 +595,10 @@ begin
              order by n.sent_at, n.notice_id)
         from app.cells_absence_notices n
         left join app.identity_members im on im.member_id = n.member_id
-       where n.meeting_id = v_meeting.meeting_id and n.notice_state = 'open'), '[]'::jsonb)
+       where n.meeting_id = v_meeting.meeting_id and n.notice_state = 'open'
+         and exists (select 1 from app.cells_memberships cm
+                      where cm.cell_id = v_meeting.cell_id and cm.ended_at is null
+                        and cm.member_id = n.member_id)), '[]'::jsonb)
       else '[]'::jsonb end,
     'roster', case when v_full then coalesce((
       select jsonb_agg(jsonb_build_object('member_id', cm.member_id, 'display_name', im.display_name,
@@ -683,7 +718,10 @@ begin
     -- Story 5.2: a contact need is kept as an anonymous fact.
     update app.cells_meeting_contact_needs n set member_id = v_nil where n.member_id = v_member;
     -- Story 5.7: the member's notices keep no person and no note.
-    update app.cells_absence_notices n set member_id = v_nil, note = null where n.member_id = v_member;
+    update app.cells_absence_notices n
+       set member_id = v_nil, note = null, notice_state = 'withdrawn',
+           withdrawn_at = coalesce(n.withdrawn_at, now())
+     where n.member_id = v_member;
     update app.cells_absence_audit a set actor_member_id = v_nil where a.actor_member_id = v_member;
     -- Story 5.4: the member's name leaves every published projection (their parts read as open).
     v_parts := array(select pt.part_id from app.cells_programme_parts pt
@@ -744,6 +782,7 @@ revoke all on function
   app.cells_absence_reminder_check(jsonb),
   app.cells_absence_notify(app.cells_absence_notices, text),
   app.cells_absence_json(uuid),
+  app.cells_lock_absence(jsonb, uuid),
   app.cells_absence_outcome(uuid, integer),
   app.cells_send_cannot_attend(uuid, bigint, jsonb),
   app.cells_change_cannot_attend(uuid, bigint, jsonb),

@@ -41,6 +41,37 @@ Future<Harness> pumpMobile(
   return h;
 }
 
+/// Go to a route without a tab (Status, Fixture, Access).
+Future<void> goTo(WidgetTester tester, String path) async {
+  GoRouter.of(tester.element(find.byType(Scaffold).first)).go(path);
+  await tester.pumpAndSettle();
+}
+
+/// A member at Home with no duties, cell or inbox items.
+Future<Harness> pumpMember(
+  WidgetTester tester, {
+  Size size = const Size(390, 844),
+  ThemeMode themeMode = ThemeMode.light,
+  double textScale = 1,
+  String location = ClientPaths.home,
+}) => pumpMobile(
+  tester,
+  size: size,
+  themeMode: themeMode,
+  textScale: textScale,
+  location: location,
+  setUp: (h) {
+    h.grants.myAccess = AccessReadOk(syntheticGrants());
+    h.memberAccess.next = MemberAccessGranted(syntheticMemberSummary());
+    h.duties.mine = AccessReadOk(
+      MyDuties.fromJson({
+        'member_id': '22222222-2222-4222-8222-222222222222',
+        'assignments': const <Object?>[],
+      }),
+    );
+  },
+);
+
 Future<void> tapKey(WidgetTester tester, String key) async {
   await tester.ensureVisible(find.byKey(Key(key)));
   await tester.tap(find.byKey(Key(key)));
@@ -256,10 +287,30 @@ void main() {
     final handle = tester.ensureSemantics();
     await pumpMobile(tester);
     expect(find.text('Status: operational'), findsOneWidget);
-    final tab = tester.getSemantics(find.bySemanticsLabel('Status').first);
-    expect(tab.role, SemanticsRole.tab);
+    // No member access: no tabs, only the top bar's way in.
+    expect(find.bySemanticsLabel('App sections'), findsNothing);
+    expect(find.byKey(const Key('nav-/account')), findsOneWidget);
+    handle.dispose();
+  });
+
+  testWidgets('a member gets the Home, Duties and My cell tabs', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await pumpMember(tester);
+    for (final label in ['Home', 'Duties', 'My cell']) {
+      final tab = tester.getSemantics(find.bySemanticsLabel(label).last);
+      expect(tab.role, SemanticsRole.tab, reason: label);
+    }
     final list = tester.getSemantics(find.bySemanticsLabel('App sections'));
     expect(list.role, SemanticsRole.tabBar);
+    // The internal screens have no tab.
+    for (final path in ['/status', '/fixture', '/access']) {
+      expect(find.byKey(Key('nav-$path')), findsNothing, reason: path);
+    }
+    // Home's top bar: the inbox and the member's initials.
+    expect(find.byKey(const Key('nav-/inbox')), findsOneWidget);
+    expect(find.text('MO'), findsOneWidget);
     handle.dispose();
   });
 
@@ -810,8 +861,7 @@ void main() {
   ) async {
     await pumpMobile(tester, configured: false);
     expect(find.byKey(const Key('missing-config')), findsOneWidget);
-    await tapKey(tester, 'nav-/fixture');
-    await tester.pumpAndSettle();
+    await goTo(tester, ClientPaths.fixture);
     await tester.enterText(find.byKey(const Key('intent-key-field')), 'k');
     await tapKey(tester, 'create-button');
     await tester.pump();
@@ -823,9 +873,7 @@ void main() {
   testWidgets('synthetic read/write fixture: create, change, conflict kept', (
     tester,
   ) async {
-    final h = await pumpMobile(tester);
-    await tapKey(tester, 'nav-/fixture');
-    await tester.pumpAndSettle();
+    final h = await pumpMobile(tester, location: ClientPaths.fixture);
     expect(find.text('Fixture command'), findsWidgets);
 
     await tester.enterText(find.byKey(const Key('intent-key-field')), 'mobile');
@@ -870,7 +918,8 @@ void main() {
       await tapKey(tester, 'nav-/account');
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
-      await tapKey(tester, 'nav-/access');
+      GoRouter.of(tester.element(find.byType(Scaffold).first))
+          .go(ClientPaths.access);
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
       expect(find.byKey(const Key('my-role-pastor')), findsOneWidget);
@@ -916,11 +965,9 @@ void main() {
       h.gateway.sent.last.unknown();
       await tester.pump();
       expect(find.text('Not confirmed'), findsOneWidget);
-      await tapKey(tester, 'nav-/status');
-      await tester.pumpAndSettle();
+      await goTo(tester, ClientPaths.status);
       expect(find.text('Not confirmed'), findsNothing);
-      await tapKey(tester, 'nav-/fixture');
-      await tester.pumpAndSettle();
+      await goTo(tester, ClientPaths.fixture);
       // The unconfirmed command is still known, so it is checked again under
       // its own request id instead of being resubmitted as a new one.
       expect(find.text('Not confirmed'), findsOneWidget);
@@ -936,10 +983,10 @@ void main() {
     testWidgets('a $kind tap on a tab leaves no focus ring behind', (
       tester,
     ) async {
-      await pumpMobile(tester);
-      await tester.tap(find.byKey(const Key('nav-/fixture')), kind: kind);
+      await pumpMember(tester);
+      await tester.tap(find.byKey(const Key('nav-/duties')), kind: kind);
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('intent-key-field')), findsOneWidget);
+      expect(find.byType(MyDutiesScreen), findsOneWidget);
       expect(
         FocusManager.instance.primaryFocus?.context
             ?.findAncestorWidgetOfExactType<NavItem>(),
@@ -964,36 +1011,40 @@ void main() {
   testWidgets('keyboard: page actions, then the tabs; Enter navigates', (
     tester,
   ) async {
-    await pumpMobile(tester);
+    await pumpMember(tester);
     String? navLabel() => FocusManager.instance.primaryFocus?.context
         ?.findAncestorWidgetOfExactType<NavItem>()
         ?.label;
     final seen = <String?>[];
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0; i < 30 && !seen.contains('Duties'); i++) {
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
       seen.add(navLabel());
     }
-    // Reload (page action), then Status, then Fixture.
-    expect(seen, [null, 'Status', 'Fixture']);
+    // The page's own controls come first, then Home, then Duties.
+    final tabs = seen.whereType<String>().toList();
+    expect(tabs, ['Home', 'Duties']);
+    expect(seen.first, isNull);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('intent-key-field')), findsOneWidget);
+    expect(find.byType(MyDutiesScreen), findsOneWidget);
     // Focus stays on the selected tab after keyboard navigation.
-    expect(navLabel(), 'Fixture');
+    expect(navLabel(), 'Duties');
   });
 
   for (final (size, mode) in [
     (const Size(390, 844), ThemeMode.light),
     (const Size(360, 640), ThemeMode.dark),
   ]) {
-    testWidgets('2x text, $size $mode: both destinations, no overflow', (
-      tester,
-    ) async {
-      await pumpMobile(tester, size: size, textScale: 2, themeMode: mode);
+    testWidgets('2x text, $size $mode: every tab, no overflow', (tester) async {
+      await pumpMember(tester, size: size, textScale: 2, themeMode: mode);
       expect(tester.takeException(), isNull);
-      await tapKey(tester, 'nav-/fixture');
-      await tester.pumpAndSettle();
+      for (final path in ['/duties', '/my-cell', '/home']) {
+        await tapKey(tester, 'nav-$path');
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: path);
+      }
+      await goTo(tester, ClientPaths.fixture);
       expect(tester.takeException(), isNull);
       expect(find.byKey(const Key('create-button')), findsOneWidget);
     });
@@ -1004,11 +1055,11 @@ void main() {
   ) async {
     tester.view.padding = const FakeViewPadding(bottom: 34);
     addTearDown(tester.view.resetPadding);
-    await pumpMobile(tester, location: '/fixture');
-    final page = tester.element(find.byType(FixtureCommandScreen));
+    await pumpMember(tester, location: ClientPaths.myDuties);
+    final page = tester.element(find.byType(MyDutiesScreen));
     expect(MediaQuery.paddingOf(page).bottom, 0);
     final bar = tester.getRect(find.bySemanticsLabel('App sections'));
-    final screen = tester.getRect(find.byType(FixtureCommandScreen));
+    final screen = tester.getRect(find.byType(MyDutiesScreen));
     expect(screen.bottom, lessThanOrEqualTo(bar.top + 0.5));
     // The bar sits above the 34 px inset.
     expect(844 - bar.bottom, greaterThanOrEqualTo(34 - 0.5));
@@ -1028,11 +1079,10 @@ void main() {
         final page = tester.element(find.byType(SignInScreen));
         expect(MediaQuery.viewInsetsOf(page).bottom, 0, reason: key);
         final field = tester.getRect(find.byKey(Key(key)));
-        final bar = tester.getRect(find.bySemanticsLabel('App sections'));
+        expect(find.bySemanticsLabel('App sections'), findsNothing);
         expect(field.height, greaterThan(20), reason: key);
         expect(field.top, greaterThanOrEqualTo(0), reason: key);
-        expect(field.bottom, lessThanOrEqualTo(bar.top + 0.5), reason: key);
-        expect(bar.bottom, lessThanOrEqualTo(844 - 336 + 0.5), reason: key);
+        expect(field.bottom, lessThanOrEqualTo(844 - 336 + 0.5), reason: key);
         tester.view.resetViewInsets();
         await tester.pumpAndSettle();
       }
@@ -1048,7 +1098,7 @@ void main() {
       r'''package:(shared_preferences|hive|sqflite|drift|isar|path_provider|flutter_secure_storage)/|dart:html|localStorage|sessionStorage|indexedDB''',
     );
     for (final f in files) {
-      final path = f.path.replaceAll(r'\\', '/');
+      final path = f.path.replaceAll('\\', '/');
       final src = f.readAsStringSync();
       final reached = boundaryViolations(path, src);
       if (path == 'lib/main.dart') {
@@ -1084,6 +1134,9 @@ void main() {
       await tapKey(tester, 'nav-/account');
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'nav-/home');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
       await tapKey(tester, 'nav-/inbox');
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
@@ -1104,6 +1157,7 @@ void main() {
       const item = '31313131-3131-4131-8131-313131313131';
       final h = await pumpMobile(
         tester,
+        location: ClientPaths.home,
         setUp: (h) {
           h.grants.myAccess = AccessReadOk(syntheticGrants());
           h.inbox.inbox = AccessReadOk(
@@ -1177,7 +1231,7 @@ void main() {
     },
   );
 
-  testWidgets('story 3.7: the Fixture tab leads to the test reminders', (
+  testWidgets('story 3.7: the Fixture screen leads to the test reminders', (
     tester,
   ) async {
     final h = await pumpMobile(tester, location: ClientPaths.fixture);

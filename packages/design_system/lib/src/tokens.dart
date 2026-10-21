@@ -196,7 +196,10 @@ abstract final class ChurchGeometry {
   static const double mobileFormPadding = 20;
   static const double sectionGap = 20;
   static const double cardPadding = 16;
-  static const double mobileCardRadius = 16;
+  static const double mobileCardRadius = 18;
+
+  /// Hero (navy) cards and large cards.
+  static const double heroRadius = 22;
   static const double mobileInputRadius = 14;
   static const double staffInputRadius = 10;
   static const double staffButtonRadius = 12;
@@ -209,29 +212,107 @@ abstract final class ChurchGeometry {
   static const double staffCompactBreakpoint = 840;
 }
 
-/// Type scale (size / weight) from the design contract. Families (Outfit,
-/// Figtree, JetBrains Mono) are not bundled yet: platform fonts are used.
+/// Font families from the design handoff (docs/design-handoff/README.md):
+/// Outfit for headings and large numbers, Figtree for body and UI, JetBrains
+/// Mono for eyebrows and programme times. Until the font files are bundled
+/// (pubspec `fonts:`), Flutter falls back to the platform font for each.
+abstract final class ChurchFonts {
+  static const heading = 'Outfit';
+  static const body = 'Figtree';
+  static const mono = 'JetBrains Mono';
+}
+
+/// Type scale (size / weight / family) from the design handoff.
 abstract final class ChurchType {
   /// Mobile tab labels 11.5 (700 active / 500 inactive).
-  static const tabLabel = TextStyle(fontSize: 11.5);
+  static const tabLabel = TextStyle(
+    fontFamily: ChurchFonts.body,
+    fontSize: 11.5,
+  );
+
+  /// A tab screen's title: 28/700 Outfit in brand.
   static const mobileScreenTitle = TextStyle(
+    fontFamily: ChurchFonts.heading,
     fontSize: 28,
     fontWeight: FontWeight.w700,
+    height: 1.1,
+  );
+
+  /// A pushed screen's bar title next to the back chevron: 20/600 Outfit.
+  static const detailTitle = TextStyle(
+    fontFamily: ChurchFonts.heading,
+    fontSize: 20,
+    fontWeight: FontWeight.w600,
   );
   static const sectionTitle = TextStyle(
+    fontFamily: ChurchFonts.heading,
     fontSize: 19,
     fontWeight: FontWeight.w600,
   );
-  static const cardTitle = TextStyle(fontSize: 17, fontWeight: FontWeight.w600);
-  static const body = TextStyle(fontSize: 16, fontWeight: FontWeight.w400);
-  static const staffBody = TextStyle(fontSize: 15, fontWeight: FontWeight.w400);
-  static const secondary = TextStyle(fontSize: 14, fontWeight: FontWeight.w400);
-  static const chip = TextStyle(fontSize: 13, fontWeight: FontWeight.w600);
+  static const cardTitle = TextStyle(
+    fontFamily: ChurchFonts.heading,
+    fontSize: 18,
+    fontWeight: FontWeight.w600,
+  );
+
+  /// A list item's title: 17/700 Figtree.
+  static const itemTitle = TextStyle(
+    fontFamily: ChurchFonts.body,
+    fontSize: 17,
+    fontWeight: FontWeight.w700,
+  );
+  static const body = TextStyle(
+    fontFamily: ChurchFonts.body,
+    fontSize: 16,
+    fontWeight: FontWeight.w400,
+    height: 1.4,
+  );
+  static const staffBody = TextStyle(
+    fontFamily: ChurchFonts.body,
+    fontSize: 15,
+    fontWeight: FontWeight.w400,
+  );
+  static const secondary = TextStyle(
+    fontFamily: ChurchFonts.body,
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+  );
+  static const chip = TextStyle(
+    fontFamily: ChurchFonts.body,
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+  );
+
+  /// Eyebrows and programme times: JetBrains Mono.
+  static const mono = TextStyle(fontFamily: ChurchFonts.mono, fontSize: 13);
+  static const eyebrow = TextStyle(
+    fontFamily: ChurchFonts.mono,
+    fontSize: 11,
+    letterSpacing: 1.3,
+  );
+
+  /// Upper-case section labels inside cards ("PROGRAMME", "INSTRUCTIONS").
+  static const label = TextStyle(
+    fontFamily: ChurchFonts.body,
+    fontSize: 13,
+    fontWeight: FontWeight.w700,
+    letterSpacing: 0.8,
+  );
+
+  /// The big number of a date badge.
+  static const dateNumber = TextStyle(
+    fontFamily: ChurchFonts.heading,
+    fontSize: 22,
+    fontWeight: FontWeight.w700,
+    height: 1.05,
+  );
   static const staffPageTitle = TextStyle(
+    fontFamily: ChurchFonts.heading,
     fontSize: 24,
     fontWeight: FontWeight.w700,
   );
   static const modalTitle = TextStyle(
+    fontFamily: ChurchFonts.heading,
     fontSize: 21,
     fontWeight: FontWeight.w700,
   );

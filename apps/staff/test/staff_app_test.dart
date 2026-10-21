@@ -1102,7 +1102,7 @@ void main() {
       r'''package:(shared_preferences|hive|sqflite|drift|isar|path_provider|flutter_secure_storage)/|dart:html|localStorage|sessionStorage|indexedDB''',
     );
     for (final f in files) {
-      final path = f.path.replaceAll(r'\\', '/');
+      final path = f.path.replaceAll('\\', '/');
       final src = f.readAsStringSync();
       final reached = boundaryViolations(path, src);
       if (path == 'lib/main.dart') {

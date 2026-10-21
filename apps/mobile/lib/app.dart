@@ -7,72 +7,35 @@ import 'package:go_router/go_router.dart';
 
 typedef MobileDestination = ({String path, String label, IconData icon});
 
-/// Platform destinations plus the member's account (story 2.1). The five member tabs (Home, Bible & Hymns,
-/// Sermons, Give, Calendar) arrive with their feature epics.
-const mobileDestinations = <MobileDestination>[
+/// The member's bottom tabs (design handoff: Home first; Bible & Hymns,
+/// Sermons, Give and Calendar join as their epics ship). Duties and My cell
+/// stand in until then. Inbox and the account live in the top bar; the
+/// platform status, fixture and access screens are internal and keep their
+/// routes but no tab.
+const mobileMemberDestinations = <MobileDestination>[
+  (path: ClientPaths.home, label: 'Home', icon: Icons.home_outlined),
   (
-    path: ClientPaths.status,
-    label: 'Status',
-    icon: Icons.monitor_heart_outlined,
+    path: ClientPaths.myDuties,
+    label: 'Duties',
+    icon: Icons.event_available_outlined,
   ),
-  (path: ClientPaths.fixture, label: 'Fixture', icon: Icons.science_outlined),
-  (path: ClientPaths.account, label: 'Account', icon: Icons.person_outline),
+  (path: ClientPaths.myCell, label: 'My cell', icon: Icons.groups_outlined),
 ];
 
-/// Story 2.3: shown while the server grants the caller member access; lists
-/// the caller's current roles and scopes. Admin grant work is on staff web.
-const mobileAccessDestination = (
-  path: ClientPaths.access,
-  label: 'Access',
-  icon: Icons.badge_outlined,
-);
+/// The tabs for the caller's current grants: none before member access (the
+/// top bar's Sign in is the way in).
+List<MobileDestination> mobileDestinationsFor(MemberGrants? grants) =>
+    grants == null ? const [] : mobileMemberDestinations;
 
-/// Story 2.6: shown while the server grants the caller member access; the
-/// member's own cell and a request to join or change cell.
-const mobileCellDestination = (
-  path: ClientPaths.myCell,
-  label: 'My cell',
-  icon: Icons.groups_outlined,
-);
-
-/// Story 3.1: shown while the server grants the caller member access; the
-/// member's durable inbox (it holds every reminder, push or not).
-const mobileInboxDestination = (
-  path: ClientPaths.inbox,
-  label: 'Inbox',
-  icon: Icons.inbox_outlined,
-);
-
-/// Story 4.5: shown while the server grants the caller member access; the
-/// member Home with the My duties card (later features add their cards).
-const mobileHomeDestination = (
-  path: ClientPaths.home,
-  label: 'Home',
-  icon: Icons.home_outlined,
-);
-
-/// Story 4.1: shown while the server grants the caller member access; the
-/// member's duties (Accept / Can't make it).
-const mobileDutiesDestination = (
-  path: ClientPaths.myDuties,
-  label: 'Duties',
-  icon: Icons.assignment_turned_in_outlined,
-);
-
-/// The tabs for the caller's current grants (presentation only).
-List<MobileDestination> mobileDestinationsFor(MemberGrants? grants) => [
-  ...mobileDestinations,
-  if (grants != null) mobileHomeDestination,
-  if (grants != null) mobileInboxDestination,
-  if (grants != null) mobileDutiesDestination,
-  if (grants != null) mobileAccessDestination,
-  if (grants != null) mobileCellDestination,
-];
+/// Routes that show the top bar (logo, inbox, account): Home, and every
+/// screen of a caller without member access.
+bool _showsTopBar(String location, bool member) =>
+    !member || location == ClientPaths.home;
 
 class MobileApp extends StatefulWidget {
   const MobileApp({
     super.key,
-    this.initialLocation = ClientPaths.status,
+    this.initialLocation = ClientPaths.home,
     this.themeMode,
   });
 
@@ -125,7 +88,10 @@ class _MobileAppState extends State<MobileApp> {
   }
 }
 
-/// Fixed bottom tabs on a surface bar with a 1 px top border.
+/// The member app frame from the design handoff: a top bar on Home (logo,
+/// inbox with its unread count, the member's initials), the bottom tabs on a
+/// surface bar with a 1 px top line (active = link colour, 700), and pushed
+/// screens with their own back title.
 class MobileShell extends ConsumerWidget {
   const MobileShell({
     super.key,
@@ -143,9 +109,9 @@ class MobileShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final c = ChurchColors.of(context);
-    final destinations = mobileDestinationsFor(
-      ref.watch(myAccessProvider.select((s) => s.grants)),
-    );
+    final grants = ref.watch(myAccessProvider.select((s) => s.grants));
+    final destinations = mobileDestinationsFor(grants);
+    final member = grants != null;
     // Story 2.3: every navigation (a new shell) and every resume asks the
     // server for the caller's grants again.
     return AccessRefresher(
@@ -154,6 +120,8 @@ class MobileShell extends ConsumerWidget {
           policy: WidgetOrderTraversalPolicy(),
           child: Column(
             children: [
+              if (_showsTopBar(location, member))
+                _TopBar(member: member, location: location),
               // The tab bar below owns the bottom safe area; pages must not add
               // it again. This Scaffold also already shrinks for the on-screen
               // keyboard; the page's own Scaffold must not shrink for it a second
@@ -161,54 +129,236 @@ class MobileShell extends ConsumerWidget {
               Expanded(
                 child: MediaQuery(
                   data: MediaQuery.of(context)
-                      .removePadding(removeBottom: true)
+                      .removePadding(
+                        removeBottom: destinations.isNotEmpty,
+                        removeTop: _showsTopBar(location, member),
+                      )
                       .removeViewInsets(removeBottom: true),
                   child: FocusTraversalGroup(child: child),
                 ),
               ),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: c.surface,
-                  border: Border(top: BorderSide(color: c.line)),
-                ),
-                child: SafeArea(
-                  top: false,
-                  child: FocusTraversalGroup(
-                    child: Semantics(
-                      role: SemanticsRole.tabBar,
-                      label: 'App sections',
-                      explicitChildNodes: true,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        child: Row(
-                          children: [
-                            for (final d in destinations)
-                              Expanded(
-                                child: NavItem(
-                                  key: Key('nav-${d.path}'),
-                                  label: d.label,
-                                  icon: d.icon,
-                                  vertical: true,
-                                  selected: location == d.path,
-                                  autofocus:
-                                      focusSelectedNav && location == d.path,
-                                  onTap: () => goFromNav(context, d.path),
+              if (destinations.isNotEmpty)
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: c.surface,
+                    border: Border(top: BorderSide(color: c.line)),
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: FocusTraversalGroup(
+                      child: Semantics(
+                        role: SemanticsRole.tabBar,
+                        label: 'App sections',
+                        explicitChildNodes: true,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 6, 4, 4),
+                          child: Row(
+                            children: [
+                              for (final d in destinations)
+                                Expanded(
+                                  child: NavItem(
+                                    key: Key('nav-${d.path}'),
+                                    label: d.label,
+                                    icon: d.icon,
+                                    vertical: true,
+                                    selected: _selected(d.path),
+                                    autofocus:
+                                        focusSelectedNav && _selected(d.path),
+                                    onTap: () => goFromNav(context, d.path),
+                                  ),
                                 ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
       ),
     );
   }
+
+  /// A tab stays selected on its own detail screens (a duty, a plan).
+  bool _selected(String path) =>
+      location == path ||
+      (path != ClientPaths.home && location.startsWith('$path/'));
+}
+
+/// The handoff's top bar: the emblem alone (it carries the church name), then
+/// the inbox with its unread count and the member's initials; a caller
+/// without member access sees a Sign in pill instead.
+class _TopBar extends ConsumerWidget {
+  const _TopBar({required this.member, required this.location});
+
+  final bool member;
+  final String location;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ChurchColors.of(context);
+    final signedIn =
+        ref.watch(accountProvider.select((s) => s.accountId)) != null;
+    return ColoredBox(
+      color: c.bg,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 12, 6),
+          child: Row(
+            children: [
+              const ChurchLogo(),
+              const Spacer(),
+              if (member) ...[
+                _InboxButton(location: location),
+                const SizedBox(width: 4),
+                _AccountButton(location: location),
+              ] else
+                FocusRing(
+                  child: FilledButton(
+                    key: const Key('nav-/account'),
+                    onPressed: () => goFromNav(context, ClientPaths.account),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                    child: Text(signedIn ? 'Account' : 'Sign in'),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InboxButton extends ConsumerWidget {
+  const _InboxButton({required this.location});
+
+  final String location;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ChurchColors.of(context);
+    final items = ref.watch(inboxProvider.select((s) => s.inbox?.items));
+    final unread = items?.where((i) => i.opened == false).length ?? 0;
+    final label = unread == 0 ? 'Inbox' : 'Inbox, $unread unread';
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: FocusRing(
+        radius: 22,
+        child: InkResponse(
+          key: const Key('nav-/inbox'),
+          radius: 22,
+          onTap: () => goFromNav(context, ClientPaths.inbox),
+          child: SizedBox.square(
+            dimension: ChurchGeometry.minTarget,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(Icons.inbox_outlined, color: c.ink, size: 24),
+                if (unread > 0)
+                  Positioned(
+                    top: 6,
+                    right: 4,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 18),
+                      height: 18,
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      decoration: BoxDecoration(
+                        color: c.accent,
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        unread > 99 ? '99+' : '$unread',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountButton extends ConsumerWidget {
+  const _AccountButton({required this.location});
+
+  final String location;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ChurchColors.of(context);
+    final summary = ref.watch(memberSummaryControllerProvider).result;
+    final name = summary is MemberAccessGranted
+        ? summary.summary.displayName
+        : null;
+    return Semantics(
+      button: true,
+      label: 'Account',
+      excludeSemantics: true,
+      child: FocusRing(
+        radius: 22,
+        child: InkResponse(
+          key: const Key('nav-/account'),
+          radius: 22,
+          onTap: () => goFromNav(context, ClientPaths.account),
+          child: SizedBox.square(
+            dimension: ChurchGeometry.minTarget,
+            child: Center(
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: c.primary,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: name == null
+                    ? const Icon(
+                        Icons.person_outline,
+                        color: Colors.white,
+                        size: 20,
+                      )
+                    : Text(
+                        initialsOf(name),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Two initials for an avatar: the first letters of the first and last
+/// words, skipping a leading "SYNTHETIC" marker.
+String initialsOf(String name) {
+  final words = name
+      .split(RegExp(r'\s+'))
+      .where((w) => w.isNotEmpty && w != 'SYNTHETIC')
+      .toList();
+  if (words.isEmpty) return '?';
+  final first = words.first.characters.first;
+  final last = words.length > 1 ? words.last.characters.first : '';
+  return (first + last).toUpperCase();
 }

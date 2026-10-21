@@ -98,40 +98,60 @@ class RadioSegments<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
+    // Handoff: a grey track (radius 14, padding 4) with equal segments; the
+    // chosen one is a white segment with a soft shadow.
     return Semantics(
       role: SemanticsRole.radioGroup,
       label: label,
       explicitChildNodes: true,
-      child: Wrap(
-        spacing: 4,
-        runSpacing: 4,
-        children: [
-          for (final o in options)
-            FocusRing(
-              child: OutlinedButton.icon(
-                key: ValueKey('segment-${o.label}'),
-                onPressed: onChanged == null ? null : () => onChanged!(o.value),
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: o.value == selected ? c.blueBg : null,
-                  foregroundColor: c.link,
-                  side: BorderSide(
-                    color: o.value == selected ? c.link : c.muted,
-                    width: o.value == selected ? 2 : 1,
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: c.surface2,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            for (final o in options)
+              Expanded(
+                child: FocusRing(
+                  radius: 13,
+                  child: TextButton(
+                    key: ValueKey('segment-${o.label}'),
+                    onPressed: onChanged == null
+                        ? null
+                        : () => onChanged!(o.value),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(0, ChurchGeometry.minTarget),
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      backgroundColor: o.value == selected
+                          ? c.surface
+                          : Colors.transparent,
+                      foregroundColor: o.value == selected ? c.ink : c.muted,
+                      shadowColor: const Color(0x1F000000),
+                      elevation: o.value == selected ? 1.5 : 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      textStyle: const TextStyle(
+                        fontFamily: ChurchFonts.body,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    child: Semantics(
+                      inMutuallyExclusiveGroup: true,
+                      checked: o.value == selected,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(o.label, maxLines: 1),
+                      ),
+                    ),
                   ),
                 ),
-                icon: Icon(
-                  o.value == selected
-                      ? Icons.check
-                      : (o.icon ?? Icons.circle_outlined),
-                ),
-                label: Semantics(
-                  inMutuallyExclusiveGroup: true,
-                  checked: o.value == selected,
-                  child: Text(o.label),
-                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -181,7 +201,7 @@ class NavItem extends StatelessWidget {
         : (selected ? c.link : c.muted);
     final highlight = onDark
         ? (selected ? ChurchStaffChrome.activeItem : Colors.transparent)
-        : (selected ? c.blueBg : Colors.transparent);
+        : Colors.transparent;
     final text = Text(
       label,
       textAlign: vertical ? TextAlign.center : TextAlign.start,
@@ -194,8 +214,8 @@ class NavItem extends StatelessWidget {
         ? Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: fg),
-              const SizedBox(height: 2),
+              Icon(icon, color: fg, size: 24),
+              const SizedBox(height: 3),
               text,
             ],
           )
@@ -324,8 +344,7 @@ class RequestStateBanner extends StatelessWidget {
       padding: const EdgeInsets.all(ChurchGeometry.cardPadding),
       decoration: BoxDecoration(
         color: bg,
-        border: Border.all(color: fg),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -341,9 +360,9 @@ class RequestStateBanner extends StatelessWidget {
                 )
               else
                 ExcludeSemantics(
-                  child: Icon(icon ?? Icons.info_outline, color: fg),
+                  child: Icon(icon ?? Icons.info_outline, color: fg, size: 20),
                 ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Semantics(
                   // A focusable banner is itself named by its title; it is
@@ -352,16 +371,19 @@ class RequestStateBanner extends StatelessWidget {
                   excludeSemantics: node != null,
                   child: Text(
                     title,
-                    style: ChurchType.cardTitle.copyWith(color: fg),
+                    style: ChurchType.body.copyWith(
+                      color: fg,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             message,
-            style: ChurchLayout.of(context).body.copyWith(color: c.ink),
+            style: ChurchType.secondary.copyWith(color: c.ink, height: 1.4),
           ),
           if (actions.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -377,13 +399,10 @@ class RequestStateBanner extends StatelessWidget {
                             onPressed: a.onPressed,
                             child: Text(a.label),
                           )
-                        : OutlinedButton(
+                        : TextButton(
                             key: a.key,
                             onPressed: a.onPressed,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: c.ink,
-                              side: BorderSide(color: fg),
-                            ),
+                            style: TextButton.styleFrom(foregroundColor: fg),
                             child: Text(a.label),
                           ),
                   ),

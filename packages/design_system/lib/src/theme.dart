@@ -6,8 +6,10 @@ import 'tokens.dart';
 ThemeData churchMobileTheme(Brightness brightness) => _theme(
   brightness == Brightness.dark ? ChurchColors.dark : ChurchColors.light,
   layout: ChurchLayout.mobile,
-  // Screen title 28/700 in brand.
-  title: ChurchType.mobileScreenTitle,
+  // Handoff: a pushed screen's bar title is 20/600 Outfit in ink beside the
+  // back chevron (tab screens set their own 28/700 brand title in the body).
+  title: ChurchType.detailTitle,
+  titleColor: null,
   headerBackground: null,
   titleSpacing: ChurchGeometry.mobileContentPadding,
   inputRadius: ChurchGeometry.mobileInputRadius,
@@ -21,6 +23,7 @@ ThemeData churchStaffTheme() => _theme(
   layout: ChurchLayout.staff,
   // Page title 24/700 #14246B on a white header, padding 18/32.
   title: ChurchType.staffPageTitle,
+  titleColor: ChurchColors.light.brand,
   headerBackground: ChurchColors.light.surface,
   titleSpacing: 32,
   inputRadius: ChurchGeometry.staffInputRadius,
@@ -33,6 +36,7 @@ ThemeData _theme(
   ChurchColors c, {
   required ChurchLayout layout,
   required TextStyle title,
+  required Color? titleColor,
   required Color? headerBackground,
   required double titleSpacing,
   required double inputRadius,
@@ -61,6 +65,26 @@ ThemeData _theme(
     ),
     visualDensity: VisualDensity.standard,
     shape: WidgetStatePropertyAll(buttonShape),
+    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 18)),
+    textStyle: const WidgetStatePropertyAll(
+      TextStyle(
+        fontFamily: ChurchFonts.body,
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
+  // Handoff: secondary buttons are a quiet 1.5 px line in ink, not a muted
+  // outline in the link colour.
+  final outlinedStyle = buttonStyle.copyWith(
+    foregroundColor: WidgetStatePropertyAll(c.ink),
+    side: WidgetStateProperty.resolveWith(
+      (states) => BorderSide(color: c.line, width: 1.5),
+    ),
+  );
+  final textStyle = buttonStyle.copyWith(
+    foregroundColor: WidgetStatePropertyAll(c.link),
+    padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10)),
   );
   OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
     borderRadius: BorderRadius.circular(inputRadius),
@@ -72,9 +96,14 @@ ThemeData _theme(
     visualDensity: VisualDensity.standard,
     materialTapTargetSize: MaterialTapTargetSize.padded,
     extensions: [c, layout],
+    fontFamily: ChurchFonts.body,
     textTheme: Typography.material2021(platform: TargetPlatform.android)
         .englishLike
-        .apply(bodyColor: c.ink, displayColor: c.ink)
+        .apply(
+          bodyColor: c.ink,
+          displayColor: c.ink,
+          fontFamily: ChurchFonts.body,
+        )
         .copyWith(
           bodyLarge: layout.body.copyWith(color: c.ink),
           bodyMedium: layout.body.copyWith(color: c.ink),
@@ -84,8 +113,8 @@ ThemeData _theme(
     focusColor: c.focus.withValues(alpha: 0.85),
     appBarTheme: AppBarTheme(
       backgroundColor: headerBackground ?? c.bg,
-      foregroundColor: c.brand,
-      titleTextStyle: title.copyWith(color: c.brand),
+      foregroundColor: titleColor ?? c.ink,
+      titleTextStyle: title.copyWith(color: titleColor ?? c.ink),
       titleSpacing: titleSpacing,
       centerTitle: false,
       shape: headerBackground == null
@@ -105,14 +134,14 @@ ThemeData _theme(
       ),
     ),
     filledButtonTheme: FilledButtonThemeData(style: buttonStyle),
-    outlinedButtonTheme: OutlinedButtonThemeData(style: buttonStyle),
-    textButtonTheme: TextButtonThemeData(style: buttonStyle),
+    outlinedButtonTheme: OutlinedButtonThemeData(style: outlinedStyle),
+    textButtonTheme: TextButtonThemeData(style: textStyle),
     iconButtonTheme: IconButtonThemeData(
       style: ButtonStyle(
         minimumSize: const WidgetStatePropertyAll(
           Size.square(ChurchGeometry.minTarget),
         ),
-        foregroundColor: WidgetStatePropertyAll(c.brand),
+        foregroundColor: WidgetStatePropertyAll(c.ink),
       ),
     ),
     inputDecorationTheme: InputDecorationTheme(

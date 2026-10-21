@@ -388,8 +388,11 @@ void main() {
       expect(byKey('duty-footer'), findsOneWidget);
       expect(byKey('duty-accept-$_a1'), findsNothing);
       expect(
-        tester.widget<Text>(byKey('duty-leaders-$_a1')).data,
-        contains('Leader: SYNTHETIC Leader'),
+        find.descendant(
+          of: byKey('duty-leaders-$_a1'),
+          matching: find.text('SYNTHETIC Leader'),
+        ),
+        findsOneWidget,
       );
       await tapKey(tester, 'duty-withdraw-$_a1');
       await settle(tester);
@@ -664,7 +667,7 @@ void main() {
       );
       expect(find.text('2 awaiting your response'), findsOneWidget);
       expect(byKey('home-duty-$_a1'), findsOneWidget);
-      expect(find.text('Next: Sunday preaching 1'), findsOneWidget);
+      expect(find.text('Sunday preaching 1'), findsOneWidget);
       await tapKey(tester, 'home-duty-accept-$_a1');
       final sent = h.gateway.sent.single;
       expect(sent.wire['command'], 'duties.respond');

@@ -6,13 +6,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../application/access_controllers.dart' show myAccessProvider;
+import '../application/account_controllers.dart'
+    show memberSummaryControllerProvider;
 import '../application/duties_controllers.dart';
 import '../application/providers.dart' show contactLauncherProvider;
 import '../domain/access_grants.dart';
 import '../domain/church_time.dart';
 import '../domain/duties.dart';
 import '../domain/duty_calendar.dart';
+import '../domain/member_access.dart' show MemberAccessGranted;
 import 'cell_screens.dart' show MyCellHomeCard;
+import 'church_widgets.dart';
 import 'followups_screens.dart' show FollowUpPaths, MyFollowUpsHomeCard;
 
 part 'duties_coverage_screens.dart';
@@ -762,7 +766,7 @@ String _timesText(BuildContext context, DutyTimes t) {
 (String, StatusTone) _responseLabel(DutyResponse r) => switch (r) {
   DutyResponse.accepted => ('Accepted', StatusTone.success),
   DutyResponse.declined => ('Can\'t make it', StatusTone.warning),
-  DutyResponse.pending => ('Awaiting response', StatusTone.info),
+  DutyResponse.pending => ('Awaiting response', StatusTone.warning),
 };
 
 String _accountLabel(AccountStanding a) => switch (a) {
@@ -2327,42 +2331,13 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
     ? ('Can\'t make it anymore', StatusTone.warning)
     : _responseLabel(r);
 
-/// The church date as a small badge ("4" over "Jan").
+/// The handoff's date badge (weekday, day, month) in church time.
 class _DateBadge extends StatelessWidget {
   const _DateBadge({required this.at});
   final DateTime at;
 
   @override
-  Widget build(BuildContext context) {
-    final c = ChurchColors.of(context);
-    final w = ChurchTime.wall(at);
-    final month = MaterialLocalizations.of(context)
-        .formatMediumDate(w)
-        .split(' ')
-        .firstWhere((p) => RegExp(r'^[A-Za-z]').hasMatch(p), orElse: () => '');
-    return ExcludeSemantics(
-      child: Container(
-        width: 52,
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        decoration: BoxDecoration(
-          color: c.blueBg,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Column(
-          children: [
-            Text(
-              '${w.day}',
-              style: ChurchType.cardTitle.copyWith(color: c.blueFg),
-            ),
-            Text(
-              month.replaceAll(',', ''),
-              style: ChurchType.secondary.copyWith(color: c.blueFg),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => ChurchDateBadge(at: at);
 }
 
 /// Story 4.1, mobile: the member's duties across departments. Story 4.5:
@@ -2841,58 +2816,74 @@ class _DutyFooter extends ConsumerWidget {
     final c = ChurchColors.of(context);
     final now = DateTime.now();
     final id = duty.assignmentId;
-    final buttons = <Widget>[
-      if (duty.needsResponse(now)) ...[
-        FocusRing(
-          child: FilledButton(
-            key: Key('duty-accept-$id'),
-            onPressed: busy
-                ? null
-                : () => ref
-                      .read(myDutiesProvider.notifier)
-                      .respond(
-                        duty,
-                        DutyResponse.accepted,
-                        note: ref.read(dutyAnswerNotesProvider)[id],
-                      ),
-            child: const Text('Accept'),
+    final Widget? content;
+    if (duty.needsResponse(now)) {
+      content = Row(
+        children: [
+          Expanded(
+            child: FocusRing(
+              child: OutlinedButton(
+                key: Key('duty-decline-$id'),
+                style: OutlinedButton.styleFrom(minimumSize: const Size(0, 52)),
+                onPressed: busy
+                    ? null
+                    : () => _showDeclineSheet(context, ref, duty),
+                child: const Text('Can\'t make it'),
+              ),
+            ),
           ),
-        ),
-        FocusRing(
-          child: OutlinedButton(
-            key: Key('duty-decline-$id'),
-            onPressed: busy
-                ? null
-                : () => _showDeclineSheet(context, ref, duty),
-            child: const Text('Can\'t make it'),
+          const SizedBox(width: 10),
+          Expanded(
+            child: FocusRing(
+              child: FilledButton(
+                key: Key('duty-accept-$id'),
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
+                onPressed: busy
+                    ? null
+                    : () => ref
+                          .read(myDutiesProvider.notifier)
+                          .respond(
+                            duty,
+                            DutyResponse.accepted,
+                            note: ref.read(dutyAnswerNotesProvider)[id],
+                          ),
+                child: const Text('Accept'),
+              ),
+            ),
           ),
-        ),
-      ] else if (duty.canWithdraw(now))
-        FocusRing(
-          child: OutlinedButton(
-            key: Key('duty-withdraw-$id'),
-            onPressed: busy
-                ? null
-                : () => _showDeclineSheet(context, ref, duty),
-            child: const Text('Can\'t make it anymore'),
+        ],
+      );
+    } else if (duty.canWithdraw(now)) {
+      content = Row(
+        children: [
+          Expanded(
+            child: Text(
+              'You accepted this duty',
+              style: ChurchType.body.copyWith(
+                color: c.greenFg,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
-        ),
-    ];
-    if (buttons.isEmpty) return const SizedBox.shrink();
-    return DecoratedBox(
+          FocusRing(
+            child: TextButton(
+              key: Key('duty-withdraw-$id'),
+              style: TextButton.styleFrom(foregroundColor: c.redFg),
+              onPressed: busy
+                  ? null
+                  : () => _showDeclineSheet(context, ref, duty),
+              child: const Text('Can\'t make it anymore'),
+            ),
+          ),
+        ],
+      );
+    } else {
+      content = null;
+    }
+    if (content == null) return const SizedBox.shrink();
+    return KeyedSubtree(
       key: const Key('duty-footer'),
-      decoration: BoxDecoration(
-        color: c.surface,
-        border: Border(top: BorderSide(color: c.line)),
-      ),
-      // Clear of the home indicator and gesture bar.
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Wrap(spacing: 8, runSpacing: 8, children: buttons),
-        ),
-      ),
+      child: BottomActionBar(child: content),
     );
   }
 }
@@ -2980,20 +2971,52 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
   };
 
   @override
-  Widget build(BuildContext context) {
-    final a = widget.duty;
-    final id = a.assignmentId;
-    final now = DateTime.now();
+  Widget build(BuildContext context) =>
+      widget.full ? _detail(context) : _summary(context);
+
+  /// The chips under a duty: the answer as the member reads it, and Short
+  /// notice when it was given late.
+  Widget _status(BuildContext context, MyDuty a, DateTime now) {
     final (sending, unsent) = _commandState(ref, a);
     final (shown, shownTone) = _shownStatus(a, sending, unsent);
-    final canAnswer = a.needsResponse(now);
-    final details = <Widget>[
-      _heading(context, a.title),
-      Text(a.ownerLabel, key: Key('duty-owner-$id')),
-      Text(_timesText(context, a.times)),
-      if (a.location case final l?) Text('Where: $l'),
-      if (a.changes case final c?) ...[
-        const SizedBox(height: 4),
+    final id = a.assignmentId;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        StatusLabel(
+          key: Key('my-duty-status-$id'),
+          label: shown,
+          tone: shownTone,
+        ),
+        // Story 4.8: given at short notice, the member is asked to answer
+        // now (the answer-by time is when it was given).
+        if (a.answerNow(now))
+          StatusLabel(
+            key: Key('duty-short-notice-$id'),
+            label: 'Short notice: please answer now',
+            tone: StatusTone.warning,
+          ),
+      ],
+    );
+  }
+
+  /// "Ushering · Report 08:30" (the handoff's subline).
+  String _subline(BuildContext context, MyDuty a) => [
+    a.ownerLabel,
+    if (a.times.reportingAt case final r?)
+      'Report ${_clock(context, r)}'
+    else
+      _clock(context, a.times.startsAt),
+  ].join(' · ');
+
+  /// What changed since the member last answered (story 4.2).
+  List<Widget> _changes(BuildContext context, MyDuty a) {
+    final id = a.assignmentId;
+    final c = ChurchColors.of(context);
+    return [
+      if (a.changes case final ch?)
         Wrap(
           spacing: 8,
           runSpacing: 4,
@@ -3004,9 +3027,13 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
               label: 'Changed',
               tone: StatusTone.info,
             ),
-            Text('What changed: ${DutyFields.describe(c)}.'),
+            Text(
+              'What changed: ${DutyFields.describe(ch)}.',
+              style: ChurchType.secondary.copyWith(color: c.ink),
+            ),
           ],
         ),
+      if (a.changes != null)
         if (a.previousResponse case final p? when p != DutyResponse.pending)
           _muted(
             context,
@@ -3014,187 +3041,328 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
                     '${a.response == DutyResponse.pending ? 'Please answer again.' : ''}'
                 .trim(),
           ),
-      ],
       if (a.notesUpdatedAt case final u?)
         _muted(
           context,
           'Details updated ${_when(context, u)}. Your answer stands.',
         ),
-      if (a.topic case final t?) Text('Topic: $t'),
-      if (a.scripture case final sc?) Text('Scripture: $sc'),
-      if (widget.full)
-        if (a.instructions case final i?) ...[
-          const SizedBox(height: 4),
-          Text('Instructions: $i', key: Key('duty-instructions-$id')),
-        ],
-      const SizedBox(height: 8),
-      Wrap(
-        spacing: 8,
-        runSpacing: 4,
-        crossAxisAlignment: WrapCrossAlignment.center,
+    ];
+  }
+
+  /// The list card (handoff "My duties"): date badge, duty, department and
+  /// report time, place, the answer chip; inline Accept / Can't make it while
+  /// an answer is needed. The whole card opens the duty.
+  Widget _summary(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final a = widget.duty;
+    final id = a.assignmentId;
+    final now = DateTime.now();
+    final canAnswer = a.needsResponse(now);
+    final muted = ChurchType.secondary.copyWith(color: c.muted);
+    return ChurchCard(
+      key: Key('my-duty-$id'),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          StatusLabel(
-            key: Key('my-duty-status-$id'),
-            label: shown,
-            tone: shownTone,
+          InkWell(
+            key: Key('duty-open-$id'),
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => context.push(DutyPaths.assignment(id)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (widget.selected case final sel?)
+                  Semantics(
+                    label:
+                        'Select ${a.title}, ${_when(context, a.times.arriveBy)}',
+                    child: Checkbox(
+                      key: Key('duty-select-$id'),
+                      value: sel,
+                      onChanged: widget.busy
+                          ? null
+                          : (v) => widget.onSelected?.call(v ?? false),
+                    ),
+                  ),
+                _DateBadge(at: a.times.arriveBy),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        a.title,
+                        style: ChurchType.itemTitle.copyWith(color: c.ink),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _subline(context, a),
+                        key: Key('duty-owner-$id'),
+                        style: muted,
+                      ),
+                      if (a.location case final l?) Text(l, style: muted),
+                      const SizedBox(height: 6),
+                      _status(context, a, now),
+                      if (a.response == DutyResponse.pending &&
+                          !a.answerNow(now))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: _muted(
+                            context,
+                            'Answer by ${_when(context, a.responseDeadline)}',
+                          ),
+                        ),
+                      ..._changes(context, a),
+                      if (a.topic case final tp?)
+                        Text('Topic: $tp', style: muted),
+                      if (a.scripture case final sc?)
+                        Text('Scripture: $sc', style: muted),
+                      if (a.note case final n?)
+                        Text('Your note: $n', style: muted),
+                      // Story 4.10: what your leader recorded after the duty.
+                      if (a.outcome case final o?)
+                        _OutcomeLines(
+                          record: o,
+                          keyPrefix: 'my-duty-outcome-$id',
+                        )
+                      else if (!a.times.arriveBy.isAfter(now) &&
+                          a.response != DutyResponse.declined)
+                        _muted(context, 'Outcome: not recorded yet.'),
+                    ],
+                  ),
+                ),
+                ExcludeSemantics(
+                  child: Icon(Icons.chevron_right, color: c.muted, size: 20),
+                ),
+              ],
+            ),
           ),
-          // Story 4.8: given at short notice, the member is asked to answer
-          // now (the answer-by time is when it was given).
-          if (a.answerNow(now))
-            StatusLabel(
-              key: Key('duty-short-notice-$id'),
-              label: 'Short notice: please answer now',
-              tone: StatusTone.warning,
-            )
-          else if (a.response == DutyResponse.pending)
-            _muted(context, 'Answer by ${_when(context, a.responseDeadline)}'),
+          if (canAnswer) ...[
+            const SizedBox(height: 12),
+            TextField(
+              key: Key('duty-note-$id'),
+              controller: _note,
+              enabled: !widget.busy,
+              maxLength: 280,
+              onChanged: (v) =>
+                  ref.read(dutyAnswerNotesProvider.notifier).set(id, v),
+              decoration: const InputDecoration(
+                labelText: 'Note for your leader (optional)',
+                helperText: 'Sent with Accept or Can\'t make it.',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: FocusRing(
+                    child: OutlinedButton(
+                      key: Key('duty-decline-$id'),
+                      onPressed: widget.busy
+                          ? null
+                          : () => _showDeclineSheet(context, ref, a),
+                      child: const Text('Can\'t make it'),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FocusRing(
+                    child: FilledButton(
+                      key: Key('duty-accept-$id'),
+                      onPressed: widget.busy
+                          ? null
+                          : () => ref
+                                .read(myDutiesProvider.notifier)
+                                .respond(
+                                  a,
+                                  DutyResponse.accepted,
+                                  note: ref.read(dutyAnswerNotesProvider)[id],
+                                ),
+                      child: const Text('Accept'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
-      // Story 4.8: the reminders this duty sends (the detail screen).
-      if (widget.full && a.response != DutyResponse.declined)
-        if (a.reminders case final r?)
-          _muted(
-            context,
-            '${r.textFor(reporting: a.times.reportingAt != null)} '
-            'You can snooze a reminder from the Inbox.',
-          ),
-      if (a.declinedLater)
-        _muted(
-          context,
-          'You had accepted on ${_when(context, a.priorAcceptedAt!)}, then '
-          'told your leader you can\'t make it.',
+    );
+  }
+
+  /// The detail screen (handoff "Duty"): chip, title, department; a table
+  /// (date, report at, time, location, topic, scripture, respond by);
+  /// instructions; the leader; Add to calendar. Answers are in the footer.
+  Widget _detail(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final a = widget.duty;
+    final id = a.assignmentId;
+    final now = DateTime.now();
+    final canAnswer = a.needsResponse(now);
+    final loc = MaterialLocalizations.of(context);
+    final t = a.times;
+    final rows = <DetailRow>[
+      (label: 'Date', value: loc.formatFullDate(ChurchTime.wall(t.arriveBy))),
+      if (t.reportingAt case final r?)
+        (label: 'Report at', value: _clock(context, r)),
+      (
+        label: 'Time',
+        value: t.endsAt == null
+            ? _clock(context, t.startsAt)
+            : '${_clock(context, t.startsAt)}–${_clock(context, t.endsAt!)}',
+      ),
+      if (a.location case final l?) (label: 'Location', value: l),
+      if (a.topic case final tp?) (label: 'Topic', value: tp),
+      if (a.scripture case final sc?) (label: 'Scripture', value: sc),
+      if (a.response == DutyResponse.pending)
+        (label: 'Respond by', value: _when(context, a.responseDeadline)),
+    ];
+    return Column(
+      key: Key('my-duty-$id'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: _status(context, a, now),
         ),
-      if (a.note case final n?) Text('Your note: $n'),
-      // Story 4.10: what your leader recorded after the duty (never assumed
-      // from the time).
-      if (a.outcome case final o?)
-        _OutcomeLines(record: o, keyPrefix: 'my-duty-outcome-$id')
-      else if (!a.times.arriveBy.isAfter(now) &&
-          a.response != DutyResponse.declined)
-        _muted(context, 'Outcome: not recorded yet.'),
-      if (canAnswer) ...[
-        const SizedBox(height: 8),
-        TextField(
-          key: Key('duty-note-$id'),
-          controller: _note,
-          enabled: !widget.busy,
-          maxLength: 280,
-          onChanged: (v) =>
-              ref.read(dutyAnswerNotesProvider.notifier).set(id, v),
-          decoration: const InputDecoration(
-            labelText: 'Note for your leader (optional)',
-            helperText: 'Sent with Accept or Can\'t make it.',
+        const SizedBox(height: 6),
+        Semantics(
+          header: true,
+          child: Text(
+            a.title,
+            style: ChurchType.mobileScreenTitle.copyWith(color: c.brand),
           ),
         ),
-      ],
-      if (widget.full) ...[
-        if (a.leaders.isNotEmpty) ...[
+        const SizedBox(height: 4),
+        Text(
+          a.ownerLabel,
+          key: Key('duty-owner-$id'),
+          style: ChurchType.body.copyWith(color: c.muted),
+        ),
+        const SizedBox(height: 16),
+        ..._changes(context, a),
+        if (a.changes != null || a.notesUpdatedAt != null)
+          const SizedBox(height: 12),
+        DetailTable(rows: rows),
+        if (a.instructions case final i?) ...[
+          const SizedBox(height: 12),
+          const CardLabel('Instructions'),
+          const SizedBox(height: 6),
+          Text(i, key: Key('duty-instructions-$id')),
+        ],
+        if (a.note case final n?) ...[
+          const SizedBox(height: 12),
+          Text('Your note: $n'),
+        ],
+        if (a.declinedLater) ...[
           const SizedBox(height: 8),
-          Text(
-            [for (final l in a.leaders) '${l.roleLabel}: ${l.displayName}']
-                .join('. '),
-            key: Key('duty-leaders-$id'),
-          ),
           _muted(
             context,
-            'Contact your leader through the church if you have questions.',
+            'You had accepted on ${_when(context, a.priorAcceptedAt!)}, then '
+            'told your leader you can\'t make it.',
+          ),
+        ],
+        // Story 4.10: what your leader recorded after the duty (never assumed
+        // from the time).
+        if (a.outcome case final o?) ...[
+          const SizedBox(height: 8),
+          _OutcomeLines(record: o, keyPrefix: 'my-duty-outcome-$id'),
+        ] else if (!t.arriveBy.isAfter(now) &&
+            a.response != DutyResponse.declined) ...[
+          const SizedBox(height: 8),
+          _muted(context, 'Outcome: not recorded yet.'),
+        ],
+        // Story 4.8: the reminders this duty sends.
+        if (a.response != DutyResponse.declined)
+          if (a.reminders case final r?) ...[
+            const SizedBox(height: 8),
+            _muted(
+              context,
+              '${r.textFor(reporting: t.reportingAt != null)} '
+              'You can snooze a reminder from the Inbox.',
+            ),
+          ],
+        if (canAnswer) ...[
+          const SizedBox(height: 12),
+          TextField(
+            key: Key('duty-note-$id'),
+            controller: _note,
+            enabled: !widget.busy,
+            maxLength: 280,
+            onChanged: (v) =>
+                ref.read(dutyAnswerNotesProvider.notifier).set(id, v),
+            decoration: const InputDecoration(
+              labelText: 'Note for your leader (optional)',
+              helperText: 'Sent with Accept or Can\'t make it.',
+            ),
+          ),
+        ],
+        if (a.leaders.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          ChurchCard(
+            key: Key('duty-leaders-$id'),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final l in a.leaders)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        InitialsAvatar(name: l.displayName),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                l.displayName,
+                                style: ChurchType.body.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              Text(
+                                l.roleLabel,
+                                style: ChurchType.secondary.copyWith(
+                                  color: c.muted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 6),
+                _muted(
+                  context,
+                  'Contact your leader through the church if you have '
+                  'questions.',
+                ),
+              ],
+            ),
           ),
         ],
         if (!a.startedAt(now) && a.response != DutyResponse.declined) ...[
-          const SizedBox(height: 8),
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: FocusRing(
-              child: Builder(
-                builder: (button) => OutlinedButton.icon(
-                  key: Key('duty-calendar-$id'),
-                  onPressed: _exporting
-                      ? null
-                      : () => _addToCalendar(a, button),
-                  icon: const Icon(Icons.event_outlined),
-                  label: const Text('Add to calendar'),
-                ),
+          const SizedBox(height: 12),
+          FocusRing(
+            child: Builder(
+              builder: (button) => OutlinedButton.icon(
+                key: Key('duty-calendar-$id'),
+                onPressed: _exporting ? null : () => _addToCalendar(a, button),
+                icon: const Icon(Icons.event_outlined),
+                label: const Text('Add to calendar'),
               ),
             ),
           ),
-          _muted(context, DutyCalendar.staleCaveat),
+          const SizedBox(height: 4),
+          Center(child: _muted(context, DutyCalendar.staleCaveat)),
           if (_calendar case final r?)
             Text(_calendarText(r), key: Key('duty-calendar-result-$id')),
         ],
       ],
-    ];
-    final actions = <Widget>[
-      if (!widget.full && canAnswer) ...[
-        FocusRing(
-          child: FilledButton(
-            key: Key('duty-accept-$id'),
-            onPressed: widget.busy
-                ? null
-                : () => ref
-                      .read(myDutiesProvider.notifier)
-                      .respond(
-                        a,
-                        DutyResponse.accepted,
-                        note: ref.read(dutyAnswerNotesProvider)[id],
-                      ),
-            child: const Text('Accept'),
-          ),
-        ),
-        FocusRing(
-          child: OutlinedButton(
-            key: Key('duty-decline-$id'),
-            onPressed: widget.busy
-                ? null
-                : () => _showDeclineSheet(context, ref, a),
-            child: const Text('Can\'t make it'),
-          ),
-        ),
-      ],
-      if (!widget.full)
-        FocusRing(
-          child: TextButton(
-            key: Key('duty-open-$id'),
-            onPressed: () => context.push(DutyPaths.assignment(id)),
-            child: const Text('Details'),
-          ),
-        ),
-    ];
-    return _Card(
-      key: Key('my-duty-$id'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (widget.selected case final sel?)
-                Semantics(
-                  label:
-                      'Select ${a.title}, ${_when(context, a.times.arriveBy)}',
-                  child: Checkbox(
-                    key: Key('duty-select-$id'),
-                    value: sel,
-                    onChanged: widget.busy
-                        ? null
-                        : (v) => widget.onSelected?.call(v ?? false),
-                  ),
-                ),
-              _DateBadge(at: a.times.arriveBy),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: details,
-                ),
-              ),
-            ],
-          ),
-          if (actions.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(spacing: 8, runSpacing: 8, children: actions),
-          ],
-        ],
-      ),
     );
   }
 }
@@ -3203,43 +3371,72 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
 // Story 4.5: the Home My duties card and the member Home
 // ---------------------------------------------------------------------------
 
-/// Story 4.5, mobile: the member Home. It holds the My duties card and
-/// (story 4.6) the My follow-ups card; later features add their own cards.
-class MemberHomeScreen extends StatelessWidget {
+/// Story 4.5, mobile: the member Home (design handoff): a greeting, then the
+/// cards. The shell's top bar carries the logo, inbox and account, so the
+/// Home has no app bar of its own.
+class MemberHomeScreen extends ConsumerWidget {
   const MemberHomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ChurchColors.of(context);
     final layout = ChurchLayout.of(context);
+    final summary = ref.watch(memberSummaryControllerProvider).result;
+    final name = summary is MemberAccessGranted
+        ? summary.summary.displayName
+              .split(RegExp(r'\s+'))
+              .where((w) => w.isNotEmpty && w != 'SYNTHETIC')
+              .firstOrNull
+        : null;
+    final hour = ChurchTime.wall(DateTime.now()).hour;
+    final greeting = hour < 12
+        ? 'Good morning'
+        : hour < 17
+        ? 'Good afternoon'
+        : 'Good evening';
     return Scaffold(
-      appBar: AppBar(title: const Text('Home')),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: layout.pagePadding,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                // Story 4.6: My follow-ups shows while the member owns open
-                // work.
-                // Story 4.9: a department leader's Needs attention card
-                // comes first (hidden for everyone else).
-                // Story 5.5: My cell (the next meeting and You're on) shows
-                // for a member with a confirmed cell.
-                children: [
-                  LeaderNeedsAttentionCard(),
-                  MyCellHomeCard(),
-                  MyDutiesHomeCard(),
-                  MyFollowUpsHomeCard(),
-                ],
-              ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Semantics(
+                  header: true,
+                  child: Text(
+                    name == null ? greeting : '$greeting, $name',
+                    key: const Key('home-greeting'),
+                    style: ChurchType.mobileScreenTitle.copyWith(color: c.ink),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                // Story 4.9: a department leader's Needs attention card comes
+                // first (hidden for everyone else). Story 4.6: My follow-ups
+                // shows while the member owns open work. Story 5.5: My cell
+                // shows for a member with a confirmed cell.
+                const _HomeGap(child: LeaderNeedsAttentionCard()),
+                const _HomeGap(child: MyDutiesHomeCard()),
+                const _HomeGap(child: MyFollowUpsHomeCard()),
+                const _HomeGap(child: MyCellHomeCard()),
+              ],
             ),
           ),
         ),
       ),
     );
   }
+}
+
+/// The 16 px gap after a Home card.
+class _HomeGap extends StatelessWidget {
+  const _HomeGap({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) =>
+      Padding(padding: const EdgeInsets.only(bottom: 16), child: child);
 }
 
 /// Story 4.5: the navy My duties card: how many duties await an answer, the
@@ -3280,21 +3477,14 @@ class _MyDutiesHomeCardState extends ConsumerState<MyDutiesHomeCard> {
     final c = ChurchColors.of(context);
     final s = ref.watch(myDutiesProvider);
     final ctl = ref.read(myDutiesProvider.notifier);
-    final on = c.onPrimary;
+    const on = Colors.white;
+    final soft = Colors.white.withValues(alpha: 0.78);
     final text = ChurchType.body.copyWith(color: on);
-    final children = <Widget>[
-      Semantics(
-        header: true,
-        child: Text(
-          'My duties',
-          style: ChurchType.cardTitle.copyWith(color: on),
-        ),
-      ),
-      const SizedBox(height: 8),
-    ];
+    Widget? pill;
+    final body = <Widget>[];
     if (s.notice case final n? when s.pending == null) {
       final (_, title, message) = _noticeText(n, s.noticeAction, s.fieldErrors);
-      children.addAll([
+      body.addAll([
         Text(
           '$title. $message',
           key: Key('home-duties-notice-${n.name}'),
@@ -3323,15 +3513,15 @@ class _MyDutiesHomeCardState extends ConsumerState<MyDutiesHomeCard> {
     }
     switch (s.result) {
       case null:
-        children.add(
+        body.add(
           Text(
             'Loading your duties…',
             key: const Key('home-duties-loading'),
-            style: text,
+            style: text.copyWith(color: soft),
           ),
         );
       case AccessReadDenied():
-        children.add(
+        body.add(
           Text(
             'Your duties are shown once you have member access.',
             key: const Key('home-duties-denied'),
@@ -3339,7 +3529,7 @@ class _MyDutiesHomeCardState extends ConsumerState<MyDutiesHomeCard> {
           ),
         );
       case AccessReadFailed(:final unreachable):
-        children.add(
+        body.add(
           Text(
             unreachable
                 ? 'No connection: we couldn\'t reach the church server. This '
@@ -3353,17 +3543,34 @@ class _MyDutiesHomeCardState extends ConsumerState<MyDutiesHomeCard> {
         final seg = MyDutySegments.of(value.assignments, DateTime.now());
         final next = seg.next;
         final awaiting = seg.needsResponse.length;
-        children.add(
-          Text(
-            awaiting == 0
-                ? 'Nothing waiting for your response.'
-                : '$awaiting awaiting your response',
-            key: const Key('home-duties-awaiting'),
-            style: text,
-          ),
+        // Handoff: the count is an amber pill in the header; with nothing
+        // waiting, a quiet line says so.
+        final awaitingText = Text(
+          awaiting == 0
+              ? 'Nothing waiting for your response.'
+              : '$awaiting awaiting your response',
+          key: const Key('home-duties-awaiting'),
+          style: awaiting == 0
+              ? ChurchType.secondary.copyWith(color: soft)
+              : ChurchType.secondary.copyWith(
+                  color: const Color(0xFF3D2A00),
+                  fontWeight: FontWeight.w700,
+                ),
         );
+        if (awaiting == 0) {
+          body.add(awaitingText);
+        } else {
+          pill = Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFC94D),
+              borderRadius: BorderRadius.circular(99),
+            ),
+            child: awaitingText,
+          );
+        }
         if (next == null) {
-          children.add(
+          body.add(
             Text(
               'You have no upcoming duties.',
               key: const Key('home-duties-empty'),
@@ -3374,54 +3581,90 @@ class _MyDutiesHomeCardState extends ConsumerState<MyDutiesHomeCard> {
           final (sending, unsent) = _commandState(ref, next);
           final (shown, tone) = _shownStatus(next, sending, unsent);
           final id = next.assignmentId;
-          children.addAll([
+          final t = next.times;
+          body.addAll([
+            if (awaiting == 0) const SizedBox(height: 12),
+            Text('NEXT UP', style: ChurchType.eyebrow.copyWith(color: soft)),
             const SizedBox(height: 8),
-            Text(
-              'Next: ${next.title}',
-              key: Key('home-duty-$id'),
-              style: text.copyWith(fontWeight: FontWeight.w600),
-            ),
-            Text(
-              '${next.ownerLabel}. ${_timesText(context, next.times)}'
-              '${next.location == null ? '' : '. ${next.location}'}',
-              style: text,
-            ),
-            const SizedBox(height: 4),
-            StatusLabel(
-              key: Key('home-duty-status-$id'),
-              label: shown,
-              tone: tone,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ChurchDateBadge(at: t.arriveBy, tone: DateBadgeTone.hero),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        next.title,
+                        key: Key('home-duty-$id'),
+                        style: ChurchType.itemTitle.copyWith(color: on),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        [
+                          next.ownerLabel,
+                          if (t.reportingAt case final r?)
+                            'Report ${_clock(context, r)}'
+                          else
+                            _clock(context, t.startsAt),
+                        ].join(' · '),
+                        style: ChurchType.secondary.copyWith(color: soft),
+                      ),
+                      if (next.location case final l?)
+                        Text(
+                          l,
+                          style: ChurchType.secondary.copyWith(color: soft),
+                        ),
+                      const SizedBox(height: 8),
+                      StatusLabel(
+                        key: Key('home-duty-status-$id'),
+                        label: shown,
+                        tone: tone,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             if (next.needsResponse(DateTime.now())) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              const SizedBox(height: 16),
+              Row(
                 children: [
-                  FocusRing(
-                    child: FilledButton(
-                      key: Key('home-duty-accept-$id'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: c.surface,
-                        foregroundColor: c.link,
+                  Expanded(
+                    child: FocusRing(
+                      child: FilledButton(
+                        key: Key('home-duty-accept-$id'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: c.hero,
+                          minimumSize: const Size(0, 46),
+                        ),
+                        onPressed: s.busy
+                            ? null
+                            : () => ctl.respond(next, DutyResponse.accepted),
+                        child: const Text('Accept'),
                       ),
-                      onPressed: s.busy
-                          ? null
-                          : () => ctl.respond(next, DutyResponse.accepted),
-                      child: const Text('Accept'),
                     ),
                   ),
-                  FocusRing(
-                    child: OutlinedButton(
-                      key: Key('home-duty-decline-$id'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: on,
-                        side: BorderSide(color: on),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FocusRing(
+                      child: OutlinedButton(
+                        key: Key('home-duty-decline-$id'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: on,
+                          minimumSize: const Size(0, 46),
+                          side: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            width: 1.5,
+                          ),
+                        ),
+                        onPressed: s.busy
+                            ? null
+                            : () => _showDeclineSheet(context, ref, next),
+                        child: const Text('Can\'t make it'),
                       ),
-                      onPressed: s.busy
-                          ? null
-                          : () => _showDeclineSheet(context, ref, next),
-                      child: const Text('Can\'t make it'),
                     ),
                   ),
                 ],
@@ -3430,29 +3673,57 @@ class _MyDutiesHomeCardState extends ConsumerState<MyDutiesHomeCard> {
           ]);
         }
     }
-    children.addAll([
-      const SizedBox(height: 8),
-      Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: FocusRing(
-          child: TextButton(
-            key: const Key('home-duties-see-all'),
-            style: TextButton.styleFrom(foregroundColor: on),
-            onPressed: () => context.go(DutyPaths.mine),
-            child: const Text('See all'),
-          ),
-        ),
-      ),
-    ]);
-    return Material(
+    return KeyedSubtree(
       key: const Key('home-duties-card'),
-      color: c.hero,
-      borderRadius: BorderRadius.circular(ChurchGeometry.mobileCardRadius),
-      child: Padding(
-        padding: const EdgeInsets.all(ChurchGeometry.cardPadding),
+      child: HeroCard(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: children,
+          children: [
+            // The pill moves under the title when both don't fit (large text).
+            SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  Semantics(
+                    header: true,
+                    child: Text(
+                      'My duties',
+                      style: ChurchType.cardTitle.copyWith(color: on),
+                    ),
+                  ),
+                  ?pill,
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            ...body,
+            const SizedBox(height: 6),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: FocusRing(
+                child: TextButton(
+                  key: const Key('home-duties-see-all'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: on,
+                    padding: EdgeInsets.zero,
+                  ),
+                  onPressed: () => context.go(DutyPaths.mine),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(child: Text('See all my duties')),
+                      SizedBox(width: 4),
+                      Icon(Icons.arrow_forward, size: 18),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

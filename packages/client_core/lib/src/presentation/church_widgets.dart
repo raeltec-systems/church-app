@@ -1,0 +1,86 @@
+import 'package:church_design_system/church_design_system.dart';
+import 'package:flutter/material.dart';
+
+import '../domain/church_time.dart';
+
+const _weekdays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+const _months = [
+  'JAN',
+  'FEB',
+  'MAR',
+  'APR',
+  'MAY',
+  'JUN',
+  'JUL',
+  'AUG',
+  'SEP',
+  'OCT',
+  'NOV',
+  'DEC',
+];
+
+/// The handoff's date badge for an instant in church time (Africa/Lusaka).
+class ChurchDateBadge extends StatelessWidget {
+  const ChurchDateBadge({
+    super.key,
+    required this.at,
+    this.tone = DateBadgeTone.surface,
+  });
+
+  final DateTime at;
+  final DateBadgeTone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final w = ChurchTime.wall(at);
+    return DateBadge(
+      weekday: _weekdays[w.weekday - 1],
+      day: '${w.day}',
+      month: _months[w.month - 1],
+      tone: tone,
+    );
+  }
+}
+
+/// Two initials for an avatar: first letters of the first and last words,
+/// skipping the "SYNTHETIC" marker of test records.
+String avatarInitials(String name) {
+  final words = name
+      .split(RegExp(r'\s+'))
+      .where((w) => w.isNotEmpty && w != 'SYNTHETIC')
+      .toList();
+  if (words.isEmpty) return '?';
+  final first = words.first.characters.first;
+  final last = words.length > 1 ? words.last.characters.first : '';
+  return (first + last).toUpperCase();
+}
+
+/// A round avatar with initials (the handoff's person rows).
+class InitialsAvatar extends StatelessWidget {
+  const InitialsAvatar({super.key, required this.name, this.size = 40});
+
+  final String name;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    return ExcludeSemantics(
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: c.surface2, shape: BoxShape.circle),
+        alignment: Alignment.center,
+        child: Text(
+          avatarInitials(name),
+          style: TextStyle(
+            fontFamily: ChurchFonts.body,
+            fontWeight: FontWeight.w700,
+            fontSize: size * 0.35,
+            color: c.ink,
+          ),
+        ),
+      ),
+    );
+  }
+}

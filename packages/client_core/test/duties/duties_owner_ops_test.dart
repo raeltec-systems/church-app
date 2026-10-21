@@ -350,7 +350,7 @@ void main() {
           ),
         );
         expect(byKey('duty-owner-$_assignment'), findsOneWidget);
-        expect(find.text('Cell programme'), findsOneWidget);
+        expect(find.textContaining('Cell programme'), findsOneWidget);
         await tapKey(tester, 'duty-accept-$_assignment');
         final sent = h.gateway.sent.single;
         expect(sent.wire['command'], 'duties.respond');

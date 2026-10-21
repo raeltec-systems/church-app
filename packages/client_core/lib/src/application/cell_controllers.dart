@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/access_grants.dart';
 import '../domain/cell_meetings.dart';
+import '../domain/cell_programmes.dart';
 import '../domain/cell_membership.dart';
 import '../domain/commands.dart';
 import '../domain/membership_application.dart';
@@ -61,6 +62,17 @@ enum CellNotice {
 
   /// Story 5.2: the cell's reminders were saved.
   remindersSet,
+
+  /// Story 5.3: programme drafts.
+  programmeCreated,
+  programmeSaved,
+  programmeCancelled,
+
+  /// The meeting is cancelled: its programme cannot be planned.
+  meetingCancelledAlready,
+
+  /// The programme is no longer a draft (cancelled elsewhere).
+  programmeNotDraft,
 }
 
 /// One command in flight or just answered.
@@ -228,6 +240,9 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
     CellMeetingCommands.cancel => CellNotice.meetingCancelled,
     CellMeetingCommands.reinstate => CellNotice.meetingReinstated,
     CellMeetingCommands.setReminders => CellNotice.remindersSet,
+    CellProgrammeCommands.create => CellNotice.programmeCreated,
+    CellProgrammeCommands.save => CellNotice.programmeSaved,
+    CellProgrammeCommands.cancel => CellNotice.programmeCancelled,
     _ => CellNotice.cancelled,
   };
 
@@ -240,6 +255,10 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
         CellNotice.alreadyCancelled,
       ErrorCode.validationFailed when f['meeting_id'] == 'started' =>
         CellNotice.meetingStarted,
+      ErrorCode.validationFailed when f['meeting_id'] == 'cancelled' =>
+        CellNotice.meetingCancelledAlready,
+      ErrorCode.conflict when f['programme_id'] == 'not_draft' =>
+        CellNotice.programmeNotDraft,
       ErrorCode.conflict => CellNotice.changedElsewhere,
       ErrorCode.validationFailed when f['cell_id'] == 'current' =>
         CellNotice.sameCell,
@@ -566,4 +585,55 @@ class CellMeetingsController extends CellsController<CellMeetingsBoard> {
 final cellMeetingsProvider =
     NotifierProvider<CellMeetingsController, CellsState<CellMeetingsBoard>>(
       CellMeetingsController.new,
+    );
+
+/// Story 5.3, staff web: one meeting's programme draft. The cell's leader or
+/// assistant creates, saves and cancels it; Pastor oversight reads it; an
+/// Admin-only reader sees counts. Every save sends the whole draft at the
+/// programme revision, so a change made elsewhere is a conflict, not a
+/// silent overwrite.
+class CellProgrammeController extends CellsController<ProgrammeRead> {
+  CellProgrammeController(this.meetingId);
+
+  final String meetingId;
+
+  @override
+  Future<AccessRead<ProgrammeRead>> fetch() =>
+      ref.read(cellsRepositoryProvider).fetchProgramme(meetingId);
+
+  Future<void> create(CellMeeting meeting) => send(
+    CellProgrammeCommands.create,
+    const Optional.of(null),
+    {'meeting_id': meeting.meetingId},
+    'the programme for ${meeting.occurrenceDate}',
+  );
+
+  /// Saves [programme]'s content as typed; empty text clears a field.
+  Future<void> save(
+    CellProgramme programme, {
+    required String topic,
+    required String scripture,
+    required String studyNotes,
+    required List<ProgrammePartDraft> parts,
+  }) => send(CellProgrammeCommands.save, Optional.of(programme.revision), {
+    'programme_id': programme.programmeId,
+    'topic': _textOrNull(topic),
+    'scripture': _textOrNull(scripture),
+    'study_notes': _textOrNull(studyNotes),
+    'parts': [for (final p in parts) p.toJson()],
+  }, 'the programme');
+
+  Future<void> cancel(CellProgramme programme) => send(
+    CellProgrammeCommands.cancel,
+    Optional.of(programme.revision),
+    {'programme_id': programme.programmeId},
+    'the programme',
+  );
+
+  static String? _textOrNull(String v) => v.trim().isEmpty ? null : v.trim();
+}
+
+final cellProgrammeProvider = NotifierProvider.autoDispose
+    .family<CellProgrammeController, CellsState<ProgrammeRead>, String>(
+      CellProgrammeController.new,
     );

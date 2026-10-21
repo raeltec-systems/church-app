@@ -14,6 +14,7 @@ import 'src/domain/access_grants.dart';
 import 'src/domain/account_auth.dart';
 import 'src/domain/assisted_recovery.dart';
 import 'src/domain/cell_meetings.dart';
+import 'src/domain/cell_programmes.dart';
 import 'src/domain/cell_membership.dart';
 import 'src/domain/commands.dart';
 import 'src/domain/credential_review.dart';
@@ -498,10 +499,22 @@ class FakeCells implements CellsRepository {
   int adminCalls = 0;
   int meetingsCalls = 0;
 
+  /// Story 5.3: the programme read, whatever meeting is asked for.
+  AccessRead<ProgrammeRead> programme = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  final programmeAsked = <String>[];
+
   @override
   Future<AccessRead<CellMeetingsBoard>> fetchMeetings() async {
     meetingsCalls++;
     return meetings;
+  }
+
+  @override
+  Future<AccessRead<ProgrammeRead>> fetchProgramme(String meetingId) async {
+    programmeAsked.add(meetingId);
+    return programme;
   }
 
   @override

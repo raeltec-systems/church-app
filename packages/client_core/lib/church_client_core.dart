@@ -25,6 +25,7 @@ export 'src/domain/access_grants.dart';
 export 'src/domain/account_auth.dart';
 export 'src/domain/assisted_recovery.dart';
 export 'src/domain/cell_meetings.dart';
+export 'src/domain/cell_programmes.dart';
 export 'src/domain/cell_membership.dart';
 export 'src/domain/commands.dart';
 export 'src/domain/church_time.dart';

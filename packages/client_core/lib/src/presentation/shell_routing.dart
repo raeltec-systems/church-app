@@ -347,6 +347,19 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.cellMeetings,
         pageBuilder: (_, state) => page(state, const CellMeetingsScreen()),
+        routes: [
+          // Story 5.3: one meeting's programme (CellPaths.plan).
+          GoRoute(
+            path: ':meetingId/plan',
+            pageBuilder: (_, state) => page(
+              state,
+              PlanMeetingScreen(
+                key: ValueKey(state.pathParameters['meetingId']),
+                meetingId: state.pathParameters['meetingId']!,
+              ),
+            ),
+          ),
+        ],
       ),
       GoRoute(
         path: ClientPaths.myCell,

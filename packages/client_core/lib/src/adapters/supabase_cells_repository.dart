@@ -3,6 +3,7 @@ import 'package:supabase/supabase.dart';
 import '../domain/access_grants.dart';
 import '../domain/cell_meetings.dart';
 import '../domain/cell_membership.dart';
+import '../domain/cell_programmes.dart';
 import 'supabase_api_reader.dart';
 
 /// Supabase adapter for [CellsRepository] (story 2.6): the member's own cell
@@ -37,4 +38,12 @@ class SupabaseCellsRepository implements CellsRepository {
   @override
   Future<AccessRead<CellMeetingsBoard>> fetchMeetings() =>
       _reader.read('cells_meetings', const {}, CellMeetingsBoard.fromJson);
+
+  /// Story 5.3: `api.cells_programme` (the cell's leader and assistant,
+  /// Pastor oversight; counts only for an Admin-only reader).
+  @override
+  Future<AccessRead<ProgrammeRead>> fetchProgramme(String meetingId) =>
+      _reader.read('cells_programme', {
+        'meeting_id': meetingId,
+      }, ProgrammeRead.fromJson);
 }

@@ -6,6 +6,7 @@ library;
 
 import 'access_grants.dart';
 import 'cell_meetings.dart';
+import 'cell_programmes.dart';
 
 /// Cells-registered scope kinds in the Identity grant model (story 2.3).
 abstract final class CellScopeKinds {
@@ -526,6 +527,9 @@ abstract interface class CellsRepository {
 
   /// Story 5.1: the staff meetings board (`api.cells_meetings`).
   Future<AccessRead<CellMeetingsBoard>> fetchMeetings();
+
+  /// Story 5.3: one meeting's programme (`api.cells_programme`).
+  Future<AccessRead<ProgrammeRead>> fetchProgramme(String meetingId);
 }
 
 class UnconfiguredCellsRepository implements CellsRepository {
@@ -545,6 +549,10 @@ class UnconfiguredCellsRepository implements CellsRepository {
 
   @override
   Future<AccessRead<CellMeetingsBoard>> fetchMeetings() async =>
+      const AccessReadDenied(AccessDenial.unavailable);
+
+  @override
+  Future<AccessRead<ProgrammeRead>> fetchProgramme(String meetingId) async =>
       const AccessReadDenied(AccessDenial.unavailable);
 }
 

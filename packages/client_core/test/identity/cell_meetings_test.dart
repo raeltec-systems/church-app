@@ -481,6 +481,33 @@ void main() {
       },
     );
 
+    testWidgets(
+      'an offset set elsewhere is offered as a choice and kept on save',
+      (tester) async {
+        final h = await pumpAt(
+          tester,
+          ClientPaths.cellMeetings,
+          setUp: (h) => h.cells.meetings = boardWith(
+            schedule: withReminders(['3 hours', '24 hours'], 6),
+          ),
+        );
+        await tapKey(tester, 'reminders-edit-$_cell');
+        await settle(tester);
+        expect(byKey('reminder-choice-$_cell-3 hours'), findsOneWidget);
+        await tapKey(tester, 'reminder-choice-$_cell-1 hour');
+        await settle(tester);
+        await tapKey(tester, 'reminders-save-$_cell');
+        expect(h.gateway.sent.single.wire['payload'], {
+          'cell_id': _cell,
+          'reminders': [
+            {'before': '1 hour'},
+            {'before': '24 hours'},
+            {'before': '3 hours'},
+          ],
+        });
+      },
+    );
+
     testWidgets('an assistant reads the reminders but has no change button', (
       tester,
     ) async {

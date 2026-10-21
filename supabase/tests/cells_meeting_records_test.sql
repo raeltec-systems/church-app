@@ -4,7 +4,7 @@
 -- cannot be held; another cell's leader is refused. HTTP evidence: tools/identity-e2e/cells-meeting-records.mjs.
 -- SYNTHETIC data only (fictional range +1 202 555 0181-0190).
 begin;
-select plan(44);
+select plan(53);
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000058' || lpad(n::text, 2, '0'))::uuid $$;
 create function pg_temp.s(n int) returns uuid language sql as
@@ -260,6 +260,24 @@ select is(pg_temp.leaders(5, pg_temp.rrev(), jsonb_build_array(
     jsonb_build_object('part_id', pg_temp.part('Opening prayer'), 'leader', null, 'reason', 'SYNTHETIC test')))
   ->> 'code', 'forbidden', 'another cell''s leader cannot record leaders');
 
+-- Review gaps: an ex-member, a batch with one bad part --------------------------------------------------
+with x as (insert into app.identity_members (display_name, membership_state, is_synthetic)
+           values ('SYNTHETIC 5.8 Moved Away', 'approved', true) returning member_id)
+insert into m select 11, member_id from x;
+select pg_temp.place(11, pg_temp.sh());
+select pg_temp.place(11, pg_temp.es());
+select is(pg_temp.leaders(2, pg_temp.rrev(), jsonb_build_array(
+    jsonb_build_object('part_id', pg_temp.part('Opening prayer'), 'leader', jsonb_build_object('member_id', pg_temp.mid(11)),
+                       'reason', 'SYNTHETIC test')))
+  #>> '{field_errors,parts.0.member_id}', 'not_in_cell', 'a member who left the cell is not a member of it');
+create temp table before_bad as select count(*) as n, pg_temp.rrev() as rev from app.cells_actual_leaders where meeting_id = pg_temp.mt();
+select is(pg_temp.leaders(2, pg_temp.rrev(), jsonb_build_array(
+    jsonb_build_object('part_id', pg_temp.part('Opening prayer'), 'leader', null, 'reason', 'SYNTHETIC test'),
+    jsonb_build_object('part_id', gen_random_uuid(), 'leader', null)))
+  #>> '{field_errors,parts.1.part_id}', 'not_found', 'one bad part refuses the batch');
+select is((select count(*) from app.cells_actual_leaders where meeting_id = pg_temp.mt()) = (select n from before_bad)
+          and pg_temp.rrev() = (select rev from before_bad), true, 'and nothing of it is written');
+
 -- The plan and the duties are untouched --------------------------------------------------------------------
 select is((select (pg_temp.asg(4)).revision = r4 and (pg_temp.asg(4)).response = a4
               and (pg_temp.asg(10)).revision = r10 and (pg_temp.asg(10)).response = a10 from before_plan), true,
@@ -293,6 +311,11 @@ select is((select string_agg((a ->> 'label') || ':' || (a ->> 'kind') || ':' || 
   'the canonical reference: held, with the actual leaders (not the planned ones)');
 select is(app.cells_meeting_reference(pg_temp.mt()) ? 'reason', false, 'the reference carries no reasons');
 
+select is((select pg_temp.rrev()) + 1 = (select (pg_temp.leaders(2, pg_temp.rrev(), jsonb_build_array(
+    jsonb_build_object('part_id', pg_temp.part('Opening prayer'), 'leader', jsonb_build_object('member_id', pg_temp.mid(4))),
+    jsonb_build_object('part_id', pg_temp.part('Bible study'), 'leader', null, 'reason', 'SYNTHETIC we skipped it')))
+    ->> 'revision')::bigint), true, 'one identical and one changed part: the revision moves once');
+
 -- A cancelled meeting cannot be held ----------------------------------------------------------------------
 select pg_temp.cells(pg_temp.c(2), 'cells.cancel_meeting',
   (select revision from app.cells_meetings where meeting_id = pg_temp.mt2()), jsonb_build_object('meeting_id', pg_temp.mt2()));
@@ -318,14 +341,30 @@ select is(pg_temp.readj(pg_temp.c(4), format('select api.cells_meeting_programme
 select is(pg_temp.read(pg_temp.c(2), 'select to_jsonb(count(*)) from app.cells_actual_leaders') like '42501%', true,
   'the tables are not readable directly');
 
+select pg_temp.cmd(pg_temp.c(1), 'api.identity_grant_command', 'identity.revoke_scope',
+  (select s.revision from app.identity_grant_sets s where s.member_id = pg_temp.mid(3)),
+  jsonb_build_object('member_id', pg_temp.mid(3), 'scope_kind', 'cell_assistant', 'scope_id', pg_temp.sh()));
+select is(pg_temp.correct(3, false, 'SYNTHETIC test') ->> 'code', 'forbidden', 'an ex-assistant is refused');
+
 -- Deletion ---------------------------------------------------------------------------------------------------
 select is((app.cells_erase_member(jsonb_build_object('member_id', pg_temp.mid(7), 'phase', 'erase')) ->> 'remaining'), '0',
   'deleting the member who stood in leaves nothing of them');
 select is((app.cells_erase_member(jsonb_build_object('member_id', pg_temp.mid(3), 'account_id', pg_temp.u(3),
                                                      'phase', 'erase')) ->> 'remaining'), '0',
   'deleting the assistant who corrected it leaves nothing of them');
-select is((select count(*)::int from app.cells_actual_leaders where part_id = pg_temp.part('Bible study')), 2,
+select is((select count(*)::int from app.cells_actual_leaders where part_id = pg_temp.part('Bible study')), 3,
   'the records stay as anonymous facts');
+select is((select count(*)::int from app.cells_actual_leaders where reason = 'SYNTHETIC it was the visiting pastor')
+          + (select count(*)::int from app.cells_meeting_record_history where reason = 'SYNTHETIC it was held after all'), 0,
+  'the reasons the assistant wrote go with them');
+select is((select count(*)::int from app.cells_meeting_record_history where reason = 'SYNTHETIC we met for prayer only'), 1,
+  'the leader''s own reasons stay');
+select is((app.cells_erase_member(jsonb_build_object('member_id', pg_temp.mid(4), 'phase', 'erase')) ->> 'remaining'), '0',
+  'deleting the member who led as planned');
+select is((select (a ->> 'removed') || '|' || coalesce(a ->> 'member_id', 'null')
+             from jsonb_array_elements(app.cells_meeting_reference(pg_temp.mt()) -> 'actual_leaders') a
+            where a ->> 'part_id' = pg_temp.part('Opening prayer')::text), 'true|null',
+  'the reference shows a removed person, never the nil id');
 
 select * from finish();
 rollback;

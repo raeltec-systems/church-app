@@ -189,7 +189,9 @@ as $$
                'part_id', a.part_id,
                'label', pt.label,
                'kind', a.leader_kind,
-               'member_id', a.member_id,
+               -- An erased member is a removed person, never a member id to join on (review fix 6).
+               'member_id', nullif(a.member_id, '00000000-0000-0000-0000-000000000000'::uuid),
+               'removed', a.member_id = '00000000-0000-0000-0000-000000000000'::uuid,
                'guest_name', a.guest_name,
                'substitute', a.leader_kind <> 'nobody'
                              and (a.leader_kind = 'guest' or a.member_id is distinct from a.planned_member_id))
@@ -912,7 +914,12 @@ begin
            withdrawn_at = coalesce(n.withdrawn_at, now())
      where n.member_id = v_member;
     update app.cells_absence_audit a set actor_member_id = v_nil where a.actor_member_id = v_member;
-    -- Story 5.8: who recorded and who led stay as anonymous facts.
+    -- Story 5.8: who recorded and who led stay as anonymous facts; the reasons the member wrote go
+    -- (free text may name people; review fix 5).
+    update app.cells_meeting_record_history h set reason = null
+     where h.actor_member_id = v_member and h.reason is not null;
+    update app.cells_actual_leaders a set reason = null
+     where a.recorded_by_member = v_member and a.reason is not null;
     update app.cells_meeting_records r set recorded_by_member = v_nil where r.recorded_by_member = v_member;
     update app.cells_meeting_records r set updated_by_member = v_nil where r.updated_by_member = v_member;
     update app.cells_meeting_record_history h set actor_member_id = v_nil where h.actor_member_id = v_member;

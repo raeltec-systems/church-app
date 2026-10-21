@@ -559,7 +559,7 @@ class ProgrammeRead {
         (_opt<List>(m, 'absences') ?? const []).map(StaffAbsence.fromJson),
       ),
       // Story 5.8 (absent from 5.7 servers).
-      status: m['status'] == null ? null : MeetingStatus.parse(m['status']),
+      status: MeetingStatus.tryParse(m['status']),
       record: m['record'] == null ? null : MeetingRecord.fromJson(m['record']),
       canRecord: _opt<bool>(m, 'can_record') ?? false,
     );

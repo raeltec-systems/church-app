@@ -230,7 +230,7 @@ import '../domain/membership_application.dart';
       (
         StatusTone.warning,
         'Not saved',
-        'Check the part below: a change needs a reason, and only members of '
+        'Check the parts below. A change needs a reason, and only members of '
             'this cell can be chosen (name anyone else as a guest).',
       ),
     CellNotice.programmePartRefused => (
@@ -253,6 +253,16 @@ import '../domain/membership_application.dart';
       'Saved',
       'Who led is saved with your name. The plan and duty answers are '
           'unchanged.',
+    ),
+    CellNotice.handoverResolved => (
+      StatusTone.success,
+      'Handover done',
+      '$who has a leader again.',
+    ),
+    CellNotice.leaderRequired => (
+      StatusTone.warning,
+      'Still no leader',
+      'Give $who a leader or assistant who can use the app first.',
     ),
     CellNotice.meetingNotStarted => (
       StatusTone.warning,
@@ -761,6 +771,30 @@ class _AdminCellCardState extends ConsumerState<_AdminCellCard> {
           if (cell.signupLabel != null)
             Text('Shown at sign-up as: ${cell.signupLabel}'),
           Text('Confirmed members: ${cell.memberCount}'),
+          // Story 5.9: the cell's last leader left with a programme published
+          // ahead; once it has a leader or assistant again, mark it done.
+          if (cell.handoverPending) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                StatusLabel(
+                  key: Key('cell-handover-$id'),
+                  label: 'Needs a leader: a programme is published ahead',
+                  tone: StatusTone.warning,
+                ),
+                FocusRing(
+                  child: OutlinedButton(
+                    key: Key('cell-handover-done-$id'),
+                    onPressed: busy ? null : () => ctl.resolveHandover(cell),
+                    child: const Text('Mark handover done'),
+                  ),
+                ),
+              ],
+            ),
+          ],
           const SizedBox(height: 8),
           if (cell.leaders.isEmpty)
             _muted(context, 'No leader yet: only an Admin can confirm.'),
@@ -2337,8 +2371,13 @@ class _PlanBody extends ConsumerWidget {
       ),
       const SizedBox(height: 12),
     ];
-    // Story 5.8: once the meeting has started, what happened comes first.
-    if (read.full && !ahead && !m.cancelled) {
+    // Story 5.8: once the meeting has started, what happened comes first (the
+    // server's status says so, not this device's clock).
+    final status = read.status;
+    if (read.full &&
+        (read.record != null ||
+            read.canRecord ||
+            status == MeetingStatus.unrecorded)) {
       children.addAll([
         _RecordCard(meetingId: meetingId, read: read, state: state),
         const SizedBox(height: 12),
@@ -4690,7 +4729,12 @@ class _RecordCardState extends ConsumerState<_RecordCard> {
                 key: const Key('record-correct'),
                 onPressed: busy
                     ? null
-                    : () => setState(() => _correcting = true),
+                    : () {
+                        // A fresh form never closes on an earlier success
+                        // (5.8 review fix 1).
+                        ctl.dismissNotice();
+                        setState(() => _correcting = true);
+                      },
                 child: Text(
                   record.held ? 'It wasn\'t held' : 'It was held after all',
                 ),
@@ -4820,6 +4864,9 @@ class _ActualRow extends ConsumerStatefulWidget {
 class _ActualRowState extends ConsumerState<_ActualRow> {
   bool _editing = false;
 
+  /// This editor sent its value and waits for the server's answer.
+  bool _awaiting = false;
+
   /// A member id, [_guestChoice] or [_nobodyChoice].
   String? _choice;
   final _guest = TextEditingController();
@@ -4834,27 +4881,40 @@ class _ActualRowState extends ConsumerState<_ActualRow> {
 
   void _open(ActualLeader? current) {
     final planned = widget.part.assignee;
+    // A member no longer in the roster (left or removed) is not offered: the
+    // leader chooses again (5.8 review fix 2).
+    bool inRoster(String? id) => widget.roster.any((r) => r.memberId == id);
     setState(() {
       _editing = true;
+      _awaiting = false;
       _choice = switch (current?.kind) {
-        ActualLeaderKind.member => current!.memberId,
+        ActualLeaderKind.member =>
+          inRoster(current!.memberId) ? current.memberId : null,
         ActualLeaderKind.guest => _guestChoice,
         ActualLeaderKind.nobody => _nobodyChoice,
-        null => planned != null && planned.inCell ? planned.memberId : null,
+        null =>
+          planned != null && planned.inCell && inRoster(planned.memberId)
+              ? planned.memberId
+              : null,
       };
       _guest.text = current?.guestName ?? '';
       _reason.clear();
     });
   }
 
-  /// Whether the server's current row is what this editor sent.
-  bool _matches(ActualLeader? current) => switch (_choice) {
-    _nobodyChoice => current?.kind == ActualLeaderKind.nobody,
-    _guestChoice =>
-      current?.kind == ActualLeaderKind.guest &&
-          current?.guestName == _guest.text.trim(),
-    final id => id != null && current?.memberId == id,
-  };
+  /// This part's index in the last record_actual_leaders the page sent (one
+  /// part from this editor, or every part from "led as planned"), so its
+  /// field errors land on this part (5.8 review fix 3).
+  int? _sentIndex(CellsState<ProgrammeRead> s) {
+    final a = s.noticeAction;
+    if (a == null || a.command != CellRecordCommands.recordLeaders) return null;
+    final parts = a.request.payload['parts'];
+    if (parts is! List) return null;
+    final i = parts.indexWhere(
+      (p) => p is Map && p['part_id'] == widget.part.partId,
+    );
+    return i < 0 ? null : i;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -4863,16 +4923,25 @@ class _ActualRowState extends ConsumerState<_ActualRow> {
     final s = widget.state;
     final busy = s.busy;
     final ctl = ref.read(cellProgrammeProvider(widget.meetingId).notifier);
-    // The editor closes once the server has saved this part's value; a
-    // refusal keeps what was typed (field errors are of the one part sent).
+    final sent = _sentIndex(s);
+    // The editor closes once the server has saved what it sent; a refusal
+    // keeps what was typed (5.8 review fix 1).
     if (_editing &&
+        _awaiting &&
         !busy &&
-        s.notice == CellNotice.leadersRecorded &&
-        _matches(current)) {
+        sent != null &&
+        s.notice == CellNotice.leadersRecorded) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _editing) setState(() => _editing = false);
+        if (mounted && _editing) {
+          setState(() {
+            _editing = false;
+            _awaiting = false;
+          });
+        }
       });
     }
+    String? err(String field) =>
+        sent == null ? null : s.fieldErrors['parts.$sent.$field'];
     final planned = part.assignee?.displayName ?? part.linkedLabel;
     final (label, tone) = switch (current) {
       null => ('Not recorded', StatusTone.warning),
@@ -4886,7 +4955,6 @@ class _ActualRowState extends ConsumerState<_ActualRow> {
       ),
       _ => ('Led by ${current.who}', StatusTone.success),
     };
-    final errors = _editing ? s.fieldErrors : const <String, String>{};
     final children = <Widget>[
       Wrap(
         spacing: 8,
@@ -4911,6 +4979,13 @@ class _ActualRowState extends ConsumerState<_ActualRow> {
       ),
       _muted(context, 'Planned: ${planned ?? 'nobody (a gap)'}'),
       if (current?.reason case final r?) _muted(context, 'Why it changed: $r'),
+      if (err('part_id') != null)
+        _muted(context, 'This part is no longer in the programme. Reload.'),
+      if (err('member_id') != null)
+        _muted(
+          context,
+          'They are no longer in this cell: name them as a guest.',
+        ),
       for (final e in current?.earlier ?? const <ActualLeader>[])
         _muted(
           context,
@@ -4958,9 +5033,7 @@ class _ActualRowState extends ConsumerState<_ActualRow> {
             enabled: !busy,
             decoration: InputDecoration(
               labelText: 'Their name',
-              errorText: errors['parts.0.name'] == null
-                  ? null
-                  : 'Type their name.',
+              errorText: err('name') == null ? null : 'Type their name.',
             ),
             onChanged: (_) => setState(() {}),
           ),
@@ -4972,16 +5045,9 @@ class _ActualRowState extends ConsumerState<_ActualRow> {
             enabled: !busy,
             decoration: InputDecoration(
               labelText: 'Why is this changing?',
-              errorText: errors['parts.0.reason'] == null
-                  ? null
-                  : 'Say why, briefly.',
+              errorText: err('reason') == null ? null : 'Say why, briefly.',
             ),
             onChanged: (_) => setState(() {}),
-          ),
-        if (errors['parts.0.member_id'] != null)
-          _muted(
-            context,
-            'They are no longer in this cell: name them as a guest.',
           ),
         Wrap(
           spacing: 8,
@@ -4991,19 +5057,23 @@ class _ActualRowState extends ConsumerState<_ActualRow> {
                 key: Key('record-save-${part.partId}'),
                 onPressed: busy || !ready
                     ? null
-                    : () => ctl.recordLeaders(widget.meeting, widget.record, [
-                        ActualLeaderDraft(
-                          partId: part.partId,
-                          memberId:
-                              choice == _guestChoice || choice == _nobodyChoice
-                              ? null
-                              : choice,
-                          guestName: choice == _guestChoice
-                              ? _guest.text
-                              : null,
-                          reason: needsReason ? _reason.text : null,
-                        ),
-                      ]),
+                    : () {
+                        setState(() => _awaiting = true);
+                        ctl.recordLeaders(widget.meeting, widget.record, [
+                          ActualLeaderDraft(
+                            partId: part.partId,
+                            memberId:
+                                choice == _guestChoice ||
+                                    choice == _nobodyChoice
+                                ? null
+                                : choice,
+                            guestName: choice == _guestChoice
+                                ? _guest.text
+                                : null,
+                            reason: needsReason ? _reason.text : null,
+                          ),
+                        ]);
+                      },
                 child: const Text('Save'),
               ),
             ),

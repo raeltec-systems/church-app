@@ -1,8 +1,8 @@
-{"step":"A00-precondition","target":"LOCAL","at":"2026-10-21T11:35:58.729Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
-{"step":"A01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-21T11:36:03.936Z","verdict":"pass","amr":["password"]}
-{"step":"A02-a-published-programme","target":"LOCAL","at":"2026-10-21T11:36:05.099Z","verdict":"pass","grants":[200,200,200,200],"placed":[200,200,200],"published":"published"}
-{"step":"A10-held-once-started-other-cell-refused","target":"LOCAL","at":"2026-10-21T11:36:06.052Z","verdict":"pass","before_start":"validation_failed","other_cell":"forbidden","held":true}
-{"step":"A20-substitute-recorded","target":"LOCAL","at":"2026-10-21T11:36:06.084Z","verdict":"pass","changed":2,"status":"held","substitutes":1}
-{"step":"A30-correction-keeps-earlier-plan-and-duties-unchanged","target":"LOCAL","at":"2026-10-21T11:36:07.342Z","verdict":"pass","without_reason":"validation_failed","changed":1,"trail":"member:false:leader,guest:true:assistant","plan_unchanged":true,"member_part":"accepted","other_part":"pending","duty_outcomes":0}
-{"step":"A40-cancelled-refused-reference-and-reads","target":"LOCAL","at":"2026-10-21T11:36:08.340Z","verdict":"pass","cancelled_held":"validation_failed","reference_status":"held","reference_part":"guest","member_reads_record":false,"other_cell_read":403,"board_recent":["held","cancelled"]}
-{"step":"A99-cleanup","target":"LOCAL","at":"2026-10-21T11:36:09.586Z","users_left":0,"unmarked":true,"programmes_left":0}
+{"step":"A00-precondition","target":"LOCAL","at":"2026-10-21T11:47:02.020Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"A01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-21T11:47:08.443Z","verdict":"pass","amr":["password"]}
+{"step":"A02-a-published-programme","target":"LOCAL","at":"2026-10-21T11:47:10.124Z","verdict":"pass","grants":[200,200,200,200],"placed":[200,200,200],"published":"published"}
+{"step":"A10-held-once-started-other-cell-refused","target":"LOCAL","at":"2026-10-21T11:47:11.152Z","verdict":"pass","before_start":"validation_failed","other_cell":"forbidden","held":true}
+{"step":"A20-substitute-recorded","target":"LOCAL","at":"2026-10-21T11:47:11.198Z","verdict":"pass","changed":2,"status":"held","substitutes":1}
+{"step":"A30-correction-keeps-earlier-plan-and-duties-unchanged","target":"LOCAL","at":"2026-10-21T11:47:12.642Z","verdict":"pass","without_reason":"validation_failed","changed":1,"trail":"member:false:leader,guest:true:assistant","plan_unchanged":true,"member_part":"accepted","other_part":"pending","duty_outcomes":0}
+{"step":"A40-cancelled-refused-reference-and-reads","target":"LOCAL","at":"2026-10-21T11:47:13.801Z","verdict":"pass","cancelled_held":"validation_failed","reference_status":"held","reference_part":"guest","member_reads_record":false,"other_cell_read":403,"board_recent":["held","cancelled"]}
+{"step":"A99-cleanup","target":"LOCAL","at":"2026-10-21T11:47:15.730Z","users_left":0,"unmarked":true,"programmes_left":0}

@@ -25,6 +25,9 @@ abstract final class CellCommands {
   static const confirm = 'cells.confirm_request';
   static const decline = 'cells.decline_request';
   static const cancel = 'cells.cancel_request';
+
+  /// Story 5.9 (Admin): the cell has a leader again after a handover.
+  static const resolveHandover = 'cells.resolve_handover';
 }
 
 /// Why a request was not confirmed (wire codes).
@@ -253,6 +256,7 @@ class AdminCell {
     required this.memberCount,
     this.signupLabel,
     this.signupRevision,
+    this.handoverPending = false,
   });
 
   factory AdminCell.fromJson(Object? json) {
@@ -272,6 +276,8 @@ class AdminCell {
       leaders: staff('leaders'),
       assistants: staff('assistants'),
       memberCount: _req<int>(m, 'member_count'),
+      // Story 5.9 (absent from earlier servers).
+      handoverPending: _opt<bool>(m, 'handover_pending') ?? false,
     );
   }
 
@@ -291,6 +297,10 @@ class AdminCell {
   final List<CellStaff> leaders;
   final List<CellStaff> assistants;
   final int memberCount;
+
+  /// Story 5.9: the cell's last leader left with a programme published
+  /// ahead; an Admin marks it done once the cell has a leader again.
+  final bool handoverPending;
 }
 
 /// One open request in the Admin overview.

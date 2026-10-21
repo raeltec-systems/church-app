@@ -375,6 +375,60 @@ void main() {
       expect(find.text('Not saved'), findsOneWidget);
     });
 
+    testWidgets('review fixes: a batch error lands on its part; after a save '
+        'another editor opens and stays open; a person who left is not '
+        'preselected', (tester) async {
+      final h = await pumpAt(
+        tester,
+        CellPaths.plan(_meeting),
+        setUp: (h) => h.cells.programme = read(
+          status: 'held',
+          record: heldRecord(
+            actual: [
+              // Recorded earlier for someone no longer on the roster.
+              actual(
+                _part1,
+                '8a8a8a8a-8a8a-4a8a-8a8a-8a8a8a8a8a8a',
+                'SYNTHETIC Moved Away',
+              ),
+            ],
+          ),
+        ),
+      );
+      await tapKey(tester, 'record-all-planned');
+      h.gateway.sent.single.refuse(
+        ErrorCode.validationFailed,
+        fieldErrors: {'parts.0.member_id': 'not_in_cell'},
+      );
+      await settle(tester);
+      // The batch had one part (part 2): its error shows on part 2.
+      expect(
+        find.descendant(
+          of: byKey('record-part-$_part2'),
+          matching: find.text(
+            'They are no longer in this cell: name them as a guest.',
+          ),
+        ),
+        findsOneWidget,
+      );
+      await tapKey(tester, 'record-edit-$_part2');
+      await settle(tester);
+      await tapKey(tester, 'record-save-$_part2');
+      h.gateway.sent.last.confirm({'meeting_id': _meeting}, 3);
+      await settle(tester);
+      expect(byKey('record-who-$_part2'), findsNothing, reason: 'saved');
+      // Opening another editor after that success keeps it open.
+      await tapKey(tester, 'record-edit-$_part1');
+      await settle(tester);
+      expect(byKey('record-who-$_part1'), findsOneWidget);
+      expect(
+        tester
+            .widget<DropdownButton<String>>(byKey('record-who-$_part1'))
+            .value,
+        isNull,
+      );
+    });
+
     testWidgets('held is corrected with a reason at the record revision', (
       tester,
     ) async {

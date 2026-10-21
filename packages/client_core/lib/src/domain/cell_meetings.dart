@@ -375,26 +375,31 @@ enum MeetingStatus {
   const MeetingStatus(this.wire);
   final String wire;
 
-  static MeetingStatus parse(Object? v) => MeetingStatus.values.firstWhere(
-    (s) => s.wire == v,
-    orElse: () => throw const FormatException('unexpected status'),
-  );
+  /// Null for a status this build does not know (a later server's).
+  static MeetingStatus? tryParse(Object? v) {
+    for (final s in MeetingStatus.values) {
+      if (s.wire == v) return s;
+    }
+    return null;
+  }
 }
 
 /// Story 5.8: a meeting of the last four weeks and its status.
 class RecentMeeting {
-  const RecentMeeting({required this.meeting, required this.status});
+  const RecentMeeting({required this.meeting, this.status});
 
   factory RecentMeeting.fromJson(Object? json) {
     final m = _map(json, 'recent meeting');
     return RecentMeeting(
       meeting: CellMeeting.fromJson(m),
-      status: MeetingStatus.parse(m['status']),
+      status: MeetingStatus.tryParse(m['status']),
     );
   }
 
   final CellMeeting meeting;
-  final MeetingStatus status;
+
+  /// Null when this build does not know the server's status.
+  final MeetingStatus? status;
 }
 
 /// `api.cells_meetings`.

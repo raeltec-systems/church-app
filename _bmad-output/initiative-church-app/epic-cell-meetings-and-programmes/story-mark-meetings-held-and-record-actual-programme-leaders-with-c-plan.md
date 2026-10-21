@@ -68,10 +68,23 @@ context:
 ## Implementation Notes
 
 - Migration: `app.cells_meeting_records` (held, revision, who and when), `app.cells_meeting_record_history` (every value with actor, reason, request id), `app.cells_actual_leaders` (member, guest or nobody per part; one current row per part, superseded rows kept; the planned person at write time). Commands `cells.record_meeting_held` (expected null), `cells.correct_meeting_held` and `cells.record_actual_leaders` (record revision). Lock order: meeting (share), record (update), programme (share), membership (key share). `app.cells_meeting_status`, `app.cells_meeting_record_json`, the internal `app.cells_meeting_reference`. Re-created: authorizer, dispatcher, in-scope (`cells_meeting_record`), staff read (`status`, `record`, `can_record`), board read (`recent`), erase.
-- pgTAP `cells_meeting_records_test.sql` (44). Full db:test passes on a fresh reset.
-- Clients: `MeetingStatus`, `RecentMeeting`, `MeetingRecord`, `HeldEntry`, `ActualLeader`, `ActualLeaderDraft`, `CellRecordCommands`; `CellProgrammeController.recordHeld/correctHeld/recordLeaders`; `_RecordCard` and `_ActualRow` on Plan meeting; Last 4 weeks on Cell meetings. Tests in `cell_meeting_records_test.dart` (8). The two `boundaries_test.dart` failures on this Windows host are a test path bug (`replaceAll(r'\', '/')`), not a change.
+- pgTAP `cells_meeting_records_test.sql` (53 after the review). Full db:test passes on a fresh reset.
+- Clients: `MeetingStatus`, `RecentMeeting`, `MeetingRecord`, `HeldEntry`, `ActualLeader`, `ActualLeaderDraft`, `CellRecordCommands`; `CellProgrammeController.recordHeld/correctHeld/recordLeaders`; `_RecordCard` and `_ActualRow` on Plan meeting; Last 4 weeks on Cell meetings. Tests in `cell_meeting_records_test.dart` (9 after the review). The two `boundaries_test.dart` failures on this Windows host are a test path bug (`replaceAll(r'\', '/')`), not a change.
 - E2E `tools/identity-e2e/cells-meeting-records.mjs` (6 checks) + offline test; numbers `+44 7700 900060-900069`. Regressions: cells-absence 5/5, cells-meetings 10/10, cells-programme-revisions 6/6.
 
 ## Plan Change Log
 
 ## Review Triage Log
+
+Independent review of `302bac3..7514bef` (2026-10-21, a separate reviewer agent; each re-created function diffed against its previous definition: additions only; server concurrency, authorization and privacy found sound). Not yet on staging, so fixed in place:
+
+1. High, fixed (client): a part editor (and the held correction) closed itself on opening after any earlier success, because the success notice stays until the next send. A part editor now closes only when the action it sent succeeded (its part is in the sent payload); opening the correction clears the old notice. Widget test: save, then open another editor.
+2. Medium, fixed (client): a current leader no longer on the roster (left or erased) was preselected in the dropdown (an invalid value). It is not preselected now.
+3. Medium/low, fixed (client): field errors were read as `parts.0.*` whatever part was sent; "led as planned" errors at other indexes were lost. Each row now maps errors through its index in the sent payload and shows part and member errors even when its editor is closed; the notice text is general.
+4. Low, fixed (client): Plan meeting decided "started" by the device clock; it now follows the server (`status`, `can_record`, `record`).
+5. Low/medium, fixed: deletion kept the free-text reasons the erased member wrote; they are cleared (history and actual leaders). pgTAP: the assistant's reasons go, the leader's stay.
+6. Low, fixed: the reference showed an erased member as `member_id` nil; it now answers `member_id: null, removed: true`. pgTAP added.
+7. Low, accepted: leaders may be recorded against a draft (never published) programme: a meeting can be held with an unpublished plan; `planned_member_id` is the draft's person. Documented here.
+8. Low, fixed (client): an unknown status no longer fails the board (`MeetingStatus.tryParse`).
+9. Low, fixed by 1: the guest editor no longer compares text to decide when to close.
+10. Tests added: an ex-assistant (revoked scope) refused, a member who moved cells refused, one bad part refuses the whole batch with nothing written, one identical and one changed part move the revision once. Not added: replay after a revoked grant (kernel in-scope recheck, covered by the 1.4 suite).

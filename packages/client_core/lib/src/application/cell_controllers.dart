@@ -100,6 +100,10 @@ enum CellNotice {
 
   /// The meeting has not started yet: it cannot be recorded.
   meetingNotStarted,
+
+  /// Story 5.9: a cell's handover is done, or it still has no leader.
+  handoverResolved,
+  leaderRequired,
 }
 
 /// One command in flight or just answered.
@@ -285,6 +289,7 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
     CellRecordCommands.recordHeld => CellNotice.meetingRecorded,
     CellRecordCommands.correctHeld => CellNotice.recordCorrected,
     CellRecordCommands.recordLeaders => CellNotice.leadersRecorded,
+    CellCommands.resolveHandover => CellNotice.handoverResolved,
     _ => CellNotice.cancelled,
   };
 
@@ -295,6 +300,8 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
         CellNotice.openRequest,
       ErrorCode.conflict when f['meeting_id'] == 'programme_published' =>
         CellNotice.meetingHasProgramme,
+      ErrorCode.conflict when f['cell_id'] == 'leader_required' =>
+        CellNotice.leaderRequired,
       ErrorCode.conflict when f['meeting_id'] == 'cancelled' =>
         CellNotice.alreadyCancelled,
       ErrorCode.validationFailed when f['meeting_id'] == 'started' =>
@@ -447,6 +454,15 @@ class CellAdminController extends CellsController<CellAdminOverview> {
         'request_id': request.requestId,
         'reason': reason.wire,
       }, request.displayName);
+
+  /// Story 5.9: the cell has a reachable leader or assistant again after
+  /// its last one left with a programme published ahead.
+  Future<void> resolveHandover(AdminCell cell) => send(
+    CellCommands.resolveHandover,
+    Optional.of(cell.revision),
+    {'cell_id': cell.cellId},
+    cell.name,
+  );
 
   /// Opens a move/join request for [member] (for example one without a
   /// login); a leader or Admin then confirms it.

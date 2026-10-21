@@ -1,0 +1,12 @@
+{"step":"C00-precondition","target":"LOCAL","at":"2026-10-21T23:02:23.390Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"C01-signed-in-by-phone-and-media-granted","target":"LOCAL","at":"2026-10-21T23:02:29.923Z","verdict":"pass","amr":["password"],"grants":[200,200]}
+{"step":"C10-media-drafts-privately","target":"LOCAL","at":"2026-10-21T23:02:30.209Z","verdict":"pass","draft":"draft","plain_member":"forbidden","pending":"forbidden","anon_status":401,"anon_sees_draft":false,"pending_sees_draft":false}
+{"step":"C11-signed-out-reads-both-endpoints","target":"LOCAL","at":"2026-10-21T23:02:30.284Z","verdict":"pass","published":"published","starts":"2026-10-27","ends":"2026-10-28","start_clock":"09:00","end_clock":"12:00","keys":["description","ends_at","event_id","location","publication_revision","published_at","starts_at","title"]}
+{"step":"C12-edited-draft-leaves-the-published-version-live","target":"LOCAL","at":"2026-10-21T23:02:30.373Z","verdict":"pass","while_editing":1,"editors_see_draft":true,"after_republish":2}
+{"step":"C13-anon-and-pending-read-the-projection-only","target":"LOCAL","at":"2026-10-21T23:02:30.403Z","verdict":"pass","leaked":0,"same_for_anon_pending_member":true}
+{"step":"C14-plain-member-refused-every-editor-command","target":"LOCAL","at":"2026-10-21T23:02:30.503Z","verdict":"pass","refusals":["forbidden","forbidden","forbidden","forbidden","forbidden"],"member_staff_read":"403:not_granted","pending_staff_read":403,"anon_staff_read":401}
+{"step":"C15-no-client-role-reads-or-writes-a-content-table","target":"LOCAL","at":"2026-10-21T23:02:30.702Z","verdict":"pass","attempts":24,"refused":24}
+{"step":"C16-withdrawal-removes-it-on-refresh","target":"LOCAL","at":"2026-10-21T23:02:30.731Z","verdict":"pass","state":"withdrawn","listed":false,"detail":null}
+{"step":"C20-erased-editor-reads-as-a-former-member","target":"LOCAL","at":"2026-10-21T23:02:32.311Z","verdict":"pass","before":4,"after":0,"created_by":"Former member","published_by":"Former member"}
+{"step":"C30-audit-content-free","target":"LOCAL","at":"2026-10-21T23:02:33.343Z","verdict":"pass","leaked_values":0,"actions":"created,published,draft_saved,published,withdrawn"}
+{"step":"C99-cleanup","target":"LOCAL","at":"2026-10-21T23:02:35.020Z","users_left":0,"unmarked":true,"items_left":0}

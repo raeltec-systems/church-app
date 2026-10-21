@@ -6,18 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../application/access_controllers.dart' show myAccessProvider;
-import '../application/account_controllers.dart'
-    show memberSummaryControllerProvider;
 import '../application/duties_controllers.dart';
 import '../application/providers.dart' show contactLauncherProvider;
 import '../domain/access_grants.dart';
 import '../domain/church_time.dart';
 import '../domain/duties.dart';
 import '../domain/duty_calendar.dart';
-import '../domain/member_access.dart' show MemberAccessGranted;
-import 'cell_screens.dart' show MyCellHomeCard;
 import 'church_widgets.dart';
-import 'followups_screens.dart' show FollowUpPaths, MyFollowUpsHomeCard;
+import 'followups_screens.dart' show FollowUpPaths;
 
 part 'duties_coverage_screens.dart';
 part 'duties_outcome_screens.dart';
@@ -2438,7 +2434,6 @@ class MyDutiesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _DutiesPage<MyDuties>(
     title: assignmentId == null ? 'My duties' : 'Duty',
-    tabRoot: assignmentId == null,
     provider: myDutiesProvider,
     needs: 'Your duties are shown once you have member access.',
     loading: 'Loading your duties…',
@@ -3487,76 +3482,8 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
 }
 
 // ---------------------------------------------------------------------------
-// Story 4.5: the Home My duties card and the member Home
+// Story 4.5: the Home My duties card (Home itself is home_screen.dart)
 // ---------------------------------------------------------------------------
-
-/// Story 4.5, mobile: the member Home (design handoff): a greeting, then the
-/// cards. The shell's top bar carries the logo, inbox and account, so the
-/// Home has no app bar of its own.
-class MemberHomeScreen extends ConsumerWidget {
-  const MemberHomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final c = ChurchColors.of(context);
-    final layout = ChurchLayout.of(context);
-    final summary = ref.watch(memberSummaryControllerProvider).result;
-    final name = summary is MemberAccessGranted
-        ? summary.summary.displayName
-              .split(RegExp(r'\s+'))
-              .where((w) => w.isNotEmpty && w != 'SYNTHETIC')
-              .firstOrNull
-        : null;
-    final hour = ChurchTime.wall(DateTime.now()).hour;
-    final greeting = hour < 12
-        ? 'Good morning'
-        : hour < 17
-        ? 'Good afternoon'
-        : 'Good evening';
-    return Scaffold(
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Semantics(
-                  header: true,
-                  child: Text(
-                    name == null ? greeting : '$greeting, $name',
-                    key: const Key('home-greeting'),
-                    style: ChurchType.mobileScreenTitle.copyWith(color: c.ink),
-                  ),
-                ),
-                const SizedBox(height: 18),
-                // Story 4.9: a department leader's Needs attention card comes
-                // first (hidden for everyone else). Story 4.6: My follow-ups
-                // shows while the member owns open work. Story 5.5: My cell
-                // shows for a member with a confirmed cell.
-                const _HomeGap(child: LeaderNeedsAttentionCard()),
-                const _HomeGap(child: MyDutiesHomeCard()),
-                const _HomeGap(child: MyFollowUpsHomeCard()),
-                const _HomeGap(child: MyCellHomeCard()),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The 16 px gap after a Home card.
-class _HomeGap extends StatelessWidget {
-  const _HomeGap({required this.child});
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) =>
-      Padding(padding: const EdgeInsets.only(bottom: 16), child: child);
-}
 
 /// Story 4.5: the navy My duties card: how many duties await an answer, the
 /// next one (date, duty, department, report time, place) with inline Accept
@@ -3827,7 +3754,7 @@ class _MyDutiesHomeCardState extends ConsumerState<MyDutiesHomeCard> {
                     foregroundColor: on,
                     padding: EdgeInsets.zero,
                   ),
-                  onPressed: () => context.go(DutyPaths.mine),
+                  onPressed: () => context.push(DutyPaths.mine),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [

@@ -1234,7 +1234,6 @@ class MyCellScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _CellsPage<MyCellView>(
     title: 'My cell',
-    tabRoot: true,
     provider: myCellProvider,
     needs: 'Your cell is shown once you have member access.',
     loading: 'Loading your cell…',
@@ -4487,7 +4486,7 @@ class MyCellHomeCard extends ConsumerWidget {
             child: TextButton(
               key: const Key('home-my-cell-open'),
               style: TextButton.styleFrom(padding: EdgeInsets.zero),
-              onPressed: () => context.go(CellPaths.myCell),
+              onPressed: () => context.push(CellPaths.myCell),
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

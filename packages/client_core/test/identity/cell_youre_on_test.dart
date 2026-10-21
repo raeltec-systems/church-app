@@ -31,6 +31,10 @@ Future<ClientTestHarness> pumpAt(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final h = ClientTestHarness();
+  // Story 6.1: Home shows the member cards to a member only.
+  if (location == ClientPaths.home) {
+    h.grants.myAccess = AccessReadOk(syntheticGrants());
+  }
   setUp?.call(h);
   final router = buildClientRouter(
     initialLocation: location,

@@ -287,11 +287,82 @@ void main() {
     final handle = tester.ensureSemantics();
     await pumpMobile(tester);
     expect(find.text('Status: operational'), findsOneWidget);
-    // No member access: no tabs, only the top bar's way in.
-    expect(find.bySemanticsLabel('App sections'), findsNothing);
+    // Story 6.1: no member access still gets the public tabs, and the top
+    // bar's way in.
+    final list = tester.getSemantics(find.bySemanticsLabel('App sections'));
+    expect(list.role, SemanticsRole.tabBar);
+    for (final label in ['Home', 'Calendar']) {
+      final tab = tester.getSemantics(find.bySemanticsLabel(label).last);
+      expect(tab.role, SemanticsRole.tab, reason: label);
+    }
     expect(find.byKey(const Key('nav-/account')), findsOneWidget);
     handle.dispose();
   });
+
+  testWidgets(
+    'story 6.1: a signed-out phone opens the Calendar and reads a two-day '
+    'event with both endpoints',
+    (tester) async {
+      const harvest = '71717171-7171-4171-8171-717171717171';
+      final h = await pumpMobile(
+        tester,
+        location: ClientPaths.home,
+        setUp: (h) {
+          h.session.switchTo(null);
+          h.content.publicEvents = AccessReadOk(
+            PublicEvents.fromJson(publicEventsData([publicEventData()])),
+          );
+          h.content.publicEvent[harvest] = AccessReadOk(
+            PublicEventRead.fromJson({'event': publicEventData()}),
+          );
+        },
+      );
+      // Guests get Home and Calendar and the top bar's Sign in.
+      expect(find.byKey(const Key('nav-/home')), findsOneWidget);
+      expect(find.byKey(const Key('nav-/calendar')), findsOneWidget);
+      expect(find.text('Sign in'), findsOneWidget);
+      expect(find.byKey(const Key('home-duties-card')), findsNothing);
+      await tapKey(tester, 'nav-/calendar');
+      await tester.pumpAndSettle();
+      expect(find.byType(CalendarScreen), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('event-when-$harvest'))).data,
+        'Sat 10 Oct 09:00 – Sun 11 Oct 12:00 · SYNTHETIC Main sanctuary',
+      );
+      await tapKey(tester, 'event-row-$harvest');
+      await tester.pumpAndSettle();
+      expect(find.text('Saturday 10 October 2099, 09:00'), findsOneWidget);
+      expect(find.text('Sunday 11 October 2099, 12:00'), findsOneWidget);
+      // The detail is pushed over the Calendar tab, with its own back bar.
+      expect(find.byType(BackButton), findsOneWidget);
+      expect(find.text('Sign in'), findsNothing);
+      expect(h.content.publicEventAsked, [harvest]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'story 6.1: a Pending applicant gets the same tabs and a Home without '
+    'member cards',
+    (tester) async {
+      await pumpMobile(
+        tester,
+        location: ClientPaths.home,
+        setUp: (h) =>
+            h.grants.myAccess = const AccessReadDenied(AccessDenial.notLinked),
+      );
+      expect(find.byKey(const Key('nav-/home')), findsOneWidget);
+      expect(find.byKey(const Key('nav-/calendar')), findsOneWidget);
+      expect(find.byKey(const Key('nav-/duties')), findsNothing);
+      expect(find.byKey(const Key('nav-/my-cell')), findsNothing);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('home-greeting'))).data,
+        'Welcome',
+      );
+      expect(find.byKey(const Key('home-duties-card')), findsNothing);
+      expect(find.byKey(const Key('coming-up')), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'Account opens over Home with a back arrow and the member\'s places',
@@ -353,15 +424,17 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('a member gets the Home, Duties and My cell tabs', (
-    tester,
-  ) async {
+  testWidgets('a member gets the same Home and Calendar tabs', (tester) async {
     final handle = tester.ensureSemantics();
     await pumpMember(tester);
-    for (final label in ['Home', 'Duties', 'My cell']) {
+    for (final label in ['Home', 'Calendar']) {
       final tab = tester.getSemantics(find.bySemanticsLabel(label).last);
       expect(tab.role, SemanticsRole.tab, reason: label);
     }
+    // Story 6.1: My duties and My cell left the tab bar for their Home cards
+    // and the Account menu.
+    expect(find.byKey(const Key('nav-/duties')), findsNothing);
+    expect(find.byKey(const Key('nav-/my-cell')), findsNothing);
     final list = tester.getSemantics(find.bySemanticsLabel('App sections'));
     expect(list.role, SemanticsRole.tabBar);
     // The internal screens have no tab.
@@ -428,6 +501,7 @@ void main() {
       final h = await pumpMobile(tester, size: const Size(390, 1400));
       expect(find.byKey(const Key('nav-/my-cell')), findsNothing);
       h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.memberAccess.next = MemberAccessGranted(syntheticMemberSummary());
       h.cells.mine = AccessReadOk(
         MyCell.fromJson(
           myCellData(
@@ -445,11 +519,13 @@ void main() {
       for (var i = 0; i < 3; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
-      await tapKey(tester, 'nav-/my-cell');
+      // Story 6.1: My cell is reached from the Account menu (no tab).
+      await tapKey(tester, 'go-my-cell');
       for (var i = 0; i < 3; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
       expect(find.text('SYNTHETIC Riverside'), findsOneWidget);
+      expect(find.byType(BackButton), findsOneWidget);
       expect(find.text('Confirmed'), findsOneWidget);
       expect(find.byKey(const Key('nav-/admin/cells')), findsNothing);
     },
@@ -462,6 +538,7 @@ void main() {
       final h = await pumpMobile(tester, size: const Size(390, 1600));
       expect(find.byKey(const Key('nav-/duties')), findsNothing);
       h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.memberAccess.next = MemberAccessGranted(syntheticMemberSummary());
       h.duties.mine = AccessReadOk(
         MyDuties.fromJson({
           'member_id': '22222222-2222-4222-8222-222222222222',
@@ -472,7 +549,8 @@ void main() {
       for (var i = 0; i < 3; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
-      await tapKey(tester, 'nav-/duties');
+      // Story 6.1: My duties is reached from the Account menu (no tab).
+      await tapKey(tester, 'go-my-duties');
       for (var i = 0; i < 3; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
@@ -517,7 +595,9 @@ void main() {
     'story 4.5: Home follows member access and shows the My duties card',
     (tester) async {
       final h = await pumpMobile(tester, size: const Size(390, 1600));
-      expect(find.byKey(const Key('nav-/home')), findsNothing);
+      // Story 6.1: the Home tab is there for everyone; the card follows
+      // member access.
+      expect(find.byKey(const Key('nav-/home')), findsOneWidget);
       h.grants.myAccess = AccessReadOk(syntheticGrants());
       h.duties.mine = AccessReadOk(
         MyDuties.fromJson({
@@ -1044,9 +1124,9 @@ void main() {
       tester,
     ) async {
       await pumpMember(tester);
-      await tester.tap(find.byKey(const Key('nav-/duties')), kind: kind);
+      await tester.tap(find.byKey(const Key('nav-/calendar')), kind: kind);
       await tester.pumpAndSettle();
-      expect(find.byType(MyDutiesScreen), findsOneWidget);
+      expect(find.byType(CalendarScreen), findsOneWidget);
       expect(
         FocusManager.instance.primaryFocus?.context
             ?.findAncestorWidgetOfExactType<NavItem>(),
@@ -1076,20 +1156,20 @@ void main() {
         ?.findAncestorWidgetOfExactType<NavItem>()
         ?.label;
     final seen = <String?>[];
-    for (var i = 0; i < 30 && !seen.contains('Duties'); i++) {
+    for (var i = 0; i < 40 && !seen.contains('Calendar'); i++) {
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
       seen.add(navLabel());
     }
-    // The page's own controls come first, then Home, then Duties.
+    // The page's own controls come first, then Home, then Calendar.
     final tabs = seen.whereType<String>().toList();
-    expect(tabs, ['Home', 'Duties']);
+    expect(tabs, ['Home', 'Calendar']);
     expect(seen.first, isNull);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
-    expect(find.byType(MyDutiesScreen), findsOneWidget);
+    expect(find.byType(CalendarScreen), findsOneWidget);
     // Focus stays on the selected tab after keyboard navigation.
-    expect(navLabel(), 'Duties');
+    expect(navLabel(), 'Calendar');
   });
 
   for (final (size, mode) in [
@@ -1099,9 +1179,14 @@ void main() {
     testWidgets('2x text, $size $mode: every tab, no overflow', (tester) async {
       await pumpMember(tester, size: size, textScale: 2, themeMode: mode);
       expect(tester.takeException(), isNull);
-      for (final path in ['/duties', '/my-cell', '/home']) {
+      for (final path in ['/calendar', '/home']) {
         await tapKey(tester, 'nav-$path');
         await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: path);
+      }
+      // My duties and My cell are pushed screens now (story 6.1).
+      for (final path in [ClientPaths.myDuties, ClientPaths.myCell]) {
+        await goTo(tester, path);
         expect(tester.takeException(), isNull, reason: path);
       }
       await goTo(tester, ClientPaths.fixture);
@@ -1139,7 +1224,6 @@ void main() {
         final page = tester.element(find.byType(SignInScreen));
         expect(MediaQuery.viewInsetsOf(page).bottom, 0, reason: key);
         final field = tester.getRect(find.byKey(Key(key)));
-        expect(find.bySemanticsLabel('App sections'), findsNothing);
         expect(field.height, greaterThan(20), reason: key);
         expect(field.top, greaterThanOrEqualTo(0), reason: key);
         expect(field.bottom, lessThanOrEqualTo(844 - 336 + 0.5), reason: key);

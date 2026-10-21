@@ -195,6 +195,14 @@ const staffFollowUpRoutingDestination = (
   icon: Icons.alt_route_outlined,
 );
 
+/// Story 6.1: shown while the caller holds Media, Pastor or Admin: draft,
+/// publish, withdraw and archive church events.
+const staffEventsDestination = (
+  path: ClientPaths.contentEvents,
+  label: 'Events',
+  icon: Icons.event_outlined,
+);
+
 /// The sidebar for the caller's current grants. Presentation only: hiding an
 /// entry is not a control, and every screen's data is checked by the server.
 List<StaffDestination> staffDestinationsFor(
@@ -215,6 +223,7 @@ List<StaffDestination> staffDestinationsFor(
   if (givesSpecialAssignments(grants)) staffDutySpecialDestination,
   if (grants != null) staffDutyHistoryDestination,
   if (grants != null) staffMyFollowUpsDestination,
+  if (editsContent(grants)) staffEventsDestination,
   if (supervisesFollowUps(grants)) staffFollowUpSupervisionDestination,
   if (grants?.isAdmin ?? false) staffFollowUpRoutingDestination,
   if (grants?.isAdmin ?? false) staffMembersDestination,

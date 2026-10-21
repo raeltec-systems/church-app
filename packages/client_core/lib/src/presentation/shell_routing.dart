@@ -5,10 +5,13 @@ import 'package:go_router/go_router.dart';
 import 'access_screens.dart';
 import 'assisted_recovery_screens.dart';
 import 'account_screen.dart';
+import 'calendar_screens.dart';
+import 'content_screens.dart';
 import 'cell_screens.dart';
 import 'credential_screens.dart';
 import 'duties_screens.dart';
 import 'followups_screens.dart';
+import 'home_screen.dart';
 import 'fixture_command_screen.dart';
 import 'fixture_reminder_screens.dart';
 import 'notification_settings_screen.dart';
@@ -68,9 +71,18 @@ abstract final class ClientPaths {
   /// is one assignment (the reminder's deep link).
   static const myDuties = DutyPaths.mine;
 
-  /// Story 4.5 (mobile): the member Home (the My duties card; later
-  /// features add their cards).
+  /// The mobile Home tab (story 4.5; story 6.1: everyone, signed in or
+  /// not). Later features add their cards.
   static const home = DutyPaths.home;
+
+  /// Story 6.1 (mobile): the public Calendar tab.
+  static const calendar = CalendarPaths.calendar;
+
+  /// Story 6.1 (mobile): one published event.
+  static String calendarEvent(String eventId) => CalendarPaths.event(eventId);
+
+  /// Story 6.1, staff web: the Events editor (Media, Pastor, Admin).
+  static const contentEvents = ContentPaths.events;
 
   /// Story 4.1, staff web: department leaders and deputies (Admin; Pastor
   /// read only): publish a duty and see the responses.
@@ -372,12 +384,36 @@ GoRouter buildClientRouter({
         path: ClientPaths.myCell,
         pageBuilder: (_, state) => page(state, const MyCellScreen()),
       ),
-      // Story 4.5: the member Home is a mobile destination only.
-      if (memberHome)
+      // Story 4.5: Home is a mobile destination only. Story 6.1: so is the
+      // public Calendar, with each event's detail.
+      if (memberHome) ...[
         GoRoute(
           path: ClientPaths.home,
-          pageBuilder: (_, state) => page(state, const MemberHomeScreen()),
+          pageBuilder: (_, state) => page(state, const HomeScreen()),
         ),
+        GoRoute(
+          path: ClientPaths.calendar,
+          pageBuilder: (_, state) => page(state, const CalendarScreen()),
+          routes: [
+            GoRoute(
+              path: 'events/:eventId',
+              pageBuilder: (_, state) => page(
+                state,
+                EventDetailScreen(
+                  key: ValueKey(state.pathParameters['eventId']),
+                  eventId: state.pathParameters['eventId']!,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+      // Story 6.1, staff web: the Events editor (the server checks every read
+      // and command).
+      GoRoute(
+        path: ClientPaths.contentEvents,
+        pageBuilder: (_, state) => page(state, const StaffEventsScreen()),
+      ),
       GoRoute(
         path: ClientPaths.myDuties,
         pageBuilder: (_, state) => page(state, const MyDutiesScreen()),

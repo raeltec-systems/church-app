@@ -234,6 +234,93 @@ void main() {
     );
   });
 
+  test('story 6.1: Events for Media, Pastor and Admin only', () {
+    for (final role in const ['media', 'pastor', 'admin']) {
+      expect(
+        staffDestinationsFor(syntheticGrants(roles: [role])),
+        contains(staffEventsDestination),
+        reason: role,
+      );
+    }
+    final leader = syntheticGrants(
+      scopes: const [
+        ScopeGrant(
+          scopeKind: 'department_leader',
+          scopeId: '44444444-4444-4444-8444-444444444444',
+        ),
+      ],
+    );
+    for (final g in [leader, syntheticGrants(), null]) {
+      expect(staffDestinationsFor(g), isNot(contains(staffEventsDestination)));
+      expect(
+        staffDestinationsFor(g, signedIn: true),
+        isNot(contains(staffEventsDestination)),
+      );
+    }
+    final icons = {
+      for (final d in staffDestinationsFor(
+        syntheticGrants(roles: const ['media']),
+      ))
+        d.icon,
+    };
+    expect(icons, contains(staffEventsDestination.icon));
+    expect(
+      staffDestinationsFor(syntheticGrants(roles: const ['admin'])).length,
+      {
+        for (final d in staffDestinationsFor(
+          syntheticGrants(roles: const ['admin']),
+        ))
+          d.icon,
+      }.length,
+      reason: 'every sidebar entry has its own icon',
+    );
+  });
+
+  testWidgets(
+    'story 6.1: a Media member opens Events from the sidebar and drafts an '
+    'event',
+    (tester) async {
+      final h = await pumpStaff(
+        tester,
+        size: const Size(1280, 1600),
+        setUp: (h) {
+          h.grants.myAccess = AccessReadOk(
+            syntheticGrants(roles: const ['media']),
+          );
+          h.content.staffEvents = AccessReadOk(
+            StaffEvents.fromJson(staffEventsData([])),
+          );
+        },
+      );
+      await tapKey(tester, 'nav-${ClientPaths.contentEvents}');
+      await tester.pumpAndSettle();
+      expect(find.byType(StaffEventsScreen), findsOneWidget);
+      await tapKey(tester, 'events-new');
+      await tester.pumpAndSettle();
+      for (final (key, value) in [
+        ('event-title-new', 'SYNTHETIC Harvest Thanksgiving'),
+        ('event-description-new', 'SYNTHETIC two days of thanksgiving.'),
+        ('event-start-date-new', '2099-10-10'),
+        ('event-start-time-new', '09:00'),
+        ('event-end-date-new', '2099-10-11'),
+        ('event-end-time-new', '12:00'),
+        ('event-location-new', 'SYNTHETIC Main sanctuary'),
+      ]) {
+        await tester.enterText(find.byKey(Key(key)), value);
+      }
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'event-save-new');
+      final sent = h.gateway.sent.single;
+      expect(sent.function, 'content_command');
+      expect(sent.wire['command'], 'content.create_event');
+      expect(
+        (sent.wire['payload'] as Map)['ends_at'],
+        '2099-10-11T10:00:00.000Z',
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets(
     'reminder health renders aggregate status for an authorized read',
     (tester) async {

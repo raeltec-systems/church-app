@@ -10,30 +10,34 @@ import 'package:go_router/go_router.dart';
 
 typedef MobileDestination = ({String path, String label, IconData icon});
 
-/// The member's bottom tabs (design handoff: Home first; Bible & Hymns,
-/// Sermons, Give and Calendar join as their epics ship). Duties and My cell
-/// stand in until then. Inbox and the account live in the top bar; the
-/// platform status, fixture and access screens are internal and keep their
-/// routes but no tab.
-const mobileMemberDestinations = <MobileDestination>[
+/// The bottom tabs (design handoff, owner decision 2026-10-21: Home, Bible &
+/// Hymns, Sermons, Give, Calendar). Story 6.1 brings Home and Calendar; Give,
+/// Bible & Hymns and Sermons join with epic 6 entries 3, 6 and 9. My duties,
+/// My follow-ups and My cell are reached from their Home cards and the
+/// Account menu. Inbox and the account live in the top bar; the platform
+/// status, fixture and access screens are internal and keep their routes but
+/// no tab.
+const mobileDestinations = <MobileDestination>[
   (path: ClientPaths.home, label: 'Home', icon: Icons.home_outlined),
   (
-    path: ClientPaths.myDuties,
-    label: 'Duties',
-    icon: Icons.event_available_outlined,
+    path: ClientPaths.calendar,
+    label: 'Calendar',
+    icon: Icons.calendar_today_outlined,
   ),
-  (path: ClientPaths.myCell, label: 'My cell', icon: Icons.groups_outlined),
 ];
 
-/// The tabs for the caller's current grants: none before member access (the
-/// top bar's Sign in is the way in).
+/// The tabs: the same public tabs for everyone, signed in or not, Pending or
+/// member (story 6.1). [grants] decides only what each screen shows.
 List<MobileDestination> mobileDestinationsFor(MemberGrants? grants) =>
-    grants == null ? const [] : mobileMemberDestinations;
+    mobileDestinations;
 
-/// Routes that show the top bar (logo, inbox, account): Home, and every
-/// screen of a caller without member access.
+/// Routes that show the top bar (logo, inbox, account or Sign in): the tab
+/// roots for everyone, and every other screen of a caller without member
+/// access except an event's detail (it has its own back bar).
 bool _showsTopBar(String location, bool member) =>
-    !member || location == ClientPaths.home;
+    location == ClientPaths.home ||
+    location == ClientPaths.calendar ||
+    (!member && !location.startsWith('${ClientPaths.calendar}/'));
 
 class MobileApp extends StatefulWidget {
   const MobileApp({
@@ -63,7 +67,7 @@ class _MobileAppState extends State<MobileApp> {
     membershipRequests: true,
     // Story 2.9: sign-in help links to staff-assisted recovery on this phone.
     assistedRecovery: true,
-    // Story 4.5: the member Home with the My duties card.
+    // Story 4.5: the Home tab; story 6.1: and the public Calendar.
     memberHome: true,
     shell: (location, focusSelectedNav, child) => MobileShell(
       location: location,

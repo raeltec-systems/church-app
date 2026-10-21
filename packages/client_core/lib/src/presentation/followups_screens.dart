@@ -625,7 +625,7 @@ class _MyFollowUpsHomeCardState extends ConsumerState<MyFollowUpsHomeCard> {
             label: 'My follow-ups',
             meta: 'Nothing open',
             showDivider: false,
-            onTap: () => context.go(FollowUpPaths.mine),
+            onTap: () => context.push(FollowUpPaths.mine),
           ),
         );
       default:
@@ -643,7 +643,7 @@ class _MyFollowUpsHomeCardState extends ConsumerState<MyFollowUpsHomeCard> {
           FocusRing(
             child: TextButton(
               key: const Key('home-followups-see-all'),
-              onPressed: () => context.go(FollowUpPaths.mine),
+              onPressed: () => context.push(FollowUpPaths.mine),
               child: const Text('See all'),
             ),
           ),

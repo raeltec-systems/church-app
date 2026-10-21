@@ -671,6 +671,67 @@ void main() {
       expect(parts[1]['assignee_member_id'], isNull);
     });
 
+    testWidgets('story 5.6: unpublished changes lead with Publish changes; '
+        'the published programme is changed behind a button', (tester) async {
+      final h = await pumpPlan(
+        tester,
+        read: readWith(
+          programme: {
+            ...programmeData(state: 'published', revision: 4),
+            'published_revision': 3,
+            'published_at': '2099-03-01T10:00:00Z',
+            'unpublished_changes': false,
+            'meeting_changed': true,
+          },
+          extra: {
+            'published': projectionData(revision: 3),
+            'duties': [dutyOf(_part1, 'accepted'), dutyOf(_part2, null)],
+          },
+        ),
+      );
+      expect(byKey('plan-unpublished'), findsOneWidget);
+      expect(
+        find.text('The meeting moved since you published'),
+        findsOneWidget,
+      );
+      expect(byKey('plan-topic'), findsNothing);
+      await tapKey(tester, 'plan-change-published');
+      await settle(tester);
+      expect(byKey('plan-topic'), findsOneWidget);
+      expect(find.text('Publish changes'), findsWidgets);
+      expect(byKey('plan-cancel'), findsOneWidget);
+      await tester.tap(find.text('Publish changes').first);
+      await tester.pump();
+      final sent = h.gateway.sent.single;
+      expect(sent.wire['command'], 'cells.publish_programme');
+      expect(sent.wire['expected_revision'], 4);
+    });
+
+    testWidgets('a published part keeps its kind: the refusal says how to '
+        'change it', (tester) async {
+      final h = await pumpPlan(
+        tester,
+        read: readWith(
+          programme: {
+            ...programmeData(state: 'published', revision: 4),
+            'published_revision': 3,
+            'unpublished_changes': true,
+          },
+          extra: {'linkable': _linkable},
+        ),
+      );
+      await tapKey(tester, 'plan-save');
+      h.gateway.sent.single.refuse(
+        ErrorCode.validationFailed,
+        fieldErrors: const {'parts.0': 'published_kind'},
+      );
+      await settle(tester);
+      expect(
+        tester.widget<Text>(byKey('part-error-0')).data,
+        startsWith('Published with a person or with a department duty'),
+      );
+    });
+
     testWidgets('a published programme shows each answer and what members '
         'see', (tester) async {
       final h = await pumpPlan(

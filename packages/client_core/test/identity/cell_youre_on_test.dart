@@ -101,45 +101,48 @@ AccessRead<MyCell> myCell({bool withMeeting = true}) => AccessReadOk(
   }),
 );
 
-AccessRead<MeetingProgrammeRead> programme({bool published = true}) =>
-    AccessReadOk(
-      MeetingProgrammeRead.fromJson({
-        'meeting': meetingData(),
-        'programme': published
-            ? {
-                'programme_id': _programme,
-                'meeting_id': _meeting,
-                'topic': 'Rooted in love',
-                'scripture': 'Ephesians 3:14-21',
-                'revision': 3,
-                'published_at': '2099-03-01T10:00:00Z',
-                'parts': [
-                  {
-                    'part_id': _part1,
-                    'label': 'Opening prayer',
-                    'starts_at': '2099-03-06T16:00:00Z',
-                    'ends_at': '2099-03-06T16:10:00Z',
-                    'leader': 'SYNTHETIC Member',
-                    'department': null,
-                  },
-                  {
-                    'part_id': _part2,
-                    'label': 'Bible study',
-                    'starts_at': '2099-03-06T16:10:00Z',
-                    'ends_at': '2099-03-06T16:50:00Z',
-                    'leader': 'SYNTHETIC Grace Banda',
-                    'department': null,
-                  },
-                ],
-              }
-            : null,
-        'yours': published
-            ? [
-                {'part_id': _part1, 'occurrence_id': _occurrence},
-              ]
-            : const [],
-      }),
-    );
+AccessRead<MeetingProgrammeRead> programme({
+  bool published = true,
+  bool meetingChanged = false,
+}) => AccessReadOk(
+  MeetingProgrammeRead.fromJson({
+    'meeting': meetingData(),
+    'programme': published
+        ? {
+            'programme_id': _programme,
+            'meeting_id': _meeting,
+            'topic': 'Rooted in love',
+            'scripture': 'Ephesians 3:14-21',
+            'revision': 3,
+            'published_at': '2099-03-01T10:00:00Z',
+            'meeting_changed': meetingChanged,
+            'parts': [
+              {
+                'part_id': _part1,
+                'label': 'Opening prayer',
+                'starts_at': '2099-03-06T16:00:00Z',
+                'ends_at': '2099-03-06T16:10:00Z',
+                'leader': 'SYNTHETIC Member',
+                'department': null,
+              },
+              {
+                'part_id': _part2,
+                'label': 'Bible study',
+                'starts_at': '2099-03-06T16:10:00Z',
+                'ends_at': '2099-03-06T16:50:00Z',
+                'leader': 'SYNTHETIC Grace Banda',
+                'department': null,
+              },
+            ],
+          }
+        : null,
+    'yours': published
+        ? [
+            {'part_id': _part1, 'occurrence_id': _occurrence},
+          ]
+        : const [],
+  }),
+);
 
 AccessRead<MyDuties> myDuties({
   String response = 'pending',
@@ -301,6 +304,20 @@ void main() {
         'Confirmed by leader',
       );
       expect(byKey('my-cell-accept-$_part1'), findsNothing);
+    });
+
+    testWidgets('story 5.6: a moved meeting says the programme is being '
+        'updated', (tester) async {
+      await pumpAt(
+        tester,
+        ClientPaths.myCell,
+        setUp: (h) {
+          h.cells.mine = myCell();
+          h.cells.meetingProgramme = programme(meetingChanged: true);
+          h.duties.mine = myDuties();
+        },
+      );
+      expect(byKey('my-cell-programme-updating'), findsOneWidget);
     });
 
     testWidgets('an unpublished programme says so', (tester) async {

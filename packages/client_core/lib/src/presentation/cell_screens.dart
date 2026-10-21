@@ -2290,6 +2290,32 @@ class _PlanBody extends ConsumerWidget {
         ),
       );
     } else if (p.published && read.canEdit) {
+      // Story 5.6: changes waiting to be published come first, with the
+      // one action that sends them.
+      if (open && (p.unpublishedChanges || p.meetingChanged)) {
+        children.addAll([
+          RequestStateBanner(
+            key: const Key('plan-unpublished'),
+            tone: StatusTone.warning,
+            title: p.meetingChanged
+                ? 'The meeting moved since you published'
+                : 'Changes not published yet',
+            message:
+                'Members and everyone with a part still have the last '
+                'version. Publishing asks people again only where their '
+                'part changed.',
+            actions: [
+              BannerAction(
+                'Publish changes',
+                state.busy ? null : () => ctl.publish(p),
+                key: const Key('plan-publish-changes'),
+                primary: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ]);
+      }
       children.add(
         _PublishedView(
           meetingId: meetingId,
@@ -2299,6 +2325,17 @@ class _PlanBody extends ConsumerWidget {
           open: open,
         ),
       );
+      if (open) {
+        children.add(
+          _PublishedEditor(
+            meetingId: meetingId,
+            read: read,
+            programme: p,
+            busy: state.busy,
+            errors: state.fieldErrors,
+          ),
+        );
+      }
     } else {
       if (p.draft && read.canEdit && !open) {
         children.add(
@@ -2806,6 +2843,8 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
                 child: Text(
                   overrideAsked
                       ? 'Publish with this reason'
+                      : widget.programme.published
+                      ? 'Publish changes'
                       : 'Publish to members',
                 ),
               ),
@@ -2814,7 +2853,9 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
               _muted(context, 'Save the draft to publish it.')
             else if (_rows.isEmpty)
               _muted(context, 'Add a part to publish.'),
-            if (!_confirmCancel)
+            if (widget.programme.published)
+              const SizedBox.shrink()
+            else if (!_confirmCancel)
               FocusRing(
                 child: TextButton(
                   key: const Key('plan-cancel'),
@@ -2907,6 +2948,9 @@ String? _partErrorText(Map<String, String> errors, int index, String window) {
     'overlap' => 'Overlaps the part above',
     'assignee_not_in_cell' => 'Choose someone in the cell, or nobody',
     'assignee_and_link' => 'A person or a department duty, not both',
+    'published_kind' =>
+      'Published with a person or with a department duty: remove this part '
+          'and add a new one to change that',
     'link_unavailable' => 'That department duty is no longer offered',
     _ => 'Reload the page and try again',
   };
@@ -3105,6 +3149,56 @@ class _PartEditorRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Story 5.6: changing a published programme: the same editor behind
+/// **Change the programme** (members keep the last publish until the
+/// changes are published).
+class _PublishedEditor extends StatefulWidget {
+  const _PublishedEditor({
+    required this.meetingId,
+    required this.read,
+    required this.programme,
+    required this.busy,
+    required this.errors,
+  });
+  final String meetingId;
+  final ProgrammeRead read;
+  final CellProgramme programme;
+  final bool busy;
+  final Map<String, String> errors;
+
+  @override
+  State<_PublishedEditor> createState() => _PublishedEditorState();
+}
+
+class _PublishedEditorState extends State<_PublishedEditor> {
+  late bool _open = widget.programme.unpublishedChanges;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 16),
+    child: _open
+        ? _ProgrammeEditor(
+            meetingId: widget.meetingId,
+            read: widget.read,
+            programme: widget.programme,
+            busy: widget.busy,
+            errors: widget.errors,
+          )
+        : Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FocusRing(
+              child: OutlinedButton(
+                key: const Key('plan-change-published'),
+                onPressed: widget.busy
+                    ? null
+                    : () => setState(() => _open = true),
+                child: const Text('Change the programme'),
+              ),
+            ),
+          ),
+  );
 }
 
 /// Story 5.4: a published programme for its managers: each part with who
@@ -3311,8 +3405,8 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
           ],
           _muted(
             context,
-            'Each person answers in the app (My duties). Changing a '
-            'published programme is not available yet.',
+            'Each person answers in the app (My duties). A change reaches '
+            'them when you publish it.',
           ),
         ],
       ),
@@ -3640,6 +3734,13 @@ class _MyCellProgrammeCardState extends ConsumerState<_MyCellProgrammeCard> {
               const SizedBox(height: 12),
             ],
           _heading(context, 'Programme'),
+          if (p.meetingChanged)
+            Text(
+              'The meeting moved. Your leader is updating the programme; '
+              'the times below may change.',
+              key: const Key('my-cell-programme-updating'),
+              style: ChurchType.secondary.copyWith(color: c.amberFg),
+            ),
           if (p.topic case final t?)
             Text(t, style: ChurchType.cardTitle.copyWith(color: c.ink)),
           if (p.scripture case final sc?)

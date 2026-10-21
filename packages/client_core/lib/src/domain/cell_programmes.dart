@@ -156,6 +156,8 @@ class CellProgramme {
     this.studyNotes,
     this.publishedRevision,
     this.publishedAt,
+    this.unpublishedChanges = false,
+    this.meetingChanged = false,
   });
 
   factory CellProgramme.fromJson(Object? json) {
@@ -182,6 +184,9 @@ class CellProgramme {
       publishedAt: m['published_at'] == null
           ? null
           : _instant(m, 'published_at'),
+      // Story 5.6 (absent from 5.4 servers).
+      unpublishedChanges: _opt<bool>(m, 'unpublished_changes') ?? false,
+      meetingChanged: _opt<bool>(m, 'meeting_changed') ?? false,
     );
   }
 
@@ -203,6 +208,11 @@ class CellProgramme {
   /// Story 5.4: the revision members read, and when it was published.
   final int? publishedRevision;
   final DateTime? publishedAt;
+
+  /// Story 5.6: saved changes members and Duties do not have yet, and a
+  /// meeting moved since the last publish (publish again to update them).
+  final bool unpublishedChanges;
+  final bool meetingChanged;
 
   bool get draft => state == ProgrammeState.draft;
   bool get published => state == ProgrammeState.published;
@@ -561,6 +571,7 @@ class ProgrammeProjection {
     this.scripture,
     this.revision,
     this.publishedAt,
+    this.meetingChanged = false,
   });
 
   factory ProgrammeProjection.fromJson(Object? json) {
@@ -577,6 +588,7 @@ class ProgrammeProjection {
       publishedAt: m['published_at'] == null
           ? null
           : _instant(m, 'published_at'),
+      meetingChanged: _opt<bool>(m, 'meeting_changed') ?? false,
     );
   }
 
@@ -589,6 +601,9 @@ class ProgrammeProjection {
   /// Set on what members read (null on a preview).
   final int? revision;
   final DateTime? publishedAt;
+
+  /// Story 5.6: the meeting moved since this was published.
+  final bool meetingChanged;
 }
 
 /// Story 5.4: `api.cells_meeting_programme`, a meeting's published programme

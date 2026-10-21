@@ -44,7 +44,9 @@ Future<void> main() async {
         // Story 4.9: Call and Message open the phone's dialler or messages.
         contactLauncherProvider.overrideWithValue(const UrlContactLauncher()),
       ],
-      child: const MobileApp(),
+      // The launch screen carries into the app and fades into the first
+      // screen.
+      child: const MobileApp(launchCurtain: true),
     ),
   );
 }

@@ -325,6 +325,34 @@ void main() {
     },
   );
 
+  testWidgets('the launch screen pulses while loading, then fades into the '
+      'app', (tester) async {
+    final h = ClientTestHarness();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: h.overrides(),
+        child: const MobileApp(
+          initialLocation: ClientPaths.status,
+          launchCurtain: true,
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(const Key('launch-curtain')), findsOneWidget);
+    // At least one breath, even when the app is ready at once.
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(find.byKey(const Key('launch-curtain')), findsOneWidget);
+    // Never longer than the cap.
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byKey(const Key('launch-curtain')), findsNothing);
+    // The app was built behind it all along.
+    await tester.pumpAndSettle();
+    expect(find.text('Status: operational'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('a member gets the Home, Duties and My cell tabs', (
     tester,
   ) async {

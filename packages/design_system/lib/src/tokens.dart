@@ -212,6 +212,10 @@ abstract final class ChurchGeometry {
   static const double staffButtonRadius = 12;
   static const double staffSidebarWidth = 232;
 
+  /// Staff web cards, tables and panels (the handoff's admin cards); the
+  /// phone keeps [mobileCardRadius].
+  static const double staffCardRadius = 12;
+
   /// The staff sidebar folded to a rail of icons.
   static const double staffRailWidth = 72;
   static const double staffContentMaxWidth = 1280;

@@ -214,12 +214,12 @@ abstract final class ChurchGeometry {
 
 /// Font families from the design handoff (docs/design-handoff/README.md):
 /// Outfit for headings and large numbers, Figtree for body and UI, JetBrains
-/// Mono for eyebrows and programme times. Until the font files are bundled
-/// (pubspec `fonts:`), Flutter falls back to the platform font for each.
+/// Mono for eyebrows and programme times. The files are bundled in this
+/// package (pubspec `fonts:`), so the families carry the package prefix.
 abstract final class ChurchFonts {
-  static const heading = 'Outfit';
-  static const body = 'Figtree';
-  static const mono = 'JetBrains Mono';
+  static const heading = 'packages/church_design_system/Outfit';
+  static const body = 'packages/church_design_system/Figtree';
+  static const mono = 'packages/church_design_system/JetBrains Mono';
 }
 
 /// Type scale (size / weight / family) from the design handoff.

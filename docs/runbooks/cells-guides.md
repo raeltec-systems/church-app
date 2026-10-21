@@ -43,7 +43,7 @@ Maintainers: [story 5.1](cells-meetings.md).
 
 ### 1.2 Moving a member to another cell
 
-**Admin cells** > the member > move them, then confirm (or let the new cell's leader confirm). Their old cell's future parts become gaps, their part duties end with **Duty released**, and their open **Can't come?** notices close. The old cell's leader and assistant get **A part needs someone**. Meetings that have already started are left as they were.
+**Admin cells** > the member > move them, then confirm (or let the new cell's leader confirm). A leader or assistant of their current cell cannot be moved until you remove that role (**Leads their cell**). Removing it is refused while they are the cell's last leader with a programme ahead (1.3). Their old cell's future parts become gaps, their part duties end with **Duty released**, and their open **Can't come?** notices close. The old cell's leader and assistant get **A part needs someone**. Meetings that have already started are left as they were.
 
 Maintainers: [story 5.9](cells-meetings.md#story-59-transfers-handovers-and-deletion).
 

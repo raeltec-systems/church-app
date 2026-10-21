@@ -762,3 +762,36 @@ The run uses fictional numbers `+44 7700 900080-900089`. Leader-only texts start
 ### Staging
 
 The staging pilot is run by the owner, using the synthetic staging accounts (cells-guides.md, Owner pilot on staging). No script runs against staging from here. Results go in `evidence-5.10/owner-pilot.md`.
+
+## Story 5.12: closing verification and the external check
+
+There is no client feature change. The only client change is a new notice for one refusal.
+- Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-verify-cell-programmes-end-to-end-and-promote-them-to-produc-plan.md`.
+- Evidence: `evidence-5.12/`.
+- Production: [production-promotion-cells.md](production-promotion-cells.md), prepared but not executed.
+
+### The external check (independent reviewer)
+
+The reviewer reran pgTAP, the E2Es and the client tests, then probed further with their own rolled-back SQL (`evidence-5.12/external-check.md`).
+- Safe projection and material revision: **PASS**.
+- Old-cell access had one failure, fixed in `supabase/migrations/20261021132636_cells_external_check_fixes.sql`:
+  - **A leader or assistant cannot be moved away from the cell they lead.** `cells.confirm_request` refuses `conflict {"member_id": "leads_current_cell"}` while the member holds that cell's `cell_leader` or `cell_assistant` scope. The role is a grant separate from membership, and it would otherwise keep the old cell's private programme, notices and venue. An Admin removes the role first (Roles and access), which runs the 5.9 handover check, then moves the member. The clients say **Leads their cell**.
+  - **Actual leaders are judged at the meeting's start.** `cells.record_actual_leaders` accepts a member who belonged to the cell when the meeting started, even if they have moved since. Someone who never belonged is still named as a guest.
+
+### Closing local suite
+
+`evidence-5.12/closing-suite-summary.txt` holds the results:
+- clean builds: staff web (release) and the mobile debug APK;
+- `client_core`: 732 tests;
+- all 14 cells, duties and lifecycle E2Es, plus the offline tests;
+- db:test on a fresh reset.
+
+On this Windows host the APK build needs `JAVA_TOOL_OPTIONS=-Djdk.net.unixdomain.tmpdir=C:\gtmp`, because the JDK's AF_UNIX loopback fails in the default temp directory.
+
+### Still with the owner (HITL)
+
+- The staging demonstration on both clients, together with the 5.10 owner pilot and the 5.x owner checks.
+- The staging rerun of the external check cases with the owner's staging accounts.
+- Story 4.15 promoted first.
+- The Q4 live-data decision and the named pilot leaders.
+- The epic 5 promotion, following production-promotion-cells.md.

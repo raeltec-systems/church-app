@@ -12,7 +12,7 @@ Related: [cells-meetings.md](cells-meetings.md) (stories 5.1-5.11), [cells-guide
 
 ## What is promoted
 
-Eleven migrations, in this order. Each was applied to staging under its hosted version, and its functions were checked identical to a fresh local reset (`evidence-5.x/staging-verify.md`):
+Twelve migrations, in this order. Each was applied to staging under its hosted version, and its functions were checked identical to a fresh local reset (`evidence-5.x/staging-verify.md`):
 
 | Story | Migration (hosted version) |
 |---|---|
@@ -25,6 +25,7 @@ Eleven migrations, in this order. Each was applied to staging under its hosted v
 | 5.7 | `20261021111547_cells_absence_notices.sql` |
 | 5.8 | `20261021115855_cells_meeting_records.sql` |
 | 5.9 | `20261021122802_cells_transfer_effects.sql` |
+| 5.12 | `20261021132636_cells_external_check_fixes.sql` |
 
 The 4.11 release gate carries over: `cell_part` is registered in 5.4. Every client in production must therefore run the 4.11 build or later; production clients are built from `main` at promotion.
 
@@ -52,7 +53,7 @@ While Q4 stays closed, stop here: production shows the baseline above.
    ```sql
    select count(*) from supabase_migrations.schema_migrations
     where version in ('20261021073514','20261021081026','20261021084446','20261021093943','20261021094249','20261021101314','20261021101323',
-                      '20261021104522','20261021111547','20261021115855','20261021122802');      -- 11
+                      '20261021104522','20261021111547','20261021115855','20261021122802','20261021132636');  -- 12
    select source_type from app.contract_source_types where owner_module = 'cells' order by 1;
      -- cells_absence_notice, cells_meeting, cells_programme, cells_programme_part, cells_signup_option
    select module from app.identity_handover_hooks order by 1;                                -- cells, duties, followups

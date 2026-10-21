@@ -44,8 +44,9 @@ context:
 ## Tasks & Acceptance
 
 - [x] `docs/runbooks/production-promotion-cells.md` (prepared, not executed)
-- [ ] Closing local suite (`evidence-5.12/closing-suite-summary.txt`)
-- [ ] Independent reviewer reruns of safe projection, material revision and old-cell access (`evidence-5.12/external-check.md`)
+- [x] Closing local suite (`evidence-5.12/closing-suite-summary.txt`)
+- [x] Independent reviewer reruns of safe projection, material revision and old-cell access (`evidence-5.12/external-check.md`): two findings fixed (`20261021132636_cells_external_check_fixes.sql`, on staging)
+- [ ] Independent re-review of old-cell access after the fixes, together with the staging rerun (owner accounts)
 - [ ] HITL: Israel witnesses the mobile and staff demonstration on staging (with the 5.10 owner pilot and the 5.x owner checks)
 - [ ] HITL: 4.15 promoted; Israel's Q4 decision and pilot leaders; Israel promotes epic 5 and follows the runbook
 
@@ -56,5 +57,16 @@ context:
   - production shows the deployed workflows, with the unapproved gates visibly disabled.
 
 ## Implementation Notes
+
+- Closing local suite:
+  - staff web release build and mobile debug APK build (with the JDK loopback workaround on this host);
+  - 732 client tests;
+  - 14 E2Es and the offline tests;
+  - db:test 4234, then 4238 after the fixes.
+- External check:
+  - safe projection and material revision PASS;
+  - old-cell access FAIL for a member who leads their cell. Fixed by refusing the transfer until the role is removed (fail closed; an automatic role end is the owner's alternative to choose later);
+  - the actual-leader membership check moved to the meeting's start.
+- Production runbook prepared. Nothing in production was touched.
 
 ## Review Triage Log

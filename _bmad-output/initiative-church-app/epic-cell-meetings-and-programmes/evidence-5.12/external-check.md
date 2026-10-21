@@ -124,7 +124,7 @@ Staging reruns are still outstanding and need the owner's accounts.
 
 ## Triage (parent session, 2026-10-21)
 
-Fixed in `supabase/migrations/20261021150000_cells_external_check_fixes.sql`. Staging gets it under its hosted version: see `staging-verify.md`.
+Fixed in `supabase/migrations/20261021132636_cells_external_check_fixes.sql`. Staging gets it under its hosted version: see `staging-verify.md`.
 
 1. **Medium, fixed (fail closed):** a transfer of a member who leads or assists their current cell is now refused with `conflict {"member_id": "leads_current_cell"}`.
    - An Admin removes that role first. Identity's revocation runs the 5.9 handover check, so the last leader of a cell with a programme ahead is never removed silently.

@@ -3,7 +3,7 @@ title: 'Publish material programme revisions atomically and flag department mism
 type: 'feature'
 ticket: '6'
 created: '2026-10-21'
-status: 'in-progress'
+status: 'done'
 baseline_revision: '149ead6'
 route: 'full'
 route_source: 'auto'
@@ -59,7 +59,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261021110000_cells_programme_revisions.sql`
+- [x] `supabase/migrations/20261021104522_cells_programme_revisions.sql`
 - [x] `supabase/tests/cells_programme_revisions_test.sql` (and the 5.4 suite's changed expectations)
 - [x] Clients: unpublished changes and meeting moved banner with **Publish changes**, **Change the programme**, `published_kind` text, members told of a moved meeting.
 - [x] E2E `tools/identity-e2e/cells-programme-revisions.mjs` + offline test.
@@ -70,7 +70,7 @@ context:
 
 ## Implementation Notes
 
-- `20261021110000_cells_programme_revisions.sql`: published snapshot columns (`published_starts_at`, `published_ends_at`, `published_venue` on programmes; `published_kind`, `published_label`, `published_starts_at`, `published_ends_at`, `published_slot_id` on parts), backfilled for programmes already published; `cells_programme_part_check` answers for removed parts too; the follow trigger moves published programmes' parts; the guard lets the cell's leader or assistant move; `cells_programme_json` adds `unpublished_changes` and `meeting_changed`; save allows published programmes and refuses a kind switch; `cells_publish_part` (new five-argument function) ends removed parts, flags changed department links and records the published snapshot; publish walks live parts then parts removed since the last publish and records the meeting snapshot; cancel also ends removed-but-published parts and flags department links; the member read adds `meeting_changed`.
+- `20261021104522_cells_programme_revisions.sql`: published snapshot columns (`published_starts_at`, `published_ends_at`, `published_venue` on programmes; `published_kind`, `published_label`, `published_starts_at`, `published_ends_at`, `published_slot_id` on parts), backfilled for programmes already published; `cells_programme_part_check` answers for removed parts too; the follow trigger moves published programmes' parts; the guard lets the cell's leader or assistant move; `cells_programme_json` adds `unpublished_changes` and `meeting_changed`; save allows published programmes and refuses a kind switch; `cells_publish_part` (new five-argument function) ends removed parts, flags changed department links and records the published snapshot; publish walks live parts then parts removed since the last publish and records the meeting snapshot; cancel also ends removed-but-published parts and flags department links; the member read adds `meeting_changed`.
 - pgTAP `cells_programme_revisions_test.sql` (28); the 5.4 suite's expectations follow 5.6 (published programmes are saved; the leader moves). Full db:test passes on a fresh reset.
 - Clients: `CellProgramme.unpublishedChanges/meetingChanged`, `ProgrammeProjection.meetingChanged`; Plan meeting: the warning banner with **Publish changes**, **Change the programme** (the same editor; its publish reads **Publish changes**; cancelling stays on the published view), the `published_kind` refusal text; My cell: "The meeting moved. Your leader is updating the programme". Tests in `cell_programmes_test.dart` and `cell_youre_on_test.dart`.
 - E2E `tools/identity-e2e/cells-programme-revisions.mjs` (6 checks) + offline test; numbers `+44 7700 900040-900049`. Regression runs of 5.5, 5.4 (its preview comparison now ignores `meeting_changed`), 5.1 and the owner-ops E2E in `evidence-5.6/`.

@@ -492,7 +492,7 @@ Record the outcome per step in `evidence-5.5/owner-check.md` (pass/fail, device,
 
 ## Story 5.6: programme revisions and department mismatches
 
-Migration: `supabase/migrations/20261021110000_cells_programme_revisions.sql` (no row deletions; it backfills the published snapshot of programmes already published).
+Migration: `supabase/migrations/20261021104522_cells_programme_revisions.sql` (no row deletions; it backfills the published snapshot of programmes already published).
 Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-publish-material-programme-revisions-atomically-and-flag-dep-plan.md`.
 Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.6/`.
 

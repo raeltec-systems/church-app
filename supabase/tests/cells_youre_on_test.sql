@@ -5,7 +5,7 @@
 -- tools/identity-e2e/cells-youre-on.mjs. Every account, phone and name here is SYNTHETIC
 -- (fictional range +1 202 555 0181-0192).
 begin;
-select plan(20);
+select plan(25);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000055' || lpad(n::text, 2, '0'))::uuid $$;
@@ -238,6 +238,32 @@ select is(pg_temp.cmd(pg_temp.c(2), 'api.duties_command', 'duties.record_contact
   jsonb_build_object('assignment_id', (pg_temp.asg(10)).assignment_id, 'channel', 'phone', 'outcome', 'no_answer',
                      'next_follow_up_at', app.cmd_utc(now() + interval '1 hour'))) ->> 'code',
   'not_found', 'contact attempts stay department-only');
+
+-- Review gaps: department duties unchanged both ways, stale confirmation, the audit row, cancel --------
+create temp table dq as select pg_temp.duties(9, 'duties.publish_duty', null, jsonb_build_object(
+  'department_id', pg_temp.d(), 'member_id', pg_temp.mid(10), 'duty_name', 'SYNTHETIC Morning ushering',
+  'starts_at', app.cmd_utc(pg_temp.at(pg_temp.mt(), '18:00') + interval '1 day'),
+  'ends_at', app.cmd_utc(pg_temp.at(pg_temp.mt(), '19:00') + interval '1 day'))) as r;
+create function pg_temp.dasg() returns app.duties_assignments language sql as $$
+  select a.* from app.duties_assignments a join app.duties_slots s using (slot_id)
+    join app.duties_occurrences o using (occurrence_id)
+   where o.department_id = pg_temp.d() and a.assignment_state = 'current'
+$$;
+select is(pg_temp.cmd(pg_temp.c(2), 'api.duties_command', 'duties.confirm_by_leader', (pg_temp.dasg()).revision,
+  jsonb_build_object('assignment_id', (pg_temp.dasg()).assignment_id, 'channel', 'phone', 'reason', 'SYNTHETIC yes')) ->> 'code',
+  'not_found', 'a cell leader cannot confirm a department duty');
+select is(pg_temp.cmd(pg_temp.c(9), 'api.duties_command', 'duties.confirm_by_leader', (pg_temp.dasg()).revision,
+  jsonb_build_object('assignment_id', (pg_temp.dasg()).assignment_id, 'channel', 'phone', 'reason', 'SYNTHETIC yes')) #>> '{data,provenance}',
+  'leader', 'the department''s leader still confirms its own duty (4.9 unchanged)');
+select is(pg_temp.cmd(pg_temp.c(2), 'api.duties_command', 'duties.confirm_by_leader', (pg_temp.asg(4)).revision - 1,
+  jsonb_build_object('assignment_id', (pg_temp.asg(4)).assignment_id, 'channel', 'phone', 'reason', 'SYNTHETIC yes')) ->> 'code',
+  'conflict', 'a confirmation at an old revision is a conflict');
+select is((select a.actor_capacity || '|' || coalesce(a.department_id::text, 'none') || '|' || (a.actor_member_id = pg_temp.mid(2))
+             from app.duties_audit a where a.action = 'leader_confirmed' and a.assignment_id = (pg_temp.asg(7)).assignment_id),
+  'cell_leader|none|true', 'the audit records the cell capacity and the leader');
+select pg_temp.cells(pg_temp.c(2), 'cells.cancel_programme', pg_temp.rev(), jsonb_build_object('programme_id', pg_temp.pid()));
+select is(pg_temp.readj(pg_temp.c(4), format('select api.cells_meeting_programme(%L)', pg_temp.mt())) -> 'yours',
+  '[]'::jsonb, 'after a cancel nothing is the member''s');
 
 select * from finish();
 rollback;

@@ -77,3 +77,15 @@ context:
 ## Plan Change Log
 
 ## Review Triage Log
+
+Independent review of `450962a..172085c` (2026-10-21, a separate reviewer agent; no high-severity finding: only a current leader or assistant of the part's own cell confirms, department duties go through the unchanged lock, replay widening is safe, `yours` leaks nothing). Fixes before staging, in place:
+
+1. Medium, deferred to 5.9: a member transferred out of the cell can still be confirmed on the old cell's part (no `cell_transferred` hook ends cell parts yet; Duties cannot read Cells membership without breaking the module boundary). Story 5.9 applies transfer and removal to programmes and cell duties and closes this. Runbook known limit.
+2. Medium, fixed: My cell declined in one tap and showed no failure. **Can't do it** now asks once more ("Yes, I can't"), and the card says Sending, a refused answer, an unconfirmed outcome or Not sent. Tests added.
+3. Low-Medium, fixed: honest states. My cell says "Loading your answer…" or "could not be loaded here" instead of sending the member away; Home says when the programme could not be loaded. Tests added.
+4. Low, fixed: Accept / Can't do it follow `needsResponse(now)`; an accepted part offers **Can't make it anymore** (withdraw, confirmed once more); labels match My duties ("Can't make it").
+5. Low, fixed: the leader's confirm form stays open (with the typed reason) until the part shows the answer; **Not now** waits while sending. Not fixed: hiding the button on the leader's own part (the server refuses `own`; the leader is rarely a member of their own programme).
+6. Low, accepted: the `leader_confirmed` audit has no cell id (traceable through the occurrence); `reminders_skipped` after a cell confirmation records capacity `member` (Duties' department-only capacity helper). Recorded.
+7. Low, accepted: the cell path does not call Cells' open-gate or active-cell checks (Duties does not call Cells; the Q4 gate is the same one Duties checks).
+8. Nit, accepted: `CellPaths.myCell` repeats `ClientPaths.myCell` (cell screens do not import the router).
+9. Tests added: department regression both ways, stale confirmation, the audit row, `yours` empty after a cancel, and the client cases above.

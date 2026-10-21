@@ -488,3 +488,4 @@ Record the outcome per step in `evidence-5.5/owner-check.md` (pass/fail, device,
 
 - No cell coverage queue, contact attempts or leader alerts for cell parts yet (department-only); the leader confirms from the published programme.
 - A declined part is not reassigned from the programme yet (5.6 publishes revisions).
+- A member who moved to another cell keeps their old cell's parts until story 5.9 (transfers end them), and can still be confirmed there by the old leader.

@@ -6,6 +6,7 @@
 // tools/identity-e2e/cells-youre-on.mjs.
 import 'package:church_client_core/church_client_core.dart';
 import 'package:church_client_core/testing.dart';
+import 'package:church_contracts/church_contracts.dart';
 import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -232,6 +233,51 @@ void main() {
       });
     });
 
+    testWidgets('Can\'t do it asks once more; a refused answer is said on '
+        'the card', (tester) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.myCell,
+        setUp: (h) {
+          h.cells.mine = myCell();
+          h.cells.meetingProgramme = programme();
+          h.duties.mine = myDuties();
+        },
+      );
+      await tapKey(tester, 'my-cell-decline-$_part1');
+      await settle(tester);
+      expect(h.gateway.sent, isEmpty);
+      await tapKey(tester, 'my-cell-decline-confirm-$_part1');
+      final sent = h.gateway.sent.single;
+      expect(sent.wire['payload'], {
+        'assignment_id': _assignment,
+        'response': 'declined',
+      });
+      expect(find.text('Sending your answer…'), findsOneWidget);
+      sent.refuse(ErrorCode.conflict);
+      await settle(tester);
+      expect(byKey('my-cell-answer-problem-$_part1'), findsOneWidget);
+    });
+
+    testWidgets('My duties loading or failing is said, never blank', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.myCell,
+        setUp: (h) {
+          h.cells.mine = myCell();
+          h.cells.meetingProgramme = programme();
+          h.duties.mine = const AccessReadFailed(unreachable: true);
+        },
+      );
+      expect(
+        find.textContaining('Your answer could not be loaded here'),
+        findsOneWidget,
+      );
+      expect(byKey('my-cell-accept-$_part1'), findsNothing);
+    });
+
     testWidgets('Confirmed by leader reads as such, with no buttons', (
       tester,
     ) async {
@@ -292,6 +338,21 @@ void main() {
       expect(byKey('home-my-cell-yours-$_part1'), findsOneWidget);
       expect(find.text('You\'re on: Opening prayer, 18:00'), findsOneWidget);
       expect(find.text('Awaiting your answer'), findsWidgets);
+    });
+
+    testWidgets('a programme that cannot be loaded is said on Home', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.home,
+        memberHome: true,
+        setUp: (h) {
+          h.cells.mine = myCell();
+          h.cells.meetingProgramme = const AccessReadFailed(unreachable: true);
+        },
+      );
+      expect(byKey('home-my-cell-programme-unavailable'), findsOneWidget);
     });
 
     testWidgets('no cell, no card', (tester) async {
@@ -381,7 +442,22 @@ void main() {
         'channel': 'phone',
         'reason': 'Said yes on the phone',
       });
-      sent.confirm({'assignment_id': _assignment, 'revision': 3}, 3);
+      sent.refuse(ErrorCode.conflict);
+      await settle(tester);
+      // A refusal keeps the form and what was typed.
+      expect(byKey('confirm-form-$_part1'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextField>(byKey('confirm-reason-$_part1'))
+            .controller!
+            .text,
+        'Said yes on the phone',
+      );
+      await tapKey(tester, 'confirm-save-$_part1');
+      h.gateway.sent.last.confirm({
+        'assignment_id': _assignment,
+        'revision': 3,
+      }, 3);
       await settle(tester);
       expect(byKey('cells-notice-leaderConfirmed'), findsOneWidget);
     });

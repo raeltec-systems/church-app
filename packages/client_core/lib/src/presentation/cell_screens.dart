@@ -4,7 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../application/cell_controllers.dart';
-import '../application/duties_controllers.dart' show myDutiesProvider;
+import '../application/duties_controllers.dart'
+    show DutyNotice, myDutiesProvider;
 import '../domain/access_grants.dart';
 import '../domain/cell_meetings.dart';
 import '../domain/cell_membership.dart';
@@ -3189,17 +3190,18 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
                   key: Key('confirm-save-${d.partId}'),
                   onPressed: busy || !ok
                       ? null
-                      : () {
-                          setState(() => _confirming = null);
-                          ctl.confirmByLeader(d, draft);
-                        },
+                      // The form closes once the part shows the answer;
+                      // a refusal keeps what was typed.
+                      : () => ctl.confirmByLeader(d, draft),
                   child: const Text('Record: confirmed by leader'),
                 ),
               ),
               FocusRing(
                 child: TextButton(
                   key: Key('confirm-keep-${d.partId}'),
-                  onPressed: () => setState(() => _confirming = null),
+                  onPressed: busy
+                      ? null
+                      : () => setState(() => _confirming = null),
                   child: const Text('Not now'),
                 ),
               ),
@@ -3304,7 +3306,8 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
               ),
             ),
             if (_confirming == part.partId)
-              if (read.duties[part.partId] case final d?) _confirmForm(d, busy),
+              if (read.duties[part.partId] case final d? when d.confirmable)
+                _confirmForm(d, busy),
           ],
           _muted(
             context,
@@ -3507,20 +3510,43 @@ class _ProgrammePreview extends StatelessWidget {
 // Story 5.5, mobile: You're on (My cell and Home)
 // ---------------------------------------------------------------------------
 
-/// The member's own Duties assignment for a programme part, from My duties.
-MyDuty? _ownDuty(WidgetRef ref, String? occurrenceId) {
-  if (occurrenceId == null) return null;
-  final duties = ref.watch(myDutiesProvider).result;
-  if (duties case AccessReadOk(:final value)) {
-    for (final d in value.assignments) {
-      if (d.occurrenceId == occurrenceId) return d;
-    }
-  }
-  return null;
+/// The member's own Duties answer for a programme part, from My duties:
+/// the duty, or why it is not known yet.
+sealed class _OwnDuty {
+  const _OwnDuty();
+}
+
+class _OwnDutyFound extends _OwnDuty {
+  const _OwnDutyFound(this.duty);
+  final MyDuty duty;
+}
+
+class _OwnDutyLoading extends _OwnDuty {
+  const _OwnDutyLoading();
+}
+
+class _OwnDutyUnavailable extends _OwnDuty {
+  const _OwnDutyUnavailable();
+}
+
+_OwnDuty _ownDuty(WidgetRef ref, String occurrenceId) {
+  final s = ref.watch(myDutiesProvider);
+  return switch (s.result) {
+    null => const _OwnDutyLoading(),
+    AccessReadOk(:final value) => () {
+      for (final d in value.assignments) {
+        if (d.occurrenceId == occurrenceId) return _OwnDutyFound(d);
+      }
+      // Listed in the programme but not (yet) in My duties: a reload is
+      // under way, or the part changed.
+      return s.loading ? const _OwnDutyLoading() : const _OwnDutyUnavailable();
+    }(),
+    _ => const _OwnDutyUnavailable(),
+  };
 }
 
 /// The member's answer as the Duties read reports it (the colour is on the
-/// answer only).
+/// answer only). The words match My duties.
 (String, StatusTone) _ownAnswer(MyDuty d) => switch (d.response) {
   DutyResponse.pending => ('Awaiting your answer', StatusTone.warning),
   DutyResponse.accepted when d.confirmedByLeader => (
@@ -3528,7 +3554,7 @@ MyDuty? _ownDuty(WidgetRef ref, String? occurrenceId) {
     StatusTone.success,
   ),
   DutyResponse.accepted => ('Accepted', StatusTone.success),
-  DutyResponse.declined => ('Declined', StatusTone.neutral),
+  DutyResponse.declined => ('Can\'t make it', StatusTone.neutral),
 };
 
 /// Story 5.5, mobile My cell: the next meeting's published programme. The
@@ -3571,8 +3597,6 @@ class _MyCellProgrammeCardState extends ConsumerState<_MyCellProgrammeCard> {
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
     final s = ref.watch(memberProgrammeProvider(widget.meetingId));
-    final duties = ref.watch(myDutiesProvider);
-    final dutiesCtl = ref.read(myDutiesProvider.notifier);
     final result = s.result;
     if (result == null) {
       return _Card(
@@ -3585,7 +3609,7 @@ class _MyCellProgrammeCardState extends ConsumerState<_MyCellProgrammeCard> {
         key: const Key('my-cell-programme-unavailable'),
         child: _muted(
           context,
-          'The programme could not be loaded. Pull to try again later.',
+          'The programme could not be loaded. Try again later.',
         ),
       );
     }
@@ -3600,25 +3624,21 @@ class _MyCellProgrammeCardState extends ConsumerState<_MyCellProgrammeCard> {
         ),
       );
     }
-    final mine = [
-      for (final part in p.parts)
-        if (read.occurrenceOf(part.partId) != null) part,
-    ];
     return _Card(
       key: const Key('my-cell-programme'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // The member's first question: am I on, and have I answered?
-          for (final part in mine) ...[
-            _YoureOn(
-              part: part,
-              duty: _ownDuty(ref, read.occurrenceOf(part.partId)),
-              busy: duties.busy,
-              onAnswer: (d, r) => dutiesCtl.respond(d, r),
-            ),
-            const SizedBox(height: 12),
-          ],
+          for (final part in p.parts)
+            if (read.occurrenceOf(part.partId) case final occ?) ...[
+              _YoureOn(
+                key: Key('my-cell-yours-${part.partId}'),
+                part: part,
+                own: _ownDuty(ref, occ),
+              ),
+              const SizedBox(height: 12),
+            ],
           _heading(context, 'Programme'),
           if (p.topic case final t?)
             Text(t, style: ChurchType.cardTitle.copyWith(color: c.ink)),
@@ -3673,78 +3693,197 @@ class _MyCellProgrammeCardState extends ConsumerState<_MyCellProgrammeCard> {
 }
 
 /// One of the member's own parts: what, when to report, the instructions,
-/// and their answer with Accept or Can't do it while it waits.
-class _YoureOn extends StatelessWidget {
-  const _YoureOn({
-    required this.part,
-    required this.duty,
-    required this.busy,
-    required this.onAnswer,
-  });
+/// and their answer. Accept or Can't do it while it waits (Can't do it asks
+/// once more, as My duties does); Can't make it anymore after accepting.
+/// Sending and a refused answer are said here, not only in My duties.
+class _YoureOn extends ConsumerStatefulWidget {
+  const _YoureOn({super.key, required this.part, required this.own});
   final ProjectionPart part;
-  final MyDuty? duty;
-  final bool busy;
-  final void Function(MyDuty duty, DutyResponse response) onAnswer;
+  final _OwnDuty own;
+
+  @override
+  ConsumerState<_YoureOn> createState() => _YoureOnState();
+}
+
+class _YoureOnState extends ConsumerState<_YoureOn> {
+  /// The answer waiting for the member's second tap.
+  DutyResponse? _confirming;
+  bool _withdrawing = false;
 
   @override
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
-    final d = duty;
-    return Column(
-      key: Key('my-cell-yours-${part.partId}'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _heading(context, 'You\'re on'),
-        Text(
-          '${part.label}, ${ChurchTime.timeText(part.startsAt)}'
-          '-${ChurchTime.timeText(part.endsAt)}',
-          style: ChurchType.sectionTitle.copyWith(color: c.ink),
-        ),
-        if (d == null)
-          _muted(context, 'Open My duties to see and answer this part.')
-        else ...[
-          const SizedBox(height: 4),
-          Builder(
-            builder: (context) {
-              final (label, tone) = _ownAnswer(d);
-              return StatusLabel(
-                key: Key('my-cell-status-${part.partId}'),
-                label: label,
-                tone: tone,
-              );
-            },
+    final part = widget.part;
+    final s = ref.watch(myDutiesProvider);
+    final ctl = ref.read(myDutiesProvider.notifier);
+    final now = DateTime.now().toUtc();
+    final children = <Widget>[
+      _heading(context, 'You\'re on'),
+      Text(
+        '${part.label}, ${ChurchTime.timeText(part.startsAt)}'
+        '-${ChurchTime.timeText(part.endsAt)}',
+        style: ChurchType.sectionTitle.copyWith(color: c.ink),
+      ),
+    ];
+    switch (widget.own) {
+      case _OwnDutyLoading():
+        children.add(_muted(context, 'Loading your answer…'));
+      case _OwnDutyUnavailable():
+        children.add(
+          _muted(
+            context,
+            'Your answer could not be loaded here. Open My duties to see '
+            'and answer this part.',
           ),
-          if (d.times.reportingAt case final r?)
+        );
+      case _OwnDutyFound(:final duty):
+        final (label, tone) = _ownAnswer(duty);
+        final mine =
+            s.pending?.request.payload['assignment_id'] == duty.assignmentId ||
+            s.noticeAction?.request.payload['assignment_id'] ==
+                duty.assignmentId;
+        final busy = s.busy;
+        children.addAll([
+          const SizedBox(height: 4),
+          StatusLabel(
+            key: Key('my-cell-status-${part.partId}'),
+            label: label,
+            tone: tone,
+          ),
+          if (duty.times.reportingAt case final r?)
             Text('Please arrive by ${ChurchTime.timeText(r)}'),
-          if (d.instructions case final i?) Text(i),
-          if (d.response == DutyResponse.pending && d.answerable) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                FocusRing(
-                  child: FilledButton(
-                    key: Key('my-cell-accept-${part.partId}'),
-                    onPressed: busy
-                        ? null
-                        : () => onAnswer(d, DutyResponse.accepted),
-                    child: const Text('Accept'),
-                  ),
-                ),
-                FocusRing(
-                  child: OutlinedButton(
-                    key: Key('my-cell-decline-${part.partId}'),
-                    onPressed: busy
-                        ? null
-                        : () => onAnswer(d, DutyResponse.declined),
-                    child: const Text('Can\'t do it'),
-                  ),
-                ),
-              ],
+          if (duty.instructions case final i?) Text(i),
+          if (mine && s.pending != null)
+            _muted(context, 'Sending your answer…')
+          else if (mine &&
+              s.notice != null &&
+              s.notice != DutyNotice.accepted &&
+              s.notice != DutyNotice.declined &&
+              s.notice != DutyNotice.withdrawn)
+            Text(
+              switch (s.notice) {
+                DutyNotice.unconfirmed =>
+                  'We don\'t know yet whether your answer arrived. Check '
+                      'My duties.',
+                DutyNotice.notSent =>
+                  'Not sent: this build has no server configured.',
+                _ =>
+                  'Your answer was not recorded: this part changed or '
+                      'could not be answered. Check My duties.',
+              },
+              key: Key('my-cell-answer-problem-${part.partId}'),
+              style: ChurchType.secondary.copyWith(color: c.redFg),
             ),
-          ],
-        ],
-      ],
+        ]);
+        if (duty.needsResponse(now) && duty.answerable) {
+          children.add(const SizedBox(height: 8));
+          if (_confirming == DutyResponse.declined) {
+            children.add(
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  const Text('Tell your leader you can\'t do this part?'),
+                  FocusRing(
+                    child: FilledButton(
+                      key: Key('my-cell-decline-confirm-${part.partId}'),
+                      onPressed: busy
+                          ? null
+                          : () {
+                              setState(() => _confirming = null);
+                              ctl.respond(duty, DutyResponse.declined);
+                            },
+                      child: const Text('Yes, I can\'t'),
+                    ),
+                  ),
+                  FocusRing(
+                    child: TextButton(
+                      key: Key('my-cell-decline-keep-${part.partId}'),
+                      onPressed: busy
+                          ? null
+                          : () => setState(() => _confirming = null),
+                      child: const Text('Keep it'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          } else {
+            children.add(
+              Wrap(
+                spacing: 8,
+                children: [
+                  FocusRing(
+                    child: FilledButton(
+                      key: Key('my-cell-accept-${part.partId}'),
+                      onPressed: busy
+                          ? null
+                          : () => ctl.respond(duty, DutyResponse.accepted),
+                      child: const Text('Accept'),
+                    ),
+                  ),
+                  FocusRing(
+                    child: OutlinedButton(
+                      key: Key('my-cell-decline-${part.partId}'),
+                      onPressed: busy
+                          ? null
+                          : () => setState(
+                              () => _confirming = DutyResponse.declined,
+                            ),
+                      child: const Text('Can\'t do it'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+        } else if (duty.canWithdraw(now) && duty.answerable) {
+          children.add(
+            _withdrawing
+                ? Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      const Text('Tell your leader you can\'t make it now?'),
+                      FocusRing(
+                        child: FilledButton(
+                          key: Key('my-cell-withdraw-confirm-${part.partId}'),
+                          onPressed: busy
+                              ? null
+                              : () {
+                                  setState(() => _withdrawing = false);
+                                  ctl.withdraw(duty);
+                                },
+                          child: const Text('Yes, I can\'t make it'),
+                        ),
+                      ),
+                      FocusRing(
+                        child: TextButton(
+                          onPressed: busy
+                              ? null
+                              : () => setState(() => _withdrawing = false),
+                          child: const Text('Keep it'),
+                        ),
+                      ),
+                    ],
+                  )
+                : FocusRing(
+                    child: TextButton(
+                      key: Key('my-cell-withdraw-${part.partId}'),
+                      onPressed: busy
+                          ? null
+                          : () => setState(() => _withdrawing = true),
+                      child: const Text('Can\'t make it anymore'),
+                    ),
+                  ),
+          );
+        }
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
     );
   }
 }
@@ -3798,7 +3937,8 @@ class MyCellHomeCard extends ConsumerWidget {
 }
 
 /// "You're on: Opening prayer, 18:00 · Awaiting your answer" (nothing when
-/// the member has no part or nothing is published).
+/// the member has no part or nothing is published; says so when the
+/// programme could not be loaded).
 class _HomeYoureOn extends ConsumerWidget {
   const _HomeYoureOn({required this.meetingId});
   final String meetingId;
@@ -3806,39 +3946,46 @@ class _HomeYoureOn extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final result = ref.watch(memberProgrammeProvider(meetingId)).result;
-    if (result case AccessReadOk(:final value) when value.programme != null) {
-      final widgets = <Widget>[];
-      for (final part in value.programme!.parts) {
-        final occ = value.occurrenceOf(part.partId);
-        if (occ == null) continue;
-        final d = _ownDuty(ref, occ);
-        widgets.add(
-          Wrap(
-            key: Key('home-my-cell-yours-${part.partId}'),
-            spacing: 8,
-            runSpacing: 4,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(
-                'You\'re on: ${part.label}, '
-                '${ChurchTime.timeText(part.startsAt)}',
-              ),
-              if (d != null)
-                Builder(
-                  builder: (context) {
-                    final (label, tone) = _ownAnswer(d);
-                    return StatusLabel(label: label, tone: tone);
-                  },
+    switch (result) {
+      case null:
+        return const SizedBox.shrink();
+      case AccessReadOk(:final value):
+        final programme = value.programme;
+        if (programme == null) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final part in programme.parts)
+              if (value.occurrenceOf(part.partId) case final occ?)
+                Wrap(
+                  key: Key('home-my-cell-yours-${part.partId}'),
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      'You\'re on: ${part.label}, '
+                      '${ChurchTime.timeText(part.startsAt)}',
+                    ),
+                    if (_ownDuty(ref, occ) case _OwnDutyFound(:final duty))
+                      Builder(
+                        builder: (context) {
+                          final (label, tone) = _ownAnswer(duty);
+                          return StatusLabel(label: label, tone: tone);
+                        },
+                      ),
+                  ],
                 ),
-            ],
+          ],
+        );
+      default:
+        return Text(
+          'The programme could not be loaded.',
+          key: const Key('home-my-cell-programme-unavailable'),
+          style: ChurchType.secondary.copyWith(
+            color: ChurchColors.of(context).muted,
           ),
         );
-      }
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: widgets,
-      );
     }
-    return const SizedBox.shrink();
   }
 }

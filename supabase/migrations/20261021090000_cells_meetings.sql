@@ -251,7 +251,8 @@ begin
     errors := errors || jsonb_build_object(p_key, 'required');
     value := null;
   elsif length(value) > 120 or value ~ '[[:cntrl:]]'
-        or value ~ '[­​-‏‪-‮⁠-⁤⁦-⁯﻿]'
+        or value ~ ('[' || chr(173) || chr(8203) || '-' || chr(8207) || chr(8234) || '-' || chr(8238)
+                     || chr(8288) || '-' || chr(8292) || chr(8294) || '-' || chr(8303) || chr(65279) || ']')
         or (not app.policy_is_open('q4_personal_data') and value !~ '^SYNTHETIC ') then
     errors := errors || jsonb_build_object(p_key, 'invalid');
     value := null;

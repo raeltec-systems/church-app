@@ -6,7 +6,7 @@
 -- tools/identity-e2e/cells-meetings.mjs. Every account, phone and name here is SYNTHETIC
 -- (fictional range +1 202 555 0140-0159).
 begin;
-select plan(53);
+select plan(54);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000051' || lpad(n::text, 2, '0'))::uuid $$;
@@ -173,6 +173,9 @@ select is(pg_temp.cells(pg_temp.c(1), 'cells.set_schedule', pg_temp.cell_rev(pg_
   '{"weekday": "out_of_range", "start_time": "invalid", "end_time": "invalid", "venue": "invalid",
     "map_pin": "invalid", "extra": "unknown_field"}'::jsonb,
   'every field error at once; while Q4 is unapproved the venue is SYNTHETIC');
+select is(pg_temp.cells(pg_temp.c(1), 'cells.set_schedule', pg_temp.cell_rev(pg_temp.sh()),
+  pg_temp.sched(jsonb_build_object('venue', 'SYNTHETIC 12 Shikoswe' || chr(173) || ' Road'))) -> 'field_errors',
+  '{"venue": "invalid"}'::jsonb, 'a venue with a hidden format character (soft hyphen) is refused');
 select is(pg_temp.cells(pg_temp.c(1), 'cells.set_schedule', pg_temp.cell_rev(pg_temp.sh()),
   pg_temp.sched('{"end_time": "17:00"}')) -> 'field_errors', '{"end_time": "before_start"}'::jsonb,
   'the meeting ends after it starts');

@@ -4,11 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../application/cell_controllers.dart';
+import '../application/duties_controllers.dart' show myDutiesProvider;
 import '../domain/access_grants.dart';
 import '../domain/cell_meetings.dart';
 import '../domain/cell_membership.dart';
 import '../domain/cell_programmes.dart';
 import '../domain/church_time.dart';
+import '../domain/duties.dart';
 import '../domain/membership_application.dart';
 
 // Story 2.6: cell setup and confirmation on staff web (Admin, leaders) and
@@ -200,6 +202,11 @@ import '../domain/membership_application.dart';
       'Programme published',
       'This meeting\'s programme is published, so the meeting can\'t be moved '
           'or cancelled here. Cancel the programme on Plan first.',
+    ),
+    CellNotice.leaderConfirmed => (
+      StatusTone.success,
+      'Confirmed by leader',
+      'Recorded as their answer, with your name, how and why.',
     ),
     CellNotice.programmePartRefused => (
       StatusTone.warning,
@@ -1152,6 +1159,15 @@ class _MyCellBodyState extends ConsumerState<_MyCellBody> {
         if (cell.meetings case final meetings?) ...[
           _NextMeetingCard(meetings: meetings),
           const SizedBox(height: 12),
+          // Story 5.5: the next meeting's programme, the member's own part
+          // first ("You're on") with its real answer.
+          if (meetings.next case final next?) ...[
+            _MyCellProgrammeCard(
+              key: ValueKey('my-cell-programme-${next.meetingId}'),
+              meetingId: next.meetingId,
+            ),
+            const SizedBox(height: 12),
+          ],
         ],
         _Card(
           key: const Key('my-cell-current'),
@@ -2125,6 +2141,9 @@ class _RemindersRowState extends ConsumerState<_RemindersRow> {
 abstract final class CellPaths {
   /// Story 5.3: one meeting's programme (`/cells/meetings/<id>/plan`).
   static String plan(String meetingId) => '/cells/meetings/$meetingId/plan';
+
+  /// The member's own cell (mobile).
+  static const myCell = '/my-cell';
 }
 
 /// Story 5.3, staff web: one meeting's programme. The cell's leader or
@@ -3111,6 +3130,86 @@ class _PublishedView extends ConsumerStatefulWidget {
 class _PublishedViewState extends ConsumerState<_PublishedView> {
   bool _confirmCancel = false;
 
+  /// Story 5.5: the part whose direct confirmation is being recorded.
+  String? _confirming;
+  ContactChannel _channel = ContactChannel.phone;
+  final _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  Widget _confirmForm(PartDuty d, bool busy) {
+    final ctl = ref.read(cellProgrammeProvider(widget.meetingId).notifier);
+    final draft = LeaderConfirmationDraft(
+      channel: _channel,
+      reason: _reason.text,
+    );
+    final ok = draft.errors().isEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(left: 52, bottom: 12),
+      child: Column(
+        key: Key('confirm-form-${d.partId}'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _muted(
+            context,
+            'Record that they said yes to you directly. It shows as '
+            'Confirmed by leader, with your name.',
+          ),
+          DropdownButton<ContactChannel>(
+            key: Key('confirm-channel-${d.partId}'),
+            value: _channel,
+            items: [
+              for (final c in ContactChannel.values)
+                DropdownMenuItem(value: c, child: Text(c.label)),
+            ],
+            onChanged: busy
+                ? null
+                : (v) => setState(() => _channel = v ?? _channel),
+          ),
+          TextField(
+            key: Key('confirm-reason-${d.partId}'),
+            controller: _reason,
+            enabled: !busy,
+            maxLength: LeaderConfirmationDraft.reasonMax,
+            decoration: const InputDecoration(
+              labelText: 'What they said (short)',
+              hintText: 'Said yes on the phone on Tuesday',
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          Wrap(
+            spacing: 8,
+            children: [
+              FocusRing(
+                child: FilledButton(
+                  key: Key('confirm-save-${d.partId}'),
+                  onPressed: busy || !ok
+                      ? null
+                      : () {
+                          setState(() => _confirming = null);
+                          ctl.confirmByLeader(d, draft);
+                        },
+                  child: const Text('Record: confirmed by leader'),
+                ),
+              ),
+              FocusRing(
+                child: TextButton(
+                  key: Key('confirm-keep-${d.partId}'),
+                  onPressed: () => setState(() => _confirming = null),
+                  child: const Text('Not now'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final read = widget.read;
@@ -3155,39 +3254,57 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
                     ),
                   ),
                   if (read.duties[part.partId] case final d?)
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      alignment: WrapAlignment.end,
-                      children: [
-                        StatusLabel(
-                          key: Key('published-status-${part.partId}'),
-                          label:
-                              part.linkedSlotId != null &&
-                                  d.status == PartDutyStatus.open
-                              ? 'Department duty: link ended'
-                              : d.label,
-                          tone: switch (d.status) {
-                            PartDutyStatus.accepted ||
-                            PartDutyStatus.departmentFilled =>
-                              StatusTone.success,
-                            PartDutyStatus.declined => StatusTone.danger,
-                            PartDutyStatus.open ||
-                            PartDutyStatus.departmentOpen => StatusTone.warning,
-                            PartDutyStatus.awaiting => StatusTone.info,
-                            PartDutyStatus.cancelled => StatusTone.neutral,
-                          },
-                        ),
-                        if (d.needsContact)
-                          const StatusLabel(
-                            label: 'Tell directly',
-                            tone: StatusTone.warning,
+                    Flexible(
+                      child: Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        alignment: WrapAlignment.end,
+                        children: [
+                          StatusLabel(
+                            key: Key('published-status-${part.partId}'),
+                            label:
+                                part.linkedSlotId != null &&
+                                    d.status == PartDutyStatus.open
+                                ? 'Department duty: link ended'
+                                : d.label,
+                            tone: switch (d.status) {
+                              PartDutyStatus.accepted ||
+                              PartDutyStatus.departmentFilled =>
+                                StatusTone.success,
+                              PartDutyStatus.declined => StatusTone.danger,
+                              PartDutyStatus.open ||
+                              PartDutyStatus.departmentOpen =>
+                                StatusTone.warning,
+                              PartDutyStatus.awaiting => StatusTone.info,
+                              PartDutyStatus.cancelled => StatusTone.neutral,
+                            },
                           ),
-                      ],
+                          if (d.needsContact)
+                            const StatusLabel(
+                              label: 'Tell directly',
+                              tone: StatusTone.warning,
+                            ),
+                          if (d.confirmable && _confirming != part.partId)
+                            FocusRing(
+                              child: TextButton(
+                                key: Key('confirm-part-${part.partId}'),
+                                onPressed: busy || !widget.open
+                                    ? null
+                                    : () => setState(() {
+                                        _confirming = part.partId;
+                                        _reason.clear();
+                                      }),
+                                child: const Text('They said yes directly'),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                 ],
               ),
             ),
+            if (_confirming == part.partId)
+              if (read.duties[part.partId] case final d?) _confirmForm(d, busy),
           ],
           _muted(
             context,
@@ -3383,5 +3500,345 @@ class _ProgrammePreview extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Story 5.5, mobile: You're on (My cell and Home)
+// ---------------------------------------------------------------------------
+
+/// The member's own Duties assignment for a programme part, from My duties.
+MyDuty? _ownDuty(WidgetRef ref, String? occurrenceId) {
+  if (occurrenceId == null) return null;
+  final duties = ref.watch(myDutiesProvider).result;
+  if (duties case AccessReadOk(:final value)) {
+    for (final d in value.assignments) {
+      if (d.occurrenceId == occurrenceId) return d;
+    }
+  }
+  return null;
+}
+
+/// The member's answer as the Duties read reports it (the colour is on the
+/// answer only).
+(String, StatusTone) _ownAnswer(MyDuty d) => switch (d.response) {
+  DutyResponse.pending => ('Awaiting your answer', StatusTone.warning),
+  DutyResponse.accepted when d.confirmedByLeader => (
+    'Confirmed by leader',
+    StatusTone.success,
+  ),
+  DutyResponse.accepted => ('Accepted', StatusTone.success),
+  DutyResponse.declined => ('Declined', StatusTone.neutral),
+};
+
+/// Story 5.5, mobile My cell: the next meeting's published programme. The
+/// member's own part leads ("You're on") with its real answer, reporting
+/// time and instructions, and Accept or Can't do it (the Duties response
+/// commands, the same as My duties). Other people's parts show names only,
+/// never answers. Nothing is shown of a draft.
+class _MyCellProgrammeCard extends ConsumerStatefulWidget {
+  const _MyCellProgrammeCard({super.key, required this.meetingId});
+  final String meetingId;
+
+  @override
+  ConsumerState<_MyCellProgrammeCard> createState() =>
+      _MyCellProgrammeCardState();
+}
+
+class _MyCellProgrammeCardState extends ConsumerState<_MyCellProgrammeCard> {
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _reload);
+  }
+
+  void _reload() {
+    if (!mounted) return;
+    ref.read(memberProgrammeProvider(widget.meetingId).notifier).reload();
+    final d = ref.read(myDutiesProvider);
+    if (!d.busy && !d.loading) ref.read(myDutiesProvider.notifier).reload();
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final s = ref.watch(memberProgrammeProvider(widget.meetingId));
+    final duties = ref.watch(myDutiesProvider);
+    final dutiesCtl = ref.read(myDutiesProvider.notifier);
+    final result = s.result;
+    if (result == null) {
+      return _Card(
+        key: const Key('my-cell-programme-loading'),
+        child: _muted(context, 'Loading the programme…'),
+      );
+    }
+    if (result is! AccessReadOk<MeetingProgrammeRead>) {
+      return _Card(
+        key: const Key('my-cell-programme-unavailable'),
+        child: _muted(
+          context,
+          'The programme could not be loaded. Pull to try again later.',
+        ),
+      );
+    }
+    final read = result.value;
+    final p = read.programme;
+    if (p == null) {
+      return _Card(
+        key: const Key('my-cell-programme-none'),
+        child: _muted(
+          context,
+          'The programme for this meeting is not published yet.',
+        ),
+      );
+    }
+    final mine = [
+      for (final part in p.parts)
+        if (read.occurrenceOf(part.partId) != null) part,
+    ];
+    return _Card(
+      key: const Key('my-cell-programme'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // The member's first question: am I on, and have I answered?
+          for (final part in mine) ...[
+            _YoureOn(
+              part: part,
+              duty: _ownDuty(ref, read.occurrenceOf(part.partId)),
+              busy: duties.busy,
+              onAnswer: (d, r) => dutiesCtl.respond(d, r),
+            ),
+            const SizedBox(height: 12),
+          ],
+          _heading(context, 'Programme'),
+          if (p.topic case final t?)
+            Text(t, style: ChurchType.cardTitle.copyWith(color: c.ink)),
+          if (p.scripture case final sc?)
+            Text(sc, style: ChurchType.secondary.copyWith(color: c.muted)),
+          const SizedBox(height: 8),
+          for (final part in p.parts)
+            Padding(
+              key: Key('my-cell-part-${part.partId}'),
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 52,
+                    child: Text(
+                      ChurchTime.timeText(part.startsAt),
+                      style: ChurchType.secondary.copyWith(
+                        color: c.muted,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(part.label),
+                        Text(
+                          read.occurrenceOf(part.partId) != null
+                              ? 'You'
+                              : part.leader ?? part.department ?? 'Open',
+                          style: ChurchType.secondary.copyWith(
+                            color: read.occurrenceOf(part.partId) != null
+                                ? c.ink
+                                : c.muted,
+                            fontWeight: read.occurrenceOf(part.partId) != null
+                                ? FontWeight.w600
+                                : null,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One of the member's own parts: what, when to report, the instructions,
+/// and their answer with Accept or Can't do it while it waits.
+class _YoureOn extends StatelessWidget {
+  const _YoureOn({
+    required this.part,
+    required this.duty,
+    required this.busy,
+    required this.onAnswer,
+  });
+  final ProjectionPart part;
+  final MyDuty? duty;
+  final bool busy;
+  final void Function(MyDuty duty, DutyResponse response) onAnswer;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final d = duty;
+    return Column(
+      key: Key('my-cell-yours-${part.partId}'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _heading(context, 'You\'re on'),
+        Text(
+          '${part.label}, ${ChurchTime.timeText(part.startsAt)}'
+          '-${ChurchTime.timeText(part.endsAt)}',
+          style: ChurchType.sectionTitle.copyWith(color: c.ink),
+        ),
+        if (d == null)
+          _muted(context, 'Open My duties to see and answer this part.')
+        else ...[
+          const SizedBox(height: 4),
+          Builder(
+            builder: (context) {
+              final (label, tone) = _ownAnswer(d);
+              return StatusLabel(
+                key: Key('my-cell-status-${part.partId}'),
+                label: label,
+                tone: tone,
+              );
+            },
+          ),
+          if (d.times.reportingAt case final r?)
+            Text('Please arrive by ${ChurchTime.timeText(r)}'),
+          if (d.instructions case final i?) Text(i),
+          if (d.response == DutyResponse.pending && d.answerable) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                FocusRing(
+                  child: FilledButton(
+                    key: Key('my-cell-accept-${part.partId}'),
+                    onPressed: busy
+                        ? null
+                        : () => onAnswer(d, DutyResponse.accepted),
+                    child: const Text('Accept'),
+                  ),
+                ),
+                FocusRing(
+                  child: OutlinedButton(
+                    key: Key('my-cell-decline-${part.partId}'),
+                    onPressed: busy
+                        ? null
+                        : () => onAnswer(d, DutyResponse.declined),
+                    child: const Text('Can\'t do it'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+}
+
+/// Story 5.5, mobile Home: My cell, for a member with a confirmed cell: when
+/// the cell meets next and, once the programme is published, the member's
+/// own part and answer. Opens My cell. Hidden for anyone without a cell.
+class MyCellHomeCard extends ConsumerWidget {
+  const MyCellHomeCard({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final s = ref.watch(myCellProvider);
+    final view = switch (s.result) {
+      AccessReadOk(:final value) => value,
+      _ => null,
+    };
+    final next = view?.cell.meetings?.next;
+    if (view == null || view.cell.primary == null || next == null) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: ChurchGeometry.sectionGap),
+      child: _Card(
+        key: const Key('home-my-cell'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _heading(context, 'My cell'),
+            Text(
+              _meetingWhen(context, next),
+              key: const Key('home-my-cell-when'),
+              style: ChurchType.sectionTitle.copyWith(
+                color: ChurchColors.of(context).ink,
+              ),
+            ),
+            _HomeYoureOn(meetingId: next.meetingId),
+            const SizedBox(height: 8),
+            FocusRing(
+              child: TextButton(
+                key: const Key('home-my-cell-open'),
+                onPressed: () => context.go(CellPaths.myCell),
+                child: const Text('Open My cell'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "You're on: Opening prayer, 18:00 · Awaiting your answer" (nothing when
+/// the member has no part or nothing is published).
+class _HomeYoureOn extends ConsumerWidget {
+  const _HomeYoureOn({required this.meetingId});
+  final String meetingId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final result = ref.watch(memberProgrammeProvider(meetingId)).result;
+    if (result case AccessReadOk(:final value) when value.programme != null) {
+      final widgets = <Widget>[];
+      for (final part in value.programme!.parts) {
+        final occ = value.occurrenceOf(part.partId);
+        if (occ == null) continue;
+        final d = _ownDuty(ref, occ);
+        widgets.add(
+          Wrap(
+            key: Key('home-my-cell-yours-${part.partId}'),
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                'You\'re on: ${part.label}, '
+                '${ChurchTime.timeText(part.startsAt)}',
+              ),
+              if (d != null)
+                Builder(
+                  builder: (context) {
+                    final (label, tone) = _ownAnswer(d);
+                    return StatusLabel(label: label, tone: tone);
+                  },
+                ),
+            ],
+          ),
+        );
+      }
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: widgets,
+      );
+    }
+    return const SizedBox.shrink();
   }
 }

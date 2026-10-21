@@ -435,6 +435,8 @@ class PartDuty {
     this.confirmedByLeader = false,
     this.needsContact = false,
     this.shortNotice = false,
+    this.assignmentId,
+    this.assignmentRevision,
   });
 
   factory PartDuty.fromJson(Object? json) {
@@ -479,6 +481,12 @@ class PartDuty {
       confirmedByLeader: assignment?['response_provenance'] == 'leader',
       needsContact: assignment?['needs_contact'] == true,
       shortNotice: assignment?['short_notice'] == true,
+      assignmentId: assignment == null
+          ? null
+          : _opt<String>(assignment, 'assignment_id'),
+      assignmentRevision: assignment == null
+          ? null
+          : _opt<int>(assignment, 'revision'),
     );
   }
 
@@ -487,6 +495,17 @@ class PartDuty {
   final bool confirmedByLeader;
   final bool needsContact;
   final bool shortNotice;
+
+  /// Story 5.5: the current assignment and its revision (the leader's
+  /// direct confirmation is sent at it).
+  final String? assignmentId;
+  final int? assignmentRevision;
+
+  /// Story 5.5: the leader may record that the person said yes directly.
+  bool get confirmable =>
+      status == PartDutyStatus.awaiting &&
+      assignmentId != null &&
+      assignmentRevision != null;
 
   String get label => switch (status) {
     PartDutyStatus.awaiting => 'Awaiting response',
@@ -575,7 +594,11 @@ class ProgrammeProjection {
 /// Story 5.4: `api.cells_meeting_programme`, a meeting's published programme
 /// for the members of its cell (null while nothing is published).
 class MeetingProgrammeRead {
-  const MeetingProgrammeRead({required this.meeting, this.programme});
+  const MeetingProgrammeRead({
+    required this.meeting,
+    this.programme,
+    this.yours = const [],
+  });
 
   factory MeetingProgrammeRead.fromJson(Object? json) {
     final m = _map(json, 'meeting programme');
@@ -584,9 +607,31 @@ class MeetingProgrammeRead {
       programme: m['programme'] == null
           ? null
           : ProgrammeProjection.fromJson(m['programme']),
+      // Story 5.5 (absent from 5.4 servers).
+      yours: List.unmodifiable(
+        (_opt<List>(m, 'yours') ?? const []).map((y) {
+          final o = _map(y, 'own part');
+          return (
+            partId: _req<String>(o, 'part_id'),
+            occurrenceId: _req<String>(o, 'occurrence_id'),
+          );
+        }),
+      ),
     );
   }
 
   final CellMeeting meeting;
   final ProgrammeProjection? programme;
+
+  /// Story 5.5: the reader's own published parts and their Duties
+  /// occurrence (their answer is in My duties, never in this read).
+  final List<({String partId, String occurrenceId})> yours;
+
+  /// The reader's own Duties occurrence for [partId], if the part is theirs.
+  String? occurrenceOf(String partId) {
+    for (final y in yours) {
+      if (y.partId == partId) return y.occurrenceId;
+    }
+    return null;
+  }
 }

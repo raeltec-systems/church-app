@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/access_grants.dart';
 import '../domain/cell_meetings.dart';
 import '../domain/cell_programmes.dart';
+import '../domain/duties.dart';
 import '../domain/cell_membership.dart';
 import '../domain/commands.dart';
 import '../domain/membership_application.dart';
@@ -83,6 +84,9 @@ enum CellNotice {
   /// Story 5.4: the meeting's programme is published, so the meeting is not
   /// moved or cancelled from Cell meetings.
   meetingHasProgramme,
+
+  /// Story 5.5: the leader recorded that the person said yes directly.
+  leaderConfirmed,
 }
 
 /// One command in flight or just answered.
@@ -261,6 +265,7 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
     CellProgrammeCommands.save => CellNotice.programmeSaved,
     CellProgrammeCommands.cancel => CellNotice.programmeCancelled,
     CellProgrammeCommands.publish => CellNotice.programmePublished,
+    DutyCoverageCommands.confirmByLeader => CellNotice.leaderConfirmed,
     _ => CellNotice.cancelled,
   };
 
@@ -657,6 +662,21 @@ class CellProgrammeController extends CellsController<ProgrammeRead> {
           'override_reason': overrideReason.trim(),
       }, 'the programme');
 
+  /// Story 5.5: the person said yes directly (a member without a login, or
+  /// by phone): recorded through Duties as Confirmed by leader, attributed
+  /// to the leader or assistant, at the assignment's revision.
+  Future<void> confirmByLeader(PartDuty duty, LeaderConfirmationDraft draft) {
+    final id = duty.assignmentId, rev = duty.assignmentRevision;
+    if (id == null || rev == null) return Future.value();
+    return send(
+      DutyCoverageCommands.confirmByLeader,
+      Optional.of(rev),
+      draft.toPayload(id),
+      'the confirmation',
+      function: DutyCommands.function,
+    );
+  }
+
   Future<void> cancel(CellProgramme programme) => send(
     CellProgrammeCommands.cancel,
     Optional.of(programme.revision),
@@ -666,6 +686,25 @@ class CellProgrammeController extends CellsController<ProgrammeRead> {
 
   static String? _textOrNull(String v) => v.trim().isEmpty ? null : v.trim();
 }
+
+/// Story 5.5, mobile My cell and Home: a meeting's published programme as a
+/// member of the cell reads it (with which parts are theirs).
+class MemberProgrammeController extends CellsController<MeetingProgrammeRead> {
+  MemberProgrammeController(this.meetingId);
+
+  final String meetingId;
+
+  @override
+  Future<AccessRead<MeetingProgrammeRead>> fetch() =>
+      ref.read(cellsRepositoryProvider).fetchMeetingProgramme(meetingId);
+}
+
+final memberProgrammeProvider = NotifierProvider.autoDispose
+    .family<
+      MemberProgrammeController,
+      CellsState<MeetingProgrammeRead>,
+      String
+    >(MemberProgrammeController.new);
 
 final cellProgrammeProvider = NotifierProvider.autoDispose
     .family<CellProgrammeController, CellsState<ProgrammeRead>, String>(

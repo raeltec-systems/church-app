@@ -12,6 +12,7 @@ import '../domain/access_grants.dart';
 import '../domain/church_time.dart';
 import '../domain/duties.dart';
 import '../domain/duty_calendar.dart';
+import 'cell_screens.dart' show MyCellHomeCard;
 import 'followups_screens.dart' show FollowUpPaths, MyFollowUpsHomeCard;
 
 part 'duties_coverage_screens.dart';
@@ -3224,8 +3225,11 @@ class MemberHomeScreen extends StatelessWidget {
                 // work.
                 // Story 4.9: a department leader's Needs attention card
                 // comes first (hidden for everyone else).
+                // Story 5.5: My cell (the next meeting and You're on) shows
+                // for a member with a confirmed cell.
                 children: [
                   LeaderNeedsAttentionCard(),
+                  MyCellHomeCard(),
                   MyDutiesHomeCard(),
                   MyFollowUpsHomeCard(),
                 ],

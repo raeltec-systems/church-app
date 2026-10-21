@@ -1298,15 +1298,9 @@ class _MyCellBodyState extends ConsumerState<_MyCellBody> {
                   ),
                 )
               : HeroCard(
-                  ringAtTop: true,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'MY CELL',
-                        style: ChurchType.eyebrow.copyWith(color: soft),
-                      ),
-                      const SizedBox(height: 8),
                       Semantics(
                         header: true,
                         child: Text(
@@ -4141,9 +4135,8 @@ class _MyCellProgrammeCardState extends ConsumerState<_MyCellProgrammeCard> {
                     width: 56,
                     child: Text(
                       ChurchTime.timeText(part.startsAt),
-                      style: ChurchType.mono.copyWith(
+                      style: ChurchType.programmeTime.copyWith(
                         color: c.muted,
-                        fontWeight: FontWeight.w500,
                         height: 1.6,
                       ),
                     ),

@@ -46,58 +46,32 @@ class ChurchCard extends StatelessWidget {
   }
 }
 
-/// The handoff's navy hero card (My duties, My cell): radius 22, white text
-/// and a thin decorative ring in one corner.
+/// The navy card for the one thing a screen leads with (My duties on Home,
+/// the member's cell): radius 22, white text, flat (no ornament).
 class HeroCard extends StatelessWidget {
   const HeroCard({
     super.key,
     required this.child,
-    this.ringAtTop = false,
-    this.padding = const EdgeInsets.all(18),
+    this.padding = const EdgeInsets.all(20),
   });
 
   final Widget child;
-  final bool ringAtTop;
   final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(ChurchGeometry.heroRadius),
-      child: ColoredBox(
+    return Container(
+      padding: padding,
+      decoration: BoxDecoration(
         color: c.hero,
-        child: Stack(
-          children: [
-            Positioned(
-              right: -60,
-              top: ringAtTop ? -60 : null,
-              bottom: ringAtTop ? null : -60,
-              child: ExcludeSemantics(
-                child: Container(
-                  width: 180,
-                  height: 180,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      width: 2,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: padding,
-              child: DefaultTextStyle.merge(
-                style: const TextStyle(color: Colors.white),
-                child: IconTheme.merge(
-                  data: const IconThemeData(color: Colors.white),
-                  child: child,
-                ),
-              ),
-            ),
-          ],
+        borderRadius: BorderRadius.circular(ChurchGeometry.heroRadius),
+      ),
+      child: DefaultTextStyle.merge(
+        style: const TextStyle(color: Colors.white),
+        child: IconTheme.merge(
+          data: const IconThemeData(color: Colors.white),
+          child: child,
         ),
       ),
     );
@@ -117,7 +91,7 @@ class DateBadge extends StatelessWidget {
     this.tone = DateBadgeTone.surface,
   });
 
-  /// Short upper-case labels, for example `SUN`, `4`, `OCT`.
+  /// Short sentence-case labels, for example `Sun`, `4`, `Oct`.
   final String weekday;
   final String day;
   final String month;
@@ -137,16 +111,16 @@ class DateBadge extends StatelessWidget {
     };
     final smallStyle = TextStyle(
       fontFamily: ChurchFonts.body,
-      fontSize: 11,
-      fontWeight: FontWeight.w700,
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
       color: small,
-      height: 1.1,
+      height: 1.2,
     );
     return Semantics(
       label: '$weekday $day $month',
       excludeSemantics: true,
       child: Container(
-        width: 52,
+        width: 48,
         padding: const EdgeInsets.symmetric(vertical: 6),
         decoration: BoxDecoration(
           color: bg,
@@ -193,7 +167,8 @@ class SectionHeader extends StatelessWidget {
   }
 }
 
-/// An upper-case label inside a card ("PROGRAMME", "INSTRUCTIONS").
+/// A small sentence-case label over a block inside a card ("Programme",
+/// "Instructions").
 class CardLabel extends StatelessWidget {
   const CardLabel(this.text, {super.key});
 
@@ -203,7 +178,7 @@ class CardLabel extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
     header: true,
     child: Text(
-      text.toUpperCase(),
+      text,
       style: ChurchType.label.copyWith(color: ChurchColors.of(context).muted),
     ),
   );

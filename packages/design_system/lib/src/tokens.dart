@@ -213,16 +213,18 @@ abstract final class ChurchGeometry {
 }
 
 /// Font families from the design handoff (docs/design-handoff/README.md):
-/// Outfit for headings and large numbers, Figtree for body and UI, JetBrains
-/// Mono for eyebrows and programme times. The files are bundled in this
-/// package (pubspec `fonts:`), so the families carry the package prefix.
+/// Outfit for headings, Figtree for body and UI. The files are bundled in
+/// this package (pubspec `fonts:`), so the families carry the package
+/// prefix. JetBrains Mono has one job: the times of a programme (figures
+/// that line up), never labels.
 abstract final class ChurchFonts {
   static const heading = 'packages/church_design_system/Outfit';
   static const body = 'packages/church_design_system/Figtree';
   static const mono = 'packages/church_design_system/JetBrains Mono';
 }
 
-/// Type scale (size / weight / family) from the design handoff.
+/// Type scale. The member app keeps five sizes far apart (24, 18, 16, 14,
+/// 12), sentence case throughout and no tracked capitals.
 abstract final class ChurchType {
   /// Mobile tab labels 11.5 (700 active / 500 inactive).
   static const tabLabel = TextStyle(
@@ -230,23 +232,23 @@ abstract final class ChurchType {
     fontSize: 11.5,
   );
 
-  /// A tab screen's title: 28/700 Outfit in brand.
+  /// A tab screen's title: 24/700 Outfit (app scale, not a landing page).
   static const mobileScreenTitle = TextStyle(
     fontFamily: ChurchFonts.heading,
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: FontWeight.w700,
-    height: 1.1,
+    height: 1.15,
   );
 
-  /// A pushed screen's bar title next to the back chevron: 20/600 Outfit.
+  /// A pushed screen's bar title next to the back chevron: 18/600 Outfit.
   static const detailTitle = TextStyle(
     fontFamily: ChurchFonts.heading,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: FontWeight.w600,
   );
   static const sectionTitle = TextStyle(
     fontFamily: ChurchFonts.heading,
-    fontSize: 19,
+    fontSize: 18,
     fontWeight: FontWeight.w600,
   );
   static const cardTitle = TextStyle(
@@ -255,11 +257,12 @@ abstract final class ChurchType {
     fontWeight: FontWeight.w600,
   );
 
-  /// A list item's title: 17/700 Figtree.
+  /// A list row's title: 16/600 Figtree.
   static const itemTitle = TextStyle(
     fontFamily: ChurchFonts.body,
-    fontSize: 17,
-    fontWeight: FontWeight.w700,
+    fontSize: 16,
+    fontWeight: FontWeight.w600,
+    height: 1.3,
   );
   static const body = TextStyle(
     fontFamily: ChurchFonts.body,
@@ -276,35 +279,43 @@ abstract final class ChurchType {
     fontFamily: ChurchFonts.body,
     fontSize: 14,
     fontWeight: FontWeight.w400,
+    height: 1.4,
+  );
+
+  /// Programme times: JetBrains Mono 14/500.
+  static const programmeTime = TextStyle(
+    fontFamily: ChurchFonts.mono,
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
+  );
+
+  /// Times and counts in running text that line up: 14, tabular figures.
+  static const figures = TextStyle(
+    fontFamily: ChurchFonts.body,
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
+    fontFeatures: [FontFeature.tabularFigures()],
   );
   static const chip = TextStyle(
     fontFamily: ChurchFonts.body,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: FontWeight.w600,
   );
 
-  /// Eyebrows and programme times: JetBrains Mono.
-  static const mono = TextStyle(fontFamily: ChurchFonts.mono, fontSize: 13);
-  static const eyebrow = TextStyle(
-    fontFamily: ChurchFonts.mono,
-    fontSize: 11,
-    letterSpacing: 1.3,
-  );
-
-  /// Upper-case section labels inside cards ("PROGRAMME", "INSTRUCTIONS").
+  /// A small label over a block inside a card ("Instructions"): sentence
+  /// case, 14/600.
   static const label = TextStyle(
     fontFamily: ChurchFonts.body,
-    fontSize: 13,
-    fontWeight: FontWeight.w700,
-    letterSpacing: 0.8,
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
   );
 
-  /// The big number of a date badge.
+  /// The number of a date badge.
   static const dateNumber = TextStyle(
     fontFamily: ChurchFonts.heading,
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: FontWeight.w700,
-    height: 1.05,
+    height: 1.1,
   );
   static const staffPageTitle = TextStyle(
     fontFamily: ChurchFonts.heading,

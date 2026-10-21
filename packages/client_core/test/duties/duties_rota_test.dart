@@ -777,7 +777,7 @@ void main() {
   ) async {
     await pumpAt(
       tester,
-      ClientPaths.myDuties,
+      DutyPaths.assignment('42424242-4242-4242-8242-424242424242'),
       setUp: (h) => h.duties.mine = AccessReadOk(
         MyDuties.fromJson({
           'member_id': _ruth,
@@ -793,7 +793,8 @@ void main() {
       ),
     );
     expect(find.text('Sunday preaching: Preacher'), findsOneWidget);
-    expect(find.text('Topic: SYNTHETIC Hope'), findsOneWidget);
-    expect(find.text('Scripture: Psalm 23'), findsOneWidget);
+    // The duty's own screen lists them in its details table.
+    expect(find.text('SYNTHETIC Hope'), findsOneWidget);
+    expect(find.text('Psalm 23'), findsOneWidget);
   });
 }

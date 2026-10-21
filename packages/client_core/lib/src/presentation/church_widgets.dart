@@ -3,20 +3,20 @@ import 'package:flutter/material.dart';
 
 import '../domain/church_time.dart';
 
-const _weekdays = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const _months = [
-  'JAN',
-  'FEB',
-  'MAR',
-  'APR',
-  'MAY',
-  'JUN',
-  'JUL',
-  'AUG',
-  'SEP',
-  'OCT',
-  'NOV',
-  'DEC',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 /// The handoff's date badge for an instant in church time (Africa/Lusaka).
@@ -42,8 +42,8 @@ class ChurchDateBadge extends StatelessWidget {
   }
 }
 
-/// A member tab's page (design handoff): no app bar, the 28/700 title in
-/// brand with a refresh button beside it, pull to refresh, 16 px gutters.
+/// A member tab's page: no app bar, the 24/700 title with a refresh button
+/// beside it, pull to refresh, 16 px gutters.
 /// Pushed detail screens keep their app bar and back chevron.
 class MemberTabPage extends StatelessWidget {
   const MemberTabPage({
@@ -92,7 +92,7 @@ class MemberTabPage extends StatelessWidget {
                               child: Text(
                                 title,
                                 style: ChurchType.mobileScreenTitle.copyWith(
-                                  color: c.brand,
+                                  color: c.ink,
                                 ),
                               ),
                             ),
@@ -108,7 +108,7 @@ class MemberTabPage extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 16),
                       ...children,
                     ],
                   ),

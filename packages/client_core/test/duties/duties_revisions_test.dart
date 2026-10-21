@@ -538,7 +538,12 @@ void main() {
         );
         expect(find.text('Accepted'), findsNothing);
         expect(byKey('duty-changed-$_assignment'), findsOneWidget);
-        expect(find.text('What changed: date or start time, place.'), findsOne);
+        expect(
+          find.text(
+            'Changed: date or start time, place. Please answer again.',
+          ),
+          findsOne,
+        );
         expect(find.text('Needs a response (1)'), findsOneWidget);
         expect(h.duties.mineCalls, 2);
       },
@@ -636,7 +641,7 @@ void main() {
     ) async {
       await pumpAt(
         tester,
-        ClientPaths.myDuties,
+        DutyPaths.assignment(_assignment),
         setUp: (h) => h.duties.mine = mineWith([
           myDutyData(
             slotRevision: 2,

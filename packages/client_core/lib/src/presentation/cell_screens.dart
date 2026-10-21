@@ -3587,54 +3587,9 @@ class _PlanBody extends ConsumerWidget {
     final ahead = m.startsAt.isAfter(DateTime.now().toUtc());
     final open = ahead && !m.cancelled;
     final children = <Widget>[
-      _muted(context, read.cellName),
       // The page's answer first: when the meeting is, and how planned.
-      Text(
-        _meetingWhen(context, m),
-        key: const Key('plan-when'),
-        style: ChurchType.sectionTitle.copyWith(
-          color: ChurchColors.of(context).ink,
-        ),
-      ),
-      const SizedBox(height: 4),
-      Wrap(
-        spacing: 8,
-        runSpacing: 4,
-        children: [
-          if (m.cancelled)
-            const StatusLabel(
-              label: 'Meeting cancelled',
-              tone: StatusTone.danger,
-            )
-          else
-            ?_statusLabel(read.status, key: const Key('plan-status')),
-          if (p == null)
-            const StatusLabel(
-              key: Key('plan-state-none'),
-              label: 'No programme yet',
-              tone: StatusTone.neutral,
-            )
-          else ...[
-            StatusLabel(
-              key: Key('plan-state-${p.state.wire}'),
-              label: switch (p.state) {
-                ProgrammeState.draft => 'Draft: members don\'t see it',
-                ProgrammeState.published => 'Published to members',
-                ProgrammeState.cancelled => 'Cancelled',
-              },
-              tone: switch (p.state) {
-                ProgrammeState.draft => StatusTone.info,
-                ProgrammeState.published => StatusTone.success,
-                ProgrammeState.cancelled => StatusTone.neutral,
-              },
-            ),
-            _partsLabel(p.partCount, p.gaps),
-            if (p.published && read.duties.isNotEmpty)
-              _answersLabel(read.duties.values),
-          ],
-        ],
-      ),
-      const SizedBox(height: 12),
+      _PlanSummary(read: read),
+      const SizedBox(height: 16),
     ];
     // Story 5.8: once the meeting has started, what happened comes first (the
     // server's status says so, not this device's clock).
@@ -3645,14 +3600,14 @@ class _PlanBody extends ConsumerWidget {
             status == MeetingStatus.unrecorded)) {
       children.addAll([
         _RecordCard(meetingId: meetingId, read: read, state: state),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
       ]);
     }
     // Story 5.7: who can't attend comes before the plan (a coverage warning).
     if (read.canEdit && read.absences.isNotEmpty) {
       children.addAll([
         _AbsencesCard(absences: read.absences),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
       ]);
     }
     if (!read.full) {
@@ -3664,32 +3619,46 @@ class _PlanBody extends ConsumerWidget {
         ),
       );
     } else if (p == null) {
-      if (read.canEdit && open) {
-        children.add(
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: FocusRing(
-              child: FilledButton(
-                key: const Key('plan-create'),
-                onPressed: state.busy ? null : () => ctl.create(m),
-                child: const Text('Start the programme'),
-              ),
+      final start = read.canEdit && open;
+      children.add(
+        _planNarrow(
+          context,
+          StaffSection(
+            title: 'Programme',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  start
+                      ? 'Start it to add the parts and who leads each. '
+                            'Members see nothing until you publish it.'
+                      : !open
+                      ? (m.cancelled
+                            ? 'This meeting is cancelled, so it has no '
+                                  'programme.'
+                            : 'This meeting has started, so it can no longer '
+                                  'be planned.')
+                      : 'The cell\'s leader or assistant plans this meeting.',
+                  key: start ? null : const Key('plan-none'),
+                  style: ChurchType.staffBody.copyWith(
+                    color: ChurchColors.of(context).muted,
+                  ),
+                ),
+                if (start) ...[
+                  const SizedBox(height: 14),
+                  FocusRing(
+                    child: FilledButton(
+                      key: const Key('plan-create'),
+                      onPressed: state.busy ? null : () => ctl.create(m),
+                      child: const Text('Start the programme'),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-        );
-      } else {
-        children.add(
-          Text(
-            !open
-                ? (m.cancelled
-                      ? 'This meeting is cancelled, so it has no programme.'
-                      : 'This meeting has started, so it can no longer be '
-                            'planned.')
-                : 'The cell\'s leader or assistant plans this meeting.',
-            key: const Key('plan-none'),
-          ),
-        );
-      }
+        ),
+      );
     } else if (p.draft && read.canEdit && open) {
       children.add(
         _ProgrammeEditor(
@@ -3713,38 +3682,18 @@ class _PlanBody extends ConsumerWidget {
         ),
       );
     } else {
+      String? why;
       if (p.draft && read.canEdit && !open) {
-        children.add(
-          _muted(
-            context,
-            m.cancelled
-                ? 'This meeting is cancelled, so its programme can\'t change.'
-                : 'This meeting has started, so its programme can\'t change.',
-          ),
-        );
+        why = m.cancelled
+            ? 'This meeting is cancelled, so its programme can\'t change.'
+            : 'This meeting has started, so its programme can\'t change.';
       } else if (!read.canEdit) {
-        children.add(_muted(context, 'Read only.'));
+        why = 'Read only.';
       }
-      children.add(const SizedBox(height: 8));
-      children.add(
-        _ProgrammePreview(
-          meeting: m,
-          topic: p.topic,
-          scripture: p.scripture,
-          studyNotes: p.studyNotes,
-          parts: [
-            for (final part in p.parts)
-              (
-                start: ChurchTime.timeText(part.startsAt),
-                end: ChurchTime.timeText(part.endsAt),
-                label: part.label,
-                who: part.assignee?.displayName ?? part.linkedLabel,
-                leftCell: part.assignee != null && !part.assignee!.inCell,
-              ),
-          ],
-          caption: null,
-        ),
-      );
+      if (why != null) {
+        children.addAll([_muted(context, why), const SizedBox(height: 12)]);
+      }
+      children.add(_PlanReadOnly(read: read, programme: p));
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3752,6 +3701,308 @@ class _PlanBody extends ConsumerWidget {
     );
   }
 }
+
+/// A block that holds a few lines keeps to a readable width on a wide
+/// screen instead of spanning the canvas.
+Widget _planNarrow(BuildContext context, Widget child) => Align(
+  alignment: AlignmentDirectional.centerStart,
+  child: ConstrainedBox(
+    constraints: const BoxConstraints(maxWidth: 760),
+    child: child,
+  ),
+);
+
+/// The page's answer: which meeting (date badge, when, where, which cell)
+/// and how planned it is (the programme's state, its gaps and, once
+/// published, who has said yes): one pale pill each, coloured by the data.
+class _PlanSummary extends StatelessWidget {
+  const _PlanSummary({required this.read});
+  final ProgrammeRead read;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final m = read.meeting;
+    final p = read.programme;
+    final pills = <Widget>[
+      if (m.cancelled)
+        const StatusLabel(label: 'Meeting cancelled', tone: StatusTone.danger)
+      else
+        ?_statusLabel(read.status, key: const Key('plan-status')),
+      if (p == null)
+        const StatusLabel(
+          key: Key('plan-state-none'),
+          label: 'No programme yet',
+          tone: StatusTone.neutral,
+        )
+      else ...[
+        StatusLabel(
+          key: Key('plan-state-${p.state.wire}'),
+          label: switch (p.state) {
+            ProgrammeState.draft => 'Draft: members don\'t see it',
+            ProgrammeState.published => 'Published to members',
+            ProgrammeState.cancelled => 'Cancelled',
+          },
+          tone: switch (p.state) {
+            ProgrammeState.draft => StatusTone.info,
+            ProgrammeState.published => StatusTone.success,
+            ProgrammeState.cancelled => StatusTone.neutral,
+          },
+        ),
+        _partsLabel(p.partCount, p.gaps),
+        if (p.published && read.duties.isNotEmpty)
+          _answersLabel(read.duties.values),
+      ],
+    ];
+    final facts = Row(
+      children: [
+        ChurchDateBadge(at: m.startsAt, tone: DateBadgeTone.info),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                read.cellName,
+                style: ChurchType.secondary.copyWith(
+                  color: c.muted,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _meetingWhen(context, m),
+                key: const Key('plan-when'),
+                style: ChurchType.sectionTitle.copyWith(color: c.ink),
+              ),
+              if (m.venue case final v?)
+                Text(v, style: ChurchType.secondary.copyWith(color: c.muted)),
+            ],
+          ),
+        ),
+      ],
+    );
+    return ChurchCard(
+      radius: churchCardRadiusOf(context),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      child: LayoutBuilder(
+        builder: (context, box) => box.maxWidth >= 720
+            ? Row(
+                children: [
+                  Expanded(flex: 3, child: facts),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 2,
+                    child: Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: pills,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  facts,
+                  const SizedBox(height: 12),
+                  Wrap(spacing: 8, runSpacing: 6, children: pills),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+/// A programme read but not changed here (pastor oversight, a cancelled
+/// programme, a meeting that has started): the parts as a table, and the
+/// Bible study beside it.
+class _PlanReadOnly extends StatelessWidget {
+  const _PlanReadOnly({required this.read, required this.programme});
+  final ProgrammeRead read;
+  final CellProgramme programme;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final p = programme;
+    final answers = read.duties.isNotEmpty;
+    final columns = [
+      const StaffColumn('Time', width: 56),
+      const StaffColumn('Part', flex: 3),
+      const StaffColumn('Who leads', flex: 3),
+      if (answers) const StaffColumn('Answer', width: 180),
+    ];
+    final table = StaffSection(
+      title: 'Programme',
+      bodyPadding: EdgeInsets.zero,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final wide = box.maxWidth >= 560;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (p.parts.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+                  child: _muted(context, 'No parts were planned.'),
+                ),
+              if (wide && p.parts.isNotEmpty)
+                StaffTableHeader(
+                  columns: columns,
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+                ),
+              for (final (i, part) in p.parts.indexed)
+                StaffTableRow(
+                  divider: wide || i > 0,
+                  child: _planReadOnlyRow(
+                    context,
+                    part,
+                    read.duties[part.partId],
+                    columns,
+                    wide: wide,
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+    String orDash(String? v) => v == null || v.trim().isEmpty ? '—' : v;
+    final study = StaffSection(
+      title: 'Bible study',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (label, value) in [
+            ('Topic', orDash(p.topic)),
+            ('Scripture', orDash(p.scripture)),
+            (
+              'Study notes (leader, assistant and pastors)',
+              orDash(p.studyNotes),
+            ),
+          ]) ...[
+            Text(label, style: staffTableHeadStyle(context)),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              style: ChurchType.staffBody.copyWith(
+                color: value == '—' ? c.muted : c.ink,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ],
+      ),
+    );
+    return LayoutBuilder(
+      builder: (context, box) => box.maxWidth >= 900
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 3, child: table),
+                const SizedBox(width: 24),
+                Expanded(flex: 2, child: study),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [table, const SizedBox(height: 16), study],
+            ),
+    );
+  }
+}
+
+/// Who leads a part, as a manager reads it: a person, a department duty
+/// shown on it, or a gap (the gap and a person who left in the warning
+/// colour).
+Widget _planWho(BuildContext context, ProgrammePart part) {
+  final c = ChurchColors.of(context);
+  final a = part.assignee;
+  final (text, warn) = a != null
+      ? (
+          a.inCell ? a.displayName : '${a.displayName} (left the cell)',
+          !a.inCell,
+        )
+      : part.linkedSlotId != null
+      ? (part.linkedLabel ?? 'Department duty', false)
+      : ('Gap: nobody leads this part', true);
+  return Text(
+    text,
+    style: ChurchType.staffBody.copyWith(color: warn ? c.amberFg : c.ink),
+  );
+}
+
+Widget _planReadOnlyRow(
+  BuildContext context,
+  ProgrammePart part,
+  PartDuty? duty,
+  List<StaffColumn> columns, {
+  required bool wide,
+}) {
+  final c = ChurchColors.of(context);
+  final time = Text(
+    ChurchTime.timeText(part.startsAt),
+    style: ChurchType.programmeTime.copyWith(color: c.muted),
+  );
+  final label = Text(
+    part.label,
+    style: ChurchType.staffBody.copyWith(
+      color: c.ink,
+      fontWeight: FontWeight.w600,
+    ),
+  );
+  final answer = duty == null
+      ? Text('—', style: ChurchType.staffBody.copyWith(color: c.muted))
+      : _planAnswer(part, duty);
+  if (wide) {
+    return StaffColumnsRow(
+      columns: columns,
+      cells: [
+        time,
+        label,
+        _planWho(context, part),
+        if (columns.length > 3) answer,
+      ],
+    );
+  }
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SizedBox(width: 56, child: time),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [label, _planWho(context, part)],
+        ),
+      ),
+      if (duty != null) ...[const SizedBox(width: 8), answer],
+    ],
+  );
+}
+
+/// A published part's answer in Duties: the one status mark of its row.
+StatusLabel _planAnswer(ProgrammePart part, PartDuty d, {Key? key}) =>
+    StatusLabel(
+      key: key,
+      label: part.linkedSlotId != null && d.status == PartDutyStatus.open
+          ? 'Department duty: link ended'
+          : d.label,
+      tone: switch (d.status) {
+        PartDutyStatus.accepted ||
+        PartDutyStatus.departmentFilled => StatusTone.success,
+        PartDutyStatus.declined => StatusTone.danger,
+        PartDutyStatus.open ||
+        PartDutyStatus.departmentOpen => StatusTone.warning,
+        PartDutyStatus.awaiting => StatusTone.info,
+        PartDutyStatus.cancelled => StatusTone.neutral,
+      },
+    );
 
 /// "5 parts, 1 gap": the gap count is the data that matters, so it carries
 /// the colour.
@@ -4008,6 +4259,7 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
     final read = widget.read;
     final m = read.meeting;
     final busy = widget.busy;
@@ -4039,6 +4291,186 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
           'd:$slot':
               '${part.linkedLabel ?? 'Department duty'} (no longer offered)',
     };
+    // The same people by name alone, for the member preview (it adds "left
+    // the cell" itself).
+    final formerNames = <String, String>{
+      for (final part in widget.programme.parts)
+        if (part.assignee case final a? when !a.inCell)
+          'm:${a.memberId}': a.displayName,
+      for (final part in widget.programme.parts)
+        if (part.linkedSlotId case final slot?
+            when !read.linkable.any((l) => l.slotId == slot))
+          'd:$slot': part.linkedLabel ?? 'Department duty',
+    };
+    InputDecoration field(String label, String key, int max) => InputDecoration(
+      labelText: label,
+      counterText: '',
+      errorText: textError(key, max),
+    );
+    final study = StaffSection(
+      title: 'Bible study',
+      subtitle:
+          'Members see the topic and scripture. The notes stay with the '
+          'leader, the assistant and pastors.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LayoutBuilder(
+            builder: (context, box) {
+              final topic = TextField(
+                key: const Key('plan-topic'),
+                controller: _topic,
+                enabled: !busy,
+                maxLength: 120,
+                decoration: field('Bible study topic', 'topic', 120),
+                onChanged: (_) => setState(() {}),
+              );
+              final scripture = TextField(
+                key: const Key('plan-scripture'),
+                controller: _scripture,
+                enabled: !busy,
+                maxLength: 120,
+                decoration: field('Scripture', 'scripture', 120),
+                onChanged: (_) => setState(() {}),
+              );
+              return box.maxWidth >= 560
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: topic),
+                        const SizedBox(width: 14),
+                        Expanded(child: scripture),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [topic, const SizedBox(height: 14), scripture],
+                    );
+            },
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            key: const Key('plan-notes'),
+            controller: _notes,
+            enabled: !busy,
+            maxLength: 2000,
+            minLines: 2,
+            maxLines: 6,
+            decoration: field(
+              'Study notes (for the leader and assistant)',
+              'study_notes',
+              2000,
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+      ),
+    );
+    final programme = StaffSection(
+      title: 'Programme',
+      subtitle:
+          'Each person sees their part on their phone. Keep the parts inside '
+          '${ChurchTime.timeText(m.startsAt)}–${ChurchTime.timeText(m.endsAt)} '
+          '(church time), in order and without overlaps.',
+      bodyPadding: EdgeInsets.zero,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final wide = box.maxWidth >= 640;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_rows.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                  child: Text(
+                    'No parts yet.',
+                    key: const Key('plan-no-parts'),
+                    style: ChurchType.staffBody.copyWith(color: c.muted),
+                  ),
+                )
+              else if (wide)
+                StaffTableHeader(
+                  columns: _planEditColumns,
+                  gap: _planEditGap,
+                  padding: _planEditHeaderPadding,
+                ),
+              for (final (i, r) in _rows.indexed)
+                _PartEditorRow(
+                  key: ValueKey('part-row-${r.key}'),
+                  index: i,
+                  row: r,
+                  wide: wide,
+                  divider: wide || i > 0,
+                  roster: read.roster,
+                  linkable: read.linkable,
+                  former: former,
+                  busy: busy,
+                  error: _partErrorText(errors, i, window),
+                  onChanged: () => setState(() {}),
+                  onRemove: () {
+                    // The refused save's errors were for the old rows
+                    // (5.3 review fix 11).
+                    ctl.clearFieldErrors();
+                    setState(() {
+                      _rows.remove(r);
+                      r.dispose();
+                    });
+                  },
+                ),
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 10, 20, 12),
+                decoration: BoxDecoration(
+                  border: _rows.isEmpty
+                      ? null
+                      : Border(top: BorderSide(color: c.line)),
+                ),
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _PlanAddPart(
+                      enabled: !busy && _rows.length < programmeMaxParts,
+                      full: _rows.length >= programmeMaxParts,
+                      onPressed: _addPart,
+                    ),
+                    if (read.linkable.isNotEmpty)
+                      _muted(
+                        context,
+                        'A part can show a department duty instead of a '
+                        'person; it stays the department\'s.',
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    final publishLabel = overrideAsked
+        ? 'Publish with this reason'
+        : widget.programme.published
+        ? 'Publish changes'
+        : 'Publish to members';
+    final note = dirty
+        ? 'Save the draft to publish it.'
+        : _rows.isEmpty
+        ? 'Add a part to publish.'
+        : widget.programme.published
+        ? 'Publishing asks again only those whose part changed.'
+        : 'Publishing asks each person to accept their part.';
+    final cancel = widget.programme.published
+        ? const SizedBox.shrink()
+        : _planCancel(
+            context,
+            confirming: _confirmCancel,
+            busy: busy,
+            question: 'Cancel it? It stays read-only.',
+            onAsk: () => setState(() => _confirmCancel = true),
+            onKeep: () => setState(() => _confirmCancel = false),
+            onCancel: () => ctl.cancel(widget.programme),
+          );
     final editor = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -4059,108 +4491,12 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
         ],
-        _Card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                key: const Key('plan-topic'),
-                controller: _topic,
-                enabled: !busy,
-                maxLength: 120,
-                decoration: InputDecoration(
-                  labelText: 'Bible study topic',
-                  errorText: textError('topic', 120),
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-              TextField(
-                key: const Key('plan-scripture'),
-                controller: _scripture,
-                enabled: !busy,
-                maxLength: 120,
-                decoration: InputDecoration(
-                  labelText: 'Scripture',
-                  errorText: textError('scripture', 120),
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-              TextField(
-                key: const Key('plan-notes'),
-                controller: _notes,
-                enabled: !busy,
-                maxLength: 2000,
-                minLines: 2,
-                maxLines: 6,
-                decoration: InputDecoration(
-                  labelText: 'Study notes (for the leader and assistant)',
-                  errorText: textError('study_notes', 2000),
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        _Card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _heading(context, 'Programme'),
-              _muted(
-                context,
-                'In time order, inside the meeting ($window, church time), '
-                'without overlaps. A part without a person is a gap. A '
-                'department duty can be shown on a part; it stays the '
-                'department\'s.',
-              ),
-              const SizedBox(height: 8),
-              if (_rows.isEmpty)
-                const Text('No parts yet.', key: Key('plan-no-parts')),
-              for (final (i, r) in _rows.indexed)
-                _PartEditorRow(
-                  key: ValueKey('part-row-${r.key}'),
-                  index: i,
-                  row: r,
-                  roster: read.roster,
-                  linkable: read.linkable,
-                  former: former,
-                  busy: busy,
-                  error: _partErrorText(errors, i, window),
-                  onChanged: () => setState(() {}),
-                  onRemove: () {
-                    // The refused save's errors were for the old rows
-                    // (5.3 review fix 11).
-                    ctl.clearFieldErrors();
-                    setState(() {
-                      _rows.remove(r);
-                      r.dispose();
-                    });
-                  },
-                ),
-              const SizedBox(height: 4),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: FocusRing(
-                  child: OutlinedButton(
-                    key: const Key('plan-add-part'),
-                    onPressed: busy || _rows.length >= programmeMaxParts
-                        ? null
-                        : _addPart,
-                    child: Text(
-                      _rows.length >= programmeMaxParts
-                          ? 'At most $programmeMaxParts parts'
-                          : 'Add a part',
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
+        study,
+        const SizedBox(height: 16),
+        programme,
+        const SizedBox(height: 16),
         if (overrideAsked) ...[
           TextField(
             key: const Key('plan-override'),
@@ -4181,84 +4517,59 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
           const SizedBox(height: 8),
         ],
         Wrap(
-          spacing: 8,
+          alignment: WrapAlignment.spaceBetween,
+          spacing: 16,
           runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            FocusRing(
-              child: OutlinedButton(
-                key: const Key('plan-save'),
-                onPressed: busy
-                    ? null
-                    : () => ctl.save(
-                        widget.programme,
-                        topic: _topic.text,
-                        scripture: _scripture.text,
-                        studyNotes: _notes.text,
-                        parts: _drafts,
-                      ),
-                child: const Text('Save draft'),
-              ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                FocusRing(
+                  child: FilledButton(
+                    key: Key(
+                      overrideAsked ? 'plan-publish-override' : 'plan-publish',
+                    ),
+                    onPressed:
+                        busy ||
+                            dirty ||
+                            _stale ||
+                            _rows.isEmpty ||
+                            (overrideAsked && _reason.text.trim().isEmpty)
+                        ? null
+                        : () => ctl.publish(
+                            widget.programme,
+                            overrideReason: overrideAsked ? _reason.text : null,
+                          ),
+                    child: Text(publishLabel),
+                  ),
+                ),
+                FocusRing(
+                  child: OutlinedButton(
+                    key: const Key('plan-save'),
+                    onPressed: busy
+                        ? null
+                        : () => ctl.save(
+                            widget.programme,
+                            topic: _topic.text,
+                            scripture: _scripture.text,
+                            studyNotes: _notes.text,
+                            parts: _drafts,
+                          ),
+                    child: const Text('Save draft'),
+                  ),
+                ),
+              ],
             ),
-            FocusRing(
-              child: FilledButton(
-                key: Key(
-                  overrideAsked ? 'plan-publish-override' : 'plan-publish',
-                ),
-                onPressed:
-                    busy ||
-                        dirty ||
-                        _stale ||
-                        _rows.isEmpty ||
-                        (overrideAsked && _reason.text.trim().isEmpty)
-                    ? null
-                    : () => ctl.publish(
-                        widget.programme,
-                        overrideReason: overrideAsked ? _reason.text : null,
-                      ),
-                child: Text(
-                  overrideAsked
-                      ? 'Publish with this reason'
-                      : widget.programme.published
-                      ? 'Publish changes'
-                      : 'Publish to members',
-                ),
-              ),
-            ),
-            if (dirty)
-              _muted(context, 'Save the draft to publish it.')
-            else if (_rows.isEmpty)
-              _muted(context, 'Add a part to publish.'),
-            if (widget.programme.published)
-              const SizedBox.shrink()
-            else if (!_confirmCancel)
-              FocusRing(
-                child: TextButton(
-                  key: const Key('plan-cancel'),
-                  onPressed: busy
-                      ? null
-                      : () => setState(() => _confirmCancel = true),
-                  child: const Text('Cancel this programme'),
-                ),
-              )
-            else ...[
-              const Text('Cancel it? It stays read-only.'),
-              FocusRing(
-                child: TextButton(
-                  key: const Key('plan-cancel-confirm'),
-                  onPressed: busy ? null : () => ctl.cancel(widget.programme),
-                  child: const Text('Yes, cancel the programme'),
-                ),
-              ),
-              FocusRing(
-                child: TextButton(
-                  key: const Key('plan-cancel-keep'),
-                  onPressed: () => setState(() => _confirmCancel = false),
-                  child: const Text('Keep it'),
-                ),
-              ),
-            ],
+            cancel,
           ],
+        ),
+        // What the buttons do, or why Publish waits, under them.
+        Padding(
+          padding: const EdgeInsetsDirectional.only(start: 6, top: 2),
+          child: _muted(context, note),
         ),
       ],
     );
@@ -4266,37 +4577,199 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
       meeting: m,
       topic: _topic.text.trim().isEmpty ? null : _topic.text.trim(),
       scripture: _scripture.text.trim().isEmpty ? null : _scripture.text.trim(),
-      studyNotes: null,
       parts: [
         for (final r in _rows)
           (
             start: r.start.text.trim(),
             end: r.end.text.trim(),
             label: r.label.text.trim().isEmpty ? 'Untitled part' : r.label.text,
-            who: r.who == null ? null : names[r.who] ?? former[r.who],
+            who: r.who == null ? null : names[r.who] ?? formerNames[r.who],
             leftCell: r.who != null && !names.containsKey(r.who),
           ),
       ],
-      caption:
-          'What members will see once it is published. They see nothing of '
-          'a draft, and no answers or notes.',
+      heading: 'What members will see',
+      caption: widget.programme.published
+          ? 'Once you publish these changes. Until then they keep the last '
+                'version.'
+          : 'Once it is published. They see nothing of a draft, and no '
+                'answers or notes.',
     );
-    return LayoutBuilder(
-      builder: (context, box) => box.maxWidth >= 860
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: editor),
-                const SizedBox(width: 16),
-                SizedBox(width: 300, child: preview),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [editor, const SizedBox(height: 16), preview],
+    return _planWithPreview(editor, preview);
+  }
+}
+
+/// The work on the left and the member's phone on the right (about 340 px)
+/// on a wide screen; the phone under the work on a narrow one.
+Widget _planWithPreview(Widget work, Widget preview) => LayoutBuilder(
+  builder: (context, box) => box.maxWidth >= 900
+      ? Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: work),
+            const SizedBox(width: 24),
+            SizedBox(width: 340, child: preview),
+          ],
+        )
+      : Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            work,
+            const SizedBox(height: 24),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: preview,
+              ),
             ),
+          ],
+        ),
+);
+
+/// Cancelling a programme: a quiet action in the negative colour that asks
+/// once more, in words, before it is sent.
+Widget _planCancel(
+  BuildContext context, {
+  required bool confirming,
+  required bool busy,
+  required String question,
+  required VoidCallback? onAsk,
+  required VoidCallback onKeep,
+  required VoidCallback onCancel,
+}) {
+  final c = ChurchColors.of(context);
+  final danger = TextButton.styleFrom(foregroundColor: c.redFg);
+  if (!confirming) {
+    return FocusRing(
+      child: TextButton(
+        key: const Key('plan-cancel'),
+        style: danger,
+        onPressed: busy ? null : onAsk,
+        child: const Text('Cancel this programme'),
+      ),
     );
   }
+  return Wrap(
+    spacing: 4,
+    runSpacing: 4,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      Padding(
+        padding: const EdgeInsetsDirectional.only(end: 4),
+        child: Text(
+          question,
+          style: ChurchType.staffBody.copyWith(color: c.ink),
+        ),
+      ),
+      FocusRing(
+        child: TextButton(
+          key: const Key('plan-cancel-confirm'),
+          style: danger,
+          onPressed: busy ? null : onCancel,
+          child: const Text('Yes, cancel the programme'),
+        ),
+      ),
+      FocusRing(
+        child: TextButton(
+          key: const Key('plan-cancel-keep'),
+          onPressed: onKeep,
+          child: const Text('Keep it'),
+        ),
+      ),
+    ],
+  );
+}
+
+/// The editor table's columns: two times, the part, who leads, remove.
+const _planEditColumns = [
+  StaffColumn('Starts', width: 92),
+  StaffColumn('Ends', width: 92),
+  StaffColumn('Part'),
+  StaffColumn('Who leads'),
+  StaffColumn('', width: 44),
+];
+const double _planEditGap = 10;
+const _planEditHeaderPadding = EdgeInsets.fromLTRB(20, 12, 12, 10);
+
+/// Where a part's own messages start on a wide row: under the part's name.
+const double _planEditMessageInset = 92 + _planEditGap + 92 + _planEditGap;
+
+/// "Add a part" as the handoff's dashed add slot.
+class _PlanAddPart extends StatelessWidget {
+  const _PlanAddPart({
+    required this.enabled,
+    required this.full,
+    required this.onPressed,
+  });
+  final bool enabled;
+  final bool full;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    return FocusRing(
+      child: CustomPaint(
+        foregroundPainter: _PlanDashedOutline(
+          color: enabled ? c.muted : c.line,
+          radius: ChurchGeometry.staffInputRadius,
+        ),
+        child: TextButton.icon(
+          key: const Key('plan-add-part'),
+          onPressed: enabled ? onPressed : null,
+          style: TextButton.styleFrom(
+            minimumSize: const Size(0, ChurchGeometry.minTarget),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(
+                ChurchGeometry.staffInputRadius,
+              ),
+            ),
+            textStyle: const TextStyle(
+              fontFamily: ChurchFonts.body,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          icon: const Icon(Icons.add, size: 18),
+          label: Text(full ? 'At most $programmeMaxParts parts' : 'Add a part'),
+        ),
+      ),
+    );
+  }
+}
+
+/// A 1.5 px dashed rounded outline (an empty slot to fill).
+class _PlanDashedOutline extends CustomPainter {
+  const _PlanDashedOutline({required this.color, required this.radius});
+  final Color color;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          Offset.zero & size,
+          Radius.circular(radius),
+        ).deflate(0.75),
+      );
+    for (final metric in path.computeMetrics()) {
+      var d = 0.0;
+      while (d < metric.length) {
+        canvas.drawPath(metric.extractPath(d, d + 5), paint);
+        d += 9;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PlanDashedOutline old) =>
+      old.color != color || old.radius != radius;
 }
 
 String? _partErrorText(Map<String, String> errors, int index, String window) {
@@ -4363,6 +4836,8 @@ class _PartEditorRow extends StatelessWidget {
     super.key,
     required this.index,
     required this.row,
+    required this.wide,
+    required this.divider,
     required this.roster,
     required this.linkable,
     required this.former,
@@ -4373,6 +4848,10 @@ class _PartEditorRow extends StatelessWidget {
   });
   final int index;
   final _PartRow row;
+
+  /// A table row under the column headers; otherwise each part stacks.
+  final bool wide;
+  final bool divider;
   final List<ProgrammeRosterMember> roster;
   final List<LinkableDuty> linkable;
   final Map<String, String> former;
@@ -4391,44 +4870,72 @@ class _PartEditorRow extends StatelessWidget {
       for (final l in linkable) 'd:${l.slotId}',
     };
     final known = value == null || offered.contains(value);
-    final who = DropdownButton<String?>(
-      key: Key('part-assignee-$index'),
-      isExpanded: true,
-      value: value,
-      hint: const Text('Nobody yet'),
-      items: [
-        const DropdownMenuItem<String?>(value: null, child: Text('Nobody yet')),
-        for (final r in roster)
-          DropdownMenuItem<String?>(
-            value: 'm:${r.memberId}',
-            child: Text(
-              r.offApp ? '${r.displayName} (no app login)' : r.displayName,
-              overflow: TextOverflow.ellipsis,
-            ),
+    // Under the column headers the labels sit inside the empty fields (and
+    // name them to assistive technology); a stacked part floats them.
+    final float = wide
+        ? FloatingLabelBehavior.never
+        : FloatingLabelBehavior.auto;
+    const dense = EdgeInsets.symmetric(horizontal: 12, vertical: 12);
+    final who = Container(
+      constraints: const BoxConstraints(minHeight: 46),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      alignment: AlignmentDirectional.centerStart,
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border.all(color: busy ? c.line : c.muted),
+        borderRadius: BorderRadius.circular(
+          isStaffLayout(context)
+              ? ChurchGeometry.staffInputRadius
+              : ChurchGeometry.mobileInputRadius,
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String?>(
+          key: Key('part-assignee-$index'),
+          isExpanded: true,
+          value: value,
+          hint: Text(
+            'Nobody yet',
+            style: ChurchType.staffBody.copyWith(color: c.amberFg),
           ),
-        for (final l in linkable)
-          DropdownMenuItem<String?>(
-            value: 'd:${l.slotId}',
-            child: Text(
-              'Department duty: ${l.label}',
-              overflow: TextOverflow.ellipsis,
+          items: [
+            const DropdownMenuItem<String?>(
+              value: null,
+              child: Text('Nobody yet'),
             ),
-          ),
-        if (!known)
-          DropdownMenuItem<String?>(
-            value: value,
-            child: Text(
-              former[value] ?? 'Someone (left the cell)',
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-      ],
-      onChanged: busy
-          ? null
-          : (v) {
-              row.who = v;
-              onChanged();
-            },
+            for (final r in roster)
+              DropdownMenuItem<String?>(
+                value: 'm:${r.memberId}',
+                child: Text(
+                  r.offApp ? '${r.displayName} (no app login)' : r.displayName,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            for (final l in linkable)
+              DropdownMenuItem<String?>(
+                value: 'd:${l.slotId}',
+                child: Text(
+                  'Department duty: ${l.label}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            if (!known)
+              DropdownMenuItem<String?>(
+                value: value,
+                child: Text(
+                  former[value] ?? 'Someone (left the cell)',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+          onChanged: busy
+              ? null
+              : (v) {
+                  row.who = v;
+                  onChanged();
+                },
+        ),
+      ),
     );
     Widget clock(TextEditingController ctl, String label, String key) =>
         SizedBox(
@@ -4438,7 +4945,14 @@ class _PartEditorRow extends StatelessWidget {
             controller: ctl,
             enabled: !busy,
             keyboardType: TextInputType.datetime,
-            decoration: InputDecoration(labelText: label, hintText: 'HH:MM'),
+            style: ChurchType.programmeTime.copyWith(color: c.ink),
+            decoration: InputDecoration(
+              labelText: wide ? '$label (part $n)' : label,
+              hintText: 'HH:MM',
+              isDense: true,
+              contentPadding: dense,
+              floatingLabelBehavior: float,
+            ),
             onChanged: (_) => onChanged(),
           ),
         );
@@ -4451,6 +4965,9 @@ class _PartEditorRow extends StatelessWidget {
         labelText: 'Part $n',
         counterText: '',
         hintText: 'Opening prayer',
+        isDense: true,
+        contentPadding: dense,
+        floatingLabelBehavior: float,
       ),
       onChanged: (_) => onChanged(),
     );
@@ -4458,70 +4975,89 @@ class _PartEditorRow extends StatelessWidget {
       key: Key('part-remove-$index'),
       tooltip: 'Remove part $n',
       onPressed: busy ? null : onRemove,
-      icon: const Icon(Icons.close),
+      color: c.muted,
+      icon: const Icon(Icons.close, size: 20),
     );
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Semantics(
-        container: true,
-        label: 'Part $n',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            LayoutBuilder(
-              builder: (context, box) => box.maxWidth >= 560
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        clock(row.start, 'Starts', 'start'),
-                        const SizedBox(width: 8),
-                        clock(row.end, 'Ends', 'end'),
-                        const SizedBox(width: 8),
-                        Expanded(flex: 3, child: label),
-                        const SizedBox(width: 8),
-                        Expanded(flex: 2, child: who),
-                        remove,
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          children: [
-                            clock(row.start, 'Starts', 'start'),
-                            const SizedBox(width: 8),
-                            clock(row.end, 'Ends', 'end'),
-                            const Spacer(),
-                            remove,
-                          ],
-                        ),
-                        label,
-                        who,
-                      ],
-                    ),
-            ),
-            if (value == null)
-              Text(
-                'Gap: nobody leads this part yet',
-                key: Key('part-gap-$index'),
-                style: ChurchType.secondary.copyWith(color: c.amberFg),
-              )
-            else if (!known)
-              Text(
-                value.startsWith('d:')
-                    ? 'That department duty is no longer offered. Choose '
-                          'again.'
-                    : 'This person has left the cell. Choose someone else.',
-                style: ChurchType.secondary.copyWith(color: c.amberFg),
-              ),
-            if (error case final e?)
-              Text(
-                e,
-                key: Key('part-error-$index'),
-                style: ChurchType.secondary.copyWith(color: c.redFg),
-              ),
-          ],
+    final messages = <Widget>[
+      if (value == null)
+        Text(
+          'Gap: nobody leads this part yet',
+          key: Key('part-gap-$index'),
+          style: ChurchType.secondary.copyWith(color: c.amberFg, fontSize: 13),
+        )
+      else if (!known)
+        Text(
+          value.startsWith('d:')
+              ? 'That department duty is no longer offered. Choose again.'
+              : 'This person has left the cell. Choose someone else.',
+          style: ChurchType.secondary.copyWith(color: c.amberFg, fontSize: 13),
         ),
+      if (error case final e?)
+        Text(
+          e,
+          key: Key('part-error-$index'),
+          style: ChurchType.secondary.copyWith(color: c.redFg, fontSize: 13),
+        ),
+    ];
+    final body = wide
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              StaffColumnsRow(
+                columns: _planEditColumns,
+                gap: _planEditGap,
+                cells: [
+                  clock(row.start, 'Starts', 'start'),
+                  clock(row.end, 'Ends', 'end'),
+                  label,
+                  who,
+                  remove,
+                ],
+              ),
+              if (messages.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(
+                    start: _planEditMessageInset,
+                    top: 4,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: messages,
+                  ),
+                ),
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  clock(row.start, 'Starts', 'start'),
+                  const SizedBox(width: 8),
+                  clock(row.end, 'Ends', 'end'),
+                  const Spacer(),
+                  remove,
+                ],
+              ),
+              const SizedBox(height: 10),
+              label,
+              const SizedBox(height: 10),
+              who,
+              if (messages.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                ...messages,
+              ],
+            ],
+          );
+    return Semantics(
+      container: true,
+      label: 'Part $n',
+      child: StaffTableRow(
+        divider: divider,
+        padding: wide
+            ? const EdgeInsets.fromLTRB(20, 8, 12, 8)
+            : const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        child: body,
       ),
     );
   }
@@ -4593,7 +5129,7 @@ class _PublishedEditorState extends ConsumerState<_PublishedEditor> {
                 ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
         ],
         _PublishedView(
           meetingId: widget.meetingId,
@@ -4601,30 +5137,28 @@ class _PublishedEditorState extends ConsumerState<_PublishedEditor> {
           programme: p,
           busy: widget.busy,
           open: widget.open,
-        ),
-        if (widget.open)
-          Padding(
-            padding: const EdgeInsets.only(top: 16),
-            child: editing
-                ? _ProgrammeEditor(
-                    meetingId: widget.meetingId,
-                    read: widget.read,
-                    programme: p,
-                    busy: widget.busy,
-                    errors: widget.errors,
-                  )
-                : Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: FocusRing(
-                      child: OutlinedButton(
-                        key: const Key('plan-change-published'),
-                        onPressed: widget.busy
-                            ? null
-                            : () => setState(() => _editing = true),
-                        child: const Text('Change the programme'),
-                      ),
-                    ),
+          change: widget.open && !editing
+              ? FocusRing(
+                  child: OutlinedButton(
+                    key: const Key('plan-change-published'),
+                    onPressed: widget.busy
+                        ? null
+                        : () => setState(() => _editing = true),
+                    child: const Text('Change the programme'),
                   ),
+                )
+              : null,
+        ),
+        if (widget.open && editing)
+          Padding(
+            padding: const EdgeInsets.only(top: 24),
+            child: _ProgrammeEditor(
+              meetingId: widget.meetingId,
+              read: widget.read,
+              programme: p,
+              busy: widget.busy,
+              errors: widget.errors,
+            ),
           ),
       ],
     );
@@ -4641,12 +5175,17 @@ class _PublishedView extends ConsumerStatefulWidget {
     required this.programme,
     required this.busy,
     required this.open,
+    this.change,
   });
   final String meetingId;
   final ProgrammeRead read;
   final CellProgramme programme;
   final bool busy;
   final bool open;
+
+  /// Story 5.6: **Change the programme**, beside cancelling (null while the
+  /// editor is open or the meeting is no longer ahead).
+  final Widget? change;
 
   @override
   ConsumerState<_PublishedView> createState() => _PublishedViewState();
@@ -4673,8 +5212,8 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
       reason: _reason.text,
     );
     final ok = draft.errors().isEmpty;
-    return Padding(
-      padding: const EdgeInsets.only(left: 52, bottom: 12),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 520),
       child: Column(
         key: Key('confirm-form-${d.partId}'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -4684,17 +5223,22 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
             'Record that they said yes to you directly. It shows as '
             'Confirmed by leader, with your name.',
           ),
-          DropdownButton<ContactChannel>(
-            key: Key('confirm-channel-${d.partId}'),
-            value: _channel,
-            items: [
-              for (final c in ContactChannel.values)
-                DropdownMenuItem(value: c, child: Text(c.label)),
-            ],
-            onChanged: busy
-                ? null
-                : (v) => setState(() => _channel = v ?? _channel),
+          const SizedBox(height: 8),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: DropdownButton<ContactChannel>(
+              key: Key('confirm-channel-${d.partId}'),
+              value: _channel,
+              items: [
+                for (final c in ContactChannel.values)
+                  DropdownMenuItem(value: c, child: Text(c.label)),
+              ],
+              onChanged: busy
+                  ? null
+                  : (v) => setState(() => _channel = v ?? _channel),
+            ),
           ),
+          const SizedBox(height: 8),
           TextField(
             key: Key('confirm-reason-${d.partId}'),
             controller: _reason,
@@ -4708,6 +5252,7 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
           ),
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: [
               FocusRing(
                 child: FilledButton(
@@ -4736,115 +5281,158 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
     );
   }
 
+  /// One part of the published programme: the time, the part, who leads it
+  /// (with what needs doing about them in the warning colour, and the
+  /// direct confirmation as a text action) and their answer.
+  Widget _partRow(ProgrammePart part, {required bool wide, required int i}) {
+    final c = ChurchColors.of(context);
+    final read = widget.read;
+    final busy = widget.busy;
+    final d = read.duties[part.partId];
+    final small = ChurchType.secondary.copyWith(color: c.amberFg, fontSize: 13);
+    // Story 5.5: the direct confirmation, beside the answer it records.
+    final confirm = d != null && d.confirmable && _confirming != part.partId
+        ? FocusRing(
+            child: TextButton(
+              key: Key('confirm-part-${part.partId}'),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, ChurchGeometry.minTarget),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                textStyle: const TextStyle(
+                  fontFamily: ChurchFonts.body,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onPressed: busy || !widget.open
+                  ? null
+                  : () => setState(() {
+                      _confirming = part.partId;
+                      _reason.clear();
+                    }),
+              child: const Text('They said yes directly'),
+            ),
+          )
+        : null;
+    final whoCell = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          part.assignee?.displayName ?? part.linkedLabel ?? 'Nobody yet',
+          style: ChurchType.staffBody.copyWith(
+            color: part.gap ? c.amberFg : c.ink,
+          ),
+        ),
+        if (d != null && d.needsContact)
+          Text('Not on the app: tell them directly', style: small),
+        if (read.absenceFor(part.partId) != null)
+          Text(
+            'Can\'t attend: they sent a notice',
+            key: Key('published-absence-${part.partId}'),
+            style: small,
+          ),
+        if (!wide && confirm != null) confirm,
+      ],
+    );
+    final answer = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (d == null)
+          Text('—', style: ChurchType.staffBody.copyWith(color: c.muted))
+        else
+          _planAnswer(part, d, key: Key('published-status-${part.partId}')),
+        if (wide && confirm != null) confirm,
+      ],
+    );
+    final time = Text(
+      ChurchTime.timeText(part.startsAt),
+      style: ChurchType.programmeTime.copyWith(color: c.muted),
+    );
+    final label = Text(
+      part.label,
+      style: ChurchType.staffBody.copyWith(
+        color: c.ink,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+    final form = _confirming == part.partId && d != null && d.confirmable
+        ? Padding(
+            padding: EdgeInsetsDirectional.only(
+              start: wide ? 56 + 16 : 0,
+              top: 8,
+              bottom: 4,
+            ),
+            child: _confirmForm(d, busy),
+          )
+        : null;
+    return StaffTableRow(
+      key: Key('published-part-${part.partId}'),
+      divider: wide || i > 0,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (wide)
+            StaffColumnsRow(
+              columns: _planPublishedColumns,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              cells: [time, label, whoCell, answer],
+            )
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 56, child: time),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [label, whoCell],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                answer,
+              ],
+            ),
+          ?form,
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final read = widget.read;
     final p = widget.programme;
     final busy = widget.busy;
     final ctl = ref.read(cellProgrammeProvider(widget.meetingId).notifier);
-    final c = ChurchColors.of(context);
-    final list = _Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _heading(context, 'Who is on'),
-          for (final part in p.parts) ...[
-            Padding(
-              key: Key('published-part-${part.partId}'),
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 52,
-                    child: Text(
-                      ChurchTime.timeText(part.startsAt),
-                      style: ChurchType.secondary.copyWith(
-                        color: c.muted,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(part.label),
-                        Text(
-                          part.assignee?.displayName ??
-                              part.linkedLabel ??
-                              'Nobody yet',
-                          style: ChurchType.secondary.copyWith(color: c.muted),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (read.duties[part.partId] case final d?)
-                    Flexible(
-                      child: Wrap(
-                        spacing: 4,
-                        runSpacing: 4,
-                        alignment: WrapAlignment.end,
-                        children: [
-                          StatusLabel(
-                            key: Key('published-status-${part.partId}'),
-                            label:
-                                part.linkedSlotId != null &&
-                                    d.status == PartDutyStatus.open
-                                ? 'Department duty: link ended'
-                                : d.label,
-                            tone: switch (d.status) {
-                              PartDutyStatus.accepted ||
-                              PartDutyStatus.departmentFilled =>
-                                StatusTone.success,
-                              PartDutyStatus.declined => StatusTone.danger,
-                              PartDutyStatus.open ||
-                              PartDutyStatus.departmentOpen =>
-                                StatusTone.warning,
-                              PartDutyStatus.awaiting => StatusTone.info,
-                              PartDutyStatus.cancelled => StatusTone.neutral,
-                            },
-                          ),
-                          if (d.needsContact)
-                            const StatusLabel(
-                              label: 'Tell directly',
-                              tone: StatusTone.warning,
-                            ),
-                          if (read.absenceFor(part.partId) != null)
-                            StatusLabel(
-                              key: Key('published-absence-${part.partId}'),
-                              label: 'Can\'t attend',
-                              tone: StatusTone.warning,
-                            ),
-                          if (d.confirmable && _confirming != part.partId)
-                            FocusRing(
-                              child: TextButton(
-                                key: Key('confirm-part-${part.partId}'),
-                                onPressed: busy || !widget.open
-                                    ? null
-                                    : () => setState(() {
-                                        _confirming = part.partId;
-                                        _reason.clear();
-                                      }),
-                                child: const Text('They said yes directly'),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (_confirming == part.partId)
-              if (read.duties[part.partId] case final d? when d.confirmable)
-                _confirmForm(d, busy),
-          ],
-          _muted(
-            context,
-            'Each person answers in the app (My duties). A change reaches '
-            'them when you publish it.',
-          ),
-        ],
+    final list = StaffSection(
+      title: 'Who is on',
+      subtitle:
+          'Each person answers in the app (My duties). A change reaches them '
+          'when you publish it.',
+      bodyPadding: EdgeInsets.zero,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final wide = box.maxWidth >= 600;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (p.parts.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+                  child: _muted(context, 'No parts were published.'),
+                ),
+              if (wide && p.parts.isNotEmpty)
+                const StaffTableHeader(
+                  columns: _planPublishedColumns,
+                  padding: EdgeInsets.fromLTRB(20, 12, 20, 10),
+                ),
+              for (final (i, part) in p.parts.indexed)
+                _partRow(part, wide: wide, i: i),
+            ],
+          );
+        },
       ),
     );
     final seen = read.membersSee;
@@ -4854,7 +5442,6 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
             meeting: read.meeting,
             topic: seen.topic,
             scripture: seen.scripture,
-            studyNotes: null,
             parts: [
               for (final part in seen.parts)
                 (
@@ -4865,143 +5452,205 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
                   leftCell: false,
                 ),
             ],
-            caption: 'What members of the cell see now.',
+            heading: 'What members see now',
+            caption: null,
           );
     final actions = Wrap(
-      spacing: 8,
+      alignment: WrapAlignment.spaceBetween,
+      spacing: 16,
       runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        if (!_confirmCancel)
-          FocusRing(
-            child: TextButton(
-              key: const Key('plan-cancel'),
-              onPressed: busy || !widget.open
-                  ? null
-                  : () => setState(() => _confirmCancel = true),
-              child: const Text('Cancel this programme'),
-            ),
-          )
-        else ...[
-          const Text(
-            'Cancel it? Members stop seeing it, and everyone with a part is '
-            'told.',
-          ),
-          FocusRing(
-            child: TextButton(
-              key: const Key('plan-cancel-confirm'),
-              onPressed: busy ? null : () => ctl.cancel(p),
-              child: const Text('Yes, cancel the programme'),
-            ),
-          ),
-          FocusRing(
-            child: TextButton(
-              key: const Key('plan-cancel-keep'),
-              onPressed: () => setState(() => _confirmCancel = false),
-              child: const Text('Keep it'),
-            ),
-          ),
-        ],
+        widget.change ?? const SizedBox.shrink(),
+        _planCancel(
+          context,
+          confirming: _confirmCancel,
+          busy: busy,
+          question:
+              'Cancel it? Members stop seeing it, and everyone with a part is '
+              'told.',
+          onAsk: widget.open
+              ? () => setState(() => _confirmCancel = true)
+              : null,
+          onKeep: () => setState(() => _confirmCancel = false),
+          onCancel: () => ctl.cancel(p),
+        ),
       ],
     );
-    return LayoutBuilder(
-      builder: (context, box) => box.maxWidth >= 860
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [list, const SizedBox(height: 12), actions],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                SizedBox(width: 300, child: preview),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                list,
-                const SizedBox(height: 12),
-                actions,
-                const SizedBox(height: 16),
-                preview,
-              ],
-            ),
+    return _planWithPreview(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [list, const SizedBox(height: 12), actions],
+      ),
+      preview,
     );
   }
 }
 
-/// The programme as a member's phone will show it once published: time,
-/// part and who leads it. A gap reads "Open" in the warning colour.
+/// The published table's columns: time, part, who leads, their answer.
+const _planPublishedColumns = [
+  StaffColumn('Time', width: 56),
+  StaffColumn('Part', flex: 3),
+  StaffColumn('Who leads', flex: 4),
+  StaffColumn('Answer', width: 196),
+];
+
+/// The meeting as a member's phone shows it (the handoff's "What members
+/// see"): the date badge, when and where, the topic and scripture, and each
+/// part with its time and who leads it. A gap reads "Open: nobody yet" in
+/// the warning colour. Built from what the editor holds, so it follows
+/// every change as it is typed.
 class _ProgrammePreview extends StatelessWidget {
   const _ProgrammePreview({
     required this.meeting,
     required this.topic,
     required this.scripture,
-    required this.studyNotes,
     required this.parts,
+    required this.heading,
     required this.caption,
   });
   final CellMeeting meeting;
   final String? topic;
   final String? scripture;
-  final String? studyNotes;
   final List<_PreviewPart> parts;
+
+  /// What this phone shows ("What members see now").
+  final String heading;
   final String? caption;
 
   @override
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
+    final grey = ChurchType.secondary.copyWith(color: c.muted, fontSize: 13);
     return Column(
       key: const Key('plan-preview'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Semantics(
+          header: true,
+          child: Text(
+            heading,
+            style: ChurchType.label.copyWith(color: c.muted, fontSize: 13),
+          ),
+        ),
         if (caption case final text?) ...[
-          _muted(context, text),
-          const SizedBox(height: 8),
+          const SizedBox(height: 2),
+          Text(text, style: grey),
         ],
-        _Card(
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
+          decoration: BoxDecoration(
+            color: c.surface,
+            border: Border.all(color: c.ink, width: 3),
+            borderRadius: BorderRadius.circular(28),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _heading(context, 'Next meeting'),
               Text(
-                _meetingWhen(context, meeting),
-                style: ChurchType.sectionTitle.copyWith(color: c.ink),
+                'Next meeting',
+                style: ChurchType.cardTitle.copyWith(
+                  color: c.ink,
+                  fontSize: 17,
+                ),
               ),
-              if (meeting.venue case final v?) Text(v),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  ChurchDateBadge(
+                    at: meeting.startsAt,
+                    tone: DateBadgeTone.info,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _meetingDay(context, meeting.startsAt),
+                          style: ChurchType.staffBody.copyWith(
+                            color: c.ink,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          '${_meetingClock(context, meeting.startsAt)}–'
+                          '${_meetingClock(context, meeting.endsAt)}',
+                          style: grey.copyWith(
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (meeting.venue case final v?) ...[
+                const SizedBox(height: 12),
+                Text(
+                  v,
+                  style: ChurchType.secondary.copyWith(
+                    color: c.ink,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
               if (topic != null || scripture != null) ...[
-                const SizedBox(height: 8),
-                if (topic case final t?)
-                  Text(t, style: ChurchType.cardTitle.copyWith(color: c.ink)),
-                if (scripture case final s?)
-                  Text(s, style: ChurchType.secondary.copyWith(color: c.muted)),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: c.bg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (topic case final t?)
+                        Text(
+                          t,
+                          style: ChurchType.secondary.copyWith(
+                            color: c.ink,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      if (scripture case final s?)
+                        Text(
+                          s,
+                          style: ChurchType.secondary.copyWith(
+                            color: c.blueFg,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ],
-              if (studyNotes case final n?) ...[
-                const SizedBox(height: 8),
-                Text(n),
-              ],
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               if (parts.isEmpty)
-                _muted(context, 'No parts yet.')
+                Text('No parts yet.', style: grey)
               else
                 for (final p in parts)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.only(bottom: 10),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SizedBox(
-                          width: 52,
-                          child: Text(
-                            p.start,
-                            style: ChurchType.secondary.copyWith(
-                              color: c.muted,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
+                          width: 48,
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              p.start,
+                              style: ChurchType.programmeTime.copyWith(
+                                color: c.muted,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ),
@@ -5009,7 +5658,13 @@ class _ProgrammePreview extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(p.label),
+                              Text(
+                                p.label,
+                                style: ChurchType.secondary.copyWith(
+                                  color: c.ink,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                               Text(
                                 p.who == null
                                     ? 'Open: nobody yet'

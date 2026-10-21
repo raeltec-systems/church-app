@@ -23,6 +23,7 @@ part 'duties_coverage_screens.dart';
 part 'duties_outcome_screens.dart';
 part 'duties_reminder_widgets.dart';
 part 'duties_rota_screens.dart';
+part 'duties_special_screens.dart';
 
 // Story 4.1: departments (Admin) and publishing with responses (leaders) on
 // staff web, and the member's duties with Accept / Can't make it on mobile.
@@ -78,6 +79,10 @@ abstract final class DutyPaths {
   /// Story 4.10: a member's history, for their department's leaders.
   static String memberHistory(String memberId) =>
       Uri(path: history, queryParameters: {'member': memberId}).toString();
+
+  /// Special assignments (staff web): the Pastors give, change and cancel
+  /// them and record their outcomes.
+  static const special = '/duties/special';
 }
 
 (StatusTone, String, String) _noticeText(
@@ -94,8 +99,11 @@ abstract final class DutyPaths {
       'Your answer is saved. Your cell leader sees it in '
           'the programme',
     DutyOwnerKind.department => 'Your leader now sees it',
+    // Special assignments: the Pastors see the answer.
+    DutyOwnerKind.special => 'The Pastor now sees it',
     _ => 'Your answer is saved. Whoever manages it sees it',
   };
+  final special = a?.ownerKind == DutyOwnerKind.special;
   return switch (n) {
     DutyNotice.departmentCreated => (
       StatusTone.success,
@@ -127,16 +135,33 @@ abstract final class DutyPaths {
     DutyNotice.accepted => (
       StatusTone.success,
       'Accepted',
-      a?.ownerKind == DutyOwnerKind.cell
+      a?.ownerKind == DutyOwnerKind.cell || special
           ? 'You accepted $what. $whoSees.'
           : 'Your leader now sees that you accepted $what.',
     ),
     DutyNotice.declined => (
       StatusTone.success,
       'Answer sent',
-      a?.ownerKind == DutyOwnerKind.cell
+      a?.ownerKind == DutyOwnerKind.cell || special
           ? 'You can\'t make $what. $whoSees.'
           : 'Your leader now sees that you can\'t make $what.',
+    ),
+    DutyNotice.specialGiven => (
+      StatusTone.success,
+      'Special assignment given',
+      '$what was sent. They are asked to accept or say they can\'t make it; '
+          'their answer shows here.',
+    ),
+    DutyNotice.specialCancelled => (
+      StatusTone.success,
+      'Cancelled',
+      '$what is cancelled. If they had not declined, they get a notice.',
+    ),
+    DutyNotice.specialOwn => (
+      StatusTone.neutral,
+      'Not to yourself',
+      'A special assignment goes to someone else: another Pastor would have '
+          'to record its outcome. Nothing was sent.',
     ),
     DutyNotice.revised => (
       StatusTone.success,
@@ -285,7 +310,7 @@ abstract final class DutyPaths {
     DutyNotice.withdrawn => (
       StatusTone.success,
       'Answer sent',
-      a?.ownerKind == DutyOwnerKind.cell
+      a?.ownerKind == DutyOwnerKind.cell || special
           ? 'You can\'t make $what anymore. $whoSees.'
           : 'Your leader now sees that you can\'t make $what anymore.',
     ),
@@ -303,10 +328,10 @@ abstract final class DutyPaths {
     ),
     DutyNotice.leaderConfirmed => (
       StatusTone.success,
-      'Confirmed by leader',
-      '$what is recorded as Confirmed by leader, with you, the time, how they '
-          'confirmed and your reason. It is kept apart from an answer in the '
-          'app; their answer reminders stop.',
+      special ? 'Confirmed by the Pastor' : 'Confirmed by leader',
+      '$what is recorded as ${special ? 'Confirmed by the Pastor' : 'Confirmed by leader'}, '
+          'with you, the time, how they confirmed and your reason. It is kept '
+          'apart from an answer in the app; their answer reminders stop.',
     ),
     DutyNotice.positionCancelled => (
       StatusTone.success,
@@ -324,7 +349,7 @@ abstract final class DutyPaths {
       StatusTone.success,
       'Outcome recorded',
       'The outcome for $what is recorded with you and the time. It is seen '
-          'only by them and this department\'s leaders and deputies.',
+          'only by them and ${special ? 'the Pastors' : 'this department\'s leaders and deputies'}.',
     ),
     DutyNotice.outcomeCorrected => (
       StatusTone.success,
@@ -358,8 +383,11 @@ abstract final class DutyPaths {
     DutyNotice.ownOutcome => (
       StatusTone.neutral,
       'Your own duty',
-      'Another leader or deputy of the department records the outcome of your '
-          'own duty. Nothing was recorded.',
+      special
+          ? 'Another Pastor records the outcome of your own special '
+                'assignment. Nothing was recorded.'
+          : 'Another leader or deputy of the department records the outcome '
+                'of your own duty. Nothing was recorded.',
     ),
     DutyNotice.ownAssignment => (
       StatusTone.neutral,
@@ -389,8 +417,11 @@ abstract final class DutyPaths {
     DutyNotice.started => (
       StatusTone.neutral,
       'Already started',
-      'This duty has started, so it can no longer be answered here. Speak to '
-          'your leader.',
+      special
+          ? 'Its time or due date has passed, so it can no longer be answered '
+                'here. Speak to the Pastor.'
+          : 'This duty has started, so it can no longer be answered here. '
+                'Speak to your leader.',
     ),
     DutyNotice.nameTaken => (
       StatusTone.warning,
@@ -2362,6 +2393,26 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
     ? ('Can\'t make it anymore', StatusTone.warning)
     : _responseLabel(r);
 
+/// When a member's duty is, in one phrase: "Due 30 Nov" for a special
+/// assignment with a due date (never a time), otherwise the date and time.
+String _dutyWhen(BuildContext context, MyDuty a) => switch (a.times.dueOn) {
+  final d? => DutySpecial.dueText(d),
+  null => _when(context, a.times.arriveBy),
+};
+
+/// A My duties row's subline: who gave it and when to be there ("Ushering ·
+/// Report 08:30", "Special assignment · 10:00", "Special assignment · Due 30
+/// Nov").
+String _dutySubline(BuildContext context, MyDuty a) => [
+  a.ownerLabel,
+  if (a.times.dueOn case final d?)
+    DutySpecial.dueText(d)
+  else if (a.times.reportingAt case final r?)
+    'Report ${_clock(context, r)}'
+  else
+    _clock(context, a.times.startsAt),
+].join(' · ');
+
 /// The handoff's date badge (weekday, day, month) in church time.
 class _DateBadge extends StatelessWidget {
   const _DateBadge({required this.at});
@@ -2456,7 +2507,7 @@ class _MyDutiesListState extends ConsumerState<_MyDutiesList> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
-                  '${_when(context, d.times.arriveBy)}: ${d.title} '
+                  '${_dutyWhen(context, d)}: ${d.title} '
                   '(${d.ownerLabel})',
                   key: Key('bulk-date-${d.assignmentId}'),
                 ),
@@ -2726,7 +2777,10 @@ class _OneDuty extends StatelessWidget {
     ? ('Not sent', StatusTone.warning)
     // Story 4.9: an acceptance a leader recorded after a call or in person.
     : a.confirmedByLeader && a.response == DutyResponse.accepted
-    ? ('Confirmed by your leader', StatusTone.success)
+    ? (
+        a.isSpecial ? 'Confirmed by the Pastor' : 'Confirmed by your leader',
+        StatusTone.success,
+      )
     : _answerLabel(a.response, a.priorAcceptedAt);
 
 /// Story 4.5: Can't make it (a pending duty) or Can't make it anymore (an
@@ -2803,10 +2857,17 @@ class _DeclineSheetState extends State<_DeclineSheet> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               _heading(context, title),
-              Text('${d.title}, ${_when(context, d.times.arriveBy)}'),
+              Text('${d.title}, ${_dutyWhen(context, d)}'),
               const SizedBox(height: 8),
               Text(
-                widget.later
+                // Special assignments: the Pastor finds someone else.
+                d.isSpecial
+                    ? (widget.later
+                          ? 'You accepted this. The Pastor sees at once that it '
+                                'needs someone else.'
+                          : 'The Pastor sees at once that it needs someone '
+                                'else.')
+                    : widget.later
                     ? 'You accepted this duty. Your leader sees at once that '
                           'this position needs cover again.'
                     : 'Your leader sees at once that this position needs '
@@ -2819,8 +2880,8 @@ class _DeclineSheetState extends State<_DeclineSheet> {
                 maxLength: 280,
                 maxLines: 3,
                 minLines: 1,
-                decoration: const InputDecoration(
-                  labelText: 'Note for your leader (optional)',
+                decoration: InputDecoration(
+                  labelText: 'Note for ${d.answersTo} (optional)',
                   helperText:
                       'Practical details only, for example "travelling '
                       'that weekend".',
@@ -3061,14 +3122,9 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
     );
   }
 
-  /// "Ushering · Report 08:30" (the handoff's subline).
-  String _subline(BuildContext context, MyDuty a) => [
-    a.ownerLabel,
-    if (a.times.reportingAt case final r?)
-      'Report ${_clock(context, r)}'
-    else
-      _clock(context, a.times.startsAt),
-  ].join(' · ');
+  /// "Ushering · Report 08:30" (the handoff's subline); "Special assignment
+  /// · Due 30 Nov" for a due date.
+  String _subline(BuildContext context, MyDuty a) => _dutySubline(context, a);
 
   /// What changed since the member last answered (story 4.2).
   List<Widget> _changes(BuildContext context, MyDuty a) {
@@ -3144,8 +3200,7 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
               children: [
                 if (widget.selected case final sel?)
                   Semantics(
-                    label:
-                        'Select ${a.title}, ${_when(context, a.times.arriveBy)}',
+                    label: 'Select ${a.title}, ${_dutyWhen(context, a)}',
                     child: Checkbox(
                       key: Key('duty-select-$id'),
                       value: sel,
@@ -3262,15 +3317,20 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
     final loc = MaterialLocalizations.of(context);
     final t = a.times;
     final rows = <DetailRow>[
-      (label: 'Date', value: loc.formatFullDate(ChurchTime.wall(t.arriveBy))),
-      if (t.reportingAt case final r?)
-        (label: 'Report at', value: _clock(context, r)),
-      (
-        label: 'Time',
-        value: t.endsAt == null
-            ? _clock(context, t.startsAt)
-            : '${_clock(context, t.startsAt)}–${_clock(context, t.endsAt!)}',
-      ),
+      // Special assignments: a "done by" assignment has a due date, no time.
+      if (t.dueOn case final d?)
+        (label: 'Due', value: loc.formatFullDate(d))
+      else ...[
+        (label: 'Date', value: loc.formatFullDate(ChurchTime.wall(t.arriveBy))),
+        if (t.reportingAt case final r?)
+          (label: 'Report at', value: _clock(context, r)),
+        (
+          label: 'Time',
+          value: t.endsAt == null
+              ? _clock(context, t.startsAt)
+              : '${_clock(context, t.startsAt)}–${_clock(context, t.endsAt!)}',
+        ),
+      ],
       if (a.location case final l?) (label: 'Location', value: l),
       if (a.topic case final tp?) (label: 'Topic', value: tp),
       if (a.scripture case final sc?) (label: 'Scripture', value: sc),
@@ -3319,7 +3379,7 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
           _muted(
             context,
             'You had accepted on ${_when(context, a.priorAcceptedAt!)}, then '
-            'told your leader you can\'t make it.',
+            'told ${a.answersTo} you can\'t make it.',
           ),
         ],
         // Story 4.10: what your leader recorded after the duty (never assumed
@@ -3338,7 +3398,7 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
             const SizedBox(height: 8),
             _muted(
               context,
-              '${r.textFor(reporting: t.reportingAt != null)} '
+              '${r.textFor(reporting: t.reportingAt != null, due: t.isDue)} '
               'You can snooze a reminder from the Inbox.',
             ),
           ],
@@ -3351,8 +3411,8 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
             maxLength: 280,
             onChanged: (v) =>
                 ref.read(dutyAnswerNotesProvider.notifier).set(id, v),
-            decoration: const InputDecoration(
-              labelText: 'Note for your leader (optional)',
+            decoration: InputDecoration(
+              labelText: 'Note for ${a.answersTo} (optional)',
               helperText: 'Sent with Accept or Can\'t make it.',
             ),
           ),
@@ -3397,7 +3457,7 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
                 const SizedBox(height: 6),
                 _muted(
                   context,
-                  'Contact your leader through the church if you have '
+                  'Contact ${a.answersTo} through the church if you have '
                   'questions.',
                 ),
               ],
@@ -3659,13 +3719,7 @@ class _MyDutiesHomeCardState extends ConsumerState<MyDutiesHomeCard> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        [
-                          next.ownerLabel,
-                          if (t.reportingAt case final r?)
-                            'Report ${_clock(context, r)}'
-                          else
-                            _clock(context, t.startsAt),
-                        ].join(' · '),
+                        _dutySubline(context, next),
                         style: ChurchType.secondary.copyWith(color: soft),
                       ),
                       if (next.location case final l?)

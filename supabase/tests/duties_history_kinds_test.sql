@@ -123,8 +123,8 @@ create temp table a as select
 create temp table own as select pg_temp.readj(2, 'select api.duties_member_history()') as j;
 select is(jsonb_array_length((select j from own) -> 'entries'), 4,
   'the member reads all four duties: department duties and cell parts');
-select is((select j -> 'kinds' from own), '{"department": 2, "cell": 2}'::jsonb,
-  'kinds counts the positions of each kind');
+select is((select j -> 'kinds' from own), '{"department": 2, "cell": 2, "special": 0}'::jsonb,
+  'kinds counts the positions of each kind (special assignments: duties_special_assignments_test.sql)');
 select is((select e ->> 'owner_kind' from own, jsonb_array_elements(j -> 'entries') e
             where e ->> 'assignment_id' = (select cell_past from a)::text), 'cell',
   'a cell part is marked as a cell part');
@@ -161,7 +161,7 @@ select is((select array_agg(e ->> 'owner_kind') from onlycell, jsonb_array_eleme
   array['cell', 'cell'], 'kind cell lists the cell parts only');
 select is((select j #>> '{summary,held}' || '/' || (j ->> 'upcoming') from onlycell), '1/1',
   'the summary and the upcoming count follow the filter');
-select is((select j -> 'kinds' from onlycell), '{"department": 2, "cell": 2}'::jsonb,
+select is((select j -> 'kinds' from onlycell), '{"department": 2, "cell": 2, "special": 0}'::jsonb,
   'kinds stays the reader''s whole view under a filter');
 select is(pg_temp.read(2, 'select api.duties_member_history(kind => ''sideways'')'),
   'PT400|validation_failed|kind', 'an unknown kind is refused');
@@ -170,7 +170,7 @@ select is(pg_temp.read(2, 'select api.duties_member_history(kind => ''sideways''
 create temp table lead as select pg_temp.readj(3, format('select api.duties_member_history(%L::uuid)', pg_temp.mid(2))) as j;
 select is((select array_agg(distinct e ->> 'owner_kind') from lead, jsonb_array_elements(j -> 'entries') e),
   array['department'], 'the department leader never sees the member''s cell parts');
-select is((select j -> 'kinds' from lead), '{"department": 2, "cell": 0}'::jsonb,
+select is((select j -> 'kinds' from lead), '{"department": 2, "cell": 0, "special": 0}'::jsonb,
   'kinds counts only what the leader may see');
 
 -- Anyone else is refused as before ---------------------------------------------------------------

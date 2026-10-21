@@ -204,6 +204,36 @@ void main() {
     );
   });
 
+  test('special assignments: the Pastors only', () {
+    final pastor = syntheticGrants(roles: const ['pastor']);
+    expect(staffDestinationsFor(pastor), contains(staffDutySpecialDestination));
+    final leader = syntheticGrants(
+      scopes: const [
+        ScopeGrant(
+          scopeKind: 'department_leader',
+          scopeId: '44444444-4444-4444-8444-444444444444',
+        ),
+      ],
+    );
+    for (final g in [
+      leader,
+      syntheticGrants(roles: const ['admin']),
+      syntheticGrants(),
+      null,
+    ]) {
+      expect(
+        staffDestinationsFor(g),
+        isNot(contains(staffDutySpecialDestination)),
+      );
+    }
+    final icons = {for (final d in staffDestinationsFor(pastor)) d.icon};
+    expect(
+      icons,
+      contains(staffDutySpecialDestination.icon),
+      reason: 'its own icon in the sidebar',
+    );
+  });
+
   testWidgets(
     'reminder health renders aggregate status for an authorized read',
     (tester) async {

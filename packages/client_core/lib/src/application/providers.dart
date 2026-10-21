@@ -87,6 +87,12 @@ final dutyOutcomesRepositoryProvider = Provider<DutyOutcomesRepository>(
   (ref) => const UnconfiguredDutyOutcomesRepository(),
 );
 
+/// Special assignments (2026-10-21): the church's special assignments, for
+/// the current Pastors.
+final dutySpecialRepositoryProvider = Provider<DutySpecialRepository>(
+  (ref) => const UnconfiguredDutySpecialRepository(),
+);
+
 /// Story 4.9: opens the phone or messaging app for a labelled contact route.
 /// Unavailable by default; the app composition roots supply the platform
 /// launcher (the app never sends a call or message itself).

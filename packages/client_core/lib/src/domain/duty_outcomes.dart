@@ -542,6 +542,7 @@ class HistoryEntry {
   /// name is the Cells module's; My duties labels it the same way).
   String get ownerName => switch (ownerKind) {
     DutyOwnerKind.cell => 'Cell programme',
+    DutyOwnerKind.special => DutySpecial.ownerLabel,
     _ => departmentName ?? 'Department',
   };
 
@@ -549,7 +550,10 @@ class HistoryEntry {
     'reassigned' => 'Given to someone else',
     'cancelled' => 'Cancelled',
     _ => switch (response) {
-      _ when confirmedByLeader => 'Confirmed by leader',
+      _ when confirmedByLeader =>
+        ownerKind == DutyOwnerKind.special
+            ? 'Confirmed by the Pastor'
+            : 'Confirmed by leader',
       DutyResponse.accepted => 'Accepted',
       // The member's words, as in My duties.
       DutyResponse.declined => 'Can\'t make it',
@@ -621,6 +625,7 @@ class MemberHistory {
     this.departmentNames = const [],
     this.departmentCount = 0,
     this.cellCount = 0,
+    this.specialCount = 0,
   });
 
   factory MemberHistory.fromJson(Object? json) {
@@ -633,6 +638,13 @@ class MemberHistory {
     final kinds = m['kinds'] == null ? null : _map(m['kinds'], 'kinds');
     int count(String k) {
       final v = kinds == null ? 0 : _req<int>(kinds, k);
+      if (v < 0) throw FormatException('unexpected $k');
+      return v;
+    }
+
+    // Special assignments: a server before them sends no `special` count.
+    int optCount(String k) {
+      final v = kinds == null ? 0 : (_opt<int>(kinds, k) ?? 0);
       if (v < 0) throw FormatException('unexpected $k');
       return v;
     }
@@ -650,6 +662,7 @@ class MemberHistory {
       ]),
       departmentCount: count('department'),
       cellCount: count('cell'),
+      specialCount: optCount('special'),
     );
   }
 
@@ -663,9 +676,19 @@ class MemberHistory {
   final List<String> departmentNames;
 
   /// Positions of each kind the reader can see, whatever the filter (the
-  /// filter is offered only when both kinds are there).
+  /// filter is offered only when more than one kind is there).
   final int departmentCount;
   final int cellCount;
+
+  /// Special assignments: a Pastor's special assignments.
+  final int specialCount;
+
+  /// Every position the reader can see, of every kind.
+  int get allCount => departmentCount + cellCount + specialCount;
+
+  /// How many kinds the reader has (the filter needs at least two).
+  int get kindsPresent =>
+      [departmentCount, cellCount, specialCount].where((n) => n > 0).length;
 
   /// The cursor of the next (older) page, when there is one.
   HistoryCursor? get next => hasMore && entries.isNotEmpty
@@ -696,7 +719,8 @@ class HistoryQuery {
 
   final String? memberId;
 
-  /// [DutyOwnerKind.department] or [DutyOwnerKind.cell]; null for both.
+  /// [DutyOwnerKind.department], [DutyOwnerKind.cell] or (special
+  /// assignments) [DutyOwnerKind.special]; null for every kind.
   final DutyOwnerKind? kind;
 
   /// The cursors of the pages opened so far (empty: the newest page).

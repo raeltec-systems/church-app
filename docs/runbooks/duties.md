@@ -1386,3 +1386,41 @@ Builds for the owner's demonstration: `evidence-4.15/builds.md` (staff web seale
 - department duties and other cells are untouched, and no department alert is sent (Cells tells the cell's leaders, see cells-meetings.md, story 5.9).
 
 The contract text is in contracts-and-owner-seams.md, item 8 of the owner-operations guide.
+
+## Special assignments (owner decision 2026-10-21)
+
+Migration `20261021211830_duties_special_assignments.sql`; plan `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-give-special-assignments-as-the-pastor-and-count-them-in-hi-plan.md`.
+
+A special assignment is a duty that belongs to no department and no cell: a church project, leading a service, a task from the church leadership. It is a third owner kind of `app.duties_occurrences` (`special = true`, no department, no cell), held by Duties for the whole church and managed by the current Pastors.
+
+- **Who.** Any current Pastor (role `pastor`) gives, changes and cancels one, records "Confirmed by the Pastor" and records or corrects its outcome; never for themselves (`{"member_id": "own"}`). Anyone else: `forbidden` to give, `not_found` for the rest (the Admin role included). The member answers it in My duties like any duty.
+- **Timing.** Either a fixed date and time (start, optional end, no reporting time) or a due date. A due date is stored as its due moment, 18:00 church time on that date: the answer-by default, Short notice, reminders ("Duty coming up" the evening before), "started" and outcomes all count from it. A due date has no busy time, so it never overlaps another duty; a fixed time takes part in overlaps (department and cell leaders see it as a busy time labelled **Special assignment**).
+- **Who sees it.** The member (My duties, My duty history: kind **Special**) and every current Pastor (**Special assignments** on staff web). Department reads, the Admin overview and a leader's view of a member's history leave it out.
+- **Notices.** The member's notices and reminders as for any duty; a member without the app shows as Needs contact on the Pastors' screen. No Pastor alert is sent (leader alerts stay department-only).
+- **Lifecycle.** Church deactivation and deletion end a member's future special assignments (the Pastors see **Needs someone**); department removal does not touch them.
+- Commands (through `api.duties_command`): `duties.give_special`, `duties.revise_special`, `duties.cancel_special`; `duties.record_outcome`, `duties.correct_outcome` and `duties.confirm_by_leader` with capacity `pastor`. Reads: `api.duties_special_assignments()`, `api.duties_candidates(starts_at => ...)` for a Pastor's church-wide check.
+
+### Local runs
+
+`npx supabase db reset --local`, then `npx supabase test db` (57 files, 4,370 tests on 2026-10-21; `duties_special_assignments_test.sql` 102, `duties_special_assignments_scale_test.sql` 10: the Pastors' read of 600 special assignments and 1,200 members about 0.6 s, the church-wide candidates read of 1,000 members about 2.4 s). Flutter: `packages/client_core/test/duties/duties_special_test.dart` (18).
+
+### Hosted staging
+
+Applied on 2026-10-21 as `20261021211830`: all 193 `app`/`api` `duties*` functions identical to a fresh local reset (aggregate md5 `aee5e8f613e2aa39fc17407219bd35f8`); `app.contract_boundary_violations()` 0. Rebuild the staging staff web and APK from this branch before the owner checks (older builds leave special assignments out of My duties).
+
+### Owner manual checks (staging, phone and web)
+
+Use synthetic members only: Pastor B (the Pastor role), member M with the staging APK, leader L of `SYNTHETIC Preaching Rota` with M in it.
+
+1. **Give with a due date.** As B, staff web **Special assignments** > **Give a special assignment**: a duty, **Done by a date** two weeks ahead, M. M's Inbox shows **New duty assigned**; My duties lists it as **Special assignment · Due <date>** with no time; the duty shows **Due** and B as Pastor. M accepts; B's row reads **Accepted**.
+2. **Give at a time, with an overlap.** As L, publish a duty for M next Sunday 10:00. As B, give M a special assignment at the same time: the picker shows the department duty as a busy time and asks why; with a reason it is given. As L, the candidates for that time show **Special assignment** as a busy time only.
+3. **Change and cancel.** As B, move the due date: M is asked again and sees what changed. Cancel the timed one: M is told.
+4. **Outcome and history.** Once a special assignment's time has passed (a parent-session time shift on staging, as in the 4.10 checks), B records **Completed**. M's **My duty history** offers **Special**, and the row reads **Special assignment · Due <date>** with its outcome.
+
+Record each step's outcome in `_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.17/owner-check.md`: pass or fail, device model, Android version and browser. Include no numbers, ids or keys.
+
+### Known limits
+
+- No Pastor alert for an overdue answer, a decline or a vacancy (fail closed, as for cell parts); the Pastors read the state on their screen.
+- An outcome is recorded only after the time or due date has passed, even if the work was finished early.
+- If no member holds the Pastor role, nobody can change, cancel or record an outcome for the existing special assignments (members still see them); no handover is asked when the last Pastor's role is removed.

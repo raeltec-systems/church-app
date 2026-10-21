@@ -146,6 +146,15 @@ enum DutyNotice {
   /// is the department's last leader or deputy the app can reach.
   staffHandoverRequired,
 
+  /// Special assignments: a Pastor gave one.
+  specialGiven,
+
+  /// Special assignments: a Pastor cancelled one.
+  specialCancelled,
+
+  /// Special assignments: a Pastor cannot give one to themselves.
+  specialOwn,
+
   /// Story 4.5: "Can't make it anymore" was recorded.
   withdrawn,
 
@@ -407,6 +416,14 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
               ? DutyNotice.memberRemovedNoNotices
               : DutyNotice.memberRemoved,
         DutyCommands.resolveHandover => DutyNotice.handoverResolved,
+        // Special assignments: a change goes through the 4.2 engine (an
+        // instructions-only change keeps the answer).
+        DutySpecial.give => DutyNotice.specialGiven,
+        DutySpecial.revise => switch (data) {
+          {'change': 'notes'} => DutyNotice.notesUpdated,
+          _ => DutyNotice.revised,
+        },
+        DutySpecial.cancel => DutyNotice.specialCancelled,
         _ =>
           action.request.payload['response'] == DutyResponse.declined.wire
               ? DutyNotice.declined
@@ -459,6 +476,12 @@ abstract class DutiesController<T> extends Notifier<DutiesState<T>> {
       if (f['assignment_id'] == 'unrecorded') {
         return DutyNotice.changedElsewhere;
       }
+    }
+    // Special assignments: a Pastor never gives one to themselves.
+    if ((action?.command == DutySpecial.give ||
+            action?.command == DutySpecial.revise) &&
+        f['member_id'] == 'own') {
+      return DutyNotice.specialOwn;
     }
     // Story 4.11: a review cleared (or changed) elsewhere reloads the list.
     if (action?.command == DutyCommands.clearReview &&
@@ -1178,4 +1201,89 @@ class MemberHistoryController extends DutiesController<MemberHistory> {
 final memberHistoryProvider =
     NotifierProvider<MemberHistoryController, DutiesState<MemberHistory>>(
       MemberHistoryController.new,
+    );
+
+// ---------------------------------------------------------------------------
+// Special assignments (owner decision 2026-10-21)
+// ---------------------------------------------------------------------------
+
+/// Staff web, the current Pastors: give, change and cancel the church's
+/// special assignments, confirm an answer given by phone, and record and
+/// correct their outcomes. Every action is a server-checked command; the list
+/// is read again after each answer.
+class DutySpecialController extends DutiesController<SpecialAssignments> {
+  @override
+  Future<AccessRead<SpecialAssignments>> fetch() =>
+      ref.read(dutySpecialRepositoryProvider).fetchSpecialAssignments();
+
+  Future<void> give(SpecialDraft draft) => send(
+    DutySpecial.give,
+    const Optional.of(null),
+    draft.toPayload(),
+    draft.dutyName.trim(),
+    ownerKind: DutyOwnerKind.special,
+  );
+
+  /// A change at the occurrence's current revision (a conflict reloads).
+  Future<void> revise(SpecialEdit edit) => send(
+    DutySpecial.revise,
+    Optional.of(edit.item.revision),
+    edit.toPayload(),
+    edit.item.dutyName,
+    ownerKind: DutyOwnerKind.special,
+  );
+
+  Future<void> cancel(SpecialAssignment item) => send(
+    DutySpecial.cancel,
+    Optional.of(item.revision),
+    {'occurrence_id': item.occurrenceId},
+    item.dutyName,
+    ownerKind: DutyOwnerKind.special,
+  );
+
+  /// Confirmed by the Pastor (a member without the app, or one reached by
+  /// phone), against the answer revision.
+  Future<void> confirm(SpecialAssignment item, LeaderConfirmationDraft draft) {
+    final h = item.holder;
+    if (h == null) return Future.value();
+    return send(
+      DutyCoverageCommands.confirmByLeader,
+      Optional.of(h.revision),
+      draft.toPayload(h.assignmentId),
+      h.name,
+      ownerKind: DutyOwnerKind.special,
+    );
+  }
+
+  /// The first outcome, sent against the answer revision.
+  Future<void> record(SpecialAssignment item, OutcomeDraft draft) {
+    final h = item.holder;
+    if (h == null) return Future.value();
+    return send(
+      DutyOutcomeCommands.recordOutcome,
+      Optional.of(h.revision),
+      draft.toPayload(h.assignmentId, correction: false),
+      h.name,
+      ownerKind: DutyOwnerKind.special,
+    );
+  }
+
+  /// A correction, sent against the current outcome revision.
+  Future<void> correct(SpecialAssignment item, OutcomeDraft draft) {
+    final h = item.holder;
+    final o = h?.outcome;
+    if (h == null || o == null) return Future.value();
+    return send(
+      DutyOutcomeCommands.correctOutcome,
+      Optional.of(o.revision),
+      draft.toPayload(h.assignmentId, correction: true),
+      h.name,
+      ownerKind: DutyOwnerKind.special,
+    );
+  }
+}
+
+final dutySpecialProvider =
+    NotifierProvider<DutySpecialController, DutiesState<SpecialAssignments>>(
+      DutySpecialController.new,
     );

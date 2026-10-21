@@ -213,3 +213,16 @@ hitl = false
 risk = "high"
 unknown = "The revocation hook changes Identity (cross-epic); the production dormancy value (180 days) and the Auth limits are applied by the owner at promotion, never by a migration."
 references = ["_bmad-output/initiative-church-app/owner-decisions-milestone-2.md", "docs/runbooks/identity-access.md", "docs/runbooks/production-promotion-identity.md"]
+
+[[entry]]
+id = 17
+type = "story"
+title = "Give special assignments as the Pastor and count them in My duty history"
+description = "Apply the owner's 2026-10-21 decision: a third duty owner kind, the special assignment, that belongs to no department and no cell and is given only by a Pastor, at a fixed date and time or with a due date (done by, no start time); the member answers it in My duties, a Pastor changes or cancels it, records Confirmed by the Pastor and records its outcome, and My duty history counts it under its own kind; the Pastors' staff web screen and the member's My duties in the current design."
+verify = "On staging, a Pastor gives a member one special assignment with a due date and one at a fixed time over a department duty (an overlap reason asked for), the member sees Due <date> without a time and accepts, the department leader sees only a busy time, the Pastor moves the due date and the member is asked again, cancels the other, and after its time records the outcome, which the member's history shows under Special; an Admin, a department leader and another member are refused."
+covers = ["D1", "D4", "D9"]
+after = [10, 11, 12, 16]
+hitl = false
+risk = "medium"
+unknown = "Pastor alerts (overdue, decline, vacancy), early completion of a due-date assignment and a handover when the last Pastor's role ends are owner questions; the build fails closed on each."
+references = ["_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-give-special-assignments-as-the-pastor-and-count-them-in-hi-plan.md", "docs/runbooks/duties.md", "docs/runbooks/production-promotion-cells.md"]

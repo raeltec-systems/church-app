@@ -148,6 +148,15 @@ const staffDutyOutcomesDestination = (
   icon: Icons.task_alt_outlined,
 );
 
+/// Special assignments (2026-10-21): shown while the caller holds the Pastor
+/// role: give, change and cancel duties that belong to no department or cell,
+/// and record their outcomes.
+const staffDutySpecialDestination = (
+  path: ClientPaths.dutySpecial,
+  label: 'Special assignments',
+  icon: Icons.assignment_ind_outlined,
+);
+
 /// Story 4.10: the caller's own duty history (every member).
 const staffDutyHistoryDestination = (
   path: ClientPaths.dutyHistory,
@@ -203,6 +212,7 @@ List<StaffDestination> staffDestinationsFor(
   if (seesDutyBoard(grants)) staffDutyRotaDestination,
   if (seesDutyBoard(grants)) staffDutyCoverageDestination,
   if (leadsADepartment(grants)) staffDutyOutcomesDestination,
+  if (givesSpecialAssignments(grants)) staffDutySpecialDestination,
   if (grants != null) staffDutyHistoryDestination,
   if (grants != null) staffMyFollowUpsDestination,
   if (supervisesFollowUps(grants)) staffFollowUpSupervisionDestination,

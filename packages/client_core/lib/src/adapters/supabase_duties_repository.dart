@@ -81,3 +81,22 @@ class SupabaseDutyOutcomesRepository implements DutyOutcomesRepository {
   Future<AccessRead<MemberHistory>> fetchHistory(HistoryQuery query) => _reader
       .read('duties_member_history', query.toParams(), MemberHistory.fromJson);
 }
+
+/// Special assignments: `api.duties_special_assignments` (the current
+/// Pastors only; the server decides).
+class SupabaseDutySpecialRepository implements DutySpecialRepository {
+  SupabaseDutySpecialRepository(
+    SupabaseClient client, {
+    Duration timeout = const Duration(seconds: 10),
+  }) : _reader = SupabaseApiReader(client, timeout: timeout);
+
+  final SupabaseApiReader _reader;
+
+  @override
+  Future<AccessRead<SpecialAssignments>> fetchSpecialAssignments() =>
+      _reader.read(
+        'duties_special_assignments',
+        const {},
+        SpecialAssignments.fromJson,
+      );
+}

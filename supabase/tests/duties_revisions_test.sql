@@ -157,10 +157,12 @@ select ok(not exists (
    where n.nspname in ('app', 'api') and p.proname ~ '^duties_'
      and not (p.proname in ('duties_command', 'duties_my_duties', 'duties_leader_board',
                             'duties_admin_overview', 'duties_rota', 'duties_candidates',
-                            'duties_coverage', 'duties_outcomes', 'duties_member_history')
+                            'duties_coverage', 'duties_outcomes', 'duties_member_history',
+                            -- Special assignments: the Pastors' read.
+                            'duties_special_assignments')
                   and r = 'authenticated')
      and has_function_privilege(r, p.oid, 'EXECUTE')),
-  'still only the command and the reads (with the 4.3 rota, the 4.4 candidates, the 4.9 coverage queue and the 4.10 outcomes and history) are client-executable');
+  'still only the command and the reads (with the 4.3 rota, the 4.4 candidates, the 4.9 coverage queue, the 4.10 outcomes and history and the special assignments) are client-executable');
 select is((select count(*)::int from app.contract_unowned_objects()), 0, 'no unowned objects');
 select is((select count(*)::int from app.contract_unpinned_functions()), 0, 'every function is pinned');
 select is((select count(*)::int from app.contract_boundary_violations()), 0, 'no boundary violations');
@@ -302,7 +304,9 @@ select is((select (j -> 'assignments' -> 0) - 'occurrence_id' - 'department_id' 
             -- Story 4.10 keys are checked in duties_outcomes_test.sql.
             - 'outcome'
             -- Story 4.11 keys are checked in duties_owner_operations_test.sql.
-            - 'cell_id' from mine),
+            - 'cell_id'
+            -- Special assignment keys are checked in duties_special_assignments_test.sql.
+            - 'due_on' from mine),
   jsonb_build_object('assignment_id', pg_temp.asg2(), 'revision', 1, 'response', 'pending', 'slot_revision', 2,
                      'changes', jsonb_build_array('starts_at', 'ends_at'), 'previous_response', 'accepted',
                      'previous_assignment_ids', jsonb_build_array(pg_temp.asg1()), 'notes_updated_at', null),

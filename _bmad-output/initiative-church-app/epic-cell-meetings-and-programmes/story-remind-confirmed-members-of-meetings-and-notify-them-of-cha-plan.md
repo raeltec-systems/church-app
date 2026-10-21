@@ -1,0 +1,89 @@
+---
+title: 'Remind confirmed members of meetings and notify them of changes'
+type: 'feature'
+ticket: '2'
+created: '2026-10-21'
+status: 'in-progress'
+baseline_revision: 'bfa57ed'
+route: 'full'
+route_source: 'auto'
+review: ''
+review_source: ''
+lenses_ran: []
+review_loop_iteration: 0
+context:
+  - '{project-root}/docs/runbooks/contracts-and-owner-seams.md'
+  - '{project-root}/docs/runbooks/notifications.md'
+  - '{project-root}/docs/runbooks/cells-meetings.md'
+---
+
+<frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
+
+## Intent
+
+**Problem:** Meetings exist (5.1) but nobody is reminded of them, and a moved or cancelled meeting is not announced, so members can arrive at the wrong time or for a meeting that is not happening.
+
+**Approach:** Register the Cells `cells_meeting` source with Notifications (source and reminder checks, generic text, deep link to My cell), plan each currently confirmed member's meeting reminder through the shared 3.3 calculation (`app.notifications_set_schedule`, a `response` schedule already answered so only start-anchored reminders exist; default one reminder 24 hours before the start; the cell's leader or an Admin may change the cell's reminders), and make a move, cancellation or reinstatement re-plan or cancel the reminders and enqueue a generic change notice to every confirmed member in the same transaction. Held and accountless members reach the leader through a registered direct-contact route, shown on staff web Cell meetings.
+
+**Decisions:**
+- Decision (agent, under owner pre-approval): reminders are set per cell (`cells.set_meeting_reminders {cell_id, reminders}`), by the cell's leader or an Admin, up to three `{before}` offsets of at most 7 days before the start; `null` returns to the default (24 hours before). Per-meeting overrides wait for an owner request. Owner decision Q2: whoever sets reminders may set them; members may snooze; no quiet hours.
+- Decision (agent, under owner pre-approval): recipients are the cell's current confirmed members (primary membership), not leaders or assistants as such. The reminder check's `recipient_eligible` is a current membership in the meeting's cell, so a member transferred out before the reminder gets nothing.
+- Decision (agent, under owner pre-approval): one reminder kind `cells_meeting_reminder` (start-anchored, snoozable) and two notices, `cells_meeting_changed` (moved, brought back, or re-timed by a schedule change) and `cells_meeting_cancelled` (cancelled, or withdrawn by a schedule change). Commands always notify; a schedule change notifies only for meetings in the next 14 days. All link to `/my-cell`; no text carries a venue, time or name.
+- Decision (agent, under owner pre-approval): planning runs in the commands and, for meetings or members not yet planned, on every meetings read (the read already generates meetings). Reads skip planning silently when the Q2 policy is not usable; commands fail closed (`unavailable`) like Duties.
+- Decision (agent, under owner pre-approval): direct-contact needs are kept in `app.cells_meeting_contact_needs` and listed by name on the meeting for the cell's leader and assistant only; deletion anonymises the member id (no rows file).
+
+## Boundaries & Constraints
+
+**Always:** Notifications last in the lock order (lock the meeting, then call Notifications); generic text only (printable ASCII, no names, venues or times); every change through `api.cells_command`; new reads behind the live-access predicate and the Q4 gate; ASCII migration with no `\u` escapes, no destructive statements, privileges revoked; the deletion hook covers every new member-linked row.
+
+**Never:** programme parts or duty reminders (5.3+), Cannot attend (5.7), quiet hours, a venue or name in a notification, reminders to people who are not confirmed members.
+
+## I/O & Edge-Case Matrix
+
+| Scenario | Input / State | Expected Output / Behavior | Error Handling |
+|----------|--------------|---------------------------|----------------|
+| Normal week | schedule set, confirmed members | one pending `cells_meeting_reminder` per member at start - 24 h; none for non-members | none |
+| Leader changes reminders | leader, reminders revision, `[{before: "2 hours"}]` | future jobs move to start - 2 h | non-leader: `forbidden`; bad offset: `validation_failed {"reminders": ...}`; stale: `conflict` |
+| Move | leader moves a meeting | old jobs cancelled (`rescheduled`/stale), new reminder at new start - offset, one `cells_meeting_changed` notice per member now | as in 5.1 |
+| Cancel | leader cancels | reminders cancelled `source_cancelled`, one `cells_meeting_cancelled` notice per member | as in 5.1 |
+| Bring back | leader reinstates | reminders planned again, `cells_meeting_changed` notice | as in 5.1 |
+| Snooze | member snoozes a delivered reminder | deferred job for that member only | expired: `conflict` |
+| Transferred out | member's membership ends before the reminder | worker ends the job `ineligible`; next sync cancels the schedule | none |
+| Accountless / held | member without a live link | no inbox item; need recorded on the leader's meeting | none |
+| Payload | any job or item | ids, kinds and instants only; generic title and body | none |
+| Production, Q2 closed | read | no planning, read works | command: `unavailable` |
+
+</frozen-after-approval>
+
+## Code Map
+
+- `supabase/migrations/20261021073514_cells_meetings.sql` -- meetings, generation, commands and reads to extend.
+- `supabase/migrations/20261014171038_duties_reminders.sql` -- the worked consumer: source/kind/contract/route registration, `notifications_set_schedule` with an answered `response` schedule for start reminders, direct-contact needs table.
+- `supabase/migrations/20261008102121_notifications_scheduling.sql` -- `notifications_set_schedule`, `notifications_snooze_item`, `notifications_policy_errors`.
+- `tools/identity-e2e/duties-reminders.mjs`, `duties-shared.mjs` -- worker-driven E2E pattern.
+
+## Tasks & Acceptance
+
+**Execution:**
+- [ ] `supabase/migrations/20261021120000_cells_meeting_reminders.sql`
+- [ ] `supabase/tests/cells_meeting_reminders_test.sql`
+- [ ] Clients: reminders on the staff Cell meetings card (leader/Admin), contact needs on meetings, `/my-cell` deep link.
+- [ ] `tools/identity-e2e/cells-meeting-reminders.mjs` + offline test.
+- [ ] Runbook section in `docs/runbooks/cells-meetings.md`.
+
+**Acceptance Criteria:**
+- Given the local stack and the worker, when the E2E runs the seven cases (normal week, leader-changed reminder, move, cancellation, snooze, transfer out, accountless), then only the expected inbox items exist, nothing is reminded for a cancelled or moved-away time, and no payload carries a venue or a name.
+
+## Implementation Notes
+
+## Plan Change Log
+
+## Review Triage Log
+
+## Verification
+
+**Commands:**
+- `npx supabase db reset && npm run -s db:test && npm run -s db:smoke`
+- `node tools/identity-e2e/cells-meeting-reminders.mjs`, `cells-meetings.mjs`, `cells.mjs`
+- `flutter analyze && flutter test` in `packages/client_core`, `apps/mobile`, `apps/staff`
+- `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/ccr-93e730dd-89lbvg`

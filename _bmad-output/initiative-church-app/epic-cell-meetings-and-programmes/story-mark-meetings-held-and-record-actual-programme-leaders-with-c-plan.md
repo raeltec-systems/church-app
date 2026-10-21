@@ -3,7 +3,7 @@ title: 'Mark meetings held and record actual programme leaders with corrections'
 type: 'feature'
 ticket: '8'
 created: '2026-10-21'
-status: 'in-progress'
+status: 'done'
 baseline_revision: '302bac3'
 route: 'full'
 route_source: 'auto'
@@ -56,7 +56,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261021130000_cells_meeting_records.sql`
+- [x] `supabase/migrations/20261021115855_cells_meeting_records.sql`
 - [x] `supabase/tests/cells_meeting_records_test.sql`
 - [x] Clients: Cell meetings "Last 4 weeks" with status and Record; Plan meeting "After the meeting" (held, who led each part, All as planned, corrections with a reason, earlier values).
 - [x] E2E `tools/identity-e2e/cells-meeting-records.mjs` + offline test.

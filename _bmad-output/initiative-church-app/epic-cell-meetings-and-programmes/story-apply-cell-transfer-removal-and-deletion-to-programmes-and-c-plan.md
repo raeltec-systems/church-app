@@ -3,7 +3,7 @@ title: 'Apply cell transfer, removal and deletion to programmes and cell duties'
 type: 'feature'
 ticket: '9'
 created: '2026-10-21'
-status: 'in-progress'
+status: 'done'
 baseline_revision: '7ac0f18'
 route: 'full'
 route_source: 'auto'
@@ -65,7 +65,7 @@ Old-cell reads are already refused at once (current membership). Register a Cell
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261021140000_cells_transfer_effects.sql`
+- [x] `supabase/migrations/20261021122802_cells_transfer_effects.sql`
 - [x] `supabase/tests/cells_transfer_effects_test.sql`
 - [x] Clients: Admin cells "Needs a leader" with Mark handover done; scope-loss tests on My cell, Home and Plan meeting.
 - [x] E2E `tools/identity-e2e/cells-transfer.mjs` + offline test.

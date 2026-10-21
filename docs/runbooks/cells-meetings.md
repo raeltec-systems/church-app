@@ -670,7 +670,7 @@ Record the outcome per step in `evidence-5.8/owner-check.md` (pass/fail, device,
 
 ## Story 5.9: transfers, handovers and deletion
 
-Migration: `supabase/migrations/20261021140000_cells_transfer_effects.sql`.
+Migration: `supabase/migrations/20261021122802_cells_transfer_effects.sql`.
 Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-apply-cell-transfer-removal-and-deletion-to-programmes-and-c-plan.md`.
 Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.9/`.
 

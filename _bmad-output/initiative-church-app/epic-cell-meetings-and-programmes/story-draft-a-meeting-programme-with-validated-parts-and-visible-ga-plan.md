@@ -3,7 +3,7 @@ title: 'Draft a meeting programme with validated parts and visible gaps'
 type: 'feature'
 ticket: '3'
 created: '2026-10-21'
-status: 'in-progress'
+status: 'done'
 baseline_revision: '5.2 branch head'
 route: 'full'
 route_source: 'auto'
@@ -79,3 +79,19 @@ context:
 ## Plan Change Log
 
 ## Review Triage Log
+
+Independent review of `2f07a06..52d8ff0` (2026-10-21, a separate reviewer agent; no high-severity finding; authorization, Admin metadata, replay scope and the deletion hook confirmed). 5.3 is on staging, so the fixes ship in the 5.4 migration (section "5.3 review fixes"), with pgTAP cases:
+
+1. Medium, fixed: draft part times went stale when the meeting moved or was re-timed. A trigger on the meeting's start now shifts a draft programme's live parts by the same amount and bumps its revision (published programmes are reconciled through Duties in 5.6).
+2. Medium, fixed: meetings crossing midnight could not hold after-midnight parts. A part time before the meeting's local start rolls to the next day when the meeting ends on a later date.
+3. Medium, fixed: two concurrent creates gave an internal error. The unique violation is now `conflict {"meeting_id": "exists"}`.
+4. Medium, partly fixed: a PCMD1 inside generation's planning rolled back every change notice of that run. Each meeting now plans in its own sub-block, so one refusal loses only that meeting's notice (logged); a durable retry marker is recorded as a known limit.
+5. Medium, fixed: a refusal inside the confirm-time reminder sync still blocked a confirmation, and two crossing transfers could deadlock. The sync is wrapped like generation and both cells are synced in cell-id order.
+6. Low, fixed: a removed part could be brought back by sending its old id; it is now `part_unknown` (a removed part never returns, as Duties never reuses a cancelled key).
+7. Low, fixed: save now locks the meeting before the programme, as create does.
+8. Low, accepted: the client shows church time with a fixed Africa/Lusaka offset; the server zone comes from the Q2 policy, which the owner fixed to Africa/Lusaka. Recorded.
+9. Low, fixed: study notes with Windows line endings are normalised to LF instead of refused.
+10. Medium, fixed in the client: after a conflict the typed draft is kept; the editor says the draft changed elsewhere and offers **Load the latest** (discarding the edits) or saving over it at the new revision.
+11. Low, fixed in the client: removing a row clears the per-part errors of the refused save.
+12. Low, fixed in the client: **Add a part** never produces a time past 23:59 and starts at the meeting's start when the last row has no end; the clock fields say `HH:MM`.
+13. Tests added for 1, 2, 3, 5, 6, 9, 10 and 11.

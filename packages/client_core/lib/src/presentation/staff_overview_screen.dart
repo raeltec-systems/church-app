@@ -742,7 +742,7 @@ class _FigureStrip extends StatelessWidget {
     final c = ChurchColors.of(context);
     return LayoutBuilder(
       builder: (context, box) {
-        final perRow = (box.maxWidth / 210).floor().clamp(1, figures.length);
+        final perRow = (box.maxWidth / 170).floor().clamp(1, figures.length);
         final rows = <List<_Figure>>[];
         for (var i = 0; i < figures.length; i += perRow) {
           rows.add(

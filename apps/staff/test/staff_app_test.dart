@@ -802,7 +802,12 @@ void main() {
       await tapKey(tester, 'nav-/admin/cells');
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
-      expect(find.text('SYNTHETIC Cell X'), findsOneWidget);
+      // Two panes: the cell in the list and, chosen, on the right.
+      expect(
+        find.byKey(const Key('cell-list-77777777-7777-4777-8777-777777777777')),
+        findsOneWidget,
+      );
+      expect(find.text('SYNTHETIC Cell X'), findsNWidgets(2));
       expect(
         staffDestinationsFor(null),
         isNot(contains(staffCellsDestination)),
@@ -1247,6 +1252,82 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
       expect(find.byKey(const Key('application-card-$app')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a cell leader\'s Overview: requests to join their cell; a read the '
+    'server refused is a dash, never a zero',
+    (tester) async {
+      const request = '88888888-8888-4888-8888-888888888888';
+      await pumpStaff(
+        tester,
+        location: ClientPaths.overview,
+        setUp: (h) {
+          h.grants.myAccess = AccessReadOk(
+            syntheticGrants(
+              scopes: const [
+                ScopeGrant(
+                  scopeKind: 'cell_leader',
+                  scopeId: '77777777-7777-4777-8777-777777777777',
+                ),
+              ],
+            ),
+          );
+          h.cells.leader = AccessReadOk(
+            LeaderQueue.fromJson({
+              'cells': [
+                {
+                  'cell_id': '77777777-7777-4777-8777-777777777777',
+                  'name': 'SYNTHETIC Cell X',
+                  'broad_area': 'SYNTHETIC North',
+                  'role': 'leader',
+                  'members': const [],
+                  'requests': [
+                    {
+                      'request_id': request,
+                      'member_id': '66666666-6666-4666-8666-666666666666',
+                      'display_name': 'SYNTHETIC Ruth Mwale',
+                      'kind': 'join',
+                      'member_revision': 2,
+                      'own_record': false,
+                    },
+                  ],
+                },
+              ],
+            }),
+          );
+        },
+      );
+      String figure(String id) => tester
+          .widgetList<Text>(
+            find.descendant(
+              of: find.byKey(Key('overview-figure-$id')),
+              matching: find.byType(Text),
+            ),
+          )
+          .first
+          .data!;
+      expect(figure('my-cell-requests'), '1');
+      expect(figure('next-meeting'), '—');
+      expect(
+        find.byKey(const Key('overview-attention-my-cell-request-$request')),
+        findsOneWidget,
+      );
+      // No Admin figures, and no role switch for one staff role.
+      expect(
+        find.byKey(const Key('overview-figure-applications')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('role-view-cellLeader')), findsNothing);
+      // The My cell group entry counts the requests to confirm.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('nav-/cells/leader')),
+          matching: find.text('1'),
+        ),
+        findsOneWidget,
+      );
     },
   );
 

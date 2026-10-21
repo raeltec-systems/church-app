@@ -513,8 +513,8 @@ Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/
 
 ### When the meeting changes
 
-- The cell's leader or assistant may **Move** a meeting with a published programme: its parts move with it (revision bumped), the staff read says `meeting_changed: true`, and the member read's programme says `meeting_changed: true` until the leader publishes. Publishing moves the parts' duties (asked again, as a material change) and flags department links `time`.
-- Admin alone cannot move such a meeting, and nobody can cancel it from Cell meetings, until the programme is cancelled (`conflict {"meeting_id": "programme_published"}`). A schedule change (generation) moves the parts but does not publish; the leader sees "The meeting moved since you published".
+- The cell's leader (or an Admin who also holds the cell's scope) may **Move** a meeting with a published programme (a venue-only move too): its parts move with it (revision bumped), the staff read says `meeting_changed: true`, and the member read's programme says `meeting_changed: true` until the leader publishes. Publishing moves the parts' duties (asked again, as a material change) and flags department links `time`.
+- Admin alone cannot move such a meeting, and nobody can cancel it from Cell meetings, until the programme is cancelled (`conflict {"meeting_id": "programme_published"}`). A schedule change re-times its parts but does not publish (the leader sees "The meeting changed since you published"), and never withdraws a meeting whose programme is published.
 
 ### Clients
 

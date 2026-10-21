@@ -691,20 +691,49 @@ void main() {
       );
       expect(byKey('plan-unpublished'), findsOneWidget);
       expect(
-        find.text('The meeting moved since you published'),
+        find.text('The meeting changed since you published'),
         findsOneWidget,
       );
       expect(byKey('plan-topic'), findsNothing);
-      await tapKey(tester, 'plan-change-published');
-      await settle(tester);
-      expect(byKey('plan-topic'), findsOneWidget);
-      expect(find.text('Publish changes'), findsWidgets);
-      expect(byKey('plan-cancel'), findsOneWidget);
-      await tester.tap(find.text('Publish changes').first);
-      await tester.pump();
+      await tapKey(tester, 'plan-publish-changes');
       final sent = h.gateway.sent.single;
       expect(sent.wire['command'], 'cells.publish_programme');
       expect(sent.wire['expected_revision'], 4);
+      // An overlap needs a reason: the editor opens with it; the banner
+      // no longer publishes around the editor (5.6 review fix 3).
+      sent.refuse(
+        ErrorCode.validationFailed,
+        fieldErrors: const {
+          'parts.0.member_id': 'overlap',
+          'parts.0.override_reason': 'required',
+        },
+      );
+      await settle(tester);
+      expect(byKey('plan-topic'), findsOneWidget);
+      expect(byKey('plan-override'), findsOneWidget);
+      expect(byKey('plan-publish-changes'), findsNothing);
+      expect(byKey('plan-cancel'), findsOneWidget);
+    });
+
+    testWidgets('Change the programme opens the editor; its publish reads '
+        'Publish changes', (tester) async {
+      await pumpPlan(
+        tester,
+        read: readWith(
+          programme: {
+            ...programmeData(state: 'published', revision: 3),
+            'published_revision': 3,
+          },
+        ),
+      );
+      expect(byKey('plan-unpublished'), findsNothing);
+      await tapKey(tester, 'plan-change-published');
+      await settle(tester);
+      expect(byKey('plan-topic'), findsOneWidget);
+      expect(
+        tester.widget<FilledButton>(byKey('plan-publish')).child,
+        isA<Text>().having((t) => t.data, 'label', 'Publish changes'),
+      );
     });
 
     testWidgets('a published part keeps its kind: the refusal says how to '

@@ -85,6 +85,145 @@ begin
 end;
 $$;
 
+-- 5.6 review fix 2: a change of the meeting's end or venue (not its start) also marks a draft or
+-- published programme as changed (revision bumped, so an open editor gets a conflict and a
+-- published one shows the meeting changed). A start change is handled above.
+create function app.cells_programme_note_meeting()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if new.starts_at is distinct from old.starts_at
+     or (new.ends_at, new.moved_venue) is not distinct from (old.ends_at, old.moved_venue) then
+    return null;
+  end if;
+  update app.cells_programmes p set revision = p.revision + 1, updated_at = now()
+   where p.meeting_id = new.meeting_id and p.programme_state in ('draft', 'published');
+  return null;
+end;
+$$;
+
+create trigger cells_meetings_programme_note
+  after update of ends_at, moved_venue on app.cells_meetings
+  for each row execute function app.cells_programme_note_meeting();
+
+
+-- (Replaced from 5.4.) A schedule change no longer withdraws a meeting whose programme is published.
+create or replace function app.cells_generate_meetings(p_cell_id uuid)
+returns integer
+language plpgsql
+set search_path = ''
+as $$
+declare
+  s app.cells_meeting_schedules;
+  v_today date;
+  v_first date;
+  v_until timestamptz;
+  v_list jsonb;
+  v_dates date[];
+  v_created integer := 0;
+  v_inserted boolean;
+  v_changed uuid[] := '{}';
+  v_withdrawn uuid[] := '{}';
+  v_id uuid;
+  x jsonb;
+  v_date date;
+  v_start timestamptz;
+  v_end timestamptz;
+begin
+  select * into s from app.cells_meeting_schedules where cell_id = p_cell_id for update;
+  if not found then
+    return 0;
+  end if;
+  v_today := (now() at time zone s.zone)::date;
+  v_first := greatest(s.from_date, v_today);
+  -- The first date on or after v_first that falls on the weekday (ISO, Monday = 1).
+  v_first := v_first + ((s.weekday - extract(isodow from v_first)::integer + 7) % 7);
+  v_until := ((v_today + 84) + s.start_time) at time zone s.zone;
+  if ((v_first + s.start_time) at time zone s.zone) > v_until then
+    v_list := '[]'::jsonb;
+  else
+    v_list := app.notifications_occurrences(
+                jsonb_build_object('zone', s.zone),
+                jsonb_build_object('local_start', to_char(v_first + s.start_time, 'YYYY-MM-DD"T"HH24:MI:SS'),
+                                   'every', 'week'),
+                (v_first::timestamp) at time zone s.zone,
+                v_until);
+  end if;
+  v_dates := '{}';
+  for x in select e from jsonb_array_elements(v_list) e loop
+    v_date := left(x ->> 'local', 10)::date;
+    v_start := (x ->> 'starts_at')::timestamptz;
+    v_end := (v_date + s.end_time) at time zone s.zone;
+    v_dates := v_dates || v_date;
+    v_id := null;
+    insert into app.cells_meetings as m (cell_id, occurrence_date, nominal_starts_at, nominal_ends_at,
+                                         starts_at, ends_at)
+    values (p_cell_id, v_date, v_start, v_end, v_start, v_end)
+    on conflict (cell_id, occurrence_date) do update
+      set nominal_starts_at = excluded.nominal_starts_at,
+          nominal_ends_at = excluded.nominal_ends_at,
+          starts_at = case when m.meeting_state in ('scheduled', 'withdrawn') then excluded.starts_at
+                           else m.starts_at end,
+          ends_at = case when m.meeting_state in ('scheduled', 'withdrawn') then excluded.ends_at
+                         else m.ends_at end,
+          meeting_state = case when m.meeting_state = 'withdrawn' then 'scheduled'
+                               else m.meeting_state end,
+          revision = m.revision + 1,
+          updated_at = now()
+      -- Only a future meeting changes, and only when the rule moved it or brings it back. A
+      -- withdrawn meeting comes back when its new time is still ahead.
+      where (m.meeting_state = 'withdrawn' and excluded.starts_at > now())
+         or (m.meeting_state <> 'withdrawn' and m.starts_at > now()
+             and (m.nominal_starts_at, m.nominal_ends_at)
+                 is distinct from (excluded.nominal_starts_at, excluded.nominal_ends_at))
+    returning (m.xmax = 0), m.meeting_id into v_inserted, v_id;
+    if v_inserted then
+      v_created := v_created + 1;
+    elsif v_id is not null then
+      v_changed := v_changed || v_id;
+    end if;
+  end loop;
+  -- Future scheduled dates the rule no longer produces (a changed weekday or first date).
+  with w as (
+    update app.cells_meetings m
+       set meeting_state = 'withdrawn', revision = m.revision + 1, updated_at = now()
+     where m.cell_id = p_cell_id and m.meeting_state = 'scheduled' and m.starts_at > now()
+       and not (m.occurrence_date = any (v_dates))
+       -- 5.6 review fix 1: a meeting with a published programme is kept (its duties stay true);
+       -- the leader cancels the programme, then the meeting.
+       and not exists (select 1 from app.cells_programmes p
+                        where p.meeting_id = m.meeting_id and p.programme_state = 'published')
+    returning m.meeting_id)
+  select coalesce(array_agg(w.meeting_id), '{}') into v_withdrawn from w;
+  -- Reminders and notices follow when the Q2 policy is usable; a refusal never fails the caller
+  -- and costs at most the one meeting it concerns.
+  if app.cells_reminders_available() then
+    foreach v_id in array v_changed || v_withdrawn loop
+      begin
+        perform app.cells_plan_meeting(
+          v_id,
+          (select case
+                    when m.nominal_starts_at > now() + interval '14 days' then null
+                    when m.meeting_state = 'withdrawn' then 'cells_meeting_cancelled'
+                    when m.meeting_state = 'scheduled' then 'cells_meeting_changed'
+                  end
+             from app.cells_meetings m where m.meeting_id = v_id));
+      exception when sqlstate 'PCMD1' then
+        raise log 'cells meeting notice not planned for a meeting (sqlstate PCMD1)';
+      end;
+    end loop;
+    begin
+      perform app.cells_sync_meeting_reminders(p_cell_id);
+    exception when sqlstate 'PCMD1' then
+      raise log 'cells meeting reminders not planned for a cell (sqlstate PCMD1)';
+    end;
+  end if;
+  return v_created;
+end;
+$$;
+
 -- (Replaced from 5.4.) Moving is allowed for the cell's leader or assistant; see the header.
 create or replace function app.cells_meeting_guard()
 returns trigger
@@ -515,6 +654,19 @@ begin
 end;
 $$;
 
+-- The key a part's refusal is reported under: `parts.<index>` for a live part, `removed_parts.<id>`
+-- for one removed since the last publish (5.6 review fix 4).
+create function app.cells_part_key(p_part app.cells_programme_parts)
+returns text
+language sql
+immutable
+set search_path = ''
+as $$
+  select case when p_part.removed_at is null then 'parts.' || (p_part.position - 1)
+              else 'removed_parts.' || p_part.part_id end;
+$$;
+
+
 -- cells.publish_programme (replaced from 5.4): also publishes a revision (see the header).
 create or replace function app.cells_publish_programme(p_actor uuid, p_expected_revision bigint, p_payload jsonb)
 returns jsonb
@@ -539,6 +691,7 @@ declare
   v_meeting_changed text[];
   v_changed text[];
 begin
+  -- (5.6 review fix 4: a refusal of a part removed since the last publish is keyed by its id.)
   select a.* into v_actor from app.cells_command_actor(p_actor) a;
   v_errors := app.contract_unknown_keys(p_payload, array['programme_id', 'override_reason']);
   select * into v_reason from app.cells_free_text(p_payload -> 'override_reason', 280, false);
@@ -639,16 +792,16 @@ begin
       -- Duties conflict (changed meanwhile) carries the programme's revision, not the duty's.
       if v_msg = 'not_found' and v_part.linked_slot_id is not null then
         perform app.cmd_fail('validation_failed', jsonb_build_object(
-          'parts.' || (v_part.position - 1) || '.linked_slot_id', 'link_unavailable'));
+          app.cells_part_key(v_part) || '.linked_slot_id', 'link_unavailable'));
       elsif v_msg = 'conflict' then
         perform app.cmd_fail('conflict', null, v_before);
       elsif v_msg <> 'validation_failed' then
         raise;
       end if;
       perform app.cmd_fail('validation_failed', coalesce((
-        select jsonb_object_agg('parts.' || (v_part.position - 1) || '.' || e.key, e.value)
+        select jsonb_object_agg(app.cells_part_key(v_part) || '.' || e.key, e.value)
           from jsonb_each(v_detail::jsonb -> 'field_errors') e),
-        jsonb_build_object('parts.' || (v_part.position - 1), 'refused')));
+        jsonb_build_object(app.cells_part_key(v_part), 'refused')));
     end;
   end loop;
   update app.cells_programmes p
@@ -786,9 +939,11 @@ begin
                      -- publishes the revision).
                      'meeting_changed', exists (
                        select 1 from app.cells_programmes p
+                         left join app.cells_meeting_schedules s on s.cell_id = v_meeting.cell_id
                         where p.programme_id = v_projection.programme_id
-                          and (p.published_starts_at, p.published_ends_at)
-                              is distinct from (v_meeting.starts_at, v_meeting.ends_at))) end,
+                          and (p.published_starts_at, p.published_ends_at, p.published_venue)
+                              is distinct from (v_meeting.starts_at, v_meeting.ends_at,
+                                                coalesce(v_meeting.moved_venue, s.venue)))) end,
     -- Story 5.5: the reader's own parts of what is published (named in the projection), with
     -- their Duties occurrence.
     'yours', case when v_projection.programme_id is not null then coalesce((
@@ -819,7 +974,13 @@ update app.cells_programme_parts pt
  where p.programme_id = pt.programme_id and p.programme_state = 'published' and pt.removed_at is null
    and pt.published_kind is null;
 
+comment on function app.cells_publish_part(app.cells_programme_parts, app.cells_programmes, text, text) is
+  'Superseded by the five-argument app.cells_publish_part (story 5.6); kept only because migrations '
+  'never drop. Do not call: it neither ends removed parts nor flags departments.';
+
 revoke all on function
+  app.cells_programme_note_meeting(),
+  app.cells_part_key(app.cells_programme_parts),
   app.cells_mark_published(app.cells_programme_parts, text),
   app.cells_publish_part(app.cells_programme_parts, app.cells_programmes, text, text, text[])
   from public, anon, authenticated, service_role;

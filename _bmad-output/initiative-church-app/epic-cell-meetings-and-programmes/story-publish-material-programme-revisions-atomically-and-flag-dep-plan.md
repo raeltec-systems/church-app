@@ -78,3 +78,16 @@ context:
 ## Plan Change Log
 
 ## Review Triage Log
+
+Independent review of `149ead6..eb31346` (2026-10-21, a separate reviewer agent; no high-severity finding: Duties treats name, times, reporting time and location as material, so topic and scripture are notes-only; removed parts are never put again; departments are flagged before links end; the published snapshot is written only inside a successful publish; lock order holds). Not yet on staging, so fixed in place:
+
+1. Medium, fixed: a schedule change could withdraw a meeting whose programme is published, leaving its duties live. Generation now keeps such a meeting (the leader cancels the programme, then the meeting). Test added.
+2. Medium, fixed: a venue-only or end-only change did not mark the programme (no revision bump) and members' `meeting_changed` compared the time only. A second trigger bumps the programme revision on end or venue changes; the member read compares the venue too. Tests added (venue move flags `place`, members told, current again after republish).
+3. Medium, fixed (client): the banner's **Publish changes** bypassed the editor. The banner now publishes only while the editor is closed; once it is open the editor's own **Publish changes** (which checks what is typed) is the action, and a refusal that needs the editor (an overlap reason, a part) opens it. Widget tests added.
+4. Low, fixed: a refusal of a part removed since the last publish is keyed `removed_parts.<part id>`, not a stale index.
+5. Low, accepted: the backfill records today's meeting time and venue as the published snapshot of programmes published under 5.4; staging had no programmes when 5.6 was applied (checked), so nothing is affected there.
+6. Low, fixed (docs): the meeting is moved by the cell's leader (or an Admin who also holds the cell's scope); the assistant cannot move meetings (5.1). Runbook corrected.
+7. Low, accepted: an Admin's schedule re-timing shifts a published programme's parts without a guard; the leader publishes the revision (runbook known limit).
+8. Low, fixed: the superseded four-argument `cells_publish_part` carries a comment saying not to call it (migrations never drop); `published_slot_id` is kept as the published snapshot for later stories.
+9. Low, accepted (recorded): notices are queued per part during a publish, as in 5.4 (same transaction, no lock cycle).
+10. Tests added: removed department part (flag `cancelled`, link ended), venue move (`place`), a no-change republish (nobody asked again, no flag), members current after republish, schedule change keeps the meeting. Not added: changing a department part to another slot and saving a removal then cancelling (both exercised by the code paths covered in 5.4 and here).

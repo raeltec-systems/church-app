@@ -6,7 +6,7 @@
 -- evidence: tools/identity-e2e/cells-programme-revisions.mjs. SYNTHETIC data only
 -- (fictional range +1 202 555 0181-0192).
 begin;
-select plan(28);
+select plan(37);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000056' || lpad(n::text, 2, '0'))::uuid $$;
@@ -295,6 +295,45 @@ select is(pg_temp.cells(pg_temp.c(2), 'cells.cancel_meeting',
   (select revision from app.cells_meetings where meeting_id = pg_temp.mt2()),
   jsonb_build_object('meeting_id', pg_temp.mt2())) #>> '{data,state}', 'cancelled',
   'another meeting without a programme is cancelled as before');
+
+-- Review gaps: after republishing members are current; a no-change republish; a venue move; a schedule
+-- change; a removed department part ---------------------------------------------------------------------
+select is(pg_temp.readj(pg_temp.c(4), format('select api.cells_meeting_programme(%L)', pg_temp.mt())) #>> '{programme,meeting_changed}',
+  'false', 'after the revision is published members are current again');
+create temp table nochange as select (pg_temp.asg(pg_temp.part(1))).assignment_id as a,
+  (select count(*) from app.duties_review_flags f join app.duties_occurrences o using (occurrence_id)
+    where o.department_id = pg_temp.d()) as flags;
+select is(pg_temp.publish() #>> '{data,state}', 'published', 'a republish with nothing changed');
+select is((select (pg_temp.asg(pg_temp.part(1))).assignment_id = a
+                  and (select count(*) from app.duties_review_flags f join app.duties_occurrences o using (occurrence_id)
+                        where o.department_id = pg_temp.d()) = flags from nochange), true,
+  'asks nobody again and flags nothing');
+select pg_temp.cells(pg_temp.c(2), 'cells.move_meeting',
+  (select revision from app.cells_meetings where meeting_id = pg_temp.mt()),
+  jsonb_build_object('meeting_id', pg_temp.mt(),
+    'starts_at', (select app.cmd_utc(starts_at) from app.cells_meetings where meeting_id = pg_temp.mt()),
+    'ends_at', (select app.cmd_utc(ends_at) from app.cells_meetings where meeting_id = pg_temp.mt()),
+    'venue', 'SYNTHETIC Church hall'));
+select is((pg_temp.readj(pg_temp.c(2), format('select api.cells_programme(%L)', pg_temp.mt())) #>> '{programme,unpublished_changes}')
+          || '|' || (pg_temp.readj(pg_temp.c(4), format('select api.cells_meeting_programme(%L)', pg_temp.mt())) #>> '{programme,meeting_changed}'),
+  'true|true', 'a venue-only move marks the programme changed for staff and members');
+select is(pg_temp.publish() #> '{data,duties,1,flagged}', '["place"]'::jsonb,
+  'publishing it flags the department duty: place');
+select pg_temp.cells(pg_temp.c(1), 'cells.set_schedule',
+  (select revision from app.cells_cells where cell_id = pg_temp.sh()),
+  jsonb_build_object('cell_id', pg_temp.sh(),
+    'weekday', ((extract(isodow from (now() at time zone 'Africa/Lusaka')::date)::int + 3) % 7) + 1,
+    'start_time', '18:00', 'end_time', '19:30'));
+select is((select meeting_state from app.cells_meetings where meeting_id = pg_temp.mt()), 'moved',
+  'a schedule change does not withdraw a meeting whose programme is published');
+select pg_temp.save((select jsonb_build_array(pg_temp.parts_now() -> 0)));
+select is(pg_temp.publish() #>> '{data,state}', 'published', 'the department part is removed and published');
+select is((select count(*)::int from app.duties_part_links l join app.cells_programme_parts pt on pt.part_id = l.source_id
+            where pt.programme_id = pg_temp.pid() and l.link_kind = 'linked' and l.ended_at is null), 0,
+  'its display link is ended');
+select is((select count(*)::int from app.duties_review_flags f join app.duties_occurrences o using (occurrence_id)
+            where o.department_id = pg_temp.d() and f.cleared_at is null and f.changed::text like '%cancelled%'), 1,
+  'and its department is told (cancelled)');
 
 -- Cancelling the programme flags the department ----------------------------------------------------------
 select pg_temp.cells(pg_temp.c(2), 'cells.cancel_programme', pg_temp.rev(), jsonb_build_object('programme_id', pg_temp.pid()));

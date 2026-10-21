@@ -2290,52 +2290,17 @@ class _PlanBody extends ConsumerWidget {
         ),
       );
     } else if (p.published && read.canEdit) {
-      // Story 5.6: changes waiting to be published come first, with the
-      // one action that sends them.
-      if (open && (p.unpublishedChanges || p.meetingChanged)) {
-        children.addAll([
-          RequestStateBanner(
-            key: const Key('plan-unpublished'),
-            tone: StatusTone.warning,
-            title: p.meetingChanged
-                ? 'The meeting moved since you published'
-                : 'Changes not published yet',
-            message:
-                'Members and everyone with a part still have the last '
-                'version. Publishing asks people again only where their '
-                'part changed.',
-            actions: [
-              BannerAction(
-                'Publish changes',
-                state.busy ? null : () => ctl.publish(p),
-                key: const Key('plan-publish-changes'),
-                primary: true,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-        ]);
-      }
+      // Story 5.6: the published programme, its unpublished changes first.
       children.add(
-        _PublishedView(
+        _PublishedEditor(
           meetingId: meetingId,
           read: read,
           programme: p,
           busy: state.busy,
+          errors: state.fieldErrors,
           open: open,
         ),
       );
-      if (open) {
-        children.add(
-          _PublishedEditor(
-            meetingId: meetingId,
-            read: read,
-            programme: p,
-            busy: state.busy,
-            errors: state.fieldErrors,
-          ),
-        );
-      }
     } else {
       if (p.draft && read.canEdit && !open) {
         children.add(
@@ -3151,16 +3116,19 @@ class _PartEditorRow extends StatelessWidget {
   }
 }
 
-/// Story 5.6: changing a published programme: the same editor behind
-/// **Change the programme** (members keep the last publish until the
-/// changes are published).
-class _PublishedEditor extends StatefulWidget {
+/// Story 5.6: a published programme for its managers: unpublished changes
+/// first (the banner publishes them while the editor is closed; once open,
+/// the editor's own **Publish changes** checks what is typed), then who is
+/// on, then **Change the programme** (the same editor). Members keep the last
+/// publish until the changes are published.
+class _PublishedEditor extends ConsumerStatefulWidget {
   const _PublishedEditor({
     required this.meetingId,
     required this.read,
     required this.programme,
     required this.busy,
     required this.errors,
+    required this.open,
   });
   final String meetingId;
   final ProgrammeRead read;
@@ -3168,37 +3136,88 @@ class _PublishedEditor extends StatefulWidget {
   final bool busy;
   final Map<String, String> errors;
 
+  /// The meeting is ahead and not cancelled.
+  final bool open;
+
   @override
-  State<_PublishedEditor> createState() => _PublishedEditorState();
+  ConsumerState<_PublishedEditor> createState() => _PublishedEditorState();
 }
 
-class _PublishedEditorState extends State<_PublishedEditor> {
-  late bool _open = widget.programme.unpublishedChanges;
+class _PublishedEditorState extends ConsumerState<_PublishedEditor> {
+  late bool _editing = widget.programme.unpublishedChanges;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(top: 16),
-    child: _open
-        ? _ProgrammeEditor(
-            meetingId: widget.meetingId,
-            read: widget.read,
-            programme: widget.programme,
-            busy: widget.busy,
-            errors: widget.errors,
-          )
-        : Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: FocusRing(
-              child: OutlinedButton(
-                key: const Key('plan-change-published'),
-                onPressed: widget.busy
-                    ? null
-                    : () => setState(() => _open = true),
-                child: const Text('Change the programme'),
-              ),
-            ),
+  Widget build(BuildContext context) {
+    final p = widget.programme;
+    final ctl = ref.read(cellProgrammeProvider(widget.meetingId).notifier);
+    // A refusal that needs the editor (an overlap reason, a part to fix)
+    // opens it (5.6 review fix 3).
+    final editing =
+        _editing ||
+        needsOverrideReason(widget.errors) ||
+        widget.errors.keys.any((k) => k.startsWith('parts.'));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (widget.open && (p.unpublishedChanges || p.meetingChanged)) ...[
+          RequestStateBanner(
+            key: const Key('plan-unpublished'),
+            tone: StatusTone.warning,
+            title: p.meetingChanged
+                ? 'The meeting changed since you published'
+                : 'Changes not published yet',
+            message: editing
+                ? 'Members and everyone with a part still have the last '
+                      'version. Publish your changes below.'
+                : 'Members and everyone with a part still have the last '
+                      'version. Publishing asks people again only where '
+                      'their part changed.',
+            actions: [
+              if (!editing)
+                BannerAction(
+                  'Publish changes',
+                  widget.busy ? null : () => ctl.publish(p),
+                  key: const Key('plan-publish-changes'),
+                  primary: true,
+                ),
+            ],
           ),
-  );
+          const SizedBox(height: 12),
+        ],
+        _PublishedView(
+          meetingId: widget.meetingId,
+          read: widget.read,
+          programme: p,
+          busy: widget.busy,
+          open: widget.open,
+        ),
+        if (widget.open)
+          Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: editing
+                ? _ProgrammeEditor(
+                    meetingId: widget.meetingId,
+                    read: widget.read,
+                    programme: p,
+                    busy: widget.busy,
+                    errors: widget.errors,
+                  )
+                : Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: FocusRing(
+                      child: OutlinedButton(
+                        key: const Key('plan-change-published'),
+                        onPressed: widget.busy
+                            ? null
+                            : () => setState(() => _editing = true),
+                        child: const Text('Change the programme'),
+                      ),
+                    ),
+                  ),
+          ),
+      ],
+    );
+  }
 }
 
 /// Story 5.4: a published programme for its managers: each part with who

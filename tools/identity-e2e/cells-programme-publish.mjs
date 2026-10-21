@@ -49,7 +49,8 @@ export function leaksPrivate(json) {
 /** The projection without the fields only a published copy carries. */
 export function withoutPublication(projection) {
   if (!projection) return projection;
-  const { revision, published_at: publishedAt, ...rest } = projection;
+  // Story 5.6 adds meeting_changed to the published copy only.
+  const { revision, published_at: publishedAt, meeting_changed: meetingChanged, ...rest } = projection;
   return rest;
 }
 

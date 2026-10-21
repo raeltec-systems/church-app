@@ -489,3 +489,66 @@ Record the outcome per step in `evidence-5.5/owner-check.md` (pass/fail, device,
 - No cell coverage queue, contact attempts or leader alerts for cell parts yet (department-only); the leader confirms from the published programme.
 - A declined part is not reassigned from the programme yet (5.6 publishes revisions).
 - A member who moved to another cell keeps their old cell's parts until story 5.9 (transfers end them), and can still be confirmed there by the old leader.
+
+## Story 5.6: programme revisions and department mismatches
+
+Migration: `supabase/migrations/20261021110000_cells_programme_revisions.sql` (no row deletions; it backfills the published snapshot of programmes already published).
+Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-publish-material-programme-revisions-atomically-and-flag-dep-plan.md`.
+Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.6/`.
+
+### Changing a published programme
+
+- `cells.save_programme` now saves a published programme too. It stays **Published**: members and Duties keep the last publish, and the staff read says `unpublished_changes: true`. A cancelled programme is still `conflict {"programme_id": "not_draft"}`.
+- A published part keeps its kind: a person's part cannot become a department duty or the reverse (`parts.<i>: published_kind`); remove it and add a new part.
+- `cells.publish_programme` publishes the revision in one transaction through the owner operations:
+
+| Change since the last publish | In Duties |
+|---|---|
+| topic or scripture only (study notes never reach Duties) | nothing material: answers kept |
+| a part's time or label, or its person | Duties' material revision: the person is asked again (a new pending revision), the earlier answer kept in history, its reminders cancelled; a swapped-out person is released |
+| a part removed | its duty cancelled (its person told), or for a department part: flagged `cancelled` and the display link ended |
+| a department part's time or label, or the meeting's time or venue | the department duty is **not** changed; its department gets a review flag (`time`, `label`, `place`) on its board |
+
+- `cells.cancel_programme` also flags linked department duties `cancelled` before ending their links, and ends parts removed since the last publish.
+
+### When the meeting changes
+
+- The cell's leader or assistant may **Move** a meeting with a published programme: its parts move with it (revision bumped), the staff read says `meeting_changed: true`, and the member read's programme says `meeting_changed: true` until the leader publishes. Publishing moves the parts' duties (asked again, as a material change) and flags department links `time`.
+- Admin alone cannot move such a meeting, and nobody can cancel it from Cell meetings, until the programme is cancelled (`conflict {"meeting_id": "programme_published"}`). A schedule change (generation) moves the parts but does not publish; the leader sees "The meeting moved since you published".
+
+### Clients
+
+- **Staff web, Plan meeting** (published): a warning banner when there are unpublished changes or the meeting moved, with **Publish changes**; **Change the programme** opens the editor (its button reads **Publish changes**; cancelling stays under Who is on). A kind switch says "Published with a person or with a department duty: remove this part and add a new one".
+- **Mobile My cell**: after a move, "The meeting moved. Your leader is updating the programme; the times below may change."
+
+### Local runs
+
+```bash
+npx supabase db reset
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/cells-programme-revisions.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The E2E uses `+44 7700 900040-900049` and removes everything it created.
+
+### Hosted staging (parent session, then the owner)
+
+Apply the migration (renamed to its hosted version), then the verify-hosted assertions.
+
+### Owner manual checks (staging, web and phone, story 5.6)
+
+Use the 5.5 setup with a published programme whose parts M (your phone) and N accepted, plus a department part.
+
+1. **Notes only.** As L, **Change the programme**, edit only the study notes, **Save draft**: "Changes not published yet". **Publish changes**: M and N still show Accepted.
+2. **Material.** Change M's part start by 5 minutes and give N's part to X; **Save draft**, **Publish changes**: M's phone shows the part Awaiting again with a change notice; N's part leaves N's My duties; X's part asks X.
+3. **Department.** Rename the department part and publish: the department's leader sees **Needs review** (label) on their board; the duty itself is unchanged.
+4. **Move.** As L on Cell meetings, **Move** the meeting 30 minutes later: Plan meeting says "The meeting moved since you published"; M's My cell says the programme is being updated. **Publish changes**: M's part moves and asks again; the department is flagged (time).
+5. **Cancel guard.** **Cancel this meeting** on Cell meetings is refused ("Programme published"); cancel the programme first.
+
+Record the outcome per step in `evidence-5.6/owner-check.md` (pass/fail, device, browser; no numbers, ids or keys).
+
+### Known limits
+
+- A schedule change by an Admin moves a published programme's parts but cannot publish (Duties owner operations need the cell scope); the cell's leader publishes it.
+- A cancelled programme stays cancelled when its meeting is brought back; a new programme for that meeting is not possible yet.

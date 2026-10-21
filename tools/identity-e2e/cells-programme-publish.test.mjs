@@ -24,7 +24,7 @@ test('a member read leaking a private field is caught', () => {
 });
 
 test('the published copy compares to the preview without its publication fields', () => {
-  assert.deepEqual(withoutPublication({ topic: 'T', parts: [], revision: 3, published_at: 'x' }), { topic: 'T', parts: [] });
+  assert.deepEqual(withoutPublication({ topic: 'T', parts: [], revision: 3, published_at: 'x', meeting_changed: false }), { topic: 'T', parts: [] });
   assert.equal(withoutPublication(null), null);
 });
 

@@ -219,14 +219,18 @@ void main() {
         setUp: (h) => h.cells.meetings = boardWith(),
       );
       expect(h.cells.meetingsCalls, 1);
+      // The next meeting leads its card; its facts are labelled values.
       expect(
         tester.widget<Text>(byKey('meeting-next-$_cell')).data,
-        startsWith('Next: Friday'),
+        startsWith('Friday'),
       );
-      expect(find.text('Venue: SYNTHETIC 12 Shikoswe Road'), findsOneWidget);
       expect(
-        find.text('Meets Fridays, 18:00-19:30 (church time)'),
-        findsOneWidget,
+        tester.widget<Text>(byKey('meeting-venue-$_cell')).data,
+        'SYNTHETIC 12 Shikoswe Road',
+      );
+      expect(
+        tester.widget<Text>(byKey('meeting-schedule-$_cell')).data,
+        'Fridays, 18:00-19:30',
       );
       expect(byKey('schedule-form-$_cell'), findsNothing);
 
@@ -328,8 +332,11 @@ void main() {
         setUp: (h) => h.cells.meetings = boardWith(role: 'admin', canSet: true),
       );
       expect(find.textContaining('SYNTHETIC 12 Shikoswe Road'), findsNothing);
-      expect(find.textContaining('Venue: set'), findsOneWidget);
-      expect(find.text('Map pin: set'), findsOneWidget);
+      expect(
+        tester.widget<Text>(byKey('meeting-venue-$_cell')).data,
+        startsWith('Set (only'),
+      );
+      expect(tester.widget<Text>(byKey('meeting-pin-$_cell')).data, 'Set');
       // The meetings lead; the rare schedule change waits behind a button.
       expect(byKey('schedule-form-$_cell'), findsNothing);
       await tapKey(tester, 'schedule-edit-$_cell');
@@ -405,6 +412,44 @@ void main() {
       });
     });
 
+    testWidgets('the next meeting leads with Plan the programme; Keep as is '
+        'closes a move without sending', (tester) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.cellMeetings,
+        setUp: (h) => h.cells.meetings = boardWith(),
+      );
+      await tapKey(tester, 'meeting-move-$_meeting');
+      await settle(tester);
+      expect(byKey('meeting-move-form-$_meeting'), findsOneWidget);
+      await tapKey(tester, 'move-cancel-$_meeting');
+      await settle(tester);
+      expect(byKey('meeting-move-form-$_meeting'), findsNothing);
+      expect(h.gateway.sent, isEmpty);
+      await tapKey(tester, 'meeting-next-plan-$_cell');
+      await settle(tester);
+      expect(h.cells.programmeAsked, [_meeting]);
+    });
+
+    testWidgets('an Admin closes a schedule change with Keep as is', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.cellMeetings,
+        setUp: (h) => h.cells.meetings = boardWith(role: 'admin', canSet: true),
+      );
+      // An Admin plans nothing: the leader or assistant does.
+      expect(byKey('meeting-next-plan-$_cell'), findsNothing);
+      await tapKey(tester, 'schedule-edit-$_cell');
+      await settle(tester);
+      expect(byKey('schedule-form-$_cell'), findsOneWidget);
+      await tapKey(tester, 'schedule-cancel-$_cell');
+      await settle(tester);
+      expect(byKey('schedule-form-$_cell'), findsNothing);
+      expect(h.gateway.sent, isEmpty);
+    });
+
     testWidgets('without a cell scope or Admin the server\'s denial shows', (
       tester,
     ) async {
@@ -434,7 +479,7 @@ void main() {
         );
         expect(
           tester.widget<Text>(byKey('meeting-reminders-$_cell')).data,
-          'Reminders: 1 day before (usual)',
+          '1 day before (usual)',
         );
         await tapKey(tester, 'reminders-edit-$_cell');
         await settle(tester);
@@ -469,7 +514,7 @@ void main() {
         );
         expect(
           tester.widget<Text>(byKey('meeting-reminders-$_cell')).data,
-          'Reminders: 2 hours before',
+          '2 hours before',
         );
         await tapKey(tester, 'reminders-edit-$_cell');
         await settle(tester);

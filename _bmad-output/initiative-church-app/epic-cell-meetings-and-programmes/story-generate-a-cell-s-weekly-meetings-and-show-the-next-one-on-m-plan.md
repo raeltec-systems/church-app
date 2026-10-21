@@ -75,18 +75,50 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261021090000_cells_meetings.sql` -- schedule, meeting and audit tables; generation; `cells.set_schedule`, `cells.move_meeting`, `cells.cancel_meeting`, `cells.reinstate_meeting`; authorizer, dispatch and in-scope replaced; `api.cells_meetings`; `api.cells_my_cell` with `meetings`; deletion hook replaced; privileges.
-- [ ] `supabase/tests/cells_meetings_test.sql` -- pgTAP for the matrix; extend `command_foundation_test.sql`.
-- [ ] Client: `domain/cell_meetings.dart`, controller, staff **Cell meetings** screen (`/cells/meetings`), My cell next-meeting card, adapter, fakes, exports, routes; staff destination for Admin and cell leaders/assistants.
-- [ ] Tests: `packages/client_core/test/identity/cell_meetings_test.dart`, app tests.
-- [ ] `tools/identity-e2e/cells-meetings.mjs` + `cells-meetings.test.mjs` -- local E2E of the verify.
-- [ ] `docs/runbooks/cells-meetings.md` (+ link in `identity-access.md` and `contracts-and-owner-seams.md`).
+- [x] `supabase/migrations/20261021090000_cells_meetings.sql` -- schedule, meeting and audit tables; generation; `cells.set_schedule`, `cells.move_meeting`, `cells.cancel_meeting`, `cells.reinstate_meeting`; authorizer, dispatch and in-scope replaced; `api.cells_meetings`; `api.cells_my_cell` with `meetings`; deletion hook replaced; privileges.
+- [x] `supabase/tests/cells_meetings_test.sql` -- pgTAP for the matrix; extend `command_foundation_test.sql`.
+- [x] Client: `domain/cell_meetings.dart`, controller, staff **Cell meetings** screen (`/cells/meetings`), My cell next-meeting card, adapter, fakes, exports, routes; staff destination for Admin and cell leaders/assistants.
+- [x] Tests: `packages/client_core/test/identity/cell_meetings_test.dart`, app tests.
+- [x] `tools/identity-e2e/cells-meetings.mjs` + `cells-meetings.test.mjs` -- local E2E of the verify.
+- [x] `docs/runbooks/cells-meetings.md` (+ link in `identity-access.md` and `contracts-and-owner-seams.md`).
 
 **Acceptance Criteria:**
 - Given the local stack, when the E2E runs, then an Admin sets a weekly schedule on `SYNTHETIC Shikoswe Cell`, the leader moves one meeting and cancels another, regeneration keeps every id, the moved and cancelled meetings keep their ids, a confirmed member reads the next meeting with its venue, and a member of `SYNTHETIC Estates C5/C7 Cell`, an account without member access and Admin-only access read no venue for Shikoswe.
 - Given the full local verification, when run, then db:test, db:smoke, the new and existing Cells E2Es, contracts, offline tool tests, flutter analyze/test, secrets, migrations and function-imports checks pass.
 
 ## Implementation Notes
+
+- Implemented directly in this session (no implementation subagent).
+- Server: `supabase/migrations/20261021090000_cells_meetings.sql`. Generation uses
+  `app.notifications_occurrences` with `{zone}` from the stored schedule, so reads do not depend on
+  the Q2 gate; only `set_schedule` calls `app.notifications_policy()`. Ids are kept by an upsert on
+  `(cell_id, occurrence_date)` that touches a row only when it is in the future and its nominal
+  times changed or it was withdrawn (no revision churn on reads).
+- Replaced from earlier stories (`create or replace`, privileges preserved): `app.cells_authorize_command`,
+  `app.cells_in_scope` (now plpgsql with a real `cells_meeting` recheck), `app.cells_command`,
+  `app.cells_my_cell`, `app.cells_erase_member`. Not touched: the hand-pasted `_rows` purge.
+- The set_schedule upsert proposes a complete row (venue and pin coalesced from the current
+  schedule) because NOT NULL is checked before ON CONFLICT resolves.
+- Ledger: `command_foundation_test.sql` (authenticated EXECUTE: `api/app.cells_meetings`). New
+  `supabase/tests/cells_meetings_test.sql` (53 checks).
+- Clients: `domain/cell_meetings.dart` (strict parsing; instants must end in `Z`),
+  `CellMeetingsController` and notices in `application/cell_controllers.dart`, `CellMeetingsScreen`
+  and the My cell next-meeting card in `presentation/cell_screens.dart`, route `/cells/meetings`,
+  staff destination **Cell meetings** for Admins and cell leaders/assistants, `FakeCells.meetings`.
+  Tests: `test/identity/cell_meetings_test.dart` (13).
+- Screens follow the design-taste-frontend app-screen rules (owner request, 2026-10-21): each screen
+  answers its one question first (My cell: the next meeting leads, its time the largest text; Cell
+  meetings: "Next: …" and the moved/cancelled count per cell), the most frequent job (move or
+  cancel one meeting) on the row, the rare schedule change behind a button. The skill's inspector
+  measures HTML only, so it could not run on the Flutter screens; the rules were applied by hand.
+- E2E: `tools/identity-e2e/cells-meetings.mjs` (10 checks, M01-M50) with offline
+  `cells-meetings.test.mjs`; fictional numbers `+44 7700 900200-900206`; pgTAP numbers
+  `+1 202 555 0141-0148`.
+- Portability fixes found running the suites on Windows: `harness.mjs` starts `npx` through a shell
+  on Windows; `supabase/tests/lib/local_stack.sh` falls back to Node for `uuid()` without
+  `/proc`. No change on Linux.
+- Runbook: `docs/runbooks/cells-meetings.md` (links from `identity-access.md` and
+  `contracts-and-owner-seams.md`).
 
 ## Plan Change Log
 
@@ -106,6 +138,15 @@ context:
 - `npm run -s contracts:test && node --test tools/identity-e2e/*.test.mjs` -- expected: pass
 - `flutter analyze && flutter test` in `packages/client_core`, `apps/mobile`, `apps/staff` -- expected: pass
 - `npm run -s ci:secrets && npm run -s ci:migrations -- --base origin/ccr-93e730dd-89lbvg && npm run -s ci:function-imports` -- expected: pass
+
+**Local results (2026-10-21, Windows dev box):** db:test PASS (all files); db:smoke PASS (139 API
+checks, 260 fixture cases, 15-case matrix); `cells-meetings.mjs` 10/10 and `cells.mjs` 13/13
+(`evidence-5.1/`); contracts 265 pass; tool tests 262 pass, 4 fail and ci:policy-test 54 pass, 2
+fail, the same failures as the baseline `179d805` on this machine (CRLF checkout and Windows file
+modes); flutter analyze clean in client_core, staff and mobile; client_core 666+13 tests pass
+except `boundaries_test.dart` and the apps' "only the composition root" tests, which fail on
+Windows paths at baseline too; ci:secrets, ci:migrations (base origin/ccr-93e730dd-89lbvg) and
+ci:function-imports pass.
 
 **Manual checks (if no CLI):**
 - Parent session: apply `20261021090000_cells_meetings.sql` to staging after `20261015190139`, run `tools/ci/verify-hosted.sql` (`expected_env=staging`). No Edge Function change.

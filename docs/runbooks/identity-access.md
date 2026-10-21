@@ -503,6 +503,8 @@ The E2E uses `+44 7700 900260–900264` and removes everything it created, inclu
 
 Apply `20261007075946_cell_membership.sql` after `20261007131600`. Production keeps no cells until the church's real cell list is set up by an Admin after Q4 approval (entry 14); staging uses SYNTHETIC cells.
 
+Weekly meeting schedules, stable meeting ids and one-meeting exceptions (epic 5, story 5.1) are in [cells-meetings.md](cells-meetings.md).
+
 ## Recovery email and forgotten password (story 2.7)
 
 Migration: `supabase/migrations/20261007093323_recovery_email.sql` (no row deletions; one file).

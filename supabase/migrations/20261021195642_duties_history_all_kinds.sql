@@ -13,6 +13,7 @@
 --   * Each entry names its owner: owner_kind, and department_id/department_name or cell_id (the
 --     other is null). The cell's name is the Cells module's (Duties may not read it); a client
 --     labels a cell part as the cell programme, as My duties does.
+-- owner-approved-cleanup: owner decision 2026-10-21 (My duty history lists every duty kind with a filter): the two history functions are dropped and recreated with a fourth argument, kind, in the same migration; no data is removed.
 
 drop function api.duties_member_history(uuid, timestamptz, uuid);
 drop function app.duties_member_history(uuid, timestamptz, uuid);

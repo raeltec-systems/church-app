@@ -52,12 +52,12 @@ abstract final class DutyCalendar {
         'Report by ${_wallClock(duty.times.reportingAt!)}, starts '
             '${_wallClock(duty.times.startsAt)} (church time).',
       'This entry is a copy and does not update if the duty changes or is '
-          'cancelled. Open BIC Kafue, My duties, for the current version.',
+          'cancelled. Open BICC Kafue, My duties, for the current version.',
     ].join(' ');
     final lines = [
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//BIC Kafue//Duties//EN',
+      'PRODID:-//BICC Kafue//Duties//EN',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       'BEGIN:VEVENT',

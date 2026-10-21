@@ -86,7 +86,7 @@ class _MobileAppState extends State<MobileApp> {
     return PushBridge(
       router: _router,
       child: MaterialApp.router(
-        title: 'BIC Kafue',
+        title: 'BICC Kafue',
         theme: churchMobileTheme(Brightness.light),
         darkTheme: churchMobileTheme(Brightness.dark),
         themeMode: widget.themeMode ?? ThemeMode.system,
@@ -247,7 +247,7 @@ class _LaunchCurtainState extends ConsumerState<LaunchCurtain>
                           Transform.scale(
                             scale: 1 + 0.05 * breath + 0.06 * t,
                             child: Semantics(
-                              label: 'BIC Kafue, loading',
+                              label: 'BICC Kafue, loading',
                               child: const ChurchLogo(size: 160),
                             ),
                           ),

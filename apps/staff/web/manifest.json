@@ -1,11 +1,11 @@
 {
-    "name": "BIC Kafue staff",
-    "short_name": "BIC staff",
+    "name": "BICC Kafue staff",
+    "short_name": "BICC staff",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#F4F6FA",
     "theme_color": "#14246B",
-    "description": "BIC Kafue staff portal.",
+    "description": "BICC Kafue staff portal.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

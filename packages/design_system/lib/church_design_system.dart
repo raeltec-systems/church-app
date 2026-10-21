@@ -1,4 +1,4 @@
-/// Semantic design system shared by the BIC Kafue mobile and staff clients.
+/// Semantic design system shared by the BICC Kafue mobile and staff clients.
 ///
 /// Tokens follow design-contract.md; primitives carry the Flutter Web
 /// accessibility workarounds proven in the 1.6 staff web trial.

@@ -64,7 +64,7 @@ void main() {
     final handle = tester.ensureSemantics();
     await pumpStaff(tester);
     expect(find.text('Status: operational'), findsOneWidget);
-    expect(find.text('BIC Kafue staff'), findsOneWidget);
+    expect(find.text('BICC Kafue staff'), findsOneWidget);
     final tab = tester.getSemantics(
       find.bySemanticsLabel('Platform status').first,
     );

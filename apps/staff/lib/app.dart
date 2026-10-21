@@ -247,7 +247,7 @@ class _StaffAppState extends State<StaffApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'BIC Kafue staff',
+      title: 'BICC Kafue staff',
       // Staff web uses the light palette only (design contract).
       theme: churchStaffTheme(),
       routerConfig: _router,
@@ -309,7 +309,7 @@ class StaffShell extends ConsumerWidget {
     final brand = Semantics(
       header: true,
       child: Text(
-        'BIC Kafue staff',
+        'BICC Kafue staff',
         style: ChurchType.cardTitle.copyWith(
           color: ChurchStaffChrome.onSidebar,
         ),

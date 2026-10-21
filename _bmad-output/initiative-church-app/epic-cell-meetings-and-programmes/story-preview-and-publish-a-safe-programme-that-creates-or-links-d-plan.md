@@ -3,7 +3,7 @@ title: 'Preview and publish a safe programme that creates or links duty slots'
 type: 'feature'
 ticket: '4'
 created: '2026-10-21'
-status: 'in-progress'
+status: 'done'
 baseline_revision: '52d8ff0'
 route: 'full'
 route_source: 'auto'
@@ -61,20 +61,20 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261021155000_duties_owner_linkable.sql` (Duties contract change)
-- [x] `supabase/migrations/20261021160000_cells_programme_publish.sql` (with the 5.3 review fixes)
+- [x] `supabase/migrations/20261021093943_duties_owner_linkable.sql` (Duties contract change)
+- [x] `supabase/migrations/20261021094249_cells_programme_publish.sql` (with the 5.3 review fixes)
 - [x] `supabase/tests/cells_programme_publish_test.sql`
 - [x] Clients: domain (projection, Duties state, linkable duties, member read), controller (publish), Plan meeting (publish, overlap reason, department duties, published view), 5.3 client review fixes.
 - [x] E2E `tools/identity-e2e/cells-programme-publish.mjs` + offline test.
 - [x] Runbook section.
-- [ ] Staging apply: blocked on the 4.11 release gate (owner confirmation that every client in use runs the 4.11 build or later).
+- [x] Staging apply (release gate confirmed by the owner; `evidence-5.4/staging-verify.md`).
 
 **Acceptance Criteria:**
 - Given a synthetic programme with assigned, unassigned and department-linked parts, when it is published, then there is one current slot per part/position with Awaiting responses, the department duty is unchanged and still owned by its department, a republish creates no duplicate slot, the preview matches the member read, and a member's API read contains no response, note or history fields.
 
 ## Implementation Notes
 
-- Server: `cells.publish_programme {programme_id, override_reason?}` (expected = programme revision) in `20261021160000_cells_programme_publish.sql`: people locked first (`duties_owner_session` of the cell, then the parts' assignees), then the meeting and the programme; refuses a cancelled programme, a cancelled or started meeting, no parts, or an assignee who left the cell; bumps the revision, sets Published, calls `app.cells_publish_part` per part (put_part with `lead`, or link_duty with `department`, unlinking a different slot first), writes `app.cells_programme_projections`, audits `programme_published`. A Duties `validation_failed` is re-keyed under its part. `cells.cancel_programme` cancels the owned occurrences (`duties_owner_cancel_part` at the occurrence revision) and unlinks, and withdraws the projection. Staff read adds `preview`, `published`, `duties` (per part, from `duties_owner_part`; leader and assistant only) and `linkable`. Member read `api.cells_meeting_programme`. Deletion removes names from projections and anonymises publishers.
+- Server: `cells.publish_programme {programme_id, override_reason?}` (expected = programme revision) in `20261021094249_cells_programme_publish.sql`: people locked first (`duties_owner_session` of the cell, then the parts' assignees), then the meeting and the programme; refuses a cancelled programme, a cancelled or started meeting, no parts, or an assignee who left the cell; bumps the revision, sets Published, calls `app.cells_publish_part` per part (put_part with `lead`, or link_duty with `department`, unlinking a different slot first), writes `app.cells_programme_projections`, audits `programme_published`. A Duties `validation_failed` is re-keyed under its part. `cells.cancel_programme` cancels the owned occurrences (`duties_owner_cancel_part` at the occurrence revision) and unlinks, and withdraws the projection. Staff read adds `preview`, `published`, `duties` (per part, from `duties_owner_part`; leader and assistant only) and `linkable`. Member read `api.cells_meeting_programme`. Deletion removes names from projections and anonymises publishers.
 - Duties contract change `app.duties_owner_linkable` (4.11 plan, change log).
 - pgTAP `supabase/tests/cells_programme_publish_test.sql` (45, including 5.3 fixes 1, 2, 6 and 9); command-foundation ledger adds the member read. Full db:test passes on a fresh reset. (`duties_owner_decisions_test` 32, a 3 s board timing, failed once while the whole suite ran in parallel and passes alone at about 0.4 s: load-sensitive, unchanged code.)
 - Clients: `cell_programmes.dart` (`ProgrammeProjection`, `PartDuty`, `LinkableDuty`, `MeetingProgrammeRead`), `CellProgrammeController.publish`, `clearFieldErrors`, Plan meeting: **Publish to members** (a saved draft only), the overlap reason, **Department duty** choices on a part, the published view (who is on, each answer, what members see, cancel). 5.3 client review fixes 10-12. Tests: `test/identity/cell_programmes_test.dart` (25).

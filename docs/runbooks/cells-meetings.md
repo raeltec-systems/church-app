@@ -363,7 +363,7 @@ or keys).
 
 ## Story 5.4: publish a safe programme that creates or links duty slots
 
-Migrations: `supabase/migrations/20261021155000_duties_owner_linkable.sql` (a Duties contract change) and `supabase/migrations/20261021160000_cells_programme_publish.sql` (no row deletions; it also carries the 5.3 review fixes).
+Migrations: `supabase/migrations/20261021093943_duties_owner_linkable.sql` (a Duties contract change) and `supabase/migrations/20261021094249_cells_programme_publish.sql` (no row deletions; it also carries the 5.3 review fixes).
 Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-preview-and-publish-a-safe-programme-that-creates-or-links-d-plan.md`.
 Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.4/`.
 
@@ -419,7 +419,7 @@ The E2E uses `+44 7700 900020-900029` and removes everything it created (Duties 
 
 ### Hosted staging (parent session, then the owner)
 
-After the release gate is confirmed: apply `20261021155000_duties_owner_linkable.sql`, then `20261021160000_cells_programme_publish.sql` (renamed to their hosted versions), then run `tools/ci/verify-hosted.sql` with `expected_env=staging`.
+After the release gate is confirmed: apply `20261021093943_duties_owner_linkable.sql`, then `20261021094249_cells_programme_publish.sql` (renamed to their hosted versions), then run `tools/ci/verify-hosted.sql` with `expected_env=staging`.
 
 ### Owner manual checks (staging, web and phone, story 5.4)
 

@@ -1,5 +1,5 @@
 -- Story 5.4: preview and publish a safe programme that creates or links duty slots (epic 5, C4).
--- Builds on 20261021084446_cells_programmes.sql and 20261021155000_duties_owner_linkable.sql.
+-- Builds on 20261021084446_cells_programmes.sql and 20261021093943_duties_owner_linkable.sql.
 --
 --   * A programme can be Published. Publishing calls the 4.11 Duties owner operations in the
 --     command's own transaction: one cell-owned Duties occurrence per stable programme part with

@@ -127,7 +127,7 @@ context:
 
 - 2026-10-15 (build): two details of the frozen decisions were built differently, fail closed, recorded under Implementation Notes: owner operations take no new Identity lock (the caller's authorizer holds the grant rows first; Duties rechecks the scope on current rows), and `duties.clear_review` answers `forbidden` (not `not_found`) to anyone who does not manage the department, as every department command does. The frozen block is unchanged.
 
-- 2026-10-21, contract change for story 5.4 (Cells, the first real caller): `app.duties_owner_linkable({cell_id, starts_at, ends_at})` in `supabase/migrations/20261021155000_duties_owner_linkable.sql`, the discovery read of linkable department positions listed in the consumer guide's step 8. Same rules as the display link: published, not started, not cancelled department positions overlapping the window (at most 50), names, times and `filled` only; the live session must lead or assist the cell; not client-executable. Cells' 5.4 migration registers `cells_programme_part` as a `cell_part` source.
+- 2026-10-21, contract change for story 5.4 (Cells, the first real caller): `app.duties_owner_linkable({cell_id, starts_at, ends_at})` in `supabase/migrations/20261021093943_duties_owner_linkable.sql`, the discovery read of linkable department positions listed in the consumer guide's step 8. Same rules as the display link: published, not started, not cancelled department positions overlapping the window (at most 50), names, times and `filled` only; the live session must lead or assist the cell; not client-executable. Cells' 5.4 migration registers `cells_programme_part` as a `cell_part` source.
 
 ## Review Triage Log
 

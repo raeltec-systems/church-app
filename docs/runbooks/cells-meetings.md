@@ -131,7 +131,7 @@ numbers, ids or keys).
 
 ## Story 5.2: meeting reminders and change notices
 
-Migration: `supabase/migrations/20261021120000_cells_meeting_reminders.sql` (no row deletions; one file).
+Migration: `supabase/migrations/20261021081026_cells_meeting_reminders.sql` (no row deletions; one file).
 Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-remind-confirmed-members-of-meetings-and-notify-them-of-cha-plan.md`.
 Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.2/`.
 
@@ -210,7 +210,7 @@ The E2E uses `+44 7700 900390-900393`, runs the real worker, and removes everyth
 
 ### Hosted staging (parent session, then the owner)
 
-Apply `20261021120000_cells_meeting_reminders.sql` after the 5.1 migration, then run
+Apply `20261021081026_cells_meeting_reminders.sql` after the 5.1 migration, then run
 `tools/ci/verify-hosted.sql` with `expected_env=staging`. No Edge Function change and no rows file.
 Staging's synthetic scheduler delivers the reminders.
 

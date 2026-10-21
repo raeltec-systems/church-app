@@ -47,7 +47,7 @@ select results_eq(
      where n.nspname in ('app', 'api') and has_function_privilege('authenticated', p.oid, 'EXECUTE')
      order by 1$$,
   $$values ('api.cells_admin_overview'::text collate "C"), ('api.cells_command'),
-           ('api.cells_leader_queue'), ('api.cells_meetings'), ('api.cells_my_cell'), ('api.cells_private_fixture_read'),
+           ('api.cells_leader_queue'), ('api.cells_meetings'), ('api.cells_my_cell'), ('api.cells_private_fixture_read'), ('api.cells_programme'),
            ('api.cells_signup_options'), ('api.duties_admin_overview'), ('api.duties_candidates'), ('api.duties_command'),
            ('api.duties_coverage'),
            ('api.duties_leader_board'), ('api.duties_member_history'), ('api.duties_my_duties'),
@@ -76,7 +76,7 @@ select results_eq(
            ('api.notifications_my_inbox'), ('api.notifications_my_push_settings'),
            ('api.notifications_open_item'),
            ('api.system_command'), ('app.cells_admin_overview'), ('app.cells_command'),
-           ('app.cells_leader_queue'), ('app.cells_meetings'), ('app.cells_my_cell'), ('app.cells_private_fixture_read'),
+           ('app.cells_leader_queue'), ('app.cells_meetings'), ('app.cells_my_cell'), ('app.cells_private_fixture_read'), ('app.cells_programme'),
            ('app.cells_signup_options'), ('app.duties_admin_overview'), ('app.duties_candidates'), ('app.duties_command'),
            ('app.duties_coverage'),
            ('app.duties_leader_board'), ('app.duties_member_history'), ('app.duties_my_duties'),

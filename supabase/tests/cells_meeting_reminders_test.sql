@@ -6,7 +6,7 @@
 -- snooze and the inbox over HTTP: tools/identity-e2e/cells-meeting-reminders.mjs. Every account,
 -- phone and name here is SYNTHETIC (fictional range +1 202 555 0160-0169).
 begin;
-select plan(41);
+select plan(45);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000052' || lpad(n::text, 2, '0'))::uuid $$;
@@ -316,6 +316,23 @@ select is((app.cells_erase_member(jsonb_build_object('phase', 'erase', 'member_i
   'the deletion hook anonymises the member''s contact needs (and their membership) and answers zero');
 select is((select count(*)::int from app.cells_meeting_contact_needs where member_id = pg_temp.mid(6)), 0,
   'no contact need keeps the erased member');
+
+-- 5.2 review fixes (shipped in the 5.3 migration) --------------------------------------------
+select pg_temp.cells(pg_temp.c(2), 'cells.set_meeting_reminders', pg_temp.rrev(),
+  jsonb_build_object('cell_id', pg_temp.sh(), 'reminders', '[]'::jsonb));
+select is((select count(*)::int from app.notifications_jobs j
+            where j.source_type = 'cells_meeting' and j.reminder_kind = 'cells_meeting_reminder'
+              and j.job_state = 'pending' and j.snoozed_from_item_id is null), 0,
+  'review fix 1: an empty reminder list means no reminders at all');
+select pg_temp.cells(pg_temp.c(2), 'cells.set_meeting_reminders', pg_temp.rrev(),
+  jsonb_build_object('cell_id', pg_temp.sh(), 'reminders', null));
+select is(pg_temp.reminder_at(pg_temp.nth_id(3), 5), null,
+  'member 5 (in Estates) has no Shikoswe reminder before joining');
+select pg_temp.place(5, pg_temp.sh());
+select is(pg_temp.reminder_at(pg_temp.nth_id(3), 5),
+  (select starts_at - interval '24 hours' from app.cells_meetings where meeting_id = pg_temp.nth_id(3)),
+  'review fix 4: confirming a member plans their reminders at once, back on the usual 24 hours');
+select is(app.cells_reminders_available(), true, 'the probe answers true while the Q2 fixture is usable');
 
 select * from finish();
 rollback;

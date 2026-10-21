@@ -86,6 +86,18 @@ context:
 
 ## Review Triage Log
 
+Independent review of `bfa57ed..story/5.2-meeting-reminders` (2026-10-21, a separate reviewer agent; no high-severity privacy finding). 5.2 was already on staging, so the fixes ship in the 5.3 migration (`20261021150000_cells_programmes.sql`, section "5.2 review fixes"), with pgTAP cases in `cells_meeting_reminders_test.sql`:
+
+1. High, fixed: an empty reminder list (`[]`, "Save: no reminders") fell back to the 24-hour default because `jsonb_agg` over no rows is null. Only `null` now means the default.
+2. Medium, fixed: planning read the meeting without a lock, so a read's sync could plan a stale revision against a concurrent move. `cells_plan_meeting` now locks the meeting (`for no key update`) before any Notifications call (Cells before Notifications).
+3. Medium, fixed: the policy probe could raise, and a planning refusal could fail a read. The probe now answers false on `PCMD1`, and generation plans inside a sub-block that logs and skips `PCMD1`.
+4. Medium, fixed: a newly confirmed or transferred member got no reminders until someone read. `cells.confirm_request` now syncs the new and the old cell.
+5. Low, accepted: audit rows are written after the Notifications calls in `set_meeting_reminders` and `set_schedule` (append-only rows; no lock cycle). Recorded.
+6. Low, accepted (runbook known limits): a weekday change notifies withdrawn dates but not the new ones; a re-timed cancelled meeting drops its pending cancellation notice.
+7. Low, fixed: "Tell directly" lists current members of the cell only.
+8. Low, accepted: `set_meeting_reminders` does not refuse a retired cell (a retired cell's schedule generates nothing).
+9. Low, fixed in the client: the reminder chips include any offset already set, so saving never drops it.
+
 ## Verification
 
 **Commands:**

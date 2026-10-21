@@ -434,6 +434,6 @@ Record the outcome per step in `evidence-5.4/owner-check.md` (pass/fail, device,
 
 ### Known limits
 
-- A published programme can't be changed yet (5.6), and moving or cancelling its meeting does not yet reconcile its duties (5.6): cancel the programme first.
+- A published programme can't be changed yet (5.6). While it is published, **Move** and **Cancel this meeting** on Cell meetings answer `conflict {"meeting_id": "programme_published"}` ("Programme published: cancel the programme on Plan first"). A schedule change that re-times or withdraws the meeting is not refused and does not yet reconcile its duties (5.6).
 - Mobile shows the programme from 5.5; leader confirmation for members without a login is 5.5 (a Duties contract change).
 - One position per part; no per-part instructions or reporting time.

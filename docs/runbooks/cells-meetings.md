@@ -437,3 +437,54 @@ Record the outcome per step in `evidence-5.4/owner-check.md` (pass/fail, device,
 - A published programme can't be changed yet (5.6). While it is published, **Move** and **Cancel this meeting** on Cell meetings answer `conflict {"meeting_id": "programme_published"}` ("Programme published: cancel the programme on Plan first"). A schedule change that re-times or withdraws the meeting is not refused and does not yet reconcile its duties (5.6).
 - Mobile shows the programme from 5.5; leader confirmation for members without a login is 5.5 (a Duties contract change).
 - One position per part; no per-part instructions or reporting time.
+
+## Story 5.5: You're on, answers and direct confirmation
+
+Migrations: `supabase/migrations/20261021100000_duties_cell_confirmation.sql` (a Duties contract change) and `supabase/migrations/20261021100500_cells_youre_on.sql`.
+Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-show-you-re-on-and-respond-to-programme-parts-on-my-cell-and-plan.md`.
+Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.5/`.
+
+### What changed
+
+- `api.cells_meeting_programme` adds `yours: [{part_id, occurrence_id}]`: the reader's own published parts and their Duties occurrence. The programme read never carries an answer; the member's own answer, reporting time and instructions come from their My duties read (`api.duties_my_duties`), matched by `occurrence_id`.
+- Members answer with the Duties commands (`duties.respond`, `duties.withdraw_acceptance`, `duties.accept_many`) at the assignment revision; a stale answer is `conflict`.
+- **Duties contract change:** `duties.confirm_by_leader {assignment_id, channel, reason}` (expected = assignment revision) also accepts a cell-owned assignment when the actor is a current leader or assistant of that cell. It records the 4.9 attributed confirmation (provenance `leader`, channel, reason, the leader as `responded_by`; audit `leader_confirmed` with capacity `cell_leader`/`cell_assistant`). Anyone else is `not_found` (a member, Admin alone, Pastor, another cell's leader, a department leader). A second confirmation is `conflict {"assignment_id": "responded"}`. Contact attempts, the coverage queue, leader alerts and outcomes stay department-only.
+
+### Clients
+
+- **Mobile My cell**: under the next meeting, the programme. The member's own part leads as **You're on** with its answer (Awaiting your answer, Accepted, Confirmed by leader, Declined), "Please arrive by ..." and the instructions, and **Accept** / **Can't do it** while it waits. Other parts show the leader's name, never an answer. Before publishing: "The programme for this meeting is not published yet."
+- **Mobile Home**: a **My cell** card (members with a confirmed cell and a next meeting): when the cell meets and "You're on: <part>, <time>" with the answer; **Open My cell**.
+- **Staff web, Plan meeting** (published): **They said yes directly** on a part awaiting an answer opens how (Phone call, Message, In person, Other) and what they said; **Record: confirmed by leader** shows the part as Confirmed by leader.
+- My duties keeps listing programme parts (Cell programme) as before.
+
+### Local runs
+
+```bash
+npx supabase db reset
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/cells-youre-on.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The E2E uses `+44 7700 900030-900039` and removes everything it created.
+
+### Hosted staging (parent session, then the owner)
+
+Apply the Duties migration, then the Cells one (renamed to their hosted versions), then the verify-hosted assertions. The mobile app on the owner's phone must be rebuilt from this branch to show You're on.
+
+### Owner manual checks (staging, phone and web, story 5.5)
+
+Use the 5.4 setup: a published programme with a part for M (you, on your phone), one for X (no login) and one for another member N.
+
+1. **You're on.** On your phone, **Home** shows **My cell** with "You're on: <part>, 18:00" and Awaiting your answer. Open **My cell**: the part leads with "Please arrive by" and the instructions.
+2. **Accept from My cell.** Tap **Accept**: the label becomes Accepted. **My duties** shows the same.
+3. **Decline from My duties.** As N (another phone or account), decline the part in **My duties**; M's My cell shows N's name for that part but no answer.
+4. **Confirm by leader.** As L on staff web, **Plan**, **They said yes directly** on X's part, Phone call, "Said yes on Tuesday", **Record**: the part shows Confirmed by leader.
+5. **Stale answer.** (API or two devices) answer the same part twice with the first revision: the second is refused as changed.
+
+Record the outcome per step in `evidence-5.5/owner-check.md` (pass/fail, device, browser; no numbers, ids or keys).
+
+### Known limits
+
+- No cell coverage queue, contact attempts or leader alerts for cell parts yet (department-only); the leader confirms from the published programme.
+- A declined part is not reassigned from the programme yet (5.6 publishes revisions).

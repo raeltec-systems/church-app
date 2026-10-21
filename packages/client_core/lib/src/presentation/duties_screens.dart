@@ -1238,6 +1238,11 @@ class _CreateDepartmentFormState extends ConsumerState<_CreateDepartmentForm> {
 /// Admin sees all; a Pastor sees all, read only). A leader publishes a duty
 /// to one department member with a response deadline and sees each
 /// position's answer.
+///
+/// The board answers one question first: which duties are short of
+/// confirmed people. Each department is a table (duty, when, where, how many
+/// are confirmed, and Change), each duty's positions and answers in a quiet
+/// well under its row; on a phone each duty is a two-line row.
 class DutyLeaderScreen extends StatelessWidget {
   const DutyLeaderScreen({super.key, this.reviewsOnly = false});
 
@@ -1253,41 +1258,59 @@ class DutyLeaderScreen extends StatelessWidget {
     provider: dutyLeaderProvider,
     needs: 'This page is for department leaders and deputies.',
     loading: 'Loading duties…',
-    body: (context, b, s) => Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (reviewsOnly)
-          Wrap(
-            key: const Key('leader-reviews-only'),
-            spacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              const Text(
-                'Showing the duties whose linked meeting or event changed.',
+    body: (context, b, s) {
+      final c = ChurchColors.of(context);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (reviewsOnly)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Wrap(
+                key: const Key('leader-reviews-only'),
+                spacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    'Showing the duties whose linked meeting or event changed.',
+                    style: ChurchType.secondary.copyWith(color: c.muted),
+                  ),
+                  FocusRing(
+                    child: TextButton(
+                      key: const Key('leader-show-all'),
+                      onPressed: () => context.go(DutyPaths.leader),
+                      child: const Text('Show all duties'),
+                    ),
+                  ),
+                ],
               ),
-              TextButton(
-                key: const Key('leader-show-all'),
-                onPressed: () => context.go(DutyPaths.leader),
-                child: const Text('Show all duties'),
+            ),
+          if (b.departments.isEmpty)
+            ChurchCard(
+              radius: churchCardRadiusOf(context),
+              child: Text(
+                'No departments yet.',
+                key: const Key('leader-no-departments'),
+                style: ChurchType.staffBody.copyWith(color: c.muted),
               ),
-            ],
-          ),
-        if (b.departments.isEmpty)
-          const Text('No departments yet.', key: Key('leader-no-departments')),
-        for (final d in b.departments) ...[
-          _LeaderDepartmentCard(
-            department: d,
-            busy: s.busy,
-            reviewsOnly: reviewsOnly,
-          ),
-          const SizedBox(height: 12),
+            ),
+          for (final (i, d) in b.departments.indexed) ...[
+            if (i > 0) const SizedBox(height: 36),
+            _LeaderDepartmentCard(
+              department: d,
+              busy: s.busy,
+              reviewsOnly: reviewsOnly,
+            ),
+          ],
         ],
-      ],
-    ),
+      );
+    },
   );
 }
 
-class _LeaderDepartmentCard extends StatelessWidget {
+/// One department: its name and the caller's capacity, who needs direct
+/// contact, the duties as a table, then the form to publish one more.
+class _LeaderDepartmentCard extends StatefulWidget {
   const _LeaderDepartmentCard({
     required this.department,
     required this.busy,
@@ -1298,8 +1321,41 @@ class _LeaderDepartmentCard extends StatelessWidget {
   final bool reviewsOnly;
 
   @override
+  State<_LeaderDepartmentCard> createState() => _LeaderDepartmentCardState();
+}
+
+class _LeaderDepartmentCardState extends State<_LeaderDepartmentCard> {
+  final _publishSection = GlobalKey();
+  final _publishName = FocusNode(debugLabel: 'publish a duty: name');
+
+  @override
+  void dispose() {
+    _publishName.dispose();
+    super.dispose();
+  }
+
+  /// The department's most frequent job, one click from its heading: the
+  /// form below the table comes into view with the cursor in its first
+  /// field.
+  void _goToPublish() {
+    final target = _publishSection.currentContext;
+    if (target != null) {
+      Scrollable.ensureVisible(
+        target,
+        alignment: 0.05,
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 200),
+      );
+    }
+    _publishName.requestFocus();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final d = department;
+    final c = ChurchColors.of(context);
+    final d = widget.department;
+    final reviewsOnly = widget.reviewsOnly;
     // Story 4.16: the reviews view lists only duties with an open review.
     final duties = reviewsOnly
         ? [
@@ -1307,68 +1363,255 @@ class _LeaderDepartmentCard extends StatelessWidget {
               if (duty.reviews.isNotEmpty) duty,
           ]
         : d.duties;
-    return _Card(
+    final publish = d.canPublish && !reviewsOnly;
+    // Story 4.8: who needs direct contact comes before the duties; when
+    // nobody does, one quiet line says so.
+    final contact =
+        d.contactNotices.isNotEmpty ||
+        d.duties.any(
+          (duty) =>
+              duty.positions.any((p) => p.assignment?.needsContact != null),
+        );
+    final heading = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Semantics(
+          header: true,
+          child: Text(
+            d.name,
+            style: ChurchType.sectionTitle.copyWith(color: c.ink),
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          d.capacityLabel,
+          style: ChurchType.secondary.copyWith(color: c.muted),
+        ),
+        if (!reviewsOnly && !contact)
+          Text(
+            'Nobody needs direct contact right now.',
+            key: Key('board-no-contact-${d.departmentId}'),
+            style: ChurchType.secondary.copyWith(color: c.muted),
+          ),
+      ],
+    );
+    return Column(
       key: Key('leader-department-${d.departmentId}'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _heading(context, d.name),
-              StatusLabel(label: d.capacityLabel, tone: StatusTone.info),
-            ],
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LayoutBuilder(
+          builder: (context, box) {
+            final jump = publish
+                ? FocusRing(
+                    child: OutlinedButton.icon(
+                      key: Key('board-publish-jump-${d.departmentId}'),
+                      onPressed: _goToPublish,
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Publish a duty'),
+                    ),
+                  )
+                : null;
+            // A phone: the button under the heading, so neither is squeezed.
+            if (box.maxWidth < 520) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  heading,
+                  if (jump != null) ...[const SizedBox(height: 8), jump],
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(child: heading),
+                if (jump != null) ...[const SizedBox(width: 12), jump],
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 12),
+        if (!reviewsOnly && contact) ...[
+          ChurchCard(
+            radius: churchCardRadiusOf(context),
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+            child: _NeedsContactList(department: d),
           ),
-          // Story 4.8: who needs direct contact, before the duties.
-          if (!reviewsOnly) _NeedsContactList(department: d),
-          const SizedBox(height: 12),
-          _heading(
-            context,
-            reviewsOnly
-                ? 'Needs review (${duties.length})'
-                : 'Duties (${d.duties.length})',
-          ),
-          // Story 4.16 (review N5): every duty needing review is listed
-          // even past the first 200, so the reviews view is complete.
-          if (d.dutiesTruncated && !reviewsOnly)
-            _muted(
-              context,
-              'Only the first 200 duties (and every duty that needs review) '
-              'are shown.',
-            ),
-          if (duties.isEmpty)
-            Text(
-              reviewsOnly ? 'Nothing needs review here.' : 'No duties yet.',
-              key: Key('no-duties-${d.departmentId}'),
-            ),
-          for (final duty in duties)
-            _LeaderDutyRow(
-              key: Key('leader-duty-row-${duty.occurrenceId}'),
-              duty: duty,
-              department: d,
-              busy: busy,
-            ),
-          if (d.canPublish && !reviewsOnly) ...[
-            const SizedBox(height: 20),
-            // A form reads best at about 640 px, not across the page.
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 680),
-                child: _PublishForm(
-                  key: Key('publish-${d.departmentId}'),
-                  department: d,
-                  busy: busy,
+          const SizedBox(height: 16),
+        ],
+        _BoardDutyTable(
+          department: d,
+          duties: duties,
+          busy: widget.busy,
+          reviewsOnly: reviewsOnly,
+        ),
+        if (publish) ...[
+          const SizedBox(height: 20),
+          // A form reads best at about 680 px, not across the page.
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: KeyedSubtree(
+                key: _publishSection,
+                child: StaffSection(
+                  title: 'Publish a duty',
+                  subtitle: 'To ${d.name}',
+                  child: _PublishForm(
+                    key: Key('publish-${d.departmentId}'),
+                    department: d,
+                    busy: widget.busy,
+                    nameFocus: _publishName,
+                  ),
                 ),
               ),
             ),
-          ],
+          ),
         ],
-      ),
+      ],
     );
   }
+}
+
+/// The table's columns on a wide screen; null on a narrow one (two-line
+/// rows instead).
+List<StaffColumn> _boardColumns(LeaderDepartment d) => [
+  const StaffColumn('Duty', flex: 4),
+  const StaffColumn('When (church time)', flex: 4),
+  const StaffColumn('Where', flex: 3),
+  const StaffColumn('Confirmed', width: 132, numeric: true),
+  if (d.canPublish) const StaffColumn('', width: 92),
+];
+
+/// A department's duties as a table: its title row ("Duties (3)" and how
+/// many are short of people), the 12 px grey header, one row group per duty.
+class _BoardDutyTable extends StatelessWidget {
+  const _BoardDutyTable({
+    required this.department,
+    required this.duties,
+    required this.busy,
+    required this.reviewsOnly,
+  });
+
+  final LeaderDepartment department;
+  final List<LeaderDuty> duties;
+  final bool busy;
+  final bool reviewsOnly;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final d = department;
+    final short = duties.where((x) => x.accepted < x.required).length;
+    final (shortText, shortColor) = short == 0
+        ? ('Every duty has its people', c.greenFg)
+        : (
+            '$short ${short == 1 ? 'duty' : 'duties'} short of people',
+            c.amberFg,
+          );
+    return LayoutBuilder(
+      builder: (context, box) {
+        final wide = box.maxWidth >= 760;
+        final columns = wide ? _boardColumns(d) : null;
+        return StaffTableFrame(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Semantics(
+                      header: true,
+                      child: Text(
+                        reviewsOnly
+                            ? 'Needs review (${duties.length})'
+                            : 'Duties (${d.duties.length})',
+                        style: ChurchType.cardTitle.copyWith(
+                          color: c.ink,
+                          fontSize: 17,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (duties.isNotEmpty)
+                    Text(
+                      shortText,
+                      key: Key('board-short-${d.departmentId}'),
+                      style: ChurchType.secondary.copyWith(
+                        color: shortColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // Story 4.16 (review N5): every duty needing review is listed
+            // even past the first 200, so the reviews view is complete.
+            if (d.dutiesTruncated && !reviewsOnly)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: _muted(
+                  context,
+                  'Only the first 200 duties (and every duty that needs '
+                  'review) are shown.',
+                ),
+              ),
+            if (duties.isEmpty)
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: c.line)),
+                ),
+                child: Text(
+                  reviewsOnly ? 'Nothing needs review here.' : 'No duties yet.',
+                  key: Key('no-duties-${d.departmentId}'),
+                  style: ChurchType.staffBody.copyWith(color: c.muted),
+                ),
+              )
+            else ...[
+              if (columns != null)
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border(top: BorderSide(color: c.line)),
+                  ),
+                  child: StaffTableHeader(columns: columns),
+                ),
+              for (final (i, duty) in duties.indexed)
+                _LeaderDutyRow(
+                  key: Key('leader-duty-row-${duty.occurrenceId}'),
+                  duty: duty,
+                  department: d,
+                  busy: busy,
+                  columns: columns,
+                  divider: columns == null || i > 0,
+                ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// When a duty is, as the table shows it: the start (and its end) on the
+/// first line, the reporting time on a second.
+(String, String?) _boardWhen(BuildContext context, DutyTimes t) {
+  final s = ChurchTime.wall(t.startsAt);
+  final first = StringBuffer(_when(context, t.startsAt));
+  if (t.endsAt case final e?) {
+    final w = ChurchTime.wall(e);
+    final sameDay = w.year == s.year && w.month == s.month && w.day == s.day;
+    first.write(
+      sameDay ? '–${_clock(context, e)}' : ' until ${_when(context, e)}',
+    );
+  }
+  return (
+    first.toString(),
+    switch (t.reportingAt) {
+      final r? => 'Report at ${_clock(context, r)}',
+      null => null,
+    },
+  );
 }
 
 class _LeaderDutyRow extends StatefulWidget {
@@ -1377,10 +1620,16 @@ class _LeaderDutyRow extends StatefulWidget {
     required this.duty,
     required this.department,
     required this.busy,
+    this.columns,
+    this.divider = true,
   });
   final LeaderDuty duty;
   final LeaderDepartment department;
   final bool busy;
+
+  /// The table's columns on a wide screen; null for a two-line row.
+  final List<StaffColumn>? columns;
+  final bool divider;
 
   @override
   State<_LeaderDutyRow> createState() => _LeaderDutyRowState();
@@ -1404,47 +1653,133 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
     final started = !duty.times.arriveBy.isAfter(DateTime.now());
     final c = ChurchColors.of(context);
     final meta = ChurchType.secondary.copyWith(color: c.muted);
-    // One duty: its name and how many are confirmed on the first line, when
-    // and where in grey, then each position and its answer.
-    return Container(
-      key: Key('leader-duty-$id'),
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        border: Border.all(color: c.line),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final canChange = widget.department.canPublish && !started;
+    final columns = widget.columns;
+    // How many are confirmed: the one coloured figure on the row (amber
+    // while short, green when full, grey when nothing is required).
+    final figureColor = duty.required == 0
+        ? c.muted
+        : duty.accepted < duty.required
+        ? c.amberFg
+        : c.greenFg;
+    final confirmed = Text.rich(
+      TextSpan(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  duty.dutyName,
-                  style: ChurchType.cardTitle.copyWith(
+          TextSpan(
+            text: '${duty.accepted} of ${duty.required}',
+            style: ChurchType.figures.copyWith(
+              color: figureColor,
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+            ),
+          ),
+          TextSpan(
+            text: ' confirmed',
+            style: ChurchType.secondary.copyWith(color: c.muted),
+          ),
+        ],
+      ),
+      key: Key('coverage-$id'),
+      textAlign: TextAlign.end,
+    );
+    final name = Text(
+      duty.dutyName,
+      style: ChurchType.staffBody.copyWith(
+        color: c.ink,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+    final change = canChange && !_editing
+        ? Semantics(
+            button: true,
+            label: 'Change this duty: ${duty.dutyName}',
+            excludeSemantics: true,
+            child: FocusRing(
+              child: TextButton(
+                key: Key('edit-$id'),
+                onPressed: widget.busy
+                    ? null
+                    : () => setState(() => _editing = true),
+                child: const Text('Change'),
+              ),
+            ),
+          )
+        : null;
+    final Widget main;
+    if (columns != null) {
+      final (whenText, report) = _boardWhen(context, duty.times);
+      main = Container(
+        constraints: const BoxConstraints(minHeight: 56),
+        padding: const EdgeInsets.fromLTRB(20, 6, 20, 6),
+        alignment: AlignmentDirectional.centerStart,
+        child: StaffColumnsRow(
+          columns: columns,
+          cells: [
+            name,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  whenText,
+                  style: ChurchType.staffBody.copyWith(
                     color: c.ink,
-                    fontSize: 16,
+                    fontSize: 14,
+                    fontFeatures: const [FontFeature.tabularFigures()],
                   ),
                 ),
+                if (report != null) Text(report, style: meta),
+              ],
+            ),
+            Text(
+              duty.location ?? '—',
+              style: ChurchType.staffBody.copyWith(
+                color: duty.location == null ? c.muted : c.ink,
+                fontSize: 14,
               ),
-              const SizedBox(width: 12),
-              Text(
-                '${duty.accepted} of ${duty.required} confirmed',
-                key: Key('coverage-$id'),
-                style: ChurchType.figures.copyWith(
-                  color: duty.accepted < duty.required ? c.amberFg : c.greenFg,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          Text(_timesText(context, duty.times), style: meta),
-          if (duty.location case final l?) Text('Where: $l', style: meta),
+            ),
+            confirmed,
+            if (widget.department.canPublish) change ?? const SizedBox.shrink(),
+          ],
+        ),
+      );
+    } else {
+      // A phone or a narrow window: the name and the figure on one line,
+      // when and where in grey under them.
+      main = Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: name),
+                const SizedBox(width: 12),
+                confirmed,
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              [_timesText(context, duty.times), ?duty.location].join(' · '),
+              style: meta,
+            ),
+          ],
+        ),
+      );
+    }
+    final pad = columns == null
+        ? const EdgeInsets.fromLTRB(16, 0, 16, 14)
+        : const EdgeInsets.fromLTRB(20, 0, 20, 16);
+    final detail = Padding(
+      padding: pad,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           if (duty.instructions case final i?)
             Text('Instructions: $i', style: meta),
-          const SizedBox(height: 6),
+          if (duty.topic case final t?) Text('Topic: $t', style: meta),
+          if (duty.scripture case final sc?)
+            Text('Scripture: $sc', style: meta),
           // Story 4.11: linked programme parts and owner-review mismatches.
           Consumer(
             builder: (context, ref, _) => _OwnerReviews(
@@ -1458,167 +1793,276 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
                   ref.read(dutyLeaderProvider.notifier).clearReview(duty, r),
             ),
           ),
-          if (duty.topic case final t?) Text('Topic: $t'),
-          if (duty.scripture case final sc?) Text('Scripture: $sc'),
-          for (final p in duty.positions) ...[
-            // Story 4.9: a cancelled position is no longer required.
-            if (p.cancelled)
-              Text(
-                '${p.positionName ?? 'Position ${p.positionNo}'}: Cancelled',
-                key: Key('position-cancelled-${p.slotId}'),
-              )
-            // Story 4.12: the person given it can no longer serve; story
-            // 4.16: with the coarse reason for the department's leaders and
-            // deputies (the server sends it to nobody else).
-            else if (p.vacated)
-              Wrap(
-                key: Key('position-vacated-${p.slotId}'),
-                spacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(
-                    '${p.positionName ?? 'Position ${p.positionNo}'}: Unfilled',
-                  ),
-                  const StatusLabel(
-                    label: 'Needs a new person',
-                    tone: StatusTone.warning,
-                  ),
-                  if (p.vacancyReason case final r?)
-                    Text(
-                      'Reason: ${DutyVacancyReasons.label(r)}',
-                      key: Key('position-vacancy-reason-${p.slotId}'),
-                    ),
-                ],
-              )
-            else if (p.assignment == null && p.positionName != null)
-              Text('${p.positionName}: Unfilled'),
-            if (p.assignment case final a?)
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(
-                    p.positionName == null
-                        ? (a.displayName ?? 'Removed member')
-                        : '${p.positionName}: '
-                              '${a.displayName ?? 'Removed member'}',
-                  ),
-                  Builder(
-                    builder: (context) {
-                      final (label, tone) = _answerLabel(
-                        a.response,
-                        a.priorAcceptedAt,
-                      );
-                      return StatusLabel(
-                        key: Key('response-${a.assignmentId}'),
-                        // Story 4.9: kept apart from the member's own answer.
-                        label: a.confirmation != null
-                            ? 'Confirmed by leader'
-                            : label,
-                        tone: tone,
-                      );
-                    },
-                  ),
-                  if (a.confirmation case final c?)
-                    _muted(
-                      context,
-                      '${c.by ?? 'A leader'} recorded it ${_when(context, c.at)} '
-                      '(${c.channel.label.toLowerCase()})'
-                      '${c.reason == null ? '' : ': "${c.reason}"'}',
-                    ),
-                  if (a.priorAcceptedAt case final t?)
-                    _muted(
-                      context,
-                      'Had accepted ${_when(context, t)}; needs cover',
-                    ),
-                  if (a.changes case final c?)
-                    StatusLabel(
-                      key: Key('changed-${a.assignmentId}'),
-                      label: 'Changed: ${DutyFields.describe(c)}',
-                      tone: StatusTone.info,
-                    ),
-                  if (a.response == DutyResponse.pending)
-                    _muted(
-                      context,
-                      a.shortNotice
-                          ? 'Given at short notice: answer requested now'
-                          : 'Answer by ${_when(context, a.responseDeadline)}'
-                                '${a.deadlineSource == DutyDeadlineSource.churchDefault ? ' (church default)' : ''}',
-                    ),
-                  ..._contactFlags(
-                    context,
-                    assignmentId: a.assignmentId,
-                    shortNotice: a.shortNotice,
-                    response: a.response,
-                    needsContact: a.needsContact,
-                  ),
-                  if (a.notesUpdatedAt case final u?)
-                    _muted(context, 'Details updated ${_when(context, u)}'),
-                  if (a.note case final n?)
-                    Text('Note: $n', key: Key('note-${a.assignmentId}')),
-                  if (a.overlaps > 0)
-                    StatusLabel(
-                      key: Key('overlaps-${a.assignmentId}'),
-                      label:
-                          'Overlaps ${a.overlaps} other '
-                          '${a.overlaps == 1 ? 'duty' : 'duties'}',
-                      tone: StatusTone.warning,
-                    ),
-                  if (a.override case final o?)
-                    Text(
-                      _overrideText(context, o),
-                      key: Key('override-${a.assignmentId}'),
-                    ),
-                ],
-              ),
-            if (p.history.isNotEmpty) _History(position: p),
+          if (duty.positions.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _BoardPositions(positions: duty.positions),
           ],
           // Story 4.8: the member reminders, changed without asking anyone
           // again.
           if (duty.reminders case final r?)
-            Consumer(
-              builder: (context, ref, _) {
-                final st = ref.watch(dutyLeaderProvider);
-                final mine =
-                    st.noticeAction?.command == DutyCommands.setReminders &&
-                    st.noticeAction?.request.payload['occurrence_id'] == id;
-                return _RemindersEditor(
-                  key: Key('leader-reminders-$id-r${duty.revision}'),
-                  keyPrefix: 'leader-$id',
-                  reminders: r,
-                  reporting: duty.times.reportingAt != null,
-                  canChange: widget.department.canPublish && !started,
-                  busy: widget.busy,
-                  error: mine ? st.fieldErrors['reminders'] : null,
-                  onSave: (specs) => ref
-                      .read(dutyLeaderProvider.notifier)
-                      .setReminders(duty, specs),
-                );
-              },
-            ),
-          if (widget.department.canPublish && !started) ...[
-            if (!_editing)
-              FocusRing(
-                child: TextButton(
-                  key: Key('edit-$id'),
-                  onPressed: widget.busy
-                      ? null
-                      : () => setState(() => _editing = true),
-                  child: const Text('Change this duty'),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: DefaultTextStyle.merge(
+                style: meta,
+                child: Consumer(
+                  builder: (context, ref, _) {
+                    final st = ref.watch(dutyLeaderProvider);
+                    final mine =
+                        st.noticeAction?.command == DutyCommands.setReminders &&
+                        st.noticeAction?.request.payload['occurrence_id'] == id;
+                    return _RemindersEditor(
+                      key: Key('leader-reminders-$id-r${duty.revision}'),
+                      keyPrefix: 'leader-$id',
+                      reminders: r,
+                      reporting: duty.times.reportingAt != null,
+                      canChange: widget.department.canPublish && !started,
+                      busy: widget.busy,
+                      error: mine ? st.fieldErrors['reminders'] : null,
+                      onSave: (specs) => ref
+                          .read(dutyLeaderProvider.notifier)
+                          .setReminders(duty, specs),
+                    );
+                  },
                 ),
-              )
-            else
-              _EditDutyForm(
-                key: Key('edit-form-$id-r${duty.revision}'),
-                duty: duty,
-                department: widget.department,
-                busy: widget.busy,
-                onClose: () => setState(() => _editing = false),
               ),
+            ),
+          // On a phone Change sits under the details.
+          if (columns == null && change != null)
+            Align(alignment: AlignmentDirectional.centerStart, child: change),
+          if (canChange && _editing) ...[
+            const SizedBox(height: 12),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: _EditDutyForm(
+                  key: Key('edit-form-$id-r${duty.revision}'),
+                  duty: duty,
+                  department: widget.department,
+                  busy: widget.busy,
+                  onClose: () => setState(() => _editing = false),
+                ),
+              ),
+            ),
           ],
         ],
       ),
+    );
+    return DecoratedBox(
+      key: Key('leader-duty-$id'),
+      decoration: BoxDecoration(
+        border: widget.divider ? Border(top: BorderSide(color: c.line)) : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [main, detail],
+      ),
+    );
+  }
+}
+
+/// A duty's positions in a quiet well under its row: each position's person
+/// and their answer (the position's one status mark), then what the leader
+/// needs to know about it in grey.
+class _BoardPositions extends StatelessWidget {
+  const _BoardPositions({required this.positions});
+
+  final List<DutyPosition> positions;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: c.bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (i, p) in positions.indexed)
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+              decoration: BoxDecoration(
+                border: i == 0 ? null : Border(top: BorderSide(color: c.line)),
+              ),
+              child: _BoardPosition(position: p),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BoardPosition extends StatelessWidget {
+  const _BoardPosition({required this.position});
+
+  final DutyPosition position;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final p = position;
+    final label = p.positionName ?? 'Position ${p.positionNo}';
+    final ink = ChurchType.staffBody.copyWith(color: c.ink, fontSize: 14);
+    final gap = ChurchType.staffBody.copyWith(
+      color: c.redFg,
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+    );
+    final lines = <Widget>[];
+    // Story 4.9: a cancelled position is no longer required.
+    if (p.cancelled) {
+      lines.add(
+        Text(
+          '$label: Cancelled',
+          key: Key('position-cancelled-${p.slotId}'),
+          style: ink.copyWith(color: c.muted),
+        ),
+      );
+    }
+    // Story 4.12: the person given it can no longer serve; story 4.16: with
+    // the coarse reason for the department's leaders and deputies (the
+    // server sends it to nobody else).
+    else if (p.vacated) {
+      lines.add(
+        Wrap(
+          key: Key('position-vacated-${p.slotId}'),
+          spacing: 8,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: '$label: ', style: ink),
+                  TextSpan(text: 'Unfilled', style: gap),
+                ],
+              ),
+            ),
+            const StatusLabel(
+              label: 'Needs a new person',
+              tone: StatusTone.warning,
+            ),
+            if (p.vacancyReason case final r?)
+              Text(
+                'Reason: ${DutyVacancyReasons.label(r)}',
+                key: Key('position-vacancy-reason-${p.slotId}'),
+                style: ChurchType.secondary.copyWith(color: c.muted),
+              ),
+          ],
+        ),
+      );
+    } else if (p.assignment == null && p.positionName != null) {
+      lines.add(
+        Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(text: '${p.positionName}: ', style: ink),
+              TextSpan(text: 'Unfilled', style: gap),
+            ],
+          ),
+        ),
+      );
+    }
+    if (p.assignment case final a?) {
+      final (answer, tone) = _answerLabel(a.response, a.priorAcceptedAt);
+      lines.add(
+        Wrap(
+          spacing: 10,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              p.positionName == null
+                  ? (a.displayName ?? 'Removed member')
+                  : '${p.positionName}: '
+                        '${a.displayName ?? 'Removed member'}',
+              style: ink.copyWith(fontWeight: FontWeight.w500),
+            ),
+            StatusLabel(
+              key: Key('response-${a.assignmentId}'),
+              // Story 4.9: kept apart from the member's own answer.
+              label: a.confirmation != null ? 'Confirmed by leader' : answer,
+              tone: tone,
+            ),
+            // Story 4.8: Short notice and Needs contact.
+            ..._contactFlags(
+              context,
+              assignmentId: a.assignmentId,
+              shortNotice: a.shortNotice,
+              response: a.response,
+              needsContact: a.needsContact,
+            ),
+          ],
+        ),
+      );
+      final quiet = ChurchType.secondary.copyWith(color: c.muted, fontSize: 13);
+      final details = <Widget>[
+        if (a.confirmation case final cf?)
+          Text(
+            '${cf.by ?? 'A leader'} recorded it ${_when(context, cf.at)} '
+            '(${cf.channel.label.toLowerCase()})'
+            '${cf.reason == null ? '' : ': "${cf.reason}"'}',
+            style: quiet,
+          ),
+        if (a.priorAcceptedAt case final t?)
+          Text('Had accepted ${_when(context, t)}; needs cover', style: quiet),
+        if (a.changes case final ch?)
+          Text(
+            'Changed: ${DutyFields.describe(ch)}',
+            key: Key('changed-${a.assignmentId}'),
+            style: quiet,
+          ),
+        if (a.response == DutyResponse.pending)
+          Text(
+            a.shortNotice
+                ? 'Given at short notice: answer requested now'
+                : 'Answer by ${_when(context, a.responseDeadline)}'
+                      '${a.deadlineSource == DutyDeadlineSource.churchDefault ? ' (church default)' : ''}',
+            style: quiet,
+          ),
+        if (a.notesUpdatedAt case final u?)
+          Text('Details updated ${_when(context, u)}', style: quiet),
+        if (a.note case final n?)
+          Text(
+            'Note: $n',
+            key: Key('note-${a.assignmentId}'),
+            style: quiet.copyWith(color: c.ink),
+          ),
+        if (a.overlaps > 0)
+          Text(
+            'Overlaps ${a.overlaps} other '
+            '${a.overlaps == 1 ? 'duty' : 'duties'}',
+            key: Key('overlaps-${a.assignmentId}'),
+            style: quiet.copyWith(
+              color: c.amberFg,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        if (a.override case final o?)
+          Text(
+            _overrideText(context, o),
+            key: Key('override-${a.assignmentId}'),
+            style: quiet,
+          ),
+      ];
+      if (details.isNotEmpty) {
+        lines.add(
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: details,
+            ),
+          ),
+        );
+      }
+    }
+    if (p.history.isNotEmpty) lines.add(_History(position: p));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: lines,
     );
   }
 }
@@ -1668,7 +2112,7 @@ class _OwnerReviews extends StatelessWidget {
         for (final r in reviews)
           Padding(
             key: Key('review-${r.flagId}'),
-            padding: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.only(top: 6),
             child: Wrap(
               spacing: 8,
               runSpacing: 4,
@@ -1681,6 +2125,9 @@ class _OwnerReviews extends StatelessWidget {
                 Text(
                   '${r.summary}. This duty was not changed; change it here if '
                   'it should follow.',
+                  style: ChurchType.secondary.copyWith(
+                    color: ChurchColors.of(context).ink,
+                  ),
                 ),
                 if (canClear)
                   Semantics(
@@ -1711,19 +2158,22 @@ class _History extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final quiet = ChurchType.secondary.copyWith(
+      color: ChurchColors.of(context).muted,
+      fontSize: 13,
+    );
     return Padding(
       key: Key('history-${position.slotId}'),
-      padding: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.only(top: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _muted(context, 'Earlier versions (${position.history.length})'),
+          Text('Earlier versions (${position.history.length})', style: quiet),
           for (final h in position.history)
             Padding(
               key: Key('history-${h.assignmentId}'),
               padding: const EdgeInsetsDirectional.only(start: 12),
-              child: _muted(
-                context,
+              child: Text(
                 [
                   '${h.displayName ?? 'Removed member'}: '
                       '${_answerLabel(h.response, h.priorAcceptedAt).$1}',
@@ -1735,12 +2185,46 @@ class _History extends StatelessWidget {
                       : 'replaced by a change ${_when(context, h.endedAt)}',
                   if (h.note case final n?) 'note: $n',
                 ].join(', '),
+                style: quiet,
               ),
             ),
         ],
       ),
     );
   }
+}
+
+/// Lays a duty form's short fields out two to a row when there is room
+/// (date beside start time, and so on), one under another on a phone.
+class _BoardFieldPairs extends StatelessWidget {
+  const _BoardFieldPairs({required this.pairs});
+
+  /// Each entry is one row: one field, or two side by side.
+  final List<List<Widget>> pairs;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, box) {
+      final two = box.maxWidth >= 520;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final row in pairs)
+            if (two && row.length == 2)
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: row[0]),
+                  const SizedBox(width: 12),
+                  Expanded(child: row[1]),
+                ],
+              )
+            else
+              ...row,
+        ],
+      );
+    },
+  );
 }
 
 /// Story 4.2, staff web: change a published duty. Changing the duty, date,
@@ -1889,6 +2373,7 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
   Widget build(BuildContext context) {
     final duty = widget.duty;
     final id = duty.occurrenceId;
+    final c = ChurchColors.of(context);
     final s = ref.watch(dutyLeaderProvider);
     // Only this form's own refusal names its fields.
     final mine =
@@ -1919,7 +2404,7 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
       int maxLength = 80,
       int maxLines = 1,
     }) => Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
         key: Key('$key-$id'),
         controller: c,
@@ -1930,18 +2415,33 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
           labelText: label,
           hintText: hint,
           errorText: wire == null ? null : err(wire),
+          // The limit still holds; only the long text shows its count.
+          counterText: maxLength > 120 ? null : '',
         ),
       ),
     );
     final inRoster = widget.department.members.any(
       (m) => m.memberId == _memberId,
     );
-    return _Card(
+    return Container(
       key: Key('edit-card-$id'),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border.all(color: c.line),
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _heading(context, 'Change this duty'),
+          Semantics(
+            header: true,
+            child: Text(
+              'Change this duty',
+              style: ChurchType.cardTitle.copyWith(color: c.ink, fontSize: 17),
+            ),
+          ),
+          const SizedBox(height: 4),
           _muted(
             context,
             'Changing the duty, date, times, place or person asks the member '
@@ -1951,52 +2451,62 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
                       'Every position of this date changes together; give a '
                       'position to someone on the Rota page.'}',
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 14),
           field('edit-name', _name, 'Duty', wire: 'duty_name'),
-          field(
-            'edit-date',
-            _date,
-            'Date',
-            hint: 'YYYY-MM-DD',
-            wire: 'starts_at',
-            maxLength: 10,
-          ),
-          field(
-            'edit-start',
-            _start,
-            'Start time',
-            hint: 'HH:MM',
-            maxLength: 5,
-          ),
-          field(
-            'edit-end',
-            _end,
-            'End time (optional)',
-            hint: 'HH:MM',
-            wire: 'ends_at',
-            maxLength: 5,
-          ),
-          field(
-            'edit-end-date',
-            _endDate,
-            'End date, if it ends on a later day (optional)',
-            hint: 'YYYY-MM-DD',
-            maxLength: 10,
-          ),
-          field(
-            'edit-reporting',
-            _reporting,
-            'Reporting time, if earlier than the start (optional)',
-            hint: 'HH:MM',
-            wire: 'reporting_at',
-            maxLength: 5,
-          ),
-          field(
-            'edit-location',
-            _location,
-            'Location (optional)',
-            wire: 'location',
-            maxLength: 120,
+          _BoardFieldPairs(
+            pairs: [
+              [
+                field(
+                  'edit-date',
+                  _date,
+                  'Date',
+                  hint: 'YYYY-MM-DD',
+                  wire: 'starts_at',
+                  maxLength: 10,
+                ),
+                field(
+                  'edit-start',
+                  _start,
+                  'Start time',
+                  hint: 'HH:MM',
+                  maxLength: 5,
+                ),
+              ],
+              [
+                field(
+                  'edit-end',
+                  _end,
+                  'End time (optional)',
+                  hint: 'HH:MM',
+                  wire: 'ends_at',
+                  maxLength: 5,
+                ),
+                field(
+                  'edit-end-date',
+                  _endDate,
+                  'End date, if a later day (optional)',
+                  hint: 'YYYY-MM-DD',
+                  maxLength: 10,
+                ),
+              ],
+              [
+                field(
+                  'edit-reporting',
+                  _reporting,
+                  'Reporting time, if earlier (optional)',
+                  hint: 'HH:MM',
+                  wire: 'reporting_at',
+                  maxLength: 5,
+                ),
+                field(
+                  'edit-location',
+                  _location,
+                  'Location (optional)',
+                  wire: 'location',
+                  maxLength: 120,
+                ),
+              ],
+            ],
           ),
           field(
             'edit-instructions',
@@ -2041,23 +2551,31 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
               ),
             ),
           if (err('member_id') case final e?)
-            Text(e, style: TextStyle(color: ChurchColors.of(context).redFg)),
-          const SizedBox(height: 8),
-          field(
-            'edit-deadline-date',
-            _deadlineDate,
-            'New answer by: date (optional; empty = the church default)',
-            hint: 'YYYY-MM-DD',
-            wire: 'response_deadline',
-            maxLength: 10,
+            Text(e, style: TextStyle(color: c.redFg)),
+          const SizedBox(height: 12),
+          _BoardFieldPairs(
+            pairs: [
+              [
+                field(
+                  'edit-deadline-date',
+                  _deadlineDate,
+                  'New answer by: date (optional)',
+                  hint: 'YYYY-MM-DD',
+                  wire: 'response_deadline',
+                  maxLength: 10,
+                ),
+                field(
+                  'edit-deadline-time',
+                  _deadlineTime,
+                  'New answer by: time',
+                  hint: 'HH:MM',
+                  maxLength: 5,
+                ),
+              ],
+            ],
           ),
-          field(
-            'edit-deadline-time',
-            _deadlineTime,
-            'New answer by: time',
-            hint: 'HH:MM',
-            maxLength: 5,
-          ),
+          _muted(context, 'An empty answer-by date means the church default.'),
+          const SizedBox(height: 12),
           ListenableBuilder(
             listenable: Listenable.merge(_all),
             builder: (context, _) {
@@ -2086,6 +2604,7 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
                       'No new answer-by time: the church default applies. '
                       '$_defaultDeadlineHelp',
                     ),
+                  const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -2121,9 +2640,17 @@ class _EditDutyFormState extends ConsumerState<_EditDutyForm> {
 }
 
 class _PublishForm extends ConsumerStatefulWidget {
-  const _PublishForm({super.key, required this.department, required this.busy});
+  const _PublishForm({
+    super.key,
+    required this.department,
+    required this.busy,
+    this.nameFocus,
+  });
   final LeaderDepartment department;
   final bool busy;
+
+  /// The first field, focused by the department's "Publish a duty" button.
+  final FocusNode? nameFocus;
 
   @override
   ConsumerState<_PublishForm> createState() => _PublishFormState();
@@ -2262,11 +2789,13 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
       String? hint,
       int maxLength = 80,
       int maxLines = 1,
+      FocusNode? focusNode,
     }) => Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
         key: Key('$key-$id'),
         controller: c,
+        focusNode: focusNode,
         enabled: !widget.busy,
         maxLength: maxLength,
         maxLines: maxLines,
@@ -2274,65 +2803,82 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
           labelText: label,
           hintText: hint,
           errorText: wire == null ? null : err(wire),
+          // The limit still holds; only the long text shows its count.
+          counterText: maxLength > 120 ? null : '',
         ),
       ),
     );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _heading(context, 'Publish a duty'),
         _muted(
           context,
           'One person, one position. They are asked to accept or say they '
           'can\'t make it by the answer-by time. Times are church time '
           '(Lusaka), whatever this computer\'s clock is set to.',
         ),
-        const SizedBox(height: 8),
-        field('publish-name', _name, 'Duty', wire: 'duty_name'),
+        const SizedBox(height: 14),
         field(
-          'publish-date',
-          _date,
-          'Date',
-          hint: 'YYYY-MM-DD',
-          wire: 'starts_at',
-          maxLength: 10,
+          'publish-name',
+          _name,
+          'Duty',
+          wire: 'duty_name',
+          focusNode: widget.nameFocus,
         ),
-        field(
-          'publish-start',
-          _start,
-          'Start time',
-          hint: 'HH:MM',
-          maxLength: 5,
-        ),
-        field(
-          'publish-end',
-          _end,
-          'End time (optional)',
-          hint: 'HH:MM',
-          wire: 'ends_at',
-          maxLength: 5,
-        ),
-        field(
-          'publish-end-date',
-          _endDate,
-          'End date, if it ends on a later day (optional)',
-          hint: 'YYYY-MM-DD',
-          maxLength: 10,
-        ),
-        field(
-          'publish-reporting',
-          _reporting,
-          'Reporting time, if earlier than the start (optional)',
-          hint: 'HH:MM',
-          wire: 'reporting_at',
-          maxLength: 5,
-        ),
-        field(
-          'publish-location',
-          _location,
-          'Location (optional)',
-          wire: 'location',
-          maxLength: 120,
+        _BoardFieldPairs(
+          pairs: [
+            [
+              field(
+                'publish-date',
+                _date,
+                'Date',
+                hint: 'YYYY-MM-DD',
+                wire: 'starts_at',
+                maxLength: 10,
+              ),
+              field(
+                'publish-start',
+                _start,
+                'Start time',
+                hint: 'HH:MM',
+                maxLength: 5,
+              ),
+            ],
+            [
+              field(
+                'publish-end',
+                _end,
+                'End time (optional)',
+                hint: 'HH:MM',
+                wire: 'ends_at',
+                maxLength: 5,
+              ),
+              field(
+                'publish-end-date',
+                _endDate,
+                'End date, if a later day (optional)',
+                hint: 'YYYY-MM-DD',
+                maxLength: 10,
+              ),
+            ],
+            [
+              field(
+                'publish-reporting',
+                _reporting,
+                'Reporting time, if earlier (optional)',
+                hint: 'HH:MM',
+                wire: 'reporting_at',
+                maxLength: 5,
+              ),
+              field(
+                'publish-location',
+                _location,
+                'Location (optional)',
+                wire: 'location',
+                maxLength: 120,
+              ),
+            ],
+          ],
         ),
         field(
           'publish-instructions',
@@ -2365,21 +2911,27 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
           Text(e, style: TextStyle(color: ChurchColors.of(context).redFg)),
         if (d.members.isEmpty)
           _muted(context, 'This department has no members yet.'),
-        const SizedBox(height: 8),
-        field(
-          'publish-deadline-date',
-          _deadlineDate,
-          'Answer by: date (optional)',
-          hint: 'YYYY-MM-DD',
-          wire: 'response_deadline',
-          maxLength: 10,
-        ),
-        field(
-          'publish-deadline-time',
-          _deadlineTime,
-          'Answer by: time (optional)',
-          hint: 'HH:MM',
-          maxLength: 5,
+        const SizedBox(height: 12),
+        _BoardFieldPairs(
+          pairs: [
+            [
+              field(
+                'publish-deadline-date',
+                _deadlineDate,
+                'Answer by: date (optional)',
+                hint: 'YYYY-MM-DD',
+                wire: 'response_deadline',
+                maxLength: 10,
+              ),
+              field(
+                'publish-deadline-time',
+                _deadlineTime,
+                'Answer by: time (optional)',
+                hint: 'HH:MM',
+                maxLength: 5,
+              ),
+            ],
+          ],
         ),
         _muted(context, _defaultDeadlineHelp),
         const SizedBox(height: 8),
@@ -2397,7 +2949,7 @@ class _PublishFormState extends ConsumerState<_PublishForm> {
                 setState(() => on ? _reminders.add(c) : _reminders.remove(c)),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: ListenableBuilder(

@@ -1,12 +1,12 @@
 -- Story 5.5: show You're on and respond to programme parts on My cell and Home (epic 5, C6).
--- Builds on 20261021094249_cells_programme_publish.sql and 20261021100000_duties_cell_confirmation.sql.
+-- Builds on 20261021094249_cells_programme_publish.sql and 20261021101314_duties_cell_confirmation.sql.
 --
 --   * api.cells_meeting_programme adds `yours`: the reader's own published parts, each with its
 --     Duties occurrence, so the member's app shows that part's actual answer, reporting time and
 --     instructions from My duties (the member's own Duties read) and answers through the Duties
 --     response commands. Other members' answers are never part of this read.
 --   * Leader confirmation for a member without a login is the Duties contract change in
---     20261021100000_duties_cell_confirmation.sql (duties.confirm_by_leader under the cell scope).
+--     20261021101314_duties_cell_confirmation.sql (duties.confirm_by_leader under the cell scope).
 --
 -- No destructive statements and no row deletions. No anon grant. ASCII only.
 

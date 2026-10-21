@@ -3,7 +3,7 @@ title: 'Show You''re on and respond to programme parts on My cell and Home'
 type: 'feature'
 ticket: '5'
 created: '2026-10-21'
-status: 'in-progress'
+status: 'done'
 baseline_revision: '450962a'
 route: 'full'
 route_source: 'auto'
@@ -56,8 +56,8 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261021100000_duties_cell_confirmation.sql` (Duties contract change)
-- [x] `supabase/migrations/20261021100500_cells_youre_on.sql`
+- [x] `supabase/migrations/20261021101314_duties_cell_confirmation.sql` (Duties contract change)
+- [x] `supabase/migrations/20261021101323_cells_youre_on.sql`
 - [x] `supabase/tests/cells_youre_on_test.sql`
 - [x] Clients: `yours`, `MemberProgrammeController`, `confirmByLeader`, My cell You're on, Home My cell card, Plan meeting direct confirmation.
 - [x] E2E `tools/identity-e2e/cells-youre-on.mjs` + offline test.

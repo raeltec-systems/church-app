@@ -440,7 +440,7 @@ Record the outcome per step in `evidence-5.4/owner-check.md` (pass/fail, device,
 
 ## Story 5.5: You're on, answers and direct confirmation
 
-Migrations: `supabase/migrations/20261021100000_duties_cell_confirmation.sql` (a Duties contract change) and `supabase/migrations/20261021100500_cells_youre_on.sql`.
+Migrations: `supabase/migrations/20261021101314_duties_cell_confirmation.sql` (a Duties contract change) and `supabase/migrations/20261021101323_cells_youre_on.sql`.
 Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-show-you-re-on-and-respond-to-programme-parts-on-my-cell-and-plan.md`.
 Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.5/`.
 

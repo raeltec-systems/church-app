@@ -1077,7 +1077,7 @@ Record the outcome of each step in `evidence-4.11/owner-check.md`: pass or fail,
 
 ### Known limits (later entries)
 
-- Cell-scope leader alerts, coverage queue, contact attempts and outcomes for cell parts: still department-only. **Confirmed by leader for cell parts was added in story 5.5** (`20261021100000_duties_cell_confirmation.sql`: `duties.confirm_by_leader` accepts a cell-owned assignment from a current leader or assistant of that cell; see [cells-meetings.md](cells-meetings.md#story-55-youre-on-answers-and-direct-confirmation)).
+- Cell-scope leader alerts, coverage queue, contact attempts and outcomes for cell parts: still department-only. **Confirmed by leader for cell parts was added in story 5.5** (`20261021101314_duties_cell_confirmation.sql`: `duties.confirm_by_leader` accepts a cell-owned assignment from a current leader or assistant of that cell; see [cells-meetings.md](cells-meetings.md#story-55-youre-on-answers-and-direct-confirmation)).
 - A discovery read of linkable department duties for cells was added in story 5.4 (`app.duties_owner_linkable`).
 - The creator's reminder choice for a part (`reminders`) is not taken; cell parts use the church defaults.
 - A system-principal caller (no live session) is not supported; owner operations need the acting member's session.

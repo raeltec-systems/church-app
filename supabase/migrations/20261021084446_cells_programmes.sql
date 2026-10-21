@@ -1,5 +1,5 @@
 -- Story 5.3: draft a meeting programme with validated parts and visible gaps (epic 5, C3).
--- Builds on 20261021073514_cells_meetings.sql and 20261021120000_cells_meeting_reminders.sql.
+-- Builds on 20261021073514_cells_meetings.sql and 20261021081026_cells_meeting_reminders.sql.
 --
 --   * One programme per meeting (app.cells_programmes): topic, scripture, study notes, state
 --     (draft, cancelled; 5.4 adds published) and revision. Its date, time and venue are the

@@ -244,7 +244,7 @@ numbers, ids or keys).
 
 ## Story 5.3: programme drafts with validated parts and visible gaps
 
-Migration: `supabase/migrations/20261021150000_cells_programmes.sql` (no row deletions; one file; it
+Migration: `supabase/migrations/20261021084446_cells_programmes.sql` (no row deletions; one file; it
 also carries the 5.2 review fixes).
 Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-draft-a-meeting-programme-with-validated-parts-and-visible-ga-plan.md`.
 Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.3/`.

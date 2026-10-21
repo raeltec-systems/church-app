@@ -60,7 +60,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261021150000_cells_programmes.sql`
+- [x] `supabase/migrations/20261021084446_cells_programmes.sql`
 - [x] `supabase/tests/cells_programmes_test.sql`
 - [x] Clients: domain, controller, **Plan meeting** screen (`/cells/meetings/:meetingId/plan`) with member preview, **Plan** on each meeting row.
 - [x] E2E `tools/identity-e2e/cells-programmes.mjs` + offline test.

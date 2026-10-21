@@ -86,7 +86,7 @@ context:
 
 ## Review Triage Log
 
-Independent review of `bfa57ed..story/5.2-meeting-reminders` (2026-10-21, a separate reviewer agent; no high-severity privacy finding). 5.2 was already on staging, so the fixes ship in the 5.3 migration (`20261021150000_cells_programmes.sql`, section "5.2 review fixes"), with pgTAP cases in `cells_meeting_reminders_test.sql`:
+Independent review of `bfa57ed..story/5.2-meeting-reminders` (2026-10-21, a separate reviewer agent; no high-severity privacy finding). 5.2 was already on staging, so the fixes ship in the 5.3 migration (`20261021084446_cells_programmes.sql`, section "5.2 review fixes"), with pgTAP cases in `cells_meeting_reminders_test.sql`:
 
 1. High, fixed: an empty reminder list (`[]`, "Save: no reminders") fell back to the 24-hour default because `jsonb_agg` over no rows is null. Only `null` now means the default.
 2. Medium, fixed: planning read the meeting without a lock, so a read's sync could plan a stale revision against a concurrent move. `cells_plan_meeting` now locks the meeting (`for no key update`) before any Notifications call (Cells before Notifications).

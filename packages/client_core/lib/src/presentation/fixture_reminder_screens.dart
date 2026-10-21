@@ -148,8 +148,8 @@ class FixtureRemindersScreen extends ConsumerWidget {
         ),
       ),
     ]);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Test reminders')),
+    return ChurchPageScaffold(
+      title: 'Test reminders',
       body: SafeArea(
         child: SingleChildScrollView(
           padding: layout.pagePadding,

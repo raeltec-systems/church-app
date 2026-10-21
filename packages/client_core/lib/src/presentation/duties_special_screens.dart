@@ -27,6 +27,7 @@ class DutySpecialScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _DutiesPage<SpecialAssignments>(
     title: 'Special assignments',
+    subtitle: 'Duties the pastors give outside any department',
     provider: dutySpecialProvider,
     needs: _specialNeeds,
     loading: 'Loading special assignments…',

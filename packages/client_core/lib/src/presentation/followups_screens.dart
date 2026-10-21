@@ -199,9 +199,13 @@ class _FollowUpsPage<T> extends ConsumerStatefulWidget {
     required this.needs,
     required this.loading,
     required this.body,
+    this.subtitle,
   });
 
   final String title;
+
+  /// Staff web: one line about the data under the page title.
+  final String? subtitle;
   final ProviderListenable<FollowUpsState<T>> provider;
   final FollowUpsController<T> Function(WidgetRef ref) controller;
   final String needs;
@@ -321,22 +325,32 @@ class _FollowUpsPageState<T> extends ConsumerState<_FollowUpsPage<T>> {
     } else {
       children.add(_readProblem(result, widget.needs));
     }
-    children.addAll([
-      const SizedBox(height: ChurchGeometry.sectionGap),
-      Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: FocusRing(
-          child: OutlinedButton.icon(
-            key: const Key('followups-reload'),
-            onPressed: s.loading || s.busy ? null : ctl.reload,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Reload'),
+    // Staff web has Reload in the page header; the phone keeps it under the
+    // content.
+    final staff = identical(layout, ChurchLayout.staff);
+    final reload = s.loading || s.busy ? null : ctl.reload;
+    if (!staff) {
+      children.addAll([
+        const SizedBox(height: ChurchGeometry.sectionGap),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: FocusRing(
+            child: OutlinedButton.icon(
+              key: const Key('followups-reload'),
+              onPressed: reload,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reload'),
+            ),
           ),
         ),
-      ),
-    ]);
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      ]);
+    }
+    return ChurchPageScaffold(
+      title: widget.title,
+      subtitle: widget.subtitle,
+      actions: [
+        if (staff) staffReloadButton(const Key('followups-reload'), reload),
+      ],
       body: SafeArea(
         child: SingleChildScrollView(
           padding: layout.pagePadding,
@@ -511,6 +525,7 @@ class MyFollowUpsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _FollowUpsPage<MyFollowUps>(
     title: 'My follow-ups',
+    subtitle: 'Tasks you own',
     provider: myFollowUpsProvider,
     controller: (ref) => ref.read(myFollowUpsProvider.notifier),
     needs: 'My follow-ups needs member access.',
@@ -1174,6 +1189,7 @@ class FollowUpSupervisionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _FollowUpsPage<FollowUpSupervision>(
     title: 'Follow-ups',
+    subtitle: 'Tasks in the cells and departments you lead',
     provider: followUpSupervisionProvider,
     controller: (ref) => ref.read(followUpSupervisionProvider.notifier),
     needs: 'Follow-ups is for the leaders of a department or cell.',
@@ -1621,6 +1637,7 @@ class FollowUpRoutingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _FollowUpsPage<FollowUpAdminRouting>(
     title: 'Follow-up routing',
+    subtitle: 'Who owns and supervises each open task',
     provider: followUpRoutingProvider,
     controller: (ref) => ref.read(followUpRoutingProvider.notifier),
     needs: 'Follow-up routing is for Admins.',

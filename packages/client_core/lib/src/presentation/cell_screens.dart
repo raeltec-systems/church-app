@@ -319,9 +319,18 @@ class _CellsPage<T> extends ConsumerStatefulWidget {
     required this.loading,
     required this.body,
     this.tabRoot = false,
+    this.subtitle,
+    this.headerAction,
   });
 
   final String title;
+
+  /// Staff web: one line about the data under the page title.
+  final String? subtitle;
+
+  /// Staff web: the screen's main action in the page header.
+  final Widget? Function(BuildContext context, T value, CellsState<T> state)?
+  headerAction;
   final NotifierProvider<CellsController<T>, CellsState<T>> provider;
   final String needs;
   final String loading;
@@ -443,42 +452,34 @@ class _CellsPageState<T> extends ConsumerState<_CellsPage<T>> {
       );
     }
     // On the phone a pushed screen refreshes from its bar (and by pulling);
-    // staff web keeps the Reload button under the content.
+    // staff web has Reload in the page header, after the main action.
     final phone = !identical(layout, ChurchLayout.staff);
     final reload = s.loading || s.busy ? null : ctl.reload;
-    if (!phone) {
-      children.addAll([
-        const SizedBox(height: ChurchGeometry.sectionGap),
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: FocusRing(
-            child: OutlinedButton.icon(
-              key: const Key('cells-reload'),
-              onPressed: s.loading || s.busy ? null : ctl.reload,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Reload'),
-            ),
-          ),
-        ),
-      ]);
-    }
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-        actions: [
-          if (phone)
-            FocusRing(
-              radius: 22,
-              child: IconButton(
-                key: const Key('cells-reload'),
-                tooltip: 'Reload',
-                onPressed: reload,
-                icon: const Icon(Icons.refresh),
-              ),
-            ),
-          const SizedBox(width: 4),
-        ],
+    final main = switch ((widget.headerAction, result)) {
+      (final f?, AccessReadOk(:final value)) when !phone => f(
+        context,
+        value,
+        s,
       ),
+      _ => null,
+    };
+    return ChurchPageScaffold(
+      title: widget.title,
+      subtitle: widget.subtitle,
+      actions: phone
+          ? [
+              FocusRing(
+                radius: 22,
+                child: IconButton(
+                  key: const Key('cells-reload'),
+                  tooltip: 'Reload',
+                  onPressed: reload,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ),
+              const SizedBox(width: 4),
+            ]
+          : [?main, staffReloadButton(const Key('cells-reload'), reload)],
       body: SafeArea(
         child: RefreshIndicator(
           notificationPredicate: (n) => phone && n.depth == 0,
@@ -556,6 +557,7 @@ class CellAdminScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _CellsPage<CellAdminOverview>(
     title: 'Cells',
+    subtitle: 'Leaders, requests to join and confirmed membership',
     provider: cellAdminProvider,
     needs: 'Cells needs the Admin role.',
     loading: 'Loading cells…',
@@ -1112,6 +1114,7 @@ class CellLeaderScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _CellsPage<LeaderQueue>(
     title: 'My cell group',
+    subtitle: 'Your cell\'s members and requests to join',
     provider: cellLeaderProvider,
     needs: 'This page is for cell leaders and assistants.',
     loading: 'Loading your cell…',
@@ -1604,6 +1607,7 @@ class CellMeetingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _CellsPage<CellMeetingsBoard>(
     title: 'Cell meetings',
+    subtitle: 'Schedules, the meetings ahead and the last four weeks',
     provider: cellMeetingsProvider,
     needs: 'This page is for cell leaders, assistants and Admins.',
     loading: 'Loading cell meetings…',
@@ -2500,6 +2504,7 @@ class PlanMeetingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _CellsPage<ProgrammeRead>(
     title: 'Plan meeting',
+    subtitle: 'The programme members see once it is published',
     provider: cellProgrammeProvider(meetingId),
     needs:
         'This page is for the cell\'s leader and assistant, and for pastors.',

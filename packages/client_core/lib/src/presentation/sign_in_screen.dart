@@ -19,7 +19,12 @@ class SignInScreen extends ConsumerStatefulWidget {
     this.afterCreateAccount = ClientPaths.account,
     this.assistedRecovery = false,
     this.continueTo,
+    this.afterSignIn = ClientPaths.account,
   });
+
+  /// Where a sign-in continues when there is no [continueTo] (staff web:
+  /// the Overview).
+  final String afterSignIn;
 
   /// Story 2.9 (mobile): the church help panel links to "I need help
   /// accessing my account" (staff-assisted recovery on this device).
@@ -131,7 +136,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         context.go(
           next.createdAccount
               ? widget.afterCreateAccount
-              : (widget.continueTo ?? ClientPaths.account),
+              : (widget.continueTo ?? widget.afterSignIn),
         );
         return;
       }
@@ -147,8 +152,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     });
     final create = _mode == _Mode.create;
 
-    return Scaffold(
-      appBar: AppBar(title: Text(create ? 'Create account' : 'Sign in')),
+    return ChurchPageScaffold(
+      title: create ? 'Create account' : 'Sign in',
       body: SafeArea(
         child: SingleChildScrollView(
           padding: layout.pagePadding,

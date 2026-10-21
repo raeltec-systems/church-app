@@ -14,6 +14,7 @@ class DutyRotaScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _DutiesPage<DutyRota>(
     title: 'Rota',
+    subtitle: 'Planned dates and who serves at each position',
     provider: dutyRotaProvider,
     needs: 'This page is for department leaders and deputies.',
     loading: 'Loading the rota…',

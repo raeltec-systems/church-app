@@ -126,30 +126,33 @@ class _MembershipReviewScreenState
     } else if (result is! AccessReadOk<ReviewQueue>) {
       children.add(_readProblem(result));
     } else {
+      final more = s.queueNext == null ? '' : '+';
       children.addAll([
-        SegmentedButton<_Section>(
-          key: const Key('review-sections'),
-          segments: [
-            ButtonSegment(
-              value: _Section.applications,
-              label: Text('Applications (${s.applications.length})'),
+        // The handoff's segmented track, as wide as its options.
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: RadioSegments<_Section>(
+              key: const Key('review-sections'),
+              label: 'Show',
+              options: [
+                SegmentOption(
+                  _Section.applications,
+                  'Applications (${s.applications.length}$more)',
+                ),
+                const SegmentOption(_Section.members, 'All members'),
+                const SegmentOption(_Section.reclaim, 'Reclaim a username'),
+              ],
+              selected: _section,
+              onChanged: (v) {
+                setState(() => _section = v);
+                if (v == _Section.members && s.searchResult == null) {
+                  ctl.search(null);
+                }
+              },
             ),
-            const ButtonSegment(
-              value: _Section.members,
-              label: Text('All members'),
-            ),
-            const ButtonSegment(
-              value: _Section.reclaim,
-              label: Text('Reclaim a username'),
-            ),
-          ],
-          selected: {_section},
-          onSelectionChanged: (v) {
-            setState(() => _section = v.first);
-            if (v.first == _Section.members && s.searchResult == null) {
-              ctl.search(null);
-            }
-          },
+          ),
         ),
         const SizedBox(height: ChurchGeometry.sectionGap),
         switch (_section) {
@@ -159,22 +162,15 @@ class _MembershipReviewScreenState
         },
       ]);
     }
-    children.addAll([
-      const SizedBox(height: ChurchGeometry.sectionGap),
-      Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: FocusRing(
-          child: OutlinedButton.icon(
-            key: const Key('review-reload'),
-            onPressed: s.loading || s.busy ? null : ctl.reload,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Reload'),
-          ),
+    return ChurchPageScaffold(
+      title: 'Members & applications',
+      subtitle: 'Applications, member records and sign-in usernames',
+      actions: [
+        staffReloadButton(
+          const Key('review-reload'),
+          s.loading || s.busy ? null : ctl.reload,
         ),
-      ),
-    ]);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Members & applications')),
+      ],
       body: SafeArea(
         child: SingleChildScrollView(
           padding: layout.pagePadding,
@@ -201,9 +197,15 @@ class _MembershipReviewScreenState
     MembershipReviewController ctl,
   ) {
     if (s.applications.isEmpty) {
-      return const Text(
-        'No applications are waiting.',
-        key: Key('review-no-applications'),
+      return ChurchCard(
+        radius: 12,
+        child: Text(
+          'No applications are waiting.',
+          key: const Key('review-no-applications'),
+          style: ChurchType.staffBody.copyWith(
+            color: ChurchColors.of(context).muted,
+          ),
+        ),
       );
     }
     return Column(
@@ -439,6 +441,8 @@ class _Card extends StatelessWidget {
   }
 }
 
+/// How the Admin checked who the person is: one row of radio choices (the
+/// key is on each whole choice, label included).
 Widget _identityCheckPicker({
   required String keyPrefix,
   required IdentityCheck? value,
@@ -450,23 +454,77 @@ Widget _identityCheckPicker({
   onChanged: (v) {
     if (enabled) onChanged(v);
   },
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        optional ? 'Identity check (optional)' : 'Identity check',
-        style: ChurchType.cardTitle,
-      ),
-      for (final k in IdentityCheck.values)
-        RadioListTile<IdentityCheck>(
-          key: Key('$keyPrefix-check-${k.wire}'),
-          value: k,
-          contentPadding: EdgeInsets.zero,
-          title: Text(k.label),
-        ),
-    ],
+  child: Builder(
+    builder: (context) {
+      final c = ChurchColors.of(context);
+      return Wrap(
+        spacing: 4,
+        runSpacing: 0,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Text(
+              optional ? 'Identity check (optional)' : 'Identity check',
+              style: ChurchType.label.copyWith(color: c.ink),
+            ),
+          ),
+          for (final k in IdentityCheck.values)
+            _RadioChoice<IdentityCheck>(
+              key: Key('$keyPrefix-check-${k.wire}'),
+              value: k,
+              label: k.label,
+              enabled: enabled,
+              onSelect: () => onChanged(k),
+            ),
+        ],
+      );
+    },
   ),
 );
+
+/// A radio and its label as one tappable choice, sized to its content
+/// (a [RadioListTile] takes the full width).
+class _RadioChoice<T> extends StatelessWidget {
+  const _RadioChoice({
+    super.key,
+    required this.value,
+    required this.label,
+    required this.enabled,
+    required this.onSelect,
+  });
+
+  final T value;
+  final String label;
+  final bool enabled;
+  final VoidCallback onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    return MergeSemantics(
+      child: InkWell(
+        onTap: enabled ? onSelect : null,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Radio<T>(value: value, enabled: enabled),
+              Flexible(
+                child: Text(
+                  label,
+                  style: ChurchType.staffBody.copyWith(color: c.ink),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// One open application with its decision controls.
 class _ApplicationCard extends ConsumerStatefulWidget {
@@ -509,21 +567,31 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
       CellChoiceKind.notSure => 'Not sure which cell',
       CellChoiceKind.notInCell => 'Not in a cell yet',
     };
+    final details = <String>[
+      app.phoneUsername,
+      cell,
+      if (a.priorNotApproved > 0)
+        '${a.priorNotApproved} earlier '
+            '${a.priorNotApproved == 1 ? 'request' : 'requests'} not approved',
+    ];
     return _Card(
       key: Key('application-card-$id'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 10,
+            runSpacing: 6,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               Semantics(
                 header: true,
                 child: Text(
                   app.fullName,
-                  style: ChurchType.cardTitle.copyWith(color: c.ink),
+                  style: ChurchType.cardTitle.copyWith(
+                    color: c.ink,
+                    fontSize: 17,
+                  ),
                 ),
               ),
               StatusLabel(
@@ -542,14 +610,17 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
             ],
           ),
           const SizedBox(height: 4),
-          Text('Sign-in username (not verified): ${app.phoneUsername}'),
-          Text(cell),
-          if (a.priorNotApproved > 0)
-            Text(
-              'Earlier requests from this account not approved: '
-              '${a.priorNotApproved}',
-              key: Key('prior-$id'),
-            ),
+          // The sign-in number, the cell they asked about and any earlier
+          // refusals: one grey line.
+          Text(
+            details.join(' · '),
+            key: a.priorNotApproved > 0 ? Key('prior-$id') : null,
+            style: ChurchType.secondary.copyWith(color: c.muted),
+          ),
+          Text(
+            'Sign-in number not verified',
+            style: ChurchType.secondary.copyWith(color: c.muted, fontSize: 13),
+          ),
           if (a.ownAccount)
             const Padding(
               padding: EdgeInsets.only(top: 8),
@@ -560,38 +631,51 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
             ),
           if (a.candidates.isNotEmpty) ...[
             const SizedBox(height: 12),
+            // The handoff's amber notice: a possible existing record.
             Container(
               key: Key('duplicates-$id'),
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
               decoration: BoxDecoration(
-                border: Border.all(color: c.line),
-                borderRadius: BorderRadius.circular(8),
+                color: c.amberBg,
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Possible existing member records (staff only)',
-                    style: ChurchType.cardTitle.copyWith(color: c.ink),
+                    'Possible existing member records (staff only). Check '
+                    'who they are before linking.',
+                    style: ChurchType.secondary.copyWith(
+                      color: c.amberFg,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  const SizedBox(height: 4),
                   for (final cand in a.candidates)
                     Padding(
-                      padding: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.only(top: 6),
                       child: Wrap(
                         spacing: 8,
                         runSpacing: 4,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          Text(cand.displayName),
-                          StatusLabel(
-                            label: _accountLabel(cand.account),
-                            tone: _accountTone(cand.account),
+                          Text(
+                            cand.displayName,
+                            style: ChurchType.secondary.copyWith(
+                              color: c.ink,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                          for (final sig in cand.signals)
-                            StatusLabel(
-                              label: DuplicateCandidate.signalLabel(sig),
-                              tone: StatusTone.warning,
+                          // What matched, each its own phrase.
+                          for (final why in [
+                            _accountLabel(cand.account),
+                            for (final sig in cand.signals)
+                              DuplicateCandidate.signalLabel(sig),
+                          ])
+                            Text(
+                              why,
+                              style: ChurchType.secondary.copyWith(
+                                color: c.amberFg,
+                              ),
                             ),
                           FocusRing(
                             child: TextButton(
@@ -600,6 +684,9 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
                                   canDecide && checked && cand.linkEligible
                                   ? () => ctl.link(a, cand.memberId, _check!)
                                   : null,
+                              style: TextButton.styleFrom(
+                                foregroundColor: c.ink,
+                              ),
                               child: Text(
                                 cand.linkEligible
                                     ? 'Link to this member'
@@ -615,22 +702,21 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
             ),
           ],
           const SizedBox(height: 12),
+          Divider(height: 1, color: c.line),
+          const SizedBox(height: 12),
+          // Check first, then decide: the identity check sits before the
+          // decisions it unlocks.
           _identityCheckPicker(
             keyPrefix: 'app-$id',
             value: _check,
             enabled: canDecide,
             onChanged: (v) => setState(() => _check = v),
           ),
-          if (!checked)
-            Text(
-              'Record how you checked who they are before approving or '
-              'linking.',
-              style: ChurchType.secondary.copyWith(color: c.muted),
-            ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 4,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               FocusRing(
                 child: FilledButton(
@@ -665,9 +751,18 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
                   onPressed: canDecide
                       ? () => setState(() => _mode = _Mode.reject)
                       : null,
+                  style: OutlinedButton.styleFrom(foregroundColor: c.redFg),
                   child: const Text('Reject'),
                 ),
               ),
+              if (!checked && canDecide)
+                Padding(
+                  padding: const EdgeInsets.only(left: 8),
+                  child: Text(
+                    'Record how you checked who they are to approve or link.',
+                    style: ChurchType.secondary.copyWith(color: c.muted),
+                  ),
+                ),
             ],
           ),
           if (_mode == _Mode.details) ..._detailsForm(a, ctl, canDecide),
@@ -888,22 +983,29 @@ class _MembersSectionState extends ConsumerState<_MembersSection> {
         ? s.fieldErrors
         : const <String, String>{};
     final result = s.searchResult;
+    final shown = s.members.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
+        // The toolbar: search, and the section's own job (add a record for
+        // someone without a login).
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            Expanded(
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 380),
               child: TextField(
                 key: const Key('member-query'),
                 controller: _query,
                 decoration: const InputDecoration(
                   labelText: 'Search by name or contact number',
+                  prefixIcon: Icon(Icons.search, size: 20),
                 ),
                 onSubmitted: (v) => ctl.search(v),
               ),
             ),
-            const SizedBox(width: 8),
             FocusRing(
               child: OutlinedButton(
                 key: const Key('member-search'),
@@ -911,109 +1013,62 @@ class _MembersSectionState extends ConsumerState<_MembersSection> {
                 child: const Text('Search'),
               ),
             ),
+            if (!_adding)
+              FocusRing(
+                child: FilledButton.icon(
+                  key: const Key('add-member-record'),
+                  onPressed: () => setState(() => _adding = true),
+                  icon: const Icon(Icons.person_add_alt_1_outlined),
+                  label: const Text('Add member record (no login)'),
+                ),
+              ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         if (result != null && result is! AccessReadOk<MemberSearchPage>)
           _readProblem(result)
         else if (result != null && s.members.isEmpty)
-          const Text('No members match.', key: Key('member-none')),
-        for (final m in s.members) ...[
-          _Card(
-            key: Key('member-record-${m.memberId}'),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      m.displayName,
-                      style: ChurchType.cardTitle.copyWith(color: c.ink),
-                    ),
-                    StatusLabel(
-                      label: _accountLabel(m.account),
-                      tone: _accountTone(m.account),
-                    ),
-                    if (m.isSynthetic)
-                      const StatusLabel(
-                        label: 'Synthetic test record',
-                        tone: StatusTone.neutral,
-                      ),
-                  ],
-                ),
-                for (final r in m.contactRoutes)
-                  Text(
-                    'Contact: ${r.phone} (${r.owner.label}'
-                    '${r.holderLabel == null ? '' : ': ${r.holderLabel}'}). '
-                    'Not a login.',
-                  ),
-                if (m.account != AccountStanding.noLogin) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      DropdownButton<UnlinkReason>(
-                        key: Key('unlink-reason-${m.memberId}'),
-                        hint: const Text('Reason to unlink'),
-                        value: _unlinkReasons[m.memberId],
-                        items: [
-                          for (final r in UnlinkReason.values)
-                            DropdownMenuItem(value: r, child: Text(r.label)),
-                        ],
-                        onChanged: s.busy
-                            ? null
-                            : (v) => setState(() {
-                                if (v != null) _unlinkReasons[m.memberId] = v;
-                              }),
-                      ),
-                      FocusRing(
-                        child: OutlinedButton(
-                          key: Key('unlink-${m.memberId}'),
-                          onPressed:
-                              s.busy || _unlinkReasons[m.memberId] == null
-                              ? null
-                              : () =>
-                                    ctl.unlink(m, _unlinkReasons[m.memberId]!),
-                          child: const Text('Unlink account'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
+          ChurchCard(
+            radius: 12,
+            child: Text(
+              'No members match.',
+              key: const Key('member-none'),
+              style: ChurchType.staffBody.copyWith(color: c.muted),
+            ),
+          )
+        else if (shown > 0) ...[
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              '$shown ${shown == 1 ? 'member' : 'members'} shown'
+              '${s.membersNext == null ? '' : ', more below'}',
+              style: ChurchType.secondary.copyWith(color: c.muted),
             ),
           ),
-          const SizedBox(height: 12),
+          _MemberTable(
+            members: s.members,
+            busy: s.busy,
+            reasons: _unlinkReasons,
+            onReason: (m, r) => setState(() => _unlinkReasons[m.memberId] = r),
+            onUnlink: (m) => ctl.unlink(m, _unlinkReasons[m.memberId]!),
+          ),
         ],
         if (s.membersNext != null)
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: FocusRing(
-              child: OutlinedButton(
-                key: const Key('member-more'),
-                onPressed: s.searching ? null : ctl.loadMoreMembers,
-                child: const Text('Show more members'),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: FocusRing(
+                child: OutlinedButton(
+                  key: const Key('member-more'),
+                  onPressed: s.searching ? null : ctl.loadMoreMembers,
+                  child: const Text('Show more members'),
+                ),
               ),
             ),
           ),
         const SizedBox(height: ChurchGeometry.sectionGap),
-        if (!_adding)
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: FocusRing(
-              child: FilledButton.icon(
-                key: const Key('add-member-record'),
-                onPressed: () => setState(() => _adding = true),
-                icon: const Icon(Icons.person_add_alt_1_outlined),
-                label: const Text('Add member record (no login)'),
-              ),
-            ),
-          )
-        else
+        if (_adding)
           _Card(
             key: const Key('add-member-form'),
             child: Column(
@@ -1228,6 +1283,207 @@ class _ReclaimSectionState extends ConsumerState<_ReclaimSection> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// All members as a table: rules and alignment, 12 px grey sentence-case
+/// headers, one status mark per row (the account), the one action where it
+/// applies (unlink an account). Below about 900 px each member is a
+/// two-line row instead.
+class _MemberTable extends StatelessWidget {
+  const _MemberTable({
+    required this.members,
+    required this.busy,
+    required this.reasons,
+    required this.onReason,
+    required this.onUnlink,
+  });
+
+  final List<MemberRecord> members;
+  final bool busy;
+  final Map<String, UnlinkReason> reasons;
+  final void Function(MemberRecord m, UnlinkReason r) onReason;
+  final void Function(MemberRecord m) onUnlink;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final head = ChurchType.secondary.copyWith(color: c.muted, fontSize: 12);
+    return ChurchCard(
+      key: const Key('member-table'),
+      radius: 12,
+      padding: EdgeInsets.zero,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final wide = box.maxWidth >= 900;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (wide)
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+                  decoration: BoxDecoration(
+                    border: Border(bottom: BorderSide(color: c.line)),
+                  ),
+                  child: ExcludeSemantics(
+                    child: Row(
+                      children: [
+                        Expanded(flex: 3, child: Text('Name', style: head)),
+                        Expanded(flex: 3, child: Text('Contact', style: head)),
+                        Expanded(flex: 2, child: Text('Account', style: head)),
+                        Expanded(
+                          flex: 6,
+                          child: Text(
+                            'Unlink an account',
+                            style: head,
+                            textAlign: TextAlign.end,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              for (var i = 0; i < members.length; i++)
+                _row(context, members[i], wide: wide, divider: i > 0),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _row(
+    BuildContext context,
+    MemberRecord m, {
+    required bool wide,
+    required bool divider,
+  }) {
+    final c = ChurchColors.of(context);
+    final name = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          m.displayName,
+          style: ChurchType.staffBody.copyWith(
+            color: c.ink,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        if (m.isSynthetic)
+          Text(
+            'Synthetic test record',
+            style: ChurchType.secondary.copyWith(color: c.muted, fontSize: 13),
+          ),
+      ],
+    );
+    final contact = m.contactRoutes.isEmpty
+        ? Text('—', style: ChurchType.staffBody.copyWith(color: c.muted))
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // The number over whose it is (a contact route, never a login).
+              for (final r in m.contactRoutes) ...[
+                Text(r.phone, style: ChurchType.figures.copyWith(color: c.ink)),
+                Text(
+                  '${r.owner.label}'
+                  '${r.holderLabel == null ? '' : ': ${r.holderLabel}'}'
+                  ' · not a login',
+                  style: ChurchType.secondary.copyWith(
+                    color: c.muted,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ],
+          );
+    final account = StatusLabel(
+      label: _accountLabel(m.account),
+      tone: _accountTone(m.account),
+    );
+    final action = m.account == AccountStanding.noLogin
+        ? const SizedBox.shrink()
+        : Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: 230,
+                child: DropdownButton<UnlinkReason>(
+                  isExpanded: true,
+                  key: Key('unlink-reason-${m.memberId}'),
+                  hint: const Text('Reason to unlink'),
+                  value: reasons[m.memberId],
+                  items: [
+                    for (final r in UnlinkReason.values)
+                      DropdownMenuItem(value: r, child: Text(r.label)),
+                  ],
+                  onChanged: busy
+                      ? null
+                      : (v) {
+                          if (v != null) onReason(m, v);
+                        },
+                ),
+              ),
+              FocusRing(
+                child: OutlinedButton(
+                  key: Key('unlink-${m.memberId}'),
+                  onPressed: busy || reasons[m.memberId] == null
+                      ? null
+                      : () => onUnlink(m),
+                  child: const Text('Unlink account'),
+                ),
+              ),
+            ],
+          );
+    return Container(
+      key: Key('member-record-${m.memberId}'),
+      constraints: const BoxConstraints(minHeight: 56),
+      padding: const EdgeInsets.fromLTRB(20, 10, 16, 10),
+      decoration: BoxDecoration(
+        border: divider ? Border(top: BorderSide(color: c.line)) : null,
+      ),
+      child: wide
+          ? Row(
+              children: [
+                Expanded(flex: 3, child: name),
+                Expanded(flex: 3, child: contact),
+                Expanded(
+                  flex: 2,
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: account,
+                  ),
+                ),
+                Expanded(
+                  flex: 6,
+                  child: Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: action,
+                  ),
+                ),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: name),
+                    const SizedBox(width: 8),
+                    account,
+                  ],
+                ),
+                const SizedBox(height: 4),
+                contact,
+                if (m.account != AccountStanding.noLogin) ...[
+                  const SizedBox(height: 4),
+                  action,
+                ],
+              ],
+            ),
     );
   }
 }

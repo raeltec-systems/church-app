@@ -53,20 +53,22 @@ class HeroCard extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.all(20),
+    this.watermark = HeroWatermark.none,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
 
+  /// The church seal as a faint mark behind the content (owner's choice,
+  /// 2026-10-21: [HeroWatermark.wide] while something needs an answer,
+  /// [HeroWatermark.corner] otherwise).
+  final HeroWatermark watermark;
+
   @override
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
-    return Container(
+    final content = Padding(
       padding: padding,
-      decoration: BoxDecoration(
-        color: c.hero,
-        borderRadius: BorderRadius.circular(ChurchGeometry.heroRadius),
-      ),
       child: DefaultTextStyle.merge(
         style: const TextStyle(color: Colors.white),
         child: IconTheme.merge(
@@ -74,6 +76,84 @@ class HeroCard extends StatelessWidget {
           child: child,
         ),
       ),
+    );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(ChurchGeometry.heroRadius),
+      child: ColoredBox(
+        color: c.hero,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: ExcludeSemantics(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 350),
+                  child: KeyedSubtree(
+                    key: ValueKey(watermark),
+                    child: _Watermark(watermark),
+                  ),
+                ),
+              ),
+            ),
+            content,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Where the seal sits on a [HeroCard], all white at low opacity so it reads
+/// as a grey mark on the navy.
+enum HeroWatermark {
+  none,
+
+  /// 220 px at the bottom right, a quarter off the card, tilted 16°, 8 %.
+  corner,
+
+  /// 380 px behind the right half, tilted 10°, 5 %.
+  wide,
+}
+
+class _Watermark extends StatelessWidget {
+  const _Watermark(this.mark);
+  final HeroWatermark mark;
+
+  @override
+  Widget build(BuildContext context) {
+    if (mark == HeroWatermark.none) return const SizedBox.shrink();
+    return LayoutBuilder(
+      builder: (context, box) {
+        final (size, angle, opacity) = switch (mark) {
+          HeroWatermark.corner => (220.0, -16.0, 0.08),
+          _ => (380.0, -10.0, 0.05),
+        };
+        final seal = Transform.rotate(
+          angle: angle * 3.141592653589793 / 180,
+          child: Image.asset(
+            'assets/bic-logo-white.png',
+            package: 'church_design_system',
+            width: size,
+            height: size,
+            opacity: AlwaysStoppedAnimation(opacity),
+            excludeFromSemantics: true,
+          ),
+        );
+        final key = Key('hero-watermark-${mark.name}');
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            if (mark == HeroWatermark.corner)
+              Positioned(key: key, right: -54, bottom: -64, child: seal)
+            else
+              Positioned(
+                key: key,
+                left: box.maxWidth * 0.42,
+                top: box.maxHeight / 2 - size / 2,
+                child: seal,
+              ),
+          ],
+        );
+      },
     );
   }
 }

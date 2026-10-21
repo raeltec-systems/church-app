@@ -1324,6 +1324,7 @@ class _MyCellBodyState extends ConsumerState<_MyCellBody> {
                   ),
                 )
               : HeroCard(
+                  watermark: HeroWatermark.corner,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

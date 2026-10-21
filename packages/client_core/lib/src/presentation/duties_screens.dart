@@ -3600,6 +3600,9 @@ class _MyDutiesHomeCardState extends ConsumerState<MyDutiesHomeCard> {
     final soft = Colors.white.withValues(alpha: 0.78);
     final text = ChurchType.body.copyWith(color: on);
     Widget? pill;
+    // The seal behind the card: wide while something waits for an answer,
+    // in the corner otherwise (owner's choice).
+    var mark = HeroWatermark.corner;
     final body = <Widget>[];
     if (s.notice case final n? when s.pending == null) {
       final (_, title, message) = _noticeText(n, s.noticeAction, s.fieldErrors);
@@ -3662,6 +3665,7 @@ class _MyDutiesHomeCardState extends ConsumerState<MyDutiesHomeCard> {
         final seg = MyDutySegments.of(value.assignments, DateTime.now());
         final next = seg.next;
         final awaiting = seg.needsResponse.length;
+        if (awaiting > 0) mark = HeroWatermark.wide;
         // Handoff: the count is an amber pill in the header; with nothing
         // waiting, a quiet line says so.
         final awaitingText = Text(
@@ -3787,6 +3791,7 @@ class _MyDutiesHomeCardState extends ConsumerState<MyDutiesHomeCard> {
     return KeyedSubtree(
       key: const Key('home-duties-card'),
       child: HeroCard(
+        watermark: mark,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

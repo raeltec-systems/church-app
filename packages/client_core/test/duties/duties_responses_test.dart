@@ -655,6 +655,29 @@ void main() {
   });
 
   group('Home My duties card', () {
+    testWidgets('the seal sits wide while a duty waits, in the corner once '
+        'nothing does', (tester) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.home,
+        setUp: (h) => h.duties.mine = mineWith([sunday(_a1, 1)]),
+      );
+      // The mark cross-fades from the loading card's; let it finish.
+      await tester.pumpAndSettle();
+      expect(byKey('hero-watermark-wide'), findsOneWidget);
+      expect(byKey('hero-watermark-corner'), findsNothing);
+      // Answered: nothing waits, so the seal moves to the corner.
+      await tapKey(tester, 'home-duty-accept-$_a1');
+      h.duties.mine = mineWith([
+        sunday(_a1, 2, response: 'accepted', respondedAt: _accepted),
+      ]);
+      h.gateway.sent.single.confirm(const {}, 2);
+      await settle(tester);
+      await tester.pumpAndSettle();
+      expect(byKey('hero-watermark-corner'), findsOneWidget);
+      expect(byKey('hero-watermark-wide'), findsNothing);
+    });
+
     testWidgets('awaiting count, the next duty, inline answers, See all', (
       tester,
     ) async {

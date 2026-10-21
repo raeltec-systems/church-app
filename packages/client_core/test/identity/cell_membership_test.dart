@@ -325,6 +325,37 @@ void main() {
       expect(byKey('cells-notice-confirmed'), findsOneWidget);
     });
 
+    testWidgets('two panes: the cells on the left with their requests counted; '
+        'choosing one shows its leaders and its requests', (tester) async {
+      await pumpAt(
+        tester,
+        ClientPaths.adminCells,
+        setUp: (h) => h.cells.admin = overviewWith(
+          cells: [
+            adminCellData(),
+            adminCellData(id: _cellY, name: 'SYNTHETIC Cell Y'),
+          ],
+          requests: [adminCellRequestData(requestedCellId: _cellY)],
+        ),
+      );
+      // The first cell is open; the request waits on the second.
+      expect(byKey('admin-cell-card-$_cellX'), findsOneWidget);
+      expect(byKey('admin-request-card-$_request'), findsNothing);
+      expect(byKey('no-waiting'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: byKey('cell-list-$_cellY'),
+          matching: find.text('1'),
+        ),
+        findsOneWidget,
+      );
+      await tapKey(tester, 'cell-list-$_cellY');
+      await settle(tester);
+      expect(byKey('admin-cell-card-$_cellY'), findsOneWidget);
+      expect(byKey('admin-cell-card-$_cellX'), findsNothing);
+      expect(byKey('admin-request-card-$_request'), findsOneWidget);
+    });
+
     testWidgets('the Admin\'s own record cannot be decided by them', (
       tester,
     ) async {

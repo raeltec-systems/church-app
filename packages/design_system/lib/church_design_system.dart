@@ -7,5 +7,6 @@ library;
 export 'src/components.dart';
 export 'src/controls.dart';
 export 'src/focus.dart';
+export 'src/staff.dart';
 export 'src/theme.dart';
 export 'src/tokens.dart';

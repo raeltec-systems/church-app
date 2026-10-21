@@ -219,8 +219,8 @@ class _MembershipApplicationScreenState
       children.add(_body(context, s));
     }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Join the church')),
+    return ChurchPageScaffold(
+      title: 'Join the church',
       body: SafeArea(
         child: SingleChildScrollView(
           padding: layout.pagePadding,

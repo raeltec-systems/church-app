@@ -16,8 +16,8 @@ import 'shell_routing.dart' show ClientPaths;
 Widget _page(BuildContext context, String title, List<Widget> children) {
   final c = ChurchColors.of(context);
   final layout = ChurchLayout.of(context);
-  return Scaffold(
-    appBar: AppBar(title: Text(title)),
+  return ChurchPageScaffold(
+    title: title,
     body: SafeArea(
       child: SingleChildScrollView(
         padding: layout.pagePadding,

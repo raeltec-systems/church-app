@@ -319,9 +319,18 @@ class _CellsPage<T> extends ConsumerStatefulWidget {
     required this.loading,
     required this.body,
     this.tabRoot = false,
+    this.subtitle,
+    this.headerAction,
   });
 
   final String title;
+
+  /// Staff web: one line about the data under the page title.
+  final String? subtitle;
+
+  /// Staff web: the screen's main action in the page header.
+  final Widget? Function(BuildContext context, T value, CellsState<T> state)?
+  headerAction;
   final NotifierProvider<CellsController<T>, CellsState<T>> provider;
   final String needs;
   final String loading;
@@ -443,42 +452,34 @@ class _CellsPageState<T> extends ConsumerState<_CellsPage<T>> {
       );
     }
     // On the phone a pushed screen refreshes from its bar (and by pulling);
-    // staff web keeps the Reload button under the content.
+    // staff web has Reload in the page header, after the main action.
     final phone = !identical(layout, ChurchLayout.staff);
     final reload = s.loading || s.busy ? null : ctl.reload;
-    if (!phone) {
-      children.addAll([
-        const SizedBox(height: ChurchGeometry.sectionGap),
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: FocusRing(
-            child: OutlinedButton.icon(
-              key: const Key('cells-reload'),
-              onPressed: s.loading || s.busy ? null : ctl.reload,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Reload'),
-            ),
-          ),
-        ),
-      ]);
-    }
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-        actions: [
-          if (phone)
-            FocusRing(
-              radius: 22,
-              child: IconButton(
-                key: const Key('cells-reload'),
-                tooltip: 'Reload',
-                onPressed: reload,
-                icon: const Icon(Icons.refresh),
-              ),
-            ),
-          const SizedBox(width: 4),
-        ],
+    final main = switch ((widget.headerAction, result)) {
+      (final f?, AccessReadOk(:final value)) when !phone => f(
+        context,
+        value,
+        s,
       ),
+      _ => null,
+    };
+    return ChurchPageScaffold(
+      title: widget.title,
+      subtitle: widget.subtitle,
+      actions: phone
+          ? [
+              FocusRing(
+                radius: 22,
+                child: IconButton(
+                  key: const Key('cells-reload'),
+                  tooltip: 'Reload',
+                  onPressed: reload,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ),
+              const SizedBox(width: 4),
+            ]
+          : [?main, staffReloadButton(const Key('cells-reload'), reload)],
       body: SafeArea(
         child: RefreshIndicator(
           notificationPredicate: (n) => phone && n.depth == 0,
@@ -556,6 +557,7 @@ class CellAdminScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _CellsPage<CellAdminOverview>(
     title: 'Cells',
+    subtitle: 'Leaders, requests to join and confirmed membership',
     provider: cellAdminProvider,
     needs: 'Cells needs the Admin role.',
     loading: 'Loading cells…',
@@ -563,71 +565,256 @@ class CellAdminScreen extends StatelessWidget {
   );
 }
 
-class _AdminBody extends ConsumerWidget {
+/// The handoff's two panes: the cells down the left (each with its open
+/// requests counted), the chosen cell on the right with its leaders, its
+/// requests to join and its confirmed members. Requests with no cell (the
+/// church office's follow-up) come first, across the page.
+class _AdminBody extends ConsumerStatefulWidget {
   const _AdminBody({required this.overview, required this.state});
   final CellAdminOverview overview;
   final CellsState<CellAdminOverview> state;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final followUp = overview.requests.where((r) => r.followUp).toList();
-    final waiting = overview.requests.where((r) => !r.followUp).toList();
+  ConsumerState<_AdminBody> createState() => _AdminBodyState();
+}
+
+class _AdminBodyState extends ConsumerState<_AdminBody> {
+  String? _selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final overview = widget.overview;
+    final state = widget.state;
+    final c = ChurchColors.of(context);
+    // A request for a cell that is not on the list is handled with the
+    // follow-up, so nothing waits out of sight.
+    final followUp = overview.requests
+        .where((r) => r.followUp || overview.cell(r.requestedCellId) == null)
+        .toList();
+    final waiting = overview.requests
+        .where((r) => !r.followUp && overview.cell(r.requestedCellId) != null)
+        .toList();
+    final selected =
+        overview.cell(_selected) ??
+        (overview.cells.isEmpty ? null : overview.cells.first);
+    List<AdminCellRequest> waitingFor(AdminCell cell) =>
+        waiting.where((r) => r.requestedCellId == cell.cellId).toList();
+
+    final followUpBlock = _Card(
+      key: const Key('follow-up-block'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _heading(
+            context,
+            'Follow-up (${followUp.length})',
+            key: const Key('follow-up-heading'),
+          ),
+          _muted(
+            context,
+            'No cell chosen yet, or the leader passed it to the church '
+            'office. Confirm into the cell you checked with its leader, or '
+            'close it.',
+          ),
+          const SizedBox(height: 8),
+          if (followUp.isEmpty)
+            Text(
+              'Nothing to follow up.',
+              key: const Key('no-follow-up'),
+              style: ChurchType.staffBody.copyWith(color: c.muted),
+            ),
+          for (var i = 0; i < followUp.length; i++)
+            _AdminRequestCard(
+              key: Key(
+                'admin-request-${followUp[i].requestId}-r'
+                '${followUp[i].memberRevision}',
+              ),
+              request: followUp[i],
+              overview: overview,
+              busy: state.busy,
+              divider: i > 0,
+            ),
+        ],
+      ),
+    );
+
+    final list = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+          child: Text(
+            overview.cells.length == 1
+                ? '1 cell'
+                : '${overview.cells.length} cells',
+            style: ChurchType.secondary.copyWith(color: c.muted),
+          ),
+        ),
+        for (final cell in overview.cells)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _CellListItem(
+              cell: cell,
+              requests: waitingFor(cell).length,
+              selected: cell.cellId == selected?.cellId,
+              onTap: () => setState(() => _selected = cell.cellId),
+            ),
+          ),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: _CreateCellForm(busy: state.busy),
+        ),
+      ],
+    );
+
+    final Widget detail;
+    if (selected == null) {
+      detail = _Card(
+        child: Text(
+          'No cells yet. Add the first one; it needs a leader before members '
+          'can be confirmed into it.',
+          key: const Key('no-cells'),
+          style: ChurchType.staffBody.copyWith(color: c.muted),
+        ),
+      );
+    } else {
+      final requests = waitingFor(selected);
+      final roster =
+          overview.members.where((m) => m.cellId == selected.cellId).toList()
+            ..sort((a, b) => a.displayName.compareTo(b.displayName));
+      detail = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _AdminCellCard(
+            key: Key('admin-cell-${selected.cellId}-r${selected.revision}'),
+            cell: selected,
+            overview: overview,
+            busy: state.busy,
+          ),
+          const SizedBox(height: 16),
+          _Card(
+            key: Key('cell-requests-${selected.cellId}'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _heading(context, 'Requests to join (${requests.length})'),
+                _muted(
+                  context,
+                  'The cell\'s leader confirms these. You may confirm after '
+                  'checking with the leader.',
+                ),
+                const SizedBox(height: 8),
+                if (requests.isEmpty)
+                  Text(
+                    'No requests are waiting.',
+                    key: const Key('no-waiting'),
+                    style: ChurchType.staffBody.copyWith(color: c.muted),
+                  ),
+                for (var i = 0; i < requests.length; i++)
+                  _AdminRequestCard(
+                    key: Key(
+                      'admin-request-${requests[i].requestId}-r'
+                      '${requests[i].memberRevision}',
+                    ),
+                    request: requests[i],
+                    overview: overview,
+                    busy: state.busy,
+                    divider: i > 0,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _Card(
+            key: Key('cell-roster-${selected.cellId}'),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _heading(
+                  context,
+                  'Confirmed members (${selected.memberCount})',
+                ),
+                if (roster.isEmpty)
+                  _muted(
+                    context,
+                    selected.memberCount == 0
+                        ? 'Nobody is confirmed in this cell yet.'
+                        : 'Their names are not in this list.',
+                  )
+                else ...[
+                  if (roster.length != selected.memberCount)
+                    _muted(
+                      context,
+                      'Showing ${roster.length} of ${selected.memberCount}.',
+                    ),
+                  const SizedBox(height: 4),
+                  LayoutBuilder(
+                    builder: (context, box) {
+                      final perRow = (box.maxWidth / 220).floor().clamp(1, 4);
+                      final w = (box.maxWidth - (perRow - 1) * 12) / perRow;
+                      return Wrap(
+                        spacing: 12,
+                        runSpacing: 10,
+                        children: [
+                          for (final m in roster)
+                            SizedBox(
+                              width: w,
+                              child: Row(
+                                children: [
+                                  InitialsAvatar(name: m.displayName, size: 32),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      m.displayName,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: ChurchType.staffBody.copyWith(
+                                        color: c.ink,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _heading(
-          context,
-          'Follow-up (${followUp.length})',
-          key: const Key('follow-up-heading'),
-        ),
-        _muted(
-          context,
-          'No cell chosen yet, or the leader passed it to the church office. '
-          'Confirm into the cell you checked with its leader, or close it.',
-        ),
-        const SizedBox(height: 8),
-        if (followUp.isEmpty)
-          const Text('Nothing to follow up.', key: Key('no-follow-up')),
-        for (final r in followUp) ...[
-          _AdminRequestCard(
-            key: Key('admin-request-${r.requestId}-r${r.memberRevision}'),
-            request: r,
-            overview: overview,
-            busy: state.busy,
-          ),
-          const SizedBox(height: 12),
-        ],
+        followUpBlock,
         const SizedBox(height: ChurchGeometry.sectionGap),
-        _heading(context, 'Waiting for a leader (${waiting.length})'),
-        _muted(
-          context,
-          'The cell\'s leader confirms these. You may confirm after checking '
-          'with the leader.',
+        LayoutBuilder(
+          builder: (context, box) {
+            if (box.maxWidth < 860) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  list,
+                  const SizedBox(height: ChurchGeometry.sectionGap),
+                  detail,
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 300, child: list),
+                const SizedBox(width: 20),
+                Expanded(child: detail),
+              ],
+            );
+          },
         ),
-        const SizedBox(height: 8),
-        if (waiting.isEmpty)
-          const Text('No requests are waiting.', key: Key('no-waiting')),
-        for (final r in waiting) ...[
-          _AdminRequestCard(
-            key: Key('admin-request-${r.requestId}-r${r.memberRevision}'),
-            request: r,
-            overview: overview,
-            busy: state.busy,
-          ),
-          const SizedBox(height: 12),
-        ],
-        const SizedBox(height: ChurchGeometry.sectionGap),
-        _heading(context, 'Cells (${overview.cells.length})'),
-        for (final cell in overview.cells) ...[
-          _AdminCellCard(
-            key: Key('admin-cell-${cell.cellId}-r${cell.revision}'),
-            cell: cell,
-            overview: overview,
-            busy: state.busy,
-          ),
-          const SizedBox(height: 12),
-        ],
-        _CreateCellForm(busy: state.busy),
         const SizedBox(height: ChurchGeometry.sectionGap),
         _MoveMemberForm(overview: overview, busy: state.busy),
       ],
@@ -635,16 +822,118 @@ class _AdminBody extends ConsumerWidget {
   }
 }
 
+/// One cell in the left pane: name, area and members, its leader, and the
+/// requests waiting for it; the chosen one has the handoff's 2 px blue edge.
+class _CellListItem extends StatelessWidget {
+  const _CellListItem({
+    required this.cell,
+    required this.requests,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final AdminCell cell;
+  final int requests;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final leader = cell.leaders.isEmpty
+        ? null
+        : cell.leaders.map((s) => s.displayName).join(', ');
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: FocusRing(
+        radius: 14,
+        child: Material(
+          color: c.surface,
+          shape: RoundedRectangleBorder(
+            side: BorderSide(
+              color: selected ? c.accent : c.line,
+              width: selected ? 2 : 1,
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: InkWell(
+            key: Key('cell-list-${cell.cellId}'),
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: EdgeInsets.all(selected ? 13 : 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          cell.name,
+                          style: ChurchType.staffBody.copyWith(
+                            color: c.ink,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${cell.broadArea} · ${cell.memberCount} '
+                          '${cell.memberCount == 1 ? 'member' : 'members'}',
+                          style: ChurchType.secondary.copyWith(
+                            color: c.muted,
+                            fontSize: 13,
+                          ),
+                        ),
+                        Text(
+                          cell.handoverPending
+                              ? 'Needs a leader'
+                              : leader == null
+                              ? 'No leader yet'
+                              : 'Leader $leader',
+                          style: ChurchType.secondary.copyWith(
+                            color: cell.handoverPending || leader == null
+                                ? c.amberFg
+                                : c.muted,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (requests > 0) ...[
+                    const SizedBox(width: 8),
+                    Semantics(
+                      label: '$requests waiting',
+                      excludeSemantics: true,
+                      child: StaffNavBadge(count: requests),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One request to join or move: who, what they asked, and the decision (the
+/// cell checked, Confirm cell, or close it). A row inside its section.
 class _AdminRequestCard extends ConsumerStatefulWidget {
   const _AdminRequestCard({
     super.key,
     required this.request,
     required this.overview,
     required this.busy,
+    this.divider = false,
   });
   final AdminCellRequest request;
   final CellAdminOverview overview;
   final bool busy;
+  final bool divider;
 
   @override
   ConsumerState<_AdminRequestCard> createState() => _AdminRequestCardState();
@@ -655,61 +944,82 @@ class _AdminRequestCardState extends ConsumerState<_AdminRequestCard> {
 
   @override
   Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
     final r = widget.request;
     final ctl = ref.read(cellAdminProvider.notifier);
     final id = r.requestId;
     final can = !widget.busy && !r.ownRecord;
     final active = widget.overview.cells.where((c) => c.active).toList();
-    return _Card(
+    final detail = [
+      _asked(r.choice, r.requestedCellName),
+      if (r.currentCellName != null) 'now in ${r.currentCellName}',
+      if (r.referred)
+        'passed on by the leader'
+            '${r.reason == null ? '' : ': ${r.reason!.label}'}',
+    ].join(' · ');
+    return Container(
       key: Key('admin-request-card-$id'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        border: widget.divider ? Border(top: BorderSide(color: c.line)) : null,
+      ),
+      child: Wrap(
+        spacing: 16,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        alignment: WrapAlignment.spaceBetween,
         children: [
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 220, maxWidth: 420),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      r.displayName,
+                      style: ChurchType.staffBody.copyWith(
+                        color: c.ink,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    StatusLabel(
+                      label: r.kind == 'change' ? 'Change of cell' : 'Joining',
+                      tone: r.referred ? StatusTone.warning : StatusTone.info,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  detail,
+                  style: ChurchType.secondary.copyWith(color: c.muted),
+                ),
+                if (r.ownRecord)
+                  Text(
+                    'Your own record: someone else must decide this',
+                    style: ChurchType.secondary.copyWith(color: c.amberFg),
+                  ),
+              ],
+            ),
+          ),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              _heading(context, r.displayName),
-              StatusLabel(
-                label: r.kind == 'change' ? 'Change of cell' : 'Joining',
-                tone: StatusTone.info,
+              DropdownButton<String>(
+                key: Key('confirm-cell-$id'),
+                hint: const Text('Choose the cell you checked'),
+                value: _cellId,
+                items: [
+                  for (final c in active)
+                    DropdownMenuItem(value: c.cellId, child: Text(c.name)),
+                ],
+                onChanged: can ? (v) => setState(() => _cellId = v) : null,
               ),
-              if (r.referred)
-                StatusLabel(
-                  label:
-                      'Passed on by the leader'
-                      '${r.reason == null ? '' : ': ${r.reason!.label}'}',
-                  tone: StatusTone.warning,
-                ),
-            ],
-          ),
-          Text(_asked(r.choice, r.requestedCellName)),
-          if (r.currentCellName != null) Text('Now in ${r.currentCellName}'),
-          if (r.ownRecord)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: StatusLabel(
-                label: 'Your own record: someone else must decide this',
-                tone: StatusTone.warning,
-              ),
-            ),
-          const SizedBox(height: 8),
-          DropdownButton<String>(
-            key: Key('confirm-cell-$id'),
-            hint: const Text('Choose the cell you checked'),
-            value: _cellId,
-            items: [
-              for (final c in active)
-                DropdownMenuItem(value: c.cellId, child: Text(c.name)),
-            ],
-            onChanged: can ? (v) => setState(() => _cellId = v) : null,
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
               FocusRing(
                 child: FilledButton(
                   key: Key('admin-confirm-$id'),
@@ -757,6 +1067,7 @@ class _AdminCellCardState extends ConsumerState<_AdminCellCard> {
 
   @override
   Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
     final cell = widget.cell;
     final ctl = ref.read(cellAdminProvider.notifier);
     final id = cell.cellId;
@@ -765,75 +1076,168 @@ class _AdminCellCardState extends ConsumerState<_AdminCellCard> {
     for (final m in widget.overview.members) {
       if (m.memberId == _memberId) picked = m;
     }
-    Widget staffRow(CellStaff st, String kind) => Wrap(
-      spacing: 8,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        Text(st.displayName),
-        StatusLabel(
-          label: kind == CellScopeKinds.leader ? 'Leader' : 'Assistant',
-          tone: StatusTone.neutral,
-        ),
-        FocusRing(
-          child: TextButton(
-            key: Key('remove-$kind-$id-${st.memberId}'),
-            onPressed: busy ? null : () => ctl.removeStaff(cell, st, kind),
-            child: const Text('Remove'),
+    Widget staffRow(CellStaff st, String kind) => Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Row(
+        children: [
+          InitialsAvatar(name: st.displayName, size: 32),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: st.displayName,
+                    style: ChurchType.staffBody.copyWith(
+                      color: c.ink,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  TextSpan(
+                    text: kind == CellScopeKinds.leader
+                        ? '  Leader'
+                        : '  Assistant',
+                    style: ChurchType.secondary.copyWith(color: c.muted),
+                  ),
+                ],
+              ),
+            ),
           ),
+          FocusRing(
+            child: TextButton(
+              key: Key('remove-$kind-$id-${st.memberId}'),
+              onPressed: busy ? null : () => ctl.removeStaff(cell, st, kind),
+              child: const Text('Remove'),
+            ),
+          ),
+        ],
+      ),
+    );
+    Widget fact(String label, String value) => Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: ChurchType.secondary.copyWith(
+                color: c.muted,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(value, style: ChurchType.staffBody.copyWith(color: c.ink)),
+          ],
         ),
-      ],
+      ),
     );
     return _Card(
       key: Key('admin-cell-card-$id'),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _heading(context, cell.name),
-              StatusLabel(
-                label: cell.listed ? 'Listed for sign-up' : 'Not listed',
-                tone: cell.listed ? StatusTone.success : StatusTone.neutral,
-              ),
-              if (cell.isSynthetic)
-                const StatusLabel(
-                  label: 'Synthetic test record',
-                  tone: StatusTone.neutral,
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Semantics(
+                      header: true,
+                      child: Text(
+                        cell.name,
+                        style: ChurchType.cardTitle.copyWith(color: c.ink),
+                      ),
+                    ),
+                    StatusLabel(
+                      label: cell.listed ? 'Listed for sign-up' : 'Not listed',
+                      tone: cell.listed
+                          ? StatusTone.success
+                          : StatusTone.neutral,
+                    ),
+                    if (cell.isSynthetic)
+                      Text(
+                        'Synthetic test record',
+                        style: ChurchType.secondary.copyWith(
+                          color: c.muted,
+                          fontSize: 13,
+                        ),
+                      ),
+                  ],
                 ),
+              ),
+              FocusRing(
+                child: TextButton(
+                  key: Key('toggle-listed-$id'),
+                  onPressed: busy
+                      ? null
+                      : () => ctl.setListed(cell, !cell.listed),
+                  child: Text(
+                    cell.listed ? 'Hide from sign-up' : 'List for sign-up',
+                  ),
+                ),
+              ),
             ],
           ),
-          Text('Area: ${cell.broadArea}'),
-          if (cell.signupLabel != null)
-            Text('Shown at sign-up as: ${cell.signupLabel}'),
-          Text('Confirmed members: ${cell.memberCount}'),
+          const SizedBox(height: 10),
+          // What the church and applicants know of the cell, as one divided
+          // strip.
+          Container(
+            decoration: BoxDecoration(
+              color: c.bg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  fact('Broad area', cell.broadArea),
+                  VerticalDivider(width: 1, color: c.line),
+                  fact('Shown at sign-up as', cell.signupLabel ?? '—'),
+                  VerticalDivider(width: 1, color: c.line),
+                  fact('Confirmed members', '${cell.memberCount}'),
+                ],
+              ),
+            ),
+          ),
           // Story 5.9: the cell's last leader left with a programme published
           // ahead; once it has a leader or assistant again, mark it done.
           if (cell.handoverPending) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                StatusLabel(
-                  key: Key('cell-handover-$id'),
-                  label: 'Needs a leader: a programme is published ahead',
-                  tone: StatusTone.warning,
-                ),
-                FocusRing(
-                  child: OutlinedButton(
-                    key: Key('cell-handover-done-$id'),
-                    onPressed: busy ? null : () => ctl.resolveHandover(cell),
-                    child: const Text('Mark handover done'),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+              decoration: BoxDecoration(
+                color: c.amberBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  StatusLabel(
+                    key: Key('cell-handover-$id'),
+                    label: 'Needs a leader: a programme is published ahead',
+                    tone: StatusTone.warning,
                   ),
-                ),
-              ],
+                  FocusRing(
+                    child: OutlinedButton(
+                      key: Key('cell-handover-done-$id'),
+                      onPressed: busy ? null : () => ctl.resolveHandover(cell),
+                      child: const Text('Mark handover done'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
-          const SizedBox(height: 8),
+          const SizedBox(height: 14),
+          CardLabel('Leader and assistants'),
+          const SizedBox(height: 6),
           if (cell.leaders.isEmpty)
             _muted(context, 'No leader yet: only an Admin can confirm.'),
           for (final st in cell.leaders) staffRow(st, CellScopeKinds.leader),
@@ -882,17 +1286,6 @@ class _AdminCellCardState extends ConsumerState<_AdminCellCard> {
                       ? null
                       : () => ctl.assignStaff(cell, picked!, _kind),
                   child: const Text('Give this role'),
-                ),
-              ),
-              FocusRing(
-                child: TextButton(
-                  key: Key('toggle-listed-$id'),
-                  onPressed: busy
-                      ? null
-                      : () => ctl.setListed(cell, !cell.listed),
-                  child: Text(
-                    cell.listed ? 'Hide from sign-up' : 'List for sign-up',
-                  ),
                 ),
               ),
             ],
@@ -1112,6 +1505,7 @@ class CellLeaderScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _CellsPage<LeaderQueue>(
     title: 'My cell group',
+    subtitle: 'Your cell\'s members and requests to join',
     provider: cellLeaderProvider,
     needs: 'This page is for cell leaders and assistants.',
     loading: 'Loading your cell…',
@@ -1604,6 +1998,7 @@ class CellMeetingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _CellsPage<CellMeetingsBoard>(
     title: 'Cell meetings',
+    subtitle: 'Schedules, the meetings ahead and the last four weeks',
     provider: cellMeetingsProvider,
     needs: 'This page is for cell leaders, assistants and Admins.',
     loading: 'Loading cell meetings…',
@@ -2500,6 +2895,7 @@ class PlanMeetingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _CellsPage<ProgrammeRead>(
     title: 'Plan meeting',
+    subtitle: 'The programme members see once it is published',
     provider: cellProgrammeProvider(meetingId),
     needs:
         'This page is for the cell\'s leader and assistant, and for pastors.',

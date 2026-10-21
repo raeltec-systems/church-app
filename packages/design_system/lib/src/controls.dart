@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
 import 'focus.dart';
+import 'staff.dart';
 import 'tokens.dart';
 
 /// A modal dialog exposed as role `dialog` whose accessible name is its
@@ -177,12 +178,30 @@ class NavItem extends StatelessWidget {
     this.onDark = false,
     this.vertical = false,
     this.autofocus = false,
+    this.compact = false,
+    this.fill = false,
+    this.badge,
+    this.badgeLabel,
   });
 
   final String label;
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
+
+  /// Staff rail: the icon alone, the label in a tooltip and in semantics.
+  final bool compact;
+
+  /// Takes the full width it is given (the staff sidebar), so a [badge]
+  /// sits at the row's end.
+  final bool fill;
+
+  /// A count of work waiting behind this destination (staff sidebar); null
+  /// or zero shows nothing.
+  final int? badge;
+
+  /// What [badge] counts, read after the label ("3 waiting").
+  final String? badgeLabel;
 
   /// True on the navy sidebar/top bar: white text and a white ring.
   final bool onDark;
@@ -206,14 +225,44 @@ class NavItem extends StatelessWidget {
     final highlight = onDark
         ? (selected ? ChurchStaffChrome.activeItem : Colors.transparent)
         : Colors.transparent;
+    final count = badge ?? 0;
     final text = Text(
       label,
       textAlign: vertical ? TextAlign.center : TextAlign.start,
       style: (vertical ? ChurchType.tabLabel : ChurchType.staffBody).copyWith(
         color: fg,
-        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        fontWeight: onDark
+            ? FontWeight.w600
+            : (selected ? FontWeight.w700 : FontWeight.w500),
       ),
     );
+    if (compact) {
+      return _tab(
+        semanticsLabel: count > 0 ? '$label, ${badgeLabel ?? count}' : label,
+        highlight: highlight,
+        padding: EdgeInsets.zero,
+        alignment: Alignment.center,
+        child: Tooltip(
+          message: label,
+          excludeFromSemantics: true,
+          child: SizedBox.square(
+            dimension: ChurchGeometry.minTarget,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(icon, color: fg, size: 22),
+                if (count > 0)
+                  Positioned(
+                    top: 7,
+                    right: 7,
+                    child: StaffNavBadge(count: count, dot: true),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     final content = vertical
         ? Column(
             mainAxisSize: MainAxisSize.min,
@@ -226,15 +275,36 @@ class NavItem extends StatelessWidget {
         : Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: fg),
-              const SizedBox(width: 12),
-              Flexible(child: text),
+              Icon(icon, color: fg, size: onDark ? 20 : null),
+              SizedBox(width: onDark ? 10 : 12),
+              if (fill) Expanded(child: text) else Flexible(child: text),
+              if (count > 0) ...[
+                const SizedBox(width: 8),
+                StaffNavBadge(count: count),
+              ],
             ],
           );
+    return _tab(
+      semanticsLabel: count > 0 ? '$label, ${badgeLabel ?? count}' : null,
+      highlight: highlight,
+      padding: EdgeInsets.symmetric(horizontal: onDark ? 10 : 12, vertical: 6),
+      alignment: vertical ? Alignment.center : null,
+      child: content,
+    );
+  }
+
+  Widget _tab({
+    required String? semanticsLabel,
+    required Color highlight,
+    required EdgeInsets padding,
+    required AlignmentGeometry? alignment,
+    required Widget child,
+  }) {
     return Semantics(
       role: SemanticsRole.tab,
       selected: selected,
       container: true,
+      label: semanticsLabel,
       child: FocusRing(
         color: onDark ? ChurchStaffChrome.onSidebar : null,
         radius: 12,
@@ -251,9 +321,11 @@ class NavItem extends StatelessWidget {
                 minHeight: ChurchGeometry.minTarget,
                 minWidth: ChurchGeometry.minTarget,
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              alignment: vertical ? Alignment.center : null,
-              child: content,
+              padding: padding,
+              alignment: alignment,
+              child: semanticsLabel == null
+                  ? child
+                  : ExcludeSemantics(child: child),
             ),
           ),
         ),

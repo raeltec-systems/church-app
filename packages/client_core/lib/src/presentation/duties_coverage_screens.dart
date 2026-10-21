@@ -46,6 +46,7 @@ class DutyCoverageScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _DutiesPage<DutyCoverage>(
     title: 'Coverage',
+    subtitle: 'Positions still to fill, answer or confirm',
     provider: dutyCoverageProvider,
     needs: _coverageNeeds,
     loading: 'Loading coverage…',

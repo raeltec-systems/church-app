@@ -141,6 +141,13 @@ abstract final class ChurchStaffChrome {
 
   /// "Active navigation translucent white".
   static const activeItem = Color(0x29FFFFFF);
+
+  /// Sidebar group names and the quiet "Staff" line: the brand tint at 70 %
+  /// (about 6:1 on the navy).
+  static const groupLabel = Color(0xB3DCE6FF);
+
+  /// The role switch's track on the navy.
+  static const track = Color(0x14FFFFFF);
 }
 
 /// Surface layout and body type: mobile and staff differ (design contract).
@@ -204,6 +211,9 @@ abstract final class ChurchGeometry {
   static const double staffInputRadius = 10;
   static const double staffButtonRadius = 12;
   static const double staffSidebarWidth = 232;
+
+  /// The staff sidebar folded to a rail of icons.
+  static const double staffRailWidth = 72;
   static const double staffContentMaxWidth = 1280;
   static const double modalWidth = 460;
   static const double modalRadius = 18;

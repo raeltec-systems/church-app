@@ -137,8 +137,8 @@ class _MembershipLifecycleScreenState
         )
         ..addAll(_find(context, s));
     }
-    return Scaffold(
-      appBar: AppBar(title: const Text('Membership status')),
+    return ChurchPageScaffold(
+      title: 'Membership status',
       body: SafeArea(
         child: SingleChildScrollView(
           padding: layout.pagePadding,

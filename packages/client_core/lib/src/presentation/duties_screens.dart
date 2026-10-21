@@ -553,9 +553,19 @@ class _DutiesPage<T> extends ConsumerStatefulWidget {
     required this.body,
     this.tabRoot = false,
     this.footer,
+    this.subtitle,
+    this.headerAction,
   });
 
   final String title;
+
+  /// Staff web: one line about the data under the page title.
+  final String? subtitle;
+
+  /// Staff web: the screen's main action in the page header (null when it
+  /// has none, or before the read answers).
+  final Widget? Function(BuildContext context, T value, DutiesState<T> state)?
+  headerAction;
   final NotifierProvider<DutiesController<T>, DutiesState<T>> provider;
   final String needs;
   final String loading;
@@ -697,46 +707,38 @@ class _DutiesPageState<T> extends ConsumerState<_DutiesPage<T>> {
       );
     }
     // On the phone a pushed screen refreshes from its bar (and by pulling);
-    // staff web keeps the Reload button under the content.
+    // staff web has Reload in the page header, after the main action.
     final phone = !identical(layout, ChurchLayout.staff);
     final reload = s.loading || s.busy ? null : ctl.reload;
-    if (!phone) {
-      children.addAll([
-        const SizedBox(height: ChurchGeometry.sectionGap),
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: FocusRing(
-            child: OutlinedButton.icon(
-              key: const Key('duties-reload'),
-              onPressed: s.loading || s.busy ? null : ctl.reload,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Reload'),
-            ),
-          ),
-        ),
-      ]);
-    }
     final footer = switch ((widget.footer, result)) {
       (final f?, AccessReadOk(:final value)) => f(context, value, s),
       _ => null,
     };
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-        actions: [
-          if (phone)
-            FocusRing(
-              radius: 22,
-              child: IconButton(
-                key: const Key('duties-reload'),
-                tooltip: 'Reload',
-                onPressed: reload,
-                icon: const Icon(Icons.refresh),
-              ),
-            ),
-          const SizedBox(width: 4),
-        ],
+    final main = switch ((widget.headerAction, result)) {
+      (final f?, AccessReadOk(:final value)) when !phone => f(
+        context,
+        value,
+        s,
       ),
+      _ => null,
+    };
+    return ChurchPageScaffold(
+      title: widget.title,
+      subtitle: widget.subtitle,
+      actions: phone
+          ? [
+              FocusRing(
+                radius: 22,
+                child: IconButton(
+                  key: const Key('duties-reload'),
+                  tooltip: 'Reload',
+                  onPressed: reload,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ),
+              const SizedBox(width: 4),
+            ]
+          : [?main, staffReloadButton(const Key('duties-reload'), reload)],
       bottomNavigationBar: footer,
       body: SafeArea(
         child: RefreshIndicator(
@@ -850,6 +852,7 @@ class DutyAdminScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _DutiesPage<DutyAdminOverview>(
     title: 'Departments',
+    subtitle: 'Departments with their leaders, deputies and members',
     provider: dutyAdminProvider,
     needs: 'Departments needs the Admin role.',
     loading: 'Loading departments…',
@@ -1246,6 +1249,7 @@ class DutyLeaderScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _DutiesPage<DutyLeaderBoard>(
     title: reviewsOnly ? 'Duties to review' : 'Duties',
+    subtitle: 'Duties your departments publish, and the answers',
     provider: dutyLeaderProvider,
     needs: 'This page is for department leaders and deputies.',
     loading: 'Loading duties…',
@@ -1319,6 +1323,7 @@ class _LeaderDepartmentCard extends StatelessWidget {
           ),
           // Story 4.8: who needs direct contact, before the duties.
           if (!reviewsOnly) _NeedsContactList(department: d),
+          const SizedBox(height: 12),
           _heading(
             context,
             reviewsOnly
@@ -1346,11 +1351,18 @@ class _LeaderDepartmentCard extends StatelessWidget {
               busy: busy,
             ),
           if (d.canPublish && !reviewsOnly) ...[
-            const SizedBox(height: 12),
-            _PublishForm(
-              key: Key('publish-${d.departmentId}'),
-              department: d,
-              busy: busy,
+            const SizedBox(height: 20),
+            // A form reads best at about 640 px, not across the page.
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 680),
+                child: _PublishForm(
+                  key: Key('publish-${d.departmentId}'),
+                  department: d,
+                  busy: busy,
+                ),
+              ),
             ),
           ],
         ],
@@ -1390,20 +1402,49 @@ class _LeaderDutyRowState extends State<_LeaderDutyRow> {
     final duty = widget.duty;
     final id = duty.occurrenceId;
     final started = !duty.times.arriveBy.isAfter(DateTime.now());
-    return Padding(
+    final c = ChurchColors.of(context);
+    final meta = ChurchType.secondary.copyWith(color: c.muted);
+    // One duty: its name and how many are confirmed on the first line, when
+    // and where in grey, then each position and its answer.
+    return Container(
       key: Key('leader-duty-$id'),
-      padding: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        border: Border.all(color: c.line),
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(duty.dutyName, style: ChurchType.cardTitle),
-          Text(_timesText(context, duty.times)),
-          if (duty.location case final l?) Text('Where: $l'),
-          if (duty.instructions case final i?) Text('Instructions: $i'),
-          Text(
-            '${duty.accepted} of ${duty.required} confirmed',
-            key: Key('coverage-$id'),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  duty.dutyName,
+                  style: ChurchType.cardTitle.copyWith(
+                    color: c.ink,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                '${duty.accepted} of ${duty.required} confirmed',
+                key: Key('coverage-$id'),
+                style: ChurchType.figures.copyWith(
+                  color: duty.accepted < duty.required ? c.amberFg : c.greenFg,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
+          Text(_timesText(context, duty.times), style: meta),
+          if (duty.location case final l?) Text('Where: $l', style: meta),
+          if (duty.instructions case final i?)
+            Text('Instructions: $i', style: meta),
+          const SizedBox(height: 6),
           // Story 4.11: linked programme parts and owner-review mismatches.
           Consumer(
             builder: (context, ref, _) => _OwnerReviews(

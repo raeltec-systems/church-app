@@ -70,20 +70,18 @@ class _PlatformStatusScreenState extends State<PlatformStatusScreen> {
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
     final loading = _state is _Loading;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Platform status'),
-        actions: [
-          FocusRing(
-            child: IconButton(
-              key: const Key('reload'),
-              tooltip: 'Reload',
-              onPressed: loading ? null : _load,
-              icon: const Icon(Icons.refresh),
-            ),
+    return ChurchPageScaffold(
+      title: 'Platform status',
+      actions: [
+        FocusRing(
+          child: IconButton(
+            key: const Key('reload'),
+            tooltip: 'Reload',
+            onPressed: loading ? null : _load,
+            icon: const Icon(Icons.refresh),
           ),
-        ],
-      ),
+        ),
+      ],
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -259,8 +257,8 @@ class MissingConfigScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Platform status')),
+    return ChurchPageScaffold(
+      title: 'Platform status',
       body: const Center(
         child: Padding(
           padding: EdgeInsets.all(ChurchGeometry.mobileContentPadding),

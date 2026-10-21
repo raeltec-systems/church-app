@@ -188,23 +188,21 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
         ? null
         : () => ref.read(memberSummaryControllerProvider.notifier).refresh();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Account'),
-        actions: [
-          if (signedIn)
-            FocusRing(
-              radius: 22,
-              child: IconButton(
-                key: const Key('refresh-summary'),
-                tooltip: 'Check again',
-                onPressed: refresh,
-                icon: const Icon(Icons.refresh),
-              ),
+    return ChurchPageScaffold(
+      title: 'Account',
+      actions: [
+        if (signedIn)
+          FocusRing(
+            radius: 22,
+            child: IconButton(
+              key: const Key('refresh-summary'),
+              tooltip: 'Check again',
+              onPressed: refresh,
+              icon: const Icon(Icons.refresh),
             ),
-          const SizedBox(width: 4),
-        ],
-      ),
+          ),
+        const SizedBox(width: 4),
+      ],
       body: SafeArea(
         child: RefreshIndicator(
           notificationPredicate: (n) => refresh != null && n.depth == 0,

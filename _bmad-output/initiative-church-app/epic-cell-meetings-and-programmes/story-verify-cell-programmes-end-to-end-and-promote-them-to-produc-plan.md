@@ -46,7 +46,8 @@ context:
 - [x] `docs/runbooks/production-promotion-cells.md` (prepared, not executed)
 - [x] Closing local suite (`evidence-5.12/closing-suite-summary.txt`)
 - [x] Independent reviewer reruns of safe projection, material revision and old-cell access (`evidence-5.12/external-check.md`): two findings fixed (`20261021132636_cells_external_check_fixes.sql`, on staging)
-- [ ] Independent re-review of old-cell access after the fixes, together with the staging rerun (owner accounts)
+- [x] Independent re-review of old-cell access after the fixes (local, `evidence-5.12/rereview-old-cell-access.md`): PASS
+- [ ] Staging rerun of the external check cases (owner accounts)
 - [ ] HITL: Israel witnesses the mobile and staff demonstration on staging (with the 5.10 owner pilot and the 5.x owner checks)
 - [ ] HITL: 4.15 promoted; Israel's Q4 decision and pilot leaders; Israel promotes epic 5 and follows the runbook
 
@@ -70,3 +71,7 @@ context:
 - Production runbook prepared. Nothing in production was touched.
 
 ## Review Triage Log
+
+- Re-review after the fixes, by a separate reviewer: old-cell access PASS. It ran 68 probe assertions and the two suites (111 tests).
+- Low, accepted: My duties still lists the member's own past old-cell duty, with its venue, inside Duties' 90-day history window. It is the member's own record, gives no new access, and Duties owns it.
+- Info: the local migration history keeps the pre-rename version of the fixes. The content is identical, and a reset applies the renamed file.

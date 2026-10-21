@@ -360,3 +360,80 @@ or keys).
 - Pastor oversight has no list of programmes yet: a Pastor opens a meeting's plan by its address.
 - Parts are not reordered by dragging: the order is the time order, and the editor reports an
   out-of-order part.
+
+## Story 5.4: publish a safe programme that creates or links duty slots
+
+Migrations: `supabase/migrations/20261021155000_duties_owner_linkable.sql` (a Duties contract change) and `supabase/migrations/20261021160000_cells_programme_publish.sql` (no row deletions; it also carries the 5.3 review fixes).
+Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-preview-and-publish-a-safe-programme-that-creates-or-links-d-plan.md`.
+Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.4/`.
+
+### Release gate (4.11, consumer guide step 7)
+
+This story registers `cells_programme_part` as a Duties `cell_part` source. A client older than the 4.11 build cannot show My duties once a cell part exists. **Apply 5.4 to staging only after the owner confirms every client in use there runs the 4.11 build or later** (staff web deployment and every installed phone build).
+
+### Publishing
+
+`cells.publish_programme {programme_id, override_reason?}` (the cell's leader or assistant; expected = programme `revision`). Each live part reaches Duties in the same transaction:
+
+| Part | In Duties |
+|---|---|
+| a person | a cell-owned occurrence (name = the part's label, times = the part's, location = the meeting's venue, topic and scripture = the programme's) with one position `lead`; the person is asked (Awaiting) and gets the Duties notice and reminders |
+| nobody | the same occurrence with an open position |
+| a department duty (`linked_slot_id`) | a display link (`department`) to that department position; the duty is not changed and stays its department's |
+
+A republish puts the same state again: no new slot, link or assignment. Refusals: `forbidden` (anyone but the cell's leader or assistant), `conflict` (stale, or `{"programme_id": "cancelled"}`), `validation_failed {"parts": "required"}`, `{"meeting_id": "cancelled" | "started"}`, `{"parts.<i>": "assignee_not_in_cell"}`, and Duties refusals under their part, e.g. `{"parts.2.member_id": "overlap", "parts.2.override_reason": "required"}` when the person is on another duty then (publish again with `override_reason`, or change the part).
+
+`cells.save_programme` parts may carry `linked_slot_id` (one of the meeting's department positions; not with an assignee: `assignee_and_link`; unknown or no longer offered: `link_unavailable`). A published programme is not saved as a draft (`not_draft`); changing it comes with 5.6.
+
+`cells.cancel_programme` on a published programme cancels its cell-owned duties through Duties (their people are told), ends its display links and withdraws what members read.
+
+### Reads
+
+- `api.cells_programme(meeting_id)` adds `preview` (the member-safe projection of the programme as it stands), `published` (what members read now, with `revision` and `published_at`), and for the cell's leader and assistant `duties` (per part: the owned position's answer, or the display link) and `linkable` (department positions overlapping the meeting).
+- `api.cells_meeting_programme(meeting_id)` (new): current confirmed members of the meeting's cell with an approved active account read `{meeting (with venue), programme}`; the programme is the stored projection (topic, scripture, parts with times, `leader` name or `department`), never study notes, answers, notes or history; null until published or after a cancel. Anyone else (another cell, Admin alone, the cell's leader when not a member, no member access) is 403 `not_granted`.
+- Duties (contract change): `app.duties_owner_linkable({cell_id, starts_at, ends_at})`, not client-executable; see the consumer guide.
+
+### Member deletion
+
+Names leave every projection (the part reads as open); publishers are anonymised.
+
+### 5.3 review fixes carried here
+
+A draft's parts follow a moved meeting (and its revision moves on); a part after midnight lands on the next day when the meeting runs past midnight; two concurrent creates answer `conflict`; a removed part never comes back; save locks the meeting first; study notes with Windows line endings are accepted; a confirmation is never blocked by reminder planning. Staff web keeps the typed draft after a conflict (**Load the latest**), clears part errors when a row is removed, and **Add a part** stays inside the meeting.
+
+### Clients
+
+- **Staff web, Plan meeting**: **Publish to members** (a saved draft; "Save the draft to publish it." otherwise). A part can show **Department duty: ...** instead of a person. An overlap shows "On another duty at this time" on its part, with a reason field and **Publish with this reason**. A published programme shows **Who is on** with each answer (Awaiting response, Accepted, Confirmed by leader, Declined, Open: nobody asked, Department duty: filled), "N of M accepted" at the top, and what members see now; **Cancel this programme** asks once more.
+- Mobile My cell and Home show the programme in 5.5.
+
+### Local runs
+
+```bash
+npx supabase db reset
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/cells-programme-publish.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The E2E uses `+44 7700 900020-900029` and removes everything it created (Duties rows included).
+
+### Hosted staging (parent session, then the owner)
+
+After the release gate is confirmed: apply `20261021155000_duties_owner_linkable.sql`, then `20261021160000_cells_programme_publish.sql` (renamed to their hosted versions), then run `tools/ci/verify-hosted.sql` with `expected_env=staging`.
+
+### Owner manual checks (staging, web and phone, story 5.4)
+
+Use the 5.3 setup (leader L, member M with the app on your phone, member X without a login) and a department with a published duty at the meeting's time.
+
+1. **Publish.** As L, open **Plan** on the next meeting: give one part to M, one to X, leave one with **Nobody yet**, and set one to **Department duty: ...**. **Save draft**, then **Publish to members**: "Published to members"; **Who is on** shows M and X as Awaiting response, the open part as Open, the department part as Department duty.
+2. **M's phone.** M gets the duty notice; **My duties** shows the part (Cell programme) waiting for an answer.
+3. **Department duty unchanged.** As the department's leader, the duty shows "Shown on 1 cell programme part" and nothing else changed.
+4. **Cancel.** As L, **Cancel this programme**: M's part leaves My duties with a cancellation notice; the department duty is unchanged.
+
+Record the outcome per step in `evidence-5.4/owner-check.md` (pass/fail, device, browser; no numbers, ids or keys).
+
+### Known limits
+
+- A published programme can't be changed yet (5.6), and moving or cancelling its meeting does not yet reconcile its duties (5.6): cancel the programme first.
+- Mobile shows the programme from 5.5; leader confirmation for members without a login is 5.5 (a Duties contract change).
+- One position per part; no per-part instructions or reporting time.

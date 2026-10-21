@@ -114,6 +114,7 @@ Migration: `supabase/migrations/20261015035112_duties_owner_operations.sql`. Cel
    | `app.duties_owner_conflicts` | `cell_id`, `member_id`, `starts_at`, `ends_at?`, `reporting_at?`, `slot_id?` | The 4.4 conflict query (own cell's parts and managed departments in full, others as busy times). |
    | `app.duties_owner_event_links` | (event reference) | The department duties that name the event: ids, states, `review_open` (at most 200). |
    | `app.duties_owner_topic` | `occurrence_id` | The sermon-draft reference (duty, position, start, topic, scripture, event) for the duty's current assignee or its managers; `not_found` otherwise. The media team reviews the draft in Content before publication. |
+   | `app.duties_owner_linkable` (story 5.4 contract change) | `cell_id`, `starts_at`, `ends_at` (at most a day) | The published, not started, not cancelled department positions overlapping the window that a cell may display-link (at most 50): department, duty and position names, times, `filled`; never a person. The session must lead or assist the cell. |
 
    - **`cell_id` is always the part's own cell** (review S1). A part belongs to the cell its first link named; naming another cell for it answers `not_found`, so pass the cell from your own part row, never from the request.
    - **Conflicts** (`duties_owner_conflicts`) cover at most 120 days (one part's time, `{"ends_at": "out_of_range"}` beyond). Restrict `member_id` to your own roster before calling: Duties does not know your roster.

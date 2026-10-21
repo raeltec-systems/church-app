@@ -173,6 +173,8 @@ abstract final class ClientPaths {
     // Story 5.2: meeting reminders and notices open My cell, which reads the
     // meeting again (a pointer, not a grant).
     RegExp(r'^/my-cell$'),
+    // Story 5.7: a Cannot attend notice opens Cell meetings for the leader.
+    RegExp(r'^/cells/meetings$'),
     // Story 4.1: the duties_assignment contract's link.
     RegExp(
       r'^/duties/assignments/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',

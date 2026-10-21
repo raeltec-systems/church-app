@@ -339,6 +339,10 @@ void main() {
   });
 
   group('story 5.7: Cannot attend', () {
+    test('the leaders\' notice opens Cell meetings', () {
+      expect(ClientPaths.isKnownDeepLink('/cells/meetings'), isTrue);
+    });
+
     testWidgets('a member sends a notice with a note; their part is still '
         'theirs', (tester) async {
       final h = await pumpAt(

@@ -552,3 +552,58 @@ Record the outcome per step in `evidence-5.6/owner-check.md` (pass/fail, device,
 
 - A schedule change by an Admin moves a published programme's parts but cannot publish (Duties owner operations need the cell scope); the cell's leader publishes it.
 - A cancelled programme stays cancelled when its meeting is brought back; a new programme for that meeting is not possible yet.
+
+## Story 5.7: Cannot attend notices
+
+Migration: `supabase/migrations/20261021120000_cells_absence_notices.sql`.
+Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-send-cannot-attend-notices-separately-from-duty-responses-plan.md`.
+Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.7/`.
+
+### What it is
+
+An intention, not attendance: a confirmed member tells the cell they cannot come to one meeting, with an optional practical note (at most 280 characters). It never sets a duty answer, Excused or any attendance (there is no attendance record before epic 7). A member who holds a part still answers it separately (My cell's You're on, or My duties).
+
+### Commands (`api.cells_command`, the member themself)
+
+| Command | `expected_revision` | Payload | Refusals |
+|---|---|---|---|
+| `cells.send_cannot_attend` | `null` | `{meeting_id, note?}` | not a current member of the meeting's cell: `not_found`; one already open: `conflict {"meeting_id": "exists"}`; cancelled or started meeting: `validation_failed` |
+| `cells.change_cannot_attend` | notice `revision` | `{notice_id, note?}` | someone else's: `not_found`; withdrawn: `conflict {"notice_id": "withdrawn"}`; stale: `conflict` |
+| `cells.withdraw_cannot_attend` | notice `revision` | `{notice_id}` | as change |
+
+Each one tells the cell's current leaders and assistants through the inbox (`cells_absence_sent` "Someone can't attend", or `cells_absence_withdrawn` "Can come after all"; generic text, no name; the link opens **Cell meetings**). A change replaces a notice still waiting.
+
+### Reads
+
+- `api.cells_programme` adds `absences: [{notice_id, member_id, display_name, note, sent_at, updated_at, part_ids}]` for the cell's leader and assistant only (not Pastor oversight).
+- `api.cells_meeting_programme` adds `my_absence` (the reader's own open notice). No member reads another's notice or note.
+
+### Clients
+
+- **Mobile My cell**: **Can't come?** under You're on (also before a programme is published): **I can't attend** with an optional note and **Tell my leader**; then "You told your leader you can't attend", the note, **Change the note** and **I can come after all** (asks once more). A member with a part reads "Your part is still yours until you answer it above."
+- **Staff web, Plan meeting**: **Can't attend (N)** with each person's note and "Holds a part"; the part shows **Can't attend** next to its answer.
+
+### Local runs
+
+```bash
+npx supabase db reset
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/cells-absence.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The E2E uses `+44 7700 900050-900059` and removes everything it created.
+
+### Owner manual checks (staging, phone and web, story 5.7)
+
+1. As M (with a part) on your phone, **My cell**, **I can't attend**, note "Travelling", **Tell my leader**: "You told your leader you can't attend"; your part still shows its answer.
+2. As L, the inbox shows "Someone can't attend"; **Plan** shows **Can't attend (1)** with your name and note, and **Can't attend** on your part.
+3. As M, **Change the note**, then **I can come after all**: L is told each time; the list empties.
+4. As another member N, My cell shows nothing of M's notice.
+
+Record the outcome per step in `evidence-5.7/owner-check.md` (pass/fail, device, browser; no numbers, ids or keys).
+
+### Known limits
+
+- Actual attendance (Present, Absent, Excused) is epic 7; a notice is never turned into one.
+- The cell coverage queue does not list notices (department-only); Plan meeting shows them.

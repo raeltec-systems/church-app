@@ -180,6 +180,12 @@
       "sourceType": "github",
       "skillPath": "skills/bmod-method/SKILL.md",
       "computedHash": "2ed29056895d86350c439ce6a54834cea88e3e5e1761232b7fe109334147a101"
+    },
+    "design-taste-frontend": {
+      "source": "Leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/taste-skill/SKILL.md",
+      "computedHash": "65049e1890f5fedf8f8e1144848f07bcda788e51c22bac78afbd073aeb486725"
     }
   }
 }

@@ -52,6 +52,80 @@ abstract final class CellProgrammeCommands {
   static const publish = 'cells.publish_programme';
 }
 
+/// Story 5.7: Cannot attend notices (the member themself).
+abstract final class CellAbsenceCommands {
+  static const send = 'cells.send_cannot_attend';
+  static const change = 'cells.change_cannot_attend';
+  static const withdraw = 'cells.withdraw_cannot_attend';
+
+  /// The note's limit (the server's).
+  static const noteMax = 280;
+}
+
+/// Story 5.7: a member's Cannot attend notice for one meeting. An
+/// intention for the leaders, never a duty answer or attendance.
+class AbsenceNotice {
+  const AbsenceNotice({
+    required this.noticeId,
+    required this.revision,
+    required this.sentAt,
+    this.note,
+  });
+
+  factory AbsenceNotice.fromJson(Object? json) {
+    final m = _map(json, 'notice');
+    final revision = _req<int>(m, 'revision');
+    if (revision < 1) throw const FormatException('unexpected revision');
+    return AbsenceNotice(
+      noticeId: _req<String>(m, 'notice_id'),
+      revision: revision,
+      note: _opt<String>(m, 'note'),
+      sentAt: _instant(m, 'sent_at'),
+    );
+  }
+
+  final String noticeId;
+
+  /// expected_revision of change and withdraw.
+  final int revision;
+  final String? note;
+  final DateTime sentAt;
+}
+
+/// Story 5.7: an open notice as the cell's leader and assistant read it,
+/// with the parts its sender holds (a coverage warning).
+class StaffAbsence {
+  const StaffAbsence({
+    required this.noticeId,
+    required this.memberId,
+    required this.displayName,
+    required this.partIds,
+    this.note,
+  });
+
+  factory StaffAbsence.fromJson(Object? json) {
+    final m = _map(json, 'absence');
+    return StaffAbsence(
+      noticeId: _req<String>(m, 'notice_id'),
+      memberId: _req<String>(m, 'member_id'),
+      displayName: _opt<String>(m, 'display_name') ?? 'Removed member',
+      note: _opt<String>(m, 'note'),
+      partIds: List.unmodifiable(
+        (_opt<List>(m, 'part_ids') ?? const []).map((v) {
+          if (v is! String) throw const FormatException('unexpected part id');
+          return v;
+        }),
+      ),
+    );
+  }
+
+  final String noticeId;
+  final String memberId;
+  final String displayName;
+  final String? note;
+  final List<String> partIds;
+}
+
 /// At most this many parts per programme (the server's limit).
 const programmeMaxParts = 20;
 
@@ -264,6 +338,7 @@ class ProgrammeRead {
     this.membersSee,
     this.duties = const {},
     this.linkable = const [],
+    this.absences = const [],
   });
 
   factory ProgrammeRead.fromJson(Object? json) {
@@ -302,6 +377,10 @@ class ProgrammeRead {
       linkable: List.unmodifiable(
         (_opt<List>(m, 'linkable') ?? const []).map(LinkableDuty.fromJson),
       ),
+      // Story 5.7 (absent from 5.6 servers).
+      absences: List.unmodifiable(
+        (_opt<List>(m, 'absences') ?? const []).map(StaffAbsence.fromJson),
+      ),
     );
   }
 
@@ -328,6 +407,17 @@ class ProgrammeRead {
 
   /// Story 5.4: department positions a draft part may show.
   final List<LinkableDuty> linkable;
+
+  /// Story 5.7: open Cannot attend notices (the cell's leader and assistant).
+  final List<StaffAbsence> absences;
+
+  /// The notice of the person holding [partId], if they sent one.
+  StaffAbsence? absenceFor(String partId) {
+    for (final a in absences) {
+      if (a.partIds.contains(partId)) return a;
+    }
+    return null;
+  }
 }
 
 /// One part as typed in the editor, sent whole by `cells.save_programme`.
@@ -613,6 +703,7 @@ class MeetingProgrammeRead {
     required this.meeting,
     this.programme,
     this.yours = const [],
+    this.myAbsence,
   });
 
   factory MeetingProgrammeRead.fromJson(Object? json) {
@@ -632,8 +723,15 @@ class MeetingProgrammeRead {
           );
         }),
       ),
+      // Story 5.7 (absent from 5.6 servers).
+      myAbsence: m['my_absence'] == null
+          ? null
+          : AbsenceNotice.fromJson(m['my_absence']),
     );
   }
+
+  /// Story 5.7: the reader's own open Cannot attend notice.
+  final AbsenceNotice? myAbsence;
 
   final CellMeeting meeting;
   final ProgrammeProjection? programme;

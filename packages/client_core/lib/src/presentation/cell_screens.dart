@@ -209,6 +209,22 @@ import '../domain/membership_application.dart';
       'Confirmed by leader',
       'Recorded as their answer, with your name, how and why.',
     ),
+    CellNotice.absenceSent => (
+      StatusTone.success,
+      'Your leader is told',
+      'They know you can\'t come. A part you hold is still yours until you '
+          'answer it.',
+    ),
+    CellNotice.absenceChanged => (
+      StatusTone.success,
+      'Note changed',
+      'Your leader sees the new note.',
+    ),
+    CellNotice.absenceWithdrawn => (
+      StatusTone.success,
+      'Glad you can come',
+      'Your leader is told you can come after all.',
+    ),
     CellNotice.programmePartRefused => (
       StatusTone.warning,
       'Not published',
@@ -2244,6 +2260,13 @@ class _PlanBody extends ConsumerWidget {
       ),
       const SizedBox(height: 12),
     ];
+    // Story 5.7: who can't attend comes before the plan (a coverage warning).
+    if (read.canEdit && read.absences.isNotEmpty) {
+      children.addAll([
+        _AbsencesCard(absences: read.absences),
+        const SizedBox(height: 12),
+      ]);
+    }
     if (!read.full) {
       children.add(
         _muted(
@@ -3399,6 +3422,12 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
                               label: 'Tell directly',
                               tone: StatusTone.warning,
                             ),
+                          if (read.absenceFor(part.partId) != null)
+                            StatusLabel(
+                              key: Key('published-absence-${part.partId}'),
+                              label: 'Can\'t attend',
+                              tone: StatusTone.warning,
+                            ),
                           if (d.confirmable && _confirming != part.partId)
                             FocusRing(
                               child: TextButton(
@@ -3728,12 +3757,21 @@ class _MyCellProgrammeCardState extends ConsumerState<_MyCellProgrammeCard> {
     }
     final read = result.value;
     final p = read.programme;
+    // Story 5.7: Can't come? is the member's to say whatever the programme.
+    final absence = _AbsenceSection(meetingId: widget.meetingId, read: read);
     if (p == null) {
       return _Card(
         key: const Key('my-cell-programme-none'),
-        child: _muted(
-          context,
-          'The programme for this meeting is not published yet.',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _muted(
+              context,
+              'The programme for this meeting is not published yet.',
+            ),
+            const SizedBox(height: 12),
+            absence,
+          ],
         ),
       );
     }
@@ -3752,6 +3790,8 @@ class _MyCellProgrammeCardState extends ConsumerState<_MyCellProgrammeCard> {
               ),
               const SizedBox(height: 12),
             ],
+          absence,
+          const SizedBox(height: 12),
           _heading(context, 'Programme'),
           if (p.meetingChanged)
             Text(
@@ -4108,4 +4148,243 @@ class _HomeYoureOn extends ConsumerWidget {
         );
     }
   }
+}
+
+/// Story 5.7, mobile My cell: Can't come? The member tells the cell's
+/// leaders they cannot attend this meeting, with an optional note, and may
+/// change the note or say they can come after all. It never answers a duty:
+/// a part the member holds stays theirs until they answer it (You're on).
+class _AbsenceSection extends ConsumerStatefulWidget {
+  const _AbsenceSection({required this.meetingId, required this.read});
+  final String meetingId;
+  final MeetingProgrammeRead read;
+
+  @override
+  ConsumerState<_AbsenceSection> createState() => _AbsenceSectionState();
+}
+
+class _AbsenceSectionState extends ConsumerState<_AbsenceSection> {
+  bool _editing = false;
+  bool _confirmWithdraw = false;
+  final _note = TextEditingController();
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final s = ref.watch(memberProgrammeProvider(widget.meetingId));
+    final ctl = ref.read(memberProgrammeProvider(widget.meetingId).notifier);
+    final busy = s.busy;
+    final notice = widget.read.myAbsence;
+    final ahead = widget.read.meeting.startsAt.isAfter(DateTime.now().toUtc());
+    final open = ahead && !widget.read.meeting.cancelled;
+    final holdsPart = widget.read.yours.isNotEmpty;
+    final absenceAction =
+        s.noticeAction?.command.startsWith('cells.') == true &&
+        s.noticeAction!.command.contains('cannot_attend');
+    final children = <Widget>[_heading(context, 'Can\'t come?')];
+    if (s.pending != null) {
+      children.add(_muted(context, 'Sending…'));
+    } else if (s.notice case final n? when absenceAction) {
+      final (_, title, message) = _noticeText(n, s.noticeAction);
+      children.add(
+        Text(
+          '$title. $message',
+          key: Key('my-cell-absence-notice-${n.name}'),
+          style: ChurchType.secondary.copyWith(
+            color:
+                n == CellNotice.absenceSent ||
+                    n == CellNotice.absenceChanged ||
+                    n == CellNotice.absenceWithdrawn
+                ? c.muted
+                : c.redFg,
+          ),
+        ),
+      );
+    }
+    if (notice != null) {
+      children.addAll([
+        Text(
+          'You told your leader you can\'t attend.',
+          key: const Key('my-cell-absence-sent'),
+        ),
+        if (notice.note case final n?) _muted(context, 'Your note: $n'),
+        if (holdsPart)
+          Text(
+            'Your part is still yours until you answer it above.',
+            key: const Key('my-cell-absence-part'),
+            style: ChurchType.secondary.copyWith(color: c.amberFg),
+          ),
+      ]);
+    }
+    if (!open) {
+      if (notice == null) {
+        children.add(_muted(context, 'This meeting can no longer be changed.'));
+      }
+    } else if (_editing) {
+      children.addAll([
+        TextField(
+          key: const Key('my-cell-absence-note'),
+          controller: _note,
+          enabled: !busy,
+          maxLength: CellAbsenceCommands.noteMax,
+          decoration: const InputDecoration(
+            labelText: 'A note for your leader (optional)',
+            hintText: 'Travelling for work',
+          ),
+        ),
+        Wrap(
+          spacing: 8,
+          children: [
+            FocusRing(
+              child: FilledButton(
+                key: const Key('my-cell-absence-send'),
+                onPressed: busy
+                    ? null
+                    : () {
+                        setState(() => _editing = false);
+                        if (notice == null) {
+                          ctl.sendCannotAttend(_note.text);
+                        } else {
+                          ctl.changeCannotAttend(notice, _note.text);
+                        }
+                      },
+                child: Text(
+                  notice == null ? 'Tell my leader' : 'Save the note',
+                ),
+              ),
+            ),
+            FocusRing(
+              child: TextButton(
+                key: const Key('my-cell-absence-keep'),
+                onPressed: busy ? null : () => setState(() => _editing = false),
+                child: const Text('Not now'),
+              ),
+            ),
+          ],
+        ),
+      ]);
+    } else if (notice == null) {
+      children.add(
+        FocusRing(
+          child: OutlinedButton(
+            key: const Key('my-cell-absence-start'),
+            onPressed: busy
+                ? null
+                : () => setState(() {
+                    _note.clear();
+                    _editing = true;
+                  }),
+            child: const Text('I can\'t attend'),
+          ),
+        ),
+      );
+    } else if (_confirmWithdraw) {
+      children.add(
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            const Text('Tell your leader you can come after all?'),
+            FocusRing(
+              child: FilledButton(
+                key: const Key('my-cell-absence-withdraw-confirm'),
+                onPressed: busy
+                    ? null
+                    : () {
+                        setState(() => _confirmWithdraw = false);
+                        ctl.withdrawCannotAttend(notice);
+                      },
+                child: const Text('Yes, I can come'),
+              ),
+            ),
+            FocusRing(
+              child: TextButton(
+                onPressed: busy
+                    ? null
+                    : () => setState(() => _confirmWithdraw = false),
+                child: const Text('Keep it'),
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      children.add(
+        Wrap(
+          spacing: 8,
+          children: [
+            FocusRing(
+              child: TextButton(
+                key: const Key('my-cell-absence-change'),
+                onPressed: busy
+                    ? null
+                    : () => setState(() {
+                        _note.text = notice.note ?? '';
+                        _editing = true;
+                      }),
+                child: const Text('Change the note'),
+              ),
+            ),
+            FocusRing(
+              child: TextButton(
+                key: const Key('my-cell-absence-withdraw'),
+                onPressed: busy
+                    ? null
+                    : () => setState(() => _confirmWithdraw = true),
+                child: const Text('I can come after all'),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return Column(
+      key: const Key('my-cell-absence'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    );
+  }
+}
+
+/// Story 5.7, staff web: who has said they cannot attend, with their note
+/// (the cell's leader and assistant only).
+class _AbsencesCard extends StatelessWidget {
+  const _AbsencesCard({required this.absences});
+  final List<StaffAbsence> absences;
+
+  @override
+  Widget build(BuildContext context) => _Card(
+    key: const Key('plan-absences'),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _heading(context, 'Can\'t attend (${absences.length})'),
+        for (final a in absences)
+          Padding(
+            key: Key('plan-absence-${a.memberId}'),
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(a.displayName),
+                if (a.note case final n?) _muted(context, n),
+                if (a.partIds.isNotEmpty)
+                  const StatusLabel(
+                    label:
+                        'Holds a part: find someone or wait for their answer',
+                    tone: StatusTone.warning,
+                  ),
+              ],
+            ),
+          ),
+      ],
+    ),
+  );
 }

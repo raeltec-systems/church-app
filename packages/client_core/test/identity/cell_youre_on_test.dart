@@ -101,9 +101,12 @@ AccessRead<MyCell> myCell({bool withMeeting = true}) => AccessReadOk(
   }),
 );
 
+const _notice = '7a7a7a7a-7a7a-4a7a-8a7a-7a7a7a7a7a7a';
+
 AccessRead<MeetingProgrammeRead> programme({
   bool published = true,
   bool meetingChanged = false,
+  Map<String, Object?>? myAbsence,
 }) => AccessReadOk(
   MeetingProgrammeRead.fromJson({
     'meeting': meetingData(),
@@ -141,6 +144,7 @@ AccessRead<MeetingProgrammeRead> programme({
             {'part_id': _part1, 'occurrence_id': _occurrence},
           ]
         : const [],
+    'my_absence': myAbsence,
   }),
 );
 
@@ -331,6 +335,181 @@ void main() {
       );
       expect(byKey('my-cell-programme-none'), findsOneWidget);
       expect(byKey('my-cell-yours-$_part1'), findsNothing);
+    });
+  });
+
+  group('story 5.7: Cannot attend', () {
+    testWidgets('a member sends a notice with a note; their part is still '
+        'theirs', (tester) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.myCell,
+        setUp: (h) {
+          h.cells.mine = myCell();
+          h.cells.meetingProgramme = programme();
+          h.duties.mine = myDuties();
+        },
+      );
+      await tapKey(tester, 'my-cell-absence-start');
+      await settle(tester);
+      await tester.enterText(
+        byKey('my-cell-absence-note'),
+        'Travelling for work',
+      );
+      await tapKey(tester, 'my-cell-absence-send');
+      final sent = h.gateway.sent.single;
+      expect(sent.function, 'cells_command');
+      expect(sent.wire['command'], 'cells.send_cannot_attend');
+      expect(sent.wire['expected_revision'], isNull);
+      expect(sent.wire['payload'], {
+        'meeting_id': _meeting,
+        'note': 'Travelling for work',
+      });
+      h.cells.meetingProgramme = programme(
+        myAbsence: {
+          'notice_id': _notice,
+          'meeting_id': _meeting,
+          'state': 'open',
+          'revision': 1,
+          'note': 'Travelling for work',
+          'sent_at': '2099-03-01T10:00:00Z',
+          'updated_at': '2099-03-01T10:00:00Z',
+        },
+      );
+      sent.confirm({'notice_id': _notice}, 1);
+      await settle(tester);
+      expect(byKey('my-cell-absence-notice-absenceSent'), findsOneWidget);
+      expect(byKey('my-cell-absence-sent'), findsOneWidget);
+      expect(find.text('Your note: Travelling for work'), findsOneWidget);
+      expect(byKey('my-cell-absence-part'), findsOneWidget);
+      // The duty answer is untouched: still waiting, with its buttons.
+      expect(
+        tester.widget<StatusLabel>(byKey('my-cell-status-$_part1')).label,
+        'Awaiting your answer',
+      );
+    });
+
+    testWidgets('the note is changed at its revision; I can come after all '
+        'asks once more', (tester) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.myCell,
+        setUp: (h) {
+          h.cells.mine = myCell();
+          h.cells.meetingProgramme = programme(
+            published: false,
+            myAbsence: {
+              'notice_id': _notice,
+              'meeting_id': _meeting,
+              'state': 'open',
+              'revision': 2,
+              'note': 'Late',
+              'sent_at': '2099-03-01T10:00:00Z',
+              'updated_at': '2099-03-01T10:00:00Z',
+            },
+          );
+        },
+      );
+      expect(byKey('my-cell-absence-part'), findsNothing);
+      await tapKey(tester, 'my-cell-absence-change');
+      await settle(tester);
+      await tester.enterText(byKey('my-cell-absence-note'), 'Very late');
+      await tapKey(tester, 'my-cell-absence-send');
+      expect(
+        h.gateway.sent.single.wire['command'],
+        'cells.change_cannot_attend',
+      );
+      expect(h.gateway.sent.single.wire['expected_revision'], 2);
+      h.gateway.sent.single.unknown();
+      await settle(tester);
+      await tapKey(tester, 'my-cell-absence-withdraw');
+      await settle(tester);
+      expect(h.gateway.sent, hasLength(1));
+      await tapKey(tester, 'my-cell-absence-withdraw-confirm');
+      expect(
+        h.gateway.sent.last.wire['command'],
+        'cells.withdraw_cannot_attend',
+      );
+      expect(h.gateway.sent.last.wire['payload'], {'notice_id': _notice});
+    });
+
+    testWidgets('the leader sees who can\'t attend and the part at risk', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        CellPaths.plan(_meeting),
+        setUp: (h) => h.cells.programme = AccessReadOk(
+          ProgrammeRead.fromJson({
+            'meeting': meetingData(),
+            'cell_name': 'SYNTHETIC Shikoswe Cell',
+            'view': 'full',
+            'can_edit': true,
+            'programme': {
+              'programme_id': _programme,
+              'meeting_id': _meeting,
+              'state': 'published',
+              'revision': 3,
+              'published_revision': 3,
+              'parts': [
+                {
+                  'part_id': _part1,
+                  'position': 1,
+                  'label': 'Opening prayer',
+                  'starts_at': '2099-03-06T16:00:00Z',
+                  'ends_at': '2099-03-06T16:10:00Z',
+                  'assignee': {
+                    'member_id': '79797979-7979-4979-8979-797979797979',
+                    'display_name': 'SYNTHETIC Member',
+                    'in_cell': true,
+                  },
+                },
+              ],
+              'gaps': 0,
+            },
+            'roster': const [],
+            'duties': [
+              {
+                'part_id': _part1,
+                'occurrence_state': 'published',
+                'positions': [
+                  {
+                    'kind': 'owned',
+                    'position_key': 'lead',
+                    'cancelled': false,
+                    'assignment': {
+                      'assignment_id': _assignment,
+                      'revision': 2,
+                      'response': 'accepted',
+                      'response_provenance': 'member',
+                    },
+                  },
+                ],
+              },
+            ],
+            'absences': [
+              {
+                'notice_id': _notice,
+                'member_id': '79797979-7979-4979-8979-797979797979',
+                'display_name': 'SYNTHETIC Member',
+                'note': 'Travelling for work',
+                'sent_at': '2099-03-01T10:00:00Z',
+                'updated_at': '2099-03-01T10:00:00Z',
+                'part_ids': [_part1],
+              },
+            ],
+          }),
+        ),
+      );
+      expect(byKey('plan-absences'), findsOneWidget);
+      expect(find.text('Can\'t attend (1)'), findsOneWidget);
+      expect(find.text('Travelling for work'), findsOneWidget);
+      expect(byKey('published-absence-$_part1'), findsOneWidget);
+      // The answer stays the member's own (Accepted), next to the warning.
+      expect(
+        tester.widget<StatusLabel>(byKey('published-status-$_part1')).label,
+        'Accepted',
+      );
     });
   });
 

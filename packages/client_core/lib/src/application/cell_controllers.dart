@@ -87,6 +87,11 @@ enum CellNotice {
 
   /// Story 5.5: the leader recorded that the person said yes directly.
   leaderConfirmed,
+
+  /// Story 5.7: Cannot attend sent, changed or withdrawn.
+  absenceSent,
+  absenceChanged,
+  absenceWithdrawn,
 }
 
 /// One command in flight or just answered.
@@ -266,6 +271,9 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
     CellProgrammeCommands.cancel => CellNotice.programmeCancelled,
     CellProgrammeCommands.publish => CellNotice.programmePublished,
     DutyCoverageCommands.confirmByLeader => CellNotice.leaderConfirmed,
+    CellAbsenceCommands.send => CellNotice.absenceSent,
+    CellAbsenceCommands.change => CellNotice.absenceChanged,
+    CellAbsenceCommands.withdraw => CellNotice.absenceWithdrawn,
     _ => CellNotice.cancelled,
   };
 
@@ -697,6 +705,27 @@ class MemberProgrammeController extends CellsController<MeetingProgrammeRead> {
   @override
   Future<AccessRead<MeetingProgrammeRead>> fetch() =>
       ref.read(cellsRepositoryProvider).fetchMeetingProgramme(meetingId);
+
+  /// Story 5.7: tell the cell's leaders the member cannot attend this
+  /// meeting (an optional practical note). Never answers a duty.
+  Future<void> sendCannotAttend(String? note) =>
+      send(CellAbsenceCommands.send, const Optional.of(null), {
+        'meeting_id': meetingId,
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      }, 'your notice');
+
+  Future<void> changeCannotAttend(AbsenceNotice notice, String? note) =>
+      send(CellAbsenceCommands.change, Optional.of(notice.revision), {
+        'notice_id': notice.noticeId,
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      }, 'your notice');
+
+  Future<void> withdrawCannotAttend(AbsenceNotice notice) => send(
+    CellAbsenceCommands.withdraw,
+    Optional.of(notice.revision),
+    {'notice_id': notice.noticeId},
+    'your notice',
+  );
 }
 
 final memberProgrammeProvider = NotifierProvider.autoDispose

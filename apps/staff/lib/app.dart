@@ -207,11 +207,19 @@ const staffFollowUpRoutingDestination = (
   icon: Icons.alt_route_outlined,
 );
 
+/// Story 6.1: shown while the caller holds Media, Pastor or Admin: draft,
+/// publish, withdraw and archive church events.
+const staffEventsDestination = (
+  path: ClientPaths.contentEvents,
+  label: 'Events',
+  icon: Icons.event_outlined,
+);
+
 /// One group of the sidebar; [label] is null for the ungrouped top entry.
 typedef StaffNavGroup = ({String? label, List<StaffDestination> items});
 
 /// The sidebar for [grants], grouped the way staff think of their work:
-/// Overview, People, Cells, Duties, Me, then System (Admin only).
+/// Overview, People, Cells, Duties, Content, Me, then System (Admin only).
 /// Presentation only: hiding an entry is not a control, and every screen's
 /// data is checked by the server.
 List<StaffNavGroup> staffNavGroupsFor(
@@ -255,6 +263,11 @@ List<StaffNavGroup> staffNavGroupsFor(
         if (givesSpecialAssignments(grants)) staffDutySpecialDestination,
         if (admin) staffDepartmentsDestination,
       ],
+    ),
+    // Story 6.1: public church content (Media, Pastor, Admin).
+    (
+      label: 'Content',
+      items: [if (editsContent(grants)) staffEventsDestination],
     ),
     (
       label: 'Me',

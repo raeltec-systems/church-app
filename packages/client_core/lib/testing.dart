@@ -17,6 +17,7 @@ import 'src/domain/cell_meetings.dart';
 import 'src/domain/cell_programmes.dart';
 import 'src/domain/cell_membership.dart';
 import 'src/domain/commands.dart';
+import 'src/domain/content_events.dart';
 import 'src/domain/credential_review.dart';
 import 'src/domain/duties.dart';
 import 'src/domain/followups.dart';
@@ -545,6 +546,125 @@ class FakeCells implements CellsRepository {
     return admin;
   }
 }
+
+/// [ContentRepository] answered by the test (story 6.1). Each field answers
+/// every read at once; the lists record what was asked.
+class FakeContent implements ContentRepository {
+  AccessRead<PublicEvents> publicEvents = AccessReadOk(
+    PublicEvents.fromJson(const {'events': <Object?>[], 'truncated': false}),
+  );
+
+  /// The detail answer by event id; an id not listed answers `{event: null}`.
+  final Map<String, AccessRead<PublicEventRead>> publicEvent = {};
+  AccessRead<StaffEvents> staffEvents = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  int publicEventsCalls = 0;
+  int staffEventsCalls = 0;
+  final publicEventAsked = <String>[];
+
+  @override
+  Future<AccessRead<PublicEvents>> fetchPublicEvents() async {
+    publicEventsCalls++;
+    return publicEvents;
+  }
+
+  @override
+  Future<AccessRead<PublicEventRead>> fetchPublicEvent(String eventId) async {
+    publicEventAsked.add(eventId);
+    return publicEvent[eventId] ?? const AccessReadOk(PublicEventRead(null));
+  }
+
+  @override
+  Future<AccessRead<StaffEvents>> fetchStaffEvents() async {
+    staffEventsCalls++;
+    return staffEvents;
+  }
+}
+
+/// The wire form of one published event as everyone reads it (story 6.1);
+/// by default the two-day SYNTHETIC Harvest Thanksgiving (Sat 10 Oct 2099
+/// 09:00 to Sun 11 Oct 12:00 church time).
+Map<String, Object?> publicEventData({
+  String eventId = '71717171-7171-4171-8171-717171717171',
+  String title = 'SYNTHETIC Harvest Thanksgiving',
+  String description = 'SYNTHETIC two days of thanksgiving services.',
+  String startsAt = '2099-10-10T07:00:00.000000Z',
+  String endsAt = '2099-10-11T10:00:00.000000Z',
+  String location = 'SYNTHETIC Main sanctuary',
+  int publicationRevision = 1,
+  String publishedAt = '2099-09-01T08:00:00.000000Z',
+}) => {
+  'event_id': eventId,
+  'title': title,
+  'description': description,
+  'starts_at': startsAt,
+  'ends_at': endsAt,
+  'location': location,
+  'publication_revision': publicationRevision,
+  'published_at': publishedAt,
+};
+
+/// The wire form of `api.content_public_events` holding [events].
+Map<String, Object?> publicEventsData(
+  List<Map<String, Object?>> events, {
+  bool truncated = false,
+}) => {'events': events, 'truncated': truncated};
+
+/// The wire form of one event revision as editors read it.
+Map<String, Object?> staffEventRevisionData({
+  int revisionNo = 1,
+  String title = 'SYNTHETIC Harvest Thanksgiving',
+  String description = 'SYNTHETIC two days of thanksgiving services.',
+  String startsAt = '2099-10-10T07:00:00.000000Z',
+  String endsAt = '2099-10-11T10:00:00.000000Z',
+  String location = 'SYNTHETIC Main sanctuary',
+  String savedAt = '2099-09-01T07:00:00.000000Z',
+  String savedBy = 'SYNTHETIC Media Phiri',
+}) => {
+  'revision_no': revisionNo,
+  'title': title,
+  'description': description,
+  'starts_at': startsAt,
+  'ends_at': endsAt,
+  'location': location,
+  'saved_at': savedAt,
+  'saved_by': savedBy,
+};
+
+/// The wire form of one event as editors read it ([live] and [draft] are
+/// revision objects or null).
+Map<String, Object?> staffEventData({
+  String eventId = '71717171-7171-4171-8171-717171717171',
+  int revision = 1,
+  String state = 'draft',
+  Map<String, Object?>? live,
+  Map<String, Object?>? draft,
+  String? publishedBy,
+  String? publishedAt,
+  String? withdrawnAt,
+  String? archivedAt,
+}) => {
+  'event_id': eventId,
+  'revision': revision,
+  'state': state,
+  'created_at': '2099-09-01T07:00:00.000000Z',
+  'created_by': 'SYNTHETIC Media Phiri',
+  'updated_at': '2099-09-01T07:00:00.000000Z',
+  'published_at': publishedAt,
+  'published_by': publishedBy,
+  'withdrawn_at': withdrawnAt,
+  'archived_at': archivedAt,
+  'live': live,
+  'draft': draft,
+};
+
+/// The wire form of `api.content_staff_events`.
+Map<String, Object?> staffEventsData(
+  List<Map<String, Object?>> events, {
+  String capacity = 'media',
+  bool truncated = false,
+}) => {'capacity': capacity, 'events': events, 'truncated': truncated};
 
 /// [FollowUpsRepository] answered by the test (story 4.6). Each field
 /// answers every read at once; the counters record how often each was asked.
@@ -1813,6 +1933,7 @@ class ClientTestHarness {
   final membership = FakeMembership();
   final review = FakeReview();
   final cells = FakeCells();
+  final content = FakeContent();
   final duties = FakeDuties();
   final coverage = FakeDutyCoverage();
   final outcomes = FakeDutyOutcomes();
@@ -1852,6 +1973,7 @@ class ClientTestHarness {
       membershipRepositoryProvider.overrideWithValue(membership),
       reviewRepositoryProvider.overrideWithValue(review),
       cellsRepositoryProvider.overrideWithValue(cells),
+      contentRepositoryProvider.overrideWithValue(content),
       dutiesRepositoryProvider.overrideWithValue(duties),
       dutyCoverageRepositoryProvider.overrideWithValue(coverage),
       dutyOutcomesRepositoryProvider.overrideWithValue(outcomes),

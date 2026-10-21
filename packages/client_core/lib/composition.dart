@@ -89,6 +89,9 @@ Future<List<Override>> compositionOverrides(
       SupabaseReviewRepository(client),
     ),
     cellsRepositoryProvider.overrideWithValue(SupabaseCellsRepository(client)),
+    contentRepositoryProvider.overrideWithValue(
+      SupabaseContentRepository(client),
+    ),
     dutiesRepositoryProvider.overrideWithValue(
       SupabaseDutiesRepository(client),
     ),

@@ -5,6 +5,7 @@ import '../domain/account_auth.dart';
 import '../domain/assisted_recovery.dart';
 import '../domain/cell_membership.dart';
 import '../domain/commands.dart';
+import '../domain/content_events.dart';
 import '../domain/credential_review.dart';
 import '../domain/duties.dart';
 import '../domain/followups.dart';
@@ -91,6 +92,11 @@ final dutyOutcomesRepositoryProvider = Provider<DutyOutcomesRepository>(
 /// the current Pastors.
 final dutySpecialRepositoryProvider = Provider<DutySpecialRepository>(
   (ref) => const UnconfiguredDutySpecialRepository(),
+);
+
+/// Story 6.1: the public event reads (everyone) and the editors' event read.
+final contentRepositoryProvider = Provider<ContentRepository>(
+  (ref) => const UnconfiguredContentRepository(),
 );
 
 /// Story 4.9: opens the phone or messaging app for a labelled contact route.

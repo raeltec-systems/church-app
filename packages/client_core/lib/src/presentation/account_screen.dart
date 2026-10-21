@@ -314,7 +314,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                     MenuRow(
                       key: const Key('go-my-duties'),
                       label: 'My duties',
-                      onTap: () => context.go(ClientPaths.myDuties),
+                      onTap: () => go(ClientPaths.myDuties),
                     ),
                     MenuRow(
                       key: const Key('go-duty-history'),
@@ -325,7 +325,7 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
                       key: const Key('go-my-cell'),
                       label: 'My cell',
                       meta: cell,
-                      onTap: () => context.go(ClientPaths.myCell),
+                      onTap: () => go(ClientPaths.myCell),
                     ),
                     MenuRow(
                       key: const Key('go-my-followups'),

@@ -17,12 +17,16 @@ class SupabaseApiReader {
   final SupabaseClient _client;
   final Duration timeout;
 
+  /// [public] (story 6.1): an unauthenticated public read, sent with the
+  /// publishable key when no one is signed in (and with the session when one
+  /// is), so a signed-out caller is not refused here.
   Future<AccessRead<T>> read<T>(
     String function,
     Map<String, Object?>? params,
-    T Function(Object?) parse,
-  ) async {
-    if (_client.auth.currentSession == null) {
+    T Function(Object?) parse, {
+    bool public = false,
+  }) async {
+    if (!public && _client.auth.currentSession == null) {
       return AccessReadDenied<T>(AccessDenial.signedOut);
     }
     final (first, rejected) = await _once(function, params, parse);

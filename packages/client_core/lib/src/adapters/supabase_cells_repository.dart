@@ -46,4 +46,13 @@ class SupabaseCellsRepository implements CellsRepository {
       _reader.read('cells_programme', {
         'meeting_id': meetingId,
       }, ProgrammeRead.fromJson);
+
+  /// Story 5.4: `api.cells_meeting_programme` (current confirmed members of
+  /// the meeting's cell).
+  @override
+  Future<AccessRead<MeetingProgrammeRead>> fetchMeetingProgramme(
+    String meetingId,
+  ) => _reader.read('cells_meeting_programme', {
+    'meeting_id': meetingId,
+  }, MeetingProgrammeRead.fromJson);
 }

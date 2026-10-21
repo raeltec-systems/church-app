@@ -530,6 +530,12 @@ abstract interface class CellsRepository {
 
   /// Story 5.3: one meeting's programme (`api.cells_programme`).
   Future<AccessRead<ProgrammeRead>> fetchProgramme(String meetingId);
+
+  /// Story 5.4: a meeting's published programme for the members of its cell
+  /// (`api.cells_meeting_programme`).
+  Future<AccessRead<MeetingProgrammeRead>> fetchMeetingProgramme(
+    String meetingId,
+  );
 }
 
 class UnconfiguredCellsRepository implements CellsRepository {
@@ -554,6 +560,11 @@ class UnconfiguredCellsRepository implements CellsRepository {
   @override
   Future<AccessRead<ProgrammeRead>> fetchProgramme(String meetingId) async =>
       const AccessReadDenied(AccessDenial.unavailable);
+
+  @override
+  Future<AccessRead<MeetingProgrammeRead>> fetchMeetingProgramme(
+    String meetingId,
+  ) async => const AccessReadDenied(AccessDenial.unavailable);
 }
 
 /// Does [grants] lead or assist any cell (navigation only)?

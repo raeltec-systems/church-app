@@ -505,6 +505,11 @@ class FakeCells implements CellsRepository {
   );
   final programmeAsked = <String>[];
 
+  /// Story 5.4: the member read of a published programme.
+  AccessRead<MeetingProgrammeRead> meetingProgramme = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+
   @override
   Future<AccessRead<CellMeetingsBoard>> fetchMeetings() async {
     meetingsCalls++;
@@ -516,6 +521,11 @@ class FakeCells implements CellsRepository {
     programmeAsked.add(meetingId);
     return programme;
   }
+
+  @override
+  Future<AccessRead<MeetingProgrammeRead>> fetchMeetingProgramme(
+    String meetingId,
+  ) async => meetingProgramme;
 
   @override
   Future<AccessRead<MyCell>> fetchMyCell() async {

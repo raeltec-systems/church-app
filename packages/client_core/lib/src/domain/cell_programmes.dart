@@ -2,7 +2,9 @@
 /// read the draft, which parts are gaps and whether an assignee is still in
 /// the cell are all decided by the server; these reads are presentation
 /// only. Part times travel as UTC instants and are typed in church time
-/// (`HH:MM` on the meeting's date). Free of widgets and SDKs.
+/// (`HH:MM` on the meeting's date). Story 5.4 adds publishing: the server's
+/// member-safe projection, each part's Duties state and the department
+/// positions a part may show. Free of widgets and SDKs.
 library;
 
 import 'cell_meetings.dart';
@@ -45,6 +47,9 @@ abstract final class CellProgrammeCommands {
   static const create = 'cells.create_programme';
   static const save = 'cells.save_programme';
   static const cancel = 'cells.cancel_programme';
+
+  /// Story 5.4: publish (or republish) through Duties.
+  static const publish = 'cells.publish_programme';
 }
 
 /// At most this many parts per programme (the server's limit).
@@ -52,6 +57,7 @@ const programmeMaxParts = 20;
 
 enum ProgrammeState {
   draft('draft'),
+  published('published'),
   cancelled('cancelled');
 
   const ProgrammeState(this.wire);
@@ -98,6 +104,8 @@ class ProgrammePart {
     required this.startsAt,
     required this.endsAt,
     this.assignee,
+    this.linkedSlotId,
+    this.linkedLabel,
   });
 
   factory ProgrammePart.fromJson(Object? json) {
@@ -111,6 +119,9 @@ class ProgrammePart {
       assignee: m['assignee'] == null
           ? null
           : ProgrammeAssignee.fromJson(m['assignee']),
+      // Story 5.4 (absent from 5.3 servers).
+      linkedSlotId: _opt<String>(m, 'linked_slot_id'),
+      linkedLabel: _opt<String>(m, 'linked_label'),
     );
   }
 
@@ -121,8 +132,12 @@ class ProgrammePart {
   final DateTime endsAt;
   final ProgrammeAssignee? assignee;
 
-  /// Nobody leads this part yet.
-  bool get gap => assignee == null;
+  /// Story 5.4: the department position this part shows, and its name.
+  final String? linkedSlotId;
+  final String? linkedLabel;
+
+  /// Nobody leads this part yet (a department part is led by its department).
+  bool get gap => assignee == null && linkedSlotId == null;
 }
 
 /// A programme. With the full view it carries the content; an Admin-only
@@ -139,6 +154,8 @@ class CellProgramme {
     this.topic,
     this.scripture,
     this.studyNotes,
+    this.publishedRevision,
+    this.publishedAt,
   });
 
   factory CellProgramme.fromJson(Object? json) {
@@ -161,6 +178,10 @@ class CellProgramme {
       parts: parts,
       partCount: m['parts'] == null ? _count(m, 'part_count') : parts.length,
       gaps: _count(m, 'gaps'),
+      publishedRevision: _opt<int>(m, 'published_revision'),
+      publishedAt: m['published_at'] == null
+          ? null
+          : _instant(m, 'published_at'),
     );
   }
 
@@ -179,7 +200,12 @@ class CellProgramme {
   /// Parts nobody leads yet.
   final int gaps;
 
+  /// Story 5.4: the revision members read, and when it was published.
+  final int? publishedRevision;
+  final DateTime? publishedAt;
+
   bool get draft => state == ProgrammeState.draft;
+  bool get published => state == ProgrammeState.published;
 }
 
 /// How a roster member's account stands (the 2.3 roster vocabulary).
@@ -224,6 +250,10 @@ class ProgrammeRead {
     required this.canEdit,
     required this.roster,
     this.programme,
+    this.preview,
+    this.membersSee,
+    this.duties = const {},
+    this.linkable = const [],
   });
 
   factory ProgrammeRead.fromJson(Object? json) {
@@ -246,6 +276,22 @@ class ProgrammeRead {
       roster: List.unmodifiable(
         _req<List>(m, 'roster').map(ProgrammeRosterMember.fromJson),
       ),
+      // Story 5.4 (absent from 5.3 servers).
+      preview: m['preview'] == null
+          ? null
+          : ProgrammeProjection.fromJson(m['preview']),
+      membersSee: m['published'] == null
+          ? null
+          : ProgrammeProjection.fromJson(m['published']),
+      duties: {
+        for (final d in (_opt<List>(m, 'duties') ?? const []).map(
+          PartDuty.fromJson,
+        ))
+          d.partId: d,
+      },
+      linkable: List.unmodifiable(
+        (_opt<List>(m, 'linkable') ?? const []).map(LinkableDuty.fromJson),
+      ),
     );
   }
 
@@ -256,10 +302,22 @@ class ProgrammeRead {
   /// an Admin-only reader (state and counts).
   final bool full;
 
-  /// The cell's leader or assistant: may create, save and cancel drafts.
+  /// The cell's leader or assistant: may create, save, publish and cancel.
   final bool canEdit;
   final CellProgramme? programme;
   final List<ProgrammeRosterMember> roster;
+
+  /// Story 5.4: the member-safe view of the programme as it stands (the
+  /// server's preview), and what members read now (null until published).
+  final ProgrammeProjection? preview;
+  final ProgrammeProjection? membersSee;
+
+  /// Story 5.4: each published part's Duties state, by part id (the cell's
+  /// leader and assistant only).
+  final Map<String, PartDuty> duties;
+
+  /// Story 5.4: department positions a draft part may show.
+  final List<LinkableDuty> linkable;
 }
 
 /// One part as typed in the editor, sent whole by `cells.save_programme`.
@@ -270,6 +328,7 @@ class ProgrammePartDraft {
     required this.endTime,
     this.partId,
     this.assigneeMemberId,
+    this.linkedSlotId,
   });
 
   /// An existing part, as the editor starts it.
@@ -279,15 +338,20 @@ class ProgrammePartDraft {
     startTime: ChurchTime.timeText(p.startsAt),
     endTime: ChurchTime.timeText(p.endsAt),
     assigneeMemberId: p.assignee?.memberId,
+    linkedSlotId: p.linkedSlotId,
   );
 
   final String? partId;
   final String label;
 
-  /// Church-local `HH:MM` on the meeting's date.
+  /// Church-local `HH:MM` on the meeting's date (after midnight: the next
+  /// day, when the meeting runs past midnight).
   final String startTime;
   final String endTime;
   final String? assigneeMemberId;
+
+  /// Story 5.4: a department position this part shows instead of a person.
+  final String? linkedSlotId;
 
   Map<String, Object?> toJson() => {
     if (partId != null) 'part_id': partId,
@@ -295,9 +359,234 @@ class ProgrammePartDraft {
     'start_time': startTime.trim(),
     'end_time': endTime.trim(),
     'assignee_member_id': assigneeMemberId,
+    if (linkedSlotId != null) 'linked_slot_id': linkedSlotId,
   };
 }
 
 /// The field error of part [index] of a refused save (`parts.<index>`).
 String? partError(Map<String, String> errors, int index) =>
     errors['parts.$index'];
+
+/// Story 5.4: a refusal of one part's Duties side (`parts.<index>.<field>`),
+/// e.g. `member_id: overlap` when the assignee is on another duty then.
+String? partDutyError(Map<String, String> errors, int index, String field) =>
+    errors['parts.$index.$field'];
+
+/// Story 5.4: the refused publish asks for a reason to keep overlaps.
+bool needsOverrideReason(Map<String, String> errors) =>
+    errors.keys.any((k) => k.endsWith('.override_reason'));
+
+/// Story 5.4: a department position a part may show (a Duties display link;
+/// the duty stays its department's). Names and times only, never people.
+class LinkableDuty {
+  const LinkableDuty({
+    required this.slotId,
+    required this.dutyName,
+    required this.startsAt,
+    required this.filled,
+    this.departmentName,
+    this.positionName,
+    this.endsAt,
+  });
+
+  factory LinkableDuty.fromJson(Object? json) {
+    final m = _map(json, 'linkable duty');
+    return LinkableDuty(
+      slotId: _req<String>(m, 'slot_id'),
+      departmentName: _opt<String>(m, 'department_name'),
+      dutyName: _req<String>(m, 'duty_name'),
+      positionName: _opt<String>(m, 'position_name'),
+      startsAt: _instant(m, 'starts_at'),
+      endsAt: m['ends_at'] == null ? null : _instant(m, 'ends_at'),
+      filled: _req<bool>(m, 'filled'),
+    );
+  }
+
+  final String slotId;
+  final String? departmentName;
+  final String dutyName;
+  final String? positionName;
+  final DateTime startsAt;
+  final DateTime? endsAt;
+  final bool filled;
+
+  /// "Ushers: Evening ushering (Door)", as the server stores it on the part.
+  String get label =>
+      '${departmentName ?? 'Department'}: $dutyName'
+      '${positionName == null ? '' : ' ($positionName)'}';
+}
+
+/// How a published part stands in Duties (the cell's managers only).
+enum PartDutyStatus {
+  awaiting,
+  accepted,
+  declined,
+  open,
+  departmentFilled,
+  departmentOpen,
+  cancelled,
+}
+
+/// Story 5.4: one published part's Duties state.
+class PartDuty {
+  const PartDuty({
+    required this.partId,
+    required this.status,
+    this.confirmedByLeader = false,
+    this.needsContact = false,
+    this.shortNotice = false,
+  });
+
+  factory PartDuty.fromJson(Object? json) {
+    final m = _map(json, 'part duty');
+    final partId = _req<String>(m, 'part_id');
+    Map? owned, linked;
+    for (final p in _opt<List>(m, 'positions') ?? const []) {
+      final position = _map(p, 'position');
+      if (position['kind'] == 'owned' && position['position_key'] == 'lead') {
+        owned = position;
+      } else if (position['kind'] == 'linked') {
+        linked = position;
+      }
+    }
+    if (linked != null) {
+      return PartDuty(
+        partId: partId,
+        status: _req<bool>(linked, 'cancelled')
+            ? PartDutyStatus.cancelled
+            : _req<bool>(linked, 'filled')
+            ? PartDutyStatus.departmentFilled
+            : PartDutyStatus.departmentOpen,
+      );
+    }
+    final assignment = owned?['assignment'] == null
+        ? null
+        : _map(owned!['assignment'], 'assignment');
+    final cancelled =
+        m['occurrence_state'] == 'cancelled' || owned?['cancelled'] == true;
+    return PartDuty(
+      partId: partId,
+      status: cancelled
+          ? PartDutyStatus.cancelled
+          : assignment == null
+          ? PartDutyStatus.open
+          : switch (assignment['response']) {
+              'accepted' => PartDutyStatus.accepted,
+              'declined' => PartDutyStatus.declined,
+              'pending' => PartDutyStatus.awaiting,
+              _ => throw const FormatException('unexpected response'),
+            },
+      confirmedByLeader: assignment?['response_provenance'] == 'leader',
+      needsContact: assignment?['needs_contact'] == true,
+      shortNotice: assignment?['short_notice'] == true,
+    );
+  }
+
+  final String partId;
+  final PartDutyStatus status;
+  final bool confirmedByLeader;
+  final bool needsContact;
+  final bool shortNotice;
+
+  String get label => switch (status) {
+    PartDutyStatus.awaiting => 'Awaiting response',
+    PartDutyStatus.accepted =>
+      confirmedByLeader ? 'Confirmed by leader' : 'Accepted',
+    PartDutyStatus.declined => 'Declined',
+    PartDutyStatus.open => 'Open: nobody asked',
+    PartDutyStatus.departmentFilled => 'Department duty: filled',
+    PartDutyStatus.departmentOpen => 'Department duty: not filled yet',
+    PartDutyStatus.cancelled => 'Cancelled',
+  };
+}
+
+/// One part of the member-safe programme: who leads it by name, or the
+/// department that does. No responses, notes or history.
+class ProjectionPart {
+  const ProjectionPart({
+    required this.partId,
+    required this.label,
+    required this.startsAt,
+    required this.endsAt,
+    this.leader,
+    this.department,
+  });
+
+  factory ProjectionPart.fromJson(Object? json) {
+    final m = _map(json, 'programme part');
+    return ProjectionPart(
+      partId: _req<String>(m, 'part_id'),
+      label: _req<String>(m, 'label'),
+      startsAt: _instant(m, 'starts_at'),
+      endsAt: _instant(m, 'ends_at'),
+      leader: _opt<String>(m, 'leader'),
+      department: _opt<String>(m, 'department'),
+    );
+  }
+
+  final String partId;
+  final String label;
+  final DateTime startsAt;
+  final DateTime endsAt;
+  final String? leader;
+  final String? department;
+}
+
+/// Story 5.4: the member-safe published programme (and the staff preview).
+class ProgrammeProjection {
+  const ProgrammeProjection({
+    required this.programmeId,
+    required this.meetingId,
+    required this.parts,
+    this.topic,
+    this.scripture,
+    this.revision,
+    this.publishedAt,
+  });
+
+  factory ProgrammeProjection.fromJson(Object? json) {
+    final m = _map(json, 'programme projection');
+    return ProgrammeProjection(
+      programmeId: _req<String>(m, 'programme_id'),
+      meetingId: _req<String>(m, 'meeting_id'),
+      topic: _opt<String>(m, 'topic'),
+      scripture: _opt<String>(m, 'scripture'),
+      parts: List.unmodifiable(
+        _req<List>(m, 'parts').map(ProjectionPart.fromJson),
+      ),
+      revision: _opt<int>(m, 'revision'),
+      publishedAt: m['published_at'] == null
+          ? null
+          : _instant(m, 'published_at'),
+    );
+  }
+
+  final String programmeId;
+  final String meetingId;
+  final String? topic;
+  final String? scripture;
+  final List<ProjectionPart> parts;
+
+  /// Set on what members read (null on a preview).
+  final int? revision;
+  final DateTime? publishedAt;
+}
+
+/// Story 5.4: `api.cells_meeting_programme`, a meeting's published programme
+/// for the members of its cell (null while nothing is published).
+class MeetingProgrammeRead {
+  const MeetingProgrammeRead({required this.meeting, this.programme});
+
+  factory MeetingProgrammeRead.fromJson(Object? json) {
+    final m = _map(json, 'meeting programme');
+    return MeetingProgrammeRead(
+      meeting: CellMeeting.fromJson(m['meeting']),
+      programme: m['programme'] == null
+          ? null
+          : ProgrammeProjection.fromJson(m['programme']),
+    );
+  }
+
+  final CellMeeting meeting;
+  final ProgrammeProjection? programme;
+}

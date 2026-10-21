@@ -155,6 +155,7 @@ AccessRead<ProgrammeRead> readWith({
   bool canEdit = true,
   String view = 'full',
   String meetingState = 'scheduled',
+  Map<String, Object?> extra = const {},
 }) => AccessReadOk(
   ProgrammeRead.fromJson({
     'meeting': meetingData(state: meetingState),
@@ -163,8 +164,79 @@ AccessRead<ProgrammeRead> readWith({
     'can_edit': canEdit,
     'programme': none ? null : (programme ?? programmeData()),
     'roster': view == 'full' ? _roster : const [],
+    ...extra,
   }),
 );
+
+const _slot = '69696969-6969-4969-8969-696969696969';
+
+/// Story 5.4: a department position at the meeting's time.
+final _linkable = [
+  {
+    'slot_id': _slot,
+    'occurrence_id': '6a6a6a6a-6a6a-4a6a-8a6a-6a6a6a6a6a6a',
+    'department_id': '6b6b6b6b-6b6b-4b6b-8b6b-6b6b6b6b6b6b',
+    'department_name': 'SYNTHETIC Ushers',
+    'duty_name': 'Evening ushering',
+    'position_name': null,
+    'starts_at': '2099-03-06T16:00:00Z',
+    'ends_at': '2099-03-06T17:30:00Z',
+    'filled': true,
+  },
+];
+
+/// Story 5.4: the member-safe projection of [programmeData].
+Map<String, Object?> projectionData({int? revision}) => {
+  'programme_id': _programme,
+  'meeting_id': _meeting,
+  'topic': 'Rooted in love',
+  'scripture': 'Ephesians 3:14-21',
+  'parts': [
+    {
+      'part_id': _part1,
+      'label': 'Opening prayer',
+      'starts_at': '2099-03-06T16:00:00Z',
+      'ends_at': '2099-03-06T16:10:00Z',
+      'leader': 'SYNTHETIC Grace Banda',
+      'department': null,
+    },
+    {
+      'part_id': _part2,
+      'label': 'Bible study',
+      'starts_at': '2099-03-06T16:10:00Z',
+      'ends_at': '2099-03-06T16:50:00Z',
+      'leader': null,
+      'department': null,
+    },
+  ],
+  if (revision != null) 'revision': revision,
+  if (revision != null) 'published_at': '2099-03-01T10:00:00Z',
+};
+
+/// Story 5.4: the Duties state of a published part.
+Map<String, Object?> dutyOf(
+  String partId,
+  String? response, {
+  bool leader = false,
+}) => {
+  'part_id': partId,
+  'occurrence_state': 'published',
+  'positions': [
+    {
+      'position_key': 'lead',
+      'kind': 'owned',
+      'cancelled': false,
+      'assignment': response == null
+          ? null
+          : {
+              'response': response,
+              'response_provenance': leader ? 'leader' : 'member',
+              'needs_contact': false,
+              'short_notice': false,
+            },
+    },
+  ],
+};
 
 void main() {
   group('domain', () {
@@ -187,6 +259,54 @@ void main() {
         'end_time': '18:10',
         'assignee_member_id': _grace,
       });
+    });
+
+    test('story 5.4: projection, Duties states and linkable duties parse', () {
+      final r = (readWith(
+        extra: {
+          'published': projectionData(revision: 3),
+          'preview': projectionData(),
+          'duties': [
+            dutyOf(_part1, 'accepted', leader: true),
+            dutyOf(_part2, 'declined'),
+          ],
+          'linkable': _linkable,
+        },
+      ) as AccessReadOk<ProgrammeRead>).value;
+      expect(r.membersSee!.revision, 3);
+      expect(r.preview!.revision, isNull);
+      expect(r.membersSee!.parts.first.leader, 'SYNTHETIC Grace Banda');
+      expect(r.duties[_part1]!.label, 'Confirmed by leader');
+      expect(r.duties[_part2]!.status, PartDutyStatus.declined);
+      expect(r.linkable.single.label, 'SYNTHETIC Ushers: Evening ushering');
+      final linked = PartDuty.fromJson({
+        'part_id': _part1,
+        'positions': [
+          {
+            'kind': 'linked',
+            'position_key': 'department',
+            'cancelled': false,
+            'filled': false,
+          },
+        ],
+      });
+      expect(linked.status, PartDutyStatus.departmentOpen);
+      expect(
+        () => PartDuty.fromJson(dutyOf(_part1, 'maybe')),
+        throwsFormatException,
+      );
+      final member = MeetingProgrammeRead.fromJson({
+        'meeting': meetingData(),
+        'programme': projectionData(revision: 3),
+      });
+      expect(member.programme!.parts, hasLength(2));
+      expect(
+        MeetingProgrammeRead.fromJson({
+          'meeting': meetingData(),
+          'programme': null,
+        }).programme,
+        isNull,
+      );
     });
 
     test('the metadata read carries counts only', () {
@@ -232,7 +352,7 @@ void main() {
       expect(
         () => ProgrammeRead.fromJson({
           ...base(),
-          'programme': {...programmeData(), 'state': 'published'},
+          'programme': {...programmeData(), 'state': 'archived'},
         }),
         throwsFormatException,
       );
@@ -350,8 +470,8 @@ void main() {
       expect(h.cells.programmeAsked, hasLength(1));
     });
 
-    testWidgets('a stale save is a conflict: the page reloads the server\'s '
-        'draft', (tester) async {
+    testWidgets('a stale save is a conflict: the typed draft is kept until '
+        'the leader loads the latest', (tester) async {
       final h = await pumpPlan(tester, read: readWith());
       await tester.enterText(byKey('plan-topic'), 'Mine');
       await tapKey(tester, 'plan-save');
@@ -361,10 +481,190 @@ void main() {
       h.gateway.sent.single.refuse(ErrorCode.conflict);
       await settle(tester);
       expect(byKey('cells-notice-changedElsewhere'), findsOneWidget);
+      expect(byKey('plan-stale'), findsOneWidget);
+      expect(
+        tester.widget<TextField>(byKey('plan-topic')).controller!.text,
+        'Mine',
+      );
+      // Saving now goes at the newer revision.
+      await tapKey(tester, 'plan-save');
+      expect(h.gateway.sent.last.wire['expected_revision'], 5);
+      h.gateway.sent.last.unknown();
+      await settle(tester);
+      await tapKey(tester, 'plan-load-latest');
+      await settle(tester);
       expect(
         tester.widget<TextField>(byKey('plan-topic')).controller!.text,
         'Theirs',
       );
+      expect(byKey('plan-stale'), findsNothing);
+    });
+
+    testWidgets('a newer revision with nothing typed simply reloads', (
+      tester,
+    ) async {
+      final h = await pumpPlan(tester, read: readWith());
+      await tapKey(tester, 'plan-cancel');
+      await tapKey(tester, 'plan-cancel-keep');
+      h.cells.programme = readWith(
+        programme: {...programmeData(revision: 6), 'topic': 'Moved along'},
+      );
+      await tapKey(tester, 'cells-reload');
+      await settle(tester);
+      expect(byKey('plan-stale'), findsNothing);
+      expect(
+        tester.widget<TextField>(byKey('plan-topic')).controller!.text,
+        'Moved along',
+      );
+    });
+
+    testWidgets('removing a row clears the errors of the refused save', (
+      tester,
+    ) async {
+      final h = await pumpPlan(tester, read: readWith());
+      await tapKey(tester, 'plan-save');
+      h.gateway.sent.single.refuse(
+        ErrorCode.validationFailed,
+        fieldErrors: const {'parts.1': 'overlap'},
+      );
+      await settle(tester);
+      expect(byKey('part-error-1'), findsOneWidget);
+      await tapKey(tester, 'part-remove-0');
+      await settle(tester);
+      expect(byKey('part-error-0'), findsNothing);
+    });
+
+    testWidgets('Add a part starts at the meeting start when the last part '
+        'has no end, and never passes the meeting end', (tester) async {
+      await pumpPlan(
+        tester,
+        read: readWith(programme: programmeData(parts: const [])),
+      );
+      await tapKey(tester, 'plan-add-part');
+      await settle(tester);
+      await tester.enterText(byKey('part-end-0'), '');
+      await tapKey(tester, 'plan-add-part');
+      await settle(tester);
+      expect(
+        tester.widget<TextField>(byKey('part-start-1')).controller!.text,
+        '18:00',
+      );
+      await tester.enterText(byKey('part-end-1'), '19:25');
+      await tapKey(tester, 'plan-add-part');
+      await settle(tester);
+      expect(
+        tester.widget<TextField>(byKey('part-end-2')).controller!.text,
+        '19:30',
+      );
+    });
+
+    testWidgets('publish needs a saved draft, then sends the revision', (
+      tester,
+    ) async {
+      final h = await pumpPlan(tester, read: readWith());
+      expect(
+        tester.widget<FilledButton>(byKey('plan-publish')).onPressed,
+        isNotNull,
+      );
+      await tester.enterText(byKey('plan-topic'), 'Changed');
+      await settle(tester);
+      expect(
+        tester.widget<FilledButton>(byKey('plan-publish')).onPressed,
+        isNull,
+      );
+      expect(find.text('Save the draft to publish it.'), findsOneWidget);
+      await tester.enterText(byKey('plan-topic'), 'Rooted in love');
+      await settle(tester);
+      await tapKey(tester, 'plan-publish');
+      final sent = h.gateway.sent.single;
+      expect(sent.wire['command'], 'cells.publish_programme');
+      expect(sent.wire['expected_revision'], 2);
+      expect(sent.wire['payload'], {'programme_id': _programme});
+    });
+
+    testWidgets('an overlap is shown on its part; a reason publishes anyway', (
+      tester,
+    ) async {
+      final h = await pumpPlan(tester, read: readWith());
+      await tapKey(tester, 'plan-publish');
+      h.gateway.sent.single.refuse(
+        ErrorCode.validationFailed,
+        fieldErrors: const {
+          'parts.0.member_id': 'overlap',
+          'parts.0.override_reason': 'required',
+        },
+      );
+      await settle(tester);
+      expect(byKey('cells-notice-programmePartRefused'), findsOneWidget);
+      expect(
+        tester.widget<Text>(byKey('part-error-0')).data,
+        'On another duty at this time',
+      );
+      expect(
+        tester.widget<FilledButton>(byKey('plan-publish-override')).onPressed,
+        isNull,
+      );
+      await tester.enterText(byKey('plan-override'), 'She leads both');
+      await settle(tester);
+      await tapKey(tester, 'plan-publish-override');
+      expect(h.gateway.sent.last.wire['payload'], {
+        'programme_id': _programme,
+        'override_reason': 'She leads both',
+      });
+    });
+
+    testWidgets('a part can show a department duty instead of a person', (
+      tester,
+    ) async {
+      final h = await pumpPlan(
+        tester,
+        read: readWith(extra: {'linkable': _linkable}),
+      );
+      await tapKey(tester, 'part-assignee-1');
+      await settle(tester);
+      await tester.tap(
+        find.text('Department duty: SYNTHETIC Ushers: Evening ushering').last,
+      );
+      await settle(tester);
+      expect(byKey('part-gap-1'), findsNothing);
+      await tapKey(tester, 'plan-save');
+      final parts = (h.gateway.sent.single.wire['payload'] as Map)['parts'] as List;
+      expect(parts[1]['linked_slot_id'], _slot);
+      expect(parts[1]['assignee_member_id'], isNull);
+    });
+
+    testWidgets('a published programme shows each answer and what members '
+        'see', (tester) async {
+      final h = await pumpPlan(
+        tester,
+        read: readWith(
+          programme: {
+            ...programmeData(state: 'published', revision: 3),
+            'published_revision': 3,
+            'published_at': '2099-03-01T10:00:00Z',
+          },
+          extra: {
+            'published': projectionData(revision: 3),
+            'preview': projectionData(),
+            'duties': [dutyOf(_part1, 'accepted'), dutyOf(_part2, null)],
+          },
+        ),
+      );
+      expect(byKey('plan-state-published'), findsOneWidget);
+      expect(find.text('1 of 1 accepted'), findsOneWidget);
+      expect(
+        tester.widget<StatusLabel>(byKey('published-status-$_part1')).label,
+        'Accepted',
+      );
+      expect(
+        tester.widget<StatusLabel>(byKey('published-status-$_part2')).label,
+        'Open: nobody asked',
+      );
+      expect(find.text('What members of the cell see now.'), findsOneWidget);
+      expect(byKey('plan-save'), findsNothing);
+      await tapKey(tester, 'plan-cancel');
+      await tapKey(tester, 'plan-cancel-confirm');
+      expect(h.gateway.sent.single.wire['command'], 'cells.cancel_programme');
     });
 
     testWidgets('a part whose person left the cell says so and can be '

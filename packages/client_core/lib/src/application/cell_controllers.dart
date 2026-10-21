@@ -73,6 +73,12 @@ enum CellNotice {
 
   /// The programme is no longer a draft (cancelled elsewhere).
   programmeNotDraft,
+
+  /// Story 5.4: published through Duties.
+  programmePublished,
+
+  /// Story 5.4: a part's Duties side was refused (an overlap, for example).
+  programmePartRefused,
 }
 
 /// One command in flight or just answered.
@@ -185,6 +191,13 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
   void dismissNotice() =>
       state = state.copyWith(clearNotice: true, fieldErrors: const {});
 
+  /// Field errors of a refused input no longer match what is typed.
+  void clearFieldErrors() {
+    if (state.fieldErrors.isNotEmpty) {
+      state = state.copyWith(fieldErrors: const {});
+    }
+  }
+
   /// Resends the unconfirmed command unchanged (same request_id and body).
   Future<void> checkAgain() async {
     final u = state.unconfirmed;
@@ -243,6 +256,7 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
     CellProgrammeCommands.create => CellNotice.programmeCreated,
     CellProgrammeCommands.save => CellNotice.programmeSaved,
     CellProgrammeCommands.cancel => CellNotice.programmeCancelled,
+    CellProgrammeCommands.publish => CellNotice.programmePublished,
     _ => CellNotice.cancelled,
   };
 
@@ -259,6 +273,9 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
         CellNotice.meetingCancelledAlready,
       ErrorCode.conflict when f['programme_id'] == 'not_draft' =>
         CellNotice.programmeNotDraft,
+      ErrorCode.validationFailed
+          when f.keys.any((k) => RegExp(r'^parts\.\d+\.').hasMatch(k)) =>
+        CellNotice.programmePartRefused,
       ErrorCode.conflict => CellNotice.changedElsewhere,
       ErrorCode.validationFailed when f['cell_id'] == 'current' =>
         CellNotice.sameCell,
@@ -310,7 +327,9 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
             notice == CellNotice.signInAgain) {
           noteProtectedDenial(ref);
         }
-        if (notice != CellNotice.invalid && notice != CellNotice.selfAction) {
+        if (notice != CellNotice.invalid &&
+            notice != CellNotice.selfAction &&
+            notice != CellNotice.programmePartRefused) {
           await _reload(epoch);
         }
       case CommandUnknownOutcome():
@@ -622,6 +641,15 @@ class CellProgrammeController extends CellsController<ProgrammeRead> {
     'study_notes': _textOrNull(studyNotes),
     'parts': [for (final p in parts) p.toJson()],
   }, 'the programme');
+
+  /// Story 5.4: publishes [programme] at its revision. [overrideReason]
+  /// keeps an assignee's overlap with their other duties knowingly.
+  Future<void> publish(CellProgramme programme, {String? overrideReason}) =>
+      send(CellProgrammeCommands.publish, Optional.of(programme.revision), {
+        'programme_id': programme.programmeId,
+        if (overrideReason != null && overrideReason.trim().isNotEmpty)
+          'override_reason': overrideReason.trim(),
+      }, 'the programme');
 
   Future<void> cancel(CellProgramme programme) => send(
     CellProgrammeCommands.cancel,

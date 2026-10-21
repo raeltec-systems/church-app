@@ -128,7 +128,14 @@ Migration: `supabase/migrations/20261015035112_duties_owner_operations.sql`. Cel
    A part has at most 50 positions over its life, cancelled ones included (`{"positions": "too_many"}`); a programme that needs more starts a new part (a new source id).
 6. **Your roster is yours.** Duties checks that an assignee is an active member; you check that they belong to your cell, and you end their parts when they leave (your transfer command calls these operations).
 7. **Release gate and client compatibility (review S2).** A cell part reaches My duties as a row with `owner_kind: "cell"` and no department. Clients before the 4.11 build cannot read such a row (they required a department) and fail the whole My duties list; the 4.11 build reads it, and from 4.11 on any row a client cannot read is left out and logged instead of failing the list. So: **no `cell_part` registration in a migration (epic 5) and no cell-part data on staging until every client in use runs the 4.11 build or later.**
-8. **Contract changes made for epic 5:** `app.duties_owner_linkable` (5.4, the table above) and cell-scope `duties.confirm_by_leader` (5.5: a current leader or assistant of the part's cell confirms its assignment directly, attributed; Cells' clients send it through `duties_command`).
+8. **Contract changes made for epic 5:**
+   - `app.duties_owner_linkable` (5.4, the table above).
+   - Cell-scope `duties.confirm_by_leader` (5.5): a current leader or assistant of the part's cell confirms its assignment directly, attributed. Cells' clients send it through `duties_command`.
+   - `app.duties_owner_vacate_member {cell_id, member_id}` (5.9):
+     - It is called by Cells' transfer inside its own transaction. Its actor is the transfer's: the new cell's leader or an Admin, who need not lead the old cell. The session rule in point 3 is replaced for this operation only, and the function is not client-executable.
+     - The member's current assignments on the cell's own future published parts end. They become `superseded` and `vacated`, with no vacancy reason, and the position is left unfilled. Their jobs are cancelled, their coverage cases close and the member gets `duty_released`.
+     - Their planned positions there are cleared. There is no department alert: Cells tells its own leaders.
+     - It answers `{vacated, drafts_cleared, leader_alerts, released, notices_skipped}`.
 9. **Contract changes.** Epic 5 is the first real caller. A shape it needs beyond these operations (for example cell-scope leader alerts, coverage and confirmation, a discovery read of linkable duties, the creator's reminders, naming a linked duty's assignee) is a Duties contract change recorded in the 4.11 plan, never a Cells-side workaround.
 
 ## Notifications owner operations (story 3.1)

@@ -240,6 +240,65 @@ void main() {
       });
     });
 
+    testWidgets('story 5.9: after a transfer the old cell\'s programme and '
+        'venue leave the screen on the next read (memory only)', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.myCell,
+        setUp: (h) {
+          h.cells.mine = myCell();
+          h.cells.meetingProgramme = programme();
+          h.duties.mine = myDuties();
+        },
+      );
+      expect(find.textContaining('SYNTHETIC 12 Shikoswe Road'), findsWidgets);
+      expect(find.text('SYNTHETIC Grace Banda'), findsOneWidget);
+      // The member moved: the server refuses the old meeting and My cell
+      // has no next meeting of the old cell.
+      h.cells.mine = myCell(withMeeting: false);
+      h.cells.meetingProgramme = const AccessReadDenied(
+        AccessDenial.notGranted,
+      );
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(MyCellScreen)),
+      );
+      await container.read(myCellProvider.notifier).reload();
+      await container.read(memberProgrammeProvider(_meeting).notifier).reload();
+      await settle(tester);
+      expect(find.textContaining('SYNTHETIC 12 Shikoswe Road'), findsNothing);
+      expect(find.text('SYNTHETIC Grace Banda'), findsNothing);
+      expect(container.read(memberProgrammeProvider(_meeting)).value, isNull);
+    });
+
+    testWidgets('story 5.9: Plan meeting drops the programme when the read '
+        'is refused', (tester) async {
+      final h = await pumpAt(
+        tester,
+        CellPaths.plan(_meeting),
+        setUp: (h) => h.cells.programme = AccessReadOk(
+          ProgrammeRead.fromJson({
+            'meeting': meetingData(),
+            'cell_name': 'SYNTHETIC Shikoswe Cell',
+            'view': 'full',
+            'can_edit': true,
+            'programme': null,
+            'roster': const [],
+          }),
+        ),
+      );
+      expect(find.text('SYNTHETIC Shikoswe Cell'), findsOneWidget);
+      h.cells.programme = const AccessReadDenied(AccessDenial.notGranted);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(PlanMeetingScreen)),
+      );
+      await container.read(cellProgrammeProvider(_meeting).notifier).reload();
+      await settle(tester);
+      expect(find.text('SYNTHETIC Shikoswe Cell'), findsNothing);
+      expect(container.read(cellProgrammeProvider(_meeting)).value, isNull);
+    });
+
     testWidgets('Can\'t do it asks once more; a refused answer is said on '
         'the card', (tester) async {
       final h = await pumpAt(

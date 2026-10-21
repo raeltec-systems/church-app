@@ -610,7 +610,7 @@ Record the outcome per step in `evidence-5.7/owner-check.md` (pass/fail, device,
 
 ## Story 5.8: meeting records and actual leaders
 
-Migration: `supabase/migrations/20261021130000_cells_meeting_records.sql`.
+Migration: `supabase/migrations/20261021115855_cells_meeting_records.sql`.
 Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-mark-meetings-held-and-record-actual-programme-leaders-with-c-plan.md`.
 Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.8/`.
 
@@ -666,4 +666,63 @@ Record the outcome per step in `evidence-5.8/owner-check.md` (pass/fail, device,
 - Attendance (Present, Absent, Excused, visitors) is epic 7. A held meeting records no attendance.
 - A duty's Completed outcome (4.10) is never set or suggested from an actual leader record (the ticket's unknown, left to epic 7 and the leader).
 - No notification is sent for a record. An unrecorded meeting only shows on Cell meetings.
-- Transfers and removals (story 5.9) do not yet end anything here. Actual leader records are facts and stay.
+- Transfers (story 5.9) leave meeting records and actual leaders as they are: they are past facts.
+
+## Story 5.9: transfers, handovers and deletion
+
+Migration: `supabase/migrations/20261021140000_cells_transfer_effects.sql`.
+Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-apply-cell-transfer-removal-and-deletion-to-programmes-and-c-plan.md`.
+Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.9/`.
+
+### What a transfer does to the old cell
+
+A transfer is `cells.confirm_request` for a member who already has a cell. It is the only way a membership ends (2.6), and it ends the member's old-cell work in the same transaction (one failing step rolls the transfer back):
+
+- **Access:** the old cell's programme, venue and meeting reads are refused at once, because they check the current membership. The new cell opens at once.
+- **Programme parts:** the member leaves every part of the old cell's future meetings (draft and published), so each becomes a gap. The published projection stops naming them. Each changed programme takes a new revision, so a leader's open editor conflicts instead of saving the member back. The leader publishes again when they have someone.
+- **Cell duties:** the member's current assignments on the old cell's future published parts end through Duties (`app.duties_owner_vacate_member`, a Duties contract change, see contracts-and-owner-seams.md). Their status is `superseded` and `vacated`, the position is unfilled, their jobs are cancelled, and they get **Duty released**. Planned (draft) positions are cleared. Any answer ends, an accepted one included. The old cell's leader can no longer confirm them on it (the 5.5 finding).
+- **Notices:** their open Cannot attend notices in the old cell close (`withdrawn`, `withdrawn_reason` `left_cell`). A notice still waiting for the leaders is cancelled, and nothing is announced.
+- **Leaders:** the old cell's current leader and assistant get **A part needs someone** (`cells_programme` / `cells_part_vacated`, generic, link **Cell meetings**), once per published programme that lost its person. A draft-only change tells nobody. The notice is actionable while a part of the published programme has nobody and the meeting is on and ahead. Without the Q2 policy no notice is planned, and the transfer still completes.
+- **The past stays:** started meetings keep their plan, duties and actual leaders (5.8).
+
+### Handover: a cell's last leader
+
+`app.cells_report_handover` (registered with Identity, 2.10/4.16) reports `cell_leader` (subject: the cell, last responsible) when the member is the last approved leader or assistant the app can reach of an active cell with a published programme for a meeting ahead.
+
+- Deactivating them is refused `handover_required`, and so is revoking that scope.
+- A deletion or an unlink records the obligation as pending. **Admin cells** then shows **Needs a leader: a programme is published ahead** on the cell.
+- Once the cell has a reachable leader or assistant again, **Mark handover done** sends `cells.resolve_handover {cell_id}` (Admin, cell revision). If there is still no reachable leader, it is refused `conflict {"cell_id": "leader_required"}` ("Still no leader"). With nothing pending it is refused `validation_failed {"cell_id": "no_handover"}`.
+
+### Deletion
+
+`app.cells_erase_member` covers meetings, notices, programmes, meeting records and actual leaders (5.1-5.8). Story 5.9 adds no personal data. A moved member's deletion check answers zero.
+
+### Clients
+
+Programme, venue and record state lives in memory only, never on disk (AD-13). A refused read replaces it with the refusal, so the old cell's meeting, venue and programme leave My cell, Home and Plan meeting on the next read after the move. Widget tests: `cell_youre_on_test.dart` (story 5.9) and `cell_transfer_test.dart`.
+
+### Local runs
+
+```bash
+npx supabase db reset
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/cells-transfer.mjs --evidence <file>.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The E2E uses `+44 7700 900070-900079` and removes everything it created.
+
+### Owner manual checks (staging, phone and web, story 5.9)
+
+1. As M with an accepted part and an open **Can't come?** notice in `SYNTHETIC Shikoswe Cell`, have an Admin move M to `SYNTHETIC Estates C5/C7 Cell` (Admin cells: request and confirm).
+2. On M's phone, pull to refresh **My cell**: Estates shows. The Shikoswe meeting, venue and programme are gone. **My duties** no longer lists the part. The inbox has **Duty released**.
+3. As Shikoswe's leader, the inbox shows **A part needs someone**. **Plan** shows the part as a gap and the notice gone.
+4. With Shikoswe's assistant removed, removing its leader is refused ("hand over first").
+5. After a different reviewer, repeat steps 1-2 on the other client (web and mobile) (the epic's external check before 5.12).
+
+Record the outcome per step in `evidence-5.9/owner-check.md` (pass/fail, device, browser; no numbers, ids or keys).
+
+### Known limits
+
+- There is no removal from a cell without a new cell (a later Cells feature). Deactivation and deletion end the member's duties through Duties (4.12) but leave the cell membership and plan names to the deletion hook.
+- The Duties department coverage queue does not list vacated cell parts (department-only). The Cells notice and Plan meeting show them.

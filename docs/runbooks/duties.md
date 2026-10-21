@@ -1375,3 +1375,14 @@ node tools/identity-e2e/duties-staging-suite.mjs --evidence <f>.jsonl --summary 
 - **Independent rerun** (the reviewer's check): after the first run's cleanup SQL has run, the owner runs the same command again with the same `DUTIES_SUITE_STATE` file and sends that summary too (named `independent-rerun-summary.md`). The rerun also needs the Admin password, so the owner runs it too; the state file stays on the owner's machine, outside the repository, mode 0600.
 
 Builds for the owner's demonstration: `evidence-4.15/builds.md` (staff web sealed as staging, APK arm64 release, debug-signed). The owner's walkthrough: `evidence-4.15/owner-demonstration.md`. Production: [production-promotion-duties.md](production-promotion-duties.md). No migration in this story.
+
+## Story 5.9 contract change: a transferred member's cell parts
+
+`app.duties_owner_vacate_member {cell_id, member_id}` is called by Cells' transfer (`cells.confirm_request`). It ends the member's current assignments on that cell's own future published parts, using the 4.12 vacate scoped to one cell (`app.duties_vacate_cell_member`):
+- the assignments become `superseded` with end reason `vacated` and no vacancy reason;
+- the position is left unfilled, jobs are cancelled and coverage cases close;
+- the member gets **Duty released**, and the actor is audited with capacity `lifecycle`;
+- planned positions there are cleared;
+- department duties and other cells are untouched, and no department alert is sent (Cells tells the cell's leaders, see cells-meetings.md, story 5.9).
+
+The contract text is in contracts-and-owner-seams.md, item 8 of the owner-operations guide.

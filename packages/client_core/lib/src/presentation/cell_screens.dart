@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/cell_controllers.dart';
 import '../domain/access_grants.dart';
+import '../domain/cell_meetings.dart';
 import '../domain/cell_membership.dart';
+import '../domain/church_time.dart';
 import '../domain/membership_application.dart';
 
 // Story 2.6: cell setup and confirmation on staff web (Admin, leaders) and
@@ -122,6 +124,37 @@ import '../domain/membership_application.dart';
       StatusTone.neutral,
       'Not sent',
       'This build has no server configured, so nothing was sent.',
+    ),
+    CellNotice.scheduleSet => (
+      StatusTone.success,
+      'Schedule saved',
+      '$who\'s meetings for the next 12 weeks follow it. Moved and cancelled '
+          'meetings keep their changes.',
+    ),
+    CellNotice.meetingMoved => (
+      StatusTone.success,
+      'Meeting moved',
+      'Only $who changed. Its other weeks stay as they are.',
+    ),
+    CellNotice.meetingCancelled => (
+      StatusTone.success,
+      'Meeting cancelled',
+      '$who is cancelled. You can bring it back while it is still ahead.',
+    ),
+    CellNotice.meetingReinstated => (
+      StatusTone.success,
+      'Meeting brought back',
+      '$who is on again at its usual time and venue.',
+    ),
+    CellNotice.meetingStarted => (
+      StatusTone.warning,
+      'Already started',
+      'That meeting has started, so it can no longer be changed.',
+    ),
+    CellNotice.alreadyCancelled => (
+      StatusTone.warning,
+      'Already cancelled',
+      'Someone cancelled that meeting already. The list was reloaded.',
     ),
   };
 }
@@ -1064,6 +1097,12 @@ class _MyCellBodyState extends ConsumerState<_MyCellBody> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        // Story 5.1: when and where the cell meets next is the member's
+        // first question, so it leads the screen.
+        if (cell.meetings case final meetings?) ...[
+          _NextMeetingCard(meetings: meetings),
+          const SizedBox(height: 12),
+        ],
         _Card(
           key: const Key('my-cell-current'),
           child: Column(
@@ -1197,6 +1236,665 @@ class _MyCellBodyState extends ConsumerState<_MyCellBody> {
           ),
         ],
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Story 5.1: meetings (staff web) and the next meeting (mobile My cell)
+// ---------------------------------------------------------------------------
+
+// Meeting times are shown in church time (Africa/Lusaka), whatever zone the
+// device is set to.
+String _meetingClock(BuildContext context, DateTime at) {
+  final w = ChurchTime.wall(at);
+  return MaterialLocalizations.of(context).formatTimeOfDay(
+    TimeOfDay(hour: w.hour, minute: w.minute),
+    alwaysUse24HourFormat: true,
+  );
+}
+
+String _meetingDay(BuildContext context, DateTime at) {
+  final w = ChurchTime.wall(at);
+  return '${weekdayName(w.weekday)} '
+      '${MaterialLocalizations.of(context).formatMediumDate(w)}';
+}
+
+String _meetingWhen(BuildContext context, CellMeeting m) =>
+    '${_meetingDay(context, m.startsAt)}, ${_meetingClock(context, m.startsAt)}'
+    '-${_meetingClock(context, m.endsAt)}';
+
+/// Story 5.1, staff web: each cell's weekly schedule and its meetings for
+/// the next 12 weeks. An Admin sets the schedule (and sees only that a
+/// venue is set unless they also lead or assist the cell); the cell's
+/// leader or an Admin moves, cancels or brings back one meeting at a time;
+/// an assistant reads. Every meeting keeps its id through every change.
+class CellMeetingsScreen extends StatelessWidget {
+  const CellMeetingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => _CellsPage<CellMeetingsBoard>(
+    title: 'Cell meetings',
+    provider: cellMeetingsProvider,
+    needs: 'This page is for cell leaders, assistants and Admins.',
+    loading: 'Loading cell meetings…',
+    body: (context, board, s) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _muted(
+          context,
+          'Times are church time (Africa/Lusaka). The venue is private to '
+          'the cell: its leader, assistant and confirmed members.',
+        ),
+        const SizedBox(height: 12),
+        if (board.cells.isEmpty)
+          const Text('No cells to show.', key: Key('meetings-no-cells')),
+        for (final cell in board.cells) ...[
+          _MeetingCellCard(
+            key: Key('meeting-cell-${cell.cellId}'),
+            cell: cell,
+            busy: s.busy,
+          ),
+          const SizedBox(height: 12),
+        ],
+      ],
+    ),
+  );
+}
+
+class _MeetingCellCard extends ConsumerStatefulWidget {
+  const _MeetingCellCard({super.key, required this.cell, required this.busy});
+  final StaffMeetingCell cell;
+  final bool busy;
+
+  @override
+  ConsumerState<_MeetingCellCard> createState() => _MeetingCellCardState();
+}
+
+class _MeetingCellCardState extends ConsumerState<_MeetingCellCard> {
+  String? _moving;
+  bool _editing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cell = widget.cell;
+    final ctl = ref.read(cellMeetingsProvider.notifier);
+    final busy = widget.busy;
+    final schedule = cell.schedule;
+    final now = DateTime.now().toUtc();
+    final id = cell.cellId;
+    CellMeeting? next;
+    for (final m in cell.meetings) {
+      if (!m.cancelled && m.endsAt.isAfter(now)) {
+        next = m;
+        break;
+      }
+    }
+    final changed = cell.meetings.where((m) => m.moved || m.cancelled).length;
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _heading(context, cell.name),
+              StatusLabel(
+                label: switch (cell.role) {
+                  MeetingRole.leader => 'You lead this cell',
+                  MeetingRole.assistant => 'You assist',
+                  MeetingRole.admin => 'Admin',
+                },
+                tone: StatusTone.info,
+              ),
+              if (cell.isSynthetic)
+                const StatusLabel(
+                  label: 'Synthetic test record',
+                  tone: StatusTone.neutral,
+                ),
+            ],
+          ),
+          if (schedule == null)
+            Text(
+              cell.canSetSchedule
+                  ? 'No meeting schedule yet. Set it below.'
+                  : 'No meeting schedule yet. The church office sets it.',
+              key: Key('meeting-no-schedule-$id'),
+            )
+          else ...[
+            // The card's answer first: when this cell meets next.
+            Text(
+              next == null
+                  ? 'No meeting in the next 12 weeks'
+                  : 'Next: ${_meetingWhen(context, next)}',
+              key: Key('meeting-next-$id'),
+              style: ChurchType.sectionTitle.copyWith(
+                color: ChurchColors.of(context).ink,
+              ),
+            ),
+            if (changed > 0)
+              _muted(
+                context,
+                '$changed of the next ${cell.meetings.length} meetings '
+                '${changed == 1 ? 'is' : 'are'} moved or cancelled.',
+              ),
+            const SizedBox(height: 8),
+            Text(
+              'Meets ${schedule.summary} (church time)',
+              key: Key('meeting-schedule-$id'),
+            ),
+            Text(
+              schedule.venue != null
+                  ? 'Venue: ${schedule.venue}'
+                  : 'Venue: set (only the cell\'s leader, assistant and '
+                        'members see it)',
+              key: Key('meeting-venue-$id'),
+            ),
+            if (schedule.mapPin case final pin?)
+              SelectableText('Map pin: ${pin.text}')
+            else if (schedule.pinSet && schedule.venue == null)
+              const Text('Map pin: set'),
+          ],
+          if (schedule != null) ...[
+            const SizedBox(height: 12),
+            _heading(context, 'Next 12 weeks'),
+            if (cell.meetings.isEmpty)
+              const Text('No meetings in the next 12 weeks.'),
+            for (final m in cell.meetings) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Wrap(
+                  key: Key('meeting-${m.meetingId}'),
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(_meetingWhen(context, m)),
+                    if (m.moved)
+                      StatusLabel(
+                        label: m.venueMoved ? 'Moved, other venue' : 'Moved',
+                        tone: StatusTone.warning,
+                      ),
+                    if (m.cancelled)
+                      const StatusLabel(
+                        label: 'Cancelled',
+                        tone: StatusTone.danger,
+                      ),
+                    if (m.venueMoved && m.venue != null) Text('at ${m.venue}'),
+                    if (cell.canChange && m.startsAt.isAfter(now)) ...[
+                      if (!m.cancelled) ...[
+                        FocusRing(
+                          child: TextButton(
+                            key: Key('meeting-move-${m.meetingId}'),
+                            onPressed: busy
+                                ? null
+                                : () => setState(
+                                    () => _moving = _moving == m.meetingId
+                                        ? null
+                                        : m.meetingId,
+                                  ),
+                            child: const Text('Move'),
+                          ),
+                        ),
+                        FocusRing(
+                          child: TextButton(
+                            key: Key('meeting-cancel-${m.meetingId}'),
+                            onPressed: busy ? null : () => ctl.cancel(m),
+                            child: const Text('Cancel this meeting'),
+                          ),
+                        ),
+                      ] else if (m.nominalStartsAt.isAfter(now))
+                        FocusRing(
+                          child: TextButton(
+                            key: Key('meeting-reinstate-${m.meetingId}'),
+                            onPressed: busy ? null : () => ctl.reinstate(m),
+                            child: const Text('Bring it back'),
+                          ),
+                        ),
+                    ],
+                  ],
+                ),
+              ),
+              if (_moving == m.meetingId && !m.cancelled)
+                _MoveMeetingForm(
+                  key: Key('meeting-move-form-${m.meetingId}'),
+                  meeting: m,
+                  busy: busy,
+                ),
+            ],
+          ],
+          // Setting the weekly rule is rare (Admin): open only for a cell
+          // without one, otherwise behind a button after the meetings.
+          if (cell.canSetSchedule) ...[
+            const SizedBox(height: 12),
+            if (schedule == null || _editing)
+              _ScheduleForm(cell: cell, busy: busy)
+            else
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: FocusRing(
+                  child: OutlinedButton(
+                    key: Key('schedule-edit-$id'),
+                    onPressed: busy
+                        ? null
+                        : () => setState(() => _editing = true),
+                    child: const Text('Change the schedule'),
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ScheduleForm extends ConsumerStatefulWidget {
+  const _ScheduleForm({required this.cell, required this.busy});
+  final StaffMeetingCell cell;
+  final bool busy;
+
+  @override
+  ConsumerState<_ScheduleForm> createState() => _ScheduleFormState();
+}
+
+class _ScheduleFormState extends ConsumerState<_ScheduleForm> {
+  late int _weekday = widget.cell.schedule?.weekday ?? 4;
+  late final _start = TextEditingController(
+    text: widget.cell.schedule?.startTime ?? '18:00',
+  );
+  late final _end = TextEditingController(
+    text: widget.cell.schedule?.endTime ?? '19:30',
+  );
+  final _venue = TextEditingController();
+  final _lat = TextEditingController();
+  final _lng = TextEditingController();
+  bool _clearPin = false;
+
+  @override
+  void dispose() {
+    _start.dispose();
+    _end.dispose();
+    _venue.dispose();
+    _lat.dispose();
+    _lng.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cell = widget.cell;
+    final errors = ref.watch(cellMeetingsProvider.select((s) => s.fieldErrors));
+    final first = cell.schedule == null;
+    String? err(String k) => switch (errors[k]) {
+      null => null,
+      'required' => 'Required',
+      'before_start' => 'End after the start',
+      'too_long' => 'At most 6 hours',
+      _ when k == 'venue' =>
+        'Check this (while personal data is not approved, start with '
+            '"SYNTHETIC ")',
+      _ => 'Check this',
+    };
+    final lat = double.tryParse(_lat.text.trim());
+    final lng = double.tryParse(_lng.text.trim());
+    final pinTyped = _lat.text.trim().isNotEmpty || _lng.text.trim().isNotEmpty;
+    final pinOk =
+        !pinTyped ||
+        (lat != null && lng != null && lat.abs() <= 90 && lng.abs() <= 180);
+    final id = cell.cellId;
+    return Column(
+      key: Key('schedule-form-$id'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _heading(
+          context,
+          first ? 'Set the weekly meeting' : 'Change the weekly meeting',
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            DropdownButton<int>(
+              key: Key('schedule-weekday-$id'),
+              value: _weekday,
+              items: [
+                for (var d = 1; d <= 7; d++)
+                  DropdownMenuItem(value: d, child: Text(weekdayName(d))),
+              ],
+              onChanged: widget.busy
+                  ? null
+                  : (v) => setState(() => _weekday = v ?? _weekday),
+            ),
+            SizedBox(
+              width: 120,
+              child: TextField(
+                key: Key('schedule-start-$id'),
+                controller: _start,
+                enabled: !widget.busy,
+                decoration: InputDecoration(
+                  labelText: 'Starts (HH:MM)',
+                  errorText: err('start_time'),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 120,
+              child: TextField(
+                key: Key('schedule-end-$id'),
+                controller: _end,
+                enabled: !widget.busy,
+                decoration: InputDecoration(
+                  labelText: 'Ends (HH:MM)',
+                  errorText: err('end_time'),
+                ),
+              ),
+            ),
+          ],
+        ),
+        TextField(
+          key: Key('schedule-venue-$id'),
+          controller: _venue,
+          enabled: !widget.busy,
+          maxLength: 120,
+          decoration: InputDecoration(
+            labelText: first ? 'Venue' : 'New venue (leave empty to keep it)',
+            errorText: err('venue'),
+          ),
+          onChanged: (_) => setState(() {}),
+        ),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            SizedBox(
+              width: 160,
+              child: TextField(
+                key: Key('schedule-lat-$id'),
+                controller: _lat,
+                enabled: !widget.busy,
+                decoration: InputDecoration(
+                  labelText: 'Map pin latitude',
+                  errorText: pinOk ? err('map_pin') : 'Check the pin',
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+            SizedBox(
+              width: 160,
+              child: TextField(
+                key: Key('schedule-lng-$id'),
+                controller: _lng,
+                enabled: !widget.busy,
+                decoration: const InputDecoration(
+                  labelText: 'Map pin longitude',
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+            if (cell.schedule?.pinSet ?? false)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Checkbox(
+                    key: Key('schedule-clear-pin-$id'),
+                    value: _clearPin,
+                    onChanged: widget.busy
+                        ? null
+                        : (v) => setState(() => _clearPin = v ?? false),
+                  ),
+                  const Text('Remove the map pin'),
+                ],
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: FocusRing(
+            child: FilledButton(
+              key: Key('schedule-save-$id'),
+              onPressed:
+                  widget.busy || !pinOk || (first && _venue.text.trim().isEmpty)
+                  ? null
+                  : () => ref
+                        .read(cellMeetingsProvider.notifier)
+                        .setSchedule(
+                          cell,
+                          weekday: _weekday,
+                          startTime: _start.text,
+                          endTime: _end.text,
+                          venue: _venue.text,
+                          pin: pinTyped && lat != null && lng != null
+                              ? MeetingMapPin(lat: lat, lng: lng)
+                              : null,
+                          clearPin: _clearPin && !pinTyped,
+                        ),
+              child: const Text('Save schedule'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MoveMeetingForm extends ConsumerStatefulWidget {
+  const _MoveMeetingForm({
+    super.key,
+    required this.meeting,
+    required this.busy,
+  });
+  final CellMeeting meeting;
+  final bool busy;
+
+  @override
+  ConsumerState<_MoveMeetingForm> createState() => _MoveMeetingFormState();
+}
+
+class _MoveMeetingFormState extends ConsumerState<_MoveMeetingForm> {
+  late final _date = TextEditingController(
+    text: ChurchTime.dateText(widget.meeting.startsAt),
+  );
+  late final _start = TextEditingController(
+    text: ChurchTime.timeText(widget.meeting.startsAt),
+  );
+  late final _end = TextEditingController(
+    text: ChurchTime.timeText(widget.meeting.endsAt),
+  );
+  final _venue = TextEditingController();
+  bool _regularVenue = false;
+
+  @override
+  void dispose() {
+    _date.dispose();
+    _start.dispose();
+    _end.dispose();
+    _venue.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = widget.meeting;
+    final errors = ref.watch(cellMeetingsProvider.select((s) => s.fieldErrors));
+    final starts = ChurchTime.parse(_date.text, _start.text);
+    final ends = ChurchTime.parse(_date.text, _end.text);
+    final ok = starts != null && ends != null && ends.isAfter(starts);
+    String? err(String k) => switch (errors[k]) {
+      null => null,
+      'past' => 'Must be in the future',
+      'out_of_range' => 'Within 30 days of the usual date',
+      'before_start' => 'End after the start',
+      'too_long' => 'At most 6 hours',
+      _ => 'Check this',
+    };
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, left: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _muted(
+            context,
+            'Move only this meeting (now ${_meetingWhen(context, m)}). '
+            'Church time.',
+          ),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              SizedBox(
+                width: 150,
+                child: TextField(
+                  key: Key('move-date-${m.meetingId}'),
+                  controller: _date,
+                  enabled: !widget.busy,
+                  decoration: InputDecoration(
+                    labelText: 'Date (YYYY-MM-DD)',
+                    errorText: err('starts_at'),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              SizedBox(
+                width: 110,
+                child: TextField(
+                  key: Key('move-start-${m.meetingId}'),
+                  controller: _start,
+                  enabled: !widget.busy,
+                  decoration: const InputDecoration(labelText: 'Starts'),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              SizedBox(
+                width: 110,
+                child: TextField(
+                  key: Key('move-end-${m.meetingId}'),
+                  controller: _end,
+                  enabled: !widget.busy,
+                  decoration: InputDecoration(
+                    labelText: 'Ends',
+                    errorText: err('ends_at'),
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+            ],
+          ),
+          TextField(
+            key: Key('move-venue-${m.meetingId}'),
+            controller: _venue,
+            enabled: !widget.busy && !_regularVenue,
+            maxLength: 120,
+            decoration: InputDecoration(
+              labelText: 'Venue for this meeting (leave empty to keep it)',
+              errorText: err('venue'),
+            ),
+          ),
+          if (m.venueMoved)
+            Row(
+              children: [
+                Checkbox(
+                  key: Key('move-regular-venue-${m.meetingId}'),
+                  value: _regularVenue,
+                  onChanged: widget.busy
+                      ? null
+                      : (v) => setState(() => _regularVenue = v ?? false),
+                ),
+                const Text('Use the usual venue'),
+              ],
+            ),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FocusRing(
+              child: FilledButton(
+                key: Key('move-save-${m.meetingId}'),
+                onPressed: widget.busy || !ok
+                    ? null
+                    : () => ref
+                          .read(cellMeetingsProvider.notifier)
+                          .move(
+                            m,
+                            startsAt: starts,
+                            endsAt: ends,
+                            venue: _regularVenue ? null : _venue.text,
+                            regularVenue: _regularVenue,
+                          ),
+                child: const Text('Move this meeting'),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Mobile My cell: the confirmed cell's next meeting with its private venue,
+/// and the cancelled meetings before it. Kept in memory only (never stored
+/// for offline reading).
+class _NextMeetingCard extends StatelessWidget {
+  const _NextMeetingCard({required this.meetings});
+  final MyCellMeetings meetings;
+
+  @override
+  Widget build(BuildContext context) {
+    final next = meetings.next;
+    return _Card(
+      key: const Key('my-cell-next-meeting'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _heading(context, 'Next meeting'),
+          for (final c in meetings.cancelled)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: StatusLabel(
+                key: Key('my-cell-cancelled-${c.meetingId}'),
+                label:
+                    'Cancelled: ${_meetingDay(context, c.nominalStartsAt)}, '
+                    '${_meetingClock(context, c.nominalStartsAt)}',
+                tone: StatusTone.neutral,
+              ),
+            ),
+          if (next == null)
+            const Text(
+              'No meeting is planned in the next 12 weeks.',
+              key: Key('my-cell-no-meeting'),
+            )
+          else ...[
+            Text(
+              _meetingWhen(context, next),
+              key: const Key('my-cell-next-when'),
+              style: ChurchType.sectionTitle.copyWith(
+                color: ChurchColors.of(context).ink,
+              ),
+            ),
+            if (next.moved)
+              const StatusLabel(
+                label: 'Moved from its usual time',
+                tone: StatusTone.warning,
+              ),
+            if (next.venue case final v?)
+              Text('Venue: $v', key: const Key('my-cell-next-venue')),
+            if (next.mapPin case final pin?)
+              SelectableText(
+                'Map pin: ${pin.text}',
+                key: const Key('my-cell-next-pin'),
+              ),
+          ],
+          const SizedBox(height: 8),
+          _muted(
+            context,
+            'Church time. Only confirmed members of your cell see where it '
+            'meets.',
+          ),
+        ],
+      ),
     );
   }
 }

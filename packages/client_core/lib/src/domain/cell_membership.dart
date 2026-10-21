@@ -5,6 +5,7 @@
 library;
 
 import 'access_grants.dart';
+import 'cell_meetings.dart';
 
 /// Cells-registered scope kinds in the Identity grant model (story 2.3).
 abstract final class CellScopeKinds {
@@ -175,6 +176,7 @@ class MyCell {
     this.primary,
     this.openRequest,
     this.lastDecision,
+    this.meetings,
   });
 
   factory MyCell.fromJson(Object? json) {
@@ -193,6 +195,9 @@ class MyCell {
       lastDecision: m['last_decision'] == null
           ? null
           : CellDecision.fromJson(m['last_decision']),
+      meetings: m['meetings'] == null
+          ? null
+          : MyCellMeetings.fromJson(m['meetings']),
     );
   }
 
@@ -203,6 +208,10 @@ class MyCell {
   final CellPlacement? primary;
   final OwnCellRequest? openRequest;
   final CellDecision? lastDecision;
+
+  /// Story 5.1: the confirmed cell's next meeting and the cancelled ones
+  /// before it; null when the member has no cell or it has no schedule.
+  final MyCellMeetings? meetings;
 }
 
 class CellStaff {
@@ -514,6 +523,9 @@ abstract interface class CellsRepository {
   Future<AccessRead<MyCell>> fetchMyCell();
   Future<AccessRead<LeaderQueue>> fetchLeaderQueue();
   Future<AccessRead<CellAdminOverview>> fetchAdminOverview();
+
+  /// Story 5.1: the staff meetings board (`api.cells_meetings`).
+  Future<AccessRead<CellMeetingsBoard>> fetchMeetings();
 }
 
 class UnconfiguredCellsRepository implements CellsRepository {
@@ -529,6 +541,10 @@ class UnconfiguredCellsRepository implements CellsRepository {
 
   @override
   Future<AccessRead<CellAdminOverview>> fetchAdminOverview() async =>
+      const AccessReadDenied(AccessDenial.unavailable);
+
+  @override
+  Future<AccessRead<CellMeetingsBoard>> fetchMeetings() async =>
       const AccessReadDenied(AccessDenial.unavailable);
 }
 

@@ -109,6 +109,14 @@ const staffCellLeaderDestination = (
   icon: Icons.diversity_3_outlined,
 );
 
+/// Story 5.1: shown while the caller leads or assists a cell, or is an
+/// Admin: cell schedules and meetings.
+const staffCellMeetingsDestination = (
+  path: ClientPaths.cellMeetings,
+  label: 'Cell meetings',
+  icon: Icons.event_repeat_outlined,
+);
+
 /// Story 4.1: shown while the caller leads or deputises a department, or is
 /// an Admin or Pastor (read only).
 const staffDutyLeaderDestination = (
@@ -189,6 +197,8 @@ List<StaffDestination> staffDestinationsFor(
   if (grants != null) staffInboxDestination,
   if (grants != null) staffAccessDestination,
   if (servesACell(grants)) staffCellLeaderDestination,
+  if (servesACell(grants) || (grants?.isAdmin ?? false))
+    staffCellMeetingsDestination,
   if (seesDutyBoard(grants)) staffDutyLeaderDestination,
   if (seesDutyBoard(grants)) staffDutyRotaDestination,
   if (seesDutyBoard(grants)) staffDutyCoverageDestination,

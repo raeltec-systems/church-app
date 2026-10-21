@@ -13,6 +13,7 @@ import 'src/domain/platform_status.dart';
 import 'src/domain/access_grants.dart';
 import 'src/domain/account_auth.dart';
 import 'src/domain/assisted_recovery.dart';
+import 'src/domain/cell_meetings.dart';
 import 'src/domain/cell_membership.dart';
 import 'src/domain/commands.dart';
 import 'src/domain/credential_review.dart';
@@ -489,9 +490,19 @@ class FakeCells implements CellsRepository {
   AccessRead<CellAdminOverview> admin = const AccessReadDenied(
     AccessDenial.notGranted,
   );
+  AccessRead<CellMeetingsBoard> meetings = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
   int mineCalls = 0;
   int leaderCalls = 0;
   int adminCalls = 0;
+  int meetingsCalls = 0;
+
+  @override
+  Future<AccessRead<CellMeetingsBoard>> fetchMeetings() async {
+    meetingsCalls++;
+    return meetings;
+  }
 
   @override
   Future<AccessRead<MyCell>> fetchMyCell() async {

@@ -4,6 +4,7 @@ import 'package:church_contracts/church_contracts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/access_grants.dart';
+import '../domain/cell_meetings.dart';
 import '../domain/cell_membership.dart';
 import '../domain/commands.dart';
 import '../domain/membership_application.dart';
@@ -45,6 +46,18 @@ enum CellNotice {
   /// The outcome is unknown: check again with the same request.
   unconfirmed,
   notSent,
+
+  /// Story 5.1: meetings.
+  scheduleSet,
+  meetingMoved,
+  meetingCancelled,
+  meetingReinstated,
+
+  /// The meeting has started: it can no longer be changed.
+  meetingStarted,
+
+  /// The meeting was already cancelled (by someone else).
+  alreadyCancelled,
 }
 
 /// One command in flight or just answered.
@@ -207,6 +220,10 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
               (data['open_request'] as Map)['state'] == 'referred'
           ? CellNotice.referred
           : CellNotice.declined,
+    CellMeetingCommands.setSchedule => CellNotice.scheduleSet,
+    CellMeetingCommands.move => CellNotice.meetingMoved,
+    CellMeetingCommands.cancel => CellNotice.meetingCancelled,
+    CellMeetingCommands.reinstate => CellNotice.meetingReinstated,
     _ => CellNotice.cancelled,
   };
 
@@ -215,6 +232,10 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
     return switch (error.code) {
       ErrorCode.conflict when f['member_id'] == 'open_request' =>
         CellNotice.openRequest,
+      ErrorCode.conflict when f['meeting_id'] == 'cancelled' =>
+        CellNotice.alreadyCancelled,
+      ErrorCode.validationFailed when f['meeting_id'] == 'started' =>
+        CellNotice.meetingStarted,
       ErrorCode.conflict => CellNotice.changedElsewhere,
       ErrorCode.validationFailed when f['cell_id'] == 'current' =>
         CellNotice.sameCell,
@@ -447,4 +468,77 @@ class MyCellController extends CellsController<MyCellView> {
 final myCellProvider =
     NotifierProvider<MyCellController, CellsState<MyCellView>>(
       MyCellController.new,
+    );
+
+/// Story 5.1, staff web: each cell's weekly schedule (set by an Admin) and
+/// its meetings, which the cell's leader or an Admin moves, cancels or
+/// reinstates one at a time. Times are typed and shown in church time and
+/// travel as UTC instants.
+class CellMeetingsController extends CellsController<CellMeetingsBoard> {
+  @override
+  Future<AccessRead<CellMeetingsBoard>> fetch() =>
+      ref.read(cellsRepositoryProvider).fetchMeetings();
+
+  /// Sets [cell]'s weekly rule. [venue] null keeps the current venue; [pin]
+  /// null with [clearPin] false keeps the current pin.
+  Future<void> setSchedule(
+    StaffMeetingCell cell, {
+    required int weekday,
+    required String startTime,
+    required String endTime,
+    String? venue,
+    MeetingMapPin? pin,
+    bool clearPin = false,
+  }) {
+    final rev = cell.cellRevision;
+    if (rev == null) return Future.value();
+    return send(CellMeetingCommands.setSchedule, Optional.of(rev), {
+      'cell_id': cell.cellId,
+      'weekday': weekday,
+      'start_time': startTime.trim(),
+      'end_time': endTime.trim(),
+      if (venue != null && venue.trim().isNotEmpty) 'venue': venue.trim(),
+      if (pin != null)
+        'map_pin': {'lat': pin.lat, 'lng': pin.lng}
+      else if (clearPin)
+        'map_pin': null,
+    }, cell.name);
+  }
+
+  /// Moves one meeting. [venue] null keeps this meeting's venue; with
+  /// [regularVenue] it goes back to the schedule's venue.
+  Future<void> move(
+    CellMeeting meeting, {
+    required DateTime startsAt,
+    required DateTime endsAt,
+    String? venue,
+    bool regularVenue = false,
+  }) => send(CellMeetingCommands.move, Optional.of(meeting.revision), {
+    'meeting_id': meeting.meetingId,
+    'starts_at': startsAt.toUtc().toIso8601String(),
+    'ends_at': endsAt.toUtc().toIso8601String(),
+    if (venue != null && venue.trim().isNotEmpty)
+      'venue': venue.trim()
+    else if (regularVenue)
+      'venue': null,
+  }, 'the meeting of ${meeting.occurrenceDate}');
+
+  Future<void> cancel(CellMeeting meeting) => send(
+    CellMeetingCommands.cancel,
+    Optional.of(meeting.revision),
+    {'meeting_id': meeting.meetingId},
+    'the meeting of ${meeting.occurrenceDate}',
+  );
+
+  Future<void> reinstate(CellMeeting meeting) => send(
+    CellMeetingCommands.reinstate,
+    Optional.of(meeting.revision),
+    {'meeting_id': meeting.meetingId},
+    'the meeting of ${meeting.occurrenceDate}',
+  );
+}
+
+final cellMeetingsProvider =
+    NotifierProvider<CellMeetingsController, CellsState<CellMeetingsBoard>>(
+      CellMeetingsController.new,
     );

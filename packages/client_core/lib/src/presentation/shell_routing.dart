@@ -57,6 +57,10 @@ abstract final class ClientPaths {
   /// Staff web, cell leaders and assistants: their cell and its requests.
   static const cellLeader = '/cells/leader';
 
+  /// Story 5.1, staff web: cell schedules and meetings (cell leaders and
+  /// assistants, Admin).
+  static const cellMeetings = '/cells/meetings';
+
   /// The member's own cell and change request (story 2.6, mobile).
   static const myCell = '/my-cell';
 
@@ -336,6 +340,10 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.cellLeader,
         pageBuilder: (_, state) => page(state, const CellLeaderScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.cellMeetings,
+        pageBuilder: (_, state) => page(state, const CellMeetingsScreen()),
       ),
       GoRoute(
         path: ClientPaths.myCell,

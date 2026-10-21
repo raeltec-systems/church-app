@@ -1,6 +1,7 @@
 import 'package:supabase/supabase.dart';
 
 import '../domain/access_grants.dart';
+import '../domain/cell_meetings.dart';
 import '../domain/cell_membership.dart';
 import 'supabase_api_reader.dart';
 
@@ -31,4 +32,9 @@ class SupabaseCellsRepository implements CellsRepository {
     const {},
     CellAdminOverview.fromJson,
   );
+
+  /// Story 5.1: `api.cells_meetings` (leaders, assistants and Admin).
+  @override
+  Future<AccessRead<CellMeetingsBoard>> fetchMeetings() =>
+      _reader.read('cells_meetings', const {}, CellMeetingsBoard.fromJson);
 }

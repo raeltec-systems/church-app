@@ -140,8 +140,8 @@ class _NotificationSettingsScreenState
         ],
       ),
     ]);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Notification settings')),
+    return ChurchPageScaffold(
+      title: 'Notification settings',
       body: SafeArea(
         child: SingleChildScrollView(
           padding: layout.pagePadding,

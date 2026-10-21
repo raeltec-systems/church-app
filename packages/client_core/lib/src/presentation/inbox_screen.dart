@@ -172,32 +172,30 @@ class _InboxScreenState extends ConsumerState<InboxScreen> {
         ]);
       }
     }
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Inbox'),
-        actions: [
-          FocusRing(
-            radius: 22,
-            child: IconButton(
-              key: const Key('refresh-inbox'),
-              tooltip: 'Check again',
-              onPressed: s.loading ? null : _refresh,
-              icon: const Icon(Icons.refresh),
-            ),
+    return ChurchPageScaffold(
+      title: 'Inbox',
+      actions: [
+        FocusRing(
+          radius: 22,
+          child: IconButton(
+            key: const Key('refresh-inbox'),
+            tooltip: 'Check again',
+            onPressed: s.loading ? null : _refresh,
+            icon: const Icon(Icons.refresh),
           ),
-          // Story 3.7: push settings by category.
-          FocusRing(
-            radius: 22,
-            child: IconButton(
-              key: const Key('open-notification-settings'),
-              tooltip: 'Notification settings',
-              onPressed: () => context.push(ClientPaths.notificationSettings),
-              icon: const Icon(Icons.tune),
-            ),
+        ),
+        // Story 3.7: push settings by category.
+        FocusRing(
+          radius: 22,
+          child: IconButton(
+            key: const Key('open-notification-settings'),
+            tooltip: 'Notification settings',
+            onPressed: () => context.push(ClientPaths.notificationSettings),
+            icon: const Icon(Icons.tune),
           ),
-          const SizedBox(width: 4),
-        ],
-      ),
+        ),
+        const SizedBox(width: 4),
+      ],
       body: SafeArea(
         // Story 3.7: pull down to ask the server again (also on open, on
         // resume, on the server's refresh signal and every 2 minutes).
@@ -811,8 +809,8 @@ class _InboxItemScreenState extends ConsumerState<InboxItemScreen> {
         ],
       ),
     ]);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Reminder')),
+    return ChurchPageScaffold(
+      title: 'Reminder',
       body: SafeArea(
         child: SingleChildScrollView(
           padding: layout.pagePadding,

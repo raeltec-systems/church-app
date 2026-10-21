@@ -407,7 +407,7 @@ void main() {
         staff: true,
         setUp: (h) => h.content.staffEvents = staffEvents([]),
       );
-      expect(textOf(tester, 'events-finding'), startsWith('No events yet.'));
+      expect(textOf(tester, 'page-subtitle'), startsWith('No events yet.'));
       await tapKey(tester, 'events-new');
       for (final (key, value) in [
         ('event-title-new', 'SYNTHETIC Harvest Thanksgiving'),
@@ -447,7 +447,7 @@ void main() {
       await settle(tester);
       expect(byKey('events-notice-created'), findsOneWidget);
       expect(byKey('event-form-new'), findsNothing);
-      expect(textOf(tester, 'events-finding'), contains('1 not published yet'));
+      expect(textOf(tester, 'page-subtitle'), contains('1 not published yet'));
       expect(
         tester.widget<StatusLabel>(byKey('event-mark-$_harvest')).label,
         'Draft',

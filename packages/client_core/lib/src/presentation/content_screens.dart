@@ -160,6 +160,9 @@ class _StaffEventsScreenState extends ConsumerState<StaffEventsScreen> {
   late final AppLifecycleListener _lifecycle;
   final _noticeFocus = FocusNode(debugLabel: 'events notice');
 
+  /// The new-event form is open (the header's main action toggles it).
+  var _creating = false;
+
   @override
   void initState() {
     super.initState();
@@ -256,7 +259,14 @@ class _StaffEventsScreenState extends ConsumerState<StaffEventsScreen> {
           ),
         );
       case AccessReadOk(:final value):
-        children.add(_EventsBody(value: value, state: s));
+        children.add(
+          _EventsBody(
+            value: value,
+            state: s,
+            creating: _creating,
+            onCreatingChanged: (v) => setState(() => _creating = v),
+          ),
+        );
       case AccessReadDenied(:final denial):
         children.add(
           RequestStateBanner(
@@ -290,22 +300,41 @@ class _StaffEventsScreenState extends ConsumerState<StaffEventsScreen> {
           ),
         );
     }
-    children.addAll([
-      const SizedBox(height: ChurchGeometry.sectionGap),
-      Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: FocusRing(
-          child: OutlinedButton.icon(
-            key: const Key('events-reload'),
-            onPressed: s.loading || s.busy ? null : ctl.reload,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Reload'),
-          ),
-        ),
-      ),
-    ]);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Events')),
+    // Staff web: the page header carries the finding, the main action (New
+    // event) and Reload; on a phone the bar keeps its Reload button.
+    final phone = !identical(layout, ChurchLayout.staff);
+    final reload = s.loading || s.busy ? null : ctl.reload;
+    final value = s.value;
+    final newEvent = value == null
+        ? null
+        : FocusRing(
+            child: FilledButton.icon(
+              key: const Key('events-new'),
+              onPressed: s.busy
+                  ? null
+                  : () => setState(() => _creating = !_creating),
+              icon: Icon(_creating ? Icons.close : Icons.add),
+              label: Text(_creating ? 'Close the form' : 'New event'),
+            ),
+          );
+    return ChurchPageScaffold(
+      title: 'Events',
+      subtitle: value == null ? null : _eventsFinding(value, DateTime.now()),
+      actions: phone
+          ? [
+              ?newEvent,
+              FocusRing(
+                radius: 22,
+                child: IconButton(
+                  key: const Key('events-reload'),
+                  tooltip: 'Reload',
+                  onPressed: reload,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ),
+              const SizedBox(width: 4),
+            ]
+          : [?newEvent, staffReloadButton(const Key('events-reload'), reload)],
       body: SafeArea(
         child: SingleChildScrollView(
           padding: layout.pagePadding,
@@ -327,17 +356,48 @@ class _StaffEventsScreenState extends ConsumerState<StaffEventsScreen> {
   }
 }
 
+/// The screen's finding, in one line under the title: what waits to be
+/// published and what is on the public calendar.
+String _eventsFinding(StaffEvents value, DateTime now) {
+  final events = value.events;
+  if (events.isEmpty) {
+    return 'No events yet. A new event stays a private draft until you '
+        'publish it.';
+  }
+  final waiting = events
+      .where((e) => e.state == ContentState.draft || e.hasChanges)
+      .length;
+  final onCalendar = events
+      .where(
+        (e) =>
+            e.state == ContentState.published &&
+            !e.hasChanges &&
+            !e.endedAt(now),
+      )
+      .length;
+  return [
+    waiting == 0 ? 'Nothing waiting to publish' : '$waiting not published yet',
+    '$onCalendar on the calendar',
+  ].join(' · ');
+}
+
 class _EventsBody extends ConsumerStatefulWidget {
-  const _EventsBody({required this.value, required this.state});
+  const _EventsBody({
+    required this.value,
+    required this.state,
+    required this.creating,
+    required this.onCreatingChanged,
+  });
   final StaffEvents value;
   final StaffEventsState state;
+  final bool creating;
+  final ValueChanged<bool> onCreatingChanged;
 
   @override
   ConsumerState<_EventsBody> createState() => _EventsBodyState();
 }
 
 class _EventsBodyState extends ConsumerState<_EventsBody> {
-  var _creating = false;
   String? _open;
   var _showArchived = false;
 
@@ -348,7 +408,7 @@ class _EventsBodyState extends ConsumerState<_EventsBody> {
     // A confirmed create closes the new-event form.
     ref.listen(staffEventsProvider.select((x) => x.notice), (prev, next) {
       if (next == ContentNotice.created && mounted) {
-        setState(() => _creating = false);
+        widget.onCreatingChanged(false);
       }
     });
     final now = DateTime.now();
@@ -379,16 +439,6 @@ class _EventsBodyState extends ConsumerState<_EventsBody> {
       for (final e in events)
         if (e.state == ContentState.archived) e,
     ];
-    final finding = events.isEmpty
-        ? 'No events yet. A new event stays a private draft until you '
-              'publish it.'
-        : [
-            waiting.isEmpty
-                ? 'Nothing waiting to publish'
-                : '${waiting.length} not published yet',
-            '${onCalendar.length} on the calendar',
-          ].join(' · ');
-
     Widget section(String title, List<StaffEvent> rows, String key) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -433,30 +483,7 @@ class _EventsBodyState extends ConsumerState<_EventsBody> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(
-              finding,
-              key: const Key('events-finding'),
-              style: ChurchType.body.copyWith(color: c.ink),
-            ),
-            FocusRing(
-              child: FilledButton.icon(
-                key: const Key('events-new'),
-                onPressed: busy
-                    ? null
-                    : () => setState(() => _creating = !_creating),
-                icon: Icon(_creating ? Icons.close : Icons.add),
-                label: Text(_creating ? 'Close the form' : 'New event'),
-              ),
-            ),
-          ],
-        ),
-        if (_creating) ...[
-          const SizedBox(height: 12),
+        if (widget.creating) ...[
           ChurchCard(
             radius: 12,
             child: _EventForm(
@@ -464,7 +491,7 @@ class _EventsBodyState extends ConsumerState<_EventsBody> {
               event: null,
               busy: busy,
               state: widget.state,
-              onCancel: () => setState(() => _creating = false),
+              onCancel: () => widget.onCreatingChanged(false),
             ),
           ),
         ],

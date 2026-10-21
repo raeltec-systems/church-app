@@ -100,6 +100,7 @@ class DutyOutcomesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _DutiesPage<DutyOutcomes>(
     title: 'Outcomes',
+    subtitle: 'What happened at duties that have started',
     provider: dutyOutcomesProvider,
     needs: _outcomesNeeds,
     loading: 'Loading outcomes…',

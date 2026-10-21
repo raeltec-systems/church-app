@@ -81,8 +81,8 @@ class NotificationHealthScreen extends ConsumerWidget {
       key: const Key('refresh-notification-health'),
       onPressed: state.loading ? null : () => ref.read(notificationHealthProvider.notifier).refresh(),
       icon: const Icon(Icons.refresh), label: const Text('Check again'))));
-    return Scaffold(
-      appBar: AppBar(title: const Text('Reminder health')),
+    return ChurchPageScaffold(
+      title: 'Reminder health',
       body: SafeArea(child: SingleChildScrollView(
         padding: layout.pagePadding,
         child: Center(child: ConstrainedBox(

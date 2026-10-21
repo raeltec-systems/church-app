@@ -22,8 +22,8 @@ class FixtureCommandScreen extends ConsumerWidget {
     // local text along with the controller's protected state.
     final generation = ref.watch(accountGenerationProvider);
     final layout = ChurchLayout.of(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Fixture command')),
+    return ChurchPageScaffold(
+      title: 'Fixture command',
       body: SafeArea(
         child: SingleChildScrollView(
           padding: layout.pagePadding,

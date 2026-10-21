@@ -28,6 +28,7 @@ import 'page_address_stub.dart'
 import 'platform_status_screen.dart';
 import 'recovery_screens.dart';
 import 'sign_in_screen.dart';
+import 'staff_overview_screen.dart';
 
 /// Destinations shared by both shells. Which ones a shell shows follows the
 /// server's current grants (story 2.3, `myAccessProvider`); a route itself is
@@ -35,6 +36,10 @@ import 'sign_in_screen.dart';
 abstract final class ClientPaths {
   static const status = '/status';
   static const fixture = '/fixture';
+
+  /// Staff web: the signed-in person's Overview (what needs attention for
+  /// the roles they hold); the sign-in landing while signed out.
+  static const overview = '/overview';
 
   /// The signed-in member's own membership (story 2.1).
   static const account = '/account';
@@ -268,6 +273,9 @@ typedef ShellBuilder = Widget Function(
 ///
 /// [reminderHealth] registers the staff reminder-health screen (story 3.8,
 /// staff web only).
+///
+/// [staffOverview] registers the staff Overview (staff web only); [home] is
+/// where `/` goes and [afterSignIn] where a sign-in continues.
 GoRouter buildClientRouter({
   required ShellBuilder shell,
   String initialLocation = ClientPaths.status,
@@ -275,6 +283,9 @@ GoRouter buildClientRouter({
   bool assistedRecovery = false,
   bool reminderHealth = false,
   bool memberHome = false,
+  bool staffOverview = false,
+  String home = ClientPaths.status,
+  String afterSignIn = ClientPaths.account,
 }) {
   final afterCreateAccount = membershipRequests
       ? ClientPaths.membership
@@ -292,7 +303,12 @@ GoRouter buildClientRouter({
   return GoRouter(
     initialLocation: initialLocation,
     routes: [
-      GoRoute(path: '/', redirect: (_, _) => ClientPaths.status),
+      GoRoute(path: '/', redirect: (_, _) => home),
+      if (staffOverview)
+        GoRoute(
+          path: ClientPaths.overview,
+          pageBuilder: (_, state) => page(state, const StaffOverviewScreen()),
+        ),
       GoRoute(
         path: ClientPaths.status,
         pageBuilder: (_, state) =>
@@ -577,6 +593,7 @@ GoRouter buildClientRouter({
           state,
           SignInScreen(
             afterCreateAccount: afterCreateAccount,
+            afterSignIn: afterSignIn,
             assistedRecovery: assistedRecovery,
             continueTo: ClientPaths.continuationFrom(
               state.uri.queryParameters['then'],

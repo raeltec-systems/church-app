@@ -555,7 +555,7 @@ Record the outcome per step in `evidence-5.6/owner-check.md` (pass/fail, device,
 
 ## Story 5.7: Cannot attend notices
 
-Migration: `supabase/migrations/20261021120000_cells_absence_notices.sql`.
+Migration: `supabase/migrations/20261021111547_cells_absence_notices.sql`.
 Plan: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/story-send-cannot-attend-notices-separately-from-duty-responses-plan.md`.
 Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/evidence-5.7/`.
 

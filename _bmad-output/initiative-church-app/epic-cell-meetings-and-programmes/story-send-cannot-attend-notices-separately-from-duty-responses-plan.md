@@ -3,7 +3,7 @@ title: 'Send Cannot attend notices separately from duty responses'
 type: 'feature'
 ticket: '7'
 created: '2026-10-21'
-status: 'in-progress'
+status: 'done'
 baseline_revision: 'd783437'
 route: 'full'
 route_source: 'auto'
@@ -55,7 +55,7 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [x] `supabase/migrations/20261021120000_cells_absence_notices.sql`
+- [x] `supabase/migrations/20261021111547_cells_absence_notices.sql`
 - [x] `supabase/tests/cells_absence_notices_test.sql`
 - [x] Clients: My cell Can't come? (send, change, withdraw; the held part reminder), Plan meeting Can't attend list and part warning, `/cells/meetings` deep link.
 - [x] E2E `tools/identity-e2e/cells-absence.mjs` + offline test.

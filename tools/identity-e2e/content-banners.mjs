@@ -268,22 +268,31 @@ async function main() {
       { drafts_public: byId['content-drafts']?.public, public_public: byId['content-public']?.public, storage_policies: policies });
 
     // ------------------------------------------------------------------ rights records
-    const rightsBody = (label, source, basis) => ({ label, source_key: source, holder: 'SYNTHETIC Church media team',
-      basis, clears_display: true, clears_offline: false, clears_audio: false,
+    const rightsBody = (label, source, basis, { display = true, offline = false, audio = false } = {}) => ({
+      label, source_key: source, holder: 'SYNTHETIC Church media team', basis,
+      clears_display: display, clears_offline: offline, clears_audio: audio,
       evidence: 'SYNTHETIC: made for this test run; no real rights are claimed.' });
     const ownDraft = await content(media.token, 'content.create_rights_record', null,
-      rightsBody(`SYNTHETIC Church artwork ${TAG}`, 'synthetic', 'church_owned'));
+      rightsBody(`SYNTHETIC Church artwork ${TAG}`, 'church-art', 'church_owned'));
     ids.own = ownDraft.data?.rights_id;
     const own = await content(media.token, 'content.verify_rights_record', ownDraft.revision, { rights_id: ids.own });
     const thirdDraft = await content(media.token, 'content.create_rights_record', null,
       rightsBody(`SYNTHETIC Licensed photo ${TAG}`, 'acme-press', 'licence'));
     ids.third = thirdDraft.data?.rights_id;
     const third = await content(media.token, 'content.verify_rights_record', thirdDraft.revision, { rights_id: ids.third });
+    const unclearedUseDraft = await content(media.token, 'content.create_rights_record', null,
+      rightsBody(`SYNTHETIC Church artwork not cleared for display ${TAG}`, 'church-art', 'church_owned',
+        { display: false, offline: true }));
+    ids.unclearedUse = unclearedUseDraft.data?.rights_id;
+    const unclearedUse = await content(media.token, 'content.verify_rights_record', unclearedUseDraft.revision,
+      { rights_id: ids.unclearedUse });
+    const ownQ5Uses = Number(psql(`select cardinality(app.content_q5_uses('church-art'))`));
     const byMemberRights = await content(member.token, 'content.create_rights_record', null,
       rightsBody(`SYNTHETIC Member record ${TAG}`, 'synthetic', 'church_owned'));
     check('C10-rights-recorded-and-verified-by-media', own.status === 200 && own.data?.state === 'published'
-      && third.status === 200 && byMemberRights.code === 'forbidden',
-      { own: own.data?.state, third_party: third.data?.state, plain_member: byMemberRights.code });
+      && ownQ5Uses === 0 && third.status === 200 && unclearedUse.status === 200 && byMemberRights.code === 'forbidden',
+      { own: own.data?.state, own_q5_uses: ownQ5Uses, third_party: third.data?.state,
+        uncleared_use: unclearedUse.data?.state, plain_member: byMemberRights.code });
 
     // ------------------------------------------------------------------ banners and an event to link
     const now = Date.now();
@@ -367,6 +376,17 @@ async function main() {
       && unclearedRefused.field_errors?.image_rights_id === 'source_not_cleared',
       { theme: `${themeRefused.code}:${themeRefused.field_errors?.image_rights_id}`,
         other: unclearedRefused.field_errors?.image_rights_id });
+
+    const unclearedUseSaved = await save(ids.uncleared, { ...campaignFields, title: UNCLEARED, event_id: null },
+      otherUp.json?.asset_id, ids.unclearedUse, unclearedSaved.revision);
+    const unclearedUseRefused = await content(media.token, 'content.publish_banner', unclearedUseSaved.revision,
+      { banner_id: ids.uncleared });
+    check('C20b-church-owned-record-still-needs-the-requested-use', unclearedUseSaved.status === 200
+      && unclearedUseRefused.code === 'validation_failed'
+      && unclearedUseRefused.field_errors?.image_rights_id === 'use_not_cleared',
+      { saved: { status: unclearedUseSaved.status, code: unclearedUseSaved.code, field_errors: unclearedUseSaved.field_errors },
+        refused: { status: unclearedUseRefused.status, code: unclearedUseRefused.code,
+          field_errors: unclearedUseRefused.field_errors } });
 
     // ------------------------------------------------------------------ publish both; sync; signed-out carousel
     const themeOwn = await save(ids.theme, themeFields, themeUp.json?.asset_id, ids.own, themeThird.revision);

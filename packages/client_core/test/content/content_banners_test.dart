@@ -102,13 +102,20 @@ AccessRead<StaffBanners> staffBanners(
 );
 
 /// A verified rights record whose source is on the Q5 list.
-AccessRead<StaffRights> verifiedRights({List<String>? q5}) => AccessReadOk(
+AccessRead<StaffRights> verifiedRights({
+  List<String>? q5,
+  RightsBasis basis = RightsBasis.churchOwned,
+  bool clearsDisplay = true,
+}) => AccessReadOk(
   StaffRights.fromJson(
     staffRightsData([
       rightsRecordData(
         state: 'published',
         revision: 2,
-        live: rightsRevisionData(),
+        live: rightsRevisionData(
+          basis: basis.wire,
+          clearsDisplay: clearsDisplay,
+        ),
         q5Uses: q5 ?? const ['display', 'offline', 'audio'],
         verifiedBy: 'SYNTHETIC Pastor Banda',
         verifiedAt: '2099-09-01T09:00:00.000000Z',
@@ -264,7 +271,29 @@ void main() {
       final off = (verifiedRights(
         q5: const [],
       ) as AccessReadOk<StaffRights>).value.rights.single;
-      expect(off.clearsDisplayNow, isFalse);
+      expect(
+        off.clearsDisplayNow,
+        isTrue,
+        reason: 'a church-owned image does not need Q5 approval',
+      );
+      final thirdParty = (verifiedRights(
+        q5: const [],
+        basis: RightsBasis.licence,
+      ) as AccessReadOk<StaffRights>).value.rights.single;
+      expect(
+        thirdParty.clearsDisplayNow,
+        isFalse,
+        reason: 'an unlisted third-party source still needs Q5 approval',
+      );
+      final useUncleared = (verifiedRights(
+        q5: const [],
+        clearsDisplay: false,
+      ) as AccessReadOk<StaffRights>).value.rights.single;
+      expect(
+        useUncleared.clearsDisplayNow,
+        isFalse,
+        reason: 'church ownership does not clear a use flag',
+      );
       for (final bad in [
         staffRightsData([
           rightsRecordData(draft: rightsRevisionData(), q5Uses: ['print']),
@@ -787,7 +816,7 @@ void main() {
       await tester.tap(
         find
             .textContaining(
-              'SYNTHETIC images made for the church · On the Q5 list',
+              'SYNTHETIC images made for the church · Q5 approval is not required',
             )
             .last,
       );
@@ -866,7 +895,7 @@ void main() {
       expect(byKey('banners-notice-blocked'), findsOneWidget);
       expect(
         find.textContaining(
-          'This rights record\'s source is not cleared by the owner (Q5).',
+          'This third-party source is not cleared by the owner (Q5).',
         ),
         findsWidgets,
       );
@@ -934,7 +963,10 @@ void main() {
           ),
         ),
       );
-      expect(textOf(tester, 'rights-q5-$_rights'), 'Not on the Q5 list');
+      expect(
+        textOf(tester, 'rights-q5-$_rights'),
+        'Q5 approval is not required for church-owned images',
+      );
       expect(
         tester.widget<StatusLabel>(byKey('rights-mark-$_rights')).label,
         'Draft',
@@ -949,6 +981,30 @@ void main() {
       await settle(tester);
       expect(byKey('rights-notice-verified'), findsOneWidget);
       expect(h.banners.syncCalls, 1);
+    });
+
+    testWidgets('an unlisted third-party source still needs Q5', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.contentRights,
+        staff: true,
+        setUp: (h) => h.banners.staffRights = AccessReadOk(
+          StaffRights.fromJson(
+            staffRightsData([
+              rightsRecordData(
+                state: 'published',
+                revision: 2,
+                live: rightsRevisionData(basis: 'licence'),
+                draft: rightsRevisionData(basis: 'church_owned'),
+                q5Uses: const [],
+              ),
+            ]),
+          ),
+        ),
+      );
+      expect(textOf(tester, 'rights-q5-$_rights'), 'Not on the Q5 list');
     });
   });
 }

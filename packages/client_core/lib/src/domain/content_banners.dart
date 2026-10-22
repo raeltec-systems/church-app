@@ -639,12 +639,13 @@ class RightsRecord {
   /// In force: verified and not withdrawn or archived.
   bool get inForce => state == ContentState.published;
 
-  /// May an image cite it for display now (in force, its live revision
-  /// clears display and its source is on the Q5 list for display)?
+  /// May an image cite it for display now (in force and its live revision
+  /// clears display; Q5 is required unless the basis is church-owned)?
   bool get clearsDisplayNow =>
       inForce &&
       (live?.fields.clearsDisplay ?? false) &&
-      q5Uses.contains(RightsUses.display);
+      (live?.fields.basis == RightsBasis.churchOwned ||
+          q5Uses.contains(RightsUses.display));
 
   bool get hasChanges => state == ContentState.published && draft != null;
   bool get canVerify =>

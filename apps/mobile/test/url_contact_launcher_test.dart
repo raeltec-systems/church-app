@@ -3,6 +3,7 @@
 // platform's answer alone decides what the leader reads.
 import 'package:bic_kafue_mobile/contact/url_contact_launcher.dart';
 import 'package:church_client_core/church_client_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -38,6 +39,62 @@ void main() {
       expect(await launcher.call('+447700900798'), ContactLaunch.failed);
       final throwing = UrlContactLauncher(open: (_) => throw StateError('x'));
       expect(await throwing.message('+447700900798'), ContactLaunch.failed);
+    },
+  );
+
+  test(
+    'Android giving handoff sends only a valid USSD tel link externally',
+    () async {
+      final opened = <Uri>[];
+      final launcher = UrlGivingDiallerLauncher(
+        platform: TargetPlatform.android,
+        isWeb: false,
+        opener: (uri) async {
+          opened.add(uri);
+          return true;
+        },
+      );
+
+      expect(launcher.supported, isTrue);
+      expect(await launcher.open('*115#'), isTrue);
+      expect(opened.map((uri) => uri.toString()), ['tel:*115%23']);
+    },
+  );
+
+  test(
+    'unsupported platforms and invalid or failed dialler links stay manual',
+    () async {
+      final opened = <Uri>[];
+      final unsupported = UrlGivingDiallerLauncher(
+        platform: TargetPlatform.iOS,
+        opener: (uri) async {
+          opened.add(uri);
+          return true;
+        },
+      );
+      expect(unsupported.supported, isFalse);
+      expect(await unsupported.open('*115#'), isFalse);
+      final web = UrlGivingDiallerLauncher(
+        platform: TargetPlatform.android,
+        isWeb: true,
+        opener: (uri) async {
+          opened.add(uri);
+          return true;
+        },
+      );
+      expect(web.supported, isFalse);
+
+      final android = UrlGivingDiallerLauncher(
+        platform: TargetPlatform.android,
+        opener: (uri) async {
+          opened.add(uri);
+          return false;
+        },
+      );
+      expect(await android.open('115'), isFalse);
+      expect(await android.open('*115#;evil'), isFalse);
+      expect(await android.open('*115#'), isFalse);
+      expect(opened.map((uri) => uri.toString()), ['tel:*115%23']);
     },
   );
 }

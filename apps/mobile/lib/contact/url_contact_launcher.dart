@@ -3,7 +3,8 @@
 // a message itself (no SMS or WhatsApp automation in v1), and it records
 // nothing: the leader records the contact attempt afterwards.
 import 'package:church_client_core/church_client_core.dart'
-    show ContactLaunch, ContactLauncher;
+    show ContactLaunch, ContactLauncher, GivingDiallerLauncher;
+import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// Opens [uri] outside the app; true when the platform accepted it.
@@ -34,6 +35,36 @@ class UrlContactLauncher implements ContactLauncher {
           : ContactLaunch.failed;
     } catch (_) {
       return ContactLaunch.failed;
+    }
+  }
+}
+
+/// Opens the Android phone dialler with the method's starting USSD code.
+/// The system owns the interaction and the app never reports a success state.
+class UrlGivingDiallerLauncher implements GivingDiallerLauncher {
+  const UrlGivingDiallerLauncher({
+    this.opener = _openExternally,
+    this.platform,
+    this.isWeb = kIsWeb,
+  });
+
+  final UrlOpener opener;
+  final TargetPlatform? platform;
+  final bool isWeb;
+
+  static final _ussd = RegExp(r'^\*[0-9*]{1,20}#$');
+
+  @override
+  bool get supported =>
+      !isWeb && (platform ?? defaultTargetPlatform) == TargetPlatform.android;
+
+  @override
+  Future<bool> open(String ussdCode) async {
+    if (!supported || !_ussd.hasMatch(ussdCode)) return false;
+    try {
+      return await opener(Uri(scheme: 'tel', path: ussdCode));
+    } catch (_) {
+      return false;
     }
   }
 }

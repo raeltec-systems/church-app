@@ -203,8 +203,9 @@ select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.
 select results_eq(
   $$select purpose, kind, rights_use, max_bytes, min_width, min_height, max_width, max_height, min_ratio, max_ratio
       from app.content_asset_purposes order by 1$$,
-  $$values ('banner_image'::text, 'banner'::text, 'display'::text, 5242880::bigint, 960, 540, 6000, 6000, 1.30, 2.40)$$,
-  'the banner image purpose and its limits');
+  $$values ('banner_image'::text, 'banner'::text, 'display'::text, 5242880::bigint, 960, 540, 6000, 6000, 1.30, 2.40),
+           ('giving_logo', 'giving_method', 'display', 2097152::bigint, 32, 32, 2000, 2000, 0.20, 5.00)$$,
+  'the banner and giving logo purposes have bounded image limits');
 
 -- Rights records -----------------------------------------------------------------------------------
 create temp table r1 as select pg_temp.cmd(3, 'content.create_rights_record', null,

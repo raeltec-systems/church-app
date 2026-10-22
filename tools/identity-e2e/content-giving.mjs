@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Story 6.3 end-to-end on the LOCAL stack: verified giving methods and the anonymous How to give
-// read, through real GoTrue phone sign-in (no SMS) and the real Data API (PostgREST), proving the
+// Stories 6.3 and 6.5 end-to-end on the LOCAL stack: verified giving methods and the anonymous How
+// to give read, through real GoTrue phone sign-in (no SMS) and the real Data API (PostgREST), proving the
 // ticket's verify at the API level:
 //   * Admin A drafts SAMPLE mobile-money and bank methods; a newly granted Admin is refused
 //     verification for 14 elapsed days; Media, a Pastor, a plain member, a Pending account and anon
@@ -14,7 +14,8 @@
 //   * any amount or payer field is rejected;
 //   * anonymous, Pending and member callers read no draft or verification evidence (verifier, test
 //     note, editor identity), and no client role reads or writes a giving table;
-//   * hiding removes a method on refresh and publishing brings it back;
+//   * hiding removes a method on refresh and publishing brings it back; unsafe flags are public,
+//     reversible, audited and do not alter the published instructions;
 //   * once Content's deletion hook has erased an Admin (as the 2.11 worker's erase step calls it),
 //     the Admins' read shows that Admin as a former member and the check answers 0.
 //
@@ -39,8 +40,8 @@ const OLD_ACCOUNT = '9900 1234 5678';
 const NEW_ACCOUNT = '9900 8765 4321';
 
 /** The public projection's keys, exactly. */
-export const PUBLIC_KEYS = ['contact', 'currency', 'details', 'method_id', 'method_type', 'name', 'note',
-  'publication_revision', 'published_at', 'purpose', 'steps', 'ussd_code', 'verified_on'];
+export const PUBLIC_KEYS = ['contact', 'currency', 'details', 'logo', 'method_id', 'method_type', 'name', 'note',
+  'publication_revision', 'published_at', 'purpose', 'steps', 'unsafe', 'ussd_code', 'verified_on'];
 
 /** The reserved fictional numbers this run uses (+44 7700 900510-900518). */
 export function isFictionalGivingPhone(phone) {
@@ -326,6 +327,7 @@ async function main() {
       ['content.archive_giving_method', current, { method_id: bankId }],
       ['content.move_giving_method', current, { method_id: bankId, position: 2 }],
       ['content.discard_giving_draft', current, { method_id: bankId }],
+      ['content.set_giving_method_unsafe', current, { method_id: bankId, unsafe: true }],
     ];
     const refusals = [];
     for (const p of [media, pastor, member]) {
@@ -338,7 +340,7 @@ async function main() {
     }
     const anonStaff = await staff(undefined);
     const unchanged = (await staffMethod(adminA.token, bankId))?.revision === current;
-    check('G14-media-pastor-and-member-refused-every-giving-command', refusals.length === 24
+    check('G14-media-pastor-and-member-refused-every-giving-command', refusals.length === 27
       && refusals.every((c) => c === 'forbidden') && staffReads.media === '403:not_granted'
       && staffReads.pastor === '403:not_granted' && staffReads.member === '403:not_granted'
       && staffReads.pending.startsWith('403') && anonStaff.status === 401 && unchanged,
@@ -386,13 +388,39 @@ async function main() {
     check('G17-no-client-role-reads-or-writes-a-giving-table', tables.every((x) => x.refused),
       { attempts: tables.length, refused: tables.filter((x) => x.refused).length });
 
+    // ------------------------------------------------------------------ unsafe warning is public and reversible
+    const mobileRevision = (await staffMethod(adminA.token, mobileId))?.revision;
+    const flagged = await content(adminA.token, 'content.set_giving_method_unsafe', mobileRevision,
+      { method_id: mobileId, unsafe: true });
+    const flaggedList = await publicList(undefined);
+    const flaggedMethod = (await publicOne(undefined, mobileId))?.method;
+    const flaggedAudit = psql(`select action || ':' || array_to_string(changed_fields, ',')
+      from app.content_giving_audit where item_id = '${mobileId}' and action = 'unsafe_flagged'`);
+    const unchangedFlag = await content(adminA.token, 'content.set_giving_method_unsafe', flagged.revision,
+      { method_id: mobileId, unsafe: true });
+    const cleared = await content(adminA.token, 'content.set_giving_method_unsafe', flagged.revision,
+      { method_id: mobileId, unsafe: false });
+    const clearedList = await publicList(undefined);
+    const clearedMethod = (await publicOne(undefined, mobileId))?.method;
+    const clearedAudit = psql(`select action || ':' || array_to_string(changed_fields, ',')
+      from app.content_giving_audit where item_id = '${mobileId}' and action = 'unsafe_cleared'`);
+    check('G18-unsafe-flag-is-public-reversible-and-audited', flagged.status === 200
+      && flagged.data?.state === 'published' && flaggedMethod?.unsafe === true
+      && findMethod(flaggedList, mobileId)?.unsafe === true && unchangedFlag.field_errors?.unsafe === 'unchanged'
+      && cleared.status === 200 && clearedMethod?.unsafe === false && findMethod(clearedList, mobileId)?.unsafe === false
+      && flaggedAudit === 'unsafe_flagged:unsafe' && clearedAudit === 'unsafe_cleared:unsafe'
+      && detail(clearedMethod, 'merchant_id') === mobileBody.identifier,
+      { flagged: flaggedMethod?.unsafe, cleared: clearedMethod?.unsafe,
+        unchanged: unchangedFlag.field_errors?.unsafe, audit: [flaggedAudit, clearedAudit],
+        instructions_preserved: detail(clearedMethod, 'merchant_id') === mobileBody.identifier });
+
     // ------------------------------------------------------------------ hide, then publish again
     const mobileRev = (await staffMethod(adminA.token, mobileId))?.revision;
     const hidden = await content(adminB.token, 'content.hide_giving_method', mobileRev, { method_id: mobileId });
     const afterHide = await publicList(undefined);
     const shown = await content(adminB.token, 'content.publish_giving_method', hidden.revision, { method_id: mobileId });
     const afterShow = await publicList(undefined);
-    check('G18-hide-removes-on-refresh-and-publishing-brings-it-back', hidden.status === 200 && hidden.data?.state === 'withdrawn'
+    check('G19-hide-removes-on-refresh-and-publishing-brings-it-back', hidden.status === 200 && hidden.data?.state === 'withdrawn'
       && !findMethod(afterHide, mobileId) && (await publicOne(undefined, mobileId))?.method?.method_id === mobileId
       && shown.status === 200 && Boolean(findMethod(afterShow, mobileId)),
       { hidden: hidden.data?.state, listed_after_hide: Boolean(findMethod(afterHide, mobileId)),
@@ -435,8 +463,14 @@ async function main() {
       psql(`delete from app.platform_environment where set_by = 'content-giving-e2e';
             delete from app.platform_environment_history where set_by = 'content-giving-e2e';`);
     }
-    log('G99-cleanup', { users_left: Number(left), unmarked: marked,
-      methods_left: Number(psql(`select count(*) from app.content_giving_revisions where name like 'SAMPLE % (6.3 E2E)'`)) });
+    const usersLeft = Number(left);
+    const methodsLeft = Number(psql(`select count(*) from app.content_giving_revisions where name like 'SAMPLE % (6.3 E2E)'`));
+    const givingLogoSlotsLeft = Number(psql(`select count(*) from app.content_revision_files where purpose = 'giving_logo'`));
+    log('G99-cleanup', { users_left: usersLeft, unmarked: marked, methods_left: methodsLeft,
+      giving_logo_slots_left: givingLogoSlotsLeft });
+    check('G99-cleanup-leaves-no-giving-records', usersLeft === 0 && methodsLeft === 0
+      && givingLogoSlotsLeft === 0, { users_left: usersLeft, methods_left: methodsLeft,
+        giving_logo_slots_left: givingLogoSlotsLeft });
   }
   finish();
 }

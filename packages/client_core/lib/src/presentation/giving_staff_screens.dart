@@ -4,11 +4,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/content_controllers.dart' show ContentAction;
 import '../application/access_controllers.dart' show myAccessProvider;
+import '../application/banner_controllers.dart' show staffRightsProvider;
 import '../application/giving_controllers.dart';
 import '../domain/access_grants.dart';
 import '../domain/church_time.dart';
 import '../domain/content_events.dart' show ContentState;
 import '../domain/content_giving.dart';
+import '../domain/content_banners.dart'
+    show
+        ContentPurposes,
+        ImageUploaded,
+        ImageUploadFailed,
+        ImageUploadRefused,
+        RightsBasis,
+        RightsRecord,
+        RightsUses;
+import '../application/providers.dart'
+    show bannerRepositoryProvider, contentFilePickerProvider;
 import 'calendar_screens.dart' show churchShortWhen;
 
 // Story 6.3, staff web: Admins keep the church's giving methods. The screen
@@ -74,6 +86,16 @@ const _ownSave =
       StatusTone.success,
       'Moved',
       '$what moved. How to give lists the methods in this order.',
+    ),
+    GivingNotice.unsafeUpdated => (
+      StatusTone.success,
+      a?.request.payload['unsafe'] == true
+          ? 'Warning shown to givers'
+          : 'Warning removed',
+      a?.request.payload['unsafe'] == true
+          ? '$what is marked as potentially unsafe. Givers see a warning. '
+                'No notifications are sent.'
+          : 'The unsafe warning is removed from $what. No notifications are sent.',
     ),
     GivingNotice.discarded => (
       StatusTone.success,
@@ -212,6 +234,10 @@ String? _fieldError(String wire, String? code) => switch (code) {
   'too_many' => 'At most $givingMaxSteps steps',
   'unknown_field' => 'The server does not accept this field',
   'sample_only' => 'On this server the name must start with "SAMPLE "',
+  'unknown' => 'Choose a current rights record',
+  'not_ready' => 'Upload the logo again',
+  'asset_and_rights_required_together' =>
+    'Choose both a logo and its rights record',
   'out_of_range' when wire == 'tested_on' =>
     'Use a date in the last 90 days, not in the future',
   'before_saved' when wire == 'tested_on' =>
@@ -970,6 +996,18 @@ class _MethodRowState extends ConsumerState<_MethodRow> {
               ),
               const SizedBox(height: 12),
               Wrap(spacing: 8, runSpacing: 8, children: actions),
+              if (g.canEdit)
+                SwitchListTile(
+                  key: Key('giving-unsafe-$id'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Show an unsafe method warning to givers'),
+                  subtitle: const Text(
+                    'This appears with the published instructions. No '
+                    'notifications are sent.',
+                  ),
+                  value: g.unsafe,
+                  onChanged: busy ? null : (value) => ctl.setUnsafe(g, value),
+                ),
               if (g.verifyBlockedForYou) ...[
                 const SizedBox(height: 8),
                 Text(
@@ -1387,6 +1425,10 @@ class _GivingFormState extends ConsumerState<_GivingForm> {
   final _swift = TextEditingController();
   final _reference = TextEditingController();
   final _steps = <_StepField>[];
+  String? _logoAssetId;
+  String? _logoRightsId;
+  bool _logoUploading = false;
+  String? _logoMessage;
 
   /// Rebuilds the Save button whenever a field or the step list changes.
   final _changed = ValueNotifier(0);
@@ -1395,6 +1437,9 @@ class _GivingFormState extends ConsumerState<_GivingForm> {
   void initState() {
     super.initState();
     // An edit starts from the draft, otherwise from the live version.
+    final current = widget.method?.draft ?? widget.method?.live;
+    _logoAssetId = current?.logoAssetId;
+    _logoRightsId = current?.logoRightsId;
     if (widget.method?.current case final f?) {
       _type = f.methodType;
       _identifierKind = f.identifierKind ?? MobileMoneyIdentifier.merchant;
@@ -1457,6 +1502,44 @@ class _GivingFormState extends ConsumerState<_GivingForm> {
     _edited();
   }
 
+  Future<void> _pickLogo() async {
+    final method = widget.method;
+    if (method == null || _logoUploading) return;
+    final file = await ref.read(contentFilePickerProvider).pickImage();
+    if (!mounted || file == null) return;
+    if (file.unreadable) {
+      setState(() => _logoMessage = 'This file is too large to upload.');
+      return;
+    }
+    setState(() {
+      _logoUploading = true;
+      _logoMessage = null;
+    });
+    final result = await ref
+        .read(bannerRepositoryProvider)
+        .uploadImage(method.methodId, ContentPurposes.givingLogo, file);
+    if (!mounted) return;
+    setState(() {
+      _logoUploading = false;
+      switch (result) {
+        case ImageUploaded(:final image):
+          _logoAssetId = image.assetId;
+          _logoMessage = 'Logo uploaded. Save the draft to attach it.';
+        case ImageUploadRefused(:final reason):
+          _logoMessage = reason == 'too_large'
+              ? 'This logo is too large.'
+              : 'The server refused this logo. Check its type and size.';
+        case ImageUploadFailed(:final unreachable):
+          _logoMessage = unreachable
+              ? 'Could not reach the church server to upload the logo.'
+              : 'The logo could not be uploaded.';
+        default:
+          _logoMessage = 'The logo could not be uploaded.';
+      }
+    });
+    if (result is ImageUploaded) _edited();
+  }
+
   /// What is typed, or null while something required is missing.
   GivingMethodInput? _input() {
     bool blank(TextEditingController c) => c.text.trim().isEmpty;
@@ -1475,7 +1558,9 @@ class _GivingFormState extends ConsumerState<_GivingForm> {
             blank(_bankName) || blank(_beneficiary) || blank(_accountNumber),
           GivingMethodType.other => false,
         };
-    if (missing) return null;
+    if (missing || (_logoAssetId != null && _logoRightsId == null)) {
+      return null;
+    }
     return GivingMethodInput(
       methodType: _type,
       name: _name.text,
@@ -1494,6 +1579,9 @@ class _GivingFormState extends ConsumerState<_GivingForm> {
       branchCode: _branchCode.text,
       swiftCode: _swift.text,
       reference: _reference.text,
+      logoAssetId: _logoAssetId,
+      logoRightsId: _logoRightsId,
+      includeLogo: widget.method != null,
     );
   }
 
@@ -1511,6 +1599,11 @@ class _GivingFormState extends ConsumerState<_GivingForm> {
               a?.request.payload['method_id'] == g.methodId;
     final errors = mine ? st.fieldErrors : const <String, String>{};
     final busy = widget.busy;
+    final rights = [
+      for (final r
+          in ref.watch(staffRightsProvider).value?.rights ?? <RightsRecord>[])
+        if (r.clearsDisplayNow) r,
+    ];
     Widget field(
       String key,
       TextEditingController ctl,
@@ -1556,6 +1649,8 @@ class _GivingFormState extends ConsumerState<_GivingForm> {
       'branch_code',
       'swift_code',
       'reference',
+      'logo_asset_id',
+      'logo_rights_id',
     };
     final shownWires = {
       'name',
@@ -1564,6 +1659,8 @@ class _GivingFormState extends ConsumerState<_GivingForm> {
       'steps',
       'note',
       'contact',
+      'logo_asset_id',
+      'logo_rights_id',
       if (_type == GivingMethodType.mobileMoney) ...[
         'beneficiary',
         'identifier_kind',
@@ -1785,6 +1882,122 @@ class _GivingFormState extends ConsumerState<_GivingForm> {
           required: true,
           hint: 'For example: the church office, +260 ...',
         ),
+        const SizedBox(height: 8),
+        const CardLabel('Provider logo (optional)'),
+        const SizedBox(height: 4),
+        Text(
+          'A logo appears only while the uploaded image and its current '
+          'rights allow display. Offline copies use image bytes only when '
+          'the rights also allow offline storage.',
+          style: ChurchType.secondary.copyWith(color: c.muted),
+        ),
+        if (g == null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Save this method first, then edit it to add a logo.',
+              key: Key('giving-logo-after-save-$tag'),
+              style: ChurchType.secondary.copyWith(color: c.muted),
+            ),
+          )
+        else ...[
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FocusRing(
+                child: OutlinedButton.icon(
+                  key: Key('giving-logo-pick-$tag'),
+                  onPressed:
+                      busy ||
+                          _logoUploading ||
+                          !ref.read(contentFilePickerProvider).supported
+                      ? null
+                      : _pickLogo,
+                  icon: _logoUploading
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.image_outlined),
+                  label: Text(_logoUploading ? 'Uploading…' : 'Choose logo'),
+                ),
+              ),
+              if (_logoAssetId != null)
+                FocusRing(
+                  child: TextButton(
+                    key: Key('giving-logo-clear-$tag'),
+                    onPressed: busy || _logoUploading
+                        ? null
+                        : () {
+                            setState(() {
+                              _logoAssetId = null;
+                              _logoRightsId = null;
+                              _logoMessage = 'Logo will be cleared on save.';
+                            });
+                            _edited();
+                          },
+                    child: const Text('Clear logo'),
+                  ),
+                ),
+            ],
+          ),
+          if (_logoAssetId != null) ...[
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String?>(
+              key: Key('giving-logo-rights-$tag'),
+              initialValue: _logoRightsId,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: 'Logo rights record',
+                errorText: _fieldError(
+                  'logo_rights_id',
+                  errors['logo_rights_id'] ??
+                      (_logoRightsId == null ? 'required' : null),
+                ),
+              ),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('Choose a rights record'),
+                ),
+                for (final r in rights)
+                  DropdownMenuItem<String?>(
+                    value: r.rightsId,
+                    child: Text(
+                      '${r.live!.fields.label} · '
+                      '${r.live!.fields.clearsOffline && (r.live!.fields.basis == RightsBasis.churchOwned || r.q5Uses.contains(RightsUses.offline)) ? 'display and offline' : 'display only'}',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                if (_logoRightsId != null &&
+                    rights.every((r) => r.rightsId != _logoRightsId))
+                  DropdownMenuItem<String?>(
+                    value: _logoRightsId,
+                    child: const Text('Current rights record'),
+                  ),
+              ],
+              onChanged: busy
+                  ? null
+                  : (value) {
+                      setState(() {
+                        _logoRightsId = value;
+                        _logoMessage = null;
+                      });
+                      _edited();
+                    },
+            ),
+          ],
+          if (_logoMessage case final message?)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                message,
+                key: Key('giving-logo-message-$tag'),
+                style: ChurchType.secondary.copyWith(color: c.muted),
+              ),
+            ),
+        ],
         if (unread)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),

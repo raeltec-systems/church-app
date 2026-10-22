@@ -1323,9 +1323,7 @@ class _CreateCellFormState extends ConsumerState<_CreateCellForm> {
     String? err(String k) => switch (errors[k]) {
       null => null,
       'required' => 'Required',
-      _ =>
-        'Check this (while personal data is not approved, start with '
-            '"SYNTHETIC ")',
+      _ => 'Use a clear value of at most 80 characters.',
     };
     Widget field(
       String key,
@@ -2953,8 +2951,7 @@ class _ScheduleFormState extends ConsumerState<_ScheduleForm> {
       'before_start' => 'End after the start',
       'too_long' => 'At most 6 hours',
       _ when k == 'venue' =>
-        'Check this (while personal data is not approved, start with '
-            '"SYNTHETIC ")',
+        'Use a clear venue name of at most 120 characters.',
       _ => 'Check this',
     };
     final lat = double.tryParse(_lat.text.trim());

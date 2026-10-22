@@ -7,6 +7,7 @@ import '../domain/access_grants.dart';
 import '../domain/church_time.dart';
 import '../domain/commands.dart';
 import '../domain/content_giving.dart';
+import '../domain/public_content_cache.dart';
 import 'access_controllers.dart' show noteProtectedDenial;
 import 'content_controllers.dart'
     show ContentAction, PublicReadController, PublicReadState;
@@ -24,6 +25,27 @@ class PublicGivingMethodsController
   @override
   Future<AccessRead<PublicGivingMethods>> fetch() =>
       ref.read(givingRepositoryProvider).fetchPublicGivingMethods();
+
+  @override
+  bool get supportsOfflineSnapshot => true;
+
+  @override
+  Future<DateTime?> saveOfflineSnapshot(PublicGivingMethods value) async {
+    final outcome = await ref
+        .read(publicContentCacheProvider)
+        .writeRead(
+          PublicContentCacheKeys.givingMethods,
+          value,
+          loadGivingLogo: (logo) => ref
+              .read(bannerRepositoryProvider)
+              .fetchPublicAsset(logo.path, logo.mediaType),
+        );
+    return outcome is PublicContentCacheSaved ? outcome.savedAt : null;
+  }
+
+  @override
+  Future<PublicContentSnapshot<PublicGivingMethods>?> readOfflineSnapshot() =>
+      ref.read(publicContentCacheProvider).readGivingMethods();
 }
 
 final publicGivingMethodsProvider =
@@ -43,6 +65,40 @@ class PublicGivingMethodController
   @override
   Future<AccessRead<PublicGivingMethodRead>> fetch() =>
       ref.read(givingRepositoryProvider).fetchPublicGivingMethod(methodId);
+
+  @override
+  bool get supportsOfflineSnapshot => true;
+
+  @override
+  Future<PublicContentSnapshot<PublicGivingMethodRead>?>
+  readOfflineSnapshot() async {
+    final snapshot = await ref
+        .read(publicContentCacheProvider)
+        .readGivingMethods();
+    if (snapshot == null) return null;
+    final value = snapshot.value;
+    final method = value.methods.where((item) => item.methodId == methodId);
+    if (method.isEmpty) return null;
+    return PublicContentSnapshot(
+      value: PublicGivingMethodRead(sample: value.sample, method: method.first),
+      savedAt: snapshot.savedAt,
+    );
+  }
+
+  @override
+  Future<void> onFreshRead(PublicGivingMethodRead value) async {
+    final cache = ref.read(publicContentCacheProvider);
+    if (value.method == null) {
+      await cache.removeGivingMethod(methodId);
+    } else {
+      await cache.reconcileGivingMethod(
+        value.method!,
+        loadGivingLogo: (logo) => ref
+            .read(bannerRepositoryProvider)
+            .fetchPublicAsset(logo.path, logo.mediaType),
+      );
+    }
+  }
 }
 
 final publicGivingMethodProvider = NotifierProvider.autoDispose
@@ -62,6 +118,7 @@ enum GivingNotice {
   hidden,
   archived,
   moved,
+  unsafeUpdated,
 
   /// The unpublished changes of a live or hidden method were dropped.
   discarded,
@@ -264,6 +321,13 @@ class StaffGivingController extends Notifier<StaffGivingState> {
     method.current.name,
   );
 
+  Future<void> setUnsafe(StaffGivingMethod method, bool unsafe) => _send(
+    GivingCommands.setUnsafe,
+    Optional.of(method.revision),
+    {'method_id': method.methodId, 'unsafe': unsafe},
+    method.current.name,
+  );
+
   /// Drops the unpublished changes of a method that has a live revision;
   /// the live revision stays as it is.
   Future<void> discard(StaffGivingMethod method) => _send(
@@ -316,6 +380,7 @@ class StaffGivingController extends Notifier<StaffGivingState> {
     GivingCommands.hide => GivingNotice.hidden,
     GivingCommands.move => GivingNotice.moved,
     GivingCommands.discard => GivingNotice.discarded,
+    GivingCommands.setUnsafe => GivingNotice.unsafeUpdated,
     _ => GivingNotice.archived,
   };
 

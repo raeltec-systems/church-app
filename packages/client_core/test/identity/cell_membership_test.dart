@@ -235,7 +235,10 @@ void main() {
       );
       await settle(tester);
       expect(byKey('cells-notice-invalid'), findsOneWidget);
-      expect(find.textContaining('start with "SYNTHETIC "'), findsOneWidget);
+      expect(
+        find.text('Use a clear value of at most 80 characters.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets(

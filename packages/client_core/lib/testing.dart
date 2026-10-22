@@ -741,6 +741,8 @@ Map<String, Object?> publicGivingMethodData({
   String verifiedOn = '2026-09-28',
   int publicationRevision = 1,
   String publishedAt = '2026-09-28T08:00:00.000000Z',
+  bool unsafe = false,
+  Map<String, Object?>? logo,
 }) => {
   'method_id': methodId,
   'method_type': methodType,
@@ -763,6 +765,8 @@ Map<String, Object?> publicGivingMethodData({
   'verified_on': verifiedOn,
   'publication_revision': publicationRevision,
   'published_at': publishedAt,
+  'unsafe': unsafe,
+  'logo': logo,
 };
 
 /// The wire form of a published SAMPLE bank transfer method.
@@ -1111,6 +1115,10 @@ class FakeBanners implements BannerRepository {
       publicImageBytes;
 
   @override
+  Future<Uint8List?> fetchPublicAsset(String path, String mediaType) async =>
+      publicImageBytes;
+
+  @override
   Future<ImageUploadOutcome> uploadImage(
     String itemId,
     String purpose,
@@ -1136,9 +1144,12 @@ class FakePublicContentCache implements PublicContentCache {
   DateTime savedAt = DateTime.utc(2099, 9, 1, 8);
   PublicContentSnapshot<PublicEvents>? events;
   PublicContentSnapshot<PublicBanners>? banners;
+  PublicContentSnapshot<PublicGivingMethods>? givingMethods;
   final reads = <String>[];
   final writes = <(String, Object)>[];
   final imageFetches = <String>[];
+  final removedGivingMethods = <String>[];
+  final reconciledGivingMethods = <PublicGivingMethod>[];
 
   @override
   Future<PublicContentSnapshot<PublicEvents>?> readEvents() async {
@@ -1153,10 +1164,93 @@ class FakePublicContentCache implements PublicContentCache {
   }
 
   @override
+  Future<PublicContentSnapshot<PublicGivingMethods>?>
+  readGivingMethods() async {
+    reads.add(PublicContentCacheKeys.givingMethods);
+    return givingMethods;
+  }
+
+  @override
+  Future<void> removeGivingMethod(String methodId) async {
+    removedGivingMethods.add(methodId);
+    final snapshot = givingMethods;
+    if (snapshot == null) return;
+    givingMethods = PublicContentSnapshot(
+      savedAt: snapshot.savedAt,
+      value: PublicGivingMethods(
+        sample: snapshot.value.sample,
+        methods: snapshot.value.methods
+            .where((method) => method.methodId != methodId)
+            .toList(growable: false),
+        truncated: snapshot.value.truncated,
+      ),
+    );
+  }
+
+  @override
+  Future<void> reconcileGivingMethod(
+    PublicGivingMethod method, {
+    required Future<Uint8List?> Function(PublicGivingLogo logo) loadGivingLogo,
+  }) async {
+    reconciledGivingMethods.add(method);
+    final snapshot = givingMethods;
+    if (snapshot == null) return;
+    final index = snapshot.value.methods.indexWhere(
+      (cached) => cached.methodId == method.methodId,
+    );
+    if (index < 0) return;
+    final cached = snapshot.value.methods[index];
+    final oldLogo = cached.logo;
+    final newLogo = method.logo;
+    final oldOfflineBytes = oldLogo?.offlineBytes;
+    final sameOfflineLogo =
+        oldLogo != null &&
+        oldOfflineBytes != null &&
+        newLogo != null &&
+        newLogo.offlineAllowed &&
+        cached.publicationRevision == method.publicationRevision &&
+        oldLogo.path == newLogo.path &&
+        oldLogo.mediaType == newLogo.mediaType &&
+        oldLogo.width == newLogo.width &&
+        oldLogo.height == newLogo.height &&
+        oldLogo.rightsRevision == newLogo.rightsRevision;
+    PublicGivingMethod updated;
+    if (sameOfflineLogo) {
+      updated = method.withLogo(newLogo.withOfflineBytes(oldOfflineBytes));
+    } else if (newLogo?.offlineAllowed == true) {
+      imageFetches.add(method.methodId);
+      Uint8List? bytes;
+      try {
+        bytes = await loadGivingLogo(newLogo!);
+      } catch (_) {
+        bytes = null;
+      }
+      updated = method.withLogo(
+        bytes == null || bytes.isEmpty || bytes.length > 2 * 1024 * 1024
+            ? null
+            : newLogo!.withOfflineBytes(bytes),
+      );
+    } else {
+      updated = method.withLogo(null);
+    }
+    final methods = [...snapshot.value.methods];
+    methods[index] = updated;
+    givingMethods = PublicContentSnapshot(
+      savedAt: snapshot.savedAt,
+      value: PublicGivingMethods(
+        sample: snapshot.value.sample,
+        methods: methods,
+        truncated: snapshot.value.truncated,
+      ),
+    );
+  }
+
+  @override
   Future<PublicContentCacheWrite> writeRead(
     String readKey,
     Object projection, {
     Future<Uint8List?> Function(PublicBanner banner)? loadBannerImage,
+    Future<Uint8List?> Function(PublicGivingLogo logo)? loadGivingLogo,
   }) async {
     writes.add((readKey, projection));
     if (!available) return const PublicContentCacheUnavailable();
@@ -1199,6 +1293,34 @@ class FakePublicContentCache implements PublicContentCache {
         savedAt: savedAt,
         savedRows: cached.length,
         omittedRows: projection.banners.length - cached.length,
+      );
+    }
+    if (readKey == PublicContentCacheKeys.givingMethods &&
+        projection is PublicGivingMethods) {
+      final cached = <PublicGivingMethod>[];
+      for (final method in projection.methods) {
+        final logo = method.logo;
+        if (logo == null || !logo.offlineAllowed || loadGivingLogo == null) {
+          cached.add(method.withLogo(null));
+          continue;
+        }
+        imageFetches.add(method.methodId);
+        final bytes = await loadGivingLogo(logo);
+        cached.add(
+          method.withLogo(bytes == null ? null : logo.withOfflineBytes(bytes)),
+        );
+      }
+      givingMethods = PublicContentSnapshot(
+        value: PublicGivingMethods(
+          sample: projection.sample,
+          methods: cached,
+          truncated: projection.truncated,
+        ),
+        savedAt: savedAt,
+      );
+      return PublicContentCacheSaved(
+        savedAt: savedAt,
+        savedRows: projection.methods.length,
       );
     }
     return const PublicContentCacheRefused(
@@ -2694,6 +2816,7 @@ class ClientTestHarness {
   final cells = FakeCells();
   final content = FakeContent();
   final giving = FakeGiving();
+  GivingDiallerLauncher? givingDiallerLauncher;
   final announcements = FakeAnnouncements();
   final banners = FakeBanners();
   final publicContentCache = FakePublicContentCache();
@@ -2739,6 +2862,9 @@ class ClientTestHarness {
       cellsRepositoryProvider.overrideWithValue(cells),
       contentRepositoryProvider.overrideWithValue(content),
       givingRepositoryProvider.overrideWithValue(giving),
+      givingDiallerLauncherProvider.overrideWithValue(
+        givingDiallerLauncher ?? const UnavailableGivingDiallerLauncher(),
+      ),
       announcementsRepositoryProvider.overrideWithValue(announcements),
       bannerRepositoryProvider.overrideWithValue(banners),
       publicContentCacheProvider.overrideWithValue(publicContentCache),

@@ -13,6 +13,19 @@ Recorded 2026-10-08 from Israel Muyoba's answers. They resolve spec decision **Q
 
 Still open under Q2: leaders and deputies for the pilot cells and department (named at the pilot; staging uses synthetic members).
 
+## Live staging test clarification (2026-10-22)
+
+The synthetic-only label convention applies to automated build-agent fixtures. During the owner's
+interactive staging tests with church members, staff may enter the real cell name, sign-up label,
+broad area and meeting venue to get useful feedback. Automated fixtures continue to use fabricated
+`SYNTHETIC` values. This staging allowance does not approve production use of personal data or open
+the `q4_personal_data` production gate. A sign-up label or broad area must still not contain a home
+address or phone number.
+
+The owner further clarified that interactive membership tests on staging may use the member's real
+name, so church members can give realistic feedback. Automated fixtures continue to use fabricated
+`SYNTHETIC` names, and production membership names remain behind the `q4_personal_data` gate.
+
 ## Production setup (2026-10-13)
 
 - Production Supabase project created by the parent session on the owner's instruction:

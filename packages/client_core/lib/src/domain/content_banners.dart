@@ -815,6 +815,7 @@ abstract final class BannerCommands {
 /// The upload purposes the server registers.
 abstract final class ContentPurposes {
   static const bannerImage = 'banner_image';
+  static const givingLogo = 'giving_logo';
 }
 
 /// A file an editor picked: its name, the type the browser declared (never
@@ -998,6 +999,9 @@ abstract interface class BannerRepository {
   /// explicitly allows offline storage. Null on any request or type failure.
   Future<Uint8List?> fetchPublicImage(PublicBanner banner);
 
+  /// Fetch a public image path after the caller confirmed its offline rights.
+  Future<Uint8List?> fetchPublicAsset(String path, String mediaType);
+
   /// Uploads [file] for the content item [itemId] (a saved banner) as
   /// [purpose]; the server measures and checks it.
   Future<ImageUploadOutcome> uploadImage(
@@ -1033,6 +1037,10 @@ class UnconfiguredBannerRepository implements BannerRepository {
 
   @override
   Future<Uint8List?> fetchPublicImage(PublicBanner banner) async => null;
+
+  @override
+  Future<Uint8List?> fetchPublicAsset(String path, String mediaType) async =>
+      null;
 
   @override
   Future<ImageUploadOutcome> uploadImage(

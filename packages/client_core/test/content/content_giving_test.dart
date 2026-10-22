@@ -7,6 +7,9 @@
 // own save and a plain message for every refusal. Fakes only; the server
 // behaviour is covered by supabase/tests/content_giving_test.sql and
 // tools/identity-e2e/content-giving.mjs.
+import 'dart:async';
+import 'dart:io';
+
 import 'package:church_client_core/church_client_core.dart';
 import 'package:church_client_core/testing.dart';
 import 'package:church_contracts/church_contracts.dart';
@@ -19,6 +22,82 @@ import 'package:flutter_test/flutter_test.dart';
 const _airtel = '61616161-6161-4161-8161-616161616161';
 const _bank = '62626262-6262-4262-8262-626262626262';
 const _cash = '63636363-6363-4363-8363-636363636363';
+
+class _RejectingHttpClient implements HttpClient {
+  int requests = 0;
+
+  @override
+  Future<HttpClientRequest> getUrl(Uri url) async {
+    requests++;
+    return _RejectingHttpClientRequest();
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _RejectingHttpClientRequest implements HttpClientRequest {
+  @override
+  final HttpHeaders headers = _RejectingHttpHeaders();
+
+  @override
+  bool followRedirects = false;
+
+  @override
+  Future<HttpClientResponse> close() async => _RejectedHttpClientResponse();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _RejectingHttpHeaders implements HttpHeaders {
+  @override
+  void add(String name, Object value, {bool preserveHeaderCase = false}) {}
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _RejectedHttpClientResponse extends Stream<List<int>>
+    implements HttpClientResponse {
+  @override
+  int get statusCode => HttpStatus.serviceUnavailable;
+
+  @override
+  String get reasonPhrase => 'Service Unavailable';
+
+  @override
+  StreamSubscription<List<int>> listen(
+    void Function(List<int>)? onData, {
+    Function? onError,
+    void Function()? onDone,
+    bool? cancelOnError,
+  }) => const Stream<List<int>>.empty().listen(
+    onData,
+    onError: onError,
+    onDone: onDone,
+    cancelOnError: cancelOnError,
+  );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _TestGivingDialler implements GivingDiallerLauncher {
+  _TestGivingDialler({this.result = true});
+
+  final bool result;
+  final openedCodes = <String>[];
+
+  @override
+  bool get supported => true;
+
+  @override
+  Future<bool> open(String ussdCode) async {
+    openedCodes.add(ussdCode);
+    return result;
+  }
+}
 
 /// Words of payment processing that must never appear in a giving payload.
 final _paymentWords = RegExp(
@@ -181,6 +260,8 @@ void main() {
       expect(airtel.subline, 'Tithes & Offerings · ZMW');
       expect(airtel.beneficiary, 'SAMPLE Brethren in Christ Church Kafue');
       expect(airtel.ussdCode, '*115#');
+      expect(airtel.unsafe, isFalse);
+      expect(airtel.logo, isNull);
       expect(
         [for (final d in airtel.details) d.labelFor(airtel.methodType)],
         ['Beneficiary', 'Merchant ID'],
@@ -195,7 +276,23 @@ void main() {
       final cash = all.methods[2];
       expect(cash.details, isEmpty);
       expect(cash.subline, 'Offering during the service');
-      // A key a later entry adds (a logo, the dialler) is ignored.
+      // The public warning and optional rights-cleared logo are additive.
+      final logo = PublicGivingMethod.fromJson(
+        publicGivingMethodData(
+          unsafe: true,
+          logo: {
+            'path': 'providers/airtel.png',
+            'media_type': 'image/png',
+            'width': 160,
+            'height': 160,
+            'rights_revision': 4,
+            'offline_allowed': true,
+          },
+        ),
+      );
+      expect(logo.unsafe, isTrue);
+      expect(logo.logo?.path, 'providers/airtel.png');
+      expect(logo.logo?.offlineAllowed, isTrue);
       expect(
         PublicGivingMethod.fromJson({...publicGivingMethodData(), 'logo': null})
             .methodId,
@@ -722,6 +819,162 @@ void main() {
       expect(byKey('give-method-name'), findsNothing);
       await tapKey(tester, 'give-method-gone-list');
       expect(byKey('give-explainer'), findsOneWidget);
+    });
+
+    testWidgets('giving instructions stay readable when the logo is omitted', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.giveMethod(_airtel),
+        account: null,
+        setUp: (h) => h.giving.publicMethod[_airtel] = detail(
+          publicGivingMethodData(logo: null),
+        ),
+      );
+
+      expect(textOf(tester, 'give-method-name'), 'SAMPLE Airtel Money');
+      expect(byKey('give-provider-logo'), findsNothing);
+      expect(byKey('give-values'), findsOneWidget);
+      expect(byKey('give-step-1'), findsOneWidget);
+      expect(textOf(tester, 'give-verified'), contains('28 Sep 2026'));
+    });
+
+    testWidgets(
+      'a rejected public logo load leaves giving instructions readable',
+      (tester) async {
+        final rejectingClient = _RejectingHttpClient();
+        final originalHttpClientProvider = debugNetworkImageHttpClientProvider;
+        debugNetworkImageHttpClientProvider = () => rejectingClient;
+        try {
+          await pumpAt(
+            tester,
+            ClientPaths.giveMethod(_airtel),
+            account: null,
+            setUp: (h) => h.giving.publicMethod[_airtel] = detail(
+              publicGivingMethodData(
+                logo: {
+                  'path': 'giving_method/$_airtel/r1/logo.png',
+                  'media_type': 'image/png',
+                  'width': 256,
+                  'height': 256,
+                  'rights_revision': 1,
+                  'offline_allowed': true,
+                },
+              ),
+            ),
+          );
+          await settle(tester);
+
+          expect(rejectingClient.requests, 1);
+          expect(tester.takeException(), isNull);
+          expect(textOf(tester, 'give-method-name'), 'SAMPLE Airtel Money');
+          expect(byKey('give-values'), findsOneWidget);
+          expect(byKey('give-step-1'), findsOneWidget);
+          expect(
+            find.text('Dial the starting code on your Airtel line.'),
+            findsOneWidget,
+          );
+          expect(
+            textOf(tester, 'give-verified'),
+            'Details checked by the church on 28 Sep 2026',
+          );
+        } finally {
+          debugNetworkImageHttpClientProvider = originalHttpClientProvider;
+        }
+      },
+    );
+
+    testWidgets('offline detail keeps the checked date and unsafe warning', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.giveMethod(_airtel),
+        account: null,
+        setUp: (h) {
+          h.giving.publicMethod[_airtel] = const AccessReadFailed(
+            unreachable: true,
+          );
+          h.publicContentCache.givingMethods = PublicContentSnapshot(
+            value: PublicGivingMethods.fromJson(
+              publicGivingMethodsData([
+                publicGivingMethodData(
+                  unsafe: true,
+                  logo: {
+                    'path': 'giving_method/$_airtel/r1/logo.png',
+                    'media_type': 'image/png',
+                    'width': 256,
+                    'height': 256,
+                    'rights_revision': 1,
+                    'offline_allowed': false,
+                  },
+                ),
+              ]),
+            ),
+            savedAt: DateTime.utc(2026, 10, 22, 12, 30),
+          );
+        },
+      );
+
+      expect(textOf(tester, 'give-method-name'), 'SAMPLE Airtel Money');
+      expect(byKey('give-method-stale'), findsOneWidget);
+      expect(byKey('give-unsafe-warning'), findsOneWidget);
+      expect(byKey('give-provider-logo'), findsNothing);
+      expect(
+        textOf(tester, 'give-verified'),
+        'Details checked by the church on 28 Sep 2026',
+      );
+      expect(byKey('give-values'), findsOneWidget);
+      expect(byKey('give-step-1'), findsOneWidget);
+      expect(find.textContaining('Offline · saved'), findsOneWidget);
+      expect(h.publicContentCache.reads, [
+        PublicContentCacheKeys.givingMethods,
+      ]);
+    });
+
+    testWidgets(
+      'Android handoff returns to the same instructions without a payment claim',
+      (tester) async {
+        final dialler = _TestGivingDialler();
+        final h = await pumpAt(
+          tester,
+          ClientPaths.giveMethod(_airtel),
+          account: null,
+          setUp: (h) {
+            h.givingDiallerLauncher = dialler;
+            h.giving.publicMethod[_airtel] = detail(publicGivingMethodData());
+          },
+        );
+
+        expect(byKey('give-dialler'), findsOneWidget);
+        await tapKey(tester, 'give-dialler');
+        expect(dialler.openedCodes, ['*115#']);
+        expect(textOf(tester, 'give-method-name'), 'SAMPLE Airtel Money');
+        expect(byKey('give-step-1'), findsOneWidget);
+        expect(find.textContaining('payment successful'), findsNothing);
+        expect(h.giving.publicMethodAsked, [_airtel]);
+      },
+    );
+
+    testWidgets('failed handoff keeps copy and manual steps available', (
+      tester,
+    ) async {
+      final dialler = _TestGivingDialler(result: false);
+      await pumpAt(
+        tester,
+        ClientPaths.giveMethod(_airtel),
+        account: null,
+        setUp: (h) {
+          h.givingDiallerLauncher = dialler;
+          h.giving.publicMethod[_airtel] = detail(publicGivingMethodData());
+        },
+      );
+
+      await tapKey(tester, 'give-dialler');
+      expect(find.textContaining('Could not open the dialler'), findsOneWidget);
+      expect(byKey('give-copy-ussd_code'), findsOneWidget);
+      expect(byKey('give-step-1'), findsOneWidget);
     });
 
     testWidgets('no published method says so plainly', (tester) async {

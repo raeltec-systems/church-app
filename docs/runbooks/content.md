@@ -13,7 +13,7 @@ Migration: `supabase/migrations/20261021233523_content_events_tracer.sql` (the v
   - Publish makes the open draft live. With no draft, publish brings back a withdrawn item's live revision.
   - Withdraw hides the item from every public read (it stays republishable). Archive retires it; every later command answers `validation_failed {"<kind>_id": "archived"}`.
   - A published revision's content never changes (trigger `content_event_revisions_immutable`, SQLSTATE `PCNT1`); only its attribution can be anonymised.
-- **Who edits.** `app.content_kinds.editor_roles` lists the Identity roles that edit a kind, in the order the audit records the capacity. Events: `admin`, `pastor`, `media` (story 2.3 roles). Giving methods (entry 3) will be `admin` only.
+- **Who edits.** `app.content_kinds.editor_roles` lists the Identity roles that edit a kind, in the order the audit records the capacity. Events: `admin`, `pastor`, `media` (story 2.3 roles). Giving methods (story 6.3): `admin` only.
 - **Audit.** `app.content_audit`: action (`created`, `draft_saved`, `published`, `withdrawn`, `archived`), actor member and account, capacity, request id, item, kind, revision numbers. No titles, names or free text.
 - **No row deletion** in any command; nothing is ever removed, only states change.
 
@@ -76,3 +76,73 @@ The E2E uses fictional numbers +44 7700 900100-900109 and removes everything it 
 4. On staff web, Edit the title and Save draft: the phone (pull to refresh) still shows the published title. Publish changes: the phone shows the new title after a refresh.
 5. Withdraw: the phone no longer lists it after a refresh.
 6. As a plain member on staff web: no **Events** entry, and `/content/events` says Events are managed by Media, Pastors and Admins.
+
+## Story 6.3: verified giving methods and the Give tab
+
+Migration: `supabase/migrations/20261021235500_content_giving_methods.sql` (renamed to the version staging records when applied). pgTAP: `supabase/tests/content_giving_test.sql`. E2E: `tools/identity-e2e/content-giving.mjs` (offline tests `content-giving.test.mjs`). Plan: `_bmad-output/initiative-church-app/epic-public-content-and-giving/story-publish-verified-giving-methods-and-show-how-to-give-to-gues-plan.md`.
+
+Instruction-only giving (K15, K16, AD-15): the app shows where and how to give; the giver gives in their provider's own channel. There is no amount, payer, sender, donor, proof, receipt, gift or transaction field in any table, payload, read or screen, and a payload that carries one is refused (`unknown_field`). Offerings (the cell offering register) never extends this API.
+
+### Model (registered through the 6.1 registries; nothing shared is replaced)
+
+- **Kind** `giving_method`, editor roles `admin` only. Media and Pastors are refused every giving command (`forbidden`) and the Admins' read (403 `not_granted`).
+- **Method** `app.content_giving_methods`: the fixed `method_type` (`mobile_money`, `bank`, `other`) and `sort_order`.
+- **Revisions** `app.content_giving_revisions`: name, purpose, currency, the type's destination fields, the optional starting USSD code (mobile money), 1-12 steps, an optional note and the church contact, plus who saved it, its **verification** (verifier, time, the date the details were tested, how they were tested) and its publication. The table's checks hold each type to its own fields and refuse a published revision that is not verified.
+- **Verification (owner decision 2026-10-21).** A destination added or changed by one Admin is verified by a different Admin before members see it. Every saved revision needs its own verification and any save clears it, because every field a giver acts on can redirect a gift (name, numbers, steps, USSD code, contact). The verifier must not be the Admin who last saved the revision: a save carries the whole method, so the last saver vouches for all of it and the verifier is the second person. The trigger `content_giving_revisions_guard` (SQLSTATE `PCNT1`) refuses a verification by the revision's last saver and any change of a verified draft that keeps its verification, and keeps a published revision immutable (attribution may only be anonymised). In practice: one Admin enters or changes the details, another tests them and verifies, either publishes. If the verifier finds a mistake, they ask the first Admin to fix it (if the verifier edits instead, the first Admin verifies the edit).
+- **Order** is outside revisions: `content.move_giving_method` applies at once (order redirects nothing) and is audited.
+- **Hide** is the lifecycle's withdraw: the method leaves every public read and stays republishable; publishing it again brings back its verified live revision (or publishes a verified draft). **Archive** retires it.
+- **Audit.** The shared actions (created, draft_saved, published, withdrawn, archived) are in `app.content_audit`; the giving-only ones (`verified`, `reordered`) in `app.content_giving_audit`. Both hold ids, codes, positions and revisions only.
+- **Gate `q3_giving` (Q3).** Publication calls `app.policy_effective('q3_giving')`: closed in production until Israel approves it (`unavailable {"policy": "gate_closed"}`; drafts and verification still work). Its local/staging fixture is `sample_only`: there a method is published only if its name starts with `SAMPLE ` (`validation_failed {"name": "sample_only"}`). Staging methods use obviously fictional values, never the prototype's `000000`, its bank details or `*000#`.
+
+### Commands (`api.content_command`, 1.4 envelope; expected = the method's `revision`, create: `null`)
+
+| Command | Payload |
+|---|---|
+| `content.create_giving_method` | `{method_type, ...the type's fields}` |
+| `content.save_giving_method` | `{method_id, ...the type's fields}` (every field: the desired draft; the type never changes) |
+| `content.verify_giving_method` | `{method_id, tested_on, test_method}` |
+| `content.publish_giving_method`, `content.hide_giving_method`, `content.archive_giving_method` | `{method_id}` |
+| `content.move_giving_method` | `{method_id, position}` (1-based among the methods that are not archived) |
+
+- Fields of every type: `name` (required, 60), `purpose` (60), `currency` (three letters, upper-cased), `steps` (required, 1-12 single-line items of 200), `note` (200), `contact` (required, 160). `mobile_money` adds `beneficiary` (required, 120), `identifier_kind` (`merchant`, `till` or `phone`), `identifier` (required, up to 40 letters, digits, spaces or hyphens, optional leading `+`) and `ussd_code` (`*`, digits or `*`, then `#`). `bank` adds `bank_name` (required, 80), `beneficiary` (required), `account_number` (required, 4-34 letters, digits, spaces or hyphens), `branch` (80), `branch_code` (20), `swift_code` (8 or 11) and `reference` (120). `other` adds nothing. Another type's field is `unknown_field`.
+- Field codes: `required`, `invalid`, `too_long`, `unknown_field`; `steps: too_many`; `tested_on: out_of_range` (a church date from 90 days ago to today); `position: out_of_range`; `method_id`: `nothing_to_verify`, `already_verified`, `saved_by_you`, `not_verified`, `nothing_to_publish`, `not_published`, `archived`; `name: sample_only`. Success `data`: `{method_id, revision, state, live_revision_no, draft_revision_no}`.
+
+### Reads
+
+| Endpoint | Who | Returns |
+|---|---|---|
+| `api.content_public_giving_methods()` | anyone (`anon`, `authenticated`) | `{sample, methods: [P], truncated}`: the published methods in the church's order, at most 50 |
+| `api.content_public_giving_method(method_id)` | anyone | `{sample, method: P}` or `{sample, method: null}` (unknown, draft only, hidden, archived) |
+| `api.content_staff_giving_methods()` | live member access and Admin | `{capacity, methods: [S], truncated}`: every method with its `live` and `draft` revisions, verification and attribution (`saved_by_you`, `verified_by_you`; `Former member` once erased), in the public order, then the archived ones |
+
+P = `{method_id, method_type, name, purpose, currency, details: [{key, value}], ussd_code, steps, note, contact, verified_on, publication_revision, published_at}`: the copyable values in display order (mobile money `beneficiary`, then `merchant_id`, `till_number` or `phone_number`; bank `bank_name`, `beneficiary`, `account_number`, `branch`, `branch_code`, `swift_code`, `reference`) and the date the church tested the details. Never the verifier, the test notes, editor identity or a draft. `sample` is true off production; the app shows the amber sample banner from it.
+
+### Deletion
+
+The erase part `giving_methods` (`app.content_giving_erase_part`) replaces the member's and account's ids in revision `saved_by`, `verified_by` and `published_by` and in `app.content_giving_audit` with the nil UUID. Admins then read the person as `Former member`; published methods stay published. No row deletion, so no `_rows` file.
+
+### Clients
+
+- **Mobile.** The tabs are Home, Give and Calendar (Bible & Hymns and Sermons join between Home and Give with entries 6 and 9). **Give** (`/give`) opens without sign-in: "How to give", the explainer that the app neither processes nor records gifts, the methods in order (name; purpose · currency), and the church contact when every method shares one. A method (`/give/methods/<id>`) shows the sample banner (when `sample`), a Copy button beside each value (it copies exactly the value and announces "<label> copied"), the starting code for mobile money (copyable; the dialler button is entry 5), the numbered steps, the note, **Before you confirm** (check that the provider shows the beneficiary), "Details checked by the church on <date>" and the contact. No amount, success state, giving history or "record my gift". A hidden method disappears on the next refresh; an open one says it is no longer listed.
+- **Staff web.** **Giving** (`/content/giving`, sidebar group **Content**, Admin only): the methods in public order with their state (Draft, needs verifying; Verified, ready to publish; Live; Live, changes need verifying; Live, changes ready to publish; Hidden; Archived), Move up and Move down, New method (type chosen once), Edit, Verify (Tested on, How it was tested; disabled for the last saver with "You saved these details, so a different Admin must verify them."), Publish, Hide and Archive, and who saved, verified and published each revision.
+
+### Local runs
+
+```bash
+npx supabase db reset --local && npx supabase test db
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/content-giving.mjs --evidence _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-6.3/content-giving-e2e.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+node --test tools/identity-e2e/content-giving.test.mjs
+```
+
+The E2E uses fictional numbers +44 7700 900510-900518 and removes everything it created.
+
+### Owner manual check on staging (the ticket's verify)
+
+1. Two SYNTHETIC Admins, A and B (staff web, **Roles & access**).
+2. As A, **Giving** > **New method** > Mobile money: `SAMPLE Mobile Money`, a SAMPLE beneficiary, merchant ID `990101`, starting code `*990#`, three steps and a contact. Save draft. Then a Bank method `SAMPLE Bank transfer` with a fictional account number. A signed-out phone's **Give** shows neither.
+3. As A, Verify is disabled ("You saved these details, ..."). As B, Verify each (tested today, and how). As A, Publish both, then Move the bank method up.
+4. On a signed-out phone, **Give** lists both in that order; open each, Copy each value and paste it somewhere: it is exactly the value. The sample banner shows.
+5. As A, Edit the bank method's account number and Save draft: Publish is refused until B verifies; meanwhile the phone still shows the old number. After B verifies and A publishes, the phone shows the new one.
+6. As a Media member, a Pastor and a plain member: no **Giving** entry, and `/content/giving` says giving methods are managed by Admins.

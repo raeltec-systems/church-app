@@ -6,6 +6,7 @@ import '../domain/assisted_recovery.dart';
 import '../domain/cell_membership.dart';
 import '../domain/commands.dart';
 import '../domain/content_events.dart';
+import '../domain/content_giving.dart';
 import '../domain/credential_review.dart';
 import '../domain/duties.dart';
 import '../domain/followups.dart';
@@ -97,6 +98,11 @@ final dutySpecialRepositoryProvider = Provider<DutySpecialRepository>(
 /// Story 6.1: the public event reads (everyone) and the editors' event read.
 final contentRepositoryProvider = Provider<ContentRepository>(
   (ref) => const UnconfiguredContentRepository(),
+);
+
+/// Story 6.3: the public giving reads (everyone) and the Admins' read.
+final givingRepositoryProvider = Provider<GivingRepository>(
+  (ref) => const UnconfiguredGivingRepository(),
 );
 
 /// Story 4.9: opens the phone or messaging app for a labelled contact route.

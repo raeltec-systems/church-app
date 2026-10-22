@@ -18,6 +18,7 @@ import 'src/domain/cell_programmes.dart';
 import 'src/domain/cell_membership.dart';
 import 'src/domain/commands.dart';
 import 'src/domain/content_events.dart';
+import 'src/domain/content_giving.dart';
 import 'src/domain/credential_review.dart';
 import 'src/domain/duties.dart';
 import 'src/domain/followups.dart';
@@ -665,6 +666,240 @@ Map<String, Object?> staffEventsData(
   String capacity = 'media',
   bool truncated = false,
 }) => {'capacity': capacity, 'events': events, 'truncated': truncated};
+
+/// [GivingRepository] answered by the test (story 6.3). Each field answers
+/// every read at once; the counters and list record what was asked.
+class FakeGiving implements GivingRepository {
+  AccessRead<PublicGivingMethods> publicMethods = AccessReadOk(
+    PublicGivingMethods.fromJson(publicGivingMethodsData([])),
+  );
+
+  /// The detail answer by method id; an id not listed answers
+  /// `{sample: true, method: null}`.
+  final Map<String, AccessRead<PublicGivingMethodRead>> publicMethod = {};
+  AccessRead<StaffGivingMethods> staffMethods = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  int publicMethodsCalls = 0;
+  int staffMethodsCalls = 0;
+  final publicMethodAsked = <String>[];
+
+  @override
+  Future<AccessRead<PublicGivingMethods>> fetchPublicGivingMethods() async {
+    publicMethodsCalls++;
+    return publicMethods;
+  }
+
+  @override
+  Future<AccessRead<PublicGivingMethodRead>> fetchPublicGivingMethod(
+    String methodId,
+  ) async {
+    publicMethodAsked.add(methodId);
+    return publicMethod[methodId] ??
+        AccessReadOk(
+          PublicGivingMethodRead.fromJson(const {
+            'sample': true,
+            'method': null,
+          }),
+        );
+  }
+
+  @override
+  Future<AccessRead<StaffGivingMethods>> fetchStaffGivingMethods() async {
+    staffMethodsCalls++;
+    return staffMethods;
+  }
+}
+
+/// The wire form of one published mobile money method as everyone reads it
+/// (story 6.3); by default SAMPLE Airtel Money with a merchant ID and a
+/// starting code. [details] replaces the destination rows.
+Map<String, Object?> publicGivingMethodData({
+  String methodId = '61616161-6161-4161-8161-616161616161',
+  String methodType = 'mobile_money',
+  String name = 'SAMPLE Airtel Money',
+  String? purpose = 'Tithes & Offerings',
+  String? currency = 'ZMW',
+  List<Map<String, Object?>>? details,
+  String? ussdCode = '*115#',
+  List<String> steps = const [
+    'Dial the starting code on your Airtel line.',
+    'Choose Make payments, then Pay merchant.',
+    'Enter the merchant ID shown above, then the amount.',
+    'Check the beneficiary name, then enter your PIN to confirm.',
+  ],
+  String? note,
+  String contact = 'SAMPLE church office, +260 97 000 0000',
+  String verifiedOn = '2026-09-28',
+  int publicationRevision = 1,
+  String publishedAt = '2026-09-28T08:00:00.000000Z',
+}) => {
+  'method_id': methodId,
+  'method_type': methodType,
+  'name': name,
+  'purpose': purpose,
+  'currency': currency,
+  'details':
+      details ??
+      [
+        {
+          'key': 'beneficiary',
+          'value': 'SAMPLE Brethren in Christ Church Kafue',
+        },
+        {'key': 'merchant_id', 'value': '000000'},
+      ],
+  'ussd_code': ussdCode,
+  'steps': steps,
+  'note': note,
+  'contact': contact,
+  'verified_on': verifiedOn,
+  'publication_revision': publicationRevision,
+  'published_at': publishedAt,
+};
+
+/// The wire form of a published SAMPLE bank transfer method.
+Map<String, Object?> publicBankMethodData({
+  String methodId = '62626262-6262-4262-8262-626262626262',
+  String name = 'SAMPLE Bank transfer',
+  String? purpose = 'Building Project',
+  String contact = 'SAMPLE church office, +260 97 000 0000',
+}) => publicGivingMethodData(
+  methodId: methodId,
+  methodType: 'bank',
+  name: name,
+  purpose: purpose,
+  ussdCode: null,
+  contact: contact,
+  details: const [
+    {'key': 'bank_name', 'value': 'SAMPLE Bank Zambia'},
+    {'key': 'beneficiary', 'value': 'SAMPLE Brethren in Christ Church Kafue'},
+    {'key': 'account_number', 'value': '0000 0000 0000'},
+    {'key': 'branch', 'value': 'Kafue'},
+    {'key': 'reference', 'value': 'BUILDING + your name'},
+  ],
+  steps: const [
+    'Open your banking app or visit a branch.',
+    'Add the church as a new beneficiary using the details above.',
+    'Use the reference shown so the treasurer can identify the purpose.',
+  ],
+);
+
+/// The wire form of `api.content_public_giving_methods` holding [methods].
+Map<String, Object?> publicGivingMethodsData(
+  List<Map<String, Object?>> methods, {
+  bool sample = true,
+  bool truncated = false,
+}) => {'sample': sample, 'methods': methods, 'truncated': truncated};
+
+/// The wire form of a revision's verification (story 6.3).
+Map<String, Object?> givingVerificationData({
+  String verifiedBy = 'SYNTHETIC Admin Banda',
+  bool verifiedByYou = false,
+  String verifiedAt = '2026-09-28T09:00:00.000000Z',
+  String testedOn = '2026-09-28',
+  String testMethod =
+      'SYNTHETIC the provider showed the beneficiary name for this ID.',
+}) => {
+  'verified_at': verifiedAt,
+  'verified_by': verifiedBy,
+  'verified_by_you': verifiedByYou,
+  'tested_on': testedOn,
+  'test_method': testMethod,
+};
+
+/// The wire form of one giving revision as Admins read it: every key of
+/// its [methodType] (mobile money by default).
+Map<String, Object?> staffGivingRevisionData({
+  int revisionNo = 1,
+  String methodType = 'mobile_money',
+  String name = 'SAMPLE Airtel Money',
+  String? purpose = 'Tithes & Offerings',
+  String? currency = 'ZMW',
+  List<String> steps = const [
+    'Dial the starting code on your Airtel line.',
+    'Enter the merchant ID shown above, then the amount.',
+  ],
+  String? note,
+  String contact = 'SAMPLE church office, +260 97 000 0000',
+  String beneficiary = 'SAMPLE Brethren in Christ Church Kafue',
+  String identifierKind = 'merchant',
+  String identifier = '000000',
+  String? ussdCode = '*115#',
+  String bankName = 'SAMPLE Bank Zambia',
+  String accountNumber = '0000 0000 0000',
+  String savedAt = '2026-09-27T07:00:00.000000Z',
+  String savedBy = 'SYNTHETIC Admin Mwale',
+  bool savedByYou = false,
+  String? publishedAt,
+  String? publishedBy,
+  Map<String, Object?>? verification,
+}) => {
+  'revision_no': revisionNo,
+  'name': name,
+  'purpose': purpose,
+  'currency': currency,
+  'steps': steps,
+  'note': note,
+  'contact': contact,
+  if (methodType == 'mobile_money') ...{
+    'beneficiary': beneficiary,
+    'identifier_kind': identifierKind,
+    'identifier': identifier,
+    'ussd_code': ussdCode,
+  },
+  if (methodType == 'bank') ...{
+    'bank_name': bankName,
+    'beneficiary': beneficiary,
+    'account_number': accountNumber,
+    'branch': null,
+    'branch_code': null,
+    'swift_code': null,
+    'reference': null,
+  },
+  'saved_at': savedAt,
+  'saved_by': savedBy,
+  'saved_by_you': savedByYou,
+  'published_at': publishedAt,
+  'published_by': publishedBy,
+  'verification': verification,
+};
+
+/// The wire form of one giving method as Admins read it ([live] and
+/// [draft] are revision objects or null; [position] null when archived).
+Map<String, Object?> staffGivingMethodData({
+  String methodId = '61616161-6161-4161-8161-616161616161',
+  String methodType = 'mobile_money',
+  int? position = 1,
+  int revision = 1,
+  String state = 'draft',
+  Map<String, Object?>? live,
+  Map<String, Object?>? draft,
+  String? publishedBy,
+  String? publishedAt,
+  String? withdrawnAt,
+  String? archivedAt,
+}) => {
+  'method_id': methodId,
+  'method_type': methodType,
+  'position': position,
+  'revision': revision,
+  'state': state,
+  'created_at': '2026-09-27T07:00:00.000000Z',
+  'created_by': 'SYNTHETIC Admin Mwale',
+  'updated_at': '2026-09-27T07:00:00.000000Z',
+  'published_at': publishedAt,
+  'published_by': publishedBy,
+  'withdrawn_at': withdrawnAt,
+  'archived_at': archivedAt,
+  'live': live,
+  'draft': draft,
+};
+
+/// The wire form of `api.content_staff_giving_methods`.
+Map<String, Object?> staffGivingMethodsData(
+  List<Map<String, Object?>> methods, {
+  bool truncated = false,
+}) => {'capacity': 'admin', 'methods': methods, 'truncated': truncated};
 
 /// [FollowUpsRepository] answered by the test (story 4.6). Each field
 /// answers every read at once; the counters record how often each was asked.
@@ -1934,6 +2169,7 @@ class ClientTestHarness {
   final review = FakeReview();
   final cells = FakeCells();
   final content = FakeContent();
+  final giving = FakeGiving();
   final duties = FakeDuties();
   final coverage = FakeDutyCoverage();
   final outcomes = FakeDutyOutcomes();
@@ -1974,6 +2210,7 @@ class ClientTestHarness {
       reviewRepositoryProvider.overrideWithValue(review),
       cellsRepositoryProvider.overrideWithValue(cells),
       contentRepositoryProvider.overrideWithValue(content),
+      givingRepositoryProvider.overrideWithValue(giving),
       dutiesRepositoryProvider.overrideWithValue(duties),
       dutyCoverageRepositoryProvider.overrideWithValue(coverage),
       dutyOutcomesRepositoryProvider.overrideWithValue(outcomes),

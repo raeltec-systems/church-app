@@ -11,6 +11,8 @@ import 'cell_screens.dart';
 import 'credential_screens.dart';
 import 'duties_screens.dart';
 import 'followups_screens.dart';
+import 'give_screens.dart';
+import 'giving_staff_screens.dart';
 import 'home_screen.dart';
 import 'fixture_command_screen.dart';
 import 'fixture_reminder_screens.dart';
@@ -88,6 +90,15 @@ abstract final class ClientPaths {
 
   /// Story 6.1, staff web: the Events editor (Media, Pastor, Admin).
   static const contentEvents = ContentPaths.events;
+
+  /// Story 6.3 (mobile): the public Give tab ("How to give").
+  static const give = GivePaths.give;
+
+  /// Story 6.3 (mobile): one published giving method.
+  static String giveMethod(String methodId) => GivePaths.method(methodId);
+
+  /// Story 6.3, staff web: the Giving editor (Admin only).
+  static const contentGiving = GivingStaffPaths.giving;
 
   /// Story 4.1, staff web: department leaders and deputies (Admin; Pastor
   /// read only): publish a duty and see the responses.
@@ -423,12 +434,35 @@ GoRouter buildClientRouter({
             ),
           ],
         ),
+        // Story 6.3: the public Give tab, with each method's detail.
+        GoRoute(
+          path: ClientPaths.give,
+          pageBuilder: (_, state) => page(state, const GiveScreen()),
+          routes: [
+            GoRoute(
+              path: 'methods/:methodId',
+              pageBuilder: (_, state) => page(
+                state,
+                GiveMethodScreen(
+                  key: ValueKey(state.pathParameters['methodId']),
+                  methodId: state.pathParameters['methodId']!,
+                ),
+              ),
+            ),
+          ],
+        ),
       ],
       // Story 6.1, staff web: the Events editor (the server checks every read
       // and command).
       GoRoute(
         path: ClientPaths.contentEvents,
         pageBuilder: (_, state) => page(state, const StaffEventsScreen()),
+      ),
+      // Story 6.3, staff web: the Giving editor (Admin only; the server
+      // checks every read and command).
+      GoRoute(
+        path: ClientPaths.contentGiving,
+        pageBuilder: (_, state) => page(state, const StaffGivingScreen()),
       ),
       GoRoute(
         path: ClientPaths.myDuties,

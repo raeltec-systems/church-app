@@ -215,6 +215,14 @@ const staffEventsDestination = (
   icon: Icons.event_outlined,
 );
 
+/// Story 6.3: shown while the server's current answer includes Admin: the
+/// church's giving methods, verified by a second Admin before publishing.
+const staffGivingDestination = (
+  path: ClientPaths.contentGiving,
+  label: 'Giving',
+  icon: Icons.volunteer_activism_outlined,
+);
+
 /// One group of the sidebar; [label] is null for the ungrouped top entry.
 typedef StaffNavGroup = ({String? label, List<StaffDestination> items});
 
@@ -264,10 +272,14 @@ List<StaffNavGroup> staffNavGroupsFor(
         if (admin) staffDepartmentsDestination,
       ],
     ),
-    // Story 6.1: public church content (Media, Pastor, Admin).
+    // Story 6.1: public church content (Media, Pastor, Admin); story 6.3:
+    // giving methods (Admin only).
     (
       label: 'Content',
-      items: [if (editsContent(grants)) staffEventsDestination],
+      items: [
+        if (editsContent(grants)) staffEventsDestination,
+        if (editsGiving(grants)) staffGivingDestination,
+      ],
     ),
     (
       label: 'Me',

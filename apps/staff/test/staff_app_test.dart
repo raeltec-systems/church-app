@@ -307,6 +307,108 @@ void main() {
     );
   });
 
+  test('story 6.3: Giving for Admins only, in the Content group', () {
+    final admin = syntheticGrants(roles: const ['admin']);
+    expect(staffDestinationsFor(admin), contains(staffGivingDestination));
+    final content = staffNavGroupsFor(admin)
+        .firstWhere((g) => g.label == 'Content');
+    expect(content.items, [staffEventsDestination, staffGivingDestination]);
+    for (final g in [
+      syntheticGrants(roles: const ['media']),
+      syntheticGrants(roles: const ['pastor']),
+      syntheticGrants(roles: const ['lead_pastor']),
+      syntheticGrants(),
+      null,
+    ]) {
+      expect(
+        staffDestinationsFor(g, signedIn: true),
+        isNot(contains(staffGivingDestination)),
+        reason: '${g?.roles}',
+      );
+    }
+    final icons = {for (final d in staffDestinationsFor(admin)) d.icon};
+    expect(
+      icons.length,
+      staffDestinationsFor(admin).length,
+      reason: 'every sidebar entry has its own icon',
+    );
+  });
+
+  testWidgets(
+    'story 6.3: an Admin opens Giving from the sidebar and cannot verify '
+    'their own save',
+    (tester) async {
+      const airtel = '61616161-6161-4161-8161-616161616161';
+      final h = await pumpStaff(
+        tester,
+        size: const Size(1280, 1600),
+        setUp: (h) {
+          asAdmin(h);
+          h.giving.staffMethods = AccessReadOk(
+            StaffGivingMethods.fromJson(
+              staffGivingMethodsData([
+                staffGivingMethodData(
+                  draft: staffGivingRevisionData(savedByYou: true),
+                ),
+              ]),
+            ),
+          );
+        },
+      );
+      await tapKey(tester, 'nav-${ClientPaths.contentGiving}');
+      await tester.pumpAndSettle();
+      expect(find.byType(StaffGivingScreen), findsOneWidget);
+      expect(h.giving.staffMethodsCalls, 1);
+      expect(
+        tester
+            .widget<StatusLabel>(find.byKey(const Key('giving-mark-$airtel')))
+            .label,
+        'Draft, needs verifying',
+      );
+      await tapKey(tester, 'giving-open-$airtel');
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.byKey(const Key('giving-verify-$airtel')),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(
+        find.text(
+          'You saved changes to these details, so a different Admin must '
+          'verify them.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('giving-publish-$airtel')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'story 6.3: a Media member has no Giving entry and is told who manages it',
+    (tester) async {
+      await pumpStaff(
+        tester,
+        location: ClientPaths.contentGiving,
+        setUp: (h) => h.grants.myAccess = AccessReadOk(
+          syntheticGrants(roles: const ['media']),
+        ),
+      );
+      expect(
+        find.byKey(const Key('nav-${ClientPaths.contentGiving}')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('giving-denied-notGranted')), findsOneWidget);
+      expect(
+        find.textContaining('Giving methods are managed by Admins.'),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets(
     'story 6.1: a Media member opens Events from the sidebar and drafts an '
     'event',

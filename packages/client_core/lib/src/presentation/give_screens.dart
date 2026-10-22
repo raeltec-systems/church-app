@@ -156,9 +156,19 @@ class _GiveScreenState extends ConsumerState<GiveScreen> {
           children.add(
             ChurchCard(
               key: const Key('give-empty'),
-              child: Text(
-                'The church hasn\'t published any giving methods yet.',
-                style: ChurchType.body.copyWith(color: c.muted),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'No giving methods yet',
+                    style: ChurchType.itemTitle.copyWith(color: c.ink),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'When the church adds how to give, it will show here.',
+                    style: ChurchType.body.copyWith(color: c.muted),
+                  ),
+                ],
               ),
             ),
           );

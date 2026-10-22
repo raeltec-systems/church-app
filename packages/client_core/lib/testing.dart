@@ -3,6 +3,7 @@
 library;
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:church_contracts/church_contracts.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -18,6 +19,7 @@ import 'src/domain/cell_programmes.dart';
 import 'src/domain/cell_membership.dart';
 import 'src/domain/commands.dart';
 import 'src/domain/content_announcements.dart';
+import 'src/domain/content_banners.dart';
 import 'src/domain/content_events.dart';
 import 'src/domain/content_giving.dart';
 import 'src/domain/credential_review.dart';
@@ -1036,6 +1038,302 @@ Map<String, Object?> staffAnnouncementsData(
   'announcements': items,
   'truncated': truncated,
 };
+
+/// [BannerRepository] answered by the test (story 6.2). Each field answers
+/// every call at once; the lists record what was asked.
+class FakeBanners implements BannerRepository {
+  AccessRead<PublicBanners> publicBanners = AccessReadOk(
+    PublicBanners.fromJson(const {'banners': <Object?>[]}),
+  );
+  AccessRead<StaffBanners> staffBanners = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  AccessRead<StaffRights> staffRights = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+
+  /// The answer to every upload (default: uploaded as a 1920 x 1080 PNG).
+  ImageUploadOutcome upload = const ImageUploaded(
+    UploadedImage(
+      assetId: '61616161-6161-4161-8161-616161616161',
+      mediaType: 'image/png',
+      byteSize: 204800,
+      width: 1920,
+      height: 1080,
+    ),
+  );
+  FileSyncOutcome sync = const FileSyncDone(
+    placed: 0,
+    removed: 0,
+    waiting: 0,
+    removalsPending: 0,
+  );
+
+  /// Preview bytes by asset id (none: null).
+  final Map<String, Uint8List> previews = {};
+  int publicCalls = 0;
+  int staffCalls = 0;
+  int rightsCalls = 0;
+  int syncCalls = 0;
+  final uploads = <(String, String, PickedFile)>[];
+
+  @override
+  Future<AccessRead<PublicBanners>> fetchPublicBanners() async {
+    publicCalls++;
+    return publicBanners;
+  }
+
+  @override
+  Future<AccessRead<StaffBanners>> fetchStaffBanners() async {
+    staffCalls++;
+    return staffBanners;
+  }
+
+  @override
+  Future<AccessRead<StaffRights>> fetchStaffRights() async {
+    rightsCalls++;
+    return staffRights;
+  }
+
+  @override
+  Uri publicFileUrl(String path) => Uri.parse(
+    'https://test.invalid/storage/v1/object/public/$contentPublicBucket/$path',
+  );
+
+  @override
+  Future<ImageUploadOutcome> uploadImage(
+    String itemId,
+    String purpose,
+    PickedFile file,
+  ) async {
+    uploads.add((itemId, purpose, file));
+    return upload;
+  }
+
+  @override
+  Future<FileSyncOutcome> syncFiles() async {
+    syncCalls++;
+    return sync;
+  }
+
+  @override
+  Future<Uint8List?> previewImage(String assetId) async => previews[assetId];
+}
+
+/// [ContentFilePicker] answered by the test: [next] is the next pick (null:
+/// the editor cancelled).
+class FakeFilePicker implements ContentFilePicker {
+  PickedFile? next;
+  int picks = 0;
+
+  @override
+  bool get supported => true;
+
+  @override
+  Future<PickedFile?> pickImage() async {
+    picks++;
+    return next;
+  }
+}
+
+/// A 1 x 1 transparent PNG (enough for Image.memory in widget tests).
+final Uint8List tinyPng = Uint8List.fromList(const [
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, //
+  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, //
+  0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, //
+  0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, //
+  0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49, //
+  0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+]);
+
+/// The wire form of one published banner (story 6.2); by default the
+/// SYNTHETIC theme for 2026.
+Map<String, Object?> publicBannerData({
+  String bannerId = '81818181-8181-4181-8181-818181818181',
+  String kind = 'theme',
+  int? themeYear = 2026,
+  String title = 'SYNTHETIC God\'s faithfulness in Self Sustenance',
+  String? subtitle = 'Deuteronomy 7:9',
+  String altText = 'SYNTHETIC theme artwork: an open field at sunrise',
+  String? eventId,
+  String path = 'banner/81818181-8181-4181-8181-818181818181/r1/image.png',
+  int publicationRevision = 1,
+  int rightsRevision = 1,
+  String publishedAt = '2099-09-01T08:00:00.000000Z',
+}) => {
+  'banner_id': bannerId,
+  'banner_kind': kind,
+  'theme_year': kind == 'theme' ? themeYear : null,
+  'title': title,
+  'subtitle': subtitle,
+  'alt_text': altText,
+  'event_id': eventId,
+  'image': {
+    'path': path,
+    'media_type': 'image/png',
+    'width': 1920,
+    'height': 1080,
+  },
+  'publication_revision': publicationRevision,
+  'rights_revision': rightsRevision,
+  'published_at': publishedAt,
+};
+
+/// The wire form of `api.content_public_banners` holding [banners].
+Map<String, Object?> publicBannersData(List<Map<String, Object?>> banners) => {
+  'banners': banners,
+};
+
+/// The wire form of one banner revision as editors read it.
+Map<String, Object?> staffBannerRevisionData({
+  int revisionNo = 1,
+  String kind = 'campaign',
+  int? themeYear,
+  String title = 'SYNTHETIC Harvest appeal',
+  String? subtitle = 'Bring a gift on Sunday',
+  String altText = 'SYNTHETIC baskets of maize and pumpkins',
+  String? eventId,
+  String? eventTitle,
+  String? imageAssetId,
+  Map<String, Object?>? rights,
+  String savedAt = '2099-09-01T07:00:00.000000Z',
+  String savedBy = 'SYNTHETIC Media Phiri',
+}) => {
+  'revision_no': revisionNo,
+  'banner_kind': kind,
+  'theme_year': themeYear,
+  'title': title,
+  'subtitle': subtitle,
+  'alt_text': altText,
+  'event_id': eventId,
+  'event_title': eventTitle,
+  'image': imageAssetId == null
+      ? null
+      : {
+          'asset_id': imageAssetId,
+          'media_type': 'image/png',
+          'byte_size': 204800,
+          'width': 1920,
+          'height': 1080,
+        },
+  'rights': rights,
+  'saved_at': savedAt,
+  'saved_by': savedBy,
+};
+
+/// The `rights` object of a banner revision.
+Map<String, Object?> bannerRightsData({
+  String rightsId = '91919191-9191-4191-8191-919191919191',
+  String label = 'SYNTHETIC images made for the church',
+  String state = 'published',
+  int? liveRevisionNo = 1,
+  String? display,
+}) => {
+  'rights_id': rightsId,
+  'label': label,
+  'state': state,
+  'live_revision_no': liveRevisionNo,
+  'display': display,
+};
+
+/// The wire form of one banner as editors read it.
+Map<String, Object?> staffBannerData({
+  String bannerId = '82828282-8282-4282-8282-828282828282',
+  int revision = 1,
+  String state = 'draft',
+  String? publicImage,
+  Map<String, Object?>? live,
+  Map<String, Object?>? draft,
+  String? publishedBy,
+  String? publishedAt,
+}) => {
+  'banner_id': bannerId,
+  'revision': revision,
+  'state': state,
+  'created_at': '2099-09-01T07:00:00.000000Z',
+  'created_by': 'SYNTHETIC Media Phiri',
+  'updated_at': '2099-09-01T07:00:00.000000Z',
+  'published_at': publishedAt,
+  'published_by': publishedBy,
+  'withdrawn_at': null,
+  'archived_at': null,
+  'public_image': publicImage,
+  'live': live,
+  'draft': draft,
+};
+
+/// The wire form of `api.content_staff_banners`.
+Map<String, Object?> staffBannersData(
+  List<Map<String, Object?>> banners, {
+  String capacity = 'media',
+  int removalsPending = 0,
+  bool truncated = false,
+}) => {
+  'capacity': capacity,
+  'banners': banners,
+  'removals_pending': removalsPending,
+  'truncated': truncated,
+};
+
+/// The wire form of one rights record revision.
+Map<String, Object?> rightsRevisionData({
+  int revisionNo = 1,
+  String label = 'SYNTHETIC images made for the church',
+  String sourceKey = 'synthetic',
+  String holder = 'SYNTHETIC BICC Kafue media team',
+  String basis = 'church_owned',
+  bool clearsDisplay = true,
+  bool clearsOffline = false,
+  bool clearsAudio = false,
+  String evidence = 'SYNTHETIC made by the media team for staging',
+  String savedAt = '2099-09-01T07:00:00.000000Z',
+  String savedBy = 'SYNTHETIC Media Phiri',
+}) => {
+  'revision_no': revisionNo,
+  'label': label,
+  'source_key': sourceKey,
+  'holder': holder,
+  'basis': basis,
+  'clears_display': clearsDisplay,
+  'clears_offline': clearsOffline,
+  'clears_audio': clearsAudio,
+  'evidence': evidence,
+  'saved_at': savedAt,
+  'saved_by': savedBy,
+};
+
+/// The wire form of one rights record as editors read it.
+Map<String, Object?> rightsRecordData({
+  String rightsId = '91919191-9191-4191-8191-919191919191',
+  int revision = 1,
+  String state = 'draft',
+  List<String> q5Uses = const ['display', 'offline', 'audio'],
+  Map<String, Object?>? live,
+  Map<String, Object?>? draft,
+  String? verifiedBy,
+  String? verifiedAt,
+}) => {
+  'rights_id': rightsId,
+  'revision': revision,
+  'state': state,
+  'created_at': '2099-09-01T07:00:00.000000Z',
+  'created_by': 'SYNTHETIC Media Phiri',
+  'updated_at': '2099-09-01T07:00:00.000000Z',
+  'verified_at': verifiedAt,
+  'verified_by': verifiedBy,
+  'withdrawn_at': null,
+  'archived_at': null,
+  'q5_uses': q5Uses,
+  'live': live,
+  'draft': draft,
+};
+
+/// The wire form of `api.content_staff_rights`.
+Map<String, Object?> staffRightsData(
+  List<Map<String, Object?>> rights, {
+  String capacity = 'media',
+  bool truncated = false,
+}) => {'capacity': capacity, 'rights': rights, 'truncated': truncated};
 
 /// [FollowUpsRepository] answered by the test (story 4.6). Each field
 /// answers every read at once; the counters record how often each was asked.
@@ -2307,6 +2605,8 @@ class ClientTestHarness {
   final content = FakeContent();
   final giving = FakeGiving();
   final announcements = FakeAnnouncements();
+  final banners = FakeBanners();
+  final filePicker = FakeFilePicker();
   final duties = FakeDuties();
   final coverage = FakeDutyCoverage();
   final outcomes = FakeDutyOutcomes();
@@ -2349,6 +2649,8 @@ class ClientTestHarness {
       contentRepositoryProvider.overrideWithValue(content),
       givingRepositoryProvider.overrideWithValue(giving),
       announcementsRepositoryProvider.overrideWithValue(announcements),
+      bannerRepositoryProvider.overrideWithValue(banners),
+      contentFilePickerProvider.overrideWithValue(filePicker),
       dutiesRepositoryProvider.overrideWithValue(duties),
       dutyCoverageRepositoryProvider.overrideWithValue(coverage),
       dutyOutcomesRepositoryProvider.overrideWithValue(outcomes),

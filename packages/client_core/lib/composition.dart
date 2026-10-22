@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'src/adapters/auth_session_storage.dart';
+import 'src/adapters/content_file_picker.dart';
 import 'src/adapters/recovery_verifier_storage.dart';
 import 'src/application/providers.dart';
 import 'src/domain/notification_settings.dart';
@@ -98,6 +99,15 @@ Future<List<Override>> compositionOverrides(
     announcementsRepositoryProvider.overrideWithValue(
       SupabaseAnnouncementsRepository(client),
     ),
+    // Story 6.2: banners, rights and the content-assets route.
+    bannerRepositoryProvider.overrideWithValue(
+      SupabaseBannerRepository(
+        client,
+        supabaseUrl: config.supabaseUrl,
+        publishableKey: config.publishableKey,
+      ),
+    ),
+    contentFilePickerProvider.overrideWithValue(platformContentFilePicker()),
     dutiesRepositoryProvider.overrideWithValue(
       SupabaseDutiesRepository(client),
     ),

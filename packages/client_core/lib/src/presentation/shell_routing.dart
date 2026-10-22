@@ -6,6 +6,7 @@ import 'access_screens.dart';
 import 'announcement_screens.dart';
 import 'assisted_recovery_screens.dart';
 import 'account_screen.dart';
+import 'banner_screens.dart';
 import 'calendar_screens.dart';
 import 'content_screens.dart';
 import 'cell_screens.dart';
@@ -14,6 +15,7 @@ import 'duties_screens.dart';
 import 'followups_screens.dart';
 import 'give_screens.dart';
 import 'giving_staff_screens.dart';
+import 'home_banners.dart';
 import 'home_screen.dart';
 import 'fixture_command_screen.dart';
 import 'fixture_reminder_screens.dart';
@@ -111,6 +113,14 @@ abstract final class ClientPaths {
 
   /// Story 6.13, staff web: the Announcements editor (Media, Pastor, Admin).
   static const contentAnnouncements = StaffAnnouncementPaths.announcements;
+
+  /// Story 6.2, staff web: Home banners and the rights records (Media,
+  /// Pastor, Admin).
+  static const contentBanners = BannerPaths.banners;
+  static const contentRights = BannerPaths.rights;
+
+  /// Story 6.2 (mobile): one published banner's original image.
+  static String banner(String bannerId) => BannerPaths.banner(bannerId);
 
   /// Story 4.1, staff web: department leaders and deputies (Admin; Pastor
   /// read only): publish a duty and see the responses.
@@ -434,6 +444,19 @@ GoRouter buildClientRouter({
         GoRoute(
           path: ClientPaths.home,
           pageBuilder: (_, state) => page(state, const HomeScreen()),
+          routes: [
+            // Story 6.2: a banner's original image.
+            GoRoute(
+              path: 'banners/:bannerId',
+              pageBuilder: (_, state) => page(
+                state,
+                BannerScreen(
+                  key: ValueKey(state.pathParameters['bannerId']),
+                  bannerId: state.pathParameters['bannerId']!,
+                ),
+              ),
+            ),
+          ],
         ),
         GoRoute(
           path: ClientPaths.calendar,
@@ -503,6 +526,15 @@ GoRouter buildClientRouter({
         path: ClientPaths.contentAnnouncements,
         pageBuilder: (_, state) =>
             page(state, const StaffAnnouncementsScreen()),
+      ),
+      // Story 6.2, staff web: Banners and Rights.
+      GoRoute(
+        path: ClientPaths.contentBanners,
+        pageBuilder: (_, state) => page(state, const StaffBannersScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.contentRights,
+        pageBuilder: (_, state) => page(state, const StaffRightsScreen()),
       ),
       GoRoute(
         path: ClientPaths.myDuties,

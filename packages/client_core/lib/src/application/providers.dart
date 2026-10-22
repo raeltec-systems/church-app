@@ -6,6 +6,7 @@ import '../domain/assisted_recovery.dart';
 import '../domain/cell_membership.dart';
 import '../domain/commands.dart';
 import '../domain/content_announcements.dart';
+import '../domain/content_banners.dart';
 import '../domain/content_events.dart';
 import '../domain/content_giving.dart';
 import '../domain/credential_review.dart';
@@ -110,6 +111,17 @@ final givingRepositoryProvider = Provider<GivingRepository>(
 /// announcement read.
 final announcementsRepositoryProvider = Provider<AnnouncementsRepository>(
   (ref) => const UnconfiguredAnnouncementsRepository(),
+);
+
+/// Story 6.2: Home banners (everyone), the editors' banner and rights reads,
+/// and image upload, sync and preview through the `content-assets` route.
+final bannerRepositoryProvider = Provider<BannerRepository>(
+  (ref) => const UnconfiguredBannerRepository(),
+);
+
+/// Story 6.2: the staff web file chooser for content images.
+final contentFilePickerProvider = Provider<ContentFilePicker>(
+  (ref) => const UnsupportedContentFilePicker(),
 );
 
 /// Story 4.9: opens the phone or messaging app for a labelled contact route.

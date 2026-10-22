@@ -117,16 +117,18 @@ select is(
   0, 'no client role has any privilege on a Content table or sequence');
 select results_eq(
   $$select (n.nspname || '.' || p.proname)::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname in ('app', 'api') and p.proname like 'content\_%' and has_function_privilege('anon', p.oid, 'EXECUTE')
+     where n.nspname in ('app', 'api') and p.proname like 'content\_%' and p.proname like '%event%'
+       and has_function_privilege('anon', p.oid, 'EXECUTE')
        and p.proname not like 'content\_%giving%' -- story 6.3 pins its own
        and p.proname not like '%announcement%'
      order by 1$$,
   $$values ('api.content_public_event'::text collate "C"), ('api.content_public_events'),
            ('app.content_public_event'), ('app.content_public_events')$$,
-  'anon can execute only the two public reads');
+  'anon can execute only the two public event reads (story 6.2 lists its own)');
 select results_eq(
   $$select (n.nspname || '.' || p.proname)::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname in ('app', 'api') and p.proname like 'content\_%'
+       and (p.proname like '%event%' or p.proname = 'content_command')
        and has_function_privilege('authenticated', p.oid, 'EXECUTE')
        and p.proname not like 'content\_%giving%' -- story 6.3 pins its own
        and p.proname not like '%announcement%'

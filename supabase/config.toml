@@ -418,6 +418,14 @@ verify_jwt = false
 enabled = true
 verify_jwt = false
 
+# Story 6.2: the Content asset path (uploads, the public bucket sync, draft previews) for staff web.
+# The caller's bearer token is forwarded to PostgREST, where the database checks the editor's live
+# session on every call, so the gateway does not verify the JWT; Storage writes use the
+# platform-provided service key only after the database has said yes. See docs/runbooks/content.md.
+[functions.content-assets]
+enabled = true
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

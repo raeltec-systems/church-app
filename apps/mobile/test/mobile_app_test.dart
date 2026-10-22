@@ -585,6 +585,48 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'story 6.2: a signed-out phone opens Home on the banners, theme first, '
+    'and a tap opens the original',
+    (tester) async {
+      const theme = '81818181-8181-4181-8181-818181818181';
+      const campaign = '83838383-8383-4383-8383-838383838383';
+      final h = await pumpMobile(
+        tester,
+        location: ClientPaths.home,
+        setUp: (h) {
+          h.session.switchTo(null);
+          h.banners.publicBanners = AccessReadOk(
+            PublicBanners.fromJson(
+              publicBannersData([
+                publicBannerData(
+                  bannerId: campaign,
+                  kind: 'campaign',
+                  title: 'SYNTHETIC Harvest appeal',
+                  path: 'banner/$campaign/r1/image.jpg',
+                ),
+                publicBannerData(),
+              ]),
+            ),
+          );
+        },
+      );
+      expect(h.banners.publicCalls, greaterThanOrEqualTo(1));
+      expect(find.byKey(const Key('home-banners')), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.byKey(const Key('home-banner-$theme'))).dx,
+        lessThan(
+          tester.getTopLeft(find.byKey(const Key('home-banner-$campaign'))).dx,
+        ),
+      );
+      expect(find.text('THEME FOR 2026'), findsOneWidget);
+      await tapKey(tester, 'home-banner-open-$theme');
+      await tester.pumpAndSettle();
+      expect(find.byType(BannerScreen), findsOneWidget);
+      expect(find.text('Theme for 2026'), findsOneWidget);
+    },
+  );
+
   testWidgets('a member gets the same Home, Give and Calendar tabs', (
     tester,
   ) async {

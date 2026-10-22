@@ -26,6 +26,19 @@ Everything here is **SYNTHETIC**. Real-data backups stay off until the Q4 and Q1
 - `app.rcv_record_refusal` records why a reconciliation was refused. `app.rcv_recovery_status()` reports the current state.
 - Only a restricted operator can run any of this (`ops_operators`, story 1.9). No client role has grants on it.
 
+## Content buckets (story 6.2)
+
+The object backup covers both Content buckets. The rehearsal's one SYNTHETIC object does not stand for them.
+
+| Bucket | What it holds | Backup | Restore |
+|--------|---------------|--------|---------|
+| `content-drafts` (private) | Every uploaded file (banner images now; posters, logos and audio later), named `<asset_id>.<ext>`, sanitised by the `content-assets` Edge Function | Every object, downloaded through the Storage API with the service key, with its sha256 in the manifest. List them with `select name from storage.objects where bucket_id = 'content-drafts'`. | Restore every object after the database, checking each sha256. The database's `app.content_assets` (`draft_path`, `sha256`, `byte_size`) is the list to reconcile against. |
+| `content-public` (public) | Copies of published files at revision-keyed paths `<kind>/<item_id>/r<revision>/<slot>.<ext>` | Every object, the same way, so the backup is complete. | **Do not copy the backed-up public objects back.** Once the restored database is reconciled, an editor runs the `content-assets` sync (or opens staff web **Banners**). It places every file the restored database publishes from `content-drafts` and deletes anything else, so a file withdrawn after the backup cannot come back from it. |
+
+- Neither bucket holds a member's personal record. Uploaded images may show people, so treat both buckets as personal data under Q4 until Israel decides on consent and retention.
+- A withdrawal made after the backup's cut-off is not in the recovery journal: content withdrawal is not an access revocation. After a restore, an editor checks **Banners** (and later content screens) for anything withdrawn after the cut-off and withdraws it again before clients are pointed at the target.
+- The bucket rows themselves come from the migration `20261022012809_content_rights_banners.sql`, so a restored database recreates them on a fresh project when the migrations are applied.
+
 ## Journal completeness (fail closed)
 
 `verifyJournal(entries, {cutoff, databaseWatermark})` accepts a journal only when all of these are true:

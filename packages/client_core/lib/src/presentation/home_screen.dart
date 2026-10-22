@@ -14,6 +14,7 @@ import 'calendar_screens.dart' show ComingUpSection;
 import 'cell_screens.dart' show MyCellHomeCard;
 import 'duties_screens.dart' show LeaderNeedsAttentionCard, MyDutiesHomeCard;
 import 'followups_screens.dart' show MyFollowUpsHomeCard;
+import 'home_banners.dart' show HomeBannersCarousel;
 
 /// The mobile Home tab (stories 4.5 and 6.1): everyone gets it, signed in or
 /// not. A member sees a greeting and their cards (a department leader's
@@ -68,6 +69,9 @@ class HomeScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Story 6.2: Home opens with the church's banners (the
+                // yearly theme first), for everyone.
+                const HomeBannersCarousel(),
                 Semantics(
                   header: true,
                   child: Text(

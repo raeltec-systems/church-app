@@ -89,6 +89,8 @@ Lifecycle events (contract v1): `access_hold_applied`, `access_hold_released`, `
 
 Content (module `content`) keeps one publication lifecycle for every content kind and registers instead of editing shared functions: kinds and their editor roles in `app.content_kinds`, commands with `app.content_register_command` (the `content` authorizer, the `api.content_command` dispatch and the replay recheck read that table) and deletion erase parts with `app.content_register_erase_part`. Its public read contract (`api.content_public_events`, `api.content_public_event`) is the only anonymous read besides the 1.1 tracer: definer functions over tables no client role can touch. Guide for later kinds: [content.md](content.md).
 
+Story 6.3 registered the second kind this way: `giving_method` (Admin only), its eight giving commands (`content.*_giving_method` and `content.discard_giving_draft`) and the `giving_methods` erase part, with its own anonymous reads `api.content_public_giving_methods` and `api.content_public_giving_method` and its own audit table for the giving-only actions; no shared Content function was replaced. It also added the `q3_giving` policy gate (Q3; local/staging fixture: SAMPLE methods only).
+
 ## Cells meeting reference (story 5.8)
 
 Later owners of meeting facts (attendance and recaps in epic 7, offerings) read a meeting through `app.cells_meeting_reference(meeting_id) -> jsonb`, called inside their own authorised read or command. They never read the Cells tables. It answers `{meeting_id, cell_id, occurrence_date, starts_at, ends_at, status, record_revision, actual_leaders}`. `status` is one of `scheduled` (ahead), `unrecorded` (started, nothing recorded), `held`, `not_held`, `cancelled` or `withdrawn`. `actual_leaders` is filled only while held: `[{part_id, label, kind: member|guest|nobody, member_id, guest_name, substitute}]` in programme order, holding who actually led each part, never who was planned. It carries no venue, notes or correction reasons. It is not granted to any role, so the caller must do its own scope check. Unrecorded is its own state: a consumer never reads it as held, or as not held.
@@ -255,10 +257,10 @@ select app.contract_register_direct_contact_route(
 
 ## Policy gates and environment
 
-- **Gates are closed by default.** `app.policy_gates` lists `q1_auth_recovery`, `q2_church_time`, `q4_personal_data`, `q9_money`, `q12_operations`, `private_access` and `outbound_sending`, plus `ops_alert_destination` and `ops_system_access` (story 1.9) and `identity_deletion_retention` (story 2.11, Q4: what a full deletion erases or anonymises). Every gate starts `unresolved`.
+- **Gates are closed by default.** `app.policy_gates` lists `q1_auth_recovery`, `q2_church_time`, `q4_personal_data`, `q9_money`, `q12_operations`, `private_access` and `outbound_sending`, plus `ops_alert_destination` and `ops_system_access` (story 1.9) `identity_deletion_retention` (story 2.11, Q4: what a full deletion erases or anonymises) and `q3_giving` (story 6.3, Q3: publication of giving methods). Every gate starts `unresolved`.
 - **Reading a gate.** `app.policy_effective(gate)` raises the kernel's `unavailable` with `{"policy": "gate_closed"}`, which names no internal gate, unless one of these holds:
   - the gate is approved, or
-  - the environment is marked `local` or `staging` and the gate has a labelled fixture. Only Q2 (Africa/Lusaka with the decided defaults since story 3.3; it was `UTC` before), Q9 (`XTS`, scale 2) and the Q4 deletion retention (`identity_deletion_retention`, labelled `TEST FIXTURE - Q4 retention and backup periods unapproved`) have fixtures.
+  - the environment is marked `local` or `staging` and the gate has a labelled fixture. Only Q2 (Africa/Lusaka with the decided defaults since story 3.3; it was `UTC` before), Q9 (`XTS`, scale 2) the Q4 deletion retention (`identity_deletion_retention`, labelled `TEST FIXTURE - Q4 retention and backup periods unapproved`) and Q3 giving (`q3_giving`, `sample_only`: only methods named `SAMPLE ...` publish) have fixtures.
 - **Environment marker.** `app.platform_environment`, with every change recorded in `app.platform_environment_history`:
   - **Nothing sets it automatically**: no seed and no migration writes it. A database with no marker behaves as **production**.
   - To use fixture policy on a local database, run `select app.platform_set_environment('local', '<you>');`.
@@ -269,5 +271,6 @@ select app.contract_register_direct_contact_route(
   `select app.policy_approve('q2_church_time', '{"zone": "<IANA zone>", ...}', '<owner name>', '<decision reference>');`
   - `q9_money` must look like `{"currencies": {"<ISO 4217 code>": <integer scale 0..6>}}`.
   - `q2_church_time` must be a valid scheduling policy (story 3.3). Check the value first with `select app.notifications_policy_errors('<value>'::jsonb);` and expect `{}`. An approved value that fails the check closes scheduling (`unavailable`) instead of guessing. After approving, re-plan: `select app.notifications_replan_all('policy_changed');`.
+  - `q3_giving` takes any object, for example `{"methods": "<the verified methods the owner names>"}`; leave out `sample_only`, which would keep publication to SAMPLE names.
   - A value that carries a `fixture_label` cannot be approved.
   - No client role can execute any of these functions.

@@ -11,14 +11,15 @@ import 'package:go_router/go_router.dart';
 typedef MobileDestination = ({String path, String label, IconData icon});
 
 /// The bottom tabs (design handoff, owner decision 2026-10-21: Home, Bible &
-/// Hymns, Sermons, Give, Calendar). Story 6.1 brings Home and Calendar; Give,
-/// Bible & Hymns and Sermons join with epic 6 entries 3, 6 and 9. My duties,
-/// My follow-ups and My cell are reached from their Home cards and the
-/// Account menu. Inbox and the account live in the top bar; the platform
-/// status, fixture and access screens are internal and keep their routes but
-/// no tab.
+/// Hymns, Sermons, Give, Calendar). Story 6.1 brings Home and Calendar and
+/// story 6.3 Give; Bible & Hymns and Sermons join with epic 6 entries 6 and 9
+/// (between Home and Give). My duties, My follow-ups and My cell are reached
+/// from their Home cards and the Account menu. Inbox and the account live in
+/// the top bar; the platform status, fixture and access screens are internal
+/// and keep their routes but no tab.
 const mobileDestinations = <MobileDestination>[
   (path: ClientPaths.home, label: 'Home', icon: Icons.home_outlined),
+  (path: ClientPaths.give, label: 'Give', icon: Icons.favorite_border),
   (
     path: ClientPaths.calendar,
     label: 'Calendar',
@@ -33,11 +34,15 @@ List<MobileDestination> mobileDestinationsFor(MemberGrants? grants) =>
 
 /// Routes that show the top bar (logo, inbox, account or Sign in): the tab
 /// roots for everyone, and every other screen of a caller without member
-/// access except an event's detail (it has its own back bar).
+/// access except an event's or a giving method's detail (each has its own
+/// back bar).
 bool _showsTopBar(String location, bool member) =>
     location == ClientPaths.home ||
+    location == ClientPaths.give ||
     location == ClientPaths.calendar ||
-    (!member && !location.startsWith('${ClientPaths.calendar}/'));
+    (!member &&
+        !location.startsWith('${ClientPaths.calendar}/') &&
+        !location.startsWith('${ClientPaths.give}/'));
 
 class MobileApp extends StatefulWidget {
   const MobileApp({

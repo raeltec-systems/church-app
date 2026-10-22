@@ -39,9 +39,11 @@ select results_eq(
      where n.nspname in ('app', 'api') and has_function_privilege('anon', p.oid, 'EXECUTE')
      order by 1$$,
   $$values ('api.content_public_event'::text collate "C"), ('api.content_public_events'),
+           ('api.content_public_giving_method'), ('api.content_public_giving_methods'),
            ('api.system_command'), ('app.content_public_event'), ('app.content_public_events'),
+           ('app.content_public_giving_method'), ('app.content_public_giving_methods'),
            ('app.sys_command')$$,
-  'anon can execute only the system route pair and the Content public reads (story 6.1)'
+  'anon can execute only the system route pair and the Content public reads (stories 6.1, 6.3)'
 );
 select results_eq(
   $$select (n.nspname || '.' || p.proname)::text collate "C"
@@ -51,7 +53,11 @@ select results_eq(
   $$values ('api.cells_admin_overview'::text collate "C"), ('api.cells_command'),
            ('api.cells_leader_queue'), ('api.cells_meeting_programme'), ('api.cells_meetings'), ('api.cells_my_cell'), ('api.cells_private_fixture_read'), ('api.cells_programme'),
            ('api.cells_signup_options'), ('api.content_command'), ('api.content_public_event'),
-           ('api.content_public_events'), ('api.content_staff_events'), ('api.duties_admin_overview'), ('api.duties_candidates'), ('api.duties_command'),
+           ('api.content_public_events'),
+           ('api.content_public_giving_method'), ('api.content_public_giving_methods'),
+           ('api.content_staff_events'),
+           ('api.content_staff_giving_methods'),
+           ('api.duties_admin_overview'), ('api.duties_candidates'), ('api.duties_command'),
            ('api.duties_coverage'),
            ('api.duties_leader_board'), ('api.duties_member_history'), ('api.duties_my_duties'),
            ('api.duties_outcomes'), ('api.duties_rota'), ('api.duties_special_assignments'), ('api.fixture_counter_command'),
@@ -81,7 +87,11 @@ select results_eq(
            ('api.system_command'), ('app.cells_admin_overview'), ('app.cells_command'),
            ('app.cells_leader_queue'), ('app.cells_meeting_programme'), ('app.cells_meetings'), ('app.cells_my_cell'), ('app.cells_private_fixture_read'), ('app.cells_programme'),
            ('app.cells_signup_options'), ('app.content_command'), ('app.content_public_event'),
-           ('app.content_public_events'), ('app.content_staff_events'), ('app.duties_admin_overview'), ('app.duties_candidates'), ('app.duties_command'),
+           ('app.content_public_events'),
+           ('app.content_public_giving_method'), ('app.content_public_giving_methods'),
+           ('app.content_staff_events'),
+           ('app.content_staff_giving_methods'),
+           ('app.duties_admin_overview'), ('app.duties_candidates'), ('app.duties_command'),
            ('app.duties_coverage'),
            ('app.duties_leader_board'), ('app.duties_member_history'), ('app.duties_my_duties'),
            ('app.duties_outcomes'), ('app.duties_rota'), ('app.duties_special_assignments'), ('app.fixture_counter_command'),

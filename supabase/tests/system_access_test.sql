@@ -94,7 +94,9 @@ select results_eq(
            ('reason'), ('request_id'), ('system_principal_id')$$,
   'the audit row has only ids, enums and timestamps (no payload, token, digest or free text)');
 select results_eq($$select command, purpose from app.sys_command_kinds order by 1$$,
-  $$values ('identity.assisted_recovery_request'::text, 'identity_assisted_recovery'::text),
+  $$values ('content.asset_retention_claim'::text, 'content_asset_retention'::text),
+           ('content.asset_retention_finalize', 'content_asset_retention'),
+           ('identity.assisted_recovery_request', 'identity_assisted_recovery'),
            ('identity.assisted_recovery_status', 'identity_assisted_recovery'),
            ('identity.assisted_reset_begin', 'identity_assisted_recovery'),
            ('identity.assisted_reset_complete', 'identity_assisted_recovery'),
@@ -115,7 +117,7 @@ select results_eq($$select command, purpose from app.sys_command_kinds order by 
            ('notifications.push_release', 'notifications_worker'),
            ('notifications.release', 'notifications_worker'),
            ('system.synthetic_probe', 'synthetic_probe')$$,
-  'the allowlist is the synthetic probe plus the story 2.9 assisted-recovery, 2.11 deletion and 3.1/3.4/3.6 notification worker commands (each their own purpose)');
+  'the system allowlist is purpose-separated across Content retention, assisted recovery, deletion and notification worker commands');
 
 -- Operators, gates and alert status ------------------------------------------------------------
 select results_eq($$select operator from app.ops_operators where active$$,

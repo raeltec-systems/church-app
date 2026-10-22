@@ -4,15 +4,22 @@ import { test } from 'node:test';
 import {
   CORS_HEADERS,
   MAX_UPLOAD_BYTES,
+  RETENTION_BATCH_LIMIT,
   bearerFrom,
   commandEnvelope,
   declaredTooLarge,
   declaredTypeMismatch,
   parseRequest,
+  parseRetentionBody,
+  parseRetentionClaim,
+  parseRetentionFinalize,
   planFrom,
+  retentionConfigFrom,
+  retentionSystemEnvelope,
   refusal,
   sha256Hex,
   sniffImage,
+  triggerMatches,
 } from './logic.mjs';
 import { jpegHeader, pngHeader } from './test-fixtures.mjs';
 
@@ -90,6 +97,50 @@ test('requests: three actions, each with exactly its parameters and method', () 
   assert.equal(parseRequest('GET', `${BASE}?action=preview&asset_id=../x`).error, 'invalid_asset_id');
   assert.equal(parseRequest('POST', `${BASE}?action=delete`).error, 'invalid_action');
   assert.equal(parseRequest('POST', 'not a url').error, 'invalid_url');
+  assert.deepEqual(parseRequest('POST', `${BASE}?action=retention-cleanup`),
+    { ok: true, value: { action: 'retention-cleanup' } });
+  assert.equal(parseRequest('GET', `${BASE}?action=retention-cleanup`).error, 'method');
+  assert.equal(parseRequest('POST', `${BASE}?action=retention-cleanup&limit=1`).error, 'unknown_parameter');
+});
+
+test('retention request body is bounded and rejects caller-selected fields', () => {
+  assert.deepEqual(parseRetentionBody(null), { ok: true, value: { limit: RETENTION_BATCH_LIMIT } });
+  assert.deepEqual(parseRetentionBody({}), { ok: true, value: { limit: RETENTION_BATCH_LIMIT } });
+  assert.deepEqual(parseRetentionBody({ limit: 3 }), { ok: true, value: { limit: 3 } });
+  assert.equal(parseRetentionBody([]).error, 'invalid_body');
+  assert.equal(parseRetentionBody({ asset_ids: [ID] }).error, 'unknown_field');
+  assert.equal(parseRetentionBody({ limit: 0 }).error, 'invalid_limit');
+  assert.equal(parseRetentionBody({ limit: 26 }).error, 'invalid_limit');
+});
+
+test('retention requires a well-formed purpose credential and the scheduler trigger', () => {
+  const trigger = `nwt_${'ab'.repeat(32)}`;
+  const credential = `sysc_local_${'A'.repeat(43)}`;
+  assert.deepEqual(retentionConfigFrom({ credential, trigger }), { credential, trigger });
+  assert.equal(retentionConfigFrom({ credential: '', trigger }), null);
+  assert.equal(retentionConfigFrom({ credential, trigger: '' }), null);
+  assert.deepEqual(retentionConfigFrom({ credential: `sysc_staging_${'A'.repeat(43)}`, trigger }),
+    { credential: `sysc_staging_${'A'.repeat(43)}`, trigger });
+  assert.equal(retentionConfigFrom({ credential: `sysc_dev_${'A'.repeat(43)}`, trigger }), null);
+  assert.equal(triggerMatches(trigger, trigger), true);
+  assert.equal(triggerMatches(`nwt_${'ab'.repeat(31)}ac`, trigger), false);
+  assert.equal(triggerMatches(null, trigger), false);
+  assert.equal(triggerMatches(credential, trigger), false);
+});
+
+test('retention claims accept only bounded, well-formed private draft paths', () => {
+  const claimId = '00000000-0000-4000-8000-000000062002';
+  const assetId = '00000000-0000-4000-8000-000000062003';
+  const result = { claim_id: claimId, claimed: 1, assets: [{ asset_id: assetId, draft_path: `${assetId}.png` }] };
+  assert.deepEqual(parseRetentionClaim(result), result);
+  assert.equal(parseRetentionClaim(null), null);
+  assert.equal(parseRetentionClaim({ ...result, claimed: 2 }), null);
+  assert.equal(parseRetentionClaim({ ...result, assets: [{ asset_id: assetId, draft_path: '../x' }] }), null);
+  assert.equal(parseRetentionClaim({ ...result, assets: [result.assets[0], result.assets[0]], claimed: 2 }), null);
+  assert.deepEqual(parseRetentionFinalize({ deleted: 1 }), { deleted: 1 });
+  assert.equal(parseRetentionFinalize({ deleted: -1 }), null);
+  assert.deepEqual(retentionSystemEnvelope('content.asset_retention_claim', { limit: 3 }, claimId),
+    { version: 1, command: 'content.asset_retention_claim', request_id: claimId, payload: { limit: 3 } });
 });
 
 test('only a bearer token is accepted as the caller', () => {

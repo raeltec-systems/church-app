@@ -4,10 +4,12 @@ import { test } from 'node:test';
 import {
   configFrom,
   constantTimeEqual,
+  dispatchContentRetention,
   declaredTooLarge,
   keyHeaders,
   parseBody,
   parseClaim,
+  parseContentRetentionResponse,
   runDeadline,
   runOnce,
   systemEnvelope,
@@ -55,6 +57,36 @@ test('only the configured trigger starts a run, compared in constant time', () =
   assert.equal(constantTimeEqual('abc', 'abcd'), false);
   assert.equal(constantTimeEqual('', ''), true);
   assert.equal(constantTimeEqual(null, 'a'), false);
+});
+
+test('Content retention dispatch uses only the existing trigger and bounded count payload', async () => {
+  const requests = [];
+  const trigger = TRIGGER;
+  const answer = await dispatchContentRetention({
+    supabaseUrl: 'http://kong:8000/', apiKey: 'sb_publishable_local', trigger,
+    fetcher: async (url, init) => {
+      requests.push([url, init]);
+      return { status: 200, json: async () => ({ outcome: 'cleaned', claimed: 2, deleted: 1, failed: 1 }) };
+    },
+  });
+  assert.deepEqual(answer, { state: 'ran', claimed: 2, deleted: 1, failed: 1 });
+  assert.equal(requests[0][0], 'http://kong:8000/functions/v1/content-assets?action=retention-cleanup');
+  assert.equal(requests[0][1].headers['x-worker-trigger'], trigger);
+  assert.deepEqual(JSON.parse(requests[0][1].body), { limit: 25 });
+  assert.equal('x-system-credential' in requests[0][1].headers, false);
+  assert.equal('authorization' in requests[0][1].headers, false);
+  assert.equal((await dispatchContentRetention({ supabaseUrl: 'x', apiKey: 'k', trigger: 'wrong', fetcher: async () => null })).state,
+    'not_configured');
+});
+
+test('Content retention dispatch reports only coarse auth and availability outcomes', async () => {
+  assert.deepEqual(parseContentRetentionResponse(401, {}), { state: 'unauthenticated' });
+  assert.deepEqual(parseContentRetentionResponse(403, {}), { state: 'forbidden' });
+  assert.deepEqual(parseContentRetentionResponse(503, { detail: 'private path' }), { state: 'unavailable' });
+  assert.deepEqual(parseContentRetentionResponse(200, { outcome: 'cleaned', claimed: 1, deleted: 0, failed: 1 }),
+    { state: 'ran', claimed: 1, deleted: 0, failed: 1 });
+  assert.deepEqual(parseContentRetentionResponse(200, { outcome: 'cleaned', claimed: 1, deleted: 1, failed: 1 }),
+    { state: 'unavailable' });
 });
 
 test('size, key headers and the envelope', () => {

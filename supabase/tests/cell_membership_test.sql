@@ -3,10 +3,10 @@
 -- applications, members and Admins, leader/Admin confirmation separate from church approval,
 -- the Admin follow-up queue, and the atomic confirmed transfer that ends old-cell access and runs
 -- the registered `cell_transferred` hooks in the same transaction. HTTP evidence with real phone
--- sign-up: tools/identity-e2e/cells.mjs. Every account, phone and name here is SYNTHETIC
--- (fictional range +1 202 555 0120-0139).
+-- sign-up: tools/identity-e2e/cells.mjs. Every account and phone is SYNTHETIC
+-- (fictional range +1 202 555 0120-0139); one fictional non-prefixed cell name checks live staging.
 begin;
-select plan(90);
+select plan(92);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000026' || lpad(n::text, 2, '0'))::uuid $$;
@@ -162,9 +162,9 @@ select is(pg_temp.cells(pg_temp.claims(pg_temp.u(1), pg_temp.s(21)), 'cells.crea
   '{"name": "SYNTHETIC X", "signup_label": "SYNTHETIC X", "broad_area": "SYNTHETIC North"}') ->> 'code',
   'unauthenticated', 'an Admin''s OTP session is unauthenticated for cells commands');
 select is(pg_temp.cells(pg_temp.c(1), 'cells.create_cell', null,
-  '{"name": "Riverside", "signup_label": "", "extra": 1}') -> 'field_errors',
-  '{"name": "invalid", "signup_label": "required", "broad_area": "required", "extra": "unknown_field"}'::jsonb,
-  'every field error at once; while Q4 is unapproved cell names are SYNTHETIC');
+  '{"name": "Example Riverside", "signup_label": "", "extra": 1}') -> 'field_errors',
+  '{"signup_label": "required", "broad_area": "required", "extra": "unknown_field"}'::jsonb,
+  'a non-prefixed cell name is accepted in local/staging while other field errors remain');
 create temp table cx as select pg_temp.cells(pg_temp.c(1), 'cells.create_cell', null,
   '{"name": "SYNTHETIC 2.6 Cell X", "signup_label": "SYNTHETIC  X  label", "broad_area": "SYNTHETIC North"}') as r;
 create temp table cy as select pg_temp.cells(pg_temp.c(1), 'cells.create_cell', null,
@@ -432,6 +432,14 @@ select is(pg_temp.cells(pg_temp.c(1), 'cells.confirm_request', pg_temp.rev(3),
 select is(pg_temp.cells(pg_temp.c(1), 'cells.confirm_request', pg_temp.rev(3),
   jsonb_build_object('request_id', (pg_temp.req(3)).request_id)) ->> 'code', 'conflict',
   'a decided request cannot be decided again');
+
+create temp table live_label as select pg_temp.cells(pg_temp.c(1), 'cells.create_cell', null,
+  '{"name": "Example Estates Cell", "signup_label": "Example Estates", "broad_area": "Example Kafue"}') as r;
+select is((select r #>> '{data,name}' from live_label), 'Example Estates Cell',
+  'local/staging cell setup accepts a non-prefixed interactive label');
+select is((select c.is_synthetic::text from app.cells_cells c
+            where c.cell_id = (select (r #>> '{data,cell_id}')::uuid from live_label)), 'false',
+  'a non-prefixed interactive cell is not marked as a synthetic fixture');
 
 -- Scope revocation is immediate --------------------------------------------------------------------
 select is(pg_temp.cmd(pg_temp.c(1), 'api.identity_grant_command', 'identity.revoke_scope',

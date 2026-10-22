@@ -168,11 +168,11 @@ select is(pg_temp.cells(pg_temp.c(2), 'cells.set_schedule', pg_temp.cell_rev(pg_
   pg_temp.sched()) ->> 'code', 'forbidden', 'a cell leader cannot set the schedule (Admin with the cell)');
 select is(pg_temp.cells(pg_temp.c(1), 'cells.set_schedule', pg_temp.cell_rev(pg_temp.sh()),
   jsonb_build_object('cell_id', pg_temp.sh(), 'weekday', 8, 'start_time', '25:00', 'end_time', '7pm',
-                     'venue', '12 Real Road', 'map_pin', '{"lat": 120, "lng": 0}'::jsonb, 'extra', 1))
+                     'venue', 'Example Church Hall', 'map_pin', '{"lat": 120, "lng": 0}'::jsonb, 'extra', 1))
   -> 'field_errors',
-  '{"weekday": "out_of_range", "start_time": "invalid", "end_time": "invalid", "venue": "invalid",
+  '{"weekday": "out_of_range", "start_time": "invalid", "end_time": "invalid",
     "map_pin": "invalid", "extra": "unknown_field"}'::jsonb,
-  'every field error at once; while Q4 is unapproved the venue is SYNTHETIC');
+  'a non-prefixed venue is accepted in local/staging while other field errors remain');
 select is(pg_temp.cells(pg_temp.c(1), 'cells.set_schedule', pg_temp.cell_rev(pg_temp.sh()),
   pg_temp.sched(jsonb_build_object('venue', 'SYNTHETIC 12 Shikoswe' || chr(173) || ' Road'))) -> 'field_errors',
   '{"venue": "invalid"}'::jsonb, 'a venue with a hidden format character (soft hyphen) is refused');

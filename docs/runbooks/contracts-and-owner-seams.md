@@ -89,7 +89,7 @@ Lifecycle events (contract v1): `access_hold_applied`, `access_hold_released`, `
 
 Content (module `content`) keeps one publication lifecycle for every content kind and registers instead of editing shared functions: kinds and their editor roles in `app.content_kinds`, commands with `app.content_register_command` (the `content` authorizer, the `api.content_command` dispatch and the replay recheck read that table) and deletion erase parts with `app.content_register_erase_part`. Its public read contract (`api.content_public_events`, `api.content_public_event`) is the only anonymous read besides the 1.1 tracer: definer functions over tables no client role can touch. Guide for later kinds: [content.md](content.md).
 
-Story 6.3 registered the second kind this way: `giving_method` (Admin only), its seven `content.*_giving_method` commands and the `giving_methods` erase part, with its own anonymous reads `api.content_public_giving_methods` and `api.content_public_giving_method` and its own audit table for the giving-only actions; no shared Content function was replaced. It also added the `q3_giving` policy gate (Q3; local/staging fixture: SAMPLE methods only).
+Story 6.3 registered the second kind this way: `giving_method` (Admin only), its eight giving commands (`content.*_giving_method` and `content.discard_giving_draft`) and the `giving_methods` erase part, with its own anonymous reads `api.content_public_giving_methods` and `api.content_public_giving_method` and its own audit table for the giving-only actions; no shared Content function was replaced. It also added the `q3_giving` policy gate (Q3; local/staging fixture: SAMPLE methods only).
 
 ## Cells meeting reference (story 5.8)
 

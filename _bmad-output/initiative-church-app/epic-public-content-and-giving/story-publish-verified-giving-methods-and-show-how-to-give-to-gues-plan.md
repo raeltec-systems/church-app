@@ -3,22 +3,54 @@ title: 'Publish verified giving methods and show How to give to guests'
 type: 'feature'
 ticket: '3'
 created: '2026-10-21'
-status: in-progress
+status: built
 baseline_revision: 'd2ed1540051bda211b0eab50f53acb6e0aca8f1f'
 route: 'full'
 route_source: 'auto'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: ['quick']
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - '{project-root}/docs/runbooks/content.md'
   - '{project-root}/docs/runbooks/client-shells.md'
   - '{project-root}/.agents/skills/design-taste-frontend/references/app-screens.md'
   - '{project-root}/_bmad-output/initiative-church-app/epic-public-content-and-giving/story-publish-an-event-on-staff-web-and-read-it-as-a-guest-on-the-plan.md'
 warnings: ['oversized', 'multiple-goals']
-deferred: []
+deferred:
+  - summary: >-
+      One person can hold two Admin identities and verify their own destination, because Identity
+      lets one Admin approve a member and grant Admin alone.
+    evidence: |-
+      External check finding 2. A Content-side "granted by the saver" rule would block the normal
+      case where the first Admin grants the second. Recorded as a residual risk in content.md and
+      an owner question (a two-person rule for granting Admin, a minimum time as Admin before
+      verifying, or showing "Admin since, granted by" in the Verify dialog).
+    location: >-
+      supabase/migrations/20261022011438_content_giving_methods.sql (app.content_giving_verify);
+      Identity grants (20261006234820_identity_grants.sql)
+    severity: medium
+  - summary: >-
+      A database-owner role could rewrite an unverified revision's savers list in one UPDATE and
+      verify in a second one.
+    evidence: |-
+      External check second pass, informational: the trigger enforces saver-list integrity on
+      published and verified rows and on the verifying UPDATE itself, not on unverified rows.
+      Reachable only by roles that can also disable triggers; no client role holds any privilege.
+    location: >-
+      supabase/migrations/20261022011438_content_giving_methods.sql (app.content_giving_revision_guard)
+    severity: low
+  - summary: >-
+      The Admins' read names only the last saver while every saver is blocked from verifying, so
+      nobody sees that a third Admin or a discard is needed.
+    evidence: |-
+      External check second pass, cosmetic. Adding every saver's name to the staff read is a wire
+      change for the client parser; the staff screen's footer already says a draft both Admins
+      saved needs a third Admin or Discard changes.
+    location: >-
+      app.content_giving_revision_json; packages/client_core/lib/src/presentation/giving_staff_screens.dart
+    severity: low
 ---
 
 <intent-contract>
@@ -77,12 +109,12 @@ deferred: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/20261021235500_content_giving_methods.sql` -- kind, `app.content_giving_methods` (type, sort order), `app.content_giving_revisions` (+ guard trigger, verification columns and checks), `app.content_giving_audit`, field validation, seven commands, gate, public and staff reads, erase part, privileges -- the server half of the wire contract.
-- [ ] `supabase/tests/content_giving_test.sql` (+ ledger updates in `command_foundation_test.sql`, fixture list in `cross_epic_contracts_test.sql`) -- every matrix row, the trigger and check, the gate in a simulated production, column-name scan for payer fields.
-- [ ] `tools/identity-e2e/content-giving.mjs` + `.test.mjs` -- the verify at the API (+44 7700 900510-900518).
-- [ ] client_core: `domain/content_giving.dart`, repository methods, `application/giving_controllers.dart`, `presentation/give_screens.dart` (mobile), `presentation/giving_staff_screens.dart` (staff), routes `ClientPaths.give` (`/give`), `giveMethod(id)` (`/give/methods/:methodId`), `contentGiving` (`/content/giving`), providers, fakes, exports; tests `test/content/content_giving_test.dart`.
-- [ ] `apps/mobile/lib/app.dart` (Give tab), `apps/staff/lib/app.dart` (Giving, Admin only); their tests.
-- [ ] `docs/runbooks/content.md` (Story 6.3 section), `production-promotion-content.md` (migration, `q3_giving` approval step), `contracts-and-owner-seams.md` (registry rows).
+- [x] `supabase/migrations/20261022011438_content_giving_methods.sql` (local `20261021235500` until applied) -- kind, `app.content_giving_methods` (type, sort order), `app.content_giving_revisions` (+ guard trigger, verification columns and checks), `app.content_giving_audit`, field validation, seven commands, gate, public and staff reads, erase part, privileges -- the server half of the wire contract.
+- [x] `supabase/tests/content_giving_test.sql` (+ ledger updates in `command_foundation_test.sql`, fixture list in `cross_epic_contracts_test.sql`) -- every matrix row, the trigger and check, the gate in a simulated production, column-name scan for payer fields.
+- [x] `tools/identity-e2e/content-giving.mjs` + `.test.mjs` -- the verify at the API (+44 7700 900510-900518).
+- [x] client_core: `domain/content_giving.dart`, repository methods, `application/giving_controllers.dart`, `presentation/give_screens.dart` (mobile), `presentation/giving_staff_screens.dart` (staff), routes `ClientPaths.give` (`/give`), `giveMethod(id)` (`/give/methods/:methodId`), `contentGiving` (`/content/giving`), providers, fakes, exports; tests `test/content/content_giving_test.dart`.
+- [x] `apps/mobile/lib/app.dart` (Give tab), `apps/staff/lib/app.dart` (Giving, Admin only); their tests.
+- [x] `docs/runbooks/content.md` (Story 6.3 section), `production-promotion-content.md` (migration, `q3_giving` approval step), `contracts-and-owner-seams.md` (registry rows).
 
 **Acceptance Criteria:**
 - Given the local stack, when the E2E runs, then Admin A drafts SAMPLE mobile-money and bank methods, A's own verification is refused, Admin B verifies, A publishes and reorders them, anon reads every value in order, a changed account number is refused publication until B verifies it again while anon still reads the old number, Media, Pastor and a plain member are refused every giving command, an amount or payer key is rejected, and anon sees no draft, verifier or test note.
@@ -127,10 +159,63 @@ deferred: []
   reason "You saved these details, so a different Admin must verify them." when the draft's
   `saved_by_you` is true. Every refusal code in Design Notes has a plain message. Show who
   saved, verified and published each revision and when (church time).
+- Server built in the main session, clients by the implementation agent (as planned). Plan to code:
+  as designed, plus the review changes below (strict savers rule, no-op refusal, changed-field
+  audit, `content.discard_giving_draft`, `tested_on: before_saved`). Nothing shared was replaced:
+  the kind, eight commands and the erase part are registry rows; the giving-only audit actions are
+  in Content's own `app.content_giving_audit`.
+- Migration `supabase/migrations/20261022011438_content_giving_methods.sql` (staging's version; the
+  local file was `20261021235500` until applied). pgTAP `supabase/tests/content_giving_test.sql`
+  (171, including the gate in a simulated production with `private_access` approved inside a
+  rolled-back block). Ledgers: `command_foundation_test.sql` (anon and authenticated EXECUTE),
+  `cross_epic_contracts_test.sql` (fixture gates: + `q3_giving`), `content_events_test.sql` (its
+  registry and privilege assertions now scoped to events, so each kind pins its own; one added
+  line per list).
+- E2E `tools/identity-e2e/content-giving.mjs` (12/12, `evidence-6.3/content-giving-e2e.jsonl`) and
+  `content-giving.test.mjs` (7), block +44 7700 900510-900516 of the assigned 900510-900518.
+- Clients: `domain/content_giving.dart`, `adapters/supabase_giving_repository.dart` (its own
+  `GivingRepository`, provider and composition override), `application/giving_controllers.dart`,
+  `presentation/give_screens.dart` (mobile `/give`, `/give/methods/:methodId`),
+  `presentation/giving_staff_screens.dart` (`/content/giving`); mobile tabs Home, Give, Calendar;
+  staff **Giving** in the Content group for Admins. Shared-file edits are additive.
+- Staging: applied verbatim through the connector as `20261022011438`; the 37 giving function
+  hashes, the giving tables' constraint and column hashes match the fresh local reset; guards 0
+  (`evidence-6.3/staging-verify.md`).
+- Owner question (new): Identity lets one Admin approve a member and grant Admin alone, so one
+  person could hold two Admin identities and verify their own destination. A two-person rule for
+  granting Admin (an Identity change), a minimum time as Admin before verifying, or showing "Admin
+  since, granted by" in the Verify dialog would close it.
 
 ## Plan Change Log
 
+### 2026-10-22 — External check, first pass (finding 1, high)
+- Trigger: the agent decision in the intent ("the verifier must not be the Admin who last saved the
+  revision ... two Admins never deadlock") let the Admin who changed a destination verify it after
+  any other Admin saved the draft, even with no change. That contradicts the owner decision the
+  intent quotes first ("verified by a different Admin"), which prevails; the intent-contract text
+  is left as written and superseded by this entry.
+- Amended (outside the intent-contract): the verifier must not be any Admin, member or account, who
+  saved the revision (`saved_by_members`, `saved_by_accounts`, also in the trigger); a save that
+  changes nothing is refused (`method_id: unchanged`); each save audits its changed field names;
+  `content.discard_giving_draft` (a method with a live revision) lets two Admins who both saved a
+  draft start afresh, a never-published draft is archived; `tested_on` is not before the day the
+  draft was last saved (`tested_on: before_saved`, finding 3).
+- KEEP: per-revision verification, the check that nothing published is unverified, the published
+  revision's immutability, order outside revisions, the q3 gate and its SAMPLE fixture.
+
 ## Review Triage Log
+
+### 2026-10-22 — Review pass (independent reviewer: the entry's external check, which also covered the quick lens's acceptance criteria, rules and bugs)
+- verdicts: 7 findings — high 1, medium 2, low 4, false 0, maybe-false 0
+- findings:
+  - `[high]` `[patch]` The Admin who changed a destination could verify it after another Admin's save (even a no-op) — every saver of a revision is now barred from verifying (command and trigger), no-op saves are refused, changed fields audited, discard added; pgTAP and E2E G13 cover the exact scenario.
+  - `[medium]` `[defer]` One person can hold two Admin identities (Identity lets one Admin grant Admin) — an Identity rule; a Content check on "granted by" would block the normal first-grants-second case; residual risk in content.md and an owner question.
+  - `[medium]` `[patch]` The tested date could predate the save it vouches for — `tested_on: before_saved`; pgTAP and E2E G11.
+  - `[low]` `[patch]` One direct UPDATE could add a verification together with a content or saver change — the trigger refuses it; two pgTAP cases.
+  - `[low]` `[patch]` Mobile "Copied" could outlive the copied value — keyed by value and publication revision; widget test.
+  - `[low]` `[patch]` The test note invited transaction data — helper text "Don't include phone numbers, amounts or transaction IDs"; examples changed.
+  - `[low]` `[patch]` Promotion runbook, doc wording (hidden method with a draft) and staging evidence missing — written.
+- External check verdict: FAIL on the first pass; PASS on the second (`evidence-6.3/external-check.md`), with two informational notes deferred (owner-role two-statement write; the Admins' read names only the last saver).
 
 ## Design Notes
 
@@ -141,6 +226,34 @@ Wire contract (SQL, Dart and the E2E share it):
 - `api.content_public_giving_methods()` -> `{sample, methods: [P], truncated}` (at most 50, order); `api.content_public_giving_method(method_id)` -> `{sample, method: P|null}`. P = `{method_id, method_type, name, purpose, currency, details: [{key, value}], ussd_code, steps, note, contact, verified_on, publication_revision, published_at}`; `details` in order: mobile money `beneficiary`, then `merchant_id|till_number|phone_number`; bank `bank_name, beneficiary, account_number, branch, branch_code, swift_code, reference` (present ones); other `[]`.
 - `api.content_staff_giving_methods()` -> `{capacity, methods: [S], truncated}`; S = `{method_id, method_type, position, revision, state, created_at, created_by, updated_at, published_at, published_by, withdrawn_at, archived_at, live: R|null, draft: R|null}` (non-archived by position, then archived; `position` null when archived); R = every F key of the type plus `{revision_no, saved_at, saved_by, saved_by_you, published_at, published_by, verification: {verified_at, verified_by, verified_by_you, tested_on, test_method}|null}`.
 - Staff states shown: Draft, needs verifying / Verified, ready to publish / Live / Live, changes need verifying / Live, changes ready to publish / Hidden / Archived.
+
+## Auto Run Result
+
+- **Summary:** Admin-only, instruction-only giving methods (mobile money, bank, other) on the 6.1
+  publication lifecycle through its registries; per-revision church verification by an Admin who
+  saved none of the revision (owner decision 2026-10-21), held in the commands, a check and a
+  trigger; discard draft; the `q3_giving` gate (closed in production, SAMPLE-only fixture); order
+  outside revisions; anonymous reads of the live giver-facing fields and the verified date only;
+  the Admins' read; the giving erase part. No amount, payer or transaction field anywhere. Mobile
+  Give tab (How to give, copyable values, steps, beneficiary check, verified date, contact, sample
+  banner); staff web Giving for Admins.
+- **Files:** migration `20261022011438_content_giving_methods.sql`; pgTAP `content_giving_test.sql`
+  and three ledger updates; E2E `content-giving.mjs` + `.test.mjs`; client_core domain, adapter,
+  controllers, `give_screens.dart`, `giving_staff_screens.dart`, routes, providers, composition,
+  fakes, exports, tests; `apps/mobile/lib/app.dart` (Give tab), `apps/staff/lib/app.dart`
+  (Giving); runbooks `content.md`, `production-promotion-content.md`,
+  `contracts-and-owner-seams.md`; evidence `evidence-6.3/`.
+- **Review:** 7 findings: 6 patched (1 high, 1 medium, 4 low), 1 deferred (medium, Identity-level,
+  owner question), none rejected; 2 informational notes deferred from the second pass.
+- **Follow-up review recommended:** true — a high was patched on the first pass (the second pass
+  of the same reviewer closed it).
+- **Verification:** full pgTAP PASS (59 files, 4661) on a fresh reset; E2E 12/12; Flutter
+  design_system 14, client_core 807, mobile 63, staff 51, analyze clean; check-migrations and
+  scan-secrets pass; staging `20261022011438` with function, constraint and column hashes identical
+  to the local reset and guards 0.
+- **Residual risks:** the owner's two-Admin walkthrough on staging with a signed-out phone is not
+  done (`content.md`, Story 6.3, "Owner manual check"); real methods and the `q3_giving` approval
+  are Q3; the two-Admin-identities risk above.
 
 ## Verification
 

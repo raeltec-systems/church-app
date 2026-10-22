@@ -123,6 +123,8 @@ class PublicBanner {
     required this.publicationRevision,
     required this.rightsRevision,
     required this.publishedAt,
+    required this.offlineAllowed,
+    this.offlineImageBytes,
   });
 
   /// Maps the wire object; throws [FormatException] on any other shape.
@@ -141,6 +143,7 @@ class PublicBanner {
       publicationRevision: wireRevision(m, 'publication_revision'),
       rightsRevision: wireRevision(m, 'rights_revision'),
       publishedAt: wireInstant(m, 'published_at'),
+      offlineAllowed: wireReq<bool>(m, 'offline_allowed'),
     );
   }
 
@@ -163,20 +166,47 @@ class PublicBanner {
   final int publicationRevision;
   final int rightsRevision;
   final DateTime publishedAt;
+
+  /// Whether the current rights record clears offline storage for this image.
+  final bool offlineAllowed;
+
+  /// Local image bytes supplied only by the mobile cache adapter.
+  /// It is never read from or written to the server projection.
+  final Uint8List? offlineImageBytes;
+
+  PublicBanner withOfflineImageBytes(Uint8List bytes) => PublicBanner(
+    bannerId: bannerId,
+    kind: kind,
+    themeYear: themeYear,
+    title: title,
+    subtitle: subtitle,
+    altText: altText,
+    eventId: eventId,
+    image: image,
+    publicationRevision: publicationRevision,
+    rightsRevision: rightsRevision,
+    publishedAt: publishedAt,
+    offlineAllowed: offlineAllowed,
+    offlineImageBytes: bytes,
+  );
 }
 
 /// `api.content_public_banners`: the theme first, then campaigns.
 class PublicBanners {
-  const PublicBanners(this.banners);
+  const PublicBanners(this.banners, {this.truncated = false});
 
   factory PublicBanners.fromJson(Object? json) {
     final m = wireMap(json, 'public banners');
     return PublicBanners(
       List.unmodifiable(wireReq<List>(m, 'banners').map(PublicBanner.fromJson)),
+      truncated: wireReq<bool>(m, 'truncated'),
     );
   }
 
   final List<PublicBanner> banners;
+
+  /// More public banners exist than the bounded carousel returns.
+  final bool truncated;
 
   /// The banner with [bannerId], or null when it is not public.
   PublicBanner? byId(String bannerId) {
@@ -964,6 +994,10 @@ abstract interface class BannerRepository {
   /// [contentPublicBucket].
   Uri publicFileUrl(String path);
 
+  /// Fetches the public bytes for an image whose current server projection
+  /// explicitly allows offline storage. Null on any request or type failure.
+  Future<Uint8List?> fetchPublicImage(PublicBanner banner);
+
   /// Uploads [file] for the content item [itemId] (a saved banner) as
   /// [purpose]; the server measures and checks it.
   Future<ImageUploadOutcome> uploadImage(
@@ -996,6 +1030,9 @@ class UnconfiguredBannerRepository implements BannerRepository {
 
   @override
   Uri publicFileUrl(String path) => Uri(path: path);
+
+  @override
+  Future<Uint8List?> fetchPublicImage(PublicBanner banner) async => null;
 
   @override
   Future<ImageUploadOutcome> uploadImage(

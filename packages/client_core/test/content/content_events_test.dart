@@ -105,6 +105,7 @@ void main() {
       final e = events.events.single;
       expect(events.truncated, isTrue);
       expect(e.title, 'SYNTHETIC Harvest Thanksgiving');
+      expect(e.offlineAllowed, isTrue);
       expect(e.multiDay, isTrue);
       expect(e.publicationRevision, 1);
       expect(
@@ -143,6 +144,13 @@ void main() {
         publicEventsData([
           {...publicEventData(), 'publication_revision': 0},
         ]),
+        publicEventsData([
+          {...publicEventData(), 'offline_allowed': 'yes'},
+        ]),
+        publicEventsData([
+          Map<String, Object?>.from(publicEventData())
+            ..remove('offline_allowed'),
+        ]),
       ]) {
         expect(
           () => PublicEvents.fromJson(bad),
@@ -150,6 +158,11 @@ void main() {
           reason: '$bad',
         );
       }
+      expect(
+        PublicEvent.fromJson(publicEventData(offlineAllowed: false))
+            .offlineAllowed,
+        isFalse,
+      );
       expect(PublicEventRead.fromJson({'event': null}).event, isNull);
       expect(() => PublicEventRead.fromJson({}), throwsFormatException);
     });
@@ -328,19 +341,38 @@ void main() {
         tester,
         ClientPaths.calendar,
         account: null,
-        setUp: (h) => h.content.publicEvents = twoEvents(),
+        setUp: (h) {
+          h.content.publicEvents = twoEvents();
+          h.publicContentCache.available = true;
+        },
       );
       expect(byKey('event-row-$_harvest'), findsOneWidget);
       h.content.publicEvents = const AccessReadFailed(unreachable: true);
       await tapKey(tester, 'calendar-reload');
       expect(byKey('calendar-stale'), findsOneWidget);
-      expect(find.textContaining('as it was at'), findsOneWidget);
+      expect(find.textContaining('Offline · saved at'), findsOneWidget);
+      expect(find.textContaining('Showing the saved calendar'), findsOneWidget);
       expect(byKey('event-row-$_harvest'), findsOneWidget);
       expect(byKey('calendar-failed'), findsNothing);
       // The next good answer clears the notice.
       h.content.publicEvents = twoEvents();
       await tapKey(tester, 'calendar-reload');
       expect(byKey('calendar-stale'), findsNothing);
+    });
+
+    testWidgets('first failed read has no offline empty snapshot', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.calendar,
+        account: null,
+        setUp: (h) =>
+            h.content.publicEvents = const AccessReadFailed(unreachable: true),
+      );
+      expect(h.publicContentCache.reads, [PublicContentCacheKeys.calendar]);
+      expect(byKey('calendar-failed'), findsOneWidget);
+      expect(byKey('calendar-empty'), findsNothing);
     });
 
     testWidgets('a one-day row is spoken with its date', (tester) async {

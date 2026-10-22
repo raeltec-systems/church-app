@@ -41,8 +41,8 @@ const UNCLEARED = `SYNTHETIC Licensed photo banner ${TAG}`;
 const FN = '/functions/v1/content-assets';
 
 /** The public banner projection's keys, exactly. */
-export const PUBLIC_KEYS = ['alt_text', 'banner_id', 'banner_kind', 'event_id', 'image', 'publication_revision',
-  'published_at', 'rights_revision', 'subtitle', 'theme_year', 'title'];
+export const PUBLIC_KEYS = ['alt_text', 'banner_id', 'banner_kind', 'event_id', 'image', 'offline_allowed',
+  'publication_revision', 'published_at', 'rights_revision', 'subtitle', 'theme_year', 'title'];
 
 /** The reserved fictional numbers this run uses (+44 7700 900501-900509). */
 export function isFictionalBannerPhone(phone) {
@@ -273,7 +273,7 @@ async function main() {
       clears_display: display, clears_offline: offline, clears_audio: audio,
       evidence: 'SYNTHETIC: made for this test run; no real rights are claimed.' });
     const ownDraft = await content(media.token, 'content.create_rights_record', null,
-      rightsBody(`SYNTHETIC Church artwork ${TAG}`, 'church-art', 'church_owned'));
+      rightsBody(`SYNTHETIC Church artwork ${TAG}`, 'church-art', 'church_owned', { offline: true }));
     ids.own = ownDraft.data?.rights_id;
     const own = await content(media.token, 'content.verify_rights_record', ownDraft.revision, { rights_id: ids.own });
     const thirdDraft = await content(media.token, 'content.create_rights_record', null,
@@ -409,6 +409,7 @@ async function main() {
       && synced.status === 200 && synced.json?.placed >= 2 && synced.json?.waiting === 0
       && JSON.stringify(order) === JSON.stringify(['theme', 'campaign'])
       && JSON.stringify(Object.keys(theme ?? {}).sort()) === JSON.stringify(PUBLIC_KEYS)
+      && theme?.offline_allowed === true && campaign?.offline_allowed === true
       && theme?.title === THEME && theme?.theme_year === 2026 && theme?.alt_text === themeFields.alt_text
       && campaign?.event_id === ids.event && theme?.image?.path === `banner/${ids.theme}/r${theme?.publication_revision}/image.png`
       && themeFile?.status === 200 && sha256(themeFile.bytes) === sha256(themePng)

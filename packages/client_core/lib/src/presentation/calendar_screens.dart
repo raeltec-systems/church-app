@@ -103,8 +103,17 @@ Widget? staleNotice<T>(
   final at = s.asOf;
   if (failed == null || at == null) return null;
   final clock =
-      '${at.hour.toString().padLeft(2, '0')}:'
-      '${at.minute.toString().padLeft(2, '0')}';
+      '${at.toLocal().hour.toString().padLeft(2, '0')}:'
+      '${at.toLocal().minute.toString().padLeft(2, '0')}';
+  if (s.offlineSnapshot) {
+    return RequestStateBanner(
+      key: Key(key),
+      tone: StatusTone.warning,
+      icon: Icons.cloud_off_outlined,
+      title: 'Offline · saved at $clock',
+      message: 'Showing the saved $what. It may have changed since.',
+    );
+  }
   return RequestStateBanner(
     key: Key(key),
     tone: StatusTone.warning,
@@ -115,6 +124,33 @@ Widget? staleNotice<T>(
               'changed since.'
         : 'The server answered in an unexpected way. This is the $what as it '
               'was at $clock.',
+  );
+}
+
+/// The last successful local save, or the explicit offline state when a
+/// public list is being shown from that snapshot.
+Widget? publicSavedStatus<T>(
+  BuildContext context,
+  PublicReadState<T> state, {
+  required String what,
+  required String key,
+}) {
+  if (state.offlineSnapshot) return staleNotice(state, what: what, key: key);
+  final at = state.savedAt;
+  if (at == null) return null;
+  final local = at.toLocal();
+  final clock =
+      '${local.hour.toString().padLeft(2, '0')}:'
+      '${local.minute.toString().padLeft(2, '0')}';
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Text(
+      'Saved for offline at $clock',
+      key: Key('$key-saved'),
+      style: ChurchType.secondary.copyWith(
+        color: ChurchColors.of(context).muted,
+      ),
+    ),
   );
 }
 
@@ -281,7 +317,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           ),
         );
       case AccessReadOk(:final value):
-        if (staleNotice(s, what: 'calendar', key: 'calendar-stale')
+        if (publicSavedStatus(
+              context,
+              s,
+              what: 'calendar',
+              key: 'calendar-stale',
+            )
             case final n?) {
           children.addAll([n, const SizedBox(height: 16)]);
         }
@@ -511,12 +552,19 @@ class ComingUpSection extends ConsumerWidget {
         style: ChurchType.body.copyWith(color: c.ink),
       ),
     };
+    final savedStatus = publicSavedStatus(
+      context,
+      s,
+      what: 'calendar',
+      key: 'coming-up-stale',
+    );
     return Column(
       key: const Key('coming-up'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SectionHeader(title: 'Coming up'),
         const SizedBox(height: 8),
+        ?savedStatus,
         body,
         const SizedBox(height: 4),
         Align(

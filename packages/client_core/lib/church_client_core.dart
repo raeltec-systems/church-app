@@ -36,6 +36,7 @@ export 'src/domain/commands.dart';
 export 'src/domain/content_announcements.dart';
 export 'src/domain/content_banners.dart';
 export 'src/domain/content_events.dart';
+export 'src/domain/public_content_cache.dart';
 export 'src/domain/content_giving.dart';
 export 'src/domain/church_time.dart';
 export 'src/domain/credential_review.dart';

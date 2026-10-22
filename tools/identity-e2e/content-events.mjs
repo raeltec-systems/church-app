@@ -33,8 +33,8 @@ const EDITED = 'SYNTHETIC Harvest Thanksgiving and meal (6.1 E2E)';
 const OTHER = 'SYNTHETIC Youth evening (6.1 E2E)';
 
 /** The public projection's keys, exactly. */
-export const PUBLIC_KEYS = ['description', 'ends_at', 'event_id', 'location', 'publication_revision',
-  'published_at', 'starts_at', 'title'];
+export const PUBLIC_KEYS = ['description', 'ends_at', 'event_id', 'location', 'offline_allowed',
+  'publication_revision', 'published_at', 'starts_at', 'title'];
 
 /** The reserved fictional numbers this run uses (+44 7700 900100-900109). */
 export function isFictionalContentPhone(phone) {

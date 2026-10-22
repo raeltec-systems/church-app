@@ -8,6 +8,7 @@ import '../domain/access_grants.dart';
 import '../domain/commands.dart';
 import '../domain/content_banners.dart';
 import '../domain/content_events.dart' show ContentCommands;
+import '../domain/public_content_cache.dart';
 import 'access_controllers.dart' show noteProtectedDenial;
 import 'content_controllers.dart'
     show ContentAction, PublicReadController, PublicReadState;
@@ -24,6 +25,30 @@ class PublicBannersController extends PublicReadController<PublicBanners> {
   @override
   Future<AccessRead<PublicBanners>> fetch() =>
       ref.read(bannerRepositoryProvider).fetchPublicBanners();
+
+  @override
+  bool get supportsOfflineSnapshot => true;
+
+  @override
+  Future<DateTime?> saveOfflineSnapshot(PublicBanners value) async {
+    final eligible = PublicBanners(
+      value.banners.where((banner) => banner.offlineAllowed).toList(),
+      truncated: value.truncated,
+    );
+    final repository = ref.read(bannerRepositoryProvider);
+    final outcome = await ref
+        .read(publicContentCacheProvider)
+        .writeRead(
+          PublicContentCacheKeys.homeBanners,
+          eligible,
+          loadBannerImage: repository.fetchPublicImage,
+        );
+    return outcome is PublicContentCacheSaved ? outcome.savedAt : null;
+  }
+
+  @override
+  Future<PublicContentSnapshot<PublicBanners>?> readOfflineSnapshot() =>
+      ref.read(publicContentCacheProvider).readBanners();
 }
 
 final publicBannersProvider =

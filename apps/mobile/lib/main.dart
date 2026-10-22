@@ -4,7 +4,10 @@ import 'package:church_client_core/church_client_core.dart'
     show
         contactLauncherProvider,
         dutyCalendarExportProvider,
+        publicContentCacheProvider,
+        publicContentReconnectsProvider,
         pushMessagingProvider;
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:church_client_core/composition.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +17,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'calendar/share_calendar_export.dart';
 import 'contact/url_contact_launcher.dart';
+import 'offline/public_content_cache_adapter.dart';
 import 'push/firebase_push_config.dart';
 import 'push/firebase_push_messaging.dart';
 
@@ -43,6 +47,29 @@ Future<void> main() async {
         ),
         // Story 4.9: Call and Message open the phone's dialler or messages.
         contactLauncherProvider.overrideWithValue(const UrlContactLauncher()),
+        publicContentCacheProvider.overrideWithValue(
+          PublicContentCacheAdapter(),
+        ),
+        publicContentReconnectsProvider.overrideWith((ref) {
+          final connectivity = Connectivity();
+          return Stream<void>.multi((controller) {
+            bool? wasOnline;
+            void update(List<ConnectivityResult> results) {
+              final online = results.any(
+                (result) => result != ConnectivityResult.none,
+              );
+              if (wasOnline == false && online) controller.add(null);
+              wasOnline = online;
+            }
+
+            connectivity.checkConnectivity().then(update).catchError((_) {});
+            final subscription = connectivity.onConnectivityChanged.listen(
+              update,
+            );
+            ref.onDispose(subscription.cancel);
+            controller.onCancel = subscription.cancel;
+          });
+        }),
       ],
       // The launch screen carries into the app and fades into the first
       // screen.

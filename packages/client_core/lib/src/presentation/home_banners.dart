@@ -10,7 +10,7 @@ import '../application/providers.dart' show bannerRepositoryProvider;
 import '../domain/access_grants.dart';
 import '../domain/content_banners.dart';
 import 'calendar_screens.dart'
-    show CalendarPaths, publicReadProblem, staleNotice;
+    show CalendarPaths, publicReadProblem, publicSavedStatus;
 
 // Story 6.2 (mobile, everyone): Home opens with the church's banners, the
 // yearly theme first and then campaigns, in a 16:9 snap carousel (handoff:
@@ -117,14 +117,34 @@ class _HomeBannersCarouselState extends ConsumerState<HomeBannersCarousel> {
           ),
         );
       case AccessReadOk(:final value) when value.banners.isEmpty:
-        return const SizedBox.shrink();
+        final status = publicSavedStatus(
+          context,
+          s,
+          what: 'banners',
+          key: 'home-banners-stale',
+        );
+        return status == null ? const SizedBox.shrink() : gap(status);
       case AccessReadOk(:final value):
         // The theme first, then campaigns, in the server's order.
         final banners = [
           ...value.banners.where((b) => b.kind == BannerKind.theme),
           ...value.banners.where((b) => b.kind == BannerKind.campaign),
         ];
-        return gap(_Carousel(banners: banners));
+        final status = publicSavedStatus(
+          context,
+          s,
+          what: 'banners',
+          key: 'home-banners-stale',
+        );
+        return gap(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ?status,
+              _Carousel(banners: banners),
+            ],
+          ),
+        );
       case AccessReadFailed():
         return gap(
           Row(
@@ -376,12 +396,9 @@ class _CampaignCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
     final b = banner;
-    return ColoredBox(
-      color: c.surface2,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.network(
+    final bytes = b.offlineImageBytes;
+    final image = bytes == null
+        ? Image.network(
             url.toString(),
             key: Key('home-banner-image-${b.bannerId}'),
             fit: BoxFit.cover,
@@ -397,7 +414,30 @@ class _CampaignCard extends StatelessWidget {
                 ),
               ),
             ),
-          ),
+          )
+        : Image.memory(
+            bytes,
+            key: Key('home-banner-image-${b.bannerId}'),
+            fit: BoxFit.cover,
+            excludeFromSemantics: true,
+            errorBuilder: (context, _, _) => Padding(
+              key: Key('home-banner-unavailable-${b.bannerId}'),
+              padding: const EdgeInsets.all(14),
+              child: Align(
+                alignment: AlignmentDirectional.topStart,
+                child: Text(
+                  'Image unavailable',
+                  style: ChurchType.secondary.copyWith(color: c.muted),
+                ),
+              ),
+            ),
+          );
+    return ColoredBox(
+      color: c.surface2,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          image,
           Positioned(
             left: 0,
             right: 0,
@@ -471,7 +511,8 @@ class BannerScreen extends ConsumerWidget {
           ),
         );
       case AccessReadOk(:final value):
-        if (staleNotice(s, what: 'banner', key: 'banner-stale') case final n?) {
+        if (publicSavedStatus(context, s, what: 'banner', key: 'banner-stale')
+            case final n?) {
           children.addAll([n, const SizedBox(height: 16)]);
         }
         final b = value.byId(bannerId);
@@ -497,6 +538,34 @@ class BannerScreen extends ConsumerWidget {
           final url = ref
               .read(bannerRepositoryProvider)
               .publicFileUrl(b.image.path);
+          final offlineBytes = b.offlineImageBytes;
+          final image = offlineBytes == null
+              ? Image.network(
+                  url.toString(),
+                  key: const Key('banner-image'),
+                  fit: BoxFit.contain,
+                  semanticLabel: b.altText,
+                  errorBuilder: (context, _, _) => Center(
+                    key: const Key('banner-image-unavailable'),
+                    child: Text(
+                      'Image unavailable',
+                      style: ChurchType.secondary.copyWith(color: c.muted),
+                    ),
+                  ),
+                )
+              : Image.memory(
+                  offlineBytes,
+                  key: const Key('banner-image'),
+                  fit: BoxFit.contain,
+                  semanticLabel: b.altText,
+                  errorBuilder: (context, _, _) => Center(
+                    key: const Key('banner-image-unavailable'),
+                    child: Text(
+                      'Image unavailable',
+                      style: ChurchType.secondary.copyWith(color: c.muted),
+                    ),
+                  ),
+                );
           children.addAll([
             ClipRRect(
               borderRadius: BorderRadius.circular(14),
@@ -507,19 +576,7 @@ class BannerScreen extends ConsumerWidget {
                   child: InteractiveViewer(
                     key: const Key('banner-viewer'),
                     maxScale: 4,
-                    child: Image.network(
-                      url.toString(),
-                      key: const Key('banner-image'),
-                      fit: BoxFit.contain,
-                      semanticLabel: b.altText,
-                      errorBuilder: (context, _, _) => Center(
-                        key: const Key('banner-image-unavailable'),
-                        child: Text(
-                          'Image unavailable',
-                          style: ChurchType.secondary.copyWith(color: c.muted),
-                        ),
-                      ),
-                    ),
+                    child: image,
                   ),
                 ),
               ),

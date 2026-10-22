@@ -17,6 +17,7 @@ import 'src/domain/cell_meetings.dart';
 import 'src/domain/cell_programmes.dart';
 import 'src/domain/cell_membership.dart';
 import 'src/domain/commands.dart';
+import 'src/domain/content_announcements.dart';
 import 'src/domain/content_events.dart';
 import 'src/domain/credential_review.dart';
 import 'src/domain/duties.dart';
@@ -665,6 +666,132 @@ Map<String, Object?> staffEventsData(
   String capacity = 'media',
   bool truncated = false,
 }) => {'capacity': capacity, 'events': events, 'truncated': truncated};
+
+/// [AnnouncementsRepository] answered by the test (story 6.13). Each field
+/// answers every read at once; the lists record what was asked.
+class FakeAnnouncements implements AnnouncementsRepository {
+  AccessRead<PublicAnnouncements> publicAnnouncements = AccessReadOk(
+    PublicAnnouncements.fromJson(publicAnnouncementsData(const [])),
+  );
+
+  /// The detail answer by id; an id not listed answers `{announcement: null}`.
+  final Map<String, AccessRead<PublicAnnouncementRead>> publicAnnouncement = {};
+  AccessRead<StaffAnnouncements> staffAnnouncements = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  int publicAnnouncementsCalls = 0;
+  int staffAnnouncementsCalls = 0;
+  final publicAnnouncementAsked = <String>[];
+
+  @override
+  Future<AccessRead<PublicAnnouncements>> fetchPublicAnnouncements() async {
+    publicAnnouncementsCalls++;
+    return publicAnnouncements;
+  }
+
+  @override
+  Future<AccessRead<PublicAnnouncementRead>> fetchPublicAnnouncement(
+    String announcementId,
+  ) async {
+    publicAnnouncementAsked.add(announcementId);
+    return publicAnnouncement[announcementId] ??
+        const AccessReadOk(PublicAnnouncementRead(null));
+  }
+
+  @override
+  Future<AccessRead<StaffAnnouncements>> fetchStaffAnnouncements() async {
+    staffAnnouncementsCalls++;
+    return staffAnnouncements;
+  }
+}
+
+/// The wire form of one published announcement as everyone reads it (story
+/// 6.13); by default the pinned SYNTHETIC harvest offering notice.
+Map<String, Object?> publicAnnouncementData({
+  String announcementId = '73737373-7373-4373-8373-737373737373',
+  String title = 'SYNTHETIC Harvest offering on Sunday',
+  String body = 'SYNTHETIC Bring your harvest offering to the 09:00 service.',
+  bool pinned = true,
+  int publicationRevision = 1,
+  String publishedAt = '2099-09-01T08:00:00.000000Z',
+}) => {
+  'announcement_id': announcementId,
+  'title': title,
+  'body': body,
+  'pinned': pinned,
+  'publication_revision': publicationRevision,
+  'published_at': publishedAt,
+};
+
+/// The wire form of `api.content_public_announcements` holding [items].
+Map<String, Object?> publicAnnouncementsData(
+  List<Map<String, Object?>> items, {
+  bool truncated = false,
+}) => {'announcements': items, 'truncated': truncated};
+
+/// The wire form of one announcement revision as editors read it.
+Map<String, Object?> staffAnnouncementRevisionData({
+  int revisionNo = 1,
+  String title = 'SYNTHETIC Harvest offering on Sunday',
+  String body = 'SYNTHETIC Bring your harvest offering to the 09:00 service.',
+  bool pinned = true,
+  String savedAt = '2099-09-01T07:00:00.000000Z',
+  String savedBy = 'SYNTHETIC Media Phiri',
+  String? notifiedAt,
+  String? notifiedBy,
+  int? notifiedCount,
+}) => {
+  'revision_no': revisionNo,
+  'title': title,
+  'body': body,
+  'pinned': pinned,
+  'saved_at': savedAt,
+  'saved_by': savedBy,
+  'notified_at': notifiedAt,
+  'notified_by': notifiedBy,
+  'notified_count': notifiedCount,
+};
+
+/// The wire form of one announcement as editors read it ([live] and [draft]
+/// are revision objects or null).
+Map<String, Object?> staffAnnouncementData({
+  String announcementId = '73737373-7373-4373-8373-737373737373',
+  int revision = 1,
+  String state = 'draft',
+  Map<String, Object?>? live,
+  Map<String, Object?>? draft,
+  String? publishedBy,
+  String? publishedAt,
+  String? withdrawnAt,
+  String? archivedAt,
+}) => {
+  'announcement_id': announcementId,
+  'revision': revision,
+  'state': state,
+  'created_at': '2099-09-01T07:00:00.000000Z',
+  'created_by': 'SYNTHETIC Media Phiri',
+  'updated_at': '2099-09-01T07:00:00.000000Z',
+  'published_at': publishedAt,
+  'published_by': publishedBy,
+  'withdrawn_at': withdrawnAt,
+  'archived_at': archivedAt,
+  'live': live,
+  'draft': draft,
+};
+
+/// The wire form of `api.content_staff_announcements`.
+Map<String, Object?> staffAnnouncementsData(
+  List<Map<String, Object?>> items, {
+  String capacity = 'media',
+  int audienceMembers = 12,
+  int audienceLimit = 1000,
+  bool truncated = false,
+}) => {
+  'capacity': capacity,
+  'audience': {'members': audienceMembers, 'limit': audienceLimit},
+  'announcements': items,
+  'truncated': truncated,
+};
 
 /// [FollowUpsRepository] answered by the test (story 4.6). Each field
 /// answers every read at once; the counters record how often each was asked.
@@ -1934,6 +2061,7 @@ class ClientTestHarness {
   final review = FakeReview();
   final cells = FakeCells();
   final content = FakeContent();
+  final announcements = FakeAnnouncements();
   final duties = FakeDuties();
   final coverage = FakeDutyCoverage();
   final outcomes = FakeDutyOutcomes();
@@ -1974,6 +2102,7 @@ class ClientTestHarness {
       reviewRepositoryProvider.overrideWithValue(review),
       cellsRepositoryProvider.overrideWithValue(cells),
       contentRepositoryProvider.overrideWithValue(content),
+      announcementsRepositoryProvider.overrideWithValue(announcements),
       dutiesRepositoryProvider.overrideWithValue(duties),
       dutyCoverageRepositoryProvider.overrideWithValue(coverage),
       dutyOutcomesRepositoryProvider.overrideWithValue(outcomes),

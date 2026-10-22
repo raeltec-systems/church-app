@@ -215,6 +215,15 @@ const staffEventsDestination = (
   icon: Icons.event_outlined,
 );
 
+/// Story 6.13: shown while the caller holds Media, Pastor or Admin: draft,
+/// publish (optionally notifying members), withdraw and archive church
+/// announcements.
+const staffAnnouncementsDestination = (
+  path: ClientPaths.contentAnnouncements,
+  label: 'Announcements',
+  icon: Icons.campaign_outlined,
+);
+
 /// One group of the sidebar; [label] is null for the ungrouped top entry.
 typedef StaffNavGroup = ({String? label, List<StaffDestination> items});
 
@@ -267,7 +276,10 @@ List<StaffNavGroup> staffNavGroupsFor(
     // Story 6.1: public church content (Media, Pastor, Admin).
     (
       label: 'Content',
-      items: [if (editsContent(grants)) staffEventsDestination],
+      items: [
+        if (editsContent(grants)) staffEventsDestination,
+        if (editsContent(grants)) staffAnnouncementsDestination,
+      ],
     ),
     (
       label: 'Me',

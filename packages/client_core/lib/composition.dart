@@ -92,6 +92,9 @@ Future<List<Override>> compositionOverrides(
     contentRepositoryProvider.overrideWithValue(
       SupabaseContentRepository(client),
     ),
+    announcementsRepositoryProvider.overrideWithValue(
+      SupabaseAnnouncementsRepository(client),
+    ),
     dutiesRepositoryProvider.overrideWithValue(
       SupabaseDutiesRepository(client),
     ),

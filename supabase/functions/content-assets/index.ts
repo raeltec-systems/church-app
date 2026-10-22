@@ -13,8 +13,9 @@
 //
 // Actions:
 //   POST ?action=upload&item_id=<uuid>&purpose=<purpose>   body: the raw file
-//     measure (type from the bytes, dimensions from the header, size, sha256) -> refuse anything
-//     that is not PNG, JPEG or WebP or whose declared type contradicts the bytes (415) ->
+//     measure and sanitise (type from the bytes, dimensions from the header, a structurally complete
+//     image, metadata and trailing data dropped; size and sha256 of what is kept) -> refuse anything
+//     that is not a complete PNG, JPEG or WebP or whose declared type contradicts the bytes (415) ->
 //     content.begin_asset_upload (the purpose's limits; 413/422 on refusal) -> store in
 //     content-drafts (never public) -> content.complete_asset_upload (the database reads the stored
 //     object's size and type)  => 200 {outcome: uploaded, asset_id, media_type, byte_size, width, height}
@@ -44,7 +45,7 @@ import {
   planFrom,
   refusal,
   sha256Hex,
-  sniffImage,
+  sanitizeImage,
 } from './logic.mjs';
 
 const SUPABASE_URL = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/+$/, '');
@@ -162,10 +163,14 @@ async function upload(req: Request, auth: string, itemId: string, purpose: strin
   const bytes = await readCapped(req);
   if (bytes === null) return tooBig;
   if (bytes.length === 0) return reply(400, { outcome: 'invalid', reason: 'empty_body' });
-  const measured = sniffImage(bytes);
+  // Measured and sanitised from the bytes: a complete PNG, JPEG or WebP, its metadata (Exif with
+  // GPS, XMP, text, comments) and anything after its end dropped. Only these bytes are stored.
+  const measured = await sanitizeImage(bytes);
   if ('error' in measured) {
-    return reply(415, { outcome: 'refused', code: 'validation_failed', field_errors: { file: measured.error } });
+    return reply(measured.error === 'too_large' ? 413 : 415,
+      { outcome: 'refused', code: 'validation_failed', field_errors: { file: measured.error } });
   }
+  const kept: Uint8Array = measured.bytes;
   if (declaredTypeMismatch(req.headers.get('content-type'), measured.type)) {
     return reply(415, { outcome: 'refused', code: 'validation_failed', field_errors: { file: 'type_mismatch' } });
   }
@@ -173,10 +178,10 @@ async function upload(req: Request, auth: string, itemId: string, purpose: strin
     item_id: itemId,
     purpose,
     media_type: measured.type,
-    byte_size: bytes.length,
+    byte_size: kept.length,
     width: measured.width,
     height: measured.height,
-    sha256: await sha256Hex(bytes),
+    sha256: await sha256Hex(kept),
   });
   if (begun.refused) return begun.refused;
   const assetId = begun.data!.asset_id as string;
@@ -185,7 +190,7 @@ async function upload(req: Request, auth: string, itemId: string, purpose: strin
   const stored = await timed(`${SUPABASE_URL}/storage/v1/object/${DRAFT_BUCKET}/${draftPath}`, {
     method: 'POST',
     headers: storageHeaders({ 'content-type': measured.type, 'x-upsert': 'false', 'cache-control': 'no-store' }),
-    body: bytes,
+    body: kept,
   }, FILE_TIMEOUT_MS);
   if (stored) await stored.body?.cancel();
   if (!stored || !stored.ok) return reply(503, { outcome: 'unavailable' });
@@ -195,7 +200,7 @@ async function upload(req: Request, auth: string, itemId: string, purpose: strin
     outcome: 'uploaded',
     asset_id: assetId,
     media_type: measured.type,
-    byte_size: bytes.length,
+    byte_size: kept.length,
     width: measured.width,
     height: measured.height,
   });

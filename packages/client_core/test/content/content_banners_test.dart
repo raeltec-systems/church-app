@@ -410,6 +410,36 @@ void main() {
       expect(size.height, closeTo(310 * 9 / 16, 0.01));
     });
 
+    testWidgets('a withdrawn banner leaves Home when the app comes back', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.home,
+        account: null,
+        setUp: (h) => h.banners.publicBanners = twoBanners(),
+      );
+      expect(byKey('home-banner-$_campaign'), findsOneWidget);
+      // Withdrawn on staff web meanwhile: the public read no longer has it.
+      h.banners.publicBanners = AccessReadOk(
+        PublicBanners.fromJson(publicBannersData([publicBannerData()])),
+      );
+      for (final s in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(s);
+      }
+      await tester.pumpAndSettle();
+      expect(h.banners.publicCalls, 2);
+      expect(byKey('home-banner-$_campaign'), findsNothing);
+      expect(byKey('home-banner-$_theme'), findsOneWidget);
+    });
+
     testWidgets('cards are spoken with their text alternatives', (
       tester,
     ) async {

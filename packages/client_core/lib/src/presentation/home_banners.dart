@@ -53,12 +53,44 @@ String _sentence(String s) {
 
 /// Home's banner carousel: nothing while there are no banners (or this
 /// build cannot read them), one grey card while loading, one line with
-/// Retry when the read failed.
-class HomeBannersCarousel extends ConsumerWidget {
+/// Retry when the read failed. Like the Calendar, it asks the server again
+/// when the app comes back to the foreground and when Home is shown again,
+/// so a withdrawn banner leaves the phone on the next look.
+class HomeBannersCarousel extends ConsumerStatefulWidget {
   const HomeBannersCarousel({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeBannersCarousel> createState() =>
+      _HomeBannersCarouselState();
+}
+
+class _HomeBannersCarouselState extends ConsumerState<HomeBannersCarousel> {
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _reload);
+    // Showing Home again asks the server again.
+    if (ref.read(publicBannersProvider).result != null) {
+      Future.microtask(_reload);
+    }
+  }
+
+  void _reload() {
+    if (mounted && !ref.read(publicBannersProvider).loading) {
+      ref.read(publicBannersProvider.notifier).reload();
+    }
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
     final s = ref.watch(publicBannersProvider);
     Widget gap(Widget child) =>

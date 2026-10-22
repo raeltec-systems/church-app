@@ -7,7 +7,7 @@
 -- storage.objects (rolled back). Every account, phone and name is SYNTHETIC (fictional range
 -- +1 202 555 0161-0166).
 begin;
-select plan(144);
+select plan(148);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000082' || lpad(n::text, 2, '0'))::uuid $$;
@@ -137,7 +137,8 @@ values (pg_temp.mid(2), 'pastor', 'israel'), (pg_temp.mid(3), 'media', 'israel')
 -- Structure, registries, privileges and buckets ---------------------------------------------------
 select has_table('app', t, format('app.%s exists', t))
   from unnest(array['content_rights_revisions', 'content_banner_revisions', 'content_media_types',
-                    'content_asset_purposes', 'content_assets', 'content_revision_files']) t;
+                    'content_asset_purposes', 'content_assets', 'content_revision_files',
+                    'content_public_conditions']) t;
 select results_eq(
   $$select (n.nspname || '.' || p.proname)::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname in ('app', 'api') and p.proname like 'content\_%' and p.proname not like '%event%'
@@ -174,6 +175,11 @@ select results_eq($$select part || ':' || handler from app.content_erase_parts w
   $$values ('asset_uploads:app.content_asset_erase_part(jsonb)'::text),
            ('banner_revisions:app.content_banner_erase_part(jsonb)'),
            ('rights_revisions:app.content_rights_erase_part(jsonb)')$$, 'three erase parts are registered');
+select results_eq($$select kind || ':' || handler from app.content_public_conditions order by 1$$,
+  $$values ('banner:app.content_banner_public_condition(jsonb)'::text)$$,
+  'banners register their public condition (a linked event must be public)');
+select throws_ok($$select app.content_register_public_condition('event', 'app.content_erase_member(jsonb)'::regprocedure)$$,
+  'PCTR1', null, 'a public condition must answer a boolean');
 select results_eq(
   $$select gate, decision_ref, state, fixture_value ? 'fixture_label' from app.policy_gates where gate = 'q5_content_rights'$$,
   $$values ('q5_content_rights'::text, 'Q5'::text, 'unresolved'::text, true)$$,
@@ -437,6 +443,9 @@ select is(pg_temp.err(pg_temp.cmd(3, 'content.withdraw_event', pg_temp.rev(pg_te
   jsonb_build_object('event_id', pg_temp.ev()))), 'ok', 'the event is withdrawn');
 select is((select count(*)::int from jsonb_array_elements(pg_temp.read(null, 'select api.content_public_banners()') -> 'banners') x
             where x ->> 'banner_kind' = 'campaign'), 0, 'its campaign leaves Home with it');
+select ok((select r -> 'remove' from (select pg_temp.read(3, 'select api.content_file_plan()') as r) s)
+            @> jsonb_build_array(pg_temp.path(pg_temp.b2(), 1)),
+  'and its public file goes in the removal plan (the event is not public)');
 select is((select x ->> 'public_image' from jsonb_array_elements(pg_temp.read(3, 'select api.content_staff_banners()') -> 'banners') x
             where x ->> 'banner_id' = pg_temp.b2()::text), 'event_not_public', 'editors see why');
 select is(pg_temp.err(pg_temp.cmd(3, 'content.publish_event', pg_temp.rev(pg_temp.ev()),

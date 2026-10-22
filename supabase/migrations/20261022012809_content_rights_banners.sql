@@ -33,6 +33,9 @@
 --     <kind>/<item_id>/r<revision_no>/<slot>.<ext>. The Edge function's sync places the missing
 --     ones (api.content_file_plan) and removes every public object outside the set; a public
 --     projection names a file only once its object is present in `content-public`.
+--   * Per-kind public conditions (app.content_public_conditions): a published item's files stay
+--     public only while its kind's condition holds; banners register theirs (a campaign linked to
+--     an event only while that event is public).
 --   * Home banners: kind `banner` (Admin, Pastor, Media), the yearly theme or a campaign,
 --     optionally linked to an event; content.create_banner, save_banner, publish_banner,
 --     withdraw_banner, archive_banner; the anonymous api.content_public_banners() and the
@@ -218,15 +221,28 @@ create index content_revision_files_rights on app.content_revision_files (rights
 comment on table app.content_revision_files is
   'owner: content. Files attached to content revisions (story 6.2); the open draft only changes.';
 
+-- A kind's extra condition for its published items to be public (and so for their files to stay
+-- in the public bucket): a Content app function (p_input jsonb {item_id}) returns boolean. A kind
+-- with no row has none. Banners: a campaign linked to an event only while that event is public.
+create table app.content_public_conditions (
+  kind text primary key references app.content_kinds (kind),
+  handler text not null unique,
+  registered_at timestamptz not null default now()
+);
+
+comment on table app.content_public_conditions is
+  'owner: content. Per-kind conditions for a published item (and its files) to be public (story 6.2).';
+
 alter table app.content_rights_revisions enable row level security;
 alter table app.content_banner_revisions enable row level security;
 alter table app.content_media_types enable row level security;
 alter table app.content_asset_purposes enable row level security;
 alter table app.content_assets enable row level security;
 alter table app.content_revision_files enable row level security;
+alter table app.content_public_conditions enable row level security;
 revoke all on table app.content_rights_revisions, app.content_banner_revisions,
                     app.content_media_types, app.content_asset_purposes, app.content_assets,
-                    app.content_revision_files
+                    app.content_revision_files, app.content_public_conditions
   from public, anon, authenticated, service_role;
 
 -- A verified (published) rights revision never changes its content; attribution may be anonymised.
@@ -444,8 +460,50 @@ comment on function app.content_rights_clear(uuid, text) is
   'live revision, source listed in the effective q5_content_rights value), else the reason code.';
 
 -- ---------------------------------------------------------------------------------------------
--- Helpers: public paths and Storage presence
+-- Helpers: per-kind public conditions, public paths and Storage presence
 -- ---------------------------------------------------------------------------------------------
+
+-- Registers a kind's public condition (migration-time only).
+create function app.content_register_public_condition(p_kind text, p_handler regprocedure)
+returns void
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if not exists (select 1 from app.content_kinds k where k.kind = p_kind) then
+    perform app.contract_registration_fail('unknown content kind: ' || coalesce(p_kind, '<null>'));
+  end if;
+  insert into app.content_public_conditions (kind, handler)
+  values (p_kind, app.contract_validate_handler('content', p_handler, 'boolean'::regtype));
+end;
+$$;
+
+-- Whether a published item of p_kind meets its kind's public condition now (true when the kind
+-- registered none). Fail closed: a registered handler that is missing or answers null is false.
+create function app.content_item_public(p_kind text, p_item_id uuid)
+returns boolean
+language plpgsql
+stable
+set search_path = ''
+as $$
+declare
+  v_handler text;
+  v_proc regprocedure;
+  v_ok boolean;
+begin
+  select c.handler into v_handler from app.content_public_conditions c where c.kind = p_kind;
+  if v_handler is null then
+    return true;
+  end if;
+  v_proc := pg_catalog.to_regprocedure(v_handler);
+  if v_proc is null then
+    return false;
+  end if;
+  execute format('select %s($1)', v_proc::regproc) into v_ok
+    using jsonb_build_object('item_id', p_item_id);
+  return coalesce(v_ok, false);
+end;
+$$;
 
 -- The revision-keyed public path of a file slot.
 create function app.content_public_path(p_kind text, p_item_id uuid, p_revision_no integer,
@@ -471,7 +529,8 @@ as $$
 $$;
 
 -- Every file that should be public now: the files of each published item's live revision whose
--- asset is ready and whose rights clear the purpose's use.
+-- asset is ready, whose rights clear the purpose's use and whose item meets its kind's public
+-- condition (app.content_public_conditions).
 create function app.content_public_files_desired()
 returns table (item_id uuid, slot text, public_path text, draft_path text, media_type text)
 language sql
@@ -487,7 +546,8 @@ as $$
     join app.content_asset_purposes p on p.purpose = f.purpose
     join app.content_media_types t on t.media_type = a.media_type
    where i.lifecycle_state = 'published'
-     and app.content_rights_clear(f.rights_id, p.rights_use) is null;
+     and app.content_rights_clear(f.rights_id, p.rights_use) is null
+     and app.content_item_public(i.kind, i.item_id);
 $$;
 
 -- One item's file in a slot when it should be public now (the same rule as the desired set, for
@@ -507,7 +567,8 @@ as $$
     join app.content_asset_purposes p on p.purpose = f.purpose
     join app.content_media_types t on t.media_type = a.media_type
    where i.item_id = p_item_id and i.lifecycle_state = 'published'
-     and app.content_rights_clear(f.rights_id, p.rights_use) is null;
+     and app.content_rights_clear(f.rights_id, p.rights_use) is null
+     and app.content_item_public(i.kind, i.item_id);
 $$;
 
 -- A published item's live file in a slot as public projections show it, only once its object is
@@ -1342,6 +1403,25 @@ select app.content_register_command('content.withdraw_banner', 'banner',
 select app.content_register_command('content.archive_banner', 'banner',
   'app.content_banner_archive(uuid, bigint, jsonb)'::regprocedure, false);
 
+-- The banner kind's public condition: a campaign linked to an event is public (and keeps its
+-- file in the public bucket) only while that event is publicly readable (published, not ended).
+create function app.content_banner_public_condition(p_input jsonb)
+returns boolean
+language sql
+stable
+set search_path = ''
+as $$
+  select coalesce((
+    select r.event_id is null or app.content_public_event_json(r.event_id) is not null
+      from app.content_items i
+      join app.content_banner_revisions r
+        on r.item_id = i.item_id and r.revision_no = i.live_revision_no
+     where i.item_id = (p_input ->> 'item_id')::uuid), false);
+$$;
+
+select app.content_register_public_condition('banner',
+  'app.content_banner_public_condition(jsonb)'::regprocedure);
+
 -- ---------------------------------------------------------------------------------------------
 -- The public read (anonymous): published banners whose image is in the public bucket
 -- ---------------------------------------------------------------------------------------------
@@ -1375,7 +1455,7 @@ as $$
    cross join lateral (select app.content_public_file(i.item_id, 'image') as image) x
    where i.item_id = p_item_id and i.kind = 'banner' and i.lifecycle_state = 'published'
      and x.image is not null
-     and (r.event_id is null or app.content_public_event_json(r.event_id) is not null);
+     and app.content_banner_public_condition(jsonb_build_object('item_id', i.item_id));
 $$;
 
 -- The Home carousel: the yearly theme first (latest year first), then campaigns (latest
@@ -1594,9 +1674,9 @@ set search_path = ''
 as $$
   select case
     when i.lifecycle_state <> 'published' then null
-    when not exists (select 1 from app.content_live_file(i.item_id, 'image')) then 'blocked'
-    when r.event_id is not null and app.content_public_event_json(r.event_id) is null
+    when not app.content_banner_public_condition(jsonb_build_object('item_id', i.item_id))
       then 'event_not_public'
+    when not exists (select 1 from app.content_live_file(i.item_id, 'image')) then 'blocked'
     when app.content_public_file(i.item_id, 'image') is null then 'waiting'
     else 'shown'
   end
@@ -1865,6 +1945,9 @@ revoke all on function
   app.content_payload_optional_uuid(jsonb, text),
   app.content_payload_int(jsonb, text),
   app.content_payload_bool(jsonb, text),
+  app.content_register_public_condition(text, regprocedure),
+  app.content_item_public(text, uuid),
+  app.content_banner_public_condition(jsonb),
   app.content_q5_uses(text),
   app.content_rights_clear(uuid, text),
   app.content_public_path(text, uuid, integer, text, text),

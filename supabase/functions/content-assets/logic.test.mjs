@@ -14,27 +14,10 @@ import {
   sha256Hex,
   sniffImage,
 } from './logic.mjs';
+import { jpegHeader, pngHeader } from './test-fixtures.mjs';
 
 const ID = '00000000-0000-4000-8000-000000062001';
 const BASE = 'http://127.0.0.1:54321/functions/v1/content-assets';
-
-/** A minimal PNG header (signature + IHDR) of the given size. */
-export function pngHeader(width, height) {
-  const b = new Uint8Array(33);
-  b.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52]);
-  new DataView(b.buffer).setUint32(16, width);
-  new DataView(b.buffer).setUint32(20, height);
-  b.set([8, 2, 0, 0, 0], 24);
-  return b;
-}
-
-/** A minimal baseline JPEG header (SOI, an APP0 segment, SOF0) of the given size. */
-export function jpegHeader(width, height) {
-  const app0 = [0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0];
-  const sof = [0xff, 0xc0, 0, 17, 8, height >> 8, height & 0xff, width >> 8, width & 0xff, 3,
-    1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1];
-  return new Uint8Array([0xff, 0xd8, ...app0, ...sof, 0xff, 0xd9]);
-}
 
 function riff(chunk, payload) {
   const b = new Uint8Array(20 + payload.length);

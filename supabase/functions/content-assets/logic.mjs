@@ -151,6 +151,237 @@ export function sniffImage(bytes) {
   return { error: 'unsupported_type' };
 }
 
+// ---------------------------------------------------------------------------------------------
+// Sanitising: the bytes kept are a structurally complete image with no metadata and nothing after
+// its end. A header alone, a truncated file, a bad checksum or an unknown critical part is
+// invalid_image; text, Exif (GPS position, camera serial), XMP and comments are dropped; anything
+// appended after the image's end (a polyglot's HTML) is dropped. Pixels are never re-encoded.
+// ---------------------------------------------------------------------------------------------
+
+/** The largest image area accepted at all (every purpose caps at 6000 x 6000). */
+export const MAX_PIXELS = 36_000_000;
+
+const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+
+/** CRC-32 as PNG chunks use it. */
+export function crc32(bytes) {
+  let c = 0xffffffff;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function concat(parts) {
+  const total = parts.reduce((n, p) => n + p.length, 0);
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const p of parts) {
+    out.set(p, at);
+    at += p.length;
+  }
+  return out;
+}
+
+/** The inflated length of a zlib stream, or -1 when it is corrupt or longer than `limit`. */
+export async function inflatedLength(data, limit) {
+  try {
+    const stream = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate'));
+    const reader = stream.getReader();
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return total;
+      total += value.byteLength;
+      if (total > limit) {
+        await reader.cancel();
+        return -1;
+      }
+    }
+  } catch {
+    return -1;
+  }
+}
+
+const PNG_CHANNELS = { 0: 1, 2: 3, 3: 1, 4: 2, 6: 4 };
+const PNG_DEPTHS = { 0: [1, 2, 4, 8, 16], 2: [8, 16], 3: [1, 2, 4, 8], 4: [8, 16], 6: [8, 16] };
+// Ancillary chunks kept (colour and size meaning); text, Exif and time chunks are dropped.
+const PNG_KEEP = new Set(['IHDR', 'PLTE', 'IDAT', 'IEND', 'tRNS', 'gAMA', 'cHRM', 'sRGB', 'iCCP', 'sBIT', 'pHYs', 'bKGD']);
+const ADAM7 = [[0, 0, 8, 8], [4, 0, 8, 8], [0, 4, 4, 8], [2, 0, 4, 4], [0, 2, 2, 4], [1, 0, 2, 2], [0, 1, 1, 2]];
+
+/** The exact filtered pixel data length of a PNG (Adam7 passes when interlaced). */
+export function pngDataLength(width, height, bitsPerPixel, interlaced) {
+  const rows = (w, h) => (w === 0 || h === 0 ? 0 : h * (1 + Math.ceil((w * bitsPerPixel) / 8)));
+  if (!interlaced) return rows(width, height);
+  return ADAM7.reduce((n, [x0, y0, dx, dy]) => n
+    + rows(Math.max(0, Math.ceil((width - x0) / dx)), Math.max(0, Math.ceil((height - y0) / dy))), 0);
+}
+
+async function sanitizePng(b) {
+  const head = png(b);
+  if (head.error) return head;
+  if (head.width * head.height > MAX_PIXELS) return { error: 'too_large' };
+  const kept = [b.subarray(0, 8)];
+  const idat = [];
+  let i = 8;
+  let idatDone = false;
+  let ended = false;
+  let ihdr = null;
+  while (i + 12 <= b.length) {
+    const len = u32be(b, i);
+    const type = ascii(b, i + 4, 4);
+    const end = i + 12 + len;
+    if (!/^[A-Za-z]{4}$/.test(type) || len > 0x7fffffff || end > b.length) return { error: 'invalid_image' };
+    if (crc32(b.subarray(i + 4, i + 8 + len)) !== u32be(b, i + 8 + len)) return { error: 'invalid_image' };
+    if (ihdr === null && type !== 'IHDR') return { error: 'invalid_image' };
+    if (type === 'IHDR') {
+      if (ihdr !== null) return { error: 'invalid_image' };
+      ihdr = b.subarray(i + 8, i + 8 + len);
+    } else if (type === 'IDAT') {
+      // The image data chunks are consecutive: an IDAT after another chunk is refused.
+      if (idatDone) return { error: 'invalid_image' };
+      idat.push(b.subarray(i + 8, i + 8 + len));
+    }
+    if (type !== 'IDAT' && idat.length > 0) idatDone = true;
+    // An unknown critical chunk (upper-case first letter) cannot be dropped safely.
+    if (type.charCodeAt(0) < 97 && !PNG_KEEP.has(type)) return { error: 'invalid_image' };
+    if (PNG_KEEP.has(type)) kept.push(b.subarray(i, end));
+    i = end;
+    if (type === 'IEND') {
+      ended = true;
+      break;
+    }
+  }
+  if (!ended || idat.length === 0 || ihdr === null) return { error: 'invalid_image' };
+  const [depth, colour, compression, filter, interlace] = [ihdr[8], ihdr[9], ihdr[10], ihdr[11], ihdr[12]];
+  if (!(colour in PNG_CHANNELS) || !PNG_DEPTHS[colour].includes(depth) || compression !== 0 || filter !== 0
+      || interlace > 1) return { error: 'invalid_image' };
+  const expected = pngDataLength(head.width, head.height, PNG_CHANNELS[colour] * depth, interlace === 1);
+  if (await inflatedLength(concat(idat), expected) !== expected) return { error: 'invalid_image' };
+  return { type: 'image/png', width: head.width, height: head.height, bytes: concat(kept) };
+}
+
+// JPEG segments kept before the image data: tables, frame and restart headers, JFIF (APP0), the
+// Adobe colour marker (APP14) and an ICC profile (APP2 ICC_PROFILE). Every other APPn (Exif, XMP,
+// IPTC, maker notes) and comments are dropped.
+function keepJpegSegment(marker, payload) {
+  if (marker === 0xe0 || marker === 0xee) return true;
+  if (marker === 0xe2) return ascii(payload, 0, 12) === `ICC_PROFILE${String.fromCharCode(0)}`;
+  if (marker >= 0xe1 && marker <= 0xef) return false;
+  if (marker === 0xfe) return false;
+  return true;
+}
+
+function sanitizeJpeg(b) {
+  const head = jpeg(b);
+  if (head.error) return head;
+  if (head.width * head.height > MAX_PIXELS) return { error: 'too_large' };
+  const out = [b.subarray(0, 2)];
+  let i = 2;
+  let frame = false;
+  let scans = 0;
+  for (;;) {
+    if (i + 1 >= b.length || b[i] !== 0xff) return { error: 'invalid_image' };
+    while (b[i + 1] === 0xff && i + 2 < b.length) i++;
+    const marker = b[i + 1];
+    if (marker === 0xd9) {
+      if (!frame || scans === 0) return { error: 'invalid_image' };
+      out.push(new Uint8Array([0xff, 0xd9])); // anything after the end of image is dropped
+      break;
+    }
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd8) || marker === 0x00) return { error: 'invalid_image' };
+    if (i + 4 > b.length) return { error: 'invalid_image' };
+    const length = u16be(b, i + 2);
+    const end = i + 2 + length;
+    if (length < 2 || end > b.length) return { error: 'invalid_image' };
+    if (SOF.has(marker)) frame = true;
+    if (marker === 0xda) {
+      if (!frame) return { error: 'invalid_image' };
+      // The scan header, then its entropy-coded data up to the next marker (not a stuffed zero or
+      // a restart marker).
+      let j = end;
+      while (j + 1 < b.length && !(b[j] === 0xff && b[j + 1] !== 0x00 && !(b[j + 1] >= 0xd0 && b[j + 1] <= 0xd7)
+               && b[j + 1] !== 0xff)) j++;
+      if (j + 1 >= b.length || j === end) return { error: 'invalid_image' };
+      out.push(b.subarray(i, j));
+      scans++;
+      i = j;
+      continue;
+    }
+    if (keepJpegSegment(marker, b.subarray(i + 4, end))) out.push(b.subarray(i, end));
+    i = end;
+  }
+  return { type: 'image/jpeg', width: head.width, height: head.height, bytes: concat(out) };
+}
+
+function riffChunk(fourcc, payload) {
+  const head = new Uint8Array(8);
+  head.set([...fourcc].map((c) => c.charCodeAt(0)), 0);
+  new DataView(head.buffer).setUint32(4, payload.length, true);
+  return concat([head, payload, payload.length % 2 ? new Uint8Array(1) : new Uint8Array()]);
+}
+
+function sanitizeWebp(b) {
+  const head = webp(b);
+  if (head.error) return head;
+  if (head.width * head.height > MAX_PIXELS) return { error: 'too_large' };
+  const riffEnd = 8 + (b[4] | (b[5] << 8) | (b[6] << 16) | ((b[7] << 24) >>> 0));
+  if (riffEnd > b.length || riffEnd < 20) return { error: 'invalid_image' };
+  const chunks = [];
+  let i = 12;
+  while (i + 8 <= riffEnd) {
+    const fourcc = ascii(b, i, 4);
+    const size = b[i + 4] | (b[i + 5] << 8) | (b[i + 6] << 16) | ((b[i + 7] << 24) >>> 0);
+    const end = i + 8 + size;
+    if (end > riffEnd) return { error: 'invalid_image' };
+    chunks.push({ fourcc, payload: b.subarray(i + 8, end) });
+    i = end + (size % 2);
+  }
+  const images = chunks.filter((c) => c.fourcc === 'VP8 ' || c.fourcc === 'VP8L');
+  if (images.length !== 1) return { error: 'invalid_image' };
+  const image = images[0];
+  if ((image.fourcc === 'VP8 ' && image.payload.length < 11) || (image.fourcc === 'VP8L' && image.payload.length < 6)) {
+    return { error: 'invalid_image' };
+  }
+  if (chunks.some((c) => c.fourcc === 'ANIM' || c.fourcc === 'ANMF')) return { error: 'unsupported_type' };
+  let kept;
+  if (chunks[0].fourcc === 'VP8X') {
+    const flags = chunks[0].payload[0];
+    if (flags & 0x02) return { error: 'unsupported_type' }; // animation
+    const vp8x = new Uint8Array(chunks[0].payload);
+    vp8x[0] = flags & ~(0x08 | 0x04); // no Exif, no XMP
+    if (!chunks.some((c) => c.fourcc === 'ICCP')) vp8x[0] &= ~0x20;
+    kept = [riffChunk('VP8X', vp8x),
+      ...chunks.filter((c) => ['ICCP', 'ALPH', 'VP8 ', 'VP8L'].includes(c.fourcc)).map((c) => riffChunk(c.fourcc, c.payload))];
+  } else if (chunks[0] === image) {
+    kept = [riffChunk(image.fourcc, image.payload)];
+  } else {
+    return { error: 'invalid_image' };
+  }
+  const body = concat(kept);
+  const out = new Uint8Array(12 + body.length);
+  out.set([...'RIFF'].map((c) => c.charCodeAt(0)), 0);
+  new DataView(out.buffer).setUint32(4, 4 + body.length, true);
+  out.set([...'WEBP'].map((c) => c.charCodeAt(0)), 8);
+  out.set(body, 12);
+  return { type: 'image/webp', width: head.width, height: head.height, bytes: out };
+}
+
+/**
+ * The image to keep: {type, width, height, bytes} with the bytes sanitised (see above), or {error}:
+ * unsupported_type, invalid_image or too_large (an area over MAX_PIXELS).
+ */
+export async function sanitizeImage(bytes) {
+  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes ?? []);
+  const measured = sniffImage(b);
+  if (measured.error) return measured;
+  if (measured.type === 'image/png') return sanitizePng(b);
+  if (measured.type === 'image/jpeg') return sanitizeJpeg(b);
+  return sanitizeWebp(b);
+}
+
 /**
  * Whether the declared Content-Type contradicts the measured type. No declaration (or a generic
  * application/octet-stream) claims nothing; `image/jpg` is read as `image/jpeg`.

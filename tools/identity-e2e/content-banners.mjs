@@ -6,8 +6,9 @@
 // ticket's verify at the API and Storage level:
 //   * a Media member uploads a `SYNTHETIC Theme 2026` image and a campaign image through the Edge
 //     Function; an oversized file (over the purpose's 5 MiB and over the 10 MiB body cap), a
-//     disguised file (text named and declared as a PNG; a PNG declared as JPEG) and an undersized
-//     image are refused with nothing stored;
+//     disguised file (text named and declared as a PNG; a PNG declared as JPEG), a PNG header with
+//     no image data and an undersized image are refused with nothing stored; HTML appended after a
+//     real image is dropped before anything is stored;
 //   * a plain member, a Pending account and a signed-out caller cannot upload, sync or preview;
 //   * a theme cited with a third-party rights record whose source is missing from the Q5 fixture
 //     cannot be published; with the SYNTHETIC church record both banners publish, and after the
@@ -25,7 +26,7 @@
 //
 // Usage: node tools/identity-e2e/content-banners.mjs [--evidence <file.jsonl>]
 import { spawn, execFileSync } from 'node:child_process';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
 
 import { amrMethods, localHttp, localKey, password, psql, runMain, sleep, startRun } from './harness.mjs';
@@ -83,6 +84,18 @@ export function solidPng(width, height, [r, g, b], padTo = 0) {
   const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
     chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
   return padTo > png.length ? Buffer.concat([png, Buffer.alloc(padTo - png.length)]) : png;
+}
+
+/** A valid RGB PNG of random pixels (incompressible: about 3 bytes per pixel). */
+export function noisePng(width, height) {
+  const raw = randomBytes((1 + width * 3) * height);
+  for (let y = 0; y < height; y++) raw[y * (1 + width * 3)] = 0;
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr.set([8, 2, 0, 0, 0], 8);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw, { level: 1 })), chunk('IEND', Buffer.alloc(0))]);
 }
 
 export const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
@@ -296,38 +309,44 @@ async function main() {
     // ------------------------------------------------------------------ uploads and refusals
     const themePng = solidPng(1920, 1080, [20, 36, 107]);
     const campaignPng = solidPng(1600, 900, [232, 120, 40]);
+    // A polyglot: the real campaign image with HTML appended. Only the image is kept.
+    const campaignPolyglot = Buffer.concat([campaignPng, Buffer.from('<html><script>alert(1)</script></html>')]);
     const otherPng = solidPng(1280, 720, [90, 90, 90]);
     const draftsBefore = objectCount('content-drafts');
     const assetsBefore = Number(psql(`select count(*) from app.content_assets`));
     const themeUp = await upload(media.token, ids.theme, themePng, 'image/png');
-    const campaignUp = await upload(media.token, ids.campaign, campaignPng, 'image/png');
+    const campaignUp = await upload(media.token, ids.campaign, campaignPolyglot, 'image/png');
     const otherUp = await upload(media.token, ids.uncleared, otherPng, 'image/png');
     check('C12-media-uploads-two-images', themeUp.status === 200 && themeUp.json?.outcome === 'uploaded'
       && themeUp.json?.width === 1920 && themeUp.json?.height === 1080 && themeUp.json?.media_type === 'image/png'
-      && campaignUp.status === 200 && otherUp.status === 200 && objectCount('content-drafts') === draftsBefore + 3,
+      && campaignUp.status === 200 && campaignUp.json?.byte_size === campaignPng.length
+      && otherUp.status === 200 && objectCount('content-drafts') === draftsBefore + 3,
       { theme: themeUp.status, campaign: campaignUp.status, measured: `${themeUp.json?.width}x${themeUp.json?.height}`,
         draft_objects_added: objectCount('content-drafts') - draftsBefore });
 
     const counts = () => `${objectCount('content-drafts')}|${Number(psql(`select count(*) from app.content_assets where state = 'ready'`))}`;
     const before = counts();
-    const overPurpose = await upload(media.token, ids.theme, solidPng(1920, 1080, [1, 2, 3], 6 * 1024 * 1024), 'image/png');
+    const overPurpose = await upload(media.token, ids.theme, noisePng(1920, 1080), 'image/png');
     const overCap = await upload(media.token, ids.theme, solidPng(1920, 1080, [1, 2, 3], 11 * 1024 * 1024), 'image/png');
     const disguised = await upload(media.token, ids.theme,
       Buffer.from('<html><body><script>alert(1)</script> SYNTHETIC not an image</body></html>'), 'image/png');
     const mismatched = await upload(media.token, ids.theme, themePng, 'image/jpeg');
     const small = await upload(media.token, ids.theme, solidPng(800, 450, [1, 2, 3]), 'image/png');
+    const headerOnly = await upload(media.token, ids.theme, themePng.subarray(0, 33), 'image/png');
     check('C13-oversized-and-disguised-files-refused-nothing-stored',
       overPurpose.status === 413 && overPurpose.json?.field_errors?.byte_size === 'too_large'
       && overCap.status === 413 && overCap.json?.field_errors?.file === 'too_large'
       && disguised.status === 415 && disguised.json?.field_errors?.file === 'unsupported_type'
       && mismatched.status === 415 && mismatched.json?.field_errors?.file === 'type_mismatch'
       && small.status === 422 && small.json?.field_errors?.width === 'too_small'
+      && headerOnly.status === 415 && headerOnly.json?.field_errors?.file === 'invalid_image'
       && counts() === before,
       { over_purpose: `${overPurpose.status}:${overPurpose.json?.field_errors?.byte_size}`,
         over_cap: `${overCap.status}:${overCap.json?.field_errors?.file}`,
         disguised: `${disguised.status}:${disguised.json?.field_errors?.file}`,
         mismatched: `${mismatched.status}:${mismatched.json?.field_errors?.file}`,
-        undersized: `${small.status}:${small.json?.field_errors?.width}`, nothing_stored: counts() === before });
+        undersized: `${small.status}:${small.json?.field_errors?.width}`,
+        header_only: `${headerOnly.status}:${headerOnly.json?.field_errors?.file}`, nothing_stored: counts() === before });
 
     const memberUp = await upload(member.token, ids.theme, themePng, 'image/png');
     const pendingUp = await upload(pending.token, ids.theme, themePng, 'image/png');
@@ -373,10 +392,12 @@ async function main() {
       && theme?.title === THEME && theme?.theme_year === 2026 && theme?.alt_text === themeFields.alt_text
       && campaign?.event_id === ids.event && theme?.image?.path === `banner/${ids.theme}/r${theme?.publication_revision}/image.png`
       && themeFile?.status === 200 && sha256(themeFile.bytes) === sha256(themePng)
-      && campaignFile?.status === 200 && sha256(campaignFile.bytes) === sha256(campaignPng),
+      && campaignFile?.status === 200 && sha256(campaignFile.bytes) === sha256(campaignPng)
+      && !campaignFile.bytes.includes(Buffer.from('<script>')),
       { before_sync_listed: Boolean(findBanner(beforeSync, ids.theme)), member_sync: memberSync.status, anon_sync: anonSync.status,
         sync: synced.json?.outcome, placed: synced.json?.placed, order, theme_file: themeFile?.status, campaign_file: campaignFile?.status,
-        bytes_match: themeFile ? sha256(themeFile.bytes) === sha256(themePng) : false });
+        bytes_match: themeFile ? sha256(themeFile.bytes) === sha256(themePng) : false,
+        appended_html_dropped: campaignFile ? !campaignFile.bytes.includes(Buffer.from('<script>')) : false });
     const texts = [await publicRead(undefined), await publicRead(pending.token), await publicRead(member.token)].map((x) => JSON.stringify(x));
     const leaks = [media.member, media.user, media.name, 'saved_by', 'published_by', 'draft', 'asset_id', ids.own, ids.third,
       'content-drafts'].filter((v) => texts.some((t) => t.includes(v)));
@@ -416,8 +437,24 @@ async function main() {
         listing_refused: `${lists.filter((l) => l.ok).length}/${lists.length}`, member_preview: memberPreview.status,
         anon_preview: anonPreview.status, editor_preview: mediaPreview.status });
 
-    // ------------------------------------------------------------------ withdrawal and suspended rights
+    // ------------------------------------------------------------------ a campaign follows its event
     const campaignPath = campaign?.image?.path;
+    const eventOff = await content(media.token, 'content.withdraw_event', eventLive.revision, { event_id: ids.event });
+    const afterEventOff = await publicRead(undefined);
+    const syncedEventOff = await sync(media.token);
+    const eventOffFile = await fetchPublic(campaignPath);
+    const eventBack = await content(media.token, 'content.publish_event', eventOff.revision, { event_id: ids.event });
+    const syncedEventBack = await sync(media.token);
+    const eventBackFile = await fetchPublic(campaignPath);
+    check('C33-a-campaign-file-leaves-the-public-bucket-with-its-event', eventOff.status === 200
+      && !findBanner(afterEventOff, ids.campaign) && findBanner(afterEventOff, ids.theme)
+      && syncedEventOff.json?.removed >= 1 && eventOffFile.status >= 400
+      && eventBack.status === 200 && syncedEventBack.json?.placed >= 1 && eventBackFile.status === 200,
+      { event_withdrawn: eventOff.data?.state, campaign_listed: Boolean(findBanner(afterEventOff, ids.campaign)),
+        removed: syncedEventOff.json?.removed, file_while_event_off: eventOffFile.status,
+        file_after_event_back: eventBackFile.status });
+
+    // ------------------------------------------------------------------ withdrawal and suspended rights
     const withdrawn = await content(media.token, 'content.withdraw_banner', campaignLive.revision, { banner_id: ids.campaign });
     const afterWithdraw = await publicRead(undefined);
     const syncedWithdraw = await sync(media.token);

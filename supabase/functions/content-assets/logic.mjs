@@ -6,7 +6,13 @@
 // are recognised from their signatures and their dimensions read from their headers; anything else
 // (SVG, HTML, a renamed text file) is refused before anything is stored.
 
-import { UUID_RE, declaredTooLarge as sharedDeclaredTooLarge, keyHeaders } from '../_shared/system_access.mjs';
+import {
+  SYSTEM_CREDENTIAL_RE,
+  UUID_RE,
+  declaredTooLarge as sharedDeclaredTooLarge,
+  keyHeaders,
+  systemEnvelope,
+} from '../_shared/system_access.mjs';
 
 /** The largest body read at all; each purpose's own limit is checked by the database. */
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
@@ -19,6 +25,8 @@ export const DRAFT_PATH_RE = /^[0-9a-f-]{36}\.[a-z0-9]{2,5}$/;
 export const PUBLIC_PATH_RE = /^[a-z][a-z0-9_]{0,30}\/[0-9a-f-]{36}\/r[0-9]{1,9}\/[a-z][a-z0-9_]{0,30}\.[a-z0-9]{2,5}$/;
 export const OBJECT_KEY_RE = /^[A-Za-z0-9._][A-Za-z0-9._/-]{0,511}$/;
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+export const RETENTION_BATCH_LIMIT = 25;
+export const RETENTION_TRIGGER_RE = /^nwt_[0-9a-f]{64}$/;
 
 export { UUID_RE, keyHeaders };
 export const declaredTooLarge = (header) => sharedDeclaredTooLarge(header, MAX_UPLOAD_BYTES);
@@ -27,7 +35,7 @@ export const declaredTooLarge = (header) => sharedDeclaredTooLarge(header, MAX_U
 export const CORS_HEADERS = {
   'access-control-allow-origin': '*',
   'access-control-allow-methods': 'POST, GET, OPTIONS',
-  'access-control-allow-headers': 'authorization, apikey, content-type, x-client-info',
+  'access-control-allow-headers': 'authorization, apikey, content-type, x-client-info, x-worker-trigger',
   'access-control-max-age': '600',
 };
 
@@ -36,6 +44,7 @@ export const CORS_HEADERS = {
  *   POST ?action=upload&item_id=<uuid>&purpose=<purpose>
  *   POST ?action=sync
  *   GET  ?action=preview&asset_id=<uuid>
+ *   POST ?action=retention-cleanup (scheduler-internal only)
  * Returns {ok: true, value} or {ok: false, error} with a coarse code.
  */
 export function parseRequest(method, url) {
@@ -69,7 +78,68 @@ export function parseRequest(method, url) {
     if (!UUID_RE.test(assetId)) return { ok: false, error: 'invalid_asset_id' };
     return { ok: true, value: { action, assetId } };
   }
+  if (action === 'retention-cleanup') {
+    if (method !== 'POST') return { ok: false, error: 'method' };
+    if (!only(['action'])) return { ok: false, error: 'unknown_parameter' };
+    return { ok: true, value: { action } };
+  }
   return { ok: false, error: 'invalid_action' };
+}
+
+/** The bounded cleanup request body: empty, {}, or {limit?: 1..25}. */
+export function parseRetentionBody(body) {
+  if (body === null || body === undefined) return { ok: true, value: { limit: RETENTION_BATCH_LIMIT } };
+  if (typeof body !== 'object' || Array.isArray(body)) return { ok: false, error: 'invalid_body' };
+  if (Object.keys(body).some((key) => key !== 'limit')) return { ok: false, error: 'unknown_field' };
+  if (body.limit !== undefined && !(Number.isInteger(body.limit)
+      && body.limit >= 1 && body.limit <= RETENTION_BATCH_LIMIT)) {
+    return { ok: false, error: 'invalid_limit' };
+  }
+  return { ok: true, value: { limit: body.limit ?? RETENTION_BATCH_LIMIT } };
+}
+
+/** Content's purpose-scoped credential and the existing low-value scheduler trigger. */
+export function retentionConfigFrom(env) {
+  const credential = env?.credential;
+  const trigger = env?.trigger;
+  if (typeof credential !== 'string' || !SYSTEM_CREDENTIAL_RE.test(credential)) return null;
+  if (typeof trigger !== 'string' || !RETENTION_TRIGGER_RE.test(trigger)) return null;
+  return { credential, trigger };
+}
+
+/** Constant-time equality for the existing notification scheduler trigger. */
+export function triggerMatches(candidate, expected) {
+  if (typeof candidate !== 'string' || typeof expected !== 'string' || candidate.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < candidate.length; i++) diff |= candidate.charCodeAt(i) ^ expected.charCodeAt(i);
+  return diff === 0;
+}
+
+/** Strictly accepts only an asset id and a private draft path from a claimed batch. */
+export function parseRetentionClaim(data) {
+  if (!data || typeof data !== 'object' || !UUID_RE.test(data.claim_id ?? '') || !Array.isArray(data.assets)) return null;
+  if (!Number.isInteger(data.claimed) || data.claimed < 0 || data.claimed !== data.assets.length
+      || data.claimed > RETENTION_BATCH_LIMIT) return null;
+  const seen = new Set();
+  const assets = [];
+  for (const asset of data.assets) {
+    if (!asset || typeof asset !== 'object' || !UUID_RE.test(asset.asset_id ?? '')
+        || !DRAFT_PATH_RE.test(asset.draft_path ?? '') || seen.has(asset.asset_id)) return null;
+    seen.add(asset.asset_id);
+    assets.push({ asset_id: asset.asset_id, draft_path: asset.draft_path });
+  }
+  return { claim_id: data.claim_id, assets, claimed: data.claimed };
+}
+
+/** Strictly accepts a metadata-finalize result from the system route. */
+export function parseRetentionFinalize(data) {
+  if (!data || typeof data !== 'object' || !Number.isInteger(data.deleted)
+      || data.deleted < 0 || data.deleted > RETENTION_BATCH_LIMIT) return null;
+  return { deleted: data.deleted };
+}
+
+export function retentionSystemEnvelope(command, payload, requestId) {
+  return systemEnvelope(command, payload, requestId);
 }
 
 /** The caller's bearer token header value, or null (the function never reads the token). */

@@ -42,15 +42,25 @@ import {
   declaredTypeMismatch,
   keyHeaders,
   parseRequest,
+  parseRetentionBody,
+  parseRetentionClaim,
+  parseRetentionFinalize,
   planFrom,
   refusal,
+  retentionConfigFrom,
+  retentionSystemEnvelope,
   sha256Hex,
   sanitizeImage,
+  triggerMatches,
 } from './logic.mjs';
 
 const SUPABASE_URL = (Deno.env.get('SUPABASE_URL') ?? '').replace(/\/+$/, '');
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+const RETENTION_CONFIG = retentionConfigFrom({
+  credential: Deno.env.get('CONTENT_ASSET_RETENTION_SYSTEM_CREDENTIAL') ?? '',
+  trigger: Deno.env.get('NOTIFICATIONS_WORKER_TRIGGER') ?? '',
+});
 const CALL_TIMEOUT_MS = 15_000;
 const FILE_TIMEOUT_MS = 30_000;
 const MAX_PLAN_ROUNDS = 4;
@@ -81,6 +91,10 @@ async function timed(url: string, init: RequestInit, ms = CALL_TIMEOUT_MS): Prom
 }
 
 class Unavailable extends Error {}
+
+class SystemRouteError extends Error {
+  constructor(readonly code: 'unauthenticated' | 'forbidden' | 'unavailable') { super(code); }
+}
 
 // A PostgREST call under the caller's own session (the database decides everything).
 async function asCaller(auth: string, fn: string, body: Json): Promise<{ status: number; json: Json | null }> {
@@ -126,6 +140,88 @@ async function command(auth: string, name: string, payload: Json): Promise<{ dat
 
 function storageHeaders(extra: Record<string, string> = {}): Record<string, string> {
   return { ...keyHeaders(SERVICE_KEY), ...extra };
+}
+
+// The Content-only system credential reaches only the Content retention allowlist.
+async function retentionSystem(commandName: string, payload: Json): Promise<Json> {
+  const res = await timed(`${SUPABASE_URL}/rest/v1/rpc/system_command`, {
+    method: 'POST',
+    headers: {
+      ...keyHeaders(ANON_KEY),
+      'content-type': 'application/json',
+      'content-profile': 'api',
+      'x-system-credential': RETENTION_CONFIG!.credential,
+    },
+    body: JSON.stringify(retentionSystemEnvelope(commandName, payload, crypto.randomUUID())),
+  });
+  if (!res) throw new SystemRouteError('unavailable');
+  const json = await res.json().catch(() => null) as Json | null;
+  if (!json || typeof json !== 'object') throw new SystemRouteError('unavailable');
+  if (typeof json.code === 'string') {
+    const code = ['unauthenticated', 'forbidden'].includes(json.code)
+      ? json.code as 'unauthenticated' | 'forbidden' : 'unavailable';
+    throw new SystemRouteError(code);
+  }
+  if (!res.ok || typeof json.data !== 'object' || json.data === null) throw new SystemRouteError('unavailable');
+  return json.data as Json;
+}
+
+async function retentionCleanup(req: Request): Promise<Response> {
+  if (!RETENTION_CONFIG) return reply(503, { outcome: 'unavailable' });
+  if (!triggerMatches(req.headers.get('x-worker-trigger'), RETENTION_CONFIG.trigger)) {
+    return reply(401, { outcome: 'unauthenticated' });
+  }
+  // This is an Edge-to-Edge scheduler action, never a member or editor session route. A legacy
+  // JWT anon key may be sent as Authorization by keyHeaders; no caller session is accepted.
+  const authorization = req.headers.get('authorization');
+  const anonBearer = ANON_KEY.startsWith('eyJ') ? `Bearer ${ANON_KEY}` : null;
+  if (authorization && authorization !== anonBearer) return reply(403, { outcome: 'forbidden' });
+  let body;
+  try {
+    const raw = await req.text();
+    if (raw.length > 256) return reply(400, { outcome: 'invalid', reason: 'too_large' });
+    body = parseRetentionBody(raw.trim() === '' ? null : JSON.parse(raw));
+  } catch {
+    body = { ok: false, error: 'invalid_body' };
+  }
+  if (!body.ok) return reply(400, { outcome: 'invalid', reason: body.error });
+
+  const claimId = crypto.randomUUID();
+  const claimData = await retentionSystem('content.asset_retention_claim', {
+    claim_id: claimId,
+    limit: body.value.limit,
+  });
+  const claim = parseRetentionClaim(claimData);
+  if (!claim || claim.claim_id !== claimId) throw new SystemRouteError('unavailable');
+
+  // Each request is restricted to a claimed content-drafts path. A failed or uncertain delete
+  // keeps its claim and metadata for the database's 30-minute expiry/retry window.
+  const removedIds: string[] = [];
+  let failed = 0;
+  const results = await Promise.all(claim.assets.map(async (asset) => {
+    if (!DRAFT_PATH_RE.test(asset.draft_path)) return { assetId: asset.asset_id, removed: false };
+    const res = await timed(`${SUPABASE_URL}/storage/v1/object/${DRAFT_BUCKET}/${asset.draft_path}`, {
+      method: 'DELETE',
+      headers: storageHeaders(),
+    }, FILE_TIMEOUT_MS);
+    if (res) await res.body?.cancel();
+    return { assetId: asset.asset_id, removed: Boolean(res && (res.ok || res.status === 404)) };
+  }));
+  for (const result of results) {
+    if (result.removed) removedIds.push(result.assetId);
+    else failed++;
+  }
+  let deleted = 0;
+  if (removedIds.length) {
+    const finalized = parseRetentionFinalize(await retentionSystem('content.asset_retention_finalize', {
+      claim_id: claimId,
+      asset_ids: removedIds,
+    }));
+    if (!finalized) throw new SystemRouteError('unavailable');
+    deleted = finalized.deleted;
+    failed += removedIds.length - deleted;
+  }
+  return reply(200, { outcome: 'cleaned', claimed: claim.claimed, deleted, failed });
 }
 
 // The body, or null when it exceeds MAX_UPLOAD_BYTES (reading stops there) or fails.
@@ -293,21 +389,27 @@ Deno.serve(async (req: Request) => {
     note('parse', parsed.error);
     return reply(parsed.error === 'method' ? 405 : 400, { outcome: 'invalid', reason: parsed.error });
   }
-  const auth = bearerFrom(req.headers.get('authorization'));
-  if (!auth) {
-    note(parsed.value.action, 'unauthenticated');
-    return reply(401, { outcome: 'unauthenticated' });
-  }
   const v = parsed.value as Json;
   try {
     let res: Response;
-    if (v.action === 'upload') res = await upload(req, auth, v.itemId as string, v.purpose as string);
-    else if (v.action === 'sync') res = await sync(auth);
-    else res = await preview(auth, v.assetId as string);
+    if (v.action === 'retention-cleanup') {
+      res = await retentionCleanup(req);
+    } else {
+      const auth = bearerFrom(req.headers.get('authorization'));
+      if (!auth) {
+        note(v.action as string, 'unauthenticated');
+        return reply(401, { outcome: 'unauthenticated' });
+      }
+      if (v.action === 'upload') res = await upload(req, auth, v.itemId as string, v.purpose as string);
+      else if (v.action === 'sync') res = await sync(auth);
+      else res = await preview(auth, v.assetId as string);
+    }
     note(v.action as string, String(res.status));
     return res;
-  } catch {
-    note(v.action as string, 'unavailable');
-    return reply(503, { outcome: 'unavailable' });
+  } catch (e) {
+    const code = e instanceof SystemRouteError ? e.code : 'unavailable';
+    note(v.action as string, code);
+    return reply(code === 'unauthenticated' ? 401 : code === 'forbidden' ? 403 : 503,
+      { outcome: code === 'unavailable' ? 'unavailable' : code });
   }
 });

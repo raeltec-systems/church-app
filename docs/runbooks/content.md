@@ -266,7 +266,7 @@ Migration: `supabase/migrations/20261022012809_content_rights_banners.sql` (the 
 - **What is public.** The desired public set is every file of a published item's live revision whose asset is ready, whose rights clear the purpose's use (`display` for images) and whose item meets its kind's public condition (`app.content_public_conditions`; banners: a campaign linked to an event only while that event is public). Its path is revision-keyed: `<kind>/<item_id>/r<revision_no>/<slot>.<ext>`. A public read names a file only once its object is present in `content-public`.
 - **Sync** (`POST ?action=sync`, any content editor): copies each desired file that is missing from `content-drafts` to its public path and deletes every object in `content-public` outside the desired set. Staff web calls it after each banner publish, withdraw and archive, after each rights verify, withdraw and archive, and when Banners opens. Until a sync runs, a newly published banner is not on Home (its file is not public yet) and a withdrawn banner's file is still fetchable at its old path, although no read names it. The Banners screen shows both counts ("waiting", "public files to remove") with a Sync button. There is no scheduler: if a withdrawal must be enforced at once, open Banners or press Sync. Public objects are cached for at most 5 minutes (`max-age=300`).
 - **Preview** (`GET ?action=preview&asset_id=<uuid>`, editors of the item's kind): the draft bytes with `cache-control: no-store, private`. No signed or reusable URL exists for a private object.
-- **Draft files are kept.** Nothing deletes from `content-drafts` (ordinary commands delete nothing, and retention is a Q4 decision). Replaced and abandoned uploads stay private there.
+- **Private draft-file retention (Story F3).** Replaced and abandoned uploads remain private in `content-drafts` until they are at least 30 days old. The existing `notifications-worker` scheduler asks the `content-assets` Edge Function to claim a bounded batch of assets with no `content_revision_files` reference in any revision. It deletes bytes through the Storage API, then removes metadata. A draft or historical revision reference keeps the file. A failed or interrupted delete stays claimed for a 30-minute lease and is retried; while claimed, an asset cannot be attached or previewed. This never deletes from `content-public`, and has no member/editor action.
 - **Registering a new purpose** (entries 5, 6, 7, 9, 10 and 11): insert a row into `app.content_asset_purposes` (kind, rights use, media types, limits), a row into `app.content_media_types` for any new type, and widen both buckets' `allowed_mime_types`. A new type also needs measuring and sanitising support in `content-assets/logic.mjs`. The kind's save command attaches files with `app.content_file_attach(item, draft_no, slot, purpose, asset, rights)` (after `app.content_item_saved`), and checks `app.content_asset_error` and `app.content_rights_ref_error`. Its publish command checks `app.content_rights_clear(rights, use)`. Its public read uses `app.content_public_file(item, slot)`. A kind whose items are public only under a condition registers it with `app.content_register_public_condition(kind, 'app.content_<kind>_public_condition(jsonb)')`.
 
 ### Banners (kind `banner`)
@@ -312,6 +312,8 @@ node tools/auth-harness/local-phone-auth.mjs on
 node tools/identity-e2e/content-banners.mjs --evidence _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-6.2/content-banners-e2e.jsonl
 node tools/auth-harness/local-phone-auth.mjs off
 node --test supabase/functions/content-assets/logic.test.mjs supabase/functions/content-assets/sanitize.test.mjs tools/identity-e2e/content-banners.test.mjs
+node tools/identity-e2e/content-retention.mjs --evidence _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-6.2/f3-content-retention-e2e.jsonl
+node --test supabase/functions/content-assets/logic.test.mjs supabase/functions/notifications-worker/logic.test.mjs tools/identity-e2e/content-retention.test.mjs
 ```
 
 The E2E starts `supabase functions serve` when it is not running and stops it afterwards. It uses fictional numbers +44 7700 900501-900509 and removes everything it created, Storage objects included. Run the pgTAP suite on a fresh reset before the E2E: its admin bootstrap leaves restricted-operator journal rows behind.
@@ -320,6 +322,19 @@ The E2E starts `supabase functions serve` when it is not running and stops it af
 
 - Migration applied as `20261022012809`; buckets created by it.
 - Edge Function `content-assets` deployed with `verify_jwt = false` (the MCP `deploy_edge_function` with `index.ts`, `logic.mjs` and `../_shared/system_access.mjs`). It needs no secret of its own: it uses the platform-provided `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY`.
+
+### Story F3: retention setup and staging checks
+
+Migration: `20261022112247_content_asset_retention.sql`. It registers `content.asset_retention_claim` and `content.asset_retention_finalize` under the separate `content_asset_retention` system purpose. The existing Notifications schedule remains the only scheduler. See `notifications.md`, Story F3, for the worker handoff and secret locations.
+
+After applying the migration to staging project `tmurpotfluignacfueki`, deploy the updated `content-assets` and `notifications-worker` functions with `verify_jwt = false`. The owner creates one staging principal with purpose `content_asset_retention`, mints a staging system credential into a private local state directory, and registers only its digest in staging. Set the raw credential only as the `content-assets` Edge secret `CONTENT_ASSET_RETENTION_SYSTEM_CREDENTIAL`; copy the existing Vault `notifications_worker_trigger` into `content-assets` as `NOTIFICATIONS_WORKER_TRIGGER`. The Notifications worker keeps its existing trigger and `notifications_worker` credential and receives no Storage/service-role key or Content credential. Do not paste any token into SQL, chat, a ticket, or evidence.
+
+Owner/operator checks (staging only):
+
+1. Confirm migration version `20261022112247`, the two command registrations with purpose `content_asset_retention`, and exactly those two commands granted to the retention principal. Confirm the function hashes against the reviewed local migration state.
+2. Confirm `verify-hosted.sql` passes for staging, no app table grants expose `content_assets`, and module guards pass. Signed-out public banner reads continue to work; `content-assets?action=retention-cleanup` without the trigger answers a coarse refusal and claims nothing.
+3. Let the existing scheduler run naturally. Do not manually invoke the scheduled worker on staging. Confirm its status advances, the worker reports only retention counts/status, and no synthetic or unintended Notifications jobs were created. Do not create test uploads in staging.
+4. For local functional evidence, run `tools/identity-e2e/content-retention.mjs`; it creates and removes only synthetic local rows and Storage objects. Staging credential rotation/revocation remains owner-controlled.
 
 ### Owner manual check on staging (the ticket's verify)
 

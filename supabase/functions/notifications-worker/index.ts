@@ -39,6 +39,7 @@ import {
   MAX_BODY_BYTES,
   configFrom,
   declaredTooLarge,
+  dispatchContentRetention,
   keyHeaders,
   parseBody,
   runOnce,
@@ -56,6 +57,7 @@ const CONFIG = configFrom({
   trigger: Deno.env.get('NOTIFICATIONS_WORKER_TRIGGER') ?? '',
 });
 const CALL_TIMEOUT_MS = 10_000;
+const CONTENT_RETENTION_TIMEOUT_MS = 45_000;
 const FCM_ACCOUNT = parseServiceAccount(Deno.env.get('NOTIFICATIONS_FCM_SERVICE_ACCOUNT') ?? '');
 const FCM_ENDPOINTS = FCM_ACCOUNT
   ? fcmEndpoints({ projectId: FCM_ACCOUNT.projectId, supabaseUrl: SUPABASE_URL,
@@ -86,9 +88,9 @@ class SystemRouteError extends Error {
   }
 }
 
-async function timed(url: string, init: RequestInit): Promise<Response | null> {
+async function timed(url: string, init: RequestInit, ms = CALL_TIMEOUT_MS): Promise<Response | null> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CALL_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), ms);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } catch {
@@ -175,14 +177,20 @@ Deno.serve(async (req: Request) => {
     } catch {
       push = { state: 'unavailable' };
     }
+    const contentRetention = await dispatchContentRetention({
+      fetcher: (url, init) => timed(url, init, CONTENT_RETENTION_TIMEOUT_MS),
+      supabaseUrl: SUPABASE_URL,
+      apiKey: ANON_KEY,
+      trigger: CONFIG.trigger,
+    });
     // When sending stopped on our own configuration, name the sender identity (the service
     // account's project and e-mail: identifiers, not secrets) so the operator can fix it.
     if (FCM_ACCOUNT && typeof push.stop_detail === 'object' && push.stop_detail !== null) {
       push.stop_detail = { ...(push.stop_detail as Json), sender_project: FCM_ACCOUNT.projectId,
         sender_account: FCM_ACCOUNT.clientEmail };
     }
-    note({ outcome: 'ran', ...counts, push });
-    return reply(200, { ...counts, push });
+    note({ outcome: 'ran', ...counts, push, content_retention: contentRetention });
+    return reply(200, { ...counts, push, content_retention: contentRetention });
   } catch (e) {
     const code = e instanceof SystemRouteError ? e.code : 'unavailable';
     note({ outcome: code });

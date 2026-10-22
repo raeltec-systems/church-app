@@ -209,7 +209,9 @@ Wire contract (SQL, Edge function, Dart and the E2E share it):
   - Full pgTAP on a fresh reset: PASS (59 files, 4638).
   - Local guards: 0.
   - E2E: 15/15. Node tests: 17/17.
-  - Flutter: see the final merge note below.
+  - Flutter after the fixes: design_system 14, client_core 808, mobile 61 and staff 50, with
+    analyze clean in all four. `story/5.8-meetings-held` was still at `d2ed154` at the end, so
+    there was nothing to merge.
   - check-migrations, check-function-imports and scan-secrets: pass.
   - Staging: `20261022012809`, with hashes identical to the local reset.
 - **Residual risks:**

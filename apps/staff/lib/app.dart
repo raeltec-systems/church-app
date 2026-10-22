@@ -215,6 +215,21 @@ const staffEventsDestination = (
   icon: Icons.event_outlined,
 );
 
+/// Story 6.2: shown while the caller holds Media, Pastor or Admin: Home's
+/// banners (the yearly theme and campaigns) with their images.
+const staffBannersDestination = (
+  path: ClientPaths.contentBanners,
+  label: 'Banners',
+  icon: Icons.view_carousel_outlined,
+);
+
+/// Story 6.2: the rights records images cite (Media, Pastor, Admin).
+const staffRightsDestination = (
+  path: ClientPaths.contentRights,
+  label: 'Rights',
+  icon: Icons.verified_outlined,
+);
+
 /// One group of the sidebar; [label] is null for the ungrouped top entry.
 typedef StaffNavGroup = ({String? label, List<StaffDestination> items});
 
@@ -267,7 +282,11 @@ List<StaffNavGroup> staffNavGroupsFor(
     // Story 6.1: public church content (Media, Pastor, Admin).
     (
       label: 'Content',
-      items: [if (editsContent(grants)) staffEventsDestination],
+      items: [
+        if (editsContent(grants)) staffEventsDestination,
+        if (editsContent(grants)) staffBannersDestination,
+        if (editsContent(grants)) staffRightsDestination,
+      ],
     ),
     (
       label: 'Me',

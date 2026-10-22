@@ -5,6 +5,7 @@ import '../domain/account_auth.dart';
 import '../domain/assisted_recovery.dart';
 import '../domain/cell_membership.dart';
 import '../domain/commands.dart';
+import '../domain/content_banners.dart';
 import '../domain/content_events.dart';
 import '../domain/credential_review.dart';
 import '../domain/duties.dart';
@@ -97,6 +98,17 @@ final dutySpecialRepositoryProvider = Provider<DutySpecialRepository>(
 /// Story 6.1: the public event reads (everyone) and the editors' event read.
 final contentRepositoryProvider = Provider<ContentRepository>(
   (ref) => const UnconfiguredContentRepository(),
+);
+
+/// Story 6.2: Home banners (everyone), the editors' banner and rights reads,
+/// and image upload, sync and preview through the `content-assets` route.
+final bannerRepositoryProvider = Provider<BannerRepository>(
+  (ref) => const UnconfiguredBannerRepository(),
+);
+
+/// Story 6.2: the staff web file chooser for content images.
+final contentFilePickerProvider = Provider<ContentFilePicker>(
+  (ref) => const UnsupportedContentFilePicker(),
 );
 
 /// Story 4.9: opens the phone or messaging app for a labelled contact route.

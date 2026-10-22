@@ -307,6 +307,51 @@ void main() {
     );
   });
 
+  test('story 6.2: Banners and Rights for Media, Pastor and Admin only', () {
+    for (final role in const ['media', 'pastor', 'admin']) {
+      final d = staffDestinationsFor(syntheticGrants(roles: [role]));
+      expect(d, contains(staffBannersDestination), reason: role);
+      expect(d, contains(staffRightsDestination), reason: role);
+      // In the Content group, after Events.
+      expect(
+        d.indexOf(staffBannersDestination),
+        d.indexOf(staffEventsDestination) + 1,
+      );
+      expect(
+        d.indexOf(staffRightsDestination),
+        d.indexOf(staffBannersDestination) + 1,
+      );
+    }
+    for (final g in [syntheticGrants(), null]) {
+      for (final d in [staffBannersDestination, staffRightsDestination]) {
+        expect(staffDestinationsFor(g), isNot(contains(d)));
+        expect(staffDestinationsFor(g, signedIn: true), isNot(contains(d)));
+      }
+    }
+  });
+
+  testWidgets('story 6.2: a Media member opens Banners from the sidebar', (
+    tester,
+  ) async {
+    final h = await pumpStaff(
+      tester,
+      size: const Size(1280, 1600),
+      setUp: (h) {
+        h.grants.myAccess = AccessReadOk(
+          syntheticGrants(roles: const ['media']),
+        );
+        h.banners.staffBanners = AccessReadOk(
+          StaffBanners.fromJson(staffBannersData([])),
+        );
+      },
+    );
+    await tapKey(tester, 'nav-${ClientPaths.contentBanners}');
+    await tester.pumpAndSettle();
+    expect(find.byType(StaffBannersScreen), findsOneWidget);
+    expect(h.banners.syncCalls, 1);
+    expect(find.byKey(const Key('banners-new')), findsOneWidget);
+  });
+
   testWidgets(
     'story 6.1: a Media member opens Events from the sidebar and drafts an '
     'event',

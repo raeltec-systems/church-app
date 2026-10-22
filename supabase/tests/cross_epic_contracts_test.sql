@@ -319,8 +319,10 @@ select is((select count(*)::int from app.policy_gates where state = 'approved'),
   'no policy gate is approved by any migration');
 select results_eq(
   $$select gate from app.policy_gates where fixture_value is not null order by gate$$,
-  $$values ('identity_deletion_retention'::text), ('q2_church_time'), ('q9_money')$$,
-  'only the Q2, Q9 and Q4 deletion-retention (2.11) gates carry (labelled) test fixtures; access and sending have none');
+  $$values ('identity_deletion_retention'::text), ('q2_church_time'),
+           ('q5_content_rights'),
+           ('q9_money')$$,
+  'only the Q2, Q5 content rights (6.2), Q9 and Q4 deletion-retention (2.11) gates carry (labelled) test fixtures; access and sending have none');
 select is(app.policy_effective('q2_church_time') ->> 'source', 'fixture',
   'local development reads the labelled fixture');
 select is(

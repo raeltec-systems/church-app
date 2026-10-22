@@ -117,14 +117,16 @@ select is(
   0, 'no client role has any privilege on a Content table or sequence');
 select results_eq(
   $$select (n.nspname || '.' || p.proname)::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname in ('app', 'api') and p.proname like 'content\_%' and has_function_privilege('anon', p.oid, 'EXECUTE')
+     where n.nspname in ('app', 'api') and p.proname like 'content\_%' and p.proname like '%event%'
+       and has_function_privilege('anon', p.oid, 'EXECUTE')
      order by 1$$,
   $$values ('api.content_public_event'::text collate "C"), ('api.content_public_events'),
            ('app.content_public_event'), ('app.content_public_events')$$,
-  'anon can execute only the two public reads');
+  'anon can execute only the two public event reads (story 6.2 lists its own)');
 select results_eq(
   $$select (n.nspname || '.' || p.proname)::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname in ('app', 'api') and p.proname like 'content\_%'
+       and (p.proname like '%event%' or p.proname = 'content_command')
        and has_function_privilege('authenticated', p.oid, 'EXECUTE')
      order by 1$$,
   $$values ('api.content_command'::text collate "C"), ('api.content_public_event'), ('api.content_public_events'),
@@ -139,9 +141,9 @@ select is_definer('app', 'content_command', array['jsonb'], 'the app entry point
 select isnt_definer('api', 'content_command', array['jsonb'], 'the api wrapper uses invoker security');
 select is_definer('app', 'content_public_events', array[]::text[], 'the public read body is a definer');
 select isnt_definer('api', 'content_public_events', array[]::text[], 'the public api wrapper is invoker');
-select results_eq($$select kind, editor_roles from app.content_kinds order by 1$$,
+select results_eq($$select kind, editor_roles from app.content_kinds where kind = 'event' order by 1$$,
   $$values ('event'::text, array['admin', 'pastor', 'media']::text[])$$, 'events are edited by Admin, Pastor and Media');
-select results_eq($$select command || ':' || handler || ':' || creates from app.content_commands order by 1$$,
+select results_eq($$select command || ':' || handler || ':' || creates from app.content_commands where kind = 'event' order by 1$$,
   $$values ('content.archive_event:app.content_event_archive(uuid,bigint,jsonb):false'::text),
            ('content.create_event:app.content_event_create(uuid,bigint,jsonb):true'),
            ('content.publish_event:app.content_event_publish(uuid,bigint,jsonb):false'),
@@ -152,7 +154,7 @@ select is((select a.handler from app.cmd_authorizers a where a.namespace = 'cont
   'app.content_authorize_command(jsonb)', 'Content registers its authorizer');
 select is((select handler from app.identity_deletion_hooks where module = 'content'),
   'app.content_erase_member(jsonb)', 'Content registers one deletion hook');
-select results_eq($$select part || ':' || handler from app.content_erase_parts order by 1$$,
+select results_eq($$select part || ':' || handler from app.content_erase_parts where part = 'event_revisions' order by 1$$,
   $$values ('event_revisions:app.content_event_erase_part(jsonb)'::text)$$, 'the events erase part is registered');
 select throws_ok($$select app.content_register_command('content.x', 'event', 'app.cells_command(jsonb)'::regprocedure, false)$$,
   'PCTR1', null, 'a command handler of another module is refused');

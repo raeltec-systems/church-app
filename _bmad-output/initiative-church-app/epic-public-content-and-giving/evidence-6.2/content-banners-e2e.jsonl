@@ -1,0 +1,16 @@
+{"step":"C00-precondition","target":"LOCAL","at":"2026-10-22T00:41:18.933Z","settings":{"phone":true,"sms_provider":""},"function_served":true,"started_here":true,"leftover_objects_removed":0,"leftover_users_removed":"0"}
+{"step":"C01-signed-in-by-phone-and-media-granted","target":"LOCAL","at":"2026-10-22T00:41:22.066Z","verdict":"pass","grant":200}
+{"step":"C02-a-private-draft-bucket-and-a-public-bucket","target":"LOCAL","at":"2026-10-22T00:41:22.512Z","verdict":"pass","drafts_public":false,"public_public":true,"storage_policies":0}
+{"step":"C10-rights-recorded-and-verified-by-media","target":"LOCAL","at":"2026-10-22T00:41:22.606Z","verdict":"pass","own":"published","third_party":"published","plain_member":"forbidden"}
+{"step":"C11-banner-drafts","target":"LOCAL","at":"2026-10-22T00:41:22.663Z","verdict":"pass","theme":"draft","campaign":"draft"}
+{"step":"C12-media-uploads-two-images","target":"LOCAL","at":"2026-10-22T00:41:24.616Z","verdict":"pass","theme":200,"campaign":200,"measured":"1920x1080","draft_objects_added":3}
+{"step":"C13-oversized-and-disguised-files-refused-nothing-stored","target":"LOCAL","at":"2026-10-22T00:41:27.360Z","verdict":"pass","over_purpose":"413:too_large","over_cap":"413:too_large","disguised":"415:unsupported_type","mismatched":"415:type_mismatch","undersized":"422:too_small","nothing_stored":true}
+{"step":"C14-only-editors-upload","target":"LOCAL","at":"2026-10-22T00:41:28.219Z","verdict":"pass","member":403,"pending":403,"anon":401}
+{"step":"C20-third-party-source-missing-from-q5-cannot-be-published","target":"LOCAL","at":"2026-10-22T00:41:28.277Z","verdict":"pass","theme":"validation_failed:source_not_cleared","other":"source_not_cleared"}
+{"step":"C21-both-published-and-the-carousel-reads-signed-out","target":"LOCAL","at":"2026-10-22T00:41:28.473Z","verdict":"pass","before_sync_listed":false,"member_sync":403,"anon_sync":401,"sync":"synced","placed":2,"order":["theme","campaign"],"theme_file":200,"campaign_file":200,"bytes_match":true}
+{"step":"C22-anon-pending-member-read-the-projection-only","target":"LOCAL","at":"2026-10-22T00:41:28.508Z","verdict":"pass","leaked":0,"same":true}
+{"step":"C30-draft-and-uncleared-files-cannot-be-fetched-or-listed","target":"LOCAL","at":"2026-10-22T00:41:29.580Z","verdict":"pass","draft_fetch_refused":"18/18","uncleared_public":400,"listing_refused":"6/6","member_preview":403,"anon_preview":401,"editor_preview":200}
+{"step":"C31-a-withdrawn-file-cannot-be-fetched","target":"LOCAL","at":"2026-10-22T00:41:29.678Z","verdict":"pass","withdrawn":"withdrawn","listed":false,"removed":1,"anon_fetch":400,"member_fetch":400}
+{"step":"C32-suspended-rights-take-the-theme-off-until-verified-again","target":"LOCAL","at":"2026-10-22T00:41:30.217Z","verdict":"pass","suspended":"withdrawn","listed_after_suspend":false,"file_after_sync":400,"back":true}
+{"step":"C40-no-client-role-reads-or-writes-a-content-table","target":"LOCAL","at":"2026-10-22T00:41:30.360Z","verdict":"pass","attempts":36,"refused":36,"member_staff":403,"anon_staff":401}
+{"step":"C99-cleanup","target":"LOCAL","at":"2026-10-22T00:41:35.215Z","users_left":0,"objects_removed":4,"unmarked":true,"stopped_serve":true,"items_left":0}

@@ -119,6 +119,7 @@ select results_eq(
   $$select (n.nspname || '.' || p.proname)::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname in ('app', 'api') and p.proname like 'content\_%' and has_function_privilege('anon', p.oid, 'EXECUTE')
        and p.proname not like 'content\_%giving%' -- story 6.3 pins its own
+       and p.proname not like '%announcement%'
      order by 1$$,
   $$values ('api.content_public_event'::text collate "C"), ('api.content_public_events'),
            ('app.content_public_event'), ('app.content_public_events')$$,
@@ -128,6 +129,7 @@ select results_eq(
      where n.nspname in ('app', 'api') and p.proname like 'content\_%'
        and has_function_privilege('authenticated', p.oid, 'EXECUTE')
        and p.proname not like 'content\_%giving%' -- story 6.3 pins its own
+       and p.proname not like '%announcement%'
      order by 1$$,
   $$values ('api.content_command'::text collate "C"), ('api.content_public_event'), ('api.content_public_events'),
            ('api.content_staff_events'), ('app.content_command'), ('app.content_public_event'),

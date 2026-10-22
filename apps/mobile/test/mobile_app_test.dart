@@ -342,6 +342,59 @@ void main() {
   );
 
   testWidgets(
+    'story 6.13: a signed-out phone opens a pinned announcement from Home, '
+    'then the whole list',
+    (tester) async {
+      const offering = '73737373-7373-4373-8373-737373737373';
+      final h = await pumpMobile(
+        tester,
+        location: ClientPaths.home,
+        setUp: (h) {
+          h.session.switchTo(null);
+          h.announcements.publicAnnouncements = AccessReadOk(
+            PublicAnnouncements.fromJson(
+              publicAnnouncementsData([
+                publicAnnouncementData(),
+                publicAnnouncementData(
+                  announcementId: '74747474-7474-4474-8474-747474747474',
+                  title: 'SYNTHETIC Choir practice moves to Thursday',
+                  pinned: false,
+                ),
+              ]),
+            ),
+          );
+          h.announcements.publicAnnouncement[offering] = AccessReadOk(
+            PublicAnnouncementRead.fromJson({
+              'announcement': publicAnnouncementData(),
+            }),
+          );
+        },
+      );
+      expect(find.text('Sign in'), findsOneWidget);
+      expect(find.byType(HomeAnnouncementsSection), findsOneWidget);
+      await tapKey(tester, 'announcement-row-$offering');
+      await tester.pumpAndSettle();
+      expect(find.byType(AnnouncementDetailScreen), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('announcement-body'))).data,
+        'SYNTHETIC Bring your harvest offering to the 09:00 service.',
+      );
+      // Pushed with its own back bar: no top bar over it, even signed out.
+      expect(find.byType(BackButton), findsOneWidget);
+      expect(find.text('Sign in'), findsNothing);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'home-announcements-all');
+      await tester.pumpAndSettle();
+      expect(find.byType(AnnouncementsScreen), findsOneWidget);
+      expect(find.text('SYNTHETIC Choir practice moves to Thursday'), findsOne);
+      expect(find.text('Sign in'), findsNothing);
+      expect(h.announcements.publicAnnouncementAsked, [offering]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'story 6.3: a signed-out phone has Home, Give and Calendar, opens How to '
     'give and copies a method\'s values',
     (tester) async {

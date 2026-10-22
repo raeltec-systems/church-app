@@ -9,6 +9,7 @@ import '../application/providers.dart' show accountProvider;
 import '../domain/access_grants.dart';
 import '../domain/church_time.dart';
 import '../domain/member_access.dart' show MemberAccessGranted;
+import 'announcement_screens.dart' show HomeAnnouncementsSection;
 import 'calendar_screens.dart' show ComingUpSection;
 import 'cell_screens.dart' show MyCellHomeCard;
 import 'duties_screens.dart' show LeaderNeedsAttentionCard, MyDutiesHomeCard;
@@ -17,10 +18,11 @@ import 'followups_screens.dart' show MyFollowUpsHomeCard;
 /// The mobile Home tab (stories 4.5 and 6.1): everyone gets it, signed in or
 /// not. A member sees a greeting and their cards (a department leader's
 /// Needs attention, My duties, My follow-ups, My cell); a guest or Pending
-/// applicant sees no member card. Everyone then sees Coming up, the next
-/// published events. The shell's top bar carries the logo and the way in, so
-/// Home has no app bar of its own. Later entries add their own Home content
-/// here (banners, Sunday hymns, announcements).
+/// applicant sees no member card. Everyone then sees the pinned
+/// announcements (story 6.13) and Coming up, the next published events. The
+/// shell's top bar carries the logo and the way in, so Home has no app bar of
+/// its own. Later entries add their own Home content here (banners, Sunday
+/// hymns).
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -102,6 +104,8 @@ class HomeScreen extends ConsumerWidget {
                   const _HomeGap(child: MyFollowUpsHomeCard()),
                   const _HomeGap(child: MyCellHomeCard()),
                 ],
+                // Story 6.13: the pinned announcements, for everyone.
+                const _HomeGap(child: HomeAnnouncementsSection()),
                 // Story 6.1: the next published events, for everyone.
                 const ComingUpSection(),
               ],

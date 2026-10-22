@@ -223,6 +223,15 @@ const staffGivingDestination = (
   icon: Icons.volunteer_activism_outlined,
 );
 
+/// Story 6.13: shown while the caller holds Media, Pastor or Admin: draft,
+/// publish (optionally notifying members), withdraw and archive church
+/// announcements.
+const staffAnnouncementsDestination = (
+  path: ClientPaths.contentAnnouncements,
+  label: 'Announcements',
+  icon: Icons.campaign_outlined,
+);
+
 /// One group of the sidebar; [label] is null for the ungrouped top entry.
 typedef StaffNavGroup = ({String? label, List<StaffDestination> items});
 
@@ -272,12 +281,14 @@ List<StaffNavGroup> staffNavGroupsFor(
         if (admin) staffDepartmentsDestination,
       ],
     ),
-    // Story 6.1: public church content (Media, Pastor, Admin); story 6.3:
-    // giving methods (Admin only).
+    // Story 6.1: public church content (Media, Pastor, Admin); story 6.13:
+    // announcements (the same editors); story 6.3: giving methods (Admin
+    // only).
     (
       label: 'Content',
       items: [
         if (editsContent(grants)) staffEventsDestination,
+        if (editsContent(grants)) staffAnnouncementsDestination,
         if (editsGiving(grants)) staffGivingDestination,
       ],
     ),
@@ -846,9 +857,7 @@ class _RoleSwitch extends StatelessWidget {
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      for (var i = 0; i < options.length; i++) ...[
-                        options[i],
-                      ],
+                      for (var i = 0; i < options.length; i++) ...[options[i]],
                     ],
                   ),
           ),

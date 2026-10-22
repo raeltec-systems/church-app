@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import 'access_screens.dart';
+import 'announcement_screens.dart';
 import 'assisted_recovery_screens.dart';
 import 'account_screen.dart';
 import 'calendar_screens.dart';
@@ -30,6 +31,7 @@ import 'page_address_stub.dart'
 import 'platform_status_screen.dart';
 import 'recovery_screens.dart';
 import 'sign_in_screen.dart';
+import 'staff_announcements_screen.dart';
 import 'staff_overview_screen.dart';
 
 /// Destinations shared by both shells. Which ones a shell shows follows the
@@ -99,6 +101,16 @@ abstract final class ClientPaths {
 
   /// Story 6.3, staff web: the Giving editor (Admin only).
   static const contentGiving = GivingStaffPaths.giving;
+
+  /// Story 6.13 (both apps, everyone): the published announcements.
+  static const announcements = AnnouncementPaths.list;
+
+  /// Story 6.13: one published announcement (the notice's deep link).
+  static String announcement(String announcementId) =>
+      AnnouncementPaths.detail(announcementId);
+
+  /// Story 6.13, staff web: the Announcements editor (Media, Pastor, Admin).
+  static const contentAnnouncements = StaffAnnouncementPaths.announcements;
 
   /// Story 4.1, staff web: department leaders and deputies (Admin; Pastor
   /// read only): publish a duty and see the responses.
@@ -221,6 +233,11 @@ abstract final class ClientPaths {
     // Story 4.9: the leaders' decline alert opens the coverage queue, which
     // reads every position again.
     RegExp(r'^/duties/coverage$'),
+    // Story 6.13: an announcement notice opens the announcement, which reads
+    // the published projection again (a pointer, not a grant).
+    RegExp(
+      r'^/announcements/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    ),
     // Story 4.7: the follow-up reminders (followups_task and
     // followups_supervision contracts) open the task, which reads it again.
     RegExp(
@@ -463,6 +480,29 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.contentGiving,
         pageBuilder: (_, state) => page(state, const StaffGivingScreen()),
+      ),
+      // Story 6.13: announcements for everyone in both apps (the staff web
+      // inbox opens a notice's announcement too) and the staff editor.
+      GoRoute(
+        path: ClientPaths.announcements,
+        pageBuilder: (_, state) => page(state, const AnnouncementsScreen()),
+        routes: [
+          GoRoute(
+            path: ':announcementId',
+            pageBuilder: (_, state) => page(
+              state,
+              AnnouncementDetailScreen(
+                key: ValueKey(state.pathParameters['announcementId']),
+                announcementId: state.pathParameters['announcementId']!,
+              ),
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: ClientPaths.contentAnnouncements,
+        pageBuilder: (_, state) =>
+            page(state, const StaffAnnouncementsScreen()),
       ),
       GoRoute(
         path: ClientPaths.myDuties,

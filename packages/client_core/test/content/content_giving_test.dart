@@ -727,8 +727,9 @@ void main() {
     testWidgets('no published method says so plainly', (tester) async {
       await pumpAt(tester, ClientPaths.give, account: null);
       expect(byKey('give-empty'), findsOneWidget);
+      expect(find.text('No giving methods yet'), findsOneWidget);
       expect(
-        find.text('The church hasn\'t published any giving methods yet.'),
+        find.text('When the church adds how to give, it will show here.'),
         findsOneWidget,
       );
       expect(byKey('give-failed'), findsNothing);

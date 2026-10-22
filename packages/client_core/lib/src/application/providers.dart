@@ -5,6 +5,7 @@ import '../domain/account_auth.dart';
 import '../domain/assisted_recovery.dart';
 import '../domain/cell_membership.dart';
 import '../domain/commands.dart';
+import '../domain/content_announcements.dart';
 import '../domain/content_events.dart';
 import '../domain/content_giving.dart';
 import '../domain/credential_review.dart';
@@ -103,6 +104,12 @@ final contentRepositoryProvider = Provider<ContentRepository>(
 /// Story 6.3: the public giving reads (everyone) and the Admins' read.
 final givingRepositoryProvider = Provider<GivingRepository>(
   (ref) => const UnconfiguredGivingRepository(),
+);
+
+/// Story 6.13: the public announcement reads (everyone) and the editors'
+/// announcement read.
+final announcementsRepositoryProvider = Provider<AnnouncementsRepository>(
+  (ref) => const UnconfiguredAnnouncementsRepository(),
 );
 
 /// Story 4.9: opens the phone or messaging app for a labelled contact route.

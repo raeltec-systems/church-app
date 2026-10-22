@@ -312,7 +312,11 @@ void main() {
     expect(staffDestinationsFor(admin), contains(staffGivingDestination));
     final content = staffNavGroupsFor(admin)
         .firstWhere((g) => g.label == 'Content');
-    expect(content.items, [staffEventsDestination, staffGivingDestination]);
+    expect(content.items, [
+      staffEventsDestination,
+      staffAnnouncementsDestination,
+      staffGivingDestination,
+    ]);
     for (final g in [
       syntheticGrants(roles: const ['media']),
       syntheticGrants(roles: const ['pastor']),
@@ -453,6 +457,62 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  test('story 6.13: Announcements for Media, Pastor and Admin only', () {
+    for (final role in const ['media', 'pastor', 'admin']) {
+      final groups = staffNavGroupsFor(syntheticGrants(roles: [role]));
+      final content = groups.firstWhere((g) => g.label == 'Content').items;
+      // Giving (story 6.3) follows for Admins only.
+      expect(content, [
+        staffEventsDestination,
+        staffAnnouncementsDestination,
+        if (role == 'admin') staffGivingDestination,
+      ], reason: role);
+    }
+    for (final g in [syntheticGrants(), null]) {
+      expect(
+        staffDestinationsFor(g, signedIn: true),
+        isNot(contains(staffAnnouncementsDestination)),
+      );
+    }
+  });
+
+  testWidgets(
+    'story 6.13: a Media member opens Announcements from the sidebar; a plain '
+    'member has no entry',
+    (tester) async {
+      await pumpStaff(
+        tester,
+        size: const Size(1280, 1600),
+        setUp: (h) {
+          h.grants.myAccess = AccessReadOk(
+            syntheticGrants(roles: const ['media']),
+          );
+          h.announcements.staffAnnouncements = AccessReadOk(
+            StaffAnnouncements.fromJson(staffAnnouncementsData([])),
+          );
+        },
+      );
+      await tapKey(tester, 'nav-${ClientPaths.contentAnnouncements}');
+      await tester.pumpAndSettle();
+      expect(find.byType(StaffAnnouncementsScreen), findsOneWidget);
+      expect(find.byKey(const Key('announcements-new')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('story 6.13: a plain member sees no Announcements entry', (
+    tester,
+  ) async {
+    await pumpStaff(
+      tester,
+      setUp: (h) => h.grants.myAccess = AccessReadOk(syntheticGrants()),
+    );
+    expect(
+      find.byKey(const Key('nav-${ClientPaths.contentAnnouncements}')),
+      findsNothing,
+    );
+  });
 
   testWidgets(
     'reminder health renders aggregate status for an authorized read',

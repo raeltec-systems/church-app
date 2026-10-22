@@ -682,7 +682,7 @@ node --test tools/identity-e2e/duties-reminders.test.mjs
 (cd packages/client_core && flutter test test/duties)
 ```
 
-Fictional numbers: pgTAP `+44 7700 900650-900669`, E2E `900670-900689`. The 4.1-4.5 E2E clean-ups now also remove the Notifications schedules and Needs contact rows their duties create.
+Fictional numbers: pgTAP `+44 7700 900650-900669`, E2E `900670-900679` (900680-900689 went to story 6.13). The 4.1-4.5 E2E clean-ups now also remove the Notifications schedules and Needs contact rows their duties create.
 
 ### Hosted staging (parent session, then the owner)
 

@@ -1499,6 +1499,8 @@ class _MoveMemberFormState extends ConsumerState<_MoveMemberForm> {
 /// Story 2.6, staff web: the cells the caller leads or assists. A leader
 /// confirms the requests for their own cell (joining or moving in), or
 /// passes one to the church office; nobody confirms their own membership.
+/// The page answers "who is waiting to join my cell?" first: the requests
+/// with their two decisions, then the cell's confirmed members.
 class CellLeaderScreen extends StatelessWidget {
   const CellLeaderScreen({super.key});
 
@@ -1512,15 +1514,27 @@ class CellLeaderScreen extends StatelessWidget {
     body: (context, q, s) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final cell in q.cells) ...[
-          _LeaderCellCard(cell: cell, busy: s.busy),
-          const SizedBox(height: 12),
+        if (q.cells.isEmpty)
+          _Card(
+            child: Text(
+              'You don\'t lead or assist a cell right now.',
+              key: const Key('leader-no-cells'),
+              style: ChurchType.staffBody.copyWith(
+                color: ChurchColors.of(context).muted,
+              ),
+            ),
+          ),
+        for (var i = 0; i < q.cells.length; i++) ...[
+          if (i > 0) const SizedBox(height: 32),
+          _LeaderCellCard(cell: q.cells[i], busy: s.busy),
         ],
       ],
     ),
   );
 }
 
+/// One cell the caller leads or assists: its name and area, the requests to
+/// join (leaders only: assistants read), then the confirmed members.
 class _LeaderCellCard extends ConsumerWidget {
   const _LeaderCellCard({required this.cell, required this.busy});
   final LeaderCell cell;
@@ -1528,87 +1542,226 @@ class _LeaderCellCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ctl = ref.read(cellLeaderProvider.notifier);
-    return _Card(
+    final c = ChurchColors.of(context);
+    final waiting = cell.requests.length;
+    final members = cell.members.length;
+    return Column(
       key: Key('leader-cell-${cell.cellId}'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              _heading(context, cell.name),
-              StatusLabel(
-                label: cell.isLeader ? 'You lead this cell' : 'You assist',
-                tone: StatusTone.info,
-              ),
-            ],
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          header: true,
+          child: Text(
+            cell.name,
+            style: ChurchType.sectionTitle.copyWith(color: c.ink, fontSize: 20),
           ),
-          Text('Area: ${cell.broadArea}'),
-          const SizedBox(height: 12),
-          if (cell.isLeader) ...[
-            _heading(context, 'Requests to confirm (${cell.requests.length})'),
-            if (cell.requests.isEmpty)
-              Text(
-                'No one is waiting.',
-                key: Key('leader-no-requests-${cell.cellId}'),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          [
+            cell.broadArea,
+            _mtgPlural(members, 'member'),
+            cell.isLeader ? 'You lead this cell' : 'You assist this cell',
+          ].join(' · '),
+          style: ChurchType.secondary.copyWith(color: c.muted),
+        ),
+        const SizedBox(height: 14),
+        if (cell.isLeader) ...[
+          StaffSection(
+            title: 'Requests to join',
+            subtitle:
+                'Confirm people you know belong to this cell. Anyone you '
+                'don\'t know goes to the church office.',
+            trailing: Text(
+              waiting == 0 ? 'None waiting' : '$waiting waiting',
+              style: ChurchType.figures.copyWith(
+                color: waiting == 0 ? c.muted : c.ink,
               ),
-            for (final r in cell.requests)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Wrap(
-                  key: Key('leader-request-${r.requestId}'),
-                  spacing: 8,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+            ),
+            bodyPadding: EdgeInsets.zero,
+            child: cell.requests.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+                    child: Text(
+                      'No one is waiting.',
+                      key: Key('leader-no-requests-${cell.cellId}'),
+                      style: ChurchType.staffBody.copyWith(color: c.muted),
+                    ),
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < cell.requests.length; i++)
+                        _leadRequestRow(
+                          context,
+                          ref,
+                          cell.requests[i],
+                          divider: i > 0,
+                        ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 16),
+        ],
+        StaffSection(
+          title: 'Members',
+          trailing: Text(
+            '$members',
+            style: ChurchType.figures.copyWith(color: c.muted),
+          ),
+          child: cell.members.isEmpty
+              ? Text(
+                  'No confirmed members yet.',
+                  style: ChurchType.staffBody.copyWith(color: c.muted),
+                )
+              : LayoutBuilder(
+                  builder: (context, box) {
+                    final perRow = (box.maxWidth / 220).floor().clamp(1, 4);
+                    final w = (box.maxWidth - (perRow - 1) * 12) / perRow;
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        for (final m in cell.members)
+                          SizedBox(
+                            width: w,
+                            child: Row(
+                              children: [
+                                InitialsAvatar(name: m.displayName, size: 32),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    m.displayName,
+                                    key: Key(
+                                      'roster-${cell.cellId}-${m.memberId}',
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                    style: ChurchType.staffBody.copyWith(
+                                      color: c.ink,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  /// One request: who, what they asked (one pale pill), and the two
+  /// decisions on the right (below on a phone).
+  Widget _leadRequestRow(
+    BuildContext context,
+    WidgetRef ref,
+    LeaderRequest r, {
+    required bool divider,
+  }) {
+    final c = ChurchColors.of(context);
+    final ctl = ref.read(cellLeaderProvider.notifier);
+    final can = !busy && !r.ownRecord;
+    final who = Row(
+      children: [
+        InitialsAvatar(name: r.displayName, size: 36),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    r.displayName,
+                    style: ChurchType.staffBody.copyWith(
+                      color: c.ink,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  StatusLabel(
+                    label: r.kind == 'change'
+                        ? 'Moving from another cell'
+                        : 'Joining',
+                    tone: StatusTone.info,
+                  ),
+                ],
+              ),
+              if (r.ownRecord) ...[
+                const SizedBox(height: 2),
+                Wrap(
+                  spacing: 6,
                   children: [
-                    Text(r.displayName),
-                    StatusLabel(
-                      label: r.kind == 'change'
-                          ? 'Moving from another cell'
-                          : 'Joining',
-                      tone: StatusTone.info,
-                    ),
-                    if (r.ownRecord)
-                      const StatusLabel(
-                        label: 'Your own request',
-                        tone: StatusTone.warning,
-                      ),
-                    FocusRing(
-                      child: FilledButton(
-                        key: Key('leader-confirm-${r.requestId}'),
-                        onPressed: busy || r.ownRecord
-                            ? null
-                            : () => ctl.confirm(r),
-                        child: const Text('Confirm member of this cell'),
+                    Text(
+                      'Your own request',
+                      style: ChurchType.secondary.copyWith(
+                        color: c.amberFg,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    FocusRing(
-                      child: OutlinedButton(
-                        key: Key('leader-refer-${r.requestId}'),
-                        onPressed: busy || r.ownRecord
-                            ? null
-                            : () => ctl.refer(
-                                r,
-                                CellDeclineReason.notKnownToLeader,
-                              ),
-                        child: const Text('I don\'t know them: ask the office'),
-                      ),
+                    Text(
+                      'Someone else must decide it.',
+                      style: ChurchType.secondary.copyWith(color: c.muted),
                     ),
                   ],
                 ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+    Widget actions(WrapAlignment align) => Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: align,
+      children: [
+        FocusRing(
+          child: FilledButton(
+            key: Key('leader-confirm-${r.requestId}'),
+            style: _mtgCompact(),
+            onPressed: can ? () => ctl.confirm(r) : null,
+            child: const Text('Confirm in this cell'),
+          ),
+        ),
+        FocusRing(
+          child: OutlinedButton(
+            key: Key('leader-refer-${r.requestId}'),
+            style: _mtgCompact(),
+            onPressed: can
+                ? () => ctl.refer(r, CellDeclineReason.notKnownToLeader)
+                : null,
+            child: const Text('I don\'t know them: ask the office'),
+          ),
+        ),
+      ],
+    );
+    return StaffTableRow(
+      key: Key('leader-request-${r.requestId}'),
+      divider: divider,
+      minHeight: 64,
+      child: LayoutBuilder(
+        builder: (context, box) => box.maxWidth < 640
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  who,
+                  const SizedBox(height: 8),
+                  actions(WrapAlignment.start),
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(child: who),
+                  const SizedBox(width: 16),
+                  actions(WrapAlignment.end),
+                ],
               ),
-            const SizedBox(height: 12),
-          ],
-          _heading(context, 'Members (${cell.members.length})'),
-          if (cell.members.isEmpty) const Text('No confirmed members yet.'),
-          for (final m in cell.members)
-            Text(
-              m.displayName,
-              key: Key('roster-${cell.cellId}-${m.memberId}'),
-            ),
-        ],
       ),
     );
   }
@@ -1986,39 +2139,122 @@ Widget _infoRow(BuildContext context, IconData icon, Widget text, {Key? key}) {
   );
 }
 
+/// "Fri 6 Mar" in church time: a table's date column.
+String _mtgShortDay(DateTime at) {
+  final w = ChurchTime.wall(at);
+  return '${weekdayName(w.weekday).substring(0, 3)} ${w.day} '
+      '${_monthsShort[w.month - 1]}';
+}
+
+/// "18:00–19:30" in church time.
+String _mtgTimes(BuildContext context, CellMeeting m) =>
+    '${_meetingClock(context, m.startsAt)}–${_meetingClock(context, m.endsAt)}';
+
+String _mtgPlural(int n, String one) => '$n ${n == 1 ? one : '${one}s'}';
+
+/// A row or header action: a 44 px target at 14/600 that takes only its own
+/// width.
+ButtonStyle _mtgCompact() => const ButtonStyle(
+  minimumSize: WidgetStatePropertyAll(Size(0, ChurchGeometry.minTarget)),
+  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  padding: WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 14)),
+  textStyle: WidgetStatePropertyAll(
+    TextStyle(
+      fontFamily: ChurchFonts.body,
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+    ),
+  ),
+);
+
+/// A row's text action (Plan, Move, Cancel): tighter than [_mtgCompact].
+ButtonStyle _mtgRowAction() => _mtgCompact().copyWith(
+  padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 10)),
+);
+
+/// A fact of a meeting card: a grey label over its value.
+Widget _mtgFact(BuildContext context, String label, Widget value) {
+  final c = ChurchColors.of(context);
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        label,
+        style: ChurchType.secondary.copyWith(color: c.muted, fontSize: 13),
+      ),
+      const SizedBox(height: 2),
+      value,
+    ],
+  );
+}
+
+/// Form fields side by side on a wide form, stacked below 560 px.
+Widget _mtgFieldRow(List<Widget> fields) => LayoutBuilder(
+  builder: (context, box) {
+    if (box.maxWidth < 560) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final f in fields)
+            Padding(padding: const EdgeInsets.only(bottom: 12), child: f),
+        ],
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < fields.length; i++) ...[
+            if (i > 0) const SizedBox(width: 12),
+            Expanded(child: fields[i]),
+          ],
+        ],
+      ),
+    );
+  },
+);
+
 /// Story 5.1, staff web: each cell's weekly schedule and its meetings for
 /// the next 12 weeks. An Admin sets the schedule (and sees only that a
 /// venue is set unless they also lead or assist the cell); the cell's
 /// leader or an Admin moves, cancels or brings back one meeting at a time;
 /// an assistant reads. Every meeting keeps its id through every change.
+///
+/// Each cell answers "when is the next meeting, is it planned, and which
+/// past meetings still need recording?": the next meeting and the last four
+/// weeks side by side, then the next 12 weeks as a table.
 class CellMeetingsScreen extends StatelessWidget {
   const CellMeetingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) => _CellsPage<CellMeetingsBoard>(
     title: 'Cell meetings',
-    subtitle: 'Schedules, the meetings ahead and the last four weeks',
+    subtitle: 'The next meeting, the weeks ahead and the last four weeks',
     provider: cellMeetingsProvider,
     needs: 'This page is for cell leaders, assistants and Admins.',
     loading: 'Loading cell meetings…',
     body: (context, board, s) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _muted(
-          context,
-          'Times are church time (Africa/Lusaka). The venue is private to '
-          'the cell: its leader, assistant and confirmed members.',
-        ),
-        const SizedBox(height: 12),
         if (board.cells.isEmpty)
-          const Text('No cells to show.', key: Key('meetings-no-cells')),
-        for (final cell in board.cells) ...[
+          _Card(
+            child: Text(
+              'No cells to show.',
+              key: const Key('meetings-no-cells'),
+              style: ChurchType.staffBody.copyWith(
+                color: ChurchColors.of(context).muted,
+              ),
+            ),
+          ),
+        for (var i = 0; i < board.cells.length; i++) ...[
+          if (i > 0) const SizedBox(height: 40),
           _MeetingCellCard(
-            key: Key('meeting-cell-${cell.cellId}'),
-            cell: cell,
+            key: Key('meeting-cell-${board.cells[i].cellId}'),
+            cell: board.cells[i],
             busy: s.busy,
           ),
-          const SizedBox(height: 12),
         ],
       ],
     ),
@@ -2040,8 +2276,8 @@ class _MeetingCellCardState extends ConsumerState<_MeetingCellCard> {
 
   @override
   Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
     final cell = widget.cell;
-    final ctl = ref.read(cellMeetingsProvider.notifier);
     final busy = widget.busy;
     final schedule = cell.schedule;
     final now = DateTime.now().toUtc();
@@ -2057,245 +2293,627 @@ class _MeetingCellCardState extends ConsumerState<_MeetingCellCard> {
     final unrecorded = cell.recent
         .where((r) => r.status == MeetingStatus.unrecorded)
         .length;
-    return _Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
+    final unrecordedLabel = unrecorded == 0
+        ? null
+        : StatusLabel(
+            key: Key('meeting-unrecorded-$id'),
+            label: unrecorded == 1
+                ? '1 recent meeting not recorded'
+                : '$unrecorded recent meetings not recorded',
+            tone: StatusTone.warning,
+          );
+    Widget header(bool narrow) => Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _heading(context, cell.name),
-              StatusLabel(
-                label: switch (cell.role) {
-                  MeetingRole.leader => 'You lead this cell',
-                  MeetingRole.assistant => 'You assist',
-                  MeetingRole.admin => 'Admin',
-                },
-                tone: StatusTone.info,
+              Semantics(
+                header: true,
+                child: Text(
+                  cell.name,
+                  style: ChurchType.sectionTitle.copyWith(
+                    color: c.ink,
+                    fontSize: 20,
+                  ),
+                ),
               ),
-              if (cell.isSynthetic)
-                const StatusLabel(
-                  label: 'Synthetic test record',
-                  tone: StatusTone.neutral,
-                ),
-              // Story 5.8: past meetings waiting for their record.
-              if (unrecorded > 0)
-                StatusLabel(
-                  key: Key('meeting-unrecorded-$id'),
-                  label: unrecorded == 1
-                      ? '1 recent meeting not recorded'
-                      : '$unrecorded recent meetings not recorded',
-                  tone: StatusTone.warning,
-                ),
+              const SizedBox(height: 2),
+              Text(
+                [
+                  switch (cell.role) {
+                    MeetingRole.leader => 'You lead this cell',
+                    MeetingRole.assistant => 'You assist this cell',
+                    MeetingRole.admin => 'Admin',
+                  },
+                  if (cell.isSynthetic) 'Synthetic test record',
+                ].join(' · '),
+                style: ChurchType.secondary.copyWith(color: c.muted),
+              ),
+              // Story 5.8: past meetings waiting for their record (under
+              // the name on a phone, on the right otherwise).
+              if (narrow && unrecordedLabel != null) ...[
+                const SizedBox(height: 6),
+                unrecordedLabel,
+              ],
             ],
           ),
-          if (schedule == null)
-            Text(
-              cell.canSetSchedule
-                  ? 'No meeting schedule yet. Set it below.'
-                  : 'No meeting schedule yet. The church office sets it.',
-              key: Key('meeting-no-schedule-$id'),
-            )
-          else ...[
-            // The card's answer first: when this cell meets next.
-            Text(
-              next == null
-                  ? 'No meeting in the next 12 weeks'
-                  : 'Next: ${_meetingWhen(context, next)}',
-              key: Key('meeting-next-$id'),
-              style: ChurchType.sectionTitle.copyWith(
-                color: ChurchColors.of(context).ink,
-              ),
-            ),
-            if (changed > 0)
-              _muted(
-                context,
-                '$changed of the next ${cell.meetings.length} meetings '
-                '${changed == 1 ? 'is' : 'are'} moved or cancelled.',
-              ),
-            const SizedBox(height: 8),
-            Text(
-              'Meets ${schedule.summary} (church time)',
-              key: Key('meeting-schedule-$id'),
-            ),
-            Text(
-              schedule.venue != null
-                  ? 'Venue: ${schedule.venue}'
-                  : 'Venue: set (only the cell\'s leader, assistant and '
-                        'members see it)',
-              key: Key('meeting-venue-$id'),
-            ),
-            if (schedule.mapPin case final pin?)
-              SelectableText('Map pin: ${pin.text}')
-            else if (schedule.pinSet && schedule.venue == null)
-              const Text('Map pin: set'),
-            // Story 5.2: the cell's reminders; the leader or an Admin
-            // changes them.
-            _RemindersRow(cell: cell, schedule: schedule, busy: busy),
-          ],
-          if (schedule != null) ...[
-            const SizedBox(height: 12),
-            _heading(context, 'Next 12 weeks'),
-            if (cell.meetings.isEmpty)
-              const Text('No meetings in the next 12 weeks.'),
-            for (final m in cell.meetings) ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Wrap(
-                  key: Key('meeting-${m.meetingId}'),
-                  spacing: 8,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+        ),
+        if (!narrow && unrecordedLabel != null) ...[
+          const SizedBox(width: 12),
+          unrecordedLabel,
+        ],
+      ],
+    );
+    return LayoutBuilder(
+      builder: (context, box) {
+        final narrow = box.maxWidth < 600;
+        final nextCard = _mtgNextCard(
+          context,
+          next,
+          changed,
+          now,
+          narrow: narrow,
+        );
+        final recent = _mtgRecent(context, wide: box.maxWidth >= 380);
+        final top = box.maxWidth >= 900
+            ? IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(_meetingWhen(context, m)),
-                    if (m.moved)
+                    Expanded(flex: 3, child: nextCard),
+                    const SizedBox(width: 16),
+                    Expanded(flex: 2, child: recent),
+                  ],
+                ),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [nextCard, const SizedBox(height: 16), recent],
+              );
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            header(narrow),
+            const SizedBox(height: 14),
+            top,
+            if (schedule != null) ...[
+              const SizedBox(height: 16),
+              _mtgAhead(context, now, busy, wide: box.maxWidth >= 720),
+            ],
+            // Setting the weekly rule is rare (Admin): open only for a cell
+            // without one, otherwise behind a button after the meetings.
+            if (cell.canSetSchedule) ...[
+              const SizedBox(height: 16),
+              if (schedule == null || _editing)
+                _ScheduleForm(
+                  cell: cell,
+                  busy: busy,
+                  onCancel: schedule == null
+                      ? null
+                      : () => setState(() => _editing = false),
+                )
+              else
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: FocusRing(
+                    child: OutlinedButton(
+                      key: Key('schedule-edit-$id'),
+                      style: _mtgCompact(),
+                      onPressed: busy
+                          ? null
+                          : () => setState(() => _editing = true),
+                      child: const Text('Change the weekly schedule'),
+                    ),
+                  ),
+                ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  /// The card's answer: when the cell meets next, where, and the one job
+  /// (plan its programme).
+  Widget _mtgNextCard(
+    BuildContext context,
+    CellMeeting? next,
+    int changed,
+    DateTime now, {
+    required bool narrow,
+  }) {
+    final c = ChurchColors.of(context);
+    final cell = widget.cell;
+    final schedule = cell.schedule;
+    final id = cell.cellId;
+    if (schedule == null) {
+      return StaffSection(
+        title: 'Next meeting',
+        child: Text(
+          cell.canSetSchedule
+              ? 'No meeting schedule yet. Set it below.'
+              : 'No meeting schedule yet. The church office sets it.',
+          key: Key('meeting-no-schedule-$id'),
+          style: ChurchType.staffBody.copyWith(color: c.muted),
+        ),
+      );
+    }
+    final canPlan =
+        next != null &&
+        cell.role != MeetingRole.admin &&
+        !next.cancelled &&
+        next.startsAt.isAfter(now);
+    final otherVenue = next != null && next.venueMoved && next.venue != null;
+    final value = ChurchType.staffBody.copyWith(color: c.ink);
+    final Widget pin;
+    if (schedule.mapPin case final p?) {
+      pin = SelectableText(
+        p.text,
+        style: ChurchType.figures.copyWith(color: c.ink),
+      );
+    } else if (schedule.pinSet && schedule.venue == null) {
+      pin = Text('Set', key: Key('meeting-pin-$id'), style: value);
+    } else {
+      pin = Text(
+        'Not set',
+        key: Key('meeting-pin-$id'),
+        style: value.copyWith(color: c.muted),
+      );
+    }
+    final plan = canPlan
+        ? FocusRing(
+            child: FilledButton(
+              key: Key('meeting-next-plan-$id'),
+              style: _mtgCompact(),
+              onPressed: () => context.go(CellPaths.plan(next.meetingId)),
+              child: const Text('Plan the programme'),
+            ),
+          )
+        : null;
+    final usually = _mtgFact(
+      context,
+      'Usually',
+      Text(schedule.summary, key: Key('meeting-schedule-$id'), style: value),
+    );
+    final venue = _mtgFact(
+      context,
+      otherVenue ? 'Venue this time' : 'Venue',
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            otherVenue
+                ? next.venue!
+                : schedule.venue ??
+                      'Set (only the cell\'s leader, assistant and members '
+                          'see it)',
+            key: Key('meeting-venue-$id'),
+            style: value,
+          ),
+          if (otherVenue && schedule.venue != null)
+            Text(
+              'Usually ${schedule.venue}',
+              style: ChurchType.secondary.copyWith(
+                color: c.muted,
+                fontSize: 13,
+              ),
+            ),
+        ],
+      ),
+    );
+    final mapPin = _mtgFact(context, 'Map pin', pin);
+    return StaffSection(
+      title: 'Next meeting',
+      subtitle: 'Church time. The venue is private to the cell.',
+      trailing: narrow ? null : plan,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (next != null) ...[
+                ChurchDateBadge(at: next.startsAt, tone: DateBadgeTone.info),
+                const SizedBox(width: 14),
+              ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      next == null
+                          ? 'No meeting in the next 12 weeks'
+                          : '${_meetingDay(context, next.startsAt)} · '
+                                '${_mtgTimes(context, next)}',
+                      key: Key('meeting-next-$id'),
+                      style: ChurchType.sectionTitle.copyWith(color: c.ink),
+                    ),
+                    if (next?.moved ?? false) ...[
+                      const SizedBox(height: 6),
                       StatusLabel(
-                        label: m.venueMoved ? 'Moved, other venue' : 'Moved',
+                        label: next!.venueMoved
+                            ? 'Moved, other venue'
+                            : 'Moved from its usual time',
                         tone: StatusTone.warning,
                       ),
-                    if (m.cancelled)
-                      const StatusLabel(
-                        label: 'Cancelled',
-                        tone: StatusTone.danger,
-                      ),
-                    if (m.venueMoved && m.venue != null) Text('at ${m.venue}'),
-                    // Story 5.2: members the app could not reach about this
-                    // meeting; the leader tells them directly.
-                    if (m.contactNeeds.isNotEmpty)
-                      StatusLabel(
-                        key: Key('meeting-contact-${m.meetingId}'),
-                        label:
-                            'Tell directly: '
-                            '${m.contactNeeds.map((n) => n.displayName).join(', ')}',
-                        tone: StatusTone.warning,
-                      ),
-                    // Story 5.3: the cell's leader or assistant plans the
-                    // meeting's programme (the server decides; Admin alone
-                    // reads counts on the page itself).
-                    if (cell.role != MeetingRole.admin &&
-                        !m.cancelled &&
-                        m.startsAt.isAfter(now))
-                      FocusRing(
-                        child: TextButton(
-                          key: Key('meeting-plan-${m.meetingId}'),
-                          onPressed: () =>
-                              context.go(CellPaths.plan(m.meetingId)),
-                          child: const Text('Plan'),
+                    ],
+                    if (changed > 0) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '$changed of the next ${cell.meetings.length} '
+                        'meetings ${changed == 1 ? 'is' : 'are'} moved or '
+                        'cancelled.',
+                        style: ChurchType.secondary.copyWith(
+                          color: c.muted,
+                          fontSize: 13,
                         ),
                       ),
-                    // The server checks a cancelled meeting against its usual
-                    // time (it comes back there), any other against its own.
-                    if (cell.canChange &&
-                        (m.cancelled ? m.nominalStartsAt : m.startsAt).isAfter(
-                          now,
-                        )) ...[
-                      if (!m.cancelled) ...[
-                        FocusRing(
-                          child: TextButton(
-                            key: Key('meeting-move-${m.meetingId}'),
-                            onPressed: busy
-                                ? null
-                                : () => setState(
-                                    () => _moving = _moving == m.meetingId
-                                        ? null
-                                        : m.meetingId,
-                                  ),
-                            child: const Text('Move'),
-                          ),
-                        ),
-                        FocusRing(
-                          child: TextButton(
-                            key: Key('meeting-cancel-${m.meetingId}'),
-                            onPressed: busy ? null : () => ctl.cancel(m),
-                            child: const Text('Cancel this meeting'),
-                          ),
-                        ),
-                      ] else if (m.nominalStartsAt.isAfter(now))
-                        FocusRing(
-                          child: TextButton(
-                            key: Key('meeting-reinstate-${m.meetingId}'),
-                            onPressed: busy ? null : () => ctl.reinstate(m),
-                            child: const Text('Bring it back'),
-                          ),
-                        ),
                     ],
                   ],
                 ),
               ),
-              if (_moving == m.meetingId && !m.cancelled)
-                _MoveMeetingForm(
-                  key: Key('meeting-move-form-${m.meetingId}'),
-                  meeting: m,
-                  busy: busy,
-                ),
             ],
-          ],
-          // Story 5.8: the last four weeks, newest first: held or not, and who
-          // led (the leader or assistant records it on the meeting's page).
-          if (cell.recent.isNotEmpty) ...[
+          ),
+          if (narrow && plan != null) ...[
             const SizedBox(height: 12),
-            _heading(context, 'Last 4 weeks'),
-            for (final r in cell.recent)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Wrap(
-                  key: Key('recent-${r.meeting.meetingId}'),
-                  spacing: 8,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(_meetingWhen(context, r.meeting)),
-                    ?_statusLabel(r.status),
-                    if (cell.role != MeetingRole.admin &&
-                        r.status != MeetingStatus.cancelled)
-                      FocusRing(
-                        child: TextButton(
-                          key: Key('recent-open-${r.meeting.meetingId}'),
-                          onPressed: () =>
-                              context.go(CellPaths.plan(r.meeting.meetingId)),
-                          child: Text(
-                            r.status == MeetingStatus.unrecorded
-                                ? 'Record'
-                                : 'Open',
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+            Align(alignment: AlignmentDirectional.centerStart, child: plan),
           ],
-          // Setting the weekly rule is rare (Admin): open only for a cell
-          // without one, otherwise behind a button after the meetings.
-          if (cell.canSetSchedule) ...[
-            const SizedBox(height: 12),
-            if (schedule == null || _editing)
-              _ScheduleForm(cell: cell, busy: busy)
-            else
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: FocusRing(
-                  child: OutlinedButton(
-                    key: Key('schedule-edit-$id'),
-                    onPressed: busy
-                        ? null
-                        : () => setState(() => _editing = true),
-                    child: const Text('Change the schedule'),
-                  ),
-                ),
-              ),
-          ],
+          const SizedBox(height: 16),
+          Container(height: 1, color: c.line),
+          const SizedBox(height: 14),
+          if (narrow)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                usually,
+                const SizedBox(height: 12),
+                venue,
+                const SizedBox(height: 12),
+                mapPin,
+              ],
+            )
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: usually),
+                const SizedBox(width: 16),
+                Expanded(flex: 2, child: venue),
+                const SizedBox(width: 16),
+                Expanded(child: mapPin),
+              ],
+            ),
+          const SizedBox(height: 14),
+          // Story 5.2: the cell's reminders; the leader or an Admin changes
+          // them.
+          _RemindersRow(cell: cell, schedule: schedule, busy: widget.busy),
         ],
       ),
+    );
+  }
+
+  /// Story 5.8: the last four weeks, newest first: held or not (one pill),
+  /// and the record action (the leader or assistant records it on the
+  /// meeting's page).
+  Widget _mtgRecent(BuildContext context, {required bool wide}) {
+    final c = ChurchColors.of(context);
+    final cell = widget.cell;
+    const cols = [
+      StaffColumn('Meeting', flex: 3),
+      StaffColumn('Record', width: 112),
+      StaffColumn('', width: 92, numeric: true),
+    ];
+    return StaffSection(
+      title: 'Last 4 weeks',
+      subtitle: cell.role == MeetingRole.admin
+          ? 'Held or not, as the cell recorded it.'
+          : 'Record each meeting once it has happened.',
+      bodyPadding: EdgeInsets.zero,
+      child: cell.recent.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+              child: Text(
+                'No meetings in the last four weeks.',
+                style: ChurchType.staffBody.copyWith(color: c.muted),
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (wide)
+                  const StaffTableHeader(
+                    columns: cols,
+                    padding: EdgeInsets.fromLTRB(20, 10, 12, 8),
+                  ),
+                for (var i = 0; i < cell.recent.length; i++)
+                  _mtgRecentRow(
+                    context,
+                    cell.recent[i],
+                    cols,
+                    divider: i > 0,
+                    wide: wide,
+                  ),
+              ],
+            ),
+    );
+  }
+
+  Widget _mtgRecentRow(
+    BuildContext context,
+    RecentMeeting r,
+    List<StaffColumn> cols, {
+    required bool divider,
+    required bool wide,
+  }) {
+    final c = ChurchColors.of(context);
+    final cell = widget.cell;
+    final m = r.meeting;
+    final when = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _mtgShortDay(m.startsAt),
+          style: ChurchType.staffBody.copyWith(
+            color: c.ink,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(
+          _mtgTimes(context, m),
+          style: ChurchType.figures.copyWith(color: c.muted, fontSize: 13),
+        ),
+      ],
+    );
+    final status =
+        _statusLabel(r.status) ??
+        Text('—', style: ChurchType.staffBody.copyWith(color: c.muted));
+    final Widget action =
+        cell.role != MeetingRole.admin && r.status != MeetingStatus.cancelled
+        ? FocusRing(
+            child: TextButton(
+              key: Key('recent-open-${m.meetingId}'),
+              style: _mtgRowAction(),
+              onPressed: () => context.go(CellPaths.plan(m.meetingId)),
+              child: Text(
+                r.status == MeetingStatus.unrecorded ? 'Record' : 'Open',
+                semanticsLabel:
+                    '${r.status == MeetingStatus.unrecorded ? 'Record' : 'Open'}'
+                    ' the meeting of ${_mtgShortDay(m.startsAt)}',
+              ),
+            ),
+          )
+        : const SizedBox.shrink();
+    return StaffTableRow(
+      key: Key('recent-${m.meetingId}'),
+      divider: divider,
+      padding: const EdgeInsets.fromLTRB(20, 4, 12, 4),
+      child: wide
+          ? StaffColumnsRow(columns: cols, cells: [when, status, action])
+          : Row(
+              children: [
+                Expanded(child: when),
+                status,
+                action,
+              ],
+            ),
+    );
+  }
+
+  /// The next 12 weeks as a table: date, time, what differs (another
+  /// venue, people to tell directly), one state pill and the row's actions.
+  Widget _mtgAhead(
+    BuildContext context,
+    DateTime now,
+    bool busy, {
+    required bool wide,
+  }) {
+    final c = ChurchColors.of(context);
+    final cell = widget.cell;
+    const cols = [
+      StaffColumn('Date', width: 104),
+      StaffColumn('Time', width: 108),
+      StaffColumn('This meeting', flex: 3),
+      StaffColumn('State', width: 150),
+      StaffColumn('', width: 236, numeric: true),
+    ];
+    final rows = <Widget>[];
+    for (var i = 0; i < cell.meetings.length; i++) {
+      final m = cell.meetings[i];
+      rows.add(
+        _mtgAheadRow(context, m, cols, now, busy, divider: i > 0, wide: wide),
+      );
+      if (_moving == m.meetingId && !m.cancelled) {
+        rows.add(
+          _MoveMeetingForm(
+            key: Key('meeting-move-form-${m.meetingId}'),
+            meeting: m,
+            busy: busy,
+            onClose: () => setState(() => _moving = null),
+          ),
+        );
+      }
+    }
+    return StaffSection(
+      title: 'Next 12 weeks',
+      trailing: Text(
+        _mtgPlural(cell.meetings.length, 'meeting'),
+        style: ChurchType.figures.copyWith(color: c.muted),
+      ),
+      bodyPadding: EdgeInsets.zero,
+      child: cell.meetings.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+              child: Text(
+                'No meetings in the next 12 weeks.',
+                style: ChurchType.staffBody.copyWith(color: c.muted),
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (wide) const StaffTableHeader(columns: cols),
+                ...rows,
+              ],
+            ),
+    );
+  }
+
+  Widget _mtgAheadRow(
+    BuildContext context,
+    CellMeeting m,
+    List<StaffColumn> cols,
+    DateTime now,
+    bool busy, {
+    required bool divider,
+    required bool wide,
+  }) {
+    final c = ChurchColors.of(context);
+    final cell = widget.cell;
+    final ctl = ref.read(cellMeetingsProvider.notifier);
+    final day = _mtgShortDay(m.startsAt);
+    final notes = <Widget>[
+      if (m.venueMoved && m.venue != null)
+        Text(
+          'At ${m.venue}',
+          style: ChurchType.staffBody.copyWith(color: c.ink),
+        ),
+      // Story 5.2: members the app could not reach about this meeting; the
+      // leader tells them directly.
+      if (m.contactNeeds.isNotEmpty)
+        Text(
+          'Tell directly: '
+          '${m.contactNeeds.map((n) => n.displayName).join(', ')}',
+          key: Key('meeting-contact-${m.meetingId}'),
+          style: ChurchType.secondary.copyWith(
+            color: c.amberFg,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+    ];
+    final Widget state = m.cancelled
+        ? const StatusLabel(label: 'Cancelled', tone: StatusTone.danger)
+        : m.moved
+        ? StatusLabel(
+            label: m.venueMoved ? 'Moved, other venue' : 'Moved',
+            tone: StatusTone.warning,
+          )
+        : Text(
+            'As usual',
+            style: ChurchType.secondary.copyWith(color: c.muted),
+          );
+    // The server checks a cancelled meeting against its usual time (it comes
+    // back there), any other against its own.
+    final changeable =
+        cell.canChange &&
+        (m.cancelled ? m.nominalStartsAt : m.startsAt).isAfter(now);
+    Widget act(String key, String label, String spoken, VoidCallback? on) =>
+        FocusRing(
+          child: TextButton(
+            key: Key(key),
+            style: _mtgRowAction(),
+            onPressed: on,
+            child: Text(label, semanticsLabel: '$spoken $day'),
+          ),
+        );
+    final actions = Wrap(
+      alignment: wide ? WrapAlignment.end : WrapAlignment.start,
+      children: [
+        // Story 5.3: the cell's leader or assistant plans the meeting's
+        // programme (the server decides; Admin alone reads counts on the
+        // page itself).
+        if (cell.role != MeetingRole.admin &&
+            !m.cancelled &&
+            m.startsAt.isAfter(now))
+          act(
+            'meeting-plan-${m.meetingId}',
+            'Plan',
+            'Plan the meeting of',
+            () => context.go(CellPaths.plan(m.meetingId)),
+          ),
+        if (changeable && !m.cancelled) ...[
+          act(
+            'meeting-move-${m.meetingId}',
+            'Move',
+            'Move the meeting of',
+            busy
+                ? null
+                : () => setState(
+                    () => _moving = _moving == m.meetingId ? null : m.meetingId,
+                  ),
+          ),
+          act(
+            'meeting-cancel-${m.meetingId}',
+            'Cancel',
+            'Cancel the meeting of',
+            busy ? null : () => ctl.cancel(m),
+          ),
+        ] else if (changeable && m.nominalStartsAt.isAfter(now))
+          act(
+            'meeting-reinstate-${m.meetingId}',
+            'Bring it back',
+            'Bring back the meeting of',
+            busy ? null : () => ctl.reinstate(m),
+          ),
+      ],
+    );
+    final dayText = Text(
+      day,
+      style: ChurchType.staffBody.copyWith(
+        color: m.cancelled ? c.muted : c.ink,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+    final timeText = Text(
+      _mtgTimes(context, m),
+      style: ChurchType.figures.copyWith(color: m.cancelled ? c.muted : c.ink),
+    );
+    return StaffTableRow(
+      key: Key('meeting-${m.meetingId}'),
+      divider: divider,
+      padding: EdgeInsets.fromLTRB(20, 2, wide ? 12 : 16, 2),
+      child: wide
+          ? StaffColumnsRow(
+              columns: cols,
+              cells: [
+                dayText,
+                timeText,
+                notes.isEmpty
+                    ? const SizedBox.shrink()
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: notes,
+                      ),
+                state,
+                actions,
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    dayText,
+                    const SizedBox(width: 10),
+                    Expanded(child: timeText),
+                    state,
+                  ],
+                ),
+                ...notes,
+                actions,
+              ],
+            ),
     );
   }
 }
 
 class _ScheduleForm extends ConsumerStatefulWidget {
-  const _ScheduleForm({required this.cell, required this.busy});
+  const _ScheduleForm({required this.cell, required this.busy, this.onCancel});
   final StaffMeetingCell cell;
   final bool busy;
+
+  /// Closes the form without saving (a change to an existing schedule).
+  final VoidCallback? onCancel;
 
   @override
   ConsumerState<_ScheduleForm> createState() => _ScheduleFormState();
@@ -2346,22 +2964,20 @@ class _ScheduleFormState extends ConsumerState<_ScheduleForm> {
         !pinTyped ||
         (lat != null && lng != null && lat.abs() <= 90 && lng.abs() <= 180);
     final id = cell.cellId;
-    return Column(
+    return StaffSection(
       key: Key('schedule-form-$id'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _heading(
-          context,
-          first ? 'Set the weekly meeting' : 'Change the weekly meeting',
-        ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            DropdownButton<int>(
+      title: first ? 'Set the weekly meeting' : 'Change the weekly meeting',
+      subtitle:
+          'Church time. The next 12 weeks follow it; moved and cancelled '
+          'meetings keep their changes.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _mtgFieldRow([
+            DropdownButtonFormField<int>(
               key: Key('schedule-weekday-$id'),
-              value: _weekday,
+              initialValue: _weekday,
+              decoration: const InputDecoration(labelText: 'Day'),
               items: [
                 for (var d = 1; d <= 7; d++)
                   DropdownMenuItem(value: d, child: Text(weekdayName(d))),
@@ -2370,128 +2986,128 @@ class _ScheduleFormState extends ConsumerState<_ScheduleForm> {
                   ? null
                   : (v) => setState(() => _weekday = v ?? _weekday),
             ),
-            SizedBox(
-              width: 120,
-              child: TextField(
-                key: Key('schedule-start-$id'),
-                controller: _start,
-                enabled: !widget.busy,
-                decoration: InputDecoration(
-                  labelText: 'Starts (HH:MM)',
-                  errorText: err('start_time'),
-                ),
+            TextField(
+              key: Key('schedule-start-$id'),
+              controller: _start,
+              enabled: !widget.busy,
+              decoration: InputDecoration(
+                labelText: 'Starts (HH:MM)',
+                errorText: err('start_time'),
               ),
             ),
-            SizedBox(
-              width: 120,
-              child: TextField(
-                key: Key('schedule-end-$id'),
-                controller: _end,
-                enabled: !widget.busy,
-                decoration: InputDecoration(
-                  labelText: 'Ends (HH:MM)',
-                  errorText: err('end_time'),
-                ),
+            TextField(
+              key: Key('schedule-end-$id'),
+              controller: _end,
+              enabled: !widget.busy,
+              decoration: InputDecoration(
+                labelText: 'Ends (HH:MM)',
+                errorText: err('end_time'),
               ),
             ),
-          ],
-        ),
-        TextField(
-          key: Key('schedule-venue-$id'),
-          controller: _venue,
-          enabled: !widget.busy,
-          maxLength: 120,
-          decoration: InputDecoration(
-            labelText: first ? 'Venue' : 'New venue (leave empty to keep it)',
-            errorText: err('venue'),
+          ]),
+          TextField(
+            key: Key('schedule-venue-$id'),
+            controller: _venue,
+            enabled: !widget.busy,
+            maxLength: 120,
+            decoration: InputDecoration(
+              labelText: first ? 'Venue' : 'New venue (leave empty to keep it)',
+              errorText: err('venue'),
+            ),
+            onChanged: (_) => setState(() {}),
           ),
-          onChanged: (_) => setState(() {}),
-        ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            SizedBox(
-              width: 160,
-              child: TextField(
-                key: Key('schedule-lat-$id'),
-                controller: _lat,
-                enabled: !widget.busy,
-                decoration: InputDecoration(
-                  labelText: 'Map pin latitude',
-                  errorText: pinOk ? err('map_pin') : 'Check the pin',
-                ),
-                onChanged: (_) => setState(() {}),
+          const SizedBox(height: 4),
+          _mtgFieldRow([
+            TextField(
+              key: Key('schedule-lat-$id'),
+              controller: _lat,
+              enabled: !widget.busy,
+              decoration: InputDecoration(
+                labelText: 'Map pin latitude (optional)',
+                errorText: pinOk ? err('map_pin') : 'Check the pin',
               ),
+              onChanged: (_) => setState(() {}),
             ),
-            SizedBox(
-              width: 160,
-              child: TextField(
-                key: Key('schedule-lng-$id'),
-                controller: _lng,
-                enabled: !widget.busy,
-                decoration: const InputDecoration(
-                  labelText: 'Map pin longitude',
-                ),
-                onChanged: (_) => setState(() {}),
+            TextField(
+              key: Key('schedule-lng-$id'),
+              controller: _lng,
+              enabled: !widget.busy,
+              decoration: const InputDecoration(
+                labelText: 'Map pin longitude (optional)',
               ),
+              onChanged: (_) => setState(() {}),
             ),
-            if (cell.schedule?.pinSet ?? false)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Checkbox(
-                    key: Key('schedule-clear-pin-$id'),
-                    value: _clearPin,
-                    onChanged: widget.busy
-                        ? null
-                        : (v) => setState(() => _clearPin = v ?? false),
+          ]),
+          if (cell.schedule?.pinSet ?? false)
+            Row(
+              children: [
+                Checkbox(
+                  key: Key('schedule-clear-pin-$id'),
+                  value: _clearPin,
+                  onChanged: widget.busy
+                      ? null
+                      : (v) => setState(() => _clearPin = v ?? false),
+                ),
+                const Flexible(child: Text('Remove the map pin')),
+              ],
+            ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FocusRing(
+                child: FilledButton(
+                  key: Key('schedule-save-$id'),
+                  onPressed:
+                      widget.busy ||
+                          !pinOk ||
+                          (first && _venue.text.trim().isEmpty)
+                      ? null
+                      : () => ref
+                            .read(cellMeetingsProvider.notifier)
+                            .setSchedule(
+                              cell,
+                              weekday: _weekday,
+                              startTime: _start.text,
+                              endTime: _end.text,
+                              venue: _venue.text,
+                              pin: pinTyped && lat != null && lng != null
+                                  ? MeetingMapPin(lat: lat, lng: lng)
+                                  : null,
+                              clearPin: _clearPin && !pinTyped,
+                            ),
+                  child: const Text('Save schedule'),
+                ),
+              ),
+              if (widget.onCancel case final close?)
+                FocusRing(
+                  child: TextButton(
+                    key: Key('schedule-cancel-$id'),
+                    onPressed: widget.busy ? null : close,
+                    child: const Text('Keep as is'),
                   ),
-                  const Text('Remove the map pin'),
-                ],
-              ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: FocusRing(
-            child: FilledButton(
-              key: Key('schedule-save-$id'),
-              onPressed:
-                  widget.busy || !pinOk || (first && _venue.text.trim().isEmpty)
-                  ? null
-                  : () => ref
-                        .read(cellMeetingsProvider.notifier)
-                        .setSchedule(
-                          cell,
-                          weekday: _weekday,
-                          startTime: _start.text,
-                          endTime: _end.text,
-                          venue: _venue.text,
-                          pin: pinTyped && lat != null && lng != null
-                              ? MeetingMapPin(lat: lat, lng: lng)
-                              : null,
-                          clearPin: _clearPin && !pinTyped,
-                        ),
-              child: const Text('Save schedule'),
-            ),
+                ),
+            ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
+/// Moves one meeting: a panel under its row in the table, the fields side
+/// by side, church time.
 class _MoveMeetingForm extends ConsumerStatefulWidget {
   const _MoveMeetingForm({
     super.key,
     required this.meeting,
     required this.busy,
+    required this.onClose,
   });
   final CellMeeting meeting;
   final bool busy;
+  final VoidCallback onClose;
 
   @override
   ConsumerState<_MoveMeetingForm> createState() => _MoveMeetingFormState();
@@ -2521,6 +3137,7 @@ class _MoveMeetingFormState extends ConsumerState<_MoveMeetingForm> {
 
   @override
   Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
     final m = widget.meeting;
     final errors = ref.watch(cellMeetingsProvider.select((s) => s.fieldErrors));
     final starts = ChurchTime.parse(_date.text, _start.text);
@@ -2534,58 +3151,58 @@ class _MoveMeetingFormState extends ConsumerState<_MoveMeetingForm> {
       'too_long' => 'At most 6 hours',
       _ => 'Check this',
     };
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12, left: 16),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 0, 16, 14),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      decoration: BoxDecoration(
+        color: c.bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _muted(
-            context,
-            'Move only this meeting (now ${_meetingWhen(context, m)}). '
-            'Church time.',
+          Text(
+            'Move only this meeting',
+            style: ChurchType.staffBody.copyWith(
+              color: c.ink,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              SizedBox(
-                width: 150,
-                child: TextField(
-                  key: Key('move-date-${m.meetingId}'),
-                  controller: _date,
-                  enabled: !widget.busy,
-                  decoration: InputDecoration(
-                    labelText: 'Date (YYYY-MM-DD)',
-                    errorText: err('starts_at'),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-              SizedBox(
-                width: 110,
-                child: TextField(
-                  key: Key('move-start-${m.meetingId}'),
-                  controller: _start,
-                  enabled: !widget.busy,
-                  decoration: const InputDecoration(labelText: 'Starts'),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-              SizedBox(
-                width: 110,
-                child: TextField(
-                  key: Key('move-end-${m.meetingId}'),
-                  controller: _end,
-                  enabled: !widget.busy,
-                  decoration: InputDecoration(
-                    labelText: 'Ends',
-                    errorText: err('ends_at'),
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-              ),
-            ],
+          Text(
+            'Now ${_meetingWhen(context, m)}. Church time. Its other weeks '
+            'stay as they are.',
+            style: ChurchType.secondary.copyWith(color: c.muted),
           ),
+          const SizedBox(height: 12),
+          _mtgFieldRow([
+            TextField(
+              key: Key('move-date-${m.meetingId}'),
+              controller: _date,
+              enabled: !widget.busy,
+              decoration: InputDecoration(
+                labelText: 'Date (YYYY-MM-DD)',
+                errorText: err('starts_at'),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            TextField(
+              key: Key('move-start-${m.meetingId}'),
+              controller: _start,
+              enabled: !widget.busy,
+              decoration: const InputDecoration(labelText: 'Starts'),
+              onChanged: (_) => setState(() {}),
+            ),
+            TextField(
+              key: Key('move-end-${m.meetingId}'),
+              controller: _end,
+              enabled: !widget.busy,
+              decoration: InputDecoration(
+                labelText: 'Ends',
+                errorText: err('ends_at'),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+          ]),
           TextField(
             key: Key('move-venue-${m.meetingId}'),
             controller: _venue,
@@ -2606,28 +3223,39 @@ class _MoveMeetingFormState extends ConsumerState<_MoveMeetingForm> {
                       ? null
                       : (v) => setState(() => _regularVenue = v ?? false),
                 ),
-                const Text('Use the usual venue'),
+                const Flexible(child: Text('Use the usual venue')),
               ],
             ),
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: FocusRing(
-              child: FilledButton(
-                key: Key('move-save-${m.meetingId}'),
-                onPressed: widget.busy || !ok
-                    ? null
-                    : () => ref
-                          .read(cellMeetingsProvider.notifier)
-                          .move(
-                            m,
-                            startsAt: starts,
-                            endsAt: ends,
-                            venue: _regularVenue ? null : _venue.text,
-                            regularVenue: _regularVenue,
-                          ),
-                child: const Text('Move this meeting'),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FocusRing(
+                child: FilledButton(
+                  key: Key('move-save-${m.meetingId}'),
+                  onPressed: widget.busy || !ok
+                      ? null
+                      : () => ref
+                            .read(cellMeetingsProvider.notifier)
+                            .move(
+                              m,
+                              startsAt: starts,
+                              endsAt: ends,
+                              venue: _regularVenue ? null : _venue.text,
+                              regularVenue: _regularVenue,
+                            ),
+                  child: const Text('Move this meeting'),
+                ),
               ),
-            ),
+              FocusRing(
+                child: TextButton(
+                  key: Key('move-cancel-${m.meetingId}'),
+                  onPressed: widget.busy ? null : widget.onClose,
+                  child: const Text('Keep as is'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -2754,6 +3382,7 @@ class _RemindersRowState extends ConsumerState<_RemindersRow> {
 
   @override
   Widget build(BuildContext context) {
+    final cl = ChurchColors.of(context);
     final cell = widget.cell;
     final schedule = widget.schedule;
     final busy = widget.busy;
@@ -2766,103 +3395,129 @@ class _RemindersRowState extends ConsumerState<_RemindersRow> {
       for (final r in schedule.reminders)
         if (!meetingReminderChoices.contains(r)) r,
     ];
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(
-                'Reminders: ${schedule.remindersText}'
-                '${schedule.remindersDefault ? ' (usual)' : ''}',
-                key: Key('meeting-reminders-$id'),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _mtgFact(
+                context,
+                'Reminders',
+                Text(
+                  '${schedule.remindersText}'
+                  '${schedule.remindersDefault ? ' (usual)' : ''}',
+                  key: Key('meeting-reminders-$id'),
+                  style: ChurchType.staffBody.copyWith(color: cl.ink),
+                ),
               ),
-              if (cell.canChange && !_editing)
-                FocusRing(
-                  child: TextButton(
-                    key: Key('reminders-edit-$id'),
-                    onPressed: busy
-                        ? null
-                        : () => setState(() {
-                            _chosen = schedule.reminders.toSet();
-                            _editing = true;
-                          }),
-                    child: const Text('Change reminders'),
-                  ),
-                ),
-            ],
-          ),
-          if (_editing) ...[
-            _muted(context, 'Choose up to three. Members can snooze each one.'),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                for (final c in choices)
-                  FilterChip(
-                    key: Key('reminder-choice-$id-$c'),
-                    label: Text(reminderLabel(c)),
-                    selected: _chosen.contains(c),
-                    onSelected: busy
-                        ? null
-                        : (on) => setState(() {
-                            if (on && _chosen.length < 3) {
-                              _chosen.add(c);
-                            } else if (!on) {
-                              _chosen.remove(c);
-                            }
-                          }),
-                  ),
-              ],
             ),
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 8,
-              children: [
-                FocusRing(
-                  child: FilledButton(
-                    key: Key('reminders-save-$id'),
-                    onPressed: busy
-                        ? null
-                        : () {
-                            setState(() => _editing = false);
-                            ctl.setReminders(cell, [
-                              for (final c in choices)
-                                if (_chosen.contains(c)) c,
-                            ]);
-                          },
-                    child: Text(
-                      _chosen.isEmpty ? 'Save: no reminders' : 'Save reminders',
-                    ),
-                  ),
+            if (cell.canChange && !_editing)
+              FocusRing(
+                child: TextButton(
+                  key: Key('reminders-edit-$id'),
+                  style: _mtgRowAction(),
+                  onPressed: busy
+                      ? null
+                      : () => setState(() {
+                          _chosen = schedule.reminders.toSet();
+                          _editing = true;
+                        }),
+                  child: const Text('Change reminders'),
                 ),
-                FocusRing(
-                  child: TextButton(
-                    key: Key('reminders-default-$id'),
-                    onPressed: busy
-                        ? null
-                        : () {
-                            setState(() => _editing = false);
-                            ctl.setReminders(cell, null);
-                          },
-                    child: const Text('Use the usual (1 day before)'),
-                  ),
-                ),
-                FocusRing(
-                  child: TextButton(
-                    key: Key('reminders-cancel-$id'),
-                    onPressed: () => setState(() => _editing = false),
-                    child: const Text('Keep as is'),
-                  ),
-                ),
-              ],
-            ),
+              ),
           ],
+        ),
+        if (_editing) ...[
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            decoration: BoxDecoration(
+              color: cl.bg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Choose up to three. Members can snooze each one.',
+                  style: ChurchType.secondary.copyWith(color: cl.muted),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final c in choices)
+                      FilterChip(
+                        key: Key('reminder-choice-$id-$c'),
+                        label: Text(reminderLabel(c)),
+                        selected: _chosen.contains(c),
+                        onSelected: busy
+                            ? null
+                            : (on) => setState(() {
+                                if (on && _chosen.length < 3) {
+                                  _chosen.add(c);
+                                } else if (!on) {
+                                  _chosen.remove(c);
+                                }
+                              }),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    FocusRing(
+                      child: FilledButton(
+                        key: Key('reminders-save-$id'),
+                        style: _mtgCompact(),
+                        onPressed: busy
+                            ? null
+                            : () {
+                                setState(() => _editing = false);
+                                ctl.setReminders(cell, [
+                                  for (final c in choices)
+                                    if (_chosen.contains(c)) c,
+                                ]);
+                              },
+                        child: Text(
+                          _chosen.isEmpty
+                              ? 'Save: no reminders'
+                              : 'Save reminders',
+                        ),
+                      ),
+                    ),
+                    FocusRing(
+                      child: TextButton(
+                        key: Key('reminders-default-$id'),
+                        style: _mtgRowAction(),
+                        onPressed: busy
+                            ? null
+                            : () {
+                                setState(() => _editing = false);
+                                ctl.setReminders(cell, null);
+                              },
+                        child: const Text('Use the usual (1 day before)'),
+                      ),
+                    ),
+                    FocusRing(
+                      child: TextButton(
+                        key: Key('reminders-cancel-$id'),
+                        style: _mtgRowAction(),
+                        onPressed: () => setState(() => _editing = false),
+                        child: const Text('Keep as is'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 }
@@ -2931,54 +3586,9 @@ class _PlanBody extends ConsumerWidget {
     final ahead = m.startsAt.isAfter(DateTime.now().toUtc());
     final open = ahead && !m.cancelled;
     final children = <Widget>[
-      _muted(context, read.cellName),
       // The page's answer first: when the meeting is, and how planned.
-      Text(
-        _meetingWhen(context, m),
-        key: const Key('plan-when'),
-        style: ChurchType.sectionTitle.copyWith(
-          color: ChurchColors.of(context).ink,
-        ),
-      ),
-      const SizedBox(height: 4),
-      Wrap(
-        spacing: 8,
-        runSpacing: 4,
-        children: [
-          if (m.cancelled)
-            const StatusLabel(
-              label: 'Meeting cancelled',
-              tone: StatusTone.danger,
-            )
-          else
-            ?_statusLabel(read.status, key: const Key('plan-status')),
-          if (p == null)
-            const StatusLabel(
-              key: Key('plan-state-none'),
-              label: 'No programme yet',
-              tone: StatusTone.neutral,
-            )
-          else ...[
-            StatusLabel(
-              key: Key('plan-state-${p.state.wire}'),
-              label: switch (p.state) {
-                ProgrammeState.draft => 'Draft: members don\'t see it',
-                ProgrammeState.published => 'Published to members',
-                ProgrammeState.cancelled => 'Cancelled',
-              },
-              tone: switch (p.state) {
-                ProgrammeState.draft => StatusTone.info,
-                ProgrammeState.published => StatusTone.success,
-                ProgrammeState.cancelled => StatusTone.neutral,
-              },
-            ),
-            _partsLabel(p.partCount, p.gaps),
-            if (p.published && read.duties.isNotEmpty)
-              _answersLabel(read.duties.values),
-          ],
-        ],
-      ),
-      const SizedBox(height: 12),
+      _PlanSummary(read: read),
+      const SizedBox(height: 16),
     ];
     // Story 5.8: once the meeting has started, what happened comes first (the
     // server's status says so, not this device's clock).
@@ -2989,14 +3599,14 @@ class _PlanBody extends ConsumerWidget {
             status == MeetingStatus.unrecorded)) {
       children.addAll([
         _RecordCard(meetingId: meetingId, read: read, state: state),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
       ]);
     }
     // Story 5.7: who can't attend comes before the plan (a coverage warning).
     if (read.canEdit && read.absences.isNotEmpty) {
       children.addAll([
         _AbsencesCard(absences: read.absences),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
       ]);
     }
     if (!read.full) {
@@ -3008,32 +3618,46 @@ class _PlanBody extends ConsumerWidget {
         ),
       );
     } else if (p == null) {
-      if (read.canEdit && open) {
-        children.add(
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: FocusRing(
-              child: FilledButton(
-                key: const Key('plan-create'),
-                onPressed: state.busy ? null : () => ctl.create(m),
-                child: const Text('Start the programme'),
-              ),
+      final start = read.canEdit && open;
+      children.add(
+        _planNarrow(
+          context,
+          StaffSection(
+            title: 'Programme',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  start
+                      ? 'Start it to add the parts and who leads each. '
+                            'Members see nothing until you publish it.'
+                      : !open
+                      ? (m.cancelled
+                            ? 'This meeting is cancelled, so it has no '
+                                  'programme.'
+                            : 'This meeting has started, so it can no longer '
+                                  'be planned.')
+                      : 'The cell\'s leader or assistant plans this meeting.',
+                  key: start ? null : const Key('plan-none'),
+                  style: ChurchType.staffBody.copyWith(
+                    color: ChurchColors.of(context).muted,
+                  ),
+                ),
+                if (start) ...[
+                  const SizedBox(height: 14),
+                  FocusRing(
+                    child: FilledButton(
+                      key: const Key('plan-create'),
+                      onPressed: state.busy ? null : () => ctl.create(m),
+                      child: const Text('Start the programme'),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-        );
-      } else {
-        children.add(
-          Text(
-            !open
-                ? (m.cancelled
-                      ? 'This meeting is cancelled, so it has no programme.'
-                      : 'This meeting has started, so it can no longer be '
-                            'planned.')
-                : 'The cell\'s leader or assistant plans this meeting.',
-            key: const Key('plan-none'),
-          ),
-        );
-      }
+        ),
+      );
     } else if (p.draft && read.canEdit && open) {
       children.add(
         _ProgrammeEditor(
@@ -3057,38 +3681,18 @@ class _PlanBody extends ConsumerWidget {
         ),
       );
     } else {
+      String? why;
       if (p.draft && read.canEdit && !open) {
-        children.add(
-          _muted(
-            context,
-            m.cancelled
-                ? 'This meeting is cancelled, so its programme can\'t change.'
-                : 'This meeting has started, so its programme can\'t change.',
-          ),
-        );
+        why = m.cancelled
+            ? 'This meeting is cancelled, so its programme can\'t change.'
+            : 'This meeting has started, so its programme can\'t change.';
       } else if (!read.canEdit) {
-        children.add(_muted(context, 'Read only.'));
+        why = 'Read only.';
       }
-      children.add(const SizedBox(height: 8));
-      children.add(
-        _ProgrammePreview(
-          meeting: m,
-          topic: p.topic,
-          scripture: p.scripture,
-          studyNotes: p.studyNotes,
-          parts: [
-            for (final part in p.parts)
-              (
-                start: ChurchTime.timeText(part.startsAt),
-                end: ChurchTime.timeText(part.endsAt),
-                label: part.label,
-                who: part.assignee?.displayName ?? part.linkedLabel,
-                leftCell: part.assignee != null && !part.assignee!.inCell,
-              ),
-          ],
-          caption: null,
-        ),
-      );
+      if (why != null) {
+        children.addAll([_muted(context, why), const SizedBox(height: 12)]);
+      }
+      children.add(_PlanReadOnly(read: read, programme: p));
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3096,6 +3700,310 @@ class _PlanBody extends ConsumerWidget {
     );
   }
 }
+
+/// A block that holds a few lines keeps to a readable width on a wide
+/// screen instead of spanning the canvas.
+Widget _planNarrow(BuildContext context, Widget child) => Align(
+  alignment: AlignmentDirectional.centerStart,
+  child: ConstrainedBox(
+    constraints: const BoxConstraints(maxWidth: 760),
+    child: child,
+  ),
+);
+
+/// The page's answer: which meeting (date badge, when, where, which cell)
+/// and how planned it is (the programme's state, its gaps and, once
+/// published, who has said yes): one pale pill each, coloured by the data.
+class _PlanSummary extends StatelessWidget {
+  const _PlanSummary({required this.read});
+  final ProgrammeRead read;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final m = read.meeting;
+    final p = read.programme;
+    final pills = <Widget>[
+      if (m.cancelled)
+        const StatusLabel(label: 'Meeting cancelled', tone: StatusTone.danger)
+      // Once recorded, After the meeting carries Held or Not held: one
+      // status mark, not two.
+      else if (read.record == null || !read.full)
+        ?_statusLabel(read.status, key: const Key('plan-status')),
+      if (p == null)
+        const StatusLabel(
+          key: Key('plan-state-none'),
+          label: 'No programme yet',
+          tone: StatusTone.neutral,
+        )
+      else ...[
+        StatusLabel(
+          key: Key('plan-state-${p.state.wire}'),
+          label: switch (p.state) {
+            ProgrammeState.draft => 'Draft: members don\'t see it',
+            ProgrammeState.published => 'Published to members',
+            ProgrammeState.cancelled => 'Cancelled',
+          },
+          tone: switch (p.state) {
+            ProgrammeState.draft => StatusTone.info,
+            ProgrammeState.published => StatusTone.success,
+            ProgrammeState.cancelled => StatusTone.neutral,
+          },
+        ),
+        _partsLabel(p.partCount, p.gaps),
+        if (p.published && read.duties.isNotEmpty)
+          _answersLabel(read.duties.values),
+      ],
+    ];
+    final facts = Row(
+      children: [
+        ChurchDateBadge(at: m.startsAt, tone: DateBadgeTone.info),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                read.cellName,
+                style: ChurchType.secondary.copyWith(
+                  color: c.muted,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                _meetingWhen(context, m),
+                key: const Key('plan-when'),
+                style: ChurchType.sectionTitle.copyWith(color: c.ink),
+              ),
+              if (m.venue case final v?)
+                Text(v, style: ChurchType.secondary.copyWith(color: c.muted)),
+            ],
+          ),
+        ),
+      ],
+    );
+    return ChurchCard(
+      radius: churchCardRadiusOf(context),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      child: LayoutBuilder(
+        builder: (context, box) => box.maxWidth >= 720
+            ? Row(
+                children: [
+                  Expanded(flex: 3, child: facts),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 2,
+                    child: Align(
+                      alignment: AlignmentDirectional.centerEnd,
+                      child: Wrap(
+                        alignment: WrapAlignment.end,
+                        spacing: 8,
+                        runSpacing: 6,
+                        children: pills,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  facts,
+                  const SizedBox(height: 12),
+                  Wrap(spacing: 8, runSpacing: 6, children: pills),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+/// A programme read but not changed here (pastor oversight, a cancelled
+/// programme, a meeting that has started): the parts as a table, and the
+/// Bible study beside it.
+class _PlanReadOnly extends StatelessWidget {
+  const _PlanReadOnly({required this.read, required this.programme});
+  final ProgrammeRead read;
+  final CellProgramme programme;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final p = programme;
+    final answers = read.duties.isNotEmpty;
+    final columns = [
+      const StaffColumn('Time', width: 56),
+      const StaffColumn('Part', flex: 3),
+      const StaffColumn('Who leads', flex: 3),
+      if (answers) const StaffColumn('Answer', width: 180),
+    ];
+    final table = StaffSection(
+      title: 'Programme',
+      bodyPadding: EdgeInsets.zero,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final wide = box.maxWidth >= 560;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (p.parts.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+                  child: _muted(context, 'No parts were planned.'),
+                ),
+              if (wide && p.parts.isNotEmpty)
+                StaffTableHeader(
+                  columns: columns,
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 10),
+                ),
+              for (final (i, part) in p.parts.indexed)
+                StaffTableRow(
+                  divider: wide || i > 0,
+                  child: _planReadOnlyRow(
+                    context,
+                    part,
+                    read.duties[part.partId],
+                    columns,
+                    wide: wide,
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+    String orDash(String? v) => v == null || v.trim().isEmpty ? '—' : v;
+    final study = StaffSection(
+      title: 'Bible study',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (label, value) in [
+            ('Topic', orDash(p.topic)),
+            ('Scripture', orDash(p.scripture)),
+            (
+              'Study notes (leader, assistant and pastors)',
+              orDash(p.studyNotes),
+            ),
+          ]) ...[
+            Text(label, style: staffTableHeadStyle(context)),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              style: ChurchType.staffBody.copyWith(
+                color: value == '—' ? c.muted : c.ink,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+        ],
+      ),
+    );
+    return LayoutBuilder(
+      builder: (context, box) => box.maxWidth >= 900
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 3, child: table),
+                const SizedBox(width: 24),
+                Expanded(flex: 2, child: study),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [table, const SizedBox(height: 16), study],
+            ),
+    );
+  }
+}
+
+/// Who leads a part, as a manager reads it: a person, a department duty
+/// shown on it, or a gap (the gap and a person who left in the warning
+/// colour).
+Widget _planWho(BuildContext context, ProgrammePart part) {
+  final c = ChurchColors.of(context);
+  final a = part.assignee;
+  final (text, warn) = a != null
+      ? (
+          a.inCell ? a.displayName : '${a.displayName} (left the cell)',
+          !a.inCell,
+        )
+      : part.linkedSlotId != null
+      ? (part.linkedLabel ?? 'Department duty', false)
+      : ('Gap: nobody leads this part', true);
+  return Text(
+    text,
+    style: ChurchType.staffBody.copyWith(color: warn ? c.amberFg : c.ink),
+  );
+}
+
+Widget _planReadOnlyRow(
+  BuildContext context,
+  ProgrammePart part,
+  PartDuty? duty,
+  List<StaffColumn> columns, {
+  required bool wide,
+}) {
+  final c = ChurchColors.of(context);
+  final time = Text(
+    ChurchTime.timeText(part.startsAt),
+    style: ChurchType.programmeTime.copyWith(color: c.muted),
+  );
+  final label = Text(
+    part.label,
+    style: ChurchType.staffBody.copyWith(
+      color: c.ink,
+      fontWeight: FontWeight.w600,
+    ),
+  );
+  final answer = duty == null
+      ? Text('—', style: ChurchType.staffBody.copyWith(color: c.muted))
+      : _planAnswer(part, duty);
+  if (wide) {
+    return StaffColumnsRow(
+      columns: columns,
+      cells: [
+        time,
+        label,
+        _planWho(context, part),
+        if (columns.length > 3) answer,
+      ],
+    );
+  }
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SizedBox(width: 56, child: time),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [label, _planWho(context, part)],
+        ),
+      ),
+      if (duty != null) ...[const SizedBox(width: 8), answer],
+    ],
+  );
+}
+
+/// A published part's answer in Duties: the one status mark of its row.
+StatusLabel _planAnswer(ProgrammePart part, PartDuty d, {Key? key}) =>
+    StatusLabel(
+      key: key,
+      label: part.linkedSlotId != null && d.status == PartDutyStatus.open
+          ? 'Department duty: link ended'
+          : d.label,
+      tone: switch (d.status) {
+        PartDutyStatus.accepted ||
+        PartDutyStatus.departmentFilled => StatusTone.success,
+        PartDutyStatus.declined => StatusTone.danger,
+        PartDutyStatus.open ||
+        PartDutyStatus.departmentOpen => StatusTone.warning,
+        PartDutyStatus.awaiting => StatusTone.info,
+        PartDutyStatus.cancelled => StatusTone.neutral,
+      },
+    );
 
 /// "5 parts, 1 gap": the gap count is the data that matters, so it carries
 /// the colour.
@@ -3352,6 +4260,7 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
     final read = widget.read;
     final m = read.meeting;
     final busy = widget.busy;
@@ -3383,6 +4292,186 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
           'd:$slot':
               '${part.linkedLabel ?? 'Department duty'} (no longer offered)',
     };
+    // The same people by name alone, for the member preview (it adds "left
+    // the cell" itself).
+    final formerNames = <String, String>{
+      for (final part in widget.programme.parts)
+        if (part.assignee case final a? when !a.inCell)
+          'm:${a.memberId}': a.displayName,
+      for (final part in widget.programme.parts)
+        if (part.linkedSlotId case final slot?
+            when !read.linkable.any((l) => l.slotId == slot))
+          'd:$slot': part.linkedLabel ?? 'Department duty',
+    };
+    InputDecoration field(String label, String key, int max) => InputDecoration(
+      labelText: label,
+      counterText: '',
+      errorText: textError(key, max),
+    );
+    final study = StaffSection(
+      title: 'Bible study',
+      subtitle:
+          'Members see the topic and scripture. The notes stay with the '
+          'leader, the assistant and pastors.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LayoutBuilder(
+            builder: (context, box) {
+              final topic = TextField(
+                key: const Key('plan-topic'),
+                controller: _topic,
+                enabled: !busy,
+                maxLength: 120,
+                decoration: field('Bible study topic', 'topic', 120),
+                onChanged: (_) => setState(() {}),
+              );
+              final scripture = TextField(
+                key: const Key('plan-scripture'),
+                controller: _scripture,
+                enabled: !busy,
+                maxLength: 120,
+                decoration: field('Scripture', 'scripture', 120),
+                onChanged: (_) => setState(() {}),
+              );
+              return box.maxWidth >= 560
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: topic),
+                        const SizedBox(width: 14),
+                        Expanded(child: scripture),
+                      ],
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [topic, const SizedBox(height: 14), scripture],
+                    );
+            },
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            key: const Key('plan-notes'),
+            controller: _notes,
+            enabled: !busy,
+            maxLength: 2000,
+            minLines: 2,
+            maxLines: 6,
+            decoration: field(
+              'Study notes (for the leader and assistant)',
+              'study_notes',
+              2000,
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+      ),
+    );
+    final programme = StaffSection(
+      title: 'Programme',
+      subtitle:
+          'Each person sees their part on their phone. Keep the parts inside '
+          '${ChurchTime.timeText(m.startsAt)}–${ChurchTime.timeText(m.endsAt)} '
+          '(church time), in order and without overlaps.',
+      bodyPadding: EdgeInsets.zero,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final wide = box.maxWidth >= 640;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_rows.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+                  child: Text(
+                    'No parts yet.',
+                    key: const Key('plan-no-parts'),
+                    style: ChurchType.staffBody.copyWith(color: c.muted),
+                  ),
+                )
+              else if (wide)
+                StaffTableHeader(
+                  columns: _planEditColumns,
+                  gap: _planEditGap,
+                  padding: _planEditHeaderPadding,
+                ),
+              for (final (i, r) in _rows.indexed)
+                _PartEditorRow(
+                  key: ValueKey('part-row-${r.key}'),
+                  index: i,
+                  row: r,
+                  wide: wide,
+                  divider: wide || i > 0,
+                  roster: read.roster,
+                  linkable: read.linkable,
+                  former: former,
+                  busy: busy,
+                  error: _partErrorText(errors, i, window),
+                  onChanged: () => setState(() {}),
+                  onRemove: () {
+                    // The refused save's errors were for the old rows
+                    // (5.3 review fix 11).
+                    ctl.clearFieldErrors();
+                    setState(() {
+                      _rows.remove(r);
+                      r.dispose();
+                    });
+                  },
+                ),
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 10, 20, 12),
+                decoration: BoxDecoration(
+                  border: _rows.isEmpty
+                      ? null
+                      : Border(top: BorderSide(color: c.line)),
+                ),
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _PlanAddPart(
+                      enabled: !busy && _rows.length < programmeMaxParts,
+                      full: _rows.length >= programmeMaxParts,
+                      onPressed: _addPart,
+                    ),
+                    if (read.linkable.isNotEmpty)
+                      _muted(
+                        context,
+                        'A part can show a department duty instead of a '
+                        'person; it stays the department\'s.',
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    final publishLabel = overrideAsked
+        ? 'Publish with this reason'
+        : widget.programme.published
+        ? 'Publish changes'
+        : 'Publish to members';
+    final note = dirty
+        ? 'Save the draft to publish it.'
+        : _rows.isEmpty
+        ? 'Add a part to publish.'
+        : widget.programme.published
+        ? 'Publishing asks again only those whose part changed.'
+        : 'Publishing asks each person to accept their part.';
+    final cancel = widget.programme.published
+        ? const SizedBox.shrink()
+        : _planCancel(
+            context,
+            confirming: _confirmCancel,
+            busy: busy,
+            question: 'Cancel it? It stays read-only.',
+            onAsk: () => setState(() => _confirmCancel = true),
+            onKeep: () => setState(() => _confirmCancel = false),
+            onCancel: () => ctl.cancel(widget.programme),
+          );
     final editor = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -3403,108 +4492,12 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
         ],
-        _Card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              TextField(
-                key: const Key('plan-topic'),
-                controller: _topic,
-                enabled: !busy,
-                maxLength: 120,
-                decoration: InputDecoration(
-                  labelText: 'Bible study topic',
-                  errorText: textError('topic', 120),
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-              TextField(
-                key: const Key('plan-scripture'),
-                controller: _scripture,
-                enabled: !busy,
-                maxLength: 120,
-                decoration: InputDecoration(
-                  labelText: 'Scripture',
-                  errorText: textError('scripture', 120),
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-              TextField(
-                key: const Key('plan-notes'),
-                controller: _notes,
-                enabled: !busy,
-                maxLength: 2000,
-                minLines: 2,
-                maxLines: 6,
-                decoration: InputDecoration(
-                  labelText: 'Study notes (for the leader and assistant)',
-                  errorText: textError('study_notes', 2000),
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        _Card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _heading(context, 'Programme'),
-              _muted(
-                context,
-                'In time order, inside the meeting ($window, church time), '
-                'without overlaps. A part without a person is a gap. A '
-                'department duty can be shown on a part; it stays the '
-                'department\'s.',
-              ),
-              const SizedBox(height: 8),
-              if (_rows.isEmpty)
-                const Text('No parts yet.', key: Key('plan-no-parts')),
-              for (final (i, r) in _rows.indexed)
-                _PartEditorRow(
-                  key: ValueKey('part-row-${r.key}'),
-                  index: i,
-                  row: r,
-                  roster: read.roster,
-                  linkable: read.linkable,
-                  former: former,
-                  busy: busy,
-                  error: _partErrorText(errors, i, window),
-                  onChanged: () => setState(() {}),
-                  onRemove: () {
-                    // The refused save's errors were for the old rows
-                    // (5.3 review fix 11).
-                    ctl.clearFieldErrors();
-                    setState(() {
-                      _rows.remove(r);
-                      r.dispose();
-                    });
-                  },
-                ),
-              const SizedBox(height: 4),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: FocusRing(
-                  child: OutlinedButton(
-                    key: const Key('plan-add-part'),
-                    onPressed: busy || _rows.length >= programmeMaxParts
-                        ? null
-                        : _addPart,
-                    child: Text(
-                      _rows.length >= programmeMaxParts
-                          ? 'At most $programmeMaxParts parts'
-                          : 'Add a part',
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
+        study,
+        const SizedBox(height: 16),
+        programme,
+        const SizedBox(height: 16),
         if (overrideAsked) ...[
           TextField(
             key: const Key('plan-override'),
@@ -3525,84 +4518,59 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
           const SizedBox(height: 8),
         ],
         Wrap(
-          spacing: 8,
+          alignment: WrapAlignment.spaceBetween,
+          spacing: 16,
           runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            FocusRing(
-              child: OutlinedButton(
-                key: const Key('plan-save'),
-                onPressed: busy
-                    ? null
-                    : () => ctl.save(
-                        widget.programme,
-                        topic: _topic.text,
-                        scripture: _scripture.text,
-                        studyNotes: _notes.text,
-                        parts: _drafts,
-                      ),
-                child: const Text('Save draft'),
-              ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                FocusRing(
+                  child: FilledButton(
+                    key: Key(
+                      overrideAsked ? 'plan-publish-override' : 'plan-publish',
+                    ),
+                    onPressed:
+                        busy ||
+                            dirty ||
+                            _stale ||
+                            _rows.isEmpty ||
+                            (overrideAsked && _reason.text.trim().isEmpty)
+                        ? null
+                        : () => ctl.publish(
+                            widget.programme,
+                            overrideReason: overrideAsked ? _reason.text : null,
+                          ),
+                    child: Text(publishLabel),
+                  ),
+                ),
+                FocusRing(
+                  child: OutlinedButton(
+                    key: const Key('plan-save'),
+                    onPressed: busy
+                        ? null
+                        : () => ctl.save(
+                            widget.programme,
+                            topic: _topic.text,
+                            scripture: _scripture.text,
+                            studyNotes: _notes.text,
+                            parts: _drafts,
+                          ),
+                    child: const Text('Save draft'),
+                  ),
+                ),
+              ],
             ),
-            FocusRing(
-              child: FilledButton(
-                key: Key(
-                  overrideAsked ? 'plan-publish-override' : 'plan-publish',
-                ),
-                onPressed:
-                    busy ||
-                        dirty ||
-                        _stale ||
-                        _rows.isEmpty ||
-                        (overrideAsked && _reason.text.trim().isEmpty)
-                    ? null
-                    : () => ctl.publish(
-                        widget.programme,
-                        overrideReason: overrideAsked ? _reason.text : null,
-                      ),
-                child: Text(
-                  overrideAsked
-                      ? 'Publish with this reason'
-                      : widget.programme.published
-                      ? 'Publish changes'
-                      : 'Publish to members',
-                ),
-              ),
-            ),
-            if (dirty)
-              _muted(context, 'Save the draft to publish it.')
-            else if (_rows.isEmpty)
-              _muted(context, 'Add a part to publish.'),
-            if (widget.programme.published)
-              const SizedBox.shrink()
-            else if (!_confirmCancel)
-              FocusRing(
-                child: TextButton(
-                  key: const Key('plan-cancel'),
-                  onPressed: busy
-                      ? null
-                      : () => setState(() => _confirmCancel = true),
-                  child: const Text('Cancel this programme'),
-                ),
-              )
-            else ...[
-              const Text('Cancel it? It stays read-only.'),
-              FocusRing(
-                child: TextButton(
-                  key: const Key('plan-cancel-confirm'),
-                  onPressed: busy ? null : () => ctl.cancel(widget.programme),
-                  child: const Text('Yes, cancel the programme'),
-                ),
-              ),
-              FocusRing(
-                child: TextButton(
-                  key: const Key('plan-cancel-keep'),
-                  onPressed: () => setState(() => _confirmCancel = false),
-                  child: const Text('Keep it'),
-                ),
-              ),
-            ],
+            cancel,
           ],
+        ),
+        // What the buttons do, or why Publish waits, under them.
+        Padding(
+          padding: const EdgeInsetsDirectional.only(start: 6, top: 2),
+          child: _muted(context, note),
         ),
       ],
     );
@@ -3610,37 +4578,202 @@ class _ProgrammeEditorState extends ConsumerState<_ProgrammeEditor> {
       meeting: m,
       topic: _topic.text.trim().isEmpty ? null : _topic.text.trim(),
       scripture: _scripture.text.trim().isEmpty ? null : _scripture.text.trim(),
-      studyNotes: null,
       parts: [
         for (final r in _rows)
           (
             start: r.start.text.trim(),
             end: r.end.text.trim(),
             label: r.label.text.trim().isEmpty ? 'Untitled part' : r.label.text,
-            who: r.who == null ? null : names[r.who] ?? former[r.who],
+            who: r.who == null ? null : names[r.who] ?? formerNames[r.who],
             leftCell: r.who != null && !names.containsKey(r.who),
           ),
       ],
-      caption:
-          'What members will see once it is published. They see nothing of '
-          'a draft, and no answers or notes.',
+      heading: 'What members will see',
+      caption: widget.programme.published
+          ? 'Once you publish these changes. Until then they keep the last '
+                'version.'
+          : 'Once it is published. They see nothing of a draft, and no '
+                'answers or notes.',
     );
-    return LayoutBuilder(
-      builder: (context, box) => box.maxWidth >= 860
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: editor),
-                const SizedBox(width: 16),
-                SizedBox(width: 300, child: preview),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [editor, const SizedBox(height: 16), preview],
+    return _planWithPreview(editor, preview);
+  }
+}
+
+/// The work on the left and the member's phone on the right (about 340 px)
+/// on a wide screen; the phone under the work on a narrow one. With nothing
+/// for members to see, the work takes the whole width (no empty column).
+Widget _planWithPreview(Widget work, Widget? preview) => LayoutBuilder(
+  builder: (context, box) => preview == null
+      ? work
+      : box.maxWidth >= 900
+      ? Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: work),
+            const SizedBox(width: 24),
+            SizedBox(width: 340, child: preview),
+          ],
+        )
+      : Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            work,
+            const SizedBox(height: 24),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: preview,
+              ),
             ),
+          ],
+        ),
+);
+
+/// Cancelling a programme: a quiet action in the negative colour that asks
+/// once more, in words, before it is sent.
+Widget _planCancel(
+  BuildContext context, {
+  required bool confirming,
+  required bool busy,
+  required String question,
+  required VoidCallback? onAsk,
+  required VoidCallback onKeep,
+  required VoidCallback onCancel,
+}) {
+  final c = ChurchColors.of(context);
+  final danger = TextButton.styleFrom(foregroundColor: c.redFg);
+  if (!confirming) {
+    return FocusRing(
+      child: TextButton(
+        key: const Key('plan-cancel'),
+        style: danger,
+        onPressed: busy ? null : onAsk,
+        child: const Text('Cancel this programme'),
+      ),
     );
   }
+  return Wrap(
+    spacing: 4,
+    runSpacing: 4,
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      Padding(
+        padding: const EdgeInsetsDirectional.only(end: 4),
+        child: Text(
+          question,
+          style: ChurchType.staffBody.copyWith(color: c.ink),
+        ),
+      ),
+      FocusRing(
+        child: TextButton(
+          key: const Key('plan-cancel-confirm'),
+          style: danger,
+          onPressed: busy ? null : onCancel,
+          child: const Text('Yes, cancel the programme'),
+        ),
+      ),
+      FocusRing(
+        child: TextButton(
+          key: const Key('plan-cancel-keep'),
+          onPressed: onKeep,
+          child: const Text('Keep it'),
+        ),
+      ),
+    ],
+  );
+}
+
+/// The editor table's columns: two times, the part, who leads, remove.
+const _planEditColumns = [
+  StaffColumn('Starts', width: 92),
+  StaffColumn('Ends', width: 92),
+  StaffColumn('Part'),
+  StaffColumn('Who leads'),
+  StaffColumn('', width: 44),
+];
+const double _planEditGap = 10;
+const _planEditHeaderPadding = EdgeInsets.fromLTRB(20, 12, 12, 10);
+
+/// Where a part's own messages start on a wide row: under the part's name.
+const double _planEditMessageInset = 92 + _planEditGap + 92 + _planEditGap;
+
+/// "Add a part" as the handoff's dashed add slot.
+class _PlanAddPart extends StatelessWidget {
+  const _PlanAddPart({
+    required this.enabled,
+    required this.full,
+    required this.onPressed,
+  });
+  final bool enabled;
+  final bool full;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    return FocusRing(
+      child: CustomPaint(
+        foregroundPainter: _PlanDashedOutline(
+          color: enabled ? c.muted : c.line,
+          radius: ChurchGeometry.staffInputRadius,
+        ),
+        child: TextButton.icon(
+          key: const Key('plan-add-part'),
+          onPressed: enabled ? onPressed : null,
+          style: TextButton.styleFrom(
+            minimumSize: const Size(0, ChurchGeometry.minTarget),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(
+                ChurchGeometry.staffInputRadius,
+              ),
+            ),
+            textStyle: const TextStyle(
+              fontFamily: ChurchFonts.body,
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          icon: const Icon(Icons.add, size: 18),
+          label: Text(full ? 'At most $programmeMaxParts parts' : 'Add a part'),
+        ),
+      ),
+    );
+  }
+}
+
+/// A 1.5 px dashed rounded outline (an empty slot to fill).
+class _PlanDashedOutline extends CustomPainter {
+  const _PlanDashedOutline({required this.color, required this.radius});
+  final Color color;
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          Offset.zero & size,
+          Radius.circular(radius),
+        ).deflate(0.75),
+      );
+    for (final metric in path.computeMetrics()) {
+      var d = 0.0;
+      while (d < metric.length) {
+        canvas.drawPath(metric.extractPath(d, d + 5), paint);
+        d += 9;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PlanDashedOutline old) =>
+      old.color != color || old.radius != radius;
 }
 
 String? _partErrorText(Map<String, String> errors, int index, String window) {
@@ -3707,6 +4840,8 @@ class _PartEditorRow extends StatelessWidget {
     super.key,
     required this.index,
     required this.row,
+    required this.wide,
+    required this.divider,
     required this.roster,
     required this.linkable,
     required this.former,
@@ -3717,6 +4852,10 @@ class _PartEditorRow extends StatelessWidget {
   });
   final int index;
   final _PartRow row;
+
+  /// A table row under the column headers; otherwise each part stacks.
+  final bool wide;
+  final bool divider;
   final List<ProgrammeRosterMember> roster;
   final List<LinkableDuty> linkable;
   final Map<String, String> former;
@@ -3735,44 +4874,72 @@ class _PartEditorRow extends StatelessWidget {
       for (final l in linkable) 'd:${l.slotId}',
     };
     final known = value == null || offered.contains(value);
-    final who = DropdownButton<String?>(
-      key: Key('part-assignee-$index'),
-      isExpanded: true,
-      value: value,
-      hint: const Text('Nobody yet'),
-      items: [
-        const DropdownMenuItem<String?>(value: null, child: Text('Nobody yet')),
-        for (final r in roster)
-          DropdownMenuItem<String?>(
-            value: 'm:${r.memberId}',
-            child: Text(
-              r.offApp ? '${r.displayName} (no app login)' : r.displayName,
-              overflow: TextOverflow.ellipsis,
-            ),
+    // Under the column headers the labels sit inside the empty fields (and
+    // name them to assistive technology); a stacked part floats them.
+    final float = wide
+        ? FloatingLabelBehavior.never
+        : FloatingLabelBehavior.auto;
+    const dense = EdgeInsets.symmetric(horizontal: 12, vertical: 12);
+    final who = Container(
+      constraints: const BoxConstraints(minHeight: 46),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      alignment: AlignmentDirectional.centerStart,
+      decoration: BoxDecoration(
+        color: c.surface,
+        border: Border.all(color: busy ? c.line : c.muted),
+        borderRadius: BorderRadius.circular(
+          isStaffLayout(context)
+              ? ChurchGeometry.staffInputRadius
+              : ChurchGeometry.mobileInputRadius,
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String?>(
+          key: Key('part-assignee-$index'),
+          isExpanded: true,
+          value: value,
+          hint: Text(
+            'Nobody yet',
+            style: ChurchType.staffBody.copyWith(color: c.amberFg),
           ),
-        for (final l in linkable)
-          DropdownMenuItem<String?>(
-            value: 'd:${l.slotId}',
-            child: Text(
-              'Department duty: ${l.label}',
-              overflow: TextOverflow.ellipsis,
+          items: [
+            const DropdownMenuItem<String?>(
+              value: null,
+              child: Text('Nobody yet'),
             ),
-          ),
-        if (!known)
-          DropdownMenuItem<String?>(
-            value: value,
-            child: Text(
-              former[value] ?? 'Someone (left the cell)',
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-      ],
-      onChanged: busy
-          ? null
-          : (v) {
-              row.who = v;
-              onChanged();
-            },
+            for (final r in roster)
+              DropdownMenuItem<String?>(
+                value: 'm:${r.memberId}',
+                child: Text(
+                  r.offApp ? '${r.displayName} (no app login)' : r.displayName,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            for (final l in linkable)
+              DropdownMenuItem<String?>(
+                value: 'd:${l.slotId}',
+                child: Text(
+                  'Department duty: ${l.label}',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            if (!known)
+              DropdownMenuItem<String?>(
+                value: value,
+                child: Text(
+                  former[value] ?? 'Someone (left the cell)',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+          ],
+          onChanged: busy
+              ? null
+              : (v) {
+                  row.who = v;
+                  onChanged();
+                },
+        ),
+      ),
     );
     Widget clock(TextEditingController ctl, String label, String key) =>
         SizedBox(
@@ -3782,7 +4949,14 @@ class _PartEditorRow extends StatelessWidget {
             controller: ctl,
             enabled: !busy,
             keyboardType: TextInputType.datetime,
-            decoration: InputDecoration(labelText: label, hintText: 'HH:MM'),
+            style: ChurchType.programmeTime.copyWith(color: c.ink),
+            decoration: InputDecoration(
+              labelText: wide ? '$label (part $n)' : label,
+              hintText: 'HH:MM',
+              isDense: true,
+              contentPadding: dense,
+              floatingLabelBehavior: float,
+            ),
             onChanged: (_) => onChanged(),
           ),
         );
@@ -3795,6 +4969,9 @@ class _PartEditorRow extends StatelessWidget {
         labelText: 'Part $n',
         counterText: '',
         hintText: 'Opening prayer',
+        isDense: true,
+        contentPadding: dense,
+        floatingLabelBehavior: float,
       ),
       onChanged: (_) => onChanged(),
     );
@@ -3802,70 +4979,89 @@ class _PartEditorRow extends StatelessWidget {
       key: Key('part-remove-$index'),
       tooltip: 'Remove part $n',
       onPressed: busy ? null : onRemove,
-      icon: const Icon(Icons.close),
+      color: c.muted,
+      icon: const Icon(Icons.close, size: 20),
     );
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Semantics(
-        container: true,
-        label: 'Part $n',
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            LayoutBuilder(
-              builder: (context, box) => box.maxWidth >= 560
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        clock(row.start, 'Starts', 'start'),
-                        const SizedBox(width: 8),
-                        clock(row.end, 'Ends', 'end'),
-                        const SizedBox(width: 8),
-                        Expanded(flex: 3, child: label),
-                        const SizedBox(width: 8),
-                        Expanded(flex: 2, child: who),
-                        remove,
-                      ],
-                    )
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
-                          children: [
-                            clock(row.start, 'Starts', 'start'),
-                            const SizedBox(width: 8),
-                            clock(row.end, 'Ends', 'end'),
-                            const Spacer(),
-                            remove,
-                          ],
-                        ),
-                        label,
-                        who,
-                      ],
-                    ),
-            ),
-            if (value == null)
-              Text(
-                'Gap: nobody leads this part yet',
-                key: Key('part-gap-$index'),
-                style: ChurchType.secondary.copyWith(color: c.amberFg),
-              )
-            else if (!known)
-              Text(
-                value.startsWith('d:')
-                    ? 'That department duty is no longer offered. Choose '
-                          'again.'
-                    : 'This person has left the cell. Choose someone else.',
-                style: ChurchType.secondary.copyWith(color: c.amberFg),
-              ),
-            if (error case final e?)
-              Text(
-                e,
-                key: Key('part-error-$index'),
-                style: ChurchType.secondary.copyWith(color: c.redFg),
-              ),
-          ],
+    final messages = <Widget>[
+      if (value == null)
+        Text(
+          'Gap: nobody leads this part yet',
+          key: Key('part-gap-$index'),
+          style: ChurchType.secondary.copyWith(color: c.amberFg, fontSize: 13),
+        )
+      else if (!known)
+        Text(
+          value.startsWith('d:')
+              ? 'That department duty is no longer offered. Choose again.'
+              : 'This person has left the cell. Choose someone else.',
+          style: ChurchType.secondary.copyWith(color: c.amberFg, fontSize: 13),
         ),
+      if (error case final e?)
+        Text(
+          e,
+          key: Key('part-error-$index'),
+          style: ChurchType.secondary.copyWith(color: c.redFg, fontSize: 13),
+        ),
+    ];
+    final body = wide
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              StaffColumnsRow(
+                columns: _planEditColumns,
+                gap: _planEditGap,
+                cells: [
+                  clock(row.start, 'Starts', 'start'),
+                  clock(row.end, 'Ends', 'end'),
+                  label,
+                  who,
+                  remove,
+                ],
+              ),
+              if (messages.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(
+                    start: _planEditMessageInset,
+                    top: 4,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: messages,
+                  ),
+                ),
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  clock(row.start, 'Starts', 'start'),
+                  const SizedBox(width: 8),
+                  clock(row.end, 'Ends', 'end'),
+                  const Spacer(),
+                  remove,
+                ],
+              ),
+              const SizedBox(height: 10),
+              label,
+              const SizedBox(height: 10),
+              who,
+              if (messages.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                ...messages,
+              ],
+            ],
+          );
+    return Semantics(
+      container: true,
+      label: 'Part $n',
+      child: StaffTableRow(
+        divider: divider,
+        padding: wide
+            ? const EdgeInsets.fromLTRB(20, 8, 12, 8)
+            : const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        child: body,
       ),
     );
   }
@@ -3937,7 +5133,7 @@ class _PublishedEditorState extends ConsumerState<_PublishedEditor> {
                 ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
         ],
         _PublishedView(
           meetingId: widget.meetingId,
@@ -3945,30 +5141,28 @@ class _PublishedEditorState extends ConsumerState<_PublishedEditor> {
           programme: p,
           busy: widget.busy,
           open: widget.open,
-        ),
-        if (widget.open)
-          Padding(
-            padding: const EdgeInsets.only(top: 16),
-            child: editing
-                ? _ProgrammeEditor(
-                    meetingId: widget.meetingId,
-                    read: widget.read,
-                    programme: p,
-                    busy: widget.busy,
-                    errors: widget.errors,
-                  )
-                : Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: FocusRing(
-                      child: OutlinedButton(
-                        key: const Key('plan-change-published'),
-                        onPressed: widget.busy
-                            ? null
-                            : () => setState(() => _editing = true),
-                        child: const Text('Change the programme'),
-                      ),
-                    ),
+          change: widget.open && !editing
+              ? FocusRing(
+                  child: OutlinedButton(
+                    key: const Key('plan-change-published'),
+                    onPressed: widget.busy
+                        ? null
+                        : () => setState(() => _editing = true),
+                    child: const Text('Change the programme'),
                   ),
+                )
+              : null,
+        ),
+        if (widget.open && editing)
+          Padding(
+            padding: const EdgeInsets.only(top: 24),
+            child: _ProgrammeEditor(
+              meetingId: widget.meetingId,
+              read: widget.read,
+              programme: p,
+              busy: widget.busy,
+              errors: widget.errors,
+            ),
           ),
       ],
     );
@@ -3985,12 +5179,17 @@ class _PublishedView extends ConsumerStatefulWidget {
     required this.programme,
     required this.busy,
     required this.open,
+    this.change,
   });
   final String meetingId;
   final ProgrammeRead read;
   final CellProgramme programme;
   final bool busy;
   final bool open;
+
+  /// Story 5.6: **Change the programme**, beside cancelling (null while the
+  /// editor is open or the meeting is no longer ahead).
+  final Widget? change;
 
   @override
   ConsumerState<_PublishedView> createState() => _PublishedViewState();
@@ -4017,8 +5216,8 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
       reason: _reason.text,
     );
     final ok = draft.errors().isEmpty;
-    return Padding(
-      padding: const EdgeInsets.only(left: 52, bottom: 12),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 520),
       child: Column(
         key: Key('confirm-form-${d.partId}'),
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -4028,17 +5227,22 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
             'Record that they said yes to you directly. It shows as '
             'Confirmed by leader, with your name.',
           ),
-          DropdownButton<ContactChannel>(
-            key: Key('confirm-channel-${d.partId}'),
-            value: _channel,
-            items: [
-              for (final c in ContactChannel.values)
-                DropdownMenuItem(value: c, child: Text(c.label)),
-            ],
-            onChanged: busy
-                ? null
-                : (v) => setState(() => _channel = v ?? _channel),
+          const SizedBox(height: 8),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: DropdownButton<ContactChannel>(
+              key: Key('confirm-channel-${d.partId}'),
+              value: _channel,
+              items: [
+                for (final c in ContactChannel.values)
+                  DropdownMenuItem(value: c, child: Text(c.label)),
+              ],
+              onChanged: busy
+                  ? null
+                  : (v) => setState(() => _channel = v ?? _channel),
+            ),
           ),
+          const SizedBox(height: 8),
           TextField(
             key: Key('confirm-reason-${d.partId}'),
             controller: _reason,
@@ -4052,6 +5256,7 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
           ),
           Wrap(
             spacing: 8,
+            runSpacing: 8,
             children: [
               FocusRing(
                 child: FilledButton(
@@ -4080,125 +5285,167 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
     );
   }
 
+  /// One part of the published programme: the time, the part, who leads it
+  /// (with what needs doing about them in the warning colour, and the
+  /// direct confirmation as a text action) and their answer.
+  Widget _partRow(ProgrammePart part, {required bool wide, required int i}) {
+    final c = ChurchColors.of(context);
+    final read = widget.read;
+    final busy = widget.busy;
+    final d = read.duties[part.partId];
+    final small = ChurchType.secondary.copyWith(color: c.amberFg, fontSize: 13);
+    // Story 5.5: the direct confirmation, beside the answer it records.
+    final confirm = d != null && d.confirmable && _confirming != part.partId
+        ? FocusRing(
+            child: TextButton(
+              key: Key('confirm-part-${part.partId}'),
+              style: TextButton.styleFrom(
+                minimumSize: const Size(0, ChurchGeometry.minTarget),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                textStyle: const TextStyle(
+                  fontFamily: ChurchFonts.body,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              onPressed: busy || !widget.open
+                  ? null
+                  : () => setState(() {
+                      _confirming = part.partId;
+                      _reason.clear();
+                    }),
+              child: const Text('They said yes directly'),
+            ),
+          )
+        : null;
+    final whoCell = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          part.assignee?.displayName ?? part.linkedLabel ?? 'Nobody yet',
+          style: ChurchType.staffBody.copyWith(
+            color: part.gap ? c.amberFg : c.ink,
+          ),
+        ),
+        if (d != null && d.needsContact)
+          Text('Not on the app: tell them directly', style: small),
+        if (read.absenceFor(part.partId) != null)
+          Text(
+            'Can\'t attend: they sent a notice',
+            key: Key('published-absence-${part.partId}'),
+            style: small,
+          ),
+        if (!wide && confirm != null) confirm,
+      ],
+    );
+    final answer = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (d == null)
+          Text('—', style: ChurchType.staffBody.copyWith(color: c.muted))
+        else
+          _planAnswer(part, d, key: Key('published-status-${part.partId}')),
+        if (wide && confirm != null) confirm,
+      ],
+    );
+    final time = Text(
+      ChurchTime.timeText(part.startsAt),
+      style: ChurchType.programmeTime.copyWith(color: c.muted),
+    );
+    final label = Text(
+      part.label,
+      style: ChurchType.staffBody.copyWith(
+        color: c.ink,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+    final form = _confirming == part.partId && d != null && d.confirmable
+        ? Padding(
+            padding: EdgeInsetsDirectional.only(
+              start: wide ? 56 + 16 : 0,
+              top: 8,
+              bottom: 4,
+            ),
+            child: _confirmForm(d, busy),
+          )
+        : null;
+    return StaffTableRow(
+      key: Key('published-part-${part.partId}'),
+      divider: wide || i > 0,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (wide)
+            StaffColumnsRow(
+              columns: _planPublishedColumns,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              cells: [time, label, whoCell, answer],
+            )
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(width: 56, child: time),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [label, whoCell],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                answer,
+              ],
+            ),
+          ?form,
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final read = widget.read;
     final p = widget.programme;
     final busy = widget.busy;
     final ctl = ref.read(cellProgrammeProvider(widget.meetingId).notifier);
-    final c = ChurchColors.of(context);
-    final list = _Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _heading(context, 'Who is on'),
-          for (final part in p.parts) ...[
-            Padding(
-              key: Key('published-part-${part.partId}'),
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 52,
-                    child: Text(
-                      ChurchTime.timeText(part.startsAt),
-                      style: ChurchType.secondary.copyWith(
-                        color: c.muted,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(part.label),
-                        Text(
-                          part.assignee?.displayName ??
-                              part.linkedLabel ??
-                              'Nobody yet',
-                          style: ChurchType.secondary.copyWith(color: c.muted),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (read.duties[part.partId] case final d?)
-                    Flexible(
-                      child: Wrap(
-                        spacing: 4,
-                        runSpacing: 4,
-                        alignment: WrapAlignment.end,
-                        children: [
-                          StatusLabel(
-                            key: Key('published-status-${part.partId}'),
-                            label:
-                                part.linkedSlotId != null &&
-                                    d.status == PartDutyStatus.open
-                                ? 'Department duty: link ended'
-                                : d.label,
-                            tone: switch (d.status) {
-                              PartDutyStatus.accepted ||
-                              PartDutyStatus.departmentFilled =>
-                                StatusTone.success,
-                              PartDutyStatus.declined => StatusTone.danger,
-                              PartDutyStatus.open ||
-                              PartDutyStatus.departmentOpen =>
-                                StatusTone.warning,
-                              PartDutyStatus.awaiting => StatusTone.info,
-                              PartDutyStatus.cancelled => StatusTone.neutral,
-                            },
-                          ),
-                          if (d.needsContact)
-                            const StatusLabel(
-                              label: 'Tell directly',
-                              tone: StatusTone.warning,
-                            ),
-                          if (read.absenceFor(part.partId) != null)
-                            StatusLabel(
-                              key: Key('published-absence-${part.partId}'),
-                              label: 'Can\'t attend',
-                              tone: StatusTone.warning,
-                            ),
-                          if (d.confirmable && _confirming != part.partId)
-                            FocusRing(
-                              child: TextButton(
-                                key: Key('confirm-part-${part.partId}'),
-                                onPressed: busy || !widget.open
-                                    ? null
-                                    : () => setState(() {
-                                        _confirming = part.partId;
-                                        _reason.clear();
-                                      }),
-                                child: const Text('They said yes directly'),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (_confirming == part.partId)
-              if (read.duties[part.partId] case final d? when d.confirmable)
-                _confirmForm(d, busy),
-          ],
-          _muted(
-            context,
-            'Each person answers in the app (My duties). A change reaches '
-            'them when you publish it.',
-          ),
-        ],
+    final list = StaffSection(
+      title: 'Who is on',
+      subtitle:
+          'Each person answers in the app (My duties). A change reaches them '
+          'when you publish it.',
+      bodyPadding: EdgeInsets.zero,
+      child: LayoutBuilder(
+        builder: (context, box) {
+          final wide = box.maxWidth >= 600;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (p.parts.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+                  child: _muted(context, 'No parts were published.'),
+                ),
+              if (wide && p.parts.isNotEmpty)
+                const StaffTableHeader(
+                  columns: _planPublishedColumns,
+                  padding: EdgeInsets.fromLTRB(20, 12, 20, 10),
+                ),
+              for (final (i, part) in p.parts.indexed)
+                _partRow(part, wide: wide, i: i),
+            ],
+          );
+        },
       ),
     );
     final seen = read.membersSee;
     final preview = seen == null
-        ? const SizedBox.shrink()
+        ? null
         : _ProgrammePreview(
             meeting: read.meeting,
             topic: seen.topic,
             scripture: seen.scripture,
-            studyNotes: null,
             parts: [
               for (final part in seen.parts)
                 (
@@ -4209,143 +5456,205 @@ class _PublishedViewState extends ConsumerState<_PublishedView> {
                   leftCell: false,
                 ),
             ],
-            caption: 'What members of the cell see now.',
+            heading: 'What members see now',
+            caption: null,
           );
     final actions = Wrap(
-      spacing: 8,
+      alignment: WrapAlignment.spaceBetween,
+      spacing: 16,
       runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        if (!_confirmCancel)
-          FocusRing(
-            child: TextButton(
-              key: const Key('plan-cancel'),
-              onPressed: busy || !widget.open
-                  ? null
-                  : () => setState(() => _confirmCancel = true),
-              child: const Text('Cancel this programme'),
-            ),
-          )
-        else ...[
-          const Text(
-            'Cancel it? Members stop seeing it, and everyone with a part is '
-            'told.',
-          ),
-          FocusRing(
-            child: TextButton(
-              key: const Key('plan-cancel-confirm'),
-              onPressed: busy ? null : () => ctl.cancel(p),
-              child: const Text('Yes, cancel the programme'),
-            ),
-          ),
-          FocusRing(
-            child: TextButton(
-              key: const Key('plan-cancel-keep'),
-              onPressed: () => setState(() => _confirmCancel = false),
-              child: const Text('Keep it'),
-            ),
-          ),
-        ],
+        widget.change ?? const SizedBox.shrink(),
+        _planCancel(
+          context,
+          confirming: _confirmCancel,
+          busy: busy,
+          question:
+              'Cancel it? Members stop seeing it, and everyone with a part is '
+              'told.',
+          onAsk: widget.open
+              ? () => setState(() => _confirmCancel = true)
+              : null,
+          onKeep: () => setState(() => _confirmCancel = false),
+          onCancel: () => ctl.cancel(p),
+        ),
       ],
     );
-    return LayoutBuilder(
-      builder: (context, box) => box.maxWidth >= 860
-          ? Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [list, const SizedBox(height: 12), actions],
-                  ),
-                ),
-                const SizedBox(width: 16),
-                SizedBox(width: 300, child: preview),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                list,
-                const SizedBox(height: 12),
-                actions,
-                const SizedBox(height: 16),
-                preview,
-              ],
-            ),
+    return _planWithPreview(
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [list, const SizedBox(height: 12), actions],
+      ),
+      preview,
     );
   }
 }
 
-/// The programme as a member's phone will show it once published: time,
-/// part and who leads it. A gap reads "Open" in the warning colour.
+/// The published table's columns: time, part, who leads, their answer.
+const _planPublishedColumns = [
+  StaffColumn('Time', width: 56),
+  StaffColumn('Part', flex: 3),
+  StaffColumn('Who leads', flex: 4),
+  StaffColumn('Answer', width: 196),
+];
+
+/// The meeting as a member's phone shows it (the handoff's "What members
+/// see"): the date badge, when and where, the topic and scripture, and each
+/// part with its time and who leads it. A gap reads "Open: nobody yet" in
+/// the warning colour. Built from what the editor holds, so it follows
+/// every change as it is typed.
 class _ProgrammePreview extends StatelessWidget {
   const _ProgrammePreview({
     required this.meeting,
     required this.topic,
     required this.scripture,
-    required this.studyNotes,
     required this.parts,
+    required this.heading,
     required this.caption,
   });
   final CellMeeting meeting;
   final String? topic;
   final String? scripture;
-  final String? studyNotes;
   final List<_PreviewPart> parts;
+
+  /// What this phone shows ("What members see now").
+  final String heading;
   final String? caption;
 
   @override
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
+    final grey = ChurchType.secondary.copyWith(color: c.muted, fontSize: 13);
     return Column(
       key: const Key('plan-preview'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Semantics(
+          header: true,
+          child: Text(
+            heading,
+            style: ChurchType.label.copyWith(color: c.muted, fontSize: 13),
+          ),
+        ),
         if (caption case final text?) ...[
-          _muted(context, text),
-          const SizedBox(height: 8),
+          const SizedBox(height: 2),
+          Text(text, style: grey),
         ],
-        _Card(
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.fromLTRB(18, 20, 18, 20),
+          decoration: BoxDecoration(
+            color: c.surface,
+            border: Border.all(color: c.ink, width: 3),
+            borderRadius: BorderRadius.circular(28),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _heading(context, 'Next meeting'),
               Text(
-                _meetingWhen(context, meeting),
-                style: ChurchType.sectionTitle.copyWith(color: c.ink),
+                'Next meeting',
+                style: ChurchType.cardTitle.copyWith(
+                  color: c.ink,
+                  fontSize: 17,
+                ),
               ),
-              if (meeting.venue case final v?) Text(v),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  ChurchDateBadge(
+                    at: meeting.startsAt,
+                    tone: DateBadgeTone.info,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _meetingDay(context, meeting.startsAt),
+                          style: ChurchType.staffBody.copyWith(
+                            color: c.ink,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          '${_meetingClock(context, meeting.startsAt)}–'
+                          '${_meetingClock(context, meeting.endsAt)}',
+                          style: grey.copyWith(
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (meeting.venue case final v?) ...[
+                const SizedBox(height: 12),
+                Text(
+                  v,
+                  style: ChurchType.secondary.copyWith(
+                    color: c.ink,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
               if (topic != null || scripture != null) ...[
-                const SizedBox(height: 8),
-                if (topic case final t?)
-                  Text(t, style: ChurchType.cardTitle.copyWith(color: c.ink)),
-                if (scripture case final s?)
-                  Text(s, style: ChurchType.secondary.copyWith(color: c.muted)),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: c.bg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (topic case final t?)
+                        Text(
+                          t,
+                          style: ChurchType.secondary.copyWith(
+                            color: c.ink,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      if (scripture case final s?)
+                        Text(
+                          s,
+                          style: ChurchType.secondary.copyWith(
+                            color: c.blueFg,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ],
-              if (studyNotes case final n?) ...[
-                const SizedBox(height: 8),
-                Text(n),
-              ],
-              const SizedBox(height: 8),
+              const SizedBox(height: 14),
               if (parts.isEmpty)
-                _muted(context, 'No parts yet.')
+                Text('No parts yet.', style: grey)
               else
                 for (final p in parts)
                   Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.only(bottom: 10),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         SizedBox(
-                          width: 52,
-                          child: Text(
-                            p.start,
-                            style: ChurchType.secondary.copyWith(
-                              color: c.muted,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
+                          width: 48,
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              p.start,
+                              style: ChurchType.programmeTime.copyWith(
+                                color: c.muted,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
                         ),
@@ -4353,7 +5662,13 @@ class _ProgrammePreview extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(p.label),
+                              Text(
+                                p.label,
+                                style: ChurchType.secondary.copyWith(
+                                  color: c.ink,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                               Text(
                                 p.who == null
                                     ? 'Open: nobody yet'
@@ -5237,6 +6552,10 @@ StatusLabel? _statusLabel(MeetingStatus? status, {Key? key}) =>
 /// who actually led each part. Every value is the leader's explicit choice
 /// (the plan is never assumed), a change needs a reason, and the earlier
 /// value stays visible. The plan and the duty answers are not touched.
+///
+/// One block: its state (Held / Not held) on the title row, who recorded
+/// it, then the parts as a table (time, part, planned, who led, the action)
+/// with "led as planned" one click away.
 class _RecordCard extends ConsumerStatefulWidget {
   const _RecordCard({
     required this.meetingId,
@@ -5263,88 +6582,88 @@ class _RecordCardState extends ConsumerState<_RecordCard> {
 
   @override
   Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
     final read = widget.read;
     final m = read.meeting;
     final record = read.record;
     final s = widget.state;
     final busy = s.busy;
     final ctl = ref.read(cellProgrammeProvider(widget.meetingId).notifier);
-    final children = <Widget>[_heading(context, 'After the meeting')];
+    final muted = ChurchType.secondary.copyWith(color: c.muted);
     if (record == null) {
-      if (read.canRecord) {
-        children.addAll([
-          const Text('Was this meeting held?'),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              FocusRing(
-                child: FilledButton(
-                  key: const Key('record-held'),
-                  onPressed: busy ? null : () => ctl.recordHeld(m, held: true),
-                  child: const Text('Yes, it was held'),
-                ),
-              ),
-              FocusRing(
-                child: OutlinedButton(
-                  key: const Key('record-not-held'),
-                  onPressed: busy ? null : () => ctl.recordHeld(m, held: false),
-                  child: const Text('It didn\'t happen'),
-                ),
-              ),
-            ],
-          ),
-        ]);
-      } else {
-        children.add(
-          const Text(
-            'Not recorded yet. The cell\'s leader or assistant records it.',
-            key: Key('record-none'),
-          ),
-        );
-      }
-      return _Card(
+      return StaffSection(
         key: const Key('plan-record'),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: children,
-        ),
+        title: 'After the meeting',
+        child: read.canRecord
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Was this meeting held?',
+                    style: ChurchType.staffBody.copyWith(
+                      color: c.ink,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Say what happened; who led each part comes next.',
+                    style: muted,
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FocusRing(
+                        child: FilledButton(
+                          key: const Key('record-held'),
+                          style: _mtgCompact(),
+                          onPressed: busy
+                              ? null
+                              : () => ctl.recordHeld(m, held: true),
+                          child: const Text('Yes, it was held'),
+                        ),
+                      ),
+                      FocusRing(
+                        child: OutlinedButton(
+                          key: const Key('record-not-held'),
+                          style: _mtgCompact(),
+                          onPressed: busy
+                              ? null
+                              : () => ctl.recordHeld(m, held: false),
+                          child: const Text('It didn\'t happen'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            : Text(
+                'Not recorded yet. The cell\'s leader or assistant records it.',
+                key: const Key('record-none'),
+                style: ChurchType.staffBody.copyWith(color: c.muted),
+              ),
       );
     }
     final latest = record.history.isEmpty ? null : record.history.first;
-    children.add(
-      Wrap(
-        spacing: 8,
-        runSpacing: 4,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          _statusLabel(
-            record.held ? MeetingStatus.held : MeetingStatus.notHeld,
-            key: const Key('record-state'),
-          )!,
-          if (latest != null)
-            _muted(
-              context,
-              '${latest.by ?? 'Removed member'}, '
-              '${ChurchTime.dateText(latest.at)}',
-            ),
-        ],
-      ),
-    );
-    if (latest?.reason case final r?) {
-      children.add(_muted(context, 'Why it changed: $r'));
-    }
-    // Earlier values, newest first.
-    for (final h in record.history.skip(1)) {
-      children.add(
-        _muted(
-          context,
+    final children = <Widget>[
+      if (latest != null)
+        Text(
+          'Recorded by ${latest.by ?? 'Removed member'}, '
+          '${ChurchTime.dateText(latest.at)}',
+          style: muted,
+        ),
+      if (latest?.reason case final r?)
+        Text('Why it changed: $r', style: muted),
+      // Earlier values, newest first.
+      for (final h in record.history.skip(1))
+        Text(
           'Earlier: ${h.held ? 'held' : 'not held'} '
           '(${h.by ?? 'Removed member'}, ${ChurchTime.dateText(h.at)})',
+          style: muted,
         ),
-      );
-    }
+    ];
     if (read.canRecord) {
       if (_correcting) {
         // A correction closes once the server has it; a refusal keeps it.
@@ -5356,50 +6675,67 @@ class _RecordCardState extends ConsumerState<_RecordCard> {
             }
           });
         }
-        children.addAll([
-          const SizedBox(height: 8),
-          TextField(
-            key: const Key('record-reason'),
-            controller: _reason,
-            maxLength: CellRecordCommands.reasonMax,
-            enabled: !busy,
-            decoration: InputDecoration(
-              labelText: 'Why is this changing?',
-              errorText: s.fieldErrors['reason'] == null
-                  ? null
-                  : 'Say why, briefly.',
+        children.add(
+          Container(
+            margin: const EdgeInsets.only(top: 10),
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            decoration: BoxDecoration(
+              color: c.bg,
+              borderRadius: BorderRadius.circular(10),
             ),
-            onChanged: (_) => setState(() {}),
-          ),
-          Wrap(
-            spacing: 8,
-            children: [
-              FocusRing(
-                child: FilledButton(
-                  key: const Key('record-correct-save'),
-                  onPressed: busy || _reason.text.trim().isEmpty
-                      ? null
-                      : () => ctl.correctHeld(
-                          m,
-                          record,
-                          held: !record.held,
-                          reason: _reason.text,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  key: const Key('record-reason'),
+                  controller: _reason,
+                  maxLength: CellRecordCommands.reasonMax,
+                  enabled: !busy,
+                  decoration: InputDecoration(
+                    labelText: 'Why is this changing?',
+                    errorText: s.fieldErrors['reason'] == null
+                        ? null
+                        : 'Say why, briefly.',
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    FocusRing(
+                      child: FilledButton(
+                        key: const Key('record-correct-save'),
+                        style: _mtgCompact(),
+                        onPressed: busy || _reason.text.trim().isEmpty
+                            ? null
+                            : () => ctl.correctHeld(
+                                m,
+                                record,
+                                held: !record.held,
+                                reason: _reason.text,
+                              ),
+                        child: Text(
+                          record.held ? 'Save: not held' : 'Save: held',
                         ),
-                  child: Text(record.held ? 'Save: not held' : 'Save: held'),
+                      ),
+                    ),
+                    FocusRing(
+                      child: TextButton(
+                        key: const Key('record-correct-cancel'),
+                        style: _mtgRowAction(),
+                        onPressed: busy
+                            ? null
+                            : () => setState(() => _correcting = false),
+                        child: const Text('Keep it'),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              FocusRing(
-                child: TextButton(
-                  key: const Key('record-correct-cancel'),
-                  onPressed: busy
-                      ? null
-                      : () => setState(() => _correcting = false),
-                  child: const Text('Keep it'),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ]);
+        );
       } else {
         children.add(
           Align(
@@ -5407,6 +6743,7 @@ class _RecordCardState extends ConsumerState<_RecordCard> {
             child: FocusRing(
               child: TextButton(
                 key: const Key('record-correct'),
+                style: _mtgRowAction(),
                 onPressed: busy
                     ? null
                     : () {
@@ -5426,17 +6763,15 @@ class _RecordCardState extends ConsumerState<_RecordCard> {
     }
     final p = read.programme;
     if (record.held) {
-      children.addAll([
-        const SizedBox(height: 12),
-        _heading(context, 'Who led each part'),
-      ]);
+      children.add(const SizedBox(height: 14));
       if (p == null || p.state == ProgrammeState.cancelled || p.parts.isEmpty) {
-        children.add(
+        children.addAll([
+          _mtgPartsTitle(context, null),
           const Text(
             'This meeting had no programme, so there are no parts to record.',
             key: Key('record-no-parts'),
           ),
-        );
+        ]);
       } else {
         // The main job in one click: every part not yet recorded whose
         // planned person is still in the cell, as planned (an explicit
@@ -5454,64 +6789,141 @@ class _RecordCardState extends ConsumerState<_RecordCard> {
         final missing = p.parts
             .where((part) => !record.actual.containsKey(part.partId))
             .length;
-        if (missing > 0) {
-          children.add(
-            _muted(
-              context,
-              '$missing of ${p.parts.length} '
-              '${p.parts.length == 1 ? 'part' : 'parts'} not recorded. '
-              'Record who actually led, not who was planned.',
-            ),
-          );
-        }
-        if (read.canRecord && asPlanned.isNotEmpty) {
-          children.add(
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: FocusRing(
-                  child: FilledButton(
-                    key: const Key('record-all-planned'),
-                    onPressed: busy
-                        ? null
-                        : () => ctl.recordLeaders(m, record, asPlanned),
-                    child: Text(
-                      asPlanned.length == 1
-                          ? '1 part was led as planned'
-                          : '${asPlanned.length} parts were led as planned',
-                    ),
+        final title = _mtgPartsTitle(
+          context,
+          missing == 0
+              ? null
+              : '$missing of ${p.parts.length} '
+                    '${p.parts.length == 1 ? 'part' : 'parts'} not '
+                    'recorded. Record who actually led, not who was planned.',
+        );
+        final allPlanned = read.canRecord && asPlanned.isNotEmpty
+            ? FocusRing(
+                child: FilledButton(
+                  key: const Key('record-all-planned'),
+                  style: _mtgCompact(),
+                  onPressed: busy
+                      ? null
+                      : () => ctl.recordLeaders(m, record, asPlanned),
+                  child: Text(
+                    asPlanned.length == 1
+                        ? '1 part was led as planned'
+                        : '${asPlanned.length} parts were led as planned',
                   ),
                 ),
-              ),
-            ),
-          );
-        }
-        for (final part in p.parts) {
-          children.add(
-            _ActualRow(
-              key: Key('record-part-${part.partId}'),
-              meetingId: widget.meetingId,
-              meeting: m,
-              record: record,
-              part: part,
-              roster: read.roster,
-              canRecord: read.canRecord,
-              state: s,
-            ),
-          );
-        }
+              )
+            : null;
+        children.addAll([
+          // The main job beside its title; under it on a phone.
+          LayoutBuilder(
+            builder: (context, box) => box.maxWidth < 560
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      title,
+                      if (allPlanned != null) ...[
+                        const SizedBox(height: 8),
+                        allPlanned,
+                      ],
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(child: title),
+                      if (allPlanned != null) ...[
+                        const SizedBox(width: 12),
+                        allPlanned,
+                      ],
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 10),
+          LayoutBuilder(
+            builder: (context, box) {
+              final wide = box.maxWidth >= 600;
+              return DecoratedBox(
+                decoration: BoxDecoration(
+                  border: Border.all(color: c.line),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (wide)
+                      const StaffTableHeader(
+                        columns: _mtgPartColumns,
+                        padding: EdgeInsets.fromLTRB(16, 10, 12, 8),
+                      ),
+                    for (var i = 0; i < p.parts.length; i++)
+                      _ActualRow(
+                        key: Key('record-part-${p.parts[i].partId}'),
+                        meetingId: widget.meetingId,
+                        meeting: m,
+                        record: record,
+                        part: p.parts[i],
+                        roster: read.roster,
+                        canRecord: read.canRecord,
+                        state: s,
+                        divider: i > 0,
+                        wide: wide,
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ]);
       }
     }
-    return _Card(
+    return StaffSection(
       key: const Key('plan-record'),
+      title: 'After the meeting',
+      trailing: _statusLabel(
+        record.held ? MeetingStatus.held : MeetingStatus.notHeld,
+        key: const Key('record-state'),
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: children,
       ),
     );
   }
 }
+
+/// "Who led each part" with its one grey line of what is still missing.
+Widget _mtgPartsTitle(BuildContext context, String? line) {
+  final c = ChurchColors.of(context);
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Semantics(
+        header: true,
+        child: Text(
+          'Who led each part',
+          style: ChurchType.staffBody.copyWith(
+            color: c.ink,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+      if (line != null)
+        Text(
+          line,
+          style: ChurchType.secondary.copyWith(color: c.muted, fontSize: 13),
+        ),
+    ],
+  );
+}
+
+/// The parts table: the time (JetBrains Mono, a programme time), the part,
+/// who was planned, who actually led (one pill) and the action.
+const _mtgPartColumns = [
+  StaffColumn('Time', width: 56),
+  StaffColumn('Part', flex: 3),
+  StaffColumn('Planned', flex: 3),
+  StaffColumn('Who led', flex: 3),
+  StaffColumn('', width: 92, numeric: true),
+];
 
 const _guestChoice = 'guest';
 const _nobodyChoice = 'nobody';
@@ -5528,6 +6940,8 @@ class _ActualRow extends ConsumerStatefulWidget {
     required this.roster,
     required this.canRecord,
     required this.state,
+    this.divider = false,
+    this.wide = true,
   });
   final String meetingId;
   final CellMeeting meeting;
@@ -5536,6 +6950,12 @@ class _ActualRow extends ConsumerStatefulWidget {
   final List<ProgrammeRosterMember> roster;
   final bool canRecord;
   final CellsState<ProgrammeRead> state;
+
+  /// A 1 px rule above (every row but the first).
+  final bool divider;
+
+  /// The table's columns; a two-line row when false (a phone).
+  final bool wide;
 
   @override
   ConsumerState<_ActualRow> createState() => _ActualRowState();
@@ -5598,10 +7018,12 @@ class _ActualRowState extends ConsumerState<_ActualRow> {
 
   @override
   Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
     final part = widget.part;
     final current = widget.record.actual[part.partId];
     final s = widget.state;
     final busy = s.busy;
+    final wide = widget.wide;
     final ctl = ref.read(cellProgrammeProvider(widget.meetingId).notifier);
     final sent = _sentIndex(s);
     // The editor closes once the server has saved what it sent; a refusal
@@ -5635,41 +7057,101 @@ class _ActualRowState extends ConsumerState<_ActualRow> {
       ),
       _ => ('Led by ${current.who}', StatusTone.success),
     };
-    final children = <Widget>[
-      Wrap(
-        spacing: 8,
-        runSpacing: 4,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Text('${ChurchTime.timeText(part.startsAt)}  ${part.label}'),
-          StatusLabel(
-            key: Key('record-actual-${part.partId}'),
-            label: label,
-            tone: tone,
-          ),
-          if (widget.canRecord && !_editing)
-            FocusRing(
-              child: TextButton(
-                key: Key('record-edit-${part.partId}'),
-                onPressed: busy ? null : () => _open(current),
-                child: Text(current == null ? 'Record' : 'Change'),
+    final muted = ChurchType.secondary.copyWith(color: c.muted, fontSize: 13);
+    final time = Text(
+      ChurchTime.timeText(part.startsAt),
+      style: ChurchType.programmeTime.copyWith(color: c.ink),
+    );
+    final partLabel = Text(
+      part.label,
+      style: ChurchType.staffBody.copyWith(
+        color: c.ink,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+    final plannedText = Text(
+      wide
+          ? planned ?? 'Nobody (a gap)'
+          : 'Planned: ${planned ?? 'nobody (a gap)'}',
+      key: Key('record-planned-${part.partId}'),
+      style: wide
+          ? ChurchType.staffBody.copyWith(
+              color: planned == null ? c.muted : c.ink,
+            )
+          : muted,
+    );
+    final who = StatusLabel(
+      key: Key('record-actual-${part.partId}'),
+      label: label,
+      tone: tone,
+    );
+    final Widget action = widget.canRecord && !_editing
+        ? FocusRing(
+            child: TextButton(
+              key: Key('record-edit-${part.partId}'),
+              style: _mtgRowAction(),
+              onPressed: busy ? null : () => _open(current),
+              child: Text(
+                current == null ? 'Record' : 'Change',
+                semanticsLabel:
+                    '${current == null ? 'Record' : 'Change'} who led '
+                    '${part.label}',
               ),
             ),
-        ],
-      ),
-      _muted(context, 'Planned: ${planned ?? 'nobody (a gap)'}'),
-      if (current?.reason case final r?) _muted(context, 'Why it changed: $r'),
+          )
+        : const SizedBox.shrink();
+    final notes = <Widget>[
+      if (current?.reason case final r?)
+        Text('Why it changed: $r', style: muted),
       if (err('part_id') != null)
-        _muted(context, 'This part is no longer in the programme. Reload.'),
+        Text(
+          'This part is no longer in the programme. Reload.',
+          style: muted.copyWith(color: c.redFg),
+        ),
       if (err('member_id') != null)
-        _muted(
-          context,
+        Text(
           'They are no longer in this cell: name them as a guest.',
+          style: muted.copyWith(color: c.redFg),
         ),
       for (final e in current?.earlier ?? const <ActualLeader>[])
-        _muted(
-          context,
+        Text(
           'Earlier: ${e.who} (${e.recordedBy ?? 'Removed member'})',
+          style: muted,
+        ),
+    ];
+    // Notes and the editor start under the part's name on a wide table.
+    final indent = wide ? _mtgPartColumns.first.width! + 16 : 0.0;
+    final children = <Widget>[
+      if (wide)
+        StaffColumnsRow(
+          columns: _mtgPartColumns,
+          cells: [time, partLabel, plannedText, who, action],
+        )
+      else ...[
+        Row(
+          children: [
+            time,
+            const SizedBox(width: 10),
+            Expanded(child: partLabel),
+          ],
+        ),
+        plannedText,
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Flexible(child: who),
+            const Spacer(),
+            action,
+          ],
+        ),
+      ],
+      if (notes.isNotEmpty)
+        Padding(
+          padding: EdgeInsetsDirectional.only(start: indent, top: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: notes,
+          ),
         ),
     ];
     if (_editing) {
@@ -5679,99 +7161,121 @@ class _ActualRowState extends ConsumerState<_ActualRow> {
           choice != null &&
           (choice != _guestChoice || _guest.text.trim().isNotEmpty) &&
           (!needsReason || _reason.text.trim().isNotEmpty);
-      children.addAll([
-        DropdownButton<String>(
-          key: Key('record-who-${part.partId}'),
-          hint: const Text('Who led it?'),
-          value: choice,
-          items: [
-            for (final r in widget.roster)
-              DropdownMenuItem(
-                value: r.memberId,
-                child: Text(
-                  r.memberId == part.assignee?.memberId
-                      ? '${r.displayName} (planned)'
-                      : r.displayName,
+      children.add(
+        Container(
+          margin: EdgeInsetsDirectional.only(start: indent, top: 8, bottom: 4),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          decoration: BoxDecoration(
+            color: c.bg,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DropdownButton<String>(
+                key: Key('record-who-${part.partId}'),
+                hint: const Text('Who led it?'),
+                value: choice,
+                items: [
+                  for (final r in widget.roster)
+                    DropdownMenuItem(
+                      value: r.memberId,
+                      child: Text(
+                        r.memberId == part.assignee?.memberId
+                            ? '${r.displayName} (planned)'
+                            : r.displayName,
+                      ),
+                    ),
+                  const DropdownMenuItem(
+                    value: _guestChoice,
+                    child: Text('Someone else (a guest)'),
+                  ),
+                  const DropdownMenuItem(
+                    value: _nobodyChoice,
+                    child: Text('Nobody led it'),
+                  ),
+                ],
+                onChanged: busy ? null : (v) => setState(() => _choice = v),
+              ),
+              if (choice == _guestChoice)
+                TextField(
+                  key: Key('record-guest-${part.partId}'),
+                  controller: _guest,
+                  maxLength: CellRecordCommands.guestNameMax,
+                  enabled: !busy,
+                  decoration: InputDecoration(
+                    labelText: 'Their name',
+                    errorText: err('name') == null ? null : 'Type their name.',
+                  ),
+                  onChanged: (_) => setState(() {}),
                 ),
+              if (needsReason)
+                TextField(
+                  key: Key('record-part-reason-${part.partId}'),
+                  controller: _reason,
+                  maxLength: CellRecordCommands.reasonMax,
+                  enabled: !busy,
+                  decoration: InputDecoration(
+                    labelText: 'Why is this changing?',
+                    errorText: err('reason') == null
+                        ? null
+                        : 'Say why, briefly.',
+                  ),
+                  onChanged: (_) => setState(() {}),
+                ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  FocusRing(
+                    child: FilledButton(
+                      key: Key('record-save-${part.partId}'),
+                      style: _mtgCompact(),
+                      onPressed: busy || !ready
+                          ? null
+                          : () {
+                              setState(() => _awaiting = true);
+                              ctl.recordLeaders(widget.meeting, widget.record, [
+                                ActualLeaderDraft(
+                                  partId: part.partId,
+                                  memberId:
+                                      choice == _guestChoice ||
+                                          choice == _nobodyChoice
+                                      ? null
+                                      : choice,
+                                  guestName: choice == _guestChoice
+                                      ? _guest.text
+                                      : null,
+                                  reason: needsReason ? _reason.text : null,
+                                ),
+                              ]);
+                            },
+                      child: const Text('Save'),
+                    ),
+                  ),
+                  FocusRing(
+                    child: TextButton(
+                      key: Key('record-cancel-${part.partId}'),
+                      style: _mtgRowAction(),
+                      onPressed: busy
+                          ? null
+                          : () => setState(() => _editing = false),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                ],
               ),
-            const DropdownMenuItem(
-              value: _guestChoice,
-              child: Text('Someone else (a guest)'),
-            ),
-            const DropdownMenuItem(
-              value: _nobodyChoice,
-              child: Text('Nobody led it'),
-            ),
-          ],
-          onChanged: busy ? null : (v) => setState(() => _choice = v),
-        ),
-        if (choice == _guestChoice)
-          TextField(
-            key: Key('record-guest-${part.partId}'),
-            controller: _guest,
-            maxLength: CellRecordCommands.guestNameMax,
-            enabled: !busy,
-            decoration: InputDecoration(
-              labelText: 'Their name',
-              errorText: err('name') == null ? null : 'Type their name.',
-            ),
-            onChanged: (_) => setState(() {}),
+            ],
           ),
-        if (needsReason)
-          TextField(
-            key: Key('record-part-reason-${part.partId}'),
-            controller: _reason,
-            maxLength: CellRecordCommands.reasonMax,
-            enabled: !busy,
-            decoration: InputDecoration(
-              labelText: 'Why is this changing?',
-              errorText: err('reason') == null ? null : 'Say why, briefly.',
-            ),
-            onChanged: (_) => setState(() {}),
-          ),
-        Wrap(
-          spacing: 8,
-          children: [
-            FocusRing(
-              child: FilledButton(
-                key: Key('record-save-${part.partId}'),
-                onPressed: busy || !ready
-                    ? null
-                    : () {
-                        setState(() => _awaiting = true);
-                        ctl.recordLeaders(widget.meeting, widget.record, [
-                          ActualLeaderDraft(
-                            partId: part.partId,
-                            memberId:
-                                choice == _guestChoice ||
-                                    choice == _nobodyChoice
-                                ? null
-                                : choice,
-                            guestName: choice == _guestChoice
-                                ? _guest.text
-                                : null,
-                            reason: needsReason ? _reason.text : null,
-                          ),
-                        ]);
-                      },
-                child: const Text('Save'),
-              ),
-            ),
-            FocusRing(
-              child: TextButton(
-                key: Key('record-cancel-${part.partId}'),
-                onPressed: busy ? null : () => setState(() => _editing = false),
-                child: const Text('Cancel'),
-              ),
-            ),
-          ],
         ),
-      ]);
+      );
     }
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+    return StaffTableRow(
+      divider: widget.divider,
+      padding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: children,
       ),
     );

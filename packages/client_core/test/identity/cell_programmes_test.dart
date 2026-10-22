@@ -788,7 +788,7 @@ void main() {
         tester.widget<StatusLabel>(byKey('published-status-$_part2')).label,
         'Open: nobody asked',
       );
-      expect(find.text('What members of the cell see now.'), findsOneWidget);
+      expect(find.text('What members see now'), findsOneWidget);
       expect(byKey('plan-save'), findsNothing);
       await tapKey(tester, 'plan-cancel');
       await tapKey(tester, 'plan-cancel-confirm');

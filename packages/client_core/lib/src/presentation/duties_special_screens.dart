@@ -31,17 +31,61 @@ class DutySpecialScreen extends StatelessWidget {
     provider: dutySpecialProvider,
     needs: _specialNeeds,
     loading: 'Loading special assignments…',
+    // The screen's main job, in the page header on staff web.
+    headerAction: (context, v, s) => _SpecGiveButton(busy: s.busy),
     body: (context, v, s) => _SpecialBody(value: v, state: s),
   );
 }
 
-/// "Due 30 Nov" or "Sat 4 Jan 10:00–12:00" (church time).
+/// Whether the give form is open: shared by the page header's button and
+/// the body, and forgotten when the screen goes.
+final _specGivingProvider = NotifierProvider.autoDispose<_SpecGiving, bool>(
+  _SpecGiving.new,
+);
+
+class _SpecGiving extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void toggle() => state = !state;
+
+  void close() => state = false;
+}
+
+/// "Give a special assignment" (or "Close the form" while it is open).
+class _SpecGiveButton extends ConsumerWidget {
+  const _SpecGiveButton({required this.busy});
+
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final giving = ref.watch(_specGivingProvider);
+    return FocusRing(
+      child: FilledButton.icon(
+        key: const Key('special-give'),
+        onPressed: busy
+            ? null
+            : () => ref.read(_specGivingProvider.notifier).toggle(),
+        icon: Icon(giving ? Icons.close : Icons.add),
+        label: Text(giving ? 'Close the form' : 'Give a special assignment'),
+      ),
+    );
+  }
+}
+
+/// "Due 30 Nov" or "Sat 4 Jan, 10:00–12:00" (church time).
 String _specialWhen(BuildContext context, SpecialAssignment a) {
   final t = a.times;
   if (t.dueOn case final d?) return DutySpecial.dueText(d);
-  final start = _when(context, t.startsAt);
-  return t.endsAt == null ? start : '$start–${_clock(context, t.endsAt!)}';
+  final start = _outDayTime(t.startsAt);
+  return t.endsAt == null ? start : '$start–${ChurchTime.timeText(t.endsAt!)}';
 }
+
+/// "Mon 30 Nov 2099" for a due date (a calendar date, no time).
+String _specDate(DateTime d) =>
+    '${_outWeekdays[d.weekday - 1]} ${d.day} ${_outMonths[d.month - 1]} '
+    '${d.year}';
 
 /// The one mark a row carries: the outcome once recorded, "Not recorded"
 /// for a past one still to record, otherwise the member's answer (or that it
@@ -65,6 +109,21 @@ String _specialWhen(BuildContext context, SpecialAssignment a) {
   };
 }
 
+/// The table's columns on a wide screen: when (or done by), the duty and its
+/// place, who holds it, the row's one mark, the one action a row that needs
+/// doing carries, and the chevron that opens the details.
+const _specColumns = [
+  StaffColumn('When', width: 196),
+  StaffColumn('Assignment', flex: 4),
+  StaffColumn('Who', flex: 3),
+  StaffColumn('Answer or outcome', flex: 3),
+  StaffColumn('', width: 150, numeric: true),
+  StaffColumn('', width: 24),
+];
+
+/// Below this width each assignment is a two-line row with its date badge.
+const _specWide = 860.0;
+
 class _SpecialBody extends ConsumerStatefulWidget {
   const _SpecialBody({required this.value, required this.state});
   final SpecialAssignments value;
@@ -75,13 +134,14 @@ class _SpecialBody extends ConsumerStatefulWidget {
 }
 
 class _SpecialBodyState extends ConsumerState<_SpecialBody> {
-  var _giving = false;
   String? _open;
 
   @override
   Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
     final v = widget.value;
     final busy = widget.state.busy;
+    final giving = ref.watch(_specGivingProvider);
     final needs = [
       for (final a in v.assignments)
         if (a.outcomeDue || a.needsSomeone) a,
@@ -96,7 +156,7 @@ class _SpecialBodyState extends ConsumerState<_SpecialBody> {
     ];
     final toRecord = needs.where((a) => a.outcomeDue).length;
     final someone = needs.length - toRecord;
-    // The screen's finding, in one line under the title.
+    // The screen's finding, first: what needs the Pastor now.
     final finding = needs.isEmpty
         ? (upcoming.isEmpty
               ? 'No special assignments are coming up.'
@@ -110,28 +170,53 @@ class _SpecialBodyState extends ConsumerState<_SpecialBody> {
           ].join(' · ');
 
     Widget section(String title, List<SpecialAssignment> rows, String key) =>
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: ChurchGeometry.sectionGap),
-            _heading(context, '$title (${rows.length})', key: Key(key)),
-            ChurchCard(
-              padding: EdgeInsets.zero,
-              radius: 12,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+        Padding(
+          padding: const EdgeInsets.only(top: ChurchGeometry.sectionGap),
+          child: LayoutBuilder(
+            builder: (context, box) {
+              final wide = box.maxWidth >= _specWide;
+              return StaffTableFrame(
                 children: [
-                  for (final (i, a) in rows.indexed) ...[
-                    if (i > 0)
-                      Divider(
-                        height: 1,
-                        indent: 78,
-                        color: ChurchColors.of(context).line,
-                      ),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+                    decoration: BoxDecoration(
+                      border: Border(bottom: BorderSide(color: c.line)),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Semantics(
+                            header: true,
+                            child: Text(
+                              title,
+                              key: Key(key),
+                              style: ChurchType.cardTitle.copyWith(
+                                color: c.ink,
+                                fontSize: 17,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Text(
+                          rows.length == 1
+                              ? '1 assignment'
+                              : '${rows.length} assignments',
+                          style: ChurchType.secondary.copyWith(
+                            color: c.muted,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (wide) const StaffTableHeader(columns: _specColumns),
+                  for (final (i, a) in rows.indexed)
                     _SpecialRow(
                       key: Key('special-row-${a.occurrenceId}'),
                       item: a,
                       members: v.members,
+                      wide: wide,
+                      divider: i > 0,
                       open: _open == a.occurrenceId,
                       busy: busy,
                       state: widget.state,
@@ -141,52 +226,54 @@ class _SpecialBodyState extends ConsumerState<_SpecialBody> {
                             : a.occurrenceId,
                       ),
                     ),
-                  ],
                 ],
-              ),
-            ),
-          ],
+              );
+            },
+          ),
         );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(
-              finding,
-              key: const Key('special-finding'),
-              style: ChurchType.body.copyWith(
-                color: ChurchColors.of(context).ink,
-              ),
-            ),
-            FocusRing(
-              child: FilledButton.icon(
-                key: const Key('special-give'),
-                onPressed: busy
-                    ? null
-                    : () => setState(() => _giving = !_giving),
-                icon: Icon(_giving ? Icons.close : Icons.add),
-                label: Text(
-                  _giving ? 'Close the form' : 'Give a special assignment',
+        Semantics(
+          header: true,
+          child: Text(
+            finding,
+            key: const Key('special-finding'),
+            style: ChurchType.sectionTitle.copyWith(color: c.ink),
+          ),
+        ),
+        const SizedBox(height: 4),
+        _muted(
+          context,
+          'Seen by the member and the Pastors only. Department and cell '
+          'leaders see only that the member is busy at that time.',
+        ),
+        // On the phone the main job sits under the finding (staff web has
+        // it in the page header).
+        if (!isStaffLayout(context)) ...[
+          const SizedBox(height: 12),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: _SpecGiveButton(busy: busy),
+          ),
+        ],
+        if (giving) ...[
+          const SizedBox(height: 16),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: _Card(
+                child: _SpecialForm(
+                  key: const Key('special-give-form'),
+                  members: v.members,
+                  membersTruncated: v.membersTruncated,
+                  busy: busy,
+                  state: widget.state,
+                  onSent: () => ref.read(_specGivingProvider.notifier).close(),
                 ),
               ),
-            ),
-          ],
-        ),
-        if (_giving) ...[
-          const SizedBox(height: 12),
-          _Card(
-            child: _SpecialForm(
-              key: const Key('special-give-form'),
-              members: v.members,
-              membersTruncated: v.membersTruncated,
-              busy: busy,
-              state: widget.state,
-              onSent: () => setState(() => _giving = false),
             ),
           ),
         ],
@@ -207,33 +294,31 @@ class _SpecialBodyState extends ConsumerState<_SpecialBody> {
         if (past.isNotEmpty) section('Past 90 days', past, 'special-past'),
         if (v.assignments.isEmpty) ...[
           const SizedBox(height: ChurchGeometry.sectionGap),
-          _muted(
-            context,
-            'No special assignments in the last 90 days or ahead. A special '
-            'assignment belongs to no department and no cell: a church project, '
-            'leading a service, a task from the church leadership.',
+          ChurchCard(
+            radius: churchCardRadiusOf(context),
+            child: _muted(
+              context,
+              'No special assignments in the last 90 days or ahead. A special '
+              'assignment belongs to no department and no cell: a church '
+              'project, leading a service, a task from the church leadership.',
+            ),
           ),
         ],
-        const SizedBox(height: 16),
-        _muted(
-          context,
-          'Special assignments are seen by the member and the Pastors only. '
-          'Department and cell leaders see only that the member is busy at '
-          'that time.',
-        ),
       ],
     );
   }
 }
 
-/// One special assignment: the row (date, duty, who and when, one mark, and
-/// the one action a row that needs doing carries), and when opened its
-/// details and every action.
+/// One special assignment: the row (when, the duty, who, one mark, and the
+/// one action a row that needs doing carries), and when opened its details
+/// and every action.
 class _SpecialRow extends ConsumerStatefulWidget {
   const _SpecialRow({
     super.key,
     required this.item,
     required this.members,
+    required this.wide,
+    required this.divider,
     required this.open,
     required this.busy,
     required this.state,
@@ -242,6 +327,8 @@ class _SpecialRow extends ConsumerStatefulWidget {
 
   final SpecialAssignment item;
   final List<DepartmentMember> members;
+  final bool wide;
+  final bool divider;
   final bool open;
   final bool busy;
   final DutiesState<SpecialAssignments> state;
@@ -306,24 +393,90 @@ class _SpecialRowState extends ConsumerState<_SpecialRow> {
     final busy = widget.busy;
     final (mark, tone) = _specialMark(a);
     final muted = ChurchType.secondary.copyWith(color: c.muted);
+    final who = h == null ? 'Nobody now' : (h.own ? '${h.name} (you)' : h.name);
     // The one action a row that needs doing shows without opening it.
     final Widget? rowAction = switch (a) {
       _ when a.outcomeDue && !(h?.own ?? false) => TextButton(
         key: Key('special-record-$id'),
+        style: _outRowButton(null),
         onPressed: busy ? null : () => _show(_SpecialForms.record),
         child: const Text('Record outcome'),
       ),
       _ when a.needsSomeone => TextButton(
         key: Key('special-reassign-$id'),
+        style: _outRowButton(null),
         onPressed: busy ? null : () => _show(_SpecialForms.change),
         child: const Text('Give to someone'),
       ),
       _ => null,
     };
-    final summary = InkWell(
-      key: Key('special-open-$id'),
-      onTap: widget.onToggle,
-      child: Padding(
+    final chevron = Icon(
+      widget.open ? Icons.expand_less : Icons.expand_more,
+      color: c.muted,
+      semanticLabel: widget.open ? 'Close details' : 'Open details',
+    );
+    final markLabel = StatusLabel(
+      key: Key('special-mark-$id'),
+      label: mark,
+      tone: tone,
+    );
+    final Widget line;
+    if (widget.wide) {
+      line = Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 58),
+          child: StaffColumnsRow(
+            columns: _specColumns,
+            cells: [
+              Text(
+                _specialWhen(context, a),
+                key: Key('special-when-$id'),
+                style: ChurchType.staffBody.copyWith(
+                  color: c.ink,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    a.dutyName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: ChurchType.staffBody.copyWith(
+                      color: c.ink,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (a.location case final l?)
+                    Text(
+                      l,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: muted.copyWith(fontSize: 13),
+                    ),
+                ],
+              ),
+              Text(
+                who,
+                key: Key('special-sub-$id'),
+                style: ChurchType.staffBody.copyWith(
+                  color: h == null ? c.muted : c.ink,
+                ),
+              ),
+              markLabel,
+              rowAction == null
+                  ? const SizedBox.shrink()
+                  : FocusRing(child: rowAction),
+              chevron,
+            ],
+          ),
+        ),
+      );
+    } else {
+      line = Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -342,44 +495,52 @@ class _SpecialRowState extends ConsumerState<_SpecialRow> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    [
-                      h == null
-                          ? 'Nobody now'
-                          : (h.own ? '${h.name} (you)' : h.name),
-                      _specialWhen(context, a),
-                    ].join(' · '),
+                    [who, _specialWhen(context, a)].join(' · '),
                     key: Key('special-sub-$id'),
                     style: muted,
                   ),
                   const SizedBox(height: 8),
-                  StatusLabel(
-                    key: Key('special-mark-$id'),
-                    label: mark,
-                    tone: tone,
-                  ),
+                  markLabel,
+                  if (rowAction != null) ...[
+                    const SizedBox(height: 4),
+                    FocusRing(child: rowAction),
+                  ],
                 ],
               ),
             ),
-            if (rowAction != null) FocusRing(child: rowAction),
-            Icon(
-              widget.open ? Icons.expand_less : Icons.expand_more,
-              color: c.muted,
-              semanticLabel: widget.open ? 'Close details' : 'Open details',
-            ),
+            chevron,
           ],
         ),
-      ),
+      );
+    }
+    final summary = InkWell(
+      key: Key('special-open-$id'),
+      onTap: widget.onToggle,
+      child: line,
     );
-    if (!widget.open) return summary;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        summary,
-        Padding(
-          padding: const EdgeInsets.fromLTRB(78, 0, 16, 16),
-          child: _details(context, a),
-        ),
-      ],
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        // The opened row and its details share one pale tint.
+        color: widget.open ? c.bg : null,
+        border: widget.divider ? Border(top: BorderSide(color: c.line)) : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          summary,
+          if (widget.open)
+            Padding(
+              padding: EdgeInsets.fromLTRB(widget.wide ? 20 : 78, 0, 16, 16),
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: _details(context, a),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -387,10 +548,9 @@ class _SpecialRowState extends ConsumerState<_SpecialRow> {
     final h = a.holder;
     final id = a.occurrenceId;
     final busy = widget.busy;
-    final loc = MaterialLocalizations.of(context);
     final rows = <DetailRow>[
       if (a.times.dueOn case final d?)
-        (label: 'Due', value: loc.formatFullDate(d))
+        (label: 'Due', value: '${_specDate(d)} (done by 18:00)')
       else
         (label: 'When', value: '${_specialWhen(context, a)} (church time)'),
       if (a.location case final l?) (label: 'Location', value: l),
@@ -398,7 +558,7 @@ class _SpecialRowState extends ConsumerState<_SpecialRow> {
         (
           label: 'Answer by',
           value: [
-            _when(context, h.responseDeadline),
+            _outDayTime(h.responseDeadline),
             if (h.deadlineSource == DutyDeadlineSource.churchDefault)
               '(church default)',
           ].join(' '),
@@ -406,7 +566,7 @@ class _SpecialRowState extends ConsumerState<_SpecialRow> {
       if (a.givenBy case final g?)
         (
           label: 'Given by',
-          value: a.givenAt == null ? g : '$g, ${_when(context, a.givenAt!)}',
+          value: a.givenAt == null ? g : '$g, ${_outDayTime(a.givenAt!)}',
         ),
       if (h?.note case final n?) (label: 'Their note', value: n),
       if (h?.override case final o?)
@@ -876,7 +1036,7 @@ class _SpecialFormState extends ConsumerState<_SpecialForm> {
                 hint: 'HH:MM',
                 wire: 'ends_at',
                 maxLength: 5,
-                width: 170,
+                width: 200,
               ),
             ],
           )
@@ -942,7 +1102,7 @@ class _SpecialFormState extends ConsumerState<_SpecialForm> {
               hint: 'YYYY-MM-DD',
               wire: 'response_deadline',
               maxLength: 10,
-              width: 220,
+              width: 250,
             ),
             field(
               'deadline-time',
@@ -950,7 +1110,7 @@ class _SpecialFormState extends ConsumerState<_SpecialForm> {
               'Answer by: time (optional)',
               hint: 'HH:MM',
               maxLength: 5,
-              width: 200,
+              width: 240,
             ),
           ],
         ),

@@ -344,76 +344,7 @@ class _GrantAdminScreenState extends ConsumerState<GrantAdminScreen> {
     GrantAction? a,
     GrantAdminController ctl,
   ) {
-    final who = a?.memberName ?? 'the member';
-    final what = a?.label ?? 'the role';
-    final (tone, title, message) = switch (n) {
-      GrantNotice.granted => (
-        StatusTone.success,
-        'Granted',
-        '$what was granted to $who. It applies at their next request.',
-      ),
-      GrantNotice.revoked => (
-        StatusTone.success,
-        'Removed',
-        '$what was removed from $who. It stops at their next request.',
-      ),
-      GrantNotice.changedElsewhere => (
-        StatusTone.warning,
-        'Changed elsewhere',
-        '$who\'s permissions changed in another tab or by another Admin. '
-            'The list was reloaded; check it and try again.',
-      ),
-      GrantNotice.lastAdmin => (
-        StatusTone.warning,
-        'The last Admin can\'t be removed',
-        'Grant Admin to another member with access first, so the church is '
-            'never left without an Admin.',
-      ),
-      GrantNotice.selfGrant => (
-        StatusTone.warning,
-        'Not allowed',
-        'Another Admin must grant you a role or scope. Nothing was changed.',
-      ),
-      GrantNotice.noLongerAdmin => (
-        StatusTone.warning,
-        'Not allowed',
-        'Your account no longer has Admin access. Nothing was changed.',
-      ),
-      GrantNotice.signInAgain => (
-        StatusTone.warning,
-        'Please sign in again',
-        'This sign-in is no longer valid. Nothing was changed.',
-      ),
-      GrantNotice.roleUnavailable => (
-        StatusTone.neutral,
-        'Not available yet',
-        '$what can\'t be granted here until the church approves the setting '
-            'it needs.',
-      ),
-      GrantNotice.handoverRequired => (
-        StatusTone.warning,
-        'Hand over first',
-        'This department has no other leader or deputy who can use the app. '
-            'Give the role to someone else first, then remove it from $who. '
-            'Nothing was changed.',
-      ),
-      GrantNotice.refused => (
-        StatusTone.warning,
-        'Not changed',
-        'The server refused the change. The list was reloaded.',
-      ),
-      GrantNotice.unconfirmed => (
-        StatusTone.warning,
-        'Not confirmed',
-        'We don\'t know whether the change to $who was made. Check again: '
-            'the same request is sent, so it can\'t apply twice.',
-      ),
-      GrantNotice.notSent => (
-        StatusTone.neutral,
-        'Not sent',
-        'This build has no server configured, so nothing was sent.',
-      ),
-    };
+    final (tone, title, message) = grantNoticeText(n, a);
     return RequestStateBanner(
       key: Key('grant-notice-${n.name}'),
       tone: tone,
@@ -552,4 +483,79 @@ class _GrantAdminScreenState extends ConsumerState<GrantAdminScreen> {
             ),
     );
   }
+}
+
+/// What a role change tells the Admin: tone, title and message (Roles &
+/// access, and the member panel on Members).
+(StatusTone, String, String) grantNoticeText(GrantNotice n, GrantAction? a) {
+  final who = a?.memberName ?? 'the member';
+  final what = a?.label ?? 'the role';
+  return switch (n) {
+    GrantNotice.granted => (
+      StatusTone.success,
+      'Granted',
+      '$what was granted to $who. It applies at their next request.',
+    ),
+    GrantNotice.revoked => (
+      StatusTone.success,
+      'Removed',
+      '$what was removed from $who. It stops at their next request.',
+    ),
+    GrantNotice.changedElsewhere => (
+      StatusTone.warning,
+      'Changed elsewhere',
+      '$who\'s permissions changed in another tab or by another Admin. '
+          'The list was reloaded; check it and try again.',
+    ),
+    GrantNotice.lastAdmin => (
+      StatusTone.warning,
+      'The last Admin can\'t be removed',
+      'Grant Admin to another member with access first, so the church is '
+          'never left without an Admin.',
+    ),
+    GrantNotice.selfGrant => (
+      StatusTone.warning,
+      'Not allowed',
+      'Another Admin must grant you a role or scope. Nothing was changed.',
+    ),
+    GrantNotice.noLongerAdmin => (
+      StatusTone.warning,
+      'Not allowed',
+      'Your account no longer has Admin access. Nothing was changed.',
+    ),
+    GrantNotice.signInAgain => (
+      StatusTone.warning,
+      'Please sign in again',
+      'This sign-in is no longer valid. Nothing was changed.',
+    ),
+    GrantNotice.roleUnavailable => (
+      StatusTone.neutral,
+      'Not available yet',
+      '$what can\'t be granted here until the church approves the setting '
+          'it needs.',
+    ),
+    GrantNotice.handoverRequired => (
+      StatusTone.warning,
+      'Hand over first',
+      'This department has no other leader or deputy who can use the app. '
+          'Give the role to someone else first, then remove it from $who. '
+          'Nothing was changed.',
+    ),
+    GrantNotice.refused => (
+      StatusTone.warning,
+      'Not changed',
+      'The server refused the change. The list was reloaded.',
+    ),
+    GrantNotice.unconfirmed => (
+      StatusTone.warning,
+      'Not confirmed',
+      'We don\'t know whether the change to $who was made. Check again: '
+          'the same request is sent, so it can\'t apply twice.',
+    ),
+    GrantNotice.notSent => (
+      StatusTone.neutral,
+      'Not sent',
+      'This build has no server configured, so nothing was sent.',
+    ),
+  };
 }

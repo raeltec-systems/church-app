@@ -319,7 +319,11 @@ void main() {
         tester.widget<StatusLabel>(byKey('record-actual-$_part2')).label,
         'Stood in: SYNTHETIC Stand In',
       );
-      expect(find.text('Planned: SYNTHETIC Planned 2'), findsOneWidget);
+      // Who was planned is the part's own column on a wide table.
+      expect(
+        tester.widget<Text>(byKey('record-planned-$_part2')).data,
+        'SYNTHETIC Planned 2',
+      );
       expect(
         find.text('Why it changed: SYNTHETIC it was them'),
         findsOneWidget,

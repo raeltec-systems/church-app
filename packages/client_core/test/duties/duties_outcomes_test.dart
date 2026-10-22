@@ -31,8 +31,10 @@ Future<ClientTestHarness> pumpAt(
   WidgetTester tester,
   String location, {
   void Function(ClientTestHarness h)? setUp,
+  bool phone = false,
+  double width = 1200,
 }) async {
-  tester.view.physicalSize = const Size(1200, 9000);
+  tester.view.physicalSize = Size(width, 9000);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final h = ClientTestHarness();
@@ -46,7 +48,7 @@ Future<ClientTestHarness> pumpAt(
     ProviderScope(
       overrides: h.overrides(),
       child: MaterialApp.router(
-        theme: churchStaffTheme(),
+        theme: phone ? churchMobileTheme(Brightness.light) : churchStaffTheme(),
         routerConfig: router,
       ),
     ),
@@ -76,6 +78,9 @@ bool enabled(WidgetTester tester, String key) {
     _ => throw StateError('not a button: $key'),
   };
 }
+
+String? textOf(WidgetTester tester, String key) =>
+    (tester.widget(byKey(key)) as Text).data;
 
 Future<void> enter(WidgetTester tester, String key, String text) async {
   await tester.ensureVisible(byKey(key));
@@ -392,8 +397,14 @@ void main() {
       );
       expect(byKey('outcomes-state-$_slotA'), findsOneWidget);
       expect(find.text('Not recorded'), findsWidgets);
-      expect(find.text('Answer: Accepted'), findsWidgets);
-      expect(find.text('Outcome: No-show'), findsOneWidget);
+      // The answer has its own column, apart from the outcome.
+      expect(textOf(tester, 'outcomes-response-$_slotA'), 'Accepted');
+      expect(
+        (tester.widget(
+          byKey('outcomes-outcome-$_slotB-label'),
+        ) as StatusLabel).label,
+        'No-show',
+      );
       expect(find.textContaining('Earlier: Completed'), findsOneWidget);
       expect(
         find.textContaining('SYNTHETIC: checked the sign-in sheet'),
@@ -449,7 +460,7 @@ void main() {
           ),
         ]),
       );
-      expect(find.text('Answer: Declined'), findsOneWidget);
+      expect(textOf(tester, 'outcomes-response-$_slotA'), 'Declined');
       await tapKey(tester, 'outcomes-record-$_slotA');
       expect(byKey('outcomes-choice-$_slotA-no_show'), findsNothing);
       expect(byKey('outcomes-choice-$_slotA-excused'), findsOneWidget);
@@ -495,6 +506,42 @@ void main() {
       );
       await settle(tester);
       expect(byKey('duties-notice-ownOutcome'), findsOneWidget);
+    });
+
+    testWidgets('the count to record leads; the Not recorded pill filters', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.dutyOutcomes,
+        setUp: (h) => h.outcomes.outcomes = outcomes(standardPositions()),
+      );
+      // The server's count, first.
+      expect(textOf(tester, 'outcomes-finding'), '1 position needs an outcome');
+      expect(byKey('outcomes-card-$_slotB'), findsOneWidget);
+      await tapKey(tester, 'outcomes-unrecorded-only');
+      expect(byKey('outcomes-card-$_slotA'), findsOneWidget);
+      expect(byKey('outcomes-card-$_slotL'), findsOneWidget);
+      expect(byKey('outcomes-card-$_slotB'), findsNothing);
+      await tapKey(tester, 'outcomes-filter-all');
+      expect(byKey('outcomes-card-$_slotB'), findsOneWidget);
+    });
+
+    testWidgets('at phone width (390 px) each position is a two-line row', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.dutyOutcomes,
+        phone: true,
+        width: 390,
+        setUp: (h) => h.outcomes.outcomes = outcomes(standardPositions()),
+      );
+      expect(tester.takeException(), isNull);
+      expect(textOf(tester, 'outcomes-response-$_slotA'), 'Answer: Accepted');
+      await tapKey(tester, 'outcomes-record-$_slotA');
+      expect(byKey('outcomes-form-$_slotA'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('a reader without a department scope sees the need', (

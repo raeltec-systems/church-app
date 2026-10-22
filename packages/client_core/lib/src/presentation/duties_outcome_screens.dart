@@ -108,6 +108,66 @@ class DutyOutcomesScreen extends StatelessWidget {
   );
 }
 
+const _outWeekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const _outMonths = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/// "Sun 11 Oct, 08:30" in church time (the handoff's day before month).
+String _outDayTime(DateTime at) {
+  final w = ChurchTime.wall(at);
+  return '${_outWeekdays[w.weekday - 1]} ${w.day} ${_outMonths[w.month - 1]}, '
+      '${ChurchTime.timeText(at)}';
+}
+
+/// "1 Oct 2026" for a `YYYY-MM-DD` window end (as typed when unreadable).
+String _outDate(String ymd) {
+  final d = DateTime.tryParse(ymd);
+  return d == null ? ymd : '${d.day} ${_outMonths[d.month - 1]} ${d.year}';
+}
+
+/// The table's columns on a wide screen: the position, who held it, their
+/// answer (kept apart from the outcome), the outcome as the row's one
+/// status mark, and the record action on the row's right edge.
+const _outColumns = [
+  StaffColumn('Position', flex: 3),
+  StaffColumn('Member', flex: 3),
+  StaffColumn('Answer', flex: 2),
+  StaffColumn('Outcome', flex: 2),
+  StaffColumn('', width: 176, numeric: true),
+];
+
+/// Below this width each position is a two-line row instead.
+const _outWide = 860.0;
+
+/// A compact button for a table row (36 px, 14 px label; with its focus
+/// ring's room it keeps a 44 px target).
+ButtonStyle _outRowButton(ButtonStyle? base) =>
+    (base ?? const ButtonStyle()).copyWith(
+      minimumSize: const WidgetStatePropertyAll(Size(0, 36)),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 14),
+      ),
+      textStyle: const WidgetStatePropertyAll(
+        TextStyle(
+          fontFamily: ChurchFonts.body,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+
 class _OutcomesBody extends ConsumerStatefulWidget {
   const _OutcomesBody({required this.value, required this.state});
   final DutyOutcomes value;
@@ -162,21 +222,51 @@ class _OutcomesBodyState extends ConsumerState<_OutcomesBody> {
 
   @override
   Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
     final v = widget.value;
     final busy = widget.state.busy;
+    // The server's counts cover every position, also beyond a truncated list.
+    var toRecord = 0, positions = 0;
+    for (final d in v.departments) {
+      toRecord += d.counts.unrecorded;
+      positions += d.counts.positions;
+    }
+    // The pills count the rows in view.
+    final listed = [for (final d in v.departments) ...d.positions];
+    final listedUnrecorded = listed
+        .where((p) => p.assignment?.state == OutcomeState.unrecorded)
+        .length;
+    final headline = positions == 0
+        ? 'No duties have started in these dates'
+        : toRecord == 0
+        ? 'Every outcome in these dates is recorded'
+        : '$toRecord ${toRecord == 1 ? 'position needs' : 'positions need'} '
+              'an outcome';
     final children = <Widget>[
+      // The screen's question first: how many outcomes are still to record.
+      Semantics(
+        header: true,
+        child: Text(
+          headline,
+          key: const Key('outcomes-finding'),
+          style: ChurchType.sectionTitle.copyWith(color: c.ink),
+        ),
+      ),
+      const SizedBox(height: 4),
       _muted(
         context,
-        'Duties from ${v.from} to ${v.to} (church time) that have started'
-        '${v.duty == null ? '' : ', duty matching "${v.duty}"'}. An outcome is '
-        'only what a leader records: a duty nobody recorded stays "Not '
-        'recorded".',
+        '${positions == 1 ? '1 position' : '$positions positions'} at duties '
+        'that started from ${_outDate(v.from)} to ${_outDate(v.to)} (church '
+        'time)${v.duty == null ? '' : ', duty matching "${v.duty}"'}. An '
+        'outcome is only what a leader records: a duty nobody recorded stays '
+        '"Not recorded".',
       ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 16),
+      // The scope: the dates first, then the narrowing filters.
       Wrap(
         spacing: 12,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.end,
+        runSpacing: 12,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           SizedBox(
             width: 160,
@@ -189,17 +279,25 @@ class _OutcomesBodyState extends ConsumerState<_OutcomesBody> {
               ),
             ),
           ),
-          DropdownButton<int>(
-            key: const Key('outcomes-days'),
-            value: _days,
-            items: [
-              for (final d in const [7, 14, 31])
-                DropdownMenuItem(value: d, child: Text('$d days')),
-            ],
-            onChanged: (d) => setState(() => _days = d ?? 14),
+          SizedBox(
+            width: 120,
+            child: DropdownButtonFormField<int>(
+              key: const Key('outcomes-days'),
+              initialValue: _days,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'For'),
+              items: [
+                for (final d in const [7, 14, 31])
+                  DropdownMenuItem(
+                    value: d,
+                    child: Text('$d days', overflow: TextOverflow.ellipsis),
+                  ),
+              ],
+              onChanged: (d) => setState(() => _days = d ?? 14),
+            ),
           ),
           SizedBox(
-            width: 200,
+            width: 220,
             child: TextField(
               key: const Key('outcomes-duty'),
               controller: _duty,
@@ -211,21 +309,26 @@ class _OutcomesBodyState extends ConsumerState<_OutcomesBody> {
             ),
           ),
           if (v.departments.length > 1 || _department != null)
-            DropdownButton<String?>(
-              key: const Key('outcomes-department'),
-              value: _department,
-              items: [
-                const DropdownMenuItem<String?>(
-                  value: null,
-                  child: Text('All my departments'),
-                ),
-                for (final d in v.departments)
-                  DropdownMenuItem<String?>(
-                    value: d.departmentId,
-                    child: Text(d.name),
+            SizedBox(
+              width: 240,
+              child: DropdownButtonFormField<String?>(
+                key: const Key('outcomes-department'),
+                initialValue: _department,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Department'),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('All my departments'),
                   ),
-              ],
-              onChanged: (d) => setState(() => _department = d),
+                  for (final d in v.departments)
+                    DropdownMenuItem<String?>(
+                      value: d.departmentId,
+                      child: Text(d.name, overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+                onChanged: (d) => setState(() => _department = d),
+              ),
             ),
           FocusRing(
             child: OutlinedButton(
@@ -236,15 +339,28 @@ class _OutcomesBodyState extends ConsumerState<_OutcomesBody> {
           ),
         ],
       ),
-      const SizedBox(height: 8),
-      FilterChip(
-        key: const Key('outcomes-unrecorded-only'),
-        label: const Text('Not recorded only'),
-        selected: _unrecordedOnly,
-        onSelected: (s) => setState(() => _unrecordedOnly = s),
-      ),
       const SizedBox(height: 12),
-      if (v.truncated)
+      StaffFilterPills<bool>(
+        label: 'Show',
+        selected: _unrecordedOnly,
+        onChanged: (s) => setState(() => _unrecordedOnly = s),
+        options: [
+          StaffFilterOption(
+            false,
+            'All',
+            count: listed.length,
+            key: const Key('outcomes-filter-all'),
+          ),
+          StaffFilterOption(
+            true,
+            'Not recorded',
+            count: listedUnrecorded,
+            key: const Key('outcomes-unrecorded-only'),
+          ),
+        ],
+      ),
+      if (v.truncated) ...[
+        const SizedBox(height: 12),
         const RequestStateBanner(
           key: Key('outcomes-truncated'),
           tone: StatusTone.warning,
@@ -253,46 +369,22 @@ class _OutcomesBodyState extends ConsumerState<_OutcomesBody> {
               'The counts cover every position; choose fewer days or one '
               'department to list the rest.',
         ),
+      ],
     ];
     if (v.departments.isEmpty) {
-      children.add(_muted(context, 'No departments to show.'));
-    }
-    for (final d in v.departments) {
-      final c = d.counts;
-      final shown = d.positions
-          .where(
-            (p) =>
-                !_unrecordedOnly ||
-                p.assignment?.state == OutcomeState.unrecorded,
-          )
-          .toList();
       children.addAll([
         const SizedBox(height: ChurchGeometry.sectionGap),
-        _heading(context, d.name, key: Key('outcomes-dept-${d.departmentId}')),
-        Text(
-          '${c.positions} positions: ${c.completed} completed, ${c.excused} '
-          'excused, ${c.noShow} no-show, ${c.unrecorded} not recorded'
-          '${c.unfilled > 0 ? ', ${c.unfilled} unfilled' : ''}',
-          key: Key('outcomes-counts-${d.departmentId}'),
+        _muted(context, 'No departments to show.'),
+      ]);
+    }
+    for (final d in v.departments) {
+      children.addAll([
+        const SizedBox(height: ChurchGeometry.sectionGap),
+        _OutDepartment(
+          department: d,
+          unrecordedOnly: _unrecordedOnly,
+          state: widget.state,
         ),
-        const SizedBox(height: 8),
-        if (shown.isEmpty)
-          _muted(
-            context,
-            _unrecordedOnly
-                ? 'Every outcome in these dates is recorded.'
-                : 'No started duties in these dates.',
-          ),
-        for (final p in shown) ...[
-          _OutcomeCard(
-            key: Key('outcomes-card-${p.slotId}'),
-            position: p,
-            busy: busy,
-            fieldErrors: widget.state.fieldErrors,
-            lastAction: widget.state.noticeAction,
-          ),
-          const SizedBox(height: 8),
-        ],
       ]);
     }
     return Column(
@@ -302,27 +394,194 @@ class _OutcomesBodyState extends ConsumerState<_OutcomesBody> {
   }
 }
 
+/// One department: its name and totals over a table of its started
+/// positions, grouped under each duty (its name, day and place once).
+class _OutDepartment extends StatelessWidget {
+  const _OutDepartment({
+    required this.department,
+    required this.unrecordedOnly,
+    required this.state,
+  });
+
+  final OutcomeDepartment department;
+  final bool unrecordedOnly;
+  final DutiesState<DutyOutcomes> state;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final d = department;
+    final k = d.counts;
+    final shown = d.positions
+        .where(
+          (p) =>
+              !unrecordedOnly || p.assignment?.state == OutcomeState.unrecorded,
+        )
+        .toList();
+    // Positions of one duty arrive together: group them under the duty.
+    final groups = <List<OutcomePosition>>[];
+    for (final p in shown) {
+      if (groups.isNotEmpty &&
+          groups.last.first.occurrenceId == p.occurrenceId) {
+        groups.last.add(p);
+      } else {
+        groups.add([p]);
+      }
+    }
+    final counts = [
+      '${k.unrecorded} not recorded',
+      '${k.completed} completed',
+      '${k.excused} excused',
+      '${k.noShow} no-show',
+      if (k.unfilled > 0) '${k.unfilled} unfilled',
+      k.positions == 1 ? '1 position' : '${k.positions} positions',
+    ];
+    final countStyle = ChurchType.secondary.copyWith(
+      color: c.muted,
+      fontSize: 13,
+      fontFeatures: const [FontFeature.tabularFigures()],
+    );
+    return LayoutBuilder(
+      builder: (context, box) {
+        final wide = box.maxWidth >= _outWide;
+        final rows = <Widget>[];
+        for (final (gi, g) in groups.indexed) {
+          final first = g.first;
+          rows.add(
+            Container(
+              padding: EdgeInsets.fromLTRB(20, gi == 0 ? 14 : 16, 20, 4),
+              decoration: BoxDecoration(
+                border: gi == 0 ? null : Border(top: BorderSide(color: c.line)),
+              ),
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 2,
+                crossAxisAlignment: WrapCrossAlignment.end,
+                children: [
+                  Text(
+                    first.dutyName,
+                    style: ChurchType.staffBody.copyWith(
+                      color: c.ink,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    [
+                      _outDayTime(first.times.startsAt),
+                      ?first.location,
+                    ].join(' · '),
+                    style: ChurchType.secondary.copyWith(
+                      color: c.muted,
+                      fontSize: 13,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+          for (final (i, p) in g.indexed) {
+            rows.add(
+              _OutRow(
+                key: Key('outcomes-card-${p.slotId}'),
+                position: p,
+                wide: wide,
+                divider: i > 0,
+                busy: state.busy,
+                fieldErrors: state.fieldErrors,
+                lastAction: state.noticeAction,
+              ),
+            );
+          }
+        }
+        return StaffTableFrame(
+          children: [
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+              decoration: BoxDecoration(
+                border: Border(bottom: BorderSide(color: c.line)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Semantics(
+                    header: true,
+                    child: Text(
+                      d.name,
+                      key: Key('outcomes-dept-${d.departmentId}'),
+                      style: ChurchType.cardTitle.copyWith(
+                        color: c.ink,
+                        fontSize: 17,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  // Each figure stays whole on a narrow screen; its separator
+                  // travels with the next one.
+                  Semantics(
+                    label: counts.join(', '),
+                    excludeSemantics: true,
+                    child: Wrap(
+                      key: Key('outcomes-counts-${d.departmentId}'),
+                      children: [
+                        for (final (i, t) in counts.indexed)
+                          Text(i == 0 ? t : ' · $t', style: countStyle),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (wide && shown.isNotEmpty)
+              const StaffTableHeader(columns: _outColumns),
+            if (shown.isEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 18),
+                child: _muted(
+                  context,
+                  unrecordedOnly
+                      ? 'Every outcome in these dates is recorded.'
+                      : 'No started duties in these dates.',
+                ),
+              ),
+            ...rows,
+            if (shown.isNotEmpty) const SizedBox(height: 6),
+          ],
+        );
+      },
+    );
+  }
+}
+
 enum _OutcomeForm { none, record, correct }
 
-class _OutcomeCard extends ConsumerStatefulWidget {
-  const _OutcomeCard({
+/// One started position: who held it, their answer, the outcome as the
+/// row's one status mark and the action that records or corrects it; the
+/// record's trail (who, when, the note, every earlier value) under it, and
+/// the record form opening in place.
+class _OutRow extends ConsumerStatefulWidget {
+  const _OutRow({
     super.key,
     required this.position,
+    required this.wide,
+    required this.divider,
     required this.busy,
     required this.fieldErrors,
     required this.lastAction,
   });
 
   final OutcomePosition position;
+  final bool wide;
+  final bool divider;
   final bool busy;
   final Map<String, String> fieldErrors;
   final DutyAction? lastAction;
 
   @override
-  ConsumerState<_OutcomeCard> createState() => _OutcomeCardState();
+  ConsumerState<_OutRow> createState() => _OutRowState();
 }
 
-class _OutcomeCardState extends ConsumerState<_OutcomeCard> {
+class _OutRowState extends ConsumerState<_OutRow> {
   var _form = _OutcomeForm.none;
   DutyOutcome? _choice;
   final _note = TextEditingController();
@@ -373,114 +632,244 @@ class _OutcomeCardState extends ConsumerState<_OutcomeCard> {
 
   @override
   Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
     final a = p.assignment;
     final busy = widget.busy;
-    final lines = <Widget>[
-      Text(
-        p.title,
-        style: ChurchType.cardTitle.copyWith(
-          color: ChurchColors.of(context).ink,
-        ),
-      ),
-      Text(
-        '${_timesText(context, p.times)}'
-        '${p.location == null ? '' : '. ${p.location}'}',
-      ),
-    ];
+    final small = ChurchType.secondary.copyWith(color: c.muted, fontSize: 13);
+    final positionName = p.positionName ?? 'Position ${p.positionNo}';
+    // Review N2: nothing is recorded about an erased member.
+    final actionable = a != null && !a.own && !a.erased;
+
+    final Widget who;
     if (a == null) {
-      lines.add(_muted(context, 'Nobody held this position.'));
-      return _Card(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: lines,
+      who = Text(
+        'Nobody held it',
+        style: ChurchType.staffBody.copyWith(color: c.muted),
+      );
+    } else if (a.erased) {
+      who = Text(
+        a.name,
+        key: Key('outcomes-who-${p.slotId}'),
+        style: ChurchType.staffBody.copyWith(color: c.muted),
+      );
+    } else {
+      // The member's name opens their history (the link colour on the
+      // name cell only).
+      final label = a.own ? 'My history' : 'History of ${a.name}';
+      // Shifted by the focus ring's room, so the name starts on the column's
+      // edge like the header above it.
+      who = Transform.translate(
+        offset: const Offset(-(ChurchGeometry.focusRingWidth + 1), 0),
+        child: FocusRing(
+          radius: 6,
+          child: Semantics(
+            link: true,
+            label: label,
+            excludeSemantics: true,
+            child: Tooltip(
+              message: label,
+              excludeFromSemantics: true,
+              child: InkWell(
+                key: Key('outcomes-history-${p.slotId}'),
+                borderRadius: BorderRadius.circular(6),
+                onTap: () => context.go(
+                  a.own
+                      ? DutyPaths.history
+                      : DutyPaths.memberHistory(a.memberId),
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 32),
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    widthFactor: 1,
+                    child: Text(
+                      a.own ? '${a.name} (you)' : a.name,
+                      key: Key('outcomes-who-${p.slotId}'),
+                      style: ChurchType.staffBody.copyWith(
+                        color: c.link,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       );
     }
+
+    final Widget mark;
+    if (a == null) {
+      mark = Text('—', style: ChurchType.staffBody.copyWith(color: c.muted));
+    } else if (a.outcome case final o?) {
+      mark = StatusLabel(
+        key: Key('outcomes-outcome-${p.slotId}-label'),
+        label: o.outcome.label,
+        tone: _outcomeTone(_stateOf(o.outcome)),
+      );
+    } else if (a.state == OutcomeState.unrecorded) {
+      mark = StatusLabel(
+        key: Key('outcomes-state-${p.slotId}'),
+        label: 'Not recorded',
+        tone: StatusTone.neutral,
+      );
+    } else {
+      mark = Text(a.state.label, style: small);
+    }
+
+    final Widget? action = !actionable
+        ? null
+        : a.outcome == null
+        ? OutlinedButton(
+            key: Key('outcomes-record-${p.slotId}'),
+            style: _outRowButton(null),
+            onPressed: busy ? null : () => _open(_OutcomeForm.record),
+            child: const Text('Record outcome'),
+          )
+        : TextButton(
+            key: Key('outcomes-correct-${p.slotId}'),
+            style: _outRowButton(null),
+            onPressed: busy ? null : () => _open(_OutcomeForm.correct),
+            child: const Text('Correct outcome'),
+          );
+
+    // The evidence under the row: who recorded it and when, the note and
+    // every earlier value; or why there is nothing to do.
+    final notes = <Widget>[
+      if (a?.outcome case final o?) ..._trail(context, o),
+      if (a != null && a.own)
+        Text(
+          'Your own duty: another leader or deputy of the department records '
+          'its outcome.',
+          style: small,
+        ),
+      if (a != null && a.erased)
+        Text(
+          'This member\'s record was removed: no outcome is recorded.',
+          style: small,
+        ),
+    ];
     final mine = widget.lastAction?.request.requestId == _sent && _sent != null;
     final errors = mine ? widget.fieldErrors : const <String, String>{};
-    lines.addAll([
-      const SizedBox(height: 4),
-      Text(
-        a.own ? '${a.name} (you)' : a.name,
-        key: Key('outcomes-who-${p.slotId}'),
-      ),
-      Wrap(
-        spacing: 8,
-        runSpacing: 4,
-        children: [
-          // The response is shown apart from the outcome.
-          StatusLabel(
-            key: Key('outcomes-response-${p.slotId}'),
-            label: 'Answer: ${a.responseLabel}',
-            tone: a.response == DutyResponse.accepted
-                ? StatusTone.success
-                : StatusTone.neutral,
-          ),
-          if (a.state == OutcomeState.unrecorded)
-            StatusLabel(
-              key: Key('outcomes-state-${p.slotId}'),
-              label: 'Not recorded',
-              tone: StatusTone.neutral,
+    final form = _form != _OutcomeForm.none && actionable
+        ? _formFor(context, a, errors)
+        : null;
+
+    final Widget line;
+    if (widget.wide) {
+      line = StaffColumnsRow(
+        columns: _outColumns,
+        cells: [
+          Text(
+            positionName,
+            style: ChurchType.staffBody.copyWith(
+              color: c.ink,
+              fontWeight: FontWeight.w500,
             ),
+          ),
+          who,
+          a == null
+              ? Text('—', style: ChurchType.staffBody.copyWith(color: c.muted))
+              : Text(
+                  a.responseLabel,
+                  key: Key('outcomes-response-${p.slotId}'),
+                  style: ChurchType.secondary.copyWith(color: c.muted),
+                ),
+          mark,
+          action == null ? const SizedBox.shrink() : FocusRing(child: action),
+        ],
+      );
+    } else {
+      line = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: who),
+              const SizedBox(width: 8),
+              mark,
+            ],
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  children: [
+                    Text(positionName, style: small),
+                    if (a != null) ...[
+                      Text('·', style: small),
+                      Text(
+                        'Answer: ${a.responseLabel}',
+                        key: Key('outcomes-response-${p.slotId}'),
+                        style: small,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              // The one action, at the row's right edge.
+              if (action != null) ...[
+                const SizedBox(width: 8),
+                FocusRing(child: action),
+              ],
+            ],
+          ),
+        ],
+      );
+    }
+    return Container(
+      decoration: BoxDecoration(
+        color: form == null ? null : c.bg,
+        border: widget.divider ? Border(top: BorderSide(color: c.line)) : null,
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 6),
+      // Every row at one pitch, whether or not it carries an action.
+      constraints: const BoxConstraints(minHeight: 66),
+      alignment: AlignmentDirectional.centerStart,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          line,
+          if (notes.isNotEmpty) ...[const SizedBox(height: 4), ...notes],
+          if (form != null) ...[const SizedBox(height: 12), form],
         ],
       ),
-      if (a.outcome case final o?)
-        _OutcomeLines(record: o, keyPrefix: 'outcomes-outcome-${p.slotId}'),
-    ]);
-    if (a.own) {
-      lines.add(
-        _muted(
-          context,
-          'This is your own duty: another leader or deputy of the department '
-          'records its outcome.',
+    );
+  }
+
+  /// The recorded outcome's trail, newest first: who recorded it and when
+  /// (and why, when corrected), its note, then every earlier value.
+  List<Widget> _trail(BuildContext context, DutyOutcomeRecord o) {
+    final small = ChurchType.secondary.copyWith(
+      color: ChurchColors.of(context).muted,
+      fontSize: 13,
+    );
+    final current = o.trail.where((t) => t.revision == o.revision).firstOrNull;
+    final by = o.recordedBy == null ? '' : ' by ${o.recordedBy}';
+    return [
+      Text(
+        '${o.corrected ? 'Corrected' : 'Recorded'}$by, '
+        '${_outDayTime(o.recordedAt)}'
+        '${current?.reason == null ? '' : '. Reason: "${current!.reason}"'}',
+        style: small,
+      ),
+      if (o.note case final n?)
+        Text(
+          'Note: "$n"',
+          key: Key('outcomes-outcome-${p.slotId}-note'),
+          style: small,
         ),
-      );
-    }
-    // Review N2: nothing is recorded about an erased member.
-    final actionable = !a.own && !a.erased;
-    if (a.erased) {
-      lines.add(
-        _muted(
-          context,
-          'This member\'s record was removed: no outcome is recorded.',
-        ),
-      );
-    }
-    final actions = <Widget>[
-      if (actionable && a.outcome == null)
-        OutlinedButton(
-          key: Key('outcomes-record-${p.slotId}'),
-          onPressed: busy ? null : () => _open(_OutcomeForm.record),
-          child: const Text('Record outcome'),
-        ),
-      if (actionable && a.outcome != null)
-        OutlinedButton(
-          key: Key('outcomes-correct-${p.slotId}'),
-          onPressed: busy ? null : () => _open(_OutcomeForm.correct),
-          child: const Text('Correct outcome'),
-        ),
-      if (!a.erased)
-        TextButton(
-          key: Key('outcomes-history-${p.slotId}'),
-          onPressed: () => context.go(
-            a.own ? DutyPaths.history : DutyPaths.memberHistory(a.memberId),
-          ),
-          child: Text(a.own ? 'My history' : 'History of ${a.name}'),
+      for (final t in o.earlier)
+        Text(
+          'Earlier: ${t.outcome.label}'
+          '${t.note == null ? '' : ' ("${t.note}")'}, recorded'
+          '${t.by == null ? '' : ' by ${t.by}'}, ${_outDayTime(t.at)}'
+          '${t.reason == null ? '' : '. Reason: "${t.reason}"'}',
+          style: small,
         ),
     ];
-    lines.addAll([
-      const SizedBox(height: 8),
-      Wrap(spacing: 8, runSpacing: 8, children: actions),
-    ]);
-    if (_form != _OutcomeForm.none && actionable) {
-      lines.addAll([const SizedBox(height: 8), _formFor(context, a, errors)]);
-    }
-    return _Card(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: lines,
-      ),
-    );
   }
 
   Widget _formFor(
@@ -504,49 +893,64 @@ class _OutcomeCardState extends ConsumerState<_OutcomeCard> {
                     'Seen by ${a.name} and this department\'s leaders and '
                     'deputies.',
         ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
+        const SizedBox(height: 8),
+        StaffFilterPills<DutyOutcome?>(
+          label: 'What happened',
+          selected: _choice,
+          onChanged: busy ? null : (o) => setState(() => _choice = o),
+          options: [
             for (final o in a.allowed)
-              ChoiceChip(
+              StaffFilterOption<DutyOutcome?>(
+                o,
+                o.label,
                 key: Key('outcomes-choice-${p.slotId}-${o.wire}'),
-                label: Text(o.label),
-                selected: _choice == o,
-                onSelected: busy ? null : (_) => setState(() => _choice = o),
               ),
           ],
         ),
-        TextField(
-          key: Key('outcomes-note-${p.slotId}'),
-          controller: _note,
-          enabled: !busy,
-          maxLength: OutcomeDraft.noteMax,
-          decoration: InputDecoration(
-            labelText: 'Short note (optional)',
-            errorText: errors['note'] == null ? null : 'Keep it short',
-          ),
-        ),
-        if (correction)
-          TextField(
-            key: Key('outcomes-reason-${p.slotId}'),
-            controller: _reason,
-            enabled: !busy,
-            maxLength: OutcomeDraft.reasonMax,
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              labelText: 'Reason for the correction (required)',
-              errorText: errors['reason'] == null
-                  ? null
-                  : 'Give a short reason',
-            ),
-          ),
+        const SizedBox(height: 8),
         Align(
           alignment: AlignmentDirectional.centerStart,
-          child: FilledButton(
-            key: Key('outcomes-save-${p.slotId}'),
-            onPressed: busy || _choice == null || !reasonOk ? null : _save,
-            child: Text(correction ? 'Save correction' : 'Save outcome'),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  key: Key('outcomes-note-${p.slotId}'),
+                  controller: _note,
+                  enabled: !busy,
+                  maxLength: OutcomeDraft.noteMax,
+                  decoration: InputDecoration(
+                    labelText: 'Short note (optional)',
+                    errorText: errors['note'] == null ? null : 'Keep it short',
+                  ),
+                ),
+                if (correction)
+                  TextField(
+                    key: Key('outcomes-reason-${p.slotId}'),
+                    controller: _reason,
+                    enabled: !busy,
+                    maxLength: OutcomeDraft.reasonMax,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      labelText: 'Reason for the correction (required)',
+                      errorText: errors['reason'] == null
+                          ? null
+                          : 'Give a short reason',
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: FocusRing(
+            child: FilledButton(
+              key: Key('outcomes-save-${p.slotId}'),
+              onPressed: busy || _choice == null || !reasonOk ? null : _save,
+              child: Text(correction ? 'Save correction' : 'Save outcome'),
+            ),
           ),
         ),
       ],

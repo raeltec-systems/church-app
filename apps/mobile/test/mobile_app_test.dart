@@ -1455,7 +1455,11 @@ void main() {
       } else {
         expect(reached, isEmpty, reason: path);
       }
-      expect(persistence.hasMatch(src), isFalse, reason: path);
+      expect(
+        persistence.hasMatch(src),
+        path == 'lib/offline/public_content_cache_adapter.dart',
+        reason: path,
+      );
     }
   });
 

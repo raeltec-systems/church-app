@@ -21,6 +21,7 @@ import 'src/domain/commands.dart';
 import 'src/domain/content_announcements.dart';
 import 'src/domain/content_banners.dart';
 import 'src/domain/content_events.dart';
+import 'src/domain/public_content_cache.dart';
 import 'src/domain/content_giving.dart';
 import 'src/domain/credential_review.dart';
 import 'src/domain/duties.dart';
@@ -600,6 +601,7 @@ Map<String, Object?> publicEventData({
   String location = 'SYNTHETIC Main sanctuary',
   int publicationRevision = 1,
   String publishedAt = '2099-09-01T08:00:00.000000Z',
+  bool offlineAllowed = true,
 }) => {
   'event_id': eventId,
   'title': title,
@@ -609,6 +611,7 @@ Map<String, Object?> publicEventData({
   'location': location,
   'publication_revision': publicationRevision,
   'published_at': publishedAt,
+  'offline_allowed': offlineAllowed,
 };
 
 /// The wire form of `api.content_public_events` holding [events].
@@ -1045,7 +1048,7 @@ Map<String, Object?> staffAnnouncementsData(
 /// every call at once; the lists record what was asked.
 class FakeBanners implements BannerRepository {
   AccessRead<PublicBanners> publicBanners = AccessReadOk(
-    PublicBanners.fromJson(const {'banners': <Object?>[]}),
+    PublicBanners.fromJson(const {'banners': <Object?>[], 'truncated': false}),
   );
   AccessRead<StaffBanners> staffBanners = const AccessReadDenied(
     AccessDenial.notGranted,
@@ -1064,6 +1067,7 @@ class FakeBanners implements BannerRepository {
       height: 1080,
     ),
   );
+  Uint8List? publicImageBytes;
   FileSyncOutcome sync = const FileSyncDone(
     placed: 0,
     removed: 0,
@@ -1103,6 +1107,10 @@ class FakeBanners implements BannerRepository {
   );
 
   @override
+  Future<Uint8List?> fetchPublicImage(PublicBanner banner) async =>
+      publicImageBytes;
+
+  @override
   Future<ImageUploadOutcome> uploadImage(
     String itemId,
     String purpose,
@@ -1120,6 +1128,83 @@ class FakeBanners implements BannerRepository {
 
   @override
   Future<Uint8List?> previewImage(String assetId) async => previews[assetId];
+}
+
+/// The two allowlisted public snapshots for controller and widget tests.
+class FakePublicContentCache implements PublicContentCache {
+  bool available = false;
+  DateTime savedAt = DateTime.utc(2099, 9, 1, 8);
+  PublicContentSnapshot<PublicEvents>? events;
+  PublicContentSnapshot<PublicBanners>? banners;
+  final reads = <String>[];
+  final writes = <(String, Object)>[];
+  final imageFetches = <String>[];
+
+  @override
+  Future<PublicContentSnapshot<PublicEvents>?> readEvents() async {
+    reads.add(PublicContentCacheKeys.calendar);
+    return events;
+  }
+
+  @override
+  Future<PublicContentSnapshot<PublicBanners>?> readBanners() async {
+    reads.add(PublicContentCacheKeys.homeBanners);
+    return banners;
+  }
+
+  @override
+  Future<PublicContentCacheWrite> writeRead(
+    String readKey,
+    Object projection, {
+    Future<Uint8List?> Function(PublicBanner banner)? loadBannerImage,
+  }) async {
+    writes.add((readKey, projection));
+    if (!available) return const PublicContentCacheUnavailable();
+    if (readKey == PublicContentCacheKeys.calendar &&
+        projection is PublicEvents) {
+      if (projection.events.any((event) => !event.offlineAllowed)) {
+        return const PublicContentCacheRefused(
+          PublicContentCacheRefusal.unexpectedProjection,
+        );
+      }
+      events = PublicContentSnapshot(value: projection, savedAt: savedAt);
+      return PublicContentCacheSaved(
+        savedAt: savedAt,
+        savedRows: projection.events.length,
+      );
+    }
+    if (readKey == PublicContentCacheKeys.homeBanners &&
+        projection is PublicBanners) {
+      if (projection.banners.any((banner) => !banner.offlineAllowed)) {
+        return const PublicContentCacheRefused(
+          PublicContentCacheRefusal.offlineRightsNotCleared,
+        );
+      }
+      if (projection.banners.isNotEmpty && loadBannerImage == null) {
+        return const PublicContentCacheRefused(
+          PublicContentCacheRefusal.imageLoaderRequired,
+        );
+      }
+      final cached = <PublicBanner>[];
+      for (final banner in projection.banners) {
+        imageFetches.add(banner.bannerId);
+        final bytes = await loadBannerImage!(banner);
+        if (bytes != null) cached.add(banner.withOfflineImageBytes(bytes));
+      }
+      banners = PublicContentSnapshot(
+        value: PublicBanners(cached, truncated: projection.truncated),
+        savedAt: savedAt,
+      );
+      return PublicContentCacheSaved(
+        savedAt: savedAt,
+        savedRows: cached.length,
+        omittedRows: projection.banners.length - cached.length,
+      );
+    }
+    return const PublicContentCacheRefused(
+      PublicContentCacheRefusal.unsupportedRead,
+    );
+  }
 }
 
 /// [ContentFilePicker] answered by the test: [next] is the next pick (null:
@@ -1162,6 +1247,7 @@ Map<String, Object?> publicBannerData({
   int publicationRevision = 1,
   int rightsRevision = 1,
   String publishedAt = '2099-09-01T08:00:00.000000Z',
+  bool offlineAllowed = true,
 }) => {
   'banner_id': bannerId,
   'banner_kind': kind,
@@ -1179,12 +1265,14 @@ Map<String, Object?> publicBannerData({
   'publication_revision': publicationRevision,
   'rights_revision': rightsRevision,
   'published_at': publishedAt,
+  'offline_allowed': offlineAllowed,
 };
 
 /// The wire form of `api.content_public_banners` holding [banners].
-Map<String, Object?> publicBannersData(List<Map<String, Object?>> banners) => {
-  'banners': banners,
-};
+Map<String, Object?> publicBannersData(
+  List<Map<String, Object?>> banners, {
+  bool truncated = false,
+}) => {'banners': banners, 'truncated': truncated};
 
 /// The wire form of one banner revision as editors read it.
 Map<String, Object?> staffBannerRevisionData({
@@ -2608,6 +2696,7 @@ class ClientTestHarness {
   final giving = FakeGiving();
   final announcements = FakeAnnouncements();
   final banners = FakeBanners();
+  final publicContentCache = FakePublicContentCache();
   final filePicker = FakeFilePicker();
   final duties = FakeDuties();
   final coverage = FakeDutyCoverage();
@@ -2652,6 +2741,7 @@ class ClientTestHarness {
       givingRepositoryProvider.overrideWithValue(giving),
       announcementsRepositoryProvider.overrideWithValue(announcements),
       bannerRepositoryProvider.overrideWithValue(banners),
+      publicContentCacheProvider.overrideWithValue(publicContentCache),
       contentFilePickerProvider.overrideWithValue(filePicker),
       dutiesRepositoryProvider.overrideWithValue(duties),
       dutyCoverageRepositoryProvider.overrideWithValue(coverage),

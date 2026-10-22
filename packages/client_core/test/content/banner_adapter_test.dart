@@ -9,6 +9,7 @@ import 'dart:typed_data';
 
 import 'package:church_client_core/church_client_core.dart';
 import 'package:church_client_core/supabase_adapters.dart';
+import 'package:church_client_core/testing.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -241,4 +242,34 @@ void main() {
       'banner/$_item/r1/image.png',
     );
   });
+
+  test(
+    'only an offline-cleared public image is fetched for the cache',
+    () async {
+      final (repo, sent) = await _repo((r) async {
+        return http.Response.bytes(
+          [7, 8, 9],
+          200,
+          headers: {'content-type': 'image/png; charset=binary'},
+        );
+      });
+      final banner = PublicBanner.fromJson(publicBannerData());
+      expect(await repo.fetchPublicImage(banner), [7, 8, 9]);
+      expect(sent.single.method, 'GET');
+      expect(
+        sent.single.url.path,
+        contains('/storage/v1/object/public/content-public/'),
+      );
+      expect(sent.single.headers['apikey'], 'sb_publishable_test');
+      sent.clear();
+
+      expect(
+        await repo.fetchPublicImage(
+          PublicBanner.fromJson(publicBannerData(offlineAllowed: false)),
+        ),
+        isNull,
+      );
+      expect(sent, isEmpty);
+    },
+  );
 }

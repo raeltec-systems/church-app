@@ -336,6 +336,33 @@ Owner/operator checks (staging only):
 3. Let the existing scheduler run naturally. Do not manually invoke the scheduled worker on staging. Confirm its status advances, the worker reports only retention counts/status, and no synthetic or unintended Notifications jobs were created. Do not create test uploads in staging.
 4. For local functional evidence, run `tools/identity-e2e/content-retention.mjs`; it creates and removes only synthetic local rows and Storage objects. Staging credential rotation/revocation remains owner-controlled.
 
+## Story 6.4: offline public Calendar and Home content
+
+Migration: `supabase/migrations/20261022123202_content_public_offline_rights.sql` (the version staging recorded; adds the server eligibility flag to the public event and banner projections). pgTAP: `supabase/tests/content_events_test.sql` and `content_banners_test.sql`. E2E: `tools/identity-e2e/content-events.mjs` and `content-banners.mjs` check the added public key and its eligibility. Client checks: `packages/client_core/test/content/public_content_cache_test.dart`, `apps/mobile/test/offline/public_content_cache_adapter_test.dart` and `packages/client_core/test/boundaries_test.dart`.
+
+### What can be kept
+
+- Mobile stores only the anonymous `api.content_public_events()` and `api.content_public_banners()` list projections in its private Application Support directory. The JSON manifest is versioned; banner image files are keyed by banner id, publication revision and rights revision. Event detail, staff reads, drafts, giving records and other public reads have no cache path.
+- The server marks church-authored public events `offline_allowed: true`. A banner is eligible only while its current live image rights record clears `offline`; display-only banners remain visible online but are omitted from the mobile snapshot. An eligible banner is stored offline only when its image bytes were also fetched successfully.
+- `path_provider` is used by the single mobile-only file adapter. Staff web and unconfigured builds use `NoPublicContentCache`. `connectivity_plus` is only a reconnect signal: a failed public request remains the deciding evidence that the server could not be reached.
+- A successful refresh replaces the matching snapshot and removes old banner revision files, including items withdrawn or no longer cleared for offline use. A failed request keeps the last valid snapshot with an “Offline · saved at” state. A failed first request without a snapshot stays an unavailable state, not an empty list.
+
+### Local runs
+
+```bash
+npx supabase db reset --local && npx supabase test db
+node --test tools/identity-e2e/content-events.test.mjs tools/identity-e2e/content-banners.test.mjs
+flutter test test/content/public_content_cache_test.dart test/boundaries_test.dart
+flutter test test/offline/public_content_cache_adapter_test.dart
+flutter analyze
+```
+
+Run each Flutter command from its package directory (`packages/client_core` or `apps/mobile`). Use `node tools/ci/check-migrations.mjs --base origin/main` after creating the migration.
+
+### Owner manual check on staging
+
+Use an Android staging-configured emulator and a church-owned synthetic banner whose rights clear offline use. As a signed-out user, load Home and Calendar once, switch airplane mode on, and confirm the eligible event and banner image remain visible with “Offline · saved at …”. Confirm a display-only banner is absent from the saved state. Restore connectivity, withdraw the synthetic event and banner or suspend the banner's offline right, refresh successfully, then switch airplane mode on again and confirm the withdrawn/ineligible items and old image revisions are absent. This check sends no notification. Do not treat a withdrawal as removed from a device until its next successful refresh observes the server change.
+
 ### Owner manual check on staging (the ticket's verify)
 
 1. As a SYNTHETIC Media member on staff web, **Rights** > New: `SYNTHETIC theme artwork`, source `church-art` (not on Q5), basis Church-owned, Display ticked, evidence "SYNTHETIC test artwork". Save, then Verify. Create and verify a third-party record with source `acme-press` (Licence) and a church-owned record with Display unticked and Offline ticked.

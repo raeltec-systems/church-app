@@ -29,4 +29,5 @@ test('names are SYNTHETIC and the public projection keys are sorted', () => {
   assert.deepEqual([...PUBLIC_KEYS].sort(), PUBLIC_KEYS);
   assert.equal(findBanner({ banners: [{ banner_id: 'a' }, { banner_id: 'b' }] }, 'b').banner_id, 'b');
   assert.equal(findBanner(null, 'b'), undefined);
+  assert.ok(PUBLIC_KEYS.includes('offline_allowed'));
 });

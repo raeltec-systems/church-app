@@ -72,7 +72,7 @@ function docker(args, opts = {}) {
   return execFileSync('docker', args, { encoding: 'utf8', ...opts });
 }
 
-function main(mode) {
+async function main(mode) {
   if (!['on', 'off', 'status'].includes(mode)) {
     console.error('usage: local-phone-auth.mjs on|off|status');
     process.exit(2);
@@ -134,14 +134,14 @@ function main(mode) {
       console.log(`${name}: ${next.filter((e) => SWITCHED.some((k) => e.startsWith(`${k}=`))).join(', ') || 'switched keys unset'}; no SMS provider (LOCAL only)`);
       return;
     }
-    execFileSync('sleep', ['1']);
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   throw new Error(`${name} did not become healthy`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
-    main(process.argv[2]);
+    await main(process.argv[2]);
   } catch (e) {
     console.error(`local-phone-auth: ${e.message}`);
     process.exit(1);

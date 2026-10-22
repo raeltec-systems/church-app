@@ -31,6 +31,10 @@ test('the public projection keys are compared sorted', () => {
   assert.deepEqual(sortedKeys(undefined), []);
 });
 
+test('church-authored public events declare offline eligibility', () => {
+  assert.ok(PUBLIC_KEYS.includes('offline_allowed'));
+});
+
 test('an event is found by id in a list read', () => {
   const list = { events: [{ event_id: 'a', title: 'x' }, { event_id: 'b', title: 'y' }] };
   assert.equal(findEvent(list, 'b')?.title, 'y');

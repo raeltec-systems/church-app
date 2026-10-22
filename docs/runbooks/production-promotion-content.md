@@ -22,6 +22,7 @@ Migrations, in this order. Each was applied to staging under its hosted version,
 | F1 | `20261022100601_f1_giving_admin_tenure.sql`: the Identity self-read's current-caller-only Admin tenure context and Content's 14-elapsed-day giving verification guard; no gate, public read or notification changes |
 | F2 | `20261022102525_f2_church_owned_q5_exemption.sql`: updates only `app.content_rights_clear`; verified church-owned records bypass Q5 while lifecycle and per-use checks remain, and all other bases still require Q5 |
 | F3 | `20261022112247_content_asset_retention.sql`: bounded 30-day cleanup claims for unreferenced private uploads, a separate `content_asset_retention` system purpose, and attachment/preview guards while a claim is live; SQL removes metadata only after the Content Edge Function deletes bytes through Storage |
+| 6.4 | `20261022123202_content_public_offline_rights.sql`: adds `offline_allowed` to public event and banner JSON; events are church-authored, while each banner follows the current live image rights record. This enables the mobile-only allowlisted Calendar/Home file cache; staff web remains a no-op. No rights gate value changes. |
 
 Edge Functions, deployed after the migrations:
 
@@ -30,7 +31,7 @@ Edge Functions, deployed after the migrations:
 | 6.2 | `content-assets` (`supabase/functions/content-assets/index.ts`, `logic.mjs`, `../_shared/system_access.mjs`) | `verify_jwt = false`; no secret of its own (the platform's `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) |
 | F3 | `content-assets` and `notifications-worker` | Both updated, `verify_jwt = false`; Content alone receives the separate `CONTENT_ASSET_RETENTION_SYSTEM_CREDENTIAL`, the existing trigger copy, and its existing Storage key. The worker receives no Content credential or service-role key. |
 
-Client compatibility (6.1): production clients must be built from `main` at promotion. Older mobile builds keep the Duties and My cell tabs and have no Calendar; older staff web has no Events entry. Nothing breaks for them: the migration only adds objects. (6.3): older mobile builds have no Give tab and older staff web no Giving entry; the migration only adds objects.
+Client compatibility (6.1): production clients must be built from `main` at promotion. Older mobile builds keep the Duties and My cell tabs and have no Calendar; older staff web has no Events entry. Nothing breaks for them: the migration only adds objects. (6.3): older mobile builds have no Give tab and older staff web no Giving entry; the migration only adds objects. (6.4): older clients ignore the additive eligibility field; the new mobile cache requires this migration before that client build is released.
 
 ## What production shows before any approval
 
@@ -50,7 +51,7 @@ No epic 6 migration approves anything, and there are no fixture values in produc
 1. **Verify the deploy** (operator, SQL editor). These answer as on staging:
    ```sql
    select count(*) from supabase_migrations.schema_migrations
-    where version in ('20261021233523', '20261022011438', '20261022011557', '20261022012809', '20261022100601', '20261022102525', '20261022112247');  -- 7
+    where version in ('20261021233523', '20261022011438', '20261022011557', '20261022012809', '20261022100601', '20261022102525', '20261022112247', '20261022123202');  -- 8
    select count(*) from app.contract_boundary_violations();                                                -- 0
    select count(*) from app.contract_unowned_objects();                                                     -- 0
    select kind, editor_roles from app.content_kinds order by 1;   -- announcement, asset, banner, event, rights | {admin,pastor,media}; giving_method | {admin}
@@ -72,8 +73,8 @@ No epic 6 migration approves anything, and there are no fixture values in produc
            or has_table_privilege(r, c.oid, 'UPDATE') or has_table_privilege(r, c.oid, 'DELETE'));  -- 0
    ```
    Compare `md5(replace(pg_get_functiondef(p.oid), chr(13), ''))` of every `app`/`api` `content%` function, plus `app.identity_my_access` and `api.identity_my_access`, with staging. Expect no difference; this includes the F2 rights helper and the F3 claim/finalize handlers and asset guards. Confirm the gate rows, module guards and signed-out `content_public_banners` response are unchanged; no gate value is approved by these migrations.
-2. **Signed-out read** (operator, from any machine): `POST <production url>/rest/v1/rpc/content_public_events` with only the publishable key and `Content-Profile: api` answers `200 {"events": [], "truncated": false}`; `content_public_announcements` answers `200 {"announcements": [], "truncated": false}`.
-   And (6.2) `POST <production url>/functions/v1/content-assets?action=sync` with only the publishable key answers `401 {"outcome": "unauthenticated"}`; `POST .../rest/v1/rpc/content_public_banners` answers `200 {"banners": [], "truncated": false}`.
+2. **Signed-out read** (operator, from any machine): `POST <production url>/rest/v1/rpc/content_public_events` with only the publishable key and `Content-Profile: api` answers `200 {"events": [], "truncated": false}`; each returned event has `offline_allowed: true`. `content_public_announcements` answers `200 {"announcements": [], "truncated": false}`.
+   And (6.2/6.4) `POST <production url>/functions/v1/content-assets?action=sync` with only the publishable key answers `401 {"outcome": "unauthenticated"}`; `POST .../rest/v1/rpc/content_public_banners` answers `200 {"banners": [], "truncated": false}`. Each returned banner exposes `offline_allowed` from its current live image rights record; an empty response stays unchanged.
 3. **Editors** (Admin, staff web, **Roles & access**): give Media to the people the owner names.
 4. **First event** (Media): follow [content.md](content.md), "Owner manual check", with the church's real event instead of the SYNTHETIC one.
 5. **Giving (6.3 and F1, Q3; owner only).** Only after the church has named its real methods, destinations, purposes, currency, contact and at least two Admins (Q3):
@@ -86,4 +87,4 @@ No epic 6 migration approves anything, and there are no fixture values in produc
 
 ## Rollback
 
-6.1, 6.2, 6.3 and 6.13 are additive (no destructive statement, no row deletion). To take a banner off Home, an editor withdraws it (or suspends its rights record) and syncs; the public read drops it at once and the sync deletes its public file. To take a giving method off Give at once, an Admin hides it (**Giving** > Hide, `content.hide_giving_method`); to stop all giving publication, leave `q3_giving` unapproved. To take an announcement down, an editor withdraws it (**Announcements** > Withdraw); its undelivered notices are cancelled with it. To take every event off the public calendar without a schema change, an editor withdraws each published event (`content.withdraw_event`, **Events** > Withdraw): the public reads answer without it at once. To stop someone editing, an Admin removes their Media, Pastor or Admin role (**Roles & access**); it applies to their next command. No down migration is needed.
+6.1, 6.2, 6.3, 6.4 and 6.13 are additive (no destructive statement, no row deletion). To take a banner off Home, an editor withdraws it (or suspends its rights record) and syncs; the public read drops it at once and the next successful mobile refresh removes its local snapshot. To take a giving method off Give at once, an Admin hides it (**Giving** > Hide, `content.hide_giving_method`); to stop all giving publication, leave `q3_giving` unapproved. To take an announcement down, an editor withdraws it (**Announcements** > Withdraw); its undelivered notices are cancelled with it. To take every event off the public calendar without a schema change, an editor withdraws each published event (`content.withdraw_event`, **Events** > Withdraw): the public reads answer without it at once and the next successful mobile refresh removes its local snapshot. To stop someone editing, an Admin removes their Media, Pastor or Admin role (**Roles & access**); it applies to their next command. No down migration is needed.

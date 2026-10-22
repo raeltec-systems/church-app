@@ -62,6 +62,37 @@ class SupabaseBannerRepository implements BannerRepository {
     '${path.split('/').map(Uri.encodeComponent).join('/')}',
   );
 
+  @override
+  Future<Uint8List?> fetchPublicImage(PublicBanner banner) async {
+    if (!banner.offlineAllowed) return null;
+    try {
+      final response = await _http
+          .get(
+            publicFileUrl(banner.image.path),
+            headers: {'apikey': _key, 'accept': banner.image.mediaType},
+          )
+          .timeout(_timeout);
+      final mediaType = response.headers['content-type']
+          ?.split(';')
+          .first
+          .trim()
+          .toLowerCase();
+      if (response.statusCode != 200 ||
+          mediaType != banner.image.mediaType ||
+          response.bodyBytes.isEmpty ||
+          response.bodyBytes.length > 5 * 1024 * 1024) {
+        return null;
+      }
+      return response.bodyBytes;
+    } on TimeoutException {
+      return null;
+    } on http.ClientException {
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// One call to the Edge function with the current session; a 401 is
   /// retried once after a session refresh. Null when unreachable.
   Future<http.Response?> _call(

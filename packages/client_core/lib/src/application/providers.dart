@@ -8,6 +8,7 @@ import '../domain/commands.dart';
 import '../domain/content_announcements.dart';
 import '../domain/content_banners.dart';
 import '../domain/content_events.dart';
+import '../domain/public_content_cache.dart';
 import '../domain/content_giving.dart';
 import '../domain/credential_review.dart';
 import '../domain/duties.dart';
@@ -117,6 +118,18 @@ final announcementsRepositoryProvider = Provider<AnnouncementsRepository>(
 /// and image upload, sync and preview through the `content-assets` route.
 final bannerRepositoryProvider = Provider<BannerRepository>(
   (ref) => const UnconfiguredBannerRepository(),
+);
+
+/// Mobile's allowlisted snapshots for the Calendar and Home list reads.
+/// Staff web and unconfigured builds keep the no-op implementation.
+final publicContentCacheProvider = Provider<PublicContentCache>(
+  (ref) => const NoPublicContentCache(),
+);
+
+/// Emits only when the device regains a network interface. A signal triggers
+/// a normal public read; it never stands in for a successful server answer.
+final publicContentReconnectsProvider = StreamProvider<void>(
+  (ref) => const Stream<void>.empty(),
 );
 
 /// Story 6.2: the staff web file chooser for content images.

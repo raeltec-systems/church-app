@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/access_grants.dart';
 import '../domain/commands.dart';
 import '../domain/content_events.dart';
+import '../domain/public_content_cache.dart';
 import 'access_controllers.dart' show noteProtectedDenial;
 import 'providers.dart';
 
@@ -22,6 +23,8 @@ class PublicReadState<T> {
     this.result,
     this.asOf,
     this.refreshFailed,
+    this.savedAt,
+    this.offlineSnapshot = false,
   });
 
   final bool loading;
@@ -37,6 +40,12 @@ class PublicReadState<T> {
   /// still shown: the screen says the data is from [asOf].
   final AccessReadFailed<T>? refreshFailed;
 
+  /// When the current public list snapshot was last committed locally.
+  final DateTime? savedAt;
+
+  /// True when [result] is the allowlisted local snapshot, never a fresh read.
+  final bool offlineSnapshot;
+
   T? get value => switch (result) {
     AccessReadOk<T>(:final value) => value,
     _ => null,
@@ -50,16 +59,28 @@ abstract class PublicReadController<T> extends Notifier<PublicReadState<T>> {
 
   Future<AccessRead<T>> fetch();
 
+  bool get supportsOfflineSnapshot => false;
+
+  Future<DateTime?> saveOfflineSnapshot(T value) async => null;
+
+  Future<PublicContentSnapshot<T>?> readOfflineSnapshot() async => null;
+
   @override
   PublicReadState<T> build() {
     ref.watch(accountGenerationProvider);
+    ref.listen(publicContentReconnectsProvider, (previous, next) {
+      if (next.hasValue) reload();
+    });
     _epoch++;
     final epoch = _epoch;
     Future.microtask(() => _reload(epoch));
     return PublicReadState<T>(loading: true);
   }
 
-  Future<void> reload() => _reload(_epoch);
+  Future<void> reload() {
+    _epoch++;
+    return _reload(_epoch);
+  }
 
   Future<void> _reload(int epoch) async {
     if (!ref.mounted || epoch != _epoch) return;
@@ -68,9 +89,37 @@ abstract class PublicReadController<T> extends Notifier<PublicReadState<T>> {
       result: state.result,
       asOf: state.asOf,
       refreshFailed: state.refreshFailed,
+      savedAt: state.savedAt,
+      offlineSnapshot: state.offlineSnapshot,
     );
     final r = await fetch();
     if (!ref.mounted || epoch != _epoch) return;
+    if (r is AccessReadOk<T>) {
+      final savedAt = supportsOfflineSnapshot
+          ? await saveOfflineSnapshot(r.value)
+          : null;
+      if (!ref.mounted || epoch != _epoch) return;
+      state = PublicReadState<T>(
+        result: r,
+        asOf: DateTime.now(),
+        savedAt: savedAt,
+      );
+      return;
+    }
+    if (r is AccessReadFailed<T> && supportsOfflineSnapshot) {
+      final snapshot = await readOfflineSnapshot();
+      if (!ref.mounted || epoch != _epoch) return;
+      if (snapshot != null) {
+        state = PublicReadState<T>(
+          result: AccessReadOk<T>(snapshot.value),
+          asOf: snapshot.savedAt,
+          refreshFailed: r,
+          savedAt: snapshot.savedAt,
+          offlineSnapshot: true,
+        );
+        return;
+      }
+    }
     // A failed refresh keeps what is on screen and says so (a denial or a
     // first failure replaces it).
     if (r is AccessReadFailed<T> && state.result is AccessReadOk<T>) {
@@ -78,6 +127,8 @@ abstract class PublicReadController<T> extends Notifier<PublicReadState<T>> {
         result: state.result,
         asOf: state.asOf,
         refreshFailed: r,
+        savedAt: state.savedAt,
+        offlineSnapshot: state.offlineSnapshot,
       );
       return;
     }
@@ -93,6 +144,25 @@ class PublicEventsController extends PublicReadController<PublicEvents> {
   @override
   Future<AccessRead<PublicEvents>> fetch() =>
       ref.read(contentRepositoryProvider).fetchPublicEvents();
+
+  @override
+  bool get supportsOfflineSnapshot => true;
+
+  @override
+  Future<DateTime?> saveOfflineSnapshot(PublicEvents value) async {
+    final eligible = PublicEvents(
+      events: value.events.where((event) => event.offlineAllowed).toList(),
+      truncated: value.truncated,
+    );
+    final outcome = await ref
+        .read(publicContentCacheProvider)
+        .writeRead(PublicContentCacheKeys.calendar, eligible);
+    return outcome is PublicContentCacheSaved ? outcome.savedAt : null;
+  }
+
+  @override
+  Future<PublicContentSnapshot<PublicEvents>?> readOfflineSnapshot() =>
+      ref.read(publicContentCacheProvider).readEvents();
 }
 
 final publicEventsProvider =

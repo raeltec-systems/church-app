@@ -35,6 +35,7 @@ class PublicEvent {
     required this.location,
     required this.publicationRevision,
     required this.publishedAt,
+    required this.offlineAllowed,
   });
 
   /// Maps the wire object; throws [FormatException] on any other shape.
@@ -56,6 +57,7 @@ class PublicEvent {
       location: _text(m, 'location'),
       publicationRevision: wireRevision(m, 'publication_revision'),
       publishedAt: wireInstant(m, 'published_at'),
+      offlineAllowed: wireReq<bool>(m, 'offline_allowed'),
     );
   }
 
@@ -69,6 +71,11 @@ class PublicEvent {
   /// The published revision shown (a later publication raises it).
   final int publicationRevision;
   final DateTime publishedAt;
+
+  /// Whether the church has cleared this published event for local storage.
+  /// The anonymous server projection is the authority; a client never infers
+  /// this from the event's fields or publication state.
+  final bool offlineAllowed;
 
   /// Starts and ends on different church days.
   bool get multiDay => !churchSameDay(startsAt, endsAt);

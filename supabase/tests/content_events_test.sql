@@ -5,7 +5,7 @@
 -- read and the deletion hook with its erase parts. Every account, phone and name is SYNTHETIC
 -- (fictional range +1 202 555 0151-0157). Times are church time (Africa/Lusaka).
 begin;
-select plan(120);
+select plan(121);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000081' || lpad(n::text, 2, '0'))::uuid $$;
@@ -262,9 +262,11 @@ select is((select (r -> 'data') - 'event_id' from p1),
 create temp table pub as select pg_temp.read(null, 'select api.content_public_events()') as r;
 select is((select jsonb_array_length(r -> 'events') from pub), 1, 'anon reads one published event');
 select results_eq($$select k from pub, jsonb_object_keys(r #> '{events,0}') k order by 1$$,
-  $$values ('description'::text), ('ends_at'), ('event_id'), ('location'), ('publication_revision'),
+  $$values ('description'::text), ('ends_at'), ('event_id'), ('location'), ('offline_allowed'), ('publication_revision'),
            ('published_at'), ('starts_at'), ('title')$$,
   'the public projection has exactly these keys');
+select ok((select (r #>> '{events,0,offline_allowed}')::boolean from pub),
+  'church-authored events are eligible for offline storage');
 select is((select r #>> '{events,0,starts_at}' from pub), to_char(pg_temp.at(5, '09:00') at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
   'the start is the first day (UTC instant)');
 select is((select r #>> '{events,0,ends_at}' from pub), to_char(pg_temp.at(6, '12:00') at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),

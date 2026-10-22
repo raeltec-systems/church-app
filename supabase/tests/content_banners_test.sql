@@ -7,7 +7,7 @@
 -- storage.objects (rolled back). Every account, phone and name is SYNTHETIC (fictional range
 -- +1 202 555 0161-0166).
 begin;
-select plan(150);
+select plan(152);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000082' || lpad(n::text, 2, '0'))::uuid $$;
@@ -399,9 +399,11 @@ select pg_temp.obj('content-public', pg_temp.path(pg_temp.b1(), 1), 3000000, 'im
 create temp table pub as select pg_temp.read(null, 'select api.content_public_banners()') as r;
 select is((select jsonb_array_length(r -> 'banners') from pub), 1, 'once placed, anon reads the theme');
 select results_eq($$select k from pub, jsonb_object_keys(r #> '{banners,0}') k order by 1$$,
-  $$values ('alt_text'::text), ('banner_id'), ('banner_kind'), ('event_id'), ('image'),
+  $$values ('alt_text'::text), ('banner_id'), ('banner_kind'), ('event_id'), ('image'), ('offline_allowed'),
            ('publication_revision'), ('published_at'), ('rights_revision'), ('subtitle'), ('theme_year'), ('title')$$,
   'the public projection has exactly these keys (no draft, editor or rights detail)');
+select is((select r #>> '{banners,0,offline_allowed}' from pub), 'false',
+  'display-only rights do not clear offline storage');
 select is((select r #> '{banners,0,image}' from pub),
   jsonb_build_object('path', pg_temp.path(pg_temp.b1(), 1), 'media_type', 'image/png', 'width', 1920, 'height', 1080),
   'the image is its public path with type and size');
@@ -496,6 +498,9 @@ select is(pg_temp.err(pg_temp.cmd(3, 'content.verify_rights_record', pg_temp.rev
   jsonb_build_object('rights_id', pg_temp.r1()))), 'ok', 'verifying the record again (its open draft revision 2)');
 select is((select x ->> 'rights_revision' from jsonb_array_elements(pg_temp.read(null, 'select api.content_public_banners()') -> 'banners') x
             where x ->> 'banner_id' = pg_temp.b1()::text), '2', 'brings the theme back with rights revision 2');
+select is((select x ->> 'offline_allowed' from jsonb_array_elements(pg_temp.read(null, 'select api.content_public_banners()') -> 'banners') x
+            where x ->> 'banner_id' = pg_temp.b1()::text), 'true',
+  'a newly live rights revision that clears offline use enables the cache');
 select is(pg_temp.err(pg_temp.cmd(2, 'content.archive_banner', pg_temp.rev(pg_temp.b2()),
   jsonb_build_object('banner_id', pg_temp.b2()))), 'ok', 'a Pastor archives the campaign');
 select is(pg_temp.err(pg_temp.cmd(2, 'content.publish_banner', pg_temp.rev(pg_temp.b2()),

@@ -136,11 +136,13 @@ void main() {
       expect(theme.themeYear, 2026);
       expect(theme.subtitle, 'Deuteronomy 7:9');
       expect(theme.image.width, 1920);
+      expect(theme.offlineAllowed, isTrue);
       final c = v.byId(_campaign)!;
       expect(c.kind, BannerKind.campaign);
       expect(c.themeYear, isNull);
       expect(c.eventId, _harvestEvent);
       expect(c.image.path, 'banner/$_campaign/r2/image.jpg');
+      expect(c.offlineAllowed, isTrue);
       expect(
         bannerCardLabel(theme),
         'Theme for 2026. SYNTHETIC God\'s faithfulness in Self Sustenance. '
@@ -199,6 +201,12 @@ void main() {
         publicBannersData([
           {...good, 'alt_text': null},
         ]),
+        publicBannersData([
+          {...good, 'offline_allowed': 'yes'},
+        ]),
+        publicBannersData([
+          Map<String, Object?>.from(good)..remove('offline_allowed'),
+        ]),
       ]) {
         expect(
           () => PublicBanners.fromJson(bad),
@@ -206,6 +214,11 @@ void main() {
           reason: '$bad',
         );
       }
+      expect(
+        PublicBanner.fromJson(publicBannerData(offlineAllowed: false))
+            .offlineAllowed,
+        isFalse,
+      );
     });
 
     test('the editors\' banner read, its image state and removals', () {
@@ -592,6 +605,40 @@ void main() {
       await tapKey(tester, 'home-banners-retry');
       expect(h.banners.publicCalls, 2);
       expect(byKey('home-banners'), findsOneWidget);
+    });
+
+    testWidgets('a failed refresh shows saved banners and their local images', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.home,
+        account: null,
+        setUp: (h) {
+          h.banners.publicBanners = twoBanners();
+          h.banners.publicImageBytes = Uint8List.fromList([1, 2, 3]);
+          h.publicContentCache.available = true;
+        },
+      );
+      expect(byKey('home-banner-$_theme'), findsOneWidget);
+      h.banners.publicBanners = const AccessReadFailed(unreachable: true);
+      for (final state in [
+        AppLifecycleState.inactive,
+        AppLifecycleState.hidden,
+        AppLifecycleState.paused,
+        AppLifecycleState.hidden,
+        AppLifecycleState.inactive,
+        AppLifecycleState.resumed,
+      ]) {
+        tester.binding.handleAppLifecycleStateChanged(state);
+      }
+      await tester.pumpAndSettle();
+      expect(h.banners.publicCalls, 2);
+      expect(find.textContaining('Offline · saved at'), findsOneWidget);
+      expect(byKey('home-banner-$_campaign'), findsOneWidget);
+      await tapKey(tester, 'home-banner-open-$_theme');
+      final image = tester.widget<Image>(byKey('banner-image'));
+      expect(image.image, isA<MemoryImage>());
     });
   });
 

@@ -267,12 +267,16 @@ class StaffAnnouncement {
 }
 
 /// `api.content_staff_announcements`: every announcement, for the editors,
-/// and how many members a notice would reach now.
+/// how many members a notice would reach now and the generic text phones
+/// show for it.
 class StaffAnnouncements {
   const StaffAnnouncements({
     required this.capacity,
     required this.audienceMembers,
     required this.audienceLimit,
+    required this.audiencePerMinute,
+    required this.noticeTitle,
+    required this.noticeBody,
     required this.announcements,
     required this.truncated,
   });
@@ -290,13 +294,18 @@ class StaffAnnouncements {
     final audience = wireMap(m['audience'], 'audience');
     final members = wireReq<int>(audience, 'members');
     final limit = wireReq<int>(audience, 'limit');
-    if (members < 0 || limit < 1) {
+    final perMinute = wireReq<int>(audience, 'per_minute');
+    if (members < 0 || limit < 1 || perMinute < 1) {
       throw const FormatException('unexpected audience');
     }
+    final notice = wireMap(m['notice'], 'notice');
     return StaffAnnouncements(
       capacity: capacity,
       audienceMembers: members,
       audienceLimit: limit,
+      audiencePerMinute: perMinute,
+      noticeTitle: _text(notice, 'title'),
+      noticeBody: _text(notice, 'body'),
       announcements: List.unmodifiable(
         wireReq<List>(m, 'announcements').map(StaffAnnouncement.fromJson),
       ),
@@ -312,6 +321,15 @@ class StaffAnnouncements {
 
   /// The most members one notice may be queued for.
   final int audienceLimit;
+
+  /// How many of a notice's members fall due per minute (a large notice is
+  /// spread so other reminders are not held back).
+  final int audiencePerMinute;
+
+  /// What phones show for a notice: the server's registered generic text,
+  /// never the announcement's own title or body.
+  final String noticeTitle;
+  final String noticeBody;
   final List<StaffAnnouncement> announcements;
   final bool truncated;
 
@@ -349,15 +367,6 @@ abstract final class AnnouncementCommands {
   static const publish = 'content.publish_announcement';
   static const withdraw = 'content.withdraw_announcement';
   static const archive = 'content.archive_announcement';
-}
-
-/// What phones show for an announcement notice: the registered generic text
-/// (`content_announcement` / `announcement_published`), never the
-/// announcement's own title or body.
-abstract final class AnnouncementNoticeText {
-  static const title = 'Church announcement';
-  static const body =
-      'The church has posted an announcement. Open the app to read it.';
 }
 
 /// Application port for the announcement reads. Never throws.

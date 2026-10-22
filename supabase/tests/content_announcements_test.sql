@@ -8,7 +8,7 @@
 -- notice per revision, the recipient recheck, the limit, replay, the Q2 gate and the deletion
 -- erase part. Every account, phone and name is SYNTHETIC (fictional +44 7700 900681-900689).
 begin;
-select plan(133);
+select plan(137);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000613' || lpad(n::text, 2, '0'))::uuid $$;
@@ -260,8 +260,12 @@ select is(pg_temp.call(1, 'identity_lifecycle_command', 'identity.deactivate_mem
 select results_eq($$select x from app.content_announcement_audience() x order by 1$$,
   $$select member_id from m where n in (1, 2, 3, 4, 6, 7) order by 1$$,
   'the audience: approved members the app can reach (not held, deactivated or accountless)');
-select is(pg_temp.read(3, 'select api.content_staff_announcements()') -> 'audience', '{"members": 6, "limit": 1000}'::jsonb,
-  'editors see how many members a notice reaches now, and the limit');
+select is(pg_temp.read(3, 'select api.content_staff_announcements()') -> 'audience',
+  '{"members": 6, "limit": 1000, "per_minute": 20}'::jsonb,
+  'editors see how many members a notice reaches now, the limit and the pace');
+select is(pg_temp.read(3, 'select api.content_staff_announcements()') -> 'notice',
+  '{"title": "Church announcement", "body": "The church has posted an announcement. Open the app to read it."}'::jsonb,
+  'editors read the registered generic text phones show');
 
 -- The limit: more members than one notice may reach --------------------------------------------
 create or replace function app.content_announcement_audience_limit() returns integer language sql immutable
@@ -539,6 +543,25 @@ select is((select e #>> '{live,saved_by}' || '|' || (e ->> 'published_by') || '|
   'Former member|Former member|Former member', 'who saved, published and notified now read as a former member');
 select is((select r.notified_count from app.content_announcement_revisions r where r.item_id = pg_temp.a2()), 6,
   'the notice record itself is kept');
+
+-- Pace: a large notice falls due a few members a minute, so other reminders are not held back --
+create or replace function app.content_announcement_pace() returns integer language sql immutable
+set search_path = '' as $$ select 2 $$;
+insert into v (k, j) values ('a6', pg_temp.cmd(3, 'content.create_announcement', null,
+  pg_temp.an('SYNTHETIC Paced notice', false)));
+select is(pg_temp.cmd(3, 'content.publish_announcement', 1,
+            jsonb_build_object('announcement_id', (select (j #>> '{data,announcement_id}')::uuid from v where k = 'a6'),
+                               'notify', true)) #>> '{data,notified}', '5', 'a notice to five members at two a minute');
+select is((select string_agg(x::text, ',' order by x) from (
+             select count(*) as x from app.notifications_jobs j
+              where j.source_id = (select (j2 #>> '{data,announcement_id}')::uuid from (select j as j2 from v where k = 'a6') q)
+              group by j.scheduled_at) d), '1,2,2',
+  'its jobs fall due two now, two a minute later and the last one after two minutes');
+select is((select extract(epoch from max(j.scheduled_at) - min(j.scheduled_at))::int from app.notifications_jobs j
+            where j.source_id = (select (j2 #>> '{data,announcement_id}')::uuid from (select j as j2 from v where k = 'a6') q)),
+  120, 'spread over two minutes');
+create or replace function app.content_announcement_pace() returns integer language sql immutable
+set search_path = '' as $$ select 20 $$;
 
 -- Q2 closed (production until Israel approves it): a notice is unavailable, nothing is published --
 -- The gate without its local fixture answers as in production (rolled back with the test).

@@ -17,7 +17,8 @@
 --     the inbox item. Notifications enqueues one recipient per logical key and has no
 --     church-wide fan-out, so publish_announcement {notify: true} enqueues one job per member
 --     whose current access allows it (approved, 3.5 route `member`), at most
---     app.content_announcement_audience_limit() of them, in the publish transaction. The same
+--     app.content_announcement_audience_limit() of them, in the publish transaction, falling due
+--     at app.content_announcement_pace() a minute so other reminders are not held back. The same
 --     route decides `recipient_eligible` at every recheck, so held, in-review, accountless,
 --     deactivated and deleted members get no job, item, push job or direct-contact need. Each
 --     published revision is notified at most once. A newer published revision, a withdrawal or
@@ -110,6 +111,20 @@ immutable
 set search_path = ''
 as $$
   select 1000;
+$$;
+
+-- How many of one publication's jobs fall due per minute. The worker claims due jobs oldest first,
+-- at most batch_max (default 25) per run, about one run a minute; a notice spread at 20 a minute
+-- leaves room in every run for other reminders falling due meanwhile, so a large notice never
+-- holds them back by more than about a minute. Its last members are reached after
+-- audience / 20 minutes (1000 members: 50 minutes).
+create function app.content_announcement_pace()
+returns integer
+language sql
+immutable
+set search_path = ''
+as $$
+  select 20;
 $$;
 
 -- A member the app can notify now: the 3.5 route is `member` (approved, a live link in good
@@ -376,6 +391,8 @@ declare
   v_no integer;
   v_audience uuid[];
   v_member uuid;
+  v_pace integer := app.content_announcement_pace();
+  v_i integer := 0;
   v_count integer := 0;
 begin
   select a.* into v_actor from app.content_command_actor(p_actor, 'announcement') a;
@@ -403,6 +420,10 @@ begin
          published_by_member = v_actor.member_id,
          published_by_account = v_actor.account_id
    where r.item_id = v_id and r.revision_no = v_no and r.published_at is null;
+  -- The revision row is locked before any Notifications row (AD-2: Notifications last), also when
+  -- a withdrawn revision is published again and the update above matched nothing.
+  perform 1 from app.content_announcement_revisions r
+   where r.item_id = v_id and r.revision_no = v_no for update;
   perform app.content_announcement_cancel_notices(v_id, 'source_revised');
   if v_notify then
     if exists (select 1 from app.content_announcement_revisions r
@@ -415,13 +436,16 @@ begin
     if cardinality(v_audience) > app.content_announcement_audience_limit() then
       perform app.cmd_fail('validation_failed', '{"notify": "too_many_recipients"}'::jsonb);
     end if;
+    -- Spread at the pace: the first `pace` members are due now, the next a minute later, and so on.
     foreach v_member in array v_audience loop
       if coalesce((app.notifications_enqueue(jsonb_build_object(
              'source_type', 'content_announcement', 'source_id', v_id, 'source_revision', v_no,
              'recipient_member_id', v_member, 'reminder_kind', 'announcement_published',
-             'scheduled_at', app.cmd_utc(now()))) ->> 'created')::boolean, false) then
+             'scheduled_at', app.cmd_utc(now() + make_interval(mins => v_i / v_pace)))) ->> 'created')::boolean,
+                  false) then
         v_count := v_count + 1;
       end if;
+      v_i := v_i + 1;
     end loop;
     update app.content_announcement_revisions r
        set notified_at = now(),
@@ -645,7 +669,9 @@ $$;
 
 -- Every announcement with its live and draft revisions, attribution and notice record, for its
 -- editors (Media, Pastor, Admin): archived last, the others most recently changed first; at most
--- 500. `audience` is how many members a notice would reach now, and the limit of one notice.
+-- 500. `audience` is how many members a notice would reach now, the limit of one notice and how
+-- many fall due per minute; `notice` is the registered generic text phones show (never the
+-- announcement's own).
 create function app.content_staff_announcements()
 returns jsonb
 language plpgsql
@@ -673,7 +699,12 @@ begin
            'capacity', v_capacity,
            'audience', jsonb_build_object(
              'members', (select count(*)::integer from app.content_announcement_audience()),
-             'limit', app.content_announcement_audience_limit()),
+             'limit', app.content_announcement_audience_limit(),
+             'per_minute', app.content_announcement_pace()),
+           'notice', (select jsonb_build_object('title', c.title, 'body', c.body)
+                        from app.contract_reminder_contracts c
+                       where c.source_type = 'content_announcement'
+                         and c.reminder_kind = 'announcement_published'),
            'announcements', coalesce(jsonb_agg(app.content_staff_announcement_json(k.item_id)
                                                order by k.rn) filter (where k.rn <= 500), '[]'::jsonb),
            'truncated', count(*) > 500)
@@ -746,6 +777,7 @@ select app.content_register_erase_part('announcement_revisions',
 revoke all on function
   app.content_announcement_revision_guard(),
   app.content_announcement_audience_limit(),
+  app.content_announcement_pace(),
   app.content_announcement_reachable(uuid),
   app.content_announcement_audience(),
   app.content_announcement_source_check(jsonb),

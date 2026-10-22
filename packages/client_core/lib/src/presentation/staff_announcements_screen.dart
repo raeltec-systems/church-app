@@ -53,12 +53,13 @@ const _needs = 'Announcements are managed by Media, Pastors and Admins.';
     ),
     AnnouncementNotice.publishedAndNotified => (
       StatusTone.success,
-      'Published and members notified',
+      'Published with a notice',
       count == null
-          ? '$what is published, and a notice is on its way to members.'
-          : '$what is published. A notice is on its way to $count '
-                '${count == 1 ? 'member' : 'members'}; each also finds it in '
-                'their Inbox.',
+          ? '$what is published, and a notice is queued for members.'
+          : '$what is published, and a notice is queued for '
+                '${_members(count)}. It reaches their Inbox over the next '
+                'minutes, and phones that allow announcement notices show '
+                'it.',
     ),
     AnnouncementNotice.withdrawn => (
       StatusTone.success,
@@ -639,6 +640,14 @@ class _AnnouncementRowState extends ConsumerState<_AnnouncementRow> {
   Future<bool?> _askPublish(StaffAnnouncement a) async {
     final target = a.publishTarget ?? a.current;
     final audience = widget.audience;
+    // Publishing a change stops the earlier version's notices that have not
+    // reached members yet (the server cancels them).
+    final earlierNoticeStops =
+        a.draft != null &&
+        (a.live?.notified ?? false) &&
+        a.state != ContentState.archived;
+    final minutes = (audience.audienceMembers / audience.audiencePerMinute)
+        .ceil();
     final String? notifyBlocked = a.notifyDone
         ? 'Members already had a notice about this version.'
         : audience.audienceTooLarge
@@ -678,7 +687,8 @@ class _AnnouncementRowState extends ConsumerState<_AnnouncementRow> {
                     subtitle: Text(
                       notifyBlocked ??
                           'About ${_members(audience.audienceMembers)} can '
-                              'get it now.',
+                              'get it now'
+                              '${minutes > 1 ? ', within about $minutes minutes' : ''}.',
                       key: const Key('announcement-notify-reason'),
                       style: muted,
                     ),
@@ -697,12 +707,14 @@ class _AnnouncementRowState extends ConsumerState<_AnnouncementRow> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          AnnouncementNoticeText.title,
+                          audience.noticeTitle,
+                          key: const Key('announcement-notice-title'),
                           style: ChurchType.itemTitle.copyWith(color: c.ink),
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          AnnouncementNoticeText.body,
+                          audience.noticeBody,
+                          key: const Key('announcement-notice-body'),
                           style: ChurchType.secondary.copyWith(color: c.ink),
                         ),
                       ],
@@ -715,6 +727,15 @@ class _AnnouncementRowState extends ConsumerState<_AnnouncementRow> {
                     'announcement notices off still find it in their Inbox.',
                     style: muted,
                   ),
+                  if (earlierNoticeStops) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Publishing this change stops the notices about the '
+                      'earlier version that have not reached members yet.',
+                      key: const Key('announcement-earlier-notice-stops'),
+                      style: muted,
+                    ),
+                  ],
                 ],
               ),
               actions: [
@@ -842,7 +863,7 @@ class _AnnouncementRowState extends ConsumerState<_AnnouncementRow> {
         :final notifiedCount?,
         :final notifiedBy,
       ) =>
-        'Members notified ${churchShortWhen(notifiedAt)} · '
+        'Notice queued ${churchShortWhen(notifiedAt)} for '
             '${_members(notifiedCount)}'
             '${notifiedBy == null ? '' : ' · by $notifiedBy'}',
       _ => null,

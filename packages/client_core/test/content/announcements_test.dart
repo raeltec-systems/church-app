@@ -751,12 +751,68 @@ void main() {
       }, 3);
       await settle(tester);
       expect(byKey('announcements-notice-publishedAndNotified'), findsOne);
-      expect(find.textContaining('on its way to 12 members'), findsOneWidget);
-      // The opened row now shows who was notified, and how many.
       expect(
-        find.textContaining('Members notified Tue 1 Sep 10:00 · 12 members'),
+        find.textContaining('a notice is queued for 12 members'),
         findsOneWidget,
       );
+      // The opened row now shows when a notice was queued, and for how many.
+      expect(
+        find.textContaining('Notice queued Tue 1 Sep 10:00 for 12 members'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('the preview shows the server\'s notice text', (tester) async {
+      await pumpAt(
+        tester,
+        ClientPaths.contentAnnouncements,
+        staff: true,
+        setUp: (h) => h.announcements.staffAnnouncements = AccessReadOk(
+          StaffAnnouncements.fromJson(
+            staffAnnouncementsData(
+              [staffAnnouncementData(draft: staffAnnouncementRevisionData())],
+              noticeTitle: 'SYNTHETIC server notice title',
+              noticeBody: 'SYNTHETIC server notice body.',
+              audienceMembers: 50,
+            ),
+          ),
+        ),
+      );
+      await tapKey(tester, 'announcement-open-$_offering');
+      await tapKey(tester, 'announcement-publish-$_offering');
+      expect(
+        tester.widget<Text>(byKey('announcement-notice-title')).data,
+        'SYNTHETIC server notice title',
+      );
+      expect(
+        tester.widget<Text>(byKey('announcement-notice-body')).data,
+        'SYNTHETIC server notice body.',
+      );
+      // 50 members at 20 a minute: about three minutes.
+      expect(find.textContaining('within about 3 minutes'), findsOneWidget);
+      expect(byKey('announcement-earlier-notice-stops'), findsNothing);
+    });
+
+    testWidgets('publishing a change says the earlier notices stop', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.contentAnnouncements,
+        staff: true,
+        setUp: (h) => h.announcements.staffAnnouncements = staffAnnouncements([
+          publishedOffering(
+            live: notifiedRevision(),
+            draft: staffAnnouncementRevisionData(
+              revisionNo: 2,
+              title: 'SYNTHETIC Harvest offering moved',
+            ),
+          ),
+        ]),
+      );
+      await tapKey(tester, 'announcement-open-$_offering');
+      await tapKey(tester, 'announcement-publish-$_offering');
+      expect(byKey('announcement-earlier-notice-stops'), findsOneWidget);
     });
 
     testWidgets('publish without a notice sends notify false', (tester) async {

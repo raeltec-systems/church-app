@@ -324,15 +324,43 @@ class _AnnouncementsScreenState extends ConsumerState<AnnouncementsScreen> {
 }
 
 /// Story 6.13: one published announcement (opened from Home, the list or an
-/// inbox notice). A withdrawn one says so instead of showing an old copy.
-class AnnouncementDetailScreen extends ConsumerWidget {
+/// inbox notice). A withdrawn one says so instead of showing an old copy;
+/// returning to the app asks the server again.
+class AnnouncementDetailScreen extends ConsumerStatefulWidget {
   const AnnouncementDetailScreen({super.key, required this.announcementId});
 
   final String announcementId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AnnouncementDetailScreen> createState() =>
+      _AnnouncementDetailScreenState();
+}
+
+class _AnnouncementDetailScreenState
+    extends ConsumerState<AnnouncementDetailScreen> {
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _reload);
+  }
+
+  void _reload() {
+    final p = publicAnnouncementProvider(widget.announcementId);
+    if (mounted && !ref.read(p).loading) ref.read(p.notifier).reload();
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
+    final announcementId = widget.announcementId;
     final s = ref.watch(publicAnnouncementProvider(announcementId));
     final ctl = ref.read(publicAnnouncementProvider(announcementId).notifier);
     final children = <Widget>[];
@@ -406,14 +434,47 @@ class AnnouncementDetailScreen extends ConsumerWidget {
 }
 
 /// Story 6.13 (Home, everyone): the pinned announcements, at most three, each
-/// opening the announcement, and See all. Entry 14 finishes Home around it.
-class HomeAnnouncementsSection extends ConsumerWidget {
+/// opening the announcement, and See all. Coming back to Home or to the app
+/// asks the server again, so a withdrawn announcement leaves Home. Entry 14
+/// finishes Home around it.
+class HomeAnnouncementsSection extends ConsumerStatefulWidget {
   const HomeAnnouncementsSection({super.key});
 
   static const shown = 3;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeAnnouncementsSection> createState() =>
+      _HomeAnnouncementsSectionState();
+}
+
+class _HomeAnnouncementsSectionState
+    extends ConsumerState<HomeAnnouncementsSection> {
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _reload);
+    // Revisiting Home asks the server again (the list may have read it before).
+    if (ref.read(publicAnnouncementsProvider).result != null) {
+      Future.microtask(_reload);
+    }
+  }
+
+  void _reload() {
+    if (mounted && !ref.read(publicAnnouncementsProvider).loading) {
+      ref.read(publicAnnouncementsProvider.notifier).reload();
+    }
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
     final s = ref.watch(publicAnnouncementsProvider);
     Widget line(String key, String text, {bool ink = false}) => Text(
@@ -440,7 +501,7 @@ class HomeAnnouncementsSection extends ConsumerWidget {
       AccessReadOk(:final value) => _RowsCard(
         key: const Key('home-announcements-list'),
         rows: [
-          for (final a in value.pinned.take(shown))
+          for (final a in value.pinned.take(HomeAnnouncementsSection.shown))
             AnnouncementRow(
               announcement: a,
               onTap: () =>

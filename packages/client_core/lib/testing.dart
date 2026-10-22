@@ -785,10 +785,19 @@ Map<String, Object?> staffAnnouncementsData(
   String capacity = 'media',
   int audienceMembers = 12,
   int audienceLimit = 1000,
+  int perMinute = 20,
+  String noticeTitle = 'Church announcement',
+  String noticeBody =
+      'The church has posted an announcement. Open the app to read it.',
   bool truncated = false,
 }) => {
   'capacity': capacity,
-  'audience': {'members': audienceMembers, 'limit': audienceLimit},
+  'audience': {
+    'members': audienceMembers,
+    'limit': audienceLimit,
+    'per_minute': perMinute,
+  },
+  'notice': {'title': noticeTitle, 'body': noticeBody},
   'announcements': items,
   'truncated': truncated,
 };

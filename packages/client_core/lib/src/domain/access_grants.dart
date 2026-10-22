@@ -44,6 +44,7 @@ class MemberGrants {
     required this.revision,
     required this.roles,
     required this.scopes,
+    this.adminTenure,
   });
 
   /// Maps the wire object; throws [FormatException] on any unexpected shape.
@@ -53,6 +54,7 @@ class MemberGrants {
     final revision = json['revision'];
     final roles = json['roles'];
     final scopes = json['scopes'];
+    final rawAdminTenure = json['admin_tenure'];
     if (id is! String ||
         revision is! int ||
         revision < 1 ||
@@ -65,6 +67,9 @@ class MemberGrants {
       memberId: id,
       revision: revision,
       roles: List.unmodifiable(roles.cast<String>()),
+      adminTenure: rawAdminTenure == null
+          ? null
+          : AdminGrantTenure.fromJson(rawAdminTenure),
       scopes: List.unmodifiable(
         scopes.map((s) {
           if (s is! Map ||
@@ -90,8 +95,50 @@ class MemberGrants {
   final List<String> roles;
   final List<ScopeGrant> scopes;
 
+  /// The caller's own active Admin grant context, present only for an Admin.
+  final AdminGrantTenure? adminTenure;
+
   bool hasRole(String role) => roles.contains(role);
   bool get isAdmin => hasRole(ChurchRoles.admin);
+}
+
+/// The current caller's own active Admin grant context from Identity.
+class AdminGrantTenure {
+  const AdminGrantTenure({
+    required this.grantedAt,
+    required this.adminSince,
+    required this.grantedBy,
+  });
+
+  factory AdminGrantTenure.fromJson(Object? json) {
+    if (json is! Map ||
+        json['granted_at'] is! String ||
+        json['admin_since'] is! String ||
+        json['granted_by'] is! String) {
+      throw const FormatException('unexpected Admin tenure shape');
+    }
+    final grantedAt = DateTime.tryParse(json['granted_at'] as String);
+    final adminSince = json['admin_since'] as String;
+    final grantedBy = json['granted_by'] as String;
+    if (grantedAt == null ||
+        !RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(adminSince) ||
+        DateTime.tryParse(adminSince) == null ||
+        grantedBy.trim().isEmpty) {
+      throw const FormatException('unexpected Admin tenure values');
+    }
+    return AdminGrantTenure(
+      grantedAt: grantedAt.toUtc(),
+      adminSince: adminSince,
+      grantedBy: grantedBy,
+    );
+  }
+
+  /// The exact server grant timestamp; clients do not use it to authorize.
+  final DateTime grantedAt;
+
+  /// The grant day in Africa/Lusaka, for display only.
+  final String adminSince;
+  final String grantedBy;
 }
 
 /// How an Admin roster row's account stands.

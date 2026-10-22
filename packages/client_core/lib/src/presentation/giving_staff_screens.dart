@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/content_controllers.dart' show ContentAction;
+import '../application/access_controllers.dart' show myAccessProvider;
 import '../application/giving_controllers.dart';
 import '../domain/access_grants.dart';
 import '../domain/church_time.dart';
@@ -215,6 +216,7 @@ String? _fieldError(String wire, String? code) => switch (code) {
     'Use a date in the last 90 days, not in the future',
   'before_saved' when wire == 'tested_on' =>
     'Use the day of the test, on or after the day these details were saved.',
+  'not_eligible' when wire == 'admin_tenure' => 'The server could not confirm 14 full days of Admin access. Refresh access and try again later.',
   'invalid' => switch (wire) {
     'currency' => 'Use a three-letter code, such as ZMW',
     'ussd_code' => 'Use a code such as *115#: a star, digits or stars, then #',
@@ -1159,6 +1161,9 @@ class _VerifyDialogState extends ConsumerState<_VerifyDialog> {
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
     final s = ref.watch(staffGivingProvider);
+    final tenure = ref.watch(
+      myAccessProvider.select((a) => a.grants?.adminTenure),
+    );
     final busy = s.busy;
     final errors = _mine(s) && s.notice == GivingNotice.invalid
         ? s.fieldErrors
@@ -1176,6 +1181,10 @@ class _VerifyDialogState extends ConsumerState<_VerifyDialog> {
     );
     void edited(String _) =>
         ref.read(staffGivingProvider.notifier).clearFieldErrors();
+    void refreshAccess() {
+      ref.read(myAccessProvider.notifier).refresh();
+    }
+
     return ChurchDialog(
       title: 'Verify ${f.name}',
       content: Column(
@@ -1189,6 +1198,43 @@ class _VerifyDialogState extends ConsumerState<_VerifyDialog> {
             key: const Key('giving-verify-intro'),
             style: ChurchType.secondary.copyWith(color: c.ink),
           ),
+          const SizedBox(height: 12),
+          if (tenure case final tenureDetails?)
+            Text(
+              'Admin since ${tenureDetails.adminSince}, granted by ${tenureDetails.grantedBy}',
+              key: const Key('giving-verify-admin-tenure'),
+              style: ChurchType.secondary.copyWith(color: c.ink),
+            )
+          else
+            Text(
+              'Your Admin grant details could not be loaded. Refresh access before verifying.',
+              key: const Key('giving-verify-admin-tenure-missing'),
+              style: ChurchType.secondary.copyWith(color: c.ink),
+            ),
+          Text(
+            'An Admin must have held the role for 14 full days before verifying.',
+            key: const Key('giving-verify-tenure-rule'),
+            style: ChurchType.secondary.copyWith(color: c.ink),
+          ),
+          if (errors['admin_tenure'] != null) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                _fieldError('admin_tenure', errors['admin_tenure'])!,
+                key: const Key('giving-verify-tenure-error'),
+                style: TextStyle(color: c.redFg),
+              ),
+            ),
+          ],
+          if (tenure == null || errors['admin_tenure'] != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: const Key('giving-refresh-access'),
+                onPressed: busy ? null : refreshAccess,
+                child: const Text('Refresh access'),
+              ),
+            ),
           const SizedBox(height: 14),
           TextField(
             key: const Key('giving-tested-on'),
@@ -1229,7 +1275,10 @@ class _VerifyDialogState extends ConsumerState<_VerifyDialog> {
               errorMaxLines: 3,
             ),
           ),
-          if (errors.keys.any((k) => k != 'tested_on' && k != 'test_method'))
+          if (errors.keys.any(
+            (k) =>
+                k != 'tested_on' && k != 'test_method' && k != 'admin_tenure',
+          ))
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(

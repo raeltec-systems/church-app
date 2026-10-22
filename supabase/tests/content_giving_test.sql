@@ -7,7 +7,7 @@
 -- the order; the anonymous projection; the Admins' read; replay; the deletion erase part. Every
 -- account, phone and name is SYNTHETIC or SAMPLE (fictional range +1 202 555 0181-0187).
 begin;
-select plan(171);
+select plan(183);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000083' || lpad(n::text, 2, '0'))::uuid $$;
@@ -142,6 +142,8 @@ select app.identity_bootstrap_admin(pg_temp.mid(1), 'israel');
 insert into app.identity_grants (member_id, role, granted_by_operator)
 values (pg_temp.mid(2), 'admin', 'israel'), (pg_temp.mid(3), 'media', 'israel'),
        (pg_temp.mid(4), 'pastor', 'israel'), (pg_temp.mid(7), 'admin', 'israel');
+update app.identity_grants set granted_at = now() - interval '14 days'
+ where member_id in (pg_temp.mid(1), pg_temp.mid(2)) and role = 'admin' and revoked_at is null;
 
 -- Structure, registries and privileges ----------------------------------------------------------
 select has_table('app', t, format('app.%s exists', t))
@@ -346,9 +348,68 @@ select throws_ok(
   format($$update app.content_giving_revisions set published_at = now(), published_by_member = %L,
            published_by_account = %L where item_id = %L$$, pg_temp.mid(1), pg_temp.u(1), pg_temp.mm1()),
   '23514', null, 'the database refuses a published revision that is not verified');
+select is(pg_temp.err(pg_temp.cmd(7, 'content.verify_giving_method', pg_temp.rev(pg_temp.mm1()),
+  pg_temp.vf(pg_temp.mm1()))), 'validation_failed|admin_tenure=not_eligible',
+  'a recently granted Admin cannot verify');
+select is(pg_temp.rev(pg_temp.mm1()), 1::bigint, 'a tenure refusal leaves the revision unchanged');
+select ok(not app.content_giving_admin_tenure_eligible(null),
+  'missing Identity self-read metadata fails closed');
+select ok(app.content_giving_admin_tenure_eligible(jsonb_build_object(
+    'granted_at', app.cmd_utc(now() - interval '15 days'),
+    'admin_since', to_char((now() - interval '15 days') at time zone 'Africa/Lusaka', 'YYYY-MM-DD'),
+    'granted_by', 'SAMPLE grantor')),
+  'well-formed old Admin context is eligible');
+select ok(not app.content_giving_admin_tenure_eligible(jsonb_build_object(
+    'granted_at', app.cmd_utc(now() - interval '15 days'),
+    'admin_since', 20261007,
+    'granted_by', 'SAMPLE grantor')),
+  'a non-string Lusaka display date fails closed');
+select ok(not app.content_giving_admin_tenure_eligible(jsonb_build_object(
+    'granted_at', app.cmd_utc(now() - interval '15 days'),
+    'admin_since', '2026-02-30',
+    'granted_by', 'SAMPLE grantor')),
+  'an impossible Lusaka display date fails closed');
+select ok(not app.content_giving_admin_tenure_eligible(jsonb_build_object(
+    'granted_at', app.cmd_utc(now() - interval '15 days'),
+    'admin_since', to_char((now() - interval '15 days') at time zone 'Africa/Lusaka', 'YYYY-MM-DD'),
+    'granted_by', 17)),
+  'a non-string grantor fails closed');
+select ok(not app.content_giving_admin_tenure_eligible(jsonb_build_object(
+    'granted_at', app.cmd_utc(now() - interval '15 days'),
+    'admin_since', to_char((now() - interval '15 days') at time zone 'Africa/Lusaka', 'YYYY-MM-DD'),
+    'granted_by', '   ')),
+  'a blank grantor fails closed');
+select ok(not app.content_giving_admin_tenure_eligible(jsonb_build_object(
+    'granted_at', app.cmd_utc(now() - interval '15 days'),
+    'admin_since', to_char((now() - interval '14 days') at time zone 'Africa/Lusaka', 'YYYY-MM-DD'),
+    'granted_by', 'SAMPLE grantor')),
+  'a Lusaka display date inconsistent with the grant timestamp fails closed');
+select ok(not app.content_giving_admin_tenure_eligible(jsonb_build_object(
+    'granted_at', 'not-a-timestamp', 'admin_since', '2026-10-07', 'granted_by', 'SAMPLE grantor')),
+  'an invalid grant timestamp fails closed');
+create or replace function api.identity_my_access()
+returns jsonb
+language sql
+security invoker
+set search_path = ''
+as $$ select '{}'::jsonb $$;
+create temp table v_missing_context as
+  select pg_temp.cmd(2, 'content.verify_giving_method', pg_temp.rev(pg_temp.mm1()),
+                     pg_temp.vf(pg_temp.mm1())) as r;
+create or replace function api.identity_my_access()
+returns jsonb
+language sql
+security invoker
+set search_path = ''
+as $$ select app.identity_my_access() $$;
+select is(pg_temp.err((select r from v_missing_context)), 'validation_failed|admin_tenure=not_eligible',
+  'missing Identity self-read context is refused by the verification command');
+select is(pg_temp.rev(pg_temp.mm1()), 1::bigint,
+  'missing Identity self-read context leaves the method revision unchanged');
 create temp table v1 as select pg_temp.cmd(2, 'content.verify_giving_method', pg_temp.rev(pg_temp.mm1()),
   pg_temp.vf(pg_temp.mm1())) as r;
-select is(pg_temp.err((select r from v1)), 'ok', 'Admin B verifies Admin A''s method');
+select is(pg_temp.err((select r from v1)), 'ok',
+  'Admin B verifies Admin A''s method at the exact 14-day boundary');
 select is((select (r #>> '{data,revision}')::int from v1), 2, 'verification moves the method''s revision on');
 select results_eq(
   $$select r.verified_by_member, r.tested_on, r.verified_at is not null from app.content_giving_revisions r

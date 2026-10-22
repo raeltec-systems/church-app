@@ -284,11 +284,13 @@ MemberGrants syntheticGrants({
   int revision = 1,
   List<String> roles = const [],
   List<ScopeGrant> scopes = const [],
+  AdminGrantTenure? adminTenure,
 }) => MemberGrants(
   memberId: memberId,
   revision: revision,
   roles: roles,
   scopes: scopes,
+  adminTenure: adminTenure,
 );
 
 /// The wire form of [syntheticGrants] (a grant command's success `data`).

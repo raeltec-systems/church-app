@@ -2,8 +2,9 @@
 // Story 6.3 end-to-end on the LOCAL stack: verified giving methods and the anonymous How to give
 // read, through real GoTrue phone sign-in (no SMS) and the real Data API (PostgREST), proving the
 // ticket's verify at the API level:
-//   * Admin A drafts SAMPLE mobile-money and bank methods; Media, a Pastor, a plain member, a
-//     Pending account and anon cannot; nobody outside the Admins sees a draft;
+//   * Admin A drafts SAMPLE mobile-money and bank methods; a newly granted Admin is refused
+//     verification for 14 elapsed days; Media, a Pastor, a plain member, a Pending account and anon
+//     cannot; nobody outside the Admins sees a draft;
 //   * Admin A cannot verify a method Admin A saved (owner decision 2026-10-21); Admin B verifies,
 //     Admin A publishes and reorders them, and a signed-out caller (publishable key only) reads
 //     every copyable value in the church's order;
@@ -124,6 +125,7 @@ async function main() {
     member: { phone: '+447700900514', name: `${NAME_PREFIX} Member` },
     pending: { phone: '+447700900515', name: `${NAME_PREFIX} Pending`, noLink: true },
     former: { phone: '+447700900516', name: `${NAME_PREFIX} Admin C` },
+    adminRecent: { phone: '+447700900517', name: `${NAME_PREFIX} Recent Admin` },
   };
   for (const p of Object.values(people)) if (!isFictionalGivingPhone(p.phone)) throw new Error(`not fictional: ${p.phone}`);
   const users = new Set();
@@ -177,7 +179,7 @@ async function main() {
   });
 
   try {
-    const { adminA, adminB, media, pastor, member, pending, former } = people;
+    const { adminA, adminB, adminRecent, media, pastor, member, pending, former } = people;
     for (const p of Object.values(people)) {
       p.password = password();
       const created = await http('POST', '/auth/v1/admin/users', { admin: true, body: { phone: p.phone, phone_confirm: true, password: p.password } });
@@ -189,12 +191,23 @@ async function main() {
     psql(`select app.identity_bootstrap_admin('${adminA.member}', '${OPERATOR}')`);
     const revisionOf = (p) => Number(psql(`select revision from app.identity_grant_sets where member_id = '${p.member}'`));
     const grants = [];
-    for (const [p, role] of [[adminB, 'admin'], [former, 'admin'], [media, 'media'], [pastor, 'pastor']]) {
+    for (const [p, role] of [[adminB, 'admin'], [former, 'admin'], [adminRecent, 'admin'],
+      [media, 'media'], [pastor, 'pastor']]) {
       grants.push(await envelope('identity_grant_command', adminA.token, 'identity.grant_role', revisionOf(p),
         { member_id: p.member, role }));
     }
+    psql(`update app.identity_grants set granted_at = now() - interval '14 days'
+           where member_id in ('${adminA.member}', '${adminB.member}')
+             and role = 'admin' and revoked_at is null`);
+    const recentAccess = await rpc('identity_my_access', adminRecent.token);
+    const recentTenure = recentAccess.json?.admin_tenure;
     check('G01-signed-in-by-phone-and-roles-granted', Object.values(people).every((p) => amrMethods(p.token).includes('password'))
-      && grants.every((g) => g.status === 200), { amr: amrMethods(adminA.token), grants: grants.map((g) => g.status) });
+      && grants.every((g) => g.status === 200) && recentAccess.status === 200
+      && typeof recentTenure?.granted_at === 'string'
+      && /^\d{4}-\d{2}-\d{2}$/.test(recentTenure?.admin_since ?? '')
+      && recentTenure?.granted_by === adminA.name,
+      { amr: amrMethods(adminA.token), grants: grants.map((g) => g.status),
+        own_tenure: Boolean(recentTenure), grantor_is_admin_a: recentTenure?.granted_by === adminA.name });
 
     // ------------------------------------------------------------------ drafts (Admin A), private
     const mobileBody = mobilePayload(MOBILE);
@@ -221,6 +234,8 @@ async function main() {
     const ownVerify = await content(adminA.token, 'content.verify_giving_method', mobile.revision, verifyPayload(mobileId));
     const unverifiedPublish = await content(adminA.token, 'content.publish_giving_method', mobile.revision, { method_id: mobileId });
     const beforeSaved = await content(adminB.token, 'content.verify_giving_method', mobile.revision, verifyPayload(mobileId, 1));
+    const recentVerify = await content(adminRecent.token, 'content.verify_giving_method', mobile.revision, verifyPayload(mobileId));
+    const afterRecentVerify = await staffMethod(adminA.token, mobileId);
     const vMobile = await content(adminB.token, 'content.verify_giving_method', mobile.revision, verifyPayload(mobileId));
     const vBank = await content(adminB.token, 'content.verify_giving_method', bank.revision, verifyPayload(bankId));
     const seen = await staffMethod(adminA.token, mobileId);
@@ -228,10 +243,13 @@ async function main() {
       && ownVerify.field_errors?.method_id === 'saved_by_you'
       && unverifiedPublish.field_errors?.method_id === 'not_verified'
       && beforeSaved.field_errors?.tested_on === 'before_saved'
+      && recentVerify.field_errors?.admin_tenure === 'not_eligible'
+      && afterRecentVerify?.revision === mobile.revision
       && vMobile.status === 200 && vBank.status === 200
       && seen?.draft?.verification?.verified_by === adminB.name && seen?.draft?.saved_by_you === true,
       { own_verify: ownVerify.field_errors?.method_id, unverified_publish: unverifiedPublish.field_errors?.method_id,
         tested_before_save: beforeSaved.field_errors?.tested_on,
+        recent_admin: recentVerify.field_errors?.admin_tenure, revision_unchanged: afterRecentVerify?.revision === mobile.revision,
         verified: [vMobile.status, vBank.status], verifier_named: seen?.draft?.verification?.verified_by === adminB.name });
 
     // ------------------------------------------------------------------ publish, reorder, read signed out

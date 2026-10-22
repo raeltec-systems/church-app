@@ -19,6 +19,7 @@ Migrations, in this order. Each was applied to staging under its hosted version,
 | 6.3 | `20261022011438_content_giving_methods.sql`: the `giving_method` kind (Admin only), its eight commands, the second-Admin verification (check and trigger), the `q3_giving` gate, the public reads `api.content_public_giving_methods` / `api.content_public_giving_method` (anon), `api.content_staff_giving_methods`, the `giving_methods` erase part |
 | 6.13 | `20261022011557_content_announcements.sql`: the `announcement` kind and its five commands, the public reads `api.content_public_announcements` / `api.content_public_announcement` (anon), `api.content_staff_announcements`, the `content_announcement` / `announcement_published` reminder contract (generic text), the `announcement_revisions` erase part |
 | 6.2 | `20261022012809_content_rights_banners.sql`: rights records, the `q5_content_rights` gate (unresolved; fixture honoured only in local/staging), the buckets `content-drafts` (private) and `content-public` (public), uploads, file slots, per-kind public conditions, banners, `api.content_public_banners` (anon), `api.content_staff_banners`, `api.content_staff_rights`, `api.content_file_plan`, `api.content_asset_preview`, three erase parts |
+| F1 | `20261022100601_f1_giving_admin_tenure.sql`: the Identity self-read's current-caller-only Admin tenure context and Content's 14-elapsed-day giving verification guard; no gate, public read or notification changes |
 
 Edge Functions, deployed after the migrations:
 
@@ -45,7 +46,7 @@ No epic 6 migration approves anything, and there are no fixture values in produc
 1. **Verify the deploy** (operator, SQL editor). These answer as on staging:
    ```sql
    select count(*) from supabase_migrations.schema_migrations
-    where version in ('20261021233523', '20261022011438', '20261022011557', '20261022012809');  -- 4
+    where version in ('20261021233523', '20261022011438', '20261022011557', '20261022012809', '20261022100601');  -- 5
    select count(*) from app.contract_boundary_violations();                                                -- 0
    select count(*) from app.contract_unowned_objects();                                                     -- 0
    select kind, editor_roles from app.content_kinds order by 1;   -- announcement, asset, banner, event, rights | {admin,pastor,media}; giving_method | {admin}
@@ -62,13 +63,13 @@ No epic 6 migration approves anything, and there are no fixture values in produc
       and (has_table_privilege(r, c.oid, 'SELECT') or has_table_privilege(r, c.oid, 'INSERT')
            or has_table_privilege(r, c.oid, 'UPDATE') or has_table_privilege(r, c.oid, 'DELETE'));  -- 0
    ```
-   Compare `md5(replace(pg_get_functiondef(p.oid), chr(13), ''))` of every `app`/`api` `content%` function with staging. Expect no difference.
+   Compare `md5(replace(pg_get_functiondef(p.oid), chr(13), ''))` of every `app`/`api` `content%` function, plus `app.identity_my_access` and `api.identity_my_access`, with staging. Expect no difference; this includes `app.content_giving_admin_tenure_eligible` and `app.content_giving_verify`.
 2. **Signed-out read** (operator, from any machine): `POST <production url>/rest/v1/rpc/content_public_events` with only the publishable key and `Content-Profile: api` answers `200 {"events": [], "truncated": false}`; `content_public_announcements` answers `200 {"announcements": [], "truncated": false}`.
    And (6.2) `POST <production url>/functions/v1/content-assets?action=sync` with only the publishable key answers `401 {"outcome": "unauthenticated"}`; `POST .../rest/v1/rpc/content_public_banners` answers `200 {"banners": [], "truncated": false}`.
 3. **Editors** (Admin, staff web, **Roles & access**): give Media to the people the owner names.
 4. **First event** (Media): follow [content.md](content.md), "Owner manual check", with the church's real event instead of the SYNTHETIC one.
-5. **Giving (6.3, Q3; owner only).** Only after the church has named its real methods, destinations, purposes, currency, contact and at least two Admins (Q3):
-   1. Admin A enters each real method on staff web **Giving** (it stays a private draft); Admin B, who saved none of it, tests the details with the provider and verifies each one (Tested on, How it was tested).
+5. **Giving (6.3 and F1, Q3; owner only).** Only after the church has named its real methods, destinations, purposes, currency, contact and at least two Admins (Q3):
+   1. Admin A enters each real method on staff web **Giving** (it stays a private draft); an Admin who saved none of it, has held an active Admin grant for at least 14 elapsed 24-hour days, and has tested the details with the provider verifies each one (Tested on, How it was tested). The Verify dialog shows the verifier's own “Admin since <Lusaka date>, granted by <name>” context; the server enforces elapsed time from the grant timestamp.
    2. Israel approves the gate in production, with an attributed note naming the verified methods: `select app.policy_approve('q3_giving', '{"methods": "<the verified methods>"}', '<owner name>', '<Q3 decision reference>');`. Do not include `sample_only`.
    3. An Admin publishes each verified method and orders them; a signed-out phone's **Give** shows them with "Details checked by the church on ..." and no sample banner.
    Until then nothing is published; the gate stays closed and Give says the church has published no methods.

@@ -65,9 +65,17 @@ void main() {
         'scopes': [
           {'scope_kind': 'fixture_care', 'scope_id': _member},
         ],
+        'admin_tenure': {
+          'granted_at': '2026-10-08T12:30:00.000000Z',
+          'admin_since': '2026-10-08',
+          'granted_by': 'SYNTHETIC Admin A',
+        },
       });
       expect(g.isAdmin, isTrue);
       expect(g.scopes.single.scopeKind, 'fixture_care');
+      expect(g.adminTenure!.grantedAt, DateTime.utc(2026, 10, 8, 12, 30));
+      expect(g.adminTenure!.adminSince, '2026-10-08');
+      expect(g.adminTenure!.grantedBy, 'SYNTHETIC Admin A');
       for (final bad in [
         {'member_id': _member, 'revision': 0, 'roles': [], 'scopes': []},
         {
@@ -81,6 +89,17 @@ void main() {
           'revision': 1,
           'roles': [],
           'scopes': [{}],
+        },
+        {
+          'member_id': _member,
+          'revision': 1,
+          'roles': ['admin'],
+          'scopes': [],
+          'admin_tenure': {
+            'granted_at': 'not-a-time',
+            'admin_since': '2026-10-08',
+            'granted_by': 'SYNTHETIC Admin A',
+          },
         },
         'x',
       ]) {

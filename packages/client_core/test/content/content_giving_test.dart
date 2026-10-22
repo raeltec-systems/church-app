@@ -962,7 +962,19 @@ void main() {
         tester,
         ClientPaths.contentGiving,
         staff: true,
-        setUp: (h) => h.giving.staffMethods = staffMethods([draftAirtel()]),
+        setUp: (h) {
+          h.giving.staffMethods = staffMethods([draftAirtel()]);
+          h.grants.myAccess = AccessReadOk(
+            syntheticGrants(
+              roles: ['admin'],
+              adminTenure: AdminGrantTenure(
+                grantedAt: DateTime.utc(2026, 10, 8, 12, 30),
+                adminSince: '2026-10-08',
+                grantedBy: 'SYNTHETIC Admin Banda',
+              ),
+            ),
+          );
+        },
       );
       await tapKey(tester, 'giving-open-$_airtel');
       expect(byKey('giving-verify-reason-$_airtel'), findsNothing);
@@ -972,6 +984,16 @@ void main() {
       );
       await tapKey(tester, 'giving-verify-$_airtel');
       expect(find.text('Verify SAMPLE Airtel Money'), findsOneWidget);
+      expect(
+        find.text('Admin since 2026-10-08, granted by SYNTHETIC Admin Banda'),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'An Admin must have held the role for 14 full days before verifying.',
+        ),
+        findsOneWidget,
+      );
       // The test note's guidance, and the earliest test date (the draft was
       // last saved on Sun 27 Sep church time).
       expect(
@@ -1055,6 +1077,21 @@ void main() {
         findsNothing,
       );
       await tapKey(tester, 'giving-verify-send');
+      h.gateway.sent.last.refuse(
+        ErrorCode.validationFailed,
+        fieldErrors: const {'admin_tenure': 'not_eligible'},
+      );
+      await settle(tester);
+      expect(
+        find.text(
+          'The server could not confirm 14 full days of Admin access. Refresh access and try again later.',
+        ),
+        findsOneWidget,
+      );
+      expect(byKey('giving-refresh-access'), findsOneWidget);
+      await tester.enterText(byKey('giving-tested-on'), today);
+      await settle(tester);
+      await tapKey(tester, 'giving-verify-send');
       final second = h.gateway.sent.last;
       expect((second.wire['payload'] as Map)['tested_on'], today);
       h.giving.staffMethods = staffMethods([
@@ -1075,6 +1112,32 @@ void main() {
         findsOneWidget,
       );
       expect(byKey('giving-publish-$_airtel'), findsOneWidget);
+    });
+
+    testWidgets('missing Admin tenure explains that access needs refresh', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.contentGiving,
+        staff: true,
+        setUp: (h) {
+          h.giving.staffMethods = staffMethods([draftAirtel()]);
+          h.grants.myAccess = AccessReadOk(syntheticGrants(roles: ['admin']));
+        },
+      );
+      await tapKey(tester, 'giving-open-$_airtel');
+      await tapKey(tester, 'giving-verify-$_airtel');
+      expect(
+        find.text(
+          'Your Admin grant details could not be loaded. Refresh access before verifying.',
+        ),
+        findsOneWidget,
+      );
+      final calls = h.grants.myAccessCalls;
+      await tapKey(tester, 'giving-refresh-access');
+      await settle(tester);
+      expect(h.grants.myAccessCalls, greaterThan(calls));
     });
 
     testWidgets('publish a verified draft; a closed gate says so', (

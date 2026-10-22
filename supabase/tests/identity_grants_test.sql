@@ -6,7 +6,7 @@
 -- HTTP evidence with real GoTrue sessions: tools/identity-e2e/grants.mjs. Every account, phone
 -- and name here is SYNTHETIC (fictional range +1 202 555 0131-0139).
 begin;
-select plan(113);
+select plan(116);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000023' || lpad(n::text, 2, '0'))::uuid $$;
@@ -230,6 +230,24 @@ select is((select string_agg(action || ':' || operator, ',' order by id) from ap
 select throws_ok(format('select app.identity_bootstrap_admin(%L, %L)', pg_temp.m(2), 'israel'),
   '22023', null, 'no second bootstrap while a usable Admin exists');
 select is(pg_temp.roles(1), 'admin', 'the Admin''s next call lists admin');
+select is(
+  substr(pg_temp.read(pg_temp.c(1), 'select api.identity_my_access()'), 4)::jsonb -> 'admin_tenure',
+  (select jsonb_build_object(
+            'granted_at', app.cmd_utc(g.granted_at),
+            'admin_since', to_char(g.granted_at at time zone 'Africa/Lusaka', 'YYYY-MM-DD'),
+            'granted_by', coalesce(m.display_name, 'Church office'))
+     from app.identity_grants g
+     left join app.identity_members m on m.member_id = g.granted_by_member
+    where g.member_id = pg_temp.m(1) and g.role = 'admin' and g.revoked_at is null),
+  'identity self-read returns only the active Admin grant metadata');
+select is(substr(pg_temp.read(pg_temp.c(2), 'select api.identity_my_access()'), 4)::jsonb -> 'admin_tenure',
+  'null'::jsonb, 'a non-Admin self-read has no Admin grant metadata');
+select ok(not exists (
+  select 1 from jsonb_array_elements(
+    substr(pg_temp.read(pg_temp.c(1), 'select api.identity_admin_member_grants()'), 4)::jsonb -> 'members')
+    as rows(row_value)
+   where row_value ? 'admin_tenure'),
+  'the Admin grant roster does not expose tenure metadata');
 
 -- Helpers compose the live-access predicate --------------------------------------------------------
 select ok(pg_temp.has_role(pg_temp.c(1), 'admin'),

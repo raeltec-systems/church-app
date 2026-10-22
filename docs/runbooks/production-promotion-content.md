@@ -20,6 +20,7 @@ Migrations, in this order. Each was applied to staging under its hosted version,
 | 6.13 | `20261022011557_content_announcements.sql`: the `announcement` kind and its five commands, the public reads `api.content_public_announcements` / `api.content_public_announcement` (anon), `api.content_staff_announcements`, the `content_announcement` / `announcement_published` reminder contract (generic text), the `announcement_revisions` erase part |
 | 6.2 | `20261022012809_content_rights_banners.sql`: rights records, the `q5_content_rights` gate (unresolved; fixture honoured only in local/staging), the buckets `content-drafts` (private) and `content-public` (public), uploads, file slots, per-kind public conditions, banners, `api.content_public_banners` (anon), `api.content_staff_banners`, `api.content_staff_rights`, `api.content_file_plan`, `api.content_asset_preview`, three erase parts |
 | F1 | `20261022100601_f1_giving_admin_tenure.sql`: the Identity self-read's current-caller-only Admin tenure context and Content's 14-elapsed-day giving verification guard; no gate, public read or notification changes |
+| F2 | `20261022102525_f2_church_owned_q5_exemption.sql`: updates only `app.content_rights_clear`; verified church-owned records bypass Q5 while lifecycle and per-use checks remain, and all other bases still require Q5 |
 
 Edge Functions, deployed after the migrations:
 
@@ -37,7 +38,7 @@ Client compatibility (6.1): production clients must be built from `main` at prom
 | Editors (6.1) | Only members holding Media, Pastor or Admin (story 2.3) can edit; the first real Admin is the identity production gate. | Staff web shows **Events** only to them. |
 | Giving (6.3) | `q3_giving` is closed: Admins can draft and verify methods, but every publish answers `unavailable {"policy": "gate_closed"}`. The public reads answer `{"sample": false, "methods": [], ...}`. | Give: "No giving methods yet. When the church adds how to give, it will show here." On staff web **Giving** (Admins only), Publish answers "Not open yet" (publishing waits for the owner's approval). No sample banner (production). |
 | Announcements (6.13) | Church-authored: no gate to publish. A publication **with a notice** answers `unavailable` (nothing published) until Israel approves `q2_church_time`; once approved, inbox items are delivered, and pushes also need `outbound_sending` and `push_enabled` in production. | Home: "No announcements right now." Staff web: **Announcements** for editors; the publish dialog says notices are not available yet when refused. |
-| Banners (6.2) | `q5_content_rights` is unresolved, so no rights record clears anything: every banner publish is refused (`image_rights_id: source_not_cleared`) and the public read is empty. Editors can still record and verify rights records and upload images; drafts stay private. | Home shows no carousel. Staff web **Rights** says "Not on the Q5 list" for every record. |
+| Banners (6.2/F2) | `q5_content_rights` is unresolved, so third-party sources do not clear any use and third-party banner publication is refused (`image_rights_id: source_not_cleared`). A verified `church_owned` record can publish when its requested use flag is clear. Editors can record and verify rights and upload images; drafts stay private. | Home is empty until a church-owned banner is published. Staff web **Rights** says Q5 approval is not required for church-owned images and reports unlisted third-party sources as not on Q5. |
 
 No epic 6 migration approves anything, and there are no fixture values in production.
 
@@ -46,7 +47,7 @@ No epic 6 migration approves anything, and there are no fixture values in produc
 1. **Verify the deploy** (operator, SQL editor). These answer as on staging:
    ```sql
    select count(*) from supabase_migrations.schema_migrations
-    where version in ('20261021233523', '20261022011438', '20261022011557', '20261022012809', '20261022100601');  -- 5
+    where version in ('20261021233523', '20261022011438', '20261022011557', '20261022012809', '20261022100601', '20261022102525');  -- 6
    select count(*) from app.contract_boundary_violations();                                                -- 0
    select count(*) from app.contract_unowned_objects();                                                     -- 0
    select kind, editor_roles from app.content_kinds order by 1;   -- announcement, asset, banner, event, rights | {admin,pastor,media}; giving_method | {admin}
@@ -54,6 +55,7 @@ No epic 6 migration approves anything, and there are no fixture values in produc
    select handler from app.identity_deletion_hooks where module = 'content';        -- app.content_erase_member(jsonb)
    select part from app.content_erase_parts order by 1;           -- announcement_revisions, asset_uploads, banner_revisions, event_revisions, giving_methods, rights_revisions
    select state from app.policy_gates where gate in ('q3_giving', 'q5_content_rights');  -- unresolved, unresolved (no migration approves them)
+   select md5(replace(pg_get_functiondef('app.content_rights_clear(uuid,text)'::regprocedure), chr(13), ''));  -- compare with the reviewed staging hash
    select id, public from storage.buckets where id like 'content-%' order by 1;    -- content-drafts f | content-public t
    select count(*) from pg_policies where schemaname = 'storage';                  -- 0
    select title, body, link from app.contract_reminder_contracts where source_type = 'content_announcement';  -- the generic text, /announcements/{source_id}
@@ -63,7 +65,7 @@ No epic 6 migration approves anything, and there are no fixture values in produc
       and (has_table_privilege(r, c.oid, 'SELECT') or has_table_privilege(r, c.oid, 'INSERT')
            or has_table_privilege(r, c.oid, 'UPDATE') or has_table_privilege(r, c.oid, 'DELETE'));  -- 0
    ```
-   Compare `md5(replace(pg_get_functiondef(p.oid), chr(13), ''))` of every `app`/`api` `content%` function, plus `app.identity_my_access` and `api.identity_my_access`, with staging. Expect no difference; this includes `app.content_giving_admin_tenure_eligible` and `app.content_giving_verify`.
+   Compare `md5(replace(pg_get_functiondef(p.oid), chr(13), ''))` of every `app`/`api` `content%` function, plus `app.identity_my_access` and `api.identity_my_access`, with staging. Expect no difference; this includes the F2 `app.content_rights_clear`, `app.content_giving_admin_tenure_eligible` and `app.content_giving_verify`. Confirm the gate rows, module guards and signed-out `content_public_banners` response are unchanged apart from the rights helper's church-owned exemption; no gate value is approved by this migration.
 2. **Signed-out read** (operator, from any machine): `POST <production url>/rest/v1/rpc/content_public_events` with only the publishable key and `Content-Profile: api` answers `200 {"events": [], "truncated": false}`; `content_public_announcements` answers `200 {"announcements": [], "truncated": false}`.
    And (6.2) `POST <production url>/functions/v1/content-assets?action=sync` with only the publishable key answers `401 {"outcome": "unauthenticated"}`; `POST .../rest/v1/rpc/content_public_banners` answers `200 {"banners": [], "truncated": false}`.
 3. **Editors** (Admin, staff web, **Roles & access**): give Media to the people the owner names.
@@ -74,7 +76,7 @@ No epic 6 migration approves anything, and there are no fixture values in produc
    3. An Admin publishes each verified method and orders them; a signed-out phone's **Give** shows them with "Details checked by the church on ..." and no sample banner.
    Until then nothing is published; the gate stays closed and Give says the church has published no methods.
 
-6. **Q5 (6.2, owner).** When Israel has cleared the church's own images and any third-party sources, he approves `q5_content_rights` with the sources and uses he clears (see [content.md](content.md), "The Q5 gate"); until then no banner can be published. Then a Media member records and verifies the matching rights records and publishes the yearly theme.
+6. **Q5 (6.2/F2, owner).** When Israel has cleared third-party sources, he approves `q5_content_rights` with the sources and uses he clears (see [content.md](content.md), "The Q5 gate"). The church-owned basis does not need a gate entry. A Media member may record and verify a church-owned rights record and publish a banner when its requested use is clear; third-party material waits for its source and use to be approved.
 
 ## Rollback
 

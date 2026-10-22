@@ -7,7 +7,7 @@
 -- storage.objects (rolled back). Every account, phone and name is SYNTHETIC (fictional range
 -- +1 202 555 0161-0166).
 begin;
-select plan(148);
+select plan(150);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000082' || lpad(n::text, 2, '0'))::uuid $$;
@@ -189,6 +189,7 @@ select results_eq(
 select is(app.policy_effective('q5_content_rights') ->> 'source', 'fixture', 'locally Q5 reads its fixture');
 select is(app.content_q5_uses('synthetic'), array['audio', 'display', 'offline'], 'the fixture lists SYNTHETIC sources');
 select is(app.content_q5_uses('acme-press'), array[]::text[], 'an unlisted source has no cleared use');
+select is(app.content_q5_uses('church-art'), array[]::text[], 'the church-owned source is intentionally absent from Q5');
 select results_eq(
   $$select id, public, file_size_limit, allowed_mime_types from storage.buckets
      where id in ('content-drafts', 'content-public') order by id$$,
@@ -207,7 +208,7 @@ select results_eq(
 
 -- Rights records -----------------------------------------------------------------------------------
 create temp table r1 as select pg_temp.cmd(3, 'content.create_rights_record', null,
-  pg_temp.rights('SYNTHETIC theme artwork', 'synthetic', true, false)) as r;
+  pg_temp.rights('SYNTHETIC theme artwork', 'church-art', true, false)) as r;
 create function pg_temp.r1() returns uuid language sql as $$ select (r #>> '{data,rights_id}')::uuid from r1 $$;
 select is((select (r -> 'data') - 'rights_id' from r1),
   '{"state": "draft", "revision": 1, "live_revision_no": null, "draft_revision_no": 1}'::jsonb,
@@ -233,7 +234,7 @@ select is(pg_temp.err(pg_temp.cmd(4, 'content.verify_rights_record', 1,
   jsonb_build_object('rights_id', pg_temp.r1()))), 'forbidden', 'a plain member cannot verify');
 select is(pg_temp.cmd(3, 'content.verify_rights_record', 1, jsonb_build_object('rights_id', pg_temp.r1()))
             #>> '{data,state}', 'published', 'Media verifies: the record is in force');
-select is(app.content_rights_clear(pg_temp.r1(), 'display'), null, 'it clears display (SYNTHETIC source on the Q5 fixture)');
+select is(app.content_rights_clear(pg_temp.r1(), 'display'), null, 'church-owned clears display without Q5 approval');
 select is(app.content_rights_clear(pg_temp.r1(), 'offline'), 'use_not_cleared', 'but not offline use');
 select is((select verified_by || '|' || (verified_at is not null)::text
              from (select x ->> 'verified_by' as verified_by, x ->> 'verified_at' as verified_at
@@ -241,10 +242,10 @@ select is((select verified_by || '|' || (verified_at is not null)::text
                     where x ->> 'rights_id' = pg_temp.r1()::text) s),
   'SYNTHETIC Banner Member 3|true', 'the editors read the verifier and the date (Pastor reading)');
 select is((select x -> 'q5_uses' from jsonb_array_elements(pg_temp.read(1, 'select api.content_staff_rights()') -> 'rights') x
-            where x ->> 'rights_id' = pg_temp.r1()::text), '["audio", "display", "offline"]'::jsonb,
-  'and the uses the Q5 value lists for its source');
+            where x ->> 'rights_id' = pg_temp.r1()::text), '[]'::jsonb,
+  'and Q5 lists no uses for the church-owned source');
 select is(pg_temp.err(pg_temp.cmd(3, 'content.save_rights_record', pg_temp.rev(pg_temp.r1()),
-  pg_temp.rights('SYNTHETIC theme artwork v2', 'synthetic', true, true, jsonb_build_object('rights_id', pg_temp.r1())))),
+  pg_temp.rights('SYNTHETIC theme artwork v2', 'church-art', true, true, jsonb_build_object('rights_id', pg_temp.r1())))),
   'ok', 'a new draft revision of a verified record');
 select is((select live_revision_no || '|' || draft_revision_no from app.content_items where item_id = pg_temp.r1()),
   '1|2', 'the verified revision stays in force until the draft is verified');
@@ -261,7 +262,7 @@ select is(pg_temp.err(pg_temp.cmd(3, 'content.verify_rights_record', 1, jsonb_bu
 select is(app.content_rights_clear(pg_temp.r2(), 'display'), 'source_not_cleared',
   'but a source missing from the Q5 value clears nothing');
 create temp table r3 as select pg_temp.cmd(3, 'content.create_rights_record', null,
-  pg_temp.rights('SYNTHETIC offline only', 'synthetic', false, true)) as r;
+  pg_temp.rights('SYNTHETIC offline only', 'church-art', false, true)) as r;
 create function pg_temp.r3() returns uuid language sql as $$ select (r #>> '{data,rights_id}')::uuid from r3 $$;
 select is(pg_temp.err(pg_temp.cmd(3, 'content.verify_rights_record', 1, jsonb_build_object('rights_id', pg_temp.r3()))),
   'ok', 'an offline-only record is verified');
@@ -559,9 +560,12 @@ select is((select count(*)::int from app.content_assets where uploaded_by_member
 
 -- Production: Q5 closed until Israel approves it ---------------------------------------------------
 select lives_ok($$select app.platform_set_environment('production', 'pgtap content banners')$$, 'marked production');
-select is(app.content_rights_clear(pg_temp.r1(), 'display'), 'source_not_cleared',
-  'in production the fixture is ignored: no source is cleared');
-select is(app.content_public_banners() -> 'banners', '[]'::jsonb, 'and no banner is public');
+select is(app.content_rights_clear(pg_temp.r1(), 'display'), null,
+  'a verified church-owned record still clears its use in production with Q5 closed');
+select is(app.content_rights_clear(pg_temp.r2(), 'display'), 'source_not_cleared',
+  'a third-party source still needs Q5 approval in production');
+select is(jsonb_array_length(app.content_public_banners() -> 'banners'), 1,
+  'the public read still names the church-owned banner when Q5 is closed');
 
 select * from finish();
 rollback;

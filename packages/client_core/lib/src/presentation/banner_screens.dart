@@ -36,7 +36,7 @@ String bannerReasonText(String code, {String? field}) => switch (code) {
   'too_small' => 'This image is smaller than 960 x 540.',
   'bad_ratio' => 'Use a landscape image close to 16:9.',
   'source_not_cleared' =>
-    'This rights record\'s source is not cleared by the owner (Q5).',
+    'This third-party source is not cleared by the owner (Q5).',
   'use_not_cleared' => 'This rights record does not clear display.',
   'not_in_force' => 'Verify this rights record first.',
   'not_published' when field == 'event_id' =>
@@ -1281,7 +1281,11 @@ class _BannerFormState extends ConsumerState<_BannerForm> {
                   value: r.rightsId,
                   child: Text(
                     '${r.live!.fields.label} · '
-                    '${r.clearsDisplayNow ? 'On the Q5 list for display' : 'Not on the Q5 list'}',
+                    '${r.live!.fields.basis == RightsBasis.churchOwned
+                        ? 'Q5 approval is not required'
+                        : r.clearsDisplayNow
+                        ? 'On the Q5 list for display'
+                        : 'Not on the Q5 list'}',
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -1509,11 +1513,18 @@ class _ImageSection extends ConsumerWidget {
   ContentState.archived => ('Archived', StatusTone.neutral),
 };
 
-String _q5Text(RightsRecord r) => r.q5Uses.contains(RightsUses.display)
-    ? 'On the Q5 list for display'
-    : r.q5Uses.isEmpty
-    ? 'Not on the Q5 list'
-    : 'On the Q5 list for ${r.q5Uses.join(', ')}';
+String _q5Text(RightsRecord r) {
+  final basis = (r.live ?? r.draft)!.fields.basis;
+  if (basis == RightsBasis.churchOwned) {
+    return 'Q5 approval is not required for church-owned images';
+  }
+  if (r.q5Uses.contains(RightsUses.display)) {
+    return 'On the Q5 list for display';
+  }
+  return r.q5Uses.isEmpty
+      ? 'Not on the Q5 list'
+      : 'On the Q5 list for ${r.q5Uses.join(', ')}';
+}
 
 String _rightsFinding(StaffRights v) {
   if (v.rights.isEmpty) {
@@ -1687,10 +1698,9 @@ class _RightsBodyState extends ConsumerState<_RightsBody> {
           ),
         const SizedBox(height: 16),
         Text(
-          'An image is published only with a rights record in force that '
-          'clears display and whose source is on the owner\'s Q5 list. Until '
-          'the owner approves Q5 in production, nothing with a rights record '
-          'is published there.',
+          'An image is published only with a verified rights record that '
+          'clears display. Church-owned images do not need Q5 source approval; '
+          'third-party sources must be on the owner\'s Q5 list for display.',
           style: ChurchType.secondary.copyWith(color: c.muted),
         ),
       ],

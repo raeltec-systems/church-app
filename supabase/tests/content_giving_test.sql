@@ -1,5 +1,5 @@
--- Story 6.3: verified giving methods. Registries, privileges and the payer-field scan; the seven
--- giving commands for Admin only (refused for Media, Pastor, a plain member and a Pending account);
+-- Stories 6.3 and 6.5: verified giving methods, unsafe command, optional logo slot and payer-field scan;
+-- all giving commands are Admin only (refused for Media, Pastor, a plain member and a Pending account);
 -- type-specific validation with amount and payer keys refused; the second-Admin verification
 -- (owner decision 2026-10-21) in the command and in the database (check and trigger); publication
 -- through the q3_giving gate (SAMPLE fixture locally, closed in a simulated production); a changed
@@ -7,7 +7,7 @@
 -- the order; the anonymous projection; the Admins' read; replay; the deletion erase part. Every
 -- account, phone and name is SYNTHETIC or SAMPLE (fictional range +1 202 555 0181-0187).
 begin;
-select plan(183);
+select plan(209);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000083' || lpad(n::text, 2, '0'))::uuid $$;
@@ -122,6 +122,38 @@ create function pg_temp.vf(p_id uuid, p_days int default 0) returns jsonb langua
   select jsonb_build_object('method_id', p_id, 'tested_on', to_char(pg_temp.today() - p_days, 'YYYY-MM-DD'),
                             'test_method', 'SAMPLE test: the treasurer''s provider showed the church name for these details.')
 $$;
+create function pg_temp.logo_rights(p_id uuid, p_display boolean) returns jsonb language sql as $$
+  select jsonb_build_object(
+    'label', 'SYNTHETIC church giving logo',
+    'source_key', 'church-art',
+    'holder', 'SYNTHETIC Church media team',
+    'basis', 'church_owned',
+    'clears_display', p_display,
+    'clears_offline', true,
+    'clears_audio', false,
+    'evidence', 'SYNTHETIC: created by the church media team for testing.')
+    || case when p_id is null then '{}'::jsonb else jsonb_build_object('rights_id', p_id) end
+$$;
+create function pg_temp.obj(p_bucket text, p_name text, p_size bigint, p_type text) returns void
+language sql as $$
+  insert into storage.objects (bucket_id, name, metadata)
+  values (p_bucket, p_name, jsonb_build_object('size', p_size, 'mimetype', p_type));
+$$;
+create function pg_temp.ready_logo(n int, p_item uuid) returns uuid language plpgsql as $$
+declare
+  r jsonb;
+begin
+  r := pg_temp.cmd(n, 'content.begin_asset_upload', null, jsonb_build_object(
+    'item_id', p_item, 'purpose', 'giving_logo', 'media_type', 'image/png',
+    'byte_size', 262144, 'width', 256, 'height', 256, 'sha256', repeat('cd', 32)));
+  insert into storage.objects (bucket_id, name, metadata)
+  values ('content-drafts', r #>> '{data,draft_path}',
+          jsonb_build_object('size', 262144, 'mimetype', 'image/png'));
+  r := pg_temp.cmd(n, 'content.complete_asset_upload', null,
+                   jsonb_build_object('asset_id', r #>> '{data,asset_id}'));
+  return (r #>> '{data,asset_id}')::uuid;
+end;
+$$;
 create function pg_temp.idp(p uuid) returns jsonb language sql as $$ select jsonb_build_object('method_id', p) $$;
 create function pg_temp.rev(p uuid) returns bigint language sql as $$
   select revision from app.content_items where item_id = p $$;
@@ -193,8 +225,9 @@ select results_eq(
            ('content.move_giving_method:app.content_giving_move(uuid,bigint,jsonb):false'),
            ('content.publish_giving_method:app.content_giving_publish(uuid,bigint,jsonb):false'),
            ('content.save_giving_method:app.content_giving_save(uuid,bigint,jsonb):false'),
+           ('content.set_giving_method_unsafe:app.content_giving_set_unsafe(uuid,bigint,jsonb):false'),
            ('content.verify_giving_method:app.content_giving_verify(uuid,bigint,jsonb):false')$$,
-  'the eight giving commands are registered');
+  'the nine giving commands are registered');
 select is((select handler from app.content_erase_parts where part = 'giving_methods'),
   'app.content_giving_erase_part(jsonb)', 'the giving erase part is registered');
 select is((select handler from app.identity_deletion_hooks where module = 'content'),
@@ -437,22 +470,102 @@ create temp table pub1 as select pg_temp.read(null, 'select api.content_public_g
 select is((select jsonb_array_length(r -> 'methods') from pub1), 1, 'anon reads the published method');
 select results_eq(
   $$select k::text collate "C" from pub1, jsonb_object_keys(r #> '{methods,0}') k order by 1$$,
-  $$values ('contact'::text collate "C"), ('currency'), ('details'), ('method_id'), ('method_type'), ('name'),
-           ('note'), ('publication_revision'), ('published_at'), ('purpose'), ('steps'), ('ussd_code'),
-           ('verified_on')$$,
+  $$values ('contact'::text collate "C"), ('currency'), ('details'), ('logo'), ('method_id'), ('method_type'),
+           ('name'), ('note'), ('publication_revision'), ('published_at'), ('purpose'), ('steps'), ('unsafe'),
+           ('ussd_code'), ('verified_on')$$,
   'the public projection carries no verifier, test note, editor or draft field');
 select is((select (r #> '{methods,0}') - 'method_id' - 'published_at' from pub1),
   jsonb_build_object('method_type', 'mobile_money', 'name', 'SAMPLE Mobile Money', 'purpose', 'Tithes and offerings',
     'currency', 'ZMW', 'details', '[{"key": "beneficiary", "value": "SAMPLE Brethren in Christ Church Kafue"}, {"key": "merchant_id", "value": "990101"}]'::jsonb,
     'ussd_code', '*990#', 'steps', pg_temp.steps(), 'note', 'SAMPLE support note.',
     'contact', 'SAMPLE church office, +260 97 000 0099',
-    'verified_on', to_char(pg_temp.today(), 'YYYY-MM-DD'), 'publication_revision', 1),
+    'verified_on', to_char(pg_temp.today(), 'YYYY-MM-DD'), 'publication_revision', 1,
+    'unsafe', false, 'logo', null),
   'anon reads the live revision: copyable details in order, steps, the verified date and the contact');
 select is((select r ->> 'sample' from pub1), 'true', 'off production the read says the methods are samples');
 select is((pg_temp.read(5, format('select api.content_public_giving_method(%L)', pg_temp.mm1())) #>> '{method,name}'),
   'SAMPLE Mobile Money', 'a member reads the same projection by id');
 select is((pg_temp.read(6, 'select api.content_public_giving_methods()') #>> '{methods,0,name}'),
   'SAMPLE Mobile Money', 'so does a Pending account');
+
+-- A provider logo shares the Content upload, rights and revision paths. It is public only while
+-- its current rights revision clears display, and the method instructions remain available when
+-- those rights are later withdrawn.
+create temp table logo_rights as select pg_temp.cmd(1, 'content.create_rights_record', null,
+  pg_temp.logo_rights(null, true)) as r;
+create function pg_temp.logo_rights_id() returns uuid language sql as $$
+  select (r #>> '{data,rights_id}')::uuid from logo_rights
+$$;
+select is(pg_temp.err((select r from logo_rights)), 'ok', 'Admin A creates church-owned giving-logo rights');
+select is(pg_temp.err(pg_temp.cmd(2, 'content.verify_rights_record', pg_temp.rev(pg_temp.logo_rights_id()),
+  jsonb_build_object('rights_id', pg_temp.logo_rights_id()))), 'ok',
+  'Admin B verifies rights that clear display and offline storage');
+create temp table logo_asset as select pg_temp.ready_logo(1, pg_temp.mm1()) as asset_id;
+select is((select a.state from app.content_assets a where a.asset_id = (select asset_id from logo_asset)),
+  'ready', 'the giving_logo asset is ready through the normal upload commands');
+select is(pg_temp.err(pg_temp.cmd(1, 'content.save_giving_method', pg_temp.rev(pg_temp.mm1()),
+  pg_temp.sv(pg_temp.mm1(), pg_temp.mm('SAMPLE Mobile Money', jsonb_build_object(
+    'logo_asset_id', (select asset_id from logo_asset), 'logo_rights_id', pg_temp.logo_rights_id()))))),
+  'ok', 'Admin A attaches the ready logo and verified rights in a new giving revision');
+select is(pg_temp.err(pg_temp.cmd(2, 'content.verify_giving_method', pg_temp.rev(pg_temp.mm1()),
+  pg_temp.vf(pg_temp.mm1()))), 'ok', 'Admin B verifies the logo-bearing giving revision');
+select is(pg_temp.err(pg_temp.cmd(1, 'content.publish_giving_method', pg_temp.rev(pg_temp.mm1()),
+  pg_temp.idp(pg_temp.mm1()))), 'ok', 'Admin A publishes the logo-bearing revision');
+select pg_temp.obj('content-public', app.content_public_path('giving_method', pg_temp.mm1(),
+  (select live_revision_no from app.content_items where item_id = pg_temp.mm1()), 'logo', 'png'),
+  262144, 'image/png');
+create temp table logo_public as select pg_temp.read(null,
+  format('select api.content_public_giving_method(%L)', pg_temp.mm1())) as r;
+select is((select r #> '{method,logo}' from logo_public),
+  jsonb_build_object('path', app.content_public_path('giving_method', pg_temp.mm1(),
+    (select live_revision_no from app.content_items where item_id = pg_temp.mm1()), 'logo', 'png'),
+    'media_type', 'image/png', 'width', 256, 'height', 256, 'rights_revision', 1, 'offline_allowed', true),
+  'the eligible logo projection includes its revision-keyed file and rights metadata');
+select is((select jsonb_build_object('details', r #> '{method,details}', 'steps', r #> '{method,steps}',
+                                      'verified_on', r #> '{method,verified_on}') from logo_public),
+  jsonb_build_object('details', '[{"key": "beneficiary", "value": "SAMPLE Brethren in Christ Church Kafue"},
+                                  {"key": "merchant_id", "value": "990101"}]'::jsonb,
+                     'steps', pg_temp.steps(), 'verified_on', to_char(pg_temp.today(), 'YYYY-MM-DD')),
+  'projecting the logo preserves the checked destination, steps and verified date');
+select is(pg_temp.err(pg_temp.cmd(1, 'content.save_rights_record', pg_temp.rev(pg_temp.logo_rights_id()),
+  pg_temp.logo_rights(pg_temp.logo_rights_id(), false))), 'ok',
+  'Admin A drafts a rights revision that no longer clears logo display');
+select is(pg_temp.err(pg_temp.cmd(2, 'content.verify_rights_record', pg_temp.rev(pg_temp.logo_rights_id()),
+  jsonb_build_object('rights_id', pg_temp.logo_rights_id()))), 'ok',
+  'Admin B verifies the restricted display rights');
+create temp table logo_blocked as select pg_temp.read(null,
+  format('select api.content_public_giving_method(%L)', pg_temp.mm1())) as r;
+select is((select r #> '{method,logo}' from logo_blocked), 'null'::jsonb,
+  'the public logo is omitted when current rights no longer clear display');
+select is((select jsonb_build_object('details', r #> '{method,details}', 'steps', r #> '{method,steps}',
+                                      'verified_on', r #> '{method,verified_on}') from logo_blocked),
+  (select jsonb_build_object('details', r #> '{method,details}', 'steps', r #> '{method,steps}',
+                             'verified_on', r #> '{method,verified_on}') from logo_public),
+  'blocked logo rights leave the published giving instructions and date intact');
+
+select is(pg_temp.err(pg_temp.cmd(1, 'content.save_giving_method', pg_temp.rev(pg_temp.mm1()),
+  pg_temp.sv(pg_temp.mm1(), pg_temp.mm('SAMPLE Mobile Money', jsonb_build_object(
+    'note', 'SAMPLE keep logo before clearing', 'logo_asset_id', (select asset_id from logo_asset),
+    'logo_rights_id', pg_temp.logo_rights_id()))))), 'ok',
+  'Admin A can start an existing giving draft with its current optional logo');
+select is((select count(*)::int from app.content_revision_files
+            where item_id = pg_temp.mm1()
+              and revision_no = (select draft_revision_no from app.content_items where item_id = pg_temp.mm1())
+              and slot = 'logo'), 1, 'the draft initially has one logo slot');
+select is(pg_temp.err(pg_temp.cmd(1, 'content.save_giving_method', pg_temp.rev(pg_temp.mm1()),
+  pg_temp.sv(pg_temp.mm1(), pg_temp.mm('SAMPLE Mobile Money', jsonb_build_object(
+    'note', 'SAMPLE logo cleared', 'logo_asset_id', null, 'logo_rights_id', null))))), 'ok',
+  'Admin A can clear the logo while saving the existing draft');
+select is((select count(*)::int from app.content_revision_files
+            where item_id = pg_temp.mm1()
+              and revision_no = (select draft_revision_no from app.content_items where item_id = pg_temp.mm1())
+              and slot = 'logo'), 0, 'clearing the logo removes its current draft file slot');
+select is(pg_temp.err(pg_temp.cmd(2, 'content.verify_giving_method', pg_temp.rev(pg_temp.mm1()),
+  pg_temp.vf(pg_temp.mm1()))), 'ok', 'Admin B verifies the draft with no logo');
+select is(pg_temp.err(pg_temp.cmd(1, 'content.publish_giving_method', pg_temp.rev(pg_temp.mm1()),
+  pg_temp.idp(pg_temp.mm1()))), 'ok', 'Admin A publishes the logo-free revision');
+select is((pg_temp.read(null, format('select api.content_public_giving_method(%L)', pg_temp.mm1()))
+  #> '{method,logo}'), 'null'::jsonb, 'the public projection keeps the logo cleared after publication');
 
 -- The bank method: verify, then the SAMPLE fixture and the production gate
 update app.content_giving_revisions set saved_at = saved_at - interval '3 days' where item_id = pg_temp.bk1();
@@ -504,6 +617,9 @@ select is(pg_temp.err(pg_temp.cmd(2, 'content.save_giving_method', pg_temp.rev(p
 select is(pg_temp.err(pg_temp.cmd(2, 'content.save_giving_method', pg_temp.rev(pg_temp.bk1()),
     pg_temp.sv(pg_temp.bk1(), pg_temp.bank('SAMPLE Bank transfer', '{"account_number": "9900 3333 4444", "note": "SAMPLE fee note."}')))),
   'ok', 'Admin B then edits the draft (a note)');
+select is((select count(*)::int from app.content_revision_files
+            where item_id = pg_temp.bk1() and revision_no = 2 and slot = 'logo'), 0,
+  'a giving revision without a provider logo has no file-slot row');
 select is((select verified_at from app.content_giving_revisions where item_id = pg_temp.bk1() and revision_no = 2),
   null, 'any save clears the verification');
 select is((select changed_fields from app.content_giving_audit
@@ -565,12 +681,31 @@ create temp table refused as
     from unnest(array[3, 4, 5, 6]) n,
          unnest(array['content.save_giving_method', 'content.verify_giving_method', 'content.publish_giving_method',
                       'content.hide_giving_method', 'content.archive_giving_method', 'content.move_giving_method',
-                      'content.discard_giving_draft']) c;
+                      'content.discard_giving_draft', 'content.set_giving_method_unsafe']) c;
 select is((select string_agg(n || ':' || c || ':' || e, ',') from refused where e <> 'forbidden'), null,
   'Media, a Pastor, a plain member and a Pending account are refused every giving command');
-select is((select count(*)::int from refused), 28, 'all 28 attempts were made');
+select is((select count(*)::int from refused), 32, 'all 32 attempts were made');
 select is((select lifecycle_state || ':' || revision from app.content_items where item_id = pg_temp.mm1()),
-  'published:3', 'and nothing changed');
+  'published:10', 'and nothing changed');
+
+select is(pg_temp.err(pg_temp.cmd(1, 'content.set_giving_method_unsafe', pg_temp.rev(pg_temp.mm1()),
+  pg_temp.idp(pg_temp.mm1()) || '{"unsafe": true}')),
+  'ok', 'an Admin marks a method unsafe through the Content command');
+select is(pg_temp.read(null, format('select api.content_public_giving_method(%L)', pg_temp.mm1()))
+          #>> '{method,unsafe}', 'true', 'the public detail shows the unsafe flag');
+select results_eq(
+  $$select action, changed_fields from app.content_giving_audit
+     where item_id = pg_temp.mm1() and action = 'unsafe_flagged'$$,
+  $$values ('unsafe_flagged'::text, array['unsafe']::text[])$$,
+  'the unsafe change is audited without notifying a recipient');
+select is(pg_temp.err(pg_temp.cmd(1, 'content.set_giving_method_unsafe', pg_temp.rev(pg_temp.mm1()),
+  pg_temp.idp(pg_temp.mm1()) || '{"unsafe": true}')),
+  'validation_failed|unsafe=unchanged', 'an unchanged unsafe flag is refused');
+select is(pg_temp.err(pg_temp.cmd(1, 'content.set_giving_method_unsafe', pg_temp.rev(pg_temp.mm1()),
+  pg_temp.idp(pg_temp.mm1()) || '{"unsafe": false}')),
+  'ok', 'an Admin clears the unsafe flag through the Content command');
+select is(pg_temp.read(null, format('select api.content_public_giving_method(%L)', pg_temp.mm1()))
+          #>> '{method,unsafe}', 'false', 'the public detail reflects a cleared warning');
 
 -- Order -------------------------------------------------------------------------------------------
 select is(pg_temp.err(pg_temp.cmd(2, 'content.publish_giving_method', pg_temp.rev(pg_temp.ot1()), pg_temp.idp(pg_temp.ot1()))),
@@ -664,7 +799,8 @@ select is((select pg_temp.st(r, x.c4id) #>> '{draft,saved_by_you}' from st1,
 select results_eq(
   $$select k::text collate "C" from st1, jsonb_object_keys(pg_temp.st(r, pg_temp.bk1()) -> 'live') k order by 1$$,
   $$values ('account_number'::text collate "C"), ('bank_name'), ('beneficiary'), ('branch'), ('branch_code'),
-           ('contact'), ('currency'), ('name'), ('note'), ('published_at'), ('published_by'), ('purpose'),
+           ('contact'), ('currency'), ('logo_asset_id'), ('logo_rights_id'), ('name'), ('note'),
+           ('published_at'), ('published_by'), ('purpose'),
            ('reference'), ('revision_no'), ('saved_at'), ('saved_by'), ('saved_by_you'), ('steps'), ('swift_code'),
            ('verification')$$,
   'a bank revision carries the bank fields only');

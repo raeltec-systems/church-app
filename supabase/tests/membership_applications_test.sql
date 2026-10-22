@@ -6,7 +6,7 @@
 -- phone and name here is SYNTHETIC (fictional range +1 202 555 0141-0149); +999 is an
 -- unassigned ITU country code used only to prove the non-fictional fence.
 begin;
-select plan(97);
+select plan(98);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000024' || lpad(n::text, 2, '0'))::uuid $$;
@@ -151,6 +151,8 @@ select is(pg_temp.submit(1, '{"choice": "not_sure"}') - 'request_id' - 'message'
   'production with q4_personal_data closed: applications are unavailable');
 select is(pg_temp.readj(pg_temp.c(1), 'select api.identity_my_application()') -> 'accepting_applications',
   'false'::jsonb, 'production: my_application says applications are not being accepted');
+select is((select errors from app.identity_application_name(to_jsonb('Preview Applicant'::text), '{}'::jsonb)),
+  '{"full_name": "invalid"}'::jsonb, 'production with q4 closed still refuses a non-SYNTHETIC name');
 
 select app.platform_set_environment('local', 'pgtap 2.4');
 select is(app.cells_seed_synthetic_cells('pgtap 2.4'), 3, 'local: three SYNTHETIC cells are seeded (idempotently)');

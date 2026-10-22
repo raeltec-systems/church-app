@@ -108,6 +108,12 @@ final givingRepositoryProvider = Provider<GivingRepository>(
   (ref) => const UnconfiguredGivingRepository(),
 );
 
+/// Optional Android handoff to the external phone dialler for a starting USSD
+/// code. Unsupported platforms keep the manual instructions visible.
+final givingDiallerLauncherProvider = Provider<GivingDiallerLauncher>(
+  (ref) => const UnavailableGivingDiallerLauncher(),
+);
+
 /// Story 6.13: the public announcement reads (everyone) and the editors'
 /// announcement read.
 final announcementsRepositoryProvider = Provider<AnnouncementsRepository>(

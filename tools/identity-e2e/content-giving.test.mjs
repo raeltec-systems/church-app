@@ -43,6 +43,8 @@ test('church dates are Lusaka dates (UTC+2)', () => {
 
 test('the public projection keys are compared sorted', () => {
   assert.deepEqual(PUBLIC_KEYS, [...PUBLIC_KEYS].sort());
+  assert.ok(PUBLIC_KEYS.includes('logo'));
+  assert.ok(PUBLIC_KEYS.includes('unsafe'));
   assert.deepEqual(sortedKeys({ name: 1, method_id: 2 }), ['method_id', 'name']);
   assert.deepEqual(sortedKeys(undefined), []);
 });

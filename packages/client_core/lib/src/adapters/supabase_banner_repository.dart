@@ -65,30 +65,98 @@ class SupabaseBannerRepository implements BannerRepository {
   @override
   Future<Uint8List?> fetchPublicImage(PublicBanner banner) async {
     if (!banner.offlineAllowed) return null;
+    return _fetchPublicAsset(
+      banner.image.path,
+      banner.image.mediaType,
+      maxBytes: 5 * 1024 * 1024,
+    );
+  }
+
+  @override
+  Future<Uint8List?> fetchPublicAsset(String path, String mediaType) =>
+      _fetchPublicAsset(path, mediaType, maxBytes: 2 * 1024 * 1024);
+
+  Future<Uint8List?> _fetchPublicAsset(
+    String path,
+    String mediaType, {
+    required int maxBytes,
+  }) async {
+    if (!contentImageTypes.contains(mediaType) ||
+        path.startsWith('/') ||
+        path.contains('..')) {
+      return null;
+    }
+    final abortTrigger = Completer<void>();
+    void abortRequest() {
+      if (!abortTrigger.isCompleted) abortTrigger.complete();
+    }
+
     try {
-      final response = await _http
-          .get(
-            publicFileUrl(banner.image.path),
-            headers: {'apikey': _key, 'accept': banner.image.mediaType},
-          )
-          .timeout(_timeout);
-      final mediaType = response.headers['content-type']
+      final request = http.AbortableRequest(
+        'GET',
+        publicFileUrl(path),
+        abortTrigger: abortTrigger.future,
+      )..headers.addAll({'apikey': _key, 'accept': mediaType});
+      final responseFuture = _http.send(request);
+      late final http.StreamedResponse response;
+      try {
+        response = await responseFuture.timeout(_timeout);
+      } on TimeoutException {
+        abortRequest();
+        try {
+          await responseFuture;
+        } catch (_) {}
+        return null;
+      }
+      final receivedMediaType = response.headers['content-type']
           ?.split(';')
           .first
           .trim()
           .toLowerCase();
+      Future<void> abandonResponse() async {
+        try {
+          await response.stream.listen((_) {}).cancel();
+        } catch (_) {}
+        abortRequest();
+      }
+
       if (response.statusCode != 200 ||
-          mediaType != banner.image.mediaType ||
-          response.bodyBytes.isEmpty ||
-          response.bodyBytes.length > 5 * 1024 * 1024) {
+          receivedMediaType != mediaType ||
+          (response.contentLength != null &&
+              response.contentLength! > maxBytes)) {
+        await abandonResponse();
         return null;
       }
-      return response.bodyBytes;
-    } on TimeoutException {
-      return null;
+      Future<Uint8List?> readBoundedBody() async {
+        final bytes = BytesBuilder(copy: false);
+        var length = 0;
+        await for (final chunk in response.stream) {
+          if (chunk.length > maxBytes - length) {
+            abortRequest();
+            return null;
+          }
+          bytes.add(chunk);
+          length += chunk.length;
+        }
+        final result = bytes.takeBytes();
+        return result.isEmpty ? null : result;
+      }
+
+      final bodyFuture = readBoundedBody();
+      try {
+        return await bodyFuture.timeout(_timeout);
+      } on TimeoutException {
+        abortRequest();
+        try {
+          await bodyFuture;
+        } catch (_) {}
+        return null;
+      }
     } on http.ClientException {
+      abortRequest();
       return null;
     } catch (_) {
+      abortRequest();
       return null;
     }
   }

@@ -65,6 +65,8 @@ abstract class PublicReadController<T> extends Notifier<PublicReadState<T>> {
 
   Future<PublicContentSnapshot<T>?> readOfflineSnapshot() async => null;
 
+  Future<void> onFreshRead(T value) async {}
+
   @override
   PublicReadState<T> build() {
     ref.watch(accountGenerationProvider);
@@ -95,6 +97,12 @@ abstract class PublicReadController<T> extends Notifier<PublicReadState<T>> {
     final r = await fetch();
     if (!ref.mounted || epoch != _epoch) return;
     if (r is AccessReadOk<T>) {
+      try {
+        await onFreshRead(r.value);
+      } catch (_) {
+        // A cache maintenance failure cannot replace a successful server read.
+      }
+      if (!ref.mounted || epoch != _epoch) return;
       final savedAt = supportsOfflineSnapshot
           ? await saveOfflineSnapshot(r.value)
           : null;

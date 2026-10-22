@@ -4,6 +4,7 @@
 // with the browser's declared type, and every answer maps to a typed
 // outcome (refusals keep the server's field errors; no answer is
 // unreachable, never success).
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -105,6 +106,80 @@ http.Response _json(Object body, int status) =>
     http.Response(jsonEncode(body), status);
 
 void main() {
+  test(
+    'a rejected public asset cancels the underlying response stream',
+    () async {
+      final client = SupabaseClient('http://localhost:54321', 'test-key');
+      addTearDown(client.dispose);
+      var responseCancelled = false;
+      final responseController = StreamController<List<int>>(
+        onCancel: () => responseCancelled = true,
+      );
+      final httpClient = MockClient.streaming((request, _) async {
+        expect(request, isA<http.AbortableRequest>());
+        return http.StreamedResponse(
+          responseController.stream,
+          200,
+          contentLength: 3 * 1024 * 1024,
+          headers: {
+            'content-type': 'image/png',
+            'content-length': '${3 * 1024 * 1024}',
+          },
+        );
+      });
+      addTearDown(httpClient.close);
+      final repo = SupabaseBannerRepository(
+        client,
+        supabaseUrl: 'http://localhost:54321',
+        publishableKey: 'test-key',
+        httpClient: httpClient,
+      );
+
+      expect(
+        await repo.fetchPublicAsset('providers/logo.png', 'image/png'),
+        isNull,
+      );
+      expect(responseCancelled, isTrue);
+    },
+  );
+
+  test(
+    'a timed-out public asset aborts the underlying response stream',
+    () async {
+      final client = SupabaseClient('http://localhost:54321', 'test-key');
+      addTearDown(client.dispose);
+      final responseController = StreamController<List<int>>();
+      final httpClient = MockClient.streaming((request, _) async {
+        expect(request, isA<http.AbortableRequest>());
+        final abort = (request as http.AbortableRequest).abortTrigger!;
+        abort.then((_) {
+          if (!responseController.isClosed) {
+            unawaited(responseController.close());
+          }
+        });
+        return http.StreamedResponse(
+          responseController.stream,
+          200,
+          headers: {'content-type': 'image/png'},
+        );
+      });
+      addTearDown(httpClient.close);
+      final repo = SupabaseBannerRepository(
+        client,
+        supabaseUrl: 'http://localhost:54321',
+        publishableKey: 'test-key',
+        httpClient: httpClient,
+        timeout: const Duration(milliseconds: 25),
+      );
+
+      expect(
+        await repo.fetchPublicAsset('providers/logo.png', 'image/png'),
+        isNull,
+      );
+      expect(responseController.isClosed, isTrue);
+    },
+  );
+
   test(
     'an upload sends the bytes with the session and the declared type',
     () async {

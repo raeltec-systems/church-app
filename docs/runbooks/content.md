@@ -149,6 +149,31 @@ The E2E uses fictional numbers +44 7700 900510-900518, checks a just-granted Adm
 5. As A, Edit the bank method's account number and Save draft: Publish is refused until B verifies; meanwhile the phone still shows the old number. (If B also saves the draft, neither can verify it: Discard changes and let A enter it again.) After B verifies and A publishes, the phone shows the new one.
 6. As a Media member, a Pastor and a plain member: no **Giving** entry, and `/content/giving` says giving methods are managed by Admins.
 
+## Story 6.5: dialler handoff, offline giving instructions and unsafe warnings
+
+Migrations: `supabase/migrations/20261022153240_content_giving_handoff_offline_unsafe.sql` and `supabase/migrations/20261022154622_content_giving_logo_clear.sql` (applied to staging project `tmurpotfluignacfueki`). Migration history was checked before each apply and the required parent Identity migrations and Content prerequisites were present. No SAMPLE giving methods were published. pgTAP: `supabase/tests/content_giving_test.sql` and `content_banners_test.sql`. E2E: `tools/identity-e2e/content-giving.mjs` (offline contract tests `content-giving.test.mjs`). Client checks: `packages/client_core/test/content/content_giving_test.dart`, `packages/client_core/test/content/public_content_cache_test.dart` and `apps/mobile/test/offline/public_content_cache_adapter_test.dart`.
+
+- **Unsafe warning.** An Admin uses `content.set_giving_method_unsafe` with `{method_id, unsafe}`. The method-level value is audited as `unsafe_flagged` or `unsafe_cleared`, appears in anonymous list/detail projections, and changes without a notification. It does not change or re-verify the published destination revision. Give displays a prominent warning while the current public snapshot says `unsafe: true`.
+- **Offline instructions.** Mobile stores only the last successful anonymous public giving list. A failed request can show a matching cached method with its church verification date and “Offline · saved at <time>”; without a saved list, it remains unavailable. A failed refresh preserves the last good snapshot with an offline/stale label. A successful list response replaces it and evicts methods no longer published.
+- **Logo.** Provider logos use the existing Content asset and rights path, purpose `giving_logo`, with a 2 MiB limit. Online public projections omit a logo unless its rights clear display. Mobile stores logo bytes only when the projection also clears offline use; image or rights failures leave the giving instructions intact. Logos are keyed by method, publication revision and rights revision.
+- **Dialler.** Android can open an external `tel:` intent for a valid starting USSD code. Returning resumes the same detail. If opening fails, the code remains copyable and manual steps remain visible. iOS and unsupported targets retain copy/manual guidance. The app does not report a successful payment.
+
+### Local runs
+
+```bash
+npm run db:test -- --local supabase/tests/content_giving_test.sql supabase/tests/content_banners_test.sql
+node --test tools/identity-e2e/content-giving.test.mjs
+flutter test test/content/content_giving_test.dart test/content/public_content_cache_test.dart
+flutter test test/offline/public_content_cache_adapter_test.dart
+flutter analyze
+```
+
+Run the client-core Flutter commands from `packages/client_core` and the adapter command from `apps/mobile`. The API E2E (`node tools/identity-e2e/content-giving.mjs`) requires the local phone-auth switch and a reset local database. Before applying the migration to staging, list migrations and confirm the required Identity versions `20261022141846` and `20261022142816`, plus Content prerequisites through `20261022123202`, are present.
+
+### Owner manual check on staging
+
+Use an Android staging-configured emulator and an already-published SAMPLE mobile-money method. Do not use a real destination, publish another SAMPLE method, or change production gates. Tap **Open dialler**, return without confirming a payment, and verify the same instructions remain and the app makes no success claim. Copy the code and confirm its manual steps remain available. Load the Give list while online, enable airplane mode, reopen a method and confirm its verification date, offline timestamp and unsafe warning (when flagged) remain visible. Have an Admin flag or clear the SAMPLE method, refresh successfully on the phone, and confirm the warning follows the server. Hide the SAMPLE method, refresh successfully, then confirm it cannot return from cache; also verify that a failed refresh retains a stale last-good snapshot. Republish it after the check to restore staging state. Check a display-only logo appears online but its bytes are not kept offline. Do not create payment records or notifications.
+
 ## Story 6.13: pinned announcements with an optional generic notice
 
 Migration: `supabase/migrations/20261022011557_content_announcements.sql` (the version staging recorded). pgTAP: `supabase/tests/content_announcements_test.sql` (137). E2E: `tools/identity-e2e/content-announcements.mjs` (offline tests `content-announcements.test.mjs`). Plan: `_bmad-output/initiative-church-app/epic-public-content-and-giving/story-publish-pinned-announcements-with-an-optional-generic-push-plan.md`. Evidence: `evidence-6.13/`.

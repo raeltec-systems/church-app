@@ -22,6 +22,10 @@ broad area and meeting venue to get useful feedback. Automated fixtures continue
 the `q4_personal_data` production gate. A sign-up label or broad area must still not contain a home
 address or phone number.
 
+The owner further clarified that interactive membership tests on staging may use the member's real
+name, so church members can give realistic feedback. Automated fixtures continue to use fabricated
+`SYNTHETIC` names, and production membership names remain behind the `q4_personal_data` gate.
+
 ## Production setup (2026-10-13)
 
 - Production Supabase project created by the parent session on the owner's instruction:

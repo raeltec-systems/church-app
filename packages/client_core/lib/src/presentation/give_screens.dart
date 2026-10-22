@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import '../application/content_controllers.dart' show PublicReadState;
 import '../application/giving_controllers.dart';
+import '../application/providers.dart'
+    show bannerRepositoryProvider, givingDiallerLauncherProvider;
 import '../domain/access_grants.dart';
 import '../domain/content_giving.dart';
 import 'church_widgets.dart';
@@ -41,6 +43,18 @@ Widget? _staleNotice<T>(PublicReadState<T> s, {required String key}) {
   final failed = s.refreshFailed;
   final at = s.asOf;
   if (failed == null || at == null) return null;
+  if (s.offlineSnapshot) {
+    return RequestStateBanner(
+      key: Key(key),
+      tone: StatusTone.warning,
+      icon: Icons.cloud_off_outlined,
+      title: 'Offline · saved ${_clock(at)}',
+      message:
+          'Showing the last saved giving instructions. Check the '
+          'church if you are unsure; the app does not know whether a gift '
+          'was made.',
+    );
+  }
   return RequestStateBanner(
     key: Key(key),
     tone: StatusTone.warning,
@@ -316,12 +330,44 @@ class _GiveMethodScreenState extends ConsumerState<GiveMethodScreen> {
   /// so a refresh that brings a new account number never shows "Copied" for
   /// a value that was not copied.
   _Copied? _copied;
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _reload);
+  }
+
+  void _reload() {
+    final provider = publicGivingMethodProvider(widget.methodId);
+    if (mounted && !ref.read(provider).loading) {
+      ref.read(provider.notifier).reload();
+    }
+  }
 
   Future<void> _copy(_Copied copied, String label) async {
     await Clipboard.setData(ClipboardData(text: copied.value));
     if (!mounted) return;
     setState(() => _copied = copied);
     announce(context, '$label copied');
+  }
+
+  Future<void> _openDialler(String code) async {
+    final opened = await ref.read(givingDiallerLauncherProvider).open(code);
+    if (!mounted || opened) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Could not open the dialler. Copy the starting code and follow the steps below.',
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
   }
 
   @override
@@ -368,7 +414,15 @@ class _GiveMethodScreenState extends ConsumerState<GiveMethodScreen> {
             ),
           );
         } else {
-          children.addAll(_methodBody(context, c, method, sample: sample));
+          children.addAll(
+            _methodBody(
+              context,
+              c,
+              method,
+              sample: sample,
+              offline: s.offlineSnapshot,
+            ),
+          );
         }
       case final AccessRead<PublicGivingMethodRead> problem:
         children.add(
@@ -420,6 +474,7 @@ class _GiveMethodScreenState extends ConsumerState<GiveMethodScreen> {
     ChurchColors c,
     PublicGivingMethod m, {
     required bool sample,
+    required bool offline,
   }) {
     final rows = <({String key, String label, String value})>[
       for (final d in m.details)
@@ -442,6 +497,35 @@ class _GiveMethodScreenState extends ConsumerState<GiveMethodScreen> {
         const SizedBox(height: 4),
         Text(sub, key: const Key('give-method-subline'), style: muted),
       ],
+      if (m.logo case final logo?
+          when !offline || logo.offlineBytes != null) ...[
+        const SizedBox(height: 10),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: logo.offlineBytes != null
+              ? Image.memory(
+                  logo.offlineBytes!,
+                  key: const Key('give-provider-logo'),
+                  width: 72,
+                  height: 72,
+                  fit: BoxFit.contain,
+                  semanticLabel: '${m.name} provider logo',
+                )
+              : Image.network(
+                  ref
+                      .read(bannerRepositoryProvider)
+                      .publicFileUrl(logo.path)
+                      .toString(),
+                  key: const Key('give-provider-logo'),
+                  width: 72,
+                  height: 72,
+                  fit: BoxFit.contain,
+                  semanticLabel: '${m.name} provider logo',
+                  errorBuilder: (context, error, stackTrace) =>
+                      const SizedBox.shrink(),
+                ),
+        ),
+      ],
       if (sample) ...[
         const SizedBox(height: 14),
         Container(
@@ -458,6 +542,23 @@ class _GiveMethodScreenState extends ConsumerState<GiveMethodScreen> {
               color: c.amberFg,
               fontWeight: FontWeight.w500,
             ),
+          ),
+        ),
+      ],
+      if (m.unsafe) ...[
+        const SizedBox(height: 14),
+        Container(
+          key: const Key('give-unsafe-warning'),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: c.amberBg,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            'The church marked this method as potentially unsafe. Check that '
+            'the provider and destination match these instructions. Stop if '
+            'anything looks different.',
+            style: ChurchType.secondary.copyWith(color: c.amberFg),
           ),
         ),
       ],
@@ -491,6 +592,26 @@ class _GiveMethodScreenState extends ConsumerState<GiveMethodScreen> {
               ],
             ],
           ),
+        ),
+      ],
+      if (m.ussdCode case final code?
+          when ref.read(givingDiallerLauncherProvider).supported) ...[
+        const SizedBox(height: 12),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: FocusRing(
+            child: FilledButton.tonalIcon(
+              key: const Key('give-dialler'),
+              onPressed: () => _openDialler(code),
+              icon: const Icon(Icons.dialpad),
+              label: const Text('Open phone dialler'),
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'The code and steps stay here if the dialler cannot open.',
+          style: muted,
         ),
       ],
       const SizedBox(height: ChurchGeometry.sectionGap),

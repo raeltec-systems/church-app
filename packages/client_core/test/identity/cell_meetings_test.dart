@@ -368,7 +368,10 @@ void main() {
       );
       await settle(tester);
       expect(byKey('cells-notice-invalid'), findsOneWidget);
-      expect(find.textContaining('start with "SYNTHETIC "'), findsOneWidget);
+      expect(
+        find.text('Use a clear venue name of at most 120 characters.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('the first schedule needs a venue before it can be saved', (

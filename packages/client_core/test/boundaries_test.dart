@@ -136,15 +136,17 @@ void main() {
     expect(offenders, isEmpty);
   });
 
-  test('mobile public cache owns only the two list reads', () {
+  test('mobile public cache owns only the allowlisted public list reads', () {
     final source = File(
       '../../apps/mobile/lib/offline/public_content_cache_adapter.dart',
     ).readAsStringSync();
     expect(source, contains('PublicContentCacheKeys.calendar'));
     expect(source, contains('PublicContentCacheKeys.homeBanners'));
+    expect(source, contains('PublicContentCacheKeys.givingMethods'));
     expect(source, isNot(contains('PublicContentCacheKeys.eventDetail')));
     expect(source, isNot(contains('StaffEvents')));
-    expect(source, isNot(contains('GivingMethod')));
+    expect(source, isNot(contains('PublicGivingMethodRead')));
+    expect(source, isNot(contains('StaffGiving')));
   });
 
   test('the Auth session storage adapters hold no domain or app state', () {

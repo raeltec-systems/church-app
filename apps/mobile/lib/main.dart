@@ -3,6 +3,7 @@
 import 'package:church_client_core/church_client_core.dart'
     show
         contactLauncherProvider,
+        givingDiallerLauncherProvider,
         dutyCalendarExportProvider,
         publicContentCacheProvider,
         publicContentReconnectsProvider,
@@ -47,6 +48,9 @@ Future<void> main() async {
         ),
         // Story 4.9: Call and Message open the phone's dialler or messages.
         contactLauncherProvider.overrideWithValue(const UrlContactLauncher()),
+        givingDiallerLauncherProvider.overrideWithValue(
+          const UrlGivingDiallerLauncher(),
+        ),
         publicContentCacheProvider.overrideWithValue(
           PublicContentCacheAdapter(),
         ),

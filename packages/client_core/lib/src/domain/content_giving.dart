@@ -14,10 +14,14 @@
 /// processes or records a gift. Free of widgets and SDKs.
 library;
 
+import 'dart:typed_data';
+
 import 'access_grants.dart';
 import 'church_time.dart';
 import 'content_events.dart' show ContentCommands, ContentState;
 import 'wire_json.dart';
+
+const _givingLogoMediaTypes = {'image/png', 'image/jpeg', 'image/webp'};
 
 /// The most steps a method carries.
 const givingMaxSteps = 12;
@@ -215,6 +219,8 @@ class PublicGivingMethod {
     required this.verifiedOn,
     required this.publicationRevision,
     required this.publishedAt,
+    this.unsafe = false,
+    this.logo,
   });
 
   /// Maps the wire object; throws [FormatException] on any other shape.
@@ -241,6 +247,8 @@ class PublicGivingMethod {
       verifiedOn: _wireDate(m, 'verified_on'),
       publicationRevision: wireRevision(m, 'publication_revision'),
       publishedAt: wireInstant(m, 'published_at'),
+      unsafe: wireOpt<bool>(m, 'unsafe') ?? false,
+      logo: m['logo'] == null ? null : PublicGivingLogo.fromJson(m['logo']),
     );
   }
 
@@ -266,6 +274,54 @@ class PublicGivingMethod {
   final int publicationRevision;
   final DateTime publishedAt;
 
+  /// Admin-marked unsafe method. It is a warning only and never claims a
+  /// payment was made.
+  final bool unsafe;
+
+  /// Optional provider mark. Its bytes are supplied only by the mobile cache.
+  final PublicGivingLogo? logo;
+
+  Map<String, Object?> toCacheJson() => {
+    'method_id': methodId,
+    'method_type': methodType.wire,
+    'name': name,
+    'purpose': purpose,
+    'currency': currency,
+    'details': [
+      for (final d in details) {'key': d.key, 'value': d.value},
+    ],
+    'ussd_code': ussdCode,
+    'steps': steps,
+    'note': note,
+    'contact': contact,
+    'verified_on':
+        '${verifiedOn.year.toString().padLeft(4, '0')}-'
+        '${verifiedOn.month.toString().padLeft(2, '0')}-'
+        '${verifiedOn.day.toString().padLeft(2, '0')}',
+    'publication_revision': publicationRevision,
+    'published_at': publishedAt.toUtc().toIso8601String(),
+    'unsafe': unsafe,
+    'logo': logo?.toCacheJson(),
+  };
+
+  PublicGivingMethod withLogo(PublicGivingLogo? value) => PublicGivingMethod(
+    methodId: methodId,
+    methodType: methodType,
+    name: name,
+    purpose: purpose,
+    currency: currency,
+    details: details,
+    ussdCode: ussdCode,
+    steps: steps,
+    note: note,
+    contact: contact,
+    verifiedOn: verifiedOn,
+    publicationRevision: publicationRevision,
+    publishedAt: publishedAt,
+    unsafe: unsafe,
+    logo: value,
+  );
+
   /// "Tithes & Offerings · ZMW".
   String get subline => givingSubline(purpose, currency);
 
@@ -276,6 +332,74 @@ class PublicGivingMethod {
     }
     return null;
   }
+}
+
+/// Public logo metadata and optional rights-cleared local bytes.
+class PublicGivingLogo {
+  const PublicGivingLogo({
+    required this.path,
+    required this.mediaType,
+    required this.width,
+    required this.height,
+    required this.rightsRevision,
+    required this.offlineAllowed,
+    this.offlineBytes,
+  });
+
+  factory PublicGivingLogo.fromJson(Object? json) {
+    final m = wireMap(json, 'giving logo');
+    final type = wireReq<String>(m, 'media_type');
+    if (!_givingLogoMediaTypes.contains(type)) {
+      throw const FormatException('unexpected giving logo media_type');
+    }
+    final path = _text(m, 'path');
+    if (path.startsWith('/') || path.contains('..')) {
+      throw const FormatException('unexpected giving logo path');
+    }
+    final width = wireReq<int>(m, 'width');
+    final height = wireReq<int>(m, 'height');
+    final revision = wireReq<int>(m, 'rights_revision');
+    if (width < 1 || height < 1 || revision < 1) {
+      throw const FormatException(
+        'unexpected giving logo dimensions or rights',
+      );
+    }
+    return PublicGivingLogo(
+      path: path,
+      mediaType: type,
+      width: width,
+      height: height,
+      rightsRevision: revision,
+      offlineAllowed: wireReq<bool>(m, 'offline_allowed'),
+    );
+  }
+
+  final String path;
+  final String mediaType;
+  final int width;
+  final int height;
+  final int rightsRevision;
+  final bool offlineAllowed;
+  final Uint8List? offlineBytes;
+
+  Map<String, Object?> toCacheJson() => {
+    'path': path,
+    'media_type': mediaType,
+    'width': width,
+    'height': height,
+    'rights_revision': rightsRevision,
+    'offline_allowed': offlineAllowed,
+  };
+
+  PublicGivingLogo withOfflineBytes(Uint8List bytes) => PublicGivingLogo(
+    path: path,
+    mediaType: mediaType,
+    width: width,
+    height: height,
+    rightsRevision: rightsRevision,
+    offlineAllowed: offlineAllowed,
+    offlineBytes: bytes,
+  );
 }
 
 /// `api.content_public_giving_methods`: the published methods in the
@@ -448,6 +572,8 @@ class StaffGivingRevision {
     required this.verification,
     this.publishedAt,
     this.publishedBy,
+    this.logoAssetId,
+    this.logoRightsId,
   });
 
   factory StaffGivingRevision.fromJson(Object? json, GivingMethodType type) {
@@ -462,6 +588,8 @@ class StaffGivingRevision {
       publishedAt: wireOptInstant(m, 'published_at'),
       publishedBy: _optText(m, 'published_by'),
       verification: v == null ? null : GivingVerification.fromJson(v),
+      logoAssetId: _optText(m, 'logo_asset_id'),
+      logoRightsId: _optText(m, 'logo_rights_id'),
     );
   }
 
@@ -477,6 +605,8 @@ class StaffGivingRevision {
   final bool savedByYou;
   final DateTime? publishedAt;
   final String? publishedBy;
+  final String? logoAssetId;
+  final String? logoRightsId;
 
   /// Null until an Admin who saved none of this revision verifies it; any
   /// save clears it.
@@ -517,6 +647,7 @@ class StaffGivingMethod {
     this.publishedBy,
     this.withdrawnAt,
     this.archivedAt,
+    this.unsafe = false,
   });
 
   factory StaffGivingMethod.fromJson(Object? json) {
@@ -556,6 +687,7 @@ class StaffGivingMethod {
       archivedAt: wireOptInstant(m, 'archived_at'),
       live: live,
       draft: draft,
+      unsafe: wireOpt<bool>(m, 'unsafe') ?? false,
     );
   }
 
@@ -579,6 +711,7 @@ class StaffGivingMethod {
   final DateTime? archivedAt;
   final StaffGivingRevision? live;
   final StaffGivingRevision? draft;
+  final bool unsafe;
 
   /// What an edit starts from: the draft, otherwise the live revision.
   GivingFields get current => (draft ?? live)!.fields;
@@ -686,6 +819,9 @@ class GivingMethodInput {
     this.branchCode = '',
     this.swiftCode = '',
     this.reference = '',
+    this.logoAssetId,
+    this.logoRightsId,
+    this.includeLogo = false,
   });
 
   final GivingMethodType methodType;
@@ -705,6 +841,9 @@ class GivingMethodInput {
   final String branchCode;
   final String swiftCode;
   final String reference;
+  final String? logoAssetId;
+  final String? logoRightsId;
+  final bool includeLogo;
 
   static String? _opt(String v) => v.trim().isEmpty ? null : v.trim();
 
@@ -722,6 +861,10 @@ class GivingMethodInput {
     ],
     'note': _opt(note),
     'contact': contact.trim(),
+    if (methodId != null && includeLogo) ...{
+      'logo_asset_id': logoAssetId,
+      'logo_rights_id': logoRightsId,
+    },
     if (methodType == GivingMethodType.mobileMoney) ...{
       'beneficiary': beneficiary.trim(),
       'identifier_kind': identifierKind.wire,
@@ -750,6 +893,7 @@ abstract final class GivingCommands {
   static const hide = 'content.hide_giving_method';
   static const archive = 'content.archive_giving_method';
   static const move = 'content.move_giving_method';
+  static const setUnsafe = 'content.set_giving_method_unsafe';
 
   /// Drops the open draft of a method that has a live revision.
   static const discard = 'content.discard_giving_draft';
@@ -767,6 +911,24 @@ abstract interface class GivingRepository {
 
   /// Admins: every method with its revisions and verification.
   Future<AccessRead<StaffGivingMethods>> fetchStaffGivingMethods();
+}
+
+/// Optional external dialler handoff. The caller always keeps the displayed
+/// instructions available and never infers that a gift succeeded.
+abstract interface class GivingDiallerLauncher {
+  bool get supported;
+
+  Future<bool> open(String ussdCode);
+}
+
+class UnavailableGivingDiallerLauncher implements GivingDiallerLauncher {
+  const UnavailableGivingDiallerLauncher();
+
+  @override
+  bool get supported => false;
+
+  @override
+  Future<bool> open(String ussdCode) async => false;
 }
 
 class UnconfiguredGivingRepository implements GivingRepository {

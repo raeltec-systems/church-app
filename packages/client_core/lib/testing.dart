@@ -21,6 +21,7 @@ import 'src/domain/commands.dart';
 import 'src/domain/content_announcements.dart';
 import 'src/domain/content_banners.dart';
 import 'src/domain/content_events.dart';
+import 'src/domain/content_sermons.dart';
 import 'src/domain/content_bible.dart';
 import 'src/domain/public_content_cache.dart';
 import 'src/domain/content_giving.dart';
@@ -634,6 +635,95 @@ class FakeBible implements BibleRepository {
   }
 }
 
+Map<String, Object?> publicSermonSeriesData({
+  String id = '91919191-9191-4191-8191-919191919191',
+  String title = 'SYNTHETIC Living hope',
+  bool poster = false,
+  bool posterOffline = true,
+  int rightsRevision = 1,
+}) => {
+  'series_id': id,
+  'title': title,
+  'description': 'SYNTHETIC Teaching for the church.',
+  'alt_text': 'SYNTHETIC blue sky poster',
+  'poster': poster
+      ? {
+          'path': '$id/1/poster.png',
+          'media_type': 'image/png',
+          'width': 960,
+          'height': 540,
+          'rights_revision': rightsRevision,
+          'offline_allowed': posterOffline,
+        }
+      : null,
+  'publication_revision': 1,
+  'published_at': '2099-09-01T08:00:00Z',
+  'offline_allowed': true,
+};
+
+Map<String, Object?> publicSermonData({
+  String id = '92929292-9292-4292-8292-929292929292',
+  String title = 'SYNTHETIC Hope for today',
+  String speaker = 'SYNTHETIC Speaker One',
+  Object? series,
+  String? videoId = 'abcdefghijk',
+  String notes = '# SYNTHETIC Notes\n\nKeep **hope**.\n\n- Read the scripture.',
+  int revision = 1,
+}) => {
+  'sermon_id': id,
+  'title': title,
+  'speaker': speaker,
+  'sermon_date': '2099-09-01',
+  'scripture_reference': 'John 1:1',
+  'notes': notes,
+  'series': series,
+  'youtube_video_id': videoId,
+  'rights_revision': videoId == null ? null : 1,
+  'publication_revision': revision,
+  'published_at': '2099-09-01T08:00:00Z',
+  'offline_allowed': true,
+};
+
+class FakeSermons implements SermonsRepository {
+  AccessRead<PublicSermons> catalog = const AccessReadOk(
+    PublicSermons(sermons: [], series: []),
+  );
+  AccessRead<StaffSermons> staff = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  AccessRead<StaffSermonSeriesCatalog> staffSeries = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  final details = <String, AccessRead<PublicSermonRead>>{};
+  int catalogCalls = 0, staffCalls = 0, seriesCalls = 0;
+  final detailCalls = <String>[];
+  @override
+  Future<AccessRead<PublicSermons>> fetchPublicSermons() async {
+    catalogCalls++;
+    return catalog;
+  }
+
+  @override
+  Future<AccessRead<PublicSermonRead>> fetchPublicSermon(
+    String sermonId,
+  ) async {
+    detailCalls.add(sermonId);
+    return details[sermonId] ?? const AccessReadOk(PublicSermonRead(null));
+  }
+
+  @override
+  Future<AccessRead<StaffSermons>> fetchStaffSermons() async {
+    staffCalls++;
+    return staff;
+  }
+
+  @override
+  Future<AccessRead<StaffSermonSeriesCatalog>> fetchStaffSeries() async {
+    seriesCalls++;
+    return staffSeries;
+  }
+}
+
 class FakeBibleTranslationPackageSource
     implements BibleTranslationPackageSource {
   String worldEnglishBibleVpl = '';
@@ -1168,8 +1258,11 @@ class FakeBanners implements BannerRepository {
       publicImageBytes;
 
   @override
-  Future<Uint8List?> fetchPublicAsset(String path, String mediaType) async =>
-      publicImageBytes;
+  Future<Uint8List?> fetchPublicAsset(
+    String path,
+    String mediaType, {
+    int maxBytes = 2 * 1024 * 1024,
+  }) async => publicImageBytes;
 
   @override
   Future<ImageUploadOutcome> uploadImage(
@@ -1199,11 +1292,18 @@ class FakePublicContentCache implements PublicContentCache {
   PublicContentSnapshot<PublicBanners>? banners;
   PublicContentSnapshot<PublicGivingMethods>? givingMethods;
   PublicContentSnapshot<PublicBibleChapter>? bibleChapter;
+  PublicContentSnapshot<PublicSermons>? sermons;
   final reads = <String>[];
   final writes = <(String, Object)>[];
   final imageFetches = <String>[];
   final removedGivingMethods = <String>[];
   final reconciledGivingMethods = <PublicGivingMethod>[];
+
+  @override
+  Future<PublicContentSnapshot<PublicSermons>?> readSermons() async {
+    reads.add(PublicContentCacheKeys.sermons);
+    return sermons;
+  }
 
   @override
   Future<PublicContentSnapshot<PublicEvents>?> readEvents() async {
@@ -1311,9 +1411,54 @@ class FakePublicContentCache implements PublicContentCache {
     Object projection, {
     Future<Uint8List?> Function(PublicBanner banner)? loadBannerImage,
     Future<Uint8List?> Function(PublicGivingLogo logo)? loadGivingLogo,
+    Future<Uint8List?> Function(SermonPoster poster)? loadSermonPoster,
   }) async {
     writes.add((readKey, projection));
     if (!available) return const PublicContentCacheUnavailable();
+    if (readKey == PublicContentCacheKeys.sermons &&
+        projection is PublicSermons) {
+      final source = PublicSermons.fromJson(projection.toCacheJson());
+      if (source.sermons.any((s) => !s.offlineAllowed) ||
+          source.series.any((s) => !s.offlineAllowed)) {
+        return const PublicContentCacheRefused(
+          PublicContentCacheRefusal.offlineRightsNotCleared,
+        );
+      }
+      final cached = <String, PublicSermonSeries>{};
+      for (final series in [
+        ...source.series,
+        ...source.sermons.map((s) => s.series).whereType<PublicSermonSeries>(),
+      ]) {
+        if (!series.offlineAllowed) continue;
+        if (cached.containsKey(series.seriesId)) continue;
+        final poster = series.poster;
+        final bytes =
+            poster != null && poster.offlineAllowed && loadSermonPoster != null
+            ? await loadSermonPoster(poster)
+            : null;
+        cached[series.seriesId] = series.withPoster(
+          bytes == null ? null : poster!.withBytes(bytes),
+        );
+      }
+      sermons = PublicContentSnapshot(
+        value: PublicSermons(
+          sermons: source.sermons
+              .map(
+                (s) => s.withSeries(
+                  s.series == null ? null : cached[s.series!.seriesId],
+                ),
+              )
+              .toList(),
+          series: source.series.map((s) => cached[s.seriesId]!).toList(),
+          truncated: source.truncated,
+        ),
+        savedAt: savedAt,
+      );
+      return PublicContentCacheSaved(
+        savedAt: savedAt,
+        savedRows: source.sermons.length,
+      );
+    }
     if (readKey == PublicContentCacheKeys.calendar &&
         projection is PublicEvents) {
       if (projection.events.any((event) => !event.offlineAllowed)) {
@@ -2893,6 +3038,7 @@ class ClientTestHarness {
   final cells = FakeCells();
   final content = FakeContent();
   final bible = FakeBible();
+  final sermons = FakeSermons();
   final biblePackageSource = FakeBibleTranslationPackageSource();
   final giving = FakeGiving();
   GivingDiallerLauncher? givingDiallerLauncher;
@@ -2941,6 +3087,7 @@ class ClientTestHarness {
       cellsRepositoryProvider.overrideWithValue(cells),
       contentRepositoryProvider.overrideWithValue(content),
       bibleRepositoryProvider.overrideWithValue(bible),
+      sermonsRepositoryProvider.overrideWithValue(sermons),
       bibleTranslationPackageSourceProvider.overrideWithValue(
         biblePackageSource,
       ),

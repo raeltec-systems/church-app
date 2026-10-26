@@ -83,6 +83,49 @@ void main() {
   setUp(FocusVisibility.instance.reset);
 
   testWidgets(
+    'story 6.9: guest opens sermons from the fifth-tab shell and detail has its own back bar',
+    (tester) async {
+      const id = '92929292-9292-4292-8292-929292929292';
+      await pumpMobile(
+        tester,
+        location: ClientPaths.home,
+        setUp: (h) {
+          h.session.switchTo(null);
+          h.sermons.catalog = AccessReadOk(
+            PublicSermons.fromJson({
+              'sermons': [publicSermonData()],
+              'series': [],
+              'truncated': false,
+            }),
+          );
+          h.sermons.details[id] = AccessReadOk(
+            PublicSermonRead.fromJson({'sermon': publicSermonData()}),
+          );
+        },
+      );
+      expect(mobileDestinations.map((d) => d.label), [
+        'Home',
+        'Bible & Hymns',
+        'Sermons',
+        'Give',
+        'Calendar',
+      ]);
+      await tapKey(tester, 'nav-/sermons');
+      await tester.pumpAndSettle();
+      expect(find.byType(SermonsScreen), findsOneWidget);
+      expect(find.text('Sign in'), findsOneWidget);
+      await tapKey(tester, 'sermon-row-$id');
+      await tester.pumpAndSettle();
+      expect(find.byType(SermonDetailScreen), findsOneWidget);
+      expect(find.byType(BackButton), findsOneWidget);
+      expect(find.text('Sign in'), findsNothing);
+      expect(find.text('John 1:1'), findsOneWidget);
+      expect(find.byKey(const Key('sermon-video-unavailable')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
     'story 3.8: the staff reminder-health route does not exist on mobile',
     (tester) async {
       await pumpMobile(tester, location: ClientPaths.notificationHealth);
@@ -291,7 +334,13 @@ void main() {
     // bar's way in (Bible & Hymns and Give between Home and Calendar).
     final list = tester.getSemantics(find.bySemanticsLabel('App sections'));
     expect(list.role, SemanticsRole.tabBar);
-    for (final label in ['Home', 'Bible & Hymns', 'Give', 'Calendar']) {
+    for (final label in [
+      'Home',
+      'Bible & Hymns',
+      'Sermons',
+      'Give',
+      'Calendar',
+    ]) {
       final tab = tester.getSemantics(find.bySemanticsLabel(label).last);
       expect(tab.role, SemanticsRole.tab, reason: label);
     }
@@ -517,7 +566,7 @@ void main() {
     );
     // The tabs, left to right: Home, Bible & Hymns, Give, Calendar.
     final xs = [
-      for (final path in ['/home', '/bible', '/give', '/calendar'])
+      for (final path in ['/home', '/bible', '/sermons', '/give', '/calendar'])
         tester.getCenter(find.byKey(Key('nav-$path'))).dx,
     ];
     expect(xs, orderedEquals([...xs]..sort()));
@@ -728,7 +777,13 @@ void main() {
     (tester) async {
       final handle = tester.ensureSemantics();
       await pumpMember(tester);
-      for (final label in ['Home', 'Bible & Hymns', 'Give', 'Calendar']) {
+      for (final label in [
+        'Home',
+        'Bible & Hymns',
+        'Sermons',
+        'Give',
+        'Calendar',
+      ]) {
         final tab = tester.getSemantics(find.bySemanticsLabel(label).last);
         expect(tab.role, SemanticsRole.tab, reason: label);
       }
@@ -1465,7 +1520,7 @@ void main() {
     }
     // The page's own controls come first, then Home, Bible & Hymns, Give and Calendar.
     final tabs = seen.whereType<String>().toList();
-    expect(tabs, ['Home', 'Bible & Hymns', 'Give', 'Calendar']);
+    expect(tabs, ['Home', 'Bible & Hymns', 'Sermons', 'Give', 'Calendar']);
     expect(seen.first, isNull);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
@@ -1481,7 +1536,13 @@ void main() {
     testWidgets('2x text, $size $mode: every tab, no overflow', (tester) async {
       await pumpMember(tester, size: size, textScale: 2, themeMode: mode);
       expect(tester.takeException(), isNull);
-      for (final path in ['/calendar', '/give', '/bible', '/home']) {
+      for (final path in [
+        '/calendar',
+        '/give',
+        '/sermons',
+        '/bible',
+        '/home',
+      ]) {
         await tapKey(tester, 'nav-$path');
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: path);

@@ -222,6 +222,17 @@ const staffBibleDestination = (
   icon: Icons.menu_book_outlined,
 );
 
+const staffSermonsDestination = (
+  path: ClientPaths.contentSermons,
+  label: 'Sermons',
+  icon: Icons.mic_none_outlined,
+);
+const staffSermonSeriesDestination = (
+  path: ClientPaths.contentSermonSeries,
+  label: 'Sermon series',
+  icon: Icons.video_library_outlined,
+);
+
 /// Story 6.3: shown while the server's current answer includes Admin: the
 /// church's giving methods, verified by a second Admin before publishing.
 const staffGivingDestination = (
@@ -311,6 +322,8 @@ List<StaffNavGroup> staffNavGroupsFor(
       items: [
         if (editsContent(grants)) staffEventsDestination,
         if (editsContent(grants)) staffBibleDestination,
+        if (editsContent(grants)) staffSermonsDestination,
+        if (editsContent(grants)) staffSermonSeriesDestination,
         if (editsContent(grants)) staffBannersDestination,
         if (editsContent(grants)) staffRightsDestination,
         if (editsContent(grants)) staffAnnouncementsDestination,

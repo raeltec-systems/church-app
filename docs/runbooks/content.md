@@ -431,3 +431,60 @@ All six Bible migrations through `20261026151013_content_bible_review_hardening.
 5. Confirm an ordinary signed-in member cannot use staff Bible actions and that the staff catalog is available to Media, Pastor and Admin. Remove or withdraw staging fixtures after the demonstration where allowed; do not claim a cached chapter was erased from a device.
 
 Do not approve `q5_content_rights` as part of this check. A staging demonstration does not clear production rights; the production catalog starts empty until the owner approves the source and the record clears display use.
+
+## Story 6.9: publish and browse sermons with safe notes
+
+Migration: `20261026153855_content_sermons.sql`. It registers `sermon_series` and `sermon`, their ten lifecycle commands, private revision tables, bounded public/staff reads, the `sermon_series_poster` asset purpose, immutable published revisions and registered attribution erasure. It adds no row deletion, policy approval, notification or second file/cache pipeline. Apply the exact reviewed migration to staging only after listing project `tmurpotfluignacfueki`'s history and confirming prerequisite `20261022012809_content_rights_banners.sql`; match the local filename to the version staging records. Compare every added function's normalized definition hash with a fresh local replay, then require zero boundary violations and unowned objects and verify the signed-out reads. Record the actual staging result in entry 9's evidence; the migration filename alone is not deployment evidence.
+
+### Editorial workflow
+
+On staff web, **Content > Sermons** is available to Media, Pastor and Admin. The server checks current access for every staff read, upload and command. A sermon draft can be incomplete, including one later received from a teaching duty; the staff catalog includes all normal drafts regardless of their creator or source. Save title, speaker, sermon date, scripture, notes, optional series and optional YouTube ID. Publication requires complete teaching metadata and validates any supplied series/video. An edited draft leaves the last published revision live until its replacement is published. A stale revision is refused and reloads the current item. Withdraw hides an item while retaining its history; archive retires it.
+
+Series have a title, description, poster text alternative and optional poster. Save the series draft before choosing its poster; upload and attach the file through the existing `content-assets` route with purpose `sermon_series_poster` and a verified rights record. Publishing, withdrawal and archive use the existing file sync. The shared **Rights** screen controls display and offline uses separately. Church-owned records still need verification and the requested use cleared; production third-party uses also need the owner's Q5 clearance. Never treat the fact that YouTube accepts an ID as distribution permission.
+
+| Command through `api.content_command` | Expected revision | Payload |
+|---|---|---|
+| `content.create_sermon_series` | `null` | `{title, description, alt_text}` |
+| `content.save_sermon_series` | series revision | `{series_id, title, description, alt_text, poster_asset_id, poster_rights_id}`; null poster/rights clears that part of the draft |
+| `content.publish_sermon_series`, `content.withdraw_sermon_series`, `content.archive_sermon_series` | series revision | `{series_id}` |
+| `content.create_sermon` | `null` | `{title, speaker, sermon_date, scripture_reference, notes, series_id, youtube_video_id, video_rights_id}` |
+| `content.save_sermon` | sermon revision | `{sermon_id, ...the complete draft fields}` |
+| `content.publish_sermon`, `content.withdraw_sermon`, `content.archive_sermon` | sermon revision | `{sermon_id}` |
+
+Notes are church-authored restricted Markdown: paragraphs, headings, emphasis and lists, with inline HTTPS links to exact hosts `ebible.org`, `biblegateway.com`, `www.biblegateway.com`, `youtube.com`, `www.youtube.com` and `youtu.be`. HTML, embedded images, reference links, autolinks, unsafe schemes, disguised hosts, user information and unsupported ports are refused on save. The editor keeps the typed input and shows the notes field error. Enter notes as readable text with the formatting help; no JSON entry is needed.
+
+### Public reading, media failures and saved content
+
+`api.content_public_sermons()` is the canonical anonymous catalog `{sermons, series, truncated}`. `api.content_public_sermon(sermon_id)` returns `{sermon}` with null for a private, withdrawn, archived or unknown sermon. The public projection contains the current published teaching metadata, safe notes and public series/poster metadata only; it excludes editor names, identities, draft fields and private provenance. `api.content_staff_sermons()` and `api.content_staff_sermon_series()` are separate protected editor reads. No client role is granted direct access to either revision table.
+
+The fifth mobile tab order is **Home, Bible & Hymns, Sermons, Give, Calendar**. A signed-out visitor can browse Latest, Series or Speaker and search titles. Detail separates the player from scripture and notes. The mobile-only player uses the pinned `youtube_player_iframe` dependency in privacy-enhanced mode without autoplay. A malformed ID is refused by the server; a removed/private/unreachable video is reported by the player, without replacing the teaching page. The server does not poll YouTube. Missing or withdrawn video display clearance removes the playable ID while leaving church-authored notes readable. Audio playback is entry 10 and duty-to-Media draft creation is entry 18.
+
+Withdrawing a series removes its title and poster from the catalog and from every public sermon projection; its still-published sermons remain readable without that series metadata. Run the existing file sync to remove the withdrawn poster's public object. Do not copy private series titles into a replacement public field.
+
+Mobile extends the existing single public cache with the canonical sermon catalog, its publication/rights revisions and saved time. Search/filter results never replace that canonical snapshot. Only eligible public teaching and offline-cleared posters may be saved; no YouTube media or uncleared thumbnails are downloaded. A successful refresh replaces the saved public set and evicts withdrawn rows/files. Failed refreshes remain visibly failed or stale and preserve the prior committed snapshot; an uncached network failure never appears as an empty catalog. Staff reads, private drafts and editor identities have no persistence path. An already saved offline copy cannot be remotely erased.
+
+Account deletion uses Content's registered erase/check parts for both new revision tables. It anonymizes all four saved/published member/account attribution columns as well as the existing shared item attribution; the staff read reports **Former member**. Content and revision rows remain, so no owner `_rows` file is needed.
+
+### Verification and support
+
+Run the full SQL suite on a fresh local reset before the live runner. The runner is guarded to the exact local origin, reserves only the previously unused fictional phones `+44 7700 900651` through `+44 7700 900656`, and uses only SYNTHETIC names, church-authored notes, generated artwork and a fictional video ID. It does not contact YouTube, approve a policy gate or enqueue a notification. Its evidence contains statuses, counts and booleans, not credentials or phone numbers. Published content fixtures remain immutable in the disposable local database; synthetic Auth identities are erased/removed, and a second run requires another reset.
+
+```text
+node --test tools/identity-e2e/content-sermons.test.mjs
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/content-sermons.mjs --evidence _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-6.9/content-sermons-e2e.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The runner starts `supabase functions serve` only if `content-assets` is unavailable and stops only the process it started. Its `finally` restores the local phone harness to off. If cleanup or restoration fails, run the final `off` command before continuing. Pure Node helper tests validate the runner's fixtures and exact projection guards; they do not exercise Flutter persistence or physical playback. The entry's Flutter/controller/cache tests and staging release builds provide their own evidence. A broken-link report is handled by an editor checking the published YouTube ID in a browser, correcting or removing it in a new draft, and publishing the replacement; never hide the notes just because a recording is unavailable.
+
+### Owner manual check on staging
+
+1. Confirm entry 9's recorded staging version and definition hashes, zero module guard counts and signed-out public responses. Use SYNTHETIC content and no notification; do not approve a policy gate or access production.
+2. With Media, Pastor and Admin accounts, save and publish two synthetic series and sermons. Verify an ordinary member and a Pending account cannot open editor reads or run any of the ten commands. Confirm normal drafts created by another editor are visible to Media.
+3. On a signed-out phone, open Sermons, use Latest/Series/Speaker and title search, and open detail through its back bar. Check the poster text alternative, title, speaker/date, scripture and safe notes. Save a revision without publishing; the phone must still show the previous published teaching.
+4. Enter HTML, image Markdown, a reference/autolink and a disguised/unallowlisted link. Saving must show a field error and retain the typed input; none of that input may become public.
+5. On physical Android and iOS devices in the entry 15 pilot, use an owner-cleared playable video, then a private/removed or unreachable one. Verify no autoplay, the unavailable message, readable scripture/notes and correct player disposal when navigating away. API and widget tests do not prove device playback.
+6. Save an eligible catalog, relaunch in airplane mode and verify its saved-time label and local title/series/speaker filtering. Start without a saved catalog to check the honest failure state. Reconnect after withdrawing one sermon; successful refresh must evict it. Confirm an uncleared poster/video is not downloaded.
+7. Withdraw a published series while leaving its sermon published: the phone must keep the teaching and remove that series's title/poster. Withdraw the video's rights: the playable ID must disappear and the notes must stay readable.
+8. Record redacted pilot results and any device-only failures for entry 15. Q5 source/use approval, physical playback and offline checks remain owner responsibilities until actually witnessed; this checklist records no approval or completion by itself.

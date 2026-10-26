@@ -1,0 +1,699 @@
+/// Published sermon teaching and the editors' revisioned catalog (story 6.9).
+library;
+
+import 'dart:typed_data';
+
+import 'access_grants.dart';
+import 'content_banners.dart';
+import 'content_events.dart' show ContentState;
+import 'content_giving.dart' show parseChurchDate;
+import 'wire_json.dart';
+
+Map _object(Object? raw, String name, Set<String> keys) {
+  final m = wireMap(raw, name);
+  if (m.length != keys.length || m.keys.any((k) => !keys.contains(k))) {
+    throw FormatException('unexpected $name fields');
+  }
+  return m;
+}
+
+String _text(Map m, String key) {
+  final text = wireReq<String>(m, key);
+  if (text.trim().isEmpty) throw FormatException('unexpected $key');
+  return text;
+}
+
+const sermonLinkHosts = {
+  'ebible.org',
+  'biblegateway.com',
+  'www.biblegateway.com',
+  'youtube.com',
+  'www.youtube.com',
+  'youtu.be',
+};
+
+/// The editor may paste a normal HTTPS watch, shorts, embed or short link.
+/// Commands always receive just the strict 11-character ID.
+String? normalizeSermonVideoId(String input) {
+  final text = input.trim();
+  final id = RegExp(r'^[A-Za-z0-9_-]{11}$');
+  if (id.hasMatch(text)) return text;
+  if (!RegExp(r'^https://(?:www[.])?(?:youtube[.]com|youtu[.]be)(?:[/#?]|$)')
+      .hasMatch(text)) {
+    return null;
+  }
+  final uri = Uri.tryParse(text);
+  if (uri == null ||
+      uri.scheme != 'https' ||
+      uri.hasPort ||
+      uri.userInfo.isNotEmpty ||
+      uri.authority != uri.host ||
+      !const {
+        'youtube.com',
+        'www.youtube.com',
+        'youtu.be',
+      }.contains(uri.host)) {
+    return null;
+  }
+  final parts = uri.pathSegments;
+  String? candidate;
+  if (uri.host == 'youtu.be' && parts.length == 1) {
+    candidate = parts.single;
+  } else if (uri.host != 'youtu.be') {
+    if (uri.path == '/watch' && uri.queryParametersAll['v']?.length == 1) {
+      candidate = uri.queryParameters['v'];
+    } else if (parts.length == 2 &&
+        const {'shorts', 'embed'}.contains(parts.first)) {
+      candidate = parts.last;
+    }
+  }
+  return candidate != null && id.hasMatch(candidate) ? candidate : null;
+}
+
+/// Exact HTTPS authorities only: no credentials, ports or encoded hosts.
+Uri? safeSermonLink(String value) {
+  if (!RegExp(r'^https://[A-Za-z.]+(?:[/#?][^\s<>\[\]()]*)?$')
+      .hasMatch(value)) {
+    return null;
+  }
+  final uri = Uri.tryParse(value);
+  if (uri == null ||
+      uri.scheme != 'https' ||
+      uri.userInfo.isNotEmpty ||
+      uri.hasPort ||
+      !sermonLinkHosts.contains(uri.host) ||
+      uri.authority != uri.host) {
+    return null;
+  }
+  return uri;
+}
+
+/// Refuse unsupported Markdown instead of relying on a renderer's defaults.
+/// The UI renders only the nodes this validator accepts; it never renders HTML.
+void validateSermonNotes(String value) {
+  if (value.length > 20000 ||
+      RegExp(r'[<>`\\\x00-\x08\x0b\x0c\x0e-\x1f]').hasMatch(value) ||
+      value.contains('![') ||
+      value.contains('~~') ||
+      RegExp(r'^\s*(?:>|\||[-*_]{3,}\s*$)', multiLine: true).hasMatch(value)) {
+    throw const FormatException('unsupported sermon notes');
+  }
+  var remainder = value;
+  final links = RegExp(r'\[([^\[\]\n]+)\]\(([^()\s]+)\)');
+  for (final m in links.allMatches(value)) {
+    if (safeSermonLink(m[2]!) == null) {
+      throw const FormatException('unsafe sermon link');
+    }
+  }
+  remainder = remainder.replaceAll(links, '');
+  if (remainder.contains('[') ||
+      remainder.contains(']') ||
+      RegExp(
+        r'(?:https?://|www\.)',
+        caseSensitive: false,
+      ).hasMatch(remainder) ||
+      RegExp(
+        r'^\s*#{7,}|^\s*\S.*\n\s*(?:===+|---+)\s*$',
+        multiLine: true,
+      ).hasMatch(remainder)) {
+    throw const FormatException('unsupported sermon link form');
+  }
+}
+
+class SermonPoster {
+  const SermonPoster({
+    required this.image,
+    required this.rightsRevision,
+    required this.offlineAllowed,
+    this.offlineBytes,
+  });
+
+  factory SermonPoster.fromJson(Object? raw) {
+    final m = _object(raw, 'sermon poster', const {
+      'path',
+      'media_type',
+      'width',
+      'height',
+      'rights_revision',
+      'offline_allowed',
+    });
+    return SermonPoster(
+      image: PublicImage.fromJson(m),
+      rightsRevision: wireRevision(m, 'rights_revision'),
+      offlineAllowed: wireReq<bool>(m, 'offline_allowed'),
+    );
+  }
+
+  final PublicImage image;
+  final int rightsRevision;
+  final bool offlineAllowed;
+  final Uint8List? offlineBytes;
+
+  SermonPoster withBytes(Uint8List bytes) => SermonPoster(
+    image: image,
+    rightsRevision: rightsRevision,
+    offlineAllowed: offlineAllowed,
+    offlineBytes: bytes,
+  );
+
+  Map<String, Object?> toJson() => {
+    'path': image.path,
+    'media_type': image.mediaType,
+    'width': image.width,
+    'height': image.height,
+    'rights_revision': rightsRevision,
+    'offline_allowed': offlineAllowed,
+  };
+}
+
+class PublicSermonSeries {
+  const PublicSermonSeries({
+    required this.seriesId,
+    required this.title,
+    required this.description,
+    required this.altText,
+    required this.poster,
+    required this.publicationRevision,
+    required this.publishedAt,
+    required this.offlineAllowed,
+  });
+
+  factory PublicSermonSeries.fromJson(Object? raw) {
+    final m = _object(raw, 'sermon series', const {
+      'series_id',
+      'title',
+      'description',
+      'alt_text',
+      'poster',
+      'publication_revision',
+      'published_at',
+      'offline_allowed',
+    });
+    return PublicSermonSeries(
+      seriesId: _text(m, 'series_id'),
+      title: _text(m, 'title'),
+      description: wireReq<String>(m, 'description'),
+      altText: wireReq<String>(m, 'alt_text'),
+      poster: m['poster'] == null ? null : SermonPoster.fromJson(m['poster']),
+      publicationRevision: wireRevision(m, 'publication_revision'),
+      publishedAt: wireInstant(m, 'published_at'),
+      offlineAllowed: wireReq<bool>(m, 'offline_allowed'),
+    );
+  }
+
+  final String seriesId;
+  final String title;
+  final String description;
+  final String altText;
+  final SermonPoster? poster;
+  final int publicationRevision;
+  final DateTime publishedAt;
+  final bool offlineAllowed;
+
+  PublicSermonSeries withPoster(SermonPoster? value) => PublicSermonSeries(
+    seriesId: seriesId,
+    title: title,
+    description: description,
+    altText: altText,
+    poster: value,
+    publicationRevision: publicationRevision,
+    publishedAt: publishedAt,
+    offlineAllowed: offlineAllowed,
+  );
+
+  Map<String, Object?> toJson() => {
+    'series_id': seriesId,
+    'title': title,
+    'description': description,
+    'alt_text': altText,
+    'poster': poster?.toJson(),
+    'publication_revision': publicationRevision,
+    'published_at': publishedAt.toIso8601String(),
+    'offline_allowed': offlineAllowed,
+  };
+}
+
+class PublicSermon {
+  const PublicSermon({
+    required this.sermonId,
+    required this.title,
+    required this.speaker,
+    required this.sermonDate,
+    required this.scriptureReference,
+    required this.notes,
+    required this.series,
+    required this.youtubeVideoId,
+    required this.rightsRevision,
+    required this.publicationRevision,
+    required this.publishedAt,
+    required this.offlineAllowed,
+  });
+
+  factory PublicSermon.fromJson(Object? raw) {
+    final m = _object(raw, 'sermon', const {
+      'sermon_id',
+      'title',
+      'speaker',
+      'sermon_date',
+      'scripture_reference',
+      'notes',
+      'series',
+      'youtube_video_id',
+      'rights_revision',
+      'publication_revision',
+      'published_at',
+      'offline_allowed',
+    });
+    final date = parseChurchDate(wireReq<String>(m, 'sermon_date'));
+    final notes = wireReq<String>(m, 'notes');
+    validateSermonNotes(notes);
+    final video = wireOpt<String>(m, 'youtube_video_id');
+    final rights = wireOpt<int>(m, 'rights_revision');
+    if (date == null ||
+        (video != null && !RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(video)) ||
+        (rights != null && rights < 1) ||
+        (video != null && rights == null)) {
+      throw const FormatException('unexpected sermon video/date');
+    }
+    return PublicSermon(
+      sermonId: _text(m, 'sermon_id'),
+      title: _text(m, 'title'),
+      speaker: _text(m, 'speaker'),
+      sermonDate: date,
+      scriptureReference: _text(m, 'scripture_reference'),
+      notes: notes,
+      series: m['series'] == null
+          ? null
+          : PublicSermonSeries.fromJson(m['series']),
+      youtubeVideoId: video,
+      rightsRevision: rights,
+      publicationRevision: wireRevision(m, 'publication_revision'),
+      publishedAt: wireInstant(m, 'published_at'),
+      offlineAllowed: wireReq<bool>(m, 'offline_allowed'),
+    );
+  }
+
+  final String sermonId;
+  final String title;
+  final String speaker;
+  final DateTime sermonDate;
+  final String scriptureReference;
+  final String notes;
+  final PublicSermonSeries? series;
+  final String? youtubeVideoId;
+  final int? rightsRevision;
+  final int publicationRevision;
+  final DateTime publishedAt;
+  final bool offlineAllowed;
+
+  PublicSermon withSeries(PublicSermonSeries? value) => PublicSermon(
+    sermonId: sermonId,
+    title: title,
+    speaker: speaker,
+    sermonDate: sermonDate,
+    scriptureReference: scriptureReference,
+    notes: notes,
+    series: value,
+    youtubeVideoId: youtubeVideoId,
+    rightsRevision: rightsRevision,
+    publicationRevision: publicationRevision,
+    publishedAt: publishedAt,
+    offlineAllowed: offlineAllowed,
+  );
+
+  Map<String, Object?> toJson({bool cache = false}) => {
+    'sermon_id': sermonId, 'title': title, 'speaker': speaker,
+    'sermon_date': sermonDate.toIso8601String().substring(0, 10),
+    'scripture_reference': scriptureReference,
+    'notes': notes,
+    'series': series?.toJson(),
+    // Offline teaching never starts a third-party player or stores its media.
+    'youtube_video_id': cache ? null : youtubeVideoId,
+    'rights_revision': cache ? null : rightsRevision,
+    'publication_revision': publicationRevision,
+    'published_at': publishedAt.toIso8601String(),
+    'offline_allowed': offlineAllowed,
+  };
+}
+
+class PublicSermons {
+  const PublicSermons({
+    required this.sermons,
+    required this.series,
+    this.truncated = false,
+  });
+  factory PublicSermons.fromJson(Object? raw) {
+    final m = _object(raw, 'sermons catalog', const {
+      'sermons',
+      'series',
+      'truncated',
+    });
+    return PublicSermons(
+      sermons: List.unmodifiable(
+        wireReq<List>(m, 'sermons').map(PublicSermon.fromJson),
+      ),
+      series: List.unmodifiable(
+        wireReq<List>(m, 'series').map(PublicSermonSeries.fromJson),
+      ),
+      truncated: wireReq<bool>(m, 'truncated'),
+    );
+  }
+  final List<PublicSermon> sermons;
+  final List<PublicSermonSeries> series;
+  final bool truncated;
+  PublicSermon? byId(String id) =>
+      sermons.where((s) => s.sermonId == id).firstOrNull;
+  List<PublicSermon> filter({
+    String query = '',
+    String? seriesId,
+    String? speaker,
+  }) {
+    final q = query.trim().toLowerCase();
+    return sermons
+        .where(
+          (s) =>
+              (seriesId == null || s.series?.seriesId == seriesId) &&
+              (speaker == null || s.speaker == speaker) &&
+              (q.isEmpty ||
+                  '${s.title} ${s.speaker} ${s.series?.title ?? ''}'
+                      .toLowerCase()
+                      .contains(q)),
+        )
+        .toList();
+  }
+
+  Map<String, Object?> toCacheJson() => {
+    'sermons': sermons.map((s) => s.toJson(cache: true)).toList(),
+    'series': series.map((s) => s.toJson()).toList(),
+    'truncated': truncated,
+  };
+}
+
+class PublicSermonRead {
+  const PublicSermonRead(this.sermon);
+  factory PublicSermonRead.fromJson(Object? raw) {
+    final m = _object(raw, 'sermon detail', const {'sermon'});
+    return PublicSermonRead(
+      m['sermon'] == null ? null : PublicSermon.fromJson(m['sermon']),
+    );
+  }
+  final PublicSermon? sermon;
+}
+
+class SermonInput {
+  const SermonInput({
+    required this.title,
+    this.speaker = '',
+    this.sermonDate,
+    this.scriptureReference = '',
+    this.notes = '',
+    this.seriesId,
+    this.youtubeVideoId,
+    this.videoRightsId,
+  });
+  final String title, speaker, scriptureReference, notes;
+  final String? sermonDate, seriesId, youtubeVideoId, videoRightsId;
+  Map<String, Object?> toPayload({String? sermonId}) => {
+    'sermon_id': ?sermonId,
+    'title': title.trim(),
+    'speaker': speaker.trim(),
+    'sermon_date': sermonDate,
+    'scripture_reference': scriptureReference.trim(),
+    'notes': notes.trim(),
+    'series_id': seriesId,
+    'youtube_video_id': youtubeVideoId,
+    'video_rights_id': videoRightsId,
+  };
+}
+
+class SermonSeriesInput {
+  const SermonSeriesInput({
+    required this.title,
+    this.description = '',
+    this.altText = '',
+    this.posterAssetId,
+    this.posterRightsId,
+  });
+  final String title, description, altText;
+  final String? posterAssetId, posterRightsId;
+  Map<String, Object?> toPayload({String? seriesId}) => {
+    'series_id': ?seriesId,
+    'title': title.trim(),
+    'description': description.trim(),
+    'alt_text': altText.trim(),
+    if (seriesId != null) 'poster_asset_id': posterAssetId,
+    if (seriesId != null) 'poster_rights_id': posterRightsId,
+  };
+}
+
+class StaffSermonRevision {
+  StaffSermonRevision({
+    required this.revisionNo,
+    required this.fields,
+    required this.videoRights,
+    required this.savedAt,
+    required this.savedBy,
+  });
+  factory StaffSermonRevision.fromJson(Object? raw) {
+    final m = wireMap(raw, 'sermon revision');
+    final notes = wireReq<String>(m, 'notes');
+    validateSermonNotes(notes);
+    final date = wireOpt<String>(m, 'sermon_date');
+    if (date != null && parseChurchDate(date) == null) {
+      throw const FormatException('unexpected sermon_date');
+    }
+    return StaffSermonRevision(
+      revisionNo: wireRevision(m, 'revision_no'),
+      fields: SermonInput(
+        title: _text(m, 'title'),
+        speaker: wireReq<String>(m, 'speaker'),
+        sermonDate: date,
+        scriptureReference: wireReq<String>(m, 'scripture_reference'),
+        notes: notes,
+        seriesId: wireOpt<String>(m, 'series_id'),
+        youtubeVideoId: wireOpt<String>(m, 'youtube_video_id'),
+        videoRightsId: m['video_rights'] == null
+            ? null
+            : BannerRights.fromJson(m['video_rights']).rightsId,
+      ),
+      videoRights: m['video_rights'] == null
+          ? null
+          : BannerRights.fromJson(m['video_rights']),
+      savedAt: wireInstant(m, 'saved_at'),
+      savedBy: _text(m, 'saved_by'),
+    );
+  }
+  final int revisionNo;
+  final SermonInput fields;
+  final BannerRights? videoRights;
+  final DateTime savedAt;
+  final String savedBy;
+}
+
+class StaffSermonSeriesRevision {
+  StaffSermonSeriesRevision({
+    required this.revisionNo,
+    required this.fields,
+    required this.poster,
+    required this.rights,
+    required this.savedAt,
+    required this.savedBy,
+  });
+  factory StaffSermonSeriesRevision.fromJson(Object? raw) {
+    final m = wireMap(raw, 'series revision');
+    final poster = m['poster'] == null
+        ? null
+        : StaffImage.fromJson(m['poster']);
+    final rights = m['rights'] == null
+        ? null
+        : BannerRights.fromJson(m['rights']);
+    return StaffSermonSeriesRevision(
+      revisionNo: wireRevision(m, 'revision_no'),
+      fields: SermonSeriesInput(
+        title: _text(m, 'title'),
+        description: wireReq<String>(m, 'description'),
+        altText: wireReq<String>(m, 'alt_text'),
+        posterAssetId: poster?.assetId,
+        posterRightsId: rights?.rightsId,
+      ),
+      poster: poster,
+      rights: rights,
+      savedAt: wireInstant(m, 'saved_at'),
+      savedBy: _text(m, 'saved_by'),
+    );
+  }
+  final int revisionNo;
+  final SermonSeriesInput fields;
+  final StaffImage? poster;
+  final BannerRights? rights;
+  final DateTime savedAt;
+  final String savedBy;
+}
+
+/// Shared lifecycle shape, retaining separate typed revision tables.
+class StaffSermonItem<T> {
+  StaffSermonItem({
+    required this.id,
+    required this.revision,
+    required this.state,
+    required this.live,
+    required this.draft,
+    required this.publishedAt,
+    required this.publishedBy,
+  });
+  factory StaffSermonItem.fromJson(
+    Object? raw,
+    String idKey,
+    T Function(Object?) parse,
+  ) {
+    final m = wireMap(raw, 'staff sermon item');
+    final state = ContentState.parse(m['state']);
+    final live = m['live'] == null ? null : parse(m['live']);
+    final draft = m['draft'] == null ? null : parse(m['draft']);
+    if ((live == null && draft == null) ||
+        (state == ContentState.draft && (live != null || draft == null)) ||
+        ((state == ContentState.published || state == ContentState.withdrawn) &&
+            live == null)) {
+      throw const FormatException('unexpected staff sermon revisions');
+    }
+    return StaffSermonItem(
+      id: _text(m, idKey),
+      revision: wireRevision(m),
+      state: state,
+      live: live,
+      draft: draft,
+      publishedAt: wireOptInstant(m, 'published_at'),
+      publishedBy: wireOpt<String>(m, 'published_by'),
+    );
+  }
+  final String id;
+  final int revision;
+  final ContentState state;
+  final T? live, draft;
+  final DateTime? publishedAt;
+  final String? publishedBy;
+  T get current => (draft ?? live)!;
+  bool get canEdit => state != ContentState.archived;
+  bool get canPublish =>
+      canEdit && (draft != null || state == ContentState.withdrawn);
+  bool get canWithdraw => state == ContentState.published;
+  bool get hasChanges => state == ContentState.published && draft != null;
+}
+
+typedef StaffSermon = StaffSermonItem<StaffSermonRevision>;
+typedef StaffSermonSeries = StaffSermonItem<StaffSermonSeriesRevision>;
+
+class StaffSermons {
+  const StaffSermons({
+    required this.capacity,
+    required this.sermons,
+    this.truncated = false,
+  });
+  factory StaffSermons.fromJson(Object? raw) {
+    final m = wireMap(raw, 'staff sermons');
+    return StaffSermons(
+      capacity: _capacity(m),
+      sermons: List.unmodifiable(
+        wireReq<List>(m, 'sermons').map(
+          (s) => StaffSermon.fromJson(
+            s,
+            'sermon_id',
+            StaffSermonRevision.fromJson,
+          ),
+        ),
+      ),
+      truncated: wireReq<bool>(m, 'truncated'),
+    );
+  }
+  final String capacity;
+  final List<StaffSermon> sermons;
+  final bool truncated;
+}
+
+class StaffSermonSeriesCatalog {
+  const StaffSermonSeriesCatalog({
+    required this.capacity,
+    required this.series,
+    this.removalsPending = 0,
+    this.truncated = false,
+  });
+  factory StaffSermonSeriesCatalog.fromJson(Object? raw) {
+    final m = wireMap(raw, 'staff sermon series');
+    final pending = wireReq<int>(m, 'removals_pending');
+    if (pending < 0) throw const FormatException('unexpected removals_pending');
+    return StaffSermonSeriesCatalog(
+      capacity: _capacity(m),
+      series: List.unmodifiable(
+        wireReq<List>(m, 'series').map(
+          (s) => StaffSermonSeries.fromJson(
+            s,
+            'series_id',
+            StaffSermonSeriesRevision.fromJson,
+          ),
+        ),
+      ),
+      removalsPending: pending,
+      truncated: wireReq<bool>(m, 'truncated'),
+    );
+  }
+  final String capacity;
+  final List<StaffSermonSeries> series;
+  final int removalsPending;
+  final bool truncated;
+}
+
+String _capacity(Map m) {
+  final c = _text(m, 'capacity');
+  if (!const ['admin', 'media', 'pastor'].contains(c)) {
+    throw const FormatException('unexpected capacity');
+  }
+  return c;
+}
+
+abstract final class SermonCommands {
+  static const create = 'content.create_sermon';
+  static const save = 'content.save_sermon';
+  static const publish = 'content.publish_sermon';
+  static const withdraw = 'content.withdraw_sermon';
+  static const archive = 'content.archive_sermon';
+  static const createSeries = 'content.create_sermon_series';
+  static const saveSeries = 'content.save_sermon_series';
+  static const publishSeries = 'content.publish_sermon_series';
+  static const withdrawSeries = 'content.withdraw_sermon_series';
+  static const archiveSeries = 'content.archive_sermon_series';
+  static const posterPurpose = 'sermon_series_poster';
+}
+
+abstract interface class SermonsRepository {
+  Future<AccessRead<PublicSermons>> fetchPublicSermons();
+  Future<AccessRead<PublicSermonRead>> fetchPublicSermon(String sermonId);
+  Future<AccessRead<StaffSermons>> fetchStaffSermons();
+  Future<AccessRead<StaffSermonSeriesCatalog>> fetchStaffSeries();
+}
+
+class UnconfiguredSermonsRepository implements SermonsRepository {
+  const UnconfiguredSermonsRepository();
+  @override
+  Future<AccessRead<PublicSermons>> fetchPublicSermons() async =>
+      const AccessReadDenied(AccessDenial.unavailable);
+  @override
+  Future<AccessRead<PublicSermonRead>> fetchPublicSermon(
+    String sermonId,
+  ) async => const AccessReadDenied(AccessDenial.unavailable);
+  @override
+  Future<AccessRead<StaffSermons>> fetchStaffSermons() async =>
+      const AccessReadDenied(AccessDenial.unavailable);
+  @override
+  Future<AccessRead<StaffSermonSeriesCatalog>> fetchStaffSeries() async =>
+      const AccessReadDenied(AccessDenial.unavailable);
+}
+
+abstract interface class SermonLinkLauncher {
+  Future<bool> open(Uri uri);
+}
+
+class UnavailableSermonLinkLauncher implements SermonLinkLauncher {
+  const UnavailableSermonLinkLauncher();
+  @override
+  Future<bool> open(Uri uri) async => false;
+}

@@ -28,6 +28,191 @@ void main() {
     if (await root.exists()) await root.delete(recursive: true);
   });
 
+  PublicSermons sermons({bool posterOffline = true, int rightsRevision = 1}) {
+    final series = publicSermonSeriesData(
+      poster: true,
+      posterOffline: posterOffline,
+      rightsRevision: rightsRevision,
+    );
+    return PublicSermons.fromJson({
+      'sermons': [publicSermonData(series: series)],
+      'series': [series],
+      'truncated': false,
+    });
+  }
+
+  test('sermon snapshot stores notes and cleared posters, never YouTube media or playable IDs', () async {
+    var fetched = 0;
+    expect(
+      await cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        sermons(),
+        loadSermonPoster: (_) async {
+          fetched++;
+          return imageBytes;
+        },
+      ),
+      isA<PublicContentCacheSaved>(),
+    );
+    final cold = PublicContentCacheAdapter(supportDirectory: () async => root);
+    final snapshot = await cold.readSermons();
+    expect(snapshot?.savedAt, savedAt);
+    expect(snapshot?.value.sermons.single.notes, contains('SYNTHETIC Notes'));
+    expect(snapshot?.value.sermons.single.youtubeVideoId, isNull);
+    expect(snapshot?.value.series.single.poster?.offlineBytes, imageBytes);
+    expect(fetched, 1);
+    final files = root.listSync(recursive: true).whereType<File>().toList();
+    expect(files, hasLength(2));
+    final text = await files
+        .singleWhere((f) => f.path.endsWith('manifest.json'))
+        .readAsString();
+    expect(text, isNot(contains('abcdefghijk')));
+    expect(text, isNot(contains('saved_by')));
+  });
+
+  test(
+    'sermon poster display rights never authorize offline download',
+    () async {
+      var fetched = 0;
+      await cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        sermons(posterOffline: false),
+        loadSermonPoster: (_) async {
+          fetched++;
+          return imageBytes;
+        },
+      );
+      final snapshot = await cache.readSermons();
+      expect(snapshot?.value.sermons, hasLength(1));
+      expect(snapshot?.value.series.single.poster, isNull);
+      expect(snapshot?.value.sermons.single.series?.poster, isNull);
+      expect(fetched, 0);
+    },
+  );
+
+  test('successful canonical refresh evicts withdrawn sermons and poster rights revisions', () async {
+    await cache.writeRead(
+      PublicContentCacheKeys.sermons,
+      sermons(),
+      loadSermonPoster: (_) async => imageBytes,
+    );
+    await cache.writeRead(
+      PublicContentCacheKeys.sermons,
+      sermons(rightsRevision: 2),
+      loadSermonPoster: (_) async => imageBytes,
+    );
+    final images = root
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.png'))
+        .toList();
+    expect(images, hasLength(1));
+    expect(images.single.path, contains('-r2.png'));
+    await cache.writeRead(
+      PublicContentCacheKeys.sermons,
+      const PublicSermons(sermons: [], series: []),
+    );
+    expect((await cache.readSermons())?.value.sermons, isEmpty);
+    expect(
+      root
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.png')),
+      isEmpty,
+    );
+  });
+
+  test(
+    'refused sermon refresh preserves the prior teaching snapshot',
+    () async {
+      await cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        sermons(),
+        loadSermonPoster: (_) async => imageBytes,
+      );
+      expect(
+        await cache.writeRead(PublicContentCacheKeys.sermons, {
+          'draft': 'private',
+        }),
+        isA<PublicContentCacheRefused>(),
+      );
+      expect((await cache.readSermons())?.value.sermons, hasLength(1));
+    },
+  );
+
+  test(
+    'strict sermon restore refuses injected attribution and unsafe links',
+    () async {
+      await cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        sermons(),
+        loadSermonPoster: (_) async => imageBytes,
+      );
+      final file = root
+          .listSync(recursive: true)
+          .whereType<File>()
+          .singleWhere((f) => f.path.endsWith('manifest.json'));
+      final original = jsonDecode(await file.readAsString()) as Map;
+      final entry = original['reads'][PublicContentCacheKeys.sermons] as Map;
+      entry['projection']['sermons'][0]['saved_by'] = 'private';
+      await file.writeAsString(jsonEncode(original));
+      expect(await cache.readSermons(), isNull);
+      (entry['projection']['sermons'][0] as Map).remove('saved_by');
+      entry['projection']['sermons'][0]['notes'] =
+          '[unsafe](https://evil.test)';
+      await file.writeAsString(jsonEncode(original));
+      expect(await cache.readSermons(), isNull);
+    },
+  );
+
+  test(
+    'failed sermon commit preserves the prior catalog and image bytes',
+    () async {
+      await cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        sermons(),
+        loadSermonPoster: (_) async => imageBytes,
+      );
+      final failing = PublicContentCacheAdapter(
+        supportDirectory: () async => root,
+        clock: () =>
+            throw const FileSystemException('SYNTHETIC clock unavailable'),
+      );
+      expect(
+        await failing.writeRead(
+          PublicContentCacheKeys.sermons,
+          const PublicSermons(sermons: [], series: []),
+        ),
+        isA<PublicContentCacheUnavailable>(),
+      );
+      expect(
+        (await cache.readSermons())?.value.series.single.poster?.offlineBytes,
+        imageBytes,
+      );
+      expect((await cache.readSermons())?.value.sermons, hasLength(1));
+    },
+  );
+
+  test(
+    'sermon and calendar writes share the same serialized manifest queue',
+    () async {
+      final poster = Completer<Uint8List?>();
+      final first = cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        sermons(),
+        loadSermonPoster: (_) => poster.future,
+      );
+      final second = cache.writeRead(
+        PublicContentCacheKeys.calendar,
+        PublicEvents.fromJson(publicEventsData([publicEventData()])),
+      );
+      poster.complete(imageBytes);
+      await Future.wait([first, second]);
+      expect((await cache.readSermons())?.value.sermons, hasLength(1));
+      expect((await cache.readEvents())?.value.events, hasLength(1));
+    },
+  );
+
   test('only allowlisted public list reads can create a manifest', () async {
     final outcome = await cache.writeRead(
       'content_staff_events',

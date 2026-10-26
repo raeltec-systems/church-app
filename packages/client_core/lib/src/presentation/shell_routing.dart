@@ -8,6 +8,8 @@ import 'assisted_recovery_screens.dart';
 import 'account_screen.dart';
 import 'banner_screens.dart';
 import 'bible_screens.dart';
+import 'sermon_screens.dart';
+import 'sermon_staff_screens.dart';
 import 'calendar_screens.dart';
 import 'content_screens.dart';
 import 'cell_screens.dart';
@@ -92,6 +94,10 @@ abstract final class ClientPaths {
 
   /// Story 6.6 (mobile): the public Bible & Hymns tab.
   static const bible = '/bible';
+  static const sermons = SermonPaths.list;
+  static String sermon(String id) => SermonPaths.detail(id);
+  static const contentSermons = SermonPaths.staff;
+  static const contentSermonSeries = SermonPaths.staffSeries;
 
   /// Story 6.1 (mobile): one published event.
   static String calendarEvent(String eventId) => CalendarPaths.event(eventId);
@@ -485,6 +491,22 @@ GoRouter buildClientRouter({
           path: ClientPaths.bible,
           pageBuilder: (_, state) => page(state, const BibleReaderScreen()),
         ),
+        GoRoute(
+          path: ClientPaths.sermons,
+          pageBuilder: (_, state) => page(state, const SermonsScreen()),
+          routes: [
+            GoRoute(
+              path: ':sermonId',
+              pageBuilder: (_, state) => page(
+                state,
+                SermonDetailScreen(
+                  key: ValueKey(state.pathParameters['sermonId']),
+                  sermonId: state.pathParameters['sermonId']!,
+                ),
+              ),
+            ),
+          ],
+        ),
         // Story 6.3: the public Give tab, with each method's detail.
         GoRoute(
           path: ClientPaths.give,
@@ -550,6 +572,36 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.contentBible,
         pageBuilder: (_, state) => page(state, const StaffBibleScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.contentSermons,
+        pageBuilder: (_, state) => page(state, const StaffSermonsScreen()),
+        routes: [
+          GoRoute(
+            path: ':itemId',
+            pageBuilder: (_, state) => page(
+              state,
+              StaffSermonsScreen(itemId: state.pathParameters['itemId']),
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: ClientPaths.contentSermonSeries,
+        pageBuilder: (_, state) =>
+            page(state, const StaffSermonsScreen(series: true)),
+        routes: [
+          GoRoute(
+            path: ':itemId',
+            pageBuilder: (_, state) => page(
+              state,
+              StaffSermonsScreen(
+                series: true,
+                itemId: state.pathParameters['itemId'],
+              ),
+            ),
+          ),
+        ],
       ),
       GoRoute(
         path: ClientPaths.myDuties,

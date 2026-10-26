@@ -24,6 +24,7 @@ const mobileDestinations = <MobileDestination>[
     label: 'Bible & Hymns',
     icon: Icons.menu_book_outlined,
   ),
+  (path: ClientPaths.sermons, label: 'Sermons', icon: Icons.mic_none_outlined),
   (path: ClientPaths.give, label: 'Give', icon: Icons.favorite_border),
   (
     path: ClientPaths.calendar,
@@ -44,11 +45,13 @@ List<MobileDestination> mobileDestinationsFor(MemberGrants? grants) =>
 bool _showsTopBar(String location, bool member) =>
     location == ClientPaths.home ||
     location == ClientPaths.bible ||
+    location == ClientPaths.sermons ||
     location == ClientPaths.give ||
     location == ClientPaths.calendar ||
     (!member &&
         !location.startsWith('${ClientPaths.calendar}/') &&
         !location.startsWith('${ClientPaths.give}/') &&
+        !location.startsWith('${ClientPaths.sermons}/') &&
         location != ClientPaths.announcements &&
         !location.startsWith('${ClientPaths.announcements}/'));
 

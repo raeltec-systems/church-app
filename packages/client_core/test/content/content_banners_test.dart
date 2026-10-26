@@ -433,9 +433,8 @@ void main() {
       );
       expect(h.banners.publicCalls, 1);
       expect(byKey('home-banners'), findsOneWidget);
-      final first = tester.getTopLeft(byKey('home-banner-$_theme'));
-      final second = tester.getTopLeft(byKey('home-banner-$_campaign'));
-      expect(first.dx, lessThan(second.dx));
+      expect(byKey('home-banner-$_theme'), findsOneWidget);
+      expect(byKey('home-banner-$_campaign'), findsNothing);
       expect(textOf(tester, 'home-banner-eyebrow-$_theme'), 'THEME FOR 2026');
       expect(
         textOf(tester, 'home-banner-title-$_theme'),
@@ -446,10 +445,17 @@ void main() {
         tester.getTopLeft(byKey('home-banners')).dy,
         lessThan(tester.getTopLeft(byKey('home-greeting')).dy),
       );
-      // 310 x 16:9 cards.
+      // The banner fills the same Home column as member cards, at 16:9.
       final size = tester.getSize(byKey('home-banner-$_theme'));
-      expect(size.width, 310);
-      expect(size.height, closeTo(310 * 9 / 16, 0.01));
+      expect(
+        size.width,
+        closeTo(tester.getSize(byKey('home-banners')).width, 0.01),
+      );
+      expect(size.width, greaterThan(310));
+      expect(size.height, closeTo(size.width * 9 / 16, 0.01));
+      await tester.drag(byKey('home-banners'), const Offset(-500, 0));
+      await settle(tester);
+      expect(byKey('home-banner-$_campaign'), findsOneWidget);
     });
 
     testWidgets('a withdrawn banner leaves Home when the app comes back', (
@@ -461,6 +467,8 @@ void main() {
         account: null,
         setUp: (h) => h.banners.publicBanners = twoBanners(),
       );
+      await tester.drag(byKey('home-banners'), const Offset(-500, 0));
+      await settle(tester);
       expect(byKey('home-banner-$_campaign'), findsOneWidget);
       // Withdrawn on staff web meanwhile: the public read no longer has it.
       h.banners.publicBanners = AccessReadOk(
@@ -499,6 +507,8 @@ void main() {
         ),
         findsOneWidget,
       );
+      await tester.drag(byKey('home-banners'), const Offset(-500, 0));
+      await settle(tester);
       expect(
         find.bySemanticsLabel(
           'SYNTHETIC baskets of maize and pumpkins. SYNTHETIC Harvest appeal.',
@@ -515,6 +525,8 @@ void main() {
         account: null,
         setUp: (h) => h.banners.publicBanners = twoBanners(),
       );
+      await tester.drag(byKey('home-banners'), const Offset(-500, 0));
+      await settle(tester);
       // The test HTTP client answers every image request with an error.
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 200)),
@@ -564,7 +576,7 @@ void main() {
         account: null,
         setUp: (h) => h.banners.publicBanners = twoBanners(),
       );
-      await tester.drag(byKey('home-banners'), const Offset(-330, 0));
+      await tester.drag(byKey('home-banners'), const Offset(-500, 0));
       await settle(tester);
       await tapKey(tester, 'home-banner-open-$_campaign');
       expect(textOf(tester, 'banner-title'), 'SYNTHETIC Harvest appeal');
@@ -635,7 +647,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(h.banners.publicCalls, 2);
       expect(find.textContaining('Offline · saved at'), findsOneWidget);
+      await tester.drag(byKey('home-banners'), const Offset(-500, 0));
+      await settle(tester);
       expect(byKey('home-banner-$_campaign'), findsOneWidget);
+      await tester.drag(byKey('home-banners'), const Offset(500, 0));
+      await settle(tester);
       await tapKey(tester, 'home-banner-open-$_theme');
       final image = tester.widget<Image>(byKey('banner-image'));
       expect(image.image, isA<MemoryImage>());

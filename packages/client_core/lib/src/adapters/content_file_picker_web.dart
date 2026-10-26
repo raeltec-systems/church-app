@@ -19,10 +19,17 @@ class _BrowserFilePicker implements ContentFilePicker {
 
   @override
   Future<PickedFile?> pickImage() {
+    return _pick(contentImageTypes.join(','));
+  }
+
+  @override
+  Future<PickedFile?> pickCsv() => _pick('.csv,text/csv');
+
+  Future<PickedFile?> _pick(String accept) {
     final done = Completer<PickedFile?>();
     final input = web.HTMLInputElement()
       ..type = 'file'
-      ..accept = contentImageTypes.join(',');
+      ..accept = accept;
     void finish(PickedFile? file) {
       if (!done.isCompleted) done.complete(file);
     }

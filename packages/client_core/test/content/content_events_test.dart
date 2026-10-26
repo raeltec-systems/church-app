@@ -503,6 +503,38 @@ void main() {
       expect(byKey('events-new'), findsNothing);
     });
 
+    testWidgets('date and time fields open native pickers', (tester) async {
+      await pumpAt(
+        tester,
+        ClientPaths.contentEvents,
+        staff: true,
+        setUp: (h) => h.content.staffEvents = staffEvents([]),
+      );
+      await tapKey(tester, 'events-new');
+
+      await tester.tap(find.byTooltip('Choose start date'));
+      await tester.pumpAndSettle();
+      expect(find.byType(DatePickerDialog), findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(DatePickerDialog),
+          matching: find.text('Cancel'),
+        ),
+      );
+      await settle(tester);
+
+      await tester.tap(find.byTooltip('Choose start time'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TimePickerDialog), findsOneWidget);
+      await tester.tap(
+        find.descendant(
+          of: find.byType(TimePickerDialog),
+          matching: find.text('Cancel'),
+        ),
+      );
+      await settle(tester);
+    });
+
     testWidgets('a new event is saved as a draft, then the list reloads', (
       tester,
     ) async {

@@ -134,6 +134,148 @@ void main() {
     expect(root.listSync(), isEmpty);
   });
 
+  test('Bible cache restores a validated chapter and its reference after a cold start', () async {
+    final chapter = PublicBibleChapter(
+      translationId: '61616161-6161-4161-8161-616161616161',
+      translationCode: 'KJV',
+      translationName: 'King James Version',
+      reference: const BibleChapterRef(bookId: 'GEN', chapter: 1),
+      verses: const [
+        BibleVerse(number: 1, text: 'SYNTHETIC verse one'),
+        BibleVerse(number: 2, text: 'SYNTHETIC verse two'),
+      ],
+      publicationRevision: 3,
+      publishedAt: DateTime.utc(2026, 10, 22),
+      offlineAllowed: true,
+    );
+    final saved = await cache.writeRead(
+      PublicContentCacheKeys.bibleChapter,
+      chapter,
+    );
+    expect(saved, isA<PublicContentCacheSaved>());
+
+    final coldStart = PublicContentCacheAdapter(
+      supportDirectory: () async => root,
+      clock: () => cacheClock,
+    );
+    final restored = await coldStart.readBibleChapter();
+    expect(restored?.value.translationId, chapter.translationId);
+    expect(
+      restored?.value.reference,
+      const BibleChapterRef(bookId: 'GEN', chapter: 1),
+    );
+    expect(restored?.value.verses, hasLength(2));
+    expect(restored?.savedAt, savedAt);
+
+    final directory = Directory(
+      '${root.path}${Platform.pathSeparator}bic-kafue'
+      '${Platform.pathSeparator}public-content-v1',
+    );
+    final manifest = jsonDecode(
+      await File('${directory.path}${Platform.pathSeparator}manifest.json')
+          .readAsString(),
+    ) as Map<String, dynamic>;
+    final entry =
+        (manifest['reads']
+                as Map<String, dynamic>)[PublicContentCacheKeys.bibleChapter]
+            as Map<String, dynamic>;
+    expect(entry['projection']['book_id'], 'GEN');
+    expect(entry['projection']['chapter'], 1);
+    expect(entry['projection']['translation_id'], chapter.translationId);
+  });
+
+  test('a refused Bible refresh keeps the previous offline chapter', () async {
+    final original = PublicBibleChapter(
+      translationId: '61616161-6161-4161-8161-616161616161',
+      translationCode: 'KJV',
+      translationName: 'King James Version',
+      reference: const BibleChapterRef(bookId: 'GEN', chapter: 1),
+      verses: const [BibleVerse(number: 1, text: 'SYNTHETIC saved verse')],
+      publicationRevision: 3,
+      publishedAt: DateTime.utc(2026, 10, 22),
+      offlineAllowed: true,
+    );
+    expect(
+      await cache.writeRead(PublicContentCacheKeys.bibleChapter, original),
+      isA<PublicContentCacheSaved>(),
+    );
+
+    final refused = PublicBibleChapter(
+      translationId: original.translationId,
+      translationCode: original.translationCode,
+      translationName: original.translationName,
+      reference: const BibleChapterRef(bookId: 'GEN', chapter: 2),
+      verses: const [BibleVerse(number: 1, text: 'SYNTHETIC blocked refresh')],
+      publicationRevision: 4,
+      publishedAt: DateTime.utc(2026, 10, 23),
+      offlineAllowed: false,
+    );
+    expect(
+      await cache.writeRead(PublicContentCacheKeys.bibleChapter, refused),
+      isA<PublicContentCacheRefused>(),
+    );
+    final restored = await cache.readBibleChapter();
+    expect(restored?.value.reference, original.reference);
+    expect(restored?.value.verses.single.text, 'SYNTHETIC saved verse');
+  });
+
+  test(
+    'Bible cache refuses display-only chapters and rejects tampered metadata',
+    () async {
+      final displayOnly = PublicBibleChapter(
+        translationId: '61616161-6161-4161-8161-616161616161',
+        translationCode: 'KJV',
+        translationName: 'King James Version',
+        reference: const BibleChapterRef(bookId: 'GEN', chapter: 1),
+        verses: const [BibleVerse(number: 1, text: 'SYNTHETIC verse one')],
+        publicationRevision: 1,
+        publishedAt: DateTime.utc(2026, 10, 22),
+        offlineAllowed: false,
+      );
+      final refused = await cache.writeRead(
+        PublicContentCacheKeys.bibleChapter,
+        displayOnly,
+      );
+      expect(refused, isA<PublicContentCacheRefused>());
+      expect(
+        (refused as PublicContentCacheRefused).reason,
+        PublicContentCacheRefusal.offlineRightsNotCleared,
+      );
+      expect(root.listSync(), isEmpty);
+
+      final eligible = PublicBibleChapter(
+        translationId: displayOnly.translationId,
+        translationCode: displayOnly.translationCode,
+        translationName: displayOnly.translationName,
+        reference: displayOnly.reference,
+        verses: displayOnly.verses,
+        publicationRevision: displayOnly.publicationRevision,
+        publishedAt: displayOnly.publishedAt,
+        offlineAllowed: true,
+      );
+      expect(
+        await cache.writeRead(PublicContentCacheKeys.bibleChapter, eligible),
+        isA<PublicContentCacheSaved>(),
+      );
+      final directory = Directory(
+        '${root.path}${Platform.pathSeparator}bic-kafue'
+        '${Platform.pathSeparator}public-content-v1',
+      );
+      final manifestFile = File(
+        '${directory.path}${Platform.pathSeparator}manifest.json',
+      );
+      final manifest =
+          jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
+      final reads = manifest['reads'] as Map<String, dynamic>;
+      final entry =
+          reads[PublicContentCacheKeys.bibleChapter] as Map<String, dynamic>;
+      final projection = entry['projection'] as Map<String, dynamic>;
+      projection['translation_code'] = 'not valid';
+      await manifestFile.writeAsString(jsonEncode(manifest));
+      expect(await cache.readBibleChapter(), isNull);
+    },
+  );
+
   test(
     'an unavailable image is omitted and a later server snapshot evicts it',
     () async {

@@ -49,8 +49,26 @@ Future<Harness> pumpStaff(
 }
 
 Future<void> tapKey(WidgetTester tester, String key) async {
-  await tester.ensureVisible(find.byKey(Key(key)));
-  await tester.tap(find.byKey(Key(key)));
+  final target = find.byKey(Key(key));
+  if (target.evaluate().isEmpty && key.startsWith('nav-')) {
+    final appContext = tester.element(find.byType(StaffApp));
+    final container = ProviderScope.containerOf(appContext, listen: false);
+    final grants = container.read(staffViewGrantsProvider);
+    final path = key.substring('nav-'.length);
+    for (final group in staffNavGroupsFor(grants, signedIn: true)) {
+      if (group.label != null &&
+          group.items.any((destination) => destination.path == path)) {
+        final groupButton = find.byKey(Key('nav-group-${group.label}'));
+        if (groupButton.evaluate().isNotEmpty) {
+          await tester.tap(groupButton);
+          await tester.pump();
+        }
+        break;
+      }
+    }
+  }
+  await tester.ensureVisible(target);
+  await tester.tap(target);
   await tester.pump();
 }
 
@@ -62,6 +80,29 @@ void asAdmin(Harness h) =>
 void main() {
   // Each test starts as a fresh app: no input seen yet.
   setUp(FocusVisibility.instance.reset);
+
+  testWidgets('staff work areas fold to keep the sidebar short', (
+    tester,
+  ) async {
+    await pumpStaff(tester, location: ClientPaths.overview, setUp: asAdmin);
+    expect(
+      find.byKey(const Key('nav-${ClientPaths.adminMembers}')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('nav-group-People')), findsOneWidget);
+
+    await tapKey(tester, 'nav-group-People');
+    expect(
+      find.byKey(const Key('nav-${ClientPaths.adminMembers}')),
+      findsOneWidget,
+    );
+
+    await tapKey(tester, 'nav-group-People');
+    expect(
+      find.byKey(const Key('nav-${ClientPaths.adminMembers}')),
+      findsNothing,
+    );
+  });
 
   testWidgets('tracer read shows in the shell; sidebar tabs are named', (
     tester,
@@ -75,7 +116,7 @@ void main() {
     );
     expect(tab.role, SemanticsRole.tab);
     final list = tester.getSemantics(find.bySemanticsLabel('Staff sections'));
-    expect(list.role, SemanticsRole.tabBar);
+    expect(list.role, SemanticsRole.list);
     handle.dispose();
   });
 
@@ -312,10 +353,14 @@ void main() {
       final d = staffDestinationsFor(syntheticGrants(roles: [role]));
       expect(d, contains(staffBannersDestination), reason: role);
       expect(d, contains(staffRightsDestination), reason: role);
-      // In the Content group, after Events.
+      // In the Content group, after Events and Bible.
+      expect(
+        d.indexOf(staffBibleDestination),
+        d.indexOf(staffEventsDestination) + 1,
+      );
       expect(
         d.indexOf(staffBannersDestination),
-        d.indexOf(staffEventsDestination) + 1,
+        d.indexOf(staffBibleDestination) + 1,
       );
       expect(
         d.indexOf(staffRightsDestination),
@@ -323,11 +368,90 @@ void main() {
       );
     }
     for (final g in [syntheticGrants(), null]) {
-      for (final d in [staffBannersDestination, staffRightsDestination]) {
+      for (final d in [
+        staffBibleDestination,
+        staffBannersDestination,
+        staffRightsDestination,
+      ]) {
         expect(staffDestinationsFor(g), isNot(contains(d)));
         expect(staffDestinationsFor(g, signedIn: true), isNot(contains(d)));
       }
     }
+  });
+
+  test('story 6.6: Bible imports are for Media, Pastor and Admin', () {
+    for (final role in const ['media', 'pastor', 'admin']) {
+      expect(
+        staffDestinationsFor(syntheticGrants(roles: [role])),
+        contains(staffBibleDestination),
+        reason: role,
+      );
+    }
+    for (final grants in [syntheticGrants(), null]) {
+      expect(
+        staffDestinationsFor(grants),
+        isNot(contains(staffBibleDestination)),
+      );
+    }
+    final content = staffNavGroupsFor(syntheticGrants(roles: const ['admin']))
+        .firstWhere((group) => group.label == 'Content');
+    expect(
+      content.items.indexOf(staffBibleDestination),
+      content.items.indexOf(staffEventsDestination) + 1,
+    );
+  });
+
+  testWidgets('story 6.6: a Media editor opens Bible imports', (tester) async {
+    final h = await pumpStaff(
+      tester,
+      size: const Size(1280, 1600),
+      setUp: (h) {
+        h.grants.myAccess = AccessReadOk(
+          syntheticGrants(roles: const ['media']),
+        );
+        h.bible.staff = AccessReadOk(
+          const StaffBibleTranslations(
+            capacity: ChurchRoles.media,
+            translations: [],
+          ),
+        );
+        h.banners.staffRights = AccessReadOk(
+          StaffRights.fromJson(
+            staffRightsData([
+              rightsRecordData(
+                draft: rightsRevisionData(
+                  label: 'World English Bible (WEB)',
+                  sourceKey: 'https://ebible.org/details.php?id=engwebp',
+                  holder: 'eBible.org public-domain text',
+                  basis: 'public_domain',
+                  evidence: 'https://ebible.org/engwebp/copyright.htm',
+                ),
+              ),
+            ]),
+          ),
+        );
+      },
+    );
+    await tapKey(tester, 'nav-group-Content');
+    await tapKey(tester, 'nav-${ClientPaths.contentBible}');
+    await tester.pumpAndSettle();
+    expect(find.byType(StaffBibleScreen), findsOneWidget);
+    expect(find.text('Bible translations'), findsOneWidget);
+    expect(
+      find.textContaining('No Bible editions are installed yet.'),
+      findsOneWidget,
+    );
+    expect(find.text('Install WEB package'), findsOneWidget);
+    expect(find.byKey(const Key('bible-pick-csv')), findsNothing);
+    expect(find.byKey(const Key('bible-web-rights')), findsOneWidget);
+    expect(find.text('WEB source rights record'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.byKey(const Key('bible-install-web')))
+          .onPressed,
+      isNotNull,
+    );
+    expect(h.bible.staffCalls, greaterThanOrEqualTo(1));
   });
 
   testWidgets('story 6.2: a Media member opens Banners from the sidebar', (
@@ -345,6 +469,7 @@ void main() {
         );
       },
     );
+    await tapKey(tester, 'nav-group-Content');
     await tapKey(tester, 'nav-${ClientPaths.contentBanners}');
     await tester.pumpAndSettle();
     expect(find.byType(StaffBannersScreen), findsOneWidget);
@@ -359,6 +484,7 @@ void main() {
         .firstWhere((g) => g.label == 'Content');
     expect(content.items, [
       staffEventsDestination,
+      staffBibleDestination,
       staffBannersDestination,
       staffRightsDestination,
       staffAnnouncementsDestination,
@@ -406,6 +532,7 @@ void main() {
           );
         },
       );
+      await tapKey(tester, 'nav-group-Content');
       await tapKey(tester, 'nav-${ClientPaths.contentGiving}');
       await tester.pumpAndSettle();
       expect(find.byType(StaffGivingScreen), findsOneWidget);
@@ -476,6 +603,7 @@ void main() {
           );
         },
       );
+      await tapKey(tester, 'nav-group-Content');
       await tapKey(tester, 'nav-${ClientPaths.contentEvents}');
       await tester.pumpAndSettle();
       expect(find.byType(StaffEventsScreen), findsOneWidget);
@@ -512,6 +640,7 @@ void main() {
       // Giving (story 6.3) follows for Admins only.
       expect(content, [
         staffEventsDestination,
+        staffBibleDestination,
         staffBannersDestination,
         staffRightsDestination,
         staffAnnouncementsDestination,
@@ -542,6 +671,7 @@ void main() {
           );
         },
       );
+      await tapKey(tester, 'nav-group-Content');
       await tapKey(tester, 'nav-${ClientPaths.contentAnnouncements}');
       await tester.pumpAndSettle();
       expect(find.byType(StaffAnnouncementsScreen), findsOneWidget);
@@ -749,6 +879,7 @@ void main() {
       await tapKey(tester, 'nav-/account');
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'nav-group-People');
       expect(find.byKey(const Key('nav-/admin/grants')), findsOneWidget);
       expect(find.byKey(const Key('nav-/access')), findsOneWidget);
       expect(find.byKey(const Key('nav-/inbox')), findsOneWidget);
@@ -852,6 +983,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       // Admin and Cell leader: the role switch narrows the sidebar to one
       // role at a time (the Admin view first).
+      await tapKey(tester, 'nav-group-People');
       expect(find.byKey(const Key('nav-/admin/followups')), findsOneWidget);
       expect(find.byKey(const Key('nav-/followups/supervision')), findsNothing);
       await tapKey(tester, 'role-view-cellLeader');
@@ -1447,6 +1579,12 @@ void main() {
     expect(navLabel(), 'Overview');
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pump();
+    expect(navLabel(), isNull);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('nav-/admin/members')), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
     expect(navLabel(), 'Members');
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
@@ -1539,6 +1677,7 @@ void main() {
       );
       expect(find.byKey(const Key('overview-problems')), findsOneWidget);
       // The Members entry counts the applications waiting.
+      await tapKey(tester, 'nav-group-People');
       expect(
         find.descendant(
           of: find.byKey(const Key('nav-/admin/members')),
@@ -1619,6 +1758,7 @@ void main() {
       );
       expect(find.byKey(const Key('role-view-cellLeader')), findsNothing);
       // The My cell group entry counts the requests to confirm.
+      await tapKey(tester, 'nav-group-Cells');
       expect(
         find.descendant(
           of: find.byKey(const Key('nav-/cells/leader')),
@@ -1706,11 +1846,13 @@ void main() {
       expect(find.byKey(const Key('role-view-admin')), findsOneWidget);
       expect(find.byKey(const Key('role-view-pastor')), findsOneWidget);
       expect(find.byKey(const Key('role-view-cellLeader')), findsNothing);
+      await tapKey(tester, 'nav-group-People');
       expect(find.byKey(const Key('nav-/admin/members')), findsOneWidget);
       expect(find.byKey(const Key('nav-/duties/special')), findsNothing);
 
       await tapKey(tester, 'role-view-pastor');
       await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'nav-group-Duties');
       expect(find.byKey(const Key('nav-/duties/special')), findsOneWidget);
       expect(find.byKey(const Key('nav-/admin/members')), findsNothing);
       // The developer pages belong to the Admin view.

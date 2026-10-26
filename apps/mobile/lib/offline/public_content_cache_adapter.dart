@@ -7,6 +7,7 @@ import 'package:church_client_core/church_client_core.dart'
     show
         PublicBanner,
         PublicBanners,
+        PublicBibleChapter,
         PublicContentCache,
         PublicContentCacheKeys,
         PublicContentCacheRefusal,
@@ -45,7 +46,7 @@ Future<List<T>> _boundedMap<T, E>(
 }
 
 /// The only file-backed public content cache. It stores exactly the Calendar,
-/// Home and giving list projections, plus rights-cleared image bytes.
+/// Home, giving and one offline-cleared Bible chapter, plus allowed image bytes.
 class PublicContentCacheAdapter implements PublicContentCache {
   PublicContentCacheAdapter({
     Future<Directory> Function()? supportDirectory,
@@ -61,6 +62,7 @@ class PublicContentCacheAdapter implements PublicContentCache {
     PublicContentCacheKeys.calendar,
     PublicContentCacheKeys.homeBanners,
     PublicContentCacheKeys.givingMethods,
+    PublicContentCacheKeys.bibleChapter,
   };
 
   final Future<Directory> Function() _supportDirectory;
@@ -255,6 +257,29 @@ class PublicContentCacheAdapter implements PublicContentCache {
   }
 
   @override
+  Future<PublicContentSnapshot<PublicBibleChapter>?> readBibleChapter() async {
+    try {
+      final directory = await _directory();
+      final manifest = await _readManifest(directory);
+      final entry =
+          (manifest?['reads'] as Map?)?[PublicContentCacheKeys.bibleChapter];
+      if (!_hasKeys(entry, const {'saved_at', 'projection'})) return null;
+      final projection = entry['projection'];
+      if (!_hasKeys(projection, _bibleChapterKeys) ||
+          projection['offline_allowed'] != true) {
+        return null;
+      }
+      final chapter = PublicBibleChapter.fromCacheJson(projection);
+      return PublicContentSnapshot<PublicBibleChapter>(
+        value: chapter,
+        savedAt: _savedAt(entry['saved_at']),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
   Future<PublicContentCacheWrite> writeRead(
     String readKey,
     Object projection, {
@@ -380,6 +405,26 @@ class PublicContentCacheAdapter implements PublicContentCache {
           'image_files': files,
         };
         savedRows = eligible.length;
+      } else if (readKey == PublicContentCacheKeys.bibleChapter) {
+        if (projection is! PublicBibleChapter) {
+          return const PublicContentCacheRefused(
+            PublicContentCacheRefusal.unexpectedProjection,
+          );
+        }
+        if (!projection.offlineAllowed) {
+          return const PublicContentCacheRefused(
+            PublicContentCacheRefusal.offlineRightsNotCleared,
+          );
+        }
+        final cacheJson = projection.toCacheJson();
+        // Re-parse through the same strict allowlist before any local write.
+        PublicBibleChapter.fromCacheJson(cacheJson);
+        final savedAt = _clock().toUtc();
+        entry = {
+          'saved_at': savedAt.toIso8601String(),
+          'projection': cacheJson,
+        };
+        savedRows = 1;
       } else {
         if (projection is! PublicGivingMethods) {
           return const PublicContentCacheRefused(
@@ -686,12 +731,35 @@ class PublicContentCacheAdapter implements PublicContentCache {
 
   Future<void> _commitManifest(Directory directory, String json) async {
     final file = await _manifest(directory);
-    final temp = File('${file.path}.tmp-${_clock().microsecondsSinceEpoch}');
+    final suffix = _clock().microsecondsSinceEpoch;
+    final temp = File('${file.path}.tmp-$suffix');
+    final backup = File('${file.path}.backup-$suffix');
     await temp.writeAsString(json, flush: true);
-    // Removing first keeps an old snapshot from surviving a failed write on
-    // platforms where rename does not replace an existing destination.
-    if (await file.exists()) await file.delete();
-    await temp.rename(file.path);
+    final hadPrevious = await file.exists();
+    try {
+      if (hadPrevious) {
+        await file.copy(backup.path);
+        await file.delete();
+      }
+      await temp.rename(file.path);
+      if (await backup.exists()) await backup.delete();
+    } catch (_) {
+      // Restore the previous manifest if the replacement fails after removal.
+      if (await backup.exists()) {
+        try {
+          if (await file.exists()) await file.delete();
+          await backup.rename(file.path);
+        } catch (_) {
+          // The original failure remains the useful error for the caller.
+        }
+      }
+      try {
+        if (await temp.exists()) await temp.delete();
+      } catch (_) {
+        // A leftover temporary manifest is ignored by the cache reader.
+      }
+      rethrow;
+    }
   }
 
   Future<void> _removeReadBeforeRefresh(
@@ -814,6 +882,20 @@ class PublicContentCacheAdapter implements PublicContentCache {
     'published_at',
     'unsafe',
     'logo',
+  };
+
+  static const _bibleChapterKeys = {
+    'translation_id',
+    'translation_code',
+    'translation_name',
+    'book_id',
+    'chapter',
+    'verse_count',
+    'omitted_verses',
+    'verses',
+    'publication_revision',
+    'published_at',
+    'offline_allowed',
   };
 
   static Map<String, Object?> _eventsToJson(PublicEvents events) => {

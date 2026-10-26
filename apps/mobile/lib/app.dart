@@ -19,6 +19,11 @@ typedef MobileDestination = ({String path, String label, IconData icon});
 /// and keep their routes but no tab.
 const mobileDestinations = <MobileDestination>[
   (path: ClientPaths.home, label: 'Home', icon: Icons.home_outlined),
+  (
+    path: ClientPaths.bible,
+    label: 'Bible & Hymns',
+    icon: Icons.menu_book_outlined,
+  ),
   (path: ClientPaths.give, label: 'Give', icon: Icons.favorite_border),
   (
     path: ClientPaths.calendar,
@@ -38,6 +43,7 @@ List<MobileDestination> mobileDestinationsFor(MemberGrants? grants) =>
 /// announcements (story 6.13), which have their own back bar.
 bool _showsTopBar(String location, bool member) =>
     location == ClientPaths.home ||
+    location == ClientPaths.bible ||
     location == ClientPaths.give ||
     location == ClientPaths.calendar ||
     (!member &&

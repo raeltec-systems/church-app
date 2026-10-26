@@ -1,0 +1,14 @@
+{"at":"2026-10-26T15:11:00.623Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"anonymous WEB catalog","verdict":"pass"}
+{"at":"2026-10-26T15:11:00.624Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"complete chapter catalog","verdict":"pass","chapters":1189,"books":66}
+{"at":"2026-10-26T15:11:00.624Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"canonical book boundary","verdict":"pass"}
+{"at":"2026-10-26T15:11:00.764Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"GEN 1 public chapter","verdict":"pass","book":"GEN","chapter":1,"verse_slots":31,"offline_allowed":true}
+{"at":"2026-10-26T15:11:00.765Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"GEN 1 excludes private fields","verdict":"pass"}
+{"at":"2026-10-26T15:11:00.878Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"GEN 50 public chapter","verdict":"pass","book":"GEN","chapter":50,"verse_slots":26,"offline_allowed":true}
+{"at":"2026-10-26T15:11:00.878Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"GEN 50 excludes private fields","verdict":"pass"}
+{"at":"2026-10-26T15:11:00.978Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"EXO 1 public chapter","verdict":"pass","book":"EXO","chapter":1,"verse_slots":22,"offline_allowed":true}
+{"at":"2026-10-26T15:11:00.978Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"EXO 1 excludes private fields","verdict":"pass"}
+{"at":"2026-10-26T15:11:01.101Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"LUK 17 public chapter","verdict":"pass","book":"LUK","chapter":17,"verse_slots":37,"offline_allowed":true}
+{"at":"2026-10-26T15:11:01.101Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"LUK 17 excludes private fields","verdict":"pass"}
+{"at":"2026-10-26T15:11:01.101Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"source omission preserved","verdict":"pass"}
+{"at":"2026-10-26T15:11:01.148Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"unknown chapter is null","verdict":"pass"}
+{"at":"2026-10-26T15:11:01.290Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"unknown manifest is null","verdict":"pass"}

@@ -7,6 +7,7 @@ import 'announcement_screens.dart';
 import 'assisted_recovery_screens.dart';
 import 'account_screen.dart';
 import 'banner_screens.dart';
+import 'bible_screens.dart';
 import 'calendar_screens.dart';
 import 'content_screens.dart';
 import 'cell_screens.dart';
@@ -89,6 +90,9 @@ abstract final class ClientPaths {
   /// Story 6.1 (mobile): the public Calendar tab.
   static const calendar = CalendarPaths.calendar;
 
+  /// Story 6.6 (mobile): the public Bible & Hymns tab.
+  static const bible = '/bible';
+
   /// Story 6.1 (mobile): one published event.
   static String calendarEvent(String eventId) => CalendarPaths.event(eventId);
 
@@ -118,6 +122,9 @@ abstract final class ClientPaths {
   /// Pastor, Admin).
   static const contentBanners = BannerPaths.banners;
   static const contentRights = BannerPaths.rights;
+
+  /// Story 6.6, staff web: Bible translation CSV imports and publication.
+  static const contentBible = '/content/bible';
 
   /// Story 6.2 (mobile): one published banner's original image.
   static String banner(String bannerId) => BannerPaths.banner(bannerId);
@@ -474,6 +481,10 @@ GoRouter buildClientRouter({
             ),
           ],
         ),
+        GoRoute(
+          path: ClientPaths.bible,
+          pageBuilder: (_, state) => page(state, const BibleReaderScreen()),
+        ),
         // Story 6.3: the public Give tab, with each method's detail.
         GoRoute(
           path: ClientPaths.give,
@@ -535,6 +546,10 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.contentRights,
         pageBuilder: (_, state) => page(state, const StaffRightsScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.contentBible,
+        pageBuilder: (_, state) => page(state, const StaffBibleScreen()),
       ),
       GoRoute(
         path: ClientPaths.myDuties,

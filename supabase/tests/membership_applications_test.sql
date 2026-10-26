@@ -6,7 +6,7 @@
 -- phone and name here is SYNTHETIC (fictional range +1 202 555 0141-0149); +999 is an
 -- unassigned ITU country code used only to prove the non-fictional fence.
 begin;
-select plan(98);
+select plan(100);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000024' || lpad(n::text, 2, '0'))::uuid $$;
@@ -270,7 +270,7 @@ select is(pg_temp.cmd(pg_temp.claims(pg_temp.u(1), pg_temp.s(21), 'otp'), 'ident
 select is(pg_temp.submit(7, '{"choice": "not_sure"}') -> 'field_errors', '{"phone_username": "required"}'::jsonb,
   'an account without a phone username cannot apply');
 select is(pg_temp.submit(8, '{"choice": "not_sure"}') -> 'field_errors', '{"phone_username": "out_of_range"}'::jsonb,
-  'local/staging: a phone outside the fictional ranges is refused');
+  'local: a phone outside the fictional ranges is refused');
 
 -- Validation -----------------------------------------------------------------------------------
 select is(pg_temp.cmd(pg_temp.c(8), 'identity.submit_application', null,
@@ -414,6 +414,16 @@ select is(pg_temp.cmd(pg_temp.c(4), 'identity.grant_role', 1, '{}', gen_random_u
   '{"command": "unsupported"}'::jsonb, 'the application entry point does not run grant commands');
 select is(app.identity_authorize_command('{"command": "identity.unknown"}'), false,
   'the dispatching authorizer still refuses unknown identity commands');
+
+-- Staging-only live acceptance testing uses real member phone numbers.
+update auth.users set phone = '260971234567' where id = pg_temp.u(8);
+select app.platform_set_environment('staging', 'pgtap 2.4');
+create temporary table staging_phone as
+  select pg_temp.submit(8, '{"choice": "not_sure"}', 'SYNTHETIC staging phone') as result;
+select is((select result #>> '{data,phone_username}' from staging_phone), '+260971234567',
+  'staging accepts a real-format sign-in phone while Q4 is closed');
+select is((select result #>> '{data,is_synthetic}' from staging_phone), 'true',
+  'staging test submissions remain marked synthetic in the database');
 
 -- A held restore closes applications in local/staging too ---------------------------------------
 select ok(app.identity_applications_open(), 'local, not held: applications are open');

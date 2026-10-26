@@ -762,6 +762,12 @@ class _MembershipApplicationScreenState
           'reloaded; choose again.',
       StatusTone.warning,
     ),
+    ApplicationNotice.phoneNeedsReview => (
+      'Phone number needs checking',
+      'The phone number on your account could not be used for this request. '
+          'Please ask the church office to check it.',
+      StatusTone.warning,
+    ),
     ApplicationNotice.invalid => (
       'Check your answers',
       'Some answers need fixing before the request can be sent.',

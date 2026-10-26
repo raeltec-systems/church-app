@@ -1067,6 +1067,9 @@ abstract interface class ContentFilePicker {
 
   /// One PNG, JPEG or WebP file, or null when the editor cancelled.
   Future<PickedFile?> pickImage();
+
+  /// One CSV file, or null when the editor cancelled.
+  Future<PickedFile?> pickCsv();
 }
 
 class UnsupportedContentFilePicker implements ContentFilePicker {
@@ -1077,4 +1080,7 @@ class UnsupportedContentFilePicker implements ContentFilePicker {
 
   @override
   Future<PickedFile?> pickImage() async => null;
+
+  @override
+  Future<PickedFile?> pickCsv() async => null;
 }

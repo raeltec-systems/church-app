@@ -1,0 +1,9 @@
+{"step":"B00-precondition","target":"LOCAL","at":"2026-10-26T15:26:43.850Z","phone_auth_enabled":true,"existing_fixtures":0}
+{"step":"B01-media-role","target":"LOCAL","at":"2026-10-26T15:26:46.798Z","verdict":"pass","status":200,"media_role":true}
+{"step":"B02-drafts-are-private","target":"LOCAL","at":"2026-10-26T15:26:47.054Z","verdict":"pass","visible_translation_count":0}
+{"step":"B03-missing-terminal-verse-stays-private","target":"LOCAL","at":"2026-10-26T15:26:47.104Z","verdict":"pass","imported_rows":30,"finalize_code":"validation_failed"}
+{"step":"B04-KJV-WEB-publish-and-read-anonymously","target":"LOCAL","at":"2026-10-26T15:26:47.528Z","verdict":"pass","codes":["KJV","WEB"],"kjv_verses":31,"web_verses":31,"chapter_keys_match":true}
+{"step":"B05-display-only-rights-deny-offline-and-members-cannot-edit","target":"LOCAL","at":"2026-10-26T15:26:47.529Z","verdict":"pass","offline_allowed":[false,false],"member_command":"forbidden"}
+{"step":"B06-navigation-follows-available-canonical-chapters","target":"LOCAL","at":"2026-10-26T15:26:47.529Z","verdict":"pass","kjv_next_book":"EXO","web_next":null}
+{"step":"B07-Media-reads-the-private-catalog","target":"LOCAL","at":"2026-10-26T15:26:47.539Z","verdict":"pass","status":200,"translation_codes":["KJV","WEB"]}
+{"step":"B99-cleanup","target":"LOCAL","at":"2026-10-26T15:26:48.366Z","synthetic_accounts_left":0,"immutable_fixtures_retained":true,"instruction":"reset the local Supabase database before a second run"}

@@ -396,3 +396,38 @@ Use an Android staging-configured emulator and a church-owned synthetic banner w
 4. Publish a campaign banner linked to a published SYNTHETIC event the same way.
 5. On a signed-out phone, Home opens with the theme card, then the campaign; tap each to open the original image.
 6. Withdraw the campaign on staff web: after the sync and a return to Home on the phone, it is gone; its old image link answers 400.
+
+## Story 6.6: read cleared Bible chapters online and offline
+
+Migrations: `20261023020507_content_bible_translations.sql` adds private, revision-scoped translation and verse storage, the initial KJV/WEB chapter-count manifests, bounded import and shared Content lifecycle commands, rights-gated public projections, and the Bible staff catalog. `20261023020509_content_bible_staff_read_gate.sql` keeps the authenticated staff catalog wrapper volatile so its live editor-role check can lock the grant. `20261023033756_content_bible_manifest_registry.sql` permits additional syntactically valid translation codes only when a complete trusted manifest is registered, and lets a re-import select a registered manifest version. `20261023100446_content_bible_web_omitted_verses.sql` records the five blank verse slots present in eBible.org's WEB package, accepts only those trusted empty rows, and exposes omitted verse numbers in public chapter projections. `20261023120311_content_bible_web_source_rights_guard.sql` enforces a matching, verified eBible.org public-domain record for WEB at publication and public/offline reads; it is applied to staging. The WEB package is bundled in the staff app, so editors do not download or format CSV files. These migrations are additive. pgTAP: `supabase/tests/content_bible_test.sql`. Local HTTP E2E: `tools/identity-e2e/content-bible.mjs` (placeholder verse text only). Client/domain and screen tests: `packages/client_core/test/content/bible_test.dart` and `packages/client_core/test/content/bible_screens_test.dart`; mobile adapter and reader coverage is in `apps/mobile/test/offline/public_content_cache_adapter_test.dart` and `apps/mobile/test/mobile_app_test.dart`.
+
+The server keeps imported text private by revision until the complete chapters match the registered manifest and an in-force rights record clears display use. Installing bundled WEB creates only a private draft; a draft eBible rights record can be attached, but display must be verified before publication and offline use has its own check. Anonymous responses contain only published chapters and their named public fields. Offline saving additionally requires offline rights. WEB manifest v2 carries five official omissions; those slots keep their verse numbers and no text is invented. The bundled public-domain source candidate does not approve Q5 or production distribution. The local E2E's KJV/WEB strings are labels for synthetic placeholder verses, never licensed text.
+
+`20261026151013_content_bible_review_hardening.sql` restores a null manifest response for unknown or incomplete editions and anonymizes/checks both saved and published Bible attribution during account deletion. It changes existing Bible functions, adds no row deletion, and needs no owner `_rows` step. The reader refreshes on reconnect, offers an explicit online retry, preserves the selected reference on reload, and ignores obsolete save completions. A withdrawn translation with a live revision and no incomplete draft can be republished directly.
+
+### Local checks
+
+Run all database tests before the local Bible HTTP E2E. The E2E creates synthetic Auth users, removes them after the run, and retains its immutable published KJV/WEB fixtures in the disposable local database; reset before a second run.
+
+```bash
+npx supabase db reset --local
+npx supabase db lint --local
+npx supabase test db --local
+node --test tools/identity-e2e/content-bible.test.mjs
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/content-bible.mjs
+```
+
+The phone-auth helper is local-only and refuses an SMS provider, credential, hook, test OTP or phone MFA setting. The Bible E2E restores the CLI Auth settings with the helper's `off` mode from `finally` on every exit path; if restoration itself fails, run `node tools/auth-harness/local-phone-auth.mjs off` before continuing. Run each Flutter test from its package directory; use `flutter test` and `flutter analyze` in `packages/client_core`, `apps/mobile`, and `apps/staff` as appropriate.
+
+### Owner manual check on staging
+
+All six Bible migrations through `20261026151013_content_bible_review_hardening.sql` are applied on project `tmurpotfluignacfueki`; history includes `20261022012809_content_rights_banners`. The local filenames match hosted versions. On 2026-10-26, all 28 Bible and staging-phone function hashes match the fresh local replay; staging boundary violations and unowned-object counts are 0. Existing staging data now includes published WEB with all 66 books, 1,189 chapters and offline clearance. Fourteen signed-out HTTP checks pass, including the Genesis/Exodus boundary, the omitted Luke 17:36 slot, exclusion of private fields, and null unknown chapter/manifest responses. The agent made no rights or policy approvals and sent no notification. See `evidence-6.6/staging-public-read-20261026.jsonl`. Physical phone checks below remain due for the entry 15 pilot; API checks do not demonstrate device behavior.
+
+1. In **Rights**, create a staging WEB record for eBible.org as a private draft; confirm the staff installer can use it without treating the rights as verified. Verify the record separately before publication and clear display use; offline use remains separate. Confirm a record without display clearance refuses publication.
+2. In staff **Bible**, choose the WEB source rights record and **Install WEB package**. The bundled source is checked against the trusted manifest and imported into a private draft in bounded batches. Finalize and publish only after the rights record is verified for display. Try to finalize a chapter with its terminal verse missing; finalization must fail and the draft must stay out of anonymous reads. Create a second draft with a different available chapter so the reader can demonstrate partial-corpus navigation.
+3. On a signed-out phone, open **Bible & Hymns**, choose the cleared translation, book and chapter, switch translations, and navigate only through available chapters. Confirm unpublished or un-cleared text stays absent.
+4. For a display-only translation, confirm no download action appears. For an offline-cleared test chapter, save it, relaunch the app in airplane mode, and confirm the saved chapter and its translation/book/chapter reference reopen. Previously saved copies are local files and cannot be remotely erased by a rights change.
+5. Confirm an ordinary signed-in member cannot use staff Bible actions and that the staff catalog is available to Media, Pastor and Admin. Remove or withdraw staging fixtures after the demonstration where allowed; do not claim a cached chapter was erased from a device.
+
+Do not approve `q5_content_rights` as part of this check. A staging demonstration does not clear production rights; the production catalog starts empty until the owner approves the source and the record clears display use.

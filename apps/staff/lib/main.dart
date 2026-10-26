@@ -1,7 +1,8 @@
 // Composition root: the only file in this app that reaches Supabase (through
 // church_client_core's composition library).
 import 'package:church_client_core/church_client_core.dart'
-    show contactLauncherProvider;
+    show
+        contactLauncherProvider;
 import 'package:church_client_core/composition.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
@@ -23,6 +24,7 @@ Future<void> main() async {
     ProviderScope(
       overrides: [
         ...overrides,
+        staffBiblePackageSourceOverride(),
         // Story 4.9: Call and Message hand tel: / sms: links to the browser.
         contactLauncherProvider.overrideWithValue(const UrlContactLauncher()),
       ],

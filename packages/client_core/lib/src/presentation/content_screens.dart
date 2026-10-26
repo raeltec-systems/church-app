@@ -870,6 +870,59 @@ class _EventFormState extends ConsumerState<_EventForm> {
     super.dispose();
   }
 
+  Future<void> _chooseDate(
+    TextEditingController controller, {
+    required String label,
+  }) async {
+    final firstDate = DateTime(1900);
+    final lastDate = DateTime(2100, 12, 31);
+    final current = DateTime.tryParse(controller.text) ?? DateTime.now();
+    final initialDate = current.isBefore(firstDate)
+        ? firstDate
+        : current.isAfter(lastDate)
+        ? lastDate
+        : current;
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: label,
+    );
+    if (!mounted || selected == null) return;
+    controller.text = ChurchTime.dateText(selected);
+    ref.read(staffEventsProvider.notifier).clearFieldErrors();
+  }
+
+  Future<void> _chooseTime(
+    TextEditingController controller, {
+    required String label,
+    required TimeOfDay fallback,
+  }) async {
+    final parts = controller.text.split(':');
+    final parsed = parts.length == 2
+        ? (int.tryParse(parts[0]), int.tryParse(parts[1]))
+        : (null, null);
+    final initial =
+        parsed.$1 != null &&
+            parsed.$2 != null &&
+            parsed.$1! >= 0 &&
+            parsed.$1! <= 23 &&
+            parsed.$2! >= 0 &&
+            parsed.$2! <= 59
+        ? TimeOfDay(hour: parsed.$1!, minute: parsed.$2!)
+        : fallback;
+    final selected = await showTimePicker(
+      context: context,
+      initialTime: initial,
+      helpText: label,
+    );
+    if (!mounted || selected == null) return;
+    controller.text = MaterialLocalizations.of(context)
+        .formatTimeOfDay(selected, alwaysUse24HourFormat: true);
+    ref.read(staffEventsProvider.notifier).clearFieldErrors();
+  }
+
   /// What is typed, or null while something required is missing or unread.
   EventInput? _input() {
     final starts = ChurchTime.parse(_startDate.text, _startTime.text);
@@ -911,6 +964,7 @@ class _EventFormState extends ConsumerState<_EventForm> {
       String? hint,
       int maxLength = 120,
       int maxLines = 1,
+      Widget? suffixIcon,
     }) => Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: TextField(
@@ -924,6 +978,7 @@ class _EventFormState extends ConsumerState<_EventForm> {
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,
+          suffixIcon: suffixIcon,
           errorText: wire == null ? null : _fieldError(wire, errors[wire]),
         ),
       ),
@@ -963,6 +1018,13 @@ class _EventFormState extends ConsumerState<_EventForm> {
           hint: 'YYYY-MM-DD',
           wire: 'starts_at',
           maxLength: 10,
+          suffixIcon: IconButton(
+            tooltip: 'Choose start date',
+            onPressed: widget.busy
+                ? null
+                : () => _chooseDate(_startDate, label: 'Choose start date'),
+            icon: const Icon(Icons.calendar_today_outlined),
+          ),
         ),
         field(
           'event-start-time',
@@ -970,6 +1032,17 @@ class _EventFormState extends ConsumerState<_EventForm> {
           'Starts: time',
           hint: 'HH:MM',
           maxLength: 5,
+          suffixIcon: IconButton(
+            tooltip: 'Choose start time',
+            onPressed: widget.busy
+                ? null
+                : () => _chooseTime(
+                    _startTime,
+                    label: 'Choose start time',
+                    fallback: const TimeOfDay(hour: 9, minute: 0),
+                  ),
+            icon: const Icon(Icons.schedule_outlined),
+          ),
         ),
         field(
           'event-end-date',
@@ -978,6 +1051,13 @@ class _EventFormState extends ConsumerState<_EventForm> {
           hint: 'YYYY-MM-DD',
           wire: 'ends_at',
           maxLength: 10,
+          suffixIcon: IconButton(
+            tooltip: 'Choose end date',
+            onPressed: widget.busy
+                ? null
+                : () => _chooseDate(_endDate, label: 'Choose end date'),
+            icon: const Icon(Icons.calendar_today_outlined),
+          ),
         ),
         field(
           'event-end-time',
@@ -985,6 +1065,17 @@ class _EventFormState extends ConsumerState<_EventForm> {
           'Ends: time',
           hint: 'HH:MM',
           maxLength: 5,
+          suffixIcon: IconButton(
+            tooltip: 'Choose end time',
+            onPressed: widget.busy
+                ? null
+                : () => _chooseTime(
+                    _endTime,
+                    label: 'Choose end time',
+                    fallback: const TimeOfDay(hour: 12, minute: 0),
+                  ),
+            icon: const Icon(Icons.schedule_outlined),
+          ),
         ),
         field(
           'event-location',

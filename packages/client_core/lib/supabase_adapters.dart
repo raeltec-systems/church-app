@@ -9,6 +9,7 @@ export 'src/adapters/supabase_banner_repository.dart';
 export 'src/adapters/supabase_cells_repository.dart';
 export 'src/adapters/supabase_command_gateway.dart';
 export 'src/adapters/supabase_content_repository.dart';
+export 'src/adapters/supabase_bible_repository.dart';
 export 'src/adapters/supabase_credential_review_repository.dart';
 export 'src/adapters/supabase_duties_repository.dart';
 export 'src/adapters/supabase_followups_repository.dart';

@@ -288,10 +288,10 @@ void main() {
     await pumpMobile(tester);
     expect(find.text('Status: operational'), findsOneWidget);
     // Story 6.1: no member access still gets the public tabs, and the top
-    // bar's way in (story 6.3: Give between Home and Calendar).
+    // bar's way in (Bible & Hymns and Give between Home and Calendar).
     final list = tester.getSemantics(find.bySemanticsLabel('App sections'));
     expect(list.role, SemanticsRole.tabBar);
-    for (final label in ['Home', 'Give', 'Calendar']) {
+    for (final label in ['Home', 'Bible & Hymns', 'Give', 'Calendar']) {
       final tab = tester.getSemantics(find.bySemanticsLabel(label).last);
       expect(tab.role, SemanticsRole.tab, reason: label);
     }
@@ -395,86 +395,169 @@ void main() {
   );
 
   testWidgets(
-    'story 6.3: a signed-out phone has Home, Give and Calendar, opens How to '
-    'give and copies a method\'s values',
+    'story 6.6: signed-out readers open cleared chapters and navigate by availability',
     (tester) async {
-      const airtel = '61616161-6161-4161-8161-616161616161';
-      final copied = <String>[];
-      final messenger = tester.binding.defaultBinaryMessenger;
-      messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
-        if (call.method == 'Clipboard.setData') {
-          copied.add((call.arguments as Map)['text'] as String);
-        }
-        return null;
-      });
-      addTearDown(
-        () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
-      );
+      const translationId = '61616161-6161-4161-8161-616161616161';
+      final genesis = BibleChapterRef(bookId: 'GEN', chapter: 1);
+      final exodus = BibleChapterRef(bookId: 'EXO', chapter: 1);
       final h = await pumpMobile(
         tester,
-        location: ClientPaths.home,
+        location: ClientPaths.bible,
         setUp: (h) {
           h.session.switchTo(null);
-          h.giving.publicMethods = AccessReadOk(
-            PublicGivingMethods.fromJson(
-              publicGivingMethodsData([
-                publicGivingMethodData(),
-                publicBankMethodData(),
-              ]),
+          h.bible.translations = AccessReadOk(
+            PublicBibleTranslations([
+              BibleTranslation(
+                id: translationId,
+                code: 'KJV',
+                name: 'King James Version',
+                chapters: [genesis, exodus],
+                offlineAllowed: false,
+              ),
+            ]),
+          );
+          h.bible.chapters[(translationId, genesis)] = AccessReadOk(
+            PublicBibleChapter(
+              translationId: translationId,
+              translationCode: 'KJV',
+              translationName: 'King James Version',
+              reference: genesis,
+              verses: const [
+                BibleVerse(number: 1, text: 'SYNTHETIC Genesis verse one'),
+              ],
+              publicationRevision: 1,
+              publishedAt: DateTime.utc(2026, 10, 22),
+              offlineAllowed: false,
             ),
           );
-          h.giving.publicMethod[airtel] = AccessReadOk(
-            PublicGivingMethodRead.fromJson({
-              'sample': true,
-              'method': publicGivingMethodData(),
-            }),
+          h.bible.chapters[(translationId, exodus)] = AccessReadOk(
+            PublicBibleChapter(
+              translationId: translationId,
+              translationCode: 'KJV',
+              translationName: 'King James Version',
+              reference: exodus,
+              verses: const [
+                BibleVerse(number: 1, text: 'SYNTHETIC Exodus verse one'),
+              ],
+              publicationRevision: 1,
+              publishedAt: DateTime.utc(2026, 10, 22),
+              offlineAllowed: false,
+            ),
           );
         },
       );
-      // The tabs, left to right: Home, Give, Calendar.
-      final xs = [
-        for (final path in ['/home', '/give', '/calendar'])
-          tester.getCenter(find.byKey(Key('nav-$path'))).dx,
-      ];
-      expect(xs, orderedEquals([...xs]..sort()));
-      await tapKey(tester, 'nav-/give');
-      await tester.pumpAndSettle();
-      expect(find.byType(GiveScreen), findsOneWidget);
-      expect(find.text('How to give'), findsOneWidget);
-      // The Give root keeps the top bar and its Sign in.
+
+      expect(find.byType(BibleReaderScreen), findsOneWidget);
+      expect(find.text('Genesis 1'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Text &&
+              widget.textSpan?.toPlainText().contains(
+                    'SYNTHETIC Genesis verse one',
+                  ) ==
+                  true,
+        ),
+        findsOneWidget,
+      );
       expect(find.text('Sign in'), findsOneWidget);
-      await tapKey(tester, 'give-method-$airtel');
+      expect(find.text('Save offline'), findsNothing);
+      await tapKey(tester, 'bible-next');
       await tester.pumpAndSettle();
-      // The detail is pushed over the Give tab, with its own back bar.
-      expect(find.byType(GiveMethodScreen), findsOneWidget);
-      expect(find.byType(BackButton), findsOneWidget);
-      expect(find.text('Sign in'), findsNothing);
-      expect(find.byKey(const Key('give-sample')), findsOneWidget);
-      await tapKey(tester, 'give-copy-merchant_id');
-      await tester.pumpAndSettle();
-      expect(copied, ['000000']);
-      expect(find.byKey(const Key('give-step-1')), findsOneWidget);
-      expect(find.byKey(const Key('give-beneficiary-check')), findsOneWidget);
+      expect(find.text('Exodus 1'), findsOneWidget);
       expect(
-        tester.widget<Text>(find.byKey(const Key('give-verified'))).data,
-        'Details checked by the church on 28 Sep 2026',
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Text &&
+              widget.textSpan?.toPlainText().contains(
+                    'SYNTHETIC Exodus verse one',
+                  ) ==
+                  true,
+        ),
+        findsOneWidget,
       );
-      expect(
-        tester.widget<Text>(find.byKey(const Key('give-method-contact'))).data,
-        'Questions? SAMPLE church office, +260 97 000 0000',
-      );
-      // The Give tab stays selected on the detail.
-      expect(
-        tester.widget<NavItem>(find.byKey(const Key('nav-/give'))).selected,
-        isTrue,
-      );
-      expect(h.giving.publicMethodAsked, [airtel]);
-      await tester.tap(find.byType(BackButton));
-      await tester.pumpAndSettle();
-      expect(find.byType(GiveScreen), findsOneWidget);
-      expect(tester.takeException(), isNull);
+      expect(h.bible.chapterCalls.last, (translationId, exodus));
     },
   );
+
+  testWidgets('story 6.3: a signed-out phone has Home, Bible & Hymns, Give and Calendar, opens How to '
+      'give and copies a method\'s values', (tester) async {
+    const airtel = '61616161-6161-4161-8161-616161616161';
+    final copied = <String>[];
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied.add((call.arguments as Map)['text'] as String);
+      }
+      return null;
+    });
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    final h = await pumpMobile(
+      tester,
+      location: ClientPaths.home,
+      setUp: (h) {
+        h.session.switchTo(null);
+        h.giving.publicMethods = AccessReadOk(
+          PublicGivingMethods.fromJson(
+            publicGivingMethodsData([
+              publicGivingMethodData(),
+              publicBankMethodData(),
+            ]),
+          ),
+        );
+        h.giving.publicMethod[airtel] = AccessReadOk(
+          PublicGivingMethodRead.fromJson({
+            'sample': true,
+            'method': publicGivingMethodData(),
+          }),
+        );
+      },
+    );
+    // The tabs, left to right: Home, Bible & Hymns, Give, Calendar.
+    final xs = [
+      for (final path in ['/home', '/bible', '/give', '/calendar'])
+        tester.getCenter(find.byKey(Key('nav-$path'))).dx,
+    ];
+    expect(xs, orderedEquals([...xs]..sort()));
+    await tapKey(tester, 'nav-/give');
+    await tester.pumpAndSettle();
+    expect(find.byType(GiveScreen), findsOneWidget);
+    expect(find.text('How to give'), findsOneWidget);
+    // The Give root keeps the top bar and its Sign in.
+    expect(find.text('Sign in'), findsOneWidget);
+    await tapKey(tester, 'give-method-$airtel');
+    await tester.pumpAndSettle();
+    // The detail is pushed over the Give tab, with its own back bar.
+    expect(find.byType(GiveMethodScreen), findsOneWidget);
+    expect(find.byType(BackButton), findsOneWidget);
+    expect(find.text('Sign in'), findsNothing);
+    expect(find.byKey(const Key('give-sample')), findsOneWidget);
+    await tapKey(tester, 'give-copy-merchant_id');
+    await tester.pumpAndSettle();
+    expect(copied, ['000000']);
+    expect(find.byKey(const Key('give-step-1')), findsOneWidget);
+    expect(find.byKey(const Key('give-beneficiary-check')), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('give-verified'))).data,
+      'Details checked by the church on 28 Sep 2026',
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const Key('give-method-contact'))).data,
+      'Questions? SAMPLE church office, +260 97 000 0000',
+    );
+    // The Give tab stays selected on the detail.
+    expect(
+      tester.widget<NavItem>(find.byKey(const Key('nav-/give'))).selected,
+      isTrue,
+    );
+    expect(h.giving.publicMethodAsked, [airtel]);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(find.byType(GiveScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final (size, mode) in [
     (const Size(390, 844), ThemeMode.light),
@@ -614,12 +697,25 @@ void main() {
       expect(h.banners.publicCalls, greaterThanOrEqualTo(1));
       expect(find.byKey(const Key('home-banners')), findsOneWidget);
       expect(
-        tester.getTopLeft(find.byKey(const Key('home-banner-$theme'))).dx,
-        lessThan(
-          tester.getTopLeft(find.byKey(const Key('home-banner-$campaign'))).dx,
+        tester.getSize(find.byKey(const Key('home-banner-$theme'))).width,
+        closeTo(
+          tester.getSize(find.byKey(const Key('home-banners'))).width,
+          0.01,
         ),
       );
+      expect(find.byKey(const Key('home-banner-$campaign')), findsNothing);
       expect(find.text('THEME FOR 2026'), findsOneWidget);
+      await tester.drag(
+        find.byKey(const Key('home-banners')),
+        const Offset(-500, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('home-banner-$campaign')), findsOneWidget);
+      await tester.drag(
+        find.byKey(const Key('home-banners')),
+        const Offset(500, 0),
+      );
+      await tester.pumpAndSettle();
       await tapKey(tester, 'home-banner-open-$theme');
       await tester.pumpAndSettle();
       expect(find.byType(BannerScreen), findsOneWidget);
@@ -627,30 +723,31 @@ void main() {
     },
   );
 
-  testWidgets('a member gets the same Home, Give and Calendar tabs', (
-    tester,
-  ) async {
-    final handle = tester.ensureSemantics();
-    await pumpMember(tester);
-    for (final label in ['Home', 'Give', 'Calendar']) {
-      final tab = tester.getSemantics(find.bySemanticsLabel(label).last);
-      expect(tab.role, SemanticsRole.tab, reason: label);
-    }
-    // Story 6.1: My duties and My cell left the tab bar for their Home cards
-    // and the Account menu.
-    expect(find.byKey(const Key('nav-/duties')), findsNothing);
-    expect(find.byKey(const Key('nav-/my-cell')), findsNothing);
-    final list = tester.getSemantics(find.bySemanticsLabel('App sections'));
-    expect(list.role, SemanticsRole.tabBar);
-    // The internal screens have no tab.
-    for (final path in ['/status', '/fixture', '/access']) {
-      expect(find.byKey(Key('nav-$path')), findsNothing, reason: path);
-    }
-    // Home's top bar: the inbox and the member's initials.
-    expect(find.byKey(const Key('nav-/inbox')), findsOneWidget);
-    expect(find.text('MO'), findsOneWidget);
-    handle.dispose();
-  });
+  testWidgets(
+    'a member gets the same Home, Bible & Hymns, Give and Calendar tabs',
+    (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpMember(tester);
+      for (final label in ['Home', 'Bible & Hymns', 'Give', 'Calendar']) {
+        final tab = tester.getSemantics(find.bySemanticsLabel(label).last);
+        expect(tab.role, SemanticsRole.tab, reason: label);
+      }
+      // Story 6.1: My duties and My cell left the tab bar for their Home cards
+      // and the Account menu.
+      expect(find.byKey(const Key('nav-/duties')), findsNothing);
+      expect(find.byKey(const Key('nav-/my-cell')), findsNothing);
+      final list = tester.getSemantics(find.bySemanticsLabel('App sections'));
+      expect(list.role, SemanticsRole.tabBar);
+      // The internal screens have no tab.
+      for (final path in ['/status', '/fixture', '/access']) {
+        expect(find.byKey(Key('nav-$path')), findsNothing, reason: path);
+      }
+      // Home's top bar: the inbox and the member's initials.
+      expect(find.byKey(const Key('nav-/inbox')), findsOneWidget);
+      expect(find.text('MO'), findsOneWidget);
+      handle.dispose();
+    },
+  );
 
   testWidgets(
     'story 2.1: account tab -> member summary; sign out; phone sign-in again',
@@ -1366,9 +1463,9 @@ void main() {
       await tester.pump();
       seen.add(navLabel());
     }
-    // The page's own controls come first, then Home, Give and Calendar.
+    // The page's own controls come first, then Home, Bible & Hymns, Give and Calendar.
     final tabs = seen.whereType<String>().toList();
-    expect(tabs, ['Home', 'Give', 'Calendar']);
+    expect(tabs, ['Home', 'Bible & Hymns', 'Give', 'Calendar']);
     expect(seen.first, isNull);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
@@ -1384,7 +1481,7 @@ void main() {
     testWidgets('2x text, $size $mode: every tab, no overflow', (tester) async {
       await pumpMember(tester, size: size, textScale: 2, themeMode: mode);
       expect(tester.takeException(), isNull);
-      for (final path in ['/calendar', '/give', '/home']) {
+      for (final path in ['/calendar', '/give', '/bible', '/home']) {
         await tapKey(tester, 'nav-$path');
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull, reason: path);

@@ -215,6 +215,13 @@ const staffEventsDestination = (
   icon: Icons.event_outlined,
 );
 
+/// Story 6.6: Bible translation imports and rights-aware publication.
+const staffBibleDestination = (
+  path: ClientPaths.contentBible,
+  label: 'Bible',
+  icon: Icons.menu_book_outlined,
+);
+
 /// Story 6.3: shown while the server's current answer includes Admin: the
 /// church's giving methods, verified by a second Admin before publishing.
 const staffGivingDestination = (
@@ -303,6 +310,7 @@ List<StaffNavGroup> staffNavGroupsFor(
       label: 'Content',
       items: [
         if (editsContent(grants)) staffEventsDestination,
+        if (editsContent(grants)) staffBibleDestination,
         if (editsContent(grants)) staffBannersDestination,
         if (editsContent(grants)) staffRightsDestination,
         if (editsContent(grants)) staffAnnouncementsDestination,
@@ -353,6 +361,24 @@ class StaffSidebarController extends Notifier<bool> {
 
 final staffSidebarCollapsedProvider =
     NotifierProvider<StaffSidebarController, bool>(StaffSidebarController.new);
+
+/// Per-session expansion state for the named staff work areas. Unset areas
+/// start open only when they contain the current page, so the sidebar stays
+/// short without hiding the section a staff member is using.
+class StaffNavSectionsController extends Notifier<Map<String, bool>> {
+  @override
+  Map<String, bool> build() => const {};
+
+  void toggle(String label, {required bool expanded}) =>
+      state = {...state, label: !expanded};
+
+  void expand(String label) => state = {...state, label: true};
+}
+
+final staffNavSectionsProvider =
+    NotifierProvider<StaffNavSectionsController, Map<String, bool>>(
+      StaffNavSectionsController.new,
+    );
 
 class StaffApp extends StatefulWidget {
   const StaffApp({super.key, this.initialLocation = ClientPaths.overview});
@@ -434,10 +460,11 @@ class StaffShell extends ConsumerWidget {
     final viewGrants = ref.watch(staffViewGrantsProvider);
     final groups = staffNavGroupsFor(viewGrants, signedIn: true);
     final badges = _badges(ref, viewGrants);
+    final sectionExpansion = ref.watch(staffNavSectionsProvider);
     final wide = _wide(context);
     final collapsed = wide && ref.watch(staffSidebarCollapsedProvider);
 
-    Widget item(StaffDestination d, {required bool compact}) {
+    Widget item(StaffDestination d, {required bool compact, String? group}) {
       final badge = badges[d.path];
       return NavItem(
         key: Key('nav-${d.path}'),
@@ -450,7 +477,12 @@ class StaffShell extends ConsumerWidget {
         badge: badge?.$1,
         badgeLabel: badge?.$2,
         autofocus: focusSelectedNav && location == d.path,
-        onTap: () => goFromNav(context, d.path),
+        onTap: () {
+          if (group != null) {
+            ref.read(staffNavSectionsProvider.notifier).expand(group);
+          }
+          goFromNav(context, d.path);
+        },
       );
     }
 
@@ -458,6 +490,11 @@ class StaffShell extends ConsumerWidget {
     if (wide) {
       for (var i = 0; i < groups.length; i++) {
         final g = groups[i];
+        final label = g.label;
+        final expanded = label == null
+            ? true
+            : sectionExpansion[label] ??
+                  g.items.any((destination) => destination.path == location);
         if (g.label case final label?) {
           navChildren.add(
             collapsed
@@ -470,23 +507,31 @@ class StaffShell extends ConsumerWidget {
                       ),
                     ),
                   )
-                : _GroupLabel(label),
+                : _GroupLabel(
+                    label,
+                    expanded: expanded,
+                    onPressed: () => ref
+                        .read(staffNavSectionsProvider.notifier)
+                        .toggle(label, expanded: expanded),
+                  ),
           );
         }
-        for (final d in g.items) {
-          navChildren.add(item(d, compact: collapsed));
+        if (label == null || collapsed || expanded) {
+          for (final d in g.items) {
+            navChildren.add(item(d, compact: collapsed, group: label));
+          }
         }
       }
     }
-    Widget tabList(Widget child) => Semantics(
-      role: SemanticsRole.tabBar,
+    Widget navList(Widget child) => Semantics(
+      role: wide ? SemanticsRole.list : SemanticsRole.tabBar,
       label: 'Staff sections',
       explicitChildNodes: true,
       child: child,
     );
     final nav = FocusTraversalGroup(
       child: wide
-          ? tabList(
+          ? navList(
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: navChildren,
@@ -496,7 +541,7 @@ class StaffShell extends ConsumerWidget {
           // bar, never the page, however many destinations there are.
           : SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              child: tabList(
+              child: navList(
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -504,7 +549,7 @@ class StaffShell extends ConsumerWidget {
                       for (final d in g.items) ...[
                         ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 420),
-                          child: item(d, compact: false),
+                          child: item(d, compact: false, group: g.label),
                         ),
                         const SizedBox(width: 4),
                       ],
@@ -735,24 +780,59 @@ class _Brand extends StatelessWidget {
   );
 }
 
-/// A sidebar group's name: sentence case, 12/600, the quiet tint. Visual
-/// only: the tab list holds tabs alone.
+/// A collapsible sidebar group's name. Sentence case and a quiet tint keep
+/// the work areas readable without making the navigation taller than needed.
 class _GroupLabel extends StatelessWidget {
-  const _GroupLabel(this.label);
+  const _GroupLabel(
+    this.label, {
+    required this.expanded,
+    required this.onPressed,
+  });
 
   final String label;
+  final bool expanded;
+  final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => ExcludeSemantics(
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(12, 16, 12, 6),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontFamily: ChurchFonts.body,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: ChurchStaffChrome.groupLabel,
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 8, bottom: 2),
+    child: FocusRing(
+      color: ChurchStaffChrome.onSidebar,
+      radius: 8,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: Key('nav-group-$label'),
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(8),
+          child: Semantics(
+            button: true,
+            expanded: expanded,
+            label: '$label section',
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: const TextStyle(
+                        fontFamily: ChurchFonts.body,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: ChurchStaffChrome.groupLabel,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    expanded ? Icons.expand_less : Icons.expand_more,
+                    size: 18,
+                    color: ChurchStaffChrome.groupLabel,
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     ),

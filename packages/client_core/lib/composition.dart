@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'src/adapters/auth_session_storage.dart';
+import 'src/adapters/bible_package_source.dart';
 import 'src/adapters/content_file_picker.dart';
 import 'src/adapters/recovery_verifier_storage.dart';
 import 'src/application/providers.dart';
@@ -16,6 +17,13 @@ import 'src/domain/password_recovery.dart';
 import 'supabase_adapters.dart';
 
 export 'package:flutter_riverpod/misc.dart' show Override;
+
+/// Installs the source bundle only in the staff composition root. Mobile
+/// builds do not bundle the 4 MB editor-only package.
+Override staffBiblePackageSourceOverride() =>
+    bibleTranslationPackageSourceProvider.overrideWithValue(
+      const BundledBibleTranslationPackageSource(),
+    );
 
 /// Client configuration, supplied only through `--dart-define`.
 ///
@@ -93,6 +101,7 @@ Future<List<Override>> compositionOverrides(
     contentRepositoryProvider.overrideWithValue(
       SupabaseContentRepository(client),
     ),
+    bibleRepositoryProvider.overrideWithValue(SupabaseBibleRepository(client)),
     givingRepositoryProvider.overrideWithValue(
       SupabaseGivingRepository(client),
     ),

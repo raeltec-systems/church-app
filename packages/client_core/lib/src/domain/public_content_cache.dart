@@ -3,12 +3,14 @@ import 'dart:typed_data';
 import 'content_banners.dart';
 import 'content_events.dart';
 import 'content_giving.dart';
+import 'content_bible.dart';
 
 /// The only public list reads that may enter a mobile offline snapshot.
 abstract final class PublicContentCacheKeys {
   static const calendar = 'content_public_events';
   static const homeBanners = 'content_public_banners';
   static const givingMethods = 'content_public_giving_methods';
+  static const bibleChapter = 'content_public_bible_chapter';
 }
 
 /// A saved, anonymous public list projection and when the complete snapshot
@@ -62,6 +64,10 @@ abstract interface class PublicContentCache {
 
   Future<PublicContentSnapshot<PublicGivingMethods>?> readGivingMethods();
 
+  /// The most recently saved offline-cleared chapter. This independent lookup
+  /// supports a cold launch before any network catalog call can succeed.
+  Future<PublicContentSnapshot<PublicBibleChapter>?> readBibleChapter();
+
   /// Remove a method after a successful fresh detail read says it is hidden.
   Future<void> removeGivingMethod(String methodId);
 
@@ -96,6 +102,10 @@ class NoPublicContentCache implements PublicContentCache {
   @override
   Future<PublicContentSnapshot<PublicGivingMethods>?>
   readGivingMethods() async => null;
+
+  @override
+  Future<PublicContentSnapshot<PublicBibleChapter>?> readBibleChapter() async =>
+      null;
 
   @override
   Future<void> removeGivingMethod(String methodId) async {}

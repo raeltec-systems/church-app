@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,8 +29,7 @@ abstract final class BannerPaths {
   static const rights = '/content/rights';
 }
 
-/// The carousel's card width and gap (handoff).
-const _cardWidth = 310.0;
+/// The carousel gap; each card fills the same Home column as the member cards.
 const _cardGap = 12.0;
 
 /// What a screen reader hears for a banner card.
@@ -100,7 +97,7 @@ class _HomeBannersCarouselState extends ConsumerState<HomeBannersCarousel> {
         return gap(
           LayoutBuilder(
             builder: (context, box) {
-              final w = math.min(_cardWidth, box.maxWidth);
+              final w = box.maxWidth;
               return Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: Container(
@@ -181,7 +178,7 @@ class _Carousel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, box) {
-      final w = math.min(_cardWidth, box.maxWidth);
+      final w = box.maxWidth;
       return SizedBox(
         height: w * 9 / 16,
         child: ListView.separated(

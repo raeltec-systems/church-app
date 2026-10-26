@@ -38,17 +38,21 @@ select results_eq(
       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
      where n.nspname in ('app', 'api') and has_function_privilege('anon', p.oid, 'EXECUTE')
      order by 1$$,
-  $$values ('api.content_public_announcement'::text collate "C"), ('api.content_public_announcements'),
+  $$values ('api.content_bible_manifest'::text collate "C"),
+           ('api.content_public_announcement'), ('api.content_public_announcements'),
            ('api.content_public_banners'),
+           ('api.content_public_bible_chapter'), ('api.content_public_bible_translations'),
            ('api.content_public_event'), ('api.content_public_events'),
            ('api.content_public_giving_method'), ('api.content_public_giving_methods'),
            ('api.system_command'),
+           ('app.content_bible_manifest_json'),
            ('app.content_public_announcement'), ('app.content_public_announcements'),
            ('app.content_public_banners'),
+           ('app.content_public_bible_chapter'), ('app.content_public_bible_translations'),
            ('app.content_public_event'), ('app.content_public_events'),
            ('app.content_public_giving_method'), ('app.content_public_giving_methods'),
            ('app.sys_command')$$,
-  'anon can execute only the system route pair and the Content public reads (stories 6.1, 6.2, 6.3, 6.13)'
+  'anon can execute only the system route pair and the Content public reads (stories 6.1, 6.2, 6.3, 6.6, 6.13)'
 );
 select results_eq(
   $$select (n.nspname || '.' || p.proname)::text collate "C"
@@ -57,14 +61,15 @@ select results_eq(
      order by 1$$,
   $$values ('api.cells_admin_overview'::text collate "C"), ('api.cells_command'),
            ('api.cells_leader_queue'), ('api.cells_meeting_programme'), ('api.cells_meetings'), ('api.cells_my_cell'), ('api.cells_private_fixture_read'), ('api.cells_programme'),
-           ('api.cells_signup_options'), ('api.content_asset_preview'), ('api.content_command'),
+           ('api.cells_signup_options'), ('api.content_asset_preview'), ('api.content_bible_manifest'), ('api.content_command'),
            ('api.content_file_plan'),
            ('api.content_public_announcement'), ('api.content_public_announcements'),
            ('api.content_public_banners'),
+           ('api.content_public_bible_chapter'), ('api.content_public_bible_translations'),
            ('api.content_public_event'), ('api.content_public_events'),
            ('api.content_public_giving_method'), ('api.content_public_giving_methods'),
            ('api.content_staff_announcements'), ('api.content_staff_banners'),
-           ('api.content_staff_events'), ('api.content_staff_giving_methods'),
+           ('api.content_staff_bibles'), ('api.content_staff_events'), ('api.content_staff_giving_methods'),
            ('api.content_staff_rights'),
            ('api.duties_admin_overview'), ('api.duties_candidates'), ('api.duties_command'),
            ('api.duties_coverage'),
@@ -95,14 +100,15 @@ select results_eq(
            ('api.notifications_open_item'),
            ('api.system_command'), ('app.cells_admin_overview'), ('app.cells_command'),
            ('app.cells_leader_queue'), ('app.cells_meeting_programme'), ('app.cells_meetings'), ('app.cells_my_cell'), ('app.cells_private_fixture_read'), ('app.cells_programme'),
-           ('app.cells_signup_options'), ('app.content_asset_preview'), ('app.content_command'),
+           ('app.cells_signup_options'), ('app.content_asset_preview'), ('app.content_bible_manifest_json'), ('app.content_command'),
            ('app.content_file_plan'),
            ('app.content_public_announcement'), ('app.content_public_announcements'),
            ('app.content_public_banners'),
+           ('app.content_public_bible_chapter'), ('app.content_public_bible_translations'),
            ('app.content_public_event'), ('app.content_public_events'),
            ('app.content_public_giving_method'), ('app.content_public_giving_methods'),
            ('app.content_staff_announcements'), ('app.content_staff_banners'),
-           ('app.content_staff_events'), ('app.content_staff_giving_methods'),
+           ('app.content_staff_bibles'), ('app.content_staff_events'), ('app.content_staff_giving_methods'),
            ('app.content_staff_rights'),
            ('app.duties_admin_overview'), ('app.duties_candidates'), ('app.duties_command'),
            ('app.duties_coverage'),
@@ -132,7 +138,7 @@ select results_eq(
            ('app.notifications_my_inbox'), ('app.notifications_my_push_settings'),
            ('app.notifications_open_item'),
            ('app.sys_command')$$,
-  'authenticated can execute only the command wrappers, the live-access-checked identity reads (stories 2.1, 2.3), the applicant reads and command (2.4), the Admin review command and reads (2.5), the recovery-email command and reads (2.7), the credential-review command and reads (2.8), the assisted-recovery command and read (2.9), the lifecycle command and reads (2.10), the deletion command and read (2.11), the cells command and reads (2.6), the content command, public reads and editors'' reads (6.1, 6.13), the duties command and reads (4.1, 4.3 rota, 4.4 candidates, the Pastors'' special assignments), the follow-ups command and reads (4.6), the member inbox read (3.1) and item open (3.2), the device and push-settings command and read (3.5), the content-free reminder health read (3.8, api wrapper only; its app body stays private), the synthetic scoped (2.3) and cell-private (2.6) fixture reads, the synthetic reminder command (3.1) and their definer entry points (the system route refuses sessions)'
+  'authenticated can execute only the command wrappers, the live-access-checked identity reads (stories 2.1, 2.3), the applicant reads and command (2.4), the Admin review command and reads (2.5), the recovery-email command and reads (2.7), the credential-review command and reads (2.8), the assisted-recovery command and read (2.9), the lifecycle command and reads (2.10), the deletion command and read (2.11), the cells command and reads (2.6), the content command, public reads and editors'' reads (6.1, 6.6, 6.13), the duties command and reads (4.1, 4.3 rota, 4.4 candidates, the Pastors'' special assignments), the follow-ups command and reads (4.6), the member inbox read (3.1) and item open (3.2), the device and push-settings command and read (3.5), the content-free reminder health read (3.8, api wrapper only; its app body stays private), the synthetic scoped (2.3) and cell-private (2.6) fixture reads, the synthetic reminder command (3.1) and their definer entry points (the system route refuses sessions)'
 );
 select is_definer('app', 'fixture_counter_command',
   array['jsonb'], 'the app entry point is SECURITY DEFINER');

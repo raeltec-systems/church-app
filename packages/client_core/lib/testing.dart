@@ -21,6 +21,7 @@ import 'src/domain/commands.dart';
 import 'src/domain/content_announcements.dart';
 import 'src/domain/content_banners.dart';
 import 'src/domain/content_events.dart';
+import 'src/domain/content_bible.dart';
 import 'src/domain/public_content_cache.dart';
 import 'src/domain/content_giving.dart';
 import 'src/domain/credential_review.dart';
@@ -589,6 +590,58 @@ class FakeContent implements ContentRepository {
   }
 }
 
+/// [BibleRepository] answered by tests (story 6.6).
+class FakeBible implements BibleRepository {
+  AccessRead<PublicBibleTranslations> translations = AccessReadOk(
+    const PublicBibleTranslations([]),
+  );
+  AccessRead<StaffBibleTranslations> staff = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  final Map<(String, BibleChapterRef), AccessRead<PublicBibleChapter?>>
+  chapters = {};
+  final Map<String, AccessRead<BibleVerseManifest>> manifests = {};
+  int translationCalls = 0;
+  int staffCalls = 0;
+  final chapterCalls = <(String, BibleChapterRef)>[];
+
+  @override
+  Future<AccessRead<PublicBibleTranslations>> fetchPublicTranslations() async {
+    translationCalls++;
+    return translations;
+  }
+
+  @override
+  Future<AccessRead<PublicBibleChapter?>> fetchPublicChapter(
+    String translationId,
+    BibleChapterRef reference,
+  ) async {
+    final key = (translationId, reference);
+    chapterCalls.add(key);
+    return chapters[key] ?? const AccessReadOk(null);
+  }
+
+  @override
+  Future<AccessRead<BibleVerseManifest>> fetchVerseManifest(
+    String code,
+  ) async =>
+      manifests[code] ?? const AccessReadDenied(AccessDenial.unavailable);
+
+  @override
+  Future<AccessRead<StaffBibleTranslations>> fetchStaffTranslations() async {
+    staffCalls++;
+    return staff;
+  }
+}
+
+class FakeBibleTranslationPackageSource
+    implements BibleTranslationPackageSource {
+  String worldEnglishBibleVpl = '';
+
+  @override
+  Future<String> loadWorldEnglishBibleVpl() async => worldEnglishBibleVpl;
+}
+
 /// The wire form of one published event as everyone reads it (story 6.1);
 /// by default the two-day SYNTHETIC Harvest Thanksgiving (Sat 10 Oct 2099
 /// 09:00 to Sun 11 Oct 12:00 church time).
@@ -1145,6 +1198,7 @@ class FakePublicContentCache implements PublicContentCache {
   PublicContentSnapshot<PublicEvents>? events;
   PublicContentSnapshot<PublicBanners>? banners;
   PublicContentSnapshot<PublicGivingMethods>? givingMethods;
+  PublicContentSnapshot<PublicBibleChapter>? bibleChapter;
   final reads = <String>[];
   final writes = <(String, Object)>[];
   final imageFetches = <String>[];
@@ -1168,6 +1222,12 @@ class FakePublicContentCache implements PublicContentCache {
   readGivingMethods() async {
     reads.add(PublicContentCacheKeys.givingMethods);
     return givingMethods;
+  }
+
+  @override
+  Future<PublicContentSnapshot<PublicBibleChapter>?> readBibleChapter() async {
+    reads.add(PublicContentCacheKeys.bibleChapter);
+    return bibleChapter;
   }
 
   @override
@@ -1323,6 +1383,16 @@ class FakePublicContentCache implements PublicContentCache {
         savedRows: projection.methods.length,
       );
     }
+    if (readKey == PublicContentCacheKeys.bibleChapter &&
+        projection is PublicBibleChapter) {
+      if (!projection.offlineAllowed) {
+        return const PublicContentCacheRefused(
+          PublicContentCacheRefusal.offlineRightsNotCleared,
+        );
+      }
+      bibleChapter = PublicContentSnapshot(value: projection, savedAt: savedAt);
+      return PublicContentCacheSaved(savedAt: savedAt, savedRows: 1);
+    }
     return const PublicContentCacheRefused(
       PublicContentCacheRefusal.unsupportedRead,
     );
@@ -1334,6 +1404,7 @@ class FakePublicContentCache implements PublicContentCache {
 class FakeFilePicker implements ContentFilePicker {
   PickedFile? next;
   int picks = 0;
+  int csvPicks = 0;
 
   @override
   bool get supported => true;
@@ -1341,6 +1412,12 @@ class FakeFilePicker implements ContentFilePicker {
   @override
   Future<PickedFile?> pickImage() async {
     picks++;
+    return next;
+  }
+
+  @override
+  Future<PickedFile?> pickCsv() async {
+    csvPicks++;
     return next;
   }
 }
@@ -2815,6 +2892,8 @@ class ClientTestHarness {
   final review = FakeReview();
   final cells = FakeCells();
   final content = FakeContent();
+  final bible = FakeBible();
+  final biblePackageSource = FakeBibleTranslationPackageSource();
   final giving = FakeGiving();
   GivingDiallerLauncher? givingDiallerLauncher;
   final announcements = FakeAnnouncements();
@@ -2861,6 +2940,10 @@ class ClientTestHarness {
       reviewRepositoryProvider.overrideWithValue(review),
       cellsRepositoryProvider.overrideWithValue(cells),
       contentRepositoryProvider.overrideWithValue(content),
+      bibleRepositoryProvider.overrideWithValue(bible),
+      bibleTranslationPackageSourceProvider.overrideWithValue(
+        biblePackageSource,
+      ),
       givingRepositoryProvider.overrideWithValue(giving),
       givingDiallerLauncherProvider.overrideWithValue(
         givingDiallerLauncher ?? const UnavailableGivingDiallerLauncher(),

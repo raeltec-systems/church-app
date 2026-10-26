@@ -6,6 +6,7 @@ import '../domain/assisted_recovery.dart';
 import '../domain/cell_membership.dart';
 import '../domain/commands.dart';
 import '../domain/content_announcements.dart';
+import '../domain/content_bible.dart';
 import '../domain/content_banners.dart';
 import '../domain/content_events.dart';
 import '../domain/public_content_cache.dart';
@@ -102,6 +103,17 @@ final dutySpecialRepositoryProvider = Provider<DutySpecialRepository>(
 final contentRepositoryProvider = Provider<ContentRepository>(
   (ref) => const UnconfiguredContentRepository(),
 );
+
+/// Story 6.6: rights-cleared public Bible chapters and editor catalog.
+final bibleRepositoryProvider = Provider<BibleRepository>(
+  (ref) => const UnconfiguredBibleRepository(),
+);
+
+/// The reviewed WEB source package used by the staff translation installer.
+final bibleTranslationPackageSourceProvider =
+    Provider<BibleTranslationPackageSource>(
+      (ref) => const NoBibleTranslationPackageSource(),
+    );
 
 /// Story 6.3: the public giving reads (everyone) and the Admins' read.
 final givingRepositoryProvider = Provider<GivingRepository>(

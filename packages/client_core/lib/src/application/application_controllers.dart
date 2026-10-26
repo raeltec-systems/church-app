@@ -23,6 +23,9 @@ enum ApplicationNotice {
   /// The chosen cell is no longer offered or changed: the list was reloaded.
   cellListChanged,
 
+  /// The sign-in phone could not be used for the membership request.
+  phoneNeedsReview,
+
   /// The form has fields to fix.
   invalid,
   signInAgain,
@@ -251,7 +254,9 @@ class MembershipApplicationController extends Notifier<ApplicationState> {
         final errors = error.fieldErrors;
         final notice = switch (error.code) {
           ErrorCode.validationFailed =>
-            errors.keys.any((k) => k.startsWith('cell_choice.cell_'))
+            errors.containsKey('phone_username')
+                ? ApplicationNotice.phoneNeedsReview
+                : errors.keys.any((k) => k.startsWith('cell_choice.cell_'))
                 ? ApplicationNotice.cellListChanged
                 : ApplicationNotice.invalid,
           ErrorCode.conflict =>

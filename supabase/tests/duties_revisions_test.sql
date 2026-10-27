@@ -306,7 +306,9 @@ select is((select (j -> 'assignments' -> 0) - 'occurrence_id' - 'department_id' 
             -- Story 4.11 keys are checked in duties_owner_operations_test.sql.
             - 'cell_id'
             -- Special assignment keys are checked in duties_special_assignments_test.sql.
-            - 'due_on' from mine),
+            - 'due_on'
+            -- Story 6.12 checks event_ref in content_event_duty_links_test.sql.
+            - 'event_ref' from mine),
   jsonb_build_object('assignment_id', pg_temp.asg2(), 'revision', 1, 'response', 'pending', 'slot_revision', 2,
                      'changes', jsonb_build_array('starts_at', 'ends_at'), 'previous_response', 'accepted',
                      'previous_assignment_ids', jsonb_build_array(pg_temp.asg1()), 'notes_updated_at', null),

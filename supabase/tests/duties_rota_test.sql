@@ -435,8 +435,13 @@ select is((select string_agg(response, ',' order by s.position_no) from app.duti
 select is((select x ->> 'topic' || '|' || (x ->> 'scripture') from jsonb_array_elements(pg_temp.readj(4, 'select api.duties_my_duties()') -> 'assignments') x
             where x ->> 'assignment_id' = pg_temp.cur(1, 1)::text), 'SYNTHETIC Hope|Psalm 23',
   'the member reads the topic and scripture');
+-- Story 6.12: event_ref must name a published event of a registered event source (the 4.11
+-- SYNTHETIC fixture event stands in for Content here); an unknown id is refused.
+select app.contract_register_source_type('fixture', 'fixture_event', 'app.fixture_event_check(jsonb)'::regprocedure);
+select app.duties_register_link_source('fixture', 'fixture_event', 'event');
+insert into app.fixture_events (title) values ('SYNTHETIC 4.3 Event');
 create temp table ref1 as select pg_temp.duties(2, 'duties.revise_duty', pg_temp.orev(1), jsonb_build_object(
-  'occurrence_id', pg_temp.o(1), 'event_ref', gen_random_uuid())) as r;
+  'occurrence_id', pg_temp.o(1), 'event_ref', (select event_id from app.fixture_events where title = 'SYNTHETIC 4.3 Event'))) as r;
 select is((select (r #>> '{data,change}') || '|' || (r #>> '{data,notice_queued}') from ref1), 'reference|false',
   'a linked-event reference is recorded without a notice');
 select is((select change_class from app.duties_slot_revisions r join app.duties_slots s using (slot_id)

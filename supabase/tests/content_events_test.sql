@@ -133,6 +133,7 @@ select results_eq(
        and has_function_privilege('authenticated', p.oid, 'EXECUTE')
        and p.proname not like 'content\_%giving%' -- story 6.3 pins its own
        and p.proname not like '%rsvp%' -- story 6.11 pins its own
+       and p.proname not like '%duty_links%' -- story 6.12 pins its own
        and p.proname not like '%announcement%'
      order by 1$$,
   $$values ('api.content_command'::text collate "C"), ('api.content_public_event'), ('api.content_public_events'),

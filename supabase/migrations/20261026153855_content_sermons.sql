@@ -29,8 +29,10 @@ declare
   v_line text;
 begin
   if length(v_rest) > 20000 then return 'too_long'; end if;
+  -- U+2028 and U+2029 are line breaks to the app's renderer but not here: refuse them.
   if v_rest ~ '[<>`|]' or position('![' in v_rest) > 0
-     or position('~~' in v_rest) > 0 or position(chr(92) in v_rest) > 0 then
+     or position('~~' in v_rest) > 0 or position(chr(92) in v_rest) > 0
+     or position(chr(8232) in v_rest) > 0 or position(chr(8233) in v_rest) > 0 then
     return 'unsupported_markdown';
   end if;
   while position('[' in v_rest) > 0 loop

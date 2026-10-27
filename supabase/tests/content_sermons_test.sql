@@ -139,7 +139,12 @@ from unnest(array['<script>alert(1)</script>','![image](https://ebible.org/a.png
   '[x](https://ebible.org/ "title")','`code`','> quote','a | table','~~strike~~',
   '    indented code','####### too deep','[x](https://ebible.org/(nested))',
   '[x](https://ebible.org/'||chr(92)||'evil)', 'https://ebible.org/', 'WWW.ebible.org',
-  '[line'||chr(10)||'break](https://ebible.org/)', '[x](https://ebible.org/[bad])']) notes;
+  '[line'||chr(10)||'break](https://ebible.org/)', '[x](https://ebible.org/[bad])',
+  'Intro'||chr(8232)||'#######', 'Intro'||chr(8233)||'---']) notes;
+select is(app.content_sermon_notes_error(repeat('a', 19990) || repeat(chr(128512), 10)), null,
+  'twenty thousand characters pass, whatever their UTF-16 length');
+select is(app.content_sermon_notes_error(repeat('a', 19991) || repeat(chr(128512), 10)), 'too_long',
+  'the limit counts characters');
 
 create temp table se1 as select pg_temp.cmd(3,'content.create_sermon_series',null,pg_temp.series('SYNTHETIC Hope')) r;
 create temp table se2 as select pg_temp.cmd(6,'content.create_sermon_series',null,pg_temp.series('SYNTHETIC Faith')) r;

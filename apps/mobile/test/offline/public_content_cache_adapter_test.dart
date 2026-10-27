@@ -70,6 +70,37 @@ void main() {
     expect(text, isNot(contains('saved_by')));
   });
 
+  test('a damaged saved sermon poster is replaced on the next save', () async {
+    final folder = Directory(
+      '${root.path}${Platform.pathSeparator}bic-kafue'
+      '${Platform.pathSeparator}public-content-v1',
+    );
+    await folder.create(recursive: true);
+    final damaged = File(
+      '${folder.path}${Platform.pathSeparator}sermon-poster-offline-'
+      '91919191-9191-4191-8191-919191919191-p1-r1.png',
+    );
+    await damaged.writeAsBytes(const []);
+    var fetched = 0;
+    expect(
+      await cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        sermons(),
+        loadSermonPoster: (_) async {
+          fetched++;
+          return imageBytes;
+        },
+      ),
+      isA<PublicContentCacheSaved>(),
+    );
+    expect(fetched, 1);
+    expect(await damaged.readAsBytes(), imageBytes);
+    expect(
+      (await cache.readSermons())?.value.series.single.poster?.offlineBytes,
+      imageBytes,
+    );
+  });
+
   test(
     'sermon poster display rights never authorize offline download',
     () async {

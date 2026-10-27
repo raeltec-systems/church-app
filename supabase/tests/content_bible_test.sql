@@ -357,6 +357,9 @@ update app.content_bible_revisions
    set saved_by_member = '00000000-0000-0000-0000-000000000000',
        saved_by_account = '00000000-0000-0000-0000-000000000000'
  where saved_by_member = pg_temp.mid(2);
+select results_eq($$select part || ':' || handler from app.content_erase_parts where part = 'bible_revisions'$$,
+  $$values ('bible_revisions:app.content_bible_erase_part(jsonb)'::text)$$,
+  'the Bible erase part is registered with Content''s deletion hook');
 select is(app.content_bible_erase_part(jsonb_build_object('member_id',pg_temp.mid(2),
   'account_id',pg_temp.u(2),'phase','check')),1,
   'deletion check counts publication-only attribution');

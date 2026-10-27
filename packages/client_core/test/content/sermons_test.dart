@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:church_client_core/church_client_core.dart';
 import 'package:church_client_core/testing.dart';
 import 'package:church_contracts/church_contracts.dart';
@@ -171,6 +173,8 @@ void main() {
         SermonPaths.list,
         player: (_, videoId) => Text('FAKE player $videoId'),
       );
+      await tester.tap(find.byKey(const Key('sermons-search-open')));
+      await _settle(tester);
       await tester.enterText(find.byKey(const Key('sermons-search')), 'hope');
       await _settle(tester);
       expect(find.byKey(const Key('sermon-row-$_id')), findsOneWidget);
@@ -228,6 +232,8 @@ void main() {
         player: (_, _) => throw StateError('offline player invoked'),
       );
       expect(find.textContaining('Offline · saved at'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('sermons-search-open')));
+      await _settle(tester);
       await tester.enterText(
         find.byKey(const Key('sermons-search')),
         'Speaker One',
@@ -359,8 +365,8 @@ void main() {
             'series': [older],
             'truncated': false,
           }),
-        )?.title,
-        'SYNTHETIC Older series',
+        ),
+        isNull,
       );
       expect(
         currentSermonSeries(const PublicSermons(sermons: [], series: [])),
@@ -385,7 +391,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Current series'), findsOneWidget);
-      expect(find.text('1 sermon'), findsOneWidget);
+      expect(find.textContaining('1 sermon · '), findsOneWidget);
       // Latest: one list, no group headers.
       expect(
         find.byKey(const Key('sermons-group-series-$series')),
@@ -411,6 +417,8 @@ void main() {
       );
       expect(one, findsOneWidget);
       expect(tester.getTopLeft(one).dy, lessThan(tester.getTopLeft(two).dy));
+      await tester.tap(find.byKey(const Key('sermons-search-open')));
+      await _settle(tester);
       await tester.enterText(find.byKey(const Key('sermons-search')), 'zzz');
       await _settle(tester);
       expect(find.byKey(const Key('sermons-no-results')), findsOneWidget);
@@ -593,4 +601,91 @@ void main() {
     expect(parse(null).publicImage, isNull);
     expect(() => parse('elsewhere'), throwsFormatException);
   });
+  test('notes limits count characters and refuse Unicode line breaks', () {
+    validateSermonNotes('${'a' * 19990}${'\u{1F600}' * 10}');
+    expect(
+      () => validateSermonNotes('${'a' * 19991}${'\u{1F600}' * 10}'),
+      throwsFormatException,
+    );
+    for (final breakChar in [' ', ' ']) {
+      expect(
+        () => validateSermonNotes('Intro${breakChar}text'),
+        throwsFormatException,
+      );
+    }
+  });
+
+  testWidgets('intraword underscores stay plain text', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp(
+          theme: churchMobileTheme(Brightness.light),
+          home: const Scaffold(
+            body: SermonNotes(markdown: 'Read name__part__x and snake_case.'),
+          ),
+        ),
+      ),
+    );
+    expect(
+      find.textContaining('name__part__x and snake_case.', findRichText: true),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('rows without a poster or video carry no empty media slot', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      SermonPaths.list,
+      setup: (h) => h.sermons.catalog = AccessReadOk(
+        PublicSermons.fromJson({
+          'sermons': [publicSermonData(videoId: null)],
+          'series': [],
+          'truncated': false,
+        }),
+      ),
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('sermon-row-$_id')),
+        matching: find.byType(ClipRRect),
+      ),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('sermons-search')), findsNothing);
+  });
+
+  testWidgets(
+    'the list shows before posters download; cleared posters are saved after',
+    (tester) async {
+      final bytes = Uint8List.fromList([0x89, 0x50, 0x4e, 0x47]);
+      final series = publicSermonSeriesData(poster: true);
+      final h = await _pump(
+        tester,
+        SermonPaths.list,
+        setup: (h) {
+          h.publicContentCache.available = true;
+          h.banners.publicImageBytes = bytes;
+          h.sermons.catalog = AccessReadOk(
+            PublicSermons.fromJson({
+              'sermons': [publicSermonData(series: series)],
+              'series': [series],
+              'truncated': false,
+            }),
+          );
+        },
+      );
+      await _settle(tester);
+      expect(find.byKey(const Key('sermon-row-$_id')), findsOneWidget);
+      final writes = h.publicContentCache.writes
+          .where((w) => w.$1 == PublicContentCacheKeys.sermons)
+          .toList();
+      expect(writes, hasLength(2));
+      expect(
+        h.publicContentCache.sermons?.value.series.single.poster?.offlineBytes,
+        bytes,
+      );
+    },
+  );
 }

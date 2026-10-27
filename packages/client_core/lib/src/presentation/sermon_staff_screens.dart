@@ -959,9 +959,11 @@ class _SermonFormState extends ConsumerState<_SermonForm> {
                 ? null
                 : (value) => setState(() => _series = value),
           ),
-          if (seriesState.value == null)
+          // Only an answered read that failed says so; loading is not failure.
+          if (seriesState.result != null && seriesState.value == null)
             const Text(
               'The series catalog could not be loaded. Your current choice is retained.',
+              key: Key('sermon-series-unavailable'),
             ),
           const SizedBox(height: 16),
           _RightsPicker(

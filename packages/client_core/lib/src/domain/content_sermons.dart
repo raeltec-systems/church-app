@@ -91,9 +91,12 @@ Uri? safeSermonLink(String value) {
 
 /// Refuse unsupported Markdown instead of relying on a renderer's defaults.
 /// The UI renders only the nodes this validator accepts; it never renders HTML.
+/// It is never stricter than the server's `app.content_sermon_notes_error`
+/// (which also refuses U+2028/U+2029 and counts characters, not UTF-16
+/// units), so a note the server stored can always be read.
 void validateSermonNotes(String value) {
-  if (value.length > 20000 ||
-      RegExp(r'[<>`\\\x00-\x08\x0b\x0c\x0e-\x1f]').hasMatch(value) ||
+  if (value.runes.length > 20000 ||
+      RegExp(r'[<>`\\\x00-\x08\x0b\x0c\x0e-\x1f  ]').hasMatch(value) ||
       value.contains('![') ||
       value.contains('~~') ||
       RegExp(r'^\s*(?:>|\||[-*_]{3,}\s*$)', multiLine: true).hasMatch(value)) {

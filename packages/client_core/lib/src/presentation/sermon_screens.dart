@@ -94,17 +94,16 @@ String sermonDateText(DateTime date, {DateTime? now}) {
 
 String _count(int n) => n == 1 ? '1 sermon' : '$n sermons';
 
-/// The series the church is preaching now: the latest sermon's series, else
-/// the most recently published series.
+/// The series the church is preaching now: the series of the newest sermon
+/// that belongs to a published series. Null when no sermon is in one.
 PublicSermonSeries? currentSermonSeries(PublicSermons catalog) {
   for (final sermon in catalog.sermons) {
-    final series = sermon.series;
-    if (series != null &&
-        catalog.series.any((s) => s.seriesId == series.seriesId)) {
-      return catalog.series.firstWhere((s) => s.seriesId == series.seriesId);
-    }
+    final id = sermon.series?.seriesId;
+    if (id == null) continue;
+    final series = catalog.series.where((s) => s.seriesId == id).firstOrNull;
+    if (series != null) return series;
   }
-  return catalog.series.firstOrNull;
+  return null;
 }
 
 enum _Browse { latest, series, speaker }
@@ -117,7 +116,9 @@ class SermonsScreen extends ConsumerStatefulWidget {
 
 class _SermonsScreenState extends ConsumerState<SermonsScreen> {
   final _search = TextEditingController();
+  final _searchFocus = FocusNode();
   var _browse = _Browse.latest;
+  var _searching = false;
   late final AppLifecycleListener _lifecycle;
 
   @override
@@ -139,6 +140,7 @@ class _SermonsScreenState extends ConsumerState<SermonsScreen> {
   @override
   void dispose() {
     _search.dispose();
+    _searchFocus.dispose();
     _lifecycle.dispose();
     super.dispose();
   }
@@ -163,7 +165,7 @@ class _SermonsScreenState extends ConsumerState<SermonsScreen> {
         if (publicSavedStatus(
               context,
               s,
-              what: 'sermons',
+              what: 'sermon list',
               key: 'sermons-offline',
             )
             case final saved?) {
@@ -172,7 +174,7 @@ class _SermonsScreenState extends ConsumerState<SermonsScreen> {
         // Offline, the saved-time notice above already says it is old.
         final stale = s.offlineSnapshot
             ? null
-            : staleNotice(s, what: 'sermons', key: 'sermons-stale');
+            : staleNotice(s, what: 'sermon list', key: 'sermons-stale');
         if (stale != null) children.addAll([stale, const SizedBox(height: 16)]);
         if (value.sermons.isEmpty) {
           children.add(
@@ -189,7 +191,7 @@ class _SermonsScreenState extends ConsumerState<SermonsScreen> {
           children.addAll(_catalog(context, value, s.offlineSnapshot));
         }
       case final AccessRead<PublicSermons> problem:
-        children.add(publicReadProblem(problem, what: 'sermons'));
+        children.add(publicReadProblem(problem, what: 'sermon list'));
     }
     return MemberTabPage(
       title: 'Sermons',
@@ -207,6 +209,7 @@ class _SermonsScreenState extends ConsumerState<SermonsScreen> {
     final c = ChurchColors.of(context);
     final current = currentSermonSeries(catalog);
     final rows = catalog.filter(query: _search.text);
+    final searching = _searching || _search.text.isNotEmpty;
     return [
       if (current != null) ...[
         _SeriesHero(
@@ -216,32 +219,66 @@ class _SermonsScreenState extends ConsumerState<SermonsScreen> {
           onBrowse: () => setState(() {
             _browse = _Browse.series;
             _search.clear();
+            _searching = false;
           }),
         ),
         const SizedBox(height: 18),
       ],
-      RadioSegments<_Browse>(
-        label: 'Browse sermons',
-        options: const [
-          SegmentOption(_Browse.latest, 'Latest'),
-          SegmentOption(_Browse.series, 'Series'),
-          SegmentOption(_Browse.speaker, 'Speaker'),
+      Row(
+        children: [
+          Expanded(
+            child: RadioSegments<_Browse>(
+              label: 'Browse sermons',
+              options: const [
+                SegmentOption(_Browse.latest, 'Latest'),
+                SegmentOption(_Browse.series, 'Series'),
+                SegmentOption(_Browse.speaker, 'Speaker'),
+              ],
+              selected: _browse,
+              onChanged: (value) => setState(() => _browse = value),
+            ),
+          ),
+          if (!searching) ...[
+            const SizedBox(width: 6),
+            FocusRing(
+              radius: 22,
+              child: IconButton(
+                key: const Key('sermons-search-open'),
+                tooltip: 'Search sermons',
+                onPressed: () {
+                  setState(() => _searching = true);
+                  _searchFocus.requestFocus();
+                },
+                icon: const Icon(Icons.search),
+              ),
+            ),
+          ],
         ],
-        selected: _browse,
-        onChanged: (value) => setState(() => _browse = value),
       ),
-      const SizedBox(height: 12),
-      TextField(
-        key: const Key('sermons-search'),
-        controller: _search,
-        textInputAction: TextInputAction.search,
-        decoration: const InputDecoration(
-          labelText: 'Search sermons',
-          hintText: 'Title, series or speaker',
-          prefixIcon: Icon(Icons.search),
+      if (searching) ...[
+        const SizedBox(height: 12),
+        TextField(
+          key: const Key('sermons-search'),
+          controller: _search,
+          focusNode: _searchFocus,
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            labelText: 'Search sermons',
+            hintText: 'Title, series or speaker',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: IconButton(
+              key: const Key('sermons-search-close'),
+              tooltip: 'Close search',
+              onPressed: () => setState(() {
+                _search.clear();
+                _searching = false;
+              }),
+              icon: const Icon(Icons.close),
+            ),
+          ),
+          onChanged: (_) => setState(() {}),
         ),
-        onChanged: (_) => setState(() {}),
-      ),
+      ],
       const SizedBox(height: 18),
       if (rows.isEmpty)
         Text(
@@ -269,16 +306,26 @@ class _SermonsScreenState extends ConsumerState<SermonsScreen> {
     List<PublicSermon> rows,
     bool offline,
   ) {
-    Widget card(List<PublicSermon> list) => _SermonRowsCard(
-      rows: [
-        for (final sermon in list)
-          _SermonRow(
-            sermon: sermon,
-            offline: offline,
-            onTap: () => context.push(SermonPaths.detail(sermon.sermonId)),
-          ),
-      ],
-    );
+    Widget card(List<PublicSermon> list) {
+      // One media slot down a card, and none when no row has a poster or a
+      // video: an empty tile repeated down the list says nothing.
+      final media = list.any(
+        (s) => s.series?.poster != null || s.youtubeVideoId != null,
+      );
+      return _SermonRowsCard(
+        media: media,
+        rows: [
+          for (final sermon in list)
+            _SermonRow(
+              sermon: sermon,
+              media: media,
+              offline: offline,
+              onTap: () => context.push(SermonPaths.detail(sermon.sermonId)),
+            ),
+        ],
+      );
+    }
+
     if (_browse == _Browse.latest) return [card(rows)];
     final groups = <String, List<PublicSermon>>{};
     final titles = <String, String>{};
@@ -322,8 +369,8 @@ class _SermonsScreenState extends ConsumerState<SermonsScreen> {
   }
 }
 
-/// The current series on navy: its poster when one is public, its title,
-/// description and how many sermons it holds, and a way to browse it.
+/// The current series on navy: its poster when one is public, then its
+/// title and how many sermons it holds; the text opens the Series view.
 class _SeriesHero extends StatelessWidget {
   const _SeriesHero({
     required this.series,
@@ -341,6 +388,10 @@ class _SeriesHero extends StatelessWidget {
     final showPoster =
         poster != null && (poster.offlineBytes != null || !offline);
     final quiet = Colors.white.withValues(alpha: 0.82);
+    final line = [
+      _count(sermons),
+      if (series.description.isNotEmpty) series.description,
+    ].join(' · ');
     return KeyedSubtree(
       key: Key('sermons-current-series-${series.seriesId}'),
       child: HeroCard(
@@ -353,55 +404,53 @@ class _SeriesHero extends StatelessWidget {
                 aspectRatio: 16 / 9,
                 child: _SeriesImage(series: series, offline: offline),
               ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Current series',
-                    style: ChurchType.secondary.copyWith(color: quiet),
-                  ),
-                  const SizedBox(height: 4),
-                  Semantics(
-                    header: true,
-                    child: Text(
-                      series.title,
-                      style: ChurchType.sectionTitle.copyWith(
-                        color: Colors.white,
-                      ),
+            Semantics(
+              button: true,
+              label: 'Current series, ${series.title}, $line. Browse it.',
+              excludeSemantics: true,
+              child: FocusRing(
+                color: Colors.white,
+                radius: 12,
+                child: InkWell(
+                  key: const Key('sermons-browse-series'),
+                  onTap: onBrowse,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 10, 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Current series',
+                                style: ChurchType.secondary.copyWith(
+                                  color: quiet,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                series.title,
+                                style: ChurchType.sectionTitle.copyWith(
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                line,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: ChurchType.secondary.copyWith(
+                                  color: quiet,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.chevron_right, color: Colors.white),
+                      ],
                     ),
-                  ),
-                  if (series.description.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      series.description,
-                      style: ChurchType.body.copyWith(color: Colors.white),
-                    ),
-                  ],
-                  const SizedBox(height: 6),
-                  Text(
-                    _count(sermons),
-                    style: ChurchType.secondary.copyWith(color: quiet),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: FocusRing(
-                  color: Colors.white,
-                  radius: 12,
-                  child: TextButton(
-                    key: const Key('sermons-browse-series'),
-                    onPressed: onBrowse,
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(0, ChurchGeometry.minTarget),
-                    ),
-                    child: const Text('Browse this series'),
                   ),
                 ),
               ),
@@ -451,8 +500,9 @@ class _SeriesImage extends ConsumerWidget {
 
 /// Rows split by 1 px lines inside one card.
 class _SermonRowsCard extends StatelessWidget {
-  const _SermonRowsCard({required this.rows});
+  const _SermonRowsCard({required this.rows, required this.media});
   final List<Widget> rows;
+  final bool media;
   @override
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
@@ -462,7 +512,8 @@ class _SermonRowsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (final (i, r) in rows.indexed) ...[
-            if (i > 0) Divider(height: 1, indent: 140, color: c.line),
+            if (i > 0)
+              Divider(height: 1, indent: media ? 140 : 14, color: c.line),
             r,
           ],
         ],
@@ -476,10 +527,12 @@ class _SermonRowsCard extends StatelessWidget {
 class _SermonRow extends StatelessWidget {
   const _SermonRow({
     required this.sermon,
+    required this.media,
     required this.offline,
     required this.onTap,
   });
   final PublicSermon sermon;
+  final bool media;
   final bool offline;
   final VoidCallback onTap;
   @override
@@ -502,40 +555,35 @@ class _SermonRow extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  width: 112,
-                  child: AspectRatio(
-                    aspectRatio: 16 / 9,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          _SeriesImage(series: sermon.series, offline: offline),
-                          if (sermon.youtubeVideoId != null)
-                            Center(
-                              child: Icon(
-                                Icons.play_circle_filled,
-                                size: 30,
-                                color: c.ink.withValues(alpha: 0.78),
-                              ),
-                            )
-                          else if (sermon.series?.poster == null)
-                            // Teaching without a picture or video: a quiet
-                            // mark, so the slot does not read as unfinished.
-                            Center(
-                              child: Icon(
-                                Icons.mic_none_outlined,
-                                size: 22,
-                                color: c.muted,
-                              ),
+                if (media) ...[
+                  SizedBox(
+                    width: 112,
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            _SeriesImage(
+                              series: sermon.series,
+                              offline: offline,
                             ),
-                        ],
+                            if (sermon.youtubeVideoId != null)
+                              Center(
+                                child: Icon(
+                                  Icons.play_circle_filled,
+                                  size: 30,
+                                  color: c.ink.withValues(alpha: 0.78),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 14),
+                  const SizedBox(width: 14),
+                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -826,7 +874,7 @@ class SermonNotes extends ConsumerWidget {
 
   List<InlineSpan> _inline(BuildContext context, WidgetRef ref, String text) {
     final pattern = RegExp(
-      r'\[([^\[\]\n]+)\]\(([^()\s]+)\)|\*\*(.+?)\*\*|__(.+?)__|\*([^*\n]+)\*|(?<![A-Za-z0-9])_([^_\n]+)_(?![A-Za-z0-9])',
+      r'\[([^\[\]\n]+)\]\(([^()\s]+)\)|\*\*(.+?)\*\*|(?<![A-Za-z0-9])__(.+?)__(?![A-Za-z0-9])|\*([^*\n]+)\*|(?<![A-Za-z0-9])_([^_\n]+)_(?![A-Za-z0-9])',
     );
     final spans = <InlineSpan>[];
     var offset = 0;

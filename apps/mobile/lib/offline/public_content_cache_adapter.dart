@@ -533,11 +533,13 @@ class PublicContentCacheAdapter implements PublicContentCache {
             omittedRows++;
             continue;
           }
-          if (!await current.exists() ||
-              await current.length() == 0 ||
-              await current.length() > _maxImageBytes) {
-            await _writeImage(current, bytes);
+          // A damaged saved poster is replaced, never kept under its name.
+          if (await current.exists() &&
+              (await current.length() == 0 ||
+                  await current.length() > _maxImageBytes)) {
+            await current.delete();
           }
+          if (!await current.exists()) await _writeImage(current, bytes);
           cached[series.seriesId] = series;
           files[series.seriesId] = name;
           imageFiles.add(name);

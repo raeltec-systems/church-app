@@ -214,11 +214,13 @@ async function main() {
     check('S01-phone-auth-and-editor-roles', Object.values(people).every((person) => amrMethods(person.token).includes('password'))
       && grantResults.every((answer) => answer.status === 200 && !answer.code), { editor_grants: grantResults.map((answer) => answer.code ?? answer.status) });
 
-    const makeRights = async (clearsDisplay, clearsOffline) => {
+    // A rights record must clear at least one use (`none_cleared`); the video
+    // record that does not clear display clears audio only.
+    const makeRights = async (clearsDisplay, clearsOffline, clearsAudio = false) => {
       const fields = {
         label: `SYNTHETIC ${clearsOffline ? 'Poster' : clearsDisplay ? 'Video' : 'Uncleared video'} rights (6.9 E2E)`,
         source_key: 'synthetic-sermon-6-9-e2e', holder: 'SYNTHETIC Church media team', basis: 'church_owned',
-        clears_display: clearsDisplay, clears_offline: clearsOffline, clears_audio: false,
+        clears_display: clearsDisplay, clears_offline: clearsOffline, clears_audio: clearsAudio,
         evidence: 'SYNTHETIC rights fixture only; no real recording or image rights are asserted.',
       };
       const draft = await content(media, 'content.create_rights_record', null, fields);
@@ -229,7 +231,7 @@ async function main() {
     };
     const videoRights = await makeRights(true, false);
     const posterRights = await makeRights(true, true);
-    const unclearedRights = await makeRights(false, false);
+    const unclearedRights = await makeRights(false, false, true);
 
     const seriesDrafts = [];
     for (let i = 0; i < 2; i++) {

@@ -35,6 +35,18 @@ final sermonPlayerBuilderProvider = Provider<SermonPlayerBuilder>(
       (context, id) => const SermonVideoUnavailable(),
 );
 
+/// Story 6.10: the same seam for a stored Facebook video or live link, played
+/// in Facebook's embedded player by the mobile entry point.
+typedef SermonFacebookPlayerBuilder = Widget Function(
+  BuildContext context,
+  String videoUrl,
+);
+final sermonFacebookPlayerBuilderProvider =
+    Provider<SermonFacebookPlayerBuilder>(
+      (ref) =>
+          (context, url) => const SermonVideoUnavailable(),
+    );
+
 /// The player's place when a recorded video cannot play: the notes stay
 /// readable below it.
 class SermonVideoUnavailable extends StatelessWidget {
@@ -301,9 +313,7 @@ class _SermonsScreenState extends ConsumerState<SermonsScreen> {
     Widget card(List<PublicSermon> list) {
       // One media slot down a card, and none when no row has a poster or a
       // video: an empty tile repeated down the list says nothing.
-      final media = list.any(
-        (s) => s.series?.poster != null || s.youtubeVideoId != null,
-      );
+      final media = list.any((s) => s.series?.poster != null || s.hasVideo);
       return _SermonRowsCard(
         media: media,
         rows: [
@@ -561,7 +571,7 @@ class _SermonRow extends StatelessWidget {
                               series: sermon.series,
                               offline: offline,
                             ),
-                            if (sermon.youtubeVideoId != null)
+                            if (sermon.hasVideo)
                               Center(
                                 child: Icon(
                                   Icons.play_circle_filled,
@@ -654,9 +664,12 @@ class SermonDetailScreen extends ConsumerWidget {
           );
         } else {
           final video = sermon.youtubeVideoId;
+          final facebook = sermon.facebookVideoUrl;
           children.addAll([
             if (video != null && !offline)
               ref.watch(sermonPlayerBuilderProvider)(context, video)
+            else if (facebook != null && !offline)
+              ref.watch(sermonFacebookPlayerBuilderProvider)(context, facebook)
             else
               _NoVideo(offline: offline),
             const SizedBox(height: 20),

@@ -70,6 +70,98 @@ String? normalizeSermonVideoId(String input) {
   return candidate != null && id.hasMatch(candidate) ? candidate : null;
 }
 
+/// Why a pasted Facebook link was refused, the same codes as the server's
+/// `app.content_sermon_facebook_url`.
+enum SermonFacebookProblem { invalid, notFacebook, notEmbeddable, tooLong }
+
+/// The stored (normal) form of a Facebook video or live link, exactly as the
+/// server writes it: `https://www.facebook.com/<page>/videos/<id>/`,
+/// `https://www.facebook.com/watch/?v=<id>` or `https://fb.watch/<code>/`.
+final _facebookNormal = RegExp(
+  r'^https://(?:www[.]facebook[.]com/(?:[A-Za-z0-9][A-Za-z0-9.-]{0,99}/videos/[0-9]{5,25}/'
+  r'|watch/[?]v=[0-9]{5,25})|fb[.]watch/[A-Za-z0-9_-]{5,32}/)$',
+);
+bool isNormalFacebookVideoUrl(String value) => _facebookNormal.hasMatch(value);
+
+/// Mirrors the server's exact allowlist so the editor can explain a refusal
+/// before sending; the server validates and normalises again.
+({String? url, SermonFacebookProblem? problem}) normalizeSermonFacebookUrl(
+  String input,
+) {
+  const none = (url: null, problem: null);
+  ({String? url, SermonFacebookProblem? problem}) fail(
+    SermonFacebookProblem p,
+  ) => (url: null, problem: p);
+  final text = input.trim();
+  if (text.isEmpty) return none;
+  if (text.runes.length > 500) return fail(SermonFacebookProblem.tooLong);
+  final m = RegExp(
+    r'^https://([A-Za-z0-9.-]+)(/[A-Za-z0-9._/-]*)?([?][A-Za-z0-9._~%=&+-]*)?(#[A-Za-z0-9._~%=&+/-]*)?$',
+  ).firstMatch(text);
+  if (m == null) return fail(SermonFacebookProblem.invalid);
+  final host = m[1]!.toLowerCase();
+  final path = m[2] ?? '/';
+  final query = (m[3] ?? '').replaceFirst('?', '');
+  if (host == 'fb.watch') {
+    final code = RegExp(r'^/([A-Za-z0-9_-]{5,32})/?$').firstMatch(path);
+    return code == null
+        ? fail(SermonFacebookProblem.invalid)
+        : (url: 'https://fb.watch/${code[1]}/', problem: null);
+  }
+  if (!const {
+    'facebook.com',
+    'www.facebook.com',
+    'm.facebook.com',
+    'web.facebook.com',
+  }.contains(host)) {
+    return fail(SermonFacebookProblem.notFacebook);
+  }
+  if (RegExp(r'^/watch(?:/live)?/?$').hasMatch(path)) {
+    final ids = [
+      for (final p in RegExp(r'(?:^|&)v=([^&]*)').allMatches(query)) p[1]!,
+    ];
+    return ids.length != 1 || !RegExp(r'^[0-9]{5,25}$').hasMatch(ids.single)
+        ? fail(SermonFacebookProblem.invalid)
+        : (
+            url: 'https://www.facebook.com/watch/?v=${ids.single}',
+            problem: null,
+          );
+  }
+  final video = RegExp(
+    r'^/([A-Za-z0-9][A-Za-z0-9.-]{0,99})/videos/([0-9]{5,25})/?$',
+  ).firstMatch(path);
+  if (video != null) {
+    return (
+      url: 'https://www.facebook.com/${video[1]}/videos/${video[2]}/',
+      problem: null,
+    );
+  }
+  if (RegExp(r'^/[A-Za-z0-9][A-Za-z0-9.-]{0,99}/live(?:_videos)?/?$')
+      .hasMatch(path)) {
+    return fail(SermonFacebookProblem.notEmbeddable);
+  }
+  return fail(SermonFacebookProblem.invalid);
+}
+
+/// Facebook's embedded video player for a stored link: no autoplay and no
+/// text panel. It plays public videos and live broadcasts without signing in.
+/// [width] (logical pixels) sizes the player to its 16:9 slot.
+Uri facebookSermonEmbedUri(String videoUrl, {int? width}) {
+  if (!isNormalFacebookVideoUrl(videoUrl)) {
+    throw ArgumentError.value(videoUrl, 'videoUrl', 'not a stored link');
+  }
+  final w = width?.clamp(220, 1280);
+  return Uri.https('www.facebook.com', '/plugins/video.php', {
+    'href': videoUrl,
+    'show_text': 'false',
+    'autoplay': 'false',
+    'mute': 'false',
+    'allowfullscreen': 'true',
+    if (w != null) 'width': '$w',
+    if (w != null) 'height': '${(w * 9 / 16).round()}',
+  });
+}
+
 /// Exact HTTPS authorities only: no credentials, ports or encoded hosts. The
 /// same characters as the server's `app.content_sermon_link_ok`.
 Uri? safeSermonLink(String value) {
@@ -247,6 +339,7 @@ class PublicSermon {
     required this.notes,
     required this.series,
     required this.youtubeVideoId,
+    this.facebookVideoUrl,
     required this.rightsRevision,
     required this.publicationRevision,
     required this.publishedAt,
@@ -263,6 +356,7 @@ class PublicSermon {
       'notes',
       'series',
       'youtube_video_id',
+      'facebook_video_url',
       'rights_revision',
       'publication_revision',
       'published_at',
@@ -272,11 +366,14 @@ class PublicSermon {
     final notes = wireReq<String>(m, 'notes');
     validateSermonNotes(notes);
     final video = wireOpt<String>(m, 'youtube_video_id');
+    final facebook = wireOpt<String>(m, 'facebook_video_url');
     final rights = wireOpt<int>(m, 'rights_revision');
     if (date == null ||
         (video != null && !RegExp(r'^[A-Za-z0-9_-]{11}$').hasMatch(video)) ||
+        (facebook != null && !isNormalFacebookVideoUrl(facebook)) ||
+        (video != null && facebook != null) ||
         (rights != null && rights < 1) ||
-        (video != null && rights == null)) {
+        ((video != null || facebook != null) && rights == null)) {
       throw const FormatException('unexpected sermon video/date');
     }
     return PublicSermon(
@@ -290,6 +387,7 @@ class PublicSermon {
           ? null
           : PublicSermonSeries.fromJson(m['series']),
       youtubeVideoId: video,
+      facebookVideoUrl: facebook,
       rightsRevision: rights,
       publicationRevision: wireRevision(m, 'publication_revision'),
       publishedAt: wireInstant(m, 'published_at'),
@@ -305,8 +403,15 @@ class PublicSermon {
   final String notes;
   final PublicSermonSeries? series;
   final String? youtubeVideoId;
+
+  /// Story 6.10: a public Facebook video or live link in its stored form; a
+  /// sermon has at most one video source.
+  final String? facebookVideoUrl;
   final int? rightsRevision;
   final int publicationRevision;
+
+  /// Whether this answer carries a playable video from either source.
+  bool get hasVideo => youtubeVideoId != null || facebookVideoUrl != null;
   final DateTime publishedAt;
   final bool offlineAllowed;
 
@@ -319,6 +424,7 @@ class PublicSermon {
     notes: notes,
     series: value,
     youtubeVideoId: youtubeVideoId,
+    facebookVideoUrl: facebookVideoUrl,
     rightsRevision: rightsRevision,
     publicationRevision: publicationRevision,
     publishedAt: publishedAt,
@@ -333,6 +439,7 @@ class PublicSermon {
     'series': series?.toJson(),
     // Offline teaching never starts a third-party player or stores its media.
     'youtube_video_id': cache ? null : youtubeVideoId,
+    'facebook_video_url': cache ? null : facebookVideoUrl,
     'rights_revision': cache ? null : rightsRevision,
     'publication_revision': publicationRevision,
     'published_at': publishedAt.toIso8601String(),
@@ -426,10 +533,12 @@ class SermonInput {
     this.notes = '',
     this.seriesId,
     this.youtubeVideoId,
+    this.facebookVideoUrl,
     this.videoRightsId,
   });
   final String title, speaker, scriptureReference, notes;
   final String? sermonDate, seriesId, youtubeVideoId, videoRightsId;
+  final String? facebookVideoUrl;
   Map<String, Object?> toPayload({String? sermonId}) => {
     'sermon_id': ?sermonId,
     'title': title.trim(),
@@ -439,6 +548,7 @@ class SermonInput {
     'notes': notes.trim(),
     'series_id': seriesId,
     'youtube_video_id': youtubeVideoId,
+    'facebook_video_url': facebookVideoUrl,
     'video_rights_id': videoRightsId,
   };
 }
@@ -489,6 +599,7 @@ class StaffSermonRevision {
         notes: notes,
         seriesId: wireOpt<String>(m, 'series_id'),
         youtubeVideoId: wireOpt<String>(m, 'youtube_video_id'),
+        facebookVideoUrl: wireOpt<String>(m, 'facebook_video_url'),
         videoRightsId: m['video_rights'] == null
             ? null
             : BannerRights.fromJson(m['video_rights']).rightsId,

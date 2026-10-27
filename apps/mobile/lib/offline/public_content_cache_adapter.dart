@@ -149,6 +149,7 @@ class PublicContentCacheAdapter implements PublicContentCache {
             (s) =>
                 !s.offlineAllowed ||
                 s.youtubeVideoId != null ||
+                s.facebookVideoUrl != null ||
                 s.rightsRevision != null,
           ) ||
           source.series.any((s) => !s.offlineAllowed)) {

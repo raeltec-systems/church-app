@@ -41,6 +41,30 @@ void main() {
     });
   }
 
+  test('a saved sermon never keeps its Facebook link (story 6.10)', () async {
+    const link =
+        'https://www.facebook.com/SyntheticChurch/videos/1061000000000001/';
+    final catalog = PublicSermons.fromJson({
+      'sermons': [publicSermonData(facebookUrl: link)],
+      'series': [],
+      'truncated': false,
+    });
+    expect(
+      await cache.writeRead(PublicContentCacheKeys.sermons, catalog),
+      isA<PublicContentCacheSaved>(),
+    );
+    final cold = PublicContentCacheAdapter(supportDirectory: () async => root);
+    final snapshot = await cold.readSermons();
+    expect(snapshot?.value.sermons.single.facebookVideoUrl, isNull);
+    expect(snapshot?.value.sermons.single.hasVideo, isFalse);
+    final text = await root
+        .listSync(recursive: true)
+        .whereType<File>()
+        .singleWhere((f) => f.path.endsWith('manifest.json'))
+        .readAsString();
+    expect(text, isNot(contains('facebook.com/SyntheticChurch')));
+  });
+
   test('sermon snapshot stores notes and cleared posters, never YouTube media or playable IDs', () async {
     var fetched = 0;
     expect(

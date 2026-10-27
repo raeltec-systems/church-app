@@ -8,6 +8,7 @@ import 'package:church_client_core/church_client_core.dart'
         publicContentCacheProvider,
         publicContentReconnectsProvider,
         sermonPlayerBuilderProvider,
+        sermonFacebookPlayerBuilderProvider,
         sermonLinkLauncherProvider,
         pushMessagingProvider;
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -23,6 +24,7 @@ import 'contact/url_contact_launcher.dart';
 import 'offline/public_content_cache_adapter.dart';
 import 'push/firebase_push_config.dart';
 import 'push/firebase_push_messaging.dart';
+import 'sermons/facebook_sermon_player.dart';
 import 'sermons/youtube_sermon_player.dart';
 
 Future<void> main() async {
@@ -60,6 +62,10 @@ Future<void> main() async {
         sermonPlayerBuilderProvider.overrideWithValue(
           (context, videoId) =>
               YoutubeSermonPlayer(key: ValueKey(videoId), videoId: videoId),
+        ),
+        sermonFacebookPlayerBuilderProvider.overrideWithValue(
+          (context, videoUrl) =>
+              FacebookSermonPlayer(key: ValueKey(videoUrl), videoUrl: videoUrl),
         ),
         sermonLinkLauncherProvider.overrideWithValue(
           const UrlSermonLinkLauncher(),

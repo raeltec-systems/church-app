@@ -29,7 +29,7 @@ export const UNSAFE_NOTES = Object.freeze([
   '[encoded host](https://%65bible.org/)', '[alternate port](https://ebible.org:8443/)',
 ]);
 export const PUBLIC_SERMON_KEYS = Object.freeze([
-  'notes', 'offline_allowed', 'publication_revision', 'published_at', 'rights_revision',
+  'facebook_video_url', 'notes', 'offline_allowed', 'publication_revision', 'published_at', 'rights_revision',
   'scripture_reference', 'series', 'sermon_date', 'sermon_id', 'speaker', 'title', 'youtube_video_id',
 ]);
 export const PUBLIC_SERIES_KEYS = Object.freeze([

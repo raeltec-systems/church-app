@@ -19,6 +19,9 @@ import 'providers.dart';
 /// on the phone, then missing offline-cleared posters are fetched outside the
 /// queue, a few at a time, and saved with the same catalog unless a newer
 /// catalog was saved meanwhile.
+///
+/// Only the current series keeps its poster on the phone (owner decision
+/// 2026-10-27, to save members' data); other series show posters online only.
 class PublicSermonsController extends PublicReadController<PublicSermons> {
   static const _posterFetches = 3;
   int _saves = 0;
@@ -34,10 +37,22 @@ class PublicSermonsController extends PublicReadController<PublicSermons> {
   @override
   Future<DateTime?> saveOfflineSnapshot(PublicSermons value) async {
     final save = ++_saves;
-    final eligible = PublicSermons(
+    final offline = PublicSermons(
       sermons: value.sermons.where((s) => s.offlineAllowed).toList(),
       series: value.series.where((s) => s.offlineAllowed).toList(),
       truncated: value.truncated,
+    );
+    // The saved list leads with this series, so its poster is the one kept.
+    final current = offline.currentSeries?.seriesId;
+    PublicSermonSeries capped(PublicSermonSeries s) =>
+        s.seriesId == current ? s : s.withPoster(null);
+    final eligible = PublicSermons(
+      sermons: [
+        for (final s in offline.sermons)
+          s.series == null ? s : s.withSeries(capped(s.series!)),
+      ],
+      series: offline.series.map(capped).toList(),
+      truncated: offline.truncated,
     );
     final outcome = await ref
         .read(publicContentCacheProvider)

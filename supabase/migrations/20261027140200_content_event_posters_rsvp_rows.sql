@@ -1,7 +1,7 @@
 -- Story 6.11 follow-up: the ROW deletions of a full member deletion for event RSVPs and organisers.
 --
 -- Replaces the fail-closed stub app.content_rsvp_purge_rows of
--- 20261027010000_content_event_posters_rsvp.sql with its body. Kept in its own small file because
+-- 20261027140149_content_event_posters_rsvp.sql with its body. Kept in its own small file because
 -- the hosted connector cannot get approval for a migration containing row deletions; the owner
 -- applies this file by hand right after that migration. Until it is applied, Content's erase
 -- step answers `unavailable` for every member deletion and nothing is erased (fail closed). It

@@ -434,7 +434,7 @@ Do not approve `q5_content_rights` as part of this check. A staging demonstratio
 
 ## Story 6.11: event posters, Add to calendar and RSVP within capacity
 
-Migrations: `supabase/migrations/20261027010000_content_event_posters_rsvp.sql` and its row-deletion file `supabase/migrations/20261027010100_content_event_posters_rsvp_rows.sql` (hand-applied on hosted projects, see "The `_rows` file" below). pgTAP: `supabase/tests/content_event_rsvp_test.sql`. E2E: `tools/identity-e2e/content-event-rsvp.mjs` (offline tests `content-event-rsvp.test.mjs`). Plan: `_bmad-output/initiative-church-app/epic-public-content-and-giving/story-show-event-posters-export-events-to-the-phone-calendar-and-r-plan.md`.
+Migrations: `supabase/migrations/20261027140149_content_event_posters_rsvp.sql` and its row-deletion file `supabase/migrations/20261027140200_content_event_posters_rsvp_rows.sql` (hand-applied on hosted projects, see "The `_rows` file" below). pgTAP: `supabase/tests/content_event_rsvp_test.sql`. E2E: `tools/identity-e2e/content-event-rsvp.mjs` (offline tests `content-event-rsvp.test.mjs`). Plan: `_bmad-output/initiative-church-app/epic-public-content-and-giving/story-show-event-posters-export-events-to-the-phone-calendar-and-r-plan.md`.
 
 ### Model (the events kind; nothing shared is replaced except the two registry-driven checks below)
 
@@ -471,7 +471,7 @@ Migrations: `supabase/migrations/20261027010000_content_event_posters_rsvp.sql` 
 
 The erase part `event_rsvps` (`app.content_rsvp_erase_part`) deletes the member's RSVP and organiser rows through `app.content_rsvp_purge_rows` and anonymises who changed organiser lists (nil UUID); `check` counts what is left. In the main migration the purge is a **fail-closed stub** that answers `unavailable` (`{"deletion": "rows_migration_missing"}`): until the `_rows` file is applied, **every** member deletion's erase step on that project waits and nothing is erased (the 2.11 worker retries). The `_rows` file replaces only that function.
 
-**Owner step (staging, right after the main migration is applied there):** open the staging SQL editor (project `tmurpotfluignacfueki`), paste the whole file `supabase/migrations/20261027010100_content_event_posters_rsvp_rows.sql` (hosted name in the promotion runbook) and run it once. Then check:
+**Owner step (staging, right after the main migration is applied there):** open the staging SQL editor (project `tmurpotfluignacfueki`), paste the whole file `supabase/migrations/20261027140200_content_event_posters_rsvp_rows.sql` (hosted name in the promotion runbook) and run it once. Then check:
 
 ```sql
 select position('delete from app.content_event_rsvps' in pg_get_functiondef('app.content_rsvp_purge_rows(uuid)'::regprocedure)) > 0;  -- true
@@ -479,6 +479,8 @@ select has_function_privilege('authenticated', 'app.content_rsvp_purge_rows(uuid
 ```
 
 Production applies both files in order with the migrations at promotion (entry 17).
+
+Staging (2026-10-27): the main migration is applied verbatim to `tmurpotfluignacfueki` as version `20261027140149` (the local file carries that version; the `_rows` file is `20261027140200`, after it). 31 of the 32 added or replaced function definitions hash identically to a fresh local replay; the 32nd, `app.content_rsvp_purge_rows`, is the stub until the owner step above. Boundary and unowned counts are 0, RLS is on, client roles hold no grant on the three tables, the existing event's creator was backfilled as its organiser, and the signed-out events read shows `poster: null` and `rsvp: null`. Evidence: `evidence-6.11/staging-verify.md`. **The `_rows` file is not yet applied on staging.**
 
 ### Clients
 

@@ -3,12 +3,12 @@ title: 'Show event posters, export events to the phone calendar and RSVP within 
 type: 'feature'
 ticket: '11'
 created: '2026-10-26'
-status: in-progress
+status: built
 baseline_revision: '7eb4f866864806ff7baefcb23f2c351786bd93f8'
 route: 'full'
 route_source: 'auto'
-review: ''
-review_source: ''
+review: 'deferred'
+review_source: 'owner process change 2026-10-27: review is deferred to the epic PR review'
 lenses_ran: []
 review_loop_iteration: 0
 followup_review_recommended: false
@@ -19,7 +19,8 @@ context:
   - '{project-root}/.agents/skills/design-taste-frontend/references/tells.md'
   - '{project-root}/docs/design-handoff/README.md'
 warnings: ['oversized', 'multiple-goals']
-deferred: []
+deferred:
+  - 'After an editor turns RSVP off, a member who was going cannot cancel from the app until RSVP is on again (the place is not counted publicly while RSVP is off).'
 ---
 
 <intent-contract>
@@ -81,7 +82,7 @@ deferred: []
 - [x] `supabase/tests/content_event_rsvp_test.sql` + ledger updates -- the matrix (concurrency proven by the E2E).
 - [x] `tools/identity-e2e/content-event-rsvp.mjs` + `.test.mjs` -- the verify at the API (block +44 7700 900584-900598).
 - [x] client_core: models, `EventCalendar` + `ICalendarText` (Duties delegates, bytes unchanged), repository reads, controllers, Calendar row thumbnail, detail (poster, RSVP, Add to calendar), staff Events (poster, RSVP, organisers, who's coming, sync), fakes, tests.
-- [ ] Runbooks `content.md` (story 6.11 section and owner manual check), `production-promotion-content.md` (migrations, the `_rows` step); `identity-access.md` deletion-hook list line.
+- [x] Runbooks `content.md` (story 6.11 section and owner manual check), `production-promotion-content.md` (migrations, the `_rows` step); `identity-access.md` deletion-hook list line.
 
 **Acceptance Criteria:**
 - Given the local stack with functions served, when the E2E runs, then a capacity-2 SYNTHETIC event with a poster publishes and a signed-out caller reads its poster and both endpoints of a three-day event, two members RSVP and a third is refused `full`, racers for one place get exactly one `going`, a cancel frees a place, a deactivated member's place is freed, guests and Pending are refused, members and a non-organiser editor cannot read names while the organiser and Admin can, and a member deletion erases the RSVP with the check at 0.
@@ -92,8 +93,8 @@ deferred: []
 - Built in this session (server, E2E and the Dart side; the planned background fork for the Dart
   side never started: the usage limit stopped it, and the coordinator then asked for no forks).
   Plan to code: as designed.
-- Migrations `supabase/migrations/20261027010000_content_event_posters_rsvp.sql` (main) and
-  `20261027010100_content_event_posters_rsvp_rows.sql` (only the purge body; hand-applied on
+- Migrations `supabase/migrations/20261027140149_content_event_posters_rsvp.sql` (main) and
+  `20261027140200_content_event_posters_rsvp_rows.sql` (only the purge body; hand-applied on
   hosted projects). The main file replaces in place, same signatures and privileges, the events
   kind's own functions (`content_event_revision_guard`, `content_event_create`, `_save`,
   `_publish`, `content_public_event_json`, `content_event_revision_json`,
@@ -123,15 +124,25 @@ deferred: []
   Change organisers), `testing.dart` (fakes and wire helpers, additive), barrel export.
   `content_banners.dart` gained only `ContentPurposes.eventPoster`. The offline cache adapter is
   unchanged (it serialises only the 6.4 keys, so posters and counts stay online only).
-- Flutter `test/content/event_rsvp_test.dart` (25); no existing test was changed. One layout fix
+- Flutter `test/content/event_rsvp_test.dart` (26); no existing test was changed. One layout fix
   found by the tests: "You're going" and Cancel RSVP wrap instead of overflowing a phone row.
 - Environment: Docker Desktop's engine VM stopped twice during this run (once before the first
   reset, once during the full pgTAP suite in the duties scale tests); it was restarted while this
   entry held the shared DB lock. The full suite was rerun after the second restart.
 
+- Staging: the main migration applied verbatim as `20261027140149` (local files renamed; the `_rows`
+  file is `20261027140200`). 31 of 32 function hashes match the fresh local replay, the 32nd is the
+  purge stub; boundary/unowned 0; signed-out read carries `poster`/`rsvp` null. Evidence
+  `evidence-6.11/staging-verify.md`. The owner still applies the `_rows` file by hand.
+
 ## Plan Change Log
 
 ## Review Triage Log
+
+- Review deferred to the epic PR review (owner process change 2026-10-27: no reviews per entry).
+  Before that change a partial external check had run; its three low findings were fixed
+  (organiser grants share-locked, poster upload re-checked under its lock, organisers dialog) and
+  one low was deferred (frontmatter `deferred`). Notes: `evidence-6.11/external-check.md`.
 
 ## Design Notes
 

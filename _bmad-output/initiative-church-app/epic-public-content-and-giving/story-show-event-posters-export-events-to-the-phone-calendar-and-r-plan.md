@@ -76,11 +76,11 @@ deferred: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `supabase/migrations/<v>_content_event_posters_rsvp.sql` -- revision columns and guard, purpose, public condition, organisers and RSVP tables, member-command registry with the authorizer and replay recheck, event commands, RSVP and organiser commands, public, member and staff reads, lifecycle hook, erase part with its fail-closed stub, privileges.
-- [ ] `supabase/migrations/<v+1>_content_event_posters_rsvp_rows.sql` -- only the purge body (row deletions), hand-applied on staging.
-- [ ] `supabase/tests/content_event_rsvp_test.sql` + ledger updates -- the matrix (concurrency proven by the E2E).
-- [ ] `tools/identity-e2e/content-event-rsvp.mjs` + `.test.mjs` -- the verify at the API (block +44 7700 900584-900598).
-- [ ] client_core: models, `EventCalendar` + `ICalendarText` (Duties delegates, bytes unchanged), repository reads, controllers, Calendar row thumbnail, detail (poster, RSVP, Add to calendar), staff Events (poster, RSVP, organisers, who's coming, sync), fakes, tests.
+- [x] `supabase/migrations/<v>_content_event_posters_rsvp.sql` -- revision columns and guard, purpose, public condition, organisers and RSVP tables, member-command registry with the authorizer and replay recheck, event commands, RSVP and organiser commands, public, member and staff reads, lifecycle hook, erase part with its fail-closed stub, privileges.
+- [x] `supabase/migrations/<v+1>_content_event_posters_rsvp_rows.sql` -- only the purge body (row deletions), hand-applied on staging.
+- [x] `supabase/tests/content_event_rsvp_test.sql` + ledger updates -- the matrix (concurrency proven by the E2E).
+- [x] `tools/identity-e2e/content-event-rsvp.mjs` + `.test.mjs` -- the verify at the API (block +44 7700 900584-900598).
+- [x] client_core: models, `EventCalendar` + `ICalendarText` (Duties delegates, bytes unchanged), repository reads, controllers, Calendar row thumbnail, detail (poster, RSVP, Add to calendar), staff Events (poster, RSVP, organisers, who's coming, sync), fakes, tests.
 - [ ] Runbooks `content.md` (story 6.11 section and owner manual check), `production-promotion-content.md` (migrations, the `_rows` step); `identity-access.md` deletion-hook list line.
 
 **Acceptance Criteria:**

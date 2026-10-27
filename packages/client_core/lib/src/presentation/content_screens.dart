@@ -143,6 +143,13 @@ const _needs = 'Events are managed by Media, Pastors and Admins.';
       'Only the event\'s organisers and Admins choose its organisers. Nothing '
           'was changed.',
     ),
+    ContentNotice.organisersInvalid => (
+      StatusTone.warning,
+      'Check the organisers',
+      'Organisers must be people who edit events now, at most '
+          '$maxEventOrganisers. The list is reloaded; choose again. Nothing was '
+          'changed.',
+    ),
   };
 }
 
@@ -1093,19 +1100,20 @@ class _OrganisersDialog extends StatefulWidget {
 }
 
 class _OrganisersDialogState extends State<_OrganisersDialog> {
+  // Only people who edit events now can be organisers: an organiser who no
+  // longer does is listed unticked (saving removes them), never sent.
   late final Set<String> _chosen = {
-    for (final o in widget.event.organisers) o.memberId,
+    for (final o in widget.event.organisers)
+      if (widget.options.any((x) => x.memberId == o.memberId)) o.memberId,
   };
 
   @override
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
-    // An organiser who no longer edits events is still listed, so they can be
-    // removed.
-    final options = [
-      ...widget.options,
+    final options = widget.options;
+    final stale = [
       for (final o in widget.event.organisers)
-        if (widget.options.every((x) => x.memberId != o.memberId)) o,
+        if (options.every((x) => x.memberId != o.memberId)) o,
     ];
     final full = _chosen.length >= maxEventOrganisers;
     return ChurchDialog(
@@ -1140,6 +1148,17 @@ class _OrganisersDialogState extends State<_OrganisersDialog> {
                                 _chosen.remove(o.memberId);
                               }
                             }),
+                    ),
+                  for (final o in stale)
+                    CheckboxListTile(
+                      key: Key('organiser-stale-${o.memberId}'),
+                      value: false,
+                      title: Text(o.name),
+                      subtitle: const Text(
+                        'No longer edits events; saving removes them',
+                      ),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      onChanged: null,
                     ),
                 ],
               ),

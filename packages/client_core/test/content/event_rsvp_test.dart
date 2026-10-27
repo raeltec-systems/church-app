@@ -650,6 +650,45 @@ void main() {
       expect(byKey('events-notice-organisersSet'), findsOneWidget);
     });
 
+    testWidgets('an organiser who no longer edits events is never sent again', (
+      tester,
+    ) async {
+      const stale = '83838383-8383-4383-8383-838383838383';
+      final h = await pumpAt(
+        tester,
+        ClientPaths.contentEvents,
+        staff: true,
+        setUp: (h) => h.content.staffEvents = staffList([
+          {
+            ...staffCamp(seesNames: true),
+            'organisers': [
+              eventOrganiserData(_organiser, 'SYNTHETIC Media Phiri'),
+              eventOrganiserData(stale, 'SYNTHETIC Former Media'),
+            ],
+          },
+        ]),
+      );
+      await tapKey(tester, 'event-open-$_camp');
+      await tapKey(tester, 'event-organisers-change-$_camp');
+      final row = tester.widget<CheckboxListTile>(
+        byKey('organiser-stale-$stale'),
+      );
+      expect(row.value, isFalse);
+      expect(row.onChanged, isNull);
+      await tapKey(tester, 'organisers-save');
+      final sent = h.gateway.sent.single;
+      expect(sent.wire['payload'], {
+        'event_id': _camp,
+        'organiser_ids': [_organiser],
+      });
+      sent.refuse(
+        ErrorCode.validationFailed,
+        fieldErrors: const {'organiser_ids': 'not_editor'},
+      );
+      await settle(tester);
+      expect(byKey('events-notice-organisersInvalid'), findsOneWidget);
+    });
+
     testWidgets('a poster waiting for the sync says so; opening Events syncs', (
       tester,
     ) async {

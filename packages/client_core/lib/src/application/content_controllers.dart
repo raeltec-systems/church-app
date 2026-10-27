@@ -238,6 +238,10 @@ enum ContentNotice {
 
   /// Story 6.11: only an Admin or one of the event's organisers changes them.
   organisersNotAllowed,
+
+  /// Story 6.11: the list named someone who no longer edits events (or too
+  /// many people).
+  organisersInvalid,
 }
 
 /// One command in flight or just answered.
@@ -471,6 +475,10 @@ class StaffEventsController extends Notifier<StaffEventsState> {
     return switch (error.code) {
       ErrorCode.forbidden when command == ContentCommands.setEventOrganisers =>
         ContentNotice.organisersNotAllowed,
+      ErrorCode.validationFailed
+          when command == ContentCommands.setEventOrganisers &&
+              f.containsKey('organiser_ids') =>
+        ContentNotice.organisersInvalid,
       ErrorCode.validationFailed when f['event_id'] == 'nothing_to_publish' =>
         ContentNotice.nothingToPublish,
       ErrorCode.validationFailed when f['event_id'] == 'not_published' =>

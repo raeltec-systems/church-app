@@ -485,6 +485,15 @@ begin
     perform app.cmd_fail('validation_failed', v_errors);
   end if;
   v_item := app.content_item_lock(v_id, 'event', p_expected_revision, 'event_id');
+  -- The upload row is locked and checked again under the lock, so a retention cleanup claim
+  -- cannot slip in between the check and the attachment (lock order: item, then asset).
+  if v_extras.poster_asset_id is not null then
+    perform 1 from app.content_assets a where a.asset_id = v_extras.poster_asset_id for update;
+    v_error := app.content_asset_error(v_extras.poster_asset_id, v_id, 'event_poster');
+    if v_error is not null then
+      perform app.cmd_fail('validation_failed', jsonb_build_object('poster_asset_id', v_error));
+    end if;
+  end if;
   v_no := app.content_item_draft_no(v_item);
   insert into app.content_event_revisions as r (item_id, revision_no, title, description, starts_at,
                                                 ends_at, location, poster_alt_text, rsvp_enabled,
@@ -613,13 +622,22 @@ begin
       v_errors := v_errors || '{"organiser_ids": "invalid"}';
     elsif v_count > 10 then
       v_errors := v_errors || '{"organiser_ids": "too_many"}';
-    elsif exists (select 1 from unnest(v_ids) u (id)
-                   where app.content_editor_capacity(u.id, 'event') is null) then
-      v_errors := v_errors || '{"organiser_ids": "not_editor"}';
     end if;
   end if;
   if v_errors <> '{}'::jsonb then
     perform app.cmd_fail('validation_failed', v_errors);
+  end if;
+  -- The named members' event-editor grants are share-locked before they are checked (Identity
+  -- rows before Content rows, AD-2): a revocation running now either waits for this command (and
+  -- its scope_revoked hook then ends the new organiser row) or is seen by the check.
+  perform 1
+     from app.identity_grants g
+     join app.content_kinds k on k.kind = 'event'
+    where g.member_id = any (v_ids) and g.revoked_at is null and g.role = any (k.editor_roles)
+      for share of g;
+  if exists (select 1 from unnest(v_ids) u (id)
+              where app.content_editor_capacity(u.id, 'event') is null) then
+    perform app.cmd_fail('validation_failed', '{"organiser_ids": "not_editor"}');
   end if;
   v_item := app.content_item_lock(v_id, 'event', p_expected_revision, 'event_id');
   if not app.content_event_sees_names(v_actor.member_id, v_id) then

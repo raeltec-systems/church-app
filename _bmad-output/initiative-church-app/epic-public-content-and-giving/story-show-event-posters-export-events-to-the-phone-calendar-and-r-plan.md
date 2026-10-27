@@ -89,6 +89,46 @@ deferred: []
 
 ## Implementation Notes
 
+- Built in this session (server, E2E and the Dart side; the planned background fork for the Dart
+  side never started: the usage limit stopped it, and the coordinator then asked for no forks).
+  Plan to code: as designed.
+- Migrations `supabase/migrations/20261027010000_content_event_posters_rsvp.sql` (main) and
+  `20261027010100_content_event_posters_rsvp_rows.sql` (only the purge body; hand-applied on
+  hosted projects). The main file replaces in place, same signatures and privileges, the events
+  kind's own functions (`content_event_revision_guard`, `content_event_create`, `_save`,
+  `_publish`, `content_public_event_json`, `content_event_revision_json`,
+  `content_staff_event_json`, `content_staff_events`) and, once, the two registry-driven checks
+  `content_authorize_command` and `content_in_scope` (editor commands unchanged). Everything else
+  is added by registry rows (purpose, public condition, three commands, two member commands,
+  erase part, three lifecycle hooks).
+- Organisers backfill: existing events get their creator as organiser while the creator still
+  edits events (staging: one published SYNTHETIC event, its creator still Media).
+- pgTAP `supabase/tests/content_event_rsvp_test.sql` (136). Scoped other files' shared
+  assertions to their own entries: `content_events_test.sql` (privilege lists exclude `%rsvp%`,
+  the five-command list excludes the three 6.11 commands, the public and staff key lists exclude
+  6.11's keys), `content_banners_test.sql` (erase parts, public conditions and purposes scoped to
+  their kinds), `cross_epic_contracts_test.sql` (its synthetic dispatch removes Content's hooks
+  too), `command_foundation_test.sql` (authenticated ledger + the two new reads).
+- E2E `tools/identity-e2e/content-event-rsvp.mjs` + `.test.mjs` (3); block +44 7700 900584-900596
+  (900597-900598 unused).
+- Dart: `content_events.dart` (poster, counts, own RSVP, names read, organisers; absent 6.11 keys
+  read as none so the 6.4 offline snapshot and older servers still parse), new
+  `icalendar_text.dart` (the 4.5 text rules; `DutyCalendar` delegates, bytes unchanged) and
+  `event_calendar.dart`, `supabase_content_repository.dart` (two reads),
+  `content_controllers.dart` (`EventRsvpController`, `staffEventRsvpsProvider`,
+  `EventPosterUploadController`, organisers command, the file sync on open and after publish,
+  withdraw, archive), `calendar_screens.dart` (row thumbnail, poster in full, Places, RSVP
+  section, Add to calendar through `dutyCalendarExportProvider`), `content_screens.dart` (form:
+  RSVP, places, poster, rights, description; row: counts, poster state, organisers, Who's coming,
+  Change organisers), `testing.dart` (fakes and wire helpers, additive), barrel export.
+  `content_banners.dart` gained only `ContentPurposes.eventPoster`. The offline cache adapter is
+  unchanged (it serialises only the 6.4 keys, so posters and counts stay online only).
+- Flutter `test/content/event_rsvp_test.dart` (25); no existing test was changed. One layout fix
+  found by the tests: "You're going" and Cancel RSVP wrap instead of overflowing a phone row.
+- Environment: Docker Desktop's engine VM stopped twice during this run (once before the first
+  reset, once during the full pgTAP suite in the duties scale tests); it was restarted while this
+  entry held the shared DB lock. The full suite was rerun after the second restart.
+
 ## Plan Change Log
 
 ## Review Triage Log

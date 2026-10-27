@@ -5,16 +5,16 @@
 -- the lifecycle hook (a login hold keeps an RSVP, a deactivation releases future ones, a revoked
 -- last editor role ends an organiser role); replay; the RSVP erase part and its fail-closed stub.
 -- Concurrent RSVPs are proven by the E2E (content-event-rsvp.mjs). Every account, phone and name
--- is SYNTHETIC (fictional range +1 202 555 0211-0221). Times are church time (Africa/Lusaka).
+-- is SYNTHETIC (fictional range +1 202 555 0171-0181). Times are church time (Africa/Lusaka).
 begin;
-select plan(108);
+select plan(136);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000611' || lpad(n::text, 2, '0'))::uuid $$;
 create function pg_temp.s(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-9000-0000000611' || lpad(n::text, 2, '0'))::uuid $$;
 create function pg_temp.phone(n int) returns text language sql as
-$$ select '+120255502' || (10 + n)::text $$;
+$$ select '+120255501' || (70 + n)::text $$;
 create function pg_temp.c(n int) returns jsonb language sql as $$
   select jsonb_build_object(
     'sub', pg_temp.u(n), 'role', 'authenticated', 'aal', 'aal1', 'session_id', pg_temp.s(n),
@@ -89,8 +89,6 @@ create function pg_temp.ev(p_title text, p_from timestamptz, p_to timestamptz,
 $$;
 create function pg_temp.rev(p uuid) returns bigint language sql as
 $$ select revision from app.content_items where item_id = p $$;
-create function pg_temp.mrev(n int) returns bigint language sql as
-$$ select revision from app.identity_members where member_id = (select member_id from m where m.n = $1) $$;
 create function pg_temp.rights(p_label text, p_display boolean, p_offline boolean) returns jsonb language sql as $$
   select jsonb_build_object('label', p_label, 'source_key', 'church-posters',
                             'holder', 'SYNTHETIC Church media team', 'basis', 'church_owned',
@@ -149,6 +147,8 @@ insert into m select n, app.identity_seed_synthetic_link(pg_temp.u(n), 'SYNTHETI
                                                          'pgtap content event rsvp')
   from generate_series(1, 11) n where n <> 7;
 create function pg_temp.mid(n int) returns uuid language sql as $$ select member_id from m where m.n = $1 $$;
+create function pg_temp.mrev(n int) returns bigint language sql as
+$$ select revision from app.identity_members where member_id = pg_temp.mid($1) $$;
 select app.identity_bootstrap_admin(pg_temp.mid(1), 'israel');
 insert into app.identity_grants (member_id, role, granted_by_operator)
 values (pg_temp.mid(2), 'media', 'israel'), (pg_temp.mid(3), 'media', 'israel'),
@@ -227,7 +227,7 @@ select is(pg_temp.err(pg_temp.cmd(2, 'content.create_event', null,
   'validation_failed|rsvp_capacity=invalid,rsvp_enabled=invalid', 'RSVP fields are typed');
 select is(pg_temp.err(pg_temp.cmd(2, 'content.create_event', null,
   pg_temp.ev('SYNTHETIC No', pg_temp.at(5), pg_temp.at(6), '{"poster_asset_id": null}'))),
-  'validation_failed|poster_asset_id=unknown', 'a new event takes no poster yet (upload after creating it)');
+  'validation_failed|poster_asset_id=unknown_field', 'a new event takes no poster yet (upload after creating it)');
 
 -- The poster: upload, draft, publication checks --------------------------------------------------------
 select is(pg_temp.err(pg_temp.cmd(2, 'content.begin_asset_upload', null, pg_temp.up(pg_temp.e('e1'), 500, 500))),
@@ -347,7 +347,7 @@ select is(pg_temp.err(pg_temp.rsvp(4, gen_random_uuid())), 'validation_failed|ev
 select is(pg_temp.err(pg_temp.rsvp(4, gen_random_uuid(), 'content.cancel_rsvp')), 'validation_failed|event_id=not_going',
   'nor can it be cancelled');
 select is(pg_temp.err(pg_temp.cmd(4, 'content.rsvp_event', null, jsonb_build_object('event_id', pg_temp.e('e1'), 'x', 1))),
-  'validation_failed|x=unknown', 'unknown payload keys are refused');
+  'validation_failed|x=unknown_field', 'unknown payload keys are refused');
 select is(pg_temp.err(pg_temp.cmd(4, 'content.rsvp_event', 3, jsonb_build_object('event_id', pg_temp.e('e1')))),
   'validation_failed|expected_revision=must_be_null', 'an RSVP takes no expected revision');
 

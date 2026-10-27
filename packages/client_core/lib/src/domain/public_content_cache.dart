@@ -4,6 +4,7 @@ import 'content_banners.dart';
 import 'content_events.dart';
 import 'content_giving.dart';
 import 'content_bible.dart';
+import 'content_sermons.dart';
 
 /// The only public list reads that may enter a mobile offline snapshot.
 abstract final class PublicContentCacheKeys {
@@ -11,6 +12,7 @@ abstract final class PublicContentCacheKeys {
   static const homeBanners = 'content_public_banners';
   static const givingMethods = 'content_public_giving_methods';
   static const bibleChapter = 'content_public_bible_chapter';
+  static const sermons = 'content_public_sermons';
 }
 
 /// A saved, anonymous public list projection and when the complete snapshot
@@ -58,6 +60,7 @@ class PublicContentCacheUnavailable extends PublicContentCacheWrite {
 /// The persistence seam for the allowlisted public list reads. Detail, staff
 /// and other public reads have no method that can cache them.
 abstract interface class PublicContentCache {
+  Future<PublicContentSnapshot<PublicSermons>?> readSermons();
   Future<PublicContentSnapshot<PublicEvents>?> readEvents();
 
   Future<PublicContentSnapshot<PublicBanners>?> readBanners();
@@ -85,6 +88,7 @@ abstract interface class PublicContentCache {
     Object projection, {
     Future<Uint8List?> Function(PublicBanner banner)? loadBannerImage,
     Future<Uint8List?> Function(PublicGivingLogo logo)? loadGivingLogo,
+    Future<Uint8List?> Function(SermonPoster poster)? loadSermonPoster,
   });
 }
 
@@ -92,6 +96,9 @@ abstract interface class PublicContentCache {
 /// public domain content.
 class NoPublicContentCache implements PublicContentCache {
   const NoPublicContentCache();
+
+  @override
+  Future<PublicContentSnapshot<PublicSermons>?> readSermons() async => null;
 
   @override
   Future<PublicContentSnapshot<PublicEvents>?> readEvents() async => null;
@@ -122,5 +129,6 @@ class NoPublicContentCache implements PublicContentCache {
     Object projection, {
     Future<Uint8List?> Function(PublicBanner banner)? loadBannerImage,
     Future<Uint8List?> Function(PublicGivingLogo logo)? loadGivingLogo,
+    Future<Uint8List?> Function(SermonPoster poster)? loadSermonPoster,
   }) async => const PublicContentCacheUnavailable();
 }

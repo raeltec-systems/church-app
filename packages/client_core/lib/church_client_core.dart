@@ -2,6 +2,11 @@
 /// shared screens. Free of Supabase; adapters live in `supabase_adapters.dart`.
 library;
 
+export 'src/domain/content_sermons.dart';
+export 'src/application/sermon_controllers.dart';
+export 'src/presentation/sermon_screens.dart';
+export 'src/presentation/sermon_staff_screens.dart';
+
 export 'src/application/access_controllers.dart';
 export 'src/application/announcement_controllers.dart';
 export 'src/application/assisted_recovery_controllers.dart';

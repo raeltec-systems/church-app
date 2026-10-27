@@ -1000,7 +1000,11 @@ abstract interface class BannerRepository {
   Future<Uint8List?> fetchPublicImage(PublicBanner banner);
 
   /// Fetch a public image path after the caller confirmed its offline rights.
-  Future<Uint8List?> fetchPublicAsset(String path, String mediaType);
+  Future<Uint8List?> fetchPublicAsset(
+    String path,
+    String mediaType, {
+    int maxBytes = 2 * 1024 * 1024,
+  });
 
   /// Uploads [file] for the content item [itemId] (a saved banner) as
   /// [purpose]; the server measures and checks it.
@@ -1039,8 +1043,11 @@ class UnconfiguredBannerRepository implements BannerRepository {
   Future<Uint8List?> fetchPublicImage(PublicBanner banner) async => null;
 
   @override
-  Future<Uint8List?> fetchPublicAsset(String path, String mediaType) async =>
-      null;
+  Future<Uint8List?> fetchPublicAsset(
+    String path,
+    String mediaType, {
+    int maxBytes = 2 * 1024 * 1024,
+  }) async => null;
 
   @override
   Future<ImageUploadOutcome> uploadImage(

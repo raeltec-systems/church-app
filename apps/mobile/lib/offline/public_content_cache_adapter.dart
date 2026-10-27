@@ -20,7 +20,10 @@ import 'package:church_client_core/church_client_core.dart'
         PublicEvents,
         PublicGivingLogo,
         PublicGivingMethod,
-        PublicGivingMethods;
+        PublicGivingMethods,
+        PublicSermons,
+        PublicSermonSeries,
+        SermonPoster;
 import 'package:path_provider/path_provider.dart';
 
 Future<List<T>> _boundedMap<T, E>(
@@ -63,6 +66,7 @@ class PublicContentCacheAdapter implements PublicContentCache {
     PublicContentCacheKeys.homeBanners,
     PublicContentCacheKeys.givingMethods,
     PublicContentCacheKeys.bibleChapter,
+    PublicContentCacheKeys.sermons,
   };
 
   final Future<Directory> Function() _supportDirectory;
@@ -122,6 +126,75 @@ class PublicContentCacheAdapter implements PublicContentCache {
       final events = PublicEvents.fromJson(projection);
       return PublicContentSnapshot<PublicEvents>(
         value: events,
+        savedAt: _savedAt(entry['saved_at']),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<PublicContentSnapshot<PublicSermons>?> readSermons() async {
+    try {
+      final directory = await _directory();
+      final manifest = await _readManifest(directory);
+      final entry =
+          (manifest?['reads'] as Map?)?[PublicContentCacheKeys.sermons];
+      if (!_hasKeys(entry, const {'saved_at', 'projection', 'image_files'}) ||
+          entry['image_files'] is! Map) {
+        return null;
+      }
+      final source = PublicSermons.fromJson(entry['projection']);
+      if (source.sermons.any(
+            (s) =>
+                !s.offlineAllowed ||
+                s.youtubeVideoId != null ||
+                s.rightsRevision != null,
+          ) ||
+          source.series.any((s) => !s.offlineAllowed)) {
+        return null;
+      }
+      final allSeries = <String, PublicSermonSeries>{
+        for (final s in source.series) s.seriesId: s,
+        for (final s in source.sermons)
+          if (s.series != null) s.series!.seriesId: s.series!,
+      };
+      final files = entry['image_files'] as Map;
+      if (files.keys.any((key) => !allSeries.containsKey(key))) return null;
+      final loaded = <String, PublicSermonSeries>{};
+      for (final series in allSeries.values) {
+        if (!series.offlineAllowed) return null;
+        final poster = series.poster;
+        if (poster == null) {
+          loaded[series.seriesId] = series;
+          continue;
+        }
+        if (!poster.offlineAllowed) return null;
+        final name = files[series.seriesId];
+        if (name != _sermonPosterFileName(series, poster)) {
+          loaded[series.seriesId] = series.withPoster(null);
+          continue;
+        }
+        final file = File('${directory.path}${Platform.pathSeparator}$name');
+        final bytes = await file.exists() ? await file.readAsBytes() : null;
+        loaded[series.seriesId] = series.withPoster(
+          bytes == null || bytes.isEmpty || bytes.length > _maxImageBytes
+              ? null
+              : poster.withBytes(bytes),
+        );
+      }
+      return PublicContentSnapshot(
+        value: PublicSermons(
+          sermons: source.sermons
+              .map(
+                (s) => s.withSeries(
+                  s.series == null ? null : loaded[s.series!.seriesId],
+                ),
+              )
+              .toList(),
+          series: source.series.map((s) => loaded[s.seriesId]!).toList(),
+          truncated: source.truncated,
+        ),
         savedAt: _savedAt(entry['saved_at']),
       );
     } catch (_) {
@@ -285,6 +358,7 @@ class PublicContentCacheAdapter implements PublicContentCache {
     Object projection, {
     Future<Uint8List?> Function(PublicBanner banner)? loadBannerImage,
     Future<Uint8List?> Function(PublicGivingLogo logo)? loadGivingLogo,
+    Future<Uint8List?> Function(SermonPoster poster)? loadSermonPoster,
   }) {
     final completer = Completer<PublicContentCacheWrite>();
     _writeQueue = _writeQueue.then((_) async {
@@ -295,6 +369,7 @@ class PublicContentCacheAdapter implements PublicContentCache {
             projection,
             loadBannerImage,
             loadGivingLogo,
+            loadSermonPoster,
           ),
         );
       } catch (_) {
@@ -309,6 +384,7 @@ class PublicContentCacheAdapter implements PublicContentCache {
     Object projection,
     Future<Uint8List?> Function(PublicBanner banner)? loadBannerImage,
     Future<Uint8List?> Function(PublicGivingLogo logo)? loadGivingLogo,
+    Future<Uint8List?> Function(SermonPoster poster)? loadSermonPoster,
   ) async {
     if (!_allowedReads.contains(readKey)) {
       return const PublicContentCacheRefused(
@@ -405,6 +481,86 @@ class PublicContentCacheAdapter implements PublicContentCache {
           'image_files': files,
         };
         savedRows = eligible.length;
+      } else if (readKey == PublicContentCacheKeys.sermons) {
+        if (projection is! PublicSermons) {
+          return const PublicContentCacheRefused(
+            PublicContentCacheRefusal.unexpectedProjection,
+          );
+        }
+        // Strict round trip refuses extra/private fields and unsafe notes before writes.
+        final source = PublicSermons.fromJson(projection.toCacheJson());
+        if (source.sermons.any((s) => !s.offlineAllowed) ||
+            source.series.any((s) => !s.offlineAllowed)) {
+          return const PublicContentCacheRefused(
+            PublicContentCacheRefusal.offlineRightsNotCleared,
+          );
+        }
+        final directory = await _directory();
+        final allSeries = <String, PublicSermonSeries>{
+          for (final s in source.series) s.seriesId: s,
+          for (final s in source.sermons)
+            if (s.series != null) s.series!.seriesId: s.series!,
+        };
+        final cached = <String, PublicSermonSeries>{};
+        final files = <String, String>{};
+        for (final series in allSeries.values) {
+          if (!series.offlineAllowed) {
+            continue;
+          }
+          final poster = series.poster;
+          if (poster == null ||
+              !poster.offlineAllowed ||
+              loadSermonPoster == null) {
+            cached[series.seriesId] = series.withPoster(null);
+            continue;
+          }
+          final name = _sermonPosterFileName(series, poster);
+          final current = File(
+            '${directory.path}${Platform.pathSeparator}$name',
+          );
+          Uint8List? bytes = await current.exists()
+              ? await current.readAsBytes()
+              : null;
+          if (bytes == null || bytes.isEmpty || bytes.length > _maxImageBytes) {
+            try {
+              bytes = await loadSermonPoster(poster);
+            } catch (_) {
+              bytes = null;
+            }
+          }
+          if (bytes == null || bytes.isEmpty || bytes.length > _maxImageBytes) {
+            cached[series.seriesId] = series.withPoster(null);
+            omittedRows++;
+            continue;
+          }
+          // A damaged saved poster is replaced, never kept under its name.
+          if (await current.exists() &&
+              (await current.length() == 0 ||
+                  await current.length() > _maxImageBytes)) {
+            await current.delete();
+          }
+          if (!await current.exists()) await _writeImage(current, bytes);
+          cached[series.seriesId] = series;
+          files[series.seriesId] = name;
+          imageFiles.add(name);
+        }
+        final value = PublicSermons(
+          sermons: source.sermons
+              .map(
+                (s) => s.withSeries(
+                  s.series == null ? null : cached[s.series!.seriesId],
+                ),
+              )
+              .toList(),
+          series: source.series.map((s) => cached[s.seriesId]!).toList(),
+          truncated: source.truncated,
+        );
+        entry = {
+          'saved_at': _clock().toUtc().toIso8601String(),
+          'projection': value.toCacheJson(),
+          'image_files': files,
+        };
+        savedRows = source.sermons.length;
       } else if (readKey == PublicContentCacheKeys.bibleChapter) {
         if (projection is! PublicBibleChapter) {
           return const PublicContentCacheRefused(
@@ -518,6 +674,21 @@ class PublicContentCacheAdapter implements PublicContentCache {
       )..[readKey] = entry;
       final next = jsonEncode({'version': _manifestVersion, 'reads': reads});
       await _commitManifest(directory, next);
+      if (readKey == PublicContentCacheKeys.sermons) {
+        try {
+          await for (final entity in directory.list()) {
+            if (entity is File &&
+                entity.uri.pathSegments.last.startsWith(
+                  'sermon-poster-offline-',
+                ) &&
+                !imageFiles.contains(entity.uri.pathSegments.last)) {
+              await entity.delete();
+            }
+          }
+        } catch (_) {
+          /* Manifest committed; leftover files are not readable. */
+        }
+      }
       if (readKey == PublicContentCacheKeys.homeBanners) {
         try {
           await _removeUnusedBannerImages(directory, imageFiles);
@@ -540,6 +711,22 @@ class PublicContentCacheAdapter implements PublicContentCache {
     } catch (_) {
       return const PublicContentCacheUnavailable();
     }
+  }
+
+  static String _sermonPosterFileName(
+    PublicSermonSeries series,
+    SermonPoster poster,
+  ) {
+    if (!RegExp(r'^[a-zA-Z0-9-]+$').hasMatch(series.seriesId)) {
+      throw const FormatException('invalid series id');
+    }
+    final extension = switch (poster.image.mediaType) {
+      'image/png' => 'png',
+      'image/jpeg' => 'jpg',
+      'image/webp' => 'webp',
+      _ => throw const FormatException('invalid poster media type'),
+    };
+    return 'sermon-poster-offline-${series.seriesId}-p${series.publicationRevision}-r${poster.rightsRevision}.$extension';
   }
 
   @override

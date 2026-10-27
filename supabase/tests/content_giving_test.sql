@@ -7,7 +7,7 @@
 -- the order; the anonymous projection; the Admins' read; replay; the deletion erase part. Every
 -- account, phone and name is SYNTHETIC or SAMPLE (fictional range +1 202 555 0181-0187).
 begin;
-select plan(209);
+select plan(210);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000083' || lpad(n::text, 2, '0'))::uuid $$;
@@ -503,6 +503,11 @@ select is(pg_temp.err(pg_temp.cmd(2, 'content.verify_rights_record', pg_temp.rev
 create temp table logo_asset as select pg_temp.ready_logo(1, pg_temp.mm1()) as asset_id;
 select is((select a.state from app.content_assets a where a.asset_id = (select asset_id from logo_asset)),
   'ready', 'the giving_logo asset is ready through the normal upload commands');
+select results_eq(
+  $$select purpose, kind, rights_use, max_bytes, min_width, min_height, max_width, max_height, min_ratio, max_ratio
+      from app.content_asset_purposes where purpose = 'giving_logo'$$,
+  $$values ('giving_logo'::text, 'giving_method'::text, 'display'::text, 2097152::bigint, 32, 32, 2000, 2000, 0.20, 5.00)$$,
+  'the giving logo purpose keeps its bounded image limits');
 select is(pg_temp.err(pg_temp.cmd(1, 'content.save_giving_method', pg_temp.rev(pg_temp.mm1()),
   pg_temp.sv(pg_temp.mm1(), pg_temp.mm('SAMPLE Mobile Money', jsonb_build_object(
     'logo_asset_id', (select asset_id from logo_asset), 'logo_rights_id', pg_temp.logo_rights_id()))))),

@@ -73,8 +73,14 @@ class SupabaseBannerRepository implements BannerRepository {
   }
 
   @override
-  Future<Uint8List?> fetchPublicAsset(String path, String mediaType) =>
-      _fetchPublicAsset(path, mediaType, maxBytes: 2 * 1024 * 1024);
+  Future<Uint8List?> fetchPublicAsset(
+    String path,
+    String mediaType, {
+    int maxBytes = 2 * 1024 * 1024,
+  }) async {
+    if (maxBytes < 1 || maxBytes > 5 * 1024 * 1024) return null;
+    return _fetchPublicAsset(path, mediaType, maxBytes: maxBytes);
+  }
 
   Future<Uint8List?> _fetchPublicAsset(
     String path,

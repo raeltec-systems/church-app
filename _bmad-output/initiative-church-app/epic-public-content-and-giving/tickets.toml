@@ -127,15 +127,15 @@ references = ["_bmad-output/initiative-church-app/spec-church-app/functional-req
 [[entry]]
 id = 10
 type = "story"
-title = "Play sermon and hymn audio in the background with lock-screen controls"
-description = "Let editors attach an audio file to a sermon or to a hymn of the built-in book (by its number) through the entry 2 asset path with its rights record, stream published audio from the public bucket with seeking, keep it playing with the screen locked or the app in the background with lock-screen and notification controls on Android and iOS, and show an unavailable-audio state when the file is withdrawn or unreachable, without changing the mobile shell."
-verify = "On an Android emulator against staging, play a SYNTHETIC sermon's audio and a hymn's audio, lock the screen and pause and resume from the lock screen, background the app, then withdraw the file on staff web and see the unavailable-audio state on the next open, with the iOS check left for Israel's device in entry 15."
-covers = ["K10", "K8", "K3"]
-after = [8, 9]
+title = "Play a sermon's Facebook video or livestream inside the app"
+description = "Replace the descoped background audio (owner decision 2026-10-27: no hymn audio exists and sermons start with video links only): let Media give a sermon either a YouTube video (entry 9) or a public Facebook video or livestream link, validated by the server against an allowlist of Facebook video URL forms (facebook.com/.../videos/..., facebook.com/watch?v=..., fb.watch/...) and stored normalised, with the same rights check as YouTube; the staff sermon editor accepts a pasted Facebook link beside the YouTube one; the mobile sermon detail plays the Facebook video or live stream inside the app through Facebook's embedded video player in a web view (no autoplay, no Facebook sign-in), with the same unavailable-video state that keeps the notes readable, and the Sermons list marks playable rows the same way for both sources."
+verify = "On staging, save SYNTHETIC sermons with a public Facebook video link and a Facebook live link, see a non-Facebook or malformed link refused, play the video inside the app on an Android emulator signed out, and see a removed or private video show the unavailable message with the notes readable."
+covers = ["K10", "K5"]
+after = [9]
 hitl = false
 risk = "medium"
-unknown = "Background audio needs native configuration (an Android foreground service, the iOS background mode) and pinned packages; iOS cannot be built or run from this Windows host, so its check waits for Israel's device."
-references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#sermons", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations", "_bmad-output/initiative-church-app/architecture-church-app/architecture-church-app.md#ad-13--public-caching-private-session-state-and-file-gates-assumption"]
+unknown = "Facebook's embedded player works only for public videos and may change its embed rules; the web view package is chosen and pinned at build. iOS playback waits for Israel's device in entry 15."
+references = ["_bmad-output/initiative-church-app/spec-church-app/functional-requirements.md#sermons", "_bmad-output/initiative-church-app/spec-church-app/design-contract.md#mobile-screen-and-flow-obligations"]
 
 [[entry]]
 id = 11

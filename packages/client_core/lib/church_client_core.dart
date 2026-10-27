@@ -45,6 +45,7 @@ export 'src/domain/credential_review.dart';
 export 'src/domain/duties.dart';
 export 'src/domain/followups.dart';
 export 'src/domain/duty_calendar.dart';
+export 'src/domain/event_calendar.dart';
 export 'src/domain/fixture_counter.dart';
 export 'src/domain/inbox.dart';
 export 'src/domain/member_access.dart';

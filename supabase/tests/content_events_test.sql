@@ -120,6 +120,7 @@ select results_eq(
      where n.nspname in ('app', 'api') and p.proname like 'content\_%' and p.proname like '%event%'
        and has_function_privilege('anon', p.oid, 'EXECUTE')
        and p.proname not like 'content\_%giving%' -- story 6.3 pins its own
+       and p.proname not like '%rsvp%' -- story 6.11 pins its own
        and p.proname not like '%announcement%'
      order by 1$$,
   $$values ('api.content_public_event'::text collate "C"), ('api.content_public_events'),
@@ -131,6 +132,7 @@ select results_eq(
        and (p.proname like '%event%' or p.proname = 'content_command')
        and has_function_privilege('authenticated', p.oid, 'EXECUTE')
        and p.proname not like 'content\_%giving%' -- story 6.3 pins its own
+       and p.proname not like '%rsvp%' -- story 6.11 pins its own
        and p.proname not like '%announcement%'
      order by 1$$,
   $$values ('api.content_command'::text collate "C"), ('api.content_public_event'), ('api.content_public_events'),
@@ -148,7 +150,10 @@ select isnt_definer('api', 'content_public_events', array[]::text[], 'the public
 select results_eq($$select kind, editor_roles from app.content_kinds where kind = 'event' order by 1$$,
   $$values ('event'::text, array['admin', 'pastor', 'media']::text[])$$, 'events are edited by Admin, Pastor and Media');
 select results_eq($$select command || ':' || handler || ':' || creates from app.content_commands
-                      where kind = 'event' order by 1$$,
+                      where kind = 'event' -- story 6.11 pins its RSVP and organiser commands
+                        and command not in ('content.rsvp_event', 'content.cancel_rsvp',
+                                            'content.set_event_organisers')
+                      order by 1$$,
   $$values ('content.archive_event:app.content_event_archive(uuid,bigint,jsonb):false'::text),
            ('content.create_event:app.content_event_create(uuid,bigint,jsonb):true'),
            ('content.publish_event:app.content_event_publish(uuid,bigint,jsonb):false'),
@@ -261,7 +266,8 @@ select is((select (r -> 'data') - 'event_id' from p1),
   'Media publishes: the draft goes live');
 create temp table pub as select pg_temp.read(null, 'select api.content_public_events()') as r;
 select is((select jsonb_array_length(r -> 'events') from pub), 1, 'anon reads one published event');
-select results_eq($$select k from pub, jsonb_object_keys(r #> '{events,0}') k order by 1$$,
+select results_eq($$select k from pub, jsonb_object_keys(r #> '{events,0}') k
+                     where k not in ('poster', 'rsvp') order by 1$$, -- story 6.11 pins its own
   $$values ('description'::text), ('ends_at'), ('event_id'), ('location'), ('offline_allowed'), ('publication_revision'),
            ('published_at'), ('starts_at'), ('title')$$,
   'the public projection has exactly these keys');
@@ -323,7 +329,8 @@ select is((select pg_temp.staff_e1(r) ->> 'published_by' from staff1), 'SYNTHETI
 select is((select pg_temp.staff_e1(r) #>> '{draft,saved_by}' from staff1), 'SYNTHETIC Content Member 3',
   'and who saved the draft');
 select is((select r ->> 'capacity' from staff1), 'media', 'the reader''s capacity');
-select results_eq($$select k from staff1, jsonb_object_keys(pg_temp.staff_e1(r)) k order by 1$$,
+select results_eq($$select k from staff1, jsonb_object_keys(pg_temp.staff_e1(r)) k -- story 6.11 pins its own
+                     where k not in ('public_poster', 'rsvp_going', 'organisers', 'sees_names') order by 1$$,
   $$values ('archived_at'::text), ('created_at'), ('created_by'), ('draft'), ('event_id'), ('live'),
            ('published_at'), ('published_by'), ('revision'), ('state'), ('updated_at'), ('withdrawn_at')$$,
   'the editors'' event keys');

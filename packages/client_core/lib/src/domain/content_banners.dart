@@ -816,6 +816,9 @@ abstract final class BannerCommands {
 abstract final class ContentPurposes {
   static const bannerImage = 'banner_image';
   static const givingLogo = 'giving_logo';
+
+  /// Story 6.11: an event's poster.
+  static const eventPoster = 'event_poster';
 }
 
 /// A file an editor picked: its name, the type the browser declared (never

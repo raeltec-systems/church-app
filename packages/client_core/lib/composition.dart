@@ -111,6 +111,10 @@ Future<List<Override>> compositionOverrides(
     announcementsRepositoryProvider.overrideWithValue(
       SupabaseAnnouncementsRepository(client),
     ),
+    // Story 6.8: favourites and Hymns for this Sunday.
+    hymnListsRepositoryProvider.overrideWithValue(
+      SupabaseHymnListsRepository(client),
+    ),
     // Story 6.2: banners, rights and the content-assets route.
     bannerRepositoryProvider.overrideWithValue(
       SupabaseBannerRepository(

@@ -372,8 +372,11 @@ select app.notifications_set_schedule(jsonb_build_object(
   'source_revision', 1, 'recipient_member_id', pg_temp.mid(9), 'schedule_type', 'task',
   'intent', jsonb_build_object('due_at', app.cmd_utc(now() + interval '3 days'), 'task_state', 'open'),
   'kinds', '{"deadline": "fixture_due"}'::jsonb, 'fresh', true));
--- Story 4.12: Duties and Follow-ups hook deletion_requested too (three hooks, Notifications last).
-select is(pg_temp.lifecycle('deletion_requested', 9), 3, 'deletion_requested reaches Notifications');
+-- Story 4.12: Duties and Follow-ups hook deletion_requested too (Notifications last); story 6.11:
+-- Content as well. Every registered hook runs.
+select is(pg_temp.lifecycle('deletion_requested', 9),
+  (select count(*)::int from app.contract_lifecycle_hooks where event = 'deletion_requested'),
+  'deletion_requested reaches Notifications');
 select is((select count(*)::int from app.notifications_jobs where recipient_member_id = pg_temp.mid(9) and job_state = 'pending'),
   0, 'the deletion request cancels every pending job of the member');
 select is((select string_agg(schedule_state || '|' || end_reason, ',') from app.notifications_schedules

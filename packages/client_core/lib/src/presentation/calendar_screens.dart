@@ -3,16 +3,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../application/access_controllers.dart' show myAccessProvider;
 import '../application/content_controllers.dart';
+import '../application/duties_controllers.dart' show dutyCalendarExportProvider;
+import '../application/providers.dart'
+    show accountProvider, bannerRepositoryProvider;
 import '../domain/access_grants.dart';
 import '../domain/church_time.dart';
 import '../domain/content_events.dart';
+import '../domain/duty_calendar.dart' show CalendarHandoff, ShareOrigin;
+import '../domain/event_calendar.dart';
 import 'church_widgets.dart';
+import 'shell_routing.dart' show ClientPaths;
 
 // Story 6.1 (mobile): the public Calendar tab and an event's detail, read by
 // everyone, signed in or not, from the published projection only. Every time
 // is church time (Africa/Lusaka), whatever zone the phone uses. A failed read
-// never looks like an empty calendar.
+// never looks like an empty calendar. Story 6.11 adds the poster (a 16:9
+// thumbnail in the list, in full on the detail), Add to calendar and the
+// RSVP: counts for everyone, an answer for approved members.
 
 /// The public calendar routes.
 abstract final class CalendarPaths {
@@ -206,10 +215,51 @@ class PublicEventRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 6),
-                ExcludeSemantics(
-                  child: Icon(Icons.chevron_right, size: 20, color: c.muted),
-                ),
+                // Story 6.11: the poster as a 16:9 thumbnail (decorative in
+                // the row: its text alternative is read on the detail).
+                if (e.poster case final poster?)
+                  _EventRowThumb(eventId: e.eventId, poster: poster)
+                else
+                  ExcludeSemantics(
+                    child: Icon(Icons.chevron_right, size: 20, color: c.muted),
+                  ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Story 6.11: an event poster as a small 16:9 thumbnail. A poster that does
+/// not load leaves a plain tile, never a broken image.
+class _EventRowThumb extends ConsumerWidget {
+  const _EventRowThumb({required this.eventId, required this.poster});
+
+  final String eventId;
+  final PublicEventPoster poster;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ChurchColors.of(context);
+    final url = ref
+        .read(bannerRepositoryProvider)
+        .publicFileUrl(poster.image.path);
+    return ExcludeSemantics(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: SizedBox(
+          width: 64,
+          height: 36,
+          child: ColoredBox(
+            color: c.surface2,
+            child: Image.network(
+              url.toString(),
+              key: Key('event-thumb-$eventId'),
+              fit: BoxFit.cover,
+              excludeFromSemantics: true,
+              errorBuilder: (context, _, _) => const SizedBox.expand(),
             ),
           ),
         ),
@@ -430,7 +480,12 @@ class EventDetailScreen extends ConsumerWidget {
             ),
           ]);
         } else {
+          final rsvp = event.rsvp;
           children.addAll([
+            if (event.poster case final poster?) ...[
+              _EventPosterView(poster: poster),
+              const SizedBox(height: 16),
+            ],
             Semantics(
               header: true,
               child: Text(
@@ -446,6 +501,7 @@ class EventDetailScreen extends ConsumerWidget {
                 (label: 'Starts', value: churchLongWhen(event.startsAt)),
                 (label: 'Ends', value: churchLongWhen(event.endsAt)),
                 (label: 'Where', value: event.location),
+                if (rsvp != null) (label: 'Places', value: rsvp.placesText),
               ],
             ),
             const SizedBox(height: 8),
@@ -453,6 +509,14 @@ class EventDetailScreen extends ConsumerWidget {
               'Times are church time (Kafue).',
               style: ChurchType.secondary.copyWith(color: c.muted),
             ),
+            if (rsvp != null) ...[
+              const SizedBox(height: ChurchGeometry.sectionGap),
+              _EventRsvpSection(event: event, rsvp: rsvp),
+            ],
+            if (!event.endedAt(DateTime.now())) ...[
+              const SizedBox(height: ChurchGeometry.sectionGap),
+              _EventCalendarExport(event: event),
+            ],
             const SizedBox(height: ChurchGeometry.sectionGap),
             const CardLabel('About this event'),
             const SizedBox(height: 8),
@@ -501,6 +565,390 @@ class EventDetailScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Story 6.11: the poster in full (its own shape, never cropped), with its
+/// text alternative. A poster that does not load says so.
+class _EventPosterView extends ConsumerWidget {
+  const _EventPosterView({required this.poster});
+
+  final PublicEventPoster poster;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ChurchColors.of(context);
+    final url = ref
+        .read(bannerRepositoryProvider)
+        .publicFileUrl(poster.image.path);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: ColoredBox(
+        color: c.surface2,
+        child: AspectRatio(
+          aspectRatio: poster.image.width / poster.image.height,
+          child: Image.network(
+            url.toString(),
+            key: const Key('event-poster'),
+            fit: BoxFit.contain,
+            semanticLabel: poster.altText,
+            errorBuilder: (context, _, _) => Center(
+              key: const Key('event-poster-unavailable'),
+              child: Text(
+                'Poster unavailable',
+                style: ChurchType.secondary.copyWith(color: c.muted),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Story 6.11: an event's RSVP. Everyone reads the counts; a guest is asked
+/// to sign in, a signed-in account without member access is told plainly
+/// that RSVP is for members, and an approved member answers. Nothing here
+/// names who else is going.
+class _EventRsvpSection extends ConsumerWidget {
+  const _EventRsvpSection({required this.event, required this.rsvp});
+
+  final PublicEvent event;
+  final PublicEventRsvp rsvp;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ChurchColors.of(context);
+    final muted = ChurchType.secondary.copyWith(color: c.muted);
+    final signedIn =
+        ref.watch(accountProvider.select((s) => s.accountId)) != null;
+    final access = ref.watch(myAccessProvider.select((s) => s.result));
+    final Widget answer;
+    if (!rsvp.open) {
+      answer = Text(
+        'RSVP is closed: the event has started.',
+        key: const Key('event-rsvp-closed'),
+        style: muted,
+      );
+    } else if (!signedIn) {
+      answer = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Church members sign in to say they are coming.', style: muted),
+          const SizedBox(height: 10),
+          FocusRing(
+            child: OutlinedButton(
+              key: const Key('event-rsvp-sign-in'),
+              onPressed: () => context.push(ClientPaths.signIn),
+              child: const Text('Sign in to RSVP'),
+            ),
+          ),
+        ],
+      );
+    } else if (access is AccessReadDenied<MemberGrants>) {
+      answer = Text(
+        'RSVP is for approved church members.',
+        key: const Key('event-rsvp-members-only'),
+        style: muted,
+      );
+    } else {
+      answer = _MemberRsvp(event: event, rsvp: rsvp);
+    }
+    return Column(
+      key: const Key('event-rsvp'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [const CardLabel('RSVP'), const SizedBox(height: 8), answer],
+    );
+  }
+}
+
+/// What the RSVP section says after an answer: (tone, sentence).
+(StatusTone, String) _rsvpNoticeText(RsvpNotice n) => switch (n) {
+  RsvpNotice.going => (
+    StatusTone.success,
+    'You\'re going. Your place is saved.',
+  ),
+  RsvpNotice.cancelled => (
+    StatusTone.success,
+    'Your RSVP is cancelled. Your place is free for someone else.',
+  ),
+  RsvpNotice.full => (StatusTone.warning, 'No places are left.'),
+  RsvpNotice.closed => (
+    StatusTone.warning,
+    'RSVP is closed: the event has started.',
+  ),
+  RsvpNotice.off => (StatusTone.warning, 'This event no longer takes RSVPs.'),
+  RsvpNotice.notPublic => (
+    StatusTone.warning,
+    'This event is no longer on the calendar.',
+  ),
+  RsvpNotice.notGoing => (StatusTone.neutral, 'You had no RSVP to cancel.'),
+  RsvpNotice.membersOnly => (
+    StatusTone.warning,
+    'RSVP is for approved church members.',
+  ),
+  RsvpNotice.signInAgain => (StatusTone.warning, 'Please sign in again.'),
+  RsvpNotice.notAvailable => (
+    StatusTone.warning,
+    'The church server could not do this now. Try again later.',
+  ),
+  RsvpNotice.refused => (StatusTone.danger, 'The church server refused this.'),
+  RsvpNotice.unconfirmed => (
+    StatusTone.warning,
+    'We couldn\'t tell whether your answer arrived. Check again sends the '
+        'same answer, so it can\'t count twice.',
+  ),
+  RsvpNotice.notSent => (
+    StatusTone.neutral,
+    'This build has no server configured, so nothing was sent.',
+  ),
+};
+
+/// Story 6.11: an approved member's own RSVP and its two answers.
+class _MemberRsvp extends ConsumerWidget {
+  const _MemberRsvp({required this.event, required this.rsvp});
+
+  final PublicEvent event;
+  final PublicEventRsvp rsvp;
+
+  Future<void> _cancel(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => ChurchDialog(
+        title: 'Cancel your RSVP?',
+        content: const Text(
+          'Your place is given up. If the event fills, you may not get it back.',
+        ),
+        actions: [
+          FocusRing(
+            child: TextButton(
+              key: const Key('event-rsvp-keep'),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Keep my place'),
+            ),
+          ),
+          FocusRing(
+            child: FilledButton(
+              key: const Key('event-rsvp-cancel-confirm'),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Cancel RSVP'),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref.read(eventRsvpProvider(event.eventId).notifier).cancel();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ChurchColors.of(context);
+    final muted = ChurchType.secondary.copyWith(color: c.muted);
+    final s = ref.watch(eventRsvpProvider(event.eventId));
+    final ctl = ref.read(eventRsvpProvider(event.eventId).notifier);
+    final busy = s.busy;
+    final children = <Widget>[];
+    switch (s.result) {
+      case null:
+        children.add(
+          Text(
+            'Checking your RSVP…',
+            key: const Key('event-rsvp-loading'),
+            style: muted,
+          ),
+        );
+      case AccessReadOk(:final value) when value.going:
+        // A wrap, not a row: large text or a narrow phone puts the action
+        // under the status instead of cutting it off.
+        children.add(
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              const StatusLabel(
+                key: Key('event-rsvp-going'),
+                label: 'You\'re going',
+                tone: StatusTone.success,
+              ),
+              FocusRing(
+                child: TextButton(
+                  key: const Key('event-rsvp-cancel'),
+                  onPressed: busy ? null : () => _cancel(context, ref),
+                  child: const Text('Cancel RSVP'),
+                ),
+              ),
+            ],
+          ),
+        );
+      case AccessReadOk() when rsvp.full:
+        children.add(
+          Text(
+            'Full: no places are left.',
+            key: const Key('event-rsvp-full'),
+            style: ChurchType.body.copyWith(color: c.ink),
+          ),
+        );
+      case AccessReadOk():
+        children.add(
+          FocusRing(
+            child: FilledButton(
+              key: const Key('event-rsvp-going-button'),
+              onPressed: busy ? null : ctl.going,
+              child: Text(busy ? 'Sending…' : 'I\'m going'),
+            ),
+          ),
+        );
+      case AccessReadDenied():
+        children.add(
+          Text(
+            'RSVP is for approved church members.',
+            key: const Key('event-rsvp-members-only'),
+            style: muted,
+          ),
+        );
+      case AccessReadFailed(:final unreachable):
+        children.add(
+          Text(
+            unreachable
+                ? 'No connection: we couldn\'t check your RSVP.'
+                : 'We couldn\'t check your RSVP. Try again later.',
+            key: const Key('event-rsvp-failed'),
+            style: ChurchType.body.copyWith(color: c.ink),
+          ),
+        );
+        children.add(
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FocusRing(
+              child: TextButton(
+                key: const Key('event-rsvp-retry'),
+                onPressed: s.loading ? null : ctl.reload,
+                child: const Text('Try again'),
+              ),
+            ),
+          ),
+        );
+    }
+    if (s.notice case final n?) {
+      final (tone, text) = _rsvpNoticeText(n);
+      children.addAll([
+        const SizedBox(height: 8),
+        Semantics(
+          liveRegion: true,
+          child: Text(
+            text,
+            key: Key('event-rsvp-notice-${n.name}'),
+            style: ChurchType.secondary.copyWith(
+              color: tone == StatusTone.danger ? c.redFg : c.ink,
+            ),
+          ),
+        ),
+        if (n == RsvpNotice.unconfirmed)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FocusRing(
+              child: TextButton(
+                key: const Key('event-rsvp-check-again'),
+                onPressed: busy ? null : ctl.checkAgain,
+                child: const Text('Check again'),
+              ),
+            ),
+          ),
+      ]);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
+    );
+  }
+}
+
+/// Story 6.11: Add to calendar for an event that has not ended, with the
+/// copy caveat and what the phone said. The same handoff as a duty's.
+class _EventCalendarExport extends ConsumerStatefulWidget {
+  const _EventCalendarExport({required this.event});
+
+  final PublicEvent event;
+
+  @override
+  ConsumerState<_EventCalendarExport> createState() =>
+      _EventCalendarExportState();
+}
+
+class _EventCalendarExportState extends ConsumerState<_EventCalendarExport> {
+  var _exporting = false;
+  CalendarHandoff? _result;
+
+  Future<void> _export(BuildContext button) async {
+    // The share sheet points at the button (an iPad popover needs it).
+    final box = button.findRenderObject();
+    ShareOrigin? origin;
+    if (box is RenderBox && box.hasSize) {
+      final o = box.localToGlobal(Offset.zero);
+      origin = ShareOrigin(o.dx, o.dy, box.size.width, box.size.height);
+    }
+    setState(() => _exporting = true);
+    final result = await ref
+        .read(dutyCalendarExportProvider)
+        .export(
+          fileName: EventCalendar.fileName(widget.event),
+          ics: EventCalendar.ics(widget.event, now: DateTime.now()),
+          origin: origin,
+        );
+    if (!mounted) return;
+    setState(() {
+      _exporting = false;
+      _result = result;
+    });
+    announce(context, _text(result));
+  }
+
+  static String _text(CalendarHandoff r) => switch (r) {
+    CalendarHandoff.shared =>
+      'Calendar file shared. Check the calendar app you chose; this copy '
+          'won\'t update if the event changes.',
+    CalendarHandoff.handedOver =>
+      'Calendar file handed to your phone. We can\'t tell whether it was '
+          'saved; this copy won\'t update if the event changes.',
+    CalendarHandoff.dismissed => 'Not added: the share sheet was closed.',
+    CalendarHandoff.unavailable =>
+      'Add to calendar isn\'t available in this version of the app.',
+    CalendarHandoff.failed =>
+      'Couldn\'t hand over the calendar file. Try again.',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FocusRing(
+          child: Builder(
+            builder: (button) => OutlinedButton.icon(
+              key: const Key('event-calendar'),
+              onPressed: _exporting ? null : () => _export(button),
+              icon: const Icon(Icons.event_outlined),
+              label: const Text('Add to calendar'),
+            ),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          EventCalendar.staleCaveat,
+          textAlign: TextAlign.center,
+          style: ChurchType.secondary.copyWith(color: c.muted),
+        ),
+        if (_result case final r?)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(_text(r), key: const Key('event-calendar-result')),
+          ),
+      ],
     );
   }
 }

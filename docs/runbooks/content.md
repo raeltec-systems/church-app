@@ -432,6 +432,86 @@ All six Bible migrations through `20261026151013_content_bible_review_hardening.
 
 Do not approve `q5_content_rights` as part of this check. A staging demonstration does not clear production rights; the production catalog starts empty until the owner approves the source and the record clears display use.
 
+## Story 6.11: event posters, Add to calendar and RSVP within capacity
+
+Migrations: `supabase/migrations/20261027140149_content_event_posters_rsvp.sql` and its row-deletion file `supabase/migrations/20261027140200_content_event_posters_rsvp_rows.sql` (hand-applied on hosted projects, see "The `_rows` file" below). pgTAP: `supabase/tests/content_event_rsvp_test.sql`. E2E: `tools/identity-e2e/content-event-rsvp.mjs` (offline tests `content-event-rsvp.test.mjs`). Plan: `_bmad-output/initiative-church-app/epic-public-content-and-giving/story-show-event-posters-export-events-to-the-phone-calendar-and-r-plan.md`.
+
+### Model (the events kind; nothing shared is replaced except the two registry-driven checks below)
+
+- **Poster.** Optional, on an event revision: an upload of purpose `event_poster` (PNG, JPEG or WebP, at most 5 MiB, 540 x 540 to 6000 x 6000, width/height 0.50 to 2.40) in the file slot `poster`, a rights record (`poster_rights_id`) and a text alternative (`poster_alt_text`, 250). Publication needs a ready upload and a rights record that clears display now (church-owned records need no Q5 entry, story F2). The public path is `event/<event_id>/r<n>/poster.<ext>`; the content-assets sync places it. Events register a public condition: a poster leaves the public bucket at the next sync once its event has ended.
+- **RSVP.** Optional on an event revision (`rsvp_enabled`, `rsvp_capacity` 1-10000 or no limit). `app.content_event_rsvps` keeps one row per event and member: `going`, `cancelled` (the member) or `released` (the member's church membership ended before the event). No command deletes a row. RSVP is open from publication until the event starts. Lowering the capacity below the people already going removes nobody: the event reads Full until places free. There is no waitlist and no notification.
+- **Capacity under concurrency.** `content.rsvp_event` locks the event's `app.content_items` row (`FOR UPDATE`) before counting, so RSVPs to one event run one at a time and `going` can never exceed the capacity (the E2E races five members for one place, twice). An RSVP never changes the event's `revision`, so editors' saves are not made stale by members.
+- **Organisers (owner decision 2026-10-21).** An event's organisers and Admins see the names of the members going; everyone else (other editors, members, guests) sees only the count and the spaces left. Organisers are per event: up to 10 members who hold an event editor role (Media, Pastor or Admin). The editor who creates an event is its first organiser (existing events: their creator, if they still edit events). Only an Admin or a current organiser changes the list (`content.set_event_organisers`), so another editor cannot make themselves an organiser. Names are on staff web only.
+- **Member commands.** `app.content_member_commands` lists the Content commands any approved member with live access may send (today the two RSVP commands; entry 8's favourites can reuse it). `app.content_authorize_command` and `app.content_in_scope` read it: a member command key-share-locks the actor's member row before the receipt (a concurrent deactivation waits), its handler reads access again after the lock, and a replayed RSVP is in scope only for its own member. Every other Content command keeps the 6.1 rule (an editor role of the command's kind).
+- **Lifecycle hook (story 2.10 contract).** `app.content_on_member_lifecycle` on `membership_deactivated` and `deletion_requested` releases the member's going RSVPs of events that have not started and ends the member's organiser rows; on `scope_revoked` it ends the organiser rows of a member who no longer holds an event editor role. A login hold changes nothing (the RSVP is kept). Restoration brings nothing back.
+
+### Commands (`api.content_command`, 1.4 envelope)
+
+| Command | Who | Expected | Payload |
+|---|---|---|---|
+| `content.create_event` | event editors | `null` | 6.1 fields + `rsvp_enabled?`, `rsvp_capacity?` (no poster: an upload needs the event) |
+| `content.save_event` | event editors | event revision | 6.1 fields + `rsvp_enabled?`, `rsvp_capacity?`, `poster_asset_id?`, `poster_rights_id?`, `poster_alt_text?` (absolute: missing RSVP keys turn RSVP off, missing poster keys leave the draft without a poster) |
+| `content.set_event_organisers` | an Admin, or an event editor who is an active organiser | event revision | `{event_id, organiser_ids}` (0-10 distinct members who edit events) |
+| `content.rsvp_event` | approved members with live access | `null` | `{event_id}` |
+| `content.cancel_rsvp` | approved members with live access | `null` | `{event_id}` |
+
+- New field codes: `rsvp_enabled: invalid`; `rsvp_capacity: invalid|out_of_range|must_be_null`; `poster_asset_id: required|unknown|not_ready|retention_claimed`; `poster_rights_id: required|unknown` (and at publish `not_in_force|use_not_cleared|source_not_cleared`); `poster_alt_text: required|too_long|invalid`; `organiser_ids: required|invalid|too_many|not_editor`.
+- RSVP refusals (field `event_id`): `not_public` (not a published event that has not ended), `rsvp_off`, `rsvp_closed` (started), `full`, `not_going` (cancel). A Pending, held or deactivated account: `forbidden`; a guest: HTTP 401. RSVP data: `{rsvp_id, event_id, rsvp_state, going, capacity, spaces_left, full}` (no names); the receipt's aggregate is the RSVP (`content_rsvp`).
+
+### Reads
+
+| Endpoint | Who | Returns |
+|---|---|---|
+| `api.content_public_events()`, `api.content_public_event(event_id)` | anyone | P gains `poster: null|{path, media_type, width, height, alt_text, offline_allowed}` (only once placed and cleared for display) and `rsvp: null|{capacity, going, spaces_left, full, open}`. Never a name or a member id. |
+| `api.content_my_event_rsvp(event_id)` | approved members with live access (Pending 403, guest 401) | `{event_id, rsvp_state: going|cancelled|released|null, updated_at}` |
+| `api.content_staff_events()` | event editors | each event gains `public_poster` (`shown`, `waiting`, `blocked`, `ended` or null), `rsvp_going`, `organisers [{member_id, name}]` and `sees_names` (the reader is an Admin or one of its organisers); each revision gains `poster`, `poster_rights`, `poster_alt_text`, `rsvp_enabled`, `rsvp_capacity`; the top level gains `organiser_options` (everyone who edits events) |
+| `api.content_staff_event_rsvps(event_id)` | an Admin, or an event editor who is an active organiser (other editors 403 `not_granted`, members 403, guests 401) | `{rsvps: null|{event_id, capacity, going, attendees: [{name, rsvp_at}], truncated}}`: the members going, earliest first, at most 2000 |
+
+### Deletion (story 2.11 hook) and the `_rows` file
+
+The erase part `event_rsvps` (`app.content_rsvp_erase_part`) deletes the member's RSVP and organiser rows through `app.content_rsvp_purge_rows` and anonymises who changed organiser lists (nil UUID); `check` counts what is left. In the main migration the purge is a **fail-closed stub** that answers `unavailable` (`{"deletion": "rows_migration_missing"}`): until the `_rows` file is applied, **every** member deletion's erase step on that project waits and nothing is erased (the 2.11 worker retries). The `_rows` file replaces only that function.
+
+**Owner step (staging, right after the main migration is applied there):** open the staging SQL editor (project `tmurpotfluignacfueki`), paste the whole file `supabase/migrations/20261027140200_content_event_posters_rsvp_rows.sql` (hosted name in the promotion runbook) and run it once. Then check:
+
+```sql
+select position('delete from app.content_event_rsvps' in pg_get_functiondef('app.content_rsvp_purge_rows(uuid)'::regprocedure)) > 0;  -- true
+select has_function_privilege('authenticated', 'app.content_rsvp_purge_rows(uuid)', 'EXECUTE');  -- false
+```
+
+Production applies both files in order with the migrations at promotion (entry 17).
+
+Staging (2026-10-27): the main migration is applied verbatim to `tmurpotfluignacfueki` as version `20261027140149` (the local file carries that version; the `_rows` file is `20261027140200`, after it). 31 of the 32 added or replaced function definitions hash identically to a fresh local replay; the 32nd, `app.content_rsvp_purge_rows`, is the stub until the owner step above. Boundary and unowned counts are 0, RLS is on, client roles hold no grant on the three tables, the existing event's creator was backfilled as its organiser, and the signed-out events read shows `poster: null` and `rsvp: null`. Evidence: `evidence-6.11/staging-verify.md`. **The `_rows` file is not yet applied on staging.**
+
+### Clients
+
+- **Mobile Calendar.** A row with a poster shows it as a 16:9 thumbnail (Home's Coming up too); the detail shows the poster in full with its text alternative, a **Places** row ("8 of 20 places left", "Full (20 places)", or "12 going"), the **RSVP** section and **Add to calendar**. RSVP: a guest gets **Sign in to RSVP**; a signed-in account without member access reads that RSVP is for approved church members; a member answers **I'm going** or, when going, sees **You're going** and **Cancel RSVP** (with a confirmation); a full event says so; an event that has started says RSVP is closed. **Add to calendar** (events that have not ended) hands the phone an `.ics` with both endpoints of a multi-day event, `SEQUENCE` = the publication revision and the copy caveat, through the 4.5 share-sheet handoff; the Duties export is unchanged. Posters and counts are not kept offline (the 6.4 snapshot keeps its shape).
+- **Staff web Events.** The form gains **Members can RSVP** with optional **Places**, and, on a saved event, **Poster (optional)**: Choose poster (uploads at once), Remove poster, **Poster rights record**, **Poster description**. An opened event shows its RSVP count (every editor), the poster's public state, its **Organisers**, and for an Admin or an organiser **Who's coming** (read on demand) and **Change organisers**; other editors read that only organisers and Admins see who is coming. Opening Events and every publish, withdraw or archive run the content-assets sync.
+
+### Local runs
+
+```bash
+npx supabase db reset --local && npx supabase test db
+node --test tools/identity-e2e/content-event-rsvp.test.mjs
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/content-event-rsvp.mjs --evidence _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-6.11/content-event-rsvp-e2e.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The E2E uses fictional numbers +44 7700 900584-900596, serves the content-assets function when it is not running, and removes every row and Storage object it created.
+
+### Owner manual check on staging (the ticket's verify)
+
+Use SYNTHETIC names only. Do not publish an announcement or anything with a notice.
+
+1. Give two SYNTHETIC members Media (**Roles & access**). As Media O on staff web, **Events** > **New event**: `SYNTHETIC Youth Camp`, two days, **Members can RSVP**, **Places** 2. Save draft. Add a poster (a church-owned image), choose a verified church-owned rights record, describe the poster, Save draft, Publish. The opened event says the poster is shown after the sync.
+2. Create and publish a three-day `SYNTHETIC Conference`. On a signed-out phone, open each: the camp shows its poster and "2 of 2 places left"; both show their first and last day. **Add to calendar** on each: the phone's calendar entry spans all days (check the three-day one ends on its third day), and the caveat is shown under the button.
+3. Members A and B tap **I'm going**; member C sees **Full**. Members C and D tap **I'm going** at the same moment on another capacity-1 event: one is going, the other is told no places are left.
+4. Member A cancels: the camp shows one place left and C can take it.
+5. An Admin deactivates a member who is going (**Membership status**): the camp's place is free again on the next refresh.
+6. A signed-out phone has **Sign in to RSVP**; a Pending account reads that RSVP is for approved church members.
+7. Media N (not an organiser) opens the camp on staff web: the count only, "Only this event's organisers and Admins see who is coming", no **Who's coming**. Media O and an Admin open **Who's coming** and see the names. Media O adds Media N with **Change organisers**: Media N now sees the names.
+8. Right after the deploy (once), the owner applies the `_rows` file as above; the entry 17 suite reruns the RSVP deletion case on staging after that.
+
 ## Story 6.7: the church's Tonga hymn book, built into the app
 
 Owner decision 2026-10-27: the hymn book is the official Brethren in Christ Church Tonga hymn book, "Inyimbo zya Bakristo" (2012 reprint). It ships inside both apps as one file, `packages/client_core/assets/hymn_book/hymn_book.json`, declared as an asset of `church_client_core`: hymns 1..199, then the choruses (Ziindululo) 1..67, each with its section, English title or tune name, hymnal reference (Z.H. = Zulu Hymnal, M.H. = Methodist Hymn Book), key, verses and chorus. There is no migration, table, rights record, staff screen, Content command, staging step or offline-cache key: the server never stores hymn text, and later entries (8, 10, 14) refer to an item by its id (`hymn-12`, `chorus-12`). Everyone reads and searches the book on the phone, signed in or not, with or without a connection.
@@ -468,6 +548,89 @@ On a signed-out Android phone in airplane mode, open **Bible & Hymns**, choose *
 4. Confirm the app's count matches the converter report: 199 hymns and 67 choruses.
 
 Spot-check list for the PDF: hymns 1, 3, 4, 25, 29, 30, 32, 62, 106, 164, 178, 199 and choruses 1, 24, 26, 34, 67. Hymns 25, 29 and 30 need the printed book: the extraction numbers the second line of their first stanza "2", so the app shows a one-line verse 1.
+
+## Story 6.8: favourite hymns and Hymns for this Sunday
+
+Migrations: `supabase/migrations/20261027182223_content_hymn_lists.sql` (the version staging recorded) and its small rows file `supabase/migrations/20261027182300_content_hymn_lists_rows.sql` (the favourites row purge; **the owner applies it by hand on hosted projects**, below). pgTAP: `supabase/tests/content_hymn_lists_test.sql` (145). E2E: `tools/identity-e2e/content-hymn-lists.mjs` (13 checks; run it after the pgTAP suite on a fresh reset; offline tests `content-hymn-lists.test.mjs`). Plan: `_bmad-output/initiative-church-app/epic-public-content-and-giving/story-save-favourite-hymns-and-set-hymns-for-this-sunday-plan.md`. Evidence: `evidence-6.8/`.
+
+The hymn book is built into the apps (story 6.7). The server holds **item numbers only**: an item is named by its id (`hymn-12`, `chorus-3`) together with the book's edition, and every write is checked against `app.content_hymn_editions` (`bicc-tonga-2012`: hymns 1-199, choruses 1-67). A number outside the edition, a title, a bare number or an unknown edition is refused. A corrected book that keeps its numbers needs no server change; a new edition with other counts needs a migration row before its app release.
+
+### Model
+
+- One content kind, `hymn_book` (editor roles `admin`, `media`), plus the Content scope kind **`worship_leader`** (registered with Identity through 2.3), whose one target is the church's single Sunday-list record `app.content_sunday_hymn_lists` (`list_id` `4f8c2d6e-1b3a-4c5d-8e9f-6a7b0c1d2e08`). Holders of that scope edit `hymn_book` beside Admin and Media. Pastors do not (owner decision 2026-10-21: Media and worship leaders; Admin also manages it).
+- Three registries so later kinds add rows instead of replacing shared functions: **member commands** (`app.content_member_commands`, `app.content_register_member_command`: any approved member with live access may send them; their handlers check the rest), **kind scopes** (`app.content_kind_scopes`, `app.content_register_kind_scope`) and **replay scopes** (`app.content_replay_scopes`, `app.content_register_replay_scope`: the AD-2 replay recheck of an aggregate that is not a content item). `app.content_editor_capacity`, `app.content_authorize_command` and `app.content_in_scope` were replaced once to read them; kinds without registry rows behave as before. Story 6.11 (RSVP, `20261027140149`) created the member-command registry first; 6.8 keeps it (`create table if not exists`, the same function bodies) and keeps 6.11's RSVP replay branch in `app.content_in_scope`.
+- **Favourites** (`app.content_hymn_favourites`): one row per member and item, `saved` or `removed`. Removal is a state change; rows go only in a member deletion. Only the member reads them.
+- **Sunday lists** (`app.content_sunday_hymn_revisions`, `app.content_sunday_hymn_items`): each set or clear of one church-time Sunday is an immutable, attributed revision (who saved it, as Admin, Media or worship leader, when, and the request id); a cleared list is a revision with no items; the latest revision is the Sunday's list. The list record's `revision` is the expected revision of both list commands.
+
+### Commands (`api.content_command`, 1.4 envelope)
+
+| Command | Who | Expected | Payload |
+|---|---|---|---|
+| `content.save_hymn_favourite` | an approved member with live access | `null` | `{edition, item}`; saving a saved item changes nothing |
+| `content.remove_hymn_favourite` | the same | `null` | `{edition, item}`; never saved: `not_found` |
+| `content.set_sunday_hymns` | Admin, Media, worship leaders | list revision | `{sunday: "YYYY-MM-DD", edition, items: ["hymn-12", ...]}` (1-12 distinct items, in order); the same list again changes nothing |
+| `content.clear_sunday_hymns` | the same | list revision | `{sunday}`; nothing set: `sunday: not_set` |
+
+Field codes: `edition` `required`, `invalid`, `unknown_edition`; `item`/`items` `required`, `invalid`, `out_of_range`, `too_many`, `duplicate`; `sunday` `required`, `invalid`, `not_a_sunday`, `past` (before this Sunday), `too_far` (more than 52 weeks ahead). A plain member, a Pastor and a Pending account are refused the list commands (`forbidden`); Pending and held accounts are refused the favourite commands; anon cannot call any (401). A stale list revision answers `conflict` with `current_revision`. A revoked worship leader is refused at once, replays included.
+
+Worship leaders are granted and removed with the 2.3 grant command (`identity.grant_scope` / `identity.revoke_scope`, `{member_id, scope_kind: "worship_leader", scope_id: <list_id>}`), Admin only, never to themselves; any other `scope_id` answers `scope_id: unknown`.
+
+### Reads
+
+| Endpoint | Who | Returns |
+|---|---|---|
+| `api.content_public_sunday_hymns()` | anyone (`anon`, `authenticated`) | `{sunday, edition, items, publication_revision}`: **this Sunday** in church time (today on a Sunday, else the coming Sunday) and its item ids in order; `items: []` with `edition`/`publication_revision` null when nothing is set or it was cleared. No name, time or capacity. |
+| `api.content_my_hymn_favourites()` | the signed-in member (live access; no member parameter) | `{favourites: [{edition, item, saved_at}], truncated}`, newest first, at most 1000 |
+| `api.content_staff_sunday_hymns()` | Admin, Media, worship leaders | `{capacity, list_id, revision, this_sunday, editions, sundays: [{sunday, revision_no, edition, items, saved_at, saved_by, saved_capacity}], worship_leaders, members, members_truncated}`: every Sunday from 8 weeks back to 52 ahead that has a list; `worship_leaders` and `members` (approved members with their grant-set revision, at most 500) for an Admin only, `null` for everyone else |
+
+Nobody, staff included, can read another member's favourites.
+
+### Deletion
+
+Two erase parts of Content's one handler: `hymn_favourites` (`app.content_hymn_favourite_erase_part`) deletes the member's favourites through `app.content_hymn_favourite_purge_rows`, and `sunday_hymn_revisions` (`app.content_sunday_hymns_erase_part`) replaces who saved a list with the nil UUID (editors read **Former member**; the lists stay). `check` counts what is left. The purge is a **fail-closed stub** in the main migration; its body is the `_rows` file. Until the owner applies that file on a hosted project, Content's erase step answers `unavailable` for **every** member deletion (all modules wait at `erase_owners`, including the 4.15 and 5.12 deletion reruns) and nothing is erased. Locally `npx supabase db reset` applies both files.
+
+### Clients
+
+- **Mobile (everyone).** A hymn's bar has a **Save** / **Saved** pill (design handoff screen 5). A member saves or removes the item; it shows as saved only when the server confirmed it, and an unknown outcome offers **Check again** (the same request). A guest is asked to sign in, and a signed-in account without member access is told saving is for approved church members; nothing is sent for either. The hymn book (no search) starts with the member's **Saved** group (newest first, at most five, **See all N** opens **Saved hymns** at `/bible/hymns/saved`); a failed read says so and never looks like none saved. Every item in this Sunday's list carries a **Sunday** chip all that week (the choir practises midweek). **Home** shows **Hymns for this Sunday** (a chip per item: number and title from the book; **Hymn book** opens the tab) from **Saturday 00:00 to Sunday 23:59 church time** (the phone's clock, Africa/Lusaka), only when the server's this-Sunday date is that Sunday and it has items; a failed read on those days says so with Try again. Favourites live in memory for the account (AD-13); the book opens them again on each visit, so a change made on another phone shows.
+- **Staff web.** **Sunday hymns** (`/content/sunday-hymns`, sidebar group **Content**, last; Admin, Media and worship leaders): the finding line (this Sunday's and next Sunday's lists), the next eight Sundays with their lists, the chosen Sunday's editor (add from the built-in book by number or title, reorder, remove, **Save list**, **Clear this Sunday** with confirmation, who set it and when) and, for an Admin, **Worship leaders** (remove; choose a member and **Make worship leader**). A member made a worship leader sees the entry on their next navigation.
+
+### Local runs
+
+```bash
+npx supabase db reset --local && npx supabase test db
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/content-hymn-lists.mjs --evidence _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-6.8/content-hymn-lists-e2e.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+node --test tools/identity-e2e/content-hymn-lists.test.mjs
+```
+
+The E2E uses fictional numbers +44 7700 900641-900648 and removes everything it created (favourites, the run's Sunday revisions, members, grants and receipts). Flutter: `packages/client_core/test/content/hymn_lists_test.dart` (wire, the Sunday window under a test clock, Home chips, the Sunday chip, the Save pill, Saved hymns, the staff editor), plus one test in each app.
+
+### Owner step on staging: the `_rows` file (right after the main migration)
+
+In the staging SQL editor (project `tmurpotfluignacfueki`), paste the whole of `supabase/migrations/20261027182300_content_hymn_lists_rows.sql` and run it, the same way as `20261013220300_duties_department_tracer_rows.sql`. It replaces one stub (`app.content_hymn_favourite_purge_rows(uuid)`) and changes no schema object. Check:
+
+```sql
+select pg_get_functiondef('app.content_hymn_favourite_purge_rows(uuid)'::regprocedure)
+       like '%delete from app.content_hymn_favourites f where f.member_id = p_member_id%';   -- true
+select has_function_privilege('authenticated', 'app.content_hymn_favourite_purge_rows(uuid)', 'EXECUTE');  -- false
+```
+
+Until it is applied, every staging member deletion waits at its erase step (`unavailable`), which is safe.
+
+### Owner manual check on staging (the ticket's verify)
+
+Use SYNTHETIC members only; nothing here sends a notification.
+
+1. As an approved SYNTHETIC member signed in on two phones, open **Bible & Hymns > Hymn book**, open hymn 12 and tap **Save**; it reads **Saved**. On the second phone open the hymn book again: hymn 12 is under **Saved**. Remove it there (**Saved** > tap) and reopen the book on the first phone: it is gone.
+2. Sign in as another member: the hymn book shows no Saved group for hymn 12. Sign out: tapping **Save** asks you to sign in and sends nothing.
+3. On staff web as an Admin, **Content > Sunday hymns > Worship leaders**: make a SYNTHETIC member a worship leader. As that member (staff web), set next Sunday's list (for example hymns 12, 45 and chorus 3) and save. As a Media member, change it and save. As a plain member (and as a Pastor) **Sunday hymns** is not in the sidebar, and `/content/sunday-hymns` says it is not available.
+4. On a signed-out phone the hymn book marks those items **Sunday** during that week. On the Saturday before that Sunday (or with the phone's date set to it), Home shows **Hymns for this Sunday** with the chips; on the Friday it does not. (The widget tests prove the Friday/Saturday boundary under a test clock.)
+5. After the `_rows` file is applied, the entry 17 suite reruns the favourites privacy and deletion cases on staging.
+
+### Staging (2026-10-27)
+
+Applied verbatim to `tmurpotfluignacfueki`, which records version `20261027182223` (after 6.11's `20261027140149`); the local files carry that version and `20261027182300` for the rows file. After a fresh local reset, 38 of the 39 added or replaced function definitions hash identically to staging; the 39th, `app.content_hymn_favourite_purge_rows`, is still the fail-closed stub on staging until the owner applies the rows file. Boundary, unowned and unpinned counts are 0; the signed-out public read answers `{"sunday": "2026-11-01", "edition": null, "items": [], "publication_revision": null}`. No list or favourite was created, no gate changed and no notification was sent. Evidence: `evidence-6.8/staging-verify.md`.
 
 ## Story 6.9: publish and browse sermons with safe notes
 

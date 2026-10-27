@@ -732,6 +732,13 @@ class _EventRowState extends ConsumerState<_EventRow> {
 
     final live = e.live;
     final draft = e.draft;
+    // Story 6.12: the linked duties a change would flag (read when opened).
+    final linksKey = (eventId: id, revision: e.revision);
+    String linked() => switch (ref.read(eventDutyLinksProvider(linksKey))) {
+      AsyncData(value: AccessReadOk(value: EventDutyLinks(:final notice?))) =>
+        '\n\n$notice',
+      _ => '',
+    };
     final publishLabel = switch (e) {
       _ when e.hasChanges => 'Publish changes',
       _ when e.state == ContentState.withdrawn && draft == null =>
@@ -765,7 +772,8 @@ class _EventRowState extends ConsumerState<_EventRow> {
                     if (await _confirm(
                       'Withdraw ${f.title}?',
                       'It disappears from the public calendar the next time '
-                          'a phone refreshes. You can publish it again later.',
+                          'a phone refreshes. You can publish it again later.'
+                          '${linked()}',
                       'Withdraw',
                     )) {
                       await ctl.withdraw(e);
@@ -784,7 +792,8 @@ class _EventRowState extends ConsumerState<_EventRow> {
                     if (await _confirm(
                       'Archive ${f.title}?',
                       'It leaves the public calendar (if it is on it) and can '
-                          'no longer be changed or published.',
+                          'no longer be changed or published.'
+                          '${linked()}',
                       'Archive',
                     )) {
                       await ctl.archive(e);
@@ -846,6 +855,7 @@ class _EventRowState extends ConsumerState<_EventRow> {
               ),
               const SizedBox(height: 14),
               _EventPeople(event: e, busy: busy),
+              if (live != null) _LinkedDuties(linksKey: linksKey),
               const SizedBox(height: 12),
               Wrap(spacing: 8, runSpacing: 8, children: actions),
               if (_editing) ...[
@@ -863,6 +873,48 @@ class _EventRowState extends ConsumerState<_EventRow> {
         ),
       ],
     );
+  }
+}
+
+/// Story 6.12: how many department duties name this event, shown before the
+/// editor saves, publishes, withdraws or archives it (counts only). A failed
+/// read says so instead of looking like none.
+class _LinkedDuties extends ConsumerWidget {
+  const _LinkedDuties({required this.linksKey});
+
+  final ({String eventId, int revision}) linksKey;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ChurchColors.of(context);
+    final id = linksKey.eventId;
+    final read = ref.watch(eventDutyLinksProvider(linksKey));
+    Widget line(String text, String key, {Color? color}) => Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Text(
+        text,
+        key: Key('$key-$id'),
+        style: ChurchType.secondary.copyWith(color: color ?? c.ink),
+      ),
+    );
+    return switch (read) {
+      AsyncData(value: AccessReadOk(value: final l)) when l.notice != null =>
+        line(
+          [
+            l.notice!,
+            if (l.reviewsOpen == 1) '1 review is still open.',
+            if (l.reviewsOpen > 1) '${l.reviewsOpen} reviews are still open.',
+          ].join(' '),
+          'event-duty-links',
+        ),
+      AsyncData(value: AccessReadOk()) => const SizedBox.shrink(),
+      AsyncData(value: AccessReadDenied()) || AsyncError() => line(
+        'Linked duties could not be checked. Reopen the event to try again.',
+        'event-duty-links-failed',
+        color: c.muted,
+      ),
+      _ => const SizedBox.shrink(),
+    };
   }
 }
 

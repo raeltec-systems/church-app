@@ -688,4 +688,53 @@ void main() {
       );
     },
   );
+
+  testWidgets(
+    'only the current series keeps its poster offline; older series stay online only',
+    (tester) async {
+      final bytes = Uint8List.fromList([0x89, 0x50, 0x4e, 0x47]);
+      const currentId = '93939393-9393-4393-8393-939393939393';
+      final current = publicSermonSeriesData(
+        id: currentId,
+        title: 'SYNTHETIC Current series',
+        poster: true,
+      );
+      final older = publicSermonSeriesData(poster: true);
+      final h = await _pump(
+        tester,
+        SermonPaths.list,
+        setup: (h) {
+          h.publicContentCache.available = true;
+          h.banners.publicImageBytes = bytes;
+          h.sermons.catalog = AccessReadOk(
+            PublicSermons.fromJson({
+              // Newest first, as the public read orders them.
+              'sermons': [
+                publicSermonData(
+                  id: '94949494-9494-4494-8494-949494949494',
+                  series: current,
+                ),
+                publicSermonData(series: older),
+              ],
+              'series': [current, older],
+              'truncated': false,
+            }),
+          );
+        },
+      );
+      await _settle(tester);
+      expect(h.banners.fetchedAssets, ['$currentId/1/poster.png']);
+      final saved = h.publicContentCache.sermons!.value;
+      expect(saved.series.map((s) => s.seriesId), [
+        currentId,
+        older['series_id'],
+      ]);
+      expect(saved.series.first.poster?.offlineBytes, bytes);
+      expect(saved.series.last.poster, isNull);
+      expect(saved.sermons.map((s) => s.series?.poster?.offlineBytes != null), [
+        true,
+        false,
+      ]);
+    },
+  );
 }

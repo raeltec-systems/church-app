@@ -367,6 +367,19 @@ class PublicSermons {
   final bool truncated;
   PublicSermon? byId(String id) =>
       sermons.where((s) => s.sermonId == id).firstOrNull;
+
+  /// The series the church is preaching now: the series of the newest sermon
+  /// that belongs to a published series. Null when no sermon is in one.
+  PublicSermonSeries? get currentSeries {
+    for (final sermon in sermons) {
+      final id = sermon.series?.seriesId;
+      if (id == null) continue;
+      final match = series.where((s) => s.seriesId == id).firstOrNull;
+      if (match != null) return match;
+    }
+    return null;
+  }
+
   List<PublicSermon> filter({
     String query = '',
     String? seriesId,

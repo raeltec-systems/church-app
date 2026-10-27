@@ -1326,12 +1326,18 @@ class FakeBanners implements BannerRepository {
   Future<Uint8List?> fetchPublicImage(PublicBanner banner) async =>
       publicImageBytes;
 
+  /// Paths passed to [fetchPublicAsset], in call order.
+  final fetchedAssets = <String>[];
+
   @override
   Future<Uint8List?> fetchPublicAsset(
     String path,
     String mediaType, {
     int maxBytes = 2 * 1024 * 1024,
-  }) async => publicImageBytes;
+  }) async {
+    fetchedAssets.add(path);
+    return publicImageBytes;
+  }
 
   @override
   Future<ImageUploadOutcome> uploadImage(

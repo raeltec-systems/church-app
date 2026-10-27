@@ -94,17 +94,9 @@ String sermonDateText(DateTime date, {DateTime? now}) {
 
 String _count(int n) => n == 1 ? '1 sermon' : '$n sermons';
 
-/// The series the church is preaching now: the series of the newest sermon
-/// that belongs to a published series. Null when no sermon is in one.
-PublicSermonSeries? currentSermonSeries(PublicSermons catalog) {
-  for (final sermon in catalog.sermons) {
-    final id = sermon.series?.seriesId;
-    if (id == null) continue;
-    final series = catalog.series.where((s) => s.seriesId == id).firstOrNull;
-    if (series != null) return series;
-  }
-  return null;
-}
+/// The series the church is preaching now ([PublicSermons.currentSeries]).
+PublicSermonSeries? currentSermonSeries(PublicSermons catalog) =>
+    catalog.currentSeries;
 
 enum _Browse { latest, series, speaker }
 

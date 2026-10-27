@@ -168,6 +168,7 @@ class PublicSermonController extends PublicReadController<PublicSermonRead> {
   static bool _sameListing(PublicSermon a, PublicSermon b) =>
       a.publicationRevision == b.publicationRevision &&
       a.youtubeVideoId == b.youtubeVideoId &&
+      a.facebookVideoUrl == b.facebookVideoUrl &&
       a.rightsRevision == b.rightsRevision &&
       a.series?.seriesId == b.series?.seriesId &&
       a.series?.publicationRevision == b.series?.publicationRevision &&

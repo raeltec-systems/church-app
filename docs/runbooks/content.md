@@ -529,3 +529,44 @@ The runner starts `supabase functions serve` only if `content-assets` is unavail
 6. Save an eligible catalog, relaunch in airplane mode and verify its saved-time label and local title/series/speaker filtering. Start without a saved catalog to check the honest failure state. Reconnect after withdrawing one sermon; successful refresh must evict it. Confirm an uncleared poster/video is not downloaded.
 7. Withdraw a published series while leaving its sermon published: the phone must keep the teaching and remove that series's title/poster. Withdraw the video's rights: the playable ID must disappear and the notes must stay readable.
 8. Record redacted pilot results and any device-only failures for entry 15. Q5 source/use approval, physical playback and offline checks remain owner responsibilities until actually witnessed; this checklist records no approval or completion by itself.
+
+## Story 6.10: play a sermon's Facebook video or livestream inside the app
+
+Migration: `20261027191003_content_sermon_facebook_video.sql`. It adds `facebook_video_url` to sermon revisions beside the YouTube id (a revision has at most one video source, checked by storage too), the validator `app.content_sermon_facebook_url`, and in-place replacements of 6.9's own sermon create, save, publish, revision guard, public sermon JSON and staff revision JSON. No row deletion, destructive statement, policy approval, notification or request to Facebook.
+
+Staging (2026-10-27): applied verbatim; staging records `20261027191003` and the local file carries that version. Before the apply, the full pgTAP suite passed on a fresh local reset (66 files, 5,325 tests), then the local HTTP runner passed 9/9. After it, all 7 added or replaced function hashes match the fresh local replay, boundary and unowned counts are 0, the validator is closed to client roles, no sermon exists, and the signed-out catalog and detail answer empty and null. Evidence: `evidence-6.10/staging-verify.md` and `evidence-6.10/content-sermon-facebook-e2e.jsonl`.
+
+### What editors paste
+
+In the sermon editor on staff web, **Facebook video or live link (optional)** sits under the YouTube field. A sermon has one video: filling both is refused. Accepted (any of facebook.com, www., m. or web.facebook.com, https only; tracking after `?` or `#` is dropped) and stored as:
+
+- `facebook.com/<page>/videos/<number>` -> `https://www.facebook.com/<page>/videos/<number>/`
+- `facebook.com/watch?v=<number>` or `facebook.com/watch/live/?v=<number>` -> `https://www.facebook.com/watch/?v=<number>`
+- `fb.watch/<code>` -> `https://fb.watch/<code>/`
+
+Refused: another host (`not_facebook`), http, a login or port in the link, share (`/share/v/...`), reel or post links, or a repeated `v` (`invalid`), and a page's Live address `facebook.com/<page>/live` (`not_embeddable`): Facebook's embedded player plays one video, not a page's broadcasts. During a broadcast, open it on Facebook and paste its own link (`.../videos/<number>`); the same link plays the recording afterwards. The video uses the sermon's **Video rights record**, which must clear display before the sermon can publish, exactly as YouTube. Withdrawn clearance hides the link and keeps the notes; the staff row then says **Published, video hidden**.
+
+### On the phone
+
+The sermon detail plays the link in Facebook's embedded video player (`https://www.facebook.com/plugins/video.php`) inside a web view (`webview_flutter` 4.14.1, pinned with its Android 4.14.1 and WebKit 3.27.2 implementations). Nothing plays until the viewer taps play; the web view never leaves the player page, so it never shows a Facebook sign-in. A removed, private or sign-in-only video, a network error, or a player that has not loaded within 25 seconds shows "This video is unavailable. You can read the notes below." Offline or stale pages say "Video needs a connection"; the saved catalog never holds a Facebook link. A playable Facebook sermon carries the same play mark in the list as a YouTube one. Facebook's embed rules can change; if public videos stop playing, the unavailable state shows and the notes stay readable.
+
+### Local checks
+
+Run the full SQL suite on a fresh reset first (`supabase/tests/content_sermon_facebook_test.sql` uses fictional phones +44 7700 900111-900114 inside a rolled-back transaction). The runner uses +44 7700 900115-900118, SYNTHETIC names and invented Facebook page names and ids; it contacts neither Facebook nor YouTube, and a second run needs another reset.
+
+```text
+node --test tools/identity-e2e/content-sermon-facebook.test.mjs
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/content-sermon-facebook.mjs --evidence _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-6.10/content-sermon-facebook-e2e.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+### Owner manual check on staging
+
+1. Install a mobile build that contains entry 10 (a 6.9 build cannot read the new sermon projection). Use SYNTHETIC sermons and a church-owned SYNTHETIC rights record; send no notification and approve no gate.
+2. On staff web, save one SYNTHETIC sermon with a public Facebook video link and one with a Facebook live link (`watch/live/?v=...` or the broadcast's `/videos/...` link). Each saved draft shows the stored form. Paste a YouTube link, an `example.com` link, a malformed Facebook link and a page's `/live` address into the Facebook field: each is refused with its own message and your input stays.
+3. Attach the verified video rights record and publish both.
+4. On an Android emulator (and later the entry 15 physical devices), signed out: open Sermons, see the play mark on both rows, open one and tap play inside the app. Confirm it did not start by itself and no Facebook sign-in appeared.
+5. Change one sermon to a removed or private Facebook video (or make the test video private on Facebook) and publish: the detail must show the unavailable message with the scripture and notes readable.
+6. Withdraw the rights record: the link disappears and the notes remain. Switch the phone to airplane mode: "Video needs a connection", notes readable.
+7. Record the results for entry 15. iOS playback waits for the owner's device in entry 15.

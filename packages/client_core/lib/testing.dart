@@ -669,6 +669,7 @@ Map<String, Object?> publicSermonData({
   String speaker = 'SYNTHETIC Speaker One',
   Object? series,
   String? videoId = 'abcdefghijk',
+  String? facebookUrl,
   String notes = '# SYNTHETIC Notes\n\nKeep **hope**.\n\n- Read the scripture.',
   int revision = 1,
 }) => {
@@ -679,8 +680,10 @@ Map<String, Object?> publicSermonData({
   'scripture_reference': 'John 1:1',
   'notes': notes,
   'series': series,
-  'youtube_video_id': videoId,
-  'rights_revision': videoId == null ? null : 1,
+  // Story 6.10: a Facebook link replaces the default YouTube id.
+  'youtube_video_id': facebookUrl == null ? videoId : null,
+  'facebook_video_url': facebookUrl,
+  'rights_revision': videoId == null && facebookUrl == null ? null : 1,
   'publication_revision': revision,
   'published_at': '2099-09-01T08:00:00Z',
   'offline_allowed': true,

@@ -48,7 +48,8 @@ _Mark _sermonMark(StaffSermon s) {
   if (s.state == ContentState.published &&
       !s.hasChanges &&
       live != null &&
-      live.fields.youtubeVideoId != null &&
+      (live.fields.youtubeVideoId != null ||
+          live.fields.facebookVideoUrl != null) &&
       live.videoRights?.display != null) {
     return ('Published, video hidden', StatusTone.warning);
   }
@@ -439,6 +440,7 @@ String _noticeMessage(
 };
 String _fieldName(String field) => switch (field) {
   'youtube_video_id' => 'YouTube video',
+  'facebook_video_url' => 'Facebook video',
   'video_rights_id' => 'Video rights',
   'poster_asset_id' => 'Poster',
   'poster_rights_id' => 'Poster rights',
@@ -462,6 +464,18 @@ String sermonReasonText(String reason, String field) => switch (reason) {
   'too_long' when field == 'youtube_video_id' =>
     'Paste an HTTPS YouTube watch, shorts, embed or youtu.be link, or the '
         '11-character video ID.',
+  'invalid' || 'too_long' when field == 'facebook_video_url' =>
+    'Paste the HTTPS link of one public Facebook video or live broadcast: '
+        'facebook.com/<page>/videos/<number>, facebook.com/watch?v=<number> '
+        'or fb.watch/<code>.',
+  'not_facebook' when field == 'facebook_video_url' =>
+    'This is not a Facebook link. Paste a facebook.com or fb.watch video '
+        'link, or put a YouTube video in the YouTube field.',
+  'not_embeddable' when field == 'facebook_video_url' =>
+    "A page's Live address cannot play in the app. Open the broadcast on "
+        'Facebook and paste its own video link (…/videos/<number>).',
+  'one_source' when field == 'facebook_video_url' =>
+    'A sermon has one video. Clear the YouTube field or this one.',
   'invalid' when field == 'sermon_date' => 'Choose a real date.',
   'not_published' when field == 'series_id' =>
     'Publish the series before publishing this sermon.',
@@ -810,12 +824,24 @@ class _SermonFormState extends ConsumerState<_SermonForm> {
   late final _video = TextEditingController(
     text: widget.item?.current.fields.youtubeVideoId,
   );
+  late final _facebook = TextEditingController(
+    text: widget.item?.current.fields.facebookVideoUrl,
+  );
   late String? _series = widget.item?.current.fields.seriesId;
   late String? _rights = widget.item?.current.fields.videoRightsId;
   bool _videoInvalid = false;
+  String? _facebookError;
   @override
   void dispose() {
-    for (final c in [_title, _speaker, _date, _scripture, _notes, _video]) {
+    for (final c in [
+      _title,
+      _speaker,
+      _date,
+      _scripture,
+      _notes,
+      _video,
+      _facebook,
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -837,7 +863,8 @@ class _SermonFormState extends ConsumerState<_SermonForm> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'You can save an incomplete draft. Add the title, speaker, date and scripture before publishing. A video needs verified display rights.',
+            'You can save an incomplete draft. Add the title, speaker, date and scripture before publishing. '
+            'A sermon has one video, from YouTube or Facebook, and it needs verified display rights.',
           ),
           const SizedBox(height: 16),
           for (final field in [
@@ -870,6 +897,13 @@ class _SermonFormState extends ConsumerState<_SermonForm> {
               label: 'YouTube link or video ID (optional)',
               lines: 1,
               max: 2000,
+            ),
+            (
+              c: _facebook,
+              key: 'facebook_video_url',
+              label: 'Facebook video or live link (optional)',
+              lines: 1,
+              max: 500,
             ),
           ])
             if (field.key == 'sermon_date')
@@ -912,10 +946,16 @@ class _SermonFormState extends ConsumerState<_SermonForm> {
                 errors: {
                   ...state.fieldErrors,
                   if (_videoInvalid) 'youtube_video_id': 'invalid',
+                  'facebook_video_url': ?_facebookError,
                 },
                 onChanged: () {
                   ctl.clearFieldErrors();
-                  if (_videoInvalid) setState(() => _videoInvalid = false);
+                  if (_videoInvalid || _facebookError != null) {
+                    setState(() {
+                      _videoInvalid = false;
+                      _facebookError = null;
+                    });
+                  }
                 },
               ),
           const Padding(
@@ -988,6 +1028,20 @@ class _SermonFormState extends ConsumerState<_SermonForm> {
                       setState(() => _videoInvalid = true);
                       return;
                     }
+                    final facebook = normalizeSermonFacebookUrl(_facebook.text);
+                    final facebookError = switch (facebook.problem) {
+                      SermonFacebookProblem.invalid => 'invalid',
+                      SermonFacebookProblem.notFacebook => 'not_facebook',
+                      SermonFacebookProblem.notEmbeddable => 'not_embeddable',
+                      SermonFacebookProblem.tooLong => 'too_long',
+                      null when facebook.url != null && videoId != null =>
+                        'one_source',
+                      null => null,
+                    };
+                    if (facebookError != null) {
+                      setState(() => _facebookError = facebookError);
+                      return;
+                    }
                     final input = SermonInput(
                       title: _title.text,
                       speaker: _speaker.text,
@@ -995,6 +1049,7 @@ class _SermonFormState extends ConsumerState<_SermonForm> {
                       scriptureReference: _scripture.text,
                       notes: _notes.text,
                       youtubeVideoId: videoId,
+                      facebookVideoUrl: facebook.url,
                       seriesId: _series,
                       videoRightsId: _rights,
                     );

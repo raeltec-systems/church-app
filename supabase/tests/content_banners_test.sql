@@ -141,59 +141,46 @@ select has_table('app', t, format('app.%s exists', t))
                     'content_public_conditions']) t;
 select results_eq(
   $$select (n.nspname || '.' || p.proname)::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname in ('app', 'api') and p.proname like 'content\_%' and p.proname not like '%event%'
-       and p.proname not like '%giving%' and p.proname not like '%announcement%'
+     where n.nspname in ('app', 'api') and p.proname ~ '^content_(asset|banner|file|item_public|lifecycle_id|live_file|payload|public_(banner|file|object|path|removals)|q5|register_public|require_editor|revision_files|rights|staff_(banner|rights))'
        and has_function_privilege('anon', p.oid, 'EXECUTE')
      order by 1$$,
-  $$values ('api.content_bible_manifest'::text collate "C"),
-           ('api.content_public_banners'), ('api.content_public_bible_chapter'),
-           ('api.content_public_bible_translations'), ('app.content_bible_manifest_json'),
-           ('app.content_public_banners'), ('app.content_public_bible_chapter'),
-           ('app.content_public_bible_translations')$$,
-  'anon can execute only the public content reads (besides event reads)');
+  $$values ('api.content_public_banners'::text collate "C"), ('app.content_public_banners')$$,
+  'anon can execute only this story''s public banner reads');
 select results_eq(
   $$select (n.nspname || '.' || p.proname)::text collate "C" from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-     where n.nspname in ('app', 'api') and p.proname like 'content\_%' and p.proname not like '%event%'
-       and p.proname not like '%giving%' and p.proname not like '%announcement%'
+     where n.nspname in ('app', 'api') and p.proname ~ '^content_(asset|banner|file|item_public|lifecycle_id|live_file|payload|public_(banner|file|object|path|removals)|q5|register_public|require_editor|revision_files|rights|staff_(banner|rights))'
        and p.proname <> 'content_command' and has_function_privilege('authenticated', p.oid, 'EXECUTE')
      order by 1$$,
-  $$values ('api.content_asset_preview'::text collate "C"), ('api.content_bible_manifest'),
+  $$values ('api.content_asset_preview'::text collate "C"),
            ('api.content_file_plan'), ('api.content_public_banners'),
-           ('api.content_public_bible_chapter'), ('api.content_public_bible_translations'),
-           ('api.content_staff_banners'), ('api.content_staff_bibles'), ('api.content_staff_rights'),
-           ('app.content_asset_preview'), ('app.content_bible_manifest_json'), ('app.content_file_plan'),
-           ('app.content_public_banners'), ('app.content_public_bible_chapter'),
-           ('app.content_public_bible_translations'), ('app.content_staff_banners'),
-           ('app.content_staff_bibles'), ('app.content_staff_rights')$$,
-  'authenticated can execute only the reads (besides the command and the event reads)');
+           ('api.content_staff_banners'), ('api.content_staff_rights'),
+           ('app.content_asset_preview'), ('app.content_file_plan'),
+           ('app.content_public_banners'), ('app.content_staff_banners'), ('app.content_staff_rights')$$,
+  'authenticated can execute only this story''s public and staff reads');
 select is_definer('app', 'content_public_banners', array[]::text[], 'the public banner read body is a definer');
 select isnt_definer('api', 'content_public_banners', array[]::text[], 'its api wrapper is invoker');
-select results_eq($$select kind, editor_roles from app.content_kinds where kind not in ('event', 'giving_method', 'announcement') order by 1$$,
+select results_eq($$select kind, editor_roles from app.content_kinds where kind in ('asset', 'banner', 'rights') order by 1$$,
   $$values ('asset'::text, array['admin', 'pastor', 'media']::text[]),
            ('banner', array['admin', 'pastor', 'media']::text[]),
-           ('bible_translation', array['admin', 'pastor', 'media']::text[]),
            ('rights', array['admin', 'pastor', 'media']::text[])$$,
-  'rights, banners, Bible translations and uploads are for Admin, Pastor and Media');
-select results_eq($$select command || ':' || creates from app.content_commands where kind not in ('event', 'giving_method', 'announcement') order by 1$$,
-  $$values ('content.archive_banner:false'::text), ('content.archive_bible_translation:false'),
+  'rights, banners and uploads are for Admin, Pastor and Media');
+select results_eq($$select command || ':' || creates from app.content_commands where kind in ('asset', 'banner', 'rights') order by 1$$,
+  $$values ('content.archive_banner:false'::text),
            ('content.archive_rights_record:false'),
-           ('content.begin_asset_upload:true'), ('content.begin_bible_revision:false'),
+           ('content.begin_asset_upload:true'),
            ('content.complete_asset_upload:true'), ('content.create_banner:true'),
-           ('content.create_bible_translation:true'), ('content.create_rights_record:true'),
-           ('content.finalize_bible_revision:false'), ('content.import_bible_verses:false'),
-           ('content.publish_banner:false'), ('content.publish_bible_translation:false'),
+           ('content.create_rights_record:true'),
+           ('content.publish_banner:false'),
            ('content.save_banner:false'),
            ('content.save_rights_record:false'), ('content.verify_rights_record:false'),
-           ('content.withdraw_banner:false'), ('content.withdraw_bible_translation:false'),
+           ('content.withdraw_banner:false'),
            ('content.withdraw_rights_record:false')$$,
-  'the nineteen commands are registered');
-select results_eq($$select part || ':' || handler from app.content_erase_parts where part not in ('event_revisions', 'giving_methods', 'announcement_revisions', 'event_rsvps') order by 1$$,
+  'this story''s twelve commands are registered');
+select results_eq($$select part || ':' || handler from app.content_erase_parts where part in ('asset_uploads', 'banner_revisions', 'rights_revisions') order by 1$$,
   $$values ('asset_uploads:app.content_asset_erase_part(jsonb)'::text),
            ('banner_revisions:app.content_banner_erase_part(jsonb)'),
-           ('bible_revisions:app.content_bible_erase_part(jsonb)'),
-           ('rights_revisions:app.content_rights_erase_part(jsonb)')$$, 'four erase parts are registered');
-select results_eq($$select kind || ':' || handler from app.content_public_conditions
-                     where kind = 'banner' order by 1$$, -- story 6.11 pins the event condition
+           ('rights_revisions:app.content_rights_erase_part(jsonb)')$$, 'this story''s three erase parts are registered');
+select results_eq($$select kind || ':' || handler from app.content_public_conditions where kind = 'banner' order by 1$$,
   $$values ('banner:app.content_banner_public_condition(jsonb)'::text)$$,
   'banners register their public condition (a linked event must be public)');
 select throws_ok($$select app.content_register_public_condition('event', 'app.content_erase_member(jsonb)'::regprocedure)$$,
@@ -218,10 +205,9 @@ select is((select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.
             where n.nspname = 'storage' and p.proname like 'content%'), 0, 'no function is added to storage');
 select results_eq(
   $$select purpose, kind, rights_use, max_bytes, min_width, min_height, max_width, max_height, min_ratio, max_ratio
-      from app.content_asset_purposes where kind in ('banner', 'giving_method') order by 1$$, -- 6.11 pins event_poster
-  $$values ('banner_image'::text, 'banner'::text, 'display'::text, 5242880::bigint, 960, 540, 6000, 6000, 1.30, 2.40),
-           ('giving_logo', 'giving_method', 'display', 2097152::bigint, 32, 32, 2000, 2000, 0.20, 5.00)$$,
-  'the banner and giving logo purposes have bounded image limits');
+      from app.content_asset_purposes where purpose = 'banner_image' order by 1$$,
+  $$values ('banner_image'::text, 'banner'::text, 'display'::text, 5242880::bigint, 960, 540, 6000, 6000, 1.30, 2.40)$$,
+  'the banner purpose has bounded image limits');
 
 -- Rights records -----------------------------------------------------------------------------------
 create temp table r1 as select pg_temp.cmd(3, 'content.create_rights_record', null,

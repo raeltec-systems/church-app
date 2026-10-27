@@ -509,3 +509,101 @@ Use SYNTHETIC names only. Do not publish an announcement or anything with a noti
 6. A signed-out phone has **Sign in to RSVP**; a Pending account reads that RSVP is for approved church members.
 7. Media N (not an organiser) opens the camp on staff web: the count only, "Only this event's organisers and Admins see who is coming", no **Who's coming**. Media O and an Admin open **Who's coming** and see the names. Media O adds Media N with **Change organisers**: Media N now sees the names.
 8. Right after the deploy (once), the owner applies the `_rows` file as above; the entry 17 suite reruns the RSVP deletion case on staging after that.
+
+## Story 6.7: the church's Tonga hymn book, built into the app
+
+Owner decision 2026-10-27: the hymn book is the official Brethren in Christ Church Tonga hymn book, "Inyimbo zya Bakristo" (2012 reprint). It ships inside both apps as one file, `packages/client_core/assets/hymn_book/hymn_book.json`, declared as an asset of `church_client_core`: hymns 1..199, then the choruses (Ziindululo) 1..67, each with its section, English title or tune name, hymnal reference (Z.H. = Zulu Hymnal, M.H. = Methodist Hymn Book), key, verses and chorus. There is no migration, table, rights record, staff screen, Content command, staging step or offline-cache key: the server never stores hymn text, and later entries (8, 10, 14) refer to an item by its id (`hymn-12`, `chorus-12`). Everyone reads and searches the book on the phone, signed in or not, with or without a connection.
+
+### Where the book comes from
+
+- `tools/hymn-book/manuscript/inyimbo_zyabakristo.txt` is the PDF's text, extracted with `pdftotext -enc UTF-8 -layout inyimbo_zyabakristo.pdf inyimbo_zyabakristo.txt` (pdftotext 4.06, Git for Windows mingw64). `manuscript/provenance.json` pins the PDF (SHA-256 `0733124a4e5376ea8504e4709b77b7d03117f187a1b8b4fd13768a0f4d621139`, 1,631,474 bytes), the extracted text (SHA-256 of its LF form), the edition (`bicc-tonga-2012`), title and language. The PDF itself is not committed: it is a downloaded file, its text and hash make the build reproducible, and Israel keeps the original.
+- `tools/hymn-book/corrections.json` lists every reviewed fix of an extraction glitch, by line number, with the exact extracted text, the fix and why; the converter refuses a fix whose line no longer reads as recorded. It also holds explanations for title differences from the book's indexes of more than two letters (none are needed today).
+- `tools/hymn-book/convert.mjs` reads the printed layout (running headers and page numbers dropped; the topical, hymn and chorus indexes read; headings by the next expected number of each sequence; verses by their numbers; `Ciindululo:` choruses), cross-checks every title, number and section against the indexes, and refuses the whole book on any problem. `tools/hymn-book/conversion-report.txt` is its committed report: 0 problems, the 26 corrections and 76 notes (12 one- or two-letter title differences kept as printed, 59 hymns whose page header lags their topical-index section, chorus 24's second chorus, hymn 29's chorus first printed after its verse 2, and hymns 25, 29 and 30, whose verse 1 is a single line that verse 2 completes, so the printed book must show whether the "2" stands on the stanza's second line).
+
+### Replacing or correcting the book
+
+1. Extract the new PDF with the exact command above into `tools/hymn-book/manuscript/`, then update `provenance.json` (PDF hash and size, text hash, edition).
+2. Run `node tools/hymn-book/convert.mjs --check`. Fix each reported line with a reviewed entry in `corrections.json` (never by editing the extracted text), or explain a larger title difference there.
+3. Write the book and the report: `node tools/hymn-book/convert.mjs --report tools/hymn-book/conversion-report.txt`.
+4. Run `node --test tools/hymn-book/convert.test.mjs` (it pins the counts and the PDF hash; update those pins deliberately for a new edition) and the Flutter suites. A corrected book reaches phones only with a new app release.
+
+### Local checks
+
+```bash
+node --test tools/hymn-book/convert.test.mjs
+node tools/hymn-book/convert.mjs --check
+```
+
+Run `flutter analyze` and `flutter test` in `packages/client_core`, `packages/design_system`, `apps/mobile` and `apps/staff`. `packages/client_core/test/content/hymn_book_test.dart` checks the shipped book (199 + 67, sections, ids) and that both bundled fonts (Figtree, Outfit) carry every character it uses; the converter writes U+201F (used as an apostrophe in the book) as U+2019 because neither font has it.
+
+### Owner manual check (the ticket's verify)
+
+On a signed-out Android phone in airplane mode, open **Bible & Hymns**, choose **Hymn book**, and:
+
+1. See the sections as group headers in the printed order (Kutalika Mubungano first; the choruses last under Ziindululo).
+2. Search by a number (`24`: hymn 24 is listed before chorus 24), by title words and by first-line words, with and without apostrophes: `wang uuteeli` and `wang' uuteeli` both find hymn 62, "Mwaala Wang’ Uuteeli".
+3. Open hymn 1 (English title REVIVE THY WORK, O LORD!, Key of F, three verses with the chorus after each), hymn 3 (one stanza, no key), and chorus 24 (a different chorus after verse 2), and compare them with the printed book.
+4. Confirm the app's count matches the converter report: 199 hymns and 67 choruses.
+
+Spot-check list for the PDF: hymns 1, 3, 4, 25, 29, 30, 32, 62, 106, 164, 178, 199 and choruses 1, 24, 26, 34, 67. Hymns 25, 29 and 30 need the printed book: the extraction numbers the second line of their first stanza "2", so the app shows a one-line verse 1.
+
+## Story 6.9: publish and browse sermons with safe notes
+
+Migration: `20261027083618_content_sermons.sql`. It registers `sermon_series` and `sermon`, their ten lifecycle commands, private revision tables, bounded public/staff reads, the `sermon_series_poster` asset purpose, immutable published revisions and registered attribution erasure. It adds no row deletion, policy approval, notification or second file/cache pipeline. Apply the exact reviewed migration to staging only after listing project `tmurpotfluignacfueki`'s history and confirming prerequisite `20261022012809_content_rights_banners.sql`; match the local filename to the version staging records. Compare every added function's normalized definition hash with a fresh local replay, then require zero boundary violations and unowned objects and verify the signed-out reads. Record the actual staging result in entry 9's evidence; the migration filename alone is not deployment evidence.
+
+Staging (2026-10-27): applied verbatim to `tmurpotfluignacfueki`, which records version `20261027083618`; the local file carries that version. Before the apply, a fresh local reset replayed every migration and the full pgTAP suite passed (65 files, 5,243 tests), and the local HTTP runner passed 16/16. After it, all 33 added sermon/series function definitions hash identically to that fresh local replay, the boundary and unowned counts are 0, the kinds, poster purpose, ten commands, two erase parts, RLS and the absence of client table grants are as migrated, no sermon or series exists, and seven signed-out HTTP checks pass (empty catalog, null unknown detail, refused staff reads and command, unreadable tables). Evidence: `evidence-6.9/staging-verify.md` and `staging-public-read-20261027.jsonl`. No content was published, no gate or rights record changed, no notification was sent and production was not touched.
+
+### Editorial workflow
+
+On staff web, **Content > Sermons** is available to Media, Pastor and Admin. The server checks current access for every staff read, upload and command. A sermon draft can be incomplete, including one later received from a teaching duty; the staff catalog includes all normal drafts regardless of their creator or source. Save title, speaker, sermon date, scripture, notes, optional series and optional YouTube ID. Publication requires complete teaching metadata and validates any supplied series/video. An edited draft leaves the last published revision live until its replacement is published. A stale revision is refused and reloads the current item. Withdraw hides an item while retaining its history; archive retires it.
+
+Series have a title, description, poster text alternative and optional poster. Save the series draft before choosing its poster; upload and attach the file through the existing `content-assets` route with purpose `sermon_series_poster` and a verified rights record. Publishing, withdrawal and archive use the existing file sync. The shared **Rights** screen controls display and offline uses separately. Church-owned records still need verification and the requested use cleared; production third-party uses also need the owner's Q5 clearance. Never treat the fact that YouTube accepts an ID as distribution permission.
+
+| Command through `api.content_command` | Expected revision | Payload |
+|---|---|---|
+| `content.create_sermon_series` | `null` | `{title, description, alt_text}` |
+| `content.save_sermon_series` | series revision | `{series_id, title, description, alt_text, poster_asset_id, poster_rights_id}`; null poster/rights clears that part of the draft |
+| `content.publish_sermon_series`, `content.withdraw_sermon_series`, `content.archive_sermon_series` | series revision | `{series_id}` |
+| `content.create_sermon` | `null` | `{title, speaker, sermon_date, scripture_reference, notes, series_id, youtube_video_id, video_rights_id}` |
+| `content.save_sermon` | sermon revision | `{sermon_id, ...the complete draft fields}` |
+| `content.publish_sermon`, `content.withdraw_sermon`, `content.archive_sermon` | sermon revision | `{sermon_id}` |
+
+Notes are church-authored restricted Markdown: paragraphs, headings, emphasis and lists, with inline HTTPS links to exact hosts `ebible.org`, `biblegateway.com`, `www.biblegateway.com`, `youtube.com`, `www.youtube.com` and `youtu.be`. HTML, embedded images, reference links, autolinks, unsafe schemes, disguised hosts, user information and unsupported ports are refused on save. The editor keeps the typed input and shows the notes field error. Enter notes as readable text with the formatting help; no JSON entry is needed.
+
+### Public reading, media failures and saved content
+
+`api.content_public_sermons()` is the canonical anonymous catalog `{sermons, series, truncated}`. `api.content_public_sermon(sermon_id)` returns `{sermon}` with null for a private, withdrawn, archived or unknown sermon. The public projection contains the current published teaching metadata, safe notes and public series/poster metadata only; it excludes editor names, identities, draft fields and private provenance. `api.content_staff_sermons()` and `api.content_staff_sermon_series()` are separate protected editor reads. No client role is granted direct access to either revision table.
+
+The fifth mobile tab order is **Home, Bible & Hymns, Sermons, Give, Calendar**. The tab leads with the current series (the series of the newest sermon that belongs to a published series; no card when none does) on the navy card: its public poster, title, sermon count and description, and tapping it opens the Series view. Latest lists every sermon by date; Series and Speaker group the same rows under each series (sermons outside a series last, under "Not in a series") or each speaker. The search icon beside Latest/Series/Speaker opens a search box that matches titles, series and speakers over the canonical catalog. A card shows a thumbnail column only when one of its rows has a series poster or a playable video, and a play mark only on a sermon with one. Detail separates the player from scripture and notes. The mobile-only player uses the pinned `youtube_player_iframe` dependency in privacy-enhanced mode without autoplay. A malformed ID is refused by the server; a removed/private/unreachable video is reported by the player ("This video is unavailable. You can read the notes below."), without replacing the teaching page. A sermon with no playable video (none recorded, or its rights withdrawn) says "No video is available for this sermon", and an offline or stale page says "Video needs a connection". The server does not poll YouTube. Missing or withdrawn video display clearance removes the playable ID while leaving church-authored notes readable. Audio playback is entry 10 and duty-to-Media draft creation is entry 18.
+
+Withdrawing a series removes its title and poster from the catalog and from every public sermon projection; its still-published sermons remain readable without that series metadata. Run the existing file sync to remove the withdrawn poster's public object. Do not copy private series titles into a replacement public field.
+
+Mobile extends the existing single public cache with the canonical sermon catalog, its publication/rights revisions and saved time. The catalog is saved as soon as it arrives, with the posters already on the phone; missing offline-cleared posters are then fetched outside the shared cache queue, three at a time, and saved with the same catalog unless a newer one was saved meanwhile, so a slow poster never delays the list or another tab's saved copy. Search/filter results never replace that canonical snapshot. Only eligible public teaching and offline-cleared posters may be saved; no YouTube media or uncleared thumbnails are downloaded. A successful refresh replaces the saved public set and evicts withdrawn rows/files. Failed refreshes remain visibly failed or stale and preserve the prior committed snapshot; an uncached network failure never appears as an empty catalog. Staff reads, private drafts and editor identities have no persistence path. An already saved offline copy cannot be remotely erased.
+
+Account deletion uses Content's registered erase/check parts for both new revision tables. It anonymizes all four saved/published member/account attribution columns as well as the existing shared item attribution; the staff read reports **Former member**. Content and revision rows remain, so no owner `_rows` file is needed.
+
+On staff web, both lists are grouped into **Waiting to publish**, **Published** and **Withdrawn**, with archived items behind a toggle. Each row carries one mark: Draft, Changes not published, Published, Published, video hidden (its live video's rights no longer clear display), Published, poster waiting or Published, poster not shown, Withdrawn or Archived. Withdraw and Archive ask for confirmation, naming the item. Opening **Sermon series** syncs public poster files, as Banners does.
+
+### Verification and support
+
+Run the full SQL suite on a fresh local reset before the live runner. The runner is guarded to the exact local origin, uses only the fictional phones `+44 7700 900651` through `+44 7700 900656` (the block given to entry 9; the entry's pgTAP file and story 4.8's reminders pgTAP also insert numbers in this range, inside transactions that roll back, so an interrupted runner whose accounts were not removed needs a reset before the next suite run), and uses only SYNTHETIC names, church-authored notes, generated artwork and a fictional video ID. It does not contact YouTube, approve a policy gate or enqueue a notification. Its evidence contains statuses, counts and booleans, not credentials or phone numbers. Published content fixtures remain immutable in the disposable local database; synthetic Auth identities are erased/removed, and a second run requires another reset.
+
+```text
+node --test tools/identity-e2e/content-sermons.test.mjs
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/content-sermons.mjs --evidence _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-6.9/content-sermons-e2e.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The runner starts `supabase functions serve` only if `content-assets` is unavailable and stops only the process it started. Its `finally` restores the local phone harness to off. If cleanup or restoration fails, run the final `off` command before continuing. Pure Node helper tests validate the runner's fixtures and exact projection guards; they do not exercise Flutter persistence or physical playback. The entry's Flutter/controller/cache tests and staging release builds provide their own evidence. A broken-link report is handled by an editor checking the published YouTube ID in a browser, correcting or removing it in a new draft, and publishing the replacement; never hide the notes just because a recording is unavailable.
+
+### Owner manual check on staging
+
+1. Confirm entry 9's recorded staging version and definition hashes, zero module guard counts and signed-out public responses. Use SYNTHETIC content and no notification; do not approve a policy gate or access production.
+2. With Media, Pastor and Admin accounts, save and publish two synthetic series and sermons. Verify an ordinary member and a Pending account cannot open editor reads or run any of the ten commands. Confirm normal drafts created by another editor are visible to Media.
+3. On a signed-out phone, open Sermons, use Latest/Series/Speaker and title search, and open detail through its back bar. Check the poster text alternative, title, speaker/date, scripture and safe notes. Save a revision without publishing; the phone must still show the previous published teaching.
+4. Enter HTML, image Markdown, a reference/autolink and a disguised/unallowlisted link. Saving must show a field error and retain the typed input; none of that input may become public.
+5. On physical Android and iOS devices in the entry 15 pilot, use an owner-cleared playable video, then a private/removed or unreachable one. Verify no autoplay, the unavailable message, readable scripture/notes and correct player disposal when navigating away. API and widget tests do not prove device playback.
+6. Save an eligible catalog, relaunch in airplane mode and verify its saved-time label and local title/series/speaker filtering. Start without a saved catalog to check the honest failure state. Reconnect after withdrawing one sermon; successful refresh must evict it. Confirm an uncleared poster/video is not downloaded.
+7. Withdraw a published series while leaving its sermon published: the phone must keep the teaching and remove that series's title/poster. Withdraw the video's rights: the playable ID must disappear and the notes must stay readable.
+8. Record redacted pilot results and any device-only failures for entry 15. Q5 source/use approval, physical playback and offline checks remain owner responsibilities until actually witnessed; this checklist records no approval or completion by itself.

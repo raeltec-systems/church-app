@@ -102,6 +102,9 @@ Future<List<Override>> compositionOverrides(
       SupabaseContentRepository(client),
     ),
     bibleRepositoryProvider.overrideWithValue(SupabaseBibleRepository(client)),
+    sermonsRepositoryProvider.overrideWithValue(
+      SupabaseSermonsRepository(client),
+    ),
     givingRepositoryProvider.overrideWithValue(
       SupabaseGivingRepository(client),
     ),

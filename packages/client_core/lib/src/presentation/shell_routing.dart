@@ -8,6 +8,8 @@ import 'assisted_recovery_screens.dart';
 import 'account_screen.dart';
 import 'banner_screens.dart';
 import 'bible_screens.dart';
+import 'sermon_screens.dart';
+import 'sermon_staff_screens.dart';
 import 'calendar_screens.dart';
 import 'content_screens.dart';
 import 'cell_screens.dart';
@@ -18,6 +20,8 @@ import 'give_screens.dart';
 import 'giving_staff_screens.dart';
 import 'home_banners.dart';
 import 'home_screen.dart';
+import 'hymn_screens.dart';
+import '../application/hymn_controllers.dart' show BibleHymnsView;
 import 'fixture_command_screen.dart';
 import 'fixture_reminder_screens.dart';
 import 'notification_settings_screen.dart';
@@ -92,6 +96,17 @@ abstract final class ClientPaths {
 
   /// Story 6.6 (mobile): the public Bible & Hymns tab.
   static const bible = '/bible';
+  static const sermons = SermonPaths.list;
+  static String sermon(String id) => SermonPaths.detail(id);
+  static const contentSermons = SermonPaths.staff;
+  static const contentSermonSeries = SermonPaths.staffSeries;
+
+  /// Story 6.7 (mobile): the tab opened on the built-in hymn book.
+  static const hymnBook = '/bible?view=hymns';
+
+  /// Story 6.7 (mobile): one hymn or chorus of the built-in book, by its id
+  /// (`hymn-12`, `chorus-3`).
+  static String hymn(String id) => '/bible/hymns/$id';
 
   /// Story 6.1 (mobile): one published event.
   static String calendarEvent(String eventId) => CalendarPaths.event(eventId);
@@ -481,9 +496,49 @@ GoRouter buildClientRouter({
             ),
           ],
         ),
+        // Story 6.7: the Bible & Hymns tab (Bible reader and the built-in
+        // hymn book) and one hymn by its number.
         GoRoute(
           path: ClientPaths.bible,
-          pageBuilder: (_, state) => page(state, const BibleReaderScreen()),
+          pageBuilder: (_, state) => page(
+            state,
+            BibleAndHymnsScreen(
+              // A hymn opened by its link returns to the hymn book.
+              initialView:
+                  state.uri.queryParameters['view'] == 'hymns' ||
+                      state.uri.path.startsWith('${ClientPaths.bible}/hymns/')
+                  ? BibleHymnsView.hymns
+                  : null,
+            ),
+          ),
+          routes: [
+            GoRoute(
+              path: 'hymns/:id',
+              pageBuilder: (_, state) => page(
+                state,
+                HymnDetailScreen(
+                  key: ValueKey(state.pathParameters['id']),
+                  id: _hymnId(state.pathParameters['id']),
+                ),
+              ),
+            ),
+          ],
+        ),
+        GoRoute(
+          path: ClientPaths.sermons,
+          pageBuilder: (_, state) => page(state, const SermonsScreen()),
+          routes: [
+            GoRoute(
+              path: ':sermonId',
+              pageBuilder: (_, state) => page(
+                state,
+                SermonDetailScreen(
+                  key: ValueKey(state.pathParameters['sermonId']),
+                  sermonId: state.pathParameters['sermonId']!,
+                ),
+              ),
+            ),
+          ],
         ),
         // Story 6.3: the public Give tab, with each method's detail.
         GoRoute(
@@ -550,6 +605,36 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.contentBible,
         pageBuilder: (_, state) => page(state, const StaffBibleScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.contentSermons,
+        pageBuilder: (_, state) => page(state, const StaffSermonsScreen()),
+        routes: [
+          GoRoute(
+            path: ':itemId',
+            pageBuilder: (_, state) => page(
+              state,
+              StaffSermonsScreen(itemId: state.pathParameters['itemId']),
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: ClientPaths.contentSermonSeries,
+        pageBuilder: (_, state) =>
+            page(state, const StaffSermonsScreen(series: true)),
+        routes: [
+          GoRoute(
+            path: ':itemId',
+            pageBuilder: (_, state) => page(
+              state,
+              StaffSermonsScreen(
+                series: true,
+                itemId: state.pathParameters['itemId'],
+              ),
+            ),
+          ),
+        ],
       ),
       GoRoute(
         path: ClientPaths.myDuties,
@@ -743,6 +828,12 @@ void goFromNav(BuildContext context, String path) => context.go(
   path,
   extra: keyboardFocusVisible ? const NavFocusRequest() : null,
 );
+
+/// Story 6.7: a hymn link's item id (`hymn-12`, `chorus-3`), else null.
+String? _hymnId(String? v) =>
+    v != null && RegExp(r'^(hymn|chorus)-[1-9][0-9]{0,2}$').hasMatch(v)
+    ? v
+    : null;
 
 /// Story 4.10: a history link's member id (a UUID only; anything else opens
 /// the reader's own history).

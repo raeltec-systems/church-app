@@ -9,6 +9,7 @@ import '../domain/content_announcements.dart';
 import '../domain/content_bible.dart';
 import '../domain/content_banners.dart';
 import '../domain/content_events.dart';
+import '../domain/content_sermons.dart';
 import '../domain/public_content_cache.dart';
 import '../domain/content_giving.dart';
 import '../domain/credential_review.dart';
@@ -107,6 +108,13 @@ final contentRepositoryProvider = Provider<ContentRepository>(
 /// Story 6.6: rights-cleared public Bible chapters and editor catalog.
 final bibleRepositoryProvider = Provider<BibleRepository>(
   (ref) => const UnconfiguredBibleRepository(),
+);
+
+final sermonsRepositoryProvider = Provider<SermonsRepository>(
+  (ref) => const UnconfiguredSermonsRepository(),
+);
+final sermonLinkLauncherProvider = Provider<SermonLinkLauncher>(
+  (ref) => const UnavailableSermonLinkLauncher(),
 );
 
 /// The reviewed WEB source package used by the staff translation installer.

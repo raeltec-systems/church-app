@@ -7,6 +7,8 @@ import 'package:church_client_core/church_client_core.dart'
         dutyCalendarExportProvider,
         publicContentCacheProvider,
         publicContentReconnectsProvider,
+        sermonPlayerBuilderProvider,
+        sermonLinkLauncherProvider,
         pushMessagingProvider;
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:church_client_core/composition.dart';
@@ -21,6 +23,7 @@ import 'contact/url_contact_launcher.dart';
 import 'offline/public_content_cache_adapter.dart';
 import 'push/firebase_push_config.dart';
 import 'push/firebase_push_messaging.dart';
+import 'sermons/youtube_sermon_player.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,6 +56,13 @@ Future<void> main() async {
         ),
         publicContentCacheProvider.overrideWithValue(
           PublicContentCacheAdapter(),
+        ),
+        sermonPlayerBuilderProvider.overrideWithValue(
+          (context, videoId) =>
+              YoutubeSermonPlayer(key: ValueKey(videoId), videoId: videoId),
+        ),
+        sermonLinkLauncherProvider.overrideWithValue(
+          const UrlSermonLinkLauncher(),
         ),
         publicContentReconnectsProvider.overrideWith((ref) {
           final connectivity = Connectivity();

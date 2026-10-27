@@ -2,11 +2,17 @@
 /// shared screens. Free of Supabase; adapters live in `supabase_adapters.dart`.
 library;
 
+export 'src/domain/content_sermons.dart';
+export 'src/application/sermon_controllers.dart';
+export 'src/presentation/sermon_screens.dart';
+export 'src/presentation/sermon_staff_screens.dart';
+
 export 'src/application/access_controllers.dart';
 export 'src/application/announcement_controllers.dart';
 export 'src/application/assisted_recovery_controllers.dart';
 export 'src/application/banner_controllers.dart';
 export 'src/application/bible_controllers.dart';
+export 'src/application/hymn_controllers.dart';
 export 'src/application/account_controllers.dart';
 export 'src/application/cell_controllers.dart';
 export 'src/application/content_controllers.dart';
@@ -37,6 +43,7 @@ export 'src/domain/commands.dart';
 export 'src/domain/content_announcements.dart';
 export 'src/domain/content_banners.dart';
 export 'src/domain/content_bible.dart';
+export 'src/domain/hymn_book.dart';
 export 'src/domain/content_events.dart';
 export 'src/domain/public_content_cache.dart';
 export 'src/domain/content_giving.dart';
@@ -77,6 +84,7 @@ export 'src/presentation/give_screens.dart';
 export 'src/presentation/giving_staff_screens.dart';
 export 'src/presentation/home_banners.dart';
 export 'src/presentation/home_screen.dart';
+export 'src/presentation/hymn_screens.dart';
 export 'src/presentation/fixture_command_screen.dart';
 export 'src/presentation/inbox_screen.dart';
 export 'src/presentation/member_deletion_screens.dart';

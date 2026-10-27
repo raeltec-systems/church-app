@@ -360,7 +360,7 @@ void main() {
       );
       expect(
         d.indexOf(staffBannersDestination),
-        d.indexOf(staffBibleDestination) + 1,
+        d.indexOf(staffSermonSeriesDestination) + 1,
       );
       expect(
         d.indexOf(staffRightsDestination),
@@ -376,6 +376,30 @@ void main() {
         expect(staffDestinationsFor(g), isNot(contains(d)));
         expect(staffDestinationsFor(g, signedIn: true), isNot(contains(d)));
       }
+    }
+  });
+
+  test('story 6.9: sermon and series editors follow Bible for Media, Pastor and Admin', () {
+    for (final role in ['media', 'pastor', 'admin']) {
+      final items = staffDestinationsFor(syntheticGrants(roles: [role]));
+      expect(
+        items.indexOf(staffSermonsDestination),
+        items.indexOf(staffBibleDestination) + 1,
+      );
+      expect(
+        items.indexOf(staffSermonSeriesDestination),
+        items.indexOf(staffSermonsDestination) + 1,
+      );
+    }
+    for (final grants in [syntheticGrants(), null]) {
+      expect(
+        staffDestinationsFor(grants),
+        isNot(contains(staffSermonsDestination)),
+      );
+      expect(
+        staffDestinationsFor(grants),
+        isNot(contains(staffSermonSeriesDestination)),
+      );
     }
   });
 
@@ -485,6 +509,8 @@ void main() {
     expect(content.items, [
       staffEventsDestination,
       staffBibleDestination,
+      staffSermonsDestination,
+      staffSermonSeriesDestination,
       staffBannersDestination,
       staffRightsDestination,
       staffAnnouncementsDestination,
@@ -641,6 +667,8 @@ void main() {
       expect(content, [
         staffEventsDestination,
         staffBibleDestination,
+        staffSermonsDestination,
+        staffSermonSeriesDestination,
         staffBannersDestination,
         staffRightsDestination,
         staffAnnouncementsDestination,

@@ -1,0 +1,18 @@
+{"step":"S00-precondition","target":"LOCAL","at":"2026-10-27T08:32:04.974Z","phone_auth_enabled":true,"local_environment":true,"edge_started_here":true}
+{"step":"S01-phone-auth-and-editor-roles","target":"LOCAL","at":"2026-10-27T08:32:09.793Z","verdict":"pass","editor_grants":[200,200,200]}
+{"step":"S10-drafts-and-upload-stay-private","target":"LOCAL","at":"2026-10-27T08:32:10.055Z","verdict":"pass","public_drafts":0,"poster_uploaded":true}
+{"step":"S11-incomplete-draft-cannot-publish","target":"LOCAL","at":"2026-10-27T08:32:10.079Z","verdict":"pass","draft_state":"draft","publish":"validation_failed","fields":["scripture_reference","sermon_date","speaker"]}
+{"step":"S12-published-catalog-is-identical-for-anon-pending-member","target":"LOCAL","at":"2026-10-27T08:32:10.234Z","verdict":"pass","exact_projection":true,"fixture_sermons":2,"same_for_public_callers":true,"leaked_fields":0}
+{"step":"S13-series-poster-uses-existing-public-file-pipeline","target":"LOCAL","at":"2026-10-27T08:32:10.250Z","verdict":"pass","sync":200,"published_poster":true,"poster_fetch":200}
+{"step":"S20-live-revision-preserved-until-replacement-and-stale-save-refused","target":"LOCAL","at":"2026-10-27T08:32:10.303Z","verdict":"pass","saved_draft":2,"stale_save":"conflict","before":1,"after":2}
+{"step":"S21-server-rejects-unsupported-and-unsafe-notes","target":"LOCAL","at":"2026-10-27T08:32:10.452Z","verdict":"pass","unsafe_cases":14,"rejected_with_notes_field":14}
+{"step":"S22-uncleared-video-does-not-publish-and-withdrawn-clearance-preserves-notes","target":"LOCAL","at":"2026-10-27T08:32:10.489Z","verdict":"pass","uncleared_publish":"validation_failed","video_omitted":true,"notes_retained":true}
+{"step":"S22b-current-rights-revision-controls-poster-offline-eligibility","target":"LOCAL","at":"2026-10-27T08:32:10.525Z","verdict":"pass","prior_live_offline":true,"current_live_offline":false,"current_rights_revision":2}
+{"step":"S23-series-withdrawal-hides-metadata-and-keeps-teaching","target":"LOCAL","at":"2026-10-27T08:32:10.613Z","verdict":"pass","series_listed":false,"sermon_readable":true,"series_metadata_omitted":true}
+{"step":"S30-editor-commands-and-reads-reject-other-callers","target":"LOCAL","at":"2026-10-27T08:32:10.713Z","verdict":"pass","command_refusals":20,"staff_refusals":6,"anonymous_command":401}
+{"step":"S31-no-client-role-reads-or-writes-new-tables","target":"LOCAL","at":"2026-10-27T08:32:10.777Z","verdict":"pass","attempted_pairs":20,"refused_pairs":20}
+{"step":"S40-successful-refresh-excludes-withdrawn-sermon","target":"LOCAL","at":"2026-10-27T08:32:10.795Z","verdict":"pass","withdrawn_listed":false,"other_still_listed":true}
+{"step":"S41-archive-removes-public-detail","target":"LOCAL","at":"2026-10-27T08:32:10.811Z","verdict":"pass","state":"archived","public_detail_absent":true}
+{"step":"S50-registered-erase-removes-sermon-and-series-attribution","target":"LOCAL","at":"2026-10-27T08:32:12.073Z","verdict":"pass","before":8,"after":0,"sermon_saved_by_anonymized":true,"series_saved_by_anonymized":true}
+{"step":"S51-module-boundaries-remain-clear","target":"LOCAL","at":"2026-10-27T08:32:13.311Z","verdict":"pass","boundary_violations":0,"unowned_objects":0}
+{"step":"S99-cleanup","target":"LOCAL","at":"2026-10-27T08:32:13.777Z","synthetic_accounts_left":0,"immutable_content_retained":true,"instruction":"reset the local database before another run"}

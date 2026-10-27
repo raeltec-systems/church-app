@@ -42,14 +42,10 @@ class BibleReaderScreen extends ConsumerWidget {
     return ColoredBox(
       color: c.bg,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+        // Story 6.7: the tab's Bible / Hymn book segment above names the
+        // view, so the reader starts with its own state and pickers.
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
         children: [
-          Text(
-            'Bible',
-            style: Theme.of(context).textTheme.headlineMedium
-                ?.copyWith(color: c.brand, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 14),
           if (state.offlineSnapshot)
             _ReaderNotice(
               icon: Icons.offline_pin_outlined,

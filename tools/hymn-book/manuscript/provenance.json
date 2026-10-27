@@ -1,0 +1,16 @@
+{
+  "pdf": "inyimbo_zyabakristo.pdf",
+  "pdf_sha256": "0733124a4e5376ea8504e4709b77b7d03117f187a1b8b4fd13768a0f4d621139",
+  "pdf_bytes": 1631474,
+  "received": "2026-10-27",
+  "extraction_command": "pdftotext -enc UTF-8 -layout inyimbo_zyabakristo.pdf inyimbo_zyabakristo.txt",
+  "extraction_tool": "pdftotext version 4.06 [www.xpdfreader.com], Git for Windows mingw64",
+  "text": "inyimbo_zyabakristo.txt",
+  "text_sha256_lf": "c371ef6b68e7cbdf6e8e1929d6196eceec869a695ed05792f5c84d85e04dc030",
+  "page_breaks": 220,
+  "book": {
+    "edition": "bicc-tonga-2012",
+    "title": "Inyimbo zya Bakristo",
+    "language": "toi"
+  }
+}

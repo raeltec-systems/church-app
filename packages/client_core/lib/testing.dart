@@ -9,6 +9,7 @@ import 'package:church_contracts/church_contracts.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 
 import 'src/application/providers.dart';
+import 'src/application/hymn_controllers.dart';
 import 'src/domain/platform_status.dart';
 
 import 'src/domain/access_grants.dart';
@@ -23,6 +24,7 @@ import 'src/domain/content_banners.dart';
 import 'src/domain/content_events.dart';
 import 'src/domain/content_sermons.dart';
 import 'src/domain/content_bible.dart';
+import 'src/domain/hymn_book.dart';
 import 'src/domain/public_content_cache.dart';
 import 'src/domain/content_giving.dart';
 import 'src/domain/credential_review.dart';
@@ -731,6 +733,73 @@ class FakeBibleTranslationPackageSource
   @override
   Future<String> loadWorldEnglishBibleVpl() async => worldEnglishBibleVpl;
 }
+
+/// The built-in hymn book as tests read it (story 6.7): a small SYNTHETIC
+/// book (placeholder words, never hymn text) unless a test sets [book] or
+/// [error].
+class FakeHymnBookSource implements HymnBookSource {
+  HymnBook book = testHymnBook();
+
+  /// When set, every load throws it (the "could not be opened" state).
+  Object? error;
+  int loads = 0;
+
+  @override
+  Future<HymnBook> load() async {
+    loads++;
+    final failure = error;
+    if (failure != null) throw failure;
+    return book;
+  }
+}
+
+/// A SYNTHETIC test book: [hymns] hymns titled "SYNTHETIC hymn N" (1 and 2 in
+/// "SYNTHETIC opening", the rest in "SYNTHETIC praise"), each with two placeholder
+/// verses, hymn 1 with an English title, a key and a chorus; then [choruses]
+/// single-stanza choruses titled "SYNTHETIC chorus N" in "SYNTHETIC choruses".
+HymnBook testHymnBook({int hymns = 3, int choruses = 2}) => HymnBook(
+  format: 1,
+  edition: 'test-1',
+  title: 'SYNTHETIC hymn book',
+  language: 'toi',
+  items: [
+    for (var n = 1; n <= hymns; n++)
+      Hymn(
+        kind: HymnKind.hymn,
+        number: n,
+        section: n <= 2 ? 'SYNTHETIC opening' : 'SYNTHETIC praise',
+        title: 'SYNTHETIC hymn $n',
+        original: n == 1 ? 'SYNTHETIC ORIGINAL' : null,
+        reference: n == 1 ? 'Z.H. 1' : null,
+        key: n == 1 ? 'A flat' : null,
+        verses: [
+          'SYNTHETIC hymn $n verse one, line one,\nSYNTHETIC hymn $n verse one, line two.',
+          'SYNTHETIC hymn $n verse two, line one,\nSYNTHETIC hymn $n verse two, line two.',
+        ],
+        choruses: [
+          if (n == 1)
+            const HymnChorus(
+              fromVerse: 1,
+              text: 'SYNTHETIC chorus line one,\nSYNTHETIC chorus line two.',
+            ),
+        ],
+      ),
+    for (var n = 1; n <= choruses; n++)
+      Hymn(
+        kind: HymnKind.chorus,
+        number: n,
+        section: 'SYNTHETIC choruses',
+        title: 'SYNTHETIC chorus $n',
+        original: null,
+        reference: null,
+        key: null,
+        verses: [
+          'SYNTHETIC chorus $n stanza, line one,\nSYNTHETIC chorus $n stanza.',
+        ],
+        choruses: const [],
+      ),
+  ],
+);
 
 /// The wire form of one published event as everyone reads it (story 6.1);
 /// by default the two-day SYNTHETIC Harvest Thanksgiving (Sat 10 Oct 2099
@@ -3040,6 +3109,7 @@ class ClientTestHarness {
   final bible = FakeBible();
   final sermons = FakeSermons();
   final biblePackageSource = FakeBibleTranslationPackageSource();
+  final hymnBook = FakeHymnBookSource();
   final giving = FakeGiving();
   GivingDiallerLauncher? givingDiallerLauncher;
   final announcements = FakeAnnouncements();
@@ -3078,6 +3148,7 @@ class ClientTestHarness {
     fixtureCounterReaderProvider.overrideWithValue(reader),
     requestIdsProvider.overrideWithValue(SequentialRequestIds()),
     pushMessagingProvider.overrideWithValue(push),
+    hymnBookSourceProvider.overrideWithValue(hymnBook),
     if (configured) ...[
       accountAuthGatewayProvider.overrideWithValue(auth),
       memberAccessRepositoryProvider.overrideWithValue(memberAccess),

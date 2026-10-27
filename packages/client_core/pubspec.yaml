@@ -26,3 +26,9 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+
+# Story 6.7: the church's hymn book, built into both apps (one checked-in file,
+# produced by tools/hymn-book/convert.mjs).
+flutter:
+  assets:
+    - assets/hymn_book/hymn_book.json

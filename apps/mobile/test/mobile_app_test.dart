@@ -577,6 +577,30 @@ void main() {
     },
   );
 
+  testWidgets(
+    'story 6.8: a signed-out phone is asked to sign in to save a hymn, and '
+    'nothing is sent',
+    (tester) async {
+      final h = await pumpMobile(
+        tester,
+        location: ClientPaths.hymn('hymn-1'),
+        setUp: (h) => h.session.switchTo(null),
+      );
+      expect(find.byKey(const Key('hymn-favourite')), findsOneWidget);
+      expect(find.text('Save'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('hymn-favourite')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('hymn-favourite-sign-in-prompt')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('hymn-favourite-not-now')));
+      await tester.pumpAndSettle();
+      expect(h.gateway.sent, isEmpty);
+      expect(h.hymnLists.favouritesCalls, 0, reason: 'nothing is read');
+    },
+  );
+
   testWidgets('story 6.3: a signed-out phone has Home, Bible & Hymns, Give and Calendar, opens How to '
       'give and copies a method\'s values', (tester) async {
     const airtel = '61616161-6161-4161-8161-616161616161';

@@ -15,6 +15,7 @@ import '../domain/content_giving.dart';
 import '../domain/credential_review.dart';
 import '../domain/duties.dart';
 import '../domain/followups.dart';
+import '../domain/hymn_lists.dart';
 import '../domain/fixture_counter.dart';
 import '../domain/inbox.dart';
 import '../domain/member_access.dart';
@@ -138,6 +139,12 @@ final givingDiallerLauncherProvider = Provider<GivingDiallerLauncher>(
 /// announcement read.
 final announcementsRepositoryProvider = Provider<AnnouncementsRepository>(
   (ref) => const UnconfiguredAnnouncementsRepository(),
+);
+
+/// Story 6.8: the member's own favourite hymns, this Sunday's public list
+/// and the editors' Sunday lists.
+final hymnListsRepositoryProvider = Provider<HymnListsRepository>(
+  (ref) => const UnconfiguredHymnListsRepository(),
 );
 
 /// Story 6.2: Home banners (everyone), the editors' banner and rights reads,

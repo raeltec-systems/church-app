@@ -25,6 +25,7 @@ import 'src/domain/content_events.dart';
 import 'src/domain/content_sermons.dart';
 import 'src/domain/content_bible.dart';
 import 'src/domain/hymn_book.dart';
+import 'src/domain/hymn_lists.dart';
 import 'src/domain/public_content_cache.dart';
 import 'src/domain/content_giving.dart';
 import 'src/domain/credential_review.dart';
@@ -765,6 +766,55 @@ class FakeBibleTranslationPackageSource
   @override
   Future<String> loadWorldEnglishBibleVpl() async => worldEnglishBibleVpl;
 }
+
+/// [HymnListsRepository] answered by the test (story 6.8): favourites, this
+/// Sunday's public list and the editors' read. Each field answers every read
+/// at once; the counters record how often each was asked.
+class FakeHymnLists implements HymnListsRepository {
+  AccessRead<MyHymnFavourites> favourites = const AccessReadOk(
+    MyHymnFavourites.empty,
+  );
+  AccessRead<PublicSundayHymns> sunday = const AccessReadOk(
+    PublicSundayHymns(
+      sunday: '2099-01-04',
+      edition: null,
+      items: [],
+      publicationRevision: null,
+    ),
+  );
+  AccessRead<StaffSundayHymns> staff = const AccessReadDenied(
+    AccessDenial.notGranted,
+  );
+  int favouritesCalls = 0, sundayCalls = 0, staffCalls = 0;
+
+  @override
+  Future<AccessRead<MyHymnFavourites>> fetchMyFavourites() async {
+    favouritesCalls++;
+    return favourites;
+  }
+
+  @override
+  Future<AccessRead<PublicSundayHymns>> fetchPublicSundayHymns() async {
+    sundayCalls++;
+    return sunday;
+  }
+
+  @override
+  Future<AccessRead<StaffSundayHymns>> fetchStaffSundayHymns() async {
+    staffCalls++;
+    return staff;
+  }
+}
+
+/// This Sunday's SYNTHETIC public list for [sunday] (`YYYY-MM-DD`) with
+/// [items] of the test book.
+PublicSundayHymns testSundayHymns(String sunday, List<String> items) =>
+    PublicSundayHymns(
+      sunday: sunday,
+      edition: items.isEmpty ? null : 'test-1',
+      items: items,
+      publicationRevision: items.isEmpty ? null : 1,
+    );
 
 /// The built-in hymn book as tests read it (story 6.7): a small SYNTHETIC
 /// book (placeholder words, never hymn text) unless a test sets [book] or
@@ -3243,6 +3293,7 @@ class ClientTestHarness {
   final sermons = FakeSermons();
   final biblePackageSource = FakeBibleTranslationPackageSource();
   final hymnBook = FakeHymnBookSource();
+  final hymnLists = FakeHymnLists();
   final giving = FakeGiving();
   GivingDiallerLauncher? givingDiallerLauncher;
   final announcements = FakeAnnouncements();
@@ -3300,6 +3351,7 @@ class ClientTestHarness {
         givingDiallerLauncher ?? const UnavailableGivingDiallerLauncher(),
       ),
       announcementsRepositoryProvider.overrideWithValue(announcements),
+      hymnListsRepositoryProvider.overrideWithValue(hymnLists),
       bannerRepositoryProvider.overrideWithValue(banners),
       publicContentCacheProvider.overrideWithValue(publicContentCache),
       contentFilePickerProvider.overrideWithValue(filePicker),

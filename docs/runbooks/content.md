@@ -549,6 +549,89 @@ On a signed-out Android phone in airplane mode, open **Bible & Hymns**, choose *
 
 Spot-check list for the PDF: hymns 1, 3, 4, 25, 29, 30, 32, 62, 106, 164, 178, 199 and choruses 1, 24, 26, 34, 67. Hymns 25, 29 and 30 need the printed book: the extraction numbers the second line of their first stanza "2", so the app shows a one-line verse 1.
 
+## Story 6.8: favourite hymns and Hymns for this Sunday
+
+Migrations: `supabase/migrations/20261027182223_content_hymn_lists.sql` (the version staging recorded) and its small rows file `supabase/migrations/20261027182300_content_hymn_lists_rows.sql` (the favourites row purge; **the owner applies it by hand on hosted projects**, below). pgTAP: `supabase/tests/content_hymn_lists_test.sql` (145). E2E: `tools/identity-e2e/content-hymn-lists.mjs` (13 checks; run it after the pgTAP suite on a fresh reset; offline tests `content-hymn-lists.test.mjs`). Plan: `_bmad-output/initiative-church-app/epic-public-content-and-giving/story-save-favourite-hymns-and-set-hymns-for-this-sunday-plan.md`. Evidence: `evidence-6.8/`.
+
+The hymn book is built into the apps (story 6.7). The server holds **item numbers only**: an item is named by its id (`hymn-12`, `chorus-3`) together with the book's edition, and every write is checked against `app.content_hymn_editions` (`bicc-tonga-2012`: hymns 1-199, choruses 1-67). A number outside the edition, a title, a bare number or an unknown edition is refused. A corrected book that keeps its numbers needs no server change; a new edition with other counts needs a migration row before its app release.
+
+### Model
+
+- One content kind, `hymn_book` (editor roles `admin`, `media`), plus the Content scope kind **`worship_leader`** (registered with Identity through 2.3), whose one target is the church's single Sunday-list record `app.content_sunday_hymn_lists` (`list_id` `4f8c2d6e-1b3a-4c5d-8e9f-6a7b0c1d2e08`). Holders of that scope edit `hymn_book` beside Admin and Media. Pastors do not (owner decision 2026-10-21: Media and worship leaders; Admin also manages it).
+- Three registries so later kinds add rows instead of replacing shared functions: **member commands** (`app.content_member_commands`, `app.content_register_member_command`: any approved member with live access may send them; their handlers check the rest), **kind scopes** (`app.content_kind_scopes`, `app.content_register_kind_scope`) and **replay scopes** (`app.content_replay_scopes`, `app.content_register_replay_scope`: the AD-2 replay recheck of an aggregate that is not a content item). `app.content_editor_capacity`, `app.content_authorize_command` and `app.content_in_scope` were replaced once to read them; kinds without registry rows behave as before. Story 6.11 (RSVP, `20261027140149`) created the member-command registry first; 6.8 keeps it (`create table if not exists`, the same function bodies) and keeps 6.11's RSVP replay branch in `app.content_in_scope`.
+- **Favourites** (`app.content_hymn_favourites`): one row per member and item, `saved` or `removed`. Removal is a state change; rows go only in a member deletion. Only the member reads them.
+- **Sunday lists** (`app.content_sunday_hymn_revisions`, `app.content_sunday_hymn_items`): each set or clear of one church-time Sunday is an immutable, attributed revision (who saved it, as Admin, Media or worship leader, when, and the request id); a cleared list is a revision with no items; the latest revision is the Sunday's list. The list record's `revision` is the expected revision of both list commands.
+
+### Commands (`api.content_command`, 1.4 envelope)
+
+| Command | Who | Expected | Payload |
+|---|---|---|---|
+| `content.save_hymn_favourite` | an approved member with live access | `null` | `{edition, item}`; saving a saved item changes nothing |
+| `content.remove_hymn_favourite` | the same | `null` | `{edition, item}`; never saved: `not_found` |
+| `content.set_sunday_hymns` | Admin, Media, worship leaders | list revision | `{sunday: "YYYY-MM-DD", edition, items: ["hymn-12", ...]}` (1-12 distinct items, in order); the same list again changes nothing |
+| `content.clear_sunday_hymns` | the same | list revision | `{sunday}`; nothing set: `sunday: not_set` |
+
+Field codes: `edition` `required`, `invalid`, `unknown_edition`; `item`/`items` `required`, `invalid`, `out_of_range`, `too_many`, `duplicate`; `sunday` `required`, `invalid`, `not_a_sunday`, `past` (before this Sunday), `too_far` (more than 52 weeks ahead). A plain member, a Pastor and a Pending account are refused the list commands (`forbidden`); Pending and held accounts are refused the favourite commands; anon cannot call any (401). A stale list revision answers `conflict` with `current_revision`. A revoked worship leader is refused at once, replays included.
+
+Worship leaders are granted and removed with the 2.3 grant command (`identity.grant_scope` / `identity.revoke_scope`, `{member_id, scope_kind: "worship_leader", scope_id: <list_id>}`), Admin only, never to themselves; any other `scope_id` answers `scope_id: unknown`.
+
+### Reads
+
+| Endpoint | Who | Returns |
+|---|---|---|
+| `api.content_public_sunday_hymns()` | anyone (`anon`, `authenticated`) | `{sunday, edition, items, publication_revision}`: **this Sunday** in church time (today on a Sunday, else the coming Sunday) and its item ids in order; `items: []` with `edition`/`publication_revision` null when nothing is set or it was cleared. No name, time or capacity. |
+| `api.content_my_hymn_favourites()` | the signed-in member (live access; no member parameter) | `{favourites: [{edition, item, saved_at}], truncated}`, newest first, at most 1000 |
+| `api.content_staff_sunday_hymns()` | Admin, Media, worship leaders | `{capacity, list_id, revision, this_sunday, editions, sundays: [{sunday, revision_no, edition, items, saved_at, saved_by, saved_capacity}], worship_leaders, members, members_truncated}`: every Sunday from 8 weeks back to 52 ahead that has a list; `worship_leaders` and `members` (approved members with their grant-set revision, at most 500) for an Admin only, `null` for everyone else |
+
+Nobody, staff included, can read another member's favourites.
+
+### Deletion
+
+Two erase parts of Content's one handler: `hymn_favourites` (`app.content_hymn_favourite_erase_part`) deletes the member's favourites through `app.content_hymn_favourite_purge_rows`, and `sunday_hymn_revisions` (`app.content_sunday_hymns_erase_part`) replaces who saved a list with the nil UUID (editors read **Former member**; the lists stay). `check` counts what is left. The purge is a **fail-closed stub** in the main migration; its body is the `_rows` file. Until the owner applies that file on a hosted project, Content's erase step answers `unavailable` for **every** member deletion (all modules wait at `erase_owners`, including the 4.15 and 5.12 deletion reruns) and nothing is erased. Locally `npx supabase db reset` applies both files.
+
+### Clients
+
+- **Mobile (everyone).** A hymn's bar has a **Save** / **Saved** pill (design handoff screen 5). A member saves or removes the item; it shows as saved only when the server confirmed it, and an unknown outcome offers **Check again** (the same request). A guest is asked to sign in, and a signed-in account without member access is told saving is for approved church members; nothing is sent for either. The hymn book (no search) starts with the member's **Saved** group (newest first, at most five, **See all N** opens **Saved hymns** at `/bible/hymns/saved`); a failed read says so and never looks like none saved. Every item in this Sunday's list carries a **Sunday** chip all that week (the choir practises midweek). **Home** shows **Hymns for this Sunday** (a chip per item: number and title from the book; **Hymn book** opens the tab) from **Saturday 00:00 to Sunday 23:59 church time** (the phone's clock, Africa/Lusaka), only when the server's this-Sunday date is that Sunday and it has items; a failed read on those days says so with Try again. Favourites live in memory for the account (AD-13); the book opens them again on each visit, so a change made on another phone shows.
+- **Staff web.** **Sunday hymns** (`/content/sunday-hymns`, sidebar group **Content**, last; Admin, Media and worship leaders): the finding line (this Sunday's and next Sunday's lists), the next eight Sundays with their lists, the chosen Sunday's editor (add from the built-in book by number or title, reorder, remove, **Save list**, **Clear this Sunday** with confirmation, who set it and when) and, for an Admin, **Worship leaders** (remove; choose a member and **Make worship leader**). A member made a worship leader sees the entry on their next navigation.
+
+### Local runs
+
+```bash
+npx supabase db reset --local && npx supabase test db
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/content-hymn-lists.mjs --evidence _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-6.8/content-hymn-lists-e2e.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+node --test tools/identity-e2e/content-hymn-lists.test.mjs
+```
+
+The E2E uses fictional numbers +44 7700 900641-900648 and removes everything it created (favourites, the run's Sunday revisions, members, grants and receipts). Flutter: `packages/client_core/test/content/hymn_lists_test.dart` (wire, the Sunday window under a test clock, Home chips, the Sunday chip, the Save pill, Saved hymns, the staff editor), plus one test in each app.
+
+### Owner step on staging: the `_rows` file (right after the main migration)
+
+In the staging SQL editor (project `tmurpotfluignacfueki`), paste the whole of `supabase/migrations/20261027182300_content_hymn_lists_rows.sql` and run it, the same way as `20261013220300_duties_department_tracer_rows.sql`. It replaces one stub (`app.content_hymn_favourite_purge_rows(uuid)`) and changes no schema object. Check:
+
+```sql
+select pg_get_functiondef('app.content_hymn_favourite_purge_rows(uuid)'::regprocedure)
+       like '%delete from app.content_hymn_favourites f where f.member_id = p_member_id%';   -- true
+select has_function_privilege('authenticated', 'app.content_hymn_favourite_purge_rows(uuid)', 'EXECUTE');  -- false
+```
+
+Until it is applied, every staging member deletion waits at its erase step (`unavailable`), which is safe.
+
+### Owner manual check on staging (the ticket's verify)
+
+Use SYNTHETIC members only; nothing here sends a notification.
+
+1. As an approved SYNTHETIC member signed in on two phones, open **Bible & Hymns > Hymn book**, open hymn 12 and tap **Save**; it reads **Saved**. On the second phone open the hymn book again: hymn 12 is under **Saved**. Remove it there (**Saved** > tap) and reopen the book on the first phone: it is gone.
+2. Sign in as another member: the hymn book shows no Saved group for hymn 12. Sign out: tapping **Save** asks you to sign in and sends nothing.
+3. On staff web as an Admin, **Content > Sunday hymns > Worship leaders**: make a SYNTHETIC member a worship leader. As that member (staff web), set next Sunday's list (for example hymns 12, 45 and chorus 3) and save. As a Media member, change it and save. As a plain member (and as a Pastor) **Sunday hymns** is not in the sidebar, and `/content/sunday-hymns` says it is not available.
+4. On a signed-out phone the hymn book marks those items **Sunday** during that week. On the Saturday before that Sunday (or with the phone's date set to it), Home shows **Hymns for this Sunday** with the chips; on the Friday it does not. (The widget tests prove the Friday/Saturday boundary under a test clock.)
+5. After the `_rows` file is applied, the entry 17 suite reruns the favourites privacy and deletion cases on staging.
+
+### Staging (2026-10-27)
+
+Applied verbatim to `tmurpotfluignacfueki`, which records version `20261027182223` (after 6.11's `20261027140149`); the local files carry that version and `20261027182300` for the rows file. After a fresh local reset, 38 of the 39 added or replaced function definitions hash identically to staging; the 39th, `app.content_hymn_favourite_purge_rows`, is still the fail-closed stub on staging until the owner applies the rows file. Boundary, unowned and unpinned counts are 0; the signed-out public read answers `{"sunday": "2026-11-01", "edition": null, "items": [], "publication_revision": null}`. No list or favourite was created, no gate changed and no notification was sent. Evidence: `evidence-6.8/staging-verify.md`.
+
 ## Story 6.9: publish and browse sermons with safe notes
 
 Migration: `20261027083618_content_sermons.sql`. It registers `sermon_series` and `sermon`, their ten lifecycle commands, private revision tables, bounded public/staff reads, the `sermon_series_poster` asset purpose, immutable published revisions and registered attribution erasure. It adds no row deletion, policy approval, notification or second file/cache pipeline. Apply the exact reviewed migration to staging only after listing project `tmurpotfluignacfueki`'s history and confirming prerequisite `20261022012809_content_rights_banners.sql`; match the local filename to the version staging records. Compare every added function's normalized definition hash with a fresh local replay, then require zero boundary violations and unowned objects and verify the signed-out reads. Record the actual staging result in entry 9's evidence; the migration filename alone is not deployment evidence.

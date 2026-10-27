@@ -45,6 +45,7 @@ select results_eq(
            ('api.content_public_event'), ('api.content_public_events'),
            ('api.content_public_giving_method'), ('api.content_public_giving_methods'),
            ('api.content_public_sermon'), ('api.content_public_sermons'),
+           ('api.content_public_sunday_hymns'),
            ('api.system_command'),
            ('app.content_bible_manifest_json'),
            ('app.content_public_announcement'), ('app.content_public_announcements'),
@@ -53,8 +54,9 @@ select results_eq(
            ('app.content_public_event'), ('app.content_public_events'),
            ('app.content_public_giving_method'), ('app.content_public_giving_methods'),
            ('app.content_public_sermon'), ('app.content_public_sermons'),
+           ('app.content_public_sunday_hymns'),
            ('app.sys_command')$$,
-  'anon can execute only the system route pair and the Content public reads (stories 6.1, 6.2, 6.3, 6.6, 6.13)'
+  'anon can execute only the system route pair and the Content public reads (stories 6.1, 6.2, 6.3, 6.6, 6.8, 6.13)'
 );
 select results_eq(
   $$select (n.nspname || '.' || p.proname)::text collate "C"
@@ -66,18 +68,21 @@ select results_eq(
            ('api.cells_signup_options'), ('api.content_asset_preview'), ('api.content_bible_manifest'), ('api.content_command'),
            ('api.content_file_plan'),
            ('api.content_my_event_rsvp'),
+           ('api.content_my_hymn_favourites'),
            ('api.content_public_announcement'), ('api.content_public_announcements'),
            ('api.content_public_banners'),
            ('api.content_public_bible_chapter'), ('api.content_public_bible_translations'),
            ('api.content_public_event'), ('api.content_public_events'),
            ('api.content_public_giving_method'), ('api.content_public_giving_methods'),
            ('api.content_public_sermon'), ('api.content_public_sermons'),
+           ('api.content_public_sunday_hymns'),
            ('api.content_staff_announcements'), ('api.content_staff_banners'),
            ('api.content_staff_bibles'),
            ('api.content_staff_event_rsvps'),
            ('api.content_staff_events'), ('api.content_staff_giving_methods'),
            ('api.content_staff_rights'),
            ('api.content_staff_sermon_series'), ('api.content_staff_sermons'),
+           ('api.content_staff_sunday_hymns'),
            ('api.duties_admin_overview'), ('api.duties_candidates'), ('api.duties_command'),
            ('api.duties_coverage'),
            ('api.duties_leader_board'), ('api.duties_member_history'), ('api.duties_my_duties'),
@@ -110,18 +115,21 @@ select results_eq(
            ('app.cells_signup_options'), ('app.content_asset_preview'), ('app.content_bible_manifest_json'), ('app.content_command'),
            ('app.content_file_plan'),
            ('app.content_my_event_rsvp'),
+           ('app.content_my_hymn_favourites'),
            ('app.content_public_announcement'), ('app.content_public_announcements'),
            ('app.content_public_banners'),
            ('app.content_public_bible_chapter'), ('app.content_public_bible_translations'),
            ('app.content_public_event'), ('app.content_public_events'),
            ('app.content_public_giving_method'), ('app.content_public_giving_methods'),
            ('app.content_public_sermon'), ('app.content_public_sermons'),
+           ('app.content_public_sunday_hymns'),
            ('app.content_staff_announcements'), ('app.content_staff_banners'),
            ('app.content_staff_bibles'),
            ('app.content_staff_event_rsvps'),
            ('app.content_staff_events'), ('app.content_staff_giving_methods'),
            ('app.content_staff_rights'),
            ('app.content_staff_sermon_series'), ('app.content_staff_sermons'),
+           ('app.content_staff_sunday_hymns'),
            ('app.duties_admin_overview'), ('app.duties_candidates'), ('app.duties_command'),
            ('app.duties_coverage'),
            ('app.duties_leader_board'), ('app.duties_member_history'), ('app.duties_my_duties'),
@@ -150,7 +158,7 @@ select results_eq(
            ('app.notifications_my_inbox'), ('app.notifications_my_push_settings'),
            ('app.notifications_open_item'),
            ('app.sys_command')$$,
-  'authenticated can execute only the command wrappers, the live-access-checked identity reads (stories 2.1, 2.3), the applicant reads and command (2.4), the Admin review command and reads (2.5), the recovery-email command and reads (2.7), the credential-review command and reads (2.8), the assisted-recovery command and read (2.9), the lifecycle command and reads (2.10), the deletion command and read (2.11), the cells command and reads (2.6), the content command, public reads and editors'' reads (6.1, 6.6, 6.13), the duties command and reads (4.1, 4.3 rota, 4.4 candidates, the Pastors'' special assignments), the follow-ups command and reads (4.6), the member inbox read (3.1) and item open (3.2), the device and push-settings command and read (3.5), the content-free reminder health read (3.8, api wrapper only; its app body stays private), the synthetic scoped (2.3) and cell-private (2.6) fixture reads, the synthetic reminder command (3.1) and their definer entry points (the system route refuses sessions)'
+  'authenticated can execute only the command wrappers, the live-access-checked identity reads (stories 2.1, 2.3), the applicant reads and command (2.4), the Admin review command and reads (2.5), the recovery-email command and reads (2.7), the credential-review command and reads (2.8), the assisted-recovery command and read (2.9), the lifecycle command and reads (2.10), the deletion command and read (2.11), the cells command and reads (2.6), the content command, public reads, editors'' reads and the member''s own favourites (6.1, 6.6, 6.8, 6.13), the duties command and reads (4.1, 4.3 rota, 4.4 candidates, the Pastors'' special assignments), the follow-ups command and reads (4.6), the member inbox read (3.1) and item open (3.2), the device and push-settings command and read (3.5), the content-free reminder health read (3.8, api wrapper only; its app body stays private), the synthetic scoped (2.3) and cell-private (2.6) fixture reads, the synthetic reminder command (3.1) and their definer entry points (the system route refuses sessions)'
 );
 select is_definer('app', 'fixture_counter_command',
   array['jsonb'], 'the app entry point is SECURITY DEFINER');

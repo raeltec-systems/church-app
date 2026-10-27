@@ -222,6 +222,14 @@ const staffBibleDestination = (
   icon: Icons.menu_book_outlined,
 );
 
+/// Story 6.8: shown while the caller is an Admin, Media or a worship leader:
+/// Hymns for this Sunday from the hymn book built into the app.
+const staffSundayHymnsDestination = (
+  path: ClientPaths.contentSundayHymns,
+  label: 'Sunday hymns',
+  icon: Icons.queue_music_outlined,
+);
+
 const staffSermonsDestination = (
   path: ClientPaths.contentSermons,
   label: 'Sermons',
@@ -316,7 +324,8 @@ List<StaffNavGroup> staffNavGroupsFor(
     ),
     // Story 6.1: public church content (Media, Pastor, Admin); story 6.2:
     // Home banners and the rights records; story 6.13: announcements (the
-    // same editors); story 6.3: giving methods (Admin only).
+    // same editors); story 6.3: giving methods (Admin only); story 6.8:
+    // Sunday hymns (Admin, Media and worship leaders).
     (
       label: 'Content',
       items: [
@@ -328,6 +337,7 @@ List<StaffNavGroup> staffNavGroupsFor(
         if (editsContent(grants)) staffRightsDestination,
         if (editsContent(grants)) staffAnnouncementsDestination,
         if (editsGiving(grants)) staffGivingDestination,
+        if (setsSundayHymns(grants)) staffSundayHymnsDestination,
       ],
     ),
     (

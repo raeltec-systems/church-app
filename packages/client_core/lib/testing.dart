@@ -3160,6 +3160,7 @@ class ClientTestHarness {
   final sermons = FakeSermons();
   final biblePackageSource = FakeBibleTranslationPackageSource();
   final hymnBook = FakeHymnBookSource();
+  final hymnLists = FakeHymnLists();
   final giving = FakeGiving();
   GivingDiallerLauncher? givingDiallerLauncher;
   final announcements = FakeAnnouncements();
@@ -3217,6 +3218,7 @@ class ClientTestHarness {
         givingDiallerLauncher ?? const UnavailableGivingDiallerLauncher(),
       ),
       announcementsRepositoryProvider.overrideWithValue(announcements),
+      hymnListsRepositoryProvider.overrideWithValue(hymnLists),
       bannerRepositoryProvider.overrideWithValue(banners),
       publicContentCacheProvider.overrideWithValue(publicContentCache),
       contentFilePickerProvider.overrideWithValue(filePicker),

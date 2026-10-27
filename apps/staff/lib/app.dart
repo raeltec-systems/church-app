@@ -331,13 +331,13 @@ List<StaffNavGroup> staffNavGroupsFor(
       items: [
         if (editsContent(grants)) staffEventsDestination,
         if (editsContent(grants)) staffBibleDestination,
-        if (setsSundayHymns(grants)) staffSundayHymnsDestination,
         if (editsContent(grants)) staffSermonsDestination,
         if (editsContent(grants)) staffSermonSeriesDestination,
         if (editsContent(grants)) staffBannersDestination,
         if (editsContent(grants)) staffRightsDestination,
         if (editsContent(grants)) staffAnnouncementsDestination,
         if (editsGiving(grants)) staffGivingDestination,
+        if (setsSundayHymns(grants)) staffSundayHymnsDestination,
       ],
     ),
     (

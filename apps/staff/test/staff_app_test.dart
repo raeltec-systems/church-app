@@ -403,6 +403,44 @@ void main() {
     }
   });
 
+  test('story 6.8: Sunday hymns for Admin, Media and worship leaders', () {
+    final leader = syntheticGrants(
+      scopes: const [
+        ScopeGrant(
+          scopeKind: 'worship_leader',
+          scopeId: '68686868-6868-4868-8868-686868686868',
+        ),
+      ],
+    );
+    for (final g in [
+      syntheticGrants(roles: const ['admin']),
+      syntheticGrants(roles: const ['media']),
+      leader,
+    ]) {
+      final content = staffNavGroupsFor(g)
+          .firstWhere((group) => group.label == 'Content')
+          .items;
+      expect(content.last, staffSundayHymnsDestination, reason: '${g.roles}');
+    }
+    // A worship leader edits no other content.
+    expect(
+      staffNavGroupsFor(leader)
+          .firstWhere((group) => group.label == 'Content')
+          .items,
+      [staffSundayHymnsDestination],
+    );
+    for (final g in [
+      syntheticGrants(roles: const ['pastor']),
+      syntheticGrants(),
+      null,
+    ]) {
+      expect(
+        staffDestinationsFor(g, signedIn: true),
+        isNot(contains(staffSundayHymnsDestination)),
+      );
+    }
+  });
+
   test('story 6.6: Bible imports are for Media, Pastor and Admin', () {
     for (final role in const ['media', 'pastor', 'admin']) {
       expect(
@@ -515,6 +553,7 @@ void main() {
       staffRightsDestination,
       staffAnnouncementsDestination,
       staffGivingDestination,
+      staffSundayHymnsDestination,
     ]);
     for (final g in [
       syntheticGrants(roles: const ['media']),
@@ -673,6 +712,7 @@ void main() {
         staffRightsDestination,
         staffAnnouncementsDestination,
         if (role == 'admin') staffGivingDestination,
+        if (role != 'pastor') staffSundayHymnsDestination,
       ], reason: role);
     }
     for (final g in [syntheticGrants(), null]) {

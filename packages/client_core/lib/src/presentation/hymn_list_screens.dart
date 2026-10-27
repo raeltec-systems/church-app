@@ -508,7 +508,7 @@ class HomeSundayHymnsSection extends ConsumerWidget {
           ],
         ),
       );
-    } else if (s.result case AccessReadFailed() || AccessReadDenied()) {
+    } else if (s.result case AccessReadFailed()) {
       body = Row(
         children: [
           Expanded(

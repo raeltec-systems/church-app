@@ -139,8 +139,9 @@ String _itemLabel(String id, HymnBook? book) {
 String _invalidText(Map<String, String> f) {
   final sunday = f['sunday'];
   final items = f['items'];
-  if (sunday == 'past')
+  if (sunday == 'past') {
     return 'That Sunday is past. Choose this Sunday or a later one.';
+  }
   if (sunday == 'too_far') return 'Lists can be set up to 52 weeks ahead.';
   if (items == 'out_of_range' || items == 'invalid' || f['edition'] != null) {
     return 'An item is not in the hymn book the church server knows. Update '
@@ -500,7 +501,7 @@ class _SundayHymnsBodyState extends ConsumerState<_SundayHymnsBody> {
             const SizedBox(height: 8),
             for (final h in matches)
               _PickRow(
-                key: Key('sunday-hymns-add-${h.id}'),
+                key: Key('sunday-hymns-match-${h.id}'),
                 hymn: h,
                 onAdd: () {
                   _search.clear();
@@ -954,7 +955,11 @@ class _PickRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           FocusRing(
-            child: TextButton(onPressed: onAdd, child: const Text('Add')),
+            child: TextButton(
+              key: Key('sunday-hymns-add-${hymn.id}'),
+              onPressed: onAdd,
+              child: const Text('Add'),
+            ),
           ),
         ],
       ),

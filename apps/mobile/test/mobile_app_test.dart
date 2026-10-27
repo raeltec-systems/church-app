@@ -480,6 +480,54 @@ void main() {
     },
   );
 
+  testWidgets(
+    'story 6.7: a signed-out phone reads and searches the built-in Tonga '
+    'hymn book',
+    (tester) async {
+      // The real asset, through the app's asset bundle and the background
+      // parse a book this size takes.
+      final book = (await tester.runAsync(
+        () => const BundledHymnBookSource().load(),
+      ))!;
+      expect(book.hymns, hasLength(199));
+      expect(book.choruses, hasLength(67));
+      await pumpMobile(
+        tester,
+        location: ClientPaths.bible,
+        setUp: (h) {
+          h.session.switchTo(null);
+          h.hymnBook.book = book;
+        },
+      );
+      await tester.tap(find.text('Hymn book'));
+      await tester.pumpAndSettle();
+      expect(find.text('Kutalika Mubungano'), findsOneWidget);
+      expect(find.byKey(const Key('hymn-row-hymn-1')), findsOneWidget);
+      expect(find.text('Leza Usimango (Cila)'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('hymn-search')), '24');
+      await tester.pumpAndSettle();
+      final hymn = tester.getTopLeft(find.byKey(const Key('hymn-row-hymn-24')));
+      final chorus = tester.getTopLeft(
+        find.byKey(const Key('hymn-row-chorus-24')),
+      );
+      expect(
+        hymn.dy,
+        lessThan(chorus.dy),
+        reason: 'the hymn before the chorus',
+      );
+      await tester.enterText(find.byKey(const Key('hymn-search')), 'usimanga');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('hymn-row-hymn-1')));
+      await tester.pumpAndSettle();
+      expect(find.text('Hymn 1'), findsOneWidget);
+      expect(find.text('REVIVE THY WORK, O LORD!'), findsOneWidget);
+      expect(find.text('Key of F'), findsOneWidget);
+      expect(find.text('Ciindululo'), findsNothing);
+      expect(find.text('Chorus'), findsNWidgets(3));
+      expect(find.text('Sign in'), findsNothing, reason: 'its own back bar');
+    },
+  );
+
   testWidgets('story 6.3: a signed-out phone has Home, Bible & Hymns, Give and Calendar, opens How to '
       'give and copies a method\'s values', (tester) async {
     const airtel = '61616161-6161-4161-8161-616161616161';

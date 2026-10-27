@@ -39,8 +39,8 @@ List<MobileDestination> mobileDestinationsFor(MemberGrants? grants) =>
 
 /// Routes that show the top bar (logo, inbox, account or Sign in): the tab
 /// roots for everyone, and every other screen of a caller without member
-/// access except an event's or a giving method's detail and the
-/// announcements (story 6.13), which have their own back bar.
+/// access except an event's, a giving method's or a hymn's detail (story
+/// 6.7) and the announcements (story 6.13), which have their own back bar.
 bool _showsTopBar(String location, bool member) =>
     location == ClientPaths.home ||
     location == ClientPaths.bible ||
@@ -49,6 +49,7 @@ bool _showsTopBar(String location, bool member) =>
     (!member &&
         !location.startsWith('${ClientPaths.calendar}/') &&
         !location.startsWith('${ClientPaths.give}/') &&
+        !location.startsWith('${ClientPaths.bible}/') &&
         location != ClientPaths.announcements &&
         !location.startsWith('${ClientPaths.announcements}/'));
 

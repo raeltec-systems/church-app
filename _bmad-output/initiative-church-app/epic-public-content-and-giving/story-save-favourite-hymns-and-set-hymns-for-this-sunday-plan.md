@@ -3,12 +3,12 @@ title: 'Save favourite hymns and set Hymns for this Sunday'
 type: 'feature'
 ticket: '8'
 created: '2026-10-27'
-status: in-progress
+status: built
 baseline_revision: '4773ea0cec14faa5b8dfd7ee2f7d5ea08dd30fb0'
 route: 'full'
 route_source: 'auto'
-review: ''
-review_source: ''
+review: 'none'
+review_source: 'pinned'
 lenses_ran: []
 review_loop_iteration: 0
 followup_review_recommended: false
@@ -18,7 +18,28 @@ context:
   - '.agents/skills/design-taste-frontend/references/app-screens.md'
   - 'docs/design-handoff/README.md'
 warnings: ['oversized']
-deferred: []
+deferred:
+  - summary: >-
+      Independent review deferred to the epic PR review (owner process change 2026-10-27).
+    evidence: |-
+      The owner asked that no per-entry reviews or reviewer agents run; a separate agent reviews the epic PR at the end. A reviewer started earlier was stopped by the usage limit before reporting and its partial output holds no findings.
+    location: >-
+      the whole entry
+    severity: medium (unreviewed)
+  - summary: >-
+      The staging `_rows` file is an owner step; until applied every staging member deletion waits at its erase step.
+    evidence: |-
+      supabase/migrations/20261027182300_content_hymn_lists_rows.sql; instructions in docs/runbooks/content.md (Story 6.8, Owner step).
+    location: >-
+      staging tmurpotfluignacfueki
+    severity: low
+  - summary: >-
+      The physical two-phone and Saturday Home checks remain owner manual checks (entry 15 pilot).
+    evidence: |-
+      Widget tests cover the Friday/Saturday/Sunday/Monday boundary with a test clock; the E2E covers two sessions of one member over HTTP.
+    location: >-
+      docs/runbooks/content.md, Story 6.8 owner manual check
+    severity: low
 ---
 
 <intent-contract>
@@ -93,6 +114,16 @@ deferred: []
 
 ## Implementation Notes
 
+- Branch `epic6/8-hymn-favourites-sunday`, from 4773ea0 (6.9 merged), later merged with 15918d5.
+- Decisions: one kind `hymn_book` (Admin, Media) plus the `worship_leader` Content scope on a single Sunday-list record; Pastors do not set the list (owner decision names Media and worship leaders; the brief adds Admin). Setting a Sunday's list is its publication (item numbers of the church-owned book, shown only as "this Sunday"); each set or clear is an immutable attributed revision. Home shows the list Saturday 00:00 to Sunday 23:59 by the device clock (injectable `hymnClockProvider`); the hymn-book Sunday chip shows all that week. Favourites are not audited (private member state) and not cached offline (not asked for). The staff entry is last in the Content group so existing order tests stay.
+- Staging: 6.11 was applied (`20261027140149`) minutes before; the first apply failed atomically, the migration now keeps 6.11's member-command registry and RSVP replay branch, and staging records `20261027182223` (rows file `20261027182300`, not applied).
+- Tests: pgTAP `content_hymn_lists_test.sql` 145, full suite 66 files / 5,388 on a fresh reset (one duties timing test passed alone, as noted in memory); E2E 13/13; Flutter client_core 1047, mobile 92, staff 61.
+- Review: none per the owner's process change; deferred to the epic PR review.
+
 ## Plan Change Log
 
 ## Review Triage Log
+
+## Auto Run Result
+
+Built hymn favourites (member-only, private, removal as a state change, guests asked to sign in, Pending told it is for members) and Hymns for this Sunday (Admin, Media and worship leaders on staff web; the `worship_leader` scope granted by an Admin through 2.3; Home chips Saturday to Sunday, Lusaka; the Sunday chip in the hymn book), with the edition record refusing numbers outside hymns 1-199 / choruses 1-67, the favourites erase part with its `_rows` file and the Sunday attribution erase part. On staging as `20261027182223`; hashes match fresh local (purge stub pending the owner's rows file); boundary/unowned 0. Review deferred to the epic PR review.

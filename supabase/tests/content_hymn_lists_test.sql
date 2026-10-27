@@ -112,6 +112,8 @@ select pg_temp.u(n), 'authenticated', 'authenticated', ltrim(pg_temp.phone(n), '
 select pg_temp.session(pg_temp.u(n), pg_temp.s(n)) from generate_series(1, 9) n;
 select pg_temp.session(pg_temp.u(4), pg_temp.s(54));
 select app.platform_set_environment('local', 'pgtap content hymn lists');
+-- The list record's revision as a fresh database has it (an earlier E2E run moves it on; rolled back).
+update app.content_sunday_hymn_lists set revision = 1;
 create temp table m (n int, member_id uuid);
 insert into m select n, app.identity_seed_synthetic_link(pg_temp.u(n), 'SYNTHETIC Hymn Member ' || n,
                                                          'pgtap content hymn lists')

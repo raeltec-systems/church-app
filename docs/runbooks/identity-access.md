@@ -1022,3 +1022,7 @@ Identity is unchanged; story 4.12 registers the Duties and Follow-ups lifecycle 
 No hold, deactivation or deletion reason reaches a leader, a notice or the evidence. Owner manual checks: [duties.md](duties.md), story 4.12 (they include the **Hand over first** notice on **Membership status**, whose text now names a department's last leader or deputy and the only possible owner of an open follow-up task).
 
 E2E: `tools/identity-e2e/duties-lifecycle.mjs` (+44 7700 900470-900479). The 2.10 `lifecycle.mjs` and 2.11 `deletion.mjs` E2Es keep passing with the real hooks registered (their synthetic members hold no duties or tasks).
+
+## Story 6.8: the Content scope kind `worship_leader`
+
+Content registers the scope kind `worship_leader` (`app.identity_register_scope_kind('content', 'worship_leader', ...)`), whose only target is the church's single Sunday-list record (`app.content_sunday_hymn_lists`). An Admin grants and revokes it with `identity.grant_scope` / `identity.revoke_scope` (`{member_id, scope_kind: "worship_leader", scope_id: <list_id>}`), on staff web **Content > Sunday hymns > Worship leaders**; holders set Hymns for this Sunday beside Media and Admins. Deactivation ends it with every other grant. See [content.md](content.md), story 6.8.

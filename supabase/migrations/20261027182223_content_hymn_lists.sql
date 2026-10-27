@@ -8,16 +8,18 @@
 --   * One Content kind, hymn_book (editors: Admin and Media, plus the worship_leader scope).
 --   * Registries, so later kinds add rows instead of replacing shared functions again:
 --       - member commands (app.content_member_commands): any approved member with live access may
---         send them; their handlers check the rest. The same names and definitions as story 6.11
---         (unmerged at this writing), so whichever lands second keeps one copy;
+--         send them; their handlers check the rest. Story 6.11 (RSVP, 20261027140149) created this
+--         registry, app.content_register_member_command and app.content_member_actor first; this
+--         file keeps them (create if not exists / the same bodies), so it also replays where 6.11
+--         is absent;
 --       - kind scopes (app.content_kind_scopes): holders of a registered Content scope edit a kind
 --         beside its editor roles (here the worship_leader scope on the Sunday-list record);
 --       - replay scopes (app.content_replay_scopes): the AD-2 replay recheck of an aggregate that
 --         is not a content item.
 --     app.content_editor_capacity, app.content_authorize_command and app.content_in_scope are
---     replaced once (same signatures and privileges; bodies copied from
---     20261021233523_content_events_tracer.sql and extended through those registries). Kinds
---     without a registered scope, member command or replay scope behave exactly as before.
+--     replaced (same signatures and privileges; bodies copied from 20261027140149 (6.11) and
+--     extended through those registries; 6.11's RSVP replay branch is kept). Kinds without a
+--     registered scope, member command or replay scope behave exactly as before.
 --   * Favourites (owner decision K9): content.save_hymn_favourite and content.remove_hymn_favourite
 --     are member commands; removal is a state change. Only the member reads them, through
 --     api.content_my_hymn_favourites() (live member access, no member parameter).
@@ -69,7 +71,7 @@ insert into app.content_kinds (kind, editor_roles, description) values
 -- ---------------------------------------------------------------------------------------------
 
 -- Content commands any approved member with live access may send (their handlers check the rest).
-create table app.content_member_commands (
+create table if not exists app.content_member_commands (
   command text primary key references app.content_commands (command),
   registered_at timestamptz not null default now()
 );
@@ -113,7 +115,7 @@ revoke all on table app.content_hymn_editions, app.content_member_commands, app.
   from public, anon, authenticated, service_role;
 
 -- Registers a member command (migration-time only): the command must already be registered.
-create function app.content_register_member_command(p_command text)
+create or replace function app.content_register_member_command(p_command text)
 returns void
 language plpgsql
 set search_path = ''
@@ -240,9 +242,10 @@ begin
 end;
 $$;
 
--- (Replaced; copied from 20261021233523_content_events_tracer.sql.) Replay recheck (AD-2): a
--- content item is in scope while the actor still edits its kind; any other aggregate (story 6.8)
--- by its registered replay scope, and none without one.
+-- (Replaced; copied from 20261027140149_content_event_posters_rsvp.sql.) Replay recheck (AD-2): a
+-- content item is in scope while the actor still edits its kind; an RSVP (story 6.11) while the
+-- actor has live member access and the RSVP is theirs; any other aggregate (story 6.8) by its
+-- registered replay scope, and none without one.
 create or replace function app.content_in_scope(p_actor uuid, p_aggregate_type text, p_aggregate_id uuid)
 returns boolean
 language plpgsql
@@ -257,6 +260,13 @@ declare
 begin
   if p_aggregate_type is null or p_aggregate_id is null then
     return false;
+  end if;
+  if p_aggregate_type = 'content_rsvp' then
+    select e.member_id into v_member from app.identity_evaluate_grant(null, null, null) e
+     where e.outcome = 'granted';
+    return v_member is not null
+       and exists (select 1 from app.content_event_rsvps v
+                    where v.rsvp_id = p_aggregate_id and v.member_id = v_member);
   end if;
   if p_aggregate_type <> 'content_item' then
     select s.handler into v_handler from app.content_replay_scopes s
@@ -285,7 +295,7 @@ $$;
 
 -- The acting member of a member command: live member access now (read after the authorizer's
 -- lock on the member row), else forbidden.
-create function app.content_member_actor(p_actor uuid, out member_id uuid, out account_id uuid)
+create or replace function app.content_member_actor(p_actor uuid, out member_id uuid, out account_id uuid)
 language plpgsql
 set search_path = ''
 as $$
@@ -1162,7 +1172,7 @@ comment on function api.content_staff_sunday_hymns() is
 -- Deletion: the favourites and Sunday-list erase parts (story 2.11 contract)
 -- ---------------------------------------------------------------------------------------------
 
--- The member's favourite rows: replaced by 20261027131600_content_hymn_lists_rows.sql. Returns the
+-- The member's favourite rows: replaced by this story's _rows file (content_hymn_lists_rows). Returns the
 -- number of rows removed.
 create function app.content_hymn_favourite_purge_rows(p_member_id uuid)
 returns integer

@@ -3,7 +3,7 @@ title: 'Publish and browse sermons with the YouTube player and safe notes'
 type: 'feature'
 ticket: '9'
 created: '2026-10-26'
-status: in-review
+status: built
 baseline_revision: '7eb4f866864806ff7baefcb23f2c351786bd93f8'
 route: 'full'
 route_source: 'auto'
@@ -11,7 +11,7 @@ review: 'quick'
 review_source: 'pinned'
 lenses_ran: [quick]
 review_loop_iteration: 0
-followup_review_recommended: false
+followup_review_recommended: true
 context:
   - '_bmad-output/initiative-church-app/epic-public-content-and-giving/codex-handoff-prompt.md'
   - '_bmad-output/initiative-church-app/epic-public-content-and-giving/epic-public-content-and-giving.md'
@@ -94,7 +94,7 @@ Resumed run (2026-10-27), parent session. The first implementer stopped before v
 - Server fix: `content_staff_sermon_series_json.public_image` is null for a published series without a poster (it said `blocked`). Client link check aligned with the server (lowercase exact hosts; quotes and backslashes refused) so a server-valid note can never fail client parsing.
 - pgTAP fixture phones moved into the entry's reserved block (+44 7700 900651-900656, rolled back with the test); three pgTAP checks added for the series poster state.
 - Changed-file inventory (whole entry): migration `supabase/migrations/20261027083618_content_sermons.sql`; SQL tests `supabase/tests/content_sermons_test.sql`, `command_foundation_test.sql`, `content_banners_test.sql`; HTTP runner `tools/identity-e2e/content-sermons.mjs` and `.test.mjs`; client `packages/client_core/lib/src/domain/content_sermons.dart`, `public_content_cache.dart`, `content_banners.dart`, `adapters/supabase_sermons_repository.dart`, `adapters/supabase_banner_repository.dart`, `application/sermon_controllers.dart`, `application/providers.dart`, `presentation/sermon_screens.dart`, `presentation/sermon_staff_screens.dart`, `presentation/shell_routing.dart`, `church_client_core.dart`, `composition.dart`, `supabase_adapters.dart`, `testing.dart`; tests `packages/client_core/test/content/sermons_test.dart`, `sermon_adapter_test.dart`, `bible_test.dart`; mobile `apps/mobile/lib/app.dart`, `main.dart`, `sermons/youtube_sermon_player.dart`, `offline/public_content_cache_adapter.dart`, `pubspec.yaml`, `pubspec.lock`, tests `apps/mobile/test/mobile_app_test.dart`, `offline/public_content_cache_adapter_test.dart`; staff `apps/staff/lib/app.dart`, `apps/staff/test/staff_app_test.dart`; runbooks `docs/runbooks/content.md`, `docs/runbooks/production-promotion-content.md`; epic Notes.
-- Environment: from 2026-10-26 18:24 the build host's Docker Desktop backend stopped responding and its WSL utility VM could not be stopped (`wsl --shutdown`, a WSL service restart, `hcsdiag kill` and a `vmcompute` restart all failed; `vmcompute` is left in StopPending). The local Supabase stack is unreachable until the host restarts, so the fresh-reset pgTAP suite and the local HTTP runner could not run in this session.
+- Environment: from 2026-10-26 18:24 the build host's Docker Desktop backend stopped responding and its WSL utility VM could not be stopped (`wsl --shutdown`, a WSL service restart, `hcsdiag kill` and a `vmcompute` restart all failed; `vmcompute` is left in StopPending). The local Supabase stack was unreachable until the engine came back on 2026-10-27 07:53; meanwhile a rolled-back dry run against staging's schema checked the migration, and the fresh-reset pgTAP suite and the local HTTP runner then ran under the shared lock before the staging apply.
 
 ## Plan Change Log
 
@@ -118,6 +118,30 @@ Resumed run (2026-10-27), parent session. The first implementer stopped before v
   - `[medium]` `[reject]` Tasks were ticked before the local database gates ran — the fix is an edit of this plan; the verification record below states what ran.
   - `[low]` `[patch]` Double underscores still made intraword bold — the `__` alternative has the same word-boundary guard as `_`; widget regression added.
   - `[low]` `[defer]` On `/content/sermons/<id>` and `/content/sermon-series/<id>` no staff nav item is selected — the staff shell matches nav paths exactly, as on the existing 5.3 meeting-plan route; a longest-prefix rule is a shell-wide change for the entry 16 refactor sweep.
+
+## Auto Run Result
+
+Implemented sermon series and sermons as two Content kinds on the shared lifecycle, rights and asset helpers: private revisioned storage, ten commands through `api.content_command`, server-validated restricted Markdown notes with exact HTTPS hosts, rights-gated posters and YouTube IDs, the canonical anonymous catalog and detail reads, protected staff reads that list every draft, and attribution erase parts for both revision tables. Mobile gains the fifth tab (Home, Bible & Hymns, Sermons, Give, Calendar) with the current-series hero, Latest/Series/Speaker views, search, 16:9 rows, a detail page whose privacy-enhanced YouTube player (no autoplay) never hides scripture and notes, and the canonical catalog plus offline-cleared posters in the single public cache. Staff web gains Sermons and Sermon series editors grouped by state, with date picker, pasted-link video normalisation, poster upload and named rights pickers. Staging records `20261027083618`.
+
+Files: see the changed-file inventory under Implementation Notes (migration `supabase/migrations/20261027083618_content_sermons.sql`).
+
+Review (quick lens, one independent reviewer): 14 findings. Patched 12 (high 1: the live runner's rights fixture; medium 3: notes parity with the server, poster saving outside the shared cache queue, the moved Bible/giving registration checks; low 8: phone-block wording, current-series rule, damaged poster replacement, list copy, staff loading state, empty media tiles, first-row position, intraword underscores). Rejected 1 (medium: tasks ticked before the database gates ran; the fix is a plan edit, and the gates have since run). Deferred 1 (low: staff nav selection on editor sub-routes, a shell-wide exact-match rule shared with the 5.3 meeting-plan route; entry 16).
+
+Follow-up review recommendation: true. This first pass patched a high-verdict entry and three medium ones. The patched code that no reviewer has re-read is the two-step poster save in `PublicSermonsController` (a newer catalog must always win over a slower poster save) and the notes parity changes; the runner fixture fix is proven by the 16/16 local run.
+
+Verification:
+- Fresh local reset under the shared-database lock replayed every migration; the full pgTAP suite passed: 65 files, 5,243 tests. Boundary and unowned counts 0. `node tools/ci/check-migrations.mjs --base origin/main`: 86 migrations ordered, unique and non-destructive; the migration is ASCII with no backslash.
+- Local HTTP runner `tools/identity-e2e/content-sermons.mjs`: 16/16 (evidence `evidence-6.9/content-sermons-e2e.jsonl`); its helper tests 8/8; synthetic accounts removed and local phone auth restored to off.
+- Flutter, after merging `story/5.8-meetings-held` (`4cb7fa2`): analysis clean in all four packages; tests pass: client_core 967, mobile 90, staff 60, design_system 19.
+- Staging `tmurpotfluignacfueki`: applied verbatim as `20261027083618`; all 33 added function hashes match the fresh local replay; boundary/unowned 0; kinds, poster purpose, commands, erase parts, RLS and grants as migrated; seven signed-out HTTP checks pass (`evidence-6.9/staging-verify.md`, `staging-public-read-20261027.jsonl`). A rolled-back dry run preceded the apply while the local engine was down.
+- Release builds for staging both pass: staff web (`flutter build web --release --no-web-resources-cdn` with the staging defines) and the Android arm64 APK (25.6 MB, `apps/mobile/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`), which also confirms the pinned player plugin builds for Android.
+- Matrix audit: publication (pgTAP lifecycle and anonymous projections; runner S10-S12), notes (pgTAP refusal corpus and parity cases; runner S21; staff form keeps input), video (pgTAP and runner S22: withdrawn clearance removes the playable ID and keeps notes; widget tests with a fake player and the unavailable states), offline (widget tests for the labelled snapshot, local filtering and honest first failure; adapter tests for eviction, preservation and damaged-file replacement) and series withdrawal (pgTAP, runner S23, detail without series) all ran and passed.
+
+Residual risks:
+- Physical playback, a removed or private video on a device, and airplane-mode reading are unverified here; they are owner checks for the entry 15 pilot.
+- The owner's staging walkthrough (two SYNTHETIC series and sermons, refused markup in the editor, signed-out browsing and search) is still to do; nothing was published on staging.
+- Sermon media and channel rights remain Q5; no gate was approved.
+- The local Docker engine on the build host failed once during this run (WSL VM stuck; `vmcompute` stuck stopping until the host restarted); the shared stack recovered.
 
 ## Design Notes
 

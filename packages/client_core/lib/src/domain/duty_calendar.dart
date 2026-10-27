@@ -6,10 +6,9 @@
 /// widgets and SDKs.
 library;
 
-import 'dart:convert';
-
 import 'church_time.dart';
 import 'duties.dart';
+import 'icalendar_text.dart';
 
 abstract final class DutyCalendar {
   /// When a duty has no end time, the exported event lasts this long (the
@@ -87,7 +86,7 @@ abstract final class DutyCalendar {
       'END:VEVENT',
       'END:VCALENDAR',
     ];
-    return '${lines.map(_fold).join('\r\n')}\r\n';
+    return ICalendarText.document(lines);
   }
 
   static String _wallClock(DateTime at) {
@@ -96,46 +95,11 @@ abstract final class DutyCalendar {
     return '${two(w.hour)}:${two(w.minute)}';
   }
 
-  /// `20991130` (a calendar date: its own year, month and day).
-  static String _date(DateTime d) {
-    String two(int v) => v.toString().padLeft(2, '0');
-    return '${d.year.toString().padLeft(4, '0')}${two(d.month)}${two(d.day)}';
-  }
-
-  /// `20990104T080000Z`.
-  static String _utc(DateTime at) {
-    final u = at.toUtc();
-    String two(int v) => v.toString().padLeft(2, '0');
-    return '${u.year.toString().padLeft(4, '0')}${two(u.month)}${two(u.day)}'
-        'T${two(u.hour)}${two(u.minute)}${two(u.second)}Z';
-  }
-
-  /// RFC 5545 TEXT escaping; control characters become spaces.
-  static String _text(String v) => v
-      .replaceAll(r'\', r'\\')
-      .replaceAll(';', r'\;')
-      .replaceAll(',', r'\,')
-      .replaceAll(RegExp(r'\r\n|\r|\n'), r'\n')
-      .replaceAll(RegExp(r'[\x00-\x08\x0b-\x1f\x7f]'), ' ');
-
-  /// Folds a content line at 75 octets without splitting a UTF-8 character.
-  static String _fold(String line) {
-    final out = StringBuffer();
-    var octets = 0;
-    var limit = 75;
-    for (final rune in line.runes) {
-      final ch = String.fromCharCode(rune);
-      final n = utf8.encode(ch).length;
-      if (octets + n > limit) {
-        out.write('\r\n ');
-        octets = 0;
-        limit = 74; // the leading space of a continuation line counts
-      }
-      out.write(ch);
-      octets += n;
-    }
-    return out.toString();
-  }
+  // Story 6.11: the text rules are shared with the event export
+  // (icalendar_text.dart); this export's bytes are unchanged.
+  static String _date(DateTime d) => ICalendarText.date(d);
+  static String _utc(DateTime at) => ICalendarText.utc(at);
+  static String _text(String v) => ICalendarText.text(v);
 }
 
 /// What handing a calendar file to the phone did. Only the platform's answer

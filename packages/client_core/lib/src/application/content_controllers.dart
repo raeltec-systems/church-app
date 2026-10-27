@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:church_contracts/church_contracts.dart';
@@ -5,9 +6,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/access_grants.dart';
 import '../domain/commands.dart';
+import '../domain/content_banners.dart'
+    show
+        ContentPurposes,
+        FileSyncDone,
+        FileSyncOutcome,
+        ImageUploadRefused,
+        ImageUploaded;
 import '../domain/content_events.dart';
 import '../domain/public_content_cache.dart';
 import 'access_controllers.dart' show noteProtectedDenial;
+import 'banner_controllers.dart' show BannerImageUpload, ImageUploadStatus;
 import 'providers.dart';
 
 // Story 6.1: the public calendar (everyone, signed in or not) and the
@@ -223,6 +232,16 @@ enum ContentNotice {
   /// The outcome is unknown: check again with the same request.
   unconfirmed,
   notSent,
+
+  /// Story 6.11: the organisers were changed.
+  organisersSet,
+
+  /// Story 6.11: only an Admin or one of the event's organisers changes them.
+  organisersNotAllowed,
+
+  /// Story 6.11: the list named someone who no longer edits events (or too
+  /// many people).
+  organisersInvalid,
 }
 
 /// One command in flight or just answered.
@@ -246,6 +265,8 @@ class StaffEventsState {
     this.notice,
     this.noticeAction,
     this.fieldErrors = const {},
+    this.syncing = false,
+    this.sync,
   });
 
   final bool loading;
@@ -255,6 +276,12 @@ class StaffEventsState {
   final ContentNotice? notice;
   final ContentAction? noticeAction;
   final Map<String, String> fieldErrors;
+
+  /// Story 6.11: a public-file sync (posters) is under way.
+  final bool syncing;
+
+  /// The last sync's outcome (null before the first).
+  final FileSyncOutcome? sync;
 
   bool get busy => pending != null;
   StaffEvents? get value => switch (result) {
@@ -273,6 +300,8 @@ class StaffEventsState {
     ContentAction? noticeAction,
     bool clearNotice = false,
     Map<String, String>? fieldErrors,
+    bool? syncing,
+    FileSyncOutcome? sync,
   }) => StaffEventsState(
     loading: loading ?? this.loading,
     result: result ?? this.result,
@@ -281,6 +310,8 @@ class StaffEventsState {
     notice: clearNotice ? null : (notice ?? this.notice),
     noticeAction: clearNotice ? null : (noticeAction ?? this.noticeAction),
     fieldErrors: fieldErrors ?? this.fieldErrors,
+    syncing: syncing ?? this.syncing,
+    sync: sync ?? this.sync,
   );
 }
 
@@ -317,9 +348,34 @@ class StaffEventsController extends Notifier<StaffEventsState> {
       notice: state.notice,
       noticeAction: state.noticeAction,
       fieldErrors: state.fieldErrors,
+      syncing: state.syncing,
+      sync: state.sync,
     );
     if (r is AccessReadDenied<StaffEvents>) noteProtectedDenial(ref);
   }
+
+  /// Story 6.11: asks the server to place published posters and remove
+  /// withdrawn or ended ones (the Content file sync, every kind at once).
+  /// The list is read again only when the sync changed something.
+  Future<void> sync() => _sync(_epoch, alwaysReload: false);
+
+  Future<void> _sync(int epoch, {required bool alwaysReload}) async {
+    if (!_current(epoch) || state.syncing) return;
+    state = state.copyWith(syncing: true);
+    final outcome = await ref.read(bannerRepositoryProvider).syncFiles();
+    if (!_current(epoch)) return;
+    state = state.copyWith(syncing: false, sync: outcome);
+    final changed =
+        outcome is FileSyncDone && (outcome.placed > 0 || outcome.removed > 0);
+    if (alwaysReload || changed) await _reload(epoch);
+  }
+
+  /// Commands after which the public files change.
+  static const _syncAfter = {
+    ContentCommands.publishEvent,
+    ContentCommands.withdrawEvent,
+    ContentCommands.archiveEvent,
+  };
 
   void dismissNotice() =>
       state = state.copyWith(clearNotice: true, fieldErrors: const {});
@@ -361,6 +417,15 @@ class StaffEventsController extends Notifier<StaffEventsState> {
   Future<void> archive(StaffEvent event) =>
       _lifecycle(ContentCommands.archiveEvent, event);
 
+  /// Story 6.11: sets the event's whole organiser list (an Admin or one of
+  /// its organisers; the server checks).
+  Future<void> setOrganisers(StaffEvent event, List<String> memberIds) => _send(
+    ContentCommands.setEventOrganisers,
+    Optional.of(event.revision),
+    {'event_id': event.eventId, 'organiser_ids': memberIds},
+    event.current.title,
+  );
+
   Future<void> _lifecycle(String command, StaffEvent event) => _send(
     command,
     Optional.of(event.revision),
@@ -401,12 +466,19 @@ class StaffEventsController extends Notifier<StaffEventsState> {
     ContentCommands.saveEvent => ContentNotice.saved,
     ContentCommands.publishEvent => ContentNotice.published,
     ContentCommands.withdrawEvent => ContentNotice.withdrawn,
+    ContentCommands.setEventOrganisers => ContentNotice.organisersSet,
     _ => ContentNotice.archived,
   };
 
-  static ContentNotice _refusal(CommandError error) {
+  static ContentNotice _refusal(String command, CommandError error) {
     final f = error.fieldErrors;
     return switch (error.code) {
+      ErrorCode.forbidden when command == ContentCommands.setEventOrganisers =>
+        ContentNotice.organisersNotAllowed,
+      ErrorCode.validationFailed
+          when command == ContentCommands.setEventOrganisers &&
+              f.containsKey('organiser_ids') =>
+        ContentNotice.organisersInvalid,
       ErrorCode.validationFailed when f['event_id'] == 'nothing_to_publish' =>
         ContentNotice.nothingToPublish,
       ErrorCode.validationFailed when f['event_id'] == 'not_published' =>
@@ -442,9 +514,13 @@ class StaffEventsController extends Notifier<StaffEventsState> {
           notice: _success(action.command),
           noticeAction: action,
         );
-        await _reload(epoch);
+        if (_syncAfter.contains(action.command)) {
+          await _sync(epoch, alwaysReload: true);
+        } else {
+          await _reload(epoch);
+        }
       case CommandRefused(:final error):
-        final notice = _refusal(error);
+        final notice = _refusal(action.command, error);
         state = state.copyWith(
           clearPending: true,
           clearUnconfirmed: true,
@@ -479,4 +555,285 @@ class StaffEventsController extends Notifier<StaffEventsState> {
 final staffEventsProvider =
     NotifierProvider<StaffEventsController, StaffEventsState>(
       StaffEventsController.new,
+    );
+
+// ---------------------------------------------------------------------------
+// Story 6.11: RSVP (members), the organisers' names and the poster upload
+// ---------------------------------------------------------------------------
+
+/// What the event's RSVP section tells the member after an answer.
+enum RsvpNotice {
+  going,
+  cancelled,
+  full,
+
+  /// The event has started.
+  closed,
+
+  /// The event takes no RSVPs (any more).
+  off,
+
+  /// The event is no longer on the calendar.
+  notPublic,
+  notGoing,
+
+  /// Only approved church members can RSVP.
+  membersOnly,
+  signInAgain,
+  notAvailable,
+  refused,
+
+  /// The outcome is unknown: check again with the same request.
+  unconfirmed,
+  notSent,
+}
+
+/// The member's own RSVP to one event and the answer in flight.
+class EventRsvpState {
+  const EventRsvpState({
+    this.loading = false,
+    this.result,
+    this.pending,
+    this.unconfirmed,
+    this.notice,
+  });
+
+  final bool loading;
+
+  /// The member's own RSVP (null before the first answer).
+  final AccessRead<MyEventRsvp>? result;
+  final CommandRequest? pending;
+  final CommandRequest? unconfirmed;
+  final RsvpNotice? notice;
+
+  bool get busy => pending != null;
+  MyEventRsvp? get value => switch (result) {
+    AccessReadOk<MyEventRsvp>(:final value) => value,
+    _ => null,
+  };
+
+  EventRsvpState copyWith({
+    bool? loading,
+    AccessRead<MyEventRsvp>? result,
+    CommandRequest? pending,
+    bool clearPending = false,
+    CommandRequest? unconfirmed,
+    bool clearUnconfirmed = false,
+    RsvpNotice? notice,
+    bool clearNotice = false,
+  }) => EventRsvpState(
+    loading: loading ?? this.loading,
+    result: result ?? this.result,
+    pending: clearPending ? null : (pending ?? this.pending),
+    unconfirmed: clearUnconfirmed ? null : (unconfirmed ?? this.unconfirmed),
+    notice: clearNotice ? null : (notice ?? this.notice),
+  );
+}
+
+/// Story 6.11, mobile: a member's RSVP to one event (read and the two member
+/// commands, 1.4 envelope). Protected state, in memory only and scoped to the
+/// account generation; the server decides who may answer and whether a place
+/// is left. After any answer the public event (its counts) is read again.
+class EventRsvpController extends Notifier<EventRsvpState> {
+  EventRsvpController(this.eventId);
+
+  final String eventId;
+  int _epoch = 0;
+
+  @override
+  EventRsvpState build() {
+    ref.watch(accountGenerationProvider);
+    _epoch++;
+    final epoch = _epoch;
+    Future.microtask(() => _reload(epoch));
+    return const EventRsvpState(loading: true);
+  }
+
+  bool _current(int epoch) => ref.mounted && epoch == _epoch;
+
+  Future<void> reload() => _reload(_epoch);
+
+  Future<void> _reload(int epoch) async {
+    if (!_current(epoch)) return;
+    state = state.copyWith(loading: true);
+    final r = await ref
+        .read(contentRepositoryProvider)
+        .fetchMyEventRsvp(eventId);
+    if (!_current(epoch)) return;
+    state = state.copyWith(loading: false, result: r);
+  }
+
+  /// "I'm going".
+  Future<void> going() => _send(ContentCommands.rsvpEvent);
+
+  /// "Cancel RSVP": the place is free again.
+  Future<void> cancel() => _send(ContentCommands.cancelRsvp);
+
+  /// Resends the unconfirmed answer unchanged (same request_id and body).
+  Future<void> checkAgain() async {
+    final u = state.unconfirmed;
+    if (u == null || state.busy) return;
+    await _dispatch(u);
+  }
+
+  void dismissNotice() => state = state.copyWith(clearNotice: true);
+
+  Future<void> _send(String command) async {
+    if (state.busy) return;
+    final u = state.unconfirmed;
+    await _dispatch(
+      CommandRequest(
+        command: command,
+        requestId: u != null && u.command == command
+            ? u.requestId
+            : ref.read(requestIdsProvider).next(),
+        expectedRevision: const Optional.of(null),
+        payload: {'event_id': eventId},
+      ),
+    );
+  }
+
+  static RsvpNotice _refusal(CommandError error) {
+    final f = error.fieldErrors['event_id'];
+    return switch (error.code) {
+      ErrorCode.validationFailed when f == 'full' => RsvpNotice.full,
+      ErrorCode.validationFailed when f == 'rsvp_closed' => RsvpNotice.closed,
+      ErrorCode.validationFailed when f == 'rsvp_off' => RsvpNotice.off,
+      ErrorCode.validationFailed when f == 'not_public' => RsvpNotice.notPublic,
+      ErrorCode.validationFailed when f == 'not_going' => RsvpNotice.notGoing,
+      ErrorCode.forbidden => RsvpNotice.membersOnly,
+      ErrorCode.unauthenticated => RsvpNotice.signInAgain,
+      ErrorCode.unavailable => RsvpNotice.notAvailable,
+      _ => RsvpNotice.refused,
+    };
+  }
+
+  Future<void> _dispatch(CommandRequest request) async {
+    final epoch = _epoch;
+    state = state.copyWith(pending: request, clearNotice: true);
+    final outcome = await ref
+        .read(commandGatewayProvider)
+        .send(ContentCommands.function, request);
+    if (!_current(epoch)) return;
+    switch (outcome) {
+      case CommandConfirmed():
+        state = state.copyWith(
+          clearPending: true,
+          clearUnconfirmed: true,
+          notice: request.command == ContentCommands.rsvpEvent
+              ? RsvpNotice.going
+              : RsvpNotice.cancelled,
+        );
+        await _refresh(epoch);
+      case CommandRefused(:final error):
+        final notice = _refusal(error);
+        state = state.copyWith(
+          clearPending: true,
+          clearUnconfirmed: true,
+          notice: notice,
+        );
+        if (notice == RsvpNotice.membersOnly ||
+            notice == RsvpNotice.signInAgain) {
+          noteProtectedDenial(ref);
+        }
+        await _refresh(epoch);
+      case CommandUnknownOutcome():
+        state = state.copyWith(
+          clearPending: true,
+          unconfirmed: request,
+          notice: RsvpNotice.unconfirmed,
+        );
+      case CommandNotSent():
+        state = state.copyWith(clearPending: true, notice: RsvpNotice.notSent);
+    }
+  }
+
+  /// The counts changed (or another member took the last place): the public
+  /// event and the member's own RSVP are read again.
+  Future<void> _refresh(int epoch) async {
+    if (!_current(epoch)) return;
+    if (ref.exists(publicEventProvider(eventId))) {
+      unawaited(ref.read(publicEventProvider(eventId).notifier).reload());
+    }
+    await _reload(epoch);
+  }
+}
+
+final eventRsvpProvider = NotifierProvider.autoDispose
+    .family<EventRsvpController, EventRsvpState, String>(
+      EventRsvpController.new,
+    );
+
+/// Story 6.11, staff web: who is going to one event, for an Admin or one of
+/// its organisers (anyone else is refused by the server). Asked when the
+/// editor opens the list; in memory only.
+final staffEventRsvpsProvider = FutureProvider.autoDispose
+    .family<AccessRead<StaffEventRsvpsRead>, String>((ref, eventId) {
+      ref.watch(accountGenerationProvider);
+      return ref.read(contentRepositoryProvider).fetchStaffEventRsvps(eventId);
+    });
+
+/// Story 6.11: one saved event's poster upload: pick a file, send it to the
+/// server (purpose `event_poster`), keep the answer. Nothing is attached
+/// until the editor saves the draft with the uploaded poster.
+class EventPosterUploadController extends Notifier<BannerImageUpload> {
+  EventPosterUploadController(this.eventId);
+
+  final String eventId;
+
+  @override
+  BannerImageUpload build() {
+    ref.watch(accountGenerationProvider);
+    return const BannerImageUpload();
+  }
+
+  Future<void> pickAndUpload() async {
+    if (state.busy) return;
+    state = const BannerImageUpload(status: ImageUploadStatus.picking);
+    final file = await ref.read(contentFilePickerProvider).pickImage();
+    if (!ref.mounted) return;
+    if (file == null) {
+      state = const BannerImageUpload();
+      return;
+    }
+    // Larger than the route reads at all: refused here, nothing sent.
+    if (file.unreadable) {
+      state = const BannerImageUpload(
+        status: ImageUploadStatus.refused,
+        outcome: ImageUploadRefused(fieldErrors: {'file': 'too_large'}),
+      );
+      return;
+    }
+    state = BannerImageUpload(
+      status: ImageUploadStatus.uploading,
+      bytes: file.bytes,
+    );
+    final outcome = await ref
+        .read(bannerRepositoryProvider)
+        .uploadImage(eventId, ContentPurposes.eventPoster, file);
+    if (!ref.mounted) return;
+    state = switch (outcome) {
+      ImageUploaded(:final image) => BannerImageUpload(
+        status: ImageUploadStatus.uploaded,
+        image: image,
+        bytes: file.bytes,
+        outcome: outcome,
+      ),
+      ImageUploadRefused() => BannerImageUpload(
+        status: ImageUploadStatus.refused,
+        outcome: outcome,
+      ),
+      _ => BannerImageUpload(
+        status: ImageUploadStatus.failed,
+        outcome: outcome,
+      ),
+    };
+  }
+
+  void clear() => state = const BannerImageUpload();
+}
+
+final eventPosterUploadProvider = NotifierProvider.autoDispose
+    .family<EventPosterUploadController, BannerImageUpload, String>(
+      EventPosterUploadController.new,
     );

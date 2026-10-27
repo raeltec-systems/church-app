@@ -591,6 +591,38 @@ class FakeContent implements ContentRepository {
     staffEventsCalls++;
     return staffEvents;
   }
+
+  /// Story 6.11: the member's own RSVP by event id; an id not listed answers
+  /// "never answered".
+  final Map<String, AccessRead<MyEventRsvp>> myRsvp = {};
+  final myRsvpAsked = <String>[];
+
+  /// Story 6.11: the names by event id; an id not listed is refused
+  /// (`not_granted`), as for an editor who is not an organiser.
+  final Map<String, AccessRead<StaffEventRsvpsRead>> staffRsvps = {};
+  final staffRsvpsAsked = <String>[];
+
+  @override
+  Future<AccessRead<MyEventRsvp>> fetchMyEventRsvp(String eventId) async {
+    myRsvpAsked.add(eventId);
+    return myRsvp[eventId] ??
+        AccessReadOk(
+          MyEventRsvp.fromJson({
+            'event_id': eventId,
+            'rsvp_state': null,
+            'updated_at': null,
+          }),
+        );
+  }
+
+  @override
+  Future<AccessRead<StaffEventRsvpsRead>> fetchStaffEventRsvps(
+    String eventId,
+  ) async {
+    staffRsvpsAsked.add(eventId);
+    return staffRsvps[eventId] ??
+        const AccessReadDenied(AccessDenial.notGranted);
+  }
 }
 
 /// [BibleRepository] answered by tests (story 6.6).
@@ -814,6 +846,8 @@ Map<String, Object?> publicEventData({
   int publicationRevision = 1,
   String publishedAt = '2099-09-01T08:00:00.000000Z',
   bool offlineAllowed = true,
+  Map<String, Object?>? poster,
+  Map<String, Object?>? rsvp,
 }) => {
   'event_id': eventId,
   'title': title,
@@ -824,6 +858,69 @@ Map<String, Object?> publicEventData({
   'publication_revision': publicationRevision,
   'published_at': publishedAt,
   'offline_allowed': offlineAllowed,
+  'poster': ?poster,
+  'rsvp': ?rsvp,
+};
+
+/// Story 6.11: the wire form of a public event's poster.
+Map<String, Object?> publicEventPosterData({
+  String eventId = '71717171-7171-4171-8171-717171717171',
+  int width = 1920,
+  int height = 1080,
+  String altText = 'SYNTHETIC harvest baskets on the altar',
+  bool offlineAllowed = false,
+}) => {
+  'path': 'event/$eventId/r1/poster.png',
+  'media_type': 'image/png',
+  'width': width,
+  'height': height,
+  'alt_text': altText,
+  'offline_allowed': offlineAllowed,
+};
+
+/// Story 6.11: the wire form of a public event's RSVP counts.
+Map<String, Object?> publicEventRsvpData({
+  int? capacity = 2,
+  int going = 0,
+  bool open = true,
+}) => {
+  'capacity': capacity,
+  'going': going,
+  'spaces_left': capacity == null
+      ? null
+      : (capacity - going < 0 ? 0 : capacity - going),
+  'full': capacity != null && going >= capacity,
+  'open': open,
+};
+
+/// Story 6.11: the wire form of `api.content_my_event_rsvp`.
+Map<String, Object?> myEventRsvpData({
+  String eventId = '71717171-7171-4171-8171-717171717171',
+  String? state,
+  String updatedAt = '2099-09-02T08:00:00.000000Z',
+}) => {
+  'event_id': eventId,
+  'rsvp_state': state,
+  'updated_at': state == null ? null : updatedAt,
+};
+
+/// Story 6.11: the wire form of `api.content_staff_event_rsvps` naming
+/// [names] (earliest first).
+Map<String, Object?> staffEventRsvpsData(
+  List<String> names, {
+  String eventId = '71717171-7171-4171-8171-717171717171',
+  int? capacity = 2,
+}) => {
+  'rsvps': {
+    'event_id': eventId,
+    'capacity': capacity,
+    'going': names.length,
+    'attendees': [
+      for (final (i, n) in names.indexed)
+        {'name': n, 'rsvp_at': '2099-09-0${(i % 8) + 1}T08:00:00.000000Z'},
+    ],
+    'truncated': false,
+  },
 };
 
 /// The wire form of `api.content_public_events` holding [events].
@@ -842,6 +939,11 @@ Map<String, Object?> staffEventRevisionData({
   String location = 'SYNTHETIC Main sanctuary',
   String savedAt = '2099-09-01T07:00:00.000000Z',
   String savedBy = 'SYNTHETIC Media Phiri',
+  Map<String, Object?>? poster,
+  Map<String, Object?>? posterRights,
+  String? posterAltText,
+  bool? rsvpEnabled,
+  int? rsvpCapacity,
 }) => {
   'revision_no': revisionNo,
   'title': title,
@@ -851,6 +953,11 @@ Map<String, Object?> staffEventRevisionData({
   'location': location,
   'saved_at': savedAt,
   'saved_by': savedBy,
+  'poster': ?poster,
+  'poster_rights': ?posterRights,
+  'poster_alt_text': ?posterAltText,
+  'rsvp_enabled': ?rsvpEnabled,
+  'rsvp_capacity': ?rsvpCapacity,
 };
 
 /// The wire form of one event as editors read it ([live] and [draft] are
@@ -865,6 +972,10 @@ Map<String, Object?> staffEventData({
   String? publishedAt,
   String? withdrawnAt,
   String? archivedAt,
+  String? publicPoster,
+  int? rsvpGoing,
+  List<Map<String, Object?>>? organisers,
+  bool? seesNames,
 }) => {
   'event_id': eventId,
   'revision': revision,
@@ -878,6 +989,16 @@ Map<String, Object?> staffEventData({
   'archived_at': archivedAt,
   'live': live,
   'draft': draft,
+  'public_poster': ?publicPoster,
+  'rsvp_going': ?rsvpGoing,
+  'organisers': ?organisers,
+  'sees_names': ?seesNames,
+};
+
+/// Story 6.11: the wire form of an organiser (or an organiser option).
+Map<String, Object?> eventOrganiserData(String memberId, String name) => {
+  'member_id': memberId,
+  'name': name,
 };
 
 /// The wire form of `api.content_staff_events`.
@@ -885,7 +1006,13 @@ Map<String, Object?> staffEventsData(
   List<Map<String, Object?>> events, {
   String capacity = 'media',
   bool truncated = false,
-}) => {'capacity': capacity, 'events': events, 'truncated': truncated};
+  List<Map<String, Object?>>? organiserOptions,
+}) => {
+  'capacity': capacity,
+  'events': events,
+  'truncated': truncated,
+  'organiser_options': ?organiserOptions,
+};
 
 /// [GivingRepository] answered by the test (story 6.3). Each field answers
 /// every read at once; the counters and list record what was asked.

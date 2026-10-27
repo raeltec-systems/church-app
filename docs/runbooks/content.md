@@ -432,6 +432,86 @@ All six Bible migrations through `20261026151013_content_bible_review_hardening.
 
 Do not approve `q5_content_rights` as part of this check. A staging demonstration does not clear production rights; the production catalog starts empty until the owner approves the source and the record clears display use.
 
+## Story 6.11: event posters, Add to calendar and RSVP within capacity
+
+Migrations: `supabase/migrations/20261027140149_content_event_posters_rsvp.sql` and its row-deletion file `supabase/migrations/20261027140200_content_event_posters_rsvp_rows.sql` (hand-applied on hosted projects, see "The `_rows` file" below). pgTAP: `supabase/tests/content_event_rsvp_test.sql`. E2E: `tools/identity-e2e/content-event-rsvp.mjs` (offline tests `content-event-rsvp.test.mjs`). Plan: `_bmad-output/initiative-church-app/epic-public-content-and-giving/story-show-event-posters-export-events-to-the-phone-calendar-and-r-plan.md`.
+
+### Model (the events kind; nothing shared is replaced except the two registry-driven checks below)
+
+- **Poster.** Optional, on an event revision: an upload of purpose `event_poster` (PNG, JPEG or WebP, at most 5 MiB, 540 x 540 to 6000 x 6000, width/height 0.50 to 2.40) in the file slot `poster`, a rights record (`poster_rights_id`) and a text alternative (`poster_alt_text`, 250). Publication needs a ready upload and a rights record that clears display now (church-owned records need no Q5 entry, story F2). The public path is `event/<event_id>/r<n>/poster.<ext>`; the content-assets sync places it. Events register a public condition: a poster leaves the public bucket at the next sync once its event has ended.
+- **RSVP.** Optional on an event revision (`rsvp_enabled`, `rsvp_capacity` 1-10000 or no limit). `app.content_event_rsvps` keeps one row per event and member: `going`, `cancelled` (the member) or `released` (the member's church membership ended before the event). No command deletes a row. RSVP is open from publication until the event starts. Lowering the capacity below the people already going removes nobody: the event reads Full until places free. There is no waitlist and no notification.
+- **Capacity under concurrency.** `content.rsvp_event` locks the event's `app.content_items` row (`FOR UPDATE`) before counting, so RSVPs to one event run one at a time and `going` can never exceed the capacity (the E2E races five members for one place, twice). An RSVP never changes the event's `revision`, so editors' saves are not made stale by members.
+- **Organisers (owner decision 2026-10-21).** An event's organisers and Admins see the names of the members going; everyone else (other editors, members, guests) sees only the count and the spaces left. Organisers are per event: up to 10 members who hold an event editor role (Media, Pastor or Admin). The editor who creates an event is its first organiser (existing events: their creator, if they still edit events). Only an Admin or a current organiser changes the list (`content.set_event_organisers`), so another editor cannot make themselves an organiser. Names are on staff web only.
+- **Member commands.** `app.content_member_commands` lists the Content commands any approved member with live access may send (today the two RSVP commands; entry 8's favourites can reuse it). `app.content_authorize_command` and `app.content_in_scope` read it: a member command key-share-locks the actor's member row before the receipt (a concurrent deactivation waits), its handler reads access again after the lock, and a replayed RSVP is in scope only for its own member. Every other Content command keeps the 6.1 rule (an editor role of the command's kind).
+- **Lifecycle hook (story 2.10 contract).** `app.content_on_member_lifecycle` on `membership_deactivated` and `deletion_requested` releases the member's going RSVPs of events that have not started and ends the member's organiser rows; on `scope_revoked` it ends the organiser rows of a member who no longer holds an event editor role. A login hold changes nothing (the RSVP is kept). Restoration brings nothing back.
+
+### Commands (`api.content_command`, 1.4 envelope)
+
+| Command | Who | Expected | Payload |
+|---|---|---|---|
+| `content.create_event` | event editors | `null` | 6.1 fields + `rsvp_enabled?`, `rsvp_capacity?` (no poster: an upload needs the event) |
+| `content.save_event` | event editors | event revision | 6.1 fields + `rsvp_enabled?`, `rsvp_capacity?`, `poster_asset_id?`, `poster_rights_id?`, `poster_alt_text?` (absolute: missing RSVP keys turn RSVP off, missing poster keys leave the draft without a poster) |
+| `content.set_event_organisers` | an Admin, or an event editor who is an active organiser | event revision | `{event_id, organiser_ids}` (0-10 distinct members who edit events) |
+| `content.rsvp_event` | approved members with live access | `null` | `{event_id}` |
+| `content.cancel_rsvp` | approved members with live access | `null` | `{event_id}` |
+
+- New field codes: `rsvp_enabled: invalid`; `rsvp_capacity: invalid|out_of_range|must_be_null`; `poster_asset_id: required|unknown|not_ready|retention_claimed`; `poster_rights_id: required|unknown` (and at publish `not_in_force|use_not_cleared|source_not_cleared`); `poster_alt_text: required|too_long|invalid`; `organiser_ids: required|invalid|too_many|not_editor`.
+- RSVP refusals (field `event_id`): `not_public` (not a published event that has not ended), `rsvp_off`, `rsvp_closed` (started), `full`, `not_going` (cancel). A Pending, held or deactivated account: `forbidden`; a guest: HTTP 401. RSVP data: `{rsvp_id, event_id, rsvp_state, going, capacity, spaces_left, full}` (no names); the receipt's aggregate is the RSVP (`content_rsvp`).
+
+### Reads
+
+| Endpoint | Who | Returns |
+|---|---|---|
+| `api.content_public_events()`, `api.content_public_event(event_id)` | anyone | P gains `poster: null|{path, media_type, width, height, alt_text, offline_allowed}` (only once placed and cleared for display) and `rsvp: null|{capacity, going, spaces_left, full, open}`. Never a name or a member id. |
+| `api.content_my_event_rsvp(event_id)` | approved members with live access (Pending 403, guest 401) | `{event_id, rsvp_state: going|cancelled|released|null, updated_at}` |
+| `api.content_staff_events()` | event editors | each event gains `public_poster` (`shown`, `waiting`, `blocked`, `ended` or null), `rsvp_going`, `organisers [{member_id, name}]` and `sees_names` (the reader is an Admin or one of its organisers); each revision gains `poster`, `poster_rights`, `poster_alt_text`, `rsvp_enabled`, `rsvp_capacity`; the top level gains `organiser_options` (everyone who edits events) |
+| `api.content_staff_event_rsvps(event_id)` | an Admin, or an event editor who is an active organiser (other editors 403 `not_granted`, members 403, guests 401) | `{rsvps: null|{event_id, capacity, going, attendees: [{name, rsvp_at}], truncated}}`: the members going, earliest first, at most 2000 |
+
+### Deletion (story 2.11 hook) and the `_rows` file
+
+The erase part `event_rsvps` (`app.content_rsvp_erase_part`) deletes the member's RSVP and organiser rows through `app.content_rsvp_purge_rows` and anonymises who changed organiser lists (nil UUID); `check` counts what is left. In the main migration the purge is a **fail-closed stub** that answers `unavailable` (`{"deletion": "rows_migration_missing"}`): until the `_rows` file is applied, **every** member deletion's erase step on that project waits and nothing is erased (the 2.11 worker retries). The `_rows` file replaces only that function.
+
+**Owner step (staging, right after the main migration is applied there):** open the staging SQL editor (project `tmurpotfluignacfueki`), paste the whole file `supabase/migrations/20261027140200_content_event_posters_rsvp_rows.sql` (hosted name in the promotion runbook) and run it once. Then check:
+
+```sql
+select position('delete from app.content_event_rsvps' in pg_get_functiondef('app.content_rsvp_purge_rows(uuid)'::regprocedure)) > 0;  -- true
+select has_function_privilege('authenticated', 'app.content_rsvp_purge_rows(uuid)', 'EXECUTE');  -- false
+```
+
+Production applies both files in order with the migrations at promotion (entry 17).
+
+Staging (2026-10-27): the main migration is applied verbatim to `tmurpotfluignacfueki` as version `20261027140149` (the local file carries that version; the `_rows` file is `20261027140200`, after it). 31 of the 32 added or replaced function definitions hash identically to a fresh local replay; the 32nd, `app.content_rsvp_purge_rows`, is the stub until the owner step above. Boundary and unowned counts are 0, RLS is on, client roles hold no grant on the three tables, the existing event's creator was backfilled as its organiser, and the signed-out events read shows `poster: null` and `rsvp: null`. Evidence: `evidence-6.11/staging-verify.md`. **The `_rows` file is not yet applied on staging.**
+
+### Clients
+
+- **Mobile Calendar.** A row with a poster shows it as a 16:9 thumbnail (Home's Coming up too); the detail shows the poster in full with its text alternative, a **Places** row ("8 of 20 places left", "Full (20 places)", or "12 going"), the **RSVP** section and **Add to calendar**. RSVP: a guest gets **Sign in to RSVP**; a signed-in account without member access reads that RSVP is for approved church members; a member answers **I'm going** or, when going, sees **You're going** and **Cancel RSVP** (with a confirmation); a full event says so; an event that has started says RSVP is closed. **Add to calendar** (events that have not ended) hands the phone an `.ics` with both endpoints of a multi-day event, `SEQUENCE` = the publication revision and the copy caveat, through the 4.5 share-sheet handoff; the Duties export is unchanged. Posters and counts are not kept offline (the 6.4 snapshot keeps its shape).
+- **Staff web Events.** The form gains **Members can RSVP** with optional **Places**, and, on a saved event, **Poster (optional)**: Choose poster (uploads at once), Remove poster, **Poster rights record**, **Poster description**. An opened event shows its RSVP count (every editor), the poster's public state, its **Organisers**, and for an Admin or an organiser **Who's coming** (read on demand) and **Change organisers**; other editors read that only organisers and Admins see who is coming. Opening Events and every publish, withdraw or archive run the content-assets sync.
+
+### Local runs
+
+```bash
+npx supabase db reset --local && npx supabase test db
+node --test tools/identity-e2e/content-event-rsvp.test.mjs
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/content-event-rsvp.mjs --evidence _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-6.11/content-event-rsvp-e2e.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The E2E uses fictional numbers +44 7700 900584-900596, serves the content-assets function when it is not running, and removes every row and Storage object it created.
+
+### Owner manual check on staging (the ticket's verify)
+
+Use SYNTHETIC names only. Do not publish an announcement or anything with a notice.
+
+1. Give two SYNTHETIC members Media (**Roles & access**). As Media O on staff web, **Events** > **New event**: `SYNTHETIC Youth Camp`, two days, **Members can RSVP**, **Places** 2. Save draft. Add a poster (a church-owned image), choose a verified church-owned rights record, describe the poster, Save draft, Publish. The opened event says the poster is shown after the sync.
+2. Create and publish a three-day `SYNTHETIC Conference`. On a signed-out phone, open each: the camp shows its poster and "2 of 2 places left"; both show their first and last day. **Add to calendar** on each: the phone's calendar entry spans all days (check the three-day one ends on its third day), and the caveat is shown under the button.
+3. Members A and B tap **I'm going**; member C sees **Full**. Members C and D tap **I'm going** at the same moment on another capacity-1 event: one is going, the other is told no places are left.
+4. Member A cancels: the camp shows one place left and C can take it.
+5. An Admin deactivates a member who is going (**Membership status**): the camp's place is free again on the next refresh.
+6. A signed-out phone has **Sign in to RSVP**; a Pending account reads that RSVP is for approved church members.
+7. Media N (not an organiser) opens the camp on staff web: the count only, "Only this event's organisers and Admins see who is coming", no **Who's coming**. Media O and an Admin open **Who's coming** and see the names. Media O adds Media N with **Change organisers**: Media N now sees the names.
+8. Right after the deploy (once), the owner applies the `_rows` file as above; the entry 17 suite reruns the RSVP deletion case on staging after that.
+
 ## Story 6.7: the church's Tonga hymn book, built into the app
 
 Owner decision 2026-10-27: the hymn book is the official Brethren in Christ Church Tonga hymn book, "Inyimbo zya Bakristo" (2012 reprint). It ships inside both apps as one file, `packages/client_core/assets/hymn_book/hymn_book.json`, declared as an asset of `church_client_core`: hymns 1..199, then the choruses (Ziindululo) 1..67, each with its section, English title or tune name, hymnal reference (Z.H. = Zulu Hymnal, M.H. = Methodist Hymn Book), key, verses and chorus. There is no migration, table, rights record, staff screen, Content command, staging step or offline-cache key: the server never stores hymn text, and later entries (8, 10, 14) refer to an item by its id (`hymn-12`, `chorus-12`). Everyone reads and searches the book on the phone, signed in or not, with or without a connection.

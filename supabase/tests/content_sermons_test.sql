@@ -234,7 +234,7 @@ select is(pg_temp.read(5,'select api.content_public_sermons()'),pg_temp.read(nul
 select is(pg_temp.read(4,'select api.content_public_sermons()'),pg_temp.read(null,'select api.content_public_sermons()'),
   'member reads the identical anonymous projection');
 select is((select jsonb_object_keys(app.content_public_sermon_json(pg_temp.sr1())) except
-  select unnest(array['sermon_id','title','speaker','sermon_date','scripture_reference','notes','series','youtube_video_id','rights_revision','publication_revision','published_at','offline_allowed']) limit 1),
+  select unnest(array['sermon_id','title','speaker','sermon_date','scripture_reference','notes','series','youtube_video_id','facebook_video_url','rights_revision','publication_revision','published_at','offline_allowed']) limit 1),
   null,'public sermon has no attribution or private source fields');
 select throws_ok($$update app.content_sermon_revisions set notes='changed' where item_id=pg_temp.sr1()$$,
   'PCNT1',null,'published sermon notes are immutable');

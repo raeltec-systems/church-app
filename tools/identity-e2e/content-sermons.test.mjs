@@ -11,7 +11,7 @@ const series = () => ({ series_id: 'series', title: SERIES_TITLES[0], descriptio
   poster: null, publication_revision: 1, published_at: '2026-10-25T10:00:00Z', offline_allowed: true });
 const sermon = () => ({ sermon_id: 'sermon', title: SERMON_TITLES[0], speaker: 'SYNTHETIC speaker',
   sermon_date: '2026-10-25', scripture_reference: 'Genesis 1:1', notes: SUPPORTED_NOTES, series: series(),
-  youtube_video_id: null, rights_revision: null, publication_revision: 1,
+  youtube_video_id: null, facebook_video_url: null, rights_revision: null, publication_revision: 1,
   published_at: '2026-10-25T10:00:00Z', offline_allowed: true });
 
 test('only this run accepts its six reserved fictional UK phones', () => {

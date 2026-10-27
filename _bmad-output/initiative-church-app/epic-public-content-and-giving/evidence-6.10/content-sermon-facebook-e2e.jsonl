@@ -1,0 +1,11 @@
+{"step":"S00-precondition","target":"LOCAL","at":"2026-10-27T19:08:31.552Z","phone_auth_enabled":true,"local_environment":true}
+{"step":"S01-phone-auth-and-media-role","target":"LOCAL","at":"2026-10-27T19:08:35.259Z","verdict":"pass","media_grant":200}
+{"step":"S10-non-facebook-malformed-live-page-and-two-sources-refused","target":"LOCAL","at":"2026-10-27T19:08:35.496Z","verdict":"pass","refused_cases":12,"refused_with_reason":12,"two_sources":"one_source"}
+{"step":"S11-pasted-links-are-stored-normalised-and-drafts-stay-private","target":"LOCAL","at":"2026-10-27T19:08:35.638Z","verdict":"pass","normalised":4,"public_drafts":0}
+{"step":"S12-facebook-sermons-need-rights-and-publish-for-every-public-caller","target":"LOCAL","at":"2026-10-27T19:08:35.947Z","verdict":"pass","publish_without_rights":"required","playable_facebook_rows":4,"same_for_public_callers":true,"leaked_fields":0}
+{"step":"S13-youtube-stays-beside-facebook","target":"LOCAL","at":"2026-10-27T19:08:35.948Z","verdict":"pass","youtube_published":true,"youtube_id":true,"facebook_on_youtube_row":null}
+{"step":"S14-switching-source-is-a-draft-until-published","target":"LOCAL","at":"2026-10-27T19:08:35.971Z","verdict":"pass","saved":true,"live_source":"facebook"}
+{"step":"S20-withdrawn-clearance-hides-the-video-and-keeps-the-notes","target":"LOCAL","at":"2026-10-27T19:08:35.992Z","verdict":"pass","video_omitted":true,"notes_retained":true}
+{"step":"S30-only-editors-save-facebook-links-and-no-table-access","target":"LOCAL","at":"2026-10-27T19:08:36.035Z","verdict":"pass","refusals":2,"anonymous_command":401,"table_read":406}
+{"step":"S40-module-boundaries-remain-clear","target":"LOCAL","at":"2026-10-27T19:08:37.499Z","verdict":"pass","boundary_violations":0,"unowned_objects":0}
+{"step":"S99-cleanup","target":"LOCAL","at":"2026-10-27T19:08:38.021Z","synthetic_accounts_left":0,"immutable_content_retained":true,"instruction":"reset the local database before another run"}

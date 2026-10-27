@@ -15,6 +15,7 @@ import 'cell_screens.dart' show MyCellHomeCard;
 import 'duties_screens.dart' show LeaderNeedsAttentionCard, MyDutiesHomeCard;
 import 'followups_screens.dart' show MyFollowUpsHomeCard;
 import 'home_banners.dart' show HomeBannersCarousel;
+import 'hymn_list_screens.dart' show HomeSundayHymnsSection;
 
 /// The mobile Home tab (stories 4.5 and 6.1): everyone gets it, signed in or
 /// not. A member sees a greeting and their cards (a department leader's
@@ -110,6 +111,8 @@ class HomeScreen extends ConsumerWidget {
                 ],
                 // Story 6.13: the pinned announcements, for everyone.
                 const _HomeGap(child: HomeAnnouncementsSection()),
+                // Story 6.8: Hymns for this Sunday, Saturday and Sunday.
+                const HomeSundayHymnsSection(gap: 16),
                 // Story 6.1: the next published events, for everyone.
                 const ComingUpSection(),
               ],

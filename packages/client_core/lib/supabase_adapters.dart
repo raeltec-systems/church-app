@@ -17,6 +17,7 @@ export 'src/adapters/supabase_duties_repository.dart';
 export 'src/adapters/supabase_followups_repository.dart';
 export 'src/adapters/supabase_giving_repository.dart';
 export 'src/adapters/supabase_grants_repository.dart';
+export 'src/adapters/supabase_hymn_lists_repository.dart';
 export 'src/adapters/supabase_inbox_repository.dart';
 export 'src/adapters/supabase_member_access_repository.dart';
 export 'src/adapters/supabase_member_deletion_repository.dart';

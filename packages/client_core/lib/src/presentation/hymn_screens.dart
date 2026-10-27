@@ -4,8 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../application/hymn_controllers.dart';
+import '../application/hymn_list_controllers.dart' show hymnFavouritesProvider;
 import '../domain/hymn_book.dart';
 import 'bible_screens.dart';
+import 'hymn_list_screens.dart'
+    show HymnFavouriteAction, SavedHymnsSliver, sundayHymnIds;
 import 'shell_routing.dart' show ClientPaths;
 
 /// Story 6.7 (mobile, everyone): the Bible & Hymns tab. A segment track
@@ -106,6 +109,19 @@ class _HymnBookViewState extends ConsumerState<HymnBookView> {
   String _query = '';
 
   @override
+  void initState() {
+    super.initState();
+    // Story 6.8: a change saved on another phone shows when the book opens.
+    Future.microtask(() {
+      if (!mounted) return;
+      final favourites = ref.read(hymnFavouritesProvider);
+      if (favourites.signedIn && !favourites.loading) {
+        ref.read(hymnFavouritesProvider.notifier).reload();
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _search.dispose();
     super.dispose();
@@ -122,9 +138,11 @@ class _HymnBookViewState extends ConsumerState<HymnBookView> {
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
     final book = ref.watch(hymnBookProvider);
+    // Story 6.8: this Sunday's items carry a Sunday chip.
+    final sundayIds = sundayHymnIds(ref);
     final List<Widget> body;
     if (book.hasValue) {
-      body = _bookSlivers(context, book.requireValue);
+      body = _bookSlivers(context, book.requireValue, sundayIds);
     } else if (book.hasError && !book.isLoading) {
       body = [
         SliverPadding(
@@ -182,7 +200,11 @@ class _HymnBookViewState extends ConsumerState<HymnBookView> {
     );
   }
 
-  List<Widget> _bookSlivers(BuildContext context, HymnBook book) {
+  List<Widget> _bookSlivers(
+    BuildContext context,
+    HymnBook book,
+    Set<String> sundayIds,
+  ) {
     final c = ChurchColors.of(context);
     if (hymnQueryTokens(_query).isEmpty) {
       // The printed order, with a header wherever the section changes.
@@ -195,6 +217,8 @@ class _HymnBookViewState extends ConsumerState<HymnBookView> {
         }
       }
       return [
+        // Story 6.8: the member's saved hymns first.
+        SavedHymnsSliver(book: book, sundayIds: sundayIds),
         for (final (index, group) in groups.indexed) ...[
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
@@ -209,7 +233,7 @@ class _HymnBookViewState extends ConsumerState<HymnBookView> {
               ),
             ),
           ),
-          _HymnRows(items: group, showKind: false),
+          _HymnRows(items: group, showKind: false, sundayIds: sundayIds),
         ],
       ];
     }
@@ -244,17 +268,30 @@ class _HymnBookViewState extends ConsumerState<HymnBookView> {
     }
     return [
       const SliverToBoxAdapter(child: SizedBox(height: 12)),
-      _HymnRows(key: const Key('hymn-results'), items: results, showKind: true),
+      _HymnRows(
+        key: const Key('hymn-results'),
+        items: results,
+        showKind: true,
+        sundayIds: sundayIds,
+      ),
     ];
   }
 }
 
 /// One card of rows split by 1 px rules, built lazily.
 class _HymnRows extends StatelessWidget {
-  const _HymnRows({super.key, required this.items, required this.showKind});
+  const _HymnRows({
+    super.key,
+    required this.items,
+    required this.showKind,
+    this.sundayIds = const {},
+  });
 
   final List<Hymn> items;
   final bool showKind;
+
+  /// Story 6.8: the ids in this Sunday's list.
+  final Set<String> sundayIds;
 
   @override
   Widget build(BuildContext context) {
@@ -274,6 +311,7 @@ class _HymnRows extends StatelessWidget {
             first: index == 0,
             last: index == items.length - 1,
             showKind: showKind,
+            sunday: sundayIds.contains(items[index].id),
           ),
         ),
       ),
@@ -283,7 +321,8 @@ class _HymnRows extends StatelessWidget {
 
 /// One row of the hymn list: the number large in the brand colour, the title
 /// and the first line under it, split from the next row by a 1 px rule. In
-/// search results a chorus says so before its first line.
+/// search results a chorus says so before its first line. Story 6.8: an item
+/// in this Sunday's list ends with a Sunday chip.
 class HymnRow extends StatelessWidget {
   const HymnRow({
     super.key,
@@ -291,12 +330,14 @@ class HymnRow extends StatelessWidget {
     this.first = false,
     this.last = false,
     this.showKind = false,
+    this.sunday = false,
   });
 
   final Hymn hymn;
   final bool first;
   final bool last;
   final bool showKind;
+  final bool sunday;
 
   @override
   Widget build(BuildContext context) {
@@ -311,7 +352,7 @@ class HymnRow extends StatelessWidget {
       button: true,
       label:
           '${chorus ? 'Chorus' : 'Hymn'} ${hymn.number}, ${hymn.title}. '
-          '${hymn.firstLine}',
+          '${sunday ? 'In this Sunday\'s hymns. ' : ''}${hymn.firstLine}',
       excludeSemantics: true,
       onTap: open,
       child: Material(
@@ -362,6 +403,14 @@ class HymnRow extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (sunday) ...[
+                  const SizedBox(width: 10),
+                  StatusLabel(
+                    key: Key('hymn-sunday-${hymn.id}'),
+                    label: 'Sunday',
+                    tone: StatusTone.info,
+                  ),
+                ],
               ],
             ),
           ),
@@ -447,6 +496,11 @@ class HymnDetailScreen extends ConsumerWidget {
       backgroundColor: c.bg,
       appBar: AppBar(
         title: Text(_barTitle(id, hymn), key: const Key('hymn-bar-title')),
+        // Story 6.8: Save / Saved (members; a guest is asked to sign in).
+        actions: [
+          if (hymn != null)
+            HymnFavouriteAction(hymn: hymn, edition: book.requireValue.edition),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(

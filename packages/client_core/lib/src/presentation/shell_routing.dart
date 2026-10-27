@@ -21,6 +21,8 @@ import 'giving_staff_screens.dart';
 import 'home_banners.dart';
 import 'home_screen.dart';
 import 'hymn_screens.dart';
+import 'hymn_list_screens.dart';
+import 'sunday_hymns_staff_screen.dart';
 import '../application/hymn_controllers.dart' show BibleHymnsView;
 import 'fixture_command_screen.dart';
 import 'fixture_reminder_screens.dart';
@@ -107,6 +109,13 @@ abstract final class ClientPaths {
   /// Story 6.7 (mobile): one hymn or chorus of the built-in book, by its id
   /// (`hymn-12`, `chorus-3`).
   static String hymn(String id) => '/bible/hymns/$id';
+
+  /// Story 6.8 (mobile, members): every saved hymn.
+  static const savedHymns = '/bible/hymns/saved';
+
+  /// Story 6.8, staff web: Hymns for this Sunday (Admin, Media, worship
+  /// leaders).
+  static const contentSundayHymns = SundayHymnsStaffPaths.sundayHymns;
 
   /// Story 6.1 (mobile): one published event.
   static String calendarEvent(String eventId) => CalendarPaths.event(eventId);
@@ -512,6 +521,11 @@ GoRouter buildClientRouter({
             ),
           ),
           routes: [
+            // Story 6.8: the member's saved hymns (before the item route).
+            GoRoute(
+              path: 'hymns/saved',
+              pageBuilder: (_, state) => page(state, const SavedHymnsScreen()),
+            ),
             GoRoute(
               path: 'hymns/:id',
               pageBuilder: (_, state) => page(
@@ -605,6 +619,12 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.contentBible,
         pageBuilder: (_, state) => page(state, const StaffBibleScreen()),
+      ),
+      // Story 6.8, staff web: Hymns for this Sunday (the server checks every
+      // read and command).
+      GoRoute(
+        path: ClientPaths.contentSundayHymns,
+        pageBuilder: (_, state) => page(state, const StaffSundayHymnsScreen()),
       ),
       GoRoute(
         path: ClientPaths.contentSermons,

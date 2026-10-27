@@ -599,7 +599,7 @@ void main() {
       final row = find.bySemanticsLabel(RegExp(r'^Hymn 2, SYNTHETIC hymn 2\.'));
       expect(
         tester.getSemantics(row),
-        containsSemantics(isButton: true, hasTapAction: true),
+        isSemantics(isButton: true, hasTapAction: true),
       );
       tester.semantics.tap(
         find.semantics.byLabel(RegExp(r'^Hymn 2, SYNTHETIC hymn 2\.')),

@@ -3,7 +3,7 @@ title: "Search and read the church's Tonga hymn book, built into the app"
 type: 'feature'
 ticket: '7'
 created: '2026-10-26'
-status: 'in-review'
+status: built
 baseline_revision: '77f4632bc5d61da1d26a5417969bda1d3d852ded'
 route: 'full'
 route_source: 'auto'
@@ -17,7 +17,21 @@ context:
   - '.agents/skills/design-taste-frontend/references/app-screens.md'
   - 'docs/design-handoff/README.md'
 warnings: ['oversized']
-deferred: []
+deferred:
+  - summary: >-
+      Hymns 25, 29 and 30 print a "2" on the second line of their first stanza; whether that line starts a verse needs the printed book.
+    evidence: |-
+      Both the layout and the raw pdftotext extraction number the second line of the first stanza "2", while every later stanza has the full line count (lines per verse: hymn 25 1, 3, 4, 4, 4; hymn 29 1, 1, 2, 2, 2, 2, 2; hymn 30 1, 7, 8, 8). The app keeps the numbers as printed and shows hymn 29's chorus from the verse it is printed after; the converter report notes all three. Israel's look at the printed pages settles it; a change would be a reviewed correction.
+    location: >-
+      tools/hymn-book/manuscript/inyimbo_zyabakristo.txt lines 925-930, 1048-1060 and 1085-1092
+    severity: medium (unverified)
+  - summary: >-
+      The signed-out phone check in airplane mode and the spot-check against the PDF remain owner manual checks.
+    evidence: |-
+      Widget tests cover the signed-out tab, search, detail and back navigation with the real asset loaded through the app's asset bundle, and the converter tests pin the counts and hashes. No physical device was used; the entry 15 pilot covers devices.
+    location: >-
+      docs/runbooks/content.md, Story 6.7 owner manual check
+    severity: low
 ---
 
 <intent-contract>
@@ -93,7 +107,7 @@ Owner-visible choices to confirm with Israel:
 ## Implementation Notes
 
 - 2026-10-27: built in the main session (the coordinator asked for no extra building agents after the usage limit stopped the first two). No database, staging or E2E work: none applies.
-- Converter run on the real book: 219 non-empty pages, 266 items, 26 corrections applied, 0 problems, 72 notes (12 titles differing from an index by one or two letters, kept as printed; 59 hymns whose page header differs from their topical-index section; chorus 24's second chorus).
+- Converter run on the real book: 219 non-empty pages, 266 items, 26 corrections applied, 0 problems, 76 notes (12 titles differing from an index by one or two letters, kept as printed; 59 hymns whose page header differs from their topical-index section; chorus 24's second chorus; hymn 29's chorus first printed after its verse 2; hymns 25, 29 and 30 whose one-line verse 1 is completed by verse 2).
 - Corrections cover: numbers glued to titles (56, 87) or split ("2 6" for chorus 26), the "(Cila)" mark wrapped onto the line under two headings (29, 82), keys split across lines (32, 42, 106, 122, 127), hymn 164's number extracted onto its page header, hymn 178's title missing "Te", chorus 34's verse numbers extracted as a column, and the topical index printing hymn 167 as 16.
 
 ## Plan Change Log
@@ -114,3 +128,28 @@ Owner-visible choices to confirm with Israel:
 - KEEP: strict reading, on-device search rules, honest error state, the 19/1.55 reading type and every earlier KEEP.
 
 ## Review Triage Log
+
+### 2026-10-27 — Review pass
+
+- verdicts: 10 findings — high 0, medium 5, low 5, false 0, maybe-false 0
+- findings:
+  - `[medium]` `[patch]` Screen readers could not open a hymn row: the row's `Semantics` excluded the `InkWell` tap and had no `onTap` — `HymnRow` now passes the same open action to `Semantics`; a test taps the row through the semantics tree.
+  - `[medium]` `[patch]` Three-digit numbers were clipped at large text sizes (a fixed 40-wide box with one line) — the number now has a 40-wide minimum and never wraps or clips; a test renders 199 at twice the text size.
+  - `[low]` `[patch]` The chorus sat flush with numbered verse text instead of 14 px inside it (handoff 34 + 14) — the indent is 48 for numbered verses; a test measures it.
+  - `[low]` `[patch]` A search with no match lost the list frame (taste rule 11) — the sentence now sits inside the bordered frame; a test checks the frame.
+  - `[medium]` `[patch]` Back from a hymn opened by its link showed the Bible reader — the `/bible` route opens on the hymn book for `/bible/hymns/...`; a test starts at a hymn link and goes back.
+  - `[low]` `[patch]` `_hymnId` was inserted under the Story 4.10 doc comment of `_memberParam` — moved above it, the comment is back on its function.
+  - `[medium]` `[patch]` The converter silently replaced an English title printed on the heading line with one printed under it — that is now a problem to resolve by a reviewed correction, a reference-only line keeps the heading's title, and the fixture and a new test cover both (no shipped hymn is affected).
+  - `[medium]` `[patch]` Hymns 25, 29 and 30 have a one-line verse 1 that verse 2 completes, and nothing flagged it — the converter now notes the pattern, the runbook spot-check list and the owner questions include the three hymns, and the print check is deferred. Hymn 29's chorus stays where it is printed (from verse 2), reverting the interim "always from verse 1" rule, because under the likely reading its verses 1-2 are one stanza.
+  - `[low]` `[patch]` The runbook's apostrophe example matched a plain title — it now uses hymn 62, "Mwaala Wang’ Uuteeli", found by `wang uuteeli` and `wang' uuteeli`.
+  - `[low]` `[patch]` The shared test book's names did not start with SYNTHETIC — `testHymnBook` and the hymn tests' own fixtures now use SYNTHETIC names.
+
+## Auto Run Result
+
+Built the church's Tonga hymn book into the app: `tools/hymn-book/convert.mjs` converts the pinned pdftotext extraction of Israel's PDF (SHA-256 0733124a...1139; 26 reviewed corrections) into `packages/client_core/assets/hymn_book/hymn_book.json`, 199 hymns and 67 choruses with sections from the topical index, English titles, references, keys, verses and choruses, cross-checked against the book's indexes (0 problems, 76 notes). The strict Dart model, bundled loader (isolate parse above 64 KiB) and the Hymn book segment of Bible & Hymns read and search it on the device, signed out and offline.
+
+Files: the converter, its tests, corrections, provenance, extracted text and report under `tools/hymn-book/`; `hymn_book.dart`, `hymn_controllers.dart`, `hymn_screens.dart` and their tests in `packages/client_core`; additive wiring in `shell_routing.dart`, `bible_screens.dart` (its own heading gives way to the segment), `church_client_core.dart`, `testing.dart`, `pubspec.yaml`, `apps/mobile/lib/app.dart`, the mobile app test, `ci.yml`, both content runbooks and the epic Notes.
+
+Review (quick, pinned; no database or security surface): 10 findings, all patched (5 medium, 5 low), none rejected; the hymns 25/29/30 print check and the physical phone check are deferred above. Follow-up review recommendation: false — five medium findings were patched, but each has a regression test that passes, so no specific unverified code risk remains; the open item is the owner's print check.
+
+Verification: converter tests 10/10 and `--check` clean (199 hymns, 67 choruses, 0 problems); `flutter analyze` clean and `flutter test` passing in all four packages: client_core 982 (53 hymn tests), mobile 82, staff 59, design_system 19. `node tools/ci/check-migrations.mjs --base origin/main` passes (no migration added) and `git diff --check` is clean outside the raw extraction. No migration, staging step or notification: none applies to this entry.

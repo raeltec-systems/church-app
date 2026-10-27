@@ -518,7 +518,11 @@ returns jsonb language sql stable set search_path = '' as $$
     'updated_at', app.cmd_utc(i.updated_at), 'published_at', app.cmd_utc(i.published_at),
     'published_by', case when i.published_by_member is not null then app.content_editor_name(i.published_by_member) end,
     'withdrawn_at', app.cmd_utc(i.withdrawn_at), 'archived_at', app.cmd_utc(i.archived_at),
-    'public_image', case when i.lifecycle_state = 'published' then case
+    -- A poster is optional: a published series without one has no image state.
+    'public_image', case when i.lifecycle_state = 'published' and exists (
+        select 1 from app.content_revision_files pf where pf.item_id = i.item_id
+           and pf.revision_no = i.live_revision_no and pf.slot = 'poster' and pf.asset_id is not null)
+      then case
       when not exists (select 1 from app.content_live_file(i.item_id, 'poster')) then 'blocked'
       when app.content_public_file(i.item_id, 'poster') is null then 'waiting' else 'shown' end end,
     'live', app.content_sermon_series_revision_json(i.item_id, i.live_revision_no),

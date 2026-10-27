@@ -70,9 +70,10 @@ String? normalizeSermonVideoId(String input) {
   return candidate != null && id.hasMatch(candidate) ? candidate : null;
 }
 
-/// Exact HTTPS authorities only: no credentials, ports or encoded hosts.
+/// Exact HTTPS authorities only: no credentials, ports or encoded hosts. The
+/// same characters as the server's `app.content_sermon_link_ok`.
 Uri? safeSermonLink(String value) {
-  if (!RegExp(r'^https://[A-Za-z.]+(?:[/#?][^\s<>\[\]()]*)?$')
+  if (!RegExp(r'''^https://[a-z.]+(?:[/?#][^\s<>\[\]()"'\\]*)?$''')
       .hasMatch(value)) {
     return null;
   }
@@ -540,6 +541,7 @@ class StaffSermonItem<T> {
     required this.draft,
     required this.publishedAt,
     required this.publishedBy,
+    this.publicImage,
   });
   factory StaffSermonItem.fromJson(
     Object? raw,
@@ -564,6 +566,7 @@ class StaffSermonItem<T> {
       draft: draft,
       publishedAt: wireOptInstant(m, 'published_at'),
       publishedBy: wireOpt<String>(m, 'published_by'),
+      publicImage: PublicImageState.parse(m['public_image']),
     );
   }
   final String id;
@@ -572,6 +575,10 @@ class StaffSermonItem<T> {
   final T? live, draft;
   final DateTime? publishedAt;
   final String? publishedBy;
+
+  /// A published series whose live revision has a poster: whether the public
+  /// file is placed (null without a poster, and for sermons).
+  final PublicImageState? publicImage;
   T get current => (draft ?? live)!;
   bool get canEdit => state != ContentState.archived;
   bool get canPublish =>

@@ -9,26 +9,91 @@ import '../domain/content_banners.dart';
 import '../domain/content_events.dart';
 import '../domain/content_sermons.dart';
 import 'banner_screens.dart' show bannerReasonText;
-import 'calendar_screens.dart' show publicReadProblem;
+import 'calendar_screens.dart' show churchShortWhen, publicReadProblem;
 import 'sermon_screens.dart';
+
+// Story 6.9 (staff web; Media, Pastor and Admin): sermons and their series.
+// The screen answers "what is waiting to publish?": drafts (including the
+// ones later sent from teaching duties) come first, whoever created them.
+// The published revision stays live until a replacement is published.
 
 class StaffSermonsScreen extends ConsumerWidget {
   const StaffSermonsScreen({super.key, this.series = false, this.itemId});
   final bool series;
   final String? itemId;
   @override
-  Widget build(BuildContext context, WidgetRef ref) =>
-      series ? _SeriesCatalog(itemId: itemId) : _SermonCatalog(itemId: itemId);
+  Widget build(BuildContext context, WidgetRef ref) => series
+      ? _SeriesCatalog(key: const Key('staff-sermon-series'), itemId: itemId)
+      : _SermonCatalog(key: const Key('staff-sermons'), itemId: itemId);
+}
+
+/// The one mark a row carries.
+typedef _Mark = (String, StatusTone);
+
+_Mark _lifecycleMark(StaffSermonItem<Object?> item) => switch (item.state) {
+  ContentState.draft => ('Draft', StatusTone.neutral),
+  ContentState.published when item.hasChanges => (
+    'Changes not published',
+    StatusTone.warning,
+  ),
+  ContentState.published => ('Published', StatusTone.success),
+  ContentState.withdrawn => ('Withdrawn', StatusTone.neutral),
+  ContentState.archived => ('Archived', StatusTone.neutral),
+};
+
+/// A published sermon whose recorded video no longer clears display shows
+/// its notes without the video.
+_Mark _sermonMark(StaffSermon s) {
+  final live = s.live;
+  if (s.state == ContentState.published &&
+      !s.hasChanges &&
+      live != null &&
+      live.fields.youtubeVideoId != null &&
+      live.videoRights?.display != null) {
+    return ('Published, video hidden', StatusTone.warning);
+  }
+  return _lifecycleMark(s);
+}
+
+_Mark _seriesMark(StaffSermonSeries s) {
+  if (s.state == ContentState.published && !s.hasChanges) {
+    switch (s.publicImage) {
+      case PublicImageState.waiting:
+        return ('Published, poster waiting', StatusTone.warning);
+      case PublicImageState.blocked || PublicImageState.eventNotPublic:
+        return ('Published, poster not shown', StatusTone.warning);
+      case PublicImageState.shown || null:
+        break;
+    }
+  }
+  return _lifecycleMark(s);
+}
+
+/// The screen's finding: what waits to be published and what is public.
+String _finding(List<StaffSermonItem<Object?>> items, String noun) {
+  if (items.isEmpty) {
+    return 'No $noun yet. A new draft stays private until you publish it.';
+  }
+  final waiting = items
+      .where((i) => i.state == ContentState.draft || i.hasChanges)
+      .length;
+  final published = items
+      .where((i) => i.state == ContentState.published)
+      .length;
+  return [
+    waiting == 0 ? 'Nothing waiting to publish' : '$waiting waiting to publish',
+    '$published published',
+  ].join(' · ');
 }
 
 class _SermonCatalog extends ConsumerWidget {
-  const _SermonCatalog({this.itemId});
+  const _SermonCatalog({super.key, this.itemId});
   final String? itemId;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(staffSermonsProvider);
     final ctl = ref.read(staffSermonsProvider.notifier);
-    final items = state.value?.sermons ?? [];
+    final items = state.value?.sermons ?? const <StaffSermon>[];
     final item = items.where((s) => s.id == itemId).firstOrNull;
     ref.listen(staffSermonsProvider.select((s) => s.notice), (previous, next) {
       if (itemId != null &&
@@ -38,6 +103,7 @@ class _SermonCatalog extends ConsumerWidget {
     });
     return _CatalogPage(
       title: 'Sermons',
+      finding: state.value == null ? null : _finding(items, 'sermons'),
       path: SermonPaths.staff,
       state: state,
       controller: ctl,
@@ -48,37 +114,58 @@ class _SermonCatalog extends ConsumerWidget {
                     key: ValueKey('sermon-form-${item?.id}-${item?.revision}'),
                     item: item,
                   )
-                : const Text(
-                    'This sermon was not found. Reload the catalog to check again.',
-                  ))
-          : _Rows(
-              children: [
-                for (final s in items)
-                  _ItemRow(
-                    item: s,
-                    title: s.current.fields.title,
-                    subtitle:
-                        '${s.current.fields.speaker.isEmpty ? 'Speaker not added' : s.current.fields.speaker} · '
-                        '${s.current.fields.sermonDate ?? 'Date not added'}',
-                    liveRevision: s.live?.revisionNo,
-                    draftRevision: s.draft?.revisionNo,
-                    onEdit: () => context.push('${SermonPaths.staff}/${s.id}'),
-                    onLifecycle: (command) => ctl.lifecycle(command, s),
-                  ),
-              ],
+                : const _NotFound(what: 'sermon'))
+          : _Sections(
+              noun: 'sermons',
+              items: items,
+              truncated: state.value?.truncated ?? false,
+              row: (s) {
+                final sermon = s as StaffSermon;
+                final f = sermon.current.fields;
+                return _ItemRow(
+                  key: Key('sermon-${sermon.id}'),
+                  item: sermon,
+                  title: f.title,
+                  subtitle: [
+                    f.speaker.isEmpty ? 'Speaker not added' : f.speaker,
+                    f.sermonDate ?? 'Date not added',
+                    if (f.scriptureReference.isNotEmpty) f.scriptureReference,
+                  ].join(' · '),
+                  mark: _sermonMark(sermon),
+                  busy: state.busy,
+                  onEdit: () =>
+                      context.push('${SermonPaths.staff}/${sermon.id}'),
+                  onLifecycle: (command) => ctl.lifecycle(command, sermon),
+                );
+              },
             ),
     );
   }
 }
 
-class _SeriesCatalog extends ConsumerWidget {
-  const _SeriesCatalog({this.itemId});
+class _SeriesCatalog extends ConsumerStatefulWidget {
+  const _SeriesCatalog({super.key, this.itemId});
   final String? itemId;
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SeriesCatalog> createState() => _SeriesCatalogState();
+}
+
+class _SeriesCatalogState extends ConsumerState<_SeriesCatalog> {
+  @override
+  void initState() {
+    super.initState();
+    // Opening the series places or removes any poster file still waiting.
+    Future.microtask(() {
+      if (mounted) ref.read(staffSermonSeriesProvider.notifier).sync();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final itemId = widget.itemId;
     final state = ref.watch(staffSermonSeriesProvider);
     final ctl = ref.read(staffSermonSeriesProvider.notifier);
-    final items = state.value?.series ?? [];
+    final items = state.value?.series ?? const <StaffSermonSeries>[];
     final item = items.where((s) => s.id == itemId).firstOrNull;
     ref.listen(staffSermonSeriesProvider.select((s) => s.notice), (
       previous,
@@ -89,8 +176,10 @@ class _SeriesCatalog extends ConsumerWidget {
         context.go(SermonPaths.staffSeries);
       }
     });
+    final removals = state.value?.removalsPending ?? 0;
     return _CatalogPage(
       title: 'Sermon series',
+      finding: state.value == null ? null : _finding(items, 'series'),
       path: SermonPaths.staffSeries,
       state: state,
       controller: ctl,
@@ -98,35 +187,54 @@ class _SeriesCatalog extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if ((state.value?.removalsPending ?? 0) > 0)
-            const Text(
-              'Some public poster files are waiting to be removed. Sync files to finish.',
+          if (removals > 0 && itemId == null) ...[
+            RequestStateBanner(
+              key: const Key('sermon-series-removals'),
+              tone: StatusTone.warning,
+              title:
+                  '$removals public ${removals == 1 ? 'file' : 'files'} to '
+                  'remove',
+              message:
+                  'Withdrawn or replaced posters are still in the public '
+                  'bucket. Sync removes them.',
+              actions: [
+                BannerAction(
+                  state.syncing ? 'Syncing…' : 'Sync',
+                  state.syncing || state.busy ? null : ctl.sync,
+                  key: const Key('sermon-series-sync'),
+                  primary: true,
+                ),
+              ],
             ),
+            const SizedBox(height: 4),
+          ],
           if (itemId != null)
             (itemId == 'new' || item != null
                 ? _SeriesForm(
                     key: ValueKey('series-form-${item?.id}-${item?.revision}'),
                     item: item,
                   )
-                : const Text(
-                    'This series was not found. Reload the catalog to check again.',
-                  ))
+                : const _NotFound(what: 'series'))
           else
-            _Rows(
-              children: [
-                for (final s in items)
-                  _ItemRow(
-                    item: s,
-                    title: s.current.fields.title,
-                    subtitle: s.current.fields.description,
-                    liveRevision: s.live?.revisionNo,
-                    draftRevision: s.draft?.revisionNo,
-                    onEdit: () =>
-                        context.push('${SermonPaths.staffSeries}/${s.id}'),
-                    series: true,
-                    onLifecycle: (command) => ctl.lifecycle(command, s),
-                  ),
-              ],
+            _Sections(
+              noun: 'series',
+              items: items,
+              truncated: state.value?.truncated ?? false,
+              row: (s) {
+                final series = s as StaffSermonSeries;
+                return _ItemRow(
+                  key: Key('sermon-series-${series.id}'),
+                  item: series,
+                  title: series.current.fields.title,
+                  subtitle: series.current.fields.description,
+                  mark: _seriesMark(series),
+                  busy: state.busy,
+                  series: true,
+                  onEdit: () =>
+                      context.push('${SermonPaths.staffSeries}/${series.id}'),
+                  onLifecycle: (command) => ctl.lifecycle(command, series),
+                );
+              },
             ),
         ],
       ),
@@ -134,9 +242,24 @@ class _SeriesCatalog extends ConsumerWidget {
   }
 }
 
+class _NotFound extends StatelessWidget {
+  const _NotFound({required this.what});
+  final String what;
+  @override
+  Widget build(BuildContext context) => RequestStateBanner(
+    key: const Key('sermon-item-not-found'),
+    tone: StatusTone.neutral,
+    title: 'Not in the catalog',
+    message:
+        'This $what was not found. Reload the catalog to check again; it '
+        'may have been archived by another editor.',
+  );
+}
+
 class _CatalogPage<T> extends StatelessWidget {
   const _CatalogPage({
     required this.title,
+    required this.finding,
     required this.path,
     required this.state,
     required this.controller,
@@ -144,104 +267,130 @@ class _CatalogPage<T> extends StatelessWidget {
     required this.editing,
   });
   final String title, path;
+  final String? finding;
   final StaffCatalogState<T> state;
   final StaffCatalogController<T> controller;
   final Widget child;
   final bool editing;
   @override
   Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final layout = ChurchLayout.of(context);
     final notice = state.notice;
+    final reload = state.loading || state.busy ? null : controller.reload;
     return ChurchPageScaffold(
       title: title,
-      subtitle: 'Drafts and published teaching',
+      subtitle: finding,
       actions: [
         if (state.value != null && !editing)
-          FilledButton(
-            key: Key('$path-new'),
-            onPressed: state.busy ? null : () => context.push('$path/new'),
-            child: const Text('New draft'),
-          ),
-        if (path == SermonPaths.staffSeries)
-          TextButton(
-            onPressed: state.syncing || state.busy ? null : controller.sync,
-            child: Text(state.syncing ? 'Syncing…' : 'Sync files'),
-          ),
-        IconButton(
-          key: Key('$path-reload'),
-          tooltip: 'Reload',
-          onPressed: state.loading || state.busy ? null : controller.reload,
-          icon: const Icon(Icons.refresh),
-        ),
-      ],
-      body: SingleChildScrollView(
-        padding: ChurchLayout.of(context).pagePadding,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: ChurchLayout.of(context).contentMaxWidth,
+          FocusRing(
+            child: FilledButton.icon(
+              key: Key('$path-new'),
+              onPressed: state.busy ? null : () => context.push('$path/new'),
+              icon: const Icon(Icons.add),
+              label: const Text('New draft'),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (editing)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: state.busy ? null : () => context.go(path),
-                      icon: const Icon(Icons.arrow_back),
-                      label: Text('Back to $title'),
-                    ),
-                  ),
-                if (state.pending != null)
-                  const RequestStateBanner(
-                    tone: StatusTone.info,
-                    busy: true,
-                    title: 'Sending…',
-                    message:
-                        'Waiting for the church server to confirm the change.',
-                  ),
-                if (notice != null)
-                  RequestStateBanner(
-                    key: Key('sermon-notice-${notice.name}'),
-                    tone: switch (notice) {
-                      BannerNotice.created ||
-                      BannerNotice.saved ||
-                      BannerNotice.published ||
-                      BannerNotice.withdrawn ||
-                      BannerNotice.archived => StatusTone.success,
-                      _ => StatusTone.warning,
-                    },
-                    title: _noticeTitle(notice),
-                    message: _noticeMessage(notice, state.fieldErrors),
-                    actions: [
-                      if (notice == BannerNotice.unconfirmed)
-                        BannerAction(
-                          'Check again',
-                          controller.checkAgain,
-                          primary: true,
+          ),
+        staffReloadButton(Key('$path-reload'), reload),
+      ],
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: layout.pagePadding,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
+              child: DefaultTextStyle.merge(
+                style: layout.body.copyWith(color: c.ink),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (editing)
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: FocusRing(
+                          child: TextButton.icon(
+                            key: const Key('sermon-back-to-catalog'),
+                            onPressed: state.busy
+                                ? null
+                                : () => context.go(path),
+                            icon: const Icon(Icons.arrow_back),
+                            label: Text('Back to $title'),
+                          ),
                         ),
-                    ],
-                  ),
-                if (state.sync is FileSyncFailed ||
-                    state.sync is FileSyncNotAllowed ||
-                    (state.sync is FileSyncDone &&
-                        (state.sync as FileSyncDone).waiting > 0))
-                  const RequestStateBanner(
-                    tone: StatusTone.warning,
-                    title: 'Public files still waiting',
-                    message: 'Some posters could not be placed or removed. Try Sync files again.',
-                  ),
-                const SizedBox(height: 16),
-                if (state.result == null)
-                  const Center(child: CircularProgressIndicator())
-                else if (state.value == null) ...[
-                  const Text(
-                    'Sermon editing is available to Media, Pastors and Admins.',
-                  ),
-                  publicReadProblem(state.result!, what: 'sermon editor'),
-                ] else
-                  child,
-              ],
+                      ),
+                    if (state.pending != null)
+                      const RequestStateBanner(
+                        tone: StatusTone.info,
+                        busy: true,
+                        title: 'Sending…',
+                        message:
+                            'Waiting for the church server to confirm the '
+                            'change.',
+                      ),
+                    if (notice != null)
+                      RequestStateBanner(
+                        key: Key('sermon-notice-${notice.name}'),
+                        tone: switch (notice) {
+                          BannerNotice.created ||
+                          BannerNotice.saved ||
+                          BannerNotice.published ||
+                          BannerNotice.withdrawn ||
+                          BannerNotice.archived => StatusTone.success,
+                          _ => StatusTone.warning,
+                        },
+                        title: _noticeTitle(notice),
+                        message: _noticeMessage(notice, state.fieldErrors),
+                        actions: [
+                          if (notice == BannerNotice.unconfirmed)
+                            BannerAction(
+                              'Check again',
+                              controller.checkAgain,
+                              primary: true,
+                            ),
+                        ],
+                      ),
+                    if (state.sync is FileSyncFailed ||
+                        state.sync is FileSyncNotAllowed ||
+                        (state.sync is FileSyncDone &&
+                            (state.sync as FileSyncDone).waiting > 0))
+                      RequestStateBanner(
+                        key: const Key('sermon-sync-waiting'),
+                        tone: StatusTone.warning,
+                        title: 'Public files still waiting',
+                        message:
+                            'Some posters could not be placed or removed. '
+                            'Try the sync again.',
+                        actions: [
+                          BannerAction(
+                            state.syncing ? 'Syncing…' : 'Sync again',
+                            state.syncing || state.busy
+                                ? null
+                                : controller.sync,
+                            primary: true,
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 8),
+                    if (state.result == null)
+                      const RequestStateBanner(
+                        tone: StatusTone.info,
+                        busy: true,
+                        title: 'Loading…',
+                        message: 'Asking the church server.',
+                      )
+                    else if (state.value == null) ...[
+                      publicReadProblem(state.result!, what: 'sermon editor'),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Sermon editing is for Media, Pastors and Admins. '
+                        'Permissions are checked by the server each time.',
+                        style: ChurchType.secondary.copyWith(color: c.muted),
+                      ),
+                    ] else
+                      child,
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -267,173 +416,372 @@ String _noticeMessage(
   BannerNotice notice,
   Map<String, String> errors,
 ) => switch (notice) {
-  BannerNotice.created || BannerNotice.saved => 'Your draft is saved. The published revision stays visible until a replacement is published.',
+  BannerNotice.created || BannerNotice.saved =>
+    'Your draft is saved. The published revision stays visible until a '
+        'replacement is published.',
   BannerNotice.published => 'The church server confirmed publication.',
   BannerNotice.withdrawn => 'This item is no longer public.',
   BannerNotice.archived => 'This item is archived.',
-  BannerNotice.changedElsewhere => 'Another editor changed this item. The catalog now shows the current revision; check it before trying again.',
+  BannerNotice.changedElsewhere =>
+    'Another editor changed this item. The catalog now shows the current '
+        'revision; check it before trying again.',
   BannerNotice.invalid || BannerNotice.blocked =>
     errors.entries
         .map((e) => '${_fieldName(e.key)}: ${sermonReasonText(e.value, e.key)}')
         .join(' '),
-  BannerNotice.unconfirmed => 'The reply did not arrive. Check again with the same request before starting another change.',
+  BannerNotice.unconfirmed =>
+    'The reply did not arrive. Check again with the same request before '
+        'starting another change.',
   BannerNotice.notSent => 'The request was not sent. Your input is still here.',
   BannerNotice.notAllowed || BannerNotice.signInAgain =>
     'Sign in with current Media, Pastor or Admin access.',
   _ => 'Reload the current catalog and check this item before trying again.',
 };
 String _fieldName(String field) => switch (field) {
-  'youtube_video_id' => 'YouTube video ID',
+  'youtube_video_id' => 'YouTube video',
   'video_rights_id' => 'Video rights',
   'poster_asset_id' => 'Poster',
   'poster_rights_id' => 'Poster rights',
+  'alt_text' => 'Poster text alternative',
   'sermon_date' => 'Date',
   'scripture_reference' => 'Scripture',
   'series_id' => 'Series',
-  _ => field.replaceAll('_', ' '),
+  'sermon_id' => 'Sermon',
+  _ => '${field[0].toUpperCase()}${field.substring(1).replaceAll('_', ' ')}',
 };
 String sermonReasonText(String reason, String field) => switch (reason) {
-  'unsupported_markdown' ||
-  'unsafe_link' ||
-  'invalid_markdown' ||
-  'unsupported' when field == 'notes' => 'Use paragraphs, # headings, *emphasis*, lists and approved HTTPS links. HTML, images and other link forms are not supported.',
+  'unsupported_markdown' || 'unsafe_link' || 'invalid_markdown' || 'unsupported'
+      when field == 'notes' =>
+    'Use paragraphs, # headings, *emphasis*, lists and approved HTTPS '
+        'links. HTML, images and other link forms are not supported.',
   'invalid' when field == 'notes' =>
     'Use supported Markdown and approved HTTPS links only.',
-  'invalid' when field == 'youtube_video_id' => 'Paste an HTTPS YouTube watch, shorts, embed or youtu.be link, or the 11-character video ID.',
-  'invalid' when field == 'sermon_date' =>
-    'Use a real date in YYYY-MM-DD format.',
+  'invalid' when field == 'youtube_video_id' =>
+    'Paste an HTTPS YouTube watch, shorts, embed or youtu.be link, or the '
+        '11-character video ID.',
+  'too_long' when field == 'youtube_video_id' =>
+    'Paste an HTTPS YouTube watch, shorts, embed or youtu.be link, or the '
+        '11-character video ID.',
+  'invalid' when field == 'sermon_date' => 'Choose a real date.',
   'not_published' when field == 'series_id' =>
     'Publish the series before publishing this sermon.',
+  'unknown' when field == 'series_id' =>
+    'This series is no longer available. Choose another or none.',
+  'archived' => 'This item is archived and can no longer change.',
+  'nothing_to_publish' => 'There are no saved changes to publish.',
+  'not_published' => 'Only a published item can be withdrawn.',
   'too_long' => 'This text is too long.',
+  'required' when field == 'alt_text' =>
+    'Describe the poster before publishing.',
   'required' => 'Add this before publishing.',
   _ => bannerReasonText(reason, field: field),
 };
 
-class _Rows extends StatelessWidget {
-  const _Rows({required this.children});
-  final List<Widget> children;
+/// Waiting to publish, published and withdrawn items, each group in one card;
+/// archived items behind a toggle.
+class _Sections extends StatefulWidget {
+  const _Sections({
+    required this.noun,
+    required this.items,
+    required this.truncated,
+    required this.row,
+  });
+  final String noun;
+  final List<StaffSermonItem<Object?>> items;
+  final bool truncated;
+  final Widget Function(StaffSermonItem<Object?> item) row;
   @override
-  Widget build(BuildContext context) => children.isEmpty
-      ? const ChurchCard(
-          child: Text(
-            'No drafts yet. Choose New draft to prepare teaching for the church.',
+  State<_Sections> createState() => _SectionsState();
+}
+
+class _SectionsState extends State<_Sections> {
+  var _showArchived = false;
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final all = widget.items;
+    if (all.isEmpty) {
+      return ChurchCard(
+        child: Text(
+          'No ${widget.noun} yet. Choose New draft to prepare one; it stays '
+          'private until you publish it.',
+          key: const Key('sermon-catalog-empty'),
+          style: ChurchType.body.copyWith(color: c.muted),
+        ),
+      );
+    }
+    final waiting = all.where(
+      (i) => i.state == ContentState.draft || i.hasChanges,
+    );
+    final published = all.where(
+      (i) => i.state == ContentState.published && !i.hasChanges,
+    );
+    final withdrawn = all.where((i) => i.state == ContentState.withdrawn);
+    final archived = all.where((i) => i.state == ContentState.archived);
+    Widget section(
+      String title,
+      String key,
+      Iterable<StaffSermonItem<Object?>> list,
+    ) {
+      final rows = [for (final i in list) widget.row(i)];
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: ChurchGeometry.sectionGap),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Semantics(
+              header: true,
+              child: Text(
+                '$title (${rows.length})',
+                key: Key(key),
+                style: ChurchType.cardTitle.copyWith(color: c.ink),
+              ),
+            ),
           ),
-        )
-      : ChurchCard(
-          padding: EdgeInsets.zero,
-          child: Column(
-            children: [
-              for (final (i, child) in children.indexed) ...[
-                if (i > 0)
-                  Divider(height: 1, color: ChurchColors.of(context).line),
-                child,
+          ChurchCard(
+            padding: EdgeInsets.zero,
+            radius: 12,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final (i, r) in rows.indexed) ...[
+                  if (i > 0) Divider(height: 1, color: c.line),
+                  r,
+                ],
               ],
-            ],
+            ),
           ),
-        );
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (widget.truncated)
+          RequestStateBanner(
+            key: const Key('sermon-catalog-truncated'),
+            tone: StatusTone.warning,
+            title: 'Not every item is listed',
+            message: 'There are more ${widget.noun} than this list shows.',
+          ),
+        if (waiting.isNotEmpty)
+          section('Waiting to publish', 'sermon-section-waiting', waiting),
+        if (published.isNotEmpty)
+          section('Published', 'sermon-section-published', published),
+        if (withdrawn.isNotEmpty)
+          section('Withdrawn', 'sermon-section-withdrawn', withdrawn),
+        if (archived.isNotEmpty) ...[
+          const SizedBox(height: ChurchGeometry.sectionGap),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FocusRing(
+              child: TextButton(
+                key: const Key('sermon-show-archived'),
+                onPressed: () => setState(() => _showArchived = !_showArchived),
+                child: Text(
+                  _showArchived
+                      ? 'Hide archived ${widget.noun}'
+                      : 'Show archived ${widget.noun} (${archived.length})',
+                ),
+              ),
+            ),
+          ),
+          if (_showArchived)
+            section('Archived', 'sermon-section-archived', archived),
+        ],
+      ],
+    );
+  }
+}
+
+Future<bool> _confirm(
+  BuildContext context,
+  String title,
+  String body,
+  String yes,
+) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (context) => ChurchDialog(
+      title: title,
+      content: Text(body),
+      actions: [
+        FocusRing(
+          child: TextButton(
+            key: const Key('sermon-confirm-no'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Keep it'),
+          ),
+        ),
+        FocusRing(
+          child: FilledButton(
+            key: const Key('sermon-confirm-yes'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(yes),
+          ),
+        ),
+      ],
+    ),
+  );
+  return ok == true && context.mounted;
 }
 
 class _ItemRow extends StatelessWidget {
   const _ItemRow({
+    super.key,
     required this.item,
     required this.title,
     required this.subtitle,
-    required this.liveRevision,
-    required this.draftRevision,
+    required this.mark,
+    required this.busy,
     required this.onEdit,
     required this.onLifecycle,
     this.series = false,
   });
   final StaffSermonItem<Object?> item;
   final String title, subtitle;
-  final int? liveRevision, draftRevision;
+  final _Mark mark;
+  final bool busy;
   final VoidCallback onEdit;
   final Future<void> Function(String command) onLifecycle;
   final bool series;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(18),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Expanded(child: Text(title, style: ChurchType.cardTitle)),
-            const SizedBox(width: 8),
-            StatusLabel(
-              label: item.hasChanges
-                  ? 'Published · draft changes'
-                  : switch (item.state) {
-                      ContentState.draft => 'Draft',
-                      ContentState.published => 'Published',
-                      ContentState.withdrawn => 'Withdrawn',
-                      ContentState.archived => 'Archived',
-                    },
-              tone: item.state == ContentState.published
-                  ? StatusTone.success
-                  : StatusTone.neutral,
-            ),
-          ],
-        ),
-        if (subtitle.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(subtitle),
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    final muted = ChurchType.secondary.copyWith(color: c.muted);
+    final id = item.id;
+    final publishedLine = [
+      if (item.publishedBy case final by?) 'Published by $by',
+      if (item.publishedAt case final at?) churchShortWhen(at),
+    ].join(' · ');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: ChurchType.cardTitle.copyWith(color: c.ink),
+                ),
+              ),
+              const SizedBox(width: 12),
+              StatusLabel(label: mark.$1, tone: mark.$2),
+            ],
           ),
-        const SizedBox(height: 6),
-        Text(
-          [
-            if (liveRevision != null) 'Live revision $liveRevision',
-            if (draftRevision != null) 'Draft revision $draftRevision',
-          ].join(' · '),
-          style: ChurchType.secondary,
-        ),
-        if (item.publishedBy != null)
-          Text('Published by ${item.publishedBy}', style: ChurchType.secondary),
-        Wrap(
-          spacing: 8,
-          children: [
-            if (item.canEdit)
-              TextButton(
-                key: Key('sermon-edit-${item.id}'),
-                onPressed: onEdit,
-                child: const Text('Edit draft'),
+          if (subtitle.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: ChurchType.body.copyWith(color: c.ink),
               ),
-            if (item.canPublish)
-              TextButton(
-                key: Key('sermon-publish-${item.id}'),
-                onPressed: () => onLifecycle(
-                  series
-                      ? SermonCommands.publishSeries
-                      : SermonCommands.publish,
+            ),
+          if (publishedLine.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(publishedLine, style: muted),
+            ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              if (item.canEdit)
+                FocusRing(
+                  child: OutlinedButton(
+                    key: Key('sermon-edit-$id'),
+                    onPressed: busy ? null : onEdit,
+                    child: Text(item.draft == null ? 'Edit' : 'Edit draft'),
+                  ),
                 ),
-                child: const Text('Publish'),
-              ),
-            if (item.canWithdraw)
-              TextButton(
-                key: Key('sermon-withdraw-${item.id}'),
-                onPressed: () => onLifecycle(
-                  series
-                      ? SermonCommands.withdrawSeries
-                      : SermonCommands.withdraw,
+              if (item.canPublish)
+                FocusRing(
+                  child: FilledButton(
+                    key: Key('sermon-publish-$id'),
+                    onPressed: busy
+                        ? null
+                        : () => onLifecycle(
+                            series
+                                ? SermonCommands.publishSeries
+                                : SermonCommands.publish,
+                          ),
+                    child: Text(
+                      item.hasChanges
+                          ? 'Publish changes'
+                          : item.state == ContentState.withdrawn &&
+                                item.draft == null
+                          ? 'Publish again'
+                          : 'Publish',
+                    ),
+                  ),
                 ),
-                child: const Text('Withdraw'),
-              ),
-            if (item.canEdit)
-              TextButton(
-                key: Key('sermon-archive-${item.id}'),
-                onPressed: () => onLifecycle(
-                  series
-                      ? SermonCommands.archiveSeries
-                      : SermonCommands.archive,
+              if (item.canWithdraw)
+                FocusRing(
+                  child: OutlinedButton(
+                    key: Key('sermon-withdraw-$id'),
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            if (await _confirm(
+                              context,
+                              'Withdraw $title?',
+                              series
+                                  ? 'Its title and poster leave the app. Its '
+                                        'published sermons stay readable '
+                                        'without them. You can publish it '
+                                        'again later.'
+                                  : 'It leaves the Sermons tab at once. You '
+                                        'can publish it again later.',
+                              'Withdraw',
+                            )) {
+                              await onLifecycle(
+                                series
+                                    ? SermonCommands.withdrawSeries
+                                    : SermonCommands.withdraw,
+                              );
+                            }
+                          },
+                    child: const Text('Withdraw'),
+                  ),
                 ),
-                child: const Text('Archive'),
-              ),
-          ],
-        ),
-      ],
-    ),
-  );
+              if (item.canEdit)
+                FocusRing(
+                  child: TextButton(
+                    key: Key('sermon-archive-$id'),
+                    onPressed: busy
+                        ? null
+                        : () async {
+                            if (await _confirm(
+                              context,
+                              'Archive $title?',
+                              'It leaves the app (if it is public) and can no '
+                                  'longer be changed or published.',
+                              'Archive',
+                            )) {
+                              await onLifecycle(
+                                series
+                                    ? SermonCommands.archiveSeries
+                                    : SermonCommands.archive,
+                              );
+                            }
+                          },
+                    child: const Text('Archive'),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _SermonForm extends ConsumerStatefulWidget {
@@ -478,7 +826,10 @@ class _SermonFormState extends ConsumerState<_SermonForm> {
     final state = ref.watch(staffSermonsProvider);
     final ctl = ref.read(staffSermonsProvider.notifier);
     final seriesState = ref.watch(staffSermonSeriesProvider);
-    final allSeries = seriesState.value?.series ?? [];
+    final selectable = [
+      for (final s in seriesState.value?.series ?? const <StaffSermonSeries>[])
+        if (s.state != ContentState.archived) s,
+    ];
     final rights = ref.watch(staffRightsProvider).value;
     return StaffSection(
       title: widget.item == null ? 'New sermon' : 'Edit sermon draft',
@@ -576,6 +927,7 @@ class _SermonFormState extends ConsumerState<_SermonForm> {
             ),
           ),
           DropdownButtonFormField<String>(
+            key: const Key('sermon-field-series_id'),
             initialValue: _series,
             isExpanded: true,
             decoration: InputDecoration(
@@ -584,12 +936,20 @@ class _SermonFormState extends ConsumerState<_SermonForm> {
             ),
             items: [
               const DropdownMenuItem(value: null, child: Text('No series')),
-              for (final s in allSeries)
+              // An archived series can no longer take sermons.
+              for (final s in selectable)
                 DropdownMenuItem(
                   value: s.id,
-                  child: Text('${s.current.fields.title} · ${s.state.name}'),
+                  child: Text(
+                    '${s.current.fields.title} · ${switch (s.state) {
+                      ContentState.published => 'published',
+                      ContentState.withdrawn => 'withdrawn',
+                      _ => 'draft, publish it first',
+                    }}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-              if (_series != null && allSeries.every((s) => s.id != _series))
+              if (_series != null && selectable.every((s) => s.id != _series))
                 DropdownMenuItem(
                   value: _series,
                   child: const Text('Previously chosen series'),

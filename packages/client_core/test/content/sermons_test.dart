@@ -179,7 +179,7 @@ void main() {
         (h.publicContentCache.writes.single.$2 as PublicSermons).sermons,
         hasLength(2),
       );
-      await tester.tap(find.byKey(const Key('sermons-filter-series')));
+      await tester.tap(find.byKey(const ValueKey('segment-Series')));
       await _settle(tester);
       await tester.tap(find.byKey(const Key('sermon-row-$_id')));
       await _settle(tester);
@@ -319,4 +319,278 @@ void main() {
       expect(find.byKey(const Key('sermon-notice-invalid')), findsOneWidget);
     },
   );
+  test('links use exact lowercase hosts like the server check', () {
+    expect(safeSermonLink('https://ebible.org/web/GEN01.htm'), isNotNull);
+    for (final link in [
+      'https://EBIBLE.ORG/',
+      'https://ebible.org/a"b',
+      "https://ebible.org/a'b",
+      r'https://ebible.org/a\b',
+      'https://ebible.org/a b',
+    ]) {
+      expect(safeSermonLink(link), isNull, reason: link);
+    }
+  });
+
+  test(
+    'the current series follows the latest sermon; dates name the weekday',
+    () {
+      final older = publicSermonSeriesData(
+        id: '94949494-9494-4494-8494-949494949494',
+        title: 'SYNTHETIC Older series',
+      );
+      final catalog = PublicSermons.fromJson({
+        'sermons': [
+          publicSermonData(series: publicSermonSeriesData()),
+          publicSermonData(
+            id: '93939393-9393-4393-8393-939393939393',
+            series: older,
+          ),
+        ],
+        // The older series was published (or republished) most recently.
+        'series': [older, publicSermonSeriesData()],
+        'truncated': false,
+      });
+      expect(currentSermonSeries(catalog)?.title, 'SYNTHETIC Living hope');
+      expect(
+        currentSermonSeries(
+          PublicSermons.fromJson({
+            'sermons': [publicSermonData()],
+            'series': [older],
+            'truncated': false,
+          }),
+        )?.title,
+        'SYNTHETIC Older series',
+      );
+      expect(
+        currentSermonSeries(const PublicSermons(sermons: [], series: [])),
+        isNull,
+      );
+      final now = DateTime.utc(2026, 10, 1);
+      expect(sermonDateText(DateTime.utc(2026, 9, 27), now: now), 'Sun 27 Sep');
+      expect(
+        sermonDateText(DateTime.utc(2025, 9, 28), now: now),
+        'Sun 28 Sep 2025',
+      );
+    },
+  );
+
+  testWidgets(
+    'the current series leads; series and speaker views group the rows',
+    (tester) async {
+      await _pump(tester, SermonPaths.list);
+      const series = '91919191-9191-4191-8191-919191919191';
+      expect(
+        find.byKey(const Key('sermons-current-series-$series')),
+        findsOneWidget,
+      );
+      expect(find.text('Current series'), findsOneWidget);
+      expect(find.text('1 sermon'), findsOneWidget);
+      // Latest: one list, no group headers.
+      expect(
+        find.byKey(const Key('sermons-group-series-$series')),
+        findsNothing,
+      );
+      await tester.tap(find.byKey(const Key('sermons-browse-series')));
+      await _settle(tester);
+      final inSeries = find.byKey(const Key('sermons-group-series-$series'));
+      final outside = find.byKey(const Key('sermons-group-series-none'));
+      expect(inSeries, findsOneWidget);
+      expect(outside, findsOneWidget);
+      expect(
+        tester.getTopLeft(inSeries).dy,
+        lessThan(tester.getTopLeft(outside).dy),
+      );
+      await tester.tap(find.byKey(const ValueKey('segment-Speaker')));
+      await _settle(tester);
+      final one = find.byKey(
+        const Key('sermons-group-speaker-SYNTHETIC Speaker One'),
+      );
+      final two = find.byKey(
+        const Key('sermons-group-speaker-SYNTHETIC Speaker Two'),
+      );
+      expect(one, findsOneWidget);
+      expect(tester.getTopLeft(one).dy, lessThan(tester.getTopLeft(two).dy));
+      await tester.enterText(find.byKey(const Key('sermons-search')), 'zzz');
+      await _settle(tester);
+      expect(find.byKey(const Key('sermons-no-results')), findsOneWidget);
+      expect(find.byKey(const Key('sermons-empty')), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('a row marks a playable video only when the sermon has one', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      SermonPaths.list,
+      setup: (h) => h.sermons.catalog = AccessReadOk(
+        PublicSermons.fromJson({
+          'sermons': [
+            publicSermonData(),
+            publicSermonData(
+              id: '93939393-9393-4393-8393-939393939393',
+              videoId: null,
+            ),
+          ],
+          'series': [],
+          'truncated': false,
+        }),
+      ),
+    );
+    Finder play(String id) => find.descendant(
+      of: find.byKey(Key('sermon-row-$id')),
+      matching: find.byIcon(Icons.play_circle_filled),
+    );
+    expect(play(_id), findsOneWidget);
+    expect(play('93939393-9393-4393-8393-939393939393'), findsNothing);
+  });
+
+  testWidgets(
+    'a withdrawn series leaves the teaching readable without its title',
+    (tester) async {
+      await _pump(
+        tester,
+        SermonPaths.detail(_id),
+        setup: (h) => h.sermons.details[_id] = AccessReadOk(
+          PublicSermonRead(PublicSermon.fromJson(publicSermonData())),
+        ),
+      );
+      expect(find.byKey(const Key('sermon-title')), findsOneWidget);
+      expect(find.byKey(const Key('sermon-series')), findsNothing);
+      expect(find.byType(SermonNotes), findsOneWidget);
+    },
+  );
+
+  testWidgets('a sermon that is no longer public says so', (tester) async {
+    await _pump(
+      tester,
+      SermonPaths.detail(_id),
+      setup: (h) =>
+          h.sermons.details[_id] = const AccessReadOk(PublicSermonRead(null)),
+    );
+    expect(find.byKey(const Key('sermon-gone')), findsOneWidget);
+    expect(find.byType(SermonNotes), findsNothing);
+  });
+
+  testWidgets(
+    'staff rows carry one mark, withdraw asks first and archived items wait '
+    'behind a toggle',
+    (tester) async {
+      Map<String, Object?> revision(int no, {String? video}) => {
+        'revision_no': no,
+        'title': 'SYNTHETIC Staff sermon $no',
+        'speaker': 'SYNTHETIC Speaker',
+        'sermon_date': '2026-10-25',
+        'scripture_reference': 'Psalm 23',
+        'notes': 'SYNTHETIC notes',
+        'series_id': null,
+        'youtube_video_id': video,
+        'video_rights': video == null
+            ? null
+            : {
+                'rights_id': '95959595-9595-4595-8595-959595959595',
+                'label': 'SYNTHETIC Video rights',
+                'state': 'withdrawn',
+                'live_revision_no': 1,
+                'display': 'not_in_force',
+              },
+        'saved_at': '2026-10-25T08:00:00Z',
+        'saved_by': 'SYNTHETIC Editor',
+      };
+      Map<String, Object?> item(
+        String id,
+        String state, {
+        Map<String, Object?>? live,
+        Map<String, Object?>? draft,
+      }) => {
+        'sermon_id': id,
+        'revision': 3,
+        'state': state,
+        'created_at': '2026-10-25T08:00:00Z',
+        'created_by': 'SYNTHETIC Editor',
+        'updated_at': '2026-10-25T08:00:00Z',
+        'published_at': live == null ? null : '2026-10-25T09:00:00Z',
+        'published_by': live == null ? null : 'SYNTHETIC Editor',
+        'withdrawn_at': null,
+        'archived_at': state == 'archived' ? '2026-10-25T10:00:00Z' : null,
+        'live': live,
+        'draft': draft,
+      };
+      const hidden = 'a1a1a1a1-a1a1-41a1-81a1-a1a1a1a1a1a1';
+      const archived = 'a2a2a2a2-a2a2-42a2-82a2-a2a2a2a2a2a2';
+      const draft = 'a3a3a3a3-a3a3-43a3-83a3-a3a3a3a3a3a3';
+      final h = await _pump(
+        tester,
+        SermonPaths.staff,
+        staff: true,
+        setup: (h) => h.sermons.staff = AccessReadOk(
+          StaffSermons.fromJson({
+            'capacity': 'media',
+            'sermons': [
+              item(draft, 'draft', draft: revision(1)),
+              item(
+                hidden,
+                'published',
+                live: revision(1, video: 'abcdefghijk'),
+              ),
+              item(archived, 'archived', live: revision(1)),
+            ],
+            'truncated': false,
+          }),
+        ),
+      );
+      expect(find.byKey(const Key('sermon-section-waiting')), findsOneWidget);
+      expect(find.text('Published, video hidden'), findsOneWidget);
+      expect(find.byKey(const Key('sermon-$archived')), findsNothing);
+      await tester.tap(find.byKey(const Key('sermon-show-archived')));
+      await _settle(tester);
+      expect(find.byKey(const Key('sermon-$archived')), findsOneWidget);
+      await tester.ensureVisible(
+        find.byKey(const Key('sermon-withdraw-$hidden')),
+      );
+      await tester.tap(find.byKey(const Key('sermon-withdraw-$hidden')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('sermon-confirm-no')));
+      await tester.pumpAndSettle();
+      expect(h.gateway.sent, isEmpty);
+      await tester.tap(find.byKey(const Key('sermon-withdraw-$hidden')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('sermon-confirm-yes')));
+      await _settle(tester);
+      expect(h.gateway.sent.single.request.command, SermonCommands.withdraw);
+      expect(h.gateway.sent.single.request.payload, {'sermon_id': hidden});
+    },
+  );
+
+  test('a series parses its poster state; a sermon has none', () {
+    Map<String, Object?> series(String? image) => {
+      'series_id': '96969696-9696-4696-8696-969696969696',
+      'revision': 2,
+      'state': 'published',
+      'published_at': '2026-10-25T09:00:00Z',
+      'published_by': 'SYNTHETIC Editor',
+      'public_image': image,
+      'live': {
+        'revision_no': 1,
+        'title': 'SYNTHETIC Series',
+        'description': '',
+        'alt_text': '',
+        'poster': null,
+        'rights': null,
+        'saved_at': '2026-10-25T08:00:00Z',
+        'saved_by': 'SYNTHETIC Editor',
+      },
+      'draft': null,
+    };
+    StaffSermonSeries parse(String? image) => StaffSermonSeries.fromJson(
+      series(image),
+      'series_id',
+      StaffSermonSeriesRevision.fromJson,
+    );
+    expect(parse('waiting').publicImage, PublicImageState.waiting);
+    expect(parse(null).publicImage, isNull);
+    expect(() => parse('elsewhere'), throwsFormatException);
+  });
 }

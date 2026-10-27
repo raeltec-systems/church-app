@@ -1,4 +1,5 @@
--- Story 6.9. All fixtures are SYNTHETIC; UK phones are fictional Ofcom numbers.
+-- Story 6.9. All fixtures are SYNTHETIC; UK phones are fictional Ofcom numbers
+-- (+44 7700 900651-900656, the entry's block; rolled back with the test).
 begin;
 select no_plan();
 
@@ -63,7 +64,7 @@ create function pg_temp.series(p_title text, p_extra jsonb default '{}') returns
 $$;
 
 insert into auth.users(id,aud,role,phone,phone_confirmed_at)
-select pg_temp.u(n), 'authenticated', 'authenticated', '447700900' || (690+n)::text, now()
+select pg_temp.u(n), 'authenticated', 'authenticated', '447700900' || (650+n)::text, now()
 from generate_series(1,6) n;
 insert into auth.sessions(id,user_id,aal,created_at)
 select pg_temp.s(n),pg_temp.u(n),'aal1',clock_timestamp()-interval '1 hour' from generate_series(1,6) n;
@@ -197,14 +198,20 @@ select is(pg_temp.err(pg_temp.cmd(3,'content.save_sermon_series',2,pg_temp.serie
   'series_id',pg_temp.se1(),'poster_asset_id',(select r#>>'{data,asset_id}' from upload1),'poster_rights_id',pg_temp.ri1())))),'ok','poster rights attach');
 select is(pg_temp.err(pg_temp.cmd(2,'content.publish_sermon_series',3,jsonb_build_object('series_id',pg_temp.se1()))),'ok','Pastor publishes series');
 select is(pg_temp.err(pg_temp.cmd(6,'content.publish_sermon_series',1,jsonb_build_object('series_id',pg_temp.se2()))),'ok','Media publishes poster-free series');
+select is(app.content_staff_sermon_series_json(pg_temp.se2())->'public_image','null'::jsonb,
+  'a published series without a poster has no poster state for editors');
 select is(jsonb_array_length(pg_temp.read(null,'select api.content_public_sermons()')->'series'),2,
   'both published series appear before they contain sermons');
 select is(app.content_public_sermon_series_json(pg_temp.se1())->'poster','null'::jsonb,'poster stays absent until public file exists');
+select is(app.content_staff_sermon_series_json(pg_temp.se1())->>'public_image','waiting',
+  'editors see the published poster waiting for the file sync');
 insert into storage.objects(bucket_id,name,metadata)
 select 'content-public',public_path,jsonb_build_object('size',3000000,'mimetype','image/png')
 from app.content_public_files_desired() where item_id=pg_temp.se1();
 select is(app.content_public_sermon_series_json(pg_temp.se1())#>>'{poster,offline_allowed}','false','display-only poster remains online only');
 select is(app.content_public_sermon_series_json(pg_temp.se1())#>>'{poster,rights_revision}','1','poster cites rights revision without private id');
+select is(app.content_staff_sermon_series_json(pg_temp.se1())->>'public_image','shown',
+  'editors see the placed poster');
 
 select is(pg_temp.err(pg_temp.cmd(3,'content.save_sermon',1,pg_temp.sermon('SYNTHETIC Shepherd',jsonb_build_object(
   'sermon_id',pg_temp.sr1(),'series_id',pg_temp.se1(),'youtube_video_id','abcdefghijk')))),'ok','complete teaching draft saved without video clearance');

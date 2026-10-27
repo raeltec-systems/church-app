@@ -3,13 +3,13 @@ title: 'Publish and browse sermons with the YouTube player and safe notes'
 type: 'feature'
 ticket: '9'
 created: '2026-10-26'
-status: in-progress
+status: in-review
 baseline_revision: '7eb4f866864806ff7baefcb23f2c351786bd93f8'
 route: 'full'
 route_source: 'auto'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
+lenses_ran: [quick]
 review_loop_iteration: 0
 followup_review_recommended: false
 context:
@@ -61,11 +61,11 @@ deferred: []
 
 **Execution:**
 - Implementation delegation writes code and runs targeted local checks; the parent completes full verification, staging application, independent review, status changes and Git finalization. Leave implementation uncommitted for that review.
-- [ ] `supabase/migrations/*_content_sermons.sql` -- create with CLI, add series/sermon revisions, input validation, publication/rights/asset commands, bounded public/staff reads and all-four-column attribution erase parts. No row deletes; migrations ASCII with no backslashes.
-- [ ] `packages/client_core/lib/src/{domain,adapters,application,presentation}/*sermon*.dart` -- typed strict models, safe Markdown render/link handling, complete staff forms/poster picker/lifecycle actions, public filters/search/detail and retry/stale/offline states.
-- [ ] Mobile composition/player/pubspec/lock and both shells -- real privacy-enhanced player plus fifth tab, editor permission navigation and safe detail back bars.
-- [ ] Existing cache interface/adapter/fakes -- eligible canonical catalog and posters, publication/rights revisions, safe refresh replacement and withdrawal eviction; no thumbnail/video download without offline clearance.
-- [ ] SQL, HTTP helper/live E2E, Flutter/core/app/cache tests and operations/promotion runbooks -- cover the matrix, role/read/table boundaries, stale revisions, rights changes and deletion attribution. Keep automated fixtures synthetic.
+- [x] `supabase/migrations/*_content_sermons.sql` -- create with CLI, add series/sermon revisions, input validation, publication/rights/asset commands, bounded public/staff reads and all-four-column attribution erase parts. No row deletes; migrations ASCII with no backslashes.
+- [x] `packages/client_core/lib/src/{domain,adapters,application,presentation}/*sermon*.dart` -- typed strict models, safe Markdown render/link handling, complete staff forms/poster picker/lifecycle actions, public filters/search/detail and retry/stale/offline states.
+- [x] Mobile composition/player/pubspec/lock and both shells -- real privacy-enhanced player plus fifth tab, editor permission navigation and safe detail back bars.
+- [x] Existing cache interface/adapter/fakes -- eligible canonical catalog and posters, publication/rights revisions, safe refresh replacement and withdrawal eviction; no thumbnail/video download without offline clearance.
+- [x] SQL, HTTP helper/live E2E, Flutter/core/app/cache tests and operations/promotion runbooks -- cover the matrix, role/read/table boundaries, stale revisions, rights changes and deletion attribution. Keep automated fixtures synthetic.
 
 **Acceptance Criteria:**
 - Given draft/revised/withdrawn/archived sermons and three editor roles, when anonymous/Pending/member callers read or edit, then only current published projections are public and all unauthorized commands/table reads are refused.
@@ -77,6 +77,17 @@ deferred: []
 ## Implementation Notes
 
 - Full-route delegation: the implementing coordinator owns client domain/adapters/controllers/screens, cache, routing, player/dependencies and Flutter tests. Its two focused children own migration/SQL tests/scoped SQL assertions and HTTP/helper tests/runbooks respectively. All changes remain uncommitted until the coordinator returns, the parent verifies, and independent review completes.
+
+Resumed run (2026-10-27), parent session. The first implementer stopped before verification; its work was committed as found (`2ef6f20`) and this run finished it in the parent session rather than through a fresh implementing subagent, because the remaining work was verification, design alignment and review fixes on an existing diff.
+
+- Kept from the hand-over: the migration's kinds, ten commands, revision tables, guards, notes/link validators, rights-gated public projections, staff reads and erase parts; the strict client models, controllers, repository, cache path, routes, tabs, player seam and the pinned `youtube_player_iframe` 6.0.2 player; pgTAP, HTTP runner and helper tests; runbook sections.
+- Mobile Sermons tab re-derived to the handoff and the app-screen rules: the current series (latest sermon's series, else the most recently published series) leads on the design system's `HeroCard` with its public poster, description, sermon count and "Browse this series"; Latest/Series/Speaker use `RadioSegments`; Series and Speaker group the rows under section headers (series by their latest sermon, "Not in a series" last; speakers alphabetically) instead of an extra dropdown row; rows show the series poster and a play mark only when a playable video exists; dates read "Sun 27 Sep" with the year only outside the church's current year; loading, empty, no-match, failed, stale and offline states are separate.
+- Sermon detail: the player when online with a playable ID; a compact "No video is available for this sermon" when none is published (none recorded or rights withdrawn) and "Video needs a connection" offline or stale; the 16:9 "This video is unavailable" box stays for player errors. A withdrawn sermon offers "Open sermons". Notes headings are semantic headers, links use the link colour with 44 px targets, intraword underscores are no longer emphasis.
+- Staff web brought to the Banners pattern: the page subtitle states what waits to publish and what is published; Waiting to publish / Published / Withdrawn sections with archived items behind a toggle; one mark per row (including "Published, video hidden" and "Published, poster waiting / not shown"); Withdraw and Archive confirm with the item's name; "Publish changes"/"Publish again" labels; opening Sermon series syncs poster files; archived series are not offered in the sermon form.
+- Server fix: `content_staff_sermon_series_json.public_image` is null for a published series without a poster (it said `blocked`). Client link check aligned with the server (lowercase exact hosts; quotes and backslashes refused) so a server-valid note can never fail client parsing.
+- pgTAP fixture phones moved into the entry's reserved block (+44 7700 900651-900656, rolled back with the test); three pgTAP checks added for the series poster state.
+- Changed-file inventory (whole entry): migration `supabase/migrations/20261026153855_content_sermons.sql`; SQL tests `supabase/tests/content_sermons_test.sql`, `command_foundation_test.sql`, `content_banners_test.sql`; HTTP runner `tools/identity-e2e/content-sermons.mjs` and `.test.mjs`; client `packages/client_core/lib/src/domain/content_sermons.dart`, `public_content_cache.dart`, `content_banners.dart`, `adapters/supabase_sermons_repository.dart`, `adapters/supabase_banner_repository.dart`, `application/sermon_controllers.dart`, `application/providers.dart`, `presentation/sermon_screens.dart`, `presentation/sermon_staff_screens.dart`, `presentation/shell_routing.dart`, `church_client_core.dart`, `composition.dart`, `supabase_adapters.dart`, `testing.dart`; tests `packages/client_core/test/content/sermons_test.dart`, `sermon_adapter_test.dart`, `bible_test.dart`; mobile `apps/mobile/lib/app.dart`, `main.dart`, `sermons/youtube_sermon_player.dart`, `offline/public_content_cache_adapter.dart`, `pubspec.yaml`, `pubspec.lock`, tests `apps/mobile/test/mobile_app_test.dart`, `offline/public_content_cache_adapter_test.dart`; staff `apps/staff/lib/app.dart`, `apps/staff/test/staff_app_test.dart`; runbooks `docs/runbooks/content.md`, `docs/runbooks/production-promotion-content.md`; epic Notes.
+- Environment: from 2026-10-26 18:24 the build host's Docker Desktop backend stopped responding and its WSL utility VM could not be stopped (`wsl --shutdown`, a WSL service restart, `hcsdiag kill` and a `vmcompute` restart all failed; `vmcompute` is left in StopPending). The local Supabase stack is unreachable until the host restarts, so the fresh-reset pgTAP suite and the local HTTP runner could not run in this session.
 
 ## Plan Change Log
 

@@ -1,0 +1,15 @@
+{"step":"H00-precondition","target":"LOCAL","at":"2026-10-27T13:38:03.726Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"H01-signed-in-by-phone-and-roles-granted","target":"LOCAL","at":"2026-10-27T13:38:11.442Z","verdict":"pass","amr":["password"],"second_session":true,"grants":[200,200]}
+{"step":"H10-a-member-saves-and-removes-on-two-phones","target":"LOCAL","at":"2026-10-27T13:38:11.539Z","verdict":"pass","phone2_sees":2,"removed_on_phone2":true,"phone1_sees_after_removal":1,"save_again_is_no_op":true}
+{"step":"H11-another-member-cannot-read-or-touch-them","target":"LOCAL","at":"2026-10-27T13:38:11.630Z","verdict":"pass","b_sees":0,"b_remove":"not_found","admin_sees":0,"media_sees":0}
+{"step":"H12-numbers-outside-the-edition-are-refused","target":"LOCAL","at":"2026-10-27T13:38:11.668Z","verdict":"pass","hymn200":"out_of_range","chorus68":"out_of_range","title":"invalid","edition":"unknown_edition"}
+{"step":"H13-guests-and-pending-cannot-save-or-read","target":"LOCAL","at":"2026-10-27T13:38:11.696Z","verdict":"pass","anon_read":401,"anon_save":401,"pending_save":"forbidden","pending_read":403}
+{"step":"H20-admin-makes-a-worship-leader","target":"LOCAL","at":"2026-10-27T13:38:12.263Z","verdict":"pass","this_sunday_matches":true,"before":403,"grant":200,"capacity":"worship_leader"}
+{"step":"H21-worship-leader-and-media-set-this-sundays-list","target":"LOCAL","at":"2026-10-27T13:38:12.306Z","verdict":"pass","leader":200,"media":200,"after_leader":3,"after_media":3,"publication_revision":2}
+{"step":"H22-plain-member-and-pastor-refused","target":"LOCAL","at":"2026-10-27T13:38:12.456Z","verdict":"pass","member":"forbidden","pastor":"forbidden","pending":"forbidden","anon":401,"stale":"conflict","range":"out_of_range","memberStaff":403,"pastorStaff":403}
+{"step":"H23-the-public-read-is-the-projection-only","target":"LOCAL","at":"2026-10-27T13:38:12.475Z","verdict":"pass","leaked":0,"same_for_anon_pending_member":true,"keys":["edition","items","publication_revision","sunday"]}
+{"step":"H24-a-revoked-worship-leader-is-refused-at-once","target":"LOCAL","at":"2026-10-27T13:38:12.911Z","verdict":"pass","revoke":200,"set":"forbidden","staff_read":403}
+{"step":"H30-no-client-role-reads-or-writes-a-table","target":"LOCAL","at":"2026-10-27T13:38:13.023Z","verdict":"pass","attempts":30,"refused":30}
+{"step":"H40-deletion-erases-favourites-and-anonymises-lists","target":"LOCAL","at":"2026-10-27T13:38:15.177Z","verdict":"pass","before":2,"after":0,"favourites_left":0,"saved_by":"Former member","list_stays_public":true}
+{"step":"H50-receipts-hold-no-member-or-hymn-text","target":"LOCAL","at":"2026-10-27T13:38:15.570Z","verdict":"pass","receipts":true,"leaked":0}
+{"step":"H99-cleanup","target":"LOCAL","at":"2026-10-27T13:38:17.362Z","users_left":0,"unmarked":true,"favourites_left":0,"revisions_left":0}

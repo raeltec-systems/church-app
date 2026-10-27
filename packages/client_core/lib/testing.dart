@@ -663,34 +663,34 @@ class FakeHymnBookSource implements HymnBookSource {
   }
 }
 
-/// A SYNTHETIC test book: [hymns] hymns titled "Test hymn N" (1 and 2 in
-/// "Test opening", the rest in "Test praise"), each with two placeholder
+/// A SYNTHETIC test book: [hymns] hymns titled "SYNTHETIC hymn N" (1 and 2 in
+/// "SYNTHETIC opening", the rest in "SYNTHETIC praise"), each with two placeholder
 /// verses, hymn 1 with an English title, a key and a chorus; then [choruses]
-/// single-stanza choruses titled "Test chorus N" in "Test choruses".
+/// single-stanza choruses titled "SYNTHETIC chorus N" in "SYNTHETIC choruses".
 HymnBook testHymnBook({int hymns = 3, int choruses = 2}) => HymnBook(
   format: 1,
   edition: 'test-1',
-  title: 'Test hymn book',
+  title: 'SYNTHETIC hymn book',
   language: 'toi',
   items: [
     for (var n = 1; n <= hymns; n++)
       Hymn(
         kind: HymnKind.hymn,
         number: n,
-        section: n <= 2 ? 'Test opening' : 'Test praise',
-        title: 'Test hymn $n',
-        original: n == 1 ? 'TEST ORIGINAL' : null,
+        section: n <= 2 ? 'SYNTHETIC opening' : 'SYNTHETIC praise',
+        title: 'SYNTHETIC hymn $n',
+        original: n == 1 ? 'SYNTHETIC ORIGINAL' : null,
         reference: n == 1 ? 'Z.H. 1' : null,
         key: n == 1 ? 'A flat' : null,
         verses: [
-          'Test hymn $n verse one, line one,\ntest hymn $n verse one, line two.',
-          'Test hymn $n verse two, line one,\ntest hymn $n verse two, line two.',
+          'SYNTHETIC hymn $n verse one, line one,\nSYNTHETIC hymn $n verse one, line two.',
+          'SYNTHETIC hymn $n verse two, line one,\nSYNTHETIC hymn $n verse two, line two.',
         ],
         choruses: [
           if (n == 1)
             const HymnChorus(
               fromVerse: 1,
-              text: 'Test chorus line one,\ntest chorus line two.',
+              text: 'SYNTHETIC chorus line one,\nSYNTHETIC chorus line two.',
             ),
         ],
       ),
@@ -698,12 +698,14 @@ HymnBook testHymnBook({int hymns = 3, int choruses = 2}) => HymnBook(
       Hymn(
         kind: HymnKind.chorus,
         number: n,
-        section: 'Test choruses',
-        title: 'Test chorus $n',
+        section: 'SYNTHETIC choruses',
+        title: 'SYNTHETIC chorus $n',
         original: null,
         reference: null,
         key: null,
-        verses: ['Test chorus $n stanza, line one,\ntest chorus $n stanza.'],
+        verses: [
+          'SYNTHETIC chorus $n stanza, line one,\nSYNTHETIC chorus $n stanza.',
+        ],
         choruses: const [],
       ),
   ],

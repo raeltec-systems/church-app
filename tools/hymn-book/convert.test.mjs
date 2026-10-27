@@ -25,7 +25,7 @@ const SMALL = [
     + '        Refrain line one,\n          refrain line two.\n\n      2 Beta line one,\n'
     + '    beta line two.\n                1\n',
   '      TEST OPENING\n   2 Test Hymn Two\n\n     Single stanza line one,\n     single stanza line two.\n'
-    + '   3 Test Hymn Three (TEST ORIGINAL THREE)\n(OTHER TUNE) Key of B\nFlat\n'
+    + '   3 Test Hymn Three (TEST ORIGINAL THREE)\n(Z.H. 9) Key of B\nFlat\n'
     + '   1 Gamma line, with \u201ftwo\u201f marks.\n                2\n',
   '      TEST LIFE\n   2 Delta line.\n     1 Test Chorus One\n   Chorus words only.\n'
     + '     2 Test Chorus Two\n   1 Epsilon line.\n   Ciindululo:\n   First refrain.\n'
@@ -47,7 +47,7 @@ const EXPECTED = [
   },
   {
     id: 'hymn-3', kind: 'hymn', number: 3, section: 'Test Life: Test Part', title: 'Test Hymn Three',
-    original: 'OTHER TUNE', reference: null, key: 'B flat',
+    original: 'TEST ORIGINAL THREE', reference: 'Z.H. 9', key: 'B flat',
     verses: ['Gamma line, with \u2019two\u2019 marks.', 'Delta line.'], choruses: [],
   },
   {
@@ -80,14 +80,12 @@ function quietMain(argv) {
 test('a small printed book becomes hymns and choruses with sections, keys and choruses', () => {
   const result = convertBook(SMALL);
   assert.deepEqual(result.problems, []);
-  // The heading line's own English title is replaced by the line under it.
-  const expected = structuredClone(EXPECTED);
-  assert.deepEqual(result.items, expected);
+  assert.deepEqual(result.items, EXPECTED);
   assert.deepEqual(result.stats, { pages: 6, hymns: 3, choruses: 2 });
   assert.ok(result.notes.some((n) => /chorus 2 has a different chorus from verse 2 on/.test(n.message)));
 });
 
-test('a chorus first printed after a later verse is still sung from verse 1', () => {
+test('a chorus first printed after a later verse is shown from that verse on, with a note', () => {
   const late = SMALL.replace(
     '             Ciindululo:\n        Refrain line one,\n          refrain line two.\n\n      2 Beta line one,\n    beta line two.\n',
     '      2 Beta line one,\n    beta line two.\n             Ciindululo:\n        Refrain line one,\n          refrain line two.\n',
@@ -95,8 +93,25 @@ test('a chorus first printed after a later verse is still sung from verse 1', ()
   assert.notEqual(late, SMALL);
   const result = convertBook(late);
   assert.deepEqual(result.problems, []);
-  assert.deepEqual(result.items[0].choruses, [{ from_verse: 1, text: 'Refrain line one,\nrefrain line two.' }]);
-  assert.ok(result.notes.some((n) => n.message === 'hymn 1 prints its chorus after verse 2; it is sung from verse 1'));
+  assert.deepEqual(result.items[0].choruses, [{ from_verse: 2, text: 'Refrain line one,\nrefrain line two.' }]);
+  assert.ok(result.notes.some((n) => n.message === 'hymn 1 prints its chorus first after verse 2; it is shown from there on'));
+});
+
+test('an English title printed both on the heading and under it is a problem, not a silent choice', () => {
+  const both = SMALL.replace('(Z.H. 9) Key of B', '(OTHER TUNE) Key of B');
+  assert.deepEqual(convertBook(both).problems.map((p) => p.message),
+    ['hymn 3 prints an English title on its heading ("TEST ORIGINAL THREE") and under it ("OTHER TUNE")']);
+});
+
+test('a one-line verse 1 completed by verse 2 is noted for the printed book check', () => {
+  const split = SMALL.replace(
+    '        1 Alpha line one,\n\n           alpha line two.\n',
+    '        1 Alpha line one,\n        2 alpha line two.\n',
+  ).replace('      2 Beta line one,\n    beta line two.\n', '      3 Beta line one,\n    beta line two.\n      4 Gamma line one,\n    gamma line two.\n');
+  const result = convertBook(split);
+  assert.deepEqual(result.problems, []);
+  assert.deepEqual(result.items[0].verses.map((v) => v.split('\n').length), [1, 1, 2, 2]);
+  assert.ok(result.notes.some((n) => n.message === 'hymn 1: verse 1 is one line and verse 2 completes its stanza (lines per verse 1, 1, 2, 2); check the verse numbers against the printed book'));
 });
 
 test('reviewed corrections apply only to the exact extracted line', () => {

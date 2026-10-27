@@ -497,7 +497,10 @@ GoRouter buildClientRouter({
           pageBuilder: (_, state) => page(
             state,
             BibleAndHymnsScreen(
-              initialView: state.uri.queryParameters['view'] == 'hymns'
+              // A hymn opened by its link returns to the hymn book.
+              initialView:
+                  state.uri.queryParameters['view'] == 'hymns' ||
+                      state.uri.path.startsWith('${ClientPaths.bible}/hymns/')
                   ? BibleHymnsView.hymns
                   : null,
             ),
@@ -774,14 +777,14 @@ void goFromNav(BuildContext context, String path) => context.go(
   extra: keyboardFocusVisible ? const NavFocusRequest() : null,
 );
 
-/// Story 4.10: a history link's member id (a UUID only; anything else opens
-/// the reader's own history).
 /// Story 6.7: a hymn link's item id (`hymn-12`, `chorus-3`), else null.
 String? _hymnId(String? v) =>
     v != null && RegExp(r'^(hymn|chorus)-[1-9][0-9]{0,2}$').hasMatch(v)
     ? v
     : null;
 
+/// Story 4.10: a history link's member id (a UUID only; anything else opens
+/// the reader's own history).
 String? _memberParam(String? v) =>
     v != null &&
         RegExp(

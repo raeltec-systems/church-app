@@ -217,13 +217,26 @@ class _HymnBookViewState extends ConsumerState<HymnBookView> {
     if (results.isEmpty) {
       return [
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           sliver: SliverToBoxAdapter(
-            child: Text(
-              'No hymns match "${_query.trim()}".',
-              key: const Key('hymn-search-empty'),
-              textAlign: TextAlign.center,
-              style: ChurchType.body.copyWith(color: c.muted),
+            child: DecoratedBox(
+              key: const Key('hymn-search-empty-frame'),
+              decoration: BoxDecoration(
+                color: c.surface,
+                border: Border.all(color: c.line),
+                borderRadius: BorderRadius.circular(
+                  ChurchGeometry.mobileCardRadius,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'No hymns match "${_query.trim()}".',
+                  key: const Key('hymn-search-empty'),
+                  textAlign: TextAlign.center,
+                  style: ChurchType.body.copyWith(color: c.muted),
+                ),
+              ),
             ),
           ),
         ),
@@ -293,12 +306,14 @@ class HymnRow extends StatelessWidget {
     final subline = showKind && chorus
         ? 'Chorus · ${hymn.firstLine}'
         : hymn.firstLine;
+    void open() => context.push(ClientPaths.hymn(hymn.id));
     return Semantics(
       button: true,
       label:
           '${chorus ? 'Chorus' : 'Hymn'} ${hymn.number}, ${hymn.title}. '
           '${hymn.firstLine}',
       excludeSemantics: true,
+      onTap: open,
       child: Material(
         type: MaterialType.transparency,
         child: InkWell(
@@ -307,7 +322,7 @@ class HymnRow extends StatelessWidget {
             top: first ? radius : Radius.zero,
             bottom: last ? radius : Radius.zero,
           ),
-          onTap: () => context.push(ClientPaths.hymn(hymn.id)),
+          onTap: open,
           child: Container(
             constraints: const BoxConstraints(minHeight: 64),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -318,12 +333,12 @@ class HymnRow extends StatelessWidget {
                   ),
             child: Row(
               children: [
-                SizedBox(
-                  width: 40,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 40),
                   child: Text(
                     '${hymn.number}',
                     textAlign: TextAlign.center,
-                    maxLines: 1,
+                    softWrap: false,
                     style: ChurchType.dateNumber.copyWith(color: c.brand),
                   ),
                 ),
@@ -525,7 +540,7 @@ class _HymnText extends StatelessWidget {
           ),
           if (hymn.chorusAfterVerse(index + 1) case final chorus?)
             Padding(
-              padding: EdgeInsets.only(left: numbered ? 34 : 14, top: 14),
+              padding: EdgeInsets.only(left: numbered ? 48 : 14, top: 14),
               child: Column(
                 key: Key('hymn-chorus-${index + 1}'),
                 crossAxisAlignment: CrossAxisAlignment.start,

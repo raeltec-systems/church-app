@@ -14,16 +14,16 @@ import 'package:flutter_test/flutter_test.dart';
 Map<String, Object?> _bookJson() => {
   'format': 1,
   'edition': 'test-1',
-  'title': 'Test hymn book',
+  'title': 'SYNTHETIC hymn book',
   'language': 'toi',
   'items': [
     {
       'id': 'hymn-1',
       'kind': 'hymn',
       'number': 1,
-      'section': 'Test opening',
-      'title': 'Test hymn 1',
-      'original': 'TEST ORIGINAL',
+      'section': 'SYNTHETIC opening',
+      'title': 'SYNTHETIC hymn 1',
+      'original': 'SYNTHETIC ORIGINAL',
       'reference': 'Z.H. 3',
       'key': 'A flat',
       'verses': ['Line one,\nline two.', 'Second verse.'],
@@ -35,8 +35,8 @@ Map<String, Object?> _bookJson() => {
       'id': 'hymn-2',
       'kind': 'hymn',
       'number': 2,
-      'section': 'Test opening',
-      'title': 'Test hymn 2',
+      'section': 'SYNTHETIC opening',
+      'title': 'SYNTHETIC hymn 2',
       'original': null,
       'reference': null,
       'key': null,
@@ -47,8 +47,8 @@ Map<String, Object?> _bookJson() => {
       'id': 'chorus-1',
       'kind': 'chorus',
       'number': 1,
-      'section': 'Test choruses',
-      'title': 'Test chorus 1',
+      'section': 'SYNTHETIC choruses',
+      'title': 'SYNTHETIC chorus 1',
       'original': null,
       'reference': null,
       'key': null,
@@ -76,7 +76,7 @@ Hymn _hymn(
 }) => Hymn(
   kind: kind,
   number: number,
-  section: kind == HymnKind.hymn ? 'Test hymns' : 'Test choruses',
+  section: kind == HymnKind.hymn ? 'SYNTHETIC hymns' : 'SYNTHETIC choruses',
   title: title,
   original: original,
   reference: null,
@@ -88,7 +88,7 @@ Hymn _hymn(
 HymnBook _searchBook() => HymnBook(
   format: 1,
   edition: 'test-1',
-  title: 'Test',
+  title: 'SYNTHETIC',
   language: 'toi',
   items: [
     for (var n = 1; n <= 13; n++)
@@ -96,17 +96,18 @@ HymnBook _searchBook() => HymnBook(
         HymnKind.hymn,
         n,
         switch (n) {
-          2 => 'Test 12 days',
-          3 => "Test ng'anda title",
-          4 => 'Test Jésus title',
-          5 => 'Test ŋanda title',
-          7 => 'Test „Quoted” ‟word',
-          _ => 'Test hymn $n',
+          2 => 'SYNTHETIC 12 days',
+          3 => "SYNTHETIC ng'anda title",
+          4 => 'SYNTHETIC Jésus title',
+          5 => 'SYNTHETIC ŋanda title',
+          7 => 'SYNTHETIC „Quoted” ‟word',
+          _ => 'SYNTHETIC hymn $n',
         },
         verse: n == 6 ? 'Morning light is breaking,\nsecond line.' : 'Plain.',
         original: n == 8 ? 'AMAZING GRACE' : null,
       ),
-    for (var n = 1; n <= 12; n++) _hymn(HymnKind.chorus, n, 'Test chorus $n'),
+    for (var n = 1; n <= 12; n++)
+      _hymn(HymnKind.chorus, n, 'SYNTHETIC chorus $n'),
   ],
 );
 
@@ -273,7 +274,7 @@ void main() {
       expect(_ids(book.items), ['hymn-1', 'hymn-2', 'chorus-1']);
       final first = book.byId('hymn-1')!;
       expect(first.firstLine, 'Line one');
-      expect(first.original, 'TEST ORIGINAL');
+      expect(first.original, 'SYNTHETIC ORIGINAL');
       expect(first.reference, 'Z.H. 3');
       expect(first.key, 'A flat');
       expect(first.chorusAfterVerse(1), 'Chorus line.');
@@ -293,7 +294,7 @@ void main() {
       'a missing field': (b) => b.remove('language'),
       'another format': (b) => b['format'] = 2,
       'a fractional format': (b) => b['format'] = 1.5,
-      'a bad edition': (b) => b['edition'] = 'Test Book',
+      'a bad edition': (b) => b['edition'] = 'SYNTHETIC Book',
       'a bad language': (b) => b['language'] = 'Tonga',
       'no items': (b) => b['items'] = <Object?>[],
       'a gap': (b) => _item(b, 1)
@@ -368,7 +369,7 @@ void main() {
       expect(_ids(book.search('1')), [
         'hymn-1',
         'chorus-1',
-        'hymn-2', // "Test 12 days": digits in a title match too
+        'hymn-2', // "SYNTHETIC 12 days": digits in a title match too
         'hymn-10',
         'hymn-11',
         'hymn-12',
@@ -413,8 +414,8 @@ void main() {
               'id': 'hymn-$n',
               'kind': 'hymn',
               'number': n,
-              'section': 'Test section',
-              'title': 'Test hymn $n',
+              'section': 'SYNTHETIC section',
+              'title': 'SYNTHETIC hymn $n',
               'original': null,
               'reference': null,
               'key': null,
@@ -431,7 +432,7 @@ void main() {
           bundle: _TextBundle({BundledHymnBookSource.assetKey: text}),
         ).load();
         expect(book.hymns, hasLength(300));
-        expect(book.byId('hymn-300')?.title, 'Test hymn 300');
+        expect(book.byId('hymn-300')?.title, 'SYNTHETIC hymn 300');
       },
     );
 
@@ -459,12 +460,12 @@ void main() {
       await tester.tap(find.text('Hymn book'));
       await tester.pumpAndSettle();
       expect(find.byType(BibleReaderScreen), findsNothing);
-      expect(find.text('Test opening'), findsOneWidget);
-      expect(find.text('Test praise'), findsOneWidget);
-      expect(find.text('Test choruses'), findsOneWidget);
-      final opening = tester.getTopLeft(find.text('Test opening')).dy;
-      final praise = tester.getTopLeft(find.text('Test praise')).dy;
-      final choruses = tester.getTopLeft(find.text('Test choruses')).dy;
+      expect(find.text('SYNTHETIC opening'), findsOneWidget);
+      expect(find.text('SYNTHETIC praise'), findsOneWidget);
+      expect(find.text('SYNTHETIC choruses'), findsOneWidget);
+      final opening = tester.getTopLeft(find.text('SYNTHETIC opening')).dy;
+      final praise = tester.getTopLeft(find.text('SYNTHETIC praise')).dy;
+      final choruses = tester.getTopLeft(find.text('SYNTHETIC choruses')).dy;
       expect(opening, lessThan(praise));
       expect(praise, lessThan(choruses));
       for (final id in ['hymn-1', 'hymn-2', 'hymn-3', 'chorus-1', 'chorus-2']) {
@@ -474,7 +475,7 @@ void main() {
         tester.getTopLeft(find.byKey(const Key('hymn-row-hymn-3'))).dy,
         greaterThan(praise),
       );
-      expect(find.text('Test hymn 1 verse one, line one'), findsOneWidget);
+      expect(find.text('SYNTHETIC hymn 1 verse one, line one'), findsOneWidget);
       expect(find.textContaining('Chorus ·'), findsNothing);
     });
 
@@ -504,16 +505,24 @@ void main() {
       expect(hymn.dy, lessThan(chorus.dy));
       expect(find.byKey(const Key('hymn-row-hymn-1')), findsNothing);
       expect(
-        find.text('Chorus · Test chorus 2 stanza, line one'),
+        find.text('Chorus · SYNTHETIC chorus 2 stanza, line one'),
         findsOneWidget,
       );
-      await tester.enterText(search, 'TEST hymn 3');
+      await tester.enterText(search, 'SYNTHETIC hymn 3');
       await tester.pump();
       expect(find.byKey(const Key('hymn-row-hymn-3')), findsOneWidget);
       expect(find.byKey(const Key('hymn-row-hymn-2')), findsNothing);
       await tester.enterText(search, 'zzz');
       await tester.pump();
       expect(find.text('No hymns match "zzz".'), findsOneWidget);
+      expect(
+        find.ancestor(
+          of: find.byKey(const Key('hymn-search-empty')),
+          matching: find.byKey(const Key('hymn-search-empty-frame')),
+        ),
+        findsOneWidget,
+        reason: 'the list keeps its frame with one sentence in it',
+      );
       expect(find.byKey(const Key('hymn-results')), findsNothing);
       await tester.tap(find.byKey(const Key('hymn-search-clear')));
       await tester.pump();
@@ -545,21 +554,21 @@ void main() {
         'verses and the italic chorus in 19/1.55 text', (tester) async {
       await _pumpRoute(tester, ClientPaths.hymn('hymn-1'));
       expect(find.text('Hymn 1'), findsOneWidget);
-      expect(find.text('Test hymn 1'), findsOneWidget);
-      expect(find.text('TEST ORIGINAL'), findsOneWidget);
+      expect(find.text('SYNTHETIC hymn 1'), findsOneWidget);
+      expect(find.text('SYNTHETIC ORIGINAL'), findsOneWidget);
       expect(find.text('Key of A flat'), findsOneWidget);
       expect(find.bySemanticsLabel('Verse 1'), findsOneWidget);
       expect(find.byKey(const Key('hymn-verse-2')), findsOneWidget);
       final verse = tester.widget<Text>(
         find.text(
-          'Test hymn 1 verse one, line one,\ntest hymn 1 verse one, line two.',
+          'SYNTHETIC hymn 1 verse one, line one,\nSYNTHETIC hymn 1 verse one, line two.',
         ),
       );
       expect(verse.style?.fontSize, 19);
       expect(verse.style?.height, 1.55);
       expect(verse.style?.fontStyle, isNot(FontStyle.italic));
       final chorus = tester.widgetList<Text>(
-        find.text('Test chorus line one,\ntest chorus line two.'),
+        find.text('SYNTHETIC chorus line one,\nSYNTHETIC chorus line two.'),
       );
       expect(chorus, hasLength(2), reason: 'the chorus follows each verse');
       for (final text in chorus) {
@@ -568,13 +577,73 @@ void main() {
         expect(text.style?.height, 1.55);
       }
       expect(find.text('Chorus'), findsNWidgets(2));
+      final verseLeft = tester
+          .getTopLeft(
+            find.text(
+              'SYNTHETIC hymn 1 verse one, line one,\n'
+              'SYNTHETIC hymn 1 verse one, line two.',
+            ),
+          )
+          .dx;
+      final chorusLeft = tester
+          .getTopLeft(find.byKey(const Key('hymn-chorus-1')))
+          .dx;
+      expect(chorusLeft - verseLeft, 14, reason: 'handoff: 14 px inside');
+    });
+
+    testWidgets('a row is a button that screen readers can open', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      await _pumpRoute(tester, ClientPaths.hymnBook);
+      final row = find.bySemanticsLabel(RegExp(r'^Hymn 2, SYNTHETIC hymn 2\.'));
+      expect(
+        tester.getSemantics(row),
+        containsSemantics(isButton: true, hasTapAction: true),
+      );
+      tester.semantics.tap(
+        find.semantics.byLabel(RegExp(r'^Hymn 2, SYNTHETIC hymn 2\.')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(HymnDetailScreen), findsOneWidget);
+      expect(find.text('Hymn 2'), findsOneWidget);
+      semantics.dispose();
+    });
+
+    testWidgets('a three-digit number keeps every digit at twice the text '
+        'size', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: churchMobileTheme(Brightness.light),
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+            child: Scaffold(
+              body: HymnRow(hymn: _hymn(HymnKind.hymn, 199, 'SYNTHETIC hymn')),
+            ),
+          ),
+        ),
+      );
+      expect(find.text('199'), findsOneWidget);
+      expect(tester.getSize(find.text('199')).width, greaterThan(40));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('back from a hymn opened by its link shows the hymn book', (
+      tester,
+    ) async {
+      await _pumpRoute(tester, ClientPaths.hymn('hymn-2'));
+      expect(find.byType(HymnDetailScreen), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(HymnBookView), findsOneWidget);
+      expect(find.byType(BibleReaderScreen), findsNothing);
     });
 
     testWidgets('a single-stanza chorus has no verse number, key or English '
         'title', (tester) async {
       await _pumpRoute(tester, ClientPaths.hymn('chorus-2'));
       expect(find.text('Chorus 2'), findsOneWidget);
-      expect(find.text('Test chorus 2'), findsOneWidget);
+      expect(find.text('SYNTHETIC chorus 2'), findsOneWidget);
       expect(find.byKey(const Key('hymn-key')), findsNothing);
       expect(find.byKey(const Key('hymn-original')), findsNothing);
       expect(find.bySemanticsLabel('Verse 1'), findsNothing);

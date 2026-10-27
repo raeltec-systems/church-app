@@ -293,11 +293,11 @@ export function convertBook(rawText, { corrections = [], explanations = [], layo
       // is sung from that verse on. A repeat of the current one adds nothing.
       const current = item.choruses.at(-1);
       if (block.lines.length > 0 && current === undefined) {
-        // The book prints the chorus once, normally after verse 1, and sings it after every verse.
+        // Printed once, normally after verse 1, and sung after that verse and every later one.
         if (block.afterVerse > 1) {
-          note(block.line, `${item.kind} ${item.number} prints its chorus after verse ${block.afterVerse}; it is sung from verse 1`);
+          note(block.line, `${item.kind} ${item.number} prints its chorus first after verse ${block.afterVerse}; it is shown from there on`);
         }
-        item.choruses.push({ from_verse: 1, text: value });
+        item.choruses.push({ from_verse: block.afterVerse, text: value });
       } else if (block.lines.length > 0 && current.text !== value) {
         if (current.from_verse === block.afterVerse) {
           problem(block.line, `${item.kind} ${item.number} prints two different choruses after verse ${block.afterVerse}`);
@@ -392,7 +392,14 @@ export function convertBook(rawText, { corrections = [], explanations = [], layo
         }
         const references = groups.filter((g) => layout.reference.test(g));
         const names = groups.filter((g) => !layout.reference.test(g));
-        item.original = names.length > 0 ? [names[0], ...names.slice(1).map((g) => `(${g})`)].join(' ') : null;
+        if (names.length > 0) {
+          const printed = [names[0], ...names.slice(1).map((g) => `(${g})`)].join(' ');
+          if (item.original !== null) {
+            problem(row.n, `${item.kind} ${item.number} prints an English title on its heading ("${item.original}") and under it ("${printed}")`);
+          } else {
+            item.original = printed;
+          }
+        }
         item.reference = references.length > 0 ? references.join('; ') : null;
         if (rest !== '') {
           const keyText = rest.match(layout.key);
@@ -459,6 +466,14 @@ export function convertBook(rawText, { corrections = [], explanations = [], layo
     if ((it.reference ?? '').length > LIMITS.maxReference) problem(it.line, `the hymnal reference of ${it.kind} ${it.number} is too long`);
     if (it.verses.length === 0) problem(it.line, `${it.kind} ${it.number} has no verses`);
     if (it.verses.length > LIMITS.maxVerses) problem(it.line, `${it.kind} ${it.number} has too many verses`);
+    // A one-line verse 1 that verse 2 completes into a full stanza: a "2" printed on the
+    // stanza's second line, or two short verses? The printed book has to say.
+    const lineCounts = it.verses.map((v) => v.split('\n').length);
+    const stanza = lineCounts[2];
+    if (lineCounts.length >= 3 && lineCounts[0] === 1 && stanza >= 2
+        && lineCounts.slice(2).every((c) => c === stanza) && lineCounts[0] + lineCounts[1] === stanza) {
+      note(it.line, `${it.kind} ${it.number}: verse 1 is one line and verse 2 completes its stanza (lines per verse ${lineCounts.join(', ')}); check the verse numbers against the printed book`);
+    }
     if (it.kind === 'hymn') {
       const entry = topical.get(it.number);
       it.section = entry?.section ?? null;

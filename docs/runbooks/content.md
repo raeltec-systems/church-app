@@ -440,7 +440,7 @@ Owner decision 2026-10-27: the hymn book is the official Brethren in Christ Chur
 
 - `tools/hymn-book/manuscript/inyimbo_zyabakristo.txt` is the PDF's text, extracted with `pdftotext -enc UTF-8 -layout inyimbo_zyabakristo.pdf inyimbo_zyabakristo.txt` (pdftotext 4.06, Git for Windows mingw64). `manuscript/provenance.json` pins the PDF (SHA-256 `0733124a4e5376ea8504e4709b77b7d03117f187a1b8b4fd13768a0f4d621139`, 1,631,474 bytes), the extracted text (SHA-256 of its LF form), the edition (`bicc-tonga-2012`), title and language. The PDF itself is not committed: it is a downloaded file, its text and hash make the build reproducible, and Israel keeps the original.
 - `tools/hymn-book/corrections.json` lists every reviewed fix of an extraction glitch, by line number, with the exact extracted text, the fix and why; the converter refuses a fix whose line no longer reads as recorded. It also holds explanations for title differences from the book's indexes of more than two letters (none are needed today).
-- `tools/hymn-book/convert.mjs` reads the printed layout (running headers and page numbers dropped; the topical, hymn and chorus indexes read; headings by the next expected number of each sequence; verses by their numbers; `Ciindululo:` choruses), cross-checks every title, number and section against the indexes, and refuses the whole book on any problem. `tools/hymn-book/conversion-report.txt` is its committed report: 0 problems, the 26 corrections and 72 notes (12 one- or two-letter title differences kept as printed, 59 hymns whose page header lags their topical-index section, and chorus 24's second chorus).
+- `tools/hymn-book/convert.mjs` reads the printed layout (running headers and page numbers dropped; the topical, hymn and chorus indexes read; headings by the next expected number of each sequence; verses by their numbers; `Ciindululo:` choruses), cross-checks every title, number and section against the indexes, and refuses the whole book on any problem. `tools/hymn-book/conversion-report.txt` is its committed report: 0 problems, the 26 corrections and 76 notes (12 one- or two-letter title differences kept as printed, 59 hymns whose page header lags their topical-index section, chorus 24's second chorus, hymn 29's chorus first printed after its verse 2, and hymns 25, 29 and 30, whose verse 1 is a single line that verse 2 completes, so the printed book must show whether the "2" stands on the stanza's second line).
 
 ### Replacing or correcting the book
 
@@ -463,8 +463,8 @@ Run `flutter analyze` and `flutter test` in `packages/client_core`, `packages/de
 On a signed-out Android phone in airplane mode, open **Bible & Hymns**, choose **Hymn book**, and:
 
 1. See the sections as group headers in the printed order (Kutalika Mubungano first; the choruses last under Ziindululo).
-2. Search by a number (`24`: hymn 24 is listed before chorus 24), by title words and by first-line words, with and without apostrophes (`nganda` finds `ng'anda`).
+2. Search by a number (`24`: hymn 24 is listed before chorus 24), by title words and by first-line words, with and without apostrophes: `wang uuteeli` and `wang' uuteeli` both find hymn 62, "Mwaala Wang’ Uuteeli".
 3. Open hymn 1 (English title REVIVE THY WORK, O LORD!, Key of F, three verses with the chorus after each), hymn 3 (one stanza, no key), and chorus 24 (a different chorus after verse 2), and compare them with the printed book.
 4. Confirm the app's count matches the converter report: 199 hymns and 67 choruses.
 
-Spot-check list for the PDF: hymns 1, 3, 4, 32, 106, 164, 178, 199 and choruses 1, 24, 26, 34, 67.
+Spot-check list for the PDF: hymns 1, 3, 4, 25, 29, 30, 32, 62, 106, 164, 178, 199 and choruses 1, 24, 26, 34, 67. Hymns 25, 29 and 30 need the printed book: the extraction numbers the second line of their first stanza "2", so the app shows a one-line verse 1.

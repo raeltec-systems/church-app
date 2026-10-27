@@ -874,7 +874,7 @@ class SermonNotes extends ConsumerWidget {
 
   List<InlineSpan> _inline(BuildContext context, WidgetRef ref, String text) {
     final pattern = RegExp(
-      r'\[([^\[\]\n]+)\]\(([^()\s]+)\)|\*\*(.+?)\*\*|(?<![A-Za-z0-9])__(.+?)__(?![A-Za-z0-9])|\*([^*\n]+)\*|(?<![A-Za-z0-9])_([^_\n]+)_(?![A-Za-z0-9])',
+      r'\[([^\[\]\n]+)\]\(([^()\s]+)\)|\*\*(.+?)\*\*|(?<![A-Za-z0-9_])__(.+?)__(?![A-Za-z0-9_])|\*([^*\n]+)\*|(?<![A-Za-z0-9_])_([^_\n]+)_(?![A-Za-z0-9_])',
     );
     final spans = <InlineSpan>[];
     var offset = 0;

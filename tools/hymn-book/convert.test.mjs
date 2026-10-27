@@ -87,6 +87,18 @@ test('a small printed book becomes hymns and choruses with sections, keys and ch
   assert.ok(result.notes.some((n) => /chorus 2 has a different chorus from verse 2 on/.test(n.message)));
 });
 
+test('a chorus first printed after a later verse is still sung from verse 1', () => {
+  const late = SMALL.replace(
+    '             Ciindululo:\n        Refrain line one,\n          refrain line two.\n\n      2 Beta line one,\n    beta line two.\n',
+    '      2 Beta line one,\n    beta line two.\n             Ciindululo:\n        Refrain line one,\n          refrain line two.\n',
+  );
+  assert.notEqual(late, SMALL);
+  const result = convertBook(late);
+  assert.deepEqual(result.problems, []);
+  assert.deepEqual(result.items[0].choruses, [{ from_verse: 1, text: 'Refrain line one,\nrefrain line two.' }]);
+  assert.ok(result.notes.some((n) => n.message === 'hymn 1 prints its chorus after verse 2; it is sung from verse 1'));
+});
+
 test('reviewed corrections apply only to the exact extracted line', () => {
   const lines = SMALL.split('\n');
   const at = lines.findIndex((l) => l.includes('Beta line one,')) + 1;

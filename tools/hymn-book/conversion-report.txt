@@ -28,12 +28,13 @@ Corrections applied: 26.
   line 7917: "Siya ansi imikuli (4 times)" -> "3 Kulainkwa akujulu (4 times)" (verse 3 of chorus 34 with its number)
   line 7919: "Kulainkwa akujulu (4 times)" -> "" (moved into line 7917)
   line 8521: "Ndeezya Syoonse Nsyuufwini .......................................... 16" -> "Ndeezya Syoonse Nsyuufwini .......................................... 167" (the topical index prints hymn 167 as 16 (hymn 16 is listed under its own section))
-Notes (index and section cross-checks): 72.
+Notes (index and section cross-checks): 73.
   line 43: hymn 1 "Leza Usimango (Cila)" differs from its index entry "Leza Usimanga" and "Leza Usimanga" by 1 letter; the heading is kept as printed
   line 263: hymn 8 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: KUZYALWA KWAKWE"; the topical index places it in "Leza Taatesu: Milimo Yakwe Aluzyalo Lwakwe"
   line 360: hymn 11 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: KUZYALWA KWAKWE"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Lufu Lwakwe"
   line 925: hymn 25 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: LUFU LWAKWE"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Kubuka Kwakwe"
   line 1048: hymn 29 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: KUBUKA KWAKWE"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Bulemu Bwakwe"
+  line 1055: hymn 29 prints its chorus after verse 2; it is sung from verse 1
   line 1160: hymn 32 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: BULEMU BWAKWE"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Kuboola Kwakwe"
   line 1195: hymn 33 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: BULEMU BWAKWE"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Kuboola Kwakwe"
   line 1832: hymn 49 is printed under the running header "KUJULU"; the topical index places it in "Mangwalo Aasweya"

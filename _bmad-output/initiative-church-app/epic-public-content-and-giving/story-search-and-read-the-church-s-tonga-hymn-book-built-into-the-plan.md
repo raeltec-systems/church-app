@@ -3,13 +3,13 @@ title: "Search and read the church's Tonga hymn book, built into the app"
 type: 'feature'
 ticket: '7'
 created: '2026-10-26'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '77f4632bc5d61da1d26a5417969bda1d3d852ded'
 route: 'full'
 route_source: 'auto'
-review: ''
-review_source: ''
-lenses_ran: []
+review: 'quick'
+review_source: 'pinned'
+lenses_ran: [quick]
 review_loop_iteration: 0
 followup_review_recommended: false
 context:

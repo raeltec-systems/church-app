@@ -292,12 +292,18 @@ export function convertBook(rawText, { corrections = [], explanations = [], layo
       // Printed once and sung after each verse; a different chorus printed after a later verse
       // is sung from that verse on. A repeat of the current one adds nothing.
       const current = item.choruses.at(-1);
-      if (block.lines.length > 0 && current?.text !== value) {
-        if (current && current.from_verse === block.afterVerse) {
+      if (block.lines.length > 0 && current === undefined) {
+        // The book prints the chorus once, normally after verse 1, and sings it after every verse.
+        if (block.afterVerse > 1) {
+          note(block.line, `${item.kind} ${item.number} prints its chorus after verse ${block.afterVerse}; it is sung from verse 1`);
+        }
+        item.choruses.push({ from_verse: 1, text: value });
+      } else if (block.lines.length > 0 && current.text !== value) {
+        if (current.from_verse === block.afterVerse) {
           problem(block.line, `${item.kind} ${item.number} prints two different choruses after verse ${block.afterVerse}`);
         } else {
           item.choruses.push({ from_verse: block.afterVerse, text: value });
-          if (current) note(block.line, `${item.kind} ${item.number} has a different chorus from verse ${block.afterVerse} on`);
+          note(block.line, `${item.kind} ${item.number} has a different chorus from verse ${block.afterVerse} on`);
         }
       }
     } else if (block.lines.length > 0) {

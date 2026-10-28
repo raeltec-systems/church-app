@@ -14,6 +14,8 @@ import 'src/adapters/recovery_verifier_storage.dart';
 import 'src/application/calendar_overlay_controllers.dart'
     show cellCalendarRepositoryProvider;
 import 'src/application/providers.dart';
+import 'src/application/search_controllers.dart'
+    show contentSearchRepositoryProvider;
 import 'src/domain/notification_settings.dart';
 import 'src/domain/password_recovery.dart';
 import 'supabase_adapters.dart';
@@ -116,6 +118,10 @@ Future<List<Override>> compositionOverrides(
     ),
     announcementsRepositoryProvider.overrideWithValue(
       SupabaseAnnouncementsRepository(client),
+    ),
+    // Epic 6 entry 14: the top-bar search read.
+    contentSearchRepositoryProvider.overrideWithValue(
+      SupabaseContentSearchRepository(client),
     ),
     // Story 6.8: favourites and Hymns for this Sunday.
     hymnListsRepositoryProvider.overrideWithValue(

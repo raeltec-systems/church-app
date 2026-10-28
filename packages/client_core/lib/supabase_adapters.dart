@@ -6,6 +6,7 @@ export 'src/adapters/supabase_sermons_repository.dart';
 
 export 'src/adapters/supabase_account_auth_gateway.dart';
 export 'src/adapters/supabase_announcements_repository.dart';
+export 'src/adapters/supabase_content_search_repository.dart';
 export 'src/adapters/supabase_assisted_recovery.dart';
 export 'src/adapters/supabase_banner_repository.dart';
 export 'src/adapters/supabase_cells_repository.dart';

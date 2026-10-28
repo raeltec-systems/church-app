@@ -10,6 +10,8 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 
 import 'src/application/providers.dart';
 import 'src/application/hymn_controllers.dart';
+import 'src/application/search_controllers.dart'
+    show contentSearchRepositoryProvider;
 import 'src/application/calendar_overlay_controllers.dart'
     show cellCalendarRepositoryProvider;
 import 'src/domain/platform_status.dart';
@@ -23,6 +25,7 @@ import 'src/domain/cell_programmes.dart';
 import 'src/domain/cell_membership.dart';
 import 'src/domain/commands.dart';
 import 'src/domain/content_announcements.dart';
+import 'src/domain/content_search.dart';
 import 'src/domain/content_banners.dart';
 import 'src/domain/content_events.dart';
 import 'src/domain/content_sermons.dart';
@@ -1399,6 +1402,41 @@ class FakeAnnouncements implements AnnouncementsRepository {
     return staffAnnouncements;
   }
 }
+
+/// [ContentSearchRepository] answered by the test (epic 6 entry 14): every
+/// search gets [answer], or the answer [byQuery] holds for its query; the
+/// queries asked are recorded. [hold] keeps answers back until completed.
+class FakeContentSearch implements ContentSearchRepository {
+  AccessRead<PublicSearchResults> answer = AccessReadOk(
+    PublicSearchResults.fromJson(publicSearchData()),
+  );
+  final Map<String, AccessRead<PublicSearchResults>> byQuery = {};
+  final asked = <String>[];
+  Completer<void>? hold;
+
+  @override
+  Future<AccessRead<PublicSearchResults>> search(String query) async {
+    asked.add(query);
+    final h = hold;
+    if (h != null) await h.future;
+    return byQuery[query] ?? answer;
+  }
+}
+
+/// The wire form of `api.content_public_search` (entry 14).
+Map<String, Object?> publicSearchData({
+  String query = 'SYNTHETIC',
+  List<Map<String, Object?>> sermons = const [],
+  List<Map<String, Object?>> events = const [],
+  List<Map<String, Object?>> announcements = const [],
+  bool truncated = false,
+}) => {
+  'query': query,
+  'sermons': sermons,
+  'events': events,
+  'announcements': announcements,
+  'truncated': truncated,
+};
 
 /// The wire form of one published announcement as everyone reads it (story
 /// 6.13); by default the pinned SYNTHETIC harvest offering notice.
@@ -3358,6 +3396,7 @@ class ClientTestHarness {
   final giving = FakeGiving();
   GivingDiallerLauncher? givingDiallerLauncher;
   final announcements = FakeAnnouncements();
+  final search = FakeContentSearch();
   final banners = FakeBanners();
   final publicContentCache = FakePublicContentCache();
   final filePicker = FakeFilePicker();
@@ -3413,6 +3452,7 @@ class ClientTestHarness {
         givingDiallerLauncher ?? const UnavailableGivingDiallerLauncher(),
       ),
       announcementsRepositoryProvider.overrideWithValue(announcements),
+      contentSearchRepositoryProvider.overrideWithValue(search),
       hymnListsRepositoryProvider.overrideWithValue(hymnLists),
       bannerRepositoryProvider.overrideWithValue(banners),
       publicContentCacheProvider.overrideWithValue(publicContentCache),

@@ -44,6 +44,7 @@ select results_eq(
            ('api.content_public_bible_chapter'), ('api.content_public_bible_translations'),
            ('api.content_public_event'), ('api.content_public_events'),
            ('api.content_public_giving_method'), ('api.content_public_giving_methods'),
+           ('api.content_public_search'),
            ('api.content_public_sermon'), ('api.content_public_sermons'),
            ('api.content_public_sunday_hymns'),
            ('api.system_command'),
@@ -53,10 +54,11 @@ select results_eq(
            ('app.content_public_bible_chapter'), ('app.content_public_bible_translations'),
            ('app.content_public_event'), ('app.content_public_events'),
            ('app.content_public_giving_method'), ('app.content_public_giving_methods'),
+           ('app.content_public_search'),
            ('app.content_public_sermon'), ('app.content_public_sermons'),
            ('app.content_public_sunday_hymns'),
            ('app.sys_command')$$,
-  'anon can execute only the system route pair and the Content public reads (stories 6.1, 6.2, 6.3, 6.6, 6.8, 6.13)'
+  'anon can execute only the system route pair and the Content public reads (stories 6.1, 6.2, 6.3, 6.6, 6.8, 6.13, 6.14)'
 );
 select results_eq(
   $$select (n.nspname || '.' || p.proname)::text collate "C"
@@ -74,6 +76,7 @@ select results_eq(
            ('api.content_public_bible_chapter'), ('api.content_public_bible_translations'),
            ('api.content_public_event'), ('api.content_public_events'),
            ('api.content_public_giving_method'), ('api.content_public_giving_methods'),
+           ('api.content_public_search'),
            ('api.content_public_sermon'), ('api.content_public_sermons'),
            ('api.content_public_sunday_hymns'),
            ('api.content_staff_announcements'), ('api.content_staff_banners'),
@@ -121,6 +124,7 @@ select results_eq(
            ('app.content_public_bible_chapter'), ('app.content_public_bible_translations'),
            ('app.content_public_event'), ('app.content_public_events'),
            ('app.content_public_giving_method'), ('app.content_public_giving_methods'),
+           ('app.content_public_search'),
            ('app.content_public_sermon'), ('app.content_public_sermons'),
            ('app.content_public_sunday_hymns'),
            ('app.content_staff_announcements'), ('app.content_staff_banners'),

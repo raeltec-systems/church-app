@@ -1709,6 +1709,19 @@ class FakePublicContentCache implements PublicContentCache {
     );
   }
 
+  final removedSermons = <String>[];
+
+  @override
+  Future<void> removeSermon(String sermonId) async {
+    removedSermons.add(sermonId);
+    final snapshot = sermons;
+    if (snapshot == null) return;
+    sermons = PublicContentSnapshot(
+      savedAt: snapshot.savedAt,
+      value: snapshot.value.withoutSermon(sermonId),
+    );
+  }
+
   @override
   Future<void> reconcileGivingMethod(
     PublicGivingMethod method, {

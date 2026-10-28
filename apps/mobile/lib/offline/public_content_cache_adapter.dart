@@ -677,15 +677,7 @@ class PublicContentCacheAdapter implements PublicContentCache {
       await _commitManifest(directory, next);
       if (readKey == PublicContentCacheKeys.sermons) {
         try {
-          await for (final entity in directory.list()) {
-            if (entity is File &&
-                entity.uri.pathSegments.last.startsWith(
-                  'sermon-poster-offline-',
-                ) &&
-                !imageFiles.contains(entity.uri.pathSegments.last)) {
-              await entity.delete();
-            }
-          }
+          await _removeUnusedSermonPosters(directory, imageFiles);
         } catch (_) {
           /* Manifest committed; leftover files are not readable. */
         }
@@ -743,6 +735,75 @@ class PublicContentCacheAdapter implements PublicContentCache {
       }
     });
     return completer.future;
+  }
+
+  @override
+  Future<void> removeSermon(String sermonId) {
+    final completer = Completer<void>();
+    _writeQueue = _writeQueue.then((_) async {
+      try {
+        await _removeSermon(sermonId);
+      } catch (_) {
+        // The detail read already says the sermon is gone; a failed cleanup
+        // leaves the previous manifest, never a partial one.
+      } finally {
+        completer.complete();
+      }
+    });
+    return completer.future;
+  }
+
+  Future<void> _removeSermon(String sermonId) async {
+    final directory = await _directory();
+    final manifest = await _readManifest(directory);
+    if (manifest == null) return;
+    final reads = Map<String, Object?>.from(manifest['reads'] as Map);
+    final entry = reads[PublicContentCacheKeys.sermons];
+    if (entry is! Map || entry['image_files'] is! Map) return;
+    final source = PublicSermons.fromJson(entry['projection']);
+    if (source.byId(sermonId) == null) return;
+    final remaining = source.withoutSermon(sermonId);
+    // A series only the removed sermon carried leaves the saved rows, so its
+    // poster file entry goes too (the reader refuses unknown file keys).
+    final seriesIds = {
+      for (final s in remaining.series) s.seriesId,
+      for (final s in remaining.sermons)
+        if (s.series != null) s.series!.seriesId,
+    };
+    final files = <String, Object?>{
+      for (final file in (entry['image_files'] as Map).entries)
+        if (seriesIds.contains(file.key)) file.key as String: file.value,
+    };
+    reads[PublicContentCacheKeys.sermons] = {
+      'saved_at': entry['saved_at'],
+      'projection': remaining.toCacheJson(),
+      'image_files': files,
+    };
+    await _commitManifest(
+      directory,
+      jsonEncode({'version': _manifestVersion, 'reads': reads}),
+    );
+    await _removeUnusedSermonPosters(
+      directory,
+      files.values.whereType<String>().toSet(),
+    );
+  }
+
+  Future<void> _removeUnusedSermonPosters(
+    Directory directory,
+    Set<String> active,
+  ) async {
+    await for (final entity in directory.list()) {
+      if (entity is File &&
+          entity.uri.pathSegments.last.startsWith('sermon-poster-offline-') &&
+          !active.contains(entity.uri.pathSegments.last)) {
+        try {
+          await entity.delete();
+        } catch (_) {
+          // The manifest no longer references this poster.
+        }
+      }
+    }
   }
 
   @override

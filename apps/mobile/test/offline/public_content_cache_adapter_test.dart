@@ -268,6 +268,50 @@ void main() {
     },
   );
 
+  // Review F3: a known withdrawal is removed without a list refresh.
+  test(
+    'removing a withdrawn sermon keeps the rest and drops its orphan poster',
+    () async {
+      const other = '93939393-9393-4393-8393-939393939393';
+      final series = publicSermonSeriesData(poster: true, posterOffline: true);
+      // The series is known only through the withdrawn sermon's row.
+      final catalog = PublicSermons.fromJson({
+        'sermons': [
+          publicSermonData(series: series),
+          publicSermonData(id: other, title: 'SYNTHETIC Another sermon'),
+        ],
+        'series': [],
+        'truncated': false,
+      });
+      await cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        catalog,
+        loadSermonPoster: (_) async => imageBytes,
+      );
+      List<File> posters() => root
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.png'))
+          .toList();
+      expect(posters(), hasLength(1));
+      final withdrawn = catalog.sermons.first.sermonId;
+
+      await cache.removeSermon(withdrawn);
+
+      final cold = PublicContentCacheAdapter(
+        supportDirectory: () async => root,
+      );
+      final snapshot = await cold.readSermons();
+      expect(snapshot, isNotNull);
+      expect(snapshot!.savedAt, savedAt);
+      expect(snapshot.value.sermons.map((s) => s.sermonId), [other]);
+      expect(posters(), isEmpty);
+      // Removing an absent sermon is a no-op.
+      await cache.removeSermon(withdrawn);
+      expect((await cold.readSermons())?.value.sermons, hasLength(1));
+    },
+  );
+
   test('only allowlisted public list reads can create a manifest', () async {
     final outcome = await cache.writeRead(
       'content_staff_events',

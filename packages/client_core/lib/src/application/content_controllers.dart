@@ -108,15 +108,24 @@ abstract class PublicReadController<T> extends Notifier<PublicReadState<T>> {
         // A cache maintenance failure cannot replace a successful server read.
       }
       if (!ref.mounted || epoch != _epoch) return;
-      final savedAt = supportsOfflineSnapshot
-          ? await saveOfflineSnapshot(r.value)
-          : null;
-      if (!ref.mounted || epoch != _epoch) return;
-      state = PublicReadState<T>(
-        result: r,
-        asOf: DateTime.now(),
-        savedAt: savedAt,
-      );
+      // The fresh answer shows at once; saving it (and any optional images)
+      // for offline use follows and never holds the screen back. Withdrawal
+      // invalidation still happens inside the save, in queue order.
+      final asOf = DateTime.now();
+      state = PublicReadState<T>(result: r, asOf: asOf);
+      if (!supportsOfflineSnapshot) return;
+      DateTime? savedAt;
+      try {
+        savedAt = await saveOfflineSnapshot(r.value);
+      } catch (_) {
+        // An offline save failure cannot replace a successful server read.
+      }
+      if (!ref.mounted || epoch != _epoch || !identical(state.result, r)) {
+        return;
+      }
+      if (savedAt != null) {
+        state = PublicReadState<T>(result: r, asOf: asOf, savedAt: savedAt);
+      }
       return;
     }
     if (r is AccessReadFailed<T> && supportsOfflineSnapshot) {
@@ -176,6 +185,30 @@ class PublicEventsController extends PublicReadController<PublicEvents> {
   @override
   Future<PublicContentSnapshot<PublicEvents>?> readOfflineSnapshot() =>
       ref.read(publicContentCacheProvider).readEvents();
+
+  /// A fresh detail read said [eventId] is no longer public: drop it from
+  /// the list on screen and from the saved Calendar at once, so a failed
+  /// list refresh cannot bring it back. The list is then refreshed; a read
+  /// already in flight is restarted so it cannot show an older copy.
+  Future<void> forgetEvent(String eventId) async {
+    final value = state.value;
+    final listed =
+        value != null && value.events.any((e) => e.eventId == eventId);
+    final inFlight = state.loading;
+    if (listed) {
+      state = PublicReadState<PublicEvents>(
+        loading: state.loading,
+        result: AccessReadOk(value.withoutEvent(eventId)),
+        asOf: state.asOf,
+        refreshFailed: state.refreshFailed,
+        savedAt: state.savedAt,
+        offlineSnapshot: state.offlineSnapshot,
+      );
+    }
+    await ref.read(publicContentCacheProvider).removeEvent(eventId);
+    if (!ref.mounted) return;
+    if (listed || inFlight) unawaited(reload());
+  }
 }
 
 final publicEventsProvider =
@@ -184,6 +217,11 @@ final publicEventsProvider =
     );
 
 /// `api.content_public_event`: one event (null when it is not public).
+///
+/// Owner decision 2026-10-28: a saved Calendar event opens offline, read
+/// from the saved Calendar list the way a sermon reads from its saved
+/// catalog. An event the saved list does not hold (unknown, or removed after
+/// a fresh read said it was withdrawn) is never shown from the cache.
 class PublicEventController extends PublicReadController<PublicEventRead> {
   PublicEventController(this.eventId);
 
@@ -192,6 +230,31 @@ class PublicEventController extends PublicReadController<PublicEventRead> {
   @override
   Future<AccessRead<PublicEventRead>> fetch() =>
       ref.read(contentRepositoryProvider).fetchPublicEvent(eventId);
+
+  @override
+  bool get supportsOfflineSnapshot => true;
+
+  @override
+  Future<PublicContentSnapshot<PublicEventRead>?> readOfflineSnapshot() async {
+    final calendar = await ref.read(publicContentCacheProvider).readEvents();
+    final event = calendar?.value.events
+        .where((e) => e.eventId == eventId && e.offlineAllowed)
+        .firstOrNull;
+    return event == null
+        ? null
+        : PublicContentSnapshot(
+            value: PublicEventRead(event),
+            savedAt: calendar!.savedAt,
+          );
+  }
+
+  @override
+  Future<void> onFreshRead(PublicEventRead value) async {
+    // A known withdrawal invalidates the saved copy directly.
+    if (value.event == null) {
+      await ref.read(publicEventsProvider.notifier).forgetEvent(eventId);
+    }
+  }
 }
 
 final publicEventProvider = NotifierProvider.autoDispose

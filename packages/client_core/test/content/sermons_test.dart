@@ -737,4 +737,61 @@ void main() {
       ]);
     },
   );
+
+  // Review F3: a known withdrawal invalidates the saved copy directly.
+  test('a withdrawn sermon leaves the saved catalog even when the list refresh fails', () async {
+    const other = '93939393-9393-4393-8393-939393939393';
+    // One harness, so both containers share the same saved cache.
+    final h = ClientTestHarness();
+    final cache = h.publicContentCache
+      ..available = true
+      ..sermons = PublicContentSnapshot(
+        value: _catalog(),
+        savedAt: DateTime.utc(2026, 10, 27),
+      );
+    h.sermons.catalog = const AccessReadFailed(unreachable: true);
+    h.sermons.details[other] = const AccessReadFailed(unreachable: true);
+    ProviderContainer open(AccessRead<PublicSermonRead> detail) {
+      h.sermons.details[_id] = detail;
+      final c = ProviderContainer(overrides: h.overrides());
+      addTearDown(c.dispose);
+      return c;
+    }
+
+    // Online detail says the sermon is gone; the list refresh fails and
+    // shows the saved catalog.
+    final online = open(const AccessReadOk(PublicSermonRead(null)));
+    final list = online.listen(publicSermonsProvider, (_, _) {});
+    addTearDown(list.close);
+    final detail = online.listen(publicSermonProvider(_id), (_, _) {});
+    addTearDown(detail.close);
+    await pumpEventQueue();
+
+    expect(cache.removedSermons, [_id]);
+    expect(cache.sermons!.value.byId(_id), isNull);
+    expect(cache.sermons!.value.byId(other), isNotNull);
+    expect(online.read(publicSermonsProvider).value?.byId(_id), isNull);
+    expect(online.read(publicSermonsProvider).value?.byId(other), isNotNull);
+
+    // Reopened offline: neither the catalog nor the detail brings it back,
+    // while the unrelated saved sermon still opens.
+    final reopened = open(
+      const AccessReadFailed<PublicSermonRead>(unreachable: true),
+    );
+    final again = reopened.listen(publicSermonsProvider, (_, _) {});
+    addTearDown(again.close);
+    final gone = reopened.listen(publicSermonProvider(_id), (_, _) {});
+    addTearDown(gone.close);
+    final kept = reopened.listen(publicSermonProvider(other), (_, _) {});
+    addTearDown(kept.close);
+    await pumpEventQueue();
+
+    expect(reopened.read(publicSermonsProvider).value?.byId(_id), isNull);
+    expect(reopened.read(publicSermonsProvider).value?.byId(other), isNotNull);
+    expect(reopened.read(publicSermonProvider(_id)).value, isNull);
+    expect(
+      reopened.read(publicSermonProvider(other)).value?.sermon?.sermonId,
+      other,
+    );
+  });
 }

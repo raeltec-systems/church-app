@@ -424,18 +424,40 @@ class BibleStaffState {
 
 class BibleStaffController extends Notifier<BibleStaffState> {
   int _epoch = 0;
+  int _generation = 0;
 
   @override
   BibleStaffState build() {
-    ref.watch(accountGenerationProvider);
+    _generation = ref.watch(accountGenerationProvider);
     final epoch = ++_epoch;
     Future.microtask(() => reload(epoch));
     return const BibleStaffState(loading: true);
   }
 
-  bool _current(int epoch) => ref.mounted && _epoch == epoch;
+  /// True while [epoch] is still the controller's operation AND the account
+  /// it began under is still signed in. The generation is read directly so a
+  /// continuation is refused even before Riverpod rebuilds this controller
+  /// after an account change.
+  bool _current(int epoch) =>
+      ref.mounted &&
+      _epoch == epoch &&
+      ref.read(accountGenerationProvider) == _generation;
+
+  /// Takes the busy guard and a fresh epoch synchronously, before an
+  /// operation's first await, so a second tap is refused and every later
+  /// continuation can be checked against this account and operation.
+  int? _begin() {
+    if (state.busy) return null;
+    if (ref.read(accountGenerationProvider) != _generation) return null;
+    final epoch = ++_epoch;
+    state = BibleStaffState(busy: true, catalog: state.catalog);
+    return epoch;
+  }
 
   Future<void> reload([int? expectedEpoch]) async {
+    // A running import or lifecycle command owns the list reload; a manual
+    // reload would orphan it and leave the busy guard on.
+    if (expectedEpoch == null && state.busy) return;
     final epoch = expectedEpoch ?? ++_epoch;
     if (!_current(epoch)) return;
     state = BibleStaffState(
@@ -475,9 +497,12 @@ class BibleStaffController extends Notifier<BibleStaffState> {
       );
       return;
     }
+    final epoch = _begin();
+    if (epoch == null) return;
     final manifestRead = await ref
         .read(bibleRepositoryProvider)
         .fetchVerseManifest(code);
+    if (!_current(epoch)) return;
     if (manifestRead is! AccessReadOk<BibleVerseManifest>) {
       state = BibleStaffState(
         catalog: state.catalog,
@@ -507,6 +532,7 @@ class BibleStaffController extends Notifier<BibleStaffState> {
       return;
     }
     await _importRows(
+      epoch: epoch,
       translationId: translationId,
       code: code,
       name: name,
@@ -534,9 +560,12 @@ class BibleStaffController extends Notifier<BibleStaffState> {
       );
       return;
     }
+    final epoch = _begin();
+    if (epoch == null) return;
     final manifestRead = await ref
         .read(bibleRepositoryProvider)
         .fetchVerseManifest('WEB');
+    if (!_current(epoch)) return;
     if (manifestRead is! AccessReadOk<BibleVerseManifest>) {
       state = BibleStaffState(
         catalog: state.catalog,
@@ -550,12 +579,14 @@ class BibleStaffController extends Notifier<BibleStaffState> {
           .read(bibleTranslationPackageSourceProvider)
           .loadWorldEnglishBibleVpl();
     } on Object {
+      if (!_current(epoch)) return;
       state = BibleStaffState(
         catalog: state.catalog,
         message: 'The bundled WEB package could not be read. Update the staff app and try again.',
       );
       return;
     }
+    if (!_current(epoch)) return;
     final parsed = parseBibleVpl(source, manifestRead.value);
     if (!parsed.valid) {
       state = BibleStaffState(
@@ -565,10 +596,19 @@ class BibleStaffController extends Notifier<BibleStaffState> {
       );
       return;
     }
-    final existing = state.value!.translations
+    final catalog = state.value;
+    if (catalog == null) {
+      state = BibleStaffState(
+        catalog: state.catalog,
+        message: 'Reload the translation list before installing WEB',
+      );
+      return;
+    }
+    final existing = catalog.translations
         .where((translation) => translation.code == 'WEB')
         .firstOrNull;
     await _importRows(
+      epoch: epoch,
       translationId: existing?.id,
       code: 'WEB',
       name: 'World English Bible',
@@ -579,6 +619,7 @@ class BibleStaffController extends Notifier<BibleStaffState> {
   }
 
   Future<void> _importRows({
+    required int epoch,
     required String? translationId,
     required String code,
     required String name,
@@ -586,7 +627,7 @@ class BibleStaffController extends Notifier<BibleStaffState> {
     required BibleVerseManifest manifest,
     required List<BibleCsvRow> rows,
   }) async {
-    final epoch = ++_epoch;
+    if (!_current(epoch)) return;
     state = BibleStaffState(
       busy: true,
       catalog: state.catalog,
@@ -683,9 +724,8 @@ class BibleStaffController extends Notifier<BibleStaffState> {
     String command,
     StaffBibleTranslation translation,
   ) async {
-    if (state.busy) return;
-    final epoch = ++_epoch;
-    state = BibleStaffState(busy: true, catalog: state.catalog);
+    final epoch = _begin();
+    if (epoch == null) return;
     final result = await _send(
       command,
       Optional<int>.of(translation.revision),
@@ -703,8 +743,9 @@ class BibleStaffController extends Notifier<BibleStaffState> {
 
   Future<void> checkAgain() async {
     final request = state.unconfirmed;
-    if (request == null || state.busy) return;
-    final epoch = ++_epoch;
+    if (request == null) return;
+    final epoch = _begin();
+    if (epoch == null) return;
     state = BibleStaffState(
       busy: true,
       unconfirmed: request,
@@ -738,6 +779,8 @@ class BibleStaffController extends Notifier<BibleStaffState> {
   }
 
   Future<CommandSuccess?> _dispatch(CommandRequest request, int epoch) async {
+    // Never send under a session other than the one the operation began in.
+    if (!_current(epoch)) return null;
     final result = await ref
         .read(commandGatewayProvider)
         .send(ContentCommands.function, request);

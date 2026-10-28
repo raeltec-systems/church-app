@@ -80,7 +80,63 @@ class PublicContentCacheAdapter implements PublicContentCache {
       '${Platform.pathSeparator}public-content-v1',
     );
     await directory.create(recursive: true);
+    await (_recovered ??= _recoverManifest(directory));
     return directory;
+  }
+
+  Future<void>? _recovered;
+
+  /// Startup recovery for a manifest replacement interrupted by a process
+  /// stop (see [_commitManifest]). With no live manifest, the newest fully
+  /// written replacement is promoted, else the newest backup is restored;
+  /// a leftover that does not parse is never promoted. Leftovers are then
+  /// removed. Runs once per adapter, before any read or write.
+  Future<void> _recoverManifest(Directory directory) async {
+    try {
+      final live = await _manifest(directory);
+      final name = live.uri.pathSegments.last;
+      final temps = <File>[];
+      final backups = <File>[];
+      await for (final entity in directory.list()) {
+        if (entity is! File) continue;
+        final n = entity.uri.pathSegments.last;
+        if (n.startsWith('$name.tmp-')) temps.add(entity);
+        if (n.startsWith('$name.backup-')) backups.add(entity);
+      }
+      int stamp(File f) =>
+          int.tryParse(f.uri.pathSegments.last.split('-').last) ?? 0;
+      temps.sort((a, b) => stamp(b).compareTo(stamp(a)));
+      backups.sort((a, b) => stamp(b).compareTo(stamp(a)));
+      if (!await live.exists()) {
+        for (final candidate in [...temps, ...backups]) {
+          if (await _validManifestFile(candidate)) {
+            await candidate.rename(live.path);
+            break;
+          }
+        }
+      }
+      for (final leftover in [...temps, ...backups]) {
+        try {
+          if (await leftover.exists()) await leftover.delete();
+        } catch (_) {
+          // A leftover is never read as the manifest.
+        }
+      }
+    } catch (_) {
+      // Recovery is best effort; an unreadable cache reads as empty.
+    }
+  }
+
+  Future<bool> _validManifestFile(File file) async {
+    try {
+      final decoded = jsonDecode(await file.readAsString());
+      return _hasKeys(decoded, const {'version', 'reads'}) &&
+          decoded['version'] == _manifestVersion &&
+          decoded['reads'] is Map &&
+          (decoded['reads'] as Map).keys.every(_allowedReads.contains);
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<File> _manifest(Directory directory) async =>
@@ -434,7 +490,9 @@ class PublicContentCacheAdapter implements PublicContentCache {
           );
         }
         final directory = await _directory();
-        await _removeReadBeforeRefresh(directory, readKey);
+        // Withdrawn, superseded or revoked banners leave the saved read now,
+        // before any download; unchanged permitted ones stay for reuse.
+        await _pruneBannersBeforeRefresh(directory, projection);
         final eligible = <PublicBanner>[];
         final files = <String, String>{};
         for (final banner in projection.banners) {
@@ -667,25 +725,26 @@ class PublicContentCacheAdapter implements PublicContentCache {
 
       final directory = await _directory();
       final manifest = await _readManifest(directory);
-      if (await (await _manifest(directory)).exists() && manifest == null) {
-        return const PublicContentCacheUnavailable();
-      }
+      // One policy for every read type: an unreadable manifest already reads
+      // as no saved content, so a successful write replaces it with just
+      // this read, and every image no longer referenced is removed.
+      final corrupt =
+          manifest == null && await (await _manifest(directory)).exists();
       final reads = Map<String, Object?>.from(
         (manifest?['reads'] as Map?) ?? const {},
       )..[readKey] = entry;
       final next = jsonEncode({'version': _manifestVersion, 'reads': reads});
       await _commitManifest(directory, next);
+      if (corrupt) {
+        try {
+          await _removeUnreferencedImages(directory, imageFiles);
+        } catch (_) {
+          // Unreferenced files are never read.
+        }
+      }
       if (readKey == PublicContentCacheKeys.sermons) {
         try {
-          await for (final entity in directory.list()) {
-            if (entity is File &&
-                entity.uri.pathSegments.last.startsWith(
-                  'sermon-poster-offline-',
-                ) &&
-                !imageFiles.contains(entity.uri.pathSegments.last)) {
-              await entity.delete();
-            }
-          }
+          await _removeUnusedSermonPosters(directory, imageFiles);
         } catch (_) {
           /* Manifest committed; leftover files are not readable. */
         }
@@ -743,6 +802,115 @@ class PublicContentCacheAdapter implements PublicContentCache {
       }
     });
     return completer.future;
+  }
+
+  @override
+  Future<void> removeSermon(String sermonId) {
+    final completer = Completer<void>();
+    _writeQueue = _writeQueue.then((_) async {
+      try {
+        await _removeSermon(sermonId);
+      } catch (_) {
+        // The detail read already says the sermon is gone; a failed cleanup
+        // leaves the previous manifest, never a partial one.
+      } finally {
+        completer.complete();
+      }
+    });
+    return completer.future;
+  }
+
+  @override
+  Future<void> removeEvent(String eventId) {
+    final completer = Completer<void>();
+    _writeQueue = _writeQueue.then((_) async {
+      try {
+        await _removeEvent(eventId);
+      } catch (_) {
+        // The detail read already says the event is gone; a failed cleanup
+        // leaves the previous manifest, never a partial one.
+      } finally {
+        completer.complete();
+      }
+    });
+    return completer.future;
+  }
+
+  Future<void> _removeEvent(String eventId) async {
+    final directory = await _directory();
+    final manifest = await _readManifest(directory);
+    if (manifest == null) return;
+    final reads = Map<String, Object?>.from(manifest['reads'] as Map);
+    final entry = reads[PublicContentCacheKeys.calendar];
+    if (entry is! Map) return;
+    final projection = entry['projection'];
+    if (projection is! Map || projection['events'] is! List) return;
+    final events = projection['events'] as List;
+    final kept = events
+        .where((raw) => raw is Map && raw['event_id'] != eventId)
+        .toList(growable: false);
+    if (kept.length == events.length) return;
+    reads[PublicContentCacheKeys.calendar] = {
+      'saved_at': entry['saved_at'],
+      'projection': {'events': kept, 'truncated': projection['truncated']},
+    };
+    await _commitManifest(
+      directory,
+      jsonEncode({'version': _manifestVersion, 'reads': reads}),
+    );
+  }
+
+  Future<void> _removeSermon(String sermonId) async {
+    final directory = await _directory();
+    final manifest = await _readManifest(directory);
+    if (manifest == null) return;
+    final reads = Map<String, Object?>.from(manifest['reads'] as Map);
+    final entry = reads[PublicContentCacheKeys.sermons];
+    if (entry is! Map || entry['image_files'] is! Map) return;
+    final source = PublicSermons.fromJson(entry['projection']);
+    if (source.byId(sermonId) == null) return;
+    final remaining = source.withoutSermon(sermonId);
+    // A series only the removed sermon carried leaves the saved rows, so its
+    // poster file entry goes too (the reader refuses unknown file keys).
+    final seriesIds = {
+      for (final s in remaining.series) s.seriesId,
+      for (final s in remaining.sermons)
+        if (s.series != null) s.series!.seriesId,
+    };
+    final files = <String, Object?>{
+      for (final file in (entry['image_files'] as Map).entries)
+        if (seriesIds.contains(file.key)) file.key as String: file.value,
+    };
+    reads[PublicContentCacheKeys.sermons] = {
+      'saved_at': entry['saved_at'],
+      'projection': remaining.toCacheJson(),
+      'image_files': files,
+    };
+    await _commitManifest(
+      directory,
+      jsonEncode({'version': _manifestVersion, 'reads': reads}),
+    );
+    await _removeUnusedSermonPosters(
+      directory,
+      files.values.whereType<String>().toSet(),
+    );
+  }
+
+  Future<void> _removeUnusedSermonPosters(
+    Directory directory,
+    Set<String> active,
+  ) async {
+    await for (final entity in directory.list()) {
+      if (entity is File &&
+          entity.uri.pathSegments.last.startsWith('sermon-poster-offline-') &&
+          !active.contains(entity.uri.pathSegments.last)) {
+        try {
+          await entity.delete();
+        } catch (_) {
+          // The manifest no longer references this poster.
+        }
+      }
+    }
   }
 
   @override
@@ -923,6 +1091,19 @@ class PublicContentCacheAdapter implements PublicContentCache {
     final temp = File('${file.path}.tmp-$suffix');
     final backup = File('${file.path}.backup-$suffix');
     await temp.writeAsString(json, flush: true);
+    if (!Platform.isWindows) {
+      // rename(2) replaces the target atomically on Android and iOS.
+      try {
+        await temp.rename(file.path);
+        return;
+      } catch (_) {
+        if (await temp.exists()) await temp.delete();
+        rethrow;
+      }
+    }
+    // Windows cannot rename over an existing file: copy a backup, delete,
+    // rename. A stop between the delete and the rename is repaired at the
+    // next start by [_recoverManifest].
     final hadPrevious = await file.exists();
     try {
       if (hadPrevious) {
@@ -959,7 +1140,7 @@ class PublicContentCacheAdapter implements PublicContentCache {
     final manifest = await _readManifest(directory);
     if (manifest == null) {
       await file.delete();
-      await _removeUnusedBannerImages(directory, const {});
+      await _removeUnreferencedImages(directory, const {});
       return;
     }
     final reads = Map<String, Object?>.from(manifest['reads'] as Map);
@@ -978,6 +1159,90 @@ class PublicContentCacheAdapter implements PublicContentCache {
     if (readKey == PublicContentCacheKeys.givingMethods) {
       await _removeUnusedGivingLogos(directory, const {});
     }
+  }
+
+  /// Keeps only saved banners the fresh projection still lists at the same
+  /// publication and rights revision (the file name encodes both), commits
+  /// that subset, and deletes every other banner file except the ones the
+  /// fresh projection names. The final commit then removes whatever the new
+  /// projection excludes.
+  Future<void> _pruneBannersBeforeRefresh(
+    Directory directory,
+    PublicBanners fresh,
+  ) async {
+    final wanted = {
+      for (final banner in fresh.banners)
+        banner.bannerId: _imageFileName(banner),
+    };
+    final file = await _manifest(directory);
+    if (!await file.exists()) {
+      await _removeUnusedBannerImages(directory, wanted.values.toSet());
+      return;
+    }
+    final manifest = await _readManifest(directory);
+    if (manifest == null) {
+      await _removeReadBeforeRefresh(
+        directory,
+        PublicContentCacheKeys.homeBanners,
+      );
+      return;
+    }
+    final reads = Map<String, Object?>.from(manifest['reads'] as Map);
+    final entry = reads[PublicContentCacheKeys.homeBanners];
+    final projection = entry is Map ? entry['projection'] : null;
+    final imageFiles = entry is Map ? entry['image_files'] : null;
+    if (entry is! Map ||
+        projection is! Map ||
+        projection['banners'] is! List ||
+        imageFiles is! Map) {
+      if (entry != null) {
+        await _removeReadBeforeRefresh(
+          directory,
+          PublicContentCacheKeys.homeBanners,
+        );
+      } else {
+        await _removeUnusedBannerImages(directory, wanted.values.toSet());
+      }
+      return;
+    }
+    final keptFiles = <String, String>{
+      for (final saved in imageFiles.entries)
+        if (saved.key is String &&
+            saved.value is String &&
+            wanted[saved.key] == saved.value)
+          saved.key as String: saved.value as String,
+    };
+    final banners = projection['banners'] as List;
+    final keptBanners = banners
+        .where((raw) => raw is Map && keptFiles.containsKey(raw['banner_id']))
+        .toList(growable: false);
+    if (keptBanners.length != banners.length ||
+        keptFiles.length != imageFiles.length) {
+      reads[PublicContentCacheKeys.homeBanners] = {
+        'saved_at': entry['saved_at'],
+        'projection': {
+          'banners': keptBanners,
+          'truncated': projection['truncated'],
+        },
+        'image_files': keptFiles,
+      };
+      await _commitManifest(
+        directory,
+        jsonEncode({'version': _manifestVersion, 'reads': reads}),
+      );
+    }
+    await _removeUnusedBannerImages(directory, wanted.values.toSet());
+  }
+
+  /// Every saved image kind, for a manifest that no longer references any
+  /// image outside [keep].
+  Future<void> _removeUnreferencedImages(
+    Directory directory,
+    Set<String> keep,
+  ) async {
+    await _removeUnusedBannerImages(directory, keep);
+    await _removeUnusedGivingLogos(directory, keep);
+    await _removeUnusedSermonPosters(directory, keep);
   }
 
   Future<void> _removeUnusedBannerImages(

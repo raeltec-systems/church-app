@@ -473,6 +473,14 @@ class PublicSermons {
   PublicSermon? byId(String id) =>
       sermons.where((s) => s.sermonId == id).firstOrNull;
 
+  /// This catalog without one sermon (one a fresh detail read says is no
+  /// longer public). Series and every other sermon are kept.
+  PublicSermons withoutSermon(String id) => PublicSermons(
+    sermons: List.unmodifiable(sermons.where((s) => s.sermonId != id)),
+    series: series,
+    truncated: truncated,
+  );
+
   /// The series the church is preaching now: the series of the newest sermon
   /// that belongs to a published series. Null when no sermon is in one.
   PublicSermonSeries? get currentSeries {

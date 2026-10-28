@@ -226,10 +226,13 @@ select ok(exists (select 1 from app.notifications_schedules s
                    where s.source_type = 'duties_assignment'
                      and s.source_id = (pg_temp.cur(pg_temp.slot_of(pg_temp.p1(), 'lead'))).assignment_id),
   'and M''s response reminders are planned (4.8)');
+-- Coverage for cells (owner decision 2026-10-28): a cell part's leaders are alerted with the cell
+-- kinds (never the department ones).
 select is((select count(*)::int from app.notifications_jobs j
             where j.source_type = 'duties_coverage'
-              and j.source_id = (pg_temp.cur(pg_temp.slot_of(pg_temp.p1(), 'lead'))).assignment_id), 0,
-  'no leader alert for a cell part (department-only until the cell-scope contract)');
+              and j.source_id = (pg_temp.cur(pg_temp.slot_of(pg_temp.p1(), 'lead'))).assignment_id
+              and j.reminder_kind not like 'cell_part_%'), 0,
+  'a cell part''s leader alerts are the cell kinds only (coverage for cells)');
 select is((select string_agg(action || ':' || actor_capacity, ',' order by event_id) from app.duties_audit
             where occurrence_id = pg_temp.occ1()), 'part_created:cell_leader,duty_revised:cell_leader',
   'audited with the cell leader''s capacity, codes only');
@@ -762,8 +765,12 @@ select is(pg_temp.duties(4, 'duties.withdraw_acceptance', (pg_temp.pca()).revisi
 select is(pg_temp.jobs((pg_temp.pca()).assignment_id, array['duty_starting']), 'duty_starting:cancelled',
   'the pre-service reminder is cancelled');
 select is((select count(*)::int from app.notifications_jobs
-            where source_type = 'duties_coverage' and source_id = (pg_temp.pca()).assignment_id), 0,
-  'no leader alert is raised for a cell part');
+            where source_type = 'duties_coverage' and source_id = (pg_temp.pca()).assignment_id
+              and reminder_kind = 'cell_part_declined') > 0
+          and not exists (select 1 from app.notifications_jobs
+                           where source_type = 'duties_coverage' and source_id = (pg_temp.pca()).assignment_id
+                             and reminder_kind not like 'cell_part_%'), true,
+  'the cell''s leaders get the cell part decline alert (coverage for cells), never a department one');
 select ok(pg_temp.fx(6, 'duties_owner_part', jsonb_build_object('source_type', 'fixture_programme_part',
             'source_id', pg_temp.pc(), 'cell_id', pg_temp.cell()))::text not like '%private withdrawal%',
   'the cell sees the answer, never the member''s note');

@@ -200,7 +200,9 @@ select is((select string_agg(distinct link, ',') from app.contract_reminder_cont
             where source_type = 'duties_coverage'
               -- Story 4.9: the decline alert opens the coverage queue (duties_coverage_test.sql);
               -- story 4.12: so does the vacancy alert (duties_lifecycle_test.sql).
-              and reminder_kind not in ('duty_declined', 'duty_vacated')), '/duties/leader',
+              -- Coverage for cells: the cell_part_* alerts open the coverage queue.
+              and reminder_kind not in ('duty_declined', 'duty_vacated')
+              and reminder_kind not like 'cell_part_%'), '/duties/leader',
   'the leaders'' alerts open the Duties board (which reads the duty again)');
 select is((select string_agg(reminder_kind, ',' order by reminder_kind) from app.contract_direct_contact_routes
             where source_type = 'duties_assignment' and handler = 'app.duties_record_contact_need(jsonb)'),

@@ -305,11 +305,14 @@ async function upload(req: Request, auth: string, itemId: string, purpose: strin
 
 // The sync loop itself is syncPublicFiles (logic.mjs): placement revalidates against a fresh plan
 // right before each upload and the final plan's removals are executed, so a withdrawal that lands
-// mid-sync never leaves a public file behind (review F1, 2026-10-28).
+// mid-sync never leaves a public file behind (review F1, 2026-10-28). A plan read refused or failed
+// after an upload makes the sync delete the objects it stored before answering (follow-up F1).
 async function sync(auth: string): Promise<Response> {
   const outcome = await syncPublicFiles({
     readPlan: async () => {
-      const read = await asCaller(auth, 'content_file_plan', {});
+      // A read that fails (timeout, network) is a 503 refusal, so the sync takes back what it placed.
+      const read = await asCaller(auth, 'content_file_plan', {}).catch(() => null);
+      if (!read) return { refused: reply(503, { outcome: 'unavailable' }) };
       const refused = readRefusal(read.status);
       return refused ? { refused } : { plan: planFrom(read.json) };
     },
@@ -344,6 +347,18 @@ async function sync(auth: string): Promise<Response> {
       const deleted = del?.ok ? await del.json().catch(() => null) : null;
       if (!del?.ok) await del?.body?.cancel();
       return Array.isArray(deleted) ? deleted.length : 0;
+    },
+    // Take-back of the objects this call stored itself, after a refused plan read (follow-up F1).
+    // Server Storage authority, like the write: it needs nothing from the caller's session. True
+    // once Storage answered the delete, whether or not the objects were still there.
+    withdrawPublic: async (paths: string[]) => {
+      const del = await timed(`${SUPABASE_URL}/storage/v1/object/${PUBLIC_BUCKET}`, {
+        method: 'DELETE',
+        headers: storageHeaders({ 'content-type': 'application/json' }),
+        body: JSON.stringify({ prefixes: paths }),
+      });
+      if (del) await del.body?.cancel();
+      return del?.ok === true;
     },
   }, MAX_PLAN_ROUNDS);
   if (outcome.refused) return outcome.refused as Response;

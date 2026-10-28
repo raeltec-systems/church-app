@@ -520,26 +520,71 @@ export function planFrom(data) {
  *   (it does not just count them) until none are left, so a withdrawal that commits between the
  *   revalidation and the upload is still undone by this same sync. A withdrawal that commits after
  *   this sync's final read comes after its last upload, and the withdrawal's own sync removes it.
+ * - a sync that cannot read its plan after an upload takes back what it placed (follow-up review
+ *   F1, 2026-10-28): once this call has started storing a public object, any later plan read that
+ *   is refused (401, 403, 503) or throws means the sync can no longer prove the object is still
+ *   wanted, nor see a withdrawal whose own sync had nothing to remove yet (the object was not
+ *   there). It then deletes exactly the paths it stored itself, with the same server Storage
+ *   authority that stored them, before answering the refusal. Fail closed: a file that was still
+ *   wanted is missing until the next authorized sync places it again (the plan reports it waiting).
  *
- * Answers `{ refused }` or `{ result: { placed, removed, waiting, removals_pending } }`, the counts
- * being those of the final plan read.
+ * `io.withdrawPublic(paths)` (optional) answers true once Storage confirmed the delete, whether or
+ * not the objects were still there; without it `removePublic` must report every path deleted. The
+ * take-back is tried at most WITHDRAW_ATTEMPTS times; if Storage refuses every attempt, the object
+ * is outside the desired set, so the next authorized sync's plan lists it and removes it.
+ *
+ * Answers `{ refused }` (plus `withdrawn`, true once a take-back was confirmed, when this call had
+ * stored something) or `{ result: { placed, removed, waiting, removals_pending } }`,
+ * the counts being those of the final plan read.
  */
+export const WITHDRAW_ATTEMPTS = 3;
+
+async function withdrawPlaced(io, paths) {
+  if (paths.length === 0) return false;
+  const attempt = io.withdrawPublic ?? (async (p) => (await io.removePublic(p)) === p.length);
+  for (let i = 0; i < WITHDRAW_ATTEMPTS; i++) {
+    try {
+      if (await attempt(paths)) return true;
+    } catch {
+      // a failed delete is retried; the attempts are bounded
+    }
+  }
+  return false;
+}
+
 export async function syncPublicFiles(io, maxRounds = 4) {
   let placed = 0;
   let removed = 0;
+  const placedPaths = [];
+  // Every plan read goes through here: after an upload, a refused or failed read takes back what
+  // this call stored before the refusal is answered.
+  const readPlan = async () => {
+    let read;
+    try {
+      read = await io.readPlan();
+    } catch (e) {
+      await withdrawPlaced(io, placedPaths);
+      throw e;
+    }
+    if (!read.refused) return read;
+    if (placedPaths.length === 0) return { refused: read.refused };
+    return { refused: read.refused, withdrawn: await withdrawPlaced(io, placedPaths) };
+  };
   for (let round = 0; round < maxRounds; round++) {
-    const read = await io.readPlan();
-    if (read.refused) return { refused: read.refused };
+    const read = await readPlan();
+    if (read.refused) return read;
     const plan = read.plan;
     const progressBefore = placed + removed;
     for (const p of plan.place) {
       const bytes = await io.readDraft(p);
       if (!bytes) continue;
-      const fresh = await io.readPlan();
-      if (fresh.refused) return { refused: fresh.refused };
+      const fresh = await readPlan();
+      if (fresh.refused) return fresh;
       const still = fresh.plan.place.some((q) => q.public_path === p.public_path
         && q.draft_path === p.draft_path && q.media_type === p.media_type);
       if (!still) continue;
+      // Recorded before the write: a write that times out may still have committed.
+      if (!placedPaths.includes(p.public_path)) placedPaths.push(p.public_path);
       if (await io.putPublic(p, bytes)) placed++;
     }
     if (plan.remove.length > 0) removed += await io.removePublic(plan.remove);
@@ -549,8 +594,8 @@ export async function syncPublicFiles(io, maxRounds = 4) {
   // Converge: execute the final plan's removals until none are pending or a delete makes no progress.
   let final = null;
   for (let round = 0; round <= maxRounds; round++) {
-    const after = await io.readPlan();
-    if (after.refused) return { refused: after.refused };
+    const after = await readPlan();
+    if (after.refused) return after;
     final = after.plan;
     if (final.remove.length === 0 || round === maxRounds) break;
     const n = await io.removePublic(final.remove);

@@ -7,7 +7,7 @@
 -- are fictional (+44 7700 900112-900117, the entry's block; rolled back with the test).
 -- Times are church time (Africa/Lusaka).
 begin;
-select plan(48);
+select plan(61);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000618' || lpad(n::text, 2, '0'))::uuid $$;
@@ -278,6 +278,85 @@ select is(pg_temp.err(pg_temp.cmd(2, 'content.publish_sermon', pg_temp.rev(pg_te
 select is(pg_temp.read(null, format('select api.content_public_sermon(%L::uuid)', pg_temp.sermon('X'))) #>> '{sermon,speaker}',
   'SYNTHETIC Preacher', 'now it is public');
 select is(pg_temp.status(4, 'X') #> '{draft,published}', 'true'::jsonb, 'the assignee sees it was published');
+
+-- Review 2026-10-28: the authority is decided after the occurrence lock -----------------------
+-- A send that waits on the occurrence's advisory lock while another transaction revokes,
+-- reassigns or cancels must be refused once it gets the lock. One session cannot wait on its own
+-- lock, and a refused command rolls back whatever ran inside it, so the interleaving is made
+-- deterministic this way: the actor's answer is read before the change and the change is then
+-- applied for real; the Duties owner read is wrapped (rolled back with the test) so that the
+-- handler's first, pre-lock read gets that earlier answer, exactly what it would have seen before
+-- queueing on the lock. The send must then be decided by the read after the lock. Before the
+-- review fix the stale answer was the only one, and each of these sends created a draft.
+select pg_temp.pub('R', 14, 'SYNTHETIC Reassigned topic', null);
+select pg_temp.pub('C', 15, 'SYNTHETIC Cancelled topic', null);
+select pg_temp.pub('M', 16, 'SYNTHETIC Manager topic', null);
+create temp table race (occurrence_id uuid primary key, answer jsonb not null);
+alter function app.duties_owner_topic(jsonb) rename to duties_owner_topic_pgtap_real;
+create function app.duties_owner_topic(p_input jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  v jsonb;
+begin
+  delete from pg_temp.race r where r.occurrence_id = (p_input ->> 'occurrence_id')::uuid
+  returning r.answer into v;
+  if v is not null then
+    return v;
+  end if;
+  return app.duties_owner_topic_pgtap_real(p_input);
+end;
+$$;
+grant execute on function app.duties_owner_topic(jsonb) to authenticated;
+create function pg_temp.stale(n int, p_tag text) returns jsonb language sql as $$
+  insert into race
+  select pg_temp.occ(p_tag), pg_temp.read(n, format(
+    'select app.duties_owner_topic(jsonb_build_object(%L, %L::uuid))', 'occurrence_id', pg_temp.occ(p_tag)))
+  returning answer
+$$;
+
+-- Reassigned: member 4's assignment of R is superseded and member 5 assigned instead.
+select is(pg_temp.stale(4, 'R') ->> 'assigned', 'true', 'setup: before the change member 4 is the assignee of R');
+update app.duties_assignments set assignment_state = 'superseded', ended_at = now(), end_reason = 'revised'
+ where assignment_id = (select (r #>> '{data,assignment_id}')::uuid from pubs where tag = 'R');
+insert into app.duties_assignments (slot_id, member_id, response_deadline, assigned_by_member,
+  assigned_by_account, slot_revision, supersedes_assignment_id)
+select slot_id, pg_temp.mid(5), response_deadline, assigned_by_member, assigned_by_account, slot_revision,
+       assignment_id
+  from app.duties_assignments where assignment_id = (select (r #>> '{data,assignment_id}')::uuid from pubs where tag = 'R');
+select is(pg_temp.err(pg_temp.send(4, 'R')), 'not_found',
+  'an assignee reassigned while the send waited on the lock is refused');
+delete from race;
+select is(pg_temp.sermon('R'), null, 'the refused send made no draft');
+select is(pg_temp.err(pg_temp.send(5, 'R')), 'ok', 'the new assignee can send it');
+select is((select a.actor_capacity from app.content_audit a where a.item_id = pg_temp.sermon('R')
+             and a.action = 'created'), 'duty_assignee', 'its draft is attributed as duty_assignee');
+
+-- Cancelled: the only slot of C is cancelled.
+select is(pg_temp.stale(4, 'C') ->> 'assigned', 'true', 'setup: before the change member 4 is the assignee of C');
+update app.duties_slots set cancelled_at = now(), cancelled_by_member = pg_temp.mid(1),
+       cancelled_by_account = pg_temp.u(1)
+ where occurrence_id = pg_temp.occ('C');
+select is(pg_temp.err(pg_temp.send(4, 'C')), 'not_found',
+  'an assignee whose slot was cancelled while the send waited is refused');
+delete from race;
+select is(pg_temp.sermon('C'), null, 'no draft for the cancelled duty');
+
+-- Revoked: leader 3 loses the department_leader scope of D.
+select is(pg_temp.stale(3, 'M') ->> 'assigned', 'false', 'setup: before the change leader 3 manages M');
+update app.identity_grants set revoked_at = now(), revoked_by_member = pg_temp.mid(1),
+       revoked_by_account = pg_temp.u(1)
+ where member_id = pg_temp.mid(3) and scope_kind = 'department_leader' and scope_id = pg_temp.d()
+   and revoked_at is null;
+select is(pg_temp.err(pg_temp.send(3, 'M')), 'not_found',
+  'a manager whose scope was revoked while the send waited is refused');
+delete from race;
+select is(pg_temp.sermon('M'), null, 'the revoked manager made no draft');
+select is(pg_temp.err(pg_temp.send(1, 'M')), 'ok', 'a manager who still holds authority can send it');
+select is((select a.actor_capacity from app.content_audit a where a.item_id = pg_temp.sermon('M')
+             and a.action = 'created'), 'duty_manager', 'its draft is attributed as duty_manager');
+
+drop function app.duties_owner_topic(jsonb);
+alter function app.duties_owner_topic_pgtap_real(jsonb) rename to duties_owner_topic;
 
 -- Deletion -----------------------------------------------------------------------------------
 select is(app.content_sermon_duty_draft_erase_part(jsonb_build_object('phase', 'erase',

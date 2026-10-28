@@ -833,6 +833,8 @@ Publishing a duty sends its member a real "duty assigned" notice. Use only SYNTH
 
 Applied as `20261028071717` (after entry 19's `20261028064546`); all 8 added or replaced function hashes match the fresh local reset; boundary/unowned 0; signed-out reads checked. No duty was published, no draft made and no notification sent. Evidence: `evidence-6.18/staging-verify.md`.
 
+**Lock recheck (review 2026-10-28).** `20261028123554_content_sermon_duty_lock_recheck.sql` makes the occurrence's advisory lock the linearization point: the handler reads `app.duties_owner_topic` again after taking the lock and uses only that answer, so a scope revoked, an assignee reassigned or a slot cancelled while a send waited refuses it (`not_found`). pgTAP `content_sermon_duty_drafts_test.sql` (61 tests) serves the handler's pre-lock read the actor's earlier answer, applies the change, and checks each send is refused and makes no draft, while the new assignee or a manager still holding authority can send. Applied to staging as `20261028123554` on 2026-10-28; the function hash matches the fresh local reset, boundary/unowned 0.
+
 ## Story 6.19: My duties and My cell overlays on the Calendar
 
 Migration: `20261028064546_cells_my_meetings.sql`, a **Cells** contract change (see

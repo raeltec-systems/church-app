@@ -1,0 +1,10 @@
+{"step":"S00-precondition","target":"LOCAL","at":"2026-10-28T07:39:51.879Z","phone_auth_enabled":true,"local_environment":true}
+{"step":"S01-phone-auth-and-media-role","target":"LOCAL","at":"2026-10-28T07:39:55.128Z","verdict":"pass","media_grant":200}
+{"step":"S10-synthetic-content-published-without-notice","target":"LOCAL","at":"2026-10-28T07:39:55.296Z","verdict":"pass","published":5,"notified":0}
+{"step":"S11-one-word-finds-a-sermon-an-event-and-an-announcement","target":"LOCAL","at":"2026-10-28T07:39:55.309Z","verdict":"pass","status":200,"sermons":1,"events":1,"announcements":1}
+{"step":"S12-results-are-the-public-projections","target":"LOCAL","at":"2026-10-28T07:39:55.324Z","verdict":"pass","sermon_same":true,"event_same":true,"announcement_same":true}
+{"step":"S13-every-caller-reads-the-same-answer-and-nothing-private","target":"LOCAL","at":"2026-10-28T07:39:55.401Z","verdict":"pass","pending_same":true,"member_same_ignoring_case":true,"leaked_fields":0}
+{"step":"S20-the-query-is-bounded-and-literal","target":"LOCAL","at":"2026-10-28T07:39:55.415Z","verdict":"pass","short":400,"long":400,"blank":400,"percent_matches":0}
+{"step":"S30-anonymous-reads-only-the-function","target":"LOCAL","at":"2026-10-28T07:39:55.422Z","verdict":"pass","table_read":406,"anonymous_command":401}
+{"step":"S40-module-boundaries-remain-clear","target":"LOCAL","at":"2026-10-28T07:39:56.622Z","verdict":"pass","boundary_violations":0,"unowned_objects":0}
+{"step":"S99-cleanup","target":"LOCAL","at":"2026-10-28T07:39:57.076Z","synthetic_accounts_left":0,"immutable_content_retained":true,"instruction":"reset the local database before another run"}

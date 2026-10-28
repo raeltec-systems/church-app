@@ -737,40 +737,68 @@ class _SpecialForm extends ConsumerStatefulWidget {
 }
 
 class _SpecialFormState extends ConsumerState<_SpecialForm> {
-  late final SpecialAssignment? _item = widget.item;
+  /// The version this form edits. Review section 8: after a conflict the
+  /// page reloads a newer version; the form keeps this one (its revision
+  /// would be refused again) until the Pastor starts from the latest.
+  late SpecialAssignment? _item = widget.item;
   late SpecialTiming _timing = _item?.timing ?? SpecialTiming.time;
-  late final _name = TextEditingController(text: _item?.dutyName ?? '');
-  late final _date = TextEditingController(
-    text: _item == null || _item.isDue
-        ? ''
-        : ChurchTime.dateText(_item.times.startsAt),
-  );
-  late final _start = TextEditingController(
-    text: _item == null || _item.isDue
-        ? ''
-        : ChurchTime.timeText(_item.times.startsAt),
-  );
-  late final _end = TextEditingController(
-    text: _item?.times.endsAt == null
-        ? ''
-        : ChurchTime.timeText(_item!.times.endsAt!),
-  );
-  late final _due = TextEditingController(
-    text: _item?.times.dueOn == null ? '' : ChurchTime.ymd(_item!.times.dueOn!),
-  );
-  late final _location = TextEditingController(text: _item?.location ?? '');
-  late final _instructions = TextEditingController(
-    text: _item?.instructions ?? '',
-  );
+  final _name = TextEditingController();
+  final _date = TextEditingController();
+  final _start = TextEditingController();
+  final _end = TextEditingController();
+  final _due = TextEditingController();
+  final _location = TextEditingController();
+  final _instructions = TextEditingController();
   final _deadlineDate = TextEditingController();
   final _deadlineTime = TextEditingController();
   final _reason = TextEditingController();
   final _find = TextEditingController();
-  // An erased holder cannot be chosen again (the picker lists real members).
-  late String? _memberId = (_item?.holder?.erased ?? true)
-      ? null
-      : _item!.holder!.memberId;
+  String? _memberId;
   String? _sent;
+
+  @override
+  void initState() {
+    super.initState();
+    _fill(_item);
+  }
+
+  /// The fields as [item] has them (empty for a new assignment).
+  void _fill(SpecialAssignment? item) {
+    _timing = item?.timing ?? SpecialTiming.time;
+    final time = item != null && !item.isDue;
+    _name.text = item?.dutyName ?? '';
+    _date.text = time ? ChurchTime.dateText(item.times.startsAt) : '';
+    _start.text = time ? ChurchTime.timeText(item.times.startsAt) : '';
+    _end.text = item?.times.endsAt == null
+        ? ''
+        : ChurchTime.timeText(item!.times.endsAt!);
+    _due.text = item?.times.dueOn == null
+        ? ''
+        : ChurchTime.ymd(item!.times.dueOn!);
+    _location.text = item?.location ?? '';
+    _instructions.text = item?.instructions ?? '';
+    _deadlineDate.clear();
+    _deadlineTime.clear();
+    _reason.clear();
+    // An erased holder cannot be chosen again (the picker lists real members).
+    _memberId = (item?.holder?.erased ?? true) ? null : item!.holder!.memberId;
+  }
+
+  /// A newer version than the one this form edits has been read.
+  bool get _stale {
+    final item = _item;
+    final latest = widget.item;
+    return item != null && latest != null && latest.revision != item.revision;
+  }
+
+  /// Review section 8: start again from the version just read.
+  void _rebase() {
+    setState(() {
+      _item = widget.item;
+      _sent = null;
+      _fill(_item);
+    });
+  }
 
   List<TextEditingController> get _all => [
     _name,
@@ -1116,12 +1144,33 @@ class _SpecialFormState extends ConsumerState<_SpecialForm> {
         ),
         _muted(context, _specialDeadlineHelp),
         const SizedBox(height: 12),
+        if (_stale) ...[
+          Text(
+            'This assignment changed since you opened it. Start again from '
+            'the latest version to change it.',
+            key: Key('$key-stale'),
+            style: TextStyle(color: ChurchColors.of(context).redFg),
+          ),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FocusRing(
+              child: TextButton(
+                key: Key('$key-latest'),
+                onPressed: widget.busy ? null : _rebase,
+                child: const Text('Start from the latest version'),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
         Align(
           alignment: AlignmentDirectional.centerStart,
           child: ListenableBuilder(
             listenable: Listenable.merge(_all),
             builder: (context, _) {
-              final ready = item == null ? _draft() != null : _edit() != null;
+              final ready = item == null
+                  ? _draft() != null
+                  : !_stale && _edit() != null;
               return FocusRing(
                 child: FilledButton(
                   key: Key('$key-save'),

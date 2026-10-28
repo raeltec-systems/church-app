@@ -77,7 +77,7 @@ $$ select coalesce(array_agg((x ->> 'meeting_id')::uuid order by ord), '{}')
      from jsonb_array_elements(p -> 'meetings') with ordinality t(x, ord) $$;
 
 -- Fixtures. 1 Admin, 2 leader of Shikoswe (not a member of it), 4 member of Shikoswe, 5 member
--- of Estates, 6 member of Estates whose membership ends, 7 an account without member access (a
+-- of Estates, 6 member of Estates who transfers to Shikoswe, 7 an account without member access (a
 -- pending applicant has no member link yet), 8 a plain member in no cell.
 insert into auth.users (id, aud, role, phone, phone_confirmed_at)
 select pg_temp.u(n), 'authenticated', 'authenticated', ltrim(pg_temp.phone(n), '+'), now()
@@ -206,9 +206,11 @@ select ok(pg_temp.mine(2) ->> 'cell_id' is null and pg_temp.mine(2) -> 'meetings
 select ok(pg_temp.mine(1) ->> 'cell_id' is null and pg_temp.mine(1) -> 'meetings' = '[]'::jsonb
           and pg_temp.mine(8) ->> 'cell_id' is null,
   'Admin-only access and a member in no cell read no meetings');
-update app.cells_memberships set ended_at = now() where member_id = pg_temp.mid(6) and ended_at is null;
-select ok(pg_temp.mine(6) ->> 'cell_id' is null and pg_temp.mine(6) -> 'meetings' = '[]'::jsonb,
-  'a member whose cell membership ended reads no meetings');
+select pg_temp.place(6, pg_temp.sh());
+select ok((pg_temp.mine(6) ->> 'cell_id')::uuid = pg_temp.sh()
+          and not (pg_temp.ids(pg_temp.mine(6)) && (select array_agg(meeting_id) from app.cells_meetings
+                                                       where cell_id = pg_temp.es())),
+  'a member transferred to another cell reads only the new cell, never the old one');
 
 -- Refusals ---------------------------------------------------------------------------------------------
 select ok(pg_temp.read(pg_temp.c(7), 'select api.cells_my_meetings()') like 'PT40%',

@@ -73,6 +73,31 @@ class PublicContentCacheAdapter implements PublicContentCache {
   final DateTime Function() _clock;
   Future<void> _writeQueue = Future<void>.value();
 
+  // Review F3: every withdrawal removal advances the generation when it is
+  // requested (before it is queued) and leaves a tombstone. A list save
+  // whose fetch began at an earlier generation leaves those rows out, so an
+  // old in-flight read queued after the removal cannot bring them back.
+  // Tombstones live for the process: after a restart no older read exists.
+  int _readGeneration = 0;
+  final _tombstones = <({String readKey, String id, int generation})>[];
+
+  @override
+  int get readGeneration => _readGeneration;
+
+  void _tombstone(String readKey, String id) {
+    _readGeneration++;
+    _tombstones.add((readKey: readKey, id: id, generation: _readGeneration));
+  }
+
+  /// Ids of [readKey] removed after a fetch that began at [readGeneration].
+  /// A save that carries no generation is not filtered (every list
+  /// controller passes one).
+  Set<String> _removedSince(String readKey, int? readGeneration) => {
+    if (readGeneration != null)
+      for (final t in _tombstones)
+        if (t.readKey == readKey && t.generation > readGeneration) t.id,
+  };
+
   Future<Directory> _directory() async {
     final support = await _supportDirectory();
     final directory = Directory(
@@ -416,14 +441,16 @@ class PublicContentCacheAdapter implements PublicContentCache {
     Future<Uint8List?> Function(PublicBanner banner)? loadBannerImage,
     Future<Uint8List?> Function(PublicGivingLogo logo)? loadGivingLogo,
     Future<Uint8List?> Function(SermonPoster poster)? loadSermonPoster,
+    int? readGeneration,
   }) {
     final completer = Completer<PublicContentCacheWrite>();
     _writeQueue = _writeQueue.then((_) async {
       try {
+        if (readKey == PublicContentCacheKeys.givingMethods) _givingWrites++;
         completer.complete(
           await _writeRead(
             readKey,
-            projection,
+            _withoutRemoved(readKey, projection, readGeneration),
             loadBannerImage,
             loadGivingLogo,
             loadSermonPoster,
@@ -434,6 +461,42 @@ class PublicContentCacheAdapter implements PublicContentCache {
       }
     });
     return completer.future;
+  }
+
+  /// Runs inside the queue, so it sees every removal requested before this
+  /// save ran, including those requested after the save was queued.
+  Object _withoutRemoved(
+    String readKey,
+    Object projection,
+    int? readGeneration,
+  ) {
+    final removed = _removedSince(readKey, readGeneration);
+    if (removed.isEmpty) return projection;
+    if (readKey == PublicContentCacheKeys.sermons &&
+        projection is PublicSermons) {
+      return removed.fold<PublicSermons>(
+        projection,
+        (p, id) => p.withoutSermon(id),
+      );
+    }
+    if (readKey == PublicContentCacheKeys.calendar &&
+        projection is PublicEvents) {
+      return removed.fold<PublicEvents>(
+        projection,
+        (p, id) => p.withoutEvent(id),
+      );
+    }
+    if (readKey == PublicContentCacheKeys.givingMethods &&
+        projection is PublicGivingMethods) {
+      return PublicGivingMethods(
+        sample: projection.sample,
+        methods: List.unmodifiable(
+          projection.methods.where((m) => !removed.contains(m.methodId)),
+        ),
+        truncated: projection.truncated,
+      );
+    }
+    return projection;
   }
 
   Future<PublicContentCacheWrite> _writeRead(
@@ -521,12 +584,9 @@ class PublicContentCacheAdapter implements PublicContentCache {
             omittedRows++;
             continue;
           }
-          if (!await current.exists()) {
-            await _writeImage(current, bytes);
-          } else if (await current.length() == 0) {
-            await current.delete();
-            await _writeImage(current, bytes);
-          }
+          // Review C2: a rejected saved file (empty or oversized) is
+          // replaced, never kept under its name, as for sermon posters.
+          await _replaceRejectedImage(current, bytes, _maxImageBytes);
           eligible.add(banner);
           files[banner.bannerId] = name;
           imageFiles.add(name);
@@ -691,12 +751,7 @@ class PublicContentCacheAdapter implements PublicContentCache {
               serialized['logo'] = null;
               return (serialized: serialized, fileName: null, omitted: true);
             }
-            if (!await current.exists()) {
-              await _writeImage(current, bytes);
-            } else if (await current.length() == 0) {
-              await current.delete();
-              await _writeImage(current, bytes);
-            }
+            await _replaceRejectedImage(current, bytes, _maxGivingLogoBytes);
             return (serialized: serialized, fileName: name, omitted: false);
           },
         );
@@ -791,9 +846,11 @@ class PublicContentCacheAdapter implements PublicContentCache {
 
   @override
   Future<void> removeGivingMethod(String methodId) {
+    _tombstone(PublicContentCacheKeys.givingMethods, methodId);
     final completer = Completer<void>();
     _writeQueue = _writeQueue.then((_) async {
       try {
+        _givingWrites++;
         await _removeGivingMethod(methodId);
       } catch (_) {
         // A stale offline method can never override the successful detail read.
@@ -806,6 +863,7 @@ class PublicContentCacheAdapter implements PublicContentCache {
 
   @override
   Future<void> removeSermon(String sermonId) {
+    _tombstone(PublicContentCacheKeys.sermons, sermonId);
     final completer = Completer<void>();
     _writeQueue = _writeQueue.then((_) async {
       try {
@@ -822,6 +880,7 @@ class PublicContentCacheAdapter implements PublicContentCache {
 
   @override
   Future<void> removeEvent(String eventId) {
+    _tombstone(PublicContentCacheKeys.calendar, eventId);
     final completer = Completer<void>();
     _writeQueue = _writeQueue.then((_) async {
       try {
@@ -914,14 +973,12 @@ class PublicContentCacheAdapter implements PublicContentCache {
   }
 
   @override
-  Future<void> reconcileGivingMethod(
-    PublicGivingMethod method, {
-    required Future<Uint8List?> Function(PublicGivingLogo logo) loadGivingLogo,
-  }) {
+  Future<void> reconcileGivingMethod(PublicGivingMethod method) {
     final completer = Completer<void>();
     _writeQueue = _writeQueue.then((_) async {
       try {
-        await _reconcileGivingMethod(method, loadGivingLogo);
+        _givingWrites++;
+        await _reconcileGivingMethod(method);
       } catch (_) {
         // Cache maintenance cannot replace a successful fresh detail read.
       } finally {
@@ -931,10 +988,26 @@ class PublicContentCacheAdapter implements PublicContentCache {
     return completer.future;
   }
 
-  Future<void> _reconcileGivingMethod(
-    PublicGivingMethod method,
-    Future<Uint8List?> Function(PublicGivingLogo logo) loadGivingLogo,
-  ) async {
+  // Review C1: counts every queued change to the saved giving read. A logo
+  // downloaded in the background is attached only if nothing changed the
+  // giving read since its detail was reconciled, so it can never undo a
+  // later revocation, removal or list save.
+  int _givingWrites = 0;
+
+  static bool _sameGivingLogo(Object? cachedLogo, PublicGivingLogo logo) =>
+      cachedLogo is Map &&
+      cachedLogo['offline_allowed'] == true &&
+      logo.offlineAllowed &&
+      cachedLogo['path'] == logo.path &&
+      cachedLogo['media_type'] == logo.mediaType &&
+      cachedLogo['width'] == logo.width &&
+      cachedLogo['height'] == logo.height &&
+      cachedLogo['rights_revision'] == logo.rightsRevision;
+
+  /// The safety half of a fresh detail: the row takes the fresh text, keeps
+  /// its logo only when it is the same revision with a valid saved file, and
+  /// otherwise loses it now. Nothing is downloaded here.
+  Future<void> _reconcileGivingMethod(PublicGivingMethod method) async {
     final directory = await _directory();
     final manifest = await _readManifest(directory);
     if (manifest == null) return;
@@ -957,40 +1030,80 @@ class PublicContentCacheAdapter implements PublicContentCache {
 
     final cached = methods[index];
     final cachedRow = cached is Map ? cached : null;
-    final cachedLogo = cachedRow?['logo'];
     final logo = method.logo;
     final files = Map<String, Object?>.from(imageFiles);
-    final expectedFileName = logo != null && logo.offlineAllowed
+    final fileName = logo != null && logo.offlineAllowed
         ? _givingLogoFileName(method, logo)
         : null;
     final sameCachedLogo =
-        cachedRow?['publication_revision'] == method.publicationRevision &&
-        cachedLogo is Map &&
-        cachedLogo['offline_allowed'] == true &&
         logo != null &&
-        logo.offlineAllowed &&
-        cachedLogo['path'] == logo.path &&
-        cachedLogo['media_type'] == logo.mediaType &&
-        cachedLogo['width'] == logo.width &&
-        cachedLogo['height'] == logo.height &&
-        cachedLogo['rights_revision'] == logo.rightsRevision;
-    final fileName = expectedFileName;
-    final file = fileName == null
-        ? null
-        : File('${directory.path}${Platform.pathSeparator}$fileName');
-    final canReuseCachedFile =
-        sameCachedLogo && files[method.methodId] == fileName;
+        cachedRow?['publication_revision'] == method.publicationRevision &&
+        _sameGivingLogo(cachedRow?['logo'], logo);
     Uint8List? bytes;
-    if (canReuseCachedFile && file != null && await file.exists()) {
-      final existing = await file.readAsBytes();
-      if (existing.isNotEmpty &&
-          existing.length <= _maxGivingLogoBytes &&
-          _givingLogoMediaTypeMatchesExtension(logo, fileName!)) {
-        bytes = existing;
+    if (sameCachedLogo &&
+        fileName != null &&
+        files[method.methodId] == fileName) {
+      final file = File('${directory.path}${Platform.pathSeparator}$fileName');
+      if (await file.exists()) {
+        final existing = await file.readAsBytes();
+        if (existing.isNotEmpty &&
+            existing.length <= _maxGivingLogoBytes &&
+            _givingLogoMediaTypeMatchesExtension(logo, fileName)) {
+          bytes = existing;
+        }
       }
     }
-    if (logo?.offlineAllowed == true && bytes == null) {
-      bytes = logo!.offlineBytes;
+
+    final updated = bytes != null
+        ? method.withLogo(logo!.withOfflineBytes(bytes))
+        : method.withLogo(null);
+    methods[index] = updated.toCacheJson();
+    if (bytes != null) {
+      files[method.methodId] = fileName!;
+    } else {
+      files.remove(method.methodId);
+    }
+    reads[PublicContentCacheKeys.givingMethods] = {
+      'saved_at': entry['saved_at'],
+      'projection': {
+        'sample': projection['sample'],
+        'methods': methods,
+        'truncated': projection['truncated'],
+      },
+      'image_files': files,
+    };
+    await _commitManifest(
+      directory,
+      jsonEncode({'version': _manifestVersion, 'reads': reads}),
+    );
+    await _removeUnusedGivingLogos(
+      directory,
+      files.values.whereType<String>().toSet(),
+    );
+  }
+
+  @override
+  Future<void> saveGivingLogo(
+    PublicGivingMethod method, {
+    required Future<Uint8List?> Function(PublicGivingLogo logo) loadGivingLogo,
+  }) async {
+    try {
+      final logo = method.logo;
+      if (logo == null || !logo.offlineAllowed) return;
+      final fileName = _givingLogoFileName(method, logo);
+      // Taken now, after the reconcile this follows: any later change to
+      // the giving read cancels the attach.
+      final writes = _givingWrites;
+      final saved = (await readGivingMethods())?.value.methods
+          .where((m) => m.methodId == method.methodId)
+          .firstOrNull;
+      if (saved == null ||
+          saved.publicationRevision != method.publicationRevision ||
+          saved.logo?.offlineBytes != null) {
+        return;
+      }
+      // Downloaded outside the write queue, so other saves never wait.
+      Uint8List? bytes = logo.offlineBytes;
       if (bytes == null) {
         try {
           bytes = await loadGivingLogo(logo);
@@ -1001,27 +1114,65 @@ class PublicContentCacheAdapter implements PublicContentCache {
       if (bytes == null ||
           bytes.isEmpty ||
           bytes.length > _maxGivingLogoBytes ||
-          !_givingLogoMediaTypeMatchesExtension(logo, fileName!)) {
-        bytes = null;
+          !_givingLogoMediaTypeMatchesExtension(logo, fileName)) {
+        return;
       }
-      if (bytes != null && file != null) {
-        // A new publication or rights revision must never inherit a file
-        // that was saved for different logo metadata under the same name.
-        if (await file.exists()) await file.delete();
-        await _writeImage(file, bytes);
-      }
+      final attach = bytes;
+      final completer = Completer<void>();
+      _writeQueue = _writeQueue.then((_) async {
+        try {
+          if (writes != _givingWrites) return;
+          _givingWrites++;
+          await _attachGivingLogo(method, logo, fileName, attach);
+        } catch (_) {
+          // The row stays without an offline logo.
+        } finally {
+          completer.complete();
+        }
+      });
+      await completer.future;
+    } catch (_) {
+      // An optional logo never fails the fresh detail.
     }
+  }
 
-    final keepLogo = logo?.offlineAllowed == true && bytes != null;
-    final updated = keepLogo
-        ? method.withLogo(logo!.withOfflineBytes(bytes))
-        : method.withLogo(null);
-    methods[index] = updated.toCacheJson();
-    if (keepLogo) {
-      files[method.methodId] = fileName!;
-    } else {
-      files.remove(method.methodId);
+  Future<void> _attachGivingLogo(
+    PublicGivingMethod method,
+    PublicGivingLogo logo,
+    String fileName,
+    Uint8List bytes,
+  ) async {
+    final directory = await _directory();
+    final manifest = await _readManifest(directory);
+    if (manifest == null) return;
+    final reads = Map<String, Object?>.from(manifest['reads'] as Map);
+    final entry = reads[PublicContentCacheKeys.givingMethods];
+    if (entry is! Map) return;
+    final projection = entry['projection'];
+    final imageFiles = entry['image_files'];
+    if (!_hasKeys(projection, const {'sample', 'methods', 'truncated'}) ||
+        projection['methods'] is! List ||
+        imageFiles is! Map) {
+      return;
     }
+    final methods = List<Object?>.from(projection['methods'] as List);
+    final index = methods.indexWhere(
+      (raw) => raw is Map && raw['method_id'] == method.methodId,
+    );
+    if (index < 0) return;
+    final row = Map<String, Object?>.from(methods[index] as Map);
+    if (row['publication_revision'] != method.publicationRevision ||
+        row['logo'] != null) {
+      return;
+    }
+    final file = File('${directory.path}${Platform.pathSeparator}$fileName');
+    // A file saved under this name for other logo metadata is never kept.
+    if (await file.exists()) await file.delete();
+    await _writeImage(file, bytes);
+    row['logo'] = method.withLogo(logo).toCacheJson()['logo'];
+    methods[index] = row;
+    final files = Map<String, Object?>.from(imageFiles)
+      ..[method.methodId] = fileName;
     reads[PublicContentCacheKeys.givingMethods] = {
       'saved_at': entry['saved_at'],
       'projection': {
@@ -1076,6 +1227,21 @@ class PublicContentCacheAdapter implements PublicContentCache {
       directory,
       files.values.whereType<String>().toSet(),
     );
+  }
+
+  /// Writes [bytes] to [target] unless it already holds an accepted file
+  /// (non-empty and at most [maxBytes]); a rejected file is deleted first.
+  Future<void> _replaceRejectedImage(
+    File target,
+    Uint8List bytes,
+    int maxBytes,
+  ) async {
+    if (await target.exists()) {
+      final length = await target.length();
+      if (length > 0 && length <= maxBytes) return;
+      await target.delete();
+    }
+    await _writeImage(target, bytes);
   }
 
   Future<void> _writeImage(File target, Uint8List bytes) async {

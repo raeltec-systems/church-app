@@ -1158,10 +1158,12 @@ void main() {
 
       cacheClock = savedAt.add(const Duration(hours: 2));
       var redundantLogoFetch = false;
-      await cache.reconcileGivingMethod(
-        PublicGivingMethod.fromJson(
-          publicGivingMethodData(methodId: methodId, unsafe: true, logo: logo),
-        ),
+      final same = PublicGivingMethod.fromJson(
+        publicGivingMethodData(methodId: methodId, unsafe: true, logo: logo),
+      );
+      await cache.reconcileGivingMethod(same);
+      await cache.saveGivingLogo(
+        same,
         loadGivingLogo: (_) async {
           redundantLogoFetch = true;
           return null;
@@ -1186,15 +1188,23 @@ void main() {
       };
       final changedBytes = Uint8List.fromList([0x89, 0x50, 0x4e, 0x47, 0x02]);
       var changedLogoFetch = false;
-      await cache.reconcileGivingMethod(
-        PublicGivingMethod.fromJson(
-          publicGivingMethodData(
-            methodId: methodId,
-            publicationRevision: 2,
-            unsafe: false,
-            logo: changedLogo,
-          ),
+      final changed = PublicGivingMethod.fromJson(
+        publicGivingMethodData(
+          methodId: methodId,
+          publicationRevision: 2,
+          unsafe: false,
+          logo: changedLogo,
         ),
+      );
+      await cache.reconcileGivingMethod(changed);
+      // The safety half already dropped the superseded logo.
+      expect(
+        (await cache.readGivingMethods())?.value.methods.first.logo,
+        isNull,
+      );
+      expect(changedLogoFetch, isFalse);
+      await cache.saveGivingLogo(
+        changed,
         loadGivingLogo: (_) async {
           changedLogoFetch = true;
           return changedBytes;

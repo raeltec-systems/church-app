@@ -1698,6 +1698,7 @@ class FakePublicContentCache implements PublicContentCache {
 
   @override
   Future<void> removeGivingMethod(String methodId) async {
+    readGeneration++;
     removedGivingMethods.add(methodId);
     final snapshot = givingMethods;
     if (snapshot == null) return;
@@ -1720,6 +1721,7 @@ class FakePublicContentCache implements PublicContentCache {
 
   @override
   Future<void> removeEvent(String eventId) async {
+    readGeneration++;
     removedEvents.add(eventId);
     final snapshot = events;
     if (snapshot == null) return;
@@ -1733,6 +1735,7 @@ class FakePublicContentCache implements PublicContentCache {
 
   @override
   Future<void> removeSermon(String sermonId) async {
+    readGeneration++;
     removedSermons.add(sermonId);
     final snapshot = sermons;
     if (snapshot == null) return;
@@ -1742,25 +1745,17 @@ class FakePublicContentCache implements PublicContentCache {
     );
   }
 
+  /// Advanced by every removal, as the file adapter does.
   @override
-  Future<void> reconcileGivingMethod(
-    PublicGivingMethod method, {
-    required Future<Uint8List?> Function(PublicGivingLogo logo) loadGivingLogo,
-  }) async {
-    reconciledGivingMethods.add(method);
-    final snapshot = givingMethods;
-    if (snapshot == null) return;
-    final index = snapshot.value.methods.indexWhere(
-      (cached) => cached.methodId == method.methodId,
-    );
-    if (index < 0) return;
-    final cached = snapshot.value.methods[index];
+  int readGeneration = 0;
+
+  /// The `readGeneration` each [writeRead] carried, in call order.
+  final writeGenerations = <int?>[];
+
+  static bool _sameLogo(PublicGivingMethod cached, PublicGivingMethod method) {
     final oldLogo = cached.logo;
     final newLogo = method.logo;
-    final oldOfflineBytes = oldLogo?.offlineBytes;
-    final sameOfflineLogo =
-        oldLogo != null &&
-        oldOfflineBytes != null &&
+    return oldLogo != null &&
         newLogo != null &&
         newLogo.offlineAllowed &&
         cached.publicationRevision == method.publicationRevision &&
@@ -1769,25 +1764,60 @@ class FakePublicContentCache implements PublicContentCache {
         oldLogo.width == newLogo.width &&
         oldLogo.height == newLogo.height &&
         oldLogo.rightsRevision == newLogo.rightsRevision;
-    PublicGivingMethod updated;
-    if (sameOfflineLogo) {
-      updated = method.withLogo(newLogo.withOfflineBytes(oldOfflineBytes));
-    } else if (newLogo?.offlineAllowed == true) {
-      imageFetches.add(method.methodId);
-      Uint8List? bytes;
-      try {
-        bytes = await loadGivingLogo(newLogo!);
-      } catch (_) {
-        bytes = null;
-      }
-      updated = method.withLogo(
-        bytes == null || bytes.isEmpty || bytes.length > 2 * 1024 * 1024
-            ? null
-            : newLogo!.withOfflineBytes(bytes),
-      );
-    } else {
-      updated = method.withLogo(null);
+  }
+
+  @override
+  Future<void> reconcileGivingMethod(PublicGivingMethod method) async {
+    reconciledGivingMethods.add(method);
+    final snapshot = givingMethods;
+    if (snapshot == null) return;
+    final index = snapshot.value.methods.indexWhere(
+      (cached) => cached.methodId == method.methodId,
+    );
+    if (index < 0) return;
+    final cached = snapshot.value.methods[index];
+    final oldOfflineBytes = cached.logo?.offlineBytes;
+    final updated = oldOfflineBytes != null && _sameLogo(cached, method)
+        ? method.withLogo(method.logo!.withOfflineBytes(oldOfflineBytes))
+        : method.withLogo(null);
+    _replaceGivingMethod(index, updated);
+  }
+
+  @override
+  Future<void> saveGivingLogo(
+    PublicGivingMethod method, {
+    required Future<Uint8List?> Function(PublicGivingLogo logo) loadGivingLogo,
+  }) async {
+    final logo = method.logo;
+    if (logo == null || !logo.offlineAllowed) return;
+    int row() =>
+        givingMethods?.value.methods.indexWhere(
+          (cached) => cached.methodId == method.methodId,
+        ) ??
+        -1;
+    final before = row();
+    if (before < 0) return;
+    final cached = givingMethods!.value.methods[before];
+    if (cached.logo?.offlineBytes != null && _sameLogo(cached, method)) return;
+    imageFetches.add(method.methodId);
+    Uint8List? bytes;
+    try {
+      bytes = await loadGivingLogo(logo);
+    } catch (_) {
+      bytes = null;
     }
+    if (bytes == null || bytes.isEmpty || bytes.length > 2 * 1024 * 1024) {
+      return;
+    }
+    final index = row();
+    if (index < 0) return;
+    final now = givingMethods!.value.methods[index];
+    if (now.publicationRevision != method.publicationRevision) return;
+    _replaceGivingMethod(index, method.withLogo(logo.withOfflineBytes(bytes)));
+  }
+
+  void _replaceGivingMethod(int index, PublicGivingMethod updated) {
+    final snapshot = givingMethods!;
     final methods = [...snapshot.value.methods];
     methods[index] = updated;
     givingMethods = PublicContentSnapshot(
@@ -1807,8 +1837,10 @@ class FakePublicContentCache implements PublicContentCache {
     Future<Uint8List?> Function(PublicBanner banner)? loadBannerImage,
     Future<Uint8List?> Function(PublicGivingLogo logo)? loadGivingLogo,
     Future<Uint8List?> Function(SermonPoster poster)? loadSermonPoster,
+    int? readGeneration,
   }) async {
     writes.add((readKey, projection));
+    writeGenerations.add(readGeneration);
     await writeGate?.future;
     if (!available) return const PublicContentCacheUnavailable();
     if (readKey == PublicContentCacheKeys.sermons &&

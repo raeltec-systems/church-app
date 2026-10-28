@@ -66,7 +66,13 @@ abstract class PublicReadController<T> extends Notifier<PublicReadState<T>> {
 
   bool get supportsOfflineSnapshot => false;
 
-  Future<DateTime?> saveOfflineSnapshot(T value) async => null;
+  /// [readGeneration] is the cache's removal generation taken before the
+  /// fetch of [value]; pass it to `writeRead` (see
+  /// [PublicContentCache.readGeneration]).
+  Future<DateTime?> saveOfflineSnapshot(
+    T value, {
+    required int readGeneration,
+  }) async => null;
 
   Future<PublicContentSnapshot<T>?> readOfflineSnapshot() async => null;
 
@@ -89,6 +95,11 @@ abstract class PublicReadController<T> extends Notifier<PublicReadState<T>> {
     return _reload(_epoch);
   }
 
+  /// Stops every read already in flight from publishing or saving its
+  /// answer. Call it before the first await of a change that the old answer
+  /// must not undo, then [reload].
+  void invalidateInFlightReads() => _epoch++;
+
   Future<void> _reload(int epoch) async {
     if (!ref.mounted || epoch != _epoch) return;
     state = PublicReadState<T>(
@@ -99,6 +110,11 @@ abstract class PublicReadController<T> extends Notifier<PublicReadState<T>> {
       savedAt: state.savedAt,
       offlineSnapshot: state.offlineSnapshot,
     );
+    // Taken before the fetch: a withdrawal removed after this point is
+    // never brought back by this read's save, whatever the queue order.
+    final readGeneration = supportsOfflineSnapshot
+        ? ref.read(publicContentCacheProvider).readGeneration
+        : 0;
     final r = await fetch();
     if (!ref.mounted || epoch != _epoch) return;
     if (r is AccessReadOk<T>) {
@@ -116,7 +132,10 @@ abstract class PublicReadController<T> extends Notifier<PublicReadState<T>> {
       if (!supportsOfflineSnapshot) return;
       DateTime? savedAt;
       try {
-        savedAt = await saveOfflineSnapshot(r.value);
+        savedAt = await saveOfflineSnapshot(
+          r.value,
+          readGeneration: readGeneration,
+        );
       } catch (_) {
         // An offline save failure cannot replace a successful server read.
       }
@@ -171,14 +190,21 @@ class PublicEventsController extends PublicReadController<PublicEvents> {
   bool get supportsOfflineSnapshot => true;
 
   @override
-  Future<DateTime?> saveOfflineSnapshot(PublicEvents value) async {
+  Future<DateTime?> saveOfflineSnapshot(
+    PublicEvents value, {
+    required int readGeneration,
+  }) async {
     final eligible = PublicEvents(
       events: value.events.where((event) => event.offlineAllowed).toList(),
       truncated: value.truncated,
     );
     final outcome = await ref
         .read(publicContentCacheProvider)
-        .writeRead(PublicContentCacheKeys.calendar, eligible);
+        .writeRead(
+          PublicContentCacheKeys.calendar,
+          eligible,
+          readGeneration: readGeneration,
+        );
     return outcome is PublicContentCacheSaved ? outcome.savedAt : null;
   }
 
@@ -195,6 +221,9 @@ class PublicEventsController extends PublicReadController<PublicEvents> {
     final listed =
         value != null && value.events.any((e) => e.eventId == eventId);
     final inFlight = state.loading;
+    // Before the first await: a list read already in flight may still hold
+    // the event, so it can neither publish nor save it (review F3).
+    invalidateInFlightReads();
     if (listed) {
       state = PublicReadState<PublicEvents>(
         loading: state.loading,

@@ -163,6 +163,8 @@ void main() {
     // A answers with the withdrawn sermon still present.
     repo.pending[0].complete(AccessReadOk(catalog()));
     await pumpEventQueue();
+    // The old answer is stale: it never reaches the screen.
+    expect(c.read(publicSermonsProvider).value?.byId(withdrawn), isNull);
 
     // The queue drains: banner, removal, and any stale catalog save.
     queue.complete(imageBytes);
@@ -234,6 +236,9 @@ void main() {
 
     repo.pending[0].complete(AccessReadOk(calendar()));
     await pumpEventQueue();
+    expect(c.read(publicEventsProvider).value?.events.map((e) => e.eventId), [
+      unrelatedEvent,
+    ]);
 
     queue.complete(imageBytes);
     await cache.removeSermon('00000000-0000-4000-8000-000000000000');
@@ -358,6 +363,109 @@ void main() {
       final cold = await adapter().readGivingMethods();
       expect(cold?.value.methods.single.logo?.rightsRevision, 5);
       expect(cold?.value.methods.single.logo?.offlineBytes, changedBytes);
+    },
+  );
+
+  test('F3 adapter: a save from a read begun before a removal leaves the removed rows out', () async {
+    final cache = adapter();
+    await cache.writeRead(PublicContentCacheKeys.sermons, catalog());
+    await cache.writeRead(PublicContentCacheKeys.calendar, calendar());
+    final before = cache.readGeneration;
+
+    final queue = blockQueue(cache);
+    final removals = [
+      cache.removeSermon(withdrawn),
+      cache.removeEvent(withdrawnEvent),
+    ];
+    expect(cache.readGeneration, before + 2);
+    // Stale saves queued after the removals, from reads begun before them.
+    final stale = [
+      cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        catalog(),
+        readGeneration: before,
+      ),
+      cache.writeRead(
+        PublicContentCacheKeys.calendar,
+        calendar(),
+        readGeneration: before,
+      ),
+    ];
+    queue.complete(imageBytes);
+    await Future.wait(removals);
+    expect(
+      await Future.wait(stale),
+      everyElement(isA<PublicContentCacheSaved>()),
+    );
+
+    final cold = adapter();
+    final sermons = (await cold.readSermons())!.value;
+    expect(sermons.byId(withdrawn), isNull);
+    expect(sermons.byId(unrelated), isNotNull);
+    expect((await cold.readEvents())!.value.events.map((e) => e.eventId), [
+      unrelatedEvent,
+    ]);
+
+    // A read begun after the removal (say the sermon is published again)
+    // saves it as usual.
+    await cache.writeRead(
+      PublicContentCacheKeys.sermons,
+      catalog(),
+      readGeneration: cache.readGeneration,
+    );
+    expect((await adapter().readSermons())!.value.byId(withdrawn), isNotNull);
+  });
+
+  test(
+    'C1 adapter: a background logo never returns after the method is hidden',
+    () async {
+      const methodId = '61616161-6161-4161-8161-616161616161';
+      Map<String, Object?> logo(int rights) => {
+        'path': 'giving_method/$methodId/r$rights/logo.png',
+        'media_type': 'image/png',
+        'width': 160,
+        'height': 160,
+        'rights_revision': rights,
+        'offline_allowed': true,
+      };
+      final cache = adapter();
+      await cache.writeRead(
+        PublicContentCacheKeys.givingMethods,
+        PublicGivingMethods.fromJson(
+          publicGivingMethodsData([
+            publicGivingMethodData(methodId: methodId, logo: logo(1)),
+            publicBankMethodData(),
+          ]),
+        ),
+        loadGivingLogo: (_) async => imageBytes,
+      );
+      final fresh = PublicGivingMethod.fromJson(
+        publicGivingMethodData(
+          methodId: methodId,
+          publicationRevision: 2,
+          logo: logo(2),
+        ),
+      );
+      await cache.reconcileGivingMethod(fresh);
+      final slow = Completer<Uint8List?>();
+      final logoSave = cache.saveGivingLogo(
+        fresh,
+        loadGivingLogo: (_) => slow.future,
+      );
+      await pumpEventQueue();
+      await cache.removeGivingMethod(methodId);
+      slow.complete(imageBytes);
+      await logoSave;
+
+      final saved = (await adapter().readGivingMethods())!.value;
+      expect(saved.methods.map((m) => m.methodId), [
+        '62626262-6262-4262-8262-626262626262',
+      ]);
+      final logos = root
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.uri.pathSegments.last.startsWith('giving-logo-'));
+      expect(logos, isEmpty);
     },
   );
 }

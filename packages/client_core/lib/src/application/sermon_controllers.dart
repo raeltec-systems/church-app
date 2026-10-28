@@ -38,7 +38,10 @@ class PublicSermonsController extends PublicReadController<PublicSermons> {
   Future<PublicContentSnapshot<PublicSermons>?> readOfflineSnapshot() =>
       ref.read(publicContentCacheProvider).readSermons();
   @override
-  Future<DateTime?> saveOfflineSnapshot(PublicSermons value) async {
+  Future<DateTime?> saveOfflineSnapshot(
+    PublicSermons value, {
+    required int readGeneration,
+  }) async {
     final save = ++_saves;
     final offline = PublicSermons(
       sermons: value.sermons.where((s) => s.offlineAllowed).toList(),
@@ -63,16 +66,21 @@ class PublicSermonsController extends PublicReadController<PublicSermons> {
           PublicContentCacheKeys.sermons,
           eligible,
           loadSermonPoster: (_) async => null,
+          readGeneration: readGeneration,
         );
     if (outcome is! PublicContentCacheSaved) return null;
-    unawaited(_savePosters(save, eligible));
+    unawaited(_savePosters(save, eligible, readGeneration));
     return outcome.savedAt;
   }
 
   static String _posterKey(SermonPoster p) =>
       '${p.image.path}#${p.rightsRevision}';
 
-  Future<void> _savePosters(int save, PublicSermons eligible) async {
+  Future<void> _savePosters(
+    int save,
+    PublicSermons eligible,
+    int readGeneration,
+  ) async {
     try {
       final cache = ref.read(publicContentCacheProvider);
       final saved = await cache.readSermons();
@@ -123,6 +131,7 @@ class PublicSermonsController extends PublicReadController<PublicSermons> {
         PublicContentCacheKeys.sermons,
         eligible,
         loadSermonPoster: (p) async => fetched[_posterKey(p)],
+        readGeneration: readGeneration,
       );
     } catch (_) {
       // Poster maintenance never replaces a successful server read.
@@ -140,6 +149,9 @@ class PublicSermonsController extends PublicReadController<PublicSermons> {
     final value = state.value;
     final listed = value != null && value.byId(sermonId) != null;
     final inFlight = state.loading;
+    // Before the first await: a catalog read already in flight may still
+    // hold the sermon, so it can neither publish nor save it (review F3).
+    invalidateInFlightReads();
     if (listed) {
       state = PublicReadState<PublicSermons>(
         loading: state.loading,

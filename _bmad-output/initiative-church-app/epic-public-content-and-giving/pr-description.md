@@ -2,9 +2,58 @@
 
 `main` was last updated at PR #3, so this branch (`story/5.8-meetings-held`) carries epic 4 (duties), epic 5 (cells and meetings) and epic 6 (public content and giving). Epics 4 and 5 were reviewed story by story when they were built. **Epic 6 has not been reviewed** (owner decision 2026-10-27: the build agent only builds, and this PR is the review). Please focus the review on epic 6.
 
-## Review fixes (after the 2026-10-28 review, HOLD)
+## Status for the reviewer
 
-All findings of the 2026-10-28 review are fixed on this branch, each with a regression test. Every migration is on staging with its hashes verified, and boundary/unowned are 0.
+**This PR is not approved yet.** Nothing here is merged to `main` or deployed to production. Production also still needs the owner's approval of the Q3 and Q5 gates, which is separate from the technical checks below.
+
+## Follow-up review fixes (2026-10-28 follow-up report, HOLD at `970e8e0`)
+
+Each finding was reproduced with a failing test committed **before** its fix. The tests then pass after the fix.
+
+| Finding | Reproduced on `970e8e0` | Fix | After |
+|---|---|---|---|
+| F1 public object survives a post-upload refusal | `post-upload-refusal.test.mjs`: 10 of 17 failed (401, 403, 503, timeout), with output in `evidence-followup-f1/before-fix.txt` | Every plan read goes through one wrapper. Once a call has stored public objects, a refused or failed read deletes exactly the paths that call stored, using server Storage authority, before answering. Retried up to 3 times; otherwise the object is listed for the next authorized sync. A timeout becomes a 503. `content-assets` is staging v4. | 17 of 17 pass. All function tests pass. `content-banners.mjs` passes 16 of 16. |
+| F3 stale catalog write undoes a withdrawal (sermons and events) | `apps/mobile/test/offline/public_content_ordering_test.dart`, with the real file adapter, a blocked queue and a gated repository: both cases failed | `forgetSermon`/`forgetEvent` invalidate in-flight reads before their first await. A cache `readGeneration` tombstone also stops any save from a read started before a removal from bringing the removed row back. Giving removals get the same treatment. | passes, including a cold adapter |
+| F8 moved meetings miss venue notices | `cells_meeting_reminders_test.sql`: 6 of 70 failed (combined edit; nominal vs effective start; replay/dedup) | Migration `20261028150927` replaces `cells_set_schedule`: moved meetings revised by the generator get their notice at that revision, and the window uses the effective start. Staging hash matches. | 70 of 70 pass |
+| C1 giving detail waits for its logo | failing widget test, which never left loading | `reconcileGivingMethod` is now only the awaited safety step (text, plus keep or drop the logo). The download runs in the background via `saveGivingLogo` and attaches only if nothing changed meanwhile. | passes |
+| C2 oversized same-revision banner never repaired | adapter test failed, leaving a 5 MiB + 1 file | Every rejected image file is replaced, for banners and giving logos. | passes; no repeat download |
+
+**Accepted residual (owner, 2026-10-28):** if the function process dies between a public upload and its take-back, the object stays until the next authorized sync. A server-side sweep would need an extra command granted to the `content_asset_retention` principal, and the owner chose not to add it now. It is documented in `docs/runbooks/content.md`.
+
+**Not independently re-verified:** the sermon-from-duty lock recheck is tested by injecting a stale first read, not by real two-session contention.
+
+## Verification at `cfc2e6f` (local, 2026-10-28)
+
+All checks ran on the merged head `cfc2e6fe46f284f9707cf26881607aa527f4e658`, using `tools/ci/run-local-ci.sh`, which runs every `ci.yml` step. The tree of the pushed head differs only in this file, the new script and the release evidence.
+
+| Check | Result |
+|---|---|
+| Migrations (base `origin/main`), secrets, env configs, function imports | **passed** |
+| TypeScript contract fixtures | **passed** |
+| pgTAP on a fresh reset | **passed**: 72 files, 5,841 tests |
+| Data API smoke | **passed** |
+| Evidence scans (every `scan-evidence.sh` step) | **passed** |
+| Flutter analyze and test: design_system, client_core, mobile, staff, staff web trial | **passed** (client_core 1,169, mobile 115, staff 63, design_system 20, staff web trial 35) |
+| client_core duties and follow-ups with `TZ=America/New_York` | **passed** (224 and 37 tests), but Windows ignores `TZ`, so this did not prove time-zone independence; CI on Linux does |
+| Staff web and trial web builds; bundle secret scan | **passed** |
+| Dart contracts in Chrome | **passed**, 283 tests |
+| Policy tool tests | **failed on Windows** (CRLF checkout and the 0600 file mode). **Passed on a clean Linux clone:** 56 of 56 (Node 22.23.4) |
+| Harness, function and shared-module tests | **failed on Windows** (CRLF `pipefail\r` and a `/C:/` bash path). **Passed on a clean Linux clone:** 410 of 410 |
+| Dart contracts test (VM) | **failed on Windows** (the generated fixture expected LF and got CRLF). **Passed on a clean Linux clone:** Dart 3.13.5, 284 of 284, analyze clean |
+| Restore rehearsal | **unrun**: the tool calls `spawnSync('npx')`, which does not resolve on Windows, so it exits before the rehearsal. Needs Linux CI |
+| Staging migration-history drift | **unrun**: needs `SUPABASE_ACCESS_TOKEN`, which CI skips too |
+| **G1** concurrent last-seat RSVP (`content-event-rsvp.mjs`) | **passed**, exit 0, 13 of 13. C21: round 1 had 1 going and 4 full, and round 2 the same. Evidence in `evidence-release/content-event-rsvp-e2e.jsonl` |
+| **G2** scheduler, worker and Storage retention (`content-retention.mjs`) | **passed**, exit 0, 6 of 6. Evidence in `evidence-release/content-retention-e2e.jsonl`; the evidence scan is clean |
+| Hosted GitHub CI | **not run**: no PR exists yet, and `ci.yml` triggers on pull requests and pushes to main |
+
+Remaining before approval:
+1. Open the PR so hosted CI runs. This is the first run of the restore rehearsal and the true `TZ` check.
+2. The reviewer re-checks F1, F3 and F8.
+3. Owner gate approvals for production (entry 17).
+
+## Earlier review fixes (2026-10-28 first review)
+
+The fixes from the first review are summarised below. F1 and F3 were completed by the follow-up fixes above.
 
 | Finding | Fix |
 |---|---|
@@ -25,8 +74,6 @@ Owner decisions taken with the fixes (2026-10-28):
 - A saved calendar event opens offline.
 
 Also fixed: the banner E2E cleanup, which 6.11's organiser rows blocked (now 16/16).
-
-Known on this Windows build host only: four Node policy tests fail, on a file-permission check and a line-ending regex in files no fix touched. The hosted CI run will confirm.
 
 ## Epic 6 entries (plans in `_bmad-output/initiative-church-app/epic-public-content-and-giving/`)
 

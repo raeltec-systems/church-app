@@ -331,6 +331,91 @@ void main() {
     expect(snapshot?.savedAt, savedAt);
   });
 
+  // Review section 8: a stop between deleting the live manifest and renaming
+  // its replacement is repaired at the next start.
+  group('manifest kill-point recovery', () {
+    const other = '72727272-7272-4272-8272-727272727272';
+    late Directory folder;
+    late File live;
+
+    Future<String> manifestFor(List<Map<String, Object?>> events) async {
+      final scratch = await Directory.systemTemp.createTemp('bic-kill-');
+      addTearDown(() => scratch.delete(recursive: true));
+      final writer = PublicContentCacheAdapter(
+        supportDirectory: () async => scratch,
+        clock: () => savedAt,
+      );
+      await writer.writeRead(
+        PublicContentCacheKeys.calendar,
+        PublicEvents.fromJson(publicEventsData(events)),
+      );
+      return File(
+        '${scratch.path}${Platform.pathSeparator}bic-kafue'
+        '${Platform.pathSeparator}public-content-v1'
+        '${Platform.pathSeparator}manifest.json',
+      ).readAsString();
+    }
+
+    setUp(() async {
+      await cache.writeRead(
+        PublicContentCacheKeys.calendar,
+        PublicEvents.fromJson(publicEventsData([publicEventData()])),
+      );
+      folder = Directory(
+        '${root.path}${Platform.pathSeparator}bic-kafue'
+        '${Platform.pathSeparator}public-content-v1',
+      );
+      live = File('${folder.path}${Platform.pathSeparator}manifest.json');
+    });
+
+    List<String> leftovers() => folder
+        .listSync()
+        .map((e) => e.uri.pathSegments.last)
+        .where((n) => n.contains('.tmp-') || n.contains('.backup-'))
+        .toList();
+
+    test('the complete replacement is promoted', () async {
+      final previous = await live.readAsString();
+      await File('${live.path}.backup-1').writeAsString(previous);
+      await File('${live.path}.tmp-1')
+          .writeAsString(await manifestFor([publicEventData(eventId: other)]));
+      await live.delete();
+
+      final restarted = PublicContentCacheAdapter(
+        supportDirectory: () async => root,
+      );
+      final events = (await restarted.readEvents())?.value.events;
+      expect(events?.map((e) => e.eventId), [other]);
+      expect(leftovers(), isEmpty);
+    });
+
+    test('the backup is restored when the replacement is damaged', () async {
+      final previous = await live.readAsString();
+      await File('${live.path}.backup-1').writeAsString(previous);
+      await File('${live.path}.tmp-1').writeAsString('{"version": 1, "rea');
+      await live.delete();
+
+      final restarted = PublicContentCacheAdapter(
+        supportDirectory: () async => root,
+      );
+      expect((await restarted.readEvents())?.value.events, hasLength(1));
+      expect(leftovers(), isEmpty);
+    });
+
+    test('a live manifest wins over leftovers, which are removed', () async {
+      await File('${live.path}.tmp-9')
+          .writeAsString(await manifestFor([publicEventData(eventId: other)]));
+      final restarted = PublicContentCacheAdapter(
+        supportDirectory: () async => root,
+      );
+      final events = (await restarted.readEvents())?.value.events;
+      expect(events?.map((e) => e.eventId), [
+        '71717171-7171-4171-8171-717171717171',
+      ]);
+      expect(leftovers(), isEmpty);
+    });
+  });
+
   test('only allowlisted public list reads can create a manifest', () async {
     final outcome = await cache.writeRead(
       'content_staff_events',

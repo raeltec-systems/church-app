@@ -80,7 +80,63 @@ class PublicContentCacheAdapter implements PublicContentCache {
       '${Platform.pathSeparator}public-content-v1',
     );
     await directory.create(recursive: true);
+    await (_recovered ??= _recoverManifest(directory));
     return directory;
+  }
+
+  Future<void>? _recovered;
+
+  /// Startup recovery for a manifest replacement interrupted by a process
+  /// stop (see [_commitManifest]). With no live manifest, the newest fully
+  /// written replacement is promoted, else the newest backup is restored;
+  /// a leftover that does not parse is never promoted. Leftovers are then
+  /// removed. Runs once per adapter, before any read or write.
+  Future<void> _recoverManifest(Directory directory) async {
+    try {
+      final live = await _manifest(directory);
+      final name = live.uri.pathSegments.last;
+      final temps = <File>[];
+      final backups = <File>[];
+      await for (final entity in directory.list()) {
+        if (entity is! File) continue;
+        final n = entity.uri.pathSegments.last;
+        if (n.startsWith('$name.tmp-')) temps.add(entity);
+        if (n.startsWith('$name.backup-')) backups.add(entity);
+      }
+      int stamp(File f) =>
+          int.tryParse(f.uri.pathSegments.last.split('-').last) ?? 0;
+      temps.sort((a, b) => stamp(b).compareTo(stamp(a)));
+      backups.sort((a, b) => stamp(b).compareTo(stamp(a)));
+      if (!await live.exists()) {
+        for (final candidate in [...temps, ...backups]) {
+          if (await _validManifestFile(candidate)) {
+            await candidate.rename(live.path);
+            break;
+          }
+        }
+      }
+      for (final leftover in [...temps, ...backups]) {
+        try {
+          if (await leftover.exists()) await leftover.delete();
+        } catch (_) {
+          // A leftover is never read as the manifest.
+        }
+      }
+    } catch (_) {
+      // Recovery is best effort; an unreadable cache reads as empty.
+    }
+  }
+
+  Future<bool> _validManifestFile(File file) async {
+    try {
+      final decoded = jsonDecode(await file.readAsString());
+      return _hasKeys(decoded, const {'version', 'reads'}) &&
+          decoded['version'] == _manifestVersion &&
+          decoded['reads'] is Map &&
+          (decoded['reads'] as Map).keys.every(_allowedReads.contains);
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<File> _manifest(Directory directory) async =>
@@ -1026,6 +1082,19 @@ class PublicContentCacheAdapter implements PublicContentCache {
     final temp = File('${file.path}.tmp-$suffix');
     final backup = File('${file.path}.backup-$suffix');
     await temp.writeAsString(json, flush: true);
+    if (!Platform.isWindows) {
+      // rename(2) replaces the target atomically on Android and iOS.
+      try {
+        await temp.rename(file.path);
+        return;
+      } catch (_) {
+        if (await temp.exists()) await temp.delete();
+        rethrow;
+      }
+    }
+    // Windows cannot rename over an existing file: copy a backup, delete,
+    // rename. A stop between the delete and the rename is repaired at the
+    // next start by [_recoverManifest].
     final hadPrevious = await file.exists();
     try {
       if (hadPrevious) {

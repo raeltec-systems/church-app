@@ -705,11 +705,17 @@ class FakeBible implements BibleRepository {
     return chapters[key] ?? const AccessReadOk(null);
   }
 
+  /// When set, every manifest read waits for it, so a test can change the
+  /// account or tap again while the read is in flight.
+  Completer<void>? manifestGate;
+  final manifestCalls = <String>[];
+
   @override
-  Future<AccessRead<BibleVerseManifest>> fetchVerseManifest(
-    String code,
-  ) async =>
-      manifests[code] ?? const AccessReadDenied(AccessDenial.unavailable);
+  Future<AccessRead<BibleVerseManifest>> fetchVerseManifest(String code) async {
+    manifestCalls.add(code);
+    await manifestGate?.future;
+    return manifests[code] ?? const AccessReadDenied(AccessDenial.unavailable);
+  }
 
   @override
   Future<AccessRead<StaffBibleTranslations>> fetchStaffTranslations() async {
@@ -826,8 +832,14 @@ class FakeBibleTranslationPackageSource
     implements BibleTranslationPackageSource {
   String worldEnglishBibleVpl = '';
 
+  /// When set, the package load waits for it (see [FakeBible.manifestGate]).
+  Completer<void>? gate;
+
   @override
-  Future<String> loadWorldEnglishBibleVpl() async => worldEnglishBibleVpl;
+  Future<String> loadWorldEnglishBibleVpl() async {
+    await gate?.future;
+    return worldEnglishBibleVpl;
+  }
 }
 
 /// [HymnListsRepository] answered by the test (story 6.8): favourites, this

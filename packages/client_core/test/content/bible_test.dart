@@ -728,6 +728,182 @@ void main() {
       contains('Complete draft'),
     );
   });
+
+  // Review F2: the preflight reads (manifest, bundled package) are bound to
+  // the account and operation that started them, and hold the busy guard.
+  group('Bible import preflight lifecycle', () {
+    final webManifest = _manifest(
+      genesisOne: 1,
+      genesisTwo: 1,
+      translationCode: 'WEB',
+    );
+
+    ({
+      ClientTestHarness h,
+      _BibleAutoGateway gateway,
+      ProviderContainer container,
+      NotifierProvider<_Gen, int> gen,
+    })
+    setUpStaff() {
+      final source = StringBuffer();
+      for (final book in bibleBooks) {
+        for (var chapter = 1; chapter <= book.chapterCount; chapter++) {
+          source.writeln('${book.id} $chapter:1 SYNTHETIC ${book.id} $chapter');
+        }
+      }
+      final h = ClientTestHarness()
+        ..bible.staff = const AccessReadOk(
+          StaffBibleTranslations(capacity: ChurchRoles.media, translations: []),
+        )
+        ..bible.manifests['WEB'] = AccessReadOk(webManifest)
+        ..bible.manifests['KJV'] = AccessReadOk(_manifest())
+        ..biblePackageSource.worldEnglishBibleVpl = source.toString();
+      final gateway = _BibleAutoGateway();
+      h.commandGateway = gateway;
+      final gen = NotifierProvider<_Gen, int>(_Gen.new);
+      final container = ProviderContainer(
+        overrides: [
+          ...h.overrides(),
+          accountGenerationProvider.overrideWith((ref) => ref.watch(gen)),
+        ],
+      );
+      addTearDown(container.dispose);
+      final sub = container.listen(bibleStaffProvider, (_, _) {});
+      addTearDown(sub.close);
+      return (h: h, gateway: gateway, container: container, gen: gen);
+    }
+
+    PickedFile kjvCsv() => PickedFile(
+      name: 'kjv.csv',
+      declaredType: 'text/csv',
+      bytes: Uint8List.fromList(
+        utf8.encode(
+          'book,chapter,verse,text\nGEN,1,1,SYNTHETIC one\nGEN,1,2,SYNTHETIC two\n',
+        ),
+      ),
+    );
+
+    test(
+      'an account switch during the CSV manifest read sends nothing',
+      () async {
+        final s = setUpStaff();
+        final controller = s.container.read(bibleStaffProvider.notifier);
+        await controller.reload();
+        final gate = s.h.bible.manifestGate = Completer<void>();
+
+        final import = controller.importCsv(
+          translationId: null,
+          code: 'KJV',
+          name: 'King James Version',
+          rightsId: _rightsId,
+          file: kjvCsv(),
+        );
+        expect(s.container.read(bibleStaffProvider).busy, isTrue);
+        await pumpEventQueue();
+        s.container.read(s.gen.notifier).bump();
+        gate.complete();
+        await import;
+        await pumpEventQueue();
+
+        expect(s.gateway.requests, isEmpty);
+        expect(s.container.read(bibleStaffProvider).busy, isFalse);
+      },
+    );
+
+    test(
+      'an account switch during the WEB manifest read sends nothing',
+      () async {
+        final s = setUpStaff();
+        final controller = s.container.read(bibleStaffProvider.notifier);
+        await controller.reload();
+        final gate = s.h.bible.manifestGate = Completer<void>();
+
+        final install = controller.installWorldEnglishBible(
+          rightsId: _rightsId,
+        );
+        await pumpEventQueue();
+        s.container.read(s.gen.notifier).bump();
+        gate.complete();
+        await install;
+        await pumpEventQueue();
+
+        expect(s.gateway.requests, isEmpty);
+        expect(s.container.read(bibleStaffProvider).busy, isFalse);
+      },
+    );
+
+    test('an account switch during the WEB package load sends nothing, even '
+        'before the controller rebuilds', () async {
+      final s = setUpStaff();
+      final controller = s.container.read(bibleStaffProvider.notifier);
+      await controller.reload();
+      final gate = s.h.biblePackageSource.gate = Completer<void>();
+
+      final install = controller.installWorldEnglishBible(rightsId: _rightsId);
+      await pumpEventQueue();
+      // The generation changes and the load answers in the same turn, so
+      // the continuation runs before Riverpod rebuilds the controller.
+      s.container.read(s.gen.notifier).bump();
+      gate.complete();
+      await install;
+
+      expect(s.gateway.requests, isEmpty);
+    });
+
+    test('a reset before the WEB lookup neither throws nor sends', () async {
+      final s = setUpStaff();
+      final controller = s.container.read(bibleStaffProvider.notifier);
+      await controller.reload();
+      final gate = s.h.biblePackageSource.gate = Completer<void>();
+
+      final install = controller.installWorldEnglishBible(rightsId: _rightsId);
+      await pumpEventQueue();
+      // The reset drops the loaded catalog the WEB lookup reads.
+      s.container.invalidate(bibleStaffProvider);
+      s.container.read(bibleStaffProvider);
+      gate.complete();
+      await expectLater(install, completes);
+      await pumpEventQueue();
+
+      expect(s.gateway.requests, isEmpty);
+      expect(s.container.read(bibleStaffProvider).busy, isFalse);
+    });
+
+    test('a double tap starts one import', () async {
+      final s = setUpStaff();
+      final controller = s.container.read(bibleStaffProvider.notifier);
+      await controller.reload();
+      final gate = s.h.bible.manifestGate = Completer<void>();
+
+      final first = controller.installWorldEnglishBible(rightsId: _rightsId);
+      final second = controller.installWorldEnglishBible(rightsId: _rightsId);
+      final third = controller.importCsv(
+        translationId: null,
+        code: 'KJV',
+        name: 'King James Version',
+        rightsId: _rightsId,
+        file: kjvCsv(),
+      );
+      await pumpEventQueue();
+      expect(s.h.bible.manifestCalls, ['WEB']);
+      gate.complete();
+      await Future.wait([first, second, third]);
+
+      expect(
+        s.gateway.requests.where((r) => r.command == BibleCommands.create),
+        hasLength(1),
+      );
+      expect(s.gateway.requests.last.command, BibleCommands.finalize);
+      expect(s.container.read(bibleStaffProvider).busy, isFalse);
+    });
+  });
+}
+
+class _Gen extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state++;
 }
 
 class _BibleAutoGateway implements CommandGateway {

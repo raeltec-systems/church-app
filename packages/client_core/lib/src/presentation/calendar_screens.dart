@@ -13,6 +13,7 @@ import '../domain/church_time.dart';
 import '../domain/content_events.dart';
 import '../domain/duty_calendar.dart' show CalendarHandoff, ShareOrigin;
 import '../domain/event_calendar.dart';
+import 'calendar_overlay_widgets.dart';
 import 'church_widgets.dart';
 import 'shell_routing.dart' show ClientPaths;
 
@@ -342,6 +343,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     if (mounted && !ref.read(publicEventsProvider).loading) {
       ref.read(publicEventsProvider.notifier).reload();
     }
+    // Epic 6 entry 19: the member's switched-on overlays are asked again.
+    if (mounted) reloadCalendarOverlays(ref);
   }
 
   @override
@@ -355,6 +358,13 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final c = ChurchColors.of(context);
     final s = ref.watch(publicEventsProvider);
     final children = <Widget>[];
+    // Epic 6 entry 19: a member with live access can lay their own duties
+    // and cell meetings over the calendar (hidden for guests and Pending).
+    final overlaysOffered = calendarOverlaysOffered(ref);
+    final overlays = watchCalendarOverlays(ref);
+    if (overlaysOffered) {
+      children.add(CalendarOverlaySwitchBar(view: overlays));
+    }
     switch (s.result) {
       case null:
         children.add(
@@ -389,25 +399,38 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           );
         }
         // Grouped by the church month of each start, in the server's order.
-        final groups = <String, List<PublicEvent>>{};
+        // Epic 6 entry 19: the member's own items join their month, in
+        // time order among the events (an event first at the same time).
+        final groups = <String, List<(DateTime, Widget)>>{};
         for (final e in value.events) {
-          groups.putIfAbsent(churchMonthTitle(e.startsAt), () => []).add(e);
+          groups.putIfAbsent(churchMonthTitle(e.startsAt), () => []).add((
+            e.startsAt,
+            PublicEventRow(
+              event: e,
+              onTap: () => context.push(CalendarPaths.event(e.eventId)),
+            ),
+          ));
         }
-        for (final (i, MapEntry(key: month, value: inMonth))
-            in groups.entries.indexed) {
+        for (final o in overlays.items) {
+          final inMonth = groups.putIfAbsent(
+            churchMonthTitle(o.startsAt),
+            () => [],
+          );
+          var at = inMonth.length;
+          while (at > 0 && inMonth[at - 1].$1.isAfter(o.startsAt)) {
+            at--;
+          }
+          inMonth.insert(at, (o.startsAt, CalendarOverlayRow(item: o)));
+        }
+        final months = groups.keys.toList()
+          ..sort((a, b) => groups[a]!.first.$1.compareTo(groups[b]!.first.$1));
+        for (final (i, month) in months.indexed) {
+          final inMonth = groups[month]!;
           if (i > 0) children.add(const SizedBox(height: 22));
           children.addAll([
             SectionHeader(key: Key('calendar-month-$i'), title: month),
             const SizedBox(height: 10),
-            EventRowsCard(
-              rows: [
-                for (final e in inMonth)
-                  PublicEventRow(
-                    event: e,
-                    onTap: () => context.push(CalendarPaths.event(e.eventId)),
-                  ),
-              ],
-            ),
+            EventRowsCard(rows: [for (final (_, row) in inMonth) row]),
           ]);
         }
         if (value.truncated) {

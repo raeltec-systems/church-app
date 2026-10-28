@@ -1,0 +1,12 @@
+{"step":"O00-precondition","target":"LOCAL","at":"2026-10-28T06:43:24.542Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"O01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-28T06:43:28.500Z","verdict":"pass","amr":["password"]}
+{"step":"O02-cells-members-schedules-and-a-cancelled-meeting","target":"LOCAL","at":"2026-10-28T06:43:29.824Z","verdict":"pass","cells":[200,200],"placed":[200,200],"schedules":[200,200],"meetings":[12,12],"cancelled":"cancelled"}
+{"step":"O03-one-duty-each","target":"LOCAL","at":"2026-10-28T06:43:30.194Z","verdict":"pass","department":200,"grant":200,"added":[200,200],"published":[200,200],"codes":[null,null]}
+{"step":"O10-member-reads-only-their-own-cell-meetings-for-the-month","target":"LOCAL","at":"2026-10-28T06:43:31.379Z","verdict":"pass","status":200,"own_cell":true,"meetings":5,"cancelled_marked":"cancelled"}
+{"step":"O11-other-member-reads-only-their-cell","target":"LOCAL","at":"2026-10-28T06:43:31.380Z","verdict":"pass","status":200,"own_cell":true,"meetings":5}
+{"step":"O12-no-venue-on-the-overlay-read","target":"LOCAL","at":"2026-10-28T06:43:31.381Z","verdict":"pass","keys":"ends_at,meeting_id,occurrence_date,starts_at,state"}
+{"step":"O20-member-reads-only-their-own-duties","target":"LOCAL","at":"2026-10-28T06:43:31.394Z","verdict":"pass","status":200,"own":true,"others":false}
+{"step":"O30-pending-and-guest-are-refused","target":"LOCAL","at":"2026-10-28T06:43:31.508Z","verdict":"pass","pending":403,"pending_duties":403,"guest":401}
+{"step":"O40-my-cell-unchanged","target":"LOCAL","at":"2026-10-28T06:43:31.555Z","verdict":"pass","status":200,"next_has_venue":true}
+{"step":"O50-direct-table-queries-refused","target":"LOCAL","at":"2026-10-28T06:43:31.586Z","verdict":"pass","statuses":["app.cells_meetings:406","api.cells_meetings:404","app.cells_memberships:406","api.cells_memberships:404","app.duties_assignments:406","api.duties_assignments:404"]}
+{"step":"O99-cleanup","target":"LOCAL","at":"2026-10-28T06:43:33.195Z","users_left":0,"unmarked":true,"cells_left":0,"departments_left":0}

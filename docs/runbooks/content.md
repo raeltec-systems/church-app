@@ -783,3 +783,56 @@ Every event change below sends real review notices to the linked departments' le
 ### Staging (2026-10-27)
 
 Applied as `20261027192013`; all 12 function hashes match the fresh local reset; boundary/unowned 0; signed-out reads checked. No duty was linked and no notification was sent. Evidence: `evidence-6.12/staging-verify.md`.
+
+## Story 6.19: My duties and My cell overlays on the Calendar
+
+Migration: `20261028064546_cells_my_meetings.sql`, a **Cells** contract change (see
+[cells-meetings.md](cells-meetings.md)): the new read `api.cells_my_meetings()`. No Content
+function changes; Content reads neither Cells nor Duties tables. The Duties side reuses the 4.5
+My duties read (`api.duties_my_duties`) unchanged.
+
+### On the phone
+
+- The Calendar tab shows two switches, **My duties** and **My cell**, only to a signed-in member
+  with live access. Guests and Pending applicants see the public calendar alone, with no switch.
+  Both start off; the choice lasts for the app session and is dropped on an account change.
+- Switched on, the member's own items join the month lists among the events in time order, each
+  with a mark: **My duty** (blue) or **My cell** (green). A duty shows its report time (or its
+  times) and place; "done by" assignments say "Done by this day". A cell meeting shows its time
+  (no venue on the Calendar); a moved one says so; a cancelled one stays listed as
+  **Cell meeting cancelled**, "Cancelled · was 18:00–19:30".
+- Only current duties: waiting for an answer or accepted, not ended, starting in the next 31
+  days (declined and past duties are left out). Cell meetings: the member's own confirmed cell,
+  next 31 days. A line under the switches says so.
+- A duty opens its duty detail (`/duties/assignments/<id>`); a meeting opens **My cell**.
+- A read that fails says "No connection" or "Couldn't load" for that overlay; the church calendar
+  stays. Overlays are never saved for offline use.
+
+### Local checks
+
+```text
+node --test tools/identity-e2e/calendar-overlays.test.mjs
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/calendar-overlays.mjs --evidence _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-6.19/calendar-overlays-e2e.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+pgTAP: `supabase/tests/cells_my_meetings_test.sql` (fictional +1 202 555 0161-0168, rolled back).
+The E2E uses +44 7700 900941-900945 (900946-900949 reserved for this entry) and removes
+everything it created.
+
+### Owner manual check on staging (the ticket's verify)
+
+Use synthetic members only and send no notification. You need member M confirmed in
+`SYNTHETIC Shikoswe Cell` (with a weekly schedule) holding one published duty in the next month,
+member E in another cell with its own duty, a Pending applicant P and a signed-out phone.
+
+1. As M on a phone with this build: **Calendar** shows **My duties** and **My cell**. Switch both
+   on: M's duty shows **My duty**, the cell's meetings for the month show **My cell**, among the
+   church events by date.
+2. Ask the cell leader to cancel one meeting on staff web; pull to refresh: it shows **Cell
+   meeting cancelled**.
+3. Tap the duty: its duty detail opens. Back, tap a meeting: **My cell** opens.
+4. E's duty and E's cell meetings never appear on M's Calendar (and the reverse on E's phone).
+5. Signed out, and as P: the Calendar has no switches.
+6. Record pass/fail per step in `evidence-6.19/owner-check.md` (device; no numbers or ids).

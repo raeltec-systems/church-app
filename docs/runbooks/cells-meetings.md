@@ -795,3 +795,26 @@ On this Windows host the APK build needs `JAVA_TOOL_OPTIONS=-Djdk.net.unixdomain
 - Story 4.15 promoted first.
 - The Q4 live-data decision and the named pilot leaders.
 - The epic 5 promotion, following production-promotion-cells.md.
+
+## Epic 6 entry 19: the member's own meetings for the Calendar (Cells contract change)
+
+Migration: `supabase/migrations/20261028064546_cells_my_meetings.sql` (one new read; no table, no
+row deletion). Plan: `_bmad-output/initiative-church-app/epic-public-content-and-giving/story-overlay-a-signed-in-member-s-own-duties-and-cell-meetings-plan.md`.
+
+- **Contract change:** a new client read `api.cells_my_meetings()` for a member with live access.
+  It answers `{cell_id, from, until, meetings: [{meeting_id, occurrence_date, state, starts_at,
+  ends_at}]}` for the caller's **own confirmed cell** only: meetings that have not ended and start
+  within the next **31 days**, soonest first, at most 62 rows. `state` is `scheduled`, `moved` or
+  `cancelled` (withdrawn dates are left out). **No venue, map pin, programme or names.** No
+  confirmed cell, or a cell without a schedule: `cell_id` null and `meetings: []`. A leader or
+  assistant who is not a member of the cell reads nothing here (own cell only).
+- **Refusals:** a guest has no EXECUTE (HTTP 401); an account without member access (a Pending
+  applicant) is refused by Identity (403); the Cells read gate applies as on My cell.
+- **Unchanged:** `api.cells_my_cell()` (still the next meeting with its venue and the cancelled
+  ones before it) and every other Cells read and command. Epic 7 may change Cells reads freely:
+  this read is its own function.
+- **Consumer:** the mobile Calendar's **My cell** overlay (Content composes it on the phone; no
+  Content function reads Cells). Nothing is cached offline.
+- **Staging (2026-10-28):** applied verbatim as `20261028064546`; the four `cells_my_*` function
+  hashes match the fresh local replay (`api.cells_my_cell` unchanged); boundary and unowned 0;
+  anon is refused (`42501`) and a session-less authenticated call answers `unauthenticated`.

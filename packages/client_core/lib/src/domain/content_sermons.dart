@@ -17,11 +17,9 @@ Map _object(Object? raw, String name, Set<String> keys) {
   return m;
 }
 
-String _text(Map m, String key) {
-  final text = wireReq<String>(m, key);
-  if (text.trim().isEmpty) throw FormatException('unexpected $key');
-  return text;
-}
+// Entry 6.16: the shared wire readers (wire_json.dart), under the short
+// names this library has always used.
+const _text = wireText;
 
 const sermonLinkHosts = {
   'ebible.org',
@@ -783,13 +781,7 @@ class StaffSermonSeriesCatalog {
   final bool truncated;
 }
 
-String _capacity(Map m) {
-  final c = _text(m, 'capacity');
-  if (!const ['admin', 'media', 'pastor'].contains(c)) {
-    throw const FormatException('unexpected capacity');
-  }
-  return c;
-}
+const _capacity = wireEditorCapacity;
 
 /// Story 6.18: the duty a sermon draft was sent from, as the editors read it:
 /// the duty's name and start when it was sent, and when. Never who sent it.

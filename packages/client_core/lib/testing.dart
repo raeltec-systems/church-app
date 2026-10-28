@@ -612,9 +612,13 @@ class FakeContent implements ContentRepository {
   int staffEventsCalls = 0;
   final publicEventAsked = <String>[];
 
+  /// When set, the public calendar read waits for it.
+  Completer<void>? publicEventsGate;
+
   @override
   Future<AccessRead<PublicEvents>> fetchPublicEvents() async {
     publicEventsCalls++;
+    await publicEventsGate?.future;
     return publicEvents;
   }
 
@@ -705,11 +709,17 @@ class FakeBible implements BibleRepository {
     return chapters[key] ?? const AccessReadOk(null);
   }
 
+  /// When set, every manifest read waits for it, so a test can change the
+  /// account or tap again while the read is in flight.
+  Completer<void>? manifestGate;
+  final manifestCalls = <String>[];
+
   @override
-  Future<AccessRead<BibleVerseManifest>> fetchVerseManifest(
-    String code,
-  ) async =>
-      manifests[code] ?? const AccessReadDenied(AccessDenial.unavailable);
+  Future<AccessRead<BibleVerseManifest>> fetchVerseManifest(String code) async {
+    manifestCalls.add(code);
+    await manifestGate?.future;
+    return manifests[code] ?? const AccessReadDenied(AccessDenial.unavailable);
+  }
 
   @override
   Future<AccessRead<StaffBibleTranslations>> fetchStaffTranslations() async {
@@ -826,8 +836,14 @@ class FakeBibleTranslationPackageSource
     implements BibleTranslationPackageSource {
   String worldEnglishBibleVpl = '';
 
+  /// When set, the package load waits for it (see [FakeBible.manifestGate]).
+  Completer<void>? gate;
+
   @override
-  Future<String> loadWorldEnglishBibleVpl() async => worldEnglishBibleVpl;
+  Future<String> loadWorldEnglishBibleVpl() async {
+    await gate?.future;
+    return worldEnglishBibleVpl;
+  }
 }
 
 /// [HymnListsRepository] answered by the test (story 6.8): favourites, this
@@ -1697,6 +1713,35 @@ class FakePublicContentCache implements PublicContentCache {
     );
   }
 
+  /// When set, every [writeRead] waits for it (a slow save or image fetch).
+  Completer<void>? writeGate;
+
+  final removedEvents = <String>[];
+
+  @override
+  Future<void> removeEvent(String eventId) async {
+    removedEvents.add(eventId);
+    final snapshot = events;
+    if (snapshot == null) return;
+    events = PublicContentSnapshot(
+      savedAt: snapshot.savedAt,
+      value: snapshot.value.withoutEvent(eventId),
+    );
+  }
+
+  final removedSermons = <String>[];
+
+  @override
+  Future<void> removeSermon(String sermonId) async {
+    removedSermons.add(sermonId);
+    final snapshot = sermons;
+    if (snapshot == null) return;
+    sermons = PublicContentSnapshot(
+      savedAt: snapshot.savedAt,
+      value: snapshot.value.withoutSermon(sermonId),
+    );
+  }
+
   @override
   Future<void> reconcileGivingMethod(
     PublicGivingMethod method, {
@@ -1764,6 +1809,7 @@ class FakePublicContentCache implements PublicContentCache {
     Future<Uint8List?> Function(SermonPoster poster)? loadSermonPoster,
   }) async {
     writes.add((readKey, projection));
+    await writeGate?.future;
     if (!available) return const PublicContentCacheUnavailable();
     if (readKey == PublicContentCacheKeys.sermons &&
         projection is PublicSermons) {

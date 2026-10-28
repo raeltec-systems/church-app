@@ -128,6 +128,32 @@ class PublicSermonsController extends PublicReadController<PublicSermons> {
       // Poster maintenance never replaces a successful server read.
     }
   }
+
+  /// A fresh detail read said [sermonId] is no longer public: drop it from
+  /// the list on screen and from the saved catalog at once, so neither a
+  /// failed list refresh nor a pending poster save can bring it back. The
+  /// list is then refreshed; a read already in flight is restarted so it
+  /// cannot show a copy taken before the removal.
+  Future<void> forgetSermon(String sermonId) async {
+    // Cancels any poster save still holding the old catalog.
+    _saves++;
+    final value = state.value;
+    final listed = value != null && value.byId(sermonId) != null;
+    final inFlight = state.loading;
+    if (listed) {
+      state = PublicReadState<PublicSermons>(
+        loading: state.loading,
+        result: AccessReadOk(value.withoutSermon(sermonId)),
+        asOf: state.asOf,
+        refreshFailed: state.refreshFailed,
+        savedAt: state.savedAt,
+        offlineSnapshot: state.offlineSnapshot,
+      );
+    }
+    await ref.read(publicContentCacheProvider).removeSermon(sermonId);
+    if (!ref.mounted) return;
+    if (listed || inFlight) unawaited(reload());
+  }
 }
 
 final publicSermonsProvider =
@@ -160,11 +186,15 @@ class PublicSermonController extends PublicReadController<PublicSermonRead> {
     // When the detail no longer matches the listed copy (withdrawn, revised,
     // or its video or series changed), refresh the canonical list so the
     // saved catalog follows. Never awaited: the teaching shows at once.
-    final listed = ref.read(publicSermonsProvider).value?.byId(sermonId);
     final fresh = value.sermon;
-    final changed = fresh == null
-        ? listed != null
-        : listed == null || !_sameListing(listed, fresh);
+    if (fresh == null) {
+      // A known withdrawal invalidates the saved copy directly; it never
+      // depends on the follow-up list refresh succeeding.
+      await ref.read(publicSermonsProvider.notifier).forgetSermon(sermonId);
+      return;
+    }
+    final listed = ref.read(publicSermonsProvider).value?.byId(sermonId);
+    final changed = listed == null || !_sameListing(listed, fresh);
     if (changed) unawaited(ref.read(publicSermonsProvider.notifier).reload());
   }
 

@@ -398,53 +398,59 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
             ),
           );
         }
-        // Grouped by the church month of each start, in the server's order.
-        // Epic 6 entry 19: the member's own items join their month, in
-        // time order among the events (an event first at the same time).
-        final groups = <String, List<(DateTime, Widget)>>{};
-        for (final e in value.events) {
-          groups.putIfAbsent(churchMonthTitle(e.startsAt), () => []).add((
-            e.startsAt,
-            PublicEventRow(
-              event: e,
-              onTap: () => context.push(CalendarPaths.event(e.eventId)),
-            ),
-          ));
-        }
-        for (final o in overlays.items) {
-          final inMonth = groups.putIfAbsent(
-            churchMonthTitle(o.startsAt),
-            () => [],
-          );
-          var at = inMonth.length;
-          while (at > 0 && inMonth[at - 1].$1.isAfter(o.startsAt)) {
-            at--;
-          }
-          inMonth.insert(at, (o.startsAt, CalendarOverlayRow(item: o)));
-        }
-        final months = groups.keys.toList()
-          ..sort((a, b) => groups[a]!.first.$1.compareTo(groups[b]!.first.$1));
-        for (final (i, month) in months.indexed) {
-          final inMonth = groups[month]!;
-          if (i > 0) children.add(const SizedBox(height: 22));
-          children.addAll([
-            SectionHeader(key: Key('calendar-month-$i'), title: month),
-            const SizedBox(height: 10),
-            EventRowsCard(rows: [for (final (_, row) in inMonth) row]),
-          ]);
-        }
-        if (value.truncated) {
-          children.addAll([
-            const SizedBox(height: 16),
-            Text(
-              'Only the soonest events are listed here.',
-              key: const Key('calendar-truncated'),
-              style: ChurchType.secondary.copyWith(color: c.muted),
-            ),
-          ]);
-        }
       case final AccessRead<PublicEvents> problem:
         children.add(publicReadProblem(problem, what: 'calendar'));
+    }
+    // The public read and the member's overlays are independent: a public
+    // failure (or a load still under way) never hides overlays that loaded.
+    final events = s.value;
+    // Grouped by the church month of each start, in the server's order.
+    // Epic 6 entry 19: the member's own items join their month, in time
+    // order among the events (an event first at the same time).
+    final groups = <String, List<(DateTime, Widget)>>{};
+    for (final e in events?.events ?? const <PublicEvent>[]) {
+      groups.putIfAbsent(churchMonthTitle(e.startsAt), () => []).add((
+        e.startsAt,
+        PublicEventRow(
+          event: e,
+          onTap: () => context.push(CalendarPaths.event(e.eventId)),
+        ),
+      ));
+    }
+    for (final o in overlays.items) {
+      final inMonth = groups.putIfAbsent(
+        churchMonthTitle(o.startsAt),
+        () => [],
+      );
+      var at = inMonth.length;
+      while (at > 0 && inMonth[at - 1].$1.isAfter(o.startsAt)) {
+        at--;
+      }
+      inMonth.insert(at, (o.startsAt, CalendarOverlayRow(item: o)));
+    }
+    final months = groups.keys.toList()
+      ..sort((a, b) => groups[a]!.first.$1.compareTo(groups[b]!.first.$1));
+    if (months.isNotEmpty && events == null) {
+      children.add(const SizedBox(height: 16));
+    }
+    for (final (i, month) in months.indexed) {
+      final inMonth = groups[month]!;
+      if (i > 0) children.add(const SizedBox(height: 22));
+      children.addAll([
+        SectionHeader(key: Key('calendar-month-$i'), title: month),
+        const SizedBox(height: 10),
+        EventRowsCard(rows: [for (final (_, row) in inMonth) row]),
+      ]);
+    }
+    if (events?.truncated ?? false) {
+      children.addAll([
+        const SizedBox(height: 16),
+        Text(
+          'Only the soonest events are listed here.',
+          key: const Key('calendar-truncated'),
+          style: ChurchType.secondary.copyWith(color: c.muted),
+        ),
+      ]);
     }
     return MemberTabPage(
       title: 'Calendar',

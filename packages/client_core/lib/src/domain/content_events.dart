@@ -199,6 +199,13 @@ class PublicEvents {
 
   /// More events exist than the read returns (the soonest are listed).
   final bool truncated;
+
+  /// This list without one event (one a fresh detail read says is no longer
+  /// public); every other event is kept.
+  PublicEvents withoutEvent(String eventId) => PublicEvents(
+    events: List.unmodifiable(events.where((e) => e.eventId != eventId)),
+    truncated: truncated,
+  );
 }
 
 /// `api.content_public_event`: one event, or null when it is not on the

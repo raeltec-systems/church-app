@@ -11,11 +11,11 @@ final cellCalendarRepositoryProvider = Provider<CellCalendarRepository>(
   (ref) => const UnconfiguredCellCalendarRepository(),
 );
 
-/// Which of the member's overlays are switched on. Both start off, so the
-/// Calendar opens as everyone's calendar; the choice lasts for the app
-/// session and is dropped on any account change (memory only).
+/// Which of the member's overlays are switched on. Both start on (owner
+/// decision 2026-10-28); the choice lasts for the app session and is reset on
+/// any account change (memory only).
 class CalendarOverlaySwitches {
-  const CalendarOverlaySwitches({this.duties = false, this.cell = false});
+  const CalendarOverlaySwitches({this.duties = true, this.cell = true});
 
   final bool duties;
   final bool cell;

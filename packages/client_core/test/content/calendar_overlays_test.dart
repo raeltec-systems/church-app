@@ -270,21 +270,19 @@ void main() {
       expect(h.cellCalendar.calls, 0);
     });
 
-    testWidgets('a member has both switches, off until switched on', (
+    testWidgets('a member has both switches, on from the start', (
       tester,
     ) async {
       final h = await pumpCalendar(tester);
       expect(byKey('calendar-overlay-duties'), findsOneWidget);
       expect(byKey('calendar-overlay-cell'), findsOneWidget);
-      expect(find.byType(CalendarOverlayRow), findsNothing);
-      expect(h.cellCalendar.calls, 0);
+      expect(find.byType(CalendarOverlayRow), findsWidgets);
+      expect(h.cellCalendar.calls, 1);
     });
 
     testWidgets('switching both on marks the member\'s own items among the '
         'events', (tester) async {
       final h = await pumpCalendar(tester);
-      await tapKey(tester, 'calendar-overlay-duties');
-      await tapKey(tester, 'calendar-overlay-cell');
       expect(h.cellCalendar.calls, 1);
       // Only the member's current duty in the window: not the declined,
       // the past or the far one.
@@ -323,7 +321,6 @@ void main() {
 
     testWidgets('switching an overlay off removes its items', (tester) async {
       await pumpCalendar(tester);
-      await tapKey(tester, 'calendar-overlay-duties');
       expect(byKey('overlay-row-duty-$_dutyMine'), findsOneWidget);
       await tapKey(tester, 'calendar-overlay-duties');
       expect(byKey('overlay-row-duty-$_dutyMine'), findsNothing);
@@ -332,7 +329,6 @@ void main() {
 
     testWidgets('a duty opens its duty detail', (tester) async {
       await pumpCalendar(tester);
-      await tapKey(tester, 'calendar-overlay-duties');
       await tapKey(tester, 'overlay-row-duty-$_dutyMine');
       final screen = tester.widget<MyDutiesScreen>(find.byType(MyDutiesScreen));
       expect(screen.assignmentId, _dutyMine);
@@ -340,7 +336,6 @@ void main() {
 
     testWidgets('a cell meeting opens My cell', (tester) async {
       await pumpCalendar(tester);
-      await tapKey(tester, 'calendar-overlay-cell');
       await tapKey(tester, 'overlay-row-cell-$_meetingA');
       expect(find.byType(MyCellScreen), findsOneWidget);
     });
@@ -355,8 +350,6 @@ void main() {
           h.duties.mine = const AccessReadFailed(unreachable: false);
         },
       );
-      await tapKey(tester, 'calendar-overlay-cell');
-      await tapKey(tester, 'calendar-overlay-duties');
       expect(byKey('calendar-overlay-cell-failed'), findsOneWidget);
       expect(byKey('calendar-overlay-duties-failed'), findsOneWidget);
       expect(find.byType(CalendarOverlayRow), findsNothing);
@@ -374,7 +367,8 @@ void main() {
           ),
         ),
       );
-      await tapKey(tester, 'calendar-overlay-cell');
+      // Duties off, so only the (empty) cell overlay is left.
+      await tapKey(tester, 'calendar-overlay-duties');
       expect(find.byType(CalendarOverlayRow), findsNothing);
       expect(byKey('calendar-overlay-cell-failed'), findsNothing);
       expect(byKey('calendar-overlay-window'), findsOneWidget);

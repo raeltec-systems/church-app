@@ -55,7 +55,10 @@ deferred:
 
 ## Verification
 
-- See Implementation Notes for suite counts after the merge of `story/5.8-meetings-held`.
+- `story/5.8-meetings-held` was still at `cc8dd51` (this entry's baseline) when the suites ran, so there was nothing new to merge.
+- Fresh local reset, full pgTAP suite: 72 files, 5,764 tests; all pass except the known load flake `duties_owner_decisions_test.sql` #32 (the 3 s board timing), which passes when its file runs alone, as recorded since 4.4. No SQL changed.
+- Flutter: `flutter analyze` clean in all four packages; `flutter test` client_core 1,148 (+2), design_system 19, mobile 96, staff 63 (+2).
+- No E2E rerun: no server, Edge function or wire change.
 
 ## Implementation Notes
 

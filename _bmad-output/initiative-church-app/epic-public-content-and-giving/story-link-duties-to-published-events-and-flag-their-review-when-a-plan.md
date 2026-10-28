@@ -86,6 +86,7 @@ deferred:
 - Existing tests scoped (no behaviour changed): `command_foundation_test.sql` (authenticated ledger + the count read), `content_events_test.sql` (privilege list excludes `%duty_links%`), `duties_tracer_test.sql` and `duties_revisions_test.sql` (My duties key lists exclude `event_ref`), `duties_rota_test.sql` (links a registered SYNTHETIC fixture event instead of a random uuid), `duties_owner_operations_scale_test.sql` (registers the fixture event source before its direct inserts).
 - pgTAP: full suite on a fresh reset 68 files, 5571 tests, pass (before the story-branch merge). E2E 10/10 (`evidence-6.12/local-e2e.jsonl`).
 - Flutter: client_core 1085, mobile 92, staff 61, design_system 19, all pass; analyze clean (before the story-branch merge). New `test/duties/duties_event_links_test.dart` (11).
+- After merging `story/5.8-meetings-held` (d92ed1e, entry 10): fresh reset, full pgTAP 69 files, 5653 tests, pass; E2E 10/10; Flutter client_core 1097, mobile 95, staff 61, design_system 19, analyze clean.
 - Staging: 12 of 12 function hashes match; boundary/unowned 0; signed-out reads checked (`evidence-6.12/staging-verify.md`). No duty linked, no notification sent.
 
 ## Plan Change Log

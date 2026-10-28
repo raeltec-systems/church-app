@@ -2,6 +2,12 @@
   "about": "Reviewed fixes for pdftotext glitches in manuscript/inyimbo_zyabakristo.txt, applied by line number to the exact extracted text, and explanations of title differences from the book's indexes that are more than two letters. The converter lists every one it applies.",
   "corrections": [
     {
+      "line": 43,
+      "extracted": "1 Leza Usimango (Cila)",
+      "corrected": "1 Leza Usimanga (Cila)",
+      "why": "owner decision 2026-10-28: the printed title has a misprint; \"Usimanga\" follows the book's index and the first line"
+    },
+    {
       "line": 1048,
       "extracted": "29 Noonse Mutangale, Wakasika Muvuni",
       "corrected": "29 Noonse Mutangale, Wakasika Muvuni (Cila)",
@@ -44,9 +50,15 @@
       "why": "the key from line 1556"
     },
     {
+      "line": 1938,
+      "extracted": "52 Lufutuko Mdulukando (Cila)",
+      "corrected": "52 Lufutuko Ndulukando (Cila)",
+      "why": "owner decision 2026-10-28: the printed title has a misprint; \"Ndulukando\" follows the book's index and the first line"
+    },
+    {
       "line": 2083,
-      "extracted": "56Ncinzi Cinsanzisya \u201fTombe? (Cila)",
-      "corrected": "56 Ncinzi Cinsanzisya \u201fTombe? (Cila)",
+      "extracted": "56Ncinzi Cinsanzisya ‟Tombe? (Cila)",
+      "corrected": "56 Ncinzi Cinsanzisya ‟Tombe? (Cila)",
       "why": "the space between the number 56 and the title was lost in extraction"
     },
     {
@@ -80,6 +92,12 @@
       "why": "joined into line 3993"
     },
     {
+      "line": 4414,
+      "extracted": "117 Wakamba Na?",
+      "corrected": "117 Wakomba Na?",
+      "why": "owner decision 2026-10-28: the printed title has a misprint; \"Wakomba\" follows the book's index and the first line"
+    },
+    {
       "line": 4607,
       "extracted": "(DRAW ME NEARER) Key of A Flat)",
       "corrected": "(DRAW ME NEARER) Key of A Flat",
@@ -98,6 +116,18 @@
       "why": "joined into line 4797"
     },
     {
+      "line": 5526,
+      "extracted": "146 Nendalange Kuciingano",
+      "corrected": "146 Nendalanga Kuciingano",
+      "why": "owner decision 2026-10-28: the printed title has a misprint; \"Nendalanga\" follows the book's index and the first line"
+    },
+    {
+      "line": 6037,
+      "extracted": "159 Nda mukombelela",
+      "corrected": "159 Ndamukombelela",
+      "why": "owner decision 2026-10-28: the printed title has a misprint; \"Ndamukombelela\" follows the book's index and the first line"
+    },
+    {
       "line": 6229,
       "extracted": "164                    KUTAMBA",
       "corrected": "KUTAMBA",
@@ -110,10 +140,28 @@
       "why": "the number 164 from the header line (line 6229)"
     },
     {
+      "line": 6411,
+      "extracted": "169  Uleziza Jesu Mwami (Cila)",
+      "corrected": "169 Uleziza Jesu Mwini (Cila)",
+      "why": "owner decision 2026-10-28: the printed title has a misprint; \"Jesu Mwini\" follows the book's index and the first line"
+    },
+    {
       "line": 6729,
       "extracted": "178 mbaula Leza Mwini (Cila)",
       "corrected": "178 Tembaula Leza Mwini (Cila)",
       "why": "the first two letters of the title were lost in extraction; the first line and both indexes read \"Tembaula\""
+    },
+    {
+      "line": 6791,
+      "extracted": "181 Akube Bulema",
+      "corrected": "181 Akube Bulemu",
+      "why": "owner decision 2026-10-28: the printed title has a misprint; \"Bulemu\" follows the book's index and the first line"
+    },
+    {
+      "line": 7786,
+      "extracted": "24 Ndima Kubuka Abuumi",
+      "corrected": "24 Ndime Kubuka Abuumi",
+      "why": "owner decision 2026-10-28: the printed title has a misprint; \"Ndime\" follows the book's index and the first line"
     },
     {
       "line": 7823,
@@ -150,6 +198,12 @@
       "extracted": "Kulainkwa akujulu (4 times)",
       "corrected": "",
       "why": "moved into line 7917"
+    },
+    {
+      "line": 8087,
+      "extracted": "53 Eli Bbuku Ndiotu Kubala",
+      "corrected": "53 Eli Bbuku Ndibotu Kubala",
+      "why": "owner decision 2026-10-28: the printed title has a misprint; \"Ndibotu\" follows the book's index and the first line"
     },
     {
       "line": 8521,

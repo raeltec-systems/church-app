@@ -794,6 +794,9 @@ abstract final class ContentPurposes {
 
   /// Story 6.11: an event's poster.
   static const eventPoster = 'event_poster';
+
+  /// Story 6.9: a sermon series' poster.
+  static const sermonSeriesPoster = 'sermon_series_poster';
 }
 
 /// A file an editor picked: its name, the type the browser declared (never

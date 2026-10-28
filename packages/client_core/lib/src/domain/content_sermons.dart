@@ -856,7 +856,6 @@ abstract final class SermonCommands {
   static const publishSeries = 'content.publish_sermon_series';
   static const withdrawSeries = 'content.withdraw_sermon_series';
   static const archiveSeries = 'content.archive_sermon_series';
-  static const posterPurpose = 'sermon_series_poster';
 
   /// Story 6.18, a member command: the duty's assignee or its managers.
   static const draftFromDuty = 'content.draft_sermon_from_duty';

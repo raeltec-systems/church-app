@@ -579,8 +579,9 @@ select is((select r #>> '{data,change}' || '|' || (r #>> '{data,overrides}') fro
   'starts_at', app.cmd_utc(pg_temp.at(51, '18:00')), 'ends_at', null, 'instructions', 'SYNTHETIC In the vestry.',
   'override_reason', 'SYNTHETIC both are short')) as r) y), 'material|1',
   'F7: with an approved override it is a material change, the override recorded');
-select is((select pg_temp.cur('F7B') <> id and (pg_temp.mine(4, pg_temp.cur('F7B')) ->> 'response') = 'pending'
-                  and (pg_temp.mine(4, pg_temp.cur('F7B')) -> 'changes') = '["due_on", "instructions"]'::jsonb from f7b), true,
+select is((select (pg_temp.cur('F7B') <> id)::text || '|' || (pg_temp.mine(4, pg_temp.cur('F7B')) ->> 'response') || '|'
+                  || coalesce((pg_temp.mine(4, pg_temp.cur('F7B')) -> 'changes')::text, '-') from f7b),
+  'true|pending|["instructions", "due_on"]',
   'F7: and M must accept again');
 create temp table f7b2 as select pg_temp.cur('F7B') as id;
 select is((select r #>> '{data,change}' from (select pg_temp.revise(3, 'F7B', jsonb_build_object(

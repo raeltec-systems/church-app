@@ -10,7 +10,8 @@ part of 'duties_screens.dart';
 // duty nobody recorded says "Not recorded".
 
 const _outcomesNeeds =
-    'Outcomes are recorded by the leaders and deputies of a department.';
+    'Outcomes are recorded by the leaders and deputies of a department, or '
+    'the leader and assistant of a cell.';
 
 const _historyPrivacy =
     'Seen only by the member and their department\'s leaders and deputies, '
@@ -104,7 +105,11 @@ class DutyOutcomesScreen extends StatelessWidget {
     provider: dutyOutcomesProvider,
     needs: _outcomesNeeds,
     loading: 'Loading outcomes…',
-    body: (context, value, state) => _OutcomesBody(value: value, state: state),
+    body: (context, value, state) => CellNames(
+      needed: value.departments.any((d) => d.isCell),
+      builder: (names) =>
+          _OutcomesBody(value: value.named(names), state: state),
+    ),
   );
 }
 
@@ -321,7 +326,7 @@ class _OutcomesBodyState extends ConsumerState<_OutcomesBody> {
                     value: null,
                     child: Text('All my departments'),
                   ),
-                  for (final d in v.departments)
+                  for (final d in v.departments.where((d) => !d.isCell))
                     DropdownMenuItem<String?>(
                       value: d.departmentId,
                       child: Text(d.name, overflow: TextOverflow.ellipsis),

@@ -217,7 +217,7 @@ class _StaffOverviewScreenState extends ConsumerState<StaffOverviewScreen> {
   }
 
   static bool _readsCoverage(MemberGrants g) =>
-      g.isAdmin || g.hasRole(ChurchRoles.pastor) || leadsADepartment(g);
+      g.isAdmin || g.hasRole(ChurchRoles.pastor) || looksAfterCoverage(g);
 
   @override
   Widget build(BuildContext context) {

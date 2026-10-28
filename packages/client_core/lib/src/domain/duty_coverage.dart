@@ -495,9 +495,12 @@ class CoverageDepartment {
     this.members = const [],
     this.contactRoutes = const {},
     this.positions = const [],
+    this.isCell = false,
   });
 
-  factory CoverageDepartment.fromJson(Object? json) {
+  /// A department, or (coverage for cells, [cell]) one of the reader's cells:
+  /// `cell_id` and no name (the client names it from its Cells reads).
+  factory CoverageDepartment.fromJson(Object? json, {bool cell = false}) {
     final m = _map(json, 'coverage department');
     final view = _req<String>(m, 'view');
     if (view != 'full' && view != 'operational') {
@@ -505,8 +508,11 @@ class CoverageDepartment {
     }
     final routes = _map(m['contact_routes'] ?? const {}, 'contact_routes');
     return CoverageDepartment(
-      departmentId: _req<String>(m, 'department_id'),
-      name: _req<String>(m, 'name'),
+      isCell: cell,
+      departmentId: _req<String>(m, cell ? 'cell_id' : 'department_id'),
+      name: cell
+          ? (_opt<String>(m, 'name') ?? DutyOwnerNames.cellFallback)
+          : _req<String>(m, 'name'),
       full: view == 'full',
       canManage: _req<bool>(m, 'can_manage'),
       canContact: _req<bool>(m, 'can_contact'),
@@ -526,8 +532,26 @@ class CoverageDepartment {
     );
   }
 
+  /// The department's id, or the cell's for a cell ([isCell]).
   final String departmentId;
   final String name;
+
+  /// Coverage for cells: one of the reader's cells (its programme parts).
+  final bool isCell;
+
+  /// The same group with [name] (a cell named from the Cells reads).
+  CoverageDepartment named(String name) => CoverageDepartment(
+    departmentId: departmentId,
+    name: name,
+    full: full,
+    canManage: canManage,
+    canContact: canContact,
+    counts: counts,
+    members: members,
+    contactRoutes: contactRoutes,
+    positions: positions,
+    isCell: isCell,
+  );
 
   /// The department's leaders and deputies get the full view (contact
   /// routes, notes, reasons); Admin and Pastor the operational one.
@@ -571,11 +595,30 @@ class DutyCoverage {
       to: to,
       duty: _opt<String>(m, 'duty'),
       truncated: _opt<bool>(m, 'truncated') ?? false,
-      departments: List.unmodifiable(
-        _req<List>(m, 'departments').map(CoverageDepartment.fromJson),
-      ),
+      departments: List.unmodifiable([
+        ..._req<List>(m, 'departments').map(CoverageDepartment.fromJson),
+        // Coverage for cells (absent from older servers).
+        ...(_opt<List>(m, 'cells') ?? const []).map(
+          (c) => CoverageDepartment.fromJson(c, cell: true),
+        ),
+      ]),
     );
   }
+
+  /// The same queue with each cell named from [cellNames] (by cell id).
+  DutyCoverage named(Map<String, String> cellNames) => DutyCoverage(
+    from: from,
+    to: to,
+    duty: duty,
+    truncated: truncated,
+    departments: List.unmodifiable([
+      for (final d in departments)
+        if (d.isCell && cellNames[d.departmentId] != null)
+          d.named(cellNames[d.departmentId]!)
+        else
+          d,
+    ]),
+  );
 
   /// Church-local dates `YYYY-MM-DD`.
   final String from;
@@ -747,6 +790,22 @@ class UnconfiguredDutyCoverageRepository implements DutyCoverageRepository {
 bool leadsADepartment(MemberGrants? grants) =>
     grants != null &&
     grants.scopes.any((s) => DutyScopeKinds.isDepartmentScope(s.scopeKind));
+
+/// Coverage for cells: does [grants] look after duties' coverage, as a
+/// department's leader or deputy or a cell's leader or assistant
+/// (navigation only; the server checks every read and command)?
+bool looksAfterCoverage(MemberGrants? grants) =>
+    leadsADepartment(grants) ||
+    (grants?.scopes.any(
+          (s) =>
+              s.scopeKind == 'cell_leader' || s.scopeKind == 'cell_assistant',
+        ) ??
+        false);
+
+/// Coverage for cells: how a cell is named until the Cells reads name it.
+abstract final class DutyOwnerNames {
+  static const cellFallback = 'Your cell';
+}
 
 /// What happened when the app asked the phone to call or message.
 enum ContactLaunch {

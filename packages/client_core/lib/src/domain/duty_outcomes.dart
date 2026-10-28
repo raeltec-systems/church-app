@@ -306,22 +306,40 @@ class OutcomeDepartment {
     required this.name,
     required this.counts,
     this.positions = const [],
+    this.isCell = false,
   });
 
-  factory OutcomeDepartment.fromJson(Object? json) {
+  /// A department, or (coverage for cells, [cell]) one of the reader's cells
+  /// (`cell_id`, no name).
+  factory OutcomeDepartment.fromJson(Object? json, {bool cell = false}) {
     final m = _map(json, 'department');
     final positions = m['positions'];
     if (positions is! List) throw const FormatException('unexpected positions');
     return OutcomeDepartment(
-      departmentId: _req<String>(m, 'department_id'),
-      name: _req<String>(m, 'name'),
+      isCell: cell,
+      departmentId: _req<String>(m, cell ? 'cell_id' : 'department_id'),
+      name: cell
+          ? (_opt<String>(m, 'name') ?? DutyOwnerNames.cellFallback)
+          : _req<String>(m, 'name'),
       counts: OutcomeCounts.fromJson(m['counts']),
       positions: List.unmodifiable(positions.map(OutcomePosition.fromJson)),
     );
   }
 
+  /// The department's id, or the cell's ([isCell]).
   final String departmentId;
   final String name;
+
+  /// Coverage for cells: one of the reader's cells.
+  final bool isCell;
+
+  OutcomeDepartment named(String name) => OutcomeDepartment(
+    departmentId: departmentId,
+    name: name,
+    counts: counts,
+    positions: positions,
+    isCell: isCell,
+  );
   final OutcomeCounts counts;
   final List<OutcomePosition> positions;
 }
@@ -352,9 +370,30 @@ class DutyOutcomes {
       to: to,
       duty: _opt<String>(m, 'duty'),
       truncated: _opt<bool>(m, 'truncated') ?? false,
-      departments: List.unmodifiable(deps.map(OutcomeDepartment.fromJson)),
+      departments: List.unmodifiable([
+        ...deps.map(OutcomeDepartment.fromJson),
+        // Coverage for cells (absent from older servers).
+        ...(_opt<List>(m, 'cells') ?? const []).map(
+          (c) => OutcomeDepartment.fromJson(c, cell: true),
+        ),
+      ]),
     );
   }
+
+  /// The same outcomes with each cell named from [cellNames] (by cell id).
+  DutyOutcomes named(Map<String, String> cellNames) => DutyOutcomes(
+    from: from,
+    to: to,
+    duty: duty,
+    truncated: truncated,
+    departments: List.unmodifiable([
+      for (final d in departments)
+        if (d.isCell && cellNames[d.departmentId] != null)
+          d.named(cellNames[d.departmentId]!)
+        else
+          d,
+    ]),
+  );
 
   final String from;
   final String to;

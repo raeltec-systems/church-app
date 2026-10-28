@@ -316,8 +316,10 @@ List<StaffNavGroup> staffNavGroupsFor(
       items: [
         if (duties) staffDutyLeaderDestination,
         if (duties) staffDutyRotaDestination,
-        if (duties) staffDutyCoverageDestination,
-        if (leadsADepartment(grants)) staffDutyOutcomesDestination,
+        // Coverage for cells: a cell's leader or assistant works its parts'
+        // coverage and outcomes here too.
+        if (duties || looksAfterCoverage(grants)) staffDutyCoverageDestination,
+        if (looksAfterCoverage(grants)) staffDutyOutcomesDestination,
         if (givesSpecialAssignments(grants)) staffDutySpecialDestination,
         if (admin) staffDepartmentsDestination,
       ],

@@ -963,6 +963,11 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
           if (o.scripture case final sc?) Text('Scripture: $sc'),
           if (o.eventRef case final ev?)
             _RotaLinkedEvent(occurrenceId: id, eventId: ev),
+          // Story 6.18: a manager sends the topic and scripture to Media.
+          if (widget.department.canManage &&
+              o.state == RotaState.published &&
+              (o.topic != null || o.scripture != null))
+            DutySermonDraftSection(occurrenceId: id, keyPrefix: 'rota-sermon'),
           if (o.state == RotaState.published)
             Text(
               '${o.confirmed} of ${o.required} confirmed',

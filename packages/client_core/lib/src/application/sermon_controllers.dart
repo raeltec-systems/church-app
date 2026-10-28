@@ -5,9 +5,12 @@ import 'package:church_contracts/church_contracts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/access_grants.dart';
+import '../domain/commands.dart';
 import '../domain/content_banners.dart';
+import '../domain/content_events.dart' show ContentCommands;
 import '../domain/content_sermons.dart';
 import '../domain/public_content_cache.dart';
+import 'access_controllers.dart' show noteProtectedDenial;
 import 'banner_controllers.dart';
 import 'content_controllers.dart';
 import 'providers.dart';
@@ -330,4 +333,181 @@ class SermonPosterUploadController extends Notifier<BannerImageUpload> {
 final sermonPosterUploadProvider = NotifierProvider.autoDispose
     .family<SermonPosterUploadController, BannerImageUpload, String>(
       SermonPosterUploadController.new,
+    );
+
+// ---------------------------------------------------------------------------
+// Story 6.18: send a duty's topic and scripture to Media as a sermon draft
+// ---------------------------------------------------------------------------
+
+/// What the duty's Sermon draft section says after a send.
+enum DutySermonDraftNotice {
+  /// A new draft is with Media.
+  sent,
+
+  /// Media already had this duty's draft: nothing new was made.
+  alreadySent,
+
+  /// The duty has no topic or scripture (any more).
+  noTopic,
+
+  /// The caller is no longer the duty's assignee or one of its managers.
+  notAllowed,
+  signInAgain,
+  notAvailable,
+  refused,
+
+  /// The outcome is unknown: check again with the same request.
+  unconfirmed,
+  notSent,
+}
+
+class DutySermonDraftState {
+  const DutySermonDraftState({
+    this.loading = false,
+    this.result,
+    this.pending,
+    this.unconfirmed,
+    this.notice,
+  });
+
+  final bool loading;
+  final AccessRead<DutySermonDraft>? result;
+  final CommandRequest? pending;
+  final CommandRequest? unconfirmed;
+  final DutySermonDraftNotice? notice;
+
+  bool get busy => pending != null;
+  DutySermonDraft? get value => switch (result) {
+    AccessReadOk<DutySermonDraft>(:final value) => value,
+    _ => null,
+  };
+
+  DutySermonDraftState copyWith({
+    bool? loading,
+    AccessRead<DutySermonDraft>? result,
+    CommandRequest? pending,
+    bool clearPending = false,
+    CommandRequest? unconfirmed,
+    bool clearUnconfirmed = false,
+    DutySermonDraftNotice? notice,
+    bool clearNotice = false,
+  }) => DutySermonDraftState(
+    loading: loading ?? this.loading,
+    result: result ?? this.result,
+    pending: clearPending ? null : (pending ?? this.pending),
+    unconfirmed: clearUnconfirmed ? null : (unconfirmed ?? this.unconfirmed),
+    notice: clearNotice ? null : (notice ?? this.notice),
+  );
+}
+
+/// Story 6.18 (mobile duty detail and the staff rota): whether one duty's
+/// topic and scripture were sent to Media, and the send itself (a member
+/// command; the server lets only the duty's current assignee or its managers
+/// send, and makes one draft per duty). In memory only, scoped to the account
+/// generation. Nothing is published: Media completes and publishes the draft.
+class DutySermonDraftController extends Notifier<DutySermonDraftState> {
+  DutySermonDraftController(this.occurrenceId);
+
+  final String occurrenceId;
+  int _epoch = 0;
+
+  @override
+  DutySermonDraftState build() {
+    ref.watch(accountGenerationProvider);
+    _epoch++;
+    final epoch = _epoch;
+    Future.microtask(() => _reload(epoch));
+    return const DutySermonDraftState(loading: true);
+  }
+
+  bool _current(int epoch) => ref.mounted && epoch == _epoch;
+
+  Future<void> reload() => _reload(_epoch);
+
+  Future<void> _reload(int epoch) async {
+    if (!_current(epoch)) return;
+    state = state.copyWith(loading: true);
+    final r = await ref
+        .read(sermonsRepositoryProvider)
+        .fetchDutySermonDraft(occurrenceId);
+    if (!_current(epoch)) return;
+    state = state.copyWith(loading: false, result: r);
+  }
+
+  /// "Send to Media". An unconfirmed earlier send is resent unchanged.
+  Future<void> send() async {
+    if (state.busy) return;
+    await _dispatch(
+      state.unconfirmed ??
+          CommandRequest(
+            command: SermonCommands.draftFromDuty,
+            requestId: ref.read(requestIdsProvider).next(),
+            expectedRevision: const Optional.of(null),
+            payload: {'occurrence_id': occurrenceId},
+          ),
+    );
+  }
+
+  void dismissNotice() => state = state.copyWith(clearNotice: true);
+
+  static DutySermonDraftNotice _refusal(CommandError error) =>
+      switch (error.code) {
+        ErrorCode.validationFailed
+            when error.fieldErrors['occurrence_id'] == 'no_topic' =>
+          DutySermonDraftNotice.noTopic,
+        ErrorCode.notFound ||
+        ErrorCode.forbidden => DutySermonDraftNotice.notAllowed,
+        ErrorCode.unauthenticated => DutySermonDraftNotice.signInAgain,
+        ErrorCode.unavailable => DutySermonDraftNotice.notAvailable,
+        _ => DutySermonDraftNotice.refused,
+      };
+
+  Future<void> _dispatch(CommandRequest request) async {
+    final epoch = _epoch;
+    state = state.copyWith(pending: request, clearNotice: true);
+    final outcome = await ref
+        .read(commandGatewayProvider)
+        .send(ContentCommands.function, request);
+    if (!_current(epoch)) return;
+    switch (outcome) {
+      case CommandConfirmed(:final success):
+        final data = success.data;
+        final created = data is Map && data['created'] == true;
+        state = state.copyWith(
+          clearPending: true,
+          clearUnconfirmed: true,
+          notice: created
+              ? DutySermonDraftNotice.sent
+              : DutySermonDraftNotice.alreadySent,
+        );
+        await _reload(epoch);
+      case CommandRefused(:final error):
+        final notice = _refusal(error);
+        state = state.copyWith(
+          clearPending: true,
+          clearUnconfirmed: true,
+          notice: notice,
+        );
+        if (notice == DutySermonDraftNotice.signInAgain) {
+          noteProtectedDenial(ref);
+        }
+        await _reload(epoch);
+      case CommandUnknownOutcome():
+        state = state.copyWith(
+          clearPending: true,
+          unconfirmed: request,
+          notice: DutySermonDraftNotice.unconfirmed,
+        );
+      case CommandNotSent():
+        state = state.copyWith(
+          clearPending: true,
+          notice: DutySermonDraftNotice.notSent,
+        );
+    }
+  }
+}
+
+final dutySermonDraftProvider = NotifierProvider.autoDispose
+    .family<DutySermonDraftController, DutySermonDraftState, String>(
+      DutySermonDraftController.new,
     );

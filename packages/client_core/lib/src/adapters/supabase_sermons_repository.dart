@@ -36,4 +36,10 @@ class SupabaseSermonsRepository implements SermonsRepository {
         const {},
         StaffSermonSeriesCatalog.fromJson,
       );
+  @override
+  Future<AccessRead<DutySermonDraft>> fetchDutySermonDraft(
+    String occurrenceId,
+  ) => _reader.read('content_duty_sermon_draft', {
+    'occurrence_id': occurrenceId,
+  }, DutySermonDraft.fromJson);
 }

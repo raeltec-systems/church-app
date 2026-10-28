@@ -4,11 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../application/account_controllers.dart';
+import '../application/cell_controllers.dart' show myCellProvider;
 import '../application/membership_lifecycle_controllers.dart';
 import '../application/providers.dart';
 import '../application/push_controllers.dart';
 import '../domain/access_grants.dart' show AccessReadOk;
 import '../domain/member_access.dart';
+import 'church_widgets.dart';
 import 'shell_routing.dart' show ClientPaths;
 
 /// "My membership": the signed-in member's own summary from the server's
@@ -23,6 +25,7 @@ class AccountScreen extends ConsumerStatefulWidget {
     super.key,
     this.linkMembershipRequest = false,
     this.linkRecoveryEmail = false,
+    this.memberMenu = false,
   });
 
   /// Story 2.4 (mobile): an account without member access links to its own
@@ -32,6 +35,10 @@ class AccountScreen extends ConsumerStatefulWidget {
   /// Story 2.7 (mobile): a member links to their own recovery email (also
   /// while access waits for its approval).
   final bool linkRecoveryEmail;
+
+  /// Mobile: the member's own places (duties, history, cell, follow-ups) and
+  /// settings as a menu, the design handoff's Profile.
+  final bool memberMenu;
 
   @override
   ConsumerState<AccountScreen> createState() => _AccountScreenState();
@@ -115,30 +122,37 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
 
     if (!signedIn) {
       children.addAll([
+        const Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: ChurchLogo(size: 64),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Sign in',
+          style: ChurchType.mobileScreenTitle.copyWith(color: c.ink),
+        ),
+        const SizedBox(height: 6),
         Text(
           'Sign in with your phone number and password to see your membership.',
-          style: layout.body.copyWith(color: c.ink),
+          style: layout.body.copyWith(color: c.muted),
         ),
-        const SizedBox(height: ChurchGeometry.sectionGap),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          children: [
-            FocusRing(
-              child: FilledButton(
-                key: const Key('go-sign-in'),
-                onPressed: () => context.go(ClientPaths.signIn),
-                child: const Text('Sign in'),
-              ),
-            ),
-            FocusRing(
-              child: OutlinedButton(
-                key: const Key('go-create-account'),
-                onPressed: () => context.go(ClientPaths.createAccount),
-                child: const Text('Create account'),
-              ),
-            ),
-          ],
+        const SizedBox(height: 24),
+        FocusRing(
+          child: FilledButton(
+            key: const Key('go-sign-in'),
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
+            onPressed: () => context.go(ClientPaths.signIn),
+            child: const Text('Sign in'),
+          ),
+        ),
+        const SizedBox(height: 10),
+        FocusRing(
+          child: OutlinedButton(
+            key: const Key('go-create-account'),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(0, 52)),
+            onPressed: () => context.go(ClientPaths.createAccount),
+            child: const Text('Create account'),
+          ),
         ),
       ]);
     } else {
@@ -157,49 +171,54 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
         children.add(_resultView(context, ref, result));
       }
       children.addAll([
-        const SizedBox(height: ChurchGeometry.sectionGap),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          children: [
-            FocusRing(
-              child: OutlinedButton.icon(
-                key: const Key('refresh-summary'),
-                onPressed: s.loading
-                    ? null
-                    : () => ref
-                          .read(memberSummaryControllerProvider.notifier)
-                          .refresh(),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Check again'),
-              ),
-            ),
-            FocusRing(
-              child: OutlinedButton.icon(
-                key: const Key('sign-out'),
-                onPressed: signOut,
-                icon: const Icon(Icons.logout),
-                label: const Text('Sign out'),
-              ),
-            ),
-          ],
+        const SizedBox(height: 16),
+        ChurchCard(
+          padding: EdgeInsets.zero,
+          child: MenuRow(
+            key: const Key('sign-out'),
+            label: 'Sign out',
+            danger: true,
+            showDivider: false,
+            onTap: signOut,
+          ),
         ),
       ]);
     }
+    final refresh = !signedIn || s.loading
+        ? null
+        : () => ref.read(memberSummaryControllerProvider.notifier).refresh();
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('My membership')),
+    return ChurchPageScaffold(
+      title: 'Account',
+      actions: [
+        if (signedIn)
+          FocusRing(
+            radius: 22,
+            child: IconButton(
+              key: const Key('refresh-summary'),
+              tooltip: 'Check again',
+              onPressed: refresh,
+              icon: const Icon(Icons.refresh),
+            ),
+          ),
+        const SizedBox(width: 4),
+      ],
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: layout.pagePadding,
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
-              child: DefaultTextStyle.merge(
-                style: layout.body.copyWith(color: c.ink),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: children,
+        child: RefreshIndicator(
+          notificationPredicate: (n) => refresh != null && n.depth == 0,
+          onRefresh: () async => refresh?.call(),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: layout.pagePadding,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: layout.contentMaxWidth),
+                child: DefaultTextStyle.merge(
+                  style: layout.body.copyWith(color: c.ink),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: children,
+                  ),
                 ),
               ),
             ),
@@ -217,91 +236,166 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     final c = ChurchColors.of(context);
     switch (result) {
       case MemberAccessGranted(:final summary):
-        return Container(
-          key: const Key('member-summary'),
-          padding: const EdgeInsets.all(ChurchGeometry.cardPadding),
-          decoration: BoxDecoration(
-            color: c.surface,
-            border: Border.all(color: c.line),
-            borderRadius: BorderRadius.circular(
-              ChurchGeometry.mobileCardRadius,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Semantics(
-                header: true,
-                child: Text(
-                  summary.displayName,
-                  style: ChurchType.cardTitle.copyWith(color: c.ink),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  StatusLabel(
-                    label: summary.membershipState == 'approved'
-                        ? 'Church member'
-                        : summary.membershipState,
-                    tone: StatusTone.success,
+        final cell = widget.memberMenu
+            ? switch (ref.watch(myCellProvider).result) {
+                AccessReadOk(:final value) => value.cell.primary?.label,
+                _ => null,
+              }
+            : null;
+        void go(String path) => context.push(path);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              key: const Key('member-summary'),
+              children: [
+                InitialsAvatar(name: summary.displayName, size: 64),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Semantics(
+                        header: true,
+                        child: Text(
+                          summary.displayName,
+                          style: ChurchType.mobileScreenTitle.copyWith(
+                            color: c.ink,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        summary.phoneUsername,
+                        key: const Key('summary-phone'),
+                        semanticsLabel:
+                            'Sign-in username ${summary.phoneUsername}',
+                        style: ChurchType.figures.copyWith(color: c.muted),
+                      ),
+                    ],
                   ),
-                  if (summary.isSynthetic)
-                    const StatusLabel(
-                      label: 'Synthetic test record',
-                      tone: StatusTone.neutral,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text('Sign-in username: ${summary.phoneUsername}'),
-              const SizedBox(height: 4),
-              Text(
-                summary.hasRecoveryEmail
-                    ? 'Recovery email: added and approved.'
-                    : 'Recovery email: none. If you forget your password, '
-                          'church staff will help you in person.',
-                style: ChurchType.secondary.copyWith(color: c.muted),
-              ),
-              if (widget.linkRecoveryEmail) ...[
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            // Church membership and the cell are confirmed separately, so
+            // they are two marks.
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                StatusLabel(
+                  label: summary.membershipState == 'approved'
+                      ? 'Church member'
+                      : summary.membershipState,
+                  tone: StatusTone.success,
+                ),
+                if (cell != null)
+                  StatusLabel(
+                    key: const Key('summary-cell'),
+                    label: 'Cell: $cell',
+                    tone: StatusTone.info,
+                  ),
+                if (summary.isSynthetic)
+                  const StatusLabel(
+                    label: 'Synthetic test record',
+                    tone: StatusTone.neutral,
+                  ),
+              ],
+            ),
+            if (widget.memberMenu) ...[
+              const SizedBox(height: 24),
+              const CardLabel('Your church'),
+              const SizedBox(height: 8),
+              ChurchCard(
+                padding: EdgeInsets.zero,
+                child: Column(
                   children: [
-                    FocusRing(
-                      child: OutlinedButton.icon(
-                        key: const Key('go-recovery-email'),
-                        onPressed: () => context.go(ClientPaths.recoveryEmail),
-                        icon: const Icon(Icons.alternate_email_outlined),
-                        label: const Text('Recovery email'),
-                      ),
+                    MenuRow(
+                      key: const Key('go-my-duties'),
+                      label: 'My duties',
+                      onTap: () => go(ClientPaths.myDuties),
                     ),
-                    // Story 2.8: reviewed username and recovery-email changes.
-                    FocusRing(
-                      child: OutlinedButton.icon(
-                        key: const Key('go-sign-in-details'),
-                        onPressed: () => context.go(ClientPaths.signInDetails),
-                        icon: const Icon(Icons.manage_accounts_outlined),
-                        label: const Text('Sign-in details'),
-                      ),
+                    MenuRow(
+                      key: const Key('go-duty-history'),
+                      label: 'My duty history',
+                      onTap: () => go(ClientPaths.dutyHistory),
                     ),
-                    // Story 2.11: the member deletes their own account.
-                    FocusRing(
-                      child: TextButton.icon(
-                        key: const Key('go-delete-account'),
-                        onPressed: () => context.go(ClientPaths.deleteAccount),
-                        icon: const Icon(Icons.person_remove_outlined),
-                        label: const Text('Delete my account'),
-                      ),
+                    MenuRow(
+                      key: const Key('go-my-cell'),
+                      label: 'My cell',
+                      meta: cell,
+                      onTap: () => go(ClientPaths.myCell),
+                    ),
+                    MenuRow(
+                      key: const Key('go-my-followups'),
+                      label: 'My follow-ups',
+                      showDivider: false,
+                      onTap: () => go(ClientPaths.myFollowUps),
                     ),
                   ],
                 ),
-              ],
+              ),
             ],
-          ),
+            if (widget.linkRecoveryEmail) ...[
+              const SizedBox(height: 24),
+              const CardLabel('Settings'),
+              const SizedBox(height: 8),
+              ChurchCard(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    if (widget.memberMenu)
+                      MenuRow(
+                        key: const Key('go-notification-settings'),
+                        label: 'Notifications',
+                        onTap: () => go(ClientPaths.notificationSettings),
+                      ),
+                    // Story 2.8: reviewed username and recovery-email changes.
+                    MenuRow(
+                      key: const Key('go-sign-in-details'),
+                      label: 'Sign-in details',
+                      onTap: () => context.go(ClientPaths.signInDetails),
+                    ),
+                    MenuRow(
+                      key: const Key('go-recovery-email'),
+                      label: 'Recovery email',
+                      meta: summary.hasRecoveryEmail ? 'Added' : 'None',
+                      onTap: () => context.go(ClientPaths.recoveryEmail),
+                    ),
+                    MenuRow(
+                      key: const Key('go-my-access'),
+                      label: 'My roles',
+                      showDivider: false,
+                      onTap: () => context.go(ClientPaths.access),
+                    ),
+                  ],
+                ),
+              ),
+              if (!summary.hasRecoveryEmail) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'With no recovery email, church staff help you in person if '
+                  'you forget your password.',
+                  style: ChurchType.secondary.copyWith(color: c.muted),
+                ),
+              ],
+              const SizedBox(height: 16),
+              // Story 2.11: the member deletes their own account; it comes
+              // last and says what it does.
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: FocusRing(
+                  child: TextButton(
+                    key: const Key('go-delete-account'),
+                    style: TextButton.styleFrom(foregroundColor: c.redFg),
+                    onPressed: () => context.go(ClientPaths.deleteAccount),
+                    child: const Text('Delete my account'),
+                  ),
+                ),
+              ),
+            ],
+          ],
         );
       case MemberAccessDenied(:final denial):
         // Story 2.10: an account whose church membership was deactivated is

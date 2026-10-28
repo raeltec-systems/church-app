@@ -113,6 +113,10 @@ enum GrantNotice {
   noLongerAdmin,
   signInAgain,
   roleUnavailable,
+
+  /// Story 4.16: the scope belongs to a department's last leader or deputy
+  /// the app can reach; another must be given the role first.
+  handoverRequired,
   refused,
 
   /// The outcome is unknown: check again with the same request.
@@ -376,6 +380,10 @@ class GrantAdminController extends Notifier<GrantAdminState> {
         await ref.read(myAccessProvider.notifier).refresh();
       case CommandRefused(:final error):
         final notice = switch (error.code) {
+          // Story 4.16: refused until handover (nothing changed).
+          ErrorCode.conflict
+              when error.fieldErrors['member_id'] == 'handover_required' =>
+            GrantNotice.handoverRequired,
           ErrorCode.conflict => GrantNotice.changedElsewhere,
           ErrorCode.forbidden
               when error.fieldErrors['member_id'] == 'unsupported' =>

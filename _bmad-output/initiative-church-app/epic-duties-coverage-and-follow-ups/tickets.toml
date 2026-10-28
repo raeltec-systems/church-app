@@ -194,9 +194,35 @@ title = "Verify duties and follow-ups end to end and promote them to production"
 description = "Run the closing mobile and staff web suite over departments, rotas, revisions, responses, conflicts, deadlines and reminders, coverage, direct confirmation, completion, follow-ups, lifecycle and the owner operations, with the role and scope permission matrix (app and accountless members, scope loss, accepted-duty reminders) on staging, then promote to the production baseline with the pilot department, its leaders and live contact data either approved by Israel or left fail-closed."
 verify = "A clean build of both clients passes the integrated duty and follow-up scenarios (AC-03, AC-08, AC-09, AC-10, AC-12, AC-13, AC-18) and the independent reviewer's reruns on staging, Israel witnesses the mobile/staff demonstration, and production shows the deployed workflows with unapproved gates (scheduling, live personal data, pilot names) visibly disabled."
 covers = ["D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10", "D11", "D12"]
-after = [14, "3.10"]
+after = [14, 16, "3.10"]
 hitl = true
 risk = "high"
 unknown = "Production needs the production project, the approved `q2_church_time` gate from 3.10, the named pilot department and leaders and the Q4 personal-data decision; while any is missing this entry delivers staging evidence and stays open."
 references = ["_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#launch-checks", "_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#verification-boundaries"]
 external_check = "An independent reviewer reruns the stale-response, provenance and scope-matrix cases before promotion."
+
+[[entry]]
+id = 16
+type = "story"
+title = "Apply the owner's epic 4 decisions"
+description = "Apply the owner's 2026-10-15 decisions: a linked meeting or event change that flags department duties for review also sends one notice per department and change to its reachable leaders and deputies (skipped and audited while Q2 is closed); a vacated position shows a coarse reason category (removed from the department, no longer an active member, member deleted) to that department's leaders and deputies only; revoking the leader or deputy scope of a department's last reachable leader or deputy is refused `handover_required` through the Identity handover hooks, and a revoked scope records its real handover obligations; an operator function approves `dormancy_days` without disturbing the staging fixture, with the production promotion gates G3, G4 and G11 documented."
+verify = "Through the API and both clients, change a linked SYNTHETIC event and see one notice per department reach only its reachable leaders and deputies, see the vacancy reason only as the department's leader or deputy, see the last leader's scope revocation refused until another reachable leader exists, and show that the dormancy approval is refused for a non-operator and honoured once approved."
+covers = ["D10", "D12"]
+after = [11, 12, 14]
+hitl = false
+risk = "high"
+unknown = "The revocation hook changes Identity (cross-epic); the production dormancy value (180 days) and the Auth limits are applied by the owner at promotion, never by a migration."
+references = ["_bmad-output/initiative-church-app/owner-decisions-milestone-2.md", "docs/runbooks/identity-access.md", "docs/runbooks/production-promotion-identity.md"]
+
+[[entry]]
+id = 17
+type = "story"
+title = "Give special assignments as the Pastor and count them in My duty history"
+description = "Apply the owner's 2026-10-21 decision: a third duty owner kind, the special assignment, that belongs to no department and no cell and is given only by a Pastor, at a fixed date and time or with a due date (done by, no start time); the member answers it in My duties, a Pastor changes or cancels it, records Confirmed by the Pastor and records its outcome, and My duty history counts it under its own kind; the Pastors' staff web screen and the member's My duties in the current design."
+verify = "On staging, a Pastor gives a member one special assignment with a due date and one at a fixed time over a department duty (an overlap reason asked for), the member sees Due <date> without a time and accepts, the department leader sees only a busy time, the Pastor moves the due date and the member is asked again, cancels the other, and after its time records the outcome, which the member's history shows under Special; an Admin, a department leader and another member are refused."
+covers = ["D1", "D4", "D9"]
+after = [10, 11, 12, 16]
+hitl = false
+risk = "medium"
+unknown = "Pastor alerts (overdue, decline, vacancy), early completion of a due-date assignment and a handover when the last Pastor's role ends are owner questions; the build fails closed on each."
+references = ["_bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/story-give-special-assignments-as-the-pastor-and-count-them-in-hi-plan.md", "docs/runbooks/duties.md", "docs/runbooks/production-promotion-cells.md"]

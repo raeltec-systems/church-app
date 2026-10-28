@@ -1,0 +1,1259 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:bic_kafue_mobile/offline/public_content_cache_adapter.dart';
+import 'package:church_client_core/church_client_core.dart';
+import 'package:church_client_core/testing.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  late Directory root;
+  late PublicContentCacheAdapter cache;
+  final savedAt = DateTime.utc(2026, 10, 22, 12, 30);
+  final imageBytes = Uint8List.fromList([0x89, 0x50, 0x4e, 0x47]);
+  late DateTime cacheClock;
+
+  setUp(() async {
+    root = await Directory.systemTemp.createTemp('bic-public-cache-test-');
+    cacheClock = savedAt;
+    cache = PublicContentCacheAdapter(
+      supportDirectory: () async => root,
+      clock: () => cacheClock,
+    );
+  });
+
+  tearDown(() async {
+    if (await root.exists()) await root.delete(recursive: true);
+  });
+
+  PublicSermons sermons({bool posterOffline = true, int rightsRevision = 1}) {
+    final series = publicSermonSeriesData(
+      poster: true,
+      posterOffline: posterOffline,
+      rightsRevision: rightsRevision,
+    );
+    return PublicSermons.fromJson({
+      'sermons': [publicSermonData(series: series)],
+      'series': [series],
+      'truncated': false,
+    });
+  }
+
+  test('a saved sermon never keeps its Facebook link (story 6.10)', () async {
+    const link =
+        'https://www.facebook.com/SyntheticChurch/videos/1061000000000001/';
+    final catalog = PublicSermons.fromJson({
+      'sermons': [publicSermonData(facebookUrl: link)],
+      'series': [],
+      'truncated': false,
+    });
+    expect(
+      await cache.writeRead(PublicContentCacheKeys.sermons, catalog),
+      isA<PublicContentCacheSaved>(),
+    );
+    final cold = PublicContentCacheAdapter(supportDirectory: () async => root);
+    final snapshot = await cold.readSermons();
+    expect(snapshot?.value.sermons.single.facebookVideoUrl, isNull);
+    expect(snapshot?.value.sermons.single.hasVideo, isFalse);
+    final text = await root
+        .listSync(recursive: true)
+        .whereType<File>()
+        .singleWhere((f) => f.path.endsWith('manifest.json'))
+        .readAsString();
+    expect(text, isNot(contains('facebook.com/SyntheticChurch')));
+  });
+
+  test('sermon snapshot stores notes and cleared posters, never YouTube media or playable IDs', () async {
+    var fetched = 0;
+    expect(
+      await cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        sermons(),
+        loadSermonPoster: (_) async {
+          fetched++;
+          return imageBytes;
+        },
+      ),
+      isA<PublicContentCacheSaved>(),
+    );
+    final cold = PublicContentCacheAdapter(supportDirectory: () async => root);
+    final snapshot = await cold.readSermons();
+    expect(snapshot?.savedAt, savedAt);
+    expect(snapshot?.value.sermons.single.notes, contains('SYNTHETIC Notes'));
+    expect(snapshot?.value.sermons.single.youtubeVideoId, isNull);
+    expect(snapshot?.value.series.single.poster?.offlineBytes, imageBytes);
+    expect(fetched, 1);
+    final files = root.listSync(recursive: true).whereType<File>().toList();
+    expect(files, hasLength(2));
+    final text = await files
+        .singleWhere((f) => f.path.endsWith('manifest.json'))
+        .readAsString();
+    expect(text, isNot(contains('abcdefghijk')));
+    expect(text, isNot(contains('saved_by')));
+  });
+
+  test('a damaged saved sermon poster is replaced on the next save', () async {
+    final folder = Directory(
+      '${root.path}${Platform.pathSeparator}bic-kafue'
+      '${Platform.pathSeparator}public-content-v1',
+    );
+    await folder.create(recursive: true);
+    final damaged = File(
+      '${folder.path}${Platform.pathSeparator}sermon-poster-offline-'
+      '91919191-9191-4191-8191-919191919191-p1-r1.png',
+    );
+    await damaged.writeAsBytes(const []);
+    var fetched = 0;
+    expect(
+      await cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        sermons(),
+        loadSermonPoster: (_) async {
+          fetched++;
+          return imageBytes;
+        },
+      ),
+      isA<PublicContentCacheSaved>(),
+    );
+    expect(fetched, 1);
+    expect(await damaged.readAsBytes(), imageBytes);
+    expect(
+      (await cache.readSermons())?.value.series.single.poster?.offlineBytes,
+      imageBytes,
+    );
+  });
+
+  test(
+    'sermon poster display rights never authorize offline download',
+    () async {
+      var fetched = 0;
+      await cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        sermons(posterOffline: false),
+        loadSermonPoster: (_) async {
+          fetched++;
+          return imageBytes;
+        },
+      );
+      final snapshot = await cache.readSermons();
+      expect(snapshot?.value.sermons, hasLength(1));
+      expect(snapshot?.value.series.single.poster, isNull);
+      expect(snapshot?.value.sermons.single.series?.poster, isNull);
+      expect(fetched, 0);
+    },
+  );
+
+  test('successful canonical refresh evicts withdrawn sermons and poster rights revisions', () async {
+    await cache.writeRead(
+      PublicContentCacheKeys.sermons,
+      sermons(),
+      loadSermonPoster: (_) async => imageBytes,
+    );
+    await cache.writeRead(
+      PublicContentCacheKeys.sermons,
+      sermons(rightsRevision: 2),
+      loadSermonPoster: (_) async => imageBytes,
+    );
+    final images = root
+        .listSync(recursive: true)
+        .whereType<File>()
+        .where((f) => f.path.endsWith('.png'))
+        .toList();
+    expect(images, hasLength(1));
+    expect(images.single.path, contains('-r2.png'));
+    await cache.writeRead(
+      PublicContentCacheKeys.sermons,
+      const PublicSermons(sermons: [], series: []),
+    );
+    expect((await cache.readSermons())?.value.sermons, isEmpty);
+    expect(
+      root
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.png')),
+      isEmpty,
+    );
+  });
+
+  test(
+    'refused sermon refresh preserves the prior teaching snapshot',
+    () async {
+      await cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        sermons(),
+        loadSermonPoster: (_) async => imageBytes,
+      );
+      expect(
+        await cache.writeRead(PublicContentCacheKeys.sermons, {
+          'draft': 'private',
+        }),
+        isA<PublicContentCacheRefused>(),
+      );
+      expect((await cache.readSermons())?.value.sermons, hasLength(1));
+    },
+  );
+
+  test(
+    'strict sermon restore refuses injected attribution and unsafe links',
+    () async {
+      await cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        sermons(),
+        loadSermonPoster: (_) async => imageBytes,
+      );
+      final file = root
+          .listSync(recursive: true)
+          .whereType<File>()
+          .singleWhere((f) => f.path.endsWith('manifest.json'));
+      final original = jsonDecode(await file.readAsString()) as Map;
+      final entry = original['reads'][PublicContentCacheKeys.sermons] as Map;
+      entry['projection']['sermons'][0]['saved_by'] = 'private';
+      await file.writeAsString(jsonEncode(original));
+      expect(await cache.readSermons(), isNull);
+      (entry['projection']['sermons'][0] as Map).remove('saved_by');
+      entry['projection']['sermons'][0]['notes'] =
+          '[unsafe](https://evil.test)';
+      await file.writeAsString(jsonEncode(original));
+      expect(await cache.readSermons(), isNull);
+    },
+  );
+
+  test(
+    'failed sermon commit preserves the prior catalog and image bytes',
+    () async {
+      await cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        sermons(),
+        loadSermonPoster: (_) async => imageBytes,
+      );
+      final failing = PublicContentCacheAdapter(
+        supportDirectory: () async => root,
+        clock: () =>
+            throw const FileSystemException('SYNTHETIC clock unavailable'),
+      );
+      expect(
+        await failing.writeRead(
+          PublicContentCacheKeys.sermons,
+          const PublicSermons(sermons: [], series: []),
+        ),
+        isA<PublicContentCacheUnavailable>(),
+      );
+      expect(
+        (await cache.readSermons())?.value.series.single.poster?.offlineBytes,
+        imageBytes,
+      );
+      expect((await cache.readSermons())?.value.sermons, hasLength(1));
+    },
+  );
+
+  test(
+    'sermon and calendar writes share the same serialized manifest queue',
+    () async {
+      final poster = Completer<Uint8List?>();
+      final first = cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        sermons(),
+        loadSermonPoster: (_) => poster.future,
+      );
+      final second = cache.writeRead(
+        PublicContentCacheKeys.calendar,
+        PublicEvents.fromJson(publicEventsData([publicEventData()])),
+      );
+      poster.complete(imageBytes);
+      await Future.wait([first, second]);
+      expect((await cache.readSermons())?.value.sermons, hasLength(1));
+      expect((await cache.readEvents())?.value.events, hasLength(1));
+    },
+  );
+
+  // Review F3: a known withdrawal is removed without a list refresh.
+  test(
+    'removing a withdrawn sermon keeps the rest and drops its orphan poster',
+    () async {
+      const other = '93939393-9393-4393-8393-939393939393';
+      final series = publicSermonSeriesData(poster: true, posterOffline: true);
+      // The series is known only through the withdrawn sermon's row.
+      final catalog = PublicSermons.fromJson({
+        'sermons': [
+          publicSermonData(series: series),
+          publicSermonData(id: other, title: 'SYNTHETIC Another sermon'),
+        ],
+        'series': [],
+        'truncated': false,
+      });
+      await cache.writeRead(
+        PublicContentCacheKeys.sermons,
+        catalog,
+        loadSermonPoster: (_) async => imageBytes,
+      );
+      List<File> posters() => root
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.png'))
+          .toList();
+      expect(posters(), hasLength(1));
+      final withdrawn = catalog.sermons.first.sermonId;
+
+      await cache.removeSermon(withdrawn);
+
+      final cold = PublicContentCacheAdapter(
+        supportDirectory: () async => root,
+      );
+      final snapshot = await cold.readSermons();
+      expect(snapshot, isNotNull);
+      expect(snapshot!.savedAt, savedAt);
+      expect(snapshot.value.sermons.map((s) => s.sermonId), [other]);
+      expect(posters(), isEmpty);
+      // Removing an absent sermon is a no-op.
+      await cache.removeSermon(withdrawn);
+      expect((await cold.readSermons())?.value.sermons, hasLength(1));
+    },
+  );
+
+  test('removing a withdrawn event keeps the rest of the Calendar', () async {
+    const other = '72727272-7272-4272-8272-727272727272';
+    await cache.writeRead(
+      PublicContentCacheKeys.calendar,
+      PublicEvents.fromJson(
+        publicEventsData([
+          publicEventData(),
+          publicEventData(eventId: other),
+        ], truncated: true),
+      ),
+    );
+    await cache.removeEvent('71717171-7171-4171-8171-717171717171');
+    final cold = PublicContentCacheAdapter(supportDirectory: () async => root);
+    final snapshot = await cold.readEvents();
+    expect(snapshot?.value.events.map((e) => e.eventId), [other]);
+    expect(snapshot?.value.truncated, isTrue);
+    expect(snapshot?.savedAt, savedAt);
+  });
+
+  // Review section 8: a stop between deleting the live manifest and renaming
+  // its replacement is repaired at the next start.
+  group('manifest kill-point recovery', () {
+    const other = '72727272-7272-4272-8272-727272727272';
+    late Directory folder;
+    late File live;
+
+    Future<String> manifestFor(List<Map<String, Object?>> events) async {
+      final scratch = await Directory.systemTemp.createTemp('bic-kill-');
+      addTearDown(() => scratch.delete(recursive: true));
+      final writer = PublicContentCacheAdapter(
+        supportDirectory: () async => scratch,
+        clock: () => savedAt,
+      );
+      await writer.writeRead(
+        PublicContentCacheKeys.calendar,
+        PublicEvents.fromJson(publicEventsData(events)),
+      );
+      return File(
+        '${scratch.path}${Platform.pathSeparator}bic-kafue'
+        '${Platform.pathSeparator}public-content-v1'
+        '${Platform.pathSeparator}manifest.json',
+      ).readAsString();
+    }
+
+    setUp(() async {
+      await cache.writeRead(
+        PublicContentCacheKeys.calendar,
+        PublicEvents.fromJson(publicEventsData([publicEventData()])),
+      );
+      folder = Directory(
+        '${root.path}${Platform.pathSeparator}bic-kafue'
+        '${Platform.pathSeparator}public-content-v1',
+      );
+      live = File('${folder.path}${Platform.pathSeparator}manifest.json');
+    });
+
+    List<String> leftovers() => folder
+        .listSync()
+        .map((e) => e.uri.pathSegments.last)
+        .where((n) => n.contains('.tmp-') || n.contains('.backup-'))
+        .toList();
+
+    test('the complete replacement is promoted', () async {
+      final previous = await live.readAsString();
+      await File('${live.path}.backup-1').writeAsString(previous);
+      await File('${live.path}.tmp-1')
+          .writeAsString(await manifestFor([publicEventData(eventId: other)]));
+      await live.delete();
+
+      final restarted = PublicContentCacheAdapter(
+        supportDirectory: () async => root,
+      );
+      final events = (await restarted.readEvents())?.value.events;
+      expect(events?.map((e) => e.eventId), [other]);
+      expect(leftovers(), isEmpty);
+    });
+
+    test('the backup is restored when the replacement is damaged', () async {
+      final previous = await live.readAsString();
+      await File('${live.path}.backup-1').writeAsString(previous);
+      await File('${live.path}.tmp-1').writeAsString('{"version": 1, "rea');
+      await live.delete();
+
+      final restarted = PublicContentCacheAdapter(
+        supportDirectory: () async => root,
+      );
+      expect((await restarted.readEvents())?.value.events, hasLength(1));
+      expect(leftovers(), isEmpty);
+    });
+
+    test('a live manifest wins over leftovers, which are removed', () async {
+      await File('${live.path}.tmp-9')
+          .writeAsString(await manifestFor([publicEventData(eventId: other)]));
+      final restarted = PublicContentCacheAdapter(
+        supportDirectory: () async => root,
+      );
+      final events = (await restarted.readEvents())?.value.events;
+      expect(events?.map((e) => e.eventId), [
+        '71717171-7171-4171-8171-717171717171',
+      ]);
+      expect(leftovers(), isEmpty);
+    });
+  });
+
+  // Review section 8: an unreadable manifest is replaced the same way for
+  // every read type, and images it may have referenced are removed.
+  group('corrupt manifest write policy', () {
+    final writes =
+        <String, (Object, Future<bool> Function(PublicContentCacheAdapter))>{
+          PublicContentCacheKeys.calendar: (
+            PublicEvents.fromJson(publicEventsData([publicEventData()])),
+            (c) async => (await c.readEvents())?.value.events.length == 1,
+          ),
+          PublicContentCacheKeys.homeBanners: (
+            PublicBanners.fromJson(publicBannersData([publicBannerData()])),
+            (c) async => (await c.readBanners())?.value.banners.length == 1,
+          ),
+          PublicContentCacheKeys.givingMethods: (
+            PublicGivingMethods.fromJson(
+              publicGivingMethodsData([publicGivingMethodData()]),
+            ),
+            (c) async =>
+                (await c.readGivingMethods())?.value.methods.length == 1,
+          ),
+          PublicContentCacheKeys.sermons: (
+            sermons(),
+            (c) async => (await c.readSermons())?.value.sermons.length == 1,
+          ),
+          PublicContentCacheKeys.bibleChapter: (
+            PublicBibleChapter(
+              translationId: '61616161-6161-4161-8161-616161616161',
+              translationCode: 'KJV',
+              translationName: 'King James Version',
+              reference: const BibleChapterRef(bookId: 'GEN', chapter: 1),
+              verses: const [BibleVerse(number: 1, text: 'SYNTHETIC verse')],
+              publicationRevision: 1,
+              publishedAt: DateTime.utc(2026, 10, 22),
+              offlineAllowed: true,
+            ),
+            (c) async => (await c.readBibleChapter()) != null,
+          ),
+        };
+    for (final MapEntry(key: readKey, value: (projection, readable))
+        in writes.entries) {
+      test('$readKey replaces an unreadable manifest', () async {
+        final folder = Directory(
+          '${root.path}${Platform.pathSeparator}bic-kafue'
+          '${Platform.pathSeparator}public-content-v1',
+        );
+        await folder.create(recursive: true);
+        await File('${folder.path}${Platform.pathSeparator}manifest.json')
+            .writeAsString('{not json');
+        // An image the unreadable manifest may have referenced.
+        final stray = File(
+          '${folder.path}${Platform.pathSeparator}giving-logo-offline-'
+          'stale-p1-r1.png',
+        );
+        await stray.writeAsBytes(imageBytes);
+
+        final outcome = await cache.writeRead(
+          readKey,
+          projection,
+          loadBannerImage: (_) async => imageBytes,
+          loadGivingLogo: (_) async => imageBytes,
+          loadSermonPoster: (_) async => imageBytes,
+        );
+        expect(outcome, isA<PublicContentCacheSaved>());
+        final cold = PublicContentCacheAdapter(
+          supportDirectory: () async => root,
+        );
+        expect(await readable(cold), isTrue);
+        expect(stray.existsSync(), isFalse);
+      });
+    }
+  });
+
+  test('only allowlisted public list reads can create a manifest', () async {
+    final outcome = await cache.writeRead(
+      'content_staff_events',
+      PublicEvents.fromJson(publicEventsData([publicEventData()])),
+    );
+
+    expect(outcome, isA<PublicContentCacheRefused>());
+    expect(
+      (outcome as PublicContentCacheRefused).reason,
+      PublicContentCacheRefusal.unsupportedRead,
+    );
+    expect(root.listSync(), isEmpty);
+  });
+
+  test('calendar round trip stores only explicitly eligible rows', () async {
+    final events = PublicEvents.fromJson(
+      publicEventsData([publicEventData()], truncated: true),
+    );
+    final saved = await cache.writeRead(
+      PublicContentCacheKeys.calendar,
+      events,
+    );
+
+    expect(saved, isA<PublicContentCacheSaved>());
+    final snapshot = await cache.readEvents();
+    expect(snapshot?.savedAt, savedAt);
+    expect(snapshot?.value.truncated, isTrue);
+    expect(snapshot?.value.events.single.offlineAllowed, isTrue);
+
+    final refused = await cache.writeRead(
+      PublicContentCacheKeys.calendar,
+      PublicEvents.fromJson(
+        publicEventsData([publicEventData(offlineAllowed: false)]),
+      ),
+    );
+    expect(refused, isA<PublicContentCacheRefused>());
+    expect((await cache.readEvents())?.value.events, hasLength(1));
+  });
+
+  test(
+    'banner snapshots keep eligible bytes and evict withdrawn revisions',
+    () async {
+      final banners = PublicBanners.fromJson(
+        publicBannersData([
+          publicBannerData(publicationRevision: 2, rightsRevision: 4),
+        ], truncated: true),
+      );
+      final saved = await cache.writeRead(
+        PublicContentCacheKeys.homeBanners,
+        banners,
+        loadBannerImage: (_) async => imageBytes,
+      );
+
+      expect(saved, isA<PublicContentCacheSaved>());
+      final directory = Directory(
+        '${root.path}${Platform.pathSeparator}'
+        'bic-kafue${Platform.pathSeparator}public-content-v1',
+      );
+      final imageName =
+          'banner-offline-81818181-8181-4181-8181-818181818181'
+          '-p2-r4.png';
+      expect(
+        File('${directory.path}${Platform.pathSeparator}$imageName')
+            .existsSync(),
+        isTrue,
+      );
+      final snapshot = await cache.readBanners();
+      expect(snapshot?.value.truncated, isTrue);
+      expect(snapshot?.value.banners.single.offlineImageBytes, imageBytes);
+      final manifest = jsonDecode(
+        await File('${directory.path}${Platform.pathSeparator}manifest.json')
+            .readAsString(),
+      ) as Map<String, dynamic>;
+      expect(jsonEncode(manifest), isNot(contains('offlineImageBytes')));
+
+      final replaced = await cache.writeRead(
+        PublicContentCacheKeys.homeBanners,
+        const PublicBanners([]),
+      );
+      expect(replaced, isA<PublicContentCacheSaved>());
+      expect((await cache.readBanners())?.value.banners, isEmpty);
+      expect(
+        File('${directory.path}${Platform.pathSeparator}$imageName')
+            .existsSync(),
+        isFalse,
+      );
+    },
+  );
+
+  // Review F4: an unchanged permitted banner is reused across refreshes; a
+  // changed, withdrawn or revoked one is never reused.
+  group('banner refresh reuse', () {
+    const campaign = '82828282-8282-4282-8282-828282828282';
+    PublicBanners banners(List<Map<String, Object?>> rows) =>
+        PublicBanners.fromJson(publicBannersData(rows));
+    Map<String, Object?> theme({int rights = 1}) =>
+        publicBannerData(rightsRevision: rights);
+    Map<String, Object?> second() => publicBannerData(
+      bannerId: campaign,
+      kind: 'campaign',
+      path: 'banner/$campaign/r1/image.png',
+    );
+    List<String> bannerFiles() =>
+        root
+            .listSync(recursive: true)
+            .whereType<File>()
+            .map((f) => f.uri.pathSegments.last)
+            .where((n) => n.startsWith('banner-offline-'))
+            .toList()
+          ..sort();
+
+    test(
+      'an unchanged banner survives a failing loader without a download',
+      () async {
+        await cache.writeRead(
+          PublicContentCacheKeys.homeBanners,
+          banners([theme()]),
+          loadBannerImage: (_) async => imageBytes,
+        );
+        var loads = 0;
+        final outcome = await cache.writeRead(
+          PublicContentCacheKeys.homeBanners,
+          banners([theme()]),
+          loadBannerImage: (_) async {
+            loads++;
+            throw const SocketException('SYNTHETIC offline');
+          },
+        );
+        expect(outcome, isA<PublicContentCacheSaved>());
+        expect(loads, 0);
+        final cold = PublicContentCacheAdapter(
+          supportDirectory: () async => root,
+        );
+        expect(
+          (await cold.readBanners())?.value.banners.single.offlineImageBytes,
+          imageBytes,
+        );
+      },
+    );
+
+    // Follow-up review C2.
+    test('an oversized saved banner at the same revision is replaced and stays repaired', () async {
+      await cache.writeRead(
+        PublicContentCacheKeys.homeBanners,
+        banners([theme()]),
+        loadBannerImage: (_) async => imageBytes,
+      );
+      final name = bannerFiles().single;
+      final file = root
+          .listSync(recursive: true)
+          .whereType<File>()
+          .singleWhere((f) => f.uri.pathSegments.last == name);
+      await file.writeAsBytes(Uint8List(5 * 1024 * 1024 + 1), flush: true);
+
+      var loads = 0;
+      Future<Uint8List?> loader(PublicBanner _) async {
+        loads++;
+        return imageBytes;
+      }
+
+      expect(
+        await cache.writeRead(
+          PublicContentCacheKeys.homeBanners,
+          banners([theme()]),
+          loadBannerImage: loader,
+        ),
+        isA<PublicContentCacheSaved>(),
+      );
+      expect(loads, 1);
+      expect(await file.readAsBytes(), imageBytes);
+      final cold = PublicContentCacheAdapter(
+        supportDirectory: () async => root,
+      );
+      expect(
+        (await cold.readBanners())?.value.banners.single.offlineImageBytes,
+        imageBytes,
+      );
+
+      // The next same-revision save reuses the repaired file.
+      await cache.writeRead(
+        PublicContentCacheKeys.homeBanners,
+        banners([theme()]),
+        loadBannerImage: loader,
+      );
+      expect(loads, 1);
+    });
+
+    test(
+      'a changed rights revision is downloaded again, never reused',
+      () async {
+        await cache.writeRead(
+          PublicContentCacheKeys.homeBanners,
+          banners([theme()]),
+          loadBannerImage: (_) async => imageBytes,
+        );
+        var loads = 0;
+        await cache.writeRead(
+          PublicContentCacheKeys.homeBanners,
+          banners([theme(rights: 2)]),
+          loadBannerImage: (_) async {
+            loads++;
+            return null;
+          },
+        );
+        expect(loads, 1);
+        expect((await cache.readBanners())?.value.banners, isEmpty);
+        expect(bannerFiles(), isEmpty);
+      },
+    );
+
+    test('withdrawn and revoked banners leave the saved read before slow downloads', () async {
+      await cache.writeRead(
+        PublicContentCacheKeys.homeBanners,
+        banners([theme(), second()]),
+        loadBannerImage: (_) async => imageBytes,
+      );
+      expect(bannerFiles(), hasLength(2));
+      // The campaign is withdrawn (or its offline rights are revoked, which
+      // the controller sends as an omitted row); a new banner downloads
+      // slowly.
+      const fresh = '83838383-8383-4383-8383-838383838383';
+      final slow = Completer<Uint8List?>();
+      final write = cache.writeRead(
+        PublicContentCacheKeys.homeBanners,
+        banners([
+          theme(),
+          publicBannerData(
+            bannerId: fresh,
+            kind: 'campaign',
+            path: 'banner/$fresh/r1/image.png',
+          ),
+        ]),
+        loadBannerImage: (banner) =>
+            banner.bannerId == fresh ? slow.future : Future.value(null),
+      );
+      for (var i = 0; i < 20 && bannerFiles().length != 1; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      final cold = PublicContentCacheAdapter(
+        supportDirectory: () async => root,
+      );
+      final during = await cold.readBanners();
+      expect(during?.value.banners.map((b) => b.bannerId), [
+        '81818181-8181-4181-8181-818181818181',
+      ]);
+      expect(bannerFiles(), hasLength(1));
+      slow.complete(null);
+      await write;
+      expect(
+        (await cache.readBanners())?.value.banners.map((b) => b.bannerId),
+        ['81818181-8181-4181-8181-818181818181'],
+      );
+      expect(bannerFiles(), hasLength(1));
+    });
+  });
+
+  test('rights uncleared for offline use refuses without writing', () async {
+    final outcome = await cache.writeRead(
+      PublicContentCacheKeys.homeBanners,
+      PublicBanners.fromJson(
+        publicBannersData([publicBannerData(offlineAllowed: false)]),
+      ),
+      loadBannerImage: (_) async => imageBytes,
+    );
+
+    expect(outcome, isA<PublicContentCacheRefused>());
+    expect(
+      (outcome as PublicContentCacheRefused).reason,
+      PublicContentCacheRefusal.offlineRightsNotCleared,
+    );
+    expect(root.listSync(), isEmpty);
+  });
+
+  test('Bible cache restores a validated chapter and its reference after a cold start', () async {
+    final chapter = PublicBibleChapter(
+      translationId: '61616161-6161-4161-8161-616161616161',
+      translationCode: 'KJV',
+      translationName: 'King James Version',
+      reference: const BibleChapterRef(bookId: 'GEN', chapter: 1),
+      verses: const [
+        BibleVerse(number: 1, text: 'SYNTHETIC verse one'),
+        BibleVerse(number: 2, text: 'SYNTHETIC verse two'),
+      ],
+      publicationRevision: 3,
+      publishedAt: DateTime.utc(2026, 10, 22),
+      offlineAllowed: true,
+    );
+    final saved = await cache.writeRead(
+      PublicContentCacheKeys.bibleChapter,
+      chapter,
+    );
+    expect(saved, isA<PublicContentCacheSaved>());
+
+    final coldStart = PublicContentCacheAdapter(
+      supportDirectory: () async => root,
+      clock: () => cacheClock,
+    );
+    final restored = await coldStart.readBibleChapter();
+    expect(restored?.value.translationId, chapter.translationId);
+    expect(
+      restored?.value.reference,
+      const BibleChapterRef(bookId: 'GEN', chapter: 1),
+    );
+    expect(restored?.value.verses, hasLength(2));
+    expect(restored?.savedAt, savedAt);
+
+    final directory = Directory(
+      '${root.path}${Platform.pathSeparator}bic-kafue'
+      '${Platform.pathSeparator}public-content-v1',
+    );
+    final manifest = jsonDecode(
+      await File('${directory.path}${Platform.pathSeparator}manifest.json')
+          .readAsString(),
+    ) as Map<String, dynamic>;
+    final entry =
+        (manifest['reads']
+                as Map<String, dynamic>)[PublicContentCacheKeys.bibleChapter]
+            as Map<String, dynamic>;
+    expect(entry['projection']['book_id'], 'GEN');
+    expect(entry['projection']['chapter'], 1);
+    expect(entry['projection']['translation_id'], chapter.translationId);
+  });
+
+  test('a refused Bible refresh keeps the previous offline chapter', () async {
+    final original = PublicBibleChapter(
+      translationId: '61616161-6161-4161-8161-616161616161',
+      translationCode: 'KJV',
+      translationName: 'King James Version',
+      reference: const BibleChapterRef(bookId: 'GEN', chapter: 1),
+      verses: const [BibleVerse(number: 1, text: 'SYNTHETIC saved verse')],
+      publicationRevision: 3,
+      publishedAt: DateTime.utc(2026, 10, 22),
+      offlineAllowed: true,
+    );
+    expect(
+      await cache.writeRead(PublicContentCacheKeys.bibleChapter, original),
+      isA<PublicContentCacheSaved>(),
+    );
+
+    final refused = PublicBibleChapter(
+      translationId: original.translationId,
+      translationCode: original.translationCode,
+      translationName: original.translationName,
+      reference: const BibleChapterRef(bookId: 'GEN', chapter: 2),
+      verses: const [BibleVerse(number: 1, text: 'SYNTHETIC blocked refresh')],
+      publicationRevision: 4,
+      publishedAt: DateTime.utc(2026, 10, 23),
+      offlineAllowed: false,
+    );
+    expect(
+      await cache.writeRead(PublicContentCacheKeys.bibleChapter, refused),
+      isA<PublicContentCacheRefused>(),
+    );
+    final restored = await cache.readBibleChapter();
+    expect(restored?.value.reference, original.reference);
+    expect(restored?.value.verses.single.text, 'SYNTHETIC saved verse');
+  });
+
+  test(
+    'Bible cache refuses display-only chapters and rejects tampered metadata',
+    () async {
+      final displayOnly = PublicBibleChapter(
+        translationId: '61616161-6161-4161-8161-616161616161',
+        translationCode: 'KJV',
+        translationName: 'King James Version',
+        reference: const BibleChapterRef(bookId: 'GEN', chapter: 1),
+        verses: const [BibleVerse(number: 1, text: 'SYNTHETIC verse one')],
+        publicationRevision: 1,
+        publishedAt: DateTime.utc(2026, 10, 22),
+        offlineAllowed: false,
+      );
+      final refused = await cache.writeRead(
+        PublicContentCacheKeys.bibleChapter,
+        displayOnly,
+      );
+      expect(refused, isA<PublicContentCacheRefused>());
+      expect(
+        (refused as PublicContentCacheRefused).reason,
+        PublicContentCacheRefusal.offlineRightsNotCleared,
+      );
+      expect(root.listSync(), isEmpty);
+
+      final eligible = PublicBibleChapter(
+        translationId: displayOnly.translationId,
+        translationCode: displayOnly.translationCode,
+        translationName: displayOnly.translationName,
+        reference: displayOnly.reference,
+        verses: displayOnly.verses,
+        publicationRevision: displayOnly.publicationRevision,
+        publishedAt: displayOnly.publishedAt,
+        offlineAllowed: true,
+      );
+      expect(
+        await cache.writeRead(PublicContentCacheKeys.bibleChapter, eligible),
+        isA<PublicContentCacheSaved>(),
+      );
+      final directory = Directory(
+        '${root.path}${Platform.pathSeparator}bic-kafue'
+        '${Platform.pathSeparator}public-content-v1',
+      );
+      final manifestFile = File(
+        '${directory.path}${Platform.pathSeparator}manifest.json',
+      );
+      final manifest =
+          jsonDecode(await manifestFile.readAsString()) as Map<String, dynamic>;
+      final reads = manifest['reads'] as Map<String, dynamic>;
+      final entry =
+          reads[PublicContentCacheKeys.bibleChapter] as Map<String, dynamic>;
+      final projection = entry['projection'] as Map<String, dynamic>;
+      projection['translation_code'] = 'not valid';
+      await manifestFile.writeAsString(jsonEncode(manifest));
+      expect(await cache.readBibleChapter(), isNull);
+    },
+  );
+
+  test(
+    'an unavailable image is omitted and a later server snapshot evicts it',
+    () async {
+      final banners = PublicBanners.fromJson(
+        publicBannersData([publicBannerData()]),
+      );
+      final first = await cache.writeRead(
+        PublicContentCacheKeys.homeBanners,
+        banners,
+        loadBannerImage: (_) async => null,
+      );
+      expect((first as PublicContentCacheSaved).omittedRows, 1);
+      expect((await cache.readBanners())?.value.banners, isEmpty);
+    },
+  );
+
+  test('giving cache keeps unsafe instructions and only offline-cleared logo bytes', () async {
+    final method = publicGivingMethodData(
+      unsafe: true,
+      logo: {
+        'path': 'providers/sample.png',
+        'media_type': 'image/png',
+        'width': 160,
+        'height': 160,
+        'rights_revision': 4,
+        'offline_allowed': true,
+      },
+    );
+    final giving = PublicGivingMethods.fromJson(
+      publicGivingMethodsData([method], truncated: true),
+    );
+    final saved = await cache.writeRead(
+      PublicContentCacheKeys.givingMethods,
+      giving,
+      loadGivingLogo: (_) async => imageBytes,
+    );
+
+    expect(saved, isA<PublicContentCacheSaved>());
+    final directory = Directory(
+      '${root.path}${Platform.pathSeparator}'
+      'bic-kafue${Platform.pathSeparator}public-content-v1',
+    );
+    final logoName =
+        'giving-logo-offline-61616161-6161-4161-8161-616161616161-p1-r4.png';
+    expect(
+      File('${directory.path}${Platform.pathSeparator}$logoName').existsSync(),
+      isTrue,
+    );
+    final snapshot = await cache.readGivingMethods();
+    expect(snapshot?.value.sample, isTrue);
+    expect(snapshot?.value.truncated, isTrue);
+    expect(snapshot?.value.methods.single.unsafe, isTrue);
+    expect(snapshot?.value.methods.single.logo?.offlineBytes, imageBytes);
+    final manifest = jsonDecode(
+      await File('${directory.path}${Platform.pathSeparator}manifest.json')
+          .readAsString(),
+    ) as Map<String, dynamic>;
+    expect(jsonEncode(manifest), isNot(contains('offlineBytes')));
+
+    await cache.writeRead(
+      PublicContentCacheKeys.givingMethods,
+      const PublicGivingMethods(sample: true, methods: [], truncated: false),
+    );
+    expect((await cache.readGivingMethods())?.value.methods, isEmpty);
+    expect(
+      File('${directory.path}${Platform.pathSeparator}$logoName').existsSync(),
+      isFalse,
+    );
+  });
+
+  test(
+    'giving refresh keeps the last snapshot and loads logos concurrently',
+    () async {
+      const oldId = '61616161-6161-4161-8161-616161616161';
+      const firstNewId = '63636363-6363-4363-8363-636363636363';
+      const secondNewId = '64646464-6464-4464-8464-646464646464';
+      final oldLogo = {
+        'path': 'providers/old.png',
+        'media_type': 'image/png',
+        'width': 160,
+        'height': 160,
+        'rights_revision': 4,
+        'offline_allowed': true,
+      };
+      final oldProjection = PublicGivingMethods.fromJson(
+        publicGivingMethodsData([
+          publicGivingMethodData(methodId: oldId, logo: oldLogo),
+        ]),
+      );
+      var fetchedLogos = 0;
+      final firstWrite = await cache.writeRead(
+        PublicContentCacheKeys.givingMethods,
+        oldProjection,
+        loadGivingLogo: (_) async {
+          fetchedLogos++;
+          return imageBytes;
+        },
+      );
+      expect(firstWrite, isA<PublicContentCacheSaved>());
+
+      final firstNewLogo = {...oldLogo, 'path': 'providers/first-new.png'};
+      final secondNewLogo = {...oldLogo, 'path': 'providers/second-new.png'};
+      final refreshed = PublicGivingMethods.fromJson(
+        publicGivingMethodsData([
+          publicGivingMethodData(methodId: oldId, logo: oldLogo),
+          publicGivingMethodData(methodId: firstNewId, logo: firstNewLogo),
+          publicGivingMethodData(methodId: secondNewId, logo: secondNewLogo),
+        ]),
+      );
+      final firstNewBytes = Completer<Uint8List?>();
+      final secondNewBytes = Completer<Uint8List?>();
+      final bothFetchesStarted = Completer<void>();
+      final newLogos = {
+        firstNewLogo['path']: firstNewBytes,
+        secondNewLogo['path']: secondNewBytes,
+      };
+      final refresh = cache.writeRead(
+        PublicContentCacheKeys.givingMethods,
+        refreshed,
+        loadGivingLogo: (logo) {
+          fetchedLogos++;
+          if (fetchedLogos == 3) bothFetchesStarted.complete();
+          return newLogos[logo.path]!.future;
+        },
+      );
+
+      await bothFetchesStarted.future.timeout(const Duration(seconds: 2));
+      expect(
+        (await cache.readGivingMethods())?.value.methods.map((m) => m.methodId),
+        [oldId],
+        reason: 'the last good list remains readable while new logos load',
+      );
+      firstNewBytes.complete(imageBytes);
+      secondNewBytes.complete(imageBytes);
+      expect(await refresh, isA<PublicContentCacheSaved>());
+      final fresh = await cache.readGivingMethods();
+      expect(fresh?.value.methods.map((m) => m.methodId), [
+        oldId,
+        firstNewId,
+        secondNewId,
+      ]);
+      expect(fresh?.value.methods.map((m) => m.logo?.offlineBytes), [
+        imageBytes,
+        imageBytes,
+        imageBytes,
+      ]);
+
+      final repeat = await cache.writeRead(
+        PublicContentCacheKeys.givingMethods,
+        refreshed,
+        loadGivingLogo: (_) async {
+          fetchedLogos++;
+          return null;
+        },
+      );
+      expect(repeat, isA<PublicContentCacheSaved>());
+      expect(fetchedLogos, 3, reason: 'unchanged cached logos are reused');
+    },
+  );
+
+  test('giving logo downloads are capped at four in flight', () async {
+    const ids = [
+      '61616161-6161-4161-8161-616161616161',
+      '63636363-6363-4363-8363-636363636363',
+      '64646464-6464-4464-8464-646464646464',
+      '65656565-6565-4565-8565-656565656565',
+      '67676767-6767-4767-8767-676767676767',
+      '68686868-6868-4868-8868-686868686868',
+    ];
+    final logo = {
+      'media_type': 'image/png',
+      'width': 160,
+      'height': 160,
+      'rights_revision': 4,
+      'offline_allowed': true,
+    };
+    final projection = PublicGivingMethods.fromJson(
+      publicGivingMethodsData([
+        for (var i = 0; i < ids.length; i++)
+          publicGivingMethodData(
+            methodId: ids[i],
+            logo: {...logo, 'path': 'providers/logo-$i.png'},
+          ),
+      ]),
+    );
+    final completions = <Completer<Uint8List?>>[];
+    final started = List.generate(ids.length, (_) => Completer<void>());
+    var active = 0;
+    var maximumActive = 0;
+    final saving = cache.writeRead(
+      PublicContentCacheKeys.givingMethods,
+      projection,
+      loadGivingLogo: (_) {
+        active++;
+        if (active > maximumActive) maximumActive = active;
+        final completion = Completer<Uint8List?>();
+        completions.add(completion);
+        started[completions.length - 1].complete();
+        return completion.future.whenComplete(() => active--);
+      },
+    );
+
+    await started[3].future.timeout(const Duration(seconds: 2));
+    expect(completions, hasLength(4));
+    expect(maximumActive, 4);
+
+    completions.first.complete(imageBytes);
+    await started[4].future.timeout(const Duration(seconds: 2));
+    expect(maximumActive, 4);
+    for (final completion in completions) {
+      if (!completion.isCompleted) completion.complete(imageBytes);
+    }
+    await started[5].future.timeout(const Duration(seconds: 2));
+    for (final completion in completions) {
+      if (!completion.isCompleted) completion.complete(imageBytes);
+    }
+
+    expect(await saving, isA<PublicContentCacheSaved>());
+    expect(maximumActive, 4);
+    expect(
+      (await cache.readGivingMethods())?.value.methods,
+      hasLength(ids.length),
+    );
+  });
+
+  test(
+    'fresh giving detail keeps list time and reconciles eligible logos',
+    () async {
+      const methodId = '61616161-6161-4161-8161-616161616161';
+      final logo = {
+        'path': 'giving_method/$methodId/r1/logo.png',
+        'media_type': 'image/png',
+        'width': 160,
+        'height': 160,
+        'rights_revision': 4,
+        'offline_allowed': true,
+      };
+      final saved = await cache.writeRead(
+        PublicContentCacheKeys.givingMethods,
+        PublicGivingMethods.fromJson(
+          publicGivingMethodsData(
+            [
+              publicGivingMethodData(methodId: methodId, logo: logo),
+              publicBankMethodData(),
+            ],
+            sample: true,
+            truncated: true,
+          ),
+        ),
+        loadGivingLogo: (_) async => imageBytes,
+      );
+      expect(saved, isA<PublicContentCacheSaved>());
+
+      cacheClock = savedAt.add(const Duration(hours: 2));
+      var redundantLogoFetch = false;
+      final same = PublicGivingMethod.fromJson(
+        publicGivingMethodData(methodId: methodId, unsafe: true, logo: logo),
+      );
+      await cache.reconcileGivingMethod(same);
+      await cache.saveGivingLogo(
+        same,
+        loadGivingLogo: (_) async {
+          redundantLogoFetch = true;
+          return null;
+        },
+      );
+      final refreshed = await cache.readGivingMethods();
+      expect(refreshed?.savedAt, savedAt);
+      expect(refreshed?.value.sample, isTrue);
+      expect(refreshed?.value.truncated, isTrue);
+      expect(refreshed?.value.methods.map((method) => method.methodId), [
+        methodId,
+        '62626262-6262-4262-8262-626262626262',
+      ]);
+      expect(refreshed?.value.methods.first.unsafe, isTrue);
+      expect(refreshed?.value.methods.first.logo?.offlineBytes, imageBytes);
+      expect(redundantLogoFetch, isFalse);
+
+      final changedLogo = {
+        ...logo,
+        'path': 'giving_method/$methodId/r2/logo.png',
+        'rights_revision': 5,
+      };
+      final changedBytes = Uint8List.fromList([0x89, 0x50, 0x4e, 0x47, 0x02]);
+      var changedLogoFetch = false;
+      final changed = PublicGivingMethod.fromJson(
+        publicGivingMethodData(
+          methodId: methodId,
+          publicationRevision: 2,
+          unsafe: false,
+          logo: changedLogo,
+        ),
+      );
+      await cache.reconcileGivingMethod(changed);
+      // The safety half already dropped the superseded logo.
+      expect(
+        (await cache.readGivingMethods())?.value.methods.first.logo,
+        isNull,
+      );
+      expect(changedLogoFetch, isFalse);
+      await cache.saveGivingLogo(
+        changed,
+        loadGivingLogo: (_) async {
+          changedLogoFetch = true;
+          return changedBytes;
+        },
+      );
+      final updated = await cache.readGivingMethods();
+      expect(updated?.savedAt, savedAt);
+      expect(updated?.value.methods.first.unsafe, isFalse);
+      expect(updated?.value.methods.first.logo?.rightsRevision, 5);
+      expect(updated?.value.methods.first.logo?.offlineBytes, changedBytes);
+      expect(changedLogoFetch, isTrue);
+    },
+  );
+
+  test(
+    'display-only logo is omitted while its giving instructions remain cached',
+    () async {
+      final giving = PublicGivingMethods.fromJson(
+        publicGivingMethodsData([
+          publicGivingMethodData(
+            unsafe: true,
+            logo: {
+              'path': 'providers/display-only.webp',
+              'media_type': 'image/webp',
+              'width': 160,
+              'height': 160,
+              'rights_revision': 5,
+              'offline_allowed': false,
+            },
+          ),
+        ]),
+      );
+      var fetchCalled = false;
+      final saved = await cache.writeRead(
+        PublicContentCacheKeys.givingMethods,
+        giving,
+        loadGivingLogo: (_) async {
+          fetchCalled = true;
+          return imageBytes;
+        },
+      );
+
+      expect(saved, isA<PublicContentCacheSaved>());
+      expect((saved as PublicContentCacheSaved).omittedRows, 1);
+      expect(fetchCalled, isFalse);
+      final method = (await cache.readGivingMethods())?.value.methods.single;
+      expect(method?.unsafe, isTrue);
+      expect(method?.name, 'SAMPLE Airtel Money');
+      expect(method?.logo, isNull);
+    },
+  );
+}

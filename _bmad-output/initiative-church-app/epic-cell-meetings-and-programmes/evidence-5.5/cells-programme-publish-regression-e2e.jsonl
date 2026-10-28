@@ -1,0 +1,14 @@
+{"step":"U00-precondition","target":"LOCAL","at":"2026-10-21T09:58:45.403Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"U01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-21T09:58:50.536Z","verdict":"pass","amr":["password"]}
+{"step":"U02-cells-department-and-a-meeting","target":"LOCAL","at":"2026-10-21T09:58:52.817Z","verdict":"pass","grants":[200,200,200],"added":[200,200],"placed":[200,200,200],"schedule":200,"department_duty":200}
+{"step":"U10-draft-with-assigned-open-and-department-parts","target":"LOCAL","at":"2026-10-21T09:58:52.862Z","verdict":"pass","created":200,"linkable_offered":1,"saved":200,"gaps":1}
+{"step":"U20-overlap-refused-on-its-part-then-published-with-a-reason","target":"LOCAL","at":"2026-10-21T09:58:53.106Z","verdict":"pass","refused":"validation_failed","part_field":["parts.2.member_id","parts.2.override_reason"],"member":"forbidden","admin":"forbidden","published":"published","duties_parts":4}
+{"step":"U21-one-slot-per-part-awaiting-department-duty-unchanged","target":"LOCAL","at":"2026-10-21T09:58:53.942Z","verdict":"pass","states":["pending","open","pending","linked"],"links_slots_assignments":"4|3|2","department_duty_unchanged":true}
+{"step":"U22-republish-duplicates-nothing","target":"LOCAL","at":"2026-10-21T09:58:54.850Z","verdict":"pass","republished":200,"counts":"4|3|2"}
+{"step":"U30-preview-equals-the-member-read","target":"LOCAL","at":"2026-10-21T09:58:54.882Z","verdict":"pass","status":200,"parts":4,"preview_equal":true,"venue_shown":true}
+{"step":"U31-member-read-is-safe-and-for-members-only","target":"LOCAL","at":"2026-10-21T09:58:54.933Z","verdict":"pass","leaks_private":false,"estates":403,"admin":403,"leader_not_member":403,"pending":403}
+{"step":"U32-member-finds-the-part-in-my-duties","target":"LOCAL","at":"2026-10-21T09:58:54.943Z","verdict":"pass","owner_kind":"cell","response":"pending"}
+{"step":"U40-cancel-ends-the-cell-duties-only","target":"LOCAL","at":"2026-10-21T09:58:56.247Z","verdict":"pass","cancelled":"cancelled","member_reads":null,"owned":"cancelled","links_left":0,"department_duty_unchanged":true}
+{"step":"U50-direct-table-queries-refused","target":"LOCAL","at":"2026-10-21T09:58:56.261Z","verdict":"pass","statuses":["app.cells_programme_projections:406","api.cells_programme_projections:404","app.cells_programmes:406","api.cells_programmes:404","app.cells_programme_parts:406","api.cells_programme_parts:404"]}
+{"step":"U51-audit-content-free","target":"LOCAL","at":"2026-10-21T09:58:57.101Z","verdict":"pass","leaked_values":0,"actions":"programme_cancelled,programme_created,programme_published,programme_saved"}
+{"step":"U99-cleanup","target":"LOCAL","at":"2026-10-21T09:58:58.435Z","users_left":0,"unmarked":true,"programmes_left":0}

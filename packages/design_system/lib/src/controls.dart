@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
 import 'focus.dart';
+import 'staff.dart';
 import 'tokens.dart';
 
 /// A modal dialog exposed as role `dialog` whose accessible name is its
@@ -98,40 +99,64 @@ class RadioSegments<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = ChurchColors.of(context);
+    // Handoff: a grey track (radius 14, padding 4) with equal segments; the
+    // chosen one is a white segment with a soft shadow.
     return Semantics(
       role: SemanticsRole.radioGroup,
       label: label,
       explicitChildNodes: true,
-      child: Wrap(
-        spacing: 4,
-        runSpacing: 4,
-        children: [
-          for (final o in options)
-            FocusRing(
-              child: OutlinedButton.icon(
-                key: ValueKey('segment-${o.label}'),
-                onPressed: onChanged == null ? null : () => onChanged!(o.value),
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: o.value == selected ? c.blueBg : null,
-                  foregroundColor: c.link,
-                  side: BorderSide(
-                    color: o.value == selected ? c.link : c.muted,
-                    width: o.value == selected ? 2 : 1,
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: c.surface2,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            // Each segment's share follows its label, so a long label
+            // ("Needs a response (2)") is not squeezed to the width of a
+            // short one ("Past (1)").
+            for (final o in options)
+              Expanded(
+                flex: o.label.length < 6 ? 6 : o.label.length,
+                child: FocusRing(
+                  radius: 13,
+                  child: TextButton(
+                    key: ValueKey('segment-${o.label}'),
+                    onPressed: onChanged == null
+                        ? null
+                        : () => onChanged!(o.value),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(0, ChurchGeometry.minTarget),
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      backgroundColor: o.value == selected
+                          ? c.surface
+                          : Colors.transparent,
+                      foregroundColor: o.value == selected ? c.ink : c.muted,
+                      shadowColor: const Color(0x1F000000),
+                      elevation: o.value == selected ? 1.5 : 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(11),
+                      ),
+                      textStyle: const TextStyle(
+                        fontFamily: ChurchFonts.body,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    child: Semantics(
+                      inMutuallyExclusiveGroup: true,
+                      checked: o.value == selected,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(o.label, maxLines: 1),
+                      ),
+                    ),
                   ),
                 ),
-                icon: Icon(
-                  o.value == selected
-                      ? Icons.check
-                      : (o.icon ?? Icons.circle_outlined),
-                ),
-                label: Semantics(
-                  inMutuallyExclusiveGroup: true,
-                  checked: o.value == selected,
-                  child: Text(o.label),
-                ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -153,12 +178,30 @@ class NavItem extends StatelessWidget {
     this.onDark = false,
     this.vertical = false,
     this.autofocus = false,
+    this.compact = false,
+    this.fill = false,
+    this.badge,
+    this.badgeLabel,
   });
 
   final String label;
   final IconData icon;
   final bool selected;
   final VoidCallback onTap;
+
+  /// Staff rail: the icon alone, the label in a tooltip and in semantics.
+  final bool compact;
+
+  /// Takes the full width it is given (the staff sidebar), so a [badge]
+  /// sits at the row's end.
+  final bool fill;
+
+  /// A count of work waiting behind this destination (staff sidebar); null
+  /// or zero shows nothing.
+  final int? badge;
+
+  /// What [badge] counts, read after the label ("3 waiting").
+  final String? badgeLabel;
 
   /// True on the navy sidebar/top bar: white text and a white ring.
   final bool onDark;
@@ -181,36 +224,101 @@ class NavItem extends StatelessWidget {
         : (selected ? c.link : c.muted);
     final highlight = onDark
         ? (selected ? ChurchStaffChrome.activeItem : Colors.transparent)
-        : (selected ? c.blueBg : Colors.transparent);
+        : Colors.transparent;
+    final count = badge ?? 0;
     final text = Text(
       label,
       textAlign: vertical ? TextAlign.center : TextAlign.start,
       style: (vertical ? ChurchType.tabLabel : ChurchType.staffBody).copyWith(
         color: fg,
-        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        fontWeight: onDark
+            ? FontWeight.w600
+            : (selected ? FontWeight.w700 : FontWeight.w500),
       ),
     );
+    if (compact) {
+      return _tab(
+        semanticsLabel: count > 0 ? '$label, ${badgeLabel ?? count}' : label,
+        highlight: highlight,
+        padding: EdgeInsets.zero,
+        alignment: Alignment.center,
+        child: Tooltip(
+          message: label,
+          excludeFromSemantics: true,
+          child: SizedBox.square(
+            dimension: ChurchGeometry.minTarget,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(icon, color: fg, size: 22),
+                if (count > 0)
+                  Positioned(
+                    top: 7,
+                    right: 7,
+                    child: StaffNavBadge(count: count, dot: true),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     final content = vertical
         ? Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: fg),
-              const SizedBox(height: 2),
-              text,
+              Icon(icon, color: fg, size: 24),
+              const SizedBox(height: 3),
+              // A tab label stays on one line: at large text sizes or on a
+              // narrow phone it shrinks to fit instead of breaking mid-word.
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  textAlign: TextAlign.center,
+                  style: text.style,
+                ),
+              ),
             ],
           )
         : Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: fg),
-              const SizedBox(width: 12),
-              Flexible(child: text),
+              Icon(icon, color: fg, size: onDark ? 20 : null),
+              SizedBox(width: onDark ? 10 : 12),
+              if (fill) Expanded(child: text) else Flexible(child: text),
+              if (count > 0) ...[
+                const SizedBox(width: 8),
+                StaffNavBadge(count: count),
+              ],
             ],
           );
+    return _tab(
+      semanticsLabel: count > 0 ? '$label, ${badgeLabel ?? count}' : null,
+      highlight: highlight,
+      padding: EdgeInsets.symmetric(
+        horizontal: vertical ? 2 : (onDark ? 10 : 12),
+        vertical: 6,
+      ),
+      alignment: vertical ? Alignment.center : null,
+      child: content,
+    );
+  }
+
+  Widget _tab({
+    required String? semanticsLabel,
+    required Color highlight,
+    required EdgeInsets padding,
+    required AlignmentGeometry? alignment,
+    required Widget child,
+  }) {
     return Semantics(
       role: SemanticsRole.tab,
       selected: selected,
       container: true,
+      label: semanticsLabel,
       child: FocusRing(
         color: onDark ? ChurchStaffChrome.onSidebar : null,
         radius: 12,
@@ -227,9 +335,11 @@ class NavItem extends StatelessWidget {
                 minHeight: ChurchGeometry.minTarget,
                 minWidth: ChurchGeometry.minTarget,
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              alignment: vertical ? Alignment.center : null,
-              child: content,
+              padding: padding,
+              alignment: alignment,
+              child: semanticsLabel == null
+                  ? child
+                  : ExcludeSemantics(child: child),
             ),
           ),
         ),
@@ -324,8 +434,7 @@ class RequestStateBanner extends StatelessWidget {
       padding: const EdgeInsets.all(ChurchGeometry.cardPadding),
       decoration: BoxDecoration(
         color: bg,
-        border: Border.all(color: fg),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -341,9 +450,9 @@ class RequestStateBanner extends StatelessWidget {
                 )
               else
                 ExcludeSemantics(
-                  child: Icon(icon ?? Icons.info_outline, color: fg),
+                  child: Icon(icon ?? Icons.info_outline, color: fg, size: 20),
                 ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Semantics(
                   // A focusable banner is itself named by its title; it is
@@ -352,16 +461,19 @@ class RequestStateBanner extends StatelessWidget {
                   excludeSemantics: node != null,
                   child: Text(
                     title,
-                    style: ChurchType.cardTitle.copyWith(color: fg),
+                    style: ChurchType.body.copyWith(
+                      color: fg,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
             message,
-            style: ChurchLayout.of(context).body.copyWith(color: c.ink),
+            style: ChurchType.secondary.copyWith(color: c.ink, height: 1.4),
           ),
           if (actions.isNotEmpty) ...[
             const SizedBox(height: 12),
@@ -377,13 +489,10 @@ class RequestStateBanner extends StatelessWidget {
                             onPressed: a.onPressed,
                             child: Text(a.label),
                           )
-                        : OutlinedButton(
+                        : TextButton(
                             key: a.key,
                             onPressed: a.onPressed,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: c.ink,
-                              side: BorderSide(color: fg),
-                            ),
+                            style: TextButton.styleFrom(foregroundColor: fg),
                             child: Text(a.label),
                           ),
                   ),

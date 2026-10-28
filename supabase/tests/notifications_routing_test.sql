@@ -372,7 +372,11 @@ select app.notifications_set_schedule(jsonb_build_object(
   'source_revision', 1, 'recipient_member_id', pg_temp.mid(9), 'schedule_type', 'task',
   'intent', jsonb_build_object('due_at', app.cmd_utc(now() + interval '3 days'), 'task_state', 'open'),
   'kinds', '{"deadline": "fixture_due"}'::jsonb, 'fresh', true));
-select is(pg_temp.lifecycle('deletion_requested', 9), 1, 'deletion_requested reaches Notifications');
+-- Story 4.12: Duties and Follow-ups hook deletion_requested too (Notifications last); story 6.11:
+-- Content as well. Every registered hook runs.
+select is(pg_temp.lifecycle('deletion_requested', 9),
+  (select count(*)::int from app.contract_lifecycle_hooks where event = 'deletion_requested'),
+  'deletion_requested reaches Notifications');
 select is((select count(*)::int from app.notifications_jobs where recipient_member_id = pg_temp.mid(9) and job_state = 'pending'),
   0, 'the deletion request cancels every pending job of the member');
 select is((select string_agg(schedule_state || '|' || end_reason, ',') from app.notifications_schedules
@@ -429,7 +433,7 @@ select is((select string_agg((r ->> 'module') || '=' || (r ->> 'remaining'), ','
 select is((select string_agg((r ->> 'module') || '=' || (r ->> 'remaining'), ',' order by r ->> 'module')
              from jsonb_array_elements(
                app.identity_call_deletion_hooks(pg_temp.mid(9), pg_temp.u(9), gen_random_uuid(), 'check')) r),
-  'cells=0,duties=0,fixture=0,notifications=0', 'the deletion check answers zero for every owner');
+  'cells=0,content=0,duties=0,fixture=0,followups=0,notifications=0', 'the deletion check answers zero for every owner');
 select is((select count(*)::int from app.notifications_jobs where recipient_member_id = pg_temp.mid(9))
           + (select count(*)::int from app.notifications_inbox_items where recipient_member_id = pg_temp.mid(9))
           + (select count(*)::int from app.notifications_schedules where recipient_member_id = pg_temp.mid(9))

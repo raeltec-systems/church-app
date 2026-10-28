@@ -1,0 +1,9 @@
+{"step":"Y00-precondition","target":"LOCAL","at":"2026-10-21T11:02:26.061Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"Y01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-21T11:02:31.577Z","verdict":"pass","amr":["password"]}
+{"step":"Y02-a-published-programme","target":"LOCAL","at":"2026-10-21T11:02:32.882Z","verdict":"pass","grants":[200,200,200,200],"placed":[200,200,200],"published":"published"}
+{"step":"Y10-the-member-reads-which-part-is-theirs","target":"LOCAL","at":"2026-10-21T11:02:32.916Z","verdict":"pass","yours":1,"my_duty_found":true,"response":"pending"}
+{"step":"Y11-names-but-never-answers-to-other-members","target":"LOCAL","at":"2026-10-21T11:02:32.943Z","verdict":"pass","other_member_sees_answers":false}
+{"step":"Y20-member-accepts-another-declines-stale-refused","target":"LOCAL","at":"2026-10-21T11:02:33.046Z","verdict":"pass","accepted":"accepted","stale":"conflict","declined":"declined"}
+{"step":"Y30-leader-confirms-the-member-without-a-login","target":"LOCAL","at":"2026-10-21T11:02:33.253Z","verdict":"pass","refused":{"member":"not_found","admin":"not_found","pastor":"not_found","other_leader":"not_found"},"confirmed":"leader","replay_same":true,"second":"responded","plan_shows":"leader"}
+{"step":"Y31-confirmation-attributed-in-the-duties-audit","target":"LOCAL","at":"2026-10-21T11:02:33.701Z","verdict":"pass","audit_rows":1}
+{"step":"Y99-cleanup","target":"LOCAL","at":"2026-10-21T11:02:35.023Z","users_left":0,"unmarked":true,"programmes_left":0}

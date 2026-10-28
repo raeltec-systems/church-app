@@ -233,10 +233,19 @@ void main() {
         }),
         throwsFormatException,
       );
+      // Story 4.12: a Confirmed by leader assignment can end (its member
+      // left), so `leader` is a valid history provenance; anything else is not.
+      expect(
+        AssignmentHistoryEntry.fromJson({
+          ...historyEntry(),
+          'response_provenance': 'leader',
+        }).provenance,
+        'leader',
+      );
       expect(
         () => AssignmentHistoryEntry.fromJson({
           ...historyEntry(),
-          'response_provenance': 'leader',
+          'response_provenance': 'system',
         }),
         throwsFormatException,
       );
@@ -303,7 +312,9 @@ void main() {
 
     test('the released notice opens My duties', () {
       expect(ClientPaths.isKnownDeepLink('/duties'), isTrue);
-      expect(ClientPaths.isKnownDeepLink('/duties/leader'), isFalse);
+      // Story 4.8: the leaders' alerts open the board; the rota is no link.
+      expect(ClientPaths.isKnownDeepLink('/duties/leader'), isTrue);
+      expect(ClientPaths.isKnownDeepLink('/duties/rota'), isFalse);
     });
   });
 
@@ -330,9 +341,10 @@ void main() {
       expect(find.textContaining('will be asked to answer again'), findsOne);
       expect(
         enabled(tester, 'edit-save-$_occurrence'),
-        isFalse,
-        reason: 'a material change needs a new answer-by time',
+        isTrue,
+        reason: 'story 4.8: without a new answer-by time the default applies',
       );
+      expect(find.textContaining('the church default applies'), findsOne);
       await enter(tester, 'edit-deadline-date-$_occurrence', '2099-01-02');
       await enter(tester, 'edit-deadline-time-$_occurrence', '18:00');
       await tapKey(tester, 'edit-save-$_occurrence');
@@ -526,7 +538,12 @@ void main() {
         );
         expect(find.text('Accepted'), findsNothing);
         expect(byKey('duty-changed-$_assignment'), findsOneWidget);
-        expect(find.text('What changed: date or start time, place.'), findsOne);
+        expect(
+          find.text(
+            'Changed: date or start time, place. Please answer again.',
+          ),
+          findsOne,
+        );
         expect(find.text('Needs a response (1)'), findsOneWidget);
         expect(h.duties.mineCalls, 2);
       },
@@ -540,6 +557,10 @@ void main() {
             h.duties.mine = mineWith([myDutyData(assignmentId: _old)]),
       );
       await tapKey(tester, 'duty-decline-$_old');
+      // Story 4.5: Can't make it asks in a sheet first.
+      await settle(tester);
+      await tapKey(tester, 'decline-confirm');
+      await settle(tester);
       h.duties.mine = mineWith(const []);
       h.gateway.sent.single.refuse(
         ErrorCode.conflict,
@@ -620,7 +641,7 @@ void main() {
     ) async {
       await pumpAt(
         tester,
-        ClientPaths.myDuties,
+        DutyPaths.assignment(_assignment),
         setUp: (h) => h.duties.mine = mineWith([
           myDutyData(
             slotRevision: 2,

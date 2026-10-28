@@ -5,8 +5,17 @@ import '../domain/account_auth.dart';
 import '../domain/assisted_recovery.dart';
 import '../domain/cell_membership.dart';
 import '../domain/commands.dart';
+import '../domain/content_announcements.dart';
+import '../domain/content_bible.dart';
+import '../domain/content_banners.dart';
+import '../domain/content_events.dart';
+import '../domain/content_sermons.dart';
+import '../domain/public_content_cache.dart';
+import '../domain/content_giving.dart';
 import '../domain/credential_review.dart';
 import '../domain/duties.dart';
+import '../domain/followups.dart';
+import '../domain/hymn_lists.dart';
 import '../domain/fixture_counter.dart';
 import '../domain/inbox.dart';
 import '../domain/member_access.dart';
@@ -72,6 +81,105 @@ final cellsRepositoryProvider = Provider<CellsRepository>(
 /// Story 4.1: the member's duties, the leader board and the Admin overview.
 final dutiesRepositoryProvider = Provider<DutiesRepository>(
   (ref) => const UnconfiguredDutiesRepository(),
+);
+
+/// Story 4.9: the coverage queue (leaders, deputies; Admin and Pastor
+/// operational).
+final dutyCoverageRepositoryProvider = Provider<DutyCoverageRepository>(
+  (ref) => const UnconfiguredDutyCoverageRepository(),
+);
+
+/// Story 4.10: completion outcomes (department leaders and deputies) and a
+/// member's assignment history (the member and their department's leaders).
+final dutyOutcomesRepositoryProvider = Provider<DutyOutcomesRepository>(
+  (ref) => const UnconfiguredDutyOutcomesRepository(),
+);
+
+/// Special assignments (2026-10-21): the church's special assignments, for
+/// the current Pastors.
+final dutySpecialRepositoryProvider = Provider<DutySpecialRepository>(
+  (ref) => const UnconfiguredDutySpecialRepository(),
+);
+
+/// Story 6.1: the public event reads (everyone) and the editors' event read.
+final contentRepositoryProvider = Provider<ContentRepository>(
+  (ref) => const UnconfiguredContentRepository(),
+);
+
+/// Story 6.6: rights-cleared public Bible chapters and editor catalog.
+final bibleRepositoryProvider = Provider<BibleRepository>(
+  (ref) => const UnconfiguredBibleRepository(),
+);
+
+final sermonsRepositoryProvider = Provider<SermonsRepository>(
+  (ref) => const UnconfiguredSermonsRepository(),
+);
+final sermonLinkLauncherProvider = Provider<SermonLinkLauncher>(
+  (ref) => const UnavailableSermonLinkLauncher(),
+);
+
+/// The reviewed WEB source package used by the staff translation installer.
+final bibleTranslationPackageSourceProvider =
+    Provider<BibleTranslationPackageSource>(
+      (ref) => const NoBibleTranslationPackageSource(),
+    );
+
+/// Story 6.3: the public giving reads (everyone) and the Admins' read.
+final givingRepositoryProvider = Provider<GivingRepository>(
+  (ref) => const UnconfiguredGivingRepository(),
+);
+
+/// Optional Android handoff to the external phone dialler for a starting USSD
+/// code. Unsupported platforms keep the manual instructions visible.
+final givingDiallerLauncherProvider = Provider<GivingDiallerLauncher>(
+  (ref) => const UnavailableGivingDiallerLauncher(),
+);
+
+/// Story 6.13: the public announcement reads (everyone) and the editors'
+/// announcement read.
+final announcementsRepositoryProvider = Provider<AnnouncementsRepository>(
+  (ref) => const UnconfiguredAnnouncementsRepository(),
+);
+
+/// Story 6.8: the member's own favourite hymns, this Sunday's public list
+/// and the editors' Sunday lists.
+final hymnListsRepositoryProvider = Provider<HymnListsRepository>(
+  (ref) => const UnconfiguredHymnListsRepository(),
+);
+
+/// Story 6.2: Home banners (everyone), the editors' banner and rights reads,
+/// and image upload, sync and preview through the `content-assets` route.
+final bannerRepositoryProvider = Provider<BannerRepository>(
+  (ref) => const UnconfiguredBannerRepository(),
+);
+
+/// Mobile's allowlisted snapshots for the Calendar and Home list reads.
+/// Staff web and unconfigured builds keep the no-op implementation.
+final publicContentCacheProvider = Provider<PublicContentCache>(
+  (ref) => const NoPublicContentCache(),
+);
+
+/// Emits only when the device regains a network interface. A signal triggers
+/// a normal public read; it never stands in for a successful server answer.
+final publicContentReconnectsProvider = StreamProvider<void>(
+  (ref) => const Stream<void>.empty(),
+);
+
+/// Story 6.2: the staff web file chooser for content images.
+final contentFilePickerProvider = Provider<ContentFilePicker>(
+  (ref) => const UnsupportedContentFilePicker(),
+);
+
+/// Story 4.9: opens the phone or messaging app for a labelled contact route.
+/// Unavailable by default; the app composition roots supply the platform
+/// launcher (the app never sends a call or message itself).
+final contactLauncherProvider = Provider<ContactLauncher>(
+  (ref) => const UnavailableContactLauncher(),
+);
+
+/// Story 4.6: My follow-ups, one task, supervision and Admin routing.
+final followUpsRepositoryProvider = Provider<FollowUpsRepository>(
+  (ref) => const UnconfiguredFollowUpsRepository(),
 );
 
 /// Story 2.7: the isolated forgotten-password route (its own Auth client).

@@ -96,7 +96,7 @@ jobs:
         with:
           node-version: 22
       - name: Harness, function and shared-module tests (no network, no credentials; supabase/functions/*/ includes _shared)
-        run: node --test tools/auth-harness/*.test.mjs tools/identity-e2e/*.test.mjs supabase/functions/*/*.test.mjs tools/identity-deletion/*.test.mjs tools/notifications/*.test.mjs
+        run: node --test tools/auth-harness/*.test.mjs tools/identity-e2e/*.test.mjs supabase/functions/*/*.test.mjs tools/identity-deletion/*.test.mjs tools/notifications/*.test.mjs tools/hymn-book/*.test.mjs
       - name: Evidence holds no tokens, keys, passwords, OTPs or link tokens
         run: bash tools/auth-harness/scan-evidence.sh
       - name: Story 2.1 evidence and identity E2E tool hold no credentials
@@ -147,6 +147,26 @@ jobs:
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-durable-inbox-and-reminders/evidence-3.3
       - name: Duties evidence (every 4.x story) and the duties runbook hold no credentials
         run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.* docs/runbooks/duties.md
+      - name: Story 4.7 evidence (follow-up reminders), its E2E and the follow-ups runbook hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.7 tools/identity-e2e/followups-reminders.mjs docs/runbooks/follow-ups.md
+      - name: Story 4.8 evidence (duty deadlines and reminders), its E2E and the duties runbook hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.8 tools/identity-e2e/duties-reminders.mjs docs/runbooks/duties.md
+      - name: Story 4.9 evidence (coverage queue, contact attempts, leader confirmation), its E2E and the duties and follow-ups runbooks hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.9 tools/identity-e2e/duties-coverage.mjs docs/runbooks/duties.md docs/runbooks/follow-ups.md
+      - name: Story 4.10 evidence (completion outcomes, corrections, assignment history), its E2E and the duties runbook hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.10 tools/identity-e2e/duties-outcomes.mjs docs/runbooks/duties.md
+      - name: Story 4.11 evidence (Duties and Follow-ups owner operations), its E2E and the contracts, duties and follow-ups runbooks hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.11 tools/identity-e2e/duties-owner-ops.mjs docs/runbooks/contracts-and-owner-seams.md docs/runbooks/duties.md docs/runbooks/follow-ups.md
+      - name: Story 4.12 evidence (membership lifecycle and handover in Duties and Follow-ups), its E2E and the duties, follow-ups and identity runbooks hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.12 tools/identity-e2e/duties-lifecycle.mjs docs/runbooks/duties.md docs/runbooks/follow-ups.md docs/runbooks/identity-access.md
+      - name: Story 4.13 evidence (duties guides, the synthetic pilot rehearsal and the owner walkthrough), its E2E and the duties guides and runbooks hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.13 tools/identity-e2e/duties-pilot.mjs docs/runbooks/duties-guides.md docs/runbooks/duties.md docs/runbooks/follow-ups.md docs/runbooks/identity-access.md docs/runbooks/contracts-and-owner-seams.md
+      - name: Story 4.14 evidence (refactor sweep), the shared duties E2E helpers and the duties and follow-ups runbooks hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.14 tools/identity-e2e/duties-shared.mjs supabase/migrations/20261015143102_duties_comment_refresh.sql docs/runbooks/duties.md docs/runbooks/follow-ups.md
+      - name: Story 4.16 evidence (the owner's epic 4 decisions), its E2E, migration and the duties, identity and promotion runbooks hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.16 tools/identity-e2e/duties-decisions.mjs supabase/migrations/20261015190139_duties_owner_decisions.sql docs/runbooks/duties.md docs/runbooks/identity-access.md docs/runbooks/production-promotion-identity.md
+      - name: Story 4.15 evidence (closing suite, builds, owner demonstration), the closing suite and the production package hold no credentials
+        run: bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-duties-coverage-and-follow-ups/evidence-4.15 tools/identity-e2e/duties-staging-suite.mjs tools/identity-e2e/duties-staging-suite.test.mjs docs/runbooks/production-promotion-duties.md docs/runbooks/production-promotion-identity.md docs/runbooks/duties.md
 
   flutter:
     name: flutter (analyze, test, web build)
@@ -199,6 +219,11 @@ jobs:
         env:
           TZ: America/New_York
         run: flutter test test/duties
+      - name: client core — follow-ups in a non-Lusaka device zone (story 4.7 reminders and dates)
+        working-directory: packages/client_core
+        env:
+          TZ: America/New_York
+        run: flutter test test/followups
       - name: mobile — pub get (locked)
         working-directory: apps/mobile
         run: flutter pub get --enforce-lockfile

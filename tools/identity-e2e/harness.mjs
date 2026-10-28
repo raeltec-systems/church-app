@@ -55,7 +55,9 @@ export function redact(value) {
  * required and returned (a run that never uses the secret or service-role key).
  */
 export function localKey({ admin = true } = {}) {
-  const env = execFileSync('npx', ['supabase', 'status', '-o', 'env'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  // On Windows npx is a .cmd script, which Node starts only through a shell.
+  const env = execFileSync('npx', ['supabase', 'status', '-o', 'env'],
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], shell: process.platform === 'win32' });
   const url = /^API_URL="([^"]+)"/m.exec(env)?.[1];
   const key = /^PUBLISHABLE_KEY="([^"]+)"/m.exec(env)?.[1];
   if (!admin) {

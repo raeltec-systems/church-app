@@ -1,0 +1,4873 @@
+{
+  "format": 1,
+  "edition": "bicc-tonga-2012",
+  "title": "Inyimbo zya Bakristo",
+  "language": "toi",
+  "items": [
+    {
+      "id": "hymn-1",
+      "kind": "hymn",
+      "number": 1,
+      "section": "Kutalika Mubungano",
+      "title": "Leza Usimanga (Cila)",
+      "original": "REVIVE THY WORK, O LORD!",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Leza, Usimanga,\nTulakulumbisya,\nMbuwatupa ciindi ceci,\nOcakunjila mo.",
+        "Cikombelo ceci,\nCasalilwa uwe,\nNjilila kunjiyo, Mwami,\nUkale munjiyo.",
+        "Cazakilwa uwe,\nUciswezye, Mwami,\nObantu babungana mo,\nAbo baswezyiwe."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ulemekwe, Mwami,\nUibuke Koonse,\nUzibwe kubantu boonse,\nAbo benjila mo."
+        }
+      ]
+    },
+    {
+      "id": "hymn-2",
+      "kind": "hymn",
+      "number": 2,
+      "section": "Kutalika Mubungano",
+      "title": "Amukombe Mwami",
+      "original": "O WORSHIP THE KING",
+      "reference": null,
+      "key": "A",
+      "verses": [
+        "Amukombe Mwami wakujulu,\nAmwiimbe luyando lwa-Leza;\nNtobo yesu a-Mugwasyi a-Conde\nMupati, ukankamanisya, nguwe.",
+        "Amwiimbe nyoonse luse lwakwe,\nUtupa munzenge akumweka;\nUzuma mumakumbi amujulu,\nUleenda mumudima amuluwo.",
+        "Bana batete abateteete,\nTwasyoma mulindinywe, O-Mwami\nMutubambe aluse lwenu buyo,\nMulengi a-Mugwasyi a-Muvuni.",
+        "Luyando lwenu lutaambiki\nLwaboneka ‘muluwo, muzuba;\nLuleenda malundu a’mabanda;\nLwaboneka mumume amvula."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-3",
+      "kind": "hymn",
+      "number": 3,
+      "section": "Kutalika Mubungano",
+      "title": "Akulumbwe Akulumbwa",
+      "original": "MAUBONGWE",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Akulumbwe akulumbwa,\n‘Ansi ano akujulu,\nTaata, Jesu, Muuy’Uusweya\nSunu mane kuta"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-4",
+      "kind": "hymn",
+      "number": 4,
+      "section": "Kutalika Mubungano",
+      "title": "Taata, Twabungana Sunu",
+      "original": "STUTTGART",
+      "reference": "Z.H. 3",
+      "key": "G",
+      "verses": [
+        "Taata, twabungana sunu\nAmug’anda yako,\nTulayanda ukupegwa\nIcipego cako.",
+        "Alakambaukwa muno\nAmakani aako,\nSwebo atukateelele\nOonse majwi aako.",
+        "Alo ali kulya kwesu\nNkotukut’ ankulo,\nAli maanzi aakupona\nNgotuyoonywa ngao.",
+        "Kulalweela oku koonse\nUkwa-Mwami wesu,\nAtupegwe swebo toonse\nOko kwakujulu.",
+        "Mwami, tulalumba eno\nUkwaabila kwako,\nNkonkuko nkotukumbila\nAluzyalo lwako"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-5",
+      "kind": "hymn",
+      "number": 5,
+      "section": "Leza Taatesu: Milimo Yakwe Aluzyalo Lwakwe",
+      "title": "Leza Uusweyisya! Sinsana! Syoonse (Cila)",
+      "original": "HOLY, HOLY, HOLY",
+      "reference": null,
+      "key": "E flat",
+      "verses": [
+        "Leza Uusweyisya! Sinsana-syoonse,\nMuunza amasiku oonse twakutembaula\nLeza Uusweyisya! Icenana ndiwe,\nMutalabala, Keemb’ Uusweya swe.",
+        "Leza Uusweyisya! Basinkombe boonse,\nBafutusi, basolozi, bakuvundamina;\nMdiwe uutakanka, ndiwe uutamana,\nMwiinzo wabuumi butamani pe.",
+        "Leza Uusweyisya! Mwami uutabonwa,\nBubi mbubwatukasizya kwako kubu-lemu;\nIcenana ndiwe, kwina uukukozya\nUmulondosi, Moz’ uutuba bu.",
+        "Leza Uusweyisya! Sinsana-syoonse,\nAnsi ano, ezeulu, syoonse sitembaule;\nLeza Uusweyisya! Luse oinsana,\nUkulindiwe silizwile mwa."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-6",
+      "kind": "hymn",
+      "number": 6,
+      "section": "Leza Taatesu: Milimo Yakwe Aluzyalo Lwakwe",
+      "title": "Atwiimbile Leza (Cila)",
+      "original": "RAVENSHAW",
+      "reference": "Z.H. 118 or 143",
+      "key": "E flat",
+      "verses": [
+        "Atwiimbile Leza,\nInguwe Usyeesu;\nAtwiimbile Jesu,\nMufutuli wesu.",
+        "Moza Uusweyisya\nAimbilwe ndiswe;\nAtulange syoonse\nSintu nsyaatupa.",
+        "Myozo yesu yoonse\nAinjilwe nguwe;\nAti isalale, Sibi sikatandwe.",
+        "Ansi, ezeulu,\nKoonse, olyoonse;\nTulemeke Leza,\nMwani wasikwense."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-7",
+      "kind": "hymn",
+      "number": 7,
+      "section": "Leza Taatesu: Milimo Yakwe Aluzyalo Lwakwe",
+      "title": "Wakatuyanda Bobuya",
+      "original": "GLORY TO GOD THE FATHER",
+      "reference": "Z.H. 10",
+      "key": "F",
+      "verses": [
+        "Wakatuyanda bobuya,\nAluyando ulupati!\nKufutuke bantu bakwe,\nAmulemye Mwami Leza.",
+        "Kristo ulatuyandisya,\nUtwaambila aluyando\nAkwalo ukutufwida,\nAmulemye Mwami Leza.",
+        "Wakasama buntu bwesu,\nWaba Munununi wesu,\nAmana mapenzi eesu,\nAmulemye Mwami Leza.",
+        "Acisamu wabafwida\nBantu bakali kufwide,\nMucuumbwe wakazundila,\nAmulemye Mwami Leza.",
+        "Ulisumpwidwe kujulu,\nWatumpukwa cincini,\nAbasunu abaciindi,\nAmulemye Mwami Leza."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Amumulemye Wisi,\nAmumulemye Wisi,\nAmulemye, amulemye,\nAmulemye Mwami Leza."
+        }
+      ]
+    },
+    {
+      "id": "hymn-8",
+      "kind": "hymn",
+      "number": 8,
+      "section": "Leza Taatesu: Milimo Yakwe Aluzyalo Lwakwe",
+      "title": "Atwiimbe Cakusakwa (Cila)",
+      "original": "UNIVERSITY COLLEGE",
+      "reference": "M.H. 488",
+      "key": null,
+      "verses": [
+        "Atwiimbe cakusakwa,\nOmyozo isalala;\nLuse lwakwe talumani,\nWasyomeka, Usimanga.",
+        "Atwiibusye luse lwakwe,\nLuye mpuwo koonse koonse;\nLuse lwakwe talumani,\nWasyomeka, Usimanga.",
+        "Syoonse situsekelezya\nSizwa Kwakwe, Leza wesu;\nLuse lwakwe talumani,\nWasyomeka, Usimanga.",
+        "Wakatupa buumi bwesu,\nUtulela cakufuna;\nLuse lwakwe talumani\nWasyomeka, Usimanga.",
+        "Nkaako atutembaule\nLeza wesu, Usinsana;\nLuse lwakwe talumani,\nWasyomeka, Usimanga."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-9",
+      "kind": "hymn",
+      "number": 9,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe",
+      "title": "Kamuboola Ku-Betelehemu",
+      "original": "O COME, ALL YE FAITHFUL",
+      "reference": null,
+      "key": "A",
+      "verses": [
+        "Kamuboola bantu bayandika bakwe,\nKamuza inywe ku-Betelehemu;\nAmumulangile Mwami wabaangelo,\nMubolle tumukombe, Kristo Mwami.",
+        "Mwiimbe baangelo alusyomo lwini,\nMwiimbe nyoonse nomukala kujulu;\nMwiimbe kuli-Leza uuli kujulu,\nMuboole tumukombe, Kristo Mwami.",
+        "Mwami, tukukombe nowazyalwa sunu,\nJesu Mwami, atukutembaule;\nNcisyomezyo ca-Leza kulindiswe,\nMuboole tumukombe, Kristo Mwami."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-10",
+      "kind": "hymn",
+      "number": 10,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe",
+      "title": "Masiku Aasweya",
+      "original": "SILENT NIGHT",
+      "reference": null,
+      "key": "C",
+      "verses": [
+        "Masiku, aasweya,\nKuumuna, kumweka,\nNkufwaafwi banyina mwana,\nBakalikusweya loko,\nOona mukuumuna,\nOona mukuumuna.",
+        "Masiku, aasweya,\nBeembezi babona,\nBulemu buzwa kujulu,\nAbaangelo baimba,\nJesu wazyalwa,\nJesu wazyalwa.",
+        "Masiku, aasweya,\nMuvuni umweka,\nBusyu bwako bwatuba bu,\nKukuzyalwa kwalufutuko\nMwami Jesu wesu,\nMwami Jesu wesu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-11",
+      "kind": "hymn",
+      "number": 11,
+      "section": "Jesu Kristo Mwana aa-Leza: Lufu Lwakwe",
+      "title": "Kuli Cilundu Akule",
+      "original": "WINCHESTER OLD",
+      "reference": "M.H. 129",
+      "key": null,
+      "verses": [
+        "Kuli cilundu akule,\nKumbali Kumuunzi,\nNkwakafwida Jesu ciindi,\nKajayilwa bantu.",
+        "Tatulwizi luu olu,\nMbuli mbwakafwide,\nPele tulizi kabotu,\nWakatujayilwa.",
+        "Wakafwa kuti tupone,\nTuvunwe milandu,\nNetusanduka tubone,\nJehova mupati.",
+        "Takukwe umbi uponya,\nBantu ibabija,\nTakwe umbi utubonya,\nInzila impya.",
+        "Watuyanda cinicini,\nAswe tumuyande,\nTubambe imbeta zyakwe,\nAti tuyoopona."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-12",
+      "kind": "hymn",
+      "number": 12,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe",
+      "title": "Pupulala Basinkombe (Cila)",
+      "original": "HARK! THE HERALD ANGELS SING",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Pupulala basinkombe,\nBaimb’ amuzyale mwama\nAnsi ano luse, bwanga, Leza wakwatila bantu.\nMasi oonse naatangale, Bezeulu batembaule\nToonse tukanane Jesu, Mwana owa-Betelehemu.",
+        "Kristo Mwami wezeulu\nKristo Mwami wasikwense\nMuteelele mbwakasika,\nMbwaakazyalwa buli uswe.\nLeza watubulikila, Wasamikwa bo buzani\nWakalamwa kuba aswe, Syezeulu tuli aze.",
+        "Sekelela Sicibanda,\nBululami bumunika\nToonse twaletelwa buumi,\nKuliboonse ngu-Muponyi.\nBwami wabusamununa, Kuti akatande lufu,\nBasumpulwe bana insi, Okuzyalwa olwabili.",
+        "Muzandisi owamasi\nKalilila muliuswe\nTanda bubi kulindiswe,\nTukabe mbuubele uwe.\nSibi siziminganyiwe Syoonse nsituteelele\nTube basiswezya-mozo, Obakala mulufuno."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Pupulala basinkombe\nBaimb’ amuzyale mwana."
+        }
+      ]
+    },
+    {
+      "id": "hymn-13",
+      "kind": "hymn",
+      "number": 13,
+      "section": "Jesu Kristo Mwana aa-Leza: Buumi Bwakwe",
+      "title": "Amba Makani aa-Jesu",
+      "original": "TELL ME THE STORY OF JESUS",
+      "reference": null,
+      "key": "E flat",
+      "verses": [
+        "Amba makani aa-Jesu\nLemba majwi mumoyo;\nAmba makani mabotu\nManono tanamvwidwe.\nAmba baangelo munyimbo\nKuti Jesu wazyalwa,\nBotelwa Leza mupati\nLuumuno lubotu.",
+        "Wakakala mulukula,\nAmba mazub’ ensiku;\nMbwakasunkwa zibi zyesu,\nMukugola wazunda.\nAmba milimo ya-Jesu,\nAmba kupenga kwakwe;\nWasampulwa mukupenga,\nTakwe kupona kabotu.",
+        "Amba ciingano cakwe,\nAmba kuciswa kwakwe;\nAmba nkwaakazikwa Jesu,\nAmba wabuka ‘limwi;\nLuyando olu lupati,\nNdalubonesya lyoonse;\nNdayanda kumwaambila,\n“Luyando lwakandilungila!”"
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Amba makani aa-Jesu\nLemba mumoya wangu;\nAmba makani mabotu\nManono tanamvwidwe."
+        }
+      ]
+    },
+    {
+      "id": "hymn-14",
+      "kind": "hymn",
+      "number": 14,
+      "section": "Jesu Kristo Mwana aa-Leza: Buumi Bwakwe",
+      "title": "Muvuni Wangu",
+      "original": "MY REDEEMER",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Ndilaimba a-Muvuni,\nAluyando uluyoosya,\nWakafwid’ aciingano,\nKuti boonse bafutulwe.",
+        "Ndilaimba a-Muvuni,\nAluzyalo lwakwe loonse,\nEno ndili wakwe Jesu,\nOyo ‘wakandinununa.",
+        "Ndilaimba a-Muvuno,\nAzyo Nguzu zyakwe ‘mpati,\nWakazund’ alufu lwakwe,\nWabusigwa akubafu.",
+        "Ndilaimba a-Muvuni,\nAlo lufutuko lwakwe,\nNdakapegwa moyo mupya\nWakucisya ziluleme."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Imba, imba a-Muvuni,\nWandivuna abulowa,\nWandifwid’ aciingano,\nJesu wandyaangulula."
+        }
+      ]
+    },
+    {
+      "id": "hymn-15",
+      "kind": "hymn",
+      "number": 15,
+      "section": "Jesu Kristo Mwana aa-Leza: Buumi Bwakwe",
+      "title": "Mwaangululi Wakasika",
+      "original": "ANOTHER CLOSING DAY",
+      "reference": "Z.H. 41",
+      "key": "B flat",
+      "verses": [
+        "Mwaangululi wesu\nWakasika ano,\nImyoyo yesu\nYabotelwa, yati:",
+        "Toonse Twabotelwa\nAkubusyu bwakwe,\nAtubweede kwakwe,\nAkwiita kwakwe.",
+        "Twakapulwa nguwe\nMwaangululi wesu,\nTwabotelwa nguwe\nAmyoyo yesu.",
+        "‘Limwe utwaambila\nAluzyalo lwakwe,\nUlatwiitila\nAkujulu lyakwe."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Mwaangululi wakasika,\nMwaangululi wakasika,\nMwaangululi twam’teele…la,\nTwam’teelela."
+        }
+      ]
+    },
+    {
+      "id": "hymn-16",
+      "kind": "hymn",
+      "number": 16,
+      "section": "Jesu Kristo Mwana aa-Leza: Buumi Bwakwe",
+      "title": "Nguuli Mukwesu Ombuli Jesu?",
+      "original": "NO, NOT ONE",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Nguuli mukwesu ombuli Jesu?\nTawo pe, tawo pe,\nUti silike malwazi eesu?\nTawo pe, tawo pe.",
+        "Tawo aumbi uutufutula,\nTawo pe, tawo pe,\nUmbi uujisi inguzu zyoonse,\nTawo pe, tawo pe.",
+        "Mpali Mukristo ngwaakasiya?\nTawo pe, tawo pe,\nSena wabona ngwaakakaka?\nTawo pe, tawo pe.",
+        "Kwina mukwesu uuinda Jesu,\nTawo pe, tawo pe,\nOyo uutusindikila lyoonse,\nTawo pe, tawo pe."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Jesu uzi kupenga kwesu,\nUlatweenzya tukasike,\nNguuli mukwesu ombuli Jesu,\nTawo pe, tawo pe."
+        }
+      ]
+    },
+    {
+      "id": "hymn-17",
+      "kind": "hymn",
+      "number": 17,
+      "section": "Jesu Kristo Mwana aa-Leza: Buumi Bwakwe",
+      "title": "Nguni Uwakaseluka?",
+      "original": "JESUS CHRIST, OUR SAVIOUR",
+      "reference": "Z.H. 92",
+      "key": "G",
+      "verses": [
+        "Nguni uwakaseluka?\nJesu, Mufutuli;\n‘Wakeza Mufutuli;\nJesu, Mufutuli.",
+        "Nguni uwakabambulwa?\nJesu, Mufutuli;\nNgun’ ino utulungila?\nJesu, Mufutuli.",
+        "Nguni oy’ utujatila?\nJesu, Mufutuli;\nNguni uteeti, “Kosyoma?”\nJesu, Mufutuli.",
+        "Nguni Mukamwini bwami?\nJesu, Mufutuli;\nNguni utukombelela?\nJesu, Mufutuli.",
+        "Kuno sena uciboola?\nIi, mbwaakaamba;\nSena tulaba awalo?\nIi, mbwaakaamba."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Atulumbe toonse,\nTumulemye Jesu,\nKwina umbi mbuli nguwe,\nJesu, Mufutuli."
+        }
+      ]
+    },
+    {
+      "id": "hymn-18",
+      "kind": "hymn",
+      "number": 18,
+      "section": "Jesu Kristo Mwana aa-Leza: Buumi Bwakwe",
+      "title": "Wakacitanzi Jesu Na?",
+      "original": "CANAAN",
+      "reference": "Z.H. 246",
+      "key": "G",
+      "verses": [
+        "Wakacitanzi Jesu na?\nWakaboola ansi ano,\nWasiya muunzi okuya\nKuti ndikajane buumi.",
+        "Wandicitilanzi ino?\nWandigwisya kukubisya,\nWajananzi’no? Kwina, pe!\nWakwelelwa ‘kubambulwa.",
+        "Ukala kuli asunu?\nWakabweeda kuli-Wisi,\nUyooboola alimwi na?\nIi, abulemu bwakwe.",
+        "Nditectinzi anguwe na?\nNdati, ulandilongezya!\nNdiyoomubona okuya,\nNjoomulemya ciindi coonse.",
+        "Mulamuziba buyani ?\nAmweempe, ‘mucililie !\nTakonzya kumukasya pe,\nAmufwambe ‘mutambule."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ngooyu Jesu, ngooyu Jesu,\nNgo-Mwami uuyandika,\nUndipa lukono oko;\nKubusena ubusweya."
+        }
+      ]
+    },
+    {
+      "id": "hymn-19",
+      "kind": "hymn",
+      "number": 19,
+      "section": "Jesu Kristo Mwana aa-Leza: Buumi Bwakwe",
+      "title": "Wakasika Musilisi",
+      "original": "PRECIOUS NAME",
+      "reference": null,
+      "key": "A",
+      "verses": [
+        "Wakasika Musilisi\nUusilika myoyo yesu,\nWakaselukila kunsi,\nNguwe Mwan’ aa-Leza wesu.",
+        "Wakaenda koonse koonse,\nAkumyunzi minjiminji,\nWakaponya bantu boonse,\nAmalwazi waabusya.",
+        "Swebo tatuna kubona\nJesu oyo uusilika,\nKwalo nkwali kuya sunu,\nNkotuyeeya kuswaangana.",
+        "Katuya ku-Musilisi,\nUlatutanbula toonse,\nAtukombe, tusinizye,\nJesu ulatwiingula."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Mufutuli wakasika,\nMufutuli wabo boonse,\nMufutuli wakasika,\nMufutuli wabo boonse."
+        }
+      ]
+    },
+    {
+      "id": "hymn-20",
+      "kind": "hymn",
+      "number": 20,
+      "section": "Jesu Kristo Mwana aa-Leza: Buumi Bwakwe",
+      "title": "Jesu, Mwami Jesu",
+      "original": "JESUS, BLESSED JESUS",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Omwe watusozya, bakwesu,\nJesu, Mwami Jesu;\nUwatufutula, bakwesu,\nJesu, Mwami Jesu;\nWakeendeenda ansi ano,\nWakaambila aswebo;\nUlaziba kubaazya boonse,\nJesu, Mwami Jesu.",
+        "Ulatuteelela, bakwesu,\nJesu, Mwami Jesu;\nWaponya baciswa, bakwesu,\nJesu, Mwami Jesu;\nAbabfunwa, natwaandana,\nImisozi natulalila;\nUlasozya myoyo yesu,\nJesu, Mwami Jesu.",
+        "Ulatujatisya, bakwesu,\nJesu, Mwami Jesu;\nUlatuumuzya, bakwesu,\nJesu, Mwami Jesu;\nLuse lwakwe tulalubula,\nTulayanda luyando lwakwe;\nAtukombe ku-Mwami toonse,\nJesu, Mwami Jesu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-21",
+      "kind": "hymn",
+      "number": 21,
+      "section": "Jesu Kristo Mwana aa-Leza: Lufu Lwakwe",
+      "title": "Teelelesya Cinicini (Cila)",
+      "original": "ALBERTYN",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Teelelesya cinicini\nMbwaakeziza Jesu;\nNkalekale katufwini,\nUli Simuzeesu.",
+        "Wakazyalwa ansi ano,\nLeza wazumina;\nSwebo twakayanda maanu,\nNcotwamuzumina.",
+        "Waseluka kusilika\nBabo bafwa myozo;\nKwakwe tulitambikile\nObulwazi bwesu.",
+        "Waseluka kufutula\nBoonse obapenga;\nKweza kwakwe umusyome,\nUlaya mubuumi."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-22",
+      "kind": "hymn",
+      "number": 22,
+      "section": "Jesu Kristo Mwana aa-Leza: Lufu Lwakwe",
+      "title": "Jesu Undibambisye",
+      "original": "NEAR THE CROSS",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Jesu undibambisye,\nMunsi aciingano,\nAwo wakamwayika,\nMwiinzo wa-Kalvari.",
+        "Ndime aciingano,\nNdibone zilonda;\nAmaanza amaulu,\nMpowakayasigwa.",
+        "Ndime aciingano,\nMukulumba kwangu,\nKuli Jesu akaambo,\nWakandifutula.",
+        "Ndilange kuciingano,\nAkusyoma lyoonse,\nMane ‘nsike kunyika,\nKwital’ amulonga."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Muvuni, Muvuni,\nNdijatilile,\nKnaambo wakandiyanda,\nNendali mubisyi,"
+        }
+      ]
+    },
+    {
+      "id": "hymn-23",
+      "kind": "hymn",
+      "number": 23,
+      "section": "Jesu Kristo Mwana aa-Leza: Lufu Lwakwe",
+      "title": "Acilundu Kule",
+      "original": "THE OLD RUGGED CROSS",
+      "reference": null,
+      "key": "B flat",
+      "verses": [
+        "Acilundu kule, kwali ciingano,\nNcikozyano cabupenzi;\nNkwakatila bulowa bwakwe.",
+        "Aciingano, canyansigwa nyika,\nMwami Jesu Mwana wa-Leza;\nBulemu bwakwe wakabusiya\nKuunka ku-Kalvari.",
+        "Aciingano ciyandwa abanji,\nNdabona kasimpe kakwe;\nKuciingano Jesu wakapenga\nKuti andipe lufutuko.",
+        "Kuciingano ndiyoosyomeka,\nNdiyootambula kuusa;\nUyakundiita kumuunzi mubotu,\nNkaabilwe bulemu bwakwe."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Njakulemeka ciingano,\nLimwi nkamupe bulumbu;\nNjakujata ciingano cakwe,\nNjakuusinta umusini."
+        }
+      ]
+    },
+    {
+      "id": "hymn-24",
+      "kind": "hymn",
+      "number": 24,
+      "section": "Jesu Kristo Mwana aa-Leza: Lufu Lwakwe",
+      "title": "Mumwiinzo Wamalowa (Cila)",
+      "original": "THERE IS A FOUNTAIN",
+      "reference": null,
+      "key": "C",
+      "verses": [
+        "Mumwiinzo wamalowa\nUvwila ku-Kalvari,\nBasibi obasamba\nBoonse basalaziwa;\nMufumpi owa kale\nWatangilila ko,\nMbu ndakozyana aze,\nNkandasanzyiwa mo.",
+        "Musamu wamyozo,\nNo nguni usabwila ?\nNo ome? Pe! Nduuzanda,\nMbwimbaazya kusofwala;\nBabo bakwizeulu,\nBalangilila mo,\nBazowa, batembaula Lufuno luli ko."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-25",
+      "kind": "hymn",
+      "number": 25,
+      "section": "Jesu Kristo Mwana aa-Leza: Kubuka Kwakwe",
+      "title": "Mwami Wes’ Ulibukile (Cila)",
+      "original": "CHRIST THE LORD IS RISEN",
+      "reference": null,
+      "key": "C",
+      "verses": [
+        "Mwami wes’ ulibukile, Aleluya!",
+        "Ndulona ulwiimbo lwesu, Aleluya!\nAtumulumbisye Jesu, Aleluya!\nOyo ‘wakazunda lufu. Aleluya!",
+        "Umulimo walondoka, Aleluya!\nUsunu ndulufutuko, Aleluya!\nBezeulu balalumba, Aleluya!\nAswe abaansyi ano. Aleluya!",
+        "Lufu talukwe kutizya, Aleluya!\nJesu uliluzundile, Aleluya!\nAswe toonse tumusyome, Aleluya!\nAswe tuvunwe kundulo. Aleluya!",
+        "Ijulu lili bukwazi, Aleluya!\nMumo mwaakenjila Jesu, Aleluya!\nBantu boonse balatambwa, Aleluya!\nAbalo benjile mumo. Aleluya!"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-26",
+      "kind": "hymn",
+      "number": 26,
+      "section": "Jesu Kristo Mwana aa-Leza: Kubuka Kwakwe",
+      "title": "Ucipona Jesu",
+      "original": "JESUS IS STILL LIVING",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Ulapona Jesu eno\nTaluciyooweki lufu,\nUlapona Jesu eno\nTocijisi nguzu ocuumbwe.",
+        "Ulapona Jesu eno\nWazwa kulinduwe ocuumbwe,\nKwalo kufwa ngomulyango\nWakunjila mubuumi.",
+        "Ulapona Jesu eno\nWafwida milandu yesu,\nTumuponene lyoonse,\nTumulemye uululeme.",
+        "Ulapona Jesu eno,\nTatucaandanu anguwe,\nTulapona naba twafwa,\n‘Twalulamikwa aa-Jesu.",
+        "Ulapona Jesu eno,\nAlele koonse koonse,\nTuye kulinguwe, tulyookezye,\nAkulela anguwe mubwami."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Aleluya, Aleluya, Aleluya, Amen."
+        }
+      ]
+    },
+    {
+      "id": "hymn-27",
+      "kind": "hymn",
+      "number": 27,
+      "section": "Jesu Kristo Mwana aa-Leza: Kubuka Kwakwe",
+      "title": "Ulilede Jesu",
+      "original": "CHRIST AROSE",
+      "reference": null,
+      "key": "C",
+      "verses": [
+        "Ulilede Jesu uli mucuumbwe,\nUli mumudima Mufutuli.",
+        "Bamulindilila Jesu Mwami wesu,\nBajatisya cuumbwe pele tamo.",
+        "Bakafwa insoni bayiwa bakwe,\nEno balakondwa boonse boonse."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Wakabuka kukufwa,\nTulumbe bulemu bwa-Leza;\nWakazunda lufu azintu zyoonse,\nJesu upona mumazuba oonse;\nWabuka kulufu,\nWakabuka wapona."
+        }
+      ]
+    },
+    {
+      "id": "hymn-28",
+      "kind": "hymn",
+      "number": 28,
+      "section": "Jesu Kristo Mwana aa-Leza: Kubuka Kwakwe",
+      "title": "Aleluya",
+      "original": "HALLELUJAH WHAT A SAVIOUR",
+      "reference": null,
+      "key": "C",
+      "verses": [
+        "Wategwa Sikuusa,\nMwana wa-Mwami Leza;\nWanununa babisyi;\nAleluya! Mufutuli!",
+        "Nguwe watuyumwida\nNsoni azibi zyesu;\nWalekelela ndiswe;\nAleluya! Mufutuli!",
+        "Wakafwa a-Ciingano\n“Kwamana,” wakakwiila;\nLino uli kujulu;\nAleluya! Mufutuli!"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-29",
+      "kind": "hymn",
+      "number": 29,
+      "section": "Jesu Kristo Mwana aa-Leza: Bulemu Bwakwe",
+      "title": "Noonse Mutangale, Wakasika Muvuni (Cila)",
+      "original": "REVIVE US AGAIN",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Noonse mutangale, wakasika Muvuni,",
+        "Ngu-Jesu uvuna boonse bamusyoma.",
+        "Noonse mutangale, wakasika Mumuni,\nWamana musinze, mwakala mwituba.",
+        "Noonse mutangale, inzyo mulipaswilwe,\nNkukaako nkwezila owakamufwila.",
+        "Noonse mutangale, wakatolwa kulufu,\nAnu Kaluzunda, wabonwa olimwi.",
+        "Noonse mutangale, wakabweela kwa-Usi,\nwamweenzelela mucuuno cabwami.",
+        "Noonse mutangale, ulazyoka olimwi,\nUleza obwami, bulemu, obwanga."
+      ],
+      "choruses": [
+        {
+          "from_verse": 2,
+          "text": "Aleluya, nalemekwe,\nInguwe Muyaye\nAleluya, naimbilwe,\nUsunu ngu-Muumi."
+        }
+      ]
+    },
+    {
+      "id": "hymn-30",
+      "kind": "hymn",
+      "number": 30,
+      "section": "Jesu Kristo Mwana aa-Leza: Bulemu Bwakwe",
+      "title": "Nkwali Uubaazyisya Banji (Cila)",
+      "original": "UMHLOBO OMUHLE",
+      "reference": "Z.H. 75",
+      "key": "D",
+      "verses": [
+        "Nkwali uubaazisya banji,",
+        "Ulinfwini;\nNguwabaazy’ abo balongo,\nUlinfwini;\nBalatwiimbizya kanji,\nKono limwi, koko linji,\nAnu walo tatucengi,\nUlinfwini.",
+        "Kuyanan’ aze mbubuumi,\nUlinfwini;\nLanga mbwaakatulongezya,\nUlinfwini;\nWiina ukatusampaula,\nWakeza kutulangaula,\nUkwa-Leza wazyolaula,\nUlinfwini.",
+        "Sa muzanda kumwiziba?\nUlinfwini;\nNguwe Jesu, Mwan’ aa-Leza,\nUlinfwini;\nOsyakale musilube,\nMusileke sicitilwe,\nZeni noonse mucilile,\nUlinfwini."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-31",
+      "kind": "hymn",
+      "number": 31,
+      "section": "Jesu Kristo Mwana aa-Leza: Bulemu Bwakwe",
+      "title": "Jesu Muvuni Utufutula (Cila)",
+      "original": "THEODORA",
+      "reference": "M.H. 90",
+      "key": null,
+      "verses": [
+        "Jesu Muvuni utufutula,\nMwanakwe Leza utupasula;\nLufuno lwako lwatukwatila,\nInsana syako satuzulila.",
+        "Twakuwizuka ulatulela,\nTwatupauka ulakobela;\nBabo balila ulabasozya,\nAbo bapenga wabatontozya.",
+        "Wakatukuka obamininwe,\nWaangulula obaangilwe;\nNdiwena Jesu Sinsana-syoonse,\nNdiwe Mukwesu mazuba oonse.",
+        "Bulemu boonse bulaba bwako,\nMikumo yoonse ilaba yako;\nAtulibonzye ku-Mwami wesu,\nAtube bakwe, Usimuzeesu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-32",
+      "kind": "hymn",
+      "number": 32,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuboola Kwakwe",
+      "title": "Nobaya Kwiitwa Boonse",
+      "original": "WHEN THE TOLL IS CALLED UP YONDER",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Niiyoolila mpeta kuya kumakumbi aakujulu,\nNacasika ciindi cakumana kwensi,\nNabasyomi boonse babungana kuli-Jesu Mwami,\nNobaya kwiitwa boonse, njooba ko.",
+        "Kuliceeco ciindi nababuka boonse baka-fwide\n‘AbaKristo bayoob’ akupona kupya,\nBasalidwe nobaya kuswaanganyigwa kuli-Jesu,\nNobaya kwiitwa boonse, njooba ko.",
+        "Ciindi coonse tukamumanine imilimo Mwami,\nAtwaambilane aluyando lwakwe,\nMbube kwaakumana ukukala kwesu kwa ‘nsi ano,\nNobaya kwiitwa bonse, njooba ko."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Nobaya . . . kwiitwa boonse,\nNobaya . . . kwiitwa boonse,\nNobaya . . . kwiitwa boonse,\nNobaya kwiitwa boonse, njooba ko."
+        }
+      ]
+    },
+    {
+      "id": "hymn-33",
+      "kind": "hymn",
+      "number": 33,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuboola Kwakwe",
+      "title": "Kufutulwa aa-Bwanga",
+      "original": "SAVED BY GRACE",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Ciindi cimwi ‘nyika iyoomana,\nMbube nsiciyooyimbi limbi;\nNdiyoobotelwa mubusena\nBwa-Leza Mwami wesu!",
+        "Ciindi cimwig’anda iyoowa,\nNsikonzya kwaamba mbwiiyooba,\nPele eci ncenzyi cilike\nUjisi busena bwangu!",
+        "Ciindi cimwi ‘zuba lyabbila,\nKunze amakumb’ asalala;\nMwami wangu uyoobotelwa,\nKunditambula kujulu.",
+        "Ciindi cimwi ndiyoolangila,\n‘Lambe lyangu lyamwekesya,\nMwami akujula mulyango,\nMuuya wangu uyoolyookezya."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ndiyoobona busyu bwakwe,\nKuyoowamba kufutulwa;\nNdiyoobona busyu bwakwe,\nKuyoowamba kufutulwa."
+        }
+      ]
+    },
+    {
+      "id": "hymn-34",
+      "kind": "hymn",
+      "number": 34,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuboola Kwakwe",
+      "title": "Tuyoobona Mwami",
+      "original": "WE SHALL SEE THE KING",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Na inzila yesu\nIlatuba bu,\nTuyoobona Mwami;\nNa makumbi eesu\nAlakupetuka,\nTuyoobona Mwami.",
+        "Kwaakumana koonse\nUkuciswa kwesu,\nTuyoobona Mwami;\nKwaakumana koonse\nAkupenga kwesu,\nTuyoobona Mwami.",
+        "Sinkondonokwesu\nUlazundwa boonse,\nTuyoobona Mwami;\nTutalangi ansi,\nJesu ulabona,\nTuyoobona Mwami.",
+        "Oko kubafunwa\nAbainka kale,\nToyoobona Mwami;\nKutangala kwakwe\nKulatubotezya,\nTuyoobona Mwami."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Tuyoobona Mwami,\nTuyoobona Mwami;\nTuswaangane toonse\nMujulu omuya,\nTuyoobona Mwami."
+        }
+      ]
+    },
+    {
+      "id": "hymn-35",
+      "kind": "hymn",
+      "number": 35,
+      "section": "Muuya Uusweyisya",
+      "title": "Mubotezyi Wakasika",
+      "original": "THE COMFORTER HAS COME",
+      "reference": null,
+      "key": "C",
+      "verses": [
+        "Mubuke nombungano muonenanzi na ?\nTamumumvwide no Muuya Mubotu,\nUli munyika eyi, twamutola sena,\nNgooyu Mubotezyi.",
+        "No kwakanka kuca kwatalika nkuko,\nOko ku-Pentekosti, kwamweeka kwa-ti mwe,\nBati mu-Jerusalemu balumba bat’ “ehe”\nNgooyu Mubotezyi.",
+        "Ii, mpali walo, awa mpali lino,\nTuzunde basinkondo boonse tukombe,\nAtuzuzigwe swe, tubambwe kabotu,\nNgooyu Mubotezyi.",
+        "Asunu ulimvwi ulanguzu zyoonse,\nUlatusalazya tuya kutuba bu,\nFwambaana mweenzuma mutole kufwamba,\nNgooyu Mubotezyi."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ncoben’ ulimunyika; uzwida kujulu,\nUyakusanzya koonse okuli mumyoyo,\nTuya kutuba bu, twasamba sena na ?\nNgooyu Mubotezyi."
+        }
+      ]
+    },
+    {
+      "id": "hymn-36",
+      "kind": "hymn",
+      "number": 36,
+      "section": "Muuya Uusweyisya",
+      "title": "Kounga, Muuya Uwabuumi (Cila)",
+      "original": "MARTYRDOM",
+      "reference": "M.H. 201",
+      "key": null,
+      "verses": [
+        "Kounga, Muuya uwabuumi,\nUbusye abafwide,\nUbaumne umukunga,\nBakazileke zibi.",
+        "Ubatondezye mbobabede,\nBabone imiiandu,\nUkuti bazibisya mbeta,\nZya-Leza Usinguzu.",
+        "Ubaambile aluzyalo\nBakalutambulisye,\nBateelelesye Ivangele,\nUkuti bakapone.",
+        "Amo mumyoyo yesu yoonse,\nKounga ciindi coonse,\nTujane buumi bupya, Mwami,\nUbuumi butamani."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-37",
+      "kind": "hymn",
+      "number": 37,
+      "section": "Muuya Uusweyisya",
+      "title": "Kondizuzya Eno",
+      "original": "HOVER O’ER ME, HOLY SPIRIT",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Ndivumbe, Muuya Mubotu;\nKosanzya buumi bwangu;\nKoboola eno ndapenga;\nKondizuzya aa-Muuya.",
+        "Nzuzya aa-Muuya\nMubotu Nakuba ndi mulwazi;\nPele ndakuyanda loko\nKoboola undizuzye.",
+        "Ndi mubombe bombe mubi,\nNdooma ansi kukomba;\nMuuya utamani boola,\nUndizuzye luyando.",
+        "Nsanzya ntube, ndifutula,\nNkomanisya, ndeleka;\nNduwe undikomanisya,\nAkuzuzya mumoyo."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Koboola, koboola,\nUndinjile mumoyo;\nKondizuzya nsetekane\nUzuzye moyo wangu."
+        }
+      ]
+    },
+    {
+      "id": "hymn-38",
+      "kind": "hymn",
+      "number": 38,
+      "section": "Muuya Uusweyisya",
+      "title": "Mfulila Moza Leza (Cila)",
+      "original": "TRENTHAM",
+      "reference": "M.H. A.T. 3",
+      "key": null,
+      "verses": [
+        "Mfulila Moza Leza,\nOlimwi nzuzya buumi,\nNkafune syoonse nsyuufuna,\nSyoonse nsyuucita, ncite.",
+        "Mfulila Moza Leza,\nNkasweye swe umozo,\nLuzanda lwako lube lwangu\nKuncita na maciswe.",
+        "Mfulila Moza Leza,\nMbe wako walolona,\nMubili wangu ubekeme,\nMbundakanjilwa ndiwe.",
+        "Mfulila Mza Leza,\nNintakafwililili\nNkapone aze bulondosi,\nBuumi obutakeeli."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-39",
+      "kind": "hymn",
+      "number": 39,
+      "section": "Kujulu",
+      "title": "Tulakuswaana ‘Mulonga",
+      "original": "SHALL WE GATHER AT THE RIVER?",
+      "reference": null,
+      "key": "E flat",
+      "verses": [
+        "Tulakuswaana ‘mulonga\nNkobaenda baangeo;\nMeenda alaenda lyoonse,\nKucuuno cakwe Mwami.",
+        "Ankomwe yawo mulonga,\nMeenda alamwekesya;\nTulakwenda mukulumba,\nBuzuba butamani.",
+        "Notutaninga sik’ oko,\nTulatula mikuli;\nLuse lulakutuvuna,\nTulapegwa misini.",
+        "Tulakufwamba kusika,\nMusinzo ulamana;\nMyoyo ilakusek’ oko,\nLwiimbo lwakuumuna."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Tulakuswaana ’mulonga,\nKumulonga mubotu mubotu,\nTuswaangane abaslidwe,\nKumulonga wa-Leza"
+        }
+      ]
+    },
+    {
+      "id": "hymn-40",
+      "kind": "hymn",
+      "number": 40,
+      "section": "Kujulu",
+      "title": "Sena Ndililembedwe Mo?",
+      "original": "IS MY NAME WRITTEN THERE?",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Ulubono nsiyandi, ndawakaindi kasyoonto\nNdilayanda kujulu, ndikanjile mumona;\nMwiBbuku lyabuumi ilisalalisya,\nKondyaambila Jesu, sena ndalembwa mo?\nSena ndalembwa mo ?\nSena ndalembwa mo ?\nMwiBbuku lyabuumi,\nSena ndililembedwe ?",
+        "„Zibi zyangu zyavula, zyali mbuli musenga\nUbulowa bwa-Jesu bwazisanzya zitube;\nCisyomezyo ca-Mwami cilandibotezya;\n“Zibi zyako na nzinji, zyoonse zyatuba bu.”\nIi, ndalembwa mo,\nJesu nguwandilemba,\nMwiBbuku lyabuumi,\nIi ndililembedwe.",
+        "Muunzi oyo mubotu ul’ amaanda aabambwa,\nBantu boonse banjila mbabo bakasa-nzigwa;\nTakunjili ukubi ukubisya bubotu,\nNkobalinda baangelo, ii, ndililwmbwsqw.\nIi, ndalembwa mo,\nJesu nguwandilemba,\nMwiBbuku lyabuumi,\nIi ndililembedwe."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-41",
+      "kind": "hymn",
+      "number": 41,
+      "section": "Kujulu",
+      "title": "Nkamuzyibe",
+      "original": "I SHALL KNOW HIM",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Ndamana milimo yangu yoonse munyika eyi,\nNjakusamikwa mubili utafwi,\nElyo njakumuziba Mufutuli kabotu,\nUyakundiciinga cakukomana.",
+        "Ndiya kukomana abusyu bwakwe bwakuu-muna\nAmeso akwe alaluse lunji;\nNdiya kumulumbaizya wakandiyandisya,\nAkundibambila g’anda yabwami.",
+        "Bayandika bangu twakaandana kaindi,\nMubuumi bubotu bwa-Mwami Jesu;\nTatukaandani mumabanda aa-Edeni,\nPele ntaangune mbone Mufutuli.",
+        "Nkanjile mumuunzi nkesamine zituba bu,\nAkandijinzye mutalili bantu,\nLwiimbo alutamani ndiya kwiimba ambabo,\nPele ntaangune mbone Mufutuli."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Kamuzyibe, nkamuzyibe,\nNdakwiima munsi lyakwe Jesu;\nNkamuzyibe, nkamuzyibe,\nAinembo mumaanza akwe."
+        }
+      ]
+    },
+    {
+      "id": "hymn-42",
+      "kind": "hymn",
+      "number": 42,
+      "section": "Kujulu",
+      "title": "Netusika Kujulu",
+      "original": "WHEN WE ALL GET TO HEAVEN",
+      "reference": null,
+      "key": "C",
+      "verses": [
+        "Imba luyando lwa-Jesu\nImba luzyalo lwakwe,\nKumuunzi wakwe mubotu,\nUlabamba cilao.",
+        "Netweenda mulweendo lwansi,\nMayoba alasiya;\nPele na lweendo lwamana,\nTakwe mudima oko.",
+        "Atusyomeke kasimpe,\nAkuzumina lyoonse;\nAkumubona kujulu,\nKuyootupa kukondwa."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Twaakusika kujulu,\nBuzuba bwakukondwa okuya;\nTwaakubona Jesu tulaimba,\nTulaimba luzundo."
+        }
+      ]
+    },
+    {
+      "id": "hymn-43",
+      "kind": "hymn",
+      "number": 43,
+      "section": "Kujulu",
+      "title": "Tuzoolumba Mwami Jesu",
+      "original": "WE SHALL STAND BEFORE THE KING",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "1. Tuzoolumba Mwami Jesu,\nTuzoobona busyu bwakwe\nCaba ciindi, caba ciindi,\nTuzooenda ‘nzila yakwe,\nTuzoobona bafutulwa,\nTwabotelwa, twabotelwa."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Tuzooima kumbele kwakwe,\nTuzoolumba Mwami Jesu,\nTuzoolumba Mwami Jesu,\nAleluya! Aleluya!\nTuzoolumba Mwami Jesu.\n2. Tuzoomwiimbila Jesu\nNkaambo kaluzyalo lwakwe,\nCaba ciindi, caba ciindi,\nTuzootembaula Jesu\nNkaambo kakuyanda kwakwe,\nTwabotelwa, twabotelwa.\n3. Oko takubonwa lufu,\nPele buumi butamani,\nCaba ciindi, caba ciindi,\nTuyoolya micelo yakwe,\nTwabotelwa, twabotelwa."
+        }
+      ]
+    },
+    {
+      "id": "hymn-44",
+      "kind": "hymn",
+      "number": 44,
+      "section": "Kujulu",
+      "title": "Mulyango Wakujwe",
+      "original": "THE EASTERN GATE",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Njookuswaana icifumo,\nMumulyango wakujwe;\nKolibamba we silweendo,\n‘Kuti uutamuki.",
+        "Na ulaya kubulemu,\nLind’ amulyango akujwe;\nNdilasika icifumo,\nYebo uutalindi.",
+        "Amusonse amalampi,\nMulindile Nacibinde;\nUlabaswe icifumo,\nMumulyango wakujwe.",
+        "Mubuzub’ obo bubotu,\nNatwaswaana abasweya;\nKuyoobota buti kuuya,\nMumulyango wakujwe."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Njookuswaana icifumo,\nMumulyango wakujwe okuya,\nNjookuswaana icifumo,\nNjookuswaana cifumo okuya."
+        }
+      ]
+    },
+    {
+      "id": "hymn-45",
+      "kind": "hymn",
+      "number": 45,
+      "section": "Kujulu",
+      "title": "Mbunono Ncobeni",
+      "original": "THERE’S A LAND THAT IS FAIRER",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Kujulu kwa-Leza Mubumbi,\nBaibele litubuzya muunzi;\nBasweeki, bazibi kamuza,\nNcobeni kubuumi bubotu.",
+        "Tuzoonjila twaimba nyimbo,\nInyimbo zyakukondwa loko;\nMapenzi, mafwabi twasiye,\n‘Tugame kuimba zya-Leza.",
+        "Malwazi, misozi taziko,\nPele kukondwa lyoonse lyoonse;\nNtolongo enzala taziko,\nPele kukuta lyoonse lyoonse.",
+        "Taata ulatulindila ‘ko,\nUlatucitila zibbula;\nAtutembule Jesu toonse,\nKukondwa kwansi kulamana."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Mbunono ncobeni,\nEneeno fwaambana mweenzuma;\nMbunono but’ ambwi\nFwaambana usike kwa-Leza."
+        }
+      ]
+    },
+    {
+      "id": "hymn-46",
+      "kind": "hymn",
+      "number": 46,
+      "section": "Kujulu",
+      "title": "Akale",
+      "original": "WE WILL UNDERSTAND IT BETTER",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Kanjikanji twatandwa alwenje lwamapenzi Iguwo\nlilainda kuboola kwezuba kanji, Kumuunzi\nmupya oko, na ingubi yatolwa, Tuya kutelela oko\nakale.",
+        "Tulapenga kanjikanji azintu zyabuumi\nTwafwa nzala, twafwa nyota, kwina kulya kubotu;\nTulamusyoma Mwami mbubonya mbuli ijwi,\nTuya kuteelela oko akale.",
+        "Tulasunkwa lyoonse, tatumvwide kabotu, Inzila\nyoonse ya-Leza nkwaya kutusolo-lela,\nNawatusololela tuya kumutobela,\nTuya kuteelela oko akale.",
+        "Tatuzi ciindi cibi ca-Saatani ncaboola,\nMiyeeyo yesu ilalila natazundi cibi;\nTwakankamana buti natwaalilwa kuzunda,\nTuya kuteelela oko akale."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Akale, cifumofumo,\nBa-Kristo basika kumuunzi;\nTuya kwaamba kuzunda kwesu,\nTuya kutelela oko akale."
+        }
+      ]
+    },
+    {
+      "id": "hymn-47",
+      "kind": "hymn",
+      "number": 47,
+      "section": "Kujulu",
+      "title": "Julu, Muunzi Wangu",
+      "original": "HEAVENLY HOME",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Julu, muunzi wangu !\nNdakuyanda mebo,\nJulu, muunzi wangu !\nWacitilwa ndime.\nJulu, muunzi wangu !\nWayakilwa toonse,\nUl’ aa-Taata wangu,\nUl’ aa-Mwami wangu.",
+        "Julu, muunzi wangu !\nNdakaulwa mebo\nJulu, muunzi wangu !\nUl’ abuumi bwangu;\nNandalanga ansi,\nZyoonse zilamana;\nTwatambula zyako,\nZitamani eno.",
+        "Ul’ abuumi bwangu,\nBuumi butamani,\nUbatecembaalwa,\nUbutasofwaali.\nJulu, muunzi wangu !\nKubuvubi bwangu,\nNkokubotu, Mwami,\nUkusweya kwako."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-48",
+      "kind": "hymn",
+      "number": 48,
+      "section": "Kujulu",
+      "title": "Busyu Kubusyu",
+      "original": "FACE TO FACE",
+      "reference": null,
+      "key": "B flat",
+      "verses": [
+        "Tuyoobona busyu bwakwe,\nBusyu bwa-Jesu Mwami,\nAbulemu bwakujulu,\nTwakukala Mwa-Tatta.",
+        "Tatukwe netwakabona,\nTwakaswiilila buyo,\nPele busiku bwasika,\nTuyoobona kabotu.",
+        "Buzuba bwakubotelwa,\nTuyoobona bulemu,\nZintu zibi ziyoomana,\nMuyoosyaala zibotu.",
+        "Busyu kubusyu bwa-Jesu,\nTuyoobonana kuya;\nTuyoomulanga, Jehova,\nJesu Mwami mupati."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Tuyoobona busyu bwakwe,\nTukalangane awe;\nAbulemu bwakwe boonse,\nTuyoobona kujulu."
+        }
+      ]
+    },
+    {
+      "id": "hymn-49",
+      "kind": "hymn",
+      "number": 49,
+      "section": "Mangwalo Aasweya",
+      "title": "Ijwi Talimani",
+      "original": "ST. CYPRIAN",
+      "reference": "Z.H. 112",
+      "key": "B flat",
+      "verses": [
+        "Ijwi talimani,\nLilasololela,\nLilababotezya\nAbasyoma ndilyo.",
+        "Na kwasika impi\nIya kutulwisya,\nIjwi lilayovwa,\nLilatufutula.",
+        "Naaba kulasiya,\nTutaboni cintu,\nIjwi lilaleezya\nAkumweka kwalyo.",
+        "Kwina uti ambe,\n‘Kubotelwa koonse\nKuya kulimbabo\nAbalanga ndilyo.",
+        "Ndyaluzyalo lyalo,\nNaaba tucipona,\nNaaba tukalafwa,\nLilayovwa lyoonse.",
+        "Mwami, tupe swebo,\nUkulitambula,\nTwiisigwe ndilyo,\nUliyandisisye."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-50",
+      "kind": "hymn",
+      "number": 50,
+      "section": "Mangwalo Aasweya",
+      "title": "Mazwi Aakwe Leza Mwini (Cila)",
+      "original": "CORONATION",
+      "reference": "Z.H. 111",
+      "key": "G",
+      "verses": [
+        "Mazwi aakwe Leza Mwini\nNgamu-Baibele\n||Lilizwile omakani\nAvwa kulinguwe.||",
+        "Inkombelo sya-Mukristo\nSyoonse sili momo\n||Nsyavumina onsyacita\nSilabalwa mumo.||",
+        "Twakabula kuteelela luse\nlwakwe Jesu\n||Inzyo tulalibwezela\nMwi-Baibele lyesu.||",
+        "Buumi bwakwe Moza Mwini\nMbubwabantu boonse\n||Bulasika ubwasunu,\nAtubutambule.||",
+        "Mazwi aya tuwajate,\nAlatulongezya\n||Twateelele ciindi coonse,\nNdiBaibele lyesu.||"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-51",
+      "kind": "hymn",
+      "number": 51,
+      "section": "Mangwalo Aasweya",
+      "title": "Majwi Akabotezya",
+      "original": "WONDERFUK WORDS",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Majwi akabotezya, amwiimbe kulindime,\nNdibone kubotezya, majwi alufutuko;\nMajwi akabota, alatupa luse.",
+        "Alapegwa aa-Kristo, majwi alufutuko,\nMumwe nyoonse nobabi, majwi alufutuko;\nMajwi al’ abuumi, alapegwa nywebo.",
+        "Amumvwe makani nywebo, majwi alufutuko;\nAlamupa kukondwa, majwi alufutuko;\nUlajatilwa, ncipegwa ca-Jesu."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "||Abotezya, ’kantamika, majwi alufutuko.||"
+        }
+      ]
+    },
+    {
+      "id": "hymn-52",
+      "kind": "hymn",
+      "number": 52,
+      "section": "Lufutuko",
+      "title": "Lufutuko Ndulukando (Cila)",
+      "original": "HOLY WARFARE",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Lufutuko ndulukando\nNdwaakapewa masi\nKubulowa obwa-Jesu,\nObwakunkil’ ansi.",
+        "Lufutuko ndulukando,\nLufutula boonse\nBuumi nwalo mbubukando,\nMbwamyaaka yoonse.",
+        "Lufutuko ndulukando,\nLutusumpulisya\nTube bakwe balye zina,\nLeza Uusweyisya.",
+        "Mwamukakilanzi Mwami,\nLeza Mufutuli?\nKwina unji Mununuzi,\nMwami wa-Bulemu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-53",
+      "kind": "hymn",
+      "number": 53,
+      "section": "Lufutuko",
+      "title": "Jesu Uvuna",
+      "original": "JESUS SAVES",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Twateelela kukondwa, uvuna, uvuna;\nKomwaya amakani, uvuna, uvuna;\nTola kaambo kumasi koonse kwitala lwizi;\nKoya nkwaamba Mwami, uvuna, uvuna.",
+        "Koompolola enguzu, uvuna, uvuna;\nKobaambila babisyi, uvuna, uvuna;\nKoimbisya ziluzi, ayebo lwizi vuwa;\nInyika ilakwiimba, uvuna, uvuna.",
+        "Nko kwiimba mulumamba, uvuna, uvuna;\nAlufu lwakwe jesu, uvuna, uvuna;\nUimbe mangolezya, nolomba luzyalo;\nImba kuzunda cuumbwe, uvuna, uvuna.",
+        "Luwo alwaambisye, uvuna, uvuna;\nMasi akomanisye, uvuna, uvuna;\nMoompolole kuvunwa, malundu omilindi;\nAlwiimbo lwakuzunda, uvuna, uvuna."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-54",
+      "kind": "hymn",
+      "number": 54,
+      "section": "Lufutuko",
+      "title": "Coolwe Cipati",
+      "original": "THERE SHALL BE SHOWERS",
+      "reference": null,
+      "key": "B flat",
+      "verses": [
+        "Coolwe cipati cileza,\nTeelela ulatusyomya;\nKuyoozwide uluzyalo,\nUboole ukutuyovwa.",
+        "Coolwe cipati cileza,\nCiyootusinsimunisya;\nMuuya wawida ombuli\n’Mvula impati iiyoosya.",
+        "Coolwe cipati cileza,\nAcituwide bwasunu;\nMwami koboola tuyovwe,\nBoola eno, Mufutuli.",
+        "Coolwe cipati cileza,\nCiindi cibotu ncasunu;\nZibi zyaboonse zivumbwe,\nJesu koboola, koboola."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Coolwe cipati,\nCoolwe cipati cileza;\nLuse lulatusikila,\nLuse tulalulilila."
+        }
+      ]
+    },
+    {
+      "id": "hymn-55",
+      "kind": "hymn",
+      "number": 55,
+      "section": "Lufutuko",
+      "title": "Tuli Beenzu Ansi Ano (Cila)",
+      "original": "INNOCENTS",
+      "reference": "M.H. 842",
+      "key": null,
+      "verses": [
+        "Tuli beenzu ansi ano,\nTuli boofu, twiina mano\nInzyo sunu tukumbile\nJesu atusindikile.",
+        "Bausyeesu obakale\nBakabula Mufutuli\nKabatana kuteelela\nAti Jesu wabafwila.",
+        "Kabacili mumusinze,\nKabakwete omapenzi\nNibakaya kupaila,\nCinzi nciba-kukapula?",
+        "Baya kukapula nsana,\nKabatana kusiyana\nMizimo yalengauka,\nAbo bantu basanduka.",
+        "Balakomba Leza Mwini,\nMwami wesu utufwini\nBuumi bwesu buvwa kwakwe,\nAtubambe mbeta syakwe."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-56",
+      "kind": "hymn",
+      "number": 56,
+      "section": "Lufutuko",
+      "title": "Ncinzi Cinsanzisya ’Tombe? (Cila)",
+      "original": "NOTHING BUT THE BLOOD OF JESUS",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Ncinzi cinsanzisya ’tombe?\nPele kubulowa bwa-Jesu;\nNkukwi nkwinkapuulushiwa?\nPele jubulowa bwa-Jesu.",
+        "Sibi syaziminganyiwa,\nPele kubulowa bwa-Jesu;\nBubyaabi bwakwatilwa,\nPele kubulowa bwa-Jesu.",
+        "Ncicibanda olufuno,\nPele kubulowa bwa-Jesu;\nBululami kwina kono,\nPele kubulowa bwa-Jesu.",
+        "Nubapengi mwize noonse,\nPele kubulowa bwa-Jesu;\nTubasibi aswe toonse,\nPele kubulowa bwa-Jesu."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Mbuzandisi bo bulowa,\nBunsanzi sya nsweye swe;\nMwiinzo unji tonabwenwe,\nPele kubulowa bwa-Jesu."
+        }
+      ]
+    },
+    {
+      "id": "hymn-57",
+      "kind": "hymn",
+      "number": 57,
+      "section": "Lufutuko",
+      "title": "Ukufutulwa Nkubotu",
+      "original": "HE WILL HIDE ME",
+      "reference": "Z.H. 256",
+      "key": "G",
+      "verses": [
+        "Ukufutulwa ! Nkubotu\nAmu matwi eesu !\nNkaambo twaangululwa nkuko\nMukubisya kwesu.",
+        "Kale twali kusweekede\nMukubisya kwesu,\nKwalo eno twaangululwa\nMumapenzi eesu.",
+        "Ukufutulwa kulumbwe\nAkumasi oonse,\nAkujulu kulalumbwa\nEmbangano zyoonse."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Mumulemye, mumulemye,\nSiluzyalo mumulemye, Aleluya! Aleluya!\nAkulumbwe Mufutuli!"
+        }
+      ]
+    },
+    {
+      "id": "hymn-58",
+      "kind": "hymn",
+      "number": 58,
+      "section": "Lufutuko",
+      "title": "Watolwa",
+      "original": "MY BURDEN ROLLED AWAY",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Ndauyeeya mukuli nowakazwa,\nNdauyumuna ciindi cupati,\nNdalangaula Leza,\nNdasyoma majwi akwe,\nNdilyona mukuli wakazwa.",
+        "Ndakayeeya mukuli nowakazwa,\nMdakayowa takwe kundisiya;\nJesu wanditondezya, Ciingano calufu,\nNdabotelwa mukuli wakazwa.",
+        "Ndilizi kuti mukuli wakazwa,\nWakandipenzya lyoonse;\nKucuuno caluzyalo,\nNdakamubona Jesu,\nNdilyona mukuli wakazwa.",
+        "Ndaimba limwi mukuli wakazwa,\nNkokuli lwimbo mukuli wakazwa;\nNdijiai Mwami wangu,\nWandipa buumi bwakwe,\nAleluya ! Mukuli wakazwa."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Watolwa, watolwa,\nNdabotelwa kuti mukuli wazwa;\nWatolwa, watolwa,\nNdabotelwa na mukuli wakazwa."
+        }
+      ]
+    },
+    {
+      "id": "hymn-59",
+      "kind": "hymn",
+      "number": 59,
+      "section": "Lufutuko",
+      "title": "Ndilaimba Amalweza (Cila)",
+      "original": "THE WONDROUS STORY",
+      "reference": null,
+      "key": "E flat",
+      "verses": [
+        "Ndilaimba amalweza,\nMbwaakamfwila Jesu Mwini,\nMbwaakasiya kwizeulu,\nMbwaakasika ansi ano.",
+        "Ndakakozya imbelele,\nNdali kusweekele bulyo\nWalo wakanzinzilika,\nWakanzyola kwakwe Mwini.",
+        "Ndawizuka, wandilela,\nNdafwa nyota, wanwinsya\nNdasimbalwa, wambotezya,\nOkupenga, wandivuna.",
+        "Onwasunu tuli aze,\nUlanyenzya ’nzila yoonse\nBuumi boonse ndamusyoma,\nTakandiimbizya ome.",
+        "Ndilaimba amalweza,\nNduse lwakwe Jesu Mwami\nNdilaimba olufuno,\nBolya mbwaakandifutula."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ndilaimba amalweza,\nMbwaakamfwila Jesu Mwini,\nMbwaakasiya kwizeulu,\nMbwaakamfwil’ a-Kalvari."
+        }
+      ]
+    },
+    {
+      "id": "hymn-60",
+      "kind": "hymn",
+      "number": 60,
+      "section": "Lufutuko",
+      "title": "Ndanununwa",
+      "original": "REDEEMED",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Ndayanda kukambaukilwa,\nMbondafutuka bulowa;\nNdafutuka aluse lwakwe,\nNdaanguluka bunene.",
+        "Jesu ulandikomansiya,\nKukomanisya kupati,\nNdizi kuti kumweka kwakwe\nKuya kukala andime.",
+        "Ndayeeya Mufutuli wangu,\nZuba lyoonse ndamuyeeya;\nNdilaimba nsikaumuni\nKwiimba luyando lwakwe.",
+        "Ndaziba ndiya kumubona\nMwami oyo undiyanda;\nUlandisololela koonse\nAkundibamba maiku."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ndili wakwe,\nNdibe wakwe kutamani;\nNdili wakwe,\nNdibe wakwe kutamani."
+        }
+      ]
+    },
+    {
+      "id": "hymn-61",
+      "kind": "hymn",
+      "number": 61,
+      "section": "Lufutuko",
+      "title": "Atumwiimbile Jesu (Cila)",
+      "original": "SAFELY THROUGH ANOTHER WEEK",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Atumwiimbile Jesu,\nKuti ’nguwe ngu-Muvuni;\nAtumwiimbile Jesu,\nOkumazwi okumyozo.\nUswe twali kusweekele,\nImbelele siteembelwa\nUswe twali kusweekele,\nJesu katulangaula.",
+        "Naakafwa acilundu,\nObulowa buzandika\nNaakafwa acilundu,\nKatuula cabuzumo.\nMuteelele, ulamwiita,\nUmwe noonse mukatele,\nMuteelele, ulamwiita,\nAti, “Ndikalamaponya”.",
+        "Uswe atuwile ansi,\nAtubebe tuvumine\nUswe atuwile ansi,\nAtubombe kulinguwe.\nSena kulayanwa kwani,\nManga aakozyan’ aa-Jesu?\nSena kulayanwa kwani,\nLuse olukozya lwakwe?"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-62",
+      "kind": "hymn",
+      "number": 62,
+      "section": "Lufutuko",
+      "title": "Mwaala Wang’ Uuteeli (Cila)",
+      "original": "ROCK OF AGES (REDHEAD)",
+      "reference": null,
+      "key": "B flat",
+      "verses": [
+        "Mwaala wang’ uuteeli,\nNtiye nzube knwako\nMeenzi omalowa azo\nAkavwila kuliuwe\nNgumusamu wangu\nUnsilika mozo.",
+        "Milimo njimana\nTekulamya, Mwami\nNaaba mail ngwinkaleta,\nNiiba ’nsoni njingusila\nPele luse lwako\nLumpasula sibi.",
+        "Ndeza kwako bulyo\nNdiina ncinkaleta\nNdalifwika, kwako Mwami,\nNswezya, ndime mubyaabi\nUnyenzanye Jesu,\n’Nsanzye mozo ntube bu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-63",
+      "kind": "hymn",
+      "number": 63,
+      "section": "Lufutuko",
+      "title": "Aciingano ca-Jesu",
+      "original": "DOWN AT THE CROSS",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Aciingano ca-Jesu Mwami\nAciingano cibiabi,\nWatutilila bulowa bwakwe\nAtumulemye.",
+        "Sunu ndili acoolwe cakwe,\nJesu wakala mulindime,\nWandibotezya iciindi coonse,\nAtumulemye.",
+        "Bazibi, nyoonse amutelele\nAmuzisanzye zibi zyanu,\nBoola ku-Jesu mujane coolwe\nAtumulemye."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Atumulemye, atumulemye,\nWatutilila bulowa bwakwe,\nAtumulemye."
+        }
+      ]
+    },
+    {
+      "id": "hymn-64",
+      "kind": "hymn",
+      "number": 64,
+      "section": "Lufutuko",
+      "title": "Buzuba Bwakukomana",
+      "original": "O HAPPY DAY",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Buzuba bwakukomana\nNondakakusala, Jesu,\nMoyo wangu ulelede,\nKubaambila bantu boonse.",
+        "Nkwasimpila, nkwasimpila,\nNdili wakwe, uli wangu;\nWandikwela, ndcilila,\nNdakakomana kwiitwa.",
+        "Kolyookezya moyo wangu,\nKoyeeya Mwami wazyoonse;\nUtaandani aa-Leza,\nUlijisi zintu zyoonse."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Bubotu buzuba,\nJesu wandigwisya kubi;\nWandiyoosya kukomba,\nAkukomanisya lyoonse;\nBubotu buzuba,\nJesu wandigwisya kubi."
+        }
+      ]
+    },
+    {
+      "id": "hymn-65",
+      "kind": "hymn",
+      "number": 65,
+      "section": "Lufutuko",
+      "title": "Luyando Lwandibweza",
+      "original": "LOVE LIFTED ME",
+      "reference": null,
+      "key": "B flat",
+      "verses": [
+        "Ndakabbila muzibi kule kuzwa Mwami,\nNdakeenda ababi, ndakawa musiya,\nPele Jesu wakamvwa kukulila kwangu,\nWakambweza kuzwa muzibi zyangu.",
+        "Ndamupa moyo wangu, ndilajatilila,\nNdipone mulinguwe, ndilalemya Jesu,\nMwami wangu mupati wakandifutula,\nMulimo usyomeka kulinguwe.",
+        "Atulange kujulu, nkoku-Mufutuli,\nUyoomubweza lino kuluyando lwakwe,\nZintu zyoonse zyanyika Mwami uyoozunda;\nMgo-Mufutuli wabo, bantu boonse."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ndakabwezwa, Ndakabwezwa,\nLuyando lwa-Jesu lwandibweza.\nNdakabwezwa, Ndakabwezwa,\nLuyando lwa-Jesu lwandibweza."
+        }
+      ]
+    },
+    {
+      "id": "hymn-66",
+      "kind": "hymn",
+      "number": 66,
+      "section": "Buumi Bwa-MuKristo: Kusanduka",
+      "title": "Mbwembede, Mwami (Cila)",
+      "original": "JUST AS I AM",
+      "reference": null,
+      "key": "E flat",
+      "verses": [
+        "Mbwembede, Mwami, ndeza eno,\nNsijisi kulyaambilila,\nNdiyeeya pele mbondiita\nMwami Jesu ,ndaboola.",
+        "Mbwembede, Mwami, ndimupusi,\nNdimoofu, ndimulwazi,\nmubi, Nkajane zyoonse kulinduwe\nMwami Jesu, ndaboola.",
+        "Mbwembede, Mwami, ndakakilwa,\nNsikonzya kuzisanzya zibi,\nMbulowa bwako bundisanzya\nMwami Jesu, ndaboola.",
+        "Mbwembede, Mwami, nditambula,\nKondijatila ziba zyangu,\nMfwida luzyalo, ndipa buumi\nMwami Jesu, ndaboola.",
+        "Mbwembede, Mwami, ndoluzyalo\nUlwandileta kulinduwe,\nNdalumba, Taata, ndili wako\nMwami Jesu, ndaboola."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-67",
+      "kind": "hymn",
+      "number": 67,
+      "section": "Buumi Bwa-MuKristo: Kusanduka",
+      "title": "Mwami, Aluzyalo Lwako",
+      "original": "DORRNANCE",
+      "reference": "Z.H. 242",
+      "key": "E",
+      "verses": [
+        "Mwami, aluzyalo lwako,\nBona oyu moyo wangu;\nNdakotama kulinduwe,\nGwisya zyoonse zibi zyangu.",
+        "Taata, kale ndakabisya,\nNsindalizi cibi cangu;\nMuzibyaabi ndalifwide,\nGwisya zyoonse zibi zyangu.",
+        "Yebo, uli Siluzyalo,\nLyoonse wandikombelela;\nWakandiita-ndakakaka,\nGwisya zyoonse zibi zyangu.",
+        "Ndakamumvma Mufutuli\nUwatola cibi cangu;\nUndiboozye-ndakatala,\nGwisya zyoonse zibi zyangu.",
+        "Jesu, ndeza kulinduwe,\nAzyo zyoonse zibi zyangu;\nNditambula aluzyalo,\nGwisya zyoonse zibi zyangu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-68",
+      "kind": "hymn",
+      "number": 68,
+      "section": "Buumi Bwa-MuKristo: Kusanduka",
+      "title": "Mwami Leza Ndimwanaako",
+      "original": "CLAREMONT",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Mwami Leza, ndimwanaako,\nKwalo ndakabisya;\nNdalila kumbele lyako,\nTaata, ndijatila.",
+        "Akubisya kwangu koonse,\nTakukooyoobalwa pe;\nNdakubika kulinduwe,\nTaata, ndijatila.",
+        "’Milumbe yako ndiityola,\nYebo ndakunyansya;\n’Lufutuko ndalusowa,\nTaata, ndijatila.",
+        "Ndakabisy’ akukanana,\nNdabisya akuyeeya;\nNdakabisya amilimo,\nTaata, ndijatila.",
+        "Amebo ndalikweelede,\nUkukulemeka;\nNdakabisya kukuluba,\nTaata, ndijatila.",
+        "Izibi zyangu zyavula,\nTaata, ndakabisya;\nNdakakusampaulisya,\nTaata, ndijatila.",
+        "Mwami Leza, Siluzyalo,\n’Lupati lutamani;\nNkaambo kaako ndilalila\nTaata, ndijatila."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-69",
+      "kind": "hymn",
+      "number": 69,
+      "section": "Buumi Bwa-MuKristo: Kusanduka",
+      "title": "Ndazumina",
+      "original": "I WILL",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Ndaimbisya amumoyo wangu,\nIjwi lyako, Mwami;\nMwami leka eno ndikubone,\nSena wazumina?",
+        "Ndafutuka amuluse lwako,\nLyoonse wandiyanda;\nKuli Kristo, ii, ndazumina,\nLyoonse undiyonwe.",
+        "Ulizi akulibombya kwangu,\nAboowa mbwenjisi;\n’Nguzu zyangu zizwa kulinduwe,\nAsunu undipe.",
+        "Mwami, boola uzoobape sunu,\nUluse akwiimba;\nToonse atwaambe ku-Mwami wesu,\nTube bana-Kristo.",
+        "Bakakumbila nowakal’ ano,\nMwami nawayanda;\nTwamvwa boonse kabaamba obo,\nAtukalilile."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ii, ii, ii, Leza ndigwasya\nUkuba wako;\nWandyula abulowa bwako,\nIi, ndibe wako."
+        }
+      ]
+    },
+    {
+      "id": "hymn-70",
+      "kind": "hymn",
+      "number": 70,
+      "section": "Buumi Bwa-MuKristo: Kusanduka",
+      "title": "Mwami Ndaboola",
+      "original": "LORD, I’M COMING HOME",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Ndakaya kule aa-Leza,\nEno ndaboola;\nNdainda munzila zibi,\nMwami ndaboola.",
+        "Ndakasowa myaaka minji,\nEno ndaboola;\nNdasanduka akulila,\nMwami ndaboola.",
+        "Ndakatala kukisiya,\nEno ndaboola;\nNdakusyom’ akuzumina,\nMwami ndaboola."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ndaboola, ndaboola,\nNsibwed’ alimwi;\nMwami, konditambula,\nMwami ndaboola."
+        }
+      ]
+    },
+    {
+      "id": "hymn-71",
+      "kind": "hymn",
+      "number": 71,
+      "section": "Buumi Bwa-MuKristo: Kusanduka",
+      "title": "Ndil’ Ezibi Zinjizinji",
+      "original": "SAVIOUR, LIKE A SHEPHERD",
+      "reference": null,
+      "key": "E",
+      "verses": [
+        "Ndil’ ezibi zinjizinji,\n’Zindipenzya lyoonse,\nNdikapula Mufutuli,\nUufutula boonse.\nYebo Jesu, Yebo Jesu,\nNduwe Mufutuli wangu.",
+        "Wandiyanda, ndime mubi,\nWatufwida toonse,\nNduwe wakandilungila\nUmulandu woonse.\nYebo Jesu, Yebo Jesu,\nNduwe Mufutuli wangu",
+        "’Bululami nsibujisi,\nAbusweyi boonse,\nSwena Jesu, undisanzye,\nSanzya moyo woonse.\nYebo Jesu, Yebo Jesu,\nNduwe Mufutuli wangu.",
+        "Jesu, eno ndili wako,\nKondeyeenzya lyoonse,\nNdipa ’nguzu, nkucilile\nAmunzila moonse.\nYebo Jesu, Yebo Jesu,\nNduwe Mufutuli wangu.",
+        "Oko kulinduwe, Mwami,\nTuyookala lyoonse,\nTunoolumbaizya Jesu\nKumaindi oonse.\nYebo Jesu, Yebo Jesu,\nNduwe Mufutuli wangu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-72",
+      "kind": "hymn",
+      "number": 72,
+      "section": "Buumi Bwa-MuKristo: Kusanduka",
+      "title": "Uyanda Kuponena kwa-Jesu?",
+      "original": "WOULD YOU LIVE FOR JESUS?",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Sena ulayanda kuponena kwa-Jesu ?\nAkumutobela munzila ince ?\nSena akuyumwine mukuli wako na ?\nMuleke asolole.",
+        "Sena ulayanda kwangununwa sunu na ?\nSena uyanda kumvwa kuumuna kwakwe ?\nSena ulayanda akufutulwa sunu,\nKuti utabi nowa?",
+        "Sa uyanda kulyookezya mubwami bwa-kwe ?\nAkuzibisya kusyomeka kwakwe ?\nSa uyanda kubelekela nguwe lyoonse ?\nMuleke asolole."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Inguzu zyakwe zyakwangununa,\nBulowa bwakwe bwakusalazya;\nLuyando lwakwe lulakuzuzya,\nInzila yakwe nimbotu kwiinda."
+        }
+      ]
+    },
+    {
+      "id": "hymn-73",
+      "kind": "hymn",
+      "number": 73,
+      "section": "Buumi Bwa-MuKristo: Kulipeda",
+      "title": "Mwami, Sunu Ndalyaaba",
+      "original": "HOLLEY",
+      "reference": "Z.H. 298",
+      "key": "A flat",
+      "verses": [
+        "Mwami, sunu ndalyaaba,\nNkabe wako ciindi coonse,\nTola koonse kube kwako,\nWoonse moyo amubili.",
+        "Amatansyi uwatole,\nWabelesye kuli koonse;\nAmatende, uwaenzye\nMumulimo wako, Mwami.",
+        "Amulak; awalo uambe\nUluyando lwako, Jesu,\nUompolole, ukaiye,\nUkalumbe ’zina lyako.",
+        "Ulubono lube lwako,\nEno talucili lwangu,\nKolutola, Jesu, sunu\nAko koonse kuli kwangu.",
+        "Aluyando lwangu tola,\nKolucita lube lwako,\nKoonse takucili kwangu,\nUkutole, Mwami wangu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-74",
+      "kind": "hymn",
+      "number": 74,
+      "section": "Buumi Bwa-MuKristo: Kulipeda",
+      "title": "Luyando Ulutandileki",
+      "original": "ST. MARGARET",
+      "reference": "Z.H. 274",
+      "key": "A flat",
+      "verses": [
+        "Luyando ulutandileki,\nNdikalyookezye kulinduwe;\nMbwempegwa buumi ndabutula\nKumbele lyako, Mwami wangu,\nMobukazyulila!",
+        "Mumuni uutazimi lyoonse,\nNdimunikila nzila yangu;\nKamuni kangu takayovwi,\nNkaako ndimunikilwa nduwe\nOoli ’Zuba lyangu!",
+        "Ciband citamani lyoonse,\nUtandisyi ciindi coonse;\nKokal’ amebo mumapenzi\nMane ndijane kubotelwa\nKulinduwe, Mwami!",
+        "Ociingano ncendapegwa,\nNdakutambula cakukondwa;\nEno ndaleka zintu zyoonse,\nNkajane kulinduwe, Mwami!\nBuumi butamani!"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-75",
+      "kind": "hymn",
+      "number": 75,
+      "section": "Buumi Bwa-MuKristo: Kulipeda",
+      "title": "Uyanda Kubota",
+      "original": "TAKE TIME TO BE HOLY",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Uyanda kubota, kaambe a-Mwami,\nKal’ awe lyoonse, akwiiya ijwi,\nUyanda ba-Jesu, gwasya batete,\nUtalubi lyoonse kombela Mwami.",
+        "Uyanda kubota ’nyika yainda;\nKopaila lyoonse alike Jesu;\nWamulanga Jesu, ube mbwabede.\nBuumi bwakwe buyoolangwa ku’nduwe.",
+        "Uyanda kubota, Jesu Ngugwasya;\nUtaciti cintu citabotezyi;\nKukondwa na kuusa, tumutobele,\nUlange kwa-Jesu, syoma ’jwi lyakwe.",
+        "Uyanda kubota, komunikisya;\nKoyeeya milimo ya-Mwami wesu;\nTuzolwede Jesu, munzila yako,\nNoyakubambilwa, kukal’ a-Mwami."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-76",
+      "kind": "hymn",
+      "number": 76,
+      "section": "Buumi Bwa-MuKristo: Kulipeda",
+      "title": "Jesu, Muvuni, Ndili Wako ’Like",
+      "original": "ARMAGEDDON",
+      "reference": "Z.H. 304",
+      "key": "C",
+      "verses": [
+        "Jesu, Muvuni, ndili wako ’like,\nNdilalipeda kulinduwe, Mwami;\nNsikwe cintu eno, Mwami uuyandika,\nKoonse oku kwangu kube kwako, Taata.",
+        "Kale ndaleya, wakandyuusila,\nWakalyaaba, wandifwida, Mwami;\nEno endifutwidwe ndilabon’ inzila,\nNjooteelela nduwe, Mufutuli wangu.",
+        "Koba amebo, kondivuna lyoonse,\nNkalelwe nduwe ooli Mwami lyoonse,\nNa ayebo mpoli njoobotelwa lyoonse.\nNkaambo yebo, Mwami, uli nguzu zyangu.",
+        "’Luyando lwako lulandilweelela,\nMbokandifwida aluzyalo, Jesu;\nNsikoobona umbi uuyelen’ ayebo,\nAmumoyo wangu kooneka, Mwami."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Jesu, Mwami wangu, eno ndili wako,\n’Yebo, ooyandika, uli wangu."
+        }
+      ]
+    },
+    {
+      "id": "hymn-77",
+      "kind": "hymn",
+      "number": 77,
+      "section": "Buumi Bwa-MuKristo: Kulipeda",
+      "title": "Ndakakupa Buumi",
+      "original": "I GAVE MY LIFE",
+      "reference": null,
+      "key": "C",
+      "verses": [
+        "Ndakakupa buumi bwangu,\nBulowa bwatika,\nKuti ufutuke,\n||Ndakakupa buumi bwangu,\nWakandipanz’ ino?||",
+        "Muunzi mubotu wa-Taata,\nBwami bwabulemu,\nNdasiya nkaambo kenyika,\nNdapenga endike,\n||Ndasiya zyoonse nkaamba kako,\nWakandipanz’ ino?||",
+        "Ndakakweetla,\nKuzwa kumuumzi wangu,\nLufutuko lupati,\nKujatila kwangu,\n||Ndakakweetela bwami,\nWakandipanz’ ino?||"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-78",
+      "kind": "hymn",
+      "number": 78,
+      "section": "Buumi Bwa-MuKristo: Kulipeda",
+      "title": "Ponena Jesu",
+      "original": "LIVING FOR JESUS",
+      "reference": null,
+      "key": "E flat",
+      "verses": [
+        "Ponena Jesu lyoonse !\nLuse lwakwe lutamani;\nKuti nkasunkwe nsiyowi,\nPonena Jesu ula’ fwi.",
+        "Ponena Jesu lyoonse !\nKukomba Mwami, ndalelekwa;\nNdayanda buyo kuciya,\nLuyando lwakwe lyoonse.",
+        "Ponena Jesu lyoonse !\nMikuli yangu yabwezwa;\nKumusyoma walo Mwami,\nUyoondisololela.",
+        "Ponena Jesu lyoonse !\nBulemu bwakwe nkajile;\nNkatelele majwi akwe,\n“Njila mumuunzi, mwanangu.”"
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ndiyovwa kukumanina,\nKondiyovwa kukulumba’\nMpone ayebo lyoonse,\nNsikwe kuya kukusiya."
+        }
+      ]
+    },
+    {
+      "id": "hymn-79",
+      "kind": "hymn",
+      "number": 79,
+      "section": "Buumi Bwa-MuKristo: Kulipeda",
+      "title": "Alimwi aa-Jesu",
+      "original": "MORE ABOUT JESUS",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Ndayandisya kumvwa alimwi\nLuse aluyando lwakwe;\nAlimwi waambile bamwi,\nLuyando wakandifwida.",
+        "Alimwi ndilakuiya,\nNdizibe kusetekanya;\nLeza Mwami kondiisya,\nKumuziba Jesu wangu.",
+        "Jesu mujwi twamuziba,\nTwazuminana anguwe;\nNdatelela ijwi lyakwe,\nNdaambile bamwi anfuwe.",
+        "Alimwi aa-Jesu Mwami,\nAcuuno cabwami cakwe;\nKambauka kaambo kakwe,\nAkuboola kwabulelo."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Alimwi aa-Jesu\nAlimwi aa-Jesu;\nAlimwi akufutuka,\nAluyando wandifwida."
+        }
+      ]
+    },
+    {
+      "id": "hymn-80",
+      "kind": "hymn",
+      "number": 80,
+      "section": "Buumi Bwa-MuKristo: Kulipeda",
+      "title": "Nkenaba Mbuli Jesu",
+      "original": "TAPPAN",
+      "reference": "Z.H. 302",
+      "key": "A",
+      "verses": [
+        "Nkenaba mbuli Jesu\nUwali kulibonzya,\nNkenaba mbuli nguwe,\n||Walo walibombede.||",
+        "Nkenaba mbuli Jesu,\n’Kupenzya bamupenzya;\nWalo katabweedezya;\n||Kwalo wabakombela.||",
+        "Nkenaba mbuli Jesu,\nNdiyeeye mbwaakakomba\nAlike mucilundu,\n||Aa-Wisi mbwateelela.||",
+        "Nkenaba mbuli Jesu,\nAmajwi aangu oonse\nAmubotezye Mwami,\n||Libombe ijwi lyangu.||",
+        "Nkenaba mbuli Jesu,\nKuncito zyangu zyoonse,\nNdimutobele Mwami\n||Mukweenda kwangu koonse.||",
+        "Nkenaba mbuli Jesu\nNsoleke oko kwako,\nKwalo ame ndiyovwa\n||Mane nkozyan’ ayebo.||"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-81",
+      "kind": "hymn",
+      "number": 81,
+      "section": "Buumi Bwa-MuKristo: Kulipeda",
+      "title": "Cita Mboyanda",
+      "original": "HAVE THINE OWN WAY",
+      "reference": null,
+      "key": "F flat",
+      "verses": [
+        "Cita mboyanda, Mwami Mubumbi,\nUli Mubumbi, ndili bulongo;\nMwami, ndibumba, mbuli mboyanda,\nMbwencilindila, Mwami Mubumbi.",
+        "Cita mboyanda, Mwami Musweyi,\nUlasalala, ndilisofweeede;\nKondisalazya mane nditube,\nMbwencifugama, Mwami Musweyi.",
+        "Cita mboyanda, Mwami Muyovwi,\nUli Singuzu, ndili mutete;\nMwami, ndiyovwa, mbuli mbwembula,\nUkandiyumye, Mwami Muyovwi.",
+        "Cita mboyanda, Mwami Singuzu,\nBoola, ukale mumoyo wangu;\nNkakukozyanye, nkakulemeke,\nMbe wako ’like, Mwami Singuzu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-82",
+      "kind": "hymn",
+      "number": 82,
+      "section": "Buumi Bwa-MuKristo: Kusolwedelwa",
+      "title": "Taata, Nyenzya Nsiku Syoonse (Cila)",
+      "original": "ST. MARTIN",
+      "reference": "M.H. 359",
+      "key": null,
+      "verses": [
+        "Taata, nyenzya nsiku syoonse,\nKoonse nkwinkasika\nMbe musweyi uusinizya,\nNdeezya nsinkacita.",
+        "Nkwiili nzila iilumine,\nNzibya mbunfutula\nMbe muzumo mbwinkusyoma,\nNkale mukufunwa.",
+        "Sibi nisintepaula,\nMbe sinsana muuza\nSili bu musyaala mwana,\nNdiwe unsuntula.",
+        "Mozo wangu nusakilwe,\nNjovwa nzingasile\nCoolwe cangu nkukwiziba\nTaata ulinfwini.",
+        "Kumulimo uuzumine,\nNsusi kubotezya\nKumaciswe, makatazo,\nMbe siswezya-mozo.",
+        "Ncite sikwense, sibotu,\nMbe mufune wako\nMunsi nje kukala aze,\nSikwense mwanaako."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-83",
+      "kind": "hymn",
+      "number": 83,
+      "section": "Buumi Bwa-MuKristo: Kusolwedelwa",
+      "title": "Yoko Wako Ngumubomvu (Cila)",
+      "original": "COME, THOU FOUNT",
+      "reference": null,
+      "key": "E flat",
+      "verses": [
+        "Yoko wako ngumubomvu\nWatukatulula myozo,\nLuse lwako ngumatilo,\nNdiwe utukobelela.\nKutangala twakuyana,\nKoonse nkutuwenzya Mwami\nBatulwisya balatiya,\nTwabazunda kulindiwe.",
+        "Nitubomba ansi ano,\nWatuponya calufuno,\nWatuzil’ atwaambo twako\nUtufwamba kutuyovwa.\nNituwamba abupusi,\nWaca ati: “Muli ame”.\nNituwamba akutiya,\nWaingula: “Tuli amwe”.",
+        "Sikwense ’tusindikile,\nJesu, Mufutuli wesu,\nAnsi ano utuvune,\nMane tukasike kwako.\nKoko kwako kutamani,\nLyoonse tukatembaule\nAleluya ku-Sinsana\nUtunjizya kwa-Jehova."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-84",
+      "kind": "hymn",
+      "number": 84,
+      "section": "Buumi Bwa-MuKristo: Kusolwedelwa",
+      "title": "Unyenzisye, Mwami Jesu (Cila)",
+      "original": "JESUS, LOVER OF MY SOUL",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Unyenzisye, Mwami Jesu,\nNdime usilweendo ansi.\nUl’ ensana, ome ndiina,\nMdilatiya kweenda ice.\nMufutuli, Mufutuli,\nNdiwe pele ootweenzya.",
+        "Unsanzisye, Mwami Jesu,\nNdilikwete sibyaabi\nUlansanzya kumatombe,\nMufutuli, Mufituli,\nNdiwe pele ootusanzya.",
+        "Ununune, Mwami Jesu,\nNdyaangilwe ocansana,\nNgu-Saatani wakag’ anga\nG’ angulula kulinguwe.\nMufutuli, Mufutuli,\nNdiwe pele oondiponya."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-85",
+      "kind": "hymn",
+      "number": 85,
+      "section": "Buumi Bwa-MuKristo: Kusolwedelwa",
+      "title": "Muluyando Ulwa-Jesu",
+      "original": "ALL THE WAY",
+      "reference": "Z.H. 257",
+      "key": "A flat",
+      "verses": [
+        "Muluyando ulwa-Jesu\nMwendikede lyoonse,\nMbobusena ububotu,\nButanjilwa zibi,\nNdilalongezegwa oyo\nUwakandifwida,\n||Uundibamba aluzyalo,\nEno ndabotelwa.||",
+        "Nampocili cinti cibi\nIcindibukila,\nLyoonse ndisumpulwa nguwe,\nOyo ngwendisyoma,\nNdoluyando mbul’ ijulu\nUlutalesegwa,\n||Ndoluzyalo mbuli lwizi\nUluteelekedwe.||",
+        "Ulayanda kumuziba?\nUkamutambule,\nLanga eno ul’ afwaafwi\nFwaamba ’mutobele!\nUluyando ulwa-Jesu\nNdulwabantu boonse,\n||Ndilalumba Mwami sunu\nMbwaakanditambula.||"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-86",
+      "kind": "hymn",
+      "number": 86,
+      "section": "Buumi Bwa-MuKristo: Kusolwedelwa",
+      "title": "Jata Itansyi, Taata",
+      "original": "HOLD THOU MY HAND",
+      "reference": "Z.H. 279",
+      "key": "A flat",
+      "verses": [
+        "Jata itansyi, Taata, ndil’ endike,\nNinjumu, yasofwaala nzila yangu,\nJata itansyi, kuti nditayoowi\nNuuba musinze awa, Mwami wangu.",
+        "Jata itansyi, ndimwana musyoonto,\nNsikuzi ukusala nzila yangu,\nJata itansyi, amumakatalo,\nKuti ntawidi ansi, Mwami wangu.",
+        "Jata itansyi, Taata, ndabotelwa\nNdiyovwegwe itansyi lyako, Mwami,\nJata itansyi ndilajana nguzu\nNandilizi kuteeti ul’ afwaafwi.",
+        "Jata itansyi nalwasika lufu,\nNdiyanda kufutulwa Mwami wangu,\nJata itansyi ndisike kumuunzi,\nNdibone busyu bwako, Jesu wangu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-87",
+      "kind": "hymn",
+      "number": 87,
+      "section": "Buumi Bwa-MuKristo: Kusolwedelwa",
+      "title": "Syoma Akuswiilila",
+      "original": "TRUST AND OBEY",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Notuya a-Leza, muluyando lwakwe,\nUsalazye inzila yesu;\nNotwamuswiilila ukala aswebo,\nAbasyoma abaswiilila.",
+        "Takukwe mukuli, takukwe kupenga\nUlatutambula kabotu;\nTakukwe kuyoowa, takukwe kunyema,\nKuti twasyoma twaswiilila.",
+        "Muluyando lwakwe, tulakala munsi,\nTulaenda awe munzila;\nNaamba tucite, twatumwa tuinke,\nMutayoowi pele ’musyome."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Muswiilile, takwe ’nzila imbi,\nKukondwa muli-Jesu pele kuswiilila."
+        }
+      ]
+    },
+    {
+      "id": "hymn-88",
+      "kind": "hymn",
+      "number": 88,
+      "section": "Buumi Bwa-MuKristo: Kusolwedelwa",
+      "title": "Ndateelela Mufutuli",
+      "original": "WHERE HE LEADS ME",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Ndateelela Mufutuli,\nWandiita nkacilile,\nAti, ciingano cangu\nNciyumune lyoonse, ’mucilile.",
+        "Ndacilila ’Getsemane,\nOko kumapenzi oonse,\nAkukunenyigwa koonse,\nAluzyalo lwakwe ’mucilile.",
+        "Ndacilila kukuusa,\nOko kukukankaminwa,\nNdacilila do kulufu,\nAluzyalo lwakwe ’mucilile.",
+        "Ndafutulwa aluzyalo,\nNdayumigwa ’nguzu zyakwe,\nNkandapegwa bwami bwakwe,\nTandi-siyi-siyi pe, lyoonse."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Koonse nkwaanditumina,\nKoonse nkwaanditumina,\nUkalandisololela,\nAluzyalo lwakwe ’mucilile."
+        }
+      ]
+    },
+    {
+      "id": "hymn-89",
+      "kind": "hymn",
+      "number": 89,
+      "section": "Buumi Bwa-MuKristo: Kusolwedelwa",
+      "title": "Koonse Koonse Nkwaya Jesu",
+      "original": "ANYWHERE WITH JESUS",
+      "reference": null,
+      "key": "D",
+      "verses": [
+        "Koonse koonse nkwaya Jesu, ndilainka,\nKoonse nkwanditumina ansi ano;\nKoonse nkwanfiitila ndilamucilila,\nNdilasyoma Jesu, nsikooyoowa, pe.",
+        "Koonse koonse Jesu wandisindikila,\nBamwi bandisiya ulakala ame;\nTondisiyi, Jesu swena kulindime,\nNdilasyoma Jesu, nsikooyoowa pe.",
+        "Koonse koonse Jesu uliizi inzila,\nKumasena oonse wandisololela;\nKondisindikila ndileend’ ayebo,\nNdilasyoma Jesu, nsikooyoowa pe."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Sikwense! Sikwense! Nsikooyoowa pe;\nKoonse koonse, Mwami ndilakucilila"
+        }
+      ]
+    },
+    {
+      "id": "hymn-90",
+      "kind": "hymn",
+      "number": 90,
+      "section": "Buumi Bwa-MuKristo: Kusolwedelwa",
+      "title": "O Lukombo",
+      "original": "HE LEADETH ME",
+      "reference": null,
+      "key": "D",
+      "verses": [
+        "O Lukombo, O Lukombo,\nLumbweza mulizyanyika\nAkundeta kuli-Leza,\nNdimwaambile nzendiyanda;\nMuziindi zyamakatazyo\nKanji ndakakatululwa\nAkutajatwa Musunki,\nNkaambo kanduwe, Lukombo.",
+        "O Lukombo, O Lukombo,\nKotola inkombo zyangu\nKuli-Leza walusyomo\nUuzi kukazika moyo;\nElyo nkaambo wandilaya\nKuti ndisyome ’Jwi lyakwe,\nNdamuletela zipenzya\nMulinduwe, O Lukombo."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-91",
+      "kind": "hymn",
+      "number": 91,
+      "section": "Buumi Bwa-MuKristo: Kusolwedelwa",
+      "title": "Ndisololela Jehova",
+      "original": "GUIDE ME, GREAT JEHOVAH",
+      "reference": null,
+      "key": "A flat or D",
+      "verses": [
+        "Ndisololela Jehova,\nNdili mulweendo lwangu;\nUlaanguzu, ime nyina,\nNdijatilila eno;\nMufutuli, Mufutuli,\n||Nduwe Muvuni wangu.||",
+        "Jalula kasensa kako;\nKalabaponya bantu;\nLeta kusalala kwako,\nKundisololele lyoonse.\nMwaangululi, Mwaangululi,\n||Koba intobo yangu.||",
+        "Kuti ndasika kulufu,\nGwisya kuyoowa kwangu;\nAndinjile julu lyako,\nKoba Mugwasyi wangu;\nNjakwiimba, njakwiimba,\n||Nyimbo zyalutangalo.||"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-92",
+      "kind": "hymn",
+      "number": 92,
+      "section": "Buumi Bwa-MuKristo: Kusyoma Leza",
+      "title": "Ndilasyoma Jesu",
+      "original": "I SURRENDER ALL",
+      "reference": null,
+      "key": "D",
+      "verses": [
+        "Ndilastoma, Jesu,\nNdilasyoma, Jesu,\nAwo woonse moyo wangu,\nNdilasyoma, Jesu.",
+        "Kooneka, Mwami,\nKooneka, Mwami,\nAmumoyo wangu woonse,\nKooneka, Mwami.",
+        "Ubalete, Jesu,\nUbalete, Jesu,\nAbo boonse bakabweeda,\nUbalete, Jesu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-93",
+      "kind": "hymn",
+      "number": 93,
+      "section": "Buumi Bwa-MuKristo: Kusyoma Leza",
+      "title": "Ndakusyoma, Mwami Jesu (Cila)",
+      "original": "STEPHANOS",
+      "reference": "Z.H. 197",
+      "key": "G",
+      "verses": [
+        "Ndakusyoma, Mwami Jesu,\nMdiwena olike\nUlozya kunfutulila\nMafunze.",
+        "Nkusyomene nsana, Mwami,\nNdimufwafwalisi,\nTukal’ aze, mbe muzumo\nSikwense.",
+        "Nkusyomene ’bo busongo,\nMdime mulimbusi,\nNsindakwiizi nzila yako\nIisweya.",
+        "Nkusyomene kusanziwa\nMubulowa bwako,\nKosalazya mozo woonse\nUsunu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-94",
+      "kind": "hymn",
+      "number": 94,
+      "section": "Buumi Bwa-MuKristo: Kusyoma Leza",
+      "title": "Ngwinzanda Lyoonse (Cila)",
+      "original": "I NEED THEE EVERY HOUR",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Ngwinzanda lyoonse\nNgu-Mwami uSiluse,\nNaakalilila mwangu\nMulatontola ne.",
+        "Ngwinzanda lyoonse,\nNgu-Mwami nSinsana,\nUunzundya masukusyo\nJesu uunzumya nta.",
+        "Ngwinzanda lyoonse,\nNgu-Mwami owabuumi\nKucoolwe, kumapenzi,\nTakasanduki pe.",
+        "Ngwinzanda lyoonse,\nNgu-Mwami uukanjiya\nLuzando lwa-Taatesu\nIciindi coonse."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ngwinzanda ndiwe Jesu,\nTube aze Mwami,\nMpa coolwe cabasyomi,\nNdeziza inzyo."
+        }
+      ]
+    },
+    {
+      "id": "hymn-95",
+      "kind": "hymn",
+      "number": 95,
+      "section": "Buumi Bwa-MuKristo: Kusyoma Leza",
+      "title": "Lusyomo Lutakamani",
+      "original": "O FOR A FAITH",
+      "reference": null,
+      "key": "B flat",
+      "verses": [
+        "Lusyomo lutakamani,\nNolukatazigwa;\nLutakayowi mapenzi,\n||Nobasinkondoma.||",
+        "Lusyomo lutakatongi,\nNalwalaigwa;\nPele mumapenzi alo.\n||Lukasyome Leza.||",
+        "Lusyomo lukakomene\nKabotu lyoonse;\nKwina kulimbulula\n||Amapenzi oonse.||",
+        "Leza kotupa lusyomo,\nLuzunda lyoonse;\nElyo tuya kumubona,\n||Kumuunzi okuya.||"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-96",
+      "kind": "hymn",
+      "number": 96,
+      "section": "Buumi Bwa-MuKristo: Kusyoma Leza",
+      "title": "Ibbwe Liyumu",
+      "original": "MY HOPE IS BUILT",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Kulangila kwangu koonse\nKuli mubulowa bwakwe;\nNdasyoma Jesu alike\nNguwakandisalulula.",
+        "Na mudima wamusisa,\nNdajata luse luyumu;\nNokuba mapenzi abe,\nNdatijila kulinguwe.",
+        "Kusyomezya abulowa,\nNkokum’vuna mumasunko\nBamwi nibawa cibi,\nNdiya kukala anguwe.",
+        "Akuboola amukunga,\nNdayanda akantambule;\nNkesamide bululami,\nNketakwe kaambo awalo."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Jesu alike ndi-Bbwe lyangu;\nZimana nsiziyandi,\nZimana nsiziyandi pe."
+        }
+      ]
+    },
+    {
+      "id": "hymn-97",
+      "kind": "hymn",
+      "number": 97,
+      "section": "Buumi Bwa-MuKristo: Kusyoma Leza",
+      "title": "Atusyome Mwami Jesu",
+      "original": "‘TIS SO SWEET TO TRUST IN JESUS",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Atusyome Mwami Jesu,\nTuteelele majwi aakwe;\nCisyomezyo tucisyome,\nCakapegwa kulindiswe.",
+        "Atusyome Mwami Jesu,\nSyoma kusalala kwakwe;\nAtusambe mubulowa,\nTulasanzya zibi zyesu.",
+        "Atusyome Mwami Jesu,\nWanngululwe ’zibi zyesu;\nTukajane buumi bwakwe,\n’Kubotelwa akuumuna.",
+        "Ndabotelwa kumusyoma,\nJesu, Mufutuli wnagu;\nNdizi kuti al’ amebo,\nSunu akumamanino."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Jesu, Jesu, twamusyoma,\nTwamuyanda eneeno;\nJesu, Jesu, Mwami wesu,\nTumusyome lyoonse."
+        }
+      ]
+    },
+    {
+      "id": "hymn-98",
+      "kind": "hymn",
+      "number": 98,
+      "section": "Buumi Bwa-MuKristo: Kusyoma Leza",
+      "title": "Nsius’ Insoni Ukwa-Jesu (Cila)",
+      "original": "AT THE CROSS",
+      "reference": null,
+      "key": "E",
+      "verses": [
+        "Nsius’ insoni ukwa-Jesu\nOkuciingano,\nNinsana syaka-Leza wesu.\nMbusibonwa ano.",
+        "Ndeziba izina lyakwe,\nJesu uusyomeka,\nTasimbulila nsana syakwe,\nMwami ngundemeka.",
+        "Ndeziba Mwami ngwinsyomene,\nInzyo ndilaminwe\nKuti walozya kucibamba\nNcimbikilwe kwakwe.",
+        "Kubusyu bwaka-Leza, Jesu\nUkalansimuna,\nUkalandulikila kwakwe\nBukalilo bwangu."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Kuncico, kuncico,\nCiingano ca-Jesu,\nNkundemunwa syandemena umozo\nKuncico ndibwene lufuno lwakwe,\nCilantangazya lyoonse."
+        }
+      ]
+    },
+    {
+      "id": "hymn-99",
+      "kind": "hymn",
+      "number": 99,
+      "section": "Buumi Bwa-MuKristo: Kusyoma Leza",
+      "title": "Ndajana Mweenzuma",
+      "original": "WHAT A FRIEND",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Ndajana mweenzuma mwini,\nWandiyanda lutanzi;\nNenditaninga muyanda,\nWandyanga luyando;\nWauzambaila moyo,\nIntambo yaluyando,\nNdili wakwe, uli wangu;\nNgwangu oku tamani.",
+        "Ndajana mweenzuma mwini,\nOwakandiyasilwa;\nWakandipa kufutuka;\nUlwakwe mwini Jesu.\nKunyuna ncenga’mba ncangu,\nNkwe ndijisi nko kwakwe,\nMoyo aunguzu zyangu,\nNzizyakwe kutamani.",
+        "Ndajana mweenzuma mwini,\nWapegwa nguzu zyoonse,\nZyakundyeenzya munzila,\nNdikasike kujulu,\nCoolwe cilamweka munsi,\nCilandibuzya calo,\nEno ndanyona, ndalwana,\nNdilakulyookezya ko."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-100",
+      "kind": "hymn",
+      "number": 100,
+      "section": "Buumi Bwa-MuKristo: Kusyoma Leza",
+      "title": "Ibbwe Eli Ngu-Mwami Wesu",
+      "original": "A SHELTER IN THE TIME OF STORM",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Ibbwe wli ngu-Mwami wesu,\nTuya kuyubila mumo;\nNakuba kukatazigwa,\nKnocili coonde ciyumu.",
+        "Ncisitilizyo isikati,\nTuya kuyubila mumo;\nMuntu takatuyoosyi,\nNkocili coonde ciyumu.",
+        "Mapenzi navula buti,\nTuya kuyubila mumo;\nTulajana muli-Leza,\nNkocili coonde ciyumu.",
+        "Citijila eci ndibbwe,\nTuya kuyubila mumo;\nKoba nduwe utugwasya,\nNkocili coonde ciyumu."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Nciyumu coonde canguzu,\nNcimvule ciindi nikupya;\nMwendezi wakeendenda,\nNkocili coonde ciyumu."
+        }
+      ]
+    },
+    {
+      "id": "hymn-101",
+      "kind": "hymn",
+      "number": 101,
+      "section": "Buumi Bwa-MuKristo: Kusyoma Leza",
+      "title": "Jesu, Ciingano Cangu (Cila)",
+      "original": "GRACE",
+      "reference": "M.H. A.T. 24",
+      "key": null,
+      "verses": [
+        "Jesu, ciingano cangu,\nNdacibweza, nkucilile,\nMbe mupusi, musampule,\nNdi muvubi mulindiwe.\nSyabulyo syaswewa,\nSyaninzyo syalekwa,\nPele ome ndisicoolwe,\nNinfuila syezeulu.",
+        "’Ba-Saatani bansampaula,\nBakamusampaula Jesu\nMbundasyoma nibancenga,\nMwami Mwini wasyomeka.\nNuucimwenamwena,\nKwina ucimpenzya\nNabansiya, nabansula,\nNcisakilwe mulindiwe.",
+        "Mozo wangu utambule\nLufutuko luzulile\nMakatazyo na matizyo,\nAlazundwa mulinguwe.\nBweza ciingano\nCakwe cabulemu,\nMwami Mwini ngu-Sinsana,\nUtusisya kubumane."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-102",
+      "kind": "hymn",
+      "number": 102,
+      "section": "Buumi Bwa-MuKristo: Kusyoma Leza",
+      "title": "Komusyoma",
+      "original": "ONLY TRUST HIM",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Koboola umwi azingwa\nKuluse lwa-Leza;\nUyoojana luumuno,\nAkusyoma Ijwi.",
+        "Bulowa bwakatilwa ansi,\nNkwa-Jesu Muvuni;\nDumpukila mubulowa\nSamba utube bu.",
+        "Jesu ninzila mbo buumi\nUjane luumuno;\nKomusyoma sunu buya,\nUlatondezegwa.",
+        "Njila lumamba lusweya,\nUkaye kujulu;\nTukanjile muunzi mupya,\nKutangala lyoonse."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Komusyoma, komusyoma,\nKosyoma lino;\nUlavuna, ulavuna,\nUvuna lino."
+        }
+      ]
+    },
+    {
+      "id": "hymn-103",
+      "kind": "hymn",
+      "number": 103,
+      "section": "Buumi Bwa-MuKristo: Kulumba",
+      "title": "Ndilakondwa",
+      "original": "I AM SO GLAD",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Ndilakondwa nkaambo Leza wesu,\nWaamba luyando lwakwe mwiBbuku;\nMuzigambya zili mu-Malembe.\nCipati ncakuti wandiyanda.",
+        "Wandiyanda, ame ndamuyanda,\nNduyando lwakamuleta kunsi;\nNduyando lwamucita amfwide,\nMdasinizya kuti wandiyanda.",
+        "Ndabuzigwa inga ndilaambanzi?\nMajwi ngenkonzya kuvuwa ngaaya;\nMuuya wa-Leza ulaandyambila\nKuti Jesu lyoonse wandiyanda."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ndakondwa kuti wandiyanda,\nWandiyanda, wandiyanda;\nNdakondwa kuti wandiyanda,\nWandiyanda, mebo."
+        }
+      ]
+    },
+    {
+      "id": "hymn-104",
+      "kind": "hymn",
+      "number": 104,
+      "section": "Buumi Bwa-MuKristo: Kulumba",
+      "title": "Mumulimo wa-Mwami",
+      "original": "IN THE SERVICE OF THE KING",
+      "reference": null,
+      "key": "B flat",
+      "verses": [
+        "Ndabotelwa, mumulimo wa-Mwami,\nNdabotelwa, ndabotelwa;\nNdilijisi kutangala kwa-Leza,\nMumulimo wa-Mwami.",
+        "Ndabotelwa mumulimo wa-Mwami,\nNdabotelwa, ndabotelwa;\nNa kuumuna na mapenzi ndaimba,\nMumulimo wa-Mwami.",
+        "Ndabotelwa mumulimo wa-Mwami,\nNdabotelwa, ndabotelwa;\nNdajatilila itansi lyakwe,\nMumulimo wa-Mwami.",
+        "Ndabotelwa, mumulimo wa-Mwami,\nNdabotelwa, ndabotelwa;\nZintu zyangu ndazipa kulinduwe,\nMumulimo wa-Mwami."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Mumulimo wa-Mwami,\nMatalenta ndaleta,\nNdilijisi cilongezyo,\nMumulimo wa-Mwami."
+        }
+      ]
+    },
+    {
+      "id": "hymn-105",
+      "kind": "hymn",
+      "number": 105,
+      "section": "Buumi Bwa-MuKristo: Kulumba",
+      "title": "Ndayanda Kwaamba Kaambo",
+      "original": "I LOVE TO TELL THE STORY",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Ndayanda kwaamba kaambo\nKazitalibonya,\nJesu acoolwe cakwe,\nAluyando lwakwe;\nNdayanda kwaamba kaambo,\nMbwendizi kasimpe,\nKalandikomanisya\nKuli zintu zyoonse.",
+        "Ndayanda kwaamba kaambo,\nKalainda koonse\nNkotuyanda kuyeeya\nMukulota kwesu;\nNdayanda kwaamba kaambo,\nAkakandivuna,\nNcendiimba kaambo aka\nKulinduwe eno.",
+        "Ndayanda kwaamba kaambo\nNkainu, kukamba\nLyoonse nindakanana,\nKainda kubota;\nNdayanda kwaamba kaambo,\nBamwi batanamvwa,\nKaambo kakufutuka\nMwiBbuku lya-Leza."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ndayanda kwaamba kaambo,\nKalaba coolwe cangu,\nKwaamba kaambo kakale\nKaluyando lwakwe."
+        }
+      ]
+    },
+    {
+      "id": "hymn-106",
+      "kind": "hymn",
+      "number": 106,
+      "section": "Buumi Bwa-MuKristo: Kulumba",
+      "title": "Naulabotelwa",
+      "original": "THANKSGIVING (Ukubonga)",
+      "reference": "Z.H. 264",
+      "key": "F",
+      "verses": [
+        "Naulabotelwa\nLumba, lumba,\nOmbuli muyuni\nUlaimba;\nNawatumwa Muuya,\nFwamba utuulele,\nFwamba ukombelwe,\nTumwiimbile.",
+        "Nawabona Jesu\nLumba, lumba,\nLumba luse lwakwe,\nTumwiimbile;\nWakatupengela,\nWakatubukila,\nUwakatufwida,\nTumwiimbile.",
+        "Naul’ amapenzi\nLumba, lumba,\nKulamubotezya,\nTumwiimbile;\nBoonse abaangelo\nBalalumba Mwami,\nLumba, lumba abo,\nTumwiimbile."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Atumwiimbile,\nKulamubotezya;\nAtutangalisye,\nTumwiimbile."
+        }
+      ]
+    },
+    {
+      "id": "hymn-107",
+      "kind": "hymn",
+      "number": 107,
+      "section": "Buumi Bwa-MuKristo: Kulumba",
+      "title": "Moyo Ulumba Jehova",
+      "original": "O FOR A HEART",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Moyo ulumba Jehova,\nMoyo utaangwi;\nMoyo ubona bulowa,\n||Bwatililwa ndime.||",
+        "Moyo mutete, O-Mwami,\nCuuno ca-Muvuni\nNkwatelelwa Mwami Kristo,\n||Nkwakala alike.||",
+        "Moyo mubombe, mutete,\nUsyoma, usweya;\nKwina cintu caandanya,\n||Mwami ambebo.||",
+        "Moyo uyeezya zibotu,\nAmulusinizyo,\nMoyo ululeme mbuli\n||Moyo yako, Mwami.||"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-108",
+      "kind": "hymn",
+      "number": 108,
+      "section": "Buumi Bwa-MuKristo: Kulumba",
+      "title": "Mumapenzi Oonse Ngojana",
+      "original": "COUNT YOUR BLESSINGS",
+      "reference": null,
+      "key": "E flat",
+      "verses": [
+        "Mumapenzi ayo oonse ngojana,\nMukuusa koonse amukweetela;\nBala zilongezyo Leza nzyakupa,\nMbube ualumba nkaambo zyavula.",
+        "Walemenwa akupenga yoomwana,\nIciingano ncoyumwine calema?\nBala buyo zintu Leza nzyakupa,\n’Lwiimbo kumulumba ulalujana.",
+        "Na wabona ubuvubi bwabantu,\nUtazilingi zyoonse zilamana;\nBala buyo zilongezyo nzyakupa,\nKujulu uyookupa buumi bwako.",
+        "Eno mumapenzi oonse utacimwi,\nLeza u-Mupati ulakubona;\nWalo nguuzi nzila yoonse njoenda,\n’Lweendo loonse mwini ulakugwasya."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Bandauka zintu zibotu,\nBandauka nzyakupa Leza;\nKozibala uzibandauke,\nMbube ulalumba nkaambo zyavula."
+        }
+      ]
+    },
+    {
+      "id": "hymn-109",
+      "kind": "hymn",
+      "number": 109,
+      "section": "Buumi Bwa-MuKristo: Kulumba",
+      "title": "Jesu Mufutuli Wangu",
+      "original": "JESUS IS DEARER THAN ALL",
+      "reference": null,
+      "key": "B flat",
+      "verses": [
+        "Jesu Mufutuli wangu,\nMufutuli uyandwa;\nNdamufugamina buti\nNkaambo kaluse lwakwe;\nKwasiya mbi loko.\nWalangaula ’mbelele,\nWakanfileta kumuunzi.",
+        "Jesu Munununi wangu\nEno ndamuyandisya;\nJesu ndebbwe lyangu\nAlufutuko lwangu;\nKusekelela kwa-Mwami,\nNkukwangu lyoonse.\nKwina bukata mu-Jesu\nWapona kulindime.",
+        "Jesu wazyalwa muciba,\nWeenda kucuungano;\nWatila bulowa bwakwe\nWafwa kutufutula;\nWakabuka acuumbwe,\nWaunka kujulu;\nEneeno ulaboola,\nMumakumbi akujulu."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Jesu, Jesu, wainda bantu boonse,\nJesu, Jesu, ndilaba mwanaako;\nKoonse kondisololela,\nNdilacilila ko,\nElyo musinzo wamana,\nNdabona busyu bwako."
+        }
+      ]
+    },
+    {
+      "id": "hymn-110",
+      "kind": "hymn",
+      "number": 110,
+      "section": "Buumi Bwa-MuKristo: Kulumba",
+      "title": "Jesu, Ndilakuyanda",
+      "original": "MY JESUS I LOVE THEE",
+      "reference": "Z.H. 248",
+      "key": "F",
+      "verses": [
+        "Jesu, ndilakuyanda, ndizi uli wangu,\nNdazisiya zibi eziyanza zyaansi,\nMuvuni waboonse, Mufutuli wangu,\nIi, ndakuyanda, kukabe kutamani.",
+        "Ndakuyanda ukuti ucindiyandisya,\nWakandinununa muzibi zipati,\nWasama musini wamamvwa ankumo,\nIi, ndakuyanda, kukabe kutamani.",
+        "Ndakuyanda nendiwe, nokuba nandafwa,\nNjoolumba nencili mucisi omuno,\nNdiyooti kukufwa kwamubili wangu,\nIi, ndakuyanda, kukabe kutamani.",
+        "Akumaanda aa-Mwami nkoku-Mufutuli,\nNdiyookala lyoonse mumuunzi wejulu,\nNjooimba amusini amutwe wangu,\nIi, ndakuyanda, kukabe kutamani."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-111",
+      "kind": "hymn",
+      "number": 111,
+      "section": "Buumi Bwa-MuKristo: Kulumba",
+      "title": "Lumba! Lumba!",
+      "original": "PRAISE HIM! PRAISE HIM!",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Lumba, lumba, Jesu Muvuni wesu,\nImba, imba, luyanda aluse;\nAnzya, anzya, Leza uyiinda zyoonse;\nKolemeka izina lyakwe;\nMweembezi, Jesu ubamba bakwe;\nMumaboko ubabweza lyoonse.",
+        "Lumba, lumba, Jesu Muvuni wesu,\nMuvuni wakapenga azibi;\nNdebbwe, lyalusyomo lyalufutuko,\nAnzya, anzya, Jesu ubambulwa;\nLumba, lumba, wabweza zibi zyesu\nLuse lwakwe ndupati, ndulamfu.",
+        "Lumba, lumba, Jesu Muvuni wesu,\n’Nyimbo zinji zyaimbwa kujulu;\nJesu Kristo uyakulela lyoonse\nMucite Musinsimi aa-Mwami;\nUlaboola kuzunda nyika yoonse;\nKulinguwe akube bulemu."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Lumba, lumba,\nAmba luzyalo lwakwe;\nLumba, lumba,\nLyoonse mulwiimbo."
+        }
+      ]
+    },
+    {
+      "id": "hymn-112",
+      "kind": "hymn",
+      "number": 112,
+      "section": "Buumi Bwa-MuKristo: Kulumba",
+      "title": "Jesu Nguwangu",
+      "original": "BLESSED ASSURANCE",
+      "reference": null,
+      "key": "D",
+      "verses": [
+        "Kwina buusu, Jesu nguwangu\nKulabila bubotu bwa-Leza;\nMakani akwe, muulo wakwe,\nMusalwi ’Muuya, ndasanzigwa.",
+        "Lusyomo lwangu, Jesu nguwangu!\nJesu ngu-Musololi wangu;\nBaangelo bakwe balaboola,\nBaangelo bakwe balaboola,\nMazuba oonse kundiyovwa.",
+        "Lusyomo lwangu, Jesu nguwangu!\nKuzuminisya, kulyookezya;\nMu-Mufutuli ndalelekwa,\nNdaangululwa, ndime wakwe."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Makani angu, Jesu nguwangu!\nNdalumba Mwani ciindi coonse.\nMakani angu, Jesu nguwangu!\nNdalumba Mwano ciindi coonse."
+        }
+      ]
+    },
+    {
+      "id": "hymn-113",
+      "kind": "hymn",
+      "number": 113,
+      "section": "Buumi Bwa-MuKristo: Kulumba",
+      "title": "Ndamulumba",
+      "original": "I WILL PRAISE HIM",
+      "reference": null,
+      "key": "E flat",
+      "verses": [
+        "Nindakuubona mwinzo\nUli bukwazi lyoonse;\nNdamvwa kusela kwa-Muuya,\nWandiita, “Kosamba”.",
+        "Nikuba kuti inzila,\nYalulama, yasweya;\nNdazumina kuli Leza\nKuleka zibi zyangu.",
+        "Elyo Muuya Usweyisya\nWanjila mumoyo wangu;\nNsikalubi kumulumba,\nAleluya ku-Mwami.",
+        "Walelekwa Jesu Kristo,\nNdabotelwa lyoonse;\nZibi zyangu zyajatilwa,\nMoyo wangu wasamba."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ndamulumba, ndamulumba,\nMwami uwakatufwida;\nTumupe bulemu boonse,\nBulowa bwakwe bwatusanzya."
+        }
+      ]
+    },
+    {
+      "id": "hymn-114",
+      "kind": "hymn",
+      "number": 114,
+      "section": "Buumi Bwa-MuKristo: Kulumba",
+      "title": "Jesu Ul’ Ame Ciindi Coonse",
+      "original": "I REMEMBER CALVARY",
+      "reference": null,
+      "key": "E flat",
+      "verses": [
+        "Jesu ul’ ame ciindi coonse,\nNdilamusyoma, Mwami wangu,\nNdilayeeya Jesu Mwini\nNg’wakandifwid’ a-Kalvari.",
+        "Ndalumbaizya Mufutuli,\nWakandiyanda cinicini,\nWakazumina kulipeda,\nWakandifwid’ a-Kalvari.",
+        "Ndilabotelwa kutobela\nMoonse munzila mwanditola.\nNdilateelela majwi aakwe\nMbwaakandifwid’ a-Kalvari.",
+        "Nsilimbululi, nsikooyoowa,\nNkaambo ndasyoma Mwami Jesu\nBumwi buzuba ndiyoobona\nUwandifwid’ a-Kalvari."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Jesu ul’ame ciindi coonse,\nJesu ul’ ame ’lweendo loonse,\nNgo-Mulongwaangu uutandisiyi,\nNkaambo ndayeeya Kalvari."
+        }
+      ]
+    },
+    {
+      "id": "hymn-115",
+      "kind": "hymn",
+      "number": 115,
+      "section": "Buumi Bwa-MuKristo: Kukomba",
+      "title": "Afwaafwi, Afwaafwi",
+      "original": "CLOSE TO THEE",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Jesu ngo-Muvuni wangu,\nWainda zintu zyoonse;\nMunzila yangi yoonse,\nKuti nkende ayebo.\n||Afwaafwi, afwaafwi,||\nMunzila yangu yoonse,\nKuti nkende ayebo.",
+        "Nsikombeli impuwo,\nNuuba mulimo muuba,\nNjakukupengela Mwami,\nKuti nkende ayebo.\n||Afwaafwi, afwaafwi,||\nNjakukupengela Mwami,\nKuti nkende ayebo.",
+        "Sololela buumi bwangu\nMubusena bwalufu\nMulyango ’takoojalwa,\nKuti njile ayebo.\n||Afwaafwi, afwaafwi,||\nMulyango ’takoojalwa,\nKuti njile ayebo."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-116",
+      "kind": "hymn",
+      "number": 116,
+      "section": "Buumi Bwa-MuKristo: Kukomba",
+      "title": "Taata, Ukandipe Moyo",
+      "original": "AZMON",
+      "reference": "Z.H. 275",
+      "key": "A",
+      "verses": [
+        "Taata, ukandipe moyo\nUsalala buya;\nUkandipe muuya mupya\nUl’ akusinizya.",
+        "Ulawuyandisya moyo\nUli akuusa;\nTokoowusula umuuya\nUwakulibonzya.",
+        "Taata, utakandisowi\nKubooneki bwako,\nKwalo ukandibotezya\n’Kubotelwa kwako.",
+        "Kosinkula matwi angu\n’Mvwe luzyalo lwako;\nNkembaambila ababisya,\nAmakani aako."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-117",
+      "kind": "hymn",
+      "number": 117,
+      "section": "Buumi Bwa-MuKristo: Kukomba",
+      "title": "Wakomba Na?",
+      "original": "DID YOU THINK TO PRAY?",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Koocili mug’ anda yako.\nSa wakomba na?\nMwizina lya-Mwami Jesu,\nMbuli intobo?",
+        "Nuwasukusigwa sunu,\nSa wakomba na?\nMukulemekezya kwakwe,\nSa wabuzya muuya wakwe,\nKukuzolweda?",
+        "Na wanyemo moyo wako,\nSa wakomba na?\nSa wabuzya luse, Musa,\nKuti ujatile umwi,\nWakubisizya?",
+        "Mapenzi acis’ askika,\nSa wakomba na?\nNa moyo wako wausa,\nSena wakumbila ’nguzu, Nobwaca sunu?"
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Kukomba kugwasya bantu,\nKukomba kusandula,\nMudima kuba mumuni,\nKokomba sunu."
+        }
+      ]
+    },
+    {
+      "id": "hymn-118",
+      "kind": "hymn",
+      "number": 118,
+      "section": "Buumi Bwa-MuKristo: Kukomba",
+      "title": "Utakundiinda",
+      "original": "PASS ME NOT",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Ndakomba utakundiinda,\nMuvuni wangu;\nAbamwi wabaswiilila,\nNswiilila ambe.",
+        "Isunu ndilazwa moyo,\nNdaleka eno;\nAbamwi wabausila,\nUsila ambe.",
+        "Takwe umbi undigwasya,\nNdiwe olike;\nAbamwi wabasilika\nNsilika ambe.",
+        "Nsikwe zilakubotezya,\nNdili mupusi;\nAbamwi tokoobatanda,\nTontandi ambe."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Jesu, Jesu, ndakukumbila,\nAbamwi wakubagwasya\nTondiindi ambe."
+        }
+      ]
+    },
+    {
+      "id": "hymn-119",
+      "kind": "hymn",
+      "number": 119,
+      "section": "Buumi Bwa-MuKristo: Kukomba",
+      "title": "Jesu, Mwami, Kondiyovwa",
+      "original": "JESUS, SAVIOR, PILOT ME",
+      "reference": null,
+      "key": "B flat",
+      "verses": [
+        "Jesu, Mwami, kondiyovwa,\nUkuzunda zintu zyoonse\nNsizi zintu ziti sike,\nLufu nalusika lili,\nKwalo Jesu ulizizi,\nJesu, Mwami, kondiyovwa.",
+        "Mbwendakala ansi ano,\nUlakonzya kundilela.\nZintu zyoonse zyateelela\nJes, Mwami, Mufutuli,\nUlakonzya kundiyovwa.",
+        "Nakwasika kufwa kwangu,\nNdipa icibanda cako,\nNdipa ukuyanda kwako,\nInteelele majwi aako,\nAlaamba kulindime:\n“Ndakuyovwa! Utayoowi.”"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-120",
+      "kind": "hymn",
+      "number": 120,
+      "section": "Buumi Bwa-MuKristo: Kukomba",
+      "title": "Ndilamwaambila Jesu",
+      "original": "I MUST TELL JESUS",
+      "reference": null,
+      "key": "E flat",
+      "verses": [
+        "Ndilamwaambila mapenzi angu;\nNsikonzyi kuyumuna mukuli;\nMumais’ angu ulandigwasya;\nUlandiyand’ akundibamba.",
+        "Ndilamwaambila mapenzi oonse;\nNgooyu mweenzuma Siluzyalo;\nNandamukumbila ulandipa;\nUlagwasya mapenzi angu.",
+        "Babi bayanda kundizolweda;\nMoyo wangu uyanda kubisya;\nNdilamwaambila, ulandigwasya,\nKuzunda Saatani munyika."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ndilamwaambila! Ndilamwaambila!\nNsikonzyi kuyumuna mukuli;\nNdilamwaambila Jesu alike,\nUlandigwasya, Jesu wangu."
+        }
+      ]
+    },
+    {
+      "id": "hymn-121",
+      "kind": "hymn",
+      "number": 121,
+      "section": "Buumi Bwa-MuKristo: Kukomba",
+      "title": "Ninsene Kwako, Leza (Cila)",
+      "original": "NEARER, MY GOD TO THEE",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Ninsene kwako, Leza,\nNsene kwako,\nNikuba kumapenzi,\nNsenye ako.\nNdulolu lwiimbo lwangu,\nMizeezo iili kwangu,\nNinsene kwako\nNsene kwako.",
+        "Ninsene kwako, Leza,\nNsene kwako,\nNciceeci ncimbulila,\nManga ako.\nNkukuti nkasenyiwe\nKufwaafwi kulindiwe,\nNinsene kwako\nNsene kwako.",
+        "Ninsene kwako, Leza,\nUnsenyisye,\nNciceeci ncinkumbila,\nTukayanane aze,\nTukafunane aze,\nNinsene kwako\nNsene kwako."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-122",
+      "kind": "hymn",
+      "number": 122,
+      "section": "Buumi Bwa-MuKristo: Kukomba",
+      "title": "Ndili Wako, Mwami",
+      "original": "DRAW ME NEARER",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Ndili wako, Mwami, ndilimvwide ijwi\nIlyamba aluyando,\nKwalo moyo wangu ulayandisiya\nUkuswena kulinduwe.",
+        "Konditola, Mwami, nkabe wako ’like,\nNdalitula buya sunu;\n’Moyo wangu woonse amatansyi angu,\nNkumanine imilimo.",
+        "Kulandibotezya kufugama, Mwami,\nNkotilongezegwa nduwe,\nNkotujana nguzu aluzundo loonse,\nNkotwaambaul’ ayebo.",
+        "Uluyando lwako ndolupati, Mwami,\nTatukonzya kulweeleka;\nKubotelwa oku nkotujisi kuno,\nKulayungililwa kuya."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Kondiswenya, kondiswenya, Mwami,\nKuciingan cako;\nKondisweny’ afwaafwi, kondiswenya, Mwami,\nKuciinfano cako."
+        }
+      ]
+    },
+    {
+      "id": "hymn-123",
+      "kind": "hymn",
+      "number": 123,
+      "section": "Buumi Bwa-MuKristo: Kukomba",
+      "title": "Ciindi Cakukomba",
+      "original": "SWEET HOUR OF PRAYER",
+      "reference": null,
+      "key": "D",
+      "verses": [
+        "Ciindi cakumupaila,\nCilatondezya mulimo,\nCilandiita kuya kwakwe,\nKwaambilwa nko ndiyandisya,\nMuziindi zyakupengesya,\nLyoonse ndajana kuvunwa,\nKuzwa kukubisya kwangu,\nMuciinci cakumukomba.",
+        "Ciindi cakumupaila,\nNdamvwa kukondwa ’luzyalo,\nUla babo balindila,\nKuboola kwa-Mwami Jesu,\nNdafwambaana kucilao,\nKubona busyu bwa-Leza,\nKutambula cuuno cangu,\nAkulindila kumukomba.",
+        "Ciindi cakumupaila,\nMababa alakutola,\nKuli oyo usyomeka,\nKukukondezya yebo,\nUlandiita kumuyanda,\nAkuzumina ’kusyoma,\nNdilainka julinguwe,\nKulindila kumukomba."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-124",
+      "kind": "hymn",
+      "number": 124,
+      "section": "Buumi Bwa-MuKristo: Kukomba",
+      "title": "Ciingano Cajulwa",
+      "original": "ROCK OF AGES",
+      "reference": null,
+      "key": "B flat",
+      "verses": [
+        "Ciingano cajulwa,\nNdisise mulincico;\nZumizya bulowa bwako,\nBwakunka kulinduwe,\nBube bwakusilisya\nZibi, Lunungu loonse.",
+        "Ndalila kutamani,\nBusungu butamani,\nTabulungili zibi;\nNduwe mwini olike,\nOfutula babisyi,\nPele bulowa bwako.",
+        "Kulamana juyoya\nMeso angu aona,\nMoyo wangu waunka,\nKucuuno ca-Mwami;\nCiingano cajulwa,\nNdisise mulincico."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-125",
+      "kind": "hymn",
+      "number": 125,
+      "section": "Buumi Bwa-MuKristo: Kukomba",
+      "title": "Ndayandisya Mumalundu",
+      "original": "HIGHER GROUND",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Ndayandisya mumalundu,\nNdatanta mazuba oonse;\nNdaya kukomba koonse\nLeza ndikwela kujulu.",
+        "Nsiyandi kukala ano,\nAtakondwi akuyowa,\nBanji balayand’ okuno,\nMebo ndayanda kujulu.",
+        "Ndayanda kuteelelesya,\nNa Saatani ulapenzya;\nMbondakondwa kuli-Leza\nMdilakwiinka kujulu."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Leza ndibweza, ndiime,\nMukukondwa kwakujulu;\nCilao cilamfu eco,\nLeza, ndikwela kujulu."
+        }
+      ]
+    },
+    {
+      "id": "hymn-126",
+      "kind": "hymn",
+      "number": 126,
+      "section": "Buumi Bwa-MuKristo: Kukomba",
+      "title": "Jesu, Owamasi-masi (Cila)",
+      "original": "EVEN ME",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Jesu owamasi-masi,\nUufutula boonse,\nMukuzingasila banji,\nNzingasila Jesu\n||Nzingasila,||\nNzingasila Jesu.",
+        "Jesu owangwala bako\nMwiBbuku lyako,\nMukoompolola banji,\nNgompolola Jesu\n||Ngompolola,||\nMgompolola Jesu.",
+        "Jesu oweenzya bako\nKwizeulu kwako,\nAme nkeenzyiwe ndiwe,\nNdeezye nzila, Jesu\n||Ndeezye znila,||\nNdeezye nzila, Jesu.",
+        "Jesu owanjizya bako\nMomo mwizeulu,\nUtandubi, ndimwanaako,\nUndinjinzye Jesu.\n||Undunjizye,||\nUndinjizye Jesu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-127",
+      "kind": "hymn",
+      "number": 127,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Amajwi Oonse aa-Mwami Leza",
+      "original": "TELL ME MORE ABOUT JESUS",
+      "reference": "Z.H. 182",
+      "key": "E flat",
+      "verses": [
+        "Amajwe oonse aa-Mwami Leza\nMabotu nkaambo ngaakwe Mwini,\nAzibwe ansi akujulu,\nTola majwi aa-Jesu!",
+        "Kwakafwa oonse malangalanga,\nKwavumbwa zuba amakumbi,\nZibotu zilafwamba kwiinda\nTola majwi aa-Jesu!",
+        "Balafwa bantu abatamwizi,\nBalila, balemenwa zibi\nKatuya tubakombelele,\nTola majwi aa-Jesu!",
+        "Ubuumi tuyoobujana kwakwe,\nBukalo bwesu bwakujulu,\nLyoonse tuyooimba oko,\nTola majwi aa-Jesu!"
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Tola majwi aa-Jesu!\nTola majwi aa-Jesu!\nOwandiyanda Nkentanaziba\nTola majwi aa-Jesu!"
+        }
+      ]
+    },
+    {
+      "id": "hymn-128",
+      "kind": "hymn",
+      "number": 128,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Kobeleka",
+      "original": "TOILING ON",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Kobeleka! Kobeleka! Tobazike ba-Leza,\nAtutobele ’nguzu zya-Mwami wesu;\nUlatupa inguzu zyakubeleka,\nAtucite enguzu mulimo wa-Leza.",
+        "Kobeleka! Kobeleka! Sanina bafwa nzala,\nKobasolweda batete kufutuka;\nNce ciingano catupa coolwe cesu,\nTulaimba “Lufutuko lwabantu boonse”",
+        "Kobeleka! Kobeleka! Munguzu zya-Mwami,\nTulakulyookezya kuzwa mumulimo;\nKumuunzi wa-Jehova, tulakala oko,\nTulaimba “Lufutuko lwabantu boonse.”"
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Beleka, beleka,\nBeleka, beleka;\n’Tusyome, ’tulange,\nMane Jesu akaboole."
+        }
+      ]
+    },
+    {
+      "id": "hymn-129",
+      "kind": "hymn",
+      "number": 129,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Amuboole Nomuyanda Mwami",
+      "original": "COME, YE THAT LOVE THE LORD",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Kamuza muswiilile majwi aa-Leza\nTwiimbe lwiimbo lubotu,\nTwiimbe lwiimbo lubotu\nKucuuno ca-Leza, kucuuno ca-Leza.",
+        "Batakondwi tabazyi kulumbaizya Leza,\nBaya kupengesya lyoonse,\nBaya kupengesya lyoonse,\nTabaizi nzla iya ku-Zioni.",
+        "Mulundu wa-Zioni uzyala zibotu\nTatunasika kujulu,\nTatunasika kujulu,\nTatuna kweenda munzila yagolida.",
+        "Twiimbe nyimbo zibotu misozi ’sansamuke\nTuya kuli-Leza wesu,\nTuya kuli-Leza wesu,\nKunyika imbotu, kunyika imbotu."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Twittigwa toonse, atufwambaane bakwesu,\nTuli mulwendo ku-Zioni, kumuunzi wa-Leza."
+        }
+      ]
+    },
+    {
+      "id": "hymn-130",
+      "kind": "hymn",
+      "number": 130,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Futula Basweeki",
+      "original": "RESCUE THE PERISHING",
+      "reference": null,
+      "key": "D flat",
+      "verses": [
+        "Futula, futula mbo bazimide,\nBoonse basweekede bayoopenga;\nBafwide luzyalo kobalilila,\nBantunyoko basweeka, basweeka.",
+        "Ambila, ambila makani oonse,\nKobaambila inzila imbotu;\nKoompolola bakambauka,\nKuti Jesu akabafutule.",
+        "Kombela, kombela bantu bapenzi,\nLeza ulakumvwa akugwasye;\nJesu Siluyando ulabaponya,\nUlabagwasya akufutuka.",
+        "Myoyo yabeenzuma ilafwa nzala,\nIlalindila luse lwa-Jesu;\nLuyando lul’ enguzu zyakukwela,\nLulasandula moyo wamuntu."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Futula, futula bantu basweeka,\nBantunyoko basweeka sunu."
+        }
+      ]
+    },
+    {
+      "id": "hymn-131",
+      "kind": "hymn",
+      "number": 131,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Kuyandaula Basweekede",
+      "original": "SEEKING THE LOST",
+      "reference": null,
+      "key": "B flat",
+      "verses": [
+        "Tulayandaula abasweekede,\nBaingaila mumalundu;\nTulababula majwi aa-Mwami,\n“Amuboole kulime nywebo.”",
+        "Tulayandaula abasweekede\nTwatondezya babisyi Jesu,\nTulabeenzya munzila ya-Mwami,\nYakufutuka kutamani.",
+        "Ndilayanda kucilila Jesu,\nKwengelela abaciswa,\nNdayanda kwimisya abawa,\nKuleta basweekede kwakwe."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Kule, kule, mumalundu malamfu\nTulaleta, basweekede,\nMuluba, muluba lwa-Mwami Jesu\nMwana ’mbelele owakayaswa."
+        }
+      ]
+    },
+    {
+      "id": "hymn-132",
+      "kind": "hymn",
+      "number": 132,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Bantu Boona Umusinze (Cila)",
+      "original": "ANGELS FROM THE REALMS",
+      "reference": null,
+      "key": "C",
+      "verses": [
+        "Bantu boona umusinze,\nBubi obusiya mbi,\nBantu mbanununa Jesu,\nMbatulila buumi\nMazwi manji, lyoonse koonse,\nAkwilil’ a-Mwami.",
+        "Mwiiyi kwina uubabula\nLuse lukwazeme\nMuulo mwiinu ngubaulwa,\nMeya omisozi\nNombaiye, nombaenzye\nKwakwe Mufutuli.",
+        "Ngusicili syabutongo,\nBwamu obulozi,\nBundya, bowa obutavu,\nBufwi obuzike\nNasiziwe, nasizaye!\nNdizwi olya-Mwami.",
+        "Atufwambe kubwibusya\nBwanga bwa-Muvuni\nKutabonwi namusweesi\nNgutukausila\nKolya kwakwe, Mubetesi,\nNkutukasakilwa."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-133",
+      "kind": "hymn",
+      "number": 133,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Leta Maila",
+      "original": "BRINGING IN THE SHEAVES",
+      "reference": null,
+      "key": "C",
+      "verses": [
+        "Kosyanga cifumo ’mbuto yaluzyalo,\nSyanga isikati akumazuba;\nLindila ciindi cakutebula loko,\nAkuseka, tuyooleta maila.",
+        "Syanga musalala, syanga mumudima,\nUtayoowi mayoba na impeyo;\nTwamana milimo, yoonse yamumuunda,\nAkuseka, tuyooleta maila.",
+        "Mukulila ukamusyangile, Mwami,\nAntela moyo ulakupengesya;\nTwamana milimo, yoonse uzootutambula,\nAkuseka, tuyooleta maila."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Leta maila, leta maila,\nAkuseka, tuyooleta maila;\nLeta maila, leta maila,\nAkuseka, tuyooleta maila."
+        }
+      ]
+    },
+    {
+      "id": "hymn-134",
+      "kind": "hymn",
+      "number": 134,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Koyandaula, Taata Leza",
+      "original": "SUN OF MY SOUL",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Koyandaula, Taata Leza,\nBoonse abakakuloboka;\nSaatani mwini wabacenga,\nBusongo boonse wabanyanga.",
+        "Koyandaula, Mwami Jesu,\nAbatajisi Mwami wabo;\nUkabamunikile nzila,\nBabnoe umumuni wako.",
+        "Usunu bali mumusinze,\nUkutasiki kusalala;\nKwalo kuzywide imisozi,\nKuti baangwa umapenzi.",
+        "Leza pilusya bana bako,\nJesu nguwabafwida nsoni;\nUkuti balaliubula,\nBati, “Usunu twazumina”.",
+        "Seluka, Muuya Usweyisya,\nUkasweyisye buumi bwesu;\nTambula imibili yesu,\nEzintu zyoonse nzotujisi.",
+        "Sinkula matwi eesu toonse,\nMakani ako akayake;\nNzotwaambilwa sunu, Mwami,\nZiyume mumyoyo yesu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-135",
+      "kind": "hymn",
+      "number": 135,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Mulwane, Ndaboola",
+      "original": "HOLD THE FORT",
+      "reference": null,
+      "key": "D",
+      "verses": [
+        "Nobayandwa amulange,\nTuyoogwasigwa;\nBasinkondo balaboola,\nTuya kuzunda.",
+        "Mulange basinkondoma\nKabaciboola;\nBapati bamwi balawa\nNkaambo twatyompwa.",
+        "Eno mubone ndembela,\nAmumvwe mpeta!\nMwizina lya-Mufutuli\nTuya kukomba.",
+        "Nakuba kulwa nkuyumu\nTulagwasigwa;\nMwami wesu ulandiswe,\nUlatuyumya."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "“Mulwane, ndaboola eno!”\nAmumvwe Jesu;\nMuleelede kumwiingula,\n“Twacita boobo.”"
+        }
+      ]
+    },
+    {
+      "id": "hymn-136",
+      "kind": "hymn",
+      "number": 136,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Ndice’nda Mumusinzo",
+      "original": "I FEEL LIKE TRAVELLING ON",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Munzi wangu mupya nkuli?\nNdice’nda mumusinzo;\nKwina mapenzi okuya,\nNdice’nda mumusinzo.",
+        "Tuya kubona Muvuni,\nNdice’nda mumusinzo;\nKwina misozi okuya,\nNdice’nda mumusinzo.",
+        "Bamwi bayandisya ansi,\nNdice’nda mumusinzo;\nKucita zintu zibiabi\nNdice’nda mumusinzo.",
+        "Leza wandipa inguzu,\nNdice’nda mumusinzo;\nLimwi nkabone kujulu,\nNdice’nda mumusinzo."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ii nce’nda mumusinzo,\nNdice’nda mumusinzo;\nMunzi wangu mupya nkuli?\nNdice’nda mumusinzo."
+        }
+      ]
+    },
+    {
+      "id": "hymn-137",
+      "kind": "hymn",
+      "number": 137,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Kunyonena Busiku Buleza",
+      "original": "WORK, FOR THE NIGHT IS COMING",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Fwambaana kunyonena busiku buleza,\nIzuba litanazwa, fuma, nyonena;\nAlimwi asikati, nikucikasaala,\nNyonena utaleki tulakotoka.",
+        "Amunyonene Jesu, busiku buleza\nNyonena zuba lyoonse, akulyookezya;\nNyonena zuba lyoonse, kabotu kabotu,\nEno nyona anguzu;\nUlalyookezya.",
+        "Muna-Kristo, nyona busiku buleza\nLyaunka kale zuba ukalyookezya\nNyona amangolezya, kutanasiya mbi;\nEno milimo yoonse yamaninina."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-138",
+      "kind": "hymn",
+      "number": 138,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Njandoobona Jesu Mwami",
+      "original": "MUST I GO EMPTY-HANDED?",
+      "reference": null,
+      "key": "D",
+      "verses": [
+        "Njandoobona Jesu Mwami,\nNjandoobona Mufutuli,\nNsikooba amuntu omwe\nNgwendaleta kulinguwe.",
+        "Nsikooyoowa lufu mebo,\nNkaamba ndafutulwa kale,\nPele ndali kulengaala\nCiindi cakukambauka.",
+        "Ndakasowa ciindi cangu\nKuno ndali umutolo,\nIno ndiyooima buti\nOko kuli Mwami wangu?",
+        "Amubuke no-BaKristo,\nAmusungilizye bamwi,\nNolutanasika lufu,\nLukajane basanduka."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ino ndiinke buti kuya\nNkentajisi bamwi bantu?\nNdiyoousa cinicini\nNkaambo ndali kulengaala."
+        }
+      ]
+    },
+    {
+      "id": "hymn-139",
+      "kind": "hymn",
+      "number": 139,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Nombungano Yakwe",
+      "original": "ONWARD CHRISTIAN SOLDIERS",
+      "reference": null,
+      "key": "E",
+      "verses": [
+        "Nombungano yakwe Mukasame nyoonse;\nTulaya bulwana, Tulwa a-Saatani.\nMusolozi wesu Uli Kristo Jesu;\nUli Mwami, Musunguli, Uli Mufutuli.",
+        "’Lange, nombungano, Ilakuzyangama\nImpi ya-Saantani Ilayoowa Jesu.\nKautelelesya, Majwi alazunda,\nKulemeka Jesu Mwami Ngo-Muzundi wesu.",
+        "Bami boonse baansi Bazoomana boonse\nKwalo imbungano Ilakala lyoonse.\nImpi ya-Saatani Tiikooyoozunda,\nWati Jesu, Mwini lwakwe, Liime Ijwi lyakwe.",
+        "Kamutanda impi, Muswaangane nyoonse\nMuzundile Jesu, Majwi alazunda,\nKamubanda Jesu Leza, Mwami wesu\nAlemekwe ciindi coonse, Jesu ulasweya."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Tembaula Leza,\nLemya Mufutuli;\nNkwali Mufutuli,\nTulamucilila."
+        }
+      ]
+    },
+    {
+      "id": "hymn-140",
+      "kind": "hymn",
+      "number": 140,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Ndijisi Kubamba",
+      "original": "A CHARGE TO KEEP I HAVE",
+      "reference": null,
+      "key": "C",
+      "verses": [
+        "Ndeelede kubamba,\nMakani amoyo;\nMuuya utakwe kumana,\nUbambilwa ’julu.",
+        "Kukwelela Leza,\nBoonse basweekede;\nTambula inguzu zyangu\nKusumpula Jesu.",
+        "Kondipa bulondo\nNkapone lyoonse;\nNkabambe buumi bubotu,\nKupa kulinguwe.",
+        "Ndiyovwa nkalinde,\nNkasyome Muvuni;\nKuti ndamutama Mwami,\nNjakufwa lyoonse."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-141",
+      "kind": "hymn",
+      "number": 141,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Muzyime Nubakwesu (Cila)",
+      "original": "STAND UP FOR JESUS",
+      "reference": null,
+      "key": "B flat",
+      "verses": [
+        "Muzyime nubakwesu,\nBasimpi baka-Jesu,\nAmukasame syoonse\nSya-Leza osyakulwa\nNguwena Mwami Jesu\nUukatusololela Kubasinkondonina,\nBoonse mbutukazunda.",
+        "Lusyomo mulubweze\nIbe intobo yenu,\nMusame lufutuko\nBuli nkuani yenu\nIceba lyakulwisya\nNgu-Moza ngumwapewa,\nInguwe umulwisya Myozo yabutongo.",
+        "Insana situzumya\nNsya-Jesu walolona,\nMwasyoma nsana syenu,\nNoonse mukalazundwa\nAmumukakatile,\nMulwisye bsinkondo,\nBoonse bakalazaya Kwa-Leza Mwami wesu.",
+        "Muzyime nubakwesu,\nInkondo nkwiili sunu,\nUzona muteelele\nInyimbo syabazunndi\nUuzunda ulayana\nBusena ukwa-Leza,\nTakakapoli koko, Wakala ko sikwense."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-142",
+      "kind": "hymn",
+      "number": 142,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Yebo, Moyo Wangu",
+      "original": "MY SOUL, BE ON THY GUARD",
+      "reference": null,
+      "key": "C",
+      "verses": [
+        "Yebo, moyo wangu,\nKonga kosongwaala;\nMpobali mbomulwan’ abo,\nAbakubukila.",
+        "Kolinda ukombe,\nUtaleki nkondo;\nIciindi coonse kumbila\nInguzu zya-Mwami.",
+        "Utayeeyi sunu\nKusowa masumo;\nMulimo oyu tuumani\nNotucikal’ ansi.",
+        "Sungwaala, Omoyo,\nMane aku lufu;\nLeza uyookutambula\nMumuunzi okuya."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-143",
+      "kind": "hymn",
+      "number": 143,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Ngu-Jesu Wakaamba",
+      "original": "FROM GREENLAND’S ICY MOUNTAINS",
+      "reference": null,
+      "key": "E",
+      "verses": [
+        "Ngu-Jesu wakaamba\nKubasikwiiya bakwe\nNaakayanda kubweeda\nKumuunzi wakujulu,\n“Kamuya mubaiisye\nEzina eli lyangu,\nBamasi mubazibye\nMakani oonse angu.",
+        "“Kamuya moompolole\nEl’ Ivangeli lyangu,\nMubaiisye abantu\nMilazyo yangu yoonse.\nUkuti uundisyoma,\nUyooba uufutulwa\nUkuti uundikaka\nUyoob’ uufwidilila.",
+        "“Muye enguzu zyangu,\nZyapegwa ndime zyoonse,\nMulange njooba ’nywebo\nMane kumamanino.”\nAmane ukwaamba\nWasumpulwa mujulu\nMbube baya kumasi\nBakambauka Ijwi."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-144",
+      "kind": "hymn",
+      "number": 144,
+      "section": "Buumi Bwa-MuKristo: Mulimo Wakwe",
+      "title": "Tuli Kubusyu Bwako",
+      "original": "ENDSLEIGH",
+      "reference": "Z.H. 184",
+      "key": "G",
+      "verses": [
+        "Tuli kubusyu bwako,\nTaata, Mwami wesu,\nTupe luzyalo lwako\nMukukomba kwesu\nTumvwide ukulila\nKwambo basweekede,\nTulabakumbilila, Mwami, abapone.",
+        "Amasi manjimanji\nAli mukusiya,\nAli munzila imbi\nIya kumapenzi\nUwafwide uluzyalo,\n’Ape Ijwi lyako,\nUwagwisye mukusiya Akusweya kwako.",
+        "Kotmua bafundisi\nBal’ enguzu zyako,\nBaambile bantu boonse\nAmakani ako\nBooneki bwako buze\nAnsi oonse, Mwami,\nKovuzya bantu bako Akumasi oonse.",
+        "Taata, kofwambya ciindi\nIcibotu cako,\nAwo abanut boonse\nBabe Ejwi lyako\nBamuzibe Jehova,\nUmubumbi wabo,\nBamuyande Jesu Kristo, Mufutuli wabo."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-145",
+      "kind": "hymn",
+      "number": 145,
+      "section": "Mulalilo Wa-Mwami",
+      "title": "Naakatusiya (Cila)",
+      "original": "BLEST BE THE TIE",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Naakatusiya,\nJesu, Mwami wesu,\nWakatusiila mulazyo,\nTumuzingasile.",
+        "Situzibalusya\nNsitubona sunu\nNdoluseba ndutupewa,\nObulowa bwakwe.",
+        "Tukalube buti\nLufuno lwa-Jesu?\nKwina lunji lulukozya,\nTwalwezwa kundulo.",
+        "Tukalube buti,\nMufutuli wesu,\nOwakeziz’ ansi ano,\nAkatupe buumi?",
+        "Twamuzingasila,\nTwamuzeeza sunu,\nNgu-Siluse, ngu-Simanga,\nJesu, Mwami wesu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-146",
+      "kind": "hymn",
+      "number": 146,
+      "section": "Mulalilo Wa-Mwami",
+      "title": "Nendalanga Kuciingano",
+      "original": "WHEN I SURVEY THE WONDROUS CROSS",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Nendalanga kuciingano\nAkafwida Mwini Bwami\nNdaamba nsijisi cintu,\nNdabuseka bwami, bwangu.",
+        "Langa mutwe amaboko,\nAbulowa aluyando\nSena wabona luyando,\nAkupenga kuli boobo?",
+        "Ndakali kusweekede,\nNdakanununwa bulowa;\nAndileke kulilemya,\nPele muciingano cakwe.",
+        "Nendajisi nyika yoonse,\nNci cilumbulo cisyoonto\nLuyando oluli boobo,\nLulaita moyo wangu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-147",
+      "kind": "hymn",
+      "number": 147,
+      "section": "Mulalilo Wa-Mwami",
+      "title": "Kala Aswe, Mwami Wesu",
+      "original": "UKUNXUSA",
+      "reference": "Z.H. 151",
+      "key": "F",
+      "verses": [
+        "Kala awe, Mwami wesu,\n’Tupe uluzyalo lwako;\nTatukwe kupona swebo,\n||Tulayanda luse lwako.||",
+        "Kala aswe, ’Zuba lyesu,\nUtumunikile swebo;\n„Tumvwe coonse cisyomezyo,\n||’Citambule, tucijate.||",
+        "Kala aswe, Mubetesi,\nZunda basinkondonyoko;\nKotukobelela lyoonse,\n||Yebo ul’ intobo yesu.||",
+        "Kala aswe, Omuvuni,\nEjwi ilibotu lyako.\nKotuyumya, tutatyeli\n||Yalo imilao yako.||",
+        "Kala aswe, Mufutuli,\n’Tucitile lufutuko.\nYovwa, tatunazibila\n||Ukukala ukubotu.||",
+        "Kala aswe, Leza wesu,\nAtubambwe luse lwako,\nKuti mumapenzi eesu,\n||Mwami, utubambisisye.||"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-148",
+      "kind": "hymn",
+      "number": 148,
+      "section": "Kutamba",
+      "title": "Fwamba Uzumine",
+      "original": "ALMOST PERSUADED",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Fwamba uzumine kukondwa,\nFwamba umuzumine Jesu;\nUmwi inga wati, “Kondileka Muuya,\nNjakwiita buzuba bweelede.”",
+        "Fwamba uzumine, koboola;\nFwamba uzumine, utakaki;\nJesu ulakwiita, baangelo abalo,\nBayandika bapaila, boola.",
+        "Fwamba uzumine, waindwa;\nFwamba uzumine, wasweeka;\nFwamba uzumine, kunyina kugwasya\nUya kulilila mumudima."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-149",
+      "kind": "hymn",
+      "number": 149,
+      "section": "Kutamba",
+      "title": "Na Izibi Zyenu Zyasiya",
+      "original": "THOUGH YOUR SINS BE AS SCARLET",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Na izibi zyenu zyasiya,\nZyoonse zilatuba bu;\nNa izibi zyenu zyasiya,\nZyoonse zilatuba bu.\nNa zisiya buya,\nZilasweya swe!\nNa izibi zyenu zyasiya,\nNa izibi zyenu zyasiya;\nZyoonse zilatuba bu,\nZyoonse zilatuba bu.",
+        "Muzumine nomul’ ezibi,\nAmuboole kwa-Leza;\nMuzumine nomul’ ezibi,\nAmuboole kwa-Leza.\nUl’ aluzyalo lupati,\nAmuyumye-nta!\nMuzumine nomul’ ezibi,\nMuzumine nomul’ ezibi;\nAmuboole kwa-Leza,\nAmuboole kwa-Leza.",
+        "Ulazijatila zyoonse;\nMbube ulaziluba;\nUlazijatila zyoonse,\nMbube ulaziluba.\nAmumusyome nyoonse,\nAmutubye bu!\nUlazijatila zyoonse,\nUlazijatila zyoonse;\nMbube ulaziluba,\nMbube ulazilube."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-150",
+      "kind": "hymn",
+      "number": 150,
+      "section": "Kutamba",
+      "title": "Ngooyu Jesu",
+      "original": "COME TO JESUS",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Ngooyu Jesu, ngooyu Jesu, Boola kwakwe eno,\nEno boola kwakwe, boola kwakwe eno.",
+        "Usilikwe, usilikwe, Usilikwe eno,\nEno usilikwe, usilikwe eno.",
+        "Akuponye, akuponye, Akuponye eno,\nEno akuponye, akuponye eno.",
+        "Uzumine, uzumine, Uzumine eno,\nEno uzumine, uzumine eno.",
+        "Kokumbila, kokumbila, Kokumbila eno.\nEno kokumbila, kokumbila eno.",
+        "Ateelele, ateelele, Ateelele eno,\nEno ateelele, ateelele eno.",
+        "Ul’ enguzu, ul’ enguzu, Ul’ enguzu eno,\nEno ul’ enguzu, ul’ enguzu eno.",
+        "Akusanzye, akusanzye, Akusanzye eno,\nEno akusanzye, akusanzye eno.",
+        "Syoma nguwe, syoma nguwe, Syoma nguwe eno,\nEno syoma nguwe, syoma nguwe eno."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-151",
+      "kind": "hymn",
+      "number": 151,
+      "section": "Kutamba",
+      "title": "Ndilaboola Eneeno",
+      "original": "WHERE HE LEADS ME",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Uundiita ngooyu Jesu,\nUundiita ngooyu Jesu, Uundiita ngooyu Jesu,\nNdilaboola, boola eneeno.",
+        "Muuya wakwe wandikwela,\nMuuya wakwe wandikwela, Muuya wakwe\nwandikwela,\nNdilaboola, boola eneeno.",
+        "Akukomba ndilakomba,\nAkukomba ndilakomba, Akukomba ndilakomba,\nNdilaboola, boola eneeno.",
+        "Kuzumina ndazumina,\nKuzumina ndazumina, Kuzumina ndazumina,\nNdilabool, boola eneeno.",
+        "Kozisanzya zibi zyangu,\nKozisanzya zibi zyangu, Kozisanzya zibi zyangu,\nNdilabool, boola eneeno.",
+        "Mwami Jesu, ndijatila,\nMwami Jesu, ndijatila, Mwami Jesu, ndijatila,\nNdilaboola, boola eneeno.",
+        "Akusyoma ndilasyoma,\nAkusyoma ndilasyoma, Akusyoma ndilasyoma,\nNdilaboola, bool eneeno.",
+        "Jesu, kondisindikila,\nJesu, kondisindikila, Jesu, kondisindikila,\nNdilaboola, boola eneeno."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-152",
+      "kind": "hymn",
+      "number": 152,
+      "section": "Kutamba",
+      "title": "Nomuleta Mubyaabi (Cila)",
+      "original": "WELCOME",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Nomuleta mubyaabi,\nJesu ulamutambula,\nNaasesemwa sibyaabi\nJesu ulamupulusya.",
+        "Twakutamba umukwesu,\nWapampwilwa buli mwami,\nNjila kwesu, muna-Kristo\nJesu mwali, ngamucanka.",
+        "Kale twali basikufwa,\nInzyo Kristo watubusya,\nWabaleta mucimpati,\nBalu, bana, obapusi.",
+        "Myozo, mazwi, omatansyi,\nOonse atembaule Leza,\nWatumunikila kwakwe,\nNkutuzanda kuba aze.",
+        "Nitusika kubulemu,\nOkwipobwe olya-Jesu,\nTulaimba, tulakomba,\nTulasakwa ko sikwense."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Aleluya, aleluya,\nAleluya ku-Muvuni!"
+        }
+      ]
+    },
+    {
+      "id": "hymn-153",
+      "kind": "hymn",
+      "number": 153,
+      "section": "Kutamba",
+      "title": "Sena Ulimwizi Jesu?",
+      "original": "ROOM FOR JESUS",
+      "reference": null,
+      "key": "C",
+      "verses": [
+        "Sena ulimwizi Jesu,\nMwami wako Mufutuli,\nSiluyando, Silizyalo,\nUlimwizi Jesu na?",
+        "Wakali mujulu lyakwe,\nWal’ a-Wisi Namakungwe,\nWalemekwa ciindi coonse\nEmbungano zyakujulu.",
+        "Kwalo nawabona bantu\n’Bapiluka kulinguwe,\nWabayanda cinicini\nAluyando ulupati.",
+        "Nkaambo kaluyando lwakwe\nWakaboola ansi ano,\nWakasika kupilusya\nBantu boonse basweekede.",
+        "Toteeleli nakwiita\nAti, “Boola kulindime,\nUfutulwe kukubisya\nUbe mucilili wangu”?",
+        "“Ii, Jesu ndazumina,\nNdilaboola eno, Mwami,\nUndiponye, undibambe,\nNdicilile nduwe lyoonse.”"
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Yanda Jesu Mufutuli,\nNguwe uwakakufwida,\nWamuyanda ulajanwa,\nUfutulwe sunu buya."
+        }
+      ]
+    },
+    {
+      "id": "hymn-154",
+      "kind": "hymn",
+      "number": 154,
+      "section": "Kutamba",
+      "title": "Ulainda Akufwamba",
+      "original": "UBANGEPH",
+      "reference": "Z.H. 198",
+      "key": "F",
+      "verses": [
+        "Ulainda akufwamba;\nIno nkuli nkotiye?\nUliizi inzila eyi\nNjoceenda anjiyo?\n||Ulainda, ulainda,\nUya ’ko kujulu na?||",
+        "Ulainda akufwamba;\nTaliim’ izuba, pe,\nLyapasula, lilabbila,\nYebo, tokoobbila na?\n||Ulainda, ulainda,\nTokookala ano, pe.||",
+        "Ulainda akufwamba,\nUindila kul’ ino?\n’Ko kujulu tokoonjila,\nOotanasanduka, pe.\n||Ulainda, ulainda,\nUlaboola lil’ ino?||",
+        "Ulainda akufwamba;\nKul’ afwaafwi kufwa. Ma!\nKwina ukutakwe cuumbwe,\nUyoovunwa yebo na?\n||Ulainda, ulainda,\nTakusail kufwa, pe.||",
+        "Ulainda akufwamba;\nWajatilwa zibi na?\nSunu mbobuzuba bwako,\nTokoojana ciindi kuya.\n||Ulainda, ulainda,\nTokoojana ciindi kuya.||"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-155",
+      "kind": "hymn",
+      "number": 155,
+      "section": "Kutamba",
+      "title": "Noonse Muzize Muteelele (Cila)",
+      "original": "THE GREAT PHYSICIAN",
+      "reference": null,
+      "key": "E flat",
+      "verses": [
+        "Noonse muzize muteelele\nMbwaatufwila Jesu,\nNgu-Mwami wesu Mufutuli,\nMwami Usimanga.",
+        "’Tuleke sibyaabi syoonse,\nJesu watuzanda,\n’Tucite siluleme syoonse,\nJesu abotelwe.",
+        "Inzyo aswe natukasambe\nMumalow’ aa-Mwami,\nAtusalale cinicini,\nTumusyome Jesu."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Natumukombe, tumulumbe,\nNguwe siluse uululeme,\nWakafwila bantu boonse\nAti bafutuke."
+        }
+      ]
+    },
+    {
+      "id": "hymn-156",
+      "kind": "hymn",
+      "number": 156,
+      "section": "Kutamba",
+      "title": "Mweembezi Nguwakandijana",
+      "original": "WHILE JESUS WHISPERS TO YOU",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Mweembezi nguwakandijana, nkendi mubi, Wakan-\ndiendela munyika, kundivuna.",
+        "Mweembezi mubotu ngu-Jesu, ngu-Muvuni,\nMwana Wambele Mubotu, ngu-Jesu.",
+        "Mulufu lwa-Mwami ndajana lufutuko,\nNkaambo kabulowa bwa-Jesu bwaka-tika."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ndilaboola ku-Mwana Leza, kundivuna,\nUlakomzya kundisalazya, Mwami Jesu."
+        }
+      ]
+    },
+    {
+      "id": "hymn-157",
+      "kind": "hymn",
+      "number": 157,
+      "section": "Kutamba",
+      "title": "Mwaambile Jesu",
+      "original": "ARE YOU WEARY?",
+      "reference": null,
+      "key": "B flat",
+      "verses": [
+        "Wakatazigwa mumoyo sena?\nMwaambile Jesu, mwaambile Jesu;\nWakatazigwa mumoyo sena?\nMwaambile Jesu alike.",
+        "Ulalila misozi nopenga,\nMwaambile Jesu, mwaambile Jesu;\nUsisilaanzi cibi mumoyo,\nMwaambile Jesu alike.",
+        "Ulayoowa kupenga mumoyo,\nMwaambile Jesu, mwaambile Jesu;\nUyanda kuziba iziboola,\nMwaambile Jesu alike.",
+        "Ulapenzegwa noyeeya lufu,\nMwaambile Jesu, mwaambile Jesu;\nUlalila bulelo buboola,\nMwaambile Jesu alike."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Mwaambile Jesu, mwaambile Jesu,\nMweenzuma ngotwaziba;\nTakwe mweenzinyolo mbuli Jesu,\nMwaambile Jesu alike."
+        }
+      ]
+    },
+    {
+      "id": "hymn-158",
+      "kind": "hymn",
+      "number": 158,
+      "section": "Kutamba",
+      "title": "Inguzu Mubulowa",
+      "original": "POWER IN THE BLOOD",
+      "reference": null,
+      "key": "B flat",
+      "verses": [
+        "Sena uyanda kusowa cibi?\nMuli-inguzu mubulowa;\nUlayanda kuzunda Saatani\nMul’ enguzu mubulowa.",
+        "Sena ulayanda kwaangululwa?\nMuli-inguzu mubulowa;\nBoola usalazigwe Kalvari,\nMul’ enguzu mubulowa.",
+        "Uyanda kutuba mbuli caanda?\nMuli-inguzu mubulowa;\nSa ulabotelwa kumwiimbila?\nMul’ enguzu mubulowa."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Inguzu ziyoosya milimo,\nBulowa bwa-Jesu;\nInguzu zyakweenda kabotu,\nMubulowa bwakwe Mwami."
+        }
+      ]
+    },
+    {
+      "id": "hymn-159",
+      "kind": "hymn",
+      "number": 159,
+      "section": "Kutamba",
+      "title": "Ndamukombelela",
+      "original": "FOR YOU I AM PRAYING",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Ndijisi Mwami uukala mujulu,\nNgonguwe wacita milimo mibotu,\nUlatulindila mujulu usunu,\nNdilamwaambila, “Kamuboola ’nywebo.”",
+        "Ndijisi Taata uutupa aswebo\nLusyomo lubotu lutamani lwesu\nWatwiita eno kuyooswana kwakwe,\nNdayanda anywebo kwiinka amebo.",
+        "Na mulijisi cibanda ca-Leza,\nKamukambauka makani aa-Jesu\nAtukombe Mwami abaite bamwi,\nKobayovwa bamwi kuziba inzila."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ndamukombelela, ndamukombelela,\nNdamukombelela, ukuti mupone."
+        }
+      ]
+    },
+    {
+      "id": "hymn-160",
+      "kind": "hymn",
+      "number": 160,
+      "section": "Kutamba",
+      "title": "Jesu Wamwiita",
+      "original": "JESUS IS CALLING",
+      "reference": null,
+      "key": "C",
+      "verses": [
+        "Jesu wamwiita sunu kumuunzi,\nKwiita sunu, kwiita sunu;\nNkaambonzi ulamutanda Mwami?\nKule, kule okuya.",
+        "Jesu waita kulyookezya,\nKwiita sunu, kwiita sunu;\nKoleta mukuli kulinguwe,\nBoola, takakutandi.",
+        "Jesu ulalnda, boola eno;\nBoola eno, boola eno;\nLeta zibi zyako, kotama;\nBoola, utmuki pe.",
+        "Ulakombelela Mwami eno,\nKotelela, kotelela;\nAbo basyoma balatangala,\nFwambaana eneeno."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Kwiita sunu, Kwiita sunu,\nJesu waita,\nWaita boonse sunu."
+        }
+      ]
+    },
+    {
+      "id": "hymn-161",
+      "kind": "hymn",
+      "number": 161,
+      "section": "Kutamba",
+      "title": "Ndilaboola, Jesu Mwami",
+      "original": "I AM COMING TO THE CROSS",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Ndilaboola, Jesu Mwami,\nNdiupusi, ndimutete\nZintu zyansi taziyovwi,\nNdilayanda lufutuko.",
+        "Ciindi moyo wafwa nzala,\nCiindi cibi candijata\nJesu ulaamba eno,\n“Njookusanzya ’zibi zyako.”",
+        "Ndalipeda kulinduwe,\nAzyo zyoonse nzendijisi\nMoyo amubili woonse,\nUbe wako kuzwa sunu!"
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ndakusyoma, Mwami Jesu,\nOwakafwa nkaambo kangu\nNdalibonzya kulinduwe,\nNdifutula, Mwami, eno."
+        }
+      ]
+    },
+    {
+      "id": "hymn-162",
+      "kind": "hymn",
+      "number": 162,
+      "section": "Kutamba",
+      "title": "Utamutandi",
+      "original": "DON’T TURN HIM AWAY",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Utamutandi Mufutuli\nWakwiita sunu aluse;\nAmumvwe ijwi\nAkusala Jesu;\nUtatandi Mufutuli.",
+        "Utamutandi Mufutuli\nKuli mapenzi kumuka;\nToonse tulafwa,\nAkulaya boonse;\nUtamutandi Mufutuli.",
+        "Utamutandi Mufutuli,\nTambula luzyalo eno;\nCiyakusika,\nCiindi cakumana,\nUtatandi Mufutuli.",
+        "Utamutandi Mufutuli,\nYeeya ciindi calubeta;\nMapenzi alo\nNawamuka oko,\nUtatandi Mufutuli."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Utamutandi, utamutandi,\nNacikwiita aluzyalo\nOwakamusiya;\nUkuti akakutambule\nBuzuba butamani,\nUtamutandi kumoyo wako,\nUtamutandi."
+        }
+      ]
+    },
+    {
+      "id": "hymn-163",
+      "kind": "hymn",
+      "number": 163,
+      "section": "Kutamba",
+      "title": "Swebo ’Tunyamuke Toonse",
+      "original": "UMFELI WETU",
+      "reference": "Z.H. 206",
+      "key": "B flat",
+      "verses": [
+        "Swebo ’tuntamuke toonse,\nMukubisya kwesu,\nKatuya amoyo woonse\nKuli-Leza wesu.",
+        "Iziyanza zyansi ano\nTaziyovwi cintu,\nTulayoowa, tulatija,\nTatusyomi cintu.",
+        "Atulange akujulu,\nKuli-Leza wesu,\nNguwe wakacit’ ijulu\nEnsi eyi yoonse.",
+        "Tuyoolongezegwa swebo\nAkusika kwesu,\nToonse tube akulumba\nMumyoyo yesu."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Wakufwida Jesu\nWandifwida mebo,\nWabafwida bantu boonse\nBezye bafutulwe."
+        }
+      ]
+    },
+    {
+      "id": "hymn-164",
+      "kind": "hymn",
+      "number": 164,
+      "section": "Kutamba",
+      "title": "Umfwile Ntenda, Jesu Mwami (Cila)",
+      "original": "SANKEY",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Umfwile ntenda, Jesu Mwami\nNjovwa ntakafwililili,\nNdeza kwako nkafutuke,\nNdeza mbwiimbele.",
+        "Ndazulwa, ndimucita sibi,\nAnukuti wakamfwila,\nNcite mbuuzanda, Mwami,\nNdeza mbwiimbele.",
+        "Ome nsikonzya kuliponya,\nNdyaangilwe sibi syangu,\nNdafutulwa luse lwako,\nNdeza mbwiimbele.",
+        "Milimo yako Mwami Jesu\nIlondolwe muliome,\nNdalibonzya kuliuwe,\nNdeza mbwiimbele."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ntambula mbwiimbele,\nNtambula mbwiimbele,\nUkuti wakamfwila Jesu,\nNdeza mbwiimbele."
+        }
+      ]
+    },
+    {
+      "id": "hymn-165",
+      "kind": "hymn",
+      "number": 165,
+      "section": "Kutamba",
+      "title": "Wasamba Mubulowa?",
+      "original": "ARE YOU WASHED IN THE BLOOD?",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Wakali kuli Jesu kusanzigwa?\nWasamba mubulowa bwakwe?\nSena ulasyoma munguzu zyakwe?\nWasamba mubulowa bwakwe?",
+        "Sena ulaenda aMufutuli?\nSena wasamba mubulowa?\nSena wakala muciingano cakwe?\nWasamba mubulowa bwakwe?",
+        "Na bwinga aboola kulaba buti?\nMuuya kulibambila sena?\nUlalyookezya sena muciingano?\nWasamba mubulowa bwakwe?",
+        "Kosowa zikobela zila tombe,\nUsambe mubulowa bwakwe;\nMpolili itinti kubabi abo,\nBasamba mubulowa bwakwe."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Wasamba bulowa?\nMbwaakatila Mwana mbelele?\nSena minjila yako yatuba bu?\nWasamba mubulowa bwakwe?"
+        }
+      ]
+    },
+    {
+      "id": "hymn-166",
+      "kind": "hymn",
+      "number": 166,
+      "section": "Kukwata",
+      "title": "Sunu Twabungana Ano",
+      "original": "SIBUTENE KULENDAWO",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Sunu twabungana ano,\nTwasikila ukutwazya\nAba bantu, mbotwayigwa\nMumulazyo wa-Jehova.\nKuleelele bayandane,\nBakayumisigwe Mwami;\nTobasyomi atulumbe\nUmulimo oyu woonse.",
+        "Bakakale mucibanda,\nBakusyome, bateelele\nMbuli bana ba-Mumuni,\nBayovwegwe nduwe lyoonse.\nKolongezya g’ anda yabo,\nBapinene nduwe balo,\nKobabamba ciindi coonse."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-167",
+      "kind": "hymn",
+      "number": 167,
+      "section": "Bana",
+      "title": "Ndeezya Syoonse Nsyuufwini (Cila)",
+      "original": "GOD IS FAITHFUL",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Ndeezya syoonse nsyuufwini,\nAsyalo sitonda,\nNdeke nzila iikantola\nKuzibisya buumi.",
+        "Njiya, nzuzya olufuno,\nNkakozyane aze,\nUlizi kubaazya boonse,\nAze koli mwana.",
+        "Nzuzya obubotu bwako,\nMozo usweyisye,\nBuumi bwangu bube lampi\nLimunika banji.",
+        "Utansiyi, utandubi,\nJesu mulongwaangu,\nNdakubula, ncili mwana,\nOkumamanino."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Jesu mulongwabo bana,\nUbe mulongwaangu,\nNkwata kumatansyi aako,\nNkaendesye aze."
+        }
+      ]
+    },
+    {
+      "id": "hymn-168",
+      "kind": "hymn",
+      "number": 168,
+      "section": "Bana",
+      "title": "Mwami Jesu Ulayanda",
+      "original": "JESUS LOVES ME",
+      "reference": null,
+      "key": "E flat",
+      "verses": [
+        "Mwami Jesu ulayanda\nKuti tube bana bakwe\nWakatupa buumi bwesu,\nEzyo zinto zyoonse zyesu.",
+        "Mwami Jesu watuyanda\nWakaleta lufutuko,\nWazisanzya zibi zyangu,\nNdikanjile kulinguwe.",
+        "Mwami Jesu watuyanda\nUl’ aswebo ciindi coonse,\nNa twanjila mumapenzi\nUlatupa uluzundo."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ulatuyanda,\nUlatuyanda,\nUlatuyanda,\nKwaambwa mu-Baibele."
+        }
+      ]
+    },
+    {
+      "id": "hymn-169",
+      "kind": "hymn",
+      "number": 169,
+      "section": "Bana",
+      "title": "Uleziza Jesu Mwini (Cila)",
+      "original": "JEWELS",
+      "reference": null,
+      "key": "E",
+      "verses": [
+        "Uleziza Jesu Mwini\nAbunge lubono,\nMbobanakwe bazandisi\nBafwinwi nguwe.",
+        "Mubooneki bwezeulu\nBoonse balenjila,\nBaluleme, obasweya,\nBafwinwi nguwe.",
+        "Bana boonse obafwini\nMuvuni mukando,\nNdulubono ulwa-Jesu\nNdwabungika ko."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Kwizeulu bavule\nBanakwe basyomi\nLwizulile lubono,\nLwa-Jesu Mwami."
+        }
+      ]
+    },
+    {
+      "id": "hymn-170",
+      "kind": "hymn",
+      "number": 170,
+      "section": "Bana",
+      "title": "Maanza Masyoonto",
+      "original": "I WASHED MY HANDS",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Ndasamba maanza angu\nKabotu, ndatuba;\nNdaamupa Jesu kuti\nAmubelekele.",
+        "Ngambile matwi angu\nAkutelelesya\nMulimo woonse mubotu\nMaanza acite.",
+        "Meso angu alange\nMilimo mibotu\nAkasye ’nzila zibi\nAkaambo ka-Jesu."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Maulu masyoonto,\nAmucenjele;\nMilimo ya-Jesu\nAndiicite."
+        }
+      ]
+    },
+    {
+      "id": "hymn-171",
+      "kind": "hymn",
+      "number": 171,
+      "section": "Cisi",
+      "title": "Mubumbi Wensi Eyi",
+      "original": "MY FAITH LOOKS UP TO THEE",
+      "reference": null,
+      "key": "E flat",
+      "verses": [
+        "Mubumbi wensi eyi,\nMuponyi wabamasi,\nUsimuzeesu\nKolanga bantu boonse,\nAbali koonse koonse,\nAbamumasi oonse,\nBoonse bakwesu.",
+        "Kolanga banjibanji,\nAbali mumusinze,\nTabakuzibi\nTabakwe kusalala,\nTabezi majwi aako,\nSaatani wabaanga,\nUlabacenga.",
+        "Mwami, kobausila\nAkooko nkobakede,\n’Bamunikile\nUboompolole boonse,\nUkabajatilile,\nUkabaangulule,\nUkabalete."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-172",
+      "kind": "hymn",
+      "number": 172,
+      "section": "Cisi",
+      "title": "Butonga",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Butonga insi yamausyesu,\nAkati kamasi nimbotu yalo\nMotwakazyalilwa motwakomenena,\nNimbotu yalo.",
+        "Bamasi nobayisampaula,\nTobeni besni ilatubotela;\nMyuunda minjiminji azyo g’ombe nzinji,\nNimbotu yalo.",
+        "Leza twalumba mbotupa baiyi,\nBayiye kabotu makani aa-Leza;\nBapone kabotu insiku zivule,\nBaiyi besu.",
+        "Leza Namakungwe cilenga wesu,\nKobika matansi kubana bako;\nBapone kabotu insiku zivule,\nBanako Leza."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-173",
+      "kind": "hymn",
+      "number": 173,
+      "section": "Cisi",
+      "title": "Leza Pupulala (Cila)",
+      "original": "DIX",
+      "reference": "M.H. 681",
+      "key": null,
+      "verses": [
+        "Leza pupulala\nMbutwoompolola,\nNdiwe ngutukomba,\nUsinsana syoonse.",
+        "Sintu sibyaabi\nNasimane syoonse,\nPele mbeta syako\nAtukasicite.",
+        "Ukatupe mvula,\nYezye myuunda yesu,\nlyo sizulile,\nTukakute toonse.",
+        "Mooneki wesu,\nAze mulongezye,\nUmuyovwe, Mwami,\nKweendela cisi.",
+        "Bami besu boonse\nBakalikwe ndiwe,\nBana ubakuzye, B\noonse ubazumye.",
+        "Izwi lyako, Mwami,\nLiteelelwe koonse,\nBoonse nabakwate\nIvangeli lyako."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Mwami, tupe luse lwako,\nUlongezye cisi cesu."
+        }
+      ]
+    },
+    {
+      "id": "hymn-174",
+      "kind": "hymn",
+      "number": 174,
+      "section": "Mangolezya",
+      "title": "Kuza Kusiya Kala Ame",
+      "original": "ABIDE WITH ME",
+      "reference": null,
+      "key": "A",
+      "verses": [
+        "Kuza kusiya kala ame,\nKala amebo kwandoosiya\nNokuba bamwi bakakilwa,\nYebo ooyovwa kal’ amebo.",
+        "Ukwesu kulafwamba kwiinda,\nBubotu bwansi buli kuli?\nZyoonse zisandauka buyo,\nOotasanduki kal’ amebo.",
+        "Ndiyanda kub’ ayebo lyoonse,\nNawandisiya ndawa buyo\nNguni ukonzya kundiyovwa?\nIciindi coonse kal’ amebo."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-175",
+      "kind": "hymn",
+      "number": 175,
+      "section": "Mangolezya",
+      "title": "Busiku Bwamana (Cila)",
+      "original": "NOW THE DAY IS OVER",
+      "reference": null,
+      "key": "A",
+      "verses": [
+        "Busiku bwamana, gumusinze,\nMweezi wabulika Entongweezi.",
+        "Silatusendela. Mbalindizi,\nMenso aka-Leza Mabonesi.",
+        "Jesu ubooneke Bakatele,\nAme menso aangu Asinkile.",
+        "Mwami ukumbate Bamininwe,\nBasanduk’ abulo Bainzikwe.",
+        "Bana boonse koonse Bakubone,\nMusiloto syabo Niboona.",
+        "Obakanza sibi Nababulwe,\nMbuwabafwilila Bafutulwe.",
+        "Basinkombe bako Banzyimine,\nAwo ngwingonena, Nintaboni.",
+        "Nilipasa zuba Nkatuluke,\nMuuza omusweyi Mbukuluke.",
+        "Naatembaulwe leza, Mufutuli,\nMoza Uusweyisya Uupa buumi."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-176",
+      "kind": "hymn",
+      "number": 176,
+      "section": "Kulaya Akumwayika",
+      "title": "Mwami Tulamana",
+      "original": "SIMON",
+      "reference": "Z.H. 150",
+      "key": "C",
+      "verses": [
+        "Mwami, tulamana\nUkuyiigwa kwesu;\nOko nkotwateelela\nKuli buumi bwesu.",
+        "Swebo tuli bako,\nTuli imbelele;\nLinda mukweembela kwako,\nTutakusweekeli.",
+        "Atuteelelesye\nUmweembezi wesu,\nMbuli imbelele ’zimvwa\nUmweembezi wazyo."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-177",
+      "kind": "hymn",
+      "number": 177,
+      "section": "Kulaya Akumwayika",
+      "title": "Lez’ Ab’ Amwe Nimukasakana (Cila)",
+      "original": "GOD BE WITH YOU",
+      "reference": null,
+      "key": "D flat",
+      "verses": [
+        "Lez’ ab’ amwe nimukasakana,\nAmaenzeye nkumuila,\nAmavune simabila,\nMani tukabweele kuswaana.",
+        "Lez’ ab’ amwe nimukasakana,\nManga amakobelele,\nLuse lube nkumubele,\nMani tukabweele kuswaana.",
+        "Lez’ ab’ amwe nimukasakana,\nLyoonse Mwami amalele,\nCoolwe nukacilolele,\nMani tukabweele kuswaana.",
+        "Lez’ ab’ amwe nimukasakana,\nNimukatusakanina,\nAtakumaandaanina,\nMani tukabweele kuswaana."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ab’ amwe, ab’ amwe,\nMani tukaswaangane,\nAb’ amwe, ab’ amwe,\nLeza abe amwe sikwense."
+        }
+      ]
+    },
+    {
+      "id": "hymn-178",
+      "kind": "hymn",
+      "number": 178,
+      "section": "Kulaya Akumwayika",
+      "title": "Tembaula Leza Mwini (Cila)",
+      "original": "PRAISE GOD",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Tembaula Leza Mwini,\nO-Mwanaakwe Jesu Kristo,\nAze Moza Uusweyisya,\nMooneki wesu. Amen."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-179",
+      "kind": "hymn",
+      "number": 179,
+      "section": "Kulaya Akumwayika",
+      "title": "Usyeesu, Utusindikile (Cila)",
+      "original": "ST. CLEMENT",
+      "reference": "M.H. 667",
+      "key": null,
+      "verses": [
+        "Usyeesu, utusindikile,\nTube ocoolwe tubanako,\nTube aswe baswezya-mozo\nTukutobele sikwense.",
+        "Usyeesy, kotuyovwa inzyo\nTukwate oonse ngotwapewa,\nTweende lyoonse mbuli bako,\nTukubotwzye sikwense."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-180",
+      "kind": "hymn",
+      "number": 180,
+      "section": "Inyimbo Zimbi",
+      "title": "Yama Kumaanza",
+      "original": "WHAT A FELLOWSHIP",
+      "reference": null,
+      "key": "A",
+      "verses": [
+        "Kuswangana munzila ya-Leza,\nYama kumaanza atamani;\nMbondalelekwa, mbondaumuna,\nYama kumaanza atamani.",
+        "Nkubotu buti mulweendo olu,\nYama kumaanza atamani,\nYatuba nzila mazuba oonse,\nYama kumaanza atamani.",
+        "Njoowenzi sena, ntijenzi sena?\nYama kumaanza atamani,\nNdila kuumuna nkaambo ka-Mwami,\nYama kumaanza atamani."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Yama, yama, yama kumaanza atamani,\nYama, yama, kumaanza ’tuvunane lyoonse."
+        }
+      ]
+    },
+    {
+      "id": "hymn-181",
+      "kind": "hymn",
+      "number": 181,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe",
+      "title": "Akube Bulemu",
+      "original": "GLORY TO GOD IN THE HIGHEST",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Akube bulemu kuli-Leza\nKujulu lyamajulu,\nAnansi akube tuumuno\nKubantu mbakondwa."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-182",
+      "kind": "hymn",
+      "number": 182,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe",
+      "title": "Wazyalwa Mwami Wa-Israyeli",
+      "original": "THE FIRST NOWELL",
+      "reference": null,
+      "key": "D",
+      "verses": [
+        "Kubuzyalwa bwa-Mwami Jesu,\nKukuli beembezi mumuunda boona,\nKabeembela mbele zyabo,\nKubuzuba bwakutontola.",
+        "Amumuni wenyenyeezi eyo,\nKwakeza basongo kuzwa kulale,\nKabayandaula Mwami,\nBacilila nyenyeezi nkoyakaya.",
+        "Inyenyeezi yakaswen’ afwaafwi,\nKu-Betelehemu yakalyookezya,\nYakaleka kweenda yakaima,\nMponya abusena Jesu mpakalede.",
+        "Bakanjila basongo botatwe,\nBakamuvundamina amazwi abo,\nBakamupa zipego zyabo\nZyangolida, amur’, atunukilizyo.",
+        "Mbube toonse tuzuminane,\nAtwiimbe kulumba Mwami wejulu,\nWakalenga julu enyika,\nAbulowa bwakwe twakafutulwa."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Aleluya! Aleluya!\nWazyalwa Mwami wa-Israyeli."
+        }
+      ]
+    },
+    {
+      "id": "hymn-183",
+      "kind": "hymn",
+      "number": 183,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe",
+      "title": "Wakasia Bwami Bwako",
+      "original": "THOU DIDST LEAVE",
+      "reference": null,
+      "key": "D",
+      "verses": [
+        "Wakasia Bwami bwako, Jesu,\nNokandiboolela ansi,\nKwakabula busena mu-Bet’lehemu\nKuti uzyalilwe mumo;\nKoboola mumoyo wangu,\nUkalile mumo.",
+        "Baangelo bakaimba akukondwa\nMumunzi wakujulu,\nNowakazyalwa wakalibombya\nMucilido cag’ombe;\nKoboola mumoyo wangu,\nUkalile mumo.",
+        "Wakatuletela Ijwi lipona,\nKuti bantu baanguluke,\nPele bakakusampaula, Mwami,\nBakutola kuciingano;\nKoboola mumoyo wangu,\nUkalile mumo.",
+        "Kujulu kuya kuba kubotelwa\nNkaambo wakazunda lufu;\nNdayanda wakazunda lufu;\n“Koboola, mwanaangu.”\nNdiyoobotelwa, Jesu,\nWaboola kunditola."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-184",
+      "kind": "hymn",
+      "number": 184,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe",
+      "title": "Ciindi Bacenjede",
+      "original": "AS WITH GLADNESS",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Ciindi bacenjede\nBakakomana loko,\nMobakabona nyenyeezi,\nYakabasololela;\nMbubonya, O Jehova,\nAtusololelwe.",
+        "Mbobakaink’ akukondwa\nKucimpati cag’ombe,\nNkobakaakukombela\nMwami wajul’ anyika,\nMbubonya kotugwasya\nKukukomba lyoonse.",
+        "Mbobakaleta zipego\nKuli-Jesu mucece,\nAswe mbubonya atupe\nMyoyo yesu abuumi,\nTukubelekele,\nO Kristo, Mwami wesu.",
+        "Jesu Kristo, tuenzye\nMunzila yako ’mbotu;\nNa buumi bwesu bwamana,\nUtutole kujulu,\nNkotuyookubonesya\nAkukulumbaizya."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-185",
+      "kind": "hymn",
+      "number": 185,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe",
+      "title": "Izina Lya-Jesu",
+      "original": "THERE IS NO NAME",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Natukala ansi ano,\nTatukonzya kumvwa,\nIzina limbi libotu,\nKwiinda ilya-Jesu.",
+        "Mungelo wakasaanguna\nKwaamba kulibanyina,\nUkuti izina lyakwe\nLiyootegwa ngu-Jesu.",
+        "Naakabikwa aciingano,\nBakalemba izina,\nUkuti boonse babone\nTweelede kumuyanda.",
+        "Asunu uli kujulu,\nAbavune basyoma;\nUli Mooneki, ngo-Mwami,\nNgo-Mufutuli Jesu."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Lino tuyanda kwiimba\nA-Mwami wesu, Jesu,\nKwiina ibala lyamvwidwe\nMbuli zina lya-Jesu."
+        }
+      ]
+    },
+    {
+      "id": "hymn-186",
+      "kind": "hymn",
+      "number": 186,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe",
+      "title": "Mwana Mucece",
+      "original": "AWAY IN A MANGER",
+      "reference": null,
+      "key": "F",
+      "verses": [
+        "Kuciba cag’ombe\nTakuko bulo,\nNkokwazyalwa Jesu\nMwami wanyika;\nKujulu nyenyeezi\nZyamumwekela;\nCilido cag’ombe\nMbobulo bwakwe.",
+        "Zyalila ig’ombe,\nWabuka mwana,\nKatalili Jesu\nMwana mucece;\nNdakuyanda Jesu,\nKolanga ndime,\nNdilele, O Mwami,\nMasiku oonse.",
+        "Koswena andime,\nJesu, ndakomba;\nAfwaafwi andime\nLyoonse alyoonse;\nKolongezya bana\nBoonse munyika;\nTutole kujulu\nKukala ’nduwe."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-187",
+      "kind": "hymn",
+      "number": 187,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe",
+      "title": "Nyenyeezi Mbotu",
+      "original": "BEAUTIFUL STAR",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "O Nyenyeezi ya-Bet’lehemu,\nOmwekela alindiswe,\nWakamunikisya bantu banji;\nWakasolwedela basongo\nKuyoojana Mwana Jesu;\nO Nyenyeezi ’mbotu komwekela.",
+        "O Nyenyeezi ya-Bet’lehemu,\nUlatugwasya asunu;\nKotutondezya znila masiku,\nTuenzya munzila kabotu\nKusikila lufu lwesu;\nO Nyenyeezi ’mbotu komwekela.",
+        "O Nyenyeezi pa kulangila\nKubasyomi, basalala,\nLino tulalangila kujulu\nOko Jesu uli Nyenyeezi\nImunikisya lyoonse;\nO Nyenyeezi ’mbotu komwekela."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Nyenyeezi ’mbotu ya-Bet’lehemu,\nKomweka mane buzuba bwaca;\nKotupa mumuni munzila,\nTusike kucisi cesu,\nO Nyenyeezi ’mbotu komwekela."
+        }
+      ]
+    },
+    {
+      "id": "hymn-188",
+      "kind": "hymn",
+      "number": 188,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe",
+      "title": "Kubotelwa Kunyika",
+      "original": "JOY TO THE WORLD",
+      "reference": null,
+      "key": "D",
+      "verses": [
+        "Kubotelwa kunyika,\nMufutuli weza;\nBantu boonse mutambule,\nWaboola kuzoomuvuna;\nAtwiimbe toonse,\nMufutuli wasika,\nMufutuli wasika, Atwiimbe!",
+        "Mutazumini zibi\nZilele lyoonse;\nMuboole kuli-Jesu,\nZibi zyanu zijatilwe,\nTutangale toonse,\nZibi zyalekelelwe,\nZibi zyesu zyamana, Tutangale!",
+        "Wakaboola kutugwasya;\nMyoyo ipengede,\nJesu ulaiponya,\nUlaipa luumuno;\nAtulumbe toonse,\nMusilisi waboola,\nMusilisi waboola, Atulumbe!",
+        "Ulalela munyika,\nAnsi mubwini;\nUlacita kuti\nZisi zyoonse zitangale,\nUlutando lwakwe,\nNdupati kulindiswe,\nLuyando ndupati, Tumukombe!"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-189",
+      "kind": "hymn",
+      "number": 189,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe",
+      "title": "Baangelo Bakujulu",
+      "original": "ANGELS FROM THE REALMS",
+      "reference": null,
+      "key": "C",
+      "verses": [
+        "Nobaangela bakujulu,\nKamuboola kunyika; Mwakaimba akulengwa,\nMwiimbe a-Mwami Jesu;\nKamuboola, kamukomba,\nKomba Mwami uuzyalwa.",
+        "Nobeembezi nomulanga\nKubutanga masiku, Leza eno ul’ aswebo\nKamuya muyoomujana;\nKamuboola, kamukomba,\nKomba Mwami uuzyalwa.",
+        "Nobasongo bazwa kujwe,\nKamusia zyaansi; Yandaula Uuyandika,\nMwabona nyenyeezi;\nKamuboola, kamukomba,\nKomba Mwami uuzyalwa.",
+        "Nobasyomi balangila,\nMwalinda ciindi coonse; Mwami Jesu ngo-Mesia,\nKamubona wasika;\nKamuboola, kamukomba,\nKomba Mwami uuzyalwa."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-190",
+      "kind": "hymn",
+      "number": 190,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe",
+      "title": "Tobasongo",
+      "original": "WE THREE KINGS",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Tobasongo bazwa kujwe,\nTweza kubona muvwanda;\nTwakabona inyenyeezi\nOkuya kujwe.",
+        "Wakazyalwa ku-Betelehemu,\nNdamuletela musini,\nMwami lyoonse utamani\nWeza kutulela.",
+        "Muunde ndamuletela,\nMuunde oyo ununkisya;\nAlemekwe, atembaulwe,\nLeza Mufutuli!",
+        "Ndamuletela mafuta,\nAanunka apa buumi\nKulila, kusinsima, buusu\nBwakujalilwa mucuumbwe.",
+        "Mubulemu twamubona,\nMwami Leza cipaizyo,\nAleluya, Aleluya,\nBoonse baimba."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "O Inyenyeezi, mweka,\nInyenyeezi, mweka,\nTuzolwede tukabone\nImwana muvwanda."
+        }
+      ]
+    },
+    {
+      "id": "hymn-191",
+      "kind": "hymn",
+      "number": 191,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe",
+      "title": "O Munzi Wa-Bet’lehemu",
+      "original": "O LITTLE TOWN",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "O munzi wa-Bet’lehemu,\nBoonse bantu baloona,\nKujulu inyenyeezi\nZilamwekesya;\nIi, mumudima wanu\nKnuuli Mumuni,\nWakali kulangilwa\nCiindi ciamfu.",
+        "Nkaambo Kristo wazyalwa\nSunu kuli-Mariya;\nMasiku abangelo\nBalamulangila;\nO nyenyeezi, koamba\nKuzyalwa kwakwe;\nImba kulumbaizya\nKuli-Leza Mwami.",
+        "Mubuumuzi Leza\nWapa cipo cigambya;\nMunzila eyo mumonya\nMbwaanjila mumoyo;\nKwiina matwi akonzya\nKumvwa naaboola;\nUlanjila kubantu Abamutambula.",
+        "O Mwana wa-Bet’lehemu,\nBoola kulindiswe;\nGwisya izibi zyesu,\nSwezya myoyo yesu;\nKokalilila aswe,\nO Mwami Jesu;\nKokala mazuba oonse,\nEmanuele!"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-192",
+      "kind": "hymn",
+      "number": 192,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe",
+      "title": "Kwakali Beembezi",
+      "original": "WHILE SHEPHERDS WATCHED",
+      "reference": null,
+      "key": "D",
+      "verses": [
+        "Kule kwakali beembezi\nBalindila butanga,\nKwakalibonya kulimbabo\nMungelo wa-Jehova.",
+        "Beembezi bayoowa loko,\nPele wakabaambila,\nMutayoowi ndamuletela\nMakani abotezya.",
+        "Kulindinye mu-Bet’lehemu\nWasyalwa Mufutuli.\nKamuya mukamujane sunu\nBabotelwa kapati.",
+        "Asunu tukamukombe\nJesu, Mwana wa-Leza.\nTwamulumba Leza kujulu,\nWatiyanda bobuya."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-193",
+      "kind": "hymn",
+      "number": 193,
+      "section": "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe",
+      "title": "Mumunzi Wa-Davida",
+      "original": "ONCE IN ROYAL DAVID’S CITY",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Ciindi mumunzi wa-Davida\nKwakali ciba cag’ombe,\nOko kuciindi camasiku\nNkwakazyalwa mwanaakwe\nMariya mubotu,\nMwanaakwe wakali Jesu.",
+        "Walo wakaselukila ansi,\nNgu-Leza, Singuzuzyoonse;\nNamakungwe wakalibombya,\nUlilede mucimpati;\nMufutuli, Mulengi,\nWakakala abacete.",
+        "Jesu wakali mwana musyoonto,\nPele wakakomena,\nNkaambo wakali mbuli ndiswe\nUlizi mapenzi esu;\nSunu uli kujulu,\nUlatubambila busena.",
+        "Cimwi ciindi tuyoomubona\nJesu Kristo, Mwami wesu,\nNkaambo muluyando lwakwe\nWalo wakatufutula;\nUzootuzolwedela\nTusike kumunzi wajulu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-194",
+      "kind": "hymn",
+      "number": 194,
+      "section": "Inyimbo Zimbi",
+      "title": "O Mwana Wa-Davida",
+      "original": "O NDODANA KA DAVIDA",
+      "reference": "Z.H. 196",
+      "key": "E flat",
+      "verses": [
+        "O Mwana wa-Davida, ndifwida luzyalo;\nMbwaakaamba oyo moofu, naakati inde Jesu.",
+        "Bantu bamutapatila, bati aumune,\nPele wakoompolola, undifwe luzyalo.",
+        "Jesu wakaima, wati, “Nzookucitilanzi ’no?”\nMoofu wakamuvwila, Mwami, ndika-bone!",
+        "Wati Jesu, “Ulusyomo lwakufutula”;\nElyo mwso akajuka, wamucilila Jesu.",
+        "Nyoonse nomupenzegwa, ngooyu Mufutuli,\nTakooyoomukasya muntu, kuti asyome nguwe."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-195",
+      "kind": "hymn",
+      "number": 195,
+      "section": "Inyimbo Zimbi",
+      "title": "Ndabika Zibi Zyangu",
+      "original": "I LAY MY SINS ON JESUS",
+      "reference": null,
+      "key": "E",
+      "verses": [
+        "Ndabika zibi zyangu muli-Jesu Kristo.\nWakapengela ndime, wandiangulula;\nNdaleta bubi bwangu kuti busanzigwe,\nMubulowa bwa-Jesu, kuti nditube buu.",
+        "Ndabika kuyanda kwangu ku-Mwana aa-Leza,\nUponya malwazi aangu, uvuna muuya wangu;\nNdabika kuusa kwangu amapenzi oonse,\nMuli-Jesu waayumuna, waatola kule.",
+        "Ndayandisya ukuba mbuli Jesu wangu,\nWakali siluzyalo, wakali bombede.\nNdayandisya kukala a-Jesu kujulu,\nKwiimba, kulumbaizya abasalala bakwe.",
+        "Ndayandisya, O Mwami, kukubotezya,\nNendacikala ansi omuno munyika;\nNdigwasye kubaleta bamwi kulinduwe,\nNdikumanine milimo, ulemekwe lyoonse."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-196",
+      "kind": "hymn",
+      "number": 196,
+      "section": "Inyimbo Zimbi",
+      "title": "Jesu Uinda Zyoonse",
+      "original": "JESUS IS ALL THE WORLD TO ME",
+      "reference": null,
+      "key": "A flat",
+      "verses": [
+        "Jesu uinda zyoonse, ulandipa buumi;\nNinguzu zyangu lyoonse, kakwina nguwe ndawa.\nNdausa ndainka kwakwe, ulandibotezya buya;\nUlandipa kubotelwa, Mweenzuma!",
+        "Jesu uinda zyoonse, mapenzi naasika;\nLyoonse ndainka kwakwe, nditainka ndilawa;\nNdamubula, nkwali lyoonse, takatali\nkundigwasya;\nZilongezyo ulandipa, Mweenzuma!",
+        "Jesu uinda zyoonse, ndilamutobela;\nMebo nsikapiluki, pe; utandisiy’ endike;\nKumucilila nsilubya; ndiyoolanga kuciingano,\nWakafwida kundivuna, Mweenzuma!",
+        "Jesu uinda zyoonse, nsiyandi umbi, pe;\nNdamusyoma mane nkwafwe, uyoonditola\nkwakwe;\nBuumi bubotu anguwe, bubotu ubutamani,\nKubotelwa kutamani, Mweenzuma!"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-197",
+      "kind": "hymn",
+      "number": 197,
+      "section": "Inyimbo Zimbi",
+      "title": "Mebo Ndili Mwana",
+      "original": "MINA NGINGUMNTWANA",
+      "reference": "Z.H. 350",
+      "key": "A flat",
+      "verses": [
+        "Mebo ndili mwana, pele eno ndamvwa,\nA-Jehova Leza, mbwaakalnega zyoonse;\nAlimwi, baiyi besu balatuambila,\nA-Mufutuli wesu, mbwaakafwida toonse.",
+        "Lino ndilongezegwa, nkaambo ndilaisigwa;\nNceeci cintu cibotu, ndibe mwana wakwe;\nNdizoobaswiilila abazyali bagu,\nNdimuyande Jehova, amoyo wangu oonse.",
+        "Ndiyakukombela mazuba amazuba,\nNdijane nguzu zyakwe ukuzunda zyoonse;\nLeza undilongezye, asilongezyo zyako;\nUndienzye kabotu, munzila yako yoonse."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-198",
+      "kind": "hymn",
+      "number": 198,
+      "section": "Inyimbo Zimbi",
+      "title": "Ndilakulumba, Jesu",
+      "original": "NGIYAKUBONGA, JESU",
+      "reference": "Z.H. 245",
+      "key": "E flat",
+      "verses": [
+        "Ndilakulumba, Jesu, ukundifwida kwako;\nuze undaangulule, ndibe wako, Mwami.",
+        "Ndakali mumusinze kakwina bululami;\nWakandimunikila, ndibe wako, Mwami.",
+        "Ndabona bubi bwangu, aluyando lwako;\nNdazundwa luse lwako, ndili wako, Mwami."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "hymn-199",
+      "kind": "hymn",
+      "number": 199,
+      "section": "Inyimbo Zimbi",
+      "title": "Ndaenda A-Mwami",
+      "original": "I WALK WITH THE KING",
+      "reference": null,
+      "key": "G",
+      "verses": [
+        "Ndakazelengana mumuuya mubi,\nLino ndakomana, ndalyookezya;\nMazuba oonse ndilaimba lwiimbo,\nMkaaka kaambo, ndaenda ’Mwami.",
+        "Myaka minjiminji ndakaangwa,\nSaatani takakonzya kundiyovwa;\nLino mbuli bayuni ba’ muluwo,\nNdakaangululwa, nde ’nda ’Mwami.",
+        "Mukuusa akupenga, kolanga,\nLanga Mufutuli akupe buumi;\nLufutuko alutangalo lwakwe,\nUlakuletela, komutambula."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ndaenda a-Mwami mubotu, ndaenda\nA-Mufutuli;\nNsizimini pe, ndaya kumunzi,\nNdaenda a-Mwami wangu."
+        }
+      ]
+    },
+    {
+      "id": "chorus-1",
+      "kind": "chorus",
+      "number": 1,
+      "section": "Ziindululo",
+      "title": "Wandimvwenta",
+      "original": "HE SOUGHT ME",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Wandimvwenta, wandimvwenta,\nNindakali kweendenda kulale;\nWandimvwenta, wandijana,\nBwakali buzuba bubotu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-2",
+      "kind": "chorus",
+      "number": 2,
+      "section": "Ziindululo",
+      "title": "Leta Mulilo",
+      "original": "SEND THE FIRE",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Leta mulilo undyuumpe, o-Mwami!||\nLeta mulilo, kujulu, undyuumpe;\nLeta mulilo, uudyuumpe."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-3",
+      "kind": "chorus",
+      "number": 3,
+      "section": "Ziindululo",
+      "title": "Majwi Alubomba",
+      "original": "JESUS CAN NEVER FAIL",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Majwi alubomba taafwi, taafwi;||\nTaafwi, pe."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-4",
+      "kind": "chorus",
+      "number": 4,
+      "section": "Ziindululo",
+      "title": "Danyeli",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Danyeli wakoona mucililo cabasyuumbwa,\nWakumbila Leza kumuyovwa;||\nNkabela walila “Yo!”\nNkabela walila “Yo!”\nNkabela walila “Leza Namakungwe!”"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-5",
+      "kind": "chorus",
+      "number": 5,
+      "section": "Ziindululo",
+      "title": "Mwami Akuboola",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Mwami akuboola omuno munyika,\nKutola bantu bakwe basyomeka.||",
+        "||Mulimigwagwa mibotu, itubatuba,\nMaanda mabotu anyengema.||",
+        "||Mulimasani mabotu, amwekamweka,\nMisini mibotu yangolida.||"
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Ndinjile sena? Ndinjile sena?\nNdinjile sena, Mwami ndafutulwa?\nNdinjila sena? Ndinjile sena?\nNsinjile sena, Mwami, mu-Zioni?"
+        }
+      ]
+    },
+    {
+      "id": "chorus-6",
+      "kind": "chorus",
+      "number": 6,
+      "section": "Ziindululo",
+      "title": "Nywebo Nobakaka",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Nywebo nomukaka, ukusanduka,\nNdinywe bana ba-Saatani.||",
+        "||Nywebo nomuti, “Tuli bana-Leza”;\nAmutambike matansyi.||"
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "||Muzoolila, “Mayo! Mayo! Mayo!\nBuumi bwangu bwasweeka!”||"
+        }
+      ]
+    },
+    {
+      "id": "chorus-7",
+      "kind": "chorus",
+      "number": 7,
+      "section": "Ziindululo",
+      "title": "Leza Wakaambila Noa",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Leza wakaambila Noa,\nWakati, “Kobeza bwaato,\nMisyobo yoonse utole,\nUkaibike mubwaato.”",
+        "Wakatuma cikwangala,\nWati, “Cikalange inyika.”\nTakukwe nakabwedela,\nWakagama kuzelengana.",
+        "Limwi wakatuma nziba,\nWati, “Ikalange inyika.”\nYez’ atewo lyamukuyu,\nKuzibya kuti nyika yayuma.",
+        "Maanzi naakayuminina\nBoonse bakazwida anze\nNoa wayaka kasanza,\nKakupailila Jehova."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "||Bakacedwa, bakacedwa,\nMane zambangulwe lyasika.||"
+        }
+      ]
+    },
+    {
+      "id": "chorus-8",
+      "kind": "chorus",
+      "number": 8,
+      "section": "Ziindululo",
+      "title": "Akundiita",
+      "original": "WHEN HE CALLS ME",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Akundiita njookuvuwa;\nAkundiita njookuvuwa;\nAkundiita njookuvuwa;\nNjookuvuwa izina lyangu.\n||Konyonena, nyona, nyona, nyona.\nNyona, nyona, nyona, nyonena, Mwami.||"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-9",
+      "kind": "chorus",
+      "number": 9,
+      "section": "Ziindululo",
+      "title": "Ivangeli",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Ivangeli, ivangeli, I\nvangeli, lilempuwo;||\nNoBakristo, amutole majwi aya;\nNoBakristo, amutole majwi aya;\nNoBakristo, amutole majwi aya;\nIvangeli lilempuwo\nTwati, “Jesu, Jesu, aleluya!”\nTwati, “Jesu, Jesu, aleluya!”\nTwati, “Jesu, Jesu, aleluya!”\nIvangeli lilempuwo."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-10",
+      "kind": "chorus",
+      "number": 10,
+      "section": "Ziindululo",
+      "title": "Ndayanda Kuya",
+      "original": "I WANT TO GO TO HEAVEN",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Ndayanda kuya kujulu,\nKujulu, kujulu, nandafwa;||\n||Kujulu, ndafwa, julu, julu, julu,\nKujulu ndafwa, julu, julu, nandafwa.||"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-11",
+      "kind": "chorus",
+      "number": 11,
+      "section": "Ziindululo",
+      "title": "Bantu Boonse Bazyibe",
+      "original": "EVERYBODY OUGHT TO KNOW",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Bantu boonse bazyibe,\nBantu boonse bazyibe,\nBantu boonse bazyibe Jesu Mwami.||\nUli mubotu kwiinda boonse,\nUli ’ntanda imweka;\nUli kwiinda bantu boonse,\nBantu boonse bazyibe."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-12",
+      "kind": "chorus",
+      "number": 12,
+      "section": "Ziindululo",
+      "title": "Muzezi Wabantu",
+      "original": "FISHERS OF MEN",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Ndiyookucita muzezi wabantu,\nMuzezi wabantu, muzezi wabantu;\nNdiyookucita muzezi wabantu,\nNawancilila.\nNawancilila, nawancilila,\nNdiyookucita muzezi wabantu,\nNawancilila.",
+        "Jesu ulaita, “Koboola ’kuno,\nKoboola ’kuno, koobola ’kuno”;\nJesu ulaita, “Koboola ’kuno,\nUkalyookezye.\nUkalyookezye, ukalyookezye”;\nJesu ulaita, “Koboola ’kuno,\nUkalyookezye.”",
+        "Komba, bala iBaibele,\nIBaibele, iBaibele, Mazuba oonse.\nMazuba oonse, mazuba oonse,\nKomba, bala iBaibele,\nMazuba oonse."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-13",
+      "kind": "chorus",
+      "number": 13,
+      "section": "Ziindululo",
+      "title": "Mwami Undizolwede",
+      "original": "LEAD ME TO SOME SOUL TODAY",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Mwami, undizolwede kubantu kubaambila,\nBeenzuma basweekeded nkaambo teebalizi;\nMbace basikubagwasya ta’ali banji bakomba,\nNdipa moyo wabuumi kuzolweda bantu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-14",
+      "kind": "chorus",
+      "number": 14,
+      "section": "Ziindululo",
+      "title": "Syoma Nguwe",
+      "original": "LEAN ON HIS ARMS",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Syoma nguwe, aluyando lwakwe,\nSyoma nguwe, aluse lwakwe;\nSyoma nguwe, Leza wajulu,\nKosyoma Mufutuli."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-15",
+      "kind": "chorus",
+      "number": 15,
+      "section": "Ziindululo",
+      "title": "Kamuboola",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Kamuboola nyoonse, tukombe,\nBalamukomba Jesu;||\n||Balamukomba, balamukomba,\nBalamukomba Jesu.||"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-16",
+      "kind": "chorus",
+      "number": 16,
+      "section": "Ziindululo",
+      "title": "Makani Angu",
+      "original": "THIS IS MY STORY",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Makani angu, lwiimbo lwangu,\nNketembaula, Jesu wangu;\nMakani angu, lwiimbo lwangu,\nNketembaula, Jesu wangu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-17",
+      "kind": "chorus",
+      "number": 17,
+      "section": "Ziindululo",
+      "title": "Jona",
+      "original": "JONAH",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Ulaamba Jona, ulaamba Jona ku-Niniva.||",
+        "||Ulalila Jona, ulalila Jona ku-Niniva.||"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-18",
+      "kind": "chorus",
+      "number": 18,
+      "section": "Ziindululo",
+      "title": "Ndinoolumba Jesu",
+      "original": "O. SAY, BUT I’M GLAD",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Ndinoolumba Jesu, Jesu,\nNdinoolumba Mwami wangu,\nUwandiyanda wandifwida,\nNdinoolumba Jesu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-19",
+      "kind": "chorus",
+      "number": 19,
+      "section": "Ziindululo",
+      "title": "Coonse Ciindi",
+      "original": "EVERY TIME I FEEL THE SPIRIT",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Coonse ciindi ndamvwa\nMuuya Usalala mulindime,||\n||Mumalundu, mutulundu,\nMutunkolola, mulwizyi.||"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-20",
+      "kind": "chorus",
+      "number": 20,
+      "section": "Ziindululo",
+      "title": "Mwami Wangu",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Mwami wangu, Mwami wangu,\nNdilongezya o-Mwami;||\n||Acikamu cabaangelo, Cindiswenye nkobede.||"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-21",
+      "kind": "chorus",
+      "number": 21,
+      "section": "Ziindululo",
+      "title": "Nikodema",
+      "original": "NICODEMUS",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Kwali muntu wakulale,\n’Zina lyakwe Nikodema;\nTakalizi cakusyoma,\nNa munt’ ulazyalw’ alimwi."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-22",
+      "kind": "chorus",
+      "number": 22,
+      "section": "Ziindululo",
+      "title": "1 Johane 1:9",
+      "original": "DOWN AT THE CROSS",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Na twalyaamba zibi zyesu,\nLeza walo ulasyomeka,\nUlatulekelela zibi\nNkaambo ka-Jesu;\nUlatusalazizya zitaluleme zyoonse;\nNa twalyaamba zibi zyesu,\nTulajatilwa!"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-23",
+      "kind": "chorus",
+      "number": 23,
+      "section": "Ziindululo",
+      "title": "Ulakonzya Kwiimba",
+      "original": "YOU CAN HAVE A SONG",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Ulakonzya kwiimba mumoyo masiku,\nKunzi lyamapenzi oonse ali buti;\nMuntu ulaimba na’zuba lyamweka,\nPele ulabula lwiimbo masiku.",
+        "Mufutuli uli andime masiku,\nNkaambo wasyomezya, “Ndaba anywe lyoonse.”\nZyoonse zililuzi mubuumi bwangu,\nKwina makani mapenzi asika."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-24",
+      "kind": "chorus",
+      "number": 24,
+      "section": "Ziindululo",
+      "title": "Ndime Kubuka Abuumi",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Lazaro mulongwakwe Jesu,\nWakalikuciswa loko.\nBakamwiita, pele katanakusika,\nLazaro walo wakafwa.",
+        "Maria a-Marta bakalila,\nBakamuzika mucuumbwe,\nNaakasika Jesu wati, “Mwanaakwanu\nAlakwe ulabuka”."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Bamuzika kuli? Bamuzika kuli?\nBakamutondezya cuumbwe,\nJesu woompolola, “Lazaro boola!”\nMpoonya Lazaro wakabuka."
+        },
+        {
+          "from_verse": 2,
+          "text": "Ndime kubuka abuumi; oyo uusyoma ndime,\nNanooli wafwa, unooli muumi;\nTakwe, takwe nayoofwa, pe pe."
+        }
+      ]
+    },
+    {
+      "id": "chorus-25",
+      "kind": "chorus",
+      "number": 25,
+      "section": "Ziindululo",
+      "title": "Konjila Mumoyo",
+      "original": "INTO MY HEART",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Jesu Mwami, Jesu Mwami, konjila mumoyo\nwangu,\nNjila sunu, kala lyoonse, konjila mumoyo, Jesu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-26",
+      "kind": "chorus",
+      "number": 26,
+      "section": "Ziindululo",
+      "title": "Tuyaka Nganda",
+      "original": "BUILDING UP THE TEMPLE",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Tuyaka g’anda, tuyaka g’anda,\nTuyaka g’anda ya-Mwami;||\nNobatata mutugwasye, nobamama mutugwasye,\nKuyaka g’anda ya-Mwami,\nNobalombe mutugwasye, nobasimbi mutugwasye,\nKuyaka g’anda ya-Mwami."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-27",
+      "kind": "chorus",
+      "number": 27,
+      "section": "Ziindululo",
+      "title": "Bulowa Bwa-Jesu",
+      "original": "OH THE BLOOD OF JESUS",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Bulowa bwa-Jesu bwakatumwaikila;\nBulagwisya zibi zyoonse zyababisyi."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-28",
+      "kind": "chorus",
+      "number": 28,
+      "section": "Ziindululo",
+      "title": "Cenjele Omeso Ncobona",
+      "original": "BE CAREFUL LITTLE EYES",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Cenjela omeso ncobona, cenjela omeso ncobona;\nNkwali Taata kujulu utulanga ’luyando;\nCenjela omeso ncobona.",
+        "Cenjela omatwi mbomvwa.",
+        "Cenjela maulu mboenda.",
+        "Cenjela mulomo mboamba."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-29",
+      "kind": "chorus",
+      "number": 29,
+      "section": "Ziindululo",
+      "title": "Ndasala Kumutobela Jesu",
+      "original": "I HAVE DECIDED TO FOLLOW JESUS",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Ndasala kumutobela Jesu; (3 times)\nNsikooyakupiluka, pe.",
+        "Nokuba endike, ndiyootobela; (3 times)\nMebo nsikapiluki, pe.",
+        "Nyika munsi lyangu, ciingano kumbele; (3 times)\nNsikooyakupiluka, pe."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-30",
+      "kind": "chorus",
+      "number": 30,
+      "section": "Ziindululo",
+      "title": "Kristo Nkwiingula",
+      "original": "CHRIST IS THE ANSWER",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Kristo nkwiingula kumapenzi oonse,\nUlizi kubula kwanyika yoonse;\nNawamusyoma, wamutambula,\nUlakugwasya ciindi coonse."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-31",
+      "kind": "chorus",
+      "number": 31,
+      "section": "Ziindululo",
+      "title": "Ima Mbuli Danyeli",
+      "original": "DARE TO BE A DANIEL",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Ima mbuli Danyel’ nokub’ olike;\nImina kasimpe lyoonse, yuma-yuma nta!"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-32",
+      "kind": "chorus",
+      "number": 32,
+      "section": "Ziindululo",
+      "title": "Jesu Mufutuli Uugambya",
+      "original": "JESUS IS A WONDERFUL SAVIOR",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Jesu Mufutuli uugambya, uyookubweza koonse;\n(3 times)\nMane do inkondo ikabe aluzundo,\nMwami uyookubweza.\nOmwanakwesu, nyika yakutentwa, uyoobula Jesu\nMuvuni wako; Uyookusisa mumpangala yabwe,\nMumpangala yabwe ibambidwe."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-33",
+      "kind": "chorus",
+      "number": 33,
+      "section": "Ziindululo",
+      "title": "Ulakunka",
+      "original": "RUNNING OVER",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Ulakunka, ulakunka; moyo wangu ulakunka;\nKuzwa nendasyoma lyoonse ndabotelwa,\nMoyo wangu ulakunka!"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-34",
+      "kind": "chorus",
+      "number": 34,
+      "section": "Ziindululo",
+      "title": "Bulamana",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Bulamana bumpelenge. (4 times)",
+        "Siya ansi imikuli (4 times)",
+        "Kulainkwa akujulu (4 times)"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-35",
+      "kind": "chorus",
+      "number": 35,
+      "section": "Ziindululo",
+      "title": "Luyando Ndupati",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Uluyando ndupati, ndupati, ndupati (3 times)\nLuyando ndupati!\nUlwa-Jesu ndupati, ndupati, ndupati (3 times)\nLuyando ndupati!\nUlwabantu ndusyoonto, ndusyoonto, ndusyoonto\n(3 times)\nKumamanino lwamana!"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-36",
+      "kind": "chorus",
+      "number": 36,
+      "section": "Ziindululo",
+      "title": "Twenda Awe",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Oyu Jesu twenda awe, tukala awe,\nTulala awe; twabuka."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-37",
+      "kind": "chorus",
+      "number": 37,
+      "section": "Ziindululo",
+      "title": "Jula Moyo Wako",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Jula moyo wako, Jes’ ulakonkomona; Jula moyo wako\nku-Mwana wambelele, Jula moyo wako yebo mujul-\nile, anjile."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-38",
+      "kind": "chorus",
+      "number": 38,
+      "section": "Ziindululo",
+      "title": "Jesu Mumuni Wenyika",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Jesu mumuni wenyika. (4 times)"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-39",
+      "kind": "chorus",
+      "number": 39,
+      "section": "Ziindululo",
+      "title": "Tuli Mulweendo",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Tuli mulweendo swebo muno munyika,\nTuya kumunzi wakujulu;||\nTuti Aleluya (3 times), Aleluya, Aleluya!"
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-40",
+      "kind": "chorus",
+      "number": 40,
+      "section": "Ziindululo",
+      "title": "Sala Yako",
+      "original": "KET’ EYAKO",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Sala yako, sala yako; kuli nzila zyobile; Sala yako, sala\nyako; kuli nzila zyobile; Imwi ilaya kujulu, imwi ilaya\nkulufu; Sala yako, sala yako, kuli nzila zyobile."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-41",
+      "kind": "chorus",
+      "number": 41,
+      "section": "Ziindululo",
+      "title": "Ndili Mukristo",
+      "original": "I’M GLAD I’M A CHRISTIAN",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Ndabotelwa nkaambo ndili mu-Kristo;\nNdasyoma Jehova, akumulumba;\nNdabala Baibele, ndasyoma Ijwi;\nIzibi zyainda, zilijatidwe.",
+        "Kububi ndiliangulukide;\nNdil’ aacikalilo mujulu oko;\nMukwesu fwambana, tukatobele;\nJesu ulaboola, tukamucinge."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-42",
+      "kind": "chorus",
+      "number": 42,
+      "section": "Ziindululo",
+      "title": "Danyeli Wakakomba",
+      "original": "NEAR THE CROSS",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Danyeli wakakomba zyotatwe abuzuba,\nPele bakamuwaala mudindi lyabasyumbwa.\nNaakali omuya, taakwe nakayoowa,\nLeza wakabakasya, tcebakamucisa."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-43",
+      "kind": "chorus",
+      "number": 43,
+      "section": "Ziindululo",
+      "title": "Moyo Wangu Wakali Kusia",
+      "original": "MY HEART WAS BLACK WITH SIN",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Moyo wangu wakali kusia muzibi;\nNdilizi bulowa bwa-Jesu bwandisanzya.\nMujwi lyakwe ndaambilwa, njooenda ango-lida;\nBwakali buzuba ’botu naakatubya mumoyo."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-44",
+      "kind": "chorus",
+      "number": 44,
+      "section": "Ziindululo",
+      "title": "Ulapona",
+      "original": "HE LIVES",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Ulapona, Jesu ulapona;\nUlaenda ulaamba andime munzila;\nUlapona kupa lufutuko;\nNdilizi buti wapona? Mwali mulindime."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-45",
+      "kind": "chorus",
+      "number": 45,
+      "section": "Ziindululo",
+      "title": "Nkaambo Wandiyanda",
+      "original": "BECAUSE HE LOVES ME SO",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Nkaambo wandiyanda, nkaambo wandiyanda;\nWakafwida aciigano, nkaambo wandiyanda."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-46",
+      "kind": "chorus",
+      "number": 46,
+      "section": "Ziindululo",
+      "title": "Jesu Ulayanda Bana",
+      "original": "ALL THE CHILDREN OF THE WORLD",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Jesu ulayanda bana, boonse bana munyika;\nAbasiya, ’Salala, MaIndi, MaJapani,\nJesu ulayanda bana boonse."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-47",
+      "kind": "chorus",
+      "number": 47,
+      "section": "Ziindululo",
+      "title": "Jesu Ulayanda Bana Mbuli Ndime",
+      "original": "JESUS LOVES A LITTLE CHILD LIKE ME",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Jesu ulayanda bana mbuli ndime,\nJesu ulayanda bana mbuli ndime,\nBana bakala ’mubili wakwe,\nJesu ulayanda bana mbuli ndime."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-48",
+      "kind": "chorus",
+      "number": 48,
+      "section": "Ziindululo",
+      "title": "Johane 3:16",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Buya Leza mbwaakayanda nyika;\nWakapa Mwanaakwe Simuzyalwa alike;\nKuti umwi uumusyoma atakafwi\nPele abe abuum, Buumi, butakoooomana."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-49",
+      "kind": "chorus",
+      "number": 49,
+      "section": "Ziindululo",
+      "title": "Leka Kupenga, Kopaila",
+      "original": "WHY WORRY WHEN YOU CAN PRAY",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Leka kupenga, kopaila;\nSyoma Jesu, abe Mwami wako;\nUtabi mbuli Tomasi, wakamuka kusyoma;\nKoleka kupenga, leka kupenga; kopaila."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-50",
+      "kind": "chorus",
+      "number": 50,
+      "section": "Ziindululo",
+      "title": "Ndabotelwa",
+      "original": "I’M SO HAPPY",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Ndabotelwa, ndabotelwa.\nNdabotelwa (4 times)\nNdabotelwa, ndabotelwa,\nNkaambo Jesu wakandifutula."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-51",
+      "kind": "chorus",
+      "number": 51,
+      "section": "Ziindululo",
+      "title": "Uleelede Kuyandisya Leza",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Uleelede Kuyandisya Leza;\nUleelede kuyandisya Leza;\nAleluya, uleelede kuyandisya Leza,\nNotakanjili kujulu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-52",
+      "kind": "chorus",
+      "number": 52,
+      "section": "Ziindululo",
+      "title": "Ndayanda Kunywa Meenda",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Ndayanda kunywa imeenda, imeenda,\nImeenda abuumi,||\nMeenda nywe, meenda, meenda, meenda,\nMeenda ’buumi, meenda, meenda abuumi."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-53",
+      "kind": "chorus",
+      "number": 53,
+      "section": "Ziindululo",
+      "title": "Eli Bbuku Ndibotu Kubala",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Eli bbuku ndibotu kubala, ndeeli Baibele,\nEli bbuku ndibotu kubala, ndeeli Baibele,\nUlibala mazuba oonse, uyoonjila kujulu,\nNdeeli ’Testementi kubala, ndeeli iBaibele."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-54",
+      "kind": "chorus",
+      "number": 54,
+      "section": "Ziindululo",
+      "title": "Nzila Yoonse Kuciingano",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Nzila yoonse kuciingano wakandiendela,\nWakandiendelela, wakandiendelela,\nNzila yoonse kuciingano wakandiendelela,\nEno ndafutulwa."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-55",
+      "kind": "chorus",
+      "number": 55,
+      "section": "Ziindululo",
+      "title": "Kuti Ndayeeya",
+      "original": "WHEN I REMEMBER",
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Kuti ndayeeya wakandifwida,\nNsikabweedi munsi alimwi;||\n||Pe, pe, pe, pe, pe; nsikabweedi munsi alimwi.||",
+        "Kuti ndayeeya mbwaakandipengela.",
+        "Kuti ndayeeya mbwaandiyanda."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-56",
+      "kind": "chorus",
+      "number": 56,
+      "section": "Ziindululo",
+      "title": "Jesu, Jesu, Jesu",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Jesu, Jesu, Jesu; zina libotu,\nLilandibotezya, ndilongezegwa lyalo."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-57",
+      "kind": "chorus",
+      "number": 57,
+      "section": "Ziindululo",
+      "title": "Saatani Awalo Wakazwa Kujulu",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Saatani wakazwa kujulu, tajisi busena;\nYebo, Mwana Leza, yebo; mebo ndilakuyanda.\nUtandisiiyi, ndime ndakuyanda kucilila nduwe\nYebo, Mwana Leza, yebo; mebo ndilakuyanda."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-58",
+      "kind": "chorus",
+      "number": 58,
+      "section": "Ziindululo",
+      "title": "Kwaamba Kwakwe Peter",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Kwaamba kwakwe Peter; nkwakulailila,\nNcinzi ciyootwaandaanya ’kaka\nMubulaye bwa-Leza.\nSena, sena ninzala? Twama-twamana kupenga\nEco, eco ciyootwaandaanya ’kaka\nMubulaye bwa-Leza."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-59",
+      "kind": "chorus",
+      "number": 59,
+      "section": "Ziindululo",
+      "title": "Jesu Muna-Nazareta",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Jesu muna-Nazareta, O Mwami,\nBa-Juda bamujaya.",
+        "Bamutola kuli-Pilato, okuya,\nIkuti bamujaye.",
+        "Nguni wakaaba Jesu? Ngu-Juda,\nNgu-Judase Iskariote.",
+        "Petro walo watama, watama,\nMuziindi zyotatwe."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-60",
+      "kind": "chorus",
+      "number": 60,
+      "section": "Ziindululo",
+      "title": "Jalula Mulyango",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Ndakasoka ndabisya, Noa kondijalwidwa.",
+        "Nsili ndime ndajala; mungelo nguwakajala.",
+        "Bamwi bayakulila mungelo naayookusika."
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "Akaka, Noa, jalula mulyango,\nNoa jalula mulyango,\nJalula mulyango ndinjile."
+        }
+      ]
+    },
+    {
+      "id": "chorus-61",
+      "kind": "chorus",
+      "number": 61,
+      "section": "Ziindululo",
+      "title": "Kupaila Kusinta Zintu",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Kupaila kusinta zintu,||\nKwina makani nocilema, kobweza,\nKuti, wacibika kuli-Jesu ulacibweza;\nKwina cinga cilakaka kubweza,\nkobweza, Kupaila kusinta zintu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-62",
+      "kind": "chorus",
+      "number": 62,
+      "section": "Ziindululo",
+      "title": "Koya Saatani",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Mukwesu ucijanayi camba cili buya,||\n||Cakujata Saatani kumubika munkwa,||\n||Saatani uzwidayi, Saatani ocenjede.||"
+      ],
+      "choruses": [
+        {
+          "from_verse": 1,
+          "text": "O! Koya Saatani, Kozwa munsi lyangu;\nKozwa Saatani, Kozwa munsi lyangu."
+        }
+      ]
+    },
+    {
+      "id": "chorus-63",
+      "kind": "chorus",
+      "number": 63,
+      "section": "Ziindululo",
+      "title": "Koamba Jesu Kulindime",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Koamba, Jesu, kulindime.\nKonkomona, Jesu, kulindime.\nGwisya ’bbwe, jesu, kulindime."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-64",
+      "kind": "chorus",
+      "number": 64,
+      "section": "Ziindululo",
+      "title": "Jerusalemu Munzi Mubotu",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Jerusalemu munzi mubotu,\nNkotuyakukala akukomana,\nTakukabi limbi mapenzi;\nAleluya, aleluya balaimba baangelo,\nAleluya balaimbila Mwami."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-65",
+      "kind": "chorus",
+      "number": 65,
+      "section": "Ziindululo",
+      "title": "Bantu Basyoma",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "||Bantu basyoma muli-Leza bayoopona,||\nUkutwa kwabo takuli kwamuuya,\nBalaya ku-Bwami bwa-kujulu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-66",
+      "kind": "chorus",
+      "number": 66,
+      "section": "Ziindululo",
+      "title": "Lumba, Lumba",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Lumba, lumba, lumba, lumba, Jesu wandi-yanda,\nDowa lyakwe ndipati lilenguzu mpati,\nDowa lyakwe ndipati, lifutula bantu."
+      ],
+      "choruses": []
+    },
+    {
+      "id": "chorus-67",
+      "kind": "chorus",
+      "number": 67,
+      "section": "Ziindululo",
+      "title": "Jesu Ulatuyanda Toonse",
+      "original": null,
+      "reference": null,
+      "key": null,
+      "verses": [
+        "Jesu ulatuyanda toonse,\nJesu ulatuyanda toonse, ati “Nobana bangu”;\nJesu ulatuyanda toonse tukale anguwe.\nJesu ulaboola ’limwi,\nJesu ulaboola ’limwi omuno munyika;\nJesu ulaboola alimwi kutola bantu bakwe."
+      ],
+      "choruses": []
+    }
+  ]
+}

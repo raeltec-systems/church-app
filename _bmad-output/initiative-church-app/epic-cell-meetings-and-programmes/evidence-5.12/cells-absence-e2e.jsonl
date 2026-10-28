@@ -1,0 +1,7 @@
+{"step":"A00-precondition","target":"LOCAL","at":"2026-10-21T12:48:38.823Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"A01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-21T12:48:46.917Z","verdict":"pass","amr":["password"]}
+{"step":"A02-a-published-programme","target":"LOCAL","at":"2026-10-21T12:48:49.334Z","verdict":"pass","grants":[200,200,200,200],"placed":[200,200,200],"published":"published"}
+{"step":"A10-notices-sent-leaders-told-parts-untouched","target":"LOCAL","at":"2026-10-21T12:48:50.312Z","verdict":"pass","sent":["open","open"],"leader_notices":2,"member_part":"accepted","other_part":"pending"}
+{"step":"A20-leader-reads-it-others-do-not","target":"LOCAL","at":"2026-10-21T12:48:50.869Z","verdict":"pass","leader_reads":2,"part_warning":1,"other_member_sees_note":false,"attendance_tables":0}
+{"step":"A30-change-and-withdraw","target":"LOCAL","at":"2026-10-21T12:48:52.645Z","verdict":"pass","other_change":"not_found","changed":true,"other_withdraw":"not_found","withdrawn":"withdrawn","leaders_told":2,"audit_holds_note":false}
+{"step":"A99-cleanup","target":"LOCAL","at":"2026-10-21T12:48:54.373Z","users_left":0,"unmarked":true,"programmes_left":0}

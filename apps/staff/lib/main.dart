@@ -1,11 +1,15 @@
 // Composition root: the only file in this app that reaches Supabase (through
 // church_client_core's composition library).
+import 'package:church_client_core/church_client_core.dart'
+    show
+        contactLauncherProvider;
 import 'package:church_client_core/composition.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'contact/url_contact_launcher.dart';
 
 /// Kept for the app's lifetime so the browser semantics tree is always built:
 /// a screen-reader user should not need Flutter's hidden "enable
@@ -16,5 +20,15 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   semanticsHandle = SemanticsBinding.instance.ensureSemantics();
   final overrides = await compositionOverrides(AppConfig.fromEnvironment);
-  runApp(ProviderScope(overrides: overrides, child: const StaffApp()));
+  runApp(
+    ProviderScope(
+      overrides: [
+        ...overrides,
+        staffBiblePackageSourceOverride(),
+        // Story 4.9: Call and Message hand tel: / sms: links to the browser.
+        contactLauncherProvider.overrideWithValue(const UrlContactLauncher()),
+      ],
+      child: const StaffApp(),
+    ),
+  );
 }

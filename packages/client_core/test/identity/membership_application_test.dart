@@ -169,7 +169,7 @@ void main() {
       await tapKey(tester, 'submit-button');
       h.auth.succeed(_applicant);
       await settleShort(tester);
-      expect(find.text('My membership'), findsWidgets);
+      expect(find.text('Account'), findsWidgets);
     });
   });
 
@@ -299,6 +299,28 @@ void main() {
       expect(find.text('The cell list changed'), findsOneWidget);
       expect(find.text('Choose again from the current list.'), findsOneWidget);
       expect(h.membership.calls, greaterThan(calls));
+    });
+
+    testWidgets('a refused sign-in phone explains what needs checking', (
+      tester,
+    ) async {
+      final h = await pumpAt(tester, ClientPaths.membership);
+      await fillForm(tester, choiceKey: 'cell-choice-not_sure');
+      await tapKey(tester, 'send-application');
+      h.gateway.sent.single.refuse(
+        ErrorCode.validationFailed,
+        fieldErrors: {'phone_username': 'out_of_range'},
+      );
+      await settleShort(tester);
+
+      expect(find.text('Phone number needs checking'), findsOneWidget);
+      expect(
+        find.textContaining(
+          'The phone number on your account could not be used',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Check your name.'), findsNothing);
     });
 
     testWidgets('unknown outcome: Check again resends the same request', (
@@ -455,7 +477,7 @@ void main() {
     await tapKey(tester, 'submit-button');
     h.auth.succeed(_applicant);
     await settleShort(tester);
-    expect(find.text('My membership'), findsWidgets);
+    expect(find.text('Account'), findsWidgets);
     h.memberAccess.answer(
       const MemberAccessDenied(MemberAccessDenial.notLinked),
     );

@@ -1,0 +1,10 @@
+{"step":"A00-precondition","target":"LOCAL","at":"2026-10-21T13:19:31.653Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"A01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-21T13:19:38.486Z","verdict":"pass","amr":["password"]}
+{"step":"A02-a-published-programme","target":"LOCAL","at":"2026-10-21T13:19:40.409Z","verdict":"pass","grants":[200,200,200,200],"placed":[200,200,200],"published":"published"}
+{"step":"P10-published-asks-each-person","target":"LOCAL","at":"2026-10-21T13:19:40.520Z","verdict":"pass","member":"pending","other":"pending","no_login":"pending"}
+{"step":"P20-time-change-asks-for-fresh-answers","target":"LOCAL","at":"2026-10-21T13:19:41.950Z","verdict":"pass","moved":200,"members_told":true,"new_answer":"pending","earlier":"superseded|accepted"}
+{"step":"P30-cannot-attend-changes-no-answer-or-attendance","target":"LOCAL","at":"2026-10-21T13:19:42.565Z","verdict":"pass","notice":"open","answer_unchanged":true,"leader_warned":true,"attendance_tables":0}
+{"step":"P40-no-login-confirmed-by-leader","target":"LOCAL","at":"2026-10-21T13:19:42.717Z","verdict":"pass","confirmed":200,"answer":"accepted","provenance":"leader"}
+{"step":"P50-substitute-is-the-actual-leader","target":"LOCAL","at":"2026-10-21T13:19:44.831Z","verdict":"pass","held":true,"substitute":true,"corrected":1,"plan_unchanged":true,"member_answer":"pending"}
+{"step":"P60-no-chat-and-nothing-private-for-a-member","target":"LOCAL","at":"2026-10-21T13:19:45.354Z","verdict":"pass","chat_objects":0,"member_read":200,"staff_read":403,"leader_only_text_seen":false}
+{"step":"A99-cleanup","target":"LOCAL","at":"2026-10-21T13:19:46.945Z","users_left":0,"unmarked":true,"programmes_left":0}

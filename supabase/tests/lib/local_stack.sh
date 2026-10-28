@@ -29,7 +29,8 @@ pg() {
 }
 sql() { pg -c "$1"; }
 
-uuid() { cat /proc/sys/kernel/random/uuid; }
+# Linux's kernel source; elsewhere (Git Bash on Windows, macOS) Node's, which the repo needs anyway.
+uuid() { cat /proc/sys/kernel/random/uuid 2>/dev/null || node -e 'console.log(crypto.randomUUID())'; }
 
 # Prints the id of a new confirmed email/password user (admin API), or nothing on failure.
 synthetic_user_create() { # email password

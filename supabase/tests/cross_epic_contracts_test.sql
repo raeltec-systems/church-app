@@ -198,9 +198,9 @@ drop view app.cells_fixture_view;
 drop table app.cells_fixture_rows;
 
 -- Lifecycle hooks -----------------------------------------------------------------------------
--- Story 3.5 registers Notifications' real hooks; this test uses its own synthetic ones instead
--- (rolled back with the test).
-delete from app.contract_lifecycle_hooks where module = 'notifications';
+-- Story 3.5 registers Notifications' real hooks (story 4.12: Duties' and Follow-ups' too); this
+-- test uses its own synthetic ones instead (rolled back with the test). Story 6.11: Content's too.
+delete from app.contract_lifecycle_hooks where module in ('notifications', 'duties', 'followups', 'content');
 create temp table hook_log (seq serial, module text, event text);
 
 create function app.cells_fixture_on_event(p jsonb) returns void language sql set search_path = '' as $$
@@ -319,8 +319,10 @@ select is((select count(*)::int from app.policy_gates where state = 'approved'),
   'no policy gate is approved by any migration');
 select results_eq(
   $$select gate from app.policy_gates where fixture_value is not null order by gate$$,
-  $$values ('identity_deletion_retention'::text), ('q2_church_time'), ('q9_money')$$,
-  'only the Q2, Q9 and Q4 deletion-retention (2.11) gates carry (labelled) test fixtures; access and sending have none');
+  $$values ('identity_deletion_retention'::text), ('q2_church_time'),
+           ('q3_giving'), ('q5_content_rights'),
+           ('q9_money')$$,
+  'only the Q2, Q9, Q4 deletion-retention (2.11), Q3 giving (6.3, SAMPLE methods only) and Q5 content rights (6.2) gates carry (labelled) test fixtures; access and sending have none');
 select is(app.policy_effective('q2_church_time') ->> 'source', 'fixture',
   'local development reads the labelled fixture');
 select is(

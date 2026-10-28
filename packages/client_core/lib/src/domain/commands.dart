@@ -1,6 +1,7 @@
 /// Command ports over the shared wire contract. Free of widgets and SDKs.
 library;
 
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:church_contracts/church_contracts.dart';
@@ -51,6 +52,31 @@ abstract interface class CommandGateway {
 /// Source of caller-generated request ids (lowercase canonical UUID v4).
 abstract interface class RequestIds {
   String next();
+}
+
+/// Story 4.14 (Duties and Follow-ups): the request to send for [command].
+/// An input whose outcome was never learned ([unconfirmed] with the same
+/// command, expected revision and payload) is resent under its original
+/// request id; anything else is a new request with an id from [ids].
+CommandRequest resendOrNewRequest({
+  required CommandRequest? unconfirmed,
+  required String command,
+  required Optional<int> expected,
+  required Map<String, Object?> payload,
+  required RequestIds ids,
+}) {
+  final u = unconfirmed;
+  final same =
+      u != null &&
+      u.command == command &&
+      u.expectedRevision.value == expected.value &&
+      jsonEncode(u.payload) == jsonEncode(payload);
+  return CommandRequest(
+    command: command,
+    requestId: same ? u.requestId : ids.next(),
+    expectedRevision: expected,
+    payload: payload,
+  );
 }
 
 /// [RequestIds] backed by a cryptographically secure generator.

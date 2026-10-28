@@ -5,7 +5,7 @@
          (asked once the server grants member access). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="BIC Kafue"
+        android:label="BICC Kafue"
         android:name=".BicKafueApplication"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -65,6 +65,16 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Story 4.9: Call and Message open the phone's dialler or messaging
+             app for a labelled contact route; the app never sends anything. -->
+        <intent>
+            <action android:name="android.intent.action.DIAL"/>
+            <data android:scheme="tel"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO"/>
+            <data android:scheme="sms"/>
         </intent>
     </queries>
 </manifest>

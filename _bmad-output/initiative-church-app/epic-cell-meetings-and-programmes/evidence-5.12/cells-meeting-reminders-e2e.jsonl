@@ -1,0 +1,11 @@
+{"step":"R00-precondition","target":"LOCAL","at":"2026-10-21T12:46:53.653Z","settings":{"phone":true},"leftover_users_removed":"0"}
+{"step":"R01-members-and-cells","target":"LOCAL","at":"2026-10-21T12:46:59.694Z","verdict":"pass","grant":200,"placed":[200,200,200]}
+{"step":"R10-normal-week-one-reminder-per-confirmed-member","target":"LOCAL","at":"2026-10-21T12:47:00.776Z","verdict":"pass","set":200,"reminders":3,"leader_reminded":false,"hours_before":[24]}
+{"step":"R20-leader-changed-reminder","target":"LOCAL","at":"2026-10-21T12:47:01.590Z","verdict":"pass","status":200,"hours_before":[2]}
+{"step":"R30-move-replans-and-delivers-a-change-notice","target":"/my-cell","at":"2026-10-21T12:47:02.553Z","verdict":"pass","moved":200,"new_time_reminders":3,"delivered":2,"item":"Cell meeting changed","open_state":"current"}
+{"step":"R31-cancel-leaves-no-reminder-and-delivers-a-notice","target":"LOCAL","at":"2026-10-21T12:47:04.025Z","verdict":"pass","cancelled":200,"reminders_left":0,"item":"Cell meeting cancelled"}
+{"step":"R40-snooze-honoured","target":"LOCAL","at":"2026-10-21T12:47:06.103Z","verdict":"pass","item":"Cell meeting coming up","snooze":200,"delivered_again":1,"items":2}
+{"step":"R41-transferred-member-gets-nothing","target":"LOCAL","at":"2026-10-21T12:47:06.104Z","verdict":"pass","transferred":200,"reminded_after_transfer":false,"worker":0}
+{"step":"R50-accountless-member-to-tell-directly","target":"LOCAL","at":"2026-10-21T12:47:06.688Z","verdict":"pass","inbox_items":0,"tell_directly":1}
+{"step":"R60-no-venue-or-name-in-any-payload","target":"LOCAL","at":"2026-10-21T12:47:07.196Z","verdict":"pass","items":6,"kinds":["cells_meeting_cancelled","cells_meeting_changed","cells_meeting_reminder"]}
+{"step":"R99-cleanup","target":"LOCAL","at":"2026-10-21T12:47:08.886Z","users_left":0,"unmarked":true}

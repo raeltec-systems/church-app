@@ -1,0 +1,7 @@
+{"step":"F300-precondition","target":"LOCAL","at":"2026-10-22T11:21:12.553Z","local_only":true,"leftover_rows_removed":0,"scheduler_reset":true}
+{"step":"F301-cleanup-requires-the-scheduler-trigger","target":"LOCAL","at":"2026-10-22T11:21:32.601Z","verdict":"pass","missing_trigger":401,"wrong_trigger":401,"claims_unchanged":true}
+{"step":"F302-existing-notification-scheduler-enabled","target":"LOCAL","at":"2026-10-22T11:21:36.877Z","verdict":"pass","scheduler_jobs":1,"schedule":"15 seconds"}
+{"step":"F303-expired-unreferenced-ready-and-pending-uploads-are-removed","target":"LOCAL","at":"2026-10-22T11:21:57.064Z","verdict":"pass","old_ready_removed":true,"old_pending_removed":true}
+{"step":"F304-recent-and-referenced-uploads-remain","target":"LOCAL","at":"2026-10-22T11:21:57.065Z","verdict":"pass","recent_retained":true,"referenced_retained":true}
+{"step":"F305-existing-scheduler-runs-cleanup-without-creating-notifications","target":"LOCAL","at":"2026-10-22T11:21:57.979Z","verdict":"pass","scheduler_jobs":1,"worker_seen":true,"notification_rows":0}
+{"step":"F399-local-synthetic-data-cleaned","target":"LOCAL","at":"2026-10-22T11:22:03.967Z","verdict":"pass","rows_left":0,"fixture_objects_cleanup_attempted":2,"leaked_values_in_logs":0}

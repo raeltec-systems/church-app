@@ -345,4 +345,51 @@ void main() {
       );
     }
   });
+
+  testWidgets('bottom tab labels stay on one line at double text size', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: churchMobileTheme(Brightness.light),
+        home: MediaQuery(
+          data: const MediaQueryData(
+            size: Size(360, 640),
+            textScaler: TextScaler.linear(2),
+          ),
+          child: Scaffold(
+            body: Row(
+              children: [
+                for (final label in const [
+                  'Home',
+                  'Bible & Hymns',
+                  'Sermons',
+                  'Give',
+                  'Calendar',
+                ])
+                  Expanded(
+                    child: NavItem(
+                      label: label,
+                      icon: Icons.home_outlined,
+                      vertical: true,
+                      selected: label == 'Home',
+                      onTap: () {},
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    for (final label in const ['Bible & Hymns', 'Sermons', 'Calendar']) {
+      final text = tester.widget<Text>(find.text(label));
+      expect(text.maxLines, 1, reason: label);
+      expect(text.softWrap, isFalse, reason: label);
+    }
+  });
 }

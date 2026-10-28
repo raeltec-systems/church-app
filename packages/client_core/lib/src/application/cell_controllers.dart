@@ -4,6 +4,9 @@ import 'package:church_contracts/church_contracts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/access_grants.dart';
+import '../domain/cell_meetings.dart';
+import '../domain/cell_programmes.dart';
+import '../domain/duties.dart';
 import '../domain/cell_membership.dart';
 import '../domain/commands.dart';
 import '../domain/membership_application.dart';
@@ -45,6 +48,66 @@ enum CellNotice {
   /// The outcome is unknown: check again with the same request.
   unconfirmed,
   notSent,
+
+  /// Story 5.1: meetings.
+  scheduleSet,
+  meetingMoved,
+  meetingCancelled,
+  meetingReinstated,
+
+  /// The meeting has started: it can no longer be changed.
+  meetingStarted,
+
+  /// The meeting was already cancelled (by someone else).
+  alreadyCancelled,
+
+  /// Story 5.2: the cell's reminders were saved.
+  remindersSet,
+
+  /// Story 5.3: programme drafts.
+  programmeCreated,
+  programmeSaved,
+  programmeCancelled,
+
+  /// The meeting is cancelled: its programme cannot be planned.
+  meetingCancelledAlready,
+
+  /// The programme is no longer a draft (cancelled elsewhere).
+  programmeNotDraft,
+
+  /// Story 5.4: published through Duties.
+  programmePublished,
+
+  /// Story 5.4: a part's Duties side was refused (an overlap, for example).
+  programmePartRefused,
+
+  /// Story 5.4: the meeting's programme is published, so the meeting is not
+  /// moved or cancelled from Cell meetings.
+  meetingHasProgramme,
+
+  /// Story 5.5: the leader recorded that the person said yes directly.
+  leaderConfirmed,
+
+  /// Story 5.7: Cannot attend sent, changed or withdrawn.
+  absenceSent,
+  absenceChanged,
+  absenceWithdrawn,
+
+  /// Story 5.8: the meeting record (held, a correction, who led).
+  meetingRecorded,
+  recordCorrected,
+  leadersRecorded,
+
+  /// The meeting has not started yet: it cannot be recorded.
+  meetingNotStarted,
+
+  /// Story 5.9: a cell's handover is done, or it still has no leader.
+  handoverResolved,
+  leaderRequired,
+
+  /// Story 5.12: the member leads or assists their current cell; an Admin
+  /// removes that role before they move.
+  leadsCurrentCell,
 }
 
 /// One command in flight or just answered.
@@ -140,9 +203,12 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
     state = state.copyWith(loading: true);
     final r = await fetch();
     if (!_current(epoch)) return;
-    // A denial or failure drops everything protected from the screen.
+    // A denial or failure drops everything protected from the screen. A
+    // request still in flight stays pending, so its buttons stay disabled
+    // and it cannot be sent twice (story 4.14 review: the Duties rule).
     state = CellsState<T>(
       result: r,
+      pending: state.pending,
       notice: state.notice,
       noticeAction: state.noticeAction,
       unconfirmed: state.unconfirmed,
@@ -153,6 +219,13 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
 
   void dismissNotice() =>
       state = state.copyWith(clearNotice: true, fieldErrors: const {});
+
+  /// Field errors of a refused input no longer match what is typed.
+  void clearFieldErrors() {
+    if (state.fieldErrors.isNotEmpty) {
+      state = state.copyWith(fieldErrors: const {});
+    }
+  }
 
   /// Resends the unconfirmed command unchanged (same request_id and body).
   Future<void> checkAgain() async {
@@ -204,14 +277,50 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
               (data['open_request'] as Map)['state'] == 'referred'
           ? CellNotice.referred
           : CellNotice.declined,
+    CellMeetingCommands.setSchedule => CellNotice.scheduleSet,
+    CellMeetingCommands.move => CellNotice.meetingMoved,
+    CellMeetingCommands.cancel => CellNotice.meetingCancelled,
+    CellMeetingCommands.reinstate => CellNotice.meetingReinstated,
+    CellMeetingCommands.setReminders => CellNotice.remindersSet,
+    CellProgrammeCommands.create => CellNotice.programmeCreated,
+    CellProgrammeCommands.save => CellNotice.programmeSaved,
+    CellProgrammeCommands.cancel => CellNotice.programmeCancelled,
+    CellProgrammeCommands.publish => CellNotice.programmePublished,
+    DutyCoverageCommands.confirmByLeader => CellNotice.leaderConfirmed,
+    CellAbsenceCommands.send => CellNotice.absenceSent,
+    CellAbsenceCommands.change => CellNotice.absenceChanged,
+    CellAbsenceCommands.withdraw => CellNotice.absenceWithdrawn,
+    CellRecordCommands.recordHeld => CellNotice.meetingRecorded,
+    CellRecordCommands.correctHeld => CellNotice.recordCorrected,
+    CellRecordCommands.recordLeaders => CellNotice.leadersRecorded,
+    CellCommands.resolveHandover => CellNotice.handoverResolved,
     _ => CellNotice.cancelled,
   };
 
   static CellNotice _refusal(CommandError error) {
     final f = error.fieldErrors;
     return switch (error.code) {
+      ErrorCode.conflict when f['member_id'] == 'leads_current_cell' =>
+        CellNotice.leadsCurrentCell,
       ErrorCode.conflict when f['member_id'] == 'open_request' =>
         CellNotice.openRequest,
+      ErrorCode.conflict when f['meeting_id'] == 'programme_published' =>
+        CellNotice.meetingHasProgramme,
+      ErrorCode.conflict when f['cell_id'] == 'leader_required' =>
+        CellNotice.leaderRequired,
+      ErrorCode.conflict when f['meeting_id'] == 'cancelled' =>
+        CellNotice.alreadyCancelled,
+      ErrorCode.validationFailed when f['meeting_id'] == 'started' =>
+        CellNotice.meetingStarted,
+      ErrorCode.validationFailed when f['meeting_id'] == 'not_started' =>
+        CellNotice.meetingNotStarted,
+      ErrorCode.validationFailed when f['meeting_id'] == 'cancelled' =>
+        CellNotice.meetingCancelledAlready,
+      ErrorCode.conflict when f['programme_id'] == 'not_draft' =>
+        CellNotice.programmeNotDraft,
+      ErrorCode.validationFailed
+          when f.keys.any((k) => RegExp(r'^parts\.\d+\.').hasMatch(k)) =>
+        CellNotice.programmePartRefused,
       ErrorCode.conflict => CellNotice.changedElsewhere,
       ErrorCode.validationFailed when f['cell_id'] == 'current' =>
         CellNotice.sameCell,
@@ -263,7 +372,9 @@ abstract class CellsController<T> extends Notifier<CellsState<T>> {
             notice == CellNotice.signInAgain) {
           noteProtectedDenial(ref);
         }
-        if (notice != CellNotice.invalid && notice != CellNotice.selfAction) {
+        if (notice != CellNotice.invalid &&
+            notice != CellNotice.selfAction &&
+            notice != CellNotice.programmePartRefused) {
           await _reload(epoch);
         }
       case CommandUnknownOutcome():
@@ -349,6 +460,15 @@ class CellAdminController extends CellsController<CellAdminOverview> {
         'request_id': request.requestId,
         'reason': reason.wire,
       }, request.displayName);
+
+  /// Story 5.9: the cell has a reachable leader or assistant again after
+  /// its last one left with a programme published ahead.
+  Future<void> resolveHandover(AdminCell cell) => send(
+    CellCommands.resolveHandover,
+    Optional.of(cell.revision),
+    {'cell_id': cell.cellId},
+    cell.name,
+  );
 
   /// Opens a move/join request for [member] (for example one without a
   /// login); a leader or Admin then confirms it.
@@ -444,4 +564,243 @@ class MyCellController extends CellsController<MyCellView> {
 final myCellProvider =
     NotifierProvider<MyCellController, CellsState<MyCellView>>(
       MyCellController.new,
+    );
+
+/// Story 5.1, staff web: each cell's weekly schedule (set by an Admin) and
+/// its meetings, which the cell's leader or an Admin moves, cancels or
+/// reinstates one at a time. Times are typed and shown in church time and
+/// travel as UTC instants.
+class CellMeetingsController extends CellsController<CellMeetingsBoard> {
+  @override
+  Future<AccessRead<CellMeetingsBoard>> fetch() =>
+      ref.read(cellsRepositoryProvider).fetchMeetings();
+
+  /// Sets [cell]'s weekly rule. [venue] null keeps the current venue; [pin]
+  /// null with [clearPin] false keeps the current pin.
+  Future<void> setSchedule(
+    StaffMeetingCell cell, {
+    required int weekday,
+    required String startTime,
+    required String endTime,
+    String? venue,
+    MeetingMapPin? pin,
+    bool clearPin = false,
+  }) {
+    final rev = cell.cellRevision;
+    if (rev == null) return Future.value();
+    return send(CellMeetingCommands.setSchedule, Optional.of(rev), {
+      'cell_id': cell.cellId,
+      'weekday': weekday,
+      'start_time': startTime.trim(),
+      'end_time': endTime.trim(),
+      if (venue != null && venue.trim().isNotEmpty) 'venue': venue.trim(),
+      if (pin != null)
+        'map_pin': {'lat': pin.lat, 'lng': pin.lng}
+      else if (clearPin)
+        'map_pin': null,
+    }, cell.name);
+  }
+
+  /// Moves one meeting. [venue] null keeps this meeting's venue; with
+  /// [regularVenue] it goes back to the schedule's venue.
+  Future<void> move(
+    CellMeeting meeting, {
+    required DateTime startsAt,
+    required DateTime endsAt,
+    String? venue,
+    bool regularVenue = false,
+  }) => send(CellMeetingCommands.move, Optional.of(meeting.revision), {
+    'meeting_id': meeting.meetingId,
+    'starts_at': startsAt.toUtc().toIso8601String(),
+    'ends_at': endsAt.toUtc().toIso8601String(),
+    if (venue != null && venue.trim().isNotEmpty)
+      'venue': venue.trim()
+    else if (regularVenue)
+      'venue': null,
+  }, 'the meeting of ${meeting.occurrenceDate}');
+
+  Future<void> cancel(CellMeeting meeting) => send(
+    CellMeetingCommands.cancel,
+    Optional.of(meeting.revision),
+    {'meeting_id': meeting.meetingId},
+    'the meeting of ${meeting.occurrenceDate}',
+  );
+
+  /// Story 5.2: the cell's meeting reminders, as offsets before the start
+  /// (`24 hours`); null returns to the default (one day before), an empty
+  /// list means none. The leader or an Admin.
+  Future<void> setReminders(StaffMeetingCell cell, List<String>? befores) {
+    final schedule = cell.schedule;
+    if (schedule == null) return Future.value();
+    return send(
+      CellMeetingCommands.setReminders,
+      Optional.of(schedule.remindersRevision),
+      {
+        'cell_id': cell.cellId,
+        'reminders': befores == null
+            ? null
+            : [
+                for (final b in befores) {'before': b},
+              ],
+      },
+      cell.name,
+    );
+  }
+
+  Future<void> reinstate(CellMeeting meeting) => send(
+    CellMeetingCommands.reinstate,
+    Optional.of(meeting.revision),
+    {'meeting_id': meeting.meetingId},
+    'the meeting of ${meeting.occurrenceDate}',
+  );
+}
+
+final cellMeetingsProvider =
+    NotifierProvider<CellMeetingsController, CellsState<CellMeetingsBoard>>(
+      CellMeetingsController.new,
+    );
+
+/// Story 5.3, staff web: one meeting's programme draft. The cell's leader or
+/// assistant creates, saves and cancels it; Pastor oversight reads it; an
+/// Admin-only reader sees counts. Every save sends the whole draft at the
+/// programme revision, so a change made elsewhere is a conflict, not a
+/// silent overwrite.
+class CellProgrammeController extends CellsController<ProgrammeRead> {
+  CellProgrammeController(this.meetingId);
+
+  final String meetingId;
+
+  @override
+  Future<AccessRead<ProgrammeRead>> fetch() =>
+      ref.read(cellsRepositoryProvider).fetchProgramme(meetingId);
+
+  Future<void> create(CellMeeting meeting) => send(
+    CellProgrammeCommands.create,
+    const Optional.of(null),
+    {'meeting_id': meeting.meetingId},
+    'the programme for ${meeting.occurrenceDate}',
+  );
+
+  /// Saves [programme]'s content as typed; empty text clears a field.
+  Future<void> save(
+    CellProgramme programme, {
+    required String topic,
+    required String scripture,
+    required String studyNotes,
+    required List<ProgrammePartDraft> parts,
+  }) => send(CellProgrammeCommands.save, Optional.of(programme.revision), {
+    'programme_id': programme.programmeId,
+    'topic': _textOrNull(topic),
+    'scripture': _textOrNull(scripture),
+    'study_notes': _textOrNull(studyNotes),
+    'parts': [for (final p in parts) p.toJson()],
+  }, 'the programme');
+
+  /// Story 5.4: publishes [programme] at its revision. [overrideReason]
+  /// keeps an assignee's overlap with their other duties knowingly.
+  Future<void> publish(CellProgramme programme, {String? overrideReason}) =>
+      send(CellProgrammeCommands.publish, Optional.of(programme.revision), {
+        'programme_id': programme.programmeId,
+        if (overrideReason != null && overrideReason.trim().isNotEmpty)
+          'override_reason': overrideReason.trim(),
+      }, 'the programme');
+
+  /// Story 5.5: the person said yes directly (a member without a login, or
+  /// by phone): recorded through Duties as Confirmed by leader, attributed
+  /// to the leader or assistant, at the assignment's revision.
+  Future<void> confirmByLeader(PartDuty duty, LeaderConfirmationDraft draft) {
+    final id = duty.assignmentId, rev = duty.assignmentRevision;
+    if (id == null || rev == null) return Future.value();
+    return send(
+      DutyCoverageCommands.confirmByLeader,
+      Optional.of(rev),
+      draft.toPayload(id),
+      'the confirmation',
+      function: DutyCommands.function,
+    );
+  }
+
+  /// Story 5.8: records whether the meeting was held (the first time).
+  Future<void> recordHeld(CellMeeting meeting, {required bool held}) => send(
+    CellRecordCommands.recordHeld,
+    const Optional.of(null),
+    {'meeting_id': meeting.meetingId, 'held': held},
+    'the meeting record',
+  );
+
+  /// Story 5.8: corrects held / not held; the earlier value is kept.
+  Future<void> correctHeld(
+    CellMeeting meeting,
+    MeetingRecord record, {
+    required bool held,
+    required String reason,
+  }) => send(CellRecordCommands.correctHeld, Optional.of(record.revision), {
+    'meeting_id': meeting.meetingId,
+    'held': held,
+    'reason': reason.trim(),
+  }, 'the meeting record');
+
+  /// Story 5.8: who actually led [parts] (a correction carries its reason).
+  Future<void> recordLeaders(
+    CellMeeting meeting,
+    MeetingRecord record,
+    List<ActualLeaderDraft> parts,
+  ) => send(CellRecordCommands.recordLeaders, Optional.of(record.revision), {
+    'meeting_id': meeting.meetingId,
+    'parts': [for (final p in parts) p.toJson()],
+  }, 'who led');
+
+  Future<void> cancel(CellProgramme programme) => send(
+    CellProgrammeCommands.cancel,
+    Optional.of(programme.revision),
+    {'programme_id': programme.programmeId},
+    'the programme',
+  );
+
+  static String? _textOrNull(String v) => v.trim().isEmpty ? null : v.trim();
+}
+
+/// Story 5.5, mobile My cell and Home: a meeting's published programme as a
+/// member of the cell reads it (with which parts are theirs).
+class MemberProgrammeController extends CellsController<MeetingProgrammeRead> {
+  MemberProgrammeController(this.meetingId);
+
+  final String meetingId;
+
+  @override
+  Future<AccessRead<MeetingProgrammeRead>> fetch() =>
+      ref.read(cellsRepositoryProvider).fetchMeetingProgramme(meetingId);
+
+  /// Story 5.7: tell the cell's leaders the member cannot attend this
+  /// meeting (an optional practical note). Never answers a duty.
+  Future<void> sendCannotAttend(String? note) =>
+      send(CellAbsenceCommands.send, const Optional.of(null), {
+        'meeting_id': meetingId,
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      }, 'your notice');
+
+  Future<void> changeCannotAttend(AbsenceNotice notice, String? note) =>
+      send(CellAbsenceCommands.change, Optional.of(notice.revision), {
+        'notice_id': notice.noticeId,
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      }, 'your notice');
+
+  Future<void> withdrawCannotAttend(AbsenceNotice notice) => send(
+    CellAbsenceCommands.withdraw,
+    Optional.of(notice.revision),
+    {'notice_id': notice.noticeId},
+    'your notice',
+  );
+}
+
+final memberProgrammeProvider = NotifierProvider.autoDispose
+    .family<
+      MemberProgrammeController,
+      CellsState<MeetingProgrammeRead>,
+      String
+    >(MemberProgrammeController.new);
+
+final cellProgrammeProvider = NotifierProvider.autoDispose
+    .family<CellProgrammeController, CellsState<ProgrammeRead>, String>(
+      CellProgrammeController.new,
     );

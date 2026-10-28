@@ -20,8 +20,8 @@ import 'shell_routing.dart' show ClientPaths;
 Widget _page(BuildContext context, String title, List<Widget> children) {
   final c = ChurchColors.of(context);
   final layout = ChurchLayout.of(context);
-  return Scaffold(
-    appBar: AppBar(title: Text(title)),
+  return ChurchPageScaffold(
+    title: title,
     body: SafeArea(
       child: SingleChildScrollView(
         padding: layout.pagePadding,
@@ -1257,157 +1257,10 @@ class _CredentialReviewScreenState
   }
 
   Widget _noticeBanner(CredentialReviewNotice notice, CredentialReviewState s) {
-    final who = s.subject ?? 'the member';
-    final (tone, title, message) = switch (notice) {
-      CredentialReviewNotice.approved => (
-        StatusTone.success,
-        'Approved and applied',
-        'The sign-in details of $who changed; every device signs in again.',
-      ),
-      CredentialReviewNotice.rejected => (
-        StatusTone.info,
-        'Not approved',
-        '$who is told to contact the church office. Their approved details '
-            'stay in force.',
-      ),
-      CredentialReviewNotice.holdPlaced => (
-        StatusTone.success,
-        'Hold placed',
-        'Every device of $who now shows only the access review screen.',
-      ),
-      CredentialReviewNotice.holdReleased => (
-        StatusTone.success,
-        'Hold released',
-        '$who signs in again to continue.',
-      ),
-      CredentialReviewNotice.restored => (
-        StatusTone.success,
-        'Approved details restored',
-        'Every device of $who was signed out.',
-      ),
-      CredentialReviewNotice.accepted => (
-        StatusTone.success,
-        'Current details accepted',
-        '$who signs in again with them.',
-      ),
-      CredentialReviewNotice.unverified => (
-        StatusTone.warning,
-        'Not confirmed',
-        'The member has not opened the confirmation link yet.',
-      ),
-      CredentialReviewNotice.otherChanges => (
-        StatusTone.danger,
-        'Other sign-in changes',
-        'Don\'t approve this request; then review the account below.',
-      ),
-      CredentialReviewNotice.taken => (
-        StatusTone.danger,
-        'Number in use',
-        'Another account holds this number. Nothing was overwritten.',
-      ),
-      CredentialReviewNotice.pendingChange => (
-        StatusTone.warning,
-        'A request is waiting',
-        'Decide the member\'s pending request first.',
-      ),
-      CredentialReviewNotice.unsupportedFactors => (
-        StatusTone.danger,
-        'Extra sign-in factor',
-        'Restore the approved details instead.',
-      ),
-      CredentialReviewNotice.notAcceptable => (
-        StatusTone.danger,
-        'Can\'t accept these details',
-        'The current number or email can\'t become the approved one. '
-            'Restore the approved details instead.',
-      ),
-      CredentialReviewNotice.alreadyHeld => (
-        StatusTone.info,
-        'Already on hold',
-        '$who already has this hold.',
-      ),
-      CredentialReviewNotice.held => (
-        StatusTone.warning,
-        'On hold',
-        'Release the hold first. Restoring the approved details is still '
-            'possible.',
-      ),
-      CredentialReviewNotice.passwordResetRequired => (
-        StatusTone.warning,
-        'Password reset needed first',
-        '$who must reset the password themselves (recovery email or staff-'
-            'assisted recovery) before this hold can be released.',
-      ),
-      CredentialReviewNotice.passwordUnreviewed => (
-        StatusTone.danger,
-        'Password may not be the member\'s',
-        'The password changed without the member\'s own reset. Restore the '
-            'approved details instead; the account stays on hold until the '
-            'member resets the password.',
-      ),
-      CredentialReviewNotice.restoreBlocked => (
-        StatusTone.danger,
-        'Can\'t restore',
-        'Another account now holds the approved number or address.',
-      ),
-      CredentialReviewNotice.lastAdmin => (
-        StatusTone.danger,
-        'Last Admin',
-        '$who is the church\'s last usable Admin. Give another member the '
-            'Admin role first.',
-      ),
-      CredentialReviewNotice.changedElsewhere => (
-        StatusTone.info,
-        'Changed elsewhere',
-        'The record changed since you loaded it. The list was reloaded.',
-      ),
-      CredentialReviewNotice.selfAction => (
-        StatusTone.warning,
-        'Not for your own record',
-        'Another Admin must decide.',
-      ),
-      CredentialReviewNotice.noLongerAdmin => (
-        StatusTone.danger,
-        'Not allowed',
-        'Your account no longer holds the Admin role.',
-      ),
-      CredentialReviewNotice.signInAgain => (
-        StatusTone.warning,
-        'Please sign in again',
-        'This sign-in is no longer valid.',
-      ),
-      CredentialReviewNotice.notAccepting => (
-        StatusTone.neutral,
-        'Not available here',
-        'This can\'t be done in this environment yet.',
-      ),
-      CredentialReviewNotice.invalid => (
-        StatusTone.danger,
-        'Check the form',
-        'Choose how you checked the member\'s identity.',
-      ),
-      CredentialReviewNotice.notFound => (
-        StatusTone.info,
-        'Not found',
-        'The record no longer exists.',
-      ),
-      CredentialReviewNotice.refused => (
-        StatusTone.danger,
-        'Refused',
-        'The server refused the request.',
-      ),
-      CredentialReviewNotice.unconfirmed => (
-        StatusTone.warning,
-        'Not confirmed yet',
-        'We couldn\'t confirm whether the decision arrived. Check again; it '
-            'is sent once.',
-      ),
-      CredentialReviewNotice.notSent => (
-        StatusTone.neutral,
-        'Not sent',
-        'This build has no server configured.',
-      ),
-    };
+    final (tone, title, message) = credentialReviewNoticeText(
+      notice,
+      s.subject,
+    );
     return RequestStateBanner(
       key: Key('credential-review-notice-${notice.name}'),
       tone: tone,
@@ -1429,4 +1282,163 @@ class _CredentialReviewScreenState
       ],
     );
   }
+}
+
+/// What a credential review outcome tells the Admin: tone, title and
+/// message (Access reviews, and the member panel on Members).
+(StatusTone, String, String) credentialReviewNoticeText(
+  CredentialReviewNotice notice,
+  String? subject,
+) {
+  final who = subject ?? 'the member';
+  return switch (notice) {
+    CredentialReviewNotice.approved => (
+      StatusTone.success,
+      'Approved and applied',
+      'The sign-in details of $who changed; every device signs in again.',
+    ),
+    CredentialReviewNotice.rejected => (
+      StatusTone.info,
+      'Not approved',
+      '$who is told to contact the church office. Their approved details '
+          'stay in force.',
+    ),
+    CredentialReviewNotice.holdPlaced => (
+      StatusTone.success,
+      'Hold placed',
+      'Every device of $who now shows only the access review screen.',
+    ),
+    CredentialReviewNotice.holdReleased => (
+      StatusTone.success,
+      'Hold released',
+      '$who signs in again to continue.',
+    ),
+    CredentialReviewNotice.restored => (
+      StatusTone.success,
+      'Approved details restored',
+      'Every device of $who was signed out.',
+    ),
+    CredentialReviewNotice.accepted => (
+      StatusTone.success,
+      'Current details accepted',
+      '$who signs in again with them.',
+    ),
+    CredentialReviewNotice.unverified => (
+      StatusTone.warning,
+      'Not confirmed',
+      'The member has not opened the confirmation link yet.',
+    ),
+    CredentialReviewNotice.otherChanges => (
+      StatusTone.danger,
+      'Other sign-in changes',
+      'Don\'t approve this request; then review the account below.',
+    ),
+    CredentialReviewNotice.taken => (
+      StatusTone.danger,
+      'Number in use',
+      'Another account holds this number. Nothing was overwritten.',
+    ),
+    CredentialReviewNotice.pendingChange => (
+      StatusTone.warning,
+      'A request is waiting',
+      'Decide the member\'s pending request first.',
+    ),
+    CredentialReviewNotice.unsupportedFactors => (
+      StatusTone.danger,
+      'Extra sign-in factor',
+      'Restore the approved details instead.',
+    ),
+    CredentialReviewNotice.notAcceptable => (
+      StatusTone.danger,
+      'Can\'t accept these details',
+      'The current number or email can\'t become the approved one. '
+          'Restore the approved details instead.',
+    ),
+    CredentialReviewNotice.alreadyHeld => (
+      StatusTone.info,
+      'Already on hold',
+      '$who already has this hold.',
+    ),
+    CredentialReviewNotice.held => (
+      StatusTone.warning,
+      'On hold',
+      'Release the hold first. Restoring the approved details is still '
+          'possible.',
+    ),
+    CredentialReviewNotice.passwordResetRequired => (
+      StatusTone.warning,
+      'Password reset needed first',
+      '$who must reset the password themselves (recovery email or staff-'
+          'assisted recovery) before this hold can be released.',
+    ),
+    CredentialReviewNotice.passwordUnreviewed => (
+      StatusTone.danger,
+      'Password may not be the member\'s',
+      'The password changed without the member\'s own reset. Restore the '
+          'approved details instead; the account stays on hold until the '
+          'member resets the password.',
+    ),
+    CredentialReviewNotice.restoreBlocked => (
+      StatusTone.danger,
+      'Can\'t restore',
+      'Another account now holds the approved number or address.',
+    ),
+    CredentialReviewNotice.lastAdmin => (
+      StatusTone.danger,
+      'Last Admin',
+      '$who is the church\'s last usable Admin. Give another member the '
+          'Admin role first.',
+    ),
+    CredentialReviewNotice.changedElsewhere => (
+      StatusTone.info,
+      'Changed elsewhere',
+      'The record changed since you loaded it. The list was reloaded.',
+    ),
+    CredentialReviewNotice.selfAction => (
+      StatusTone.warning,
+      'Not for your own record',
+      'Another Admin must decide.',
+    ),
+    CredentialReviewNotice.noLongerAdmin => (
+      StatusTone.danger,
+      'Not allowed',
+      'Your account no longer holds the Admin role.',
+    ),
+    CredentialReviewNotice.signInAgain => (
+      StatusTone.warning,
+      'Please sign in again',
+      'This sign-in is no longer valid.',
+    ),
+    CredentialReviewNotice.notAccepting => (
+      StatusTone.neutral,
+      'Not available here',
+      'This can\'t be done in this environment yet.',
+    ),
+    CredentialReviewNotice.invalid => (
+      StatusTone.danger,
+      'Check the form',
+      'Choose how you checked the member\'s identity.',
+    ),
+    CredentialReviewNotice.notFound => (
+      StatusTone.info,
+      'Not found',
+      'The record no longer exists.',
+    ),
+    CredentialReviewNotice.refused => (
+      StatusTone.danger,
+      'Refused',
+      'The server refused the request.',
+    ),
+    CredentialReviewNotice.unconfirmed => (
+      StatusTone.warning,
+      'Not confirmed yet',
+      'We couldn\'t confirm whether the decision arrived. Check again; it '
+          'is sent once.',
+    ),
+    CredentialReviewNotice.notSent => (
+      StatusTone.neutral,
+      'Not sent',
+      'This build has no server configured.',
+    ),
+  };
 }

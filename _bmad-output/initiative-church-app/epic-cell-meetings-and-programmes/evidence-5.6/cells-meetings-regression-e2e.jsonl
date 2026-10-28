@@ -1,0 +1,12 @@
+{"step":"M00-precondition","target":"LOCAL","at":"2026-10-21T10:42:46.361Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"M01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-21T10:42:50.701Z","verdict":"pass","amr":["password"]}
+{"step":"M02-cells-roles-and-confirmed-members","target":"LOCAL","at":"2026-10-21T10:42:50.915Z","verdict":"pass","cells":[200,200],"grants":[200,200,200],"placed":[200,200]}
+{"step":"M10-admin-sets-the-weekly-schedule-in-church-time","target":"LOCAL","at":"2026-10-21T10:42:51.100Z","verdict":"pass","leader_refused":"forbidden","set":200,"meetings":12,"all_at_18_church_time":true}
+{"step":"M11-meeting-ids-stable-across-regeneration","target":"LOCAL","at":"2026-10-21T10:42:51.278Z","verdict":"pass","meetings":12,"after_read":true,"after_resave":true}
+{"step":"M20-leader-moves-one-and-cancels-another","target":"LOCAL","at":"2026-10-21T10:42:51.426Z","verdict":"pass","assistant":"forbidden","other_cell_leader":"forbidden","moved":"moved","replay_same":true,"cancelled":"cancelled"}
+{"step":"M21-exceptions-keep-their-ids-through-regeneration","target":"LOCAL","at":"2026-10-21T10:42:51.480Z","verdict":"pass","same_ids":true,"moved_state":"moved","cancelled_state":"cancelled"}
+{"step":"M30-confirmed-member-reads-the-next-meeting-and-venue","target":"LOCAL","at":"2026-10-21T10:42:51.542Z","verdict":"pass","status":200,"is_first_meeting":true,"venue_shown":true,"pin_shown":true}
+{"step":"M31-others-read-no-shikoswe-venue","target":"LOCAL","at":"2026-10-21T10:42:51.641Z","verdict":"pass","estates_member":null,"pending_applicant":403,"admin_my_cell":null,"admin_board_venue":null,"admin_venue_set":true,"estates_member_staff_read":403}
+{"step":"M40-direct-table-queries-refused","target":"LOCAL","at":"2026-10-21T10:42:51.652Z","verdict":"pass","statuses":["app.cells_meeting_schedules:406","api.cells_meeting_schedules:404","app.cells_meetings:406","api.cells_meetings:404","app.cells_meeting_audit:406","api.cells_meeting_audit:404"]}
+{"step":"M50-audit-content-free","target":"LOCAL","at":"2026-10-21T10:42:52.445Z","verdict":"pass","leaked_values":0,"actions":"meeting_cancelled,meeting_moved,schedule_set"}
+{"step":"M99-cleanup","target":"LOCAL","at":"2026-10-21T10:42:53.711Z","users_left":0,"unmarked":true,"meetings_left":0}

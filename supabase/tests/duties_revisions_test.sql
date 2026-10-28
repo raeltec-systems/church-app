@@ -77,6 +77,8 @@ create function pg_temp.jobs(p_source uuid) returns text language sql as $$
   select string_agg(reminder_kind || ':' || job_state || ':' || coalesce(cancel_reason, finish_reason, '-'),
                     ',' order by enqueued_at, reminder_kind, job_state)
     from app.notifications_jobs where source_type = 'duties_assignment' and source_id = p_source
+      -- Story 4.8's reminders are checked in duties_reminders_test.sql.
+      and reminder_kind not in ('duty_response_due', 'duty_starting')
 $$;
 
 -- Accounts: 1 Admin; 2 leader of D; 3 deputy of D; 4 member M (assignee); 5 member O (another
@@ -154,9 +156,13 @@ select ok(not exists (
    cross join unnest(array['anon', 'authenticated', 'service_role']) r
    where n.nspname in ('app', 'api') and p.proname ~ '^duties_'
      and not (p.proname in ('duties_command', 'duties_my_duties', 'duties_leader_board',
-                            'duties_admin_overview') and r = 'authenticated')
+                            'duties_admin_overview', 'duties_rota', 'duties_candidates',
+                            'duties_coverage', 'duties_outcomes', 'duties_member_history',
+                            -- Special assignments: the Pastors' read.
+                            'duties_special_assignments')
+                  and r = 'authenticated')
      and has_function_privilege(r, p.oid, 'EXECUTE')),
-  'still only the command and the three reads are client-executable');
+  'still only the command and the reads (with the 4.3 rota, the 4.4 candidates, the 4.9 coverage queue, the 4.10 outcomes and history and the special assignments) are client-executable');
 select is((select count(*)::int from app.contract_unowned_objects()), 0, 'no unowned objects');
 select is((select count(*)::int from app.contract_unpinned_functions()), 0, 'every function is pinned');
 select is((select count(*)::int from app.contract_boundary_violations()), 0, 'no boundary violations');
@@ -168,7 +174,7 @@ select is((select string_agg(f || '=' || coalesce(app.duties_slot_field_class(f)
   'every revisable field is classified explicitly (spec list material; instructions notes)');
 select is((select string_agg(c.reminder_kind || '|' || c.title || '|' || c.link, ',' order by c.reminder_kind)
              from app.contract_reminder_contracts c
-            where c.source_type = 'duties_assignment' and c.reminder_kind <> 'duty_assigned'),
+            where c.source_type = 'duties_assignment' and c.reminder_kind in ('duty_changed', 'duty_updated', 'duty_released')),
   'duty_changed|Duty changed|/duties/assignments/{source_id},'
   'duty_released|Duty changed|/duties,'
   'duty_updated|Duty details updated|/duties/assignments/{source_id}',
@@ -200,8 +206,9 @@ select is(pg_temp.revise(2, jsonb_build_object('instructions', 'Bring a Bible.',
             'response_deadline', pg_temp.at(interval '8 days'))) -> 'field_errors',
   '{"response_deadline": "not_material"}'::jsonb, 'a notes-only change takes no new deadline');
 select is(pg_temp.revise(2, jsonb_build_object('starts_at', pg_temp.at(interval '11 days'),
-            'ends_at', pg_temp.at(interval '11 days 2 hours'))) -> 'field_errors',
-  '{"response_deadline": "required"}'::jsonb, 'a material change needs a new response deadline');
+            'ends_at', pg_temp.at(interval '11 days 2 hours'), 'response_deadline', 1)) -> 'field_errors',
+  '{"response_deadline": "invalid"}'::jsonb,
+  'a material change checks its new response deadline (story 4.8: without one the 3.3 default applies)');
 select is(pg_temp.revise(2, jsonb_build_object('starts_at', pg_temp.at(interval '11 days'),
             'response_deadline', pg_temp.at(interval '12 days'))) -> 'field_errors',
   '{"ends_at": "before_start", "response_deadline": "after_start"}'::jsonb,
@@ -227,7 +234,7 @@ create temp table rev as select pg_temp.revise(2, jsonb_build_object(
 create function pg_temp.asg2() returns uuid language sql as $$ select (r #>> '{data,assignment_id}')::uuid from rev $$;
 select is((select (r -> 'data') - 'occurrence_id' - 'slot_id' - 'assignment_id' from rev),
   jsonb_build_object('revision', 2, 'change', 'material', 'slot_revision', 2, 'assignment_revision', 1,
-                     'superseded_assignment_id', pg_temp.asg1(), 'response', 'pending', 'notice_queued', true),
+                     'superseded_assignment_id', pg_temp.asg1(), 'response', 'pending', 'notice_queued', true, 'overrides', 0),
   'a time change is material: a new pending assignment revision; the answer holds ids and states only');
 select isnt(pg_temp.asg2(), pg_temp.asg1(), 'the new revision is a new assignment for the same member');
 select is((select assignment_state || '|' || end_reason || '|' || response || '|' || response_provenance
@@ -285,7 +292,23 @@ create temp table mine as select pg_temp.readj(4, 'select api.duties_my_duties()
 select is((select jsonb_array_length(j -> 'assignments') from mine), 1, 'My duties lists the current revision only');
 select is((select (j -> 'assignments' -> 0) - 'occurrence_id' - 'department_id' - 'starts_at' - 'ends_at'
                   - 'response_deadline' - 'duty_name' - 'department_name' - 'location' - 'instructions'
-                  - 'reporting_at' - 'responded_at' - 'note' from mine),
+                  - 'reporting_at' - 'responded_at' - 'note'
+                  -- Story 4.3 keys are checked in duties_rota_test.sql.
+                  - 'position_name' - 'topic' - 'scripture'
+                  -- Story 4.5 keys are checked in duties_responses_test.sql.
+                  - 'owner_kind' - 'prior_accepted_at' - 'leaders' - 'slot_id'
+                  -- Story 4.8 keys are checked in duties_reminders_test.sql.
+                  - 'deadline_source' - 'short_notice' - 'reminders'
+                  -- Story 4.9 keys are checked in duties_coverage_test.sql.
+                  - 'response_provenance' - 'confirmed_channel'
+            -- Story 4.10 keys are checked in duties_outcomes_test.sql.
+            - 'outcome'
+            -- Story 4.11 keys are checked in duties_owner_operations_test.sql.
+            - 'cell_id'
+            -- Special assignment keys are checked in duties_special_assignments_test.sql.
+            - 'due_on'
+            -- Story 6.12 checks event_ref in content_event_duty_links_test.sql.
+            - 'event_ref' from mine),
   jsonb_build_object('assignment_id', pg_temp.asg2(), 'revision', 1, 'response', 'pending', 'slot_revision', 2,
                      'changes', jsonb_build_array('starts_at', 'ends_at'), 'previous_response', 'accepted',
                      'previous_assignment_ids', jsonb_build_array(pg_temp.asg1()), 'notes_updated_at', null),
@@ -295,7 +318,9 @@ create temp table board as select jsonb_path_query_first(pg_temp.readj(2, 'selec
 select is((select (p ->> 'slot_revision') || '|' || (p #>> '{assignment,response}') || '|'
                   || (p #>> '{assignment,changes}') || '|' || jsonb_array_length(p -> 'history') from board),
   '2|pending|["starts_at", "ends_at"]|1', 'the leader sees the new pending revision and one history entry');
-select is((select (p -> 'history' -> 0) - 'ended_at' - 'responded_at' - 'display_name' from board),
+select is((select (p -> 'history' -> 0) - 'ended_at' - 'responded_at' - 'display_name'
+                  -- Story 4.5 key, checked in duties_responses_test.sql.
+                  - 'prior_accepted_at' from board),
   jsonb_build_object('assignment_id', pg_temp.asg1(), 'member_id', pg_temp.mid(4), 'state', 'superseded',
                      'end_reason', 'revised', 'response', 'accepted', 'response_provenance', 'member',
                      'note', 'SYNTHETIC note one.', 'slot_revision', 1),
@@ -312,7 +337,7 @@ create temp table notes as select pg_temp.revise(3, '{"instructions": "Bring a B
 select is((select (r -> 'data') - 'occurrence_id' - 'slot_id' from notes),
   jsonb_build_object('revision', 3, 'change', 'notes', 'slot_revision', 3, 'assignment_id', pg_temp.asg2(),
                      'assignment_revision', 2, 'superseded_assignment_id', null, 'response', 'accepted',
-                     'notice_queued', true),
+                     'notice_queued', true, 'overrides', 0),
   'the deputy''s instructions edit is notes-only: same assignment, still Accepted');
 select is((select response || '|' || revision || '|' || assignment_state from app.duties_assignments
             where assignment_id = pg_temp.asg2()), 'accepted|2|current', 'the acceptance is untouched');
@@ -338,8 +363,8 @@ select is((select string_agg(x ->> 'title', ',' order by x ->> 'title')
 
 -- Concurrent edits: one success and one conflict ------------------------------------------------------
 create temp table race as select pg_temp.orev() as expected;
-create temp table race1 as select pg_temp.revise(2, '{"location": "SYNTHETIC Side hall"}', (select expected from race)) as r;
-select is((select r ->> 'code' from race1), 'validation_failed', 'a location change is material and needs a deadline');
+create temp table race1 as select pg_temp.revise(2, '{"location": "SYNTHETIC Side hall", "response_deadline": 1}', (select expected from race)) as r;
+select is((select r ->> 'code' from race1), 'validation_failed', 'a location change with a malformed deadline is refused');
 create temp table race2 as select pg_temp.revise(2, jsonb_build_object('location', 'SYNTHETIC Side hall',
   'response_deadline', pg_temp.at(interval '9 days')), (select expected from race)) as r;
 create temp table race3 as select pg_temp.revise(1, '{"instructions": "Admin text."}', (select expected from race)) as r;

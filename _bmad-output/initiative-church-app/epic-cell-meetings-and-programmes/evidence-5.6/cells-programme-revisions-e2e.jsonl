@@ -1,0 +1,8 @@
+{"step":"V00-precondition","target":"LOCAL","at":"2026-10-21T10:42:14.561Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"V01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-21T10:42:18.519Z","verdict":"pass","amr":["password"]}
+{"step":"V02-published-and-accepted","target":"LOCAL","at":"2026-10-21T10:42:20.560Z","verdict":"pass","published":"published","answers":["accepted","accepted"]}
+{"step":"V10-notes-only-keeps-answers","target":"LOCAL","at":"2026-10-21T10:42:20.673Z","verdict":"pass","waited_for_publish":true,"same_assignment":true,"response":"accepted"}
+{"step":"V20-material-change-asks-again-only-there","target":"LOCAL","at":"2026-10-21T10:42:21.621Z","verdict":"pass","new_pending":"pending","history":"superseded|accepted","stale_reminders":0,"late_answer":"conflict","replaced_person_still_on":false}
+{"step":"V30-department-duty-unchanged-with-a-mismatch","target":"LOCAL","at":"2026-10-21T10:42:22.913Z","verdict":"pass","flagged":["label"],"open_flags":true,"department_revision_unchanged":true}
+{"step":"V40-move-reconciled-and-another-cancelled","target":"LOCAL","at":"2026-10-21T10:42:24.784Z","verdict":"pass","admin_move":"programme_published","leader_move":200,"members_told":true,"part_moved_with_meeting":true,"department_flag":["time"],"cancel_this":"programme_published","cancel_another":"cancelled"}
+{"step":"V99-cleanup","target":"LOCAL","at":"2026-10-21T10:42:26.051Z","users_left":0,"unmarked":true,"programmes_left":0}

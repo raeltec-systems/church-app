@@ -3,11 +3,29 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import 'access_screens.dart';
+import 'announcement_screens.dart';
 import 'assisted_recovery_screens.dart';
 import 'account_screen.dart';
+import 'banner_screens.dart';
+import 'bible_screens.dart';
+import 'sermon_screens.dart';
+import 'sermon_staff_screens.dart';
+import 'calendar_screens.dart';
+import 'content_screens.dart';
 import 'cell_screens.dart';
 import 'credential_screens.dart';
 import 'duties_screens.dart';
+import 'followups_screens.dart';
+import 'give_screens.dart';
+import 'giving_staff_screens.dart';
+import 'home_banners.dart';
+import 'home_screen.dart';
+import 'home_coming_up.dart';
+import 'search_screens.dart';
+import 'hymn_screens.dart';
+import 'hymn_list_screens.dart';
+import 'sunday_hymns_staff_screen.dart';
+import '../application/hymn_controllers.dart' show BibleHymnsView;
 import 'fixture_command_screen.dart';
 import 'fixture_reminder_screens.dart';
 import 'notification_settings_screen.dart';
@@ -24,6 +42,8 @@ import 'page_address_stub.dart'
 import 'platform_status_screen.dart';
 import 'recovery_screens.dart';
 import 'sign_in_screen.dart';
+import 'staff_announcements_screen.dart';
+import 'staff_overview_screen.dart';
 
 /// Destinations shared by both shells. Which ones a shell shows follows the
 /// server's current grants (story 2.3, `myAccessProvider`); a route itself is
@@ -31,6 +51,10 @@ import 'sign_in_screen.dart';
 abstract final class ClientPaths {
   static const status = '/status';
   static const fixture = '/fixture';
+
+  /// Staff web: the signed-in person's Overview (what needs attention for
+  /// the roles they hold); the sign-in landing while signed out.
+  static const overview = '/overview';
 
   /// The signed-in member's own membership (story 2.1).
   static const account = '/account';
@@ -56,6 +80,10 @@ abstract final class ClientPaths {
   /// Staff web, cell leaders and assistants: their cell and its requests.
   static const cellLeader = '/cells/leader';
 
+  /// Story 5.1, staff web: cell schedules and meetings (cell leaders and
+  /// assistants, Admin).
+  static const cellMeetings = '/cells/meetings';
+
   /// The member's own cell and change request (story 2.6, mobile).
   static const myCell = '/my-cell';
 
@@ -63,13 +91,104 @@ abstract final class ClientPaths {
   /// is one assignment (the reminder's deep link).
   static const myDuties = DutyPaths.mine;
 
+  /// The mobile Home tab (story 4.5; story 6.1: everyone, signed in or
+  /// not). Later features add their cards.
+  static const home = DutyPaths.home;
+
+  /// Story 6.1 (mobile): the public Calendar tab.
+  static const calendar = CalendarPaths.calendar;
+
+  /// Story 6.6 (mobile): the public Bible & Hymns tab.
+  static const bible = '/bible';
+  static const sermons = SermonPaths.list;
+  static String sermon(String id) => SermonPaths.detail(id);
+  static const contentSermons = SermonPaths.staff;
+  static const contentSermonSeries = SermonPaths.staffSeries;
+
+  /// Story 6.7 (mobile): the tab opened on the built-in hymn book.
+  static const hymnBook = '/bible?view=hymns';
+
+  /// Story 6.7 (mobile): one hymn or chorus of the built-in book, by its id
+  /// (`hymn-12`, `chorus-3`).
+  static String hymn(String id) => '/bible/hymns/$id';
+
+  /// Story 6.8 (mobile, members): every saved hymn.
+  static const savedHymns = '/bible/hymns/saved';
+
+  /// Story 6.8, staff web: Hymns for this Sunday (Admin, Media, worship
+  /// leaders).
+  static const contentSundayHymns = SundayHymnsStaffPaths.sundayHymns;
+
+  /// Story 6.1 (mobile): one published event.
+  static String calendarEvent(String eventId) => CalendarPaths.event(eventId);
+
+  /// Story 6.1, staff web: the Events editor (Media, Pastor, Admin).
+  static const contentEvents = ContentPaths.events;
+
+  /// Story 6.3 (mobile): the public Give tab ("How to give").
+  static const give = GivePaths.give;
+
+  /// Story 6.3 (mobile): one published giving method.
+  static String giveMethod(String methodId) => GivePaths.method(methodId);
+
+  /// Story 6.3, staff web: the Giving editor (Admin only).
+  static const contentGiving = GivingStaffPaths.giving;
+
+  /// Story 6.13 (both apps, everyone): the published announcements.
+  static const announcements = AnnouncementPaths.list;
+
+  /// Story 6.13: one published announcement (the notice's deep link).
+  static String announcement(String announcementId) =>
+      AnnouncementPaths.detail(announcementId);
+
+  /// Story 6.13, staff web: the Announcements editor (Media, Pastor, Admin).
+  static const contentAnnouncements = StaffAnnouncementPaths.announcements;
+
+  /// Story 6.2, staff web: Home banners and the rights records (Media,
+  /// Pastor, Admin).
+  static const contentBanners = BannerPaths.banners;
+  static const contentRights = BannerPaths.rights;
+
+  /// Story 6.6, staff web: Bible translation CSV imports and publication.
+  static const contentBible = '/content/bible';
+
+  /// Story 6.2 (mobile): one published banner's original image.
+  static String banner(String bannerId) => BannerPaths.banner(bannerId);
+
   /// Story 4.1, staff web: department leaders and deputies (Admin; Pastor
   /// read only): publish a duty and see the responses.
   static const dutyLeader = DutyPaths.leader;
 
+  /// Story 4.3 (staff web): the rota grid.
+  static const dutyRota = DutyPaths.rota;
+
+  /// Story 4.9 (staff web and mobile): the coverage queue.
+  static const dutyCoverage = DutyPaths.coverage;
+
+  /// Story 4.10 (staff web and mobile): record and correct duty outcomes.
+  static const dutyOutcomes = DutyPaths.outcomes;
+
+  /// Story 4.10: the reader's own duty history (a leader opens a member's
+  /// with `?member=<id>`).
+  static const dutyHistory = DutyPaths.history;
+
+  /// Special assignments (staff web, the Pastors): give, change, cancel and
+  /// record the outcome of duties that belong to no department or cell.
+  static const dutySpecial = DutyPaths.special;
+
   /// Story 4.1, staff web, Admin only: departments, leaders, deputies and
   /// members.
   static const adminDepartments = DutyPaths.adminDepartments;
+
+  /// Story 4.6: My follow-ups (every owner; mobile from the Home card, staff
+  /// web in the sidebar); `/followups/tasks/<id>` is one task.
+  static const myFollowUps = FollowUpPaths.mine;
+
+  /// Story 4.6, staff web: the tasks in the scopes the caller holds.
+  static const followUpSupervision = FollowUpPaths.supervision;
+
+  /// Story 4.6, staff web, Admin only: routing metadata of every task.
+  static const adminFollowUps = FollowUpPaths.adminRouting;
 
   /// Story 2.7: forgot password (neutral acknowledgement).
   static const forgotPassword = '/forgot-password';
@@ -110,6 +229,14 @@ abstract final class ClientPaths {
   /// for members who cannot use the app.
   static const adminMemberDeletions = '/admin/member-deletions';
 
+  /// Entry 14 (mobile, everyone): the top bar's search.
+  static const search = SearchPaths.search;
+
+  /// Entry 14: a Coming up poster in full.
+  static String eventPoster(String eventId) => HomePosterPaths.event(eventId);
+  static String seriesPoster(String seriesId) =>
+      HomePosterPaths.series(seriesId);
+
   /// Story 3.1 (both clients): the member's durable inbox.
   static const inbox = '/inbox';
 
@@ -138,12 +265,35 @@ abstract final class ClientPaths {
     RegExp(
       r'^/fixture/reminders/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
     ),
+    // Story 5.2: meeting reminders and notices open My cell, which reads the
+    // meeting again (a pointer, not a grant).
+    RegExp(r'^/my-cell$'),
+    // Story 5.7: a Cannot attend notice opens Cell meetings for the leader.
+    RegExp(r'^/cells/meetings$'),
     // Story 4.1: the duties_assignment contract's link.
     RegExp(
       r'^/duties/assignments/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
     ),
     // Story 4.2: the duty_released notice opens My duties.
     RegExp(r'^/duties$'),
+    // Story 4.8: the leaders' overdue and short-notice alerts open the
+    // Duties board, which reads the duty again (a pointer, not a grant).
+    RegExp(r'^/duties/leader$'),
+    // Story 4.16: the leaders' review notice opens the board's reviews.
+    RegExp(r'^/duties/leader/reviews$'),
+    // Story 4.9: the leaders' decline alert opens the coverage queue, which
+    // reads every position again.
+    RegExp(r'^/duties/coverage$'),
+    // Story 6.13: an announcement notice opens the announcement, which reads
+    // the published projection again (a pointer, not a grant).
+    RegExp(
+      r'^/announcements/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    ),
+    // Story 4.7: the follow-up reminders (followups_task and
+    // followups_supervision contracts) open the task, which reads it again.
+    RegExp(
+      r'^/followups/tasks/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    ),
   ];
 
   static bool isKnownDeepLink(String target) =>
@@ -202,12 +352,19 @@ typedef ShellBuilder = Widget Function(
 ///
 /// [reminderHealth] registers the staff reminder-health screen (story 3.8,
 /// staff web only).
+///
+/// [staffOverview] registers the staff Overview (staff web only); [home] is
+/// where `/` goes and [afterSignIn] where a sign-in continues.
 GoRouter buildClientRouter({
   required ShellBuilder shell,
   String initialLocation = ClientPaths.status,
   bool membershipRequests = false,
   bool assistedRecovery = false,
   bool reminderHealth = false,
+  bool memberHome = false,
+  bool staffOverview = false,
+  String home = ClientPaths.status,
+  String afterSignIn = ClientPaths.account,
 }) {
   final afterCreateAccount = membershipRequests
       ? ClientPaths.membership
@@ -225,7 +382,12 @@ GoRouter buildClientRouter({
   return GoRouter(
     initialLocation: initialLocation,
     routes: [
-      GoRoute(path: '/', redirect: (_, _) => ClientPaths.status),
+      GoRoute(path: '/', redirect: (_, _) => home),
+      if (staffOverview)
+        GoRoute(
+          path: ClientPaths.overview,
+          pageBuilder: (_, state) => page(state, const StaffOverviewScreen()),
+        ),
       GoRoute(
         path: ClientPaths.status,
         pageBuilder: (_, state) =>
@@ -272,6 +434,7 @@ GoRouter buildClientRouter({
           AccountScreen(
             linkMembershipRequest: membershipRequests,
             linkRecoveryEmail: membershipRequests,
+            memberMenu: memberHome,
           ),
         ),
       ),
@@ -296,8 +459,239 @@ GoRouter buildClientRouter({
         pageBuilder: (_, state) => page(state, const CellLeaderScreen()),
       ),
       GoRoute(
+        path: ClientPaths.cellMeetings,
+        pageBuilder: (_, state) => page(state, const CellMeetingsScreen()),
+        routes: [
+          // Story 5.3: one meeting's programme (CellPaths.plan).
+          GoRoute(
+            path: ':meetingId/plan',
+            pageBuilder: (_, state) => page(
+              state,
+              PlanMeetingScreen(
+                key: ValueKey(state.pathParameters['meetingId']),
+                meetingId: state.pathParameters['meetingId']!,
+              ),
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
         path: ClientPaths.myCell,
         pageBuilder: (_, state) => page(state, const MyCellScreen()),
+      ),
+      // Story 4.5: Home is a mobile destination only. Story 6.1: so is the
+      // public Calendar, with each event's detail.
+      if (memberHome) ...[
+        GoRoute(
+          path: ClientPaths.home,
+          pageBuilder: (_, state) => page(state, const HomeScreen()),
+          routes: [
+            // Story 6.2: a banner's original image.
+            GoRoute(
+              path: 'banners/:bannerId',
+              pageBuilder: (_, state) => page(
+                state,
+                BannerScreen(
+                  key: ValueKey(state.pathParameters['bannerId']),
+                  bannerId: state.pathParameters['bannerId']!,
+                ),
+              ),
+            ),
+            // Entry 14: a Coming up poster in full.
+            GoRoute(
+              path: 'posters/events/:eventId',
+              pageBuilder: (_, state) => page(
+                state,
+                HomePosterScreen.event(
+                  key: ValueKey(state.pathParameters['eventId']),
+                  id: state.pathParameters['eventId']!,
+                ),
+              ),
+            ),
+            GoRoute(
+              path: 'posters/series/:seriesId',
+              pageBuilder: (_, state) => page(
+                state,
+                HomePosterScreen.series(
+                  key: ValueKey(state.pathParameters['seriesId']),
+                  id: state.pathParameters['seriesId']!,
+                ),
+              ),
+            ),
+          ],
+        ),
+        // Entry 14: the top bar's search (hymns on the device; sermons,
+        // events and announcements from the bounded public search read).
+        GoRoute(
+          path: ClientPaths.search,
+          pageBuilder: (_, state) => page(state, const SearchScreen()),
+        ),
+        GoRoute(
+          path: ClientPaths.calendar,
+          pageBuilder: (_, state) => page(state, const CalendarScreen()),
+          routes: [
+            GoRoute(
+              path: 'events/:eventId',
+              pageBuilder: (_, state) => page(
+                state,
+                EventDetailScreen(
+                  key: ValueKey(state.pathParameters['eventId']),
+                  eventId: state.pathParameters['eventId']!,
+                ),
+              ),
+            ),
+          ],
+        ),
+        // Story 6.7: the Bible & Hymns tab (Bible reader and the built-in
+        // hymn book) and one hymn by its number.
+        GoRoute(
+          path: ClientPaths.bible,
+          pageBuilder: (_, state) => page(
+            state,
+            BibleAndHymnsScreen(
+              // A hymn opened by its link returns to the hymn book.
+              initialView:
+                  state.uri.queryParameters['view'] == 'hymns' ||
+                      state.uri.path.startsWith('${ClientPaths.bible}/hymns/')
+                  ? BibleHymnsView.hymns
+                  : null,
+            ),
+          ),
+          routes: [
+            // Story 6.8: the member's saved hymns (before the item route).
+            GoRoute(
+              path: 'hymns/saved',
+              pageBuilder: (_, state) => page(state, const SavedHymnsScreen()),
+            ),
+            GoRoute(
+              path: 'hymns/:id',
+              pageBuilder: (_, state) => page(
+                state,
+                HymnDetailScreen(
+                  key: ValueKey(state.pathParameters['id']),
+                  id: _hymnId(state.pathParameters['id']),
+                ),
+              ),
+            ),
+          ],
+        ),
+        GoRoute(
+          path: ClientPaths.sermons,
+          pageBuilder: (_, state) => page(state, const SermonsScreen()),
+          routes: [
+            GoRoute(
+              path: ':sermonId',
+              pageBuilder: (_, state) => page(
+                state,
+                SermonDetailScreen(
+                  key: ValueKey(state.pathParameters['sermonId']),
+                  sermonId: state.pathParameters['sermonId']!,
+                ),
+              ),
+            ),
+          ],
+        ),
+        // Story 6.3: the public Give tab, with each method's detail.
+        GoRoute(
+          path: ClientPaths.give,
+          pageBuilder: (_, state) => page(state, const GiveScreen()),
+          routes: [
+            GoRoute(
+              path: 'methods/:methodId',
+              pageBuilder: (_, state) => page(
+                state,
+                GiveMethodScreen(
+                  key: ValueKey(state.pathParameters['methodId']),
+                  methodId: state.pathParameters['methodId']!,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+      // Story 6.1, staff web: the Events editor (the server checks every read
+      // and command).
+      GoRoute(
+        path: ClientPaths.contentEvents,
+        pageBuilder: (_, state) => page(state, const StaffEventsScreen()),
+      ),
+      // Story 6.3, staff web: the Giving editor (Admin only; the server
+      // checks every read and command).
+      GoRoute(
+        path: ClientPaths.contentGiving,
+        pageBuilder: (_, state) => page(state, const StaffGivingScreen()),
+      ),
+      // Story 6.13: announcements for everyone in both apps (the staff web
+      // inbox opens a notice's announcement too) and the staff editor.
+      GoRoute(
+        path: ClientPaths.announcements,
+        pageBuilder: (_, state) => page(state, const AnnouncementsScreen()),
+        routes: [
+          GoRoute(
+            path: ':announcementId',
+            pageBuilder: (_, state) => page(
+              state,
+              AnnouncementDetailScreen(
+                key: ValueKey(state.pathParameters['announcementId']),
+                announcementId: state.pathParameters['announcementId']!,
+              ),
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: ClientPaths.contentAnnouncements,
+        pageBuilder: (_, state) =>
+            page(state, const StaffAnnouncementsScreen()),
+      ),
+      // Story 6.2, staff web: Banners and Rights.
+      GoRoute(
+        path: ClientPaths.contentBanners,
+        pageBuilder: (_, state) => page(state, const StaffBannersScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.contentRights,
+        pageBuilder: (_, state) => page(state, const StaffRightsScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.contentBible,
+        pageBuilder: (_, state) => page(state, const StaffBibleScreen()),
+      ),
+      // Story 6.8, staff web: Hymns for this Sunday (the server checks every
+      // read and command).
+      GoRoute(
+        path: ClientPaths.contentSundayHymns,
+        pageBuilder: (_, state) => page(state, const StaffSundayHymnsScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.contentSermons,
+        pageBuilder: (_, state) => page(state, const StaffSermonsScreen()),
+        routes: [
+          GoRoute(
+            path: ':itemId',
+            pageBuilder: (_, state) => page(
+              state,
+              StaffSermonsScreen(itemId: state.pathParameters['itemId']),
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: ClientPaths.contentSermonSeries,
+        pageBuilder: (_, state) =>
+            page(state, const StaffSermonsScreen(series: true)),
+        routes: [
+          GoRoute(
+            path: ':itemId',
+            pageBuilder: (_, state) => page(
+              state,
+              StaffSermonsScreen(
+                series: true,
+                itemId: state.pathParameters['itemId'],
+              ),
+            ),
+          ),
+        ],
       ),
       GoRoute(
         path: ClientPaths.myDuties,
@@ -306,6 +700,44 @@ GoRouter buildClientRouter({
           GoRoute(
             path: 'leader',
             pageBuilder: (_, state) => page(state, const DutyLeaderScreen()),
+            routes: [
+              // Story 4.16: the review notice's link (both apps).
+              GoRoute(
+                path: 'reviews',
+                pageBuilder: (_, state) =>
+                    page(state, const DutyLeaderScreen(reviewsOnly: true)),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: 'rota',
+            pageBuilder: (_, state) => page(state, const DutyRotaScreen()),
+          ),
+          // Story 4.9: both apps (the leader's essential actions on mobile).
+          GoRoute(
+            path: 'coverage',
+            pageBuilder: (_, state) => page(state, const DutyCoverageScreen()),
+          ),
+          // Story 4.10: both apps.
+          GoRoute(
+            path: 'outcomes',
+            pageBuilder: (_, state) => page(state, const DutyOutcomesScreen()),
+          ),
+          // Special assignments: the Pastors (staff web's sidebar; the
+          // server checks every read and command).
+          GoRoute(
+            path: 'special',
+            pageBuilder: (_, state) => page(state, const DutySpecialScreen()),
+          ),
+          GoRoute(
+            path: 'history',
+            pageBuilder: (_, state) => page(
+              state,
+              DutyHistoryScreen(
+                key: ValueKey(state.uri.queryParameters['member']),
+                memberId: _memberParam(state.uri.queryParameters['member']),
+              ),
+            ),
           ),
           GoRoute(
             path: 'assignments/:assignmentId',
@@ -321,6 +753,28 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.adminDepartments,
         pageBuilder: (_, state) => page(state, const DutyAdminScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.myFollowUps,
+        pageBuilder: (_, state) => page(state, const MyFollowUpsScreen()),
+        routes: [
+          GoRoute(
+            path: 'supervision',
+            pageBuilder: (_, state) =>
+                page(state, const FollowUpSupervisionScreen()),
+          ),
+          GoRoute(
+            path: 'tasks/:taskId',
+            pageBuilder: (_, state) => page(
+              state,
+              FollowUpTaskScreen(taskId: state.pathParameters['taskId']!),
+            ),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: ClientPaths.adminFollowUps,
+        pageBuilder: (_, state) => page(state, const FollowUpRoutingScreen()),
       ),
       GoRoute(
         path: ClientPaths.membership,
@@ -402,6 +856,7 @@ GoRouter buildClientRouter({
           state,
           SignInScreen(
             afterCreateAccount: afterCreateAccount,
+            afterSignIn: afterSignIn,
             assistedRecovery: assistedRecovery,
             continueTo: ClientPaths.continuationFrom(
               state.uri.queryParameters['then'],
@@ -430,3 +885,19 @@ void goFromNav(BuildContext context, String path) => context.go(
   path,
   extra: keyboardFocusVisible ? const NavFocusRequest() : null,
 );
+
+/// Story 6.7: a hymn link's item id (`hymn-12`, `chorus-3`), else null.
+String? _hymnId(String? v) =>
+    v != null && RegExp(r'^(hymn|chorus)-[1-9][0-9]{0,2}$').hasMatch(v)
+    ? v
+    : null;
+
+/// Story 4.10: a history link's member id (a UUID only; anything else opens
+/// the reader's own history).
+String? _memberParam(String? v) =>
+    v != null &&
+        RegExp(
+          r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+        ).hasMatch(v)
+    ? v
+    : null;

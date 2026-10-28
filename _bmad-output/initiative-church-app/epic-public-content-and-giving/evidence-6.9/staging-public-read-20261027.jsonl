@@ -1,0 +1,7 @@
+{"at":"2026-10-27T08:37:13.661Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"anonymous sermon catalog","verdict":"pass","status":200,"sermons":0,"series":0}
+{"at":"2026-10-27T08:37:13.781Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"unknown sermon detail is null","verdict":"pass","status":200}
+{"at":"2026-10-27T08:37:13.922Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"signed-out content_staff_sermons refused","verdict":"pass","status":401}
+{"at":"2026-10-27T08:37:13.966Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"signed-out content_staff_sermon_series refused","verdict":"pass","status":401}
+{"at":"2026-10-27T08:37:14.068Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"signed-out sermon command refused","verdict":"pass","status":401}
+{"at":"2026-10-27T08:37:14.141Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"signed-out content_sermon_revisions unreadable","verdict":"pass","status":406}
+{"at":"2026-10-27T08:37:14.228Z","project":"tmurpotfluignacfueki","target":"STAGING","name":"signed-out content_sermon_series_revisions unreadable","verdict":"pass","status":406}

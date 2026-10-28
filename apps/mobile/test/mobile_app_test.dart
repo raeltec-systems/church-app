@@ -41,6 +41,37 @@ Future<Harness> pumpMobile(
   return h;
 }
 
+/// Go to a route without a tab (Status, Fixture, Access).
+Future<void> goTo(WidgetTester tester, String path) async {
+  GoRouter.of(tester.element(find.byType(Scaffold).first)).go(path);
+  await tester.pumpAndSettle();
+}
+
+/// A member at Home with no duties, cell or inbox items.
+Future<Harness> pumpMember(
+  WidgetTester tester, {
+  Size size = const Size(390, 844),
+  ThemeMode themeMode = ThemeMode.light,
+  double textScale = 1,
+  String location = ClientPaths.home,
+}) => pumpMobile(
+  tester,
+  size: size,
+  themeMode: themeMode,
+  textScale: textScale,
+  location: location,
+  setUp: (h) {
+    h.grants.myAccess = AccessReadOk(syntheticGrants());
+    h.memberAccess.next = MemberAccessGranted(syntheticMemberSummary());
+    h.duties.mine = AccessReadOk(
+      MyDuties.fromJson({
+        'member_id': '22222222-2222-4222-8222-222222222222',
+        'assignments': const <Object?>[],
+      }),
+    );
+  },
+);
+
 Future<void> tapKey(WidgetTester tester, String key) async {
   await tester.ensureVisible(find.byKey(Key(key)));
   await tester.tap(find.byKey(Key(key)));
@@ -51,13 +82,57 @@ void main() {
   // Each test starts as a fresh app: no input seen yet.
   setUp(FocusVisibility.instance.reset);
 
-  testWidgets('story 3.8: the staff reminder-health route does not exist on mobile', (
-    tester,
-  ) async {
-    await pumpMobile(tester, location: ClientPaths.notificationHealth);
-    expect(find.byType(NotificationHealthScreen), findsNothing);
-    expect(find.text('Reminder health'), findsNothing);
-  });
+  testWidgets(
+    'story 6.9: guest opens sermons from the fifth-tab shell and detail has its own back bar',
+    (tester) async {
+      const id = '92929292-9292-4292-8292-929292929292';
+      await pumpMobile(
+        tester,
+        location: ClientPaths.home,
+        setUp: (h) {
+          h.session.switchTo(null);
+          h.sermons.catalog = AccessReadOk(
+            PublicSermons.fromJson({
+              'sermons': [publicSermonData()],
+              'series': [],
+              'truncated': false,
+            }),
+          );
+          h.sermons.details[id] = AccessReadOk(
+            PublicSermonRead.fromJson({'sermon': publicSermonData()}),
+          );
+        },
+      );
+      expect(mobileDestinations.map((d) => d.label), [
+        'Home',
+        'Bible & Hymns',
+        'Sermons',
+        'Give',
+        'Calendar',
+      ]);
+      await tapKey(tester, 'nav-/sermons');
+      await tester.pumpAndSettle();
+      expect(find.byType(SermonsScreen), findsOneWidget);
+      expect(find.text('Sign in'), findsOneWidget);
+      await tapKey(tester, 'sermon-row-$id');
+      await tester.pumpAndSettle();
+      expect(find.byType(SermonDetailScreen), findsOneWidget);
+      expect(find.byType(BackButton), findsOneWidget);
+      expect(find.text('Sign in'), findsNothing);
+      expect(find.text('John 1:1'), findsOneWidget);
+      expect(find.byKey(const Key('sermon-video-unavailable')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'story 3.8: the staff reminder-health route does not exist on mobile',
+    (tester) async {
+      await pumpMobile(tester, location: ClientPaths.notificationHealth);
+      expect(find.byType(NotificationHealthScreen), findsNothing);
+      expect(find.text('Reminder health'), findsNothing);
+    },
+  );
 
   testWidgets(
     'story 3.6: a tapped notification opens its inbox item; denied push registers nothing',
@@ -255,12 +330,593 @@ void main() {
     final handle = tester.ensureSemantics();
     await pumpMobile(tester);
     expect(find.text('Status: operational'), findsOneWidget);
-    final tab = tester.getSemantics(find.bySemanticsLabel('Status').first);
-    expect(tab.role, SemanticsRole.tab);
+    // Story 6.1: no member access still gets the public tabs, and the top
+    // bar's way in (Bible & Hymns and Give between Home and Calendar).
     final list = tester.getSemantics(find.bySemanticsLabel('App sections'));
     expect(list.role, SemanticsRole.tabBar);
+    for (final label in [
+      'Home',
+      'Bible & Hymns',
+      'Sermons',
+      'Give',
+      'Calendar',
+    ]) {
+      final tab = tester.getSemantics(find.bySemanticsLabel(label).last);
+      expect(tab.role, SemanticsRole.tab, reason: label);
+    }
+    expect(find.byKey(const Key('nav-/account')), findsOneWidget);
     handle.dispose();
   });
+
+  testWidgets(
+    'story 6.1: a signed-out phone opens the Calendar and reads a two-day '
+    'event with both endpoints',
+    (tester) async {
+      const harvest = '71717171-7171-4171-8171-717171717171';
+      final h = await pumpMobile(
+        tester,
+        location: ClientPaths.home,
+        setUp: (h) {
+          h.session.switchTo(null);
+          h.content.publicEvents = AccessReadOk(
+            PublicEvents.fromJson(publicEventsData([publicEventData()])),
+          );
+          h.content.publicEvent[harvest] = AccessReadOk(
+            PublicEventRead.fromJson({'event': publicEventData()}),
+          );
+        },
+      );
+      // Guests get Home and Calendar and the top bar's Sign in.
+      expect(find.byKey(const Key('nav-/home')), findsOneWidget);
+      expect(find.byKey(const Key('nav-/calendar')), findsOneWidget);
+      expect(find.text('Sign in'), findsOneWidget);
+      expect(find.byKey(const Key('home-duties-card')), findsNothing);
+      await tapKey(tester, 'nav-/calendar');
+      await tester.pumpAndSettle();
+      expect(find.byType(CalendarScreen), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('event-when-$harvest'))).data,
+        'Sat 10 Oct 09:00 – Sun 11 Oct 12:00 · SYNTHETIC Main sanctuary',
+      );
+      await tapKey(tester, 'event-row-$harvest');
+      await tester.pumpAndSettle();
+      expect(find.text('Saturday 10 October 2099, 09:00'), findsOneWidget);
+      expect(find.text('Sunday 11 October 2099, 12:00'), findsOneWidget);
+      // The detail is pushed over the Calendar tab, with its own back bar.
+      expect(find.byType(BackButton), findsOneWidget);
+      expect(find.text('Sign in'), findsNothing);
+      expect(h.content.publicEventAsked, [harvest]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'story 6.13: a signed-out phone opens a pinned announcement from Home, '
+    'then the whole list',
+    (tester) async {
+      const offering = '73737373-7373-4373-8373-737373737373';
+      final h = await pumpMobile(
+        tester,
+        location: ClientPaths.home,
+        setUp: (h) {
+          h.session.switchTo(null);
+          h.announcements.publicAnnouncements = AccessReadOk(
+            PublicAnnouncements.fromJson(
+              publicAnnouncementsData([
+                publicAnnouncementData(),
+                publicAnnouncementData(
+                  announcementId: '74747474-7474-4474-8474-747474747474',
+                  title: 'SYNTHETIC Choir practice moves to Thursday',
+                  pinned: false,
+                ),
+              ]),
+            ),
+          );
+          h.announcements.publicAnnouncement[offering] = AccessReadOk(
+            PublicAnnouncementRead.fromJson({
+              'announcement': publicAnnouncementData(),
+            }),
+          );
+        },
+      );
+      expect(find.text('Sign in'), findsOneWidget);
+      expect(find.byType(HomeAnnouncementsSection), findsOneWidget);
+      await tapKey(tester, 'announcement-row-$offering');
+      await tester.pumpAndSettle();
+      expect(find.byType(AnnouncementDetailScreen), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('announcement-body'))).data,
+        'SYNTHETIC Bring your harvest offering to the 09:00 service.',
+      );
+      // Pushed with its own back bar: no top bar over it, even signed out.
+      expect(find.byType(BackButton), findsOneWidget);
+      expect(find.text('Sign in'), findsNothing);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'home-announcements-all');
+      await tester.pumpAndSettle();
+      expect(find.byType(AnnouncementsScreen), findsOneWidget);
+      expect(find.text('SYNTHETIC Choir practice moves to Thursday'), findsOne);
+      expect(find.text('Sign in'), findsNothing);
+      expect(h.announcements.publicAnnouncementAsked, [offering]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'story 6.6: signed-out readers open cleared chapters and navigate by availability',
+    (tester) async {
+      const translationId = '61616161-6161-4161-8161-616161616161';
+      final genesis = BibleChapterRef(bookId: 'GEN', chapter: 1);
+      final exodus = BibleChapterRef(bookId: 'EXO', chapter: 1);
+      final h = await pumpMobile(
+        tester,
+        location: ClientPaths.bible,
+        setUp: (h) {
+          h.session.switchTo(null);
+          h.bible.translations = AccessReadOk(
+            PublicBibleTranslations([
+              BibleTranslation(
+                id: translationId,
+                code: 'KJV',
+                name: 'King James Version',
+                chapters: [genesis, exodus],
+                offlineAllowed: false,
+              ),
+            ]),
+          );
+          h.bible.chapters[(translationId, genesis)] = AccessReadOk(
+            PublicBibleChapter(
+              translationId: translationId,
+              translationCode: 'KJV',
+              translationName: 'King James Version',
+              reference: genesis,
+              verses: const [
+                BibleVerse(number: 1, text: 'SYNTHETIC Genesis verse one'),
+              ],
+              publicationRevision: 1,
+              publishedAt: DateTime.utc(2026, 10, 22),
+              offlineAllowed: false,
+            ),
+          );
+          h.bible.chapters[(translationId, exodus)] = AccessReadOk(
+            PublicBibleChapter(
+              translationId: translationId,
+              translationCode: 'KJV',
+              translationName: 'King James Version',
+              reference: exodus,
+              verses: const [
+                BibleVerse(number: 1, text: 'SYNTHETIC Exodus verse one'),
+              ],
+              publicationRevision: 1,
+              publishedAt: DateTime.utc(2026, 10, 22),
+              offlineAllowed: false,
+            ),
+          );
+        },
+      );
+
+      expect(find.byType(BibleReaderScreen), findsOneWidget);
+      expect(find.text('Genesis 1'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Text &&
+              widget.textSpan?.toPlainText().contains(
+                    'SYNTHETIC Genesis verse one',
+                  ) ==
+                  true,
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Sign in'), findsOneWidget);
+      expect(find.text('Save offline'), findsNothing);
+      await tapKey(tester, 'bible-next');
+      await tester.pumpAndSettle();
+      expect(find.text('Exodus 1'), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Text &&
+              widget.textSpan?.toPlainText().contains(
+                    'SYNTHETIC Exodus verse one',
+                  ) ==
+                  true,
+        ),
+        findsOneWidget,
+      );
+      expect(h.bible.chapterCalls.last, (translationId, exodus));
+    },
+  );
+
+  testWidgets(
+    'story 6.7: a signed-out phone reads and searches the built-in Tonga '
+    'hymn book',
+    (tester) async {
+      // The real asset, through the app's asset bundle and the background
+      // parse a book this size takes.
+      final book = (await tester.runAsync(
+        () => const BundledHymnBookSource().load(),
+      ))!;
+      expect(book.hymns, hasLength(199));
+      expect(book.choruses, hasLength(67));
+      await pumpMobile(
+        tester,
+        location: ClientPaths.bible,
+        setUp: (h) {
+          h.session.switchTo(null);
+          h.hymnBook.book = book;
+        },
+      );
+      await tester.tap(find.text('Hymn book'));
+      await tester.pumpAndSettle();
+      expect(find.text('Kutalika Mubungano'), findsOneWidget);
+      expect(find.byKey(const Key('hymn-row-hymn-1')), findsOneWidget);
+      expect(find.text('Leza Usimanga (Cila)'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('hymn-search')), '24');
+      await tester.pumpAndSettle();
+      final hymn = tester.getTopLeft(find.byKey(const Key('hymn-row-hymn-24')));
+      final chorus = tester.getTopLeft(
+        find.byKey(const Key('hymn-row-chorus-24')),
+      );
+      expect(
+        hymn.dy,
+        lessThan(chorus.dy),
+        reason: 'the hymn before the chorus',
+      );
+      await tester.enterText(find.byKey(const Key('hymn-search')), 'usimanga');
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('hymn-row-hymn-1')));
+      await tester.pumpAndSettle();
+      expect(find.text('Hymn 1'), findsOneWidget);
+      expect(find.text('REVIVE THY WORK, O LORD!'), findsOneWidget);
+      expect(find.text('Key of F'), findsOneWidget);
+      expect(find.text('Ciindululo'), findsNothing);
+      expect(find.text('Chorus'), findsNWidgets(3));
+      expect(find.text('Sign in'), findsNothing, reason: 'its own back bar');
+    },
+  );
+
+  testWidgets(
+    'story 6.8: a signed-out phone is asked to sign in to save a hymn, and '
+    'nothing is sent',
+    (tester) async {
+      final h = await pumpMobile(
+        tester,
+        location: ClientPaths.hymn('hymn-1'),
+        setUp: (h) => h.session.switchTo(null),
+      );
+      expect(find.byKey(const Key('hymn-favourite')), findsOneWidget);
+      expect(find.text('Save'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('hymn-favourite')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('hymn-favourite-sign-in-prompt')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('hymn-favourite-not-now')));
+      await tester.pumpAndSettle();
+      expect(h.gateway.sent, isEmpty);
+      expect(h.hymnLists.favouritesCalls, 0, reason: 'nothing is read');
+    },
+  );
+
+  testWidgets('story 6.3: a signed-out phone has Home, Bible & Hymns, Give and Calendar, opens How to '
+      'give and copies a method\'s values', (tester) async {
+    const airtel = '61616161-6161-4161-8161-616161616161';
+    final copied = <String>[];
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied.add((call.arguments as Map)['text'] as String);
+      }
+      return null;
+    });
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    final h = await pumpMobile(
+      tester,
+      location: ClientPaths.home,
+      setUp: (h) {
+        h.session.switchTo(null);
+        h.giving.publicMethods = AccessReadOk(
+          PublicGivingMethods.fromJson(
+            publicGivingMethodsData([
+              publicGivingMethodData(),
+              publicBankMethodData(),
+            ]),
+          ),
+        );
+        h.giving.publicMethod[airtel] = AccessReadOk(
+          PublicGivingMethodRead.fromJson({
+            'sample': true,
+            'method': publicGivingMethodData(),
+          }),
+        );
+      },
+    );
+    // The tabs, left to right: Home, Bible & Hymns, Give, Calendar.
+    final xs = [
+      for (final path in ['/home', '/bible', '/sermons', '/give', '/calendar'])
+        tester.getCenter(find.byKey(Key('nav-$path'))).dx,
+    ];
+    expect(xs, orderedEquals([...xs]..sort()));
+    await tapKey(tester, 'nav-/give');
+    await tester.pumpAndSettle();
+    expect(find.byType(GiveScreen), findsOneWidget);
+    expect(find.text('How to give'), findsOneWidget);
+    // The Give root keeps the top bar and its Sign in.
+    expect(find.text('Sign in'), findsOneWidget);
+    await tapKey(tester, 'give-method-$airtel');
+    await tester.pumpAndSettle();
+    // The detail is pushed over the Give tab, with its own back bar.
+    expect(find.byType(GiveMethodScreen), findsOneWidget);
+    expect(find.byType(BackButton), findsOneWidget);
+    expect(find.text('Sign in'), findsNothing);
+    expect(find.byKey(const Key('give-sample')), findsOneWidget);
+    await tapKey(tester, 'give-copy-merchant_id');
+    await tester.pumpAndSettle();
+    expect(copied, ['000000']);
+    expect(find.byKey(const Key('give-step-1')), findsOneWidget);
+    expect(find.byKey(const Key('give-beneficiary-check')), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('give-verified'))).data,
+      'Details checked by the church on 28 Sep 2026',
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const Key('give-method-contact'))).data,
+      'Questions? SAMPLE church office, +260 97 000 0000',
+    );
+    // The Give tab stays selected on the detail.
+    expect(
+      tester.widget<NavItem>(find.byKey(const Key('nav-/give'))).selected,
+      isTrue,
+    );
+    expect(h.giving.publicMethodAsked, [airtel]);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(find.byType(GiveScreen), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final (size, mode) in [
+    (const Size(390, 844), ThemeMode.light),
+    (const Size(360, 640), ThemeMode.dark),
+  ]) {
+    testWidgets('story 6.3: 2x text, $size $mode: a bank method has no '
+        'overflow', (tester) async {
+      const bank = '62626262-6262-4262-8262-626262626262';
+      await pumpMobile(
+        tester,
+        size: size,
+        themeMode: mode,
+        textScale: 2,
+        location: ClientPaths.giveMethod(bank),
+        setUp: (h) => h.giving.publicMethod[bank] = AccessReadOk(
+          PublicGivingMethodRead.fromJson({
+            'sample': true,
+            'method': publicBankMethodData(),
+          }),
+        ),
+      );
+      expect(find.byType(GiveMethodScreen), findsOneWidget);
+      expect(find.byKey(const Key('give-copy-account_number')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'story 6.1: a Pending applicant gets the same tabs and a Home without '
+    'member cards',
+    (tester) async {
+      await pumpMobile(
+        tester,
+        location: ClientPaths.home,
+        setUp: (h) =>
+            h.grants.myAccess = const AccessReadDenied(AccessDenial.notLinked),
+      );
+      expect(find.byKey(const Key('nav-/home')), findsOneWidget);
+      expect(find.byKey(const Key('nav-/calendar')), findsOneWidget);
+      expect(find.byKey(const Key('nav-/duties')), findsNothing);
+      expect(find.byKey(const Key('nav-/my-cell')), findsNothing);
+      // Entry 14 (layout change): no "Welcome" heading; the applicant's
+      // line (their request card once one is sent) leads instead.
+      expect(find.byKey(const Key('home-greeting')), findsNothing);
+      expect(find.byKey(const Key('home-signed-in-line')), findsOneWidget);
+      expect(find.byKey(const Key('home-duties-card')), findsNothing);
+      expect(find.byKey(const Key('coming-up')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'entry 14: a signed-out phone searches from the top bar: a hymn on the '
+    'phone and an announcement from the server, with its own back bar',
+    (tester) async {
+      const offering = '73737373-7373-4373-8373-737373737373';
+      final h = await pumpMobile(
+        tester,
+        location: ClientPaths.home,
+        setUp: (h) {
+          h.session.switchTo(null);
+          h.search.answer = AccessReadOk(
+            PublicSearchResults.fromJson(
+              publicSearchData(
+                query: 'SYNTHETIC hymn',
+                announcements: [publicAnnouncementData()],
+              ),
+            ),
+          );
+        },
+      );
+      expect(find.byKey(const Key('home-join-card')), findsOneWidget);
+      await tapKey(tester, 'nav-/search');
+      await tester.pumpAndSettle();
+      expect(find.byType(SearchScreen), findsOneWidget);
+      expect(find.text('Sign in'), findsNothing);
+      expect(find.byType(BackButton), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const Key('search-field')),
+        'SYNTHETIC hymn',
+      );
+      await tester.pump(searchDebounce + const Duration(milliseconds: 10));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('hymn-row-hymn-1')), findsOneWidget);
+      expect(find.byKey(const Key('announcement-row-$offering')), findsOne);
+      expect(h.search.asked, ['SYNTHETIC hymn']);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Account opens over Home with a back arrow and the member\'s places',
+    (tester) async {
+      await pumpMember(tester, size: const Size(390, 1400));
+      await tapKey(tester, 'nav-/account');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('member-summary')), findsOneWidget);
+      expect(find.text('+12025550101'), findsOneWidget);
+      for (final key in [
+        'go-my-duties',
+        'go-duty-history',
+        'go-my-cell',
+        'go-my-followups',
+        'go-notification-settings',
+        'go-sign-in-details',
+        'go-recovery-email',
+        'go-my-access',
+        'sign-out',
+        'go-delete-account',
+      ]) {
+        expect(find.byKey(Key(key)), findsOneWidget, reason: key);
+      }
+      // Pushed over Home: back returns there.
+      expect(find.byType(BackButton), findsOneWidget);
+      await tapKey(tester, 'go-duty-history');
+      await tester.pumpAndSettle();
+      expect(find.text('My duty history'), findsOneWidget);
+      expect(find.byType(BackButton), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('the launch screen pulses while loading, then fades into the '
+      'app', (tester) async {
+    final h = ClientTestHarness();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: h.overrides(),
+        child: const MobileApp(
+          initialLocation: ClientPaths.status,
+          launchCurtain: true,
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byKey(const Key('launch-curtain')), findsOneWidget);
+    // At least one breath, even when the app is ready at once.
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(find.byKey(const Key('launch-curtain')), findsOneWidget);
+    // Never longer than the cap.
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byKey(const Key('launch-curtain')), findsNothing);
+    // The app was built behind it all along.
+    await tester.pumpAndSettle();
+    expect(find.text('Status: operational'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'story 6.2: a signed-out phone opens Home on the banners, theme first, '
+    'and a tap opens the original',
+    (tester) async {
+      const theme = '81818181-8181-4181-8181-818181818181';
+      const campaign = '83838383-8383-4383-8383-838383838383';
+      final h = await pumpMobile(
+        tester,
+        location: ClientPaths.home,
+        setUp: (h) {
+          h.session.switchTo(null);
+          h.banners.publicBanners = AccessReadOk(
+            PublicBanners.fromJson(
+              publicBannersData([
+                publicBannerData(
+                  bannerId: campaign,
+                  kind: 'campaign',
+                  title: 'SYNTHETIC Harvest appeal',
+                  path: 'banner/$campaign/r1/image.jpg',
+                ),
+                publicBannerData(),
+              ]),
+            ),
+          );
+        },
+      );
+      expect(h.banners.publicCalls, greaterThanOrEqualTo(1));
+      expect(find.byKey(const Key('home-banners')), findsOneWidget);
+      expect(
+        tester.getSize(find.byKey(const Key('home-banner-$theme'))).width,
+        closeTo(
+          tester.getSize(find.byKey(const Key('home-banners'))).width,
+          0.01,
+        ),
+      );
+      expect(find.byKey(const Key('home-banner-$campaign')), findsNothing);
+      expect(find.text('THEME FOR 2026'), findsOneWidget);
+      await tester.drag(
+        find.byKey(const Key('home-banners')),
+        const Offset(-500, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('home-banner-$campaign')), findsOneWidget);
+      await tester.drag(
+        find.byKey(const Key('home-banners')),
+        const Offset(500, 0),
+      );
+      await tester.pumpAndSettle();
+      await tapKey(tester, 'home-banner-open-$theme');
+      await tester.pumpAndSettle();
+      expect(find.byType(BannerScreen), findsOneWidget);
+      expect(find.text('Theme for 2026'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'a member gets the same Home, Bible & Hymns, Give and Calendar tabs',
+    (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpMember(tester);
+      for (final label in [
+        'Home',
+        'Bible & Hymns',
+        'Sermons',
+        'Give',
+        'Calendar',
+      ]) {
+        final tab = tester.getSemantics(find.bySemanticsLabel(label).last);
+        expect(tab.role, SemanticsRole.tab, reason: label);
+      }
+      // Story 6.1: My duties and My cell left the tab bar for their Home cards
+      // and the Account menu.
+      expect(find.byKey(const Key('nav-/duties')), findsNothing);
+      expect(find.byKey(const Key('nav-/my-cell')), findsNothing);
+      final list = tester.getSemantics(find.bySemanticsLabel('App sections'));
+      expect(list.role, SemanticsRole.tabBar);
+      // The internal screens have no tab.
+      for (final path in ['/status', '/fixture', '/access']) {
+        expect(find.byKey(Key('nav-$path')), findsNothing, reason: path);
+      }
+      // Home's top bar: the inbox and the member's initials.
+      expect(find.byKey(const Key('nav-/inbox')), findsOneWidget);
+      expect(find.text('MO'), findsOneWidget);
+      handle.dispose();
+    },
+  );
 
   testWidgets(
     'story 2.1: account tab -> member summary; sign out; phone sign-in again',
@@ -270,11 +926,11 @@ void main() {
       for (var i = 0; i < 3; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
-      expect(find.text('My membership'), findsWidgets);
+      expect(find.text('Account'), findsWidgets);
       h.memberAccess.answer(MemberAccessGranted(syntheticMemberSummary()));
       await tester.pumpAndSettle();
       expect(find.text('SYNTHETIC Member One'), findsOneWidget);
-      expect(find.text('Sign-in username: +12025550101'), findsOneWidget);
+      expect(find.text('+12025550101'), findsOneWidget);
 
       await tapKey(tester, 'sign-out');
       await tester.pumpAndSettle();
@@ -316,6 +972,7 @@ void main() {
       final h = await pumpMobile(tester, size: const Size(390, 1400));
       expect(find.byKey(const Key('nav-/my-cell')), findsNothing);
       h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.memberAccess.next = MemberAccessGranted(syntheticMemberSummary());
       h.cells.mine = AccessReadOk(
         MyCell.fromJson(
           myCellData(
@@ -333,11 +990,13 @@ void main() {
       for (var i = 0; i < 3; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
-      await tapKey(tester, 'nav-/my-cell');
+      // Story 6.1: My cell is reached from the Account menu (no tab).
+      await tapKey(tester, 'go-my-cell');
       for (var i = 0; i < 3; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
       expect(find.text('SYNTHETIC Riverside'), findsOneWidget);
+      expect(find.byType(BackButton), findsOneWidget);
       expect(find.text('Confirmed'), findsOneWidget);
       expect(find.byKey(const Key('nav-/admin/cells')), findsNothing);
     },
@@ -350,6 +1009,7 @@ void main() {
       final h = await pumpMobile(tester, size: const Size(390, 1600));
       expect(find.byKey(const Key('nav-/duties')), findsNothing);
       h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.memberAccess.next = MemberAccessGranted(syntheticMemberSummary());
       h.duties.mine = AccessReadOk(
         MyDuties.fromJson({
           'member_id': '22222222-2222-4222-8222-222222222222',
@@ -360,7 +1020,8 @@ void main() {
       for (var i = 0; i < 3; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
-      await tapKey(tester, 'nav-/duties');
+      // Story 6.1: My duties is reached from the Account menu (no tab).
+      await tapKey(tester, 'go-my-duties');
       for (var i = 0; i < 3; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
@@ -386,6 +1047,11 @@ void main() {
       for (var i = 0; i < 3; i++) {
         await tester.pump(const Duration(milliseconds: 100));
       }
+      // Story 4.5: the answered duty is under Upcoming.
+      await tester.tap(find.text('Upcoming (1)'));
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
       expect(
         find.descendant(
           of: find.byKey(const Key('my-duty-status-$id')),
@@ -393,6 +1059,219 @@ void main() {
         ),
         findsOneWidget,
       );
+    },
+  );
+
+  testWidgets(
+    'story 4.5: Home follows member access and shows the My duties card',
+    (tester) async {
+      final h = await pumpMobile(tester, size: const Size(390, 1600));
+      // Story 6.1: the Home tab is there for everyone; the card follows
+      // member access.
+      expect(find.byKey(const Key('nav-/home')), findsOneWidget);
+      h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.duties.mine = AccessReadOk(
+        MyDuties.fromJson({
+          'member_id': '22222222-2222-4222-8222-222222222222',
+          'assignments': [myDutyData()],
+        }),
+      );
+      await tapKey(tester, 'nav-/account');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tapKey(tester, 'nav-/home');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('home-duties-card')), findsOneWidget);
+      expect(find.text('1 awaiting your response'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'story 4.6: Home shows My follow-ups for an ordinary owner with open work '
+    'and opens the task',
+    (tester) async {
+      final h = await pumpMobile(tester, size: const Size(390, 2000));
+      h.grants.myAccess = AccessReadOk(syntheticGrants());
+      h.duties.mine = AccessReadOk(
+        MyDuties.fromJson({
+          'member_id': '22222222-2222-4222-8222-222222222222',
+          'assignments': const <Object?>[],
+        }),
+      );
+      h.followUps.mine = AccessReadOk(
+        MyFollowUps.fromJson({
+          'member_id': '22222222-2222-4222-8222-222222222222',
+          'tasks': [followUpTaskData()],
+          'truncated': false,
+        }),
+      );
+      h.followUps.task = AccessReadOk(
+        FollowUpDetail.fromJson({
+          'view': 'full',
+          'task': followUpTaskData(),
+          'activity': const <Object?>[],
+          'notes': const <Object?>[],
+        }),
+      );
+      await tapKey(tester, 'nav-/account');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tapKey(tester, 'nav-/home');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('home-followups-card')), findsOneWidget);
+      await tapKey(tester, 'home-followups-see-all');
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      await tapKey(
+        tester,
+        'followup-open-46464646-4646-4646-8646-464646464646',
+      );
+      for (var i = 0; i < 3; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(find.byKey(const Key('followup-actions')), findsOneWidget);
+      await tapKey(tester, 'followup-done');
+      final sent = h.gateway.sent.single;
+      expect(sent.wire['command'], 'followups.update_task');
+      expect(sent.wire['payload'], {
+        'task_id': '46464646-4646-4646-8646-464646464646',
+        'status': 'done',
+      });
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'story 4.7: a tapped follow-up reminder opens its item, then the task',
+    (tester) async {
+      const item = '32323232-3232-4232-8232-323232323232';
+      const task = '46464646-4646-4646-8646-464646464646';
+      final push = FakePushMessaging(
+        deviceToken: 'synthetic-AAAAAAAAAAAAAAAAAAAAAAAA:APA91b',
+        answer: PushPermission.denied,
+      );
+      final h = await pumpMobile(
+        tester,
+        size: const Size(390, 2000),
+        setUp: (h) {
+          h.push = push;
+          h.grants.myAccess = AccessReadOk(syntheticGrants());
+          h.inbox.opened[item] = AccessReadOk(
+            OpenedInboxItem.fromJson({
+              ...inboxItemData(
+                id: item,
+                kind: 'followup_due',
+                title: 'Follow-up task due',
+                body:
+                    'A follow-up task is due. Open it to record progress or '
+                    'set a review date.',
+              ),
+              'state': 'current',
+              'target': '/followups/tasks/$task',
+            }),
+          );
+          h.followUps.task = AccessReadOk(
+            FollowUpDetail.fromJson({
+              'view': 'full',
+              'task': followUpTaskData(
+                reminders: {
+                  'schedule': 'default',
+                  'owner': null,
+                  'supervisor': [
+                    {'anchor': 'deadline', 'after': '1 day'},
+                  ],
+                  'on_assignment': true,
+                },
+              ),
+              'activity': const <Object?>[],
+              'notes': const <Object?>[],
+            }),
+          );
+        },
+      );
+      push.tap(item);
+      await tester.pumpAndSettle();
+      expect(find.text('Follow-up task due'), findsOneWidget);
+      expect(
+        find.textContaining('SYNTHETIC: phone'),
+        findsNothing,
+        reason: 'the reminder carries no task content',
+      );
+      await tapKey(tester, 'inbox-item-open-target');
+      await tester.pumpAndSettle();
+      expect(h.followUps.taskReads, contains(task));
+      expect(find.byKey(const Key('followup-summary')), findsOneWidget);
+      expect(find.byKey(const Key('followup-reminders-text')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'story 4.8: a duty answer reminder opens the duty, marked Short notice',
+    (tester) async {
+      const item = '34343434-3434-4434-8434-343434343434';
+      const duty = '42424242-4242-4242-8242-424242424242';
+      final push = FakePushMessaging(
+        deviceToken: 'synthetic-AAAAAAAAAAAAAAAAAAAAAAAA:APA91b',
+        answer: PushPermission.denied,
+      );
+      final h = await pumpMobile(
+        tester,
+        size: const Size(390, 2400),
+        setUp: (h) {
+          h.push = push;
+          h.grants.myAccess = AccessReadOk(syntheticGrants());
+          h.inbox.opened[item] = AccessReadOk(
+            OpenedInboxItem.fromJson({
+              ...inboxItemData(
+                id: item,
+                kind: 'duty_response_due',
+                title: 'Duty answer needed',
+                body:
+                    'One of your duties is waiting for your answer. Open it '
+                    'to accept or say you cannot make it.',
+              ),
+              'state': 'current',
+              'target': '/duties/assignments/$duty',
+            }),
+          );
+          h.duties.mine = AccessReadOk(
+            MyDuties.fromJson({
+              'member_id': '66666666-6666-4666-8666-666666666666',
+              'assignments': [
+                myDutyData(
+                  extra: const {
+                    'deadline_source': 'default',
+                    'short_notice': true,
+                    'reminders': null,
+                  },
+                ),
+              ],
+            }),
+          );
+        },
+      );
+      push.tap(item);
+      await tester.pumpAndSettle();
+      expect(find.text('Duty answer needed'), findsOneWidget);
+      expect(
+        find.textContaining('SYNTHETIC Main hall'),
+        findsNothing,
+        reason: 'the reminder carries no duty content',
+      );
+      await tapKey(tester, 'inbox-item-open-target');
+      await tester.pumpAndSettle();
+      expect(h.duties.mineCalls, greaterThan(0));
+      expect(find.byKey(const Key('duty-short-notice-$duty')), findsWidgets);
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -593,8 +1472,7 @@ void main() {
   ) async {
     await pumpMobile(tester, configured: false);
     expect(find.byKey(const Key('missing-config')), findsOneWidget);
-    await tapKey(tester, 'nav-/fixture');
-    await tester.pumpAndSettle();
+    await goTo(tester, ClientPaths.fixture);
     await tester.enterText(find.byKey(const Key('intent-key-field')), 'k');
     await tapKey(tester, 'create-button');
     await tester.pump();
@@ -606,9 +1484,7 @@ void main() {
   testWidgets('synthetic read/write fixture: create, change, conflict kept', (
     tester,
   ) async {
-    final h = await pumpMobile(tester);
-    await tapKey(tester, 'nav-/fixture');
-    await tester.pumpAndSettle();
+    final h = await pumpMobile(tester, location: ClientPaths.fixture);
     expect(find.text('Fixture command'), findsWidgets);
 
     await tester.enterText(find.byKey(const Key('intent-key-field')), 'mobile');
@@ -653,7 +1529,8 @@ void main() {
       await tapKey(tester, 'nav-/account');
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
-      await tapKey(tester, 'nav-/access');
+      GoRouter.of(tester.element(find.byType(Scaffold).first))
+          .go(ClientPaths.access);
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
       expect(find.byKey(const Key('my-role-pastor')), findsOneWidget);
@@ -699,11 +1576,9 @@ void main() {
       h.gateway.sent.last.unknown();
       await tester.pump();
       expect(find.text('Not confirmed'), findsOneWidget);
-      await tapKey(tester, 'nav-/status');
-      await tester.pumpAndSettle();
+      await goTo(tester, ClientPaths.status);
       expect(find.text('Not confirmed'), findsNothing);
-      await tapKey(tester, 'nav-/fixture');
-      await tester.pumpAndSettle();
+      await goTo(tester, ClientPaths.fixture);
       // The unconfirmed command is still known, so it is checked again under
       // its own request id instead of being resubmitted as a new one.
       expect(find.text('Not confirmed'), findsOneWidget);
@@ -719,10 +1594,10 @@ void main() {
     testWidgets('a $kind tap on a tab leaves no focus ring behind', (
       tester,
     ) async {
-      await pumpMobile(tester);
-      await tester.tap(find.byKey(const Key('nav-/fixture')), kind: kind);
+      await pumpMember(tester);
+      await tester.tap(find.byKey(const Key('nav-/calendar')), kind: kind);
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('intent-key-field')), findsOneWidget);
+      expect(find.byType(CalendarScreen), findsOneWidget);
       expect(
         FocusManager.instance.primaryFocus?.context
             ?.findAncestorWidgetOfExactType<NavItem>(),
@@ -747,36 +1622,51 @@ void main() {
   testWidgets('keyboard: page actions, then the tabs; Enter navigates', (
     tester,
   ) async {
-    await pumpMobile(tester);
+    await pumpMember(tester);
     String? navLabel() => FocusManager.instance.primaryFocus?.context
         ?.findAncestorWidgetOfExactType<NavItem>()
         ?.label;
     final seen = <String?>[];
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0; i < 40 && !seen.contains('Calendar'); i++) {
       await tester.sendKeyEvent(LogicalKeyboardKey.tab);
       await tester.pump();
       seen.add(navLabel());
     }
-    // Reload (page action), then Status, then Fixture.
-    expect(seen, [null, 'Status', 'Fixture']);
+    // The page's own controls come first, then Home, Bible & Hymns, Give and Calendar.
+    final tabs = seen.whereType<String>().toList();
+    expect(tabs, ['Home', 'Bible & Hymns', 'Sermons', 'Give', 'Calendar']);
+    expect(seen.first, isNull);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('intent-key-field')), findsOneWidget);
+    expect(find.byType(CalendarScreen), findsOneWidget);
     // Focus stays on the selected tab after keyboard navigation.
-    expect(navLabel(), 'Fixture');
+    expect(navLabel(), 'Calendar');
   });
 
   for (final (size, mode) in [
     (const Size(390, 844), ThemeMode.light),
     (const Size(360, 640), ThemeMode.dark),
   ]) {
-    testWidgets('2x text, $size $mode: both destinations, no overflow', (
-      tester,
-    ) async {
-      await pumpMobile(tester, size: size, textScale: 2, themeMode: mode);
+    testWidgets('2x text, $size $mode: every tab, no overflow', (tester) async {
+      await pumpMember(tester, size: size, textScale: 2, themeMode: mode);
       expect(tester.takeException(), isNull);
-      await tapKey(tester, 'nav-/fixture');
-      await tester.pumpAndSettle();
+      for (final path in [
+        '/calendar',
+        '/give',
+        '/sermons',
+        '/bible',
+        '/home',
+      ]) {
+        await tapKey(tester, 'nav-$path');
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull, reason: path);
+      }
+      // My duties and My cell are pushed screens now (story 6.1).
+      for (final path in [ClientPaths.myDuties, ClientPaths.myCell]) {
+        await goTo(tester, path);
+        expect(tester.takeException(), isNull, reason: path);
+      }
+      await goTo(tester, ClientPaths.fixture);
       expect(tester.takeException(), isNull);
       expect(find.byKey(const Key('create-button')), findsOneWidget);
     });
@@ -787,11 +1677,11 @@ void main() {
   ) async {
     tester.view.padding = const FakeViewPadding(bottom: 34);
     addTearDown(tester.view.resetPadding);
-    await pumpMobile(tester, location: '/fixture');
-    final page = tester.element(find.byType(FixtureCommandScreen));
+    await pumpMember(tester, location: ClientPaths.myDuties);
+    final page = tester.element(find.byType(MyDutiesScreen));
     expect(MediaQuery.paddingOf(page).bottom, 0);
     final bar = tester.getRect(find.bySemanticsLabel('App sections'));
-    final screen = tester.getRect(find.byType(FixtureCommandScreen));
+    final screen = tester.getRect(find.byType(MyDutiesScreen));
     expect(screen.bottom, lessThanOrEqualTo(bar.top + 0.5));
     // The bar sits above the 34 px inset.
     expect(844 - bar.bottom, greaterThanOrEqualTo(34 - 0.5));
@@ -811,11 +1701,9 @@ void main() {
         final page = tester.element(find.byType(SignInScreen));
         expect(MediaQuery.viewInsetsOf(page).bottom, 0, reason: key);
         final field = tester.getRect(find.byKey(Key(key)));
-        final bar = tester.getRect(find.bySemanticsLabel('App sections'));
         expect(field.height, greaterThan(20), reason: key);
         expect(field.top, greaterThanOrEqualTo(0), reason: key);
-        expect(field.bottom, lessThanOrEqualTo(bar.top + 0.5), reason: key);
-        expect(bar.bottom, lessThanOrEqualTo(844 - 336 + 0.5), reason: key);
+        expect(field.bottom, lessThanOrEqualTo(844 - 336 + 0.5), reason: key);
         tester.view.resetViewInsets();
         await tester.pumpAndSettle();
       }
@@ -831,7 +1719,7 @@ void main() {
       r'''package:(shared_preferences|hive|sqflite|drift|isar|path_provider|flutter_secure_storage)/|dart:html|localStorage|sessionStorage|indexedDB''',
     );
     for (final f in files) {
-      final path = f.path.replaceAll(r'\\', '/');
+      final path = f.path.replaceAll('\\', '/');
       final src = f.readAsStringSync();
       final reached = boundaryViolations(path, src);
       if (path == 'lib/main.dart') {
@@ -839,7 +1727,11 @@ void main() {
       } else {
         expect(reached, isEmpty, reason: path);
       }
-      expect(persistence.hasMatch(src), isFalse, reason: path);
+      expect(
+        persistence.hasMatch(src),
+        path == 'lib/offline/public_content_cache_adapter.dart',
+        reason: path,
+      );
     }
   });
 
@@ -867,6 +1759,9 @@ void main() {
       await tapKey(tester, 'nav-/account');
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
+      await tapKey(tester, 'nav-/home');
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
       await tapKey(tester, 'nav-/inbox');
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pump(const Duration(milliseconds: 100));
@@ -887,6 +1782,7 @@ void main() {
       const item = '31313131-3131-4131-8131-313131313131';
       final h = await pumpMobile(
         tester,
+        location: ClientPaths.home,
         setUp: (h) {
           h.grants.myAccess = AccessReadOk(syntheticGrants());
           h.inbox.inbox = AccessReadOk(
@@ -960,7 +1856,7 @@ void main() {
     },
   );
 
-  testWidgets('story 3.7: the Fixture tab leads to the test reminders', (
+  testWidgets('story 3.7: the Fixture screen leads to the test reminders', (
     tester,
   ) async {
     final h = await pumpMobile(tester, location: ClientPaths.fixture);

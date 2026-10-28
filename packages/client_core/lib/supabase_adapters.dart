@@ -2,13 +2,24 @@
 /// `main.dart`) import this library; presentation never does.
 library;
 
+export 'src/adapters/supabase_sermons_repository.dart';
+
 export 'src/adapters/supabase_account_auth_gateway.dart';
+export 'src/adapters/supabase_announcements_repository.dart';
+export 'src/adapters/supabase_content_search_repository.dart';
 export 'src/adapters/supabase_assisted_recovery.dart';
+export 'src/adapters/supabase_banner_repository.dart';
 export 'src/adapters/supabase_cells_repository.dart';
+export 'src/adapters/supabase_cell_calendar_repository.dart';
 export 'src/adapters/supabase_command_gateway.dart';
+export 'src/adapters/supabase_content_repository.dart';
+export 'src/adapters/supabase_bible_repository.dart';
 export 'src/adapters/supabase_credential_review_repository.dart';
 export 'src/adapters/supabase_duties_repository.dart';
+export 'src/adapters/supabase_followups_repository.dart';
+export 'src/adapters/supabase_giving_repository.dart';
 export 'src/adapters/supabase_grants_repository.dart';
+export 'src/adapters/supabase_hymn_lists_repository.dart';
 export 'src/adapters/supabase_inbox_repository.dart';
 export 'src/adapters/supabase_member_access_repository.dart';
 export 'src/adapters/supabase_member_deletion_repository.dart';

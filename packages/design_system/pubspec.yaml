@@ -14,3 +14,34 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+
+flutter:
+  assets:
+    - assets/bic-logo.png
+    - assets/bic-logo-white.png
+  # Design handoff fonts (SIL Open Font License 1.1; licences in fonts/).
+  fonts:
+    - family: Outfit
+      fonts:
+        - asset: fonts/Outfit-SemiBold.ttf
+          weight: 600
+        - asset: fonts/Outfit-Bold.ttf
+          weight: 700
+    - family: Figtree
+      fonts:
+        - asset: fonts/Figtree-Regular.ttf
+          weight: 400
+        - asset: fonts/Figtree-Medium.ttf
+          weight: 500
+        - asset: fonts/Figtree-SemiBold.ttf
+          weight: 600
+        - asset: fonts/Figtree-Bold.ttf
+          weight: 700
+    - family: JetBrains Mono
+      fonts:
+        - asset: fonts/JetBrainsMono-Regular.ttf
+          weight: 400
+        - asset: fonts/JetBrainsMono-Medium.ttf
+          weight: 500
+        - asset: fonts/JetBrainsMono-SemiBold.ttf
+          weight: 600

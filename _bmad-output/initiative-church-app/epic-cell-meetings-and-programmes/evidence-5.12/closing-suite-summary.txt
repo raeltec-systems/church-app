@@ -1,0 +1,33 @@
+Story 5.12 closing local suite, 2026-10-21T12:42:03Z, commit 80c4b47
+staff web clean release build: pass
+mobile clean debug APK build: pass (after a host fix: the JDK AF_UNIX loopback needs JAVA_TOOL_OPTIONS=-Djdk.net.unixdomain.tmpdir=C:/gtmp on this Windows host; the first attempt failed with "Unable to establish loopback connection")
+client_core tests: +732: All tests passed
+cells: 13/13 checks passed
+cells-meetings: 10/10 checks passed
+cells-meeting-reminders: 9/9 checks passed
+cells-programmes: 11/11 checks passed
+cells-programme-publish: 12/12 checks passed
+cells-youre-on: 7/7 checks passed
+cells-programme-revisions: 6/6 checks passed
+cells-absence: 5/5 checks passed
+cells-meeting-records: 6/6 checks passed
+cells-transfer: 7/7 checks passed
+cells-pilot: 8/8 checks passed
+duties-owner-ops: 13/13 checks passed
+duties-lifecycle: 16/16 checks passed
+lifecycle: 9/9 checks passed
+offline cells-absence.test.mjs: pass
+offline cells-cleanup.test.mjs: pass
+offline cells-meeting-records.test.mjs: pass
+offline cells-meeting-reminders.test.mjs: pass
+offline cells-meetings.test.mjs: pass
+offline cells-pilot.test.mjs: pass
+offline cells-programme-publish.test.mjs: pass
+offline cells-programme-revisions.test.mjs: pass
+offline cells-programmes.test.mjs: pass
+offline cells-transfer.test.mjs: pass
+offline cells-youre-on.test.mjs: pass
+offline cells.test.mjs: pass
+offline duties-owner-ops.test.mjs: pass
+db:test (fresh reset): Result: PASS Files=54, Tests=4234
+done

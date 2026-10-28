@@ -141,6 +141,13 @@ abstract final class ChurchStaffChrome {
 
   /// "Active navigation translucent white".
   static const activeItem = Color(0x29FFFFFF);
+
+  /// Sidebar group names and the quiet "Staff" line: the brand tint at 70 %
+  /// (about 6:1 on the navy).
+  static const groupLabel = Color(0xB3DCE6FF);
+
+  /// The role switch's track on the navy.
+  static const track = Color(0x14FFFFFF);
 }
 
 /// Surface layout and body type: mobile and staff differ (design contract).
@@ -196,11 +203,21 @@ abstract final class ChurchGeometry {
   static const double mobileFormPadding = 20;
   static const double sectionGap = 20;
   static const double cardPadding = 16;
-  static const double mobileCardRadius = 16;
+  static const double mobileCardRadius = 18;
+
+  /// Hero (navy) cards and large cards.
+  static const double heroRadius = 22;
   static const double mobileInputRadius = 14;
   static const double staffInputRadius = 10;
   static const double staffButtonRadius = 12;
   static const double staffSidebarWidth = 232;
+
+  /// Staff web cards, tables and panels (the handoff's admin cards); the
+  /// phone keeps [mobileCardRadius].
+  static const double staffCardRadius = 12;
+
+  /// The staff sidebar folded to a rail of icons.
+  static const double staffRailWidth = 72;
   static const double staffContentMaxWidth = 1280;
   static const double modalWidth = 460;
   static const double modalRadius = 18;
@@ -209,29 +226,118 @@ abstract final class ChurchGeometry {
   static const double staffCompactBreakpoint = 840;
 }
 
-/// Type scale (size / weight) from the design contract. Families (Outfit,
-/// Figtree, JetBrains Mono) are not bundled yet: platform fonts are used.
+/// Font families from the design handoff (docs/design-handoff/README.md):
+/// Outfit for headings, Figtree for body and UI. The files are bundled in
+/// this package (pubspec `fonts:`), so the families carry the package
+/// prefix. JetBrains Mono has one job: the times of a programme (figures
+/// that line up), never labels.
+abstract final class ChurchFonts {
+  static const heading = 'packages/church_design_system/Outfit';
+  static const body = 'packages/church_design_system/Figtree';
+  static const mono = 'packages/church_design_system/JetBrains Mono';
+}
+
+/// Type scale. The member app keeps five sizes far apart (24, 18, 16, 14,
+/// 12), sentence case throughout and no tracked capitals.
 abstract final class ChurchType {
   /// Mobile tab labels 11.5 (700 active / 500 inactive).
-  static const tabLabel = TextStyle(fontSize: 11.5);
-  static const mobileScreenTitle = TextStyle(
-    fontSize: 28,
-    fontWeight: FontWeight.w700,
+  static const tabLabel = TextStyle(
+    fontFamily: ChurchFonts.body,
+    fontSize: 11.5,
   );
-  static const sectionTitle = TextStyle(
-    fontSize: 19,
+
+  /// A tab screen's title: 24/700 Outfit (app scale, not a landing page).
+  static const mobileScreenTitle = TextStyle(
+    fontFamily: ChurchFonts.heading,
+    fontSize: 24,
+    fontWeight: FontWeight.w700,
+    height: 1.15,
+  );
+
+  /// A pushed screen's bar title next to the back chevron: 18/600 Outfit.
+  static const detailTitle = TextStyle(
+    fontFamily: ChurchFonts.heading,
+    fontSize: 18,
     fontWeight: FontWeight.w600,
   );
-  static const cardTitle = TextStyle(fontSize: 17, fontWeight: FontWeight.w600);
-  static const body = TextStyle(fontSize: 16, fontWeight: FontWeight.w400);
-  static const staffBody = TextStyle(fontSize: 15, fontWeight: FontWeight.w400);
-  static const secondary = TextStyle(fontSize: 14, fontWeight: FontWeight.w400);
-  static const chip = TextStyle(fontSize: 13, fontWeight: FontWeight.w600);
+  static const sectionTitle = TextStyle(
+    fontFamily: ChurchFonts.heading,
+    fontSize: 18,
+    fontWeight: FontWeight.w600,
+  );
+  static const cardTitle = TextStyle(
+    fontFamily: ChurchFonts.heading,
+    fontSize: 18,
+    fontWeight: FontWeight.w600,
+  );
+
+  /// A list row's title: 16/600 Figtree.
+  static const itemTitle = TextStyle(
+    fontFamily: ChurchFonts.body,
+    fontSize: 16,
+    fontWeight: FontWeight.w600,
+    height: 1.3,
+  );
+  static const body = TextStyle(
+    fontFamily: ChurchFonts.body,
+    fontSize: 16,
+    fontWeight: FontWeight.w400,
+    height: 1.4,
+  );
+  static const staffBody = TextStyle(
+    fontFamily: ChurchFonts.body,
+    fontSize: 15,
+    fontWeight: FontWeight.w400,
+  );
+  static const secondary = TextStyle(
+    fontFamily: ChurchFonts.body,
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+    height: 1.4,
+  );
+
+  /// Programme times: JetBrains Mono 14/500.
+  static const programmeTime = TextStyle(
+    fontFamily: ChurchFonts.mono,
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
+  );
+
+  /// Times and counts in running text that line up: 14, tabular figures.
+  static const figures = TextStyle(
+    fontFamily: ChurchFonts.body,
+    fontSize: 14,
+    fontWeight: FontWeight.w500,
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
+  static const chip = TextStyle(
+    fontFamily: ChurchFonts.body,
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+  );
+
+  /// A small label over a block inside a card ("Instructions"): sentence
+  /// case, 14/600.
+  static const label = TextStyle(
+    fontFamily: ChurchFonts.body,
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+  );
+
+  /// The number of a date badge.
+  static const dateNumber = TextStyle(
+    fontFamily: ChurchFonts.heading,
+    fontSize: 20,
+    fontWeight: FontWeight.w700,
+    height: 1.1,
+  );
   static const staffPageTitle = TextStyle(
+    fontFamily: ChurchFonts.heading,
     fontSize: 24,
     fontWeight: FontWeight.w700,
   );
   static const modalTitle = TextStyle(
+    fontFamily: ChurchFonts.heading,
     fontSize: 21,
     fontWeight: FontWeight.w700,
   );

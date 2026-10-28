@@ -219,8 +219,8 @@ class _MembershipApplicationScreenState
       children.add(_body(context, s));
     }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Join the church')),
+    return ChurchPageScaffold(
+      title: 'Join the church',
       body: SafeArea(
         child: SingleChildScrollView(
           padding: layout.pagePadding,
@@ -760,6 +760,12 @@ class _MembershipApplicationScreenState
       'The cell list changed',
       'The cell you chose is no longer offered in that form. The list was '
           'reloaded; choose again.',
+      StatusTone.warning,
+    ),
+    ApplicationNotice.phoneNeedsReview => (
+      'Phone number needs checking',
+      'The phone number on your account could not be used for this request. '
+          'Please ask the church office to check it.',
       StatusTone.warning,
     ),
     ApplicationNotice.invalid => (

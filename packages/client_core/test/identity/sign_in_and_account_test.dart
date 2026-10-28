@@ -123,7 +123,7 @@ void main() {
         expect(h.auth.last.phoneE164, '+12025550101');
         h.auth.succeed(_a);
         await settleShort(tester);
-        expect(find.text('My membership'), findsOneWidget);
+        expect(find.text('Account'), findsWidgets);
         expect(h.memberAccess.calls, 1);
         h.memberAccess.answer(MemberAccessGranted(syntheticMemberSummary()));
         await tester.pumpAndSettle();

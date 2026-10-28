@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The church navy (design handoff hero colour): the launch screen, its system bars,
+         and the launcher icon behind the white seal. -->
+    <color name="splash_background">#14246B</color>
+    <color name="ic_launcher_background">#14246B</color>
+</resources>

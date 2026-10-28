@@ -245,14 +245,16 @@ const Map<String, String> embeddedFixtures = {
   "kind": "notification_key",
   "contract_version": 1,
   "valid": [
-    {"name": "full logical key", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 3, "recipient_member_id": "00000000-0000-4000-8000-000000000002", "reminder_kind": "fixture_nudge", "scheduled_at": "2026-10-04T07:00:00.000000Z"}}
+    {"name": "full logical key", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 3, "recipient_member_id": "00000000-0000-4000-8000-000000000002", "reminder_kind": "fixture_nudge", "scheduled_at": "2026-10-04T07:00:00.000000Z"}},
+    {"name": "an announcement notice key (story 6.13)", "value": {"source_type": "content_announcement", "source_id": "00000000-0000-4000-8000-000000000613", "source_revision": 1, "recipient_member_id": "00000000-0000-4000-8000-000000000002", "reminder_kind": "announcement_published", "scheduled_at": "2026-10-22T07:00:00.000000Z"}}
   ],
   "invalid": [
     {"name": "everything missing", "value": {}, "field_errors": {"source_type": "required", "source_id": "required", "source_revision": "required", "recipient_member_id": "required", "reminder_kind": "required", "scheduled_at": "required"}},
     {"name": "local time without zone", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 3, "recipient_member_id": "00000000-0000-4000-8000-000000000002", "reminder_kind": "fixture_nudge", "scheduled_at": "2026-10-04T07:00:00"}, "field_errors": {"scheduled_at": "invalid"}},
     {"name": "account is not a recipient member", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 3, "recipient_auth_user_id": "00000000-0000-4000-8000-000000000002", "reminder_kind": "fixture_nudge", "scheduled_at": "2026-10-04T07:00:00Z"}, "field_errors": {"recipient_member_id": "required", "recipient_auth_user_id": "unknown_field"}},
     {"name": "private body and contact never ride on a key (story 3.2)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 3, "recipient_member_id": "00000000-0000-4000-8000-000000000002", "reminder_kind": "fixture_nudge", "scheduled_at": "2026-10-04T07:00:00Z", "body": "x", "recipient_phone": "x"}, "field_errors": {"body": "unknown_field", "recipient_phone": "unknown_field"}},
-    {"name": "notification text and link are registered, never sent with a key (story 3.2)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 3, "recipient_member_id": "00000000-0000-4000-8000-000000000002", "reminder_kind": "fixture_nudge", "scheduled_at": "2026-10-04T07:00:00Z", "title": "x", "link": "/x"}, "field_errors": {"title": "unknown_field", "link": "unknown_field"}}
+    {"name": "notification text and link are registered, never sent with a key (story 3.2)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 3, "recipient_member_id": "00000000-0000-4000-8000-000000000002", "reminder_kind": "fixture_nudge", "scheduled_at": "2026-10-04T07:00:00Z", "title": "x", "link": "/x"}, "field_errors": {"title": "unknown_field", "link": "unknown_field"}},
+    {"name": "an announcement key never carries its title or body (story 6.13)", "value": {"source_type": "content_announcement", "source_id": "00000000-0000-4000-8000-000000000613", "source_revision": 1, "recipient_member_id": "00000000-0000-4000-8000-000000000002", "reminder_kind": "announcement_published", "scheduled_at": "2026-10-22T07:00:00Z", "title": "x", "body": "x", "pinned": true}, "field_errors": {"title": "unknown_field", "body": "unknown_field", "pinned": "unknown_field"}}
   ]
 }
 ''',
@@ -265,7 +267,15 @@ const Map<String, String> embeddedFixtures = {
     {"name": "longest token (63 chars)", "value": {"source_type": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1}},
     {"name": "integral value written with an exponent (1e3)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1e3}},
     {"name": "integral value written with a fraction (1.0)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1.0}},
-    {"name": "integral value written as 2E1", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 2E1}}
+    {"name": "integral value written as 2E1", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 2E1}},
+    {"name": "a programme part (story 4.11, Cells)", "value": {"source_type": "cells_programme_part", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 3}},
+    {"name": "a linked event (story 4.11, Content)", "value": {"source_type": "content_event", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 2}},
+    {"name": "a duty occurrence for a sermon draft (story 4.11)", "value": {"source_type": "duties_occurrence", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 5}},
+    {"name": "a meeting with a missing report (story 4.11, Cells)", "value": {"source_type": "cells_meeting", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 1}},
+    {"name": "a visitor (story 4.11, Cells)", "value": {"source_type": "cells_visitor", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 1}},
+    {"name": "a visit request (story 4.11, Care)", "value": {"source_type": "care_visit_request", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 4}},
+    {"name": "a service with a missing count (story 4.11, Services)", "value": {"source_type": "services_count", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 1}},
+    {"name": "an offering collection in custody (story 4.11, Offerings)", "value": {"source_type": "offerings_collection", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 2}}
   ],
   "invalid": [
     {"name": "everything missing", "value": {}, "field_errors": {"source_type": "required", "source_id": "required", "source_revision": "required"}},
@@ -287,7 +297,10 @@ const Map<String, String> embeddedFixtures = {
     {"name": "prototype-named key constructor", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "constructor": "x"}, "field_errors": {"constructor": "unknown_field"}},
     {"name": "prototype-named key __proto__", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "__proto__": "x"}, "field_errors": {"__proto__": "unknown_field"}},
     {"name": "prototype-named key toString", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "toString": "x"}, "field_errors": {"toString": "unknown_field"}},
-    {"name": "source content never rides on a reference (story 3.2)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "title": "x", "note": "x"}, "field_errors": {"title": "unknown_field", "note": "unknown_field"}}
+    {"name": "source content never rides on a reference (story 3.2)", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "source_revision": 1, "title": "x", "note": "x"}, "field_errors": {"title": "unknown_field", "note": "unknown_field"}},
+    {"name": "a part reference carries no position key; it travels beside the reference (story 4.11)", "value": {"source_type": "cells_programme_part", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 3, "position_key": "lead"}, "field_errors": {"position_key": "unknown_field"}},
+    {"name": "a duty reference carries no topic or scripture text (story 4.11)", "value": {"source_type": "duties_occurrence", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 5, "topic": "x", "scripture": "x"}, "field_errors": {"topic": "unknown_field", "scripture": "unknown_field"}},
+    {"name": "an event reference carries no venue or time (story 4.11)", "value": {"source_type": "content_event", "source_id": "00000000-0000-4000-8000-000000000411", "source_revision": 2, "venue": "x", "starts_at": "2026-10-21T16:00:00Z"}, "field_errors": {"venue": "unknown_field", "starts_at": "unknown_field"}}
   ]
 }
 ''',
@@ -295,13 +308,25 @@ const Map<String, String> embeddedFixtures = {
   "kind": "task_source",
   "contract_version": 1,
   "valid": [
-    {"name": "source and purpose", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "purpose": "fixture_review"}}
+    {"name": "source and purpose", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "purpose": "fixture_review"}},
+    {"name": "a programme part to fill (story 4.11, Cells)", "value": {"source_type": "cells_programme_part", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "fill_part"}},
+    {"name": "a visitor to follow up (story 4.11, Cells)", "value": {"source_type": "cells_visitor", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "visitor_follow_up"}},
+    {"name": "a visit request needing care (story 4.11, Care)", "value": {"source_type": "care_visit_request", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "care_follow_up"}},
+    {"name": "a missing meeting report (story 4.11, Cells)", "value": {"source_type": "cells_meeting", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "missing_report"}},
+    {"name": "a missing service count (story 4.11, Services)", "value": {"source_type": "services_count", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "missing_count"}},
+    {"name": "an offering collection in custody (story 4.11, Offerings)", "value": {"source_type": "offerings_collection", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "custody_follow_up"}},
+    {"name": "a duty coverage case (story 4.11 guide; registered in 4.9)", "value": {"source_type": "duties_coverage_case", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "coverage_follow_up"}}
   ],
   "invalid": [
     {"name": "missing purpose", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001"}, "field_errors": {"purpose": "required"}},
     {"name": "purpose with spaces", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "purpose": "fixture review"}, "field_errors": {"purpose": "invalid"}},
     {"name": "revision does not belong to a task identity", "value": {"source_type": "fixture_counter", "source_id": "00000000-0000-4000-8000-000000000001", "purpose": "fixture_review", "source_revision": 1}, "field_errors": {"source_revision": "unknown_field"}},
-    {"name": "not an object", "value": 3, "field_errors": {"$": "must_be_object"}}
+    {"name": "not an object", "value": 3, "field_errors": {"$": "must_be_object"}},
+    {"name": "a care task identity carries no private note (story 4.11)", "value": {"source_type": "care_visit_request", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "care_follow_up", "note": "x"}, "field_errors": {"note": "unknown_field"}},
+    {"name": "a custody task identity carries no amount (story 4.11)", "value": {"source_type": "offerings_collection", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "custody_follow_up", "amount": "10.00"}, "field_errors": {"amount": "unknown_field"}},
+    {"name": "a prayer never rides on a task identity (story 4.11)", "value": {"source_type": "care_visit_request", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "care_follow_up", "prayer_text": "x"}, "field_errors": {"prayer_text": "unknown_field"}},
+    {"name": "the owner is not part of a task identity (story 4.11)", "value": {"source_type": "cells_visitor", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "visitor_follow_up", "owner_member_id": "00000000-0000-4000-8000-000000000411"}, "field_errors": {"owner_member_id": "unknown_field"}},
+    {"name": "a purpose is a token (story 4.11)", "value": {"source_type": "cells_meeting", "source_id": "00000000-0000-4000-8000-000000000411", "purpose": "Missing-Report"}, "field_errors": {"purpose": "invalid"}}
   ]
 }
 ''',

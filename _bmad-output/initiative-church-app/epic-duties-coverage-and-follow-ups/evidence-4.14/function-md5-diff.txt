@@ -1,0 +1,21 @@
+# Story 4.14: every app/api/public function on the local database before (baseline e398b5f)
+# and after 20261015143102_duties_comment_refresh.sql (805 functions both times).
+# Columns: signature|md5(pg_get_functiondef)|ACL|md5(comment). Only the comment column of the
+# four refreshed functions differs; every body md5 and ACL is identical.
+
+9c9
+< api.duties_command(jsonb)|14a2359ae19c14f622d232fa6be656c7|{postgres=X/postgres,authenticated=X/postgres}|5214ec86bb6b509ed0e44373bd73edaf
+---
+> api.duties_command(jsonb)|14a2359ae19c14f622d232fa6be656c7|{postgres=X/postgres,authenticated=X/postgres}|249bb29c470fe850434e7b3b55d8c6e6
+20c20
+< api.followups_command(jsonb)|ca61956cc5aea0224d2c6ea4f1062431|{postgres=X/postgres,authenticated=X/postgres}|2e51f86d9044ac69f9ee7d017d8859e9
+---
+> api.followups_command(jsonb)|ca61956cc5aea0224d2c6ea4f1062431|{postgres=X/postgres,authenticated=X/postgres}|d911663b45d64d24cb1fb0e826099c03
+294c294
+< app.duties_state_ok(text,text)|662c12a4003168af848bf6d91769c8ff|{postgres=X/postgres}|9eeca7b1c516a09047ecb7d479c29005
+---
+> app.duties_state_ok(text,text)|662c12a4003168af848bf6d91769c8ff|{postgres=X/postgres}|7d1ab0f68a2f60d2ccd16287ca1b841c
+407c407
+< app.followups_state_ok(text,text)|09d7a2d3e47990716d143030fc50dacc|{postgres=X/postgres}|55f2ed8969f56a001bb5b4eb2d38ec4f
+---
+> app.followups_state_ok(text,text)|09d7a2d3e47990716d143030fc50dacc|{postgres=X/postgres}|bfb4dc4d5aea44d05e3ab6fdc180d42a

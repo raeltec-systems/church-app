@@ -1,0 +1,107 @@
+Source: inyimbo_zyabakristo.pdf (SHA-256 0733124a4e5376ea8504e4709b77b7d03117f187a1b8b4fd13768a0f4d621139), extracted with: pdftotext -enc UTF-8 -layout inyimbo_zyabakristo.pdf inyimbo_zyabakristo.txt
+Pages read: 219. Items: 199 hymns (index 199) and 67 choruses (index 67).
+Unplaced lines and other problems: 0.
+Corrections applied: 35.
+  line 43: "1 Leza Usimango (Cila)" -> "1 Leza Usimanga (Cila)" (owner decision 2026-10-28: the printed title has a misprint; "Usimanga" follows the book's index and the first line)
+  line 1048: "29 Noonse Mutangale, Wakasika Muvuni" -> "29 Noonse Mutangale, Wakasika Muvuni (Cila)" (the "(Cila)" mark of the heading was extracted at the start of the next line)
+  line 1050: "(Cila) (REVIVE US AGAIN) Key of G" -> "(REVIVE US AGAIN) Key of G" (the "(Cila)" mark belongs to the heading of hymn 29 (line 1048))
+  line 1160: "32 Nobaya Kwiitwa Boonse           Key of" -> "32 Nobaya Kwiitwa Boonse" (the key printed beside the heading was split over three lines; it moves to the line under the heading)
+  line 1162: "(WHEN THE TOLL IS CALLED UP YONDER)" -> "(WHEN THE TOLL IS CALLED UP YONDER) Key of A Flat" (joins "Key of" (line 1160) and "A Flat" (line 1163) into the line under the heading)
+  line 1163: "A Flat" -> "" (moved into line 1162)
+  line 1556: "42 Netusika Kujulu         Key of C" -> "42 Netusika Kujulu" (the key printed beside the heading moves to the line under the heading)
+  line 1558: "(WHEN WE ALL GET TO HEAVEN)" -> "(WHEN WE ALL GET TO HEAVEN) Key of C" (the key from line 1556)
+  line 1938: "52 Lufutuko Mdulukando (Cila)" -> "52 Lufutuko Ndulukando (Cila)" (owner decision 2026-10-28: the printed title has a misprint; "Ndulukando" follows the book's index and the first line)
+  line 2083: "56Ncinzi Cinsanzisya ‟Tombe? (Cila)" -> "56 Ncinzi Cinsanzisya ‟Tombe? (Cila)" (the space between the number 56 and the title was lost in extraction)
+  line 3093: "82 Taata, Nyenzya Nsiku Syoonse" -> "82 Taata, Nyenzya Nsiku Syoonse (Cila)" (the "(Cila)" mark of the heading was extracted at the start of the next line)
+  line 3095: "(Cila) (ST. MARTIN) (M.H. 359)" -> "(ST. MARTIN) (M.H. 359)" (the "(Cila)" mark belongs to the heading of hymn 82 (line 3093))
+  line 3286: "87Syoma Akuswiilila" -> "87 Syoma Akuswiilila" (the space between the number 87 and the title was lost in extraction)
+  line 3993: "(THANKSGIVING)" -> "(THANKSGIVING) (Ukubonga) (Z.H. 264) Key of F" (the two lines under the heading of hymn 106 are one: the Zulu title Ukubonga, the Zulu Hymnal number and the key)
+  line 3994: "(Ukubonga Z.H. 264) Key of F" -> "" (joined into line 3993)
+  line 4414: "117 Wakamba Na?" -> "117 Wakomba Na?" (owner decision 2026-10-28: the printed title has a misprint; "Wakomba" follows the book's index and the first line)
+  line 4607: "(DRAW ME NEARER) Key of A Flat)" -> "(DRAW ME NEARER) Key of A Flat" (a stray closing parenthesis after the key)
+  line 4797: "(TELL ME MORE ABOUT JESUS) (Z.H. 182 Key of E" -> "(TELL ME MORE ABOUT JESUS) (Z.H. 182) Key of E Flat" (the Zulu Hymnal reference lost its closing parenthesis and the key was split over two lines)
+  line 4798: "Flat" -> "" (joined into line 4797)
+  line 5526: "146 Nendalange Kuciingano" -> "146 Nendalanga Kuciingano" (owner decision 2026-10-28: the printed title has a misprint; "Nendalanga" follows the book's index and the first line)
+  line 6037: "159 Nda mukombelela" -> "159 Ndamukombelela" (owner decision 2026-10-28: the printed title has a misprint; "Ndamukombelela" follows the book's index and the first line)
+  line 6229: "164                    KUTAMBA" -> "KUTAMBA" (the number of hymn 164 was extracted onto the running header line)
+  line 6230: "Umfwile Ntenda, Jesu Mwami (Cila)" -> "164 Umfwile Ntenda, Jesu Mwami (Cila)" (the number 164 from the header line (line 6229))
+  line 6411: "169  Uleziza Jesu Mwami (Cila)" -> "169 Uleziza Jesu Mwini (Cila)" (owner decision 2026-10-28: the printed title has a misprint; "Jesu Mwini" follows the book's index and the first line)
+  line 6729: "178 mbaula Leza Mwini (Cila)" -> "178 Tembaula Leza Mwini (Cila)" (the first two letters of the title were lost in extraction; the first line and both indexes read "Tembaula")
+  line 6791: "181 Akube Bulema" -> "181 Akube Bulemu" (owner decision 2026-10-28: the printed title has a misprint; "Bulemu" follows the book's index and the first line)
+  line 7786: "24 Ndima Kubuka Abuumi" -> "24 Ndime Kubuka Abuumi" (owner decision 2026-10-28: the printed title has a misprint; "Ndime" follows the book's index and the first line)
+  line 7823: "2 6 Tuyaka Nganda" -> "26 Tuyaka Nganda" (the number 26 was split into "2 6" in extraction)
+  line 7914: "1            34 Bulamana" -> "34 Bulamana" (the verse numbers 1-3 of chorus 34 were extracted as a column beside its heading)
+  line 7915: "2" -> "1 Bulamana bumpelenge. (4 times)" (verse 1 of chorus 34 with its number)
+  line 7916: "3   Bulamana bumpelenge. (4 times)" -> "2 Siya ansi imikuli (4 times)" (verse 2 of chorus 34 with its number)
+  line 7917: "Siya ansi imikuli (4 times)" -> "3 Kulainkwa akujulu (4 times)" (verse 3 of chorus 34 with its number)
+  line 7919: "Kulainkwa akujulu (4 times)" -> "" (moved into line 7917)
+  line 8087: "53 Eli Bbuku Ndiotu Kubala" -> "53 Eli Bbuku Ndibotu Kubala" (owner decision 2026-10-28: the printed title has a misprint; "Ndibotu" follows the book's index and the first line)
+  line 8521: "Ndeezya Syoonse Nsyuufwini .......................................... 16" -> "Ndeezya Syoonse Nsyuufwini .......................................... 167" (the topical index prints hymn 167 as 16 (hymn 16 is listed under its own section))
+Notes (index and section cross-checks): 67.
+  line 263: hymn 8 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: KUZYALWA KWAKWE"; the topical index places it in "Leza Taatesu: Milimo Yakwe Aluzyalo Lwakwe"
+  line 360: hymn 11 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: KUZYALWA KWAKWE"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Lufu Lwakwe"
+  line 925: hymn 25: verse 1 is one line and verse 2 completes its stanza (lines per verse 1, 3, 4, 4, 4); check the verse numbers against the printed book
+  line 925: hymn 25 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: LUFU LWAKWE"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Kubuka Kwakwe"
+  line 1048: hymn 29: verse 1 is one line and verse 2 completes its stanza (lines per verse 1, 1, 2, 2, 2, 2, 2); check the verse numbers against the printed book
+  line 1048: hymn 29 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: KUBUKA KWAKWE"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Bulemu Bwakwe"
+  line 1055: hymn 29 prints its chorus first after verse 2; it is shown from there on
+  line 1085: hymn 30: verse 1 is one line and verse 2 completes its stanza (lines per verse 1, 7, 8, 8); check the verse numbers against the printed book
+  line 1160: hymn 32 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: BULEMU BWAKWE"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Kuboola Kwakwe"
+  line 1195: hymn 33 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: BULEMU BWAKWE"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Kuboola Kwakwe"
+  line 1832: hymn 49 is printed under the running header "KUJULU"; the topical index places it in "Mangwalo Aasweya"
+  line 1876: hymn 50 "Mazwi Aakwe Leza Mwini (Cila)" differs from its index entry "Mazwi Aakwe Lea Mwini" and "Mazei Aakwe Leza Mwini" by 1 letter; the heading is kept as printed
+  line 1938: hymn 52 is printed under the running header "MANGWALO AASWEYA"; the topical index places it in "Lufutuko"
+  line 2458: hymn 66 is printed under the running header "LUFUTUKO"; the topical index places it in "Buumi Bwa-MuKristo: Kusanduka"
+  line 2763: hymn 73 is printed under the running header "BUUMI BWA-MUKRISTO: KUSANDUKA"; the topical index places it in "Buumi Bwa-MuKristo: Kulipeda"
+  line 2801: hymn 74 is printed under the running header "BUUMI BWA-MUKRISTO: KUSANDUKA"; the topical index places it in "Buumi Bwa-MuKristo: Kulipeda"
+  line 2839: hymn 75 is printed under the running header "BUUMI BWA-MUKRISTO: KUSANDUKA"; the topical index places it in "Buumi Bwa-MuKristo: Kulipeda"
+  line 2868: hymn 76 is printed under the running header "BUUMI BWA-MUKRISTO: KUSANDUKA"; the topical index places it in "Buumi Bwa-MuKristo: Kulipeda"
+  line 3093: hymn 82 is printed under the running header "BUUMI BWA-MUKRISTO: KULIPEDA"; the topical index places it in "Buumi Bwa-MuKristo: Kusolwedelwa"
+  line 3447: hymn 92 is printed under the running header "BUUMI BWA-MUKRISTO: KUSOLWESELWA"; the topical index places it in "Buumi Bwa-MuKristo: Kusyoma Leza"
+  line 3475: hymn 93 is printed under the running header "BUUMI BWA-MUKRISTO: KUSOLWESELWA"; the topical index places it in "Buumi Bwa-MuKristo: Kusyoma Leza"
+  line 3510: hymn 94 is printed under the running header "BUUMI BWA-MUKRISTO: KUSOLWESELWA"; the topical index places it in "Buumi Bwa-MuKristo: Kusyoma Leza"
+  line 3868: hymn 103 is printed under the running header "BUUMI BWA-MUKRISTO: KUSYOMA LEZA"; the topical index places it in "Buumi Bwa-MuKristo: Kulumba"
+  line 3901: hymn 104 is printed under the running header "BUUMI BWA-MUKRISTO: KUSYOMA LEZA"; the topical index places it in "Buumi Bwa-MuKristo: Kulumba"
+  line 4795: hymn 127 is printed under the running header "BUUMI BWA-MUKRISTO: KUKOMBA"; the topical index places it in "Buumi Bwa-MuKristo: Mulimo Wakwe"
+  line 4835: hymn 128 is printed under the running header "BUUMI BWA-MUKRISTO: KUKOMBA"; the topical index places it in "Buumi Bwa-MuKristo: Mulimo Wakwe"
+  line 4867: hymn 129 is printed under the running header "BUUMI BWA-MUKRISTO: KUKOMBA"; the topical index places it in "Buumi Bwa-MuKristo: Mulimo Wakwe"
+  line 4902: hymn 130 is printed under the running header "BUUMI BWA-MUKRISTO: KUKOMBA"; the topical index places it in "Buumi Bwa-MuKristo: Mulimo Wakwe"
+  line 5486: hymn 145 is printed under the running header "BUUMI BWA-MUKRISTO: MULIMO WAKWE"; the topical index places it in "Mulalilo Wa-Mwami"
+  line 5526: hymn 146 is printed under the running header "BUUMI BWA-MUKRISTO: MULIMO WAKWE"; the topical index places it in "Mulalilo Wa-Mwami"
+  line 5558: hymn 147 is printed under the running header "BUUMI BWA-MUKRISTO: MULIMO WAKWE"; the topical index places it in "Mulalilo Wa-Mwami"
+  line 5602: hymn 148 is printed under the running header "BUUMI BWA-MUKRISTO: MULIMO WAKWE"; the topical index places it in "Kutamba"
+  line 5627: hymn 149 is printed under the running header "BUUMI BWA-MUKRISTO: MULIMO WAKWE"; the topical index places it in "Kutamba"
+  line 5675: hymn 150 is printed under the running header "MULALILO WA-MWAMI"; the topical index places it in "Kutamba"
+  line 5718: hymn 151 is printed under the running header "MULALILO WA-MWAMI"; the topical index places it in "Kutamba"
+  line 5767: hymn 152 is printed under the running header "MULALILO WA-MWAMI"; the topical index places it in "Kutamba"
+  line 6311: hymn 166 is printed under the running header "KUTAMBA"; the topical index places it in "Kukwata"
+  line 6337: hymn 167 is printed under the running header "KUTAMBA"; the topical index places it in "Bana"
+  line 6379: hymn 168 is printed under the running header "KUTAMBA"; the topical index places it in "Bana"
+  line 6411: hymn 169 is printed under the running header "KUTAMBA"; the topical index places it in "Bana"
+  line 6444: hymn 170 is printed under the running header "KUTAMBA"; the topical index places it in "Bana"
+  line 6476: hymn 171 is printed under the running header "KUTAMBA"; the topical index places it in "Cisi"
+  line 6515: hymn 172 is printed under the running header "KUKWATA"; the topical index places it in "Cisi"
+  line 6546: hymn 173 is printed under the running header "KUKWATA"; the topical index places it in "Cisi"
+  line 6598: hymn 174 is printed under the running header "BANA"; the topical index places it in "Mangolezya"
+  line 6624: hymn 175 is printed under the running header "BANA"; the topical index places it in "Mangolezya"
+  line 6667: hymn 176 is printed under the running header "CISI"; the topical index places it in "Kulaya Akumwayika"
+  line 6690: hymn 177 is printed under the running header "CISI"; the topical index places it in "Kulaya Akumwayika"
+  line 6729: hymn 178 is printed under the running header "CISI"; the topical index places it in "Kulaya Akumwayika"
+  line 6739: hymn 179 is printed under the running header "CISI"; the topical index places it in "Kulaya Akumwayika"
+  line 6760: hymn 180 is printed under the running header "CISI"; the topical index places it in "Inyimbo Zimbi"
+  line 6791: hymn 181 is printed under the running header "MANGOLEZYA"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe"
+  line 6801: hymn 182 is printed under the running header "MANGOLEZYA"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe"
+  line 6845: hymn 183 is printed under the running header "MANGOLEZYA"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe"
+  line 6891: hymn 184 is printed under the running header "KULAYA AKUMWAYIKA"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe"
+  line 6935: hymn 185 is printed under the running header "KULAYA AKUMWAYIKA"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe"
+  line 6975: hymn 186 is printed under the running header "KULAYA AKUMWAYIKA"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe"
+  line 7017: hymn 187 is printed under the running header "KULAYA AKUMWAYIKA"; the topical index places it in "Jesu Kristo Mwana aa-Leza: Kuzyalwa Kwakwe"
+  line 7316: hymn 194 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: KUZYALWA KWAKWE"; the topical index places it in "Inyimbo Zimbi"
+  line 7344: hymn 195 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: KUZYALWA KWAKWE"; the topical index places it in "Inyimbo Zimbi"
+  line 7375: hymn 196 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: KUZYALWA KWAKWE"; the topical index places it in "Inyimbo Zimbi"
+  line 7407: hymn 197 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: KUZYALWA KWAKWE"; the topical index places it in "Inyimbo Zimbi"
+  line 7436: hymn 198 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: KUZYALWA KWAKWE"; the topical index places it in "Inyimbo Zimbi"
+  line 7452: hymn 199 is printed under the running header "JESU KRISTO, MWANA AA-LEZA: KUZYALWA KWAKWE"; the topical index places it in "Inyimbo Zimbi"
+  line 7810: chorus 24 has a different chorus from verse 2 on
+  line 8000: chorus 43 "Moyo Wangu Wakali Kusia" differs from its index entry "Moyo Mangu Wakali Kusia" by 1 letter; the heading is kept as printed
+  line 8195: chorus 63 "Koamba Jesu Kulindime" differs from its index entry "Koamba Jesu Kulindim" by 1 letter; the heading is kept as printed

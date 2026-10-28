@@ -50,7 +50,7 @@ void main() {
   test('only adapters and the composition root reach Supabase or adapters', () {
     final offenders = <String, List<String>>{};
     for (final f in _dart('lib')) {
-      final path = f.path.replaceAll(r'\\', '/');
+      final path = f.path.replaceAll('\\', '/');
       if (exempt(path)) continue;
       final v = boundaryViolations(path, f.readAsStringSync());
       if (v.isNotEmpty) offenders[path] = v;
@@ -117,16 +117,36 @@ void main() {
     'lib/src/adapters/recovery_verifier_storage_web.dart',
   };
 
-  test('no client persistence API anywhere else in the package', () {
+  test('only the owned client adapters may use persistence APIs', () {
+    const mobilePublicCache =
+        '../../apps/mobile/lib/offline/public_content_cache_adapter.dart';
     final offenders = [
-      for (final f in _dart('lib'))
-        if (!authSessionStorageFiles.contains(f.path.replaceAll(r'\\', '/')) &&
-            !recoveryVerifierFiles.contains(f.path.replaceAll(r'\\', '/')) &&
-            f.path.replaceAll(r'\\', '/') != 'lib/composition.dart' &&
+      for (final f in [
+        ..._dart('lib'),
+        ..._dart('../../apps/mobile/lib'),
+        ..._dart('../../apps/staff/lib'),
+      ])
+        if (!authSessionStorageFiles.contains(f.path.replaceAll('\\', '/')) &&
+            !recoveryVerifierFiles.contains(f.path.replaceAll('\\', '/')) &&
+            f.path.replaceAll('\\', '/') != 'lib/composition.dart' &&
+            f.path.replaceAll('\\', '/') != mobilePublicCache &&
             _persistence.hasMatch(f.readAsStringSync()))
           f.path,
     ];
     expect(offenders, isEmpty);
+  });
+
+  test('mobile public cache owns only the allowlisted public list reads', () {
+    final source = File(
+      '../../apps/mobile/lib/offline/public_content_cache_adapter.dart',
+    ).readAsStringSync();
+    expect(source, contains('PublicContentCacheKeys.calendar'));
+    expect(source, contains('PublicContentCacheKeys.homeBanners'));
+    expect(source, contains('PublicContentCacheKeys.givingMethods'));
+    expect(source, isNot(contains('PublicContentCacheKeys.eventDetail')));
+    expect(source, isNot(contains('StaffEvents')));
+    expect(source, isNot(contains('PublicGivingMethodRead')));
+    expect(source, isNot(contains('StaffGiving')));
   });
 
   test('the Auth session storage adapters hold no domain or app state', () {

@@ -1,0 +1,9 @@
+{"step":"A00-precondition","target":"LOCAL","at":"2026-10-21T12:49:19.792Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"A01-members-signed-in-by-phone","target":"LOCAL","at":"2026-10-21T12:49:28.284Z","verdict":"pass","amr":["password"]}
+{"step":"A02-a-published-programme","target":"LOCAL","at":"2026-10-21T12:49:30.320Z","verdict":"pass","grants":[200,200,200,200],"placed":[200,200,200],"published":"published"}
+{"step":"B10-before-the-move","target":"LOCAL","at":"2026-10-21T12:49:30.571Z","verdict":"pass","accepted":"accepted","notice":"open","programme_read":200}
+{"step":"B20-old-cell-refused-new-cell-open","target":"LOCAL","at":"2026-10-21T12:49:31.133Z","verdict":"pass","moved":200,"old_programme_read":403,"new_cell":true,"old_venue_shown":false}
+{"step":"B30-part-vacant-duty-released-leaders-told","target":"LOCAL","at":"2026-10-21T12:49:33.119Z","verdict":"pass","part":"gap","assignment":"superseded:vacated","member_sees_it":false,"other_part_unchanged":true,"released":1,"leaders_told":2}
+{"step":"B40-notice-closed","target":"LOCAL","at":"2026-10-21T12:49:34.125Z","verdict":"pass","notice":"withdrawn:left_cell","waiting":0}
+{"step":"B50-last-leader-handover-and-deletion-zero","target":"LOCAL","at":"2026-10-21T12:49:36.890Z","verdict":"pass","assistant_removed":200,"last_leader_removed":"conflict","deletion_check":0}
+{"step":"A99-cleanup","target":"LOCAL","at":"2026-10-21T12:49:38.704Z","users_left":0,"unmarked":true,"programmes_left":0}

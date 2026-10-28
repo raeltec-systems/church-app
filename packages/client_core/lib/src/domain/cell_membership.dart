@@ -5,6 +5,8 @@
 library;
 
 import 'access_grants.dart';
+import 'cell_meetings.dart';
+import 'cell_programmes.dart';
 
 /// Cells-registered scope kinds in the Identity grant model (story 2.3).
 abstract final class CellScopeKinds {
@@ -23,6 +25,9 @@ abstract final class CellCommands {
   static const confirm = 'cells.confirm_request';
   static const decline = 'cells.decline_request';
   static const cancel = 'cells.cancel_request';
+
+  /// Story 5.9 (Admin): the cell has a leader again after a handover.
+  static const resolveHandover = 'cells.resolve_handover';
 }
 
 /// Why a request was not confirmed (wire codes).
@@ -175,6 +180,7 @@ class MyCell {
     this.primary,
     this.openRequest,
     this.lastDecision,
+    this.meetings,
   });
 
   factory MyCell.fromJson(Object? json) {
@@ -193,6 +199,9 @@ class MyCell {
       lastDecision: m['last_decision'] == null
           ? null
           : CellDecision.fromJson(m['last_decision']),
+      meetings: m['meetings'] == null
+          ? null
+          : MyCellMeetings.fromJson(m['meetings']),
     );
   }
 
@@ -203,6 +212,10 @@ class MyCell {
   final CellPlacement? primary;
   final OwnCellRequest? openRequest;
   final CellDecision? lastDecision;
+
+  /// Story 5.1: the confirmed cell's next meeting and the cancelled ones
+  /// before it; null when the member has no cell or it has no schedule.
+  final MyCellMeetings? meetings;
 }
 
 class CellStaff {
@@ -243,6 +256,7 @@ class AdminCell {
     required this.memberCount,
     this.signupLabel,
     this.signupRevision,
+    this.handoverPending = false,
   });
 
   factory AdminCell.fromJson(Object? json) {
@@ -262,6 +276,8 @@ class AdminCell {
       leaders: staff('leaders'),
       assistants: staff('assistants'),
       memberCount: _req<int>(m, 'member_count'),
+      // Story 5.9 (absent from earlier servers).
+      handoverPending: _opt<bool>(m, 'handover_pending') ?? false,
     );
   }
 
@@ -281,6 +297,10 @@ class AdminCell {
   final List<CellStaff> leaders;
   final List<CellStaff> assistants;
   final int memberCount;
+
+  /// Story 5.9: the cell's last leader left with a programme published
+  /// ahead; an Admin marks it done once the cell has a leader again.
+  final bool handoverPending;
 }
 
 /// One open request in the Admin overview.
@@ -514,6 +534,18 @@ abstract interface class CellsRepository {
   Future<AccessRead<MyCell>> fetchMyCell();
   Future<AccessRead<LeaderQueue>> fetchLeaderQueue();
   Future<AccessRead<CellAdminOverview>> fetchAdminOverview();
+
+  /// Story 5.1: the staff meetings board (`api.cells_meetings`).
+  Future<AccessRead<CellMeetingsBoard>> fetchMeetings();
+
+  /// Story 5.3: one meeting's programme (`api.cells_programme`).
+  Future<AccessRead<ProgrammeRead>> fetchProgramme(String meetingId);
+
+  /// Story 5.4: a meeting's published programme for the members of its cell
+  /// (`api.cells_meeting_programme`).
+  Future<AccessRead<MeetingProgrammeRead>> fetchMeetingProgramme(
+    String meetingId,
+  );
 }
 
 class UnconfiguredCellsRepository implements CellsRepository {
@@ -530,6 +562,19 @@ class UnconfiguredCellsRepository implements CellsRepository {
   @override
   Future<AccessRead<CellAdminOverview>> fetchAdminOverview() async =>
       const AccessReadDenied(AccessDenial.unavailable);
+
+  @override
+  Future<AccessRead<CellMeetingsBoard>> fetchMeetings() async =>
+      const AccessReadDenied(AccessDenial.unavailable);
+
+  @override
+  Future<AccessRead<ProgrammeRead>> fetchProgramme(String meetingId) async =>
+      const AccessReadDenied(AccessDenial.unavailable);
+
+  @override
+  Future<AccessRead<MeetingProgrammeRead>> fetchMeetingProgramme(
+    String meetingId,
+  ) async => const AccessReadDenied(AccessDenial.unavailable);
 }
 
 /// Does [grants] lead or assist any cell (navigation only)?

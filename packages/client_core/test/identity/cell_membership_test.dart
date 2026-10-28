@@ -235,7 +235,10 @@ void main() {
       );
       await settle(tester);
       expect(byKey('cells-notice-invalid'), findsOneWidget);
-      expect(find.textContaining('start with "SYNTHETIC "'), findsOneWidget);
+      expect(
+        find.text('Use a clear value of at most 80 characters.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets(
@@ -325,6 +328,37 @@ void main() {
       expect(byKey('cells-notice-confirmed'), findsOneWidget);
     });
 
+    testWidgets('two panes: the cells on the left with their requests counted; '
+        'choosing one shows its leaders and its requests', (tester) async {
+      await pumpAt(
+        tester,
+        ClientPaths.adminCells,
+        setUp: (h) => h.cells.admin = overviewWith(
+          cells: [
+            adminCellData(),
+            adminCellData(id: _cellY, name: 'SYNTHETIC Cell Y'),
+          ],
+          requests: [adminCellRequestData(requestedCellId: _cellY)],
+        ),
+      );
+      // The first cell is open; the request waits on the second.
+      expect(byKey('admin-cell-card-$_cellX'), findsOneWidget);
+      expect(byKey('admin-request-card-$_request'), findsNothing);
+      expect(byKey('no-waiting'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: byKey('cell-list-$_cellY'),
+          matching: find.text('1'),
+        ),
+        findsOneWidget,
+      );
+      await tapKey(tester, 'cell-list-$_cellY');
+      await settle(tester);
+      expect(byKey('admin-cell-card-$_cellY'), findsOneWidget);
+      expect(byKey('admin-cell-card-$_cellX'), findsNothing);
+      expect(byKey('admin-request-card-$_request'), findsOneWidget);
+    });
+
     testWidgets('the Admin\'s own record cannot be decided by them', (
       tester,
     ) async {
@@ -369,6 +403,36 @@ void main() {
       await settle(tester);
       expect(byKey('cells-notice-notAllowed'), findsOneWidget);
       expect(h.cells.leaderCalls, 2);
+    });
+
+    // Story 4.14 review: a reload while a confirmation is in flight keeps it
+    // pending (the C5 rule), so it cannot be sent twice.
+    testWidgets('a reload while a confirmation is in flight cannot send it '
+        'twice', (tester) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.cellLeader,
+        setUp: (h) => h.cells.leader = leaderWith([leaderRequest()]),
+      );
+      await tapKey(tester, 'leader-confirm-$_request');
+      final sent = h.gateway.sent.single;
+      final calls = h.cells.leaderCalls;
+      final container = ProviderScope.containerOf(
+        tester.element(byKey('leader-confirm-$_request')),
+      );
+      await container.read(cellLeaderProvider.notifier).reload();
+      await settle(tester);
+      expect(h.cells.leaderCalls, calls + 1);
+      expect(byKey('cells-pending'), findsOneWidget);
+      expect(enabled(tester, 'leader-confirm-$_request'), isFalse);
+      await tester.tap(byKey('leader-confirm-$_request'), warnIfMissed: false);
+      await tester.pump();
+      expect(h.gateway.sent, hasLength(1));
+      sent.unknown();
+      await settle(tester);
+      await tapKey(tester, 'cells-check-again');
+      expect(h.gateway.sent, hasLength(2));
+      expect(h.gateway.sent.last.wire['request_id'], sent.wire['request_id']);
     });
 
     testWidgets('passes an unknown person to the church office', (
@@ -440,6 +504,9 @@ void main() {
         ),
       );
       expect(byKey('my-cell-label'), findsOneWidget);
+      // The form opens on request for a member who already has a cell.
+      expect(byKey('my-cell-change'), findsNothing);
+      await tapKey(tester, 'my-cell-change-open');
       // The current cell is not offered again.
       expect(
         byKey('my-cell-option-${syntheticCellOptions.first.cellId}'),

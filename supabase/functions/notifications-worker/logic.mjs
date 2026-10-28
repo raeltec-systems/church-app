@@ -16,6 +16,7 @@ export const UUID_RE = SHARED_UUID_RE;
 export const CREDENTIAL_RE = SYSTEM_CREDENTIAL_RE;
 /** The scheduler's trigger token (Vault + Edge secret): it can only start one run. */
 export const TRIGGER_RE = /^nwt_[0-9a-f]{64}$/;
+export const CONTENT_RETENTION_LIMIT = 25;
 /** Wall-clock budget of one run; the lease (from the claim) bounds it further. */
 export const RUN_BUDGET_MS = 50_000;
 /** Stop this long before the lease ends: one 10 s call plus a margin. */
@@ -61,6 +62,44 @@ export function constantTimeEqual(a, b) {
 export function triggerMatches(header, expected) {
   if (typeof header !== 'string' || !TRIGGER_RE.test(header)) return false;
   return constantTimeEqual(header, expected);
+}
+
+/** A content-free result from Content's trigger-protected retention action. */
+export function parseContentRetentionResponse(status, body) {
+  if (status === 200 && body?.outcome === 'cleaned'
+      && ['claimed', 'deleted', 'failed'].every((key) => Number.isInteger(body[key]) && body[key] >= 0)
+      && body.claimed <= CONTENT_RETENTION_LIMIT
+      && body.deleted + body.failed === body.claimed) {
+    return { state: 'ran', claimed: body.claimed, deleted: body.deleted, failed: body.failed };
+  }
+  if (status === 401) return { state: 'unauthenticated' };
+  if (status === 403) return { state: 'forbidden' };
+  return { state: 'unavailable' };
+}
+
+/** Start Content's private-upload cleanup with the existing low-value scheduler trigger only. */
+export async function dispatchContentRetention({ fetcher, supabaseUrl, apiKey, trigger }) {
+  if (typeof fetcher !== 'function' || typeof supabaseUrl !== 'string' || !supabaseUrl
+      || typeof apiKey !== 'string' || !apiKey || !TRIGGER_RE.test(trigger ?? '')) {
+    return { state: 'not_configured' };
+  }
+  const url = `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/content-assets?action=retention-cleanup`;
+  try {
+    const response = await fetcher(url, {
+      method: 'POST',
+      headers: {
+        ...keyHeaders(apiKey),
+        'content-type': 'application/json',
+        'x-worker-trigger': trigger,
+      },
+      body: JSON.stringify({ limit: CONTENT_RETENTION_LIMIT }),
+    });
+    if (!response) return { state: 'unavailable' };
+    const body = await response.json().catch(() => null);
+    return parseContentRetentionResponse(response.status, body);
+  } catch {
+    return { state: 'unavailable' };
+  }
 }
 
 /** A Content-Length header that already announces more than MAX_BODY_BYTES (or is malformed). */

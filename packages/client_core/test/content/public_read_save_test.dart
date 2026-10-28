@@ -4,7 +4,6 @@ import 'dart:async';
 
 import 'package:church_client_core/church_client_core.dart';
 import 'package:church_client_core/testing.dart';
-import 'package:church_contracts/church_contracts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 

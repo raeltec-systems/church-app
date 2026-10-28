@@ -4,7 +4,7 @@
 -- cannot be held; another cell's leader is refused. HTTP evidence: tools/identity-e2e/cells-meeting-records.mjs.
 -- SYNTHETIC data only (fictional range +1 202 555 0181-0190).
 begin;
-select plan(53);
+select plan(60);
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000058' || lpad(n::text, 2, '0'))::uuid $$;
 create function pg_temp.s(n int) returns uuid language sql as
@@ -368,6 +368,42 @@ select is((select (a ->> 'removed') || '|' || coalesce(a ->> 'member_id', 'null'
              from jsonb_array_elements(app.cells_meeting_reference(pg_temp.mt()) -> 'actual_leaders') a
             where a ->> 'part_id' = pg_temp.part('Opening prayer')::text), 'true|null',
   'the reference shows a removed person, never the nil id');
+
+-- Review finding F6: a member who was in the cell when the meeting started and has moved since ---------
+with x as (insert into app.identity_members (display_name, membership_state, is_synthetic)
+           values ('SYNTHETIC 5.8 Transferred', 'approved', true) returning member_id)
+insert into m select 12, member_id from x;
+select pg_temp.place(12, pg_temp.sh());
+update app.cells_memberships set started_at = now() - interval '60 days'
+ where member_id = pg_temp.mid(12) and ended_at is null;
+select pg_temp.place(12, pg_temp.es());
+create temp table sr3 as select pg_temp.readj(pg_temp.c(2), format('select api.cells_programme(%L)', pg_temp.mt())) as r;
+select is((select string_agg((x ->> 'display_name') || ':' || (x ->> 'in_cell'), ',' order by x ->> 'display_name')
+             from sr3, jsonb_array_elements(r -> 'record_roster') x
+            where x ->> 'member_id' in (pg_temp.mid(12)::text, pg_temp.mid(10)::text)),
+  'SYNTHETIC 5.8 Member 10:true,SYNTHETIC 5.8 Transferred:false',
+  'F6: the recording roster offers the transferred member (no longer in the cell) beside current ones');
+select is((select count(*)::int from sr3, jsonb_array_elements(r -> 'roster') x
+            where x ->> 'member_id' = pg_temp.mid(12)::text), 0,
+  'F6: the current roster (planning and access) still leaves them out');
+select is((select count(*)::int from sr3, jsonb_array_elements(r -> 'record_roster') x
+            where x ->> 'member_id' in (pg_temp.mid(11)::text, pg_temp.mid(8)::text)), 0,
+  'F6: someone who joined after the meeting, or was never a member, is not offered');
+select is(pg_temp.leaders(2, pg_temp.rrev(), jsonb_build_array(
+    jsonb_build_object('part_id', pg_temp.part('Opening prayer'), 'leader', jsonb_build_object('member_id', pg_temp.mid(12)),
+                       'reason', 'SYNTHETIC it was them')))
+  #>> '{data,changed}', '1', 'F6: the leader credits the transferred member');
+select is((select leader_kind || ':' || (member_id = pg_temp.mid(12))::text from app.cells_actual_leaders
+            where part_id = pg_temp.part('Opening prayer') and superseded_at is null), 'member:true',
+  'F6: saved under their member identity, not as a guest');
+select is(pg_temp.leaders(2, pg_temp.rrev(), jsonb_build_array(
+    jsonb_build_object('part_id', pg_temp.part('Opening prayer'), 'leader', jsonb_build_object('member_id', pg_temp.mid(11)),
+                       'reason', 'SYNTHETIC test')))
+  #>> '{field_errors,parts.0.member_id}', 'not_in_cell', 'F6: the outsider at meeting time is still refused');
+select is(jsonb_array_length(pg_temp.readj(pg_temp.c(6), format('select api.cells_programme(%L)', pg_temp.mt())) -> 'record_roster')
+          + jsonb_array_length(pg_temp.readj(pg_temp.c(1), format('select api.cells_programme(%L)', pg_temp.mt())) -> 'record_roster')
+          + jsonb_array_length(pg_temp.readj(pg_temp.c(2), format('select api.cells_programme(%L)', pg_temp.mt2())) -> 'record_roster'),
+  0, 'F6: only the readers who may record get it (not Pastor oversight, Admin, or a cancelled meeting)');
 
 select * from finish();
 rollback;

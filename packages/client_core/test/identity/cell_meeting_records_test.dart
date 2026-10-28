@@ -97,6 +97,8 @@ AccessRead<ProgrammeRead> read({
   Map<String, Object?>? record,
   String status = 'unrecorded',
   bool canEdit = true,
+  List<(String, String)>? roster,
+  List<(String, String, bool)>? recordRoster,
 }) => AccessReadOk(
   ProgrammeRead.fromJson({
     'meeting': meetingData(),
@@ -117,13 +119,26 @@ AccessRead<ProgrammeRead> read({
       'gaps': 0,
     },
     'roster': [
-      for (final (id, name) in [
-        (_planned1, 'SYNTHETIC Planned 1'),
-        (_planned2, 'SYNTHETIC Planned 2'),
-        (_standIn, 'SYNTHETIC Stand In'),
-      ])
+      for (final (id, name)
+          in roster ??
+              [
+                (_planned1, 'SYNTHETIC Planned 1'),
+                (_planned2, 'SYNTHETIC Planned 2'),
+                (_standIn, 'SYNTHETIC Stand In'),
+              ])
         {'member_id': id, 'display_name': name, 'account': 'app_account'},
     ],
+    'record_roster': recordRoster == null
+        ? null
+        : [
+            for (final (id, name, inCell) in recordRoster)
+              {
+                'member_id': id,
+                'display_name': name,
+                'account': 'app_account',
+                'in_cell': inCell,
+              },
+          ],
     'status': status,
     'record': record,
     'can_record': canEdit,
@@ -430,6 +445,101 @@ void main() {
             .widget<DropdownButton<String>>(byKey('record-who-$_part1'))
             .value,
         isNull,
+      );
+    });
+
+    testWidgets('review finding F6: a member who has moved since the meeting '
+        'is offered, preselected as planned and saved as a member', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        CellPaths.plan(_meeting),
+        setUp: (h) => h.cells.programme = read(
+          status: 'held',
+          record: heldRecord(),
+          // Planned 2 moved to another cell after the meeting.
+          roster: [
+            (_planned1, 'SYNTHETIC Planned 1'),
+            (_standIn, 'SYNTHETIC Stand In'),
+          ],
+          recordRoster: [
+            (_planned1, 'SYNTHETIC Planned 1', true),
+            (_planned2, 'SYNTHETIC Planned 2', false),
+            (_standIn, 'SYNTHETIC Stand In', true),
+          ],
+        ),
+      );
+      expect(find.text('2 parts were led as planned'), findsOneWidget);
+      await tapKey(tester, 'record-edit-$_part2');
+      await settle(tester);
+      expect(
+        tester
+            .widget<DropdownButton<String>>(byKey('record-who-$_part2'))
+            .value,
+        _planned2,
+      );
+      expect(
+        find.text('SYNTHETIC Planned 2 (planned) (left the cell since)'),
+        findsWidgets,
+      );
+      await tapKey(tester, 'record-save-$_part2');
+      expect(h.gateway.sent.single.wire['payload'], {
+        'meeting_id': _meeting,
+        'parts': [
+          {
+            'part_id': _part2,
+            'leader': {'member_id': _planned2},
+          },
+        ],
+      });
+    });
+
+    testWidgets('review section 8: an open editor clears a chosen member the '
+        'reloaded options no longer offer', (tester) async {
+      final h = await pumpAt(
+        tester,
+        CellPaths.plan(_meeting),
+        setUp: (h) =>
+            h.cells.programme = read(status: 'held', record: heldRecord()),
+      );
+      await tapKey(tester, 'record-edit-$_part2');
+      await settle(tester);
+      await tapKey(tester, 'record-who-$_part2');
+      await settle(tester);
+      await tester.tap(find.text('SYNTHETIC Stand In').last);
+      await settle(tester);
+      expect(
+        tester
+            .widget<DropdownButton<String>>(byKey('record-who-$_part2'))
+            .value,
+        _standIn,
+      );
+      // The stand-in was removed; the page reloads with the editor open.
+      h.cells.programme = read(
+        status: 'held',
+        record: heldRecord(),
+        recordRoster: [
+          (_planned1, 'SYNTHETIC Planned 1', true),
+          (_planned2, 'SYNTHETIC Planned 2', true),
+        ],
+      );
+      final container = ProviderScope.containerOf(
+        tester.element(byKey('record-who-$_part2')),
+      );
+      await container.read(cellProgrammeProvider(_meeting).notifier).reload();
+      await settle(tester);
+      expect(tester.takeException(), isNull);
+      expect(
+        tester
+            .widget<DropdownButton<String>>(byKey('record-who-$_part2'))
+            .value,
+        isNull,
+      );
+      expect(
+        tester.widget<FilledButton>(byKey('record-save-$_part2')).onPressed,
+        isNull,
+        reason: 'the leader chooses again',
       );
     });
 

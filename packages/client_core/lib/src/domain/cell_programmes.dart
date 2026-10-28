@@ -475,6 +475,7 @@ class ProgrammeRosterMember {
     required this.memberId,
     required this.displayName,
     required this.account,
+    this.inCell = true,
   });
 
   factory ProgrammeRosterMember.fromJson(Object? json) {
@@ -488,12 +489,18 @@ class ProgrammeRosterMember {
         'access_review' => ProgrammeRosterAccount.accessReview,
         _ => throw const FormatException('unexpected account'),
       },
+      // Review finding F6: only on the recording roster.
+      inCell: _opt<bool>(m, 'in_cell') ?? true,
     );
   }
 
   final String memberId;
   final String displayName;
   final ProgrammeRosterAccount account;
+
+  /// False on the recording roster for someone who was in the cell when the
+  /// meeting started and has moved or left since (review finding F6).
+  final bool inCell;
 
   /// Without a working login: the leader tells them directly.
   bool get offApp => account != ProgrammeRosterAccount.appAccount;
@@ -516,6 +523,7 @@ class ProgrammeRead {
     this.status,
     this.record,
     this.canRecord = false,
+    this.recordRoster,
   });
 
   factory ProgrammeRead.fromJson(Object? json) {
@@ -562,6 +570,15 @@ class ProgrammeRead {
       status: MeetingStatus.tryParse(m['status']),
       record: m['record'] == null ? null : MeetingRecord.fromJson(m['record']),
       canRecord: _opt<bool>(m, 'can_record') ?? false,
+      // Review finding F6 (absent from older servers).
+      recordRoster: _opt<List>(m, 'record_roster') == null
+          ? null
+          : List.unmodifiable(
+              _req<List>(
+                m,
+                'record_roster',
+              ).map(ProgrammeRosterMember.fromJson),
+            ),
     );
   }
 
@@ -599,6 +616,15 @@ class ProgrammeRead {
   final MeetingStatus? status;
   final MeetingRecord? record;
   final bool canRecord;
+
+  /// Review finding F6: who the leader may name for who led a part, the
+  /// cell's members when the meeting started (some may have moved since);
+  /// null from an older server.
+  final List<ProgrammeRosterMember>? recordRoster;
+
+  /// The recording picker's members: [recordRoster], or the current [roster]
+  /// from an older server.
+  List<ProgrammeRosterMember> get recordingRoster => recordRoster ?? roster;
 
   /// The notice of the person holding [partId], if they sent one.
   StaffAbsence? absenceFor(String partId) {

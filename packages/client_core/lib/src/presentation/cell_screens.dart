@@ -6771,13 +6771,15 @@ class _RecordCardState extends ConsumerState<_RecordCard> {
         ]);
       } else {
         // The main job in one click: every part not yet recorded whose
-        // planned person is still in the cell, as planned (an explicit
-        // choice; nothing is assumed).
+        // planned person was in the cell when it met, as planned (an
+        // explicit choice; nothing is assumed). Review finding F6: someone
+        // who has moved since still counts.
+        final recordingIds = {for (final r in read.recordingRoster) r.memberId};
         final asPlanned = [
           for (final part in p.parts)
             if (!record.actual.containsKey(part.partId) &&
                 part.assignee != null &&
-                part.assignee!.inCell)
+                recordingIds.contains(part.assignee!.memberId))
               ActualLeaderDraft(
                 partId: part.partId,
                 memberId: part.assignee!.memberId,
@@ -6858,7 +6860,7 @@ class _RecordCardState extends ConsumerState<_RecordCard> {
                         meeting: m,
                         record: record,
                         part: p.parts[i],
-                        roster: read.roster,
+                        roster: read.recordingRoster,
                         canRecord: read.canRecord,
                         state: s,
                         divider: i > 0,
@@ -6944,6 +6946,8 @@ class _ActualRow extends ConsumerStatefulWidget {
   final CellMeeting meeting;
   final MeetingRecord record;
   final ProgrammePart part;
+
+  /// The cell's members when the meeting started (review finding F6).
   final List<ProgrammeRosterMember> roster;
   final bool canRecord;
   final CellsState<ProgrammeRead> state;
@@ -6976,10 +6980,26 @@ class _ActualRowState extends ConsumerState<_ActualRow> {
     super.dispose();
   }
 
+  /// Review section 8: a reload can drop the chosen member from the options
+  /// while the editor is open. The choice is then cleared so the leader
+  /// chooses again, never a value the picker cannot show.
+  @override
+  void didUpdateWidget(covariant _ActualRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final choice = _choice;
+    if (choice != null &&
+        choice != _guestChoice &&
+        choice != _nobodyChoice &&
+        !widget.roster.any((r) => r.memberId == choice)) {
+      _choice = null;
+    }
+  }
+
   void _open(ActualLeader? current) {
     final planned = widget.part.assignee;
-    // A member no longer in the roster (left or removed) is not offered: the
-    // leader chooses again (5.8 review fix 2).
+    // Only someone on the recording roster (a member when the meeting
+    // started) is offered; otherwise the leader chooses again (5.8 review
+    // fix 2, review finding F6).
     bool inRoster(String? id) => widget.roster.any((r) => r.memberId == id);
     setState(() {
       _editing = true;
@@ -6990,7 +7010,7 @@ class _ActualRowState extends ConsumerState<_ActualRow> {
         ActualLeaderKind.guest => _guestChoice,
         ActualLeaderKind.nobody => _nobodyChoice,
         null =>
-          planned != null && planned.inCell && inRoster(planned.memberId)
+          planned != null && inRoster(planned.memberId)
               ? planned.memberId
               : null,
       };
@@ -7178,9 +7198,12 @@ class _ActualRowState extends ConsumerState<_ActualRow> {
                     DropdownMenuItem(
                       value: r.memberId,
                       child: Text(
-                        r.memberId == part.assignee?.memberId
-                            ? '${r.displayName} (planned)'
-                            : r.displayName,
+                        [
+                          r.displayName,
+                          if (r.memberId == part.assignee?.memberId)
+                            '(planned)',
+                          if (!r.inCell) '(left the cell since)',
+                        ].join(' '),
                       ),
                     ),
                   const DropdownMenuItem(

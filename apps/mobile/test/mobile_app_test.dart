@@ -552,7 +552,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Kutalika Mubungano'), findsOneWidget);
       expect(find.byKey(const Key('hymn-row-hymn-1')), findsOneWidget);
-      expect(find.text('Leza Usimango (Cila)'), findsOneWidget);
+      expect(find.text('Leza Usimanga (Cila)'), findsOneWidget);
       await tester.enterText(find.byKey(const Key('hymn-search')), '24');
       await tester.pumpAndSettle();
       final hymn = tester.getTopLeft(find.byKey(const Key('hymn-row-hymn-24')));

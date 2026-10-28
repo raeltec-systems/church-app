@@ -1,3 +1,5 @@
+import 'dart:async';
+
 // Epic 6 entry 19: the member's own duties and cell meetings over the
 // Calendar. The wire parsing of the new Cells read (api.cells_my_meetings),
 // the overlay composition (own current duties and cell meetings in the
@@ -354,6 +356,61 @@ void main() {
       expect(byKey('calendar-overlay-duties-failed'), findsOneWidget);
       expect(find.byType(CalendarOverlayRow), findsNothing);
       expect(byKey('event-row-$_event'), findsOneWidget);
+    });
+
+    // Review F5: the public read and the overlays are independent.
+    testWidgets(
+      'a public failure with no saved copy keeps the loaded overlays',
+      (tester) async {
+        await pumpCalendar(
+          tester,
+          setUp: (h) => h.content.publicEvents = const AccessReadFailed(
+            unreachable: true,
+          ),
+        );
+        expect(byKey('calendar-failed'), findsOneWidget);
+        expect(byKey('event-row-$_event'), findsNothing);
+        expect(byKey('overlay-row-duty-$_dutyMine'), findsOneWidget);
+        expect(byKey('overlay-row-cell-$_meetingA'), findsOneWidget);
+        // The failure leads; the member's own items follow it.
+        expect(
+          tester.getTopLeft(byKey('calendar-failed')).dy,
+          lessThan(tester.getTopLeft(byKey('overlay-row-cell-$_meetingA')).dy),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('an empty public calendar still lists the overlays', (
+      tester,
+    ) async {
+      await pumpCalendar(
+        tester,
+        setUp: (h) => h.content.publicEvents = AccessReadOk(
+          PublicEvents.fromJson(publicEventsData([])),
+        ),
+      );
+      expect(byKey('calendar-empty'), findsOneWidget);
+      expect(byKey('overlay-row-duty-$_dutyMine'), findsOneWidget);
+      expect(byKey('overlay-row-cell-$_meetingA'), findsOneWidget);
+    });
+
+    testWidgets('overlays show while the public calendar is still loading', (
+      tester,
+    ) async {
+      final gate = Completer<void>();
+      await pumpCalendar(
+        tester,
+        setUp: (h) => h.content.publicEventsGate = gate,
+      );
+      expect(byKey('calendar-loading'), findsOneWidget);
+      expect(byKey('overlay-row-duty-$_dutyMine'), findsOneWidget);
+      expect(byKey('overlay-row-cell-$_meetingA'), findsOneWidget);
+      gate.complete();
+      await settle(tester);
+      expect(byKey('calendar-loading'), findsNothing);
+      expect(byKey('event-row-$_event'), findsOneWidget);
+      expect(byKey('overlay-row-duty-$_dutyMine'), findsOneWidget);
     });
 
     testWidgets('a member with no cell sees no meetings and no failure', (

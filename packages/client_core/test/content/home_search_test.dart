@@ -501,5 +501,45 @@ void main() {
       await tapKey(tester, 'search-clear');
       expect(byKey('search-intro'), findsOneWidget);
     });
+
+    // Review section 8: an answer shows only under the words it was asked
+    // for; new words wait as a pending search.
+    testWidgets('new words never show the previous answer or its "nothing"', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.search,
+        account: null,
+        setUp: (h) => h.search.answer = AccessReadOk(
+          PublicSearchResults.fromJson(
+            publicSearchData(
+              announcements: [publicAnnouncementData()],
+              truncated: true,
+            ),
+          ),
+        ),
+      );
+      await typeSearch(tester, 'harvest');
+      expect(byKey('search-truncated'), findsOneWidget);
+      await tester.enterText(byKey('search-field'), 'harvest choir');
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(byKey('search-truncated'), findsNothing);
+      expect(byKey('search-server-loading'), findsOneWidget);
+      await tester.pump(searchDebounce);
+      await settle(tester);
+      expect(h.search.asked, ['harvest', 'harvest choir']);
+      expect(byKey('search-truncated'), findsOneWidget);
+
+      h.search.answer = AccessReadOk(
+        PublicSearchResults.fromJson(publicSearchData()),
+      );
+      await typeSearch(tester, 'zzzz');
+      expect(byKey('search-nothing'), findsOneWidget);
+      await tester.enterText(byKey('search-field'), 'zzzzq');
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(byKey('search-nothing'), findsNothing);
+      expect(byKey('search-server-loading'), findsOneWidget);
+    });
   });
 }

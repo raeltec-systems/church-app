@@ -73,7 +73,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final c = ChurchColors.of(context);
     final layout = ChurchLayout.of(context);
     final typed = _text.text.trim();
-    final s = ref.watch(contentSearchProvider);
+    final asked = ref.watch(contentSearchProvider);
+    // A server answer belongs to the query it was asked for. While the
+    // debounce has not yet asked for what is typed now, the search is shown
+    // as pending: an older answer (or its "nothing found") is never shown
+    // under the new words.
+    final s = asked.query == searchQueryOf(typed)
+        ? asked
+        : const ContentSearchState(loading: true);
     final book = ref.watch(hymnBookProvider);
     final children = <Widget>[];
     if (typed.isEmpty) {

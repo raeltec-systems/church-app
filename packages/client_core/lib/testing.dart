@@ -10,12 +10,15 @@ import 'package:flutter_riverpod/misc.dart' show Override;
 
 import 'src/application/providers.dart';
 import 'src/application/hymn_controllers.dart';
+import 'src/application/calendar_overlay_controllers.dart'
+    show cellCalendarRepositoryProvider;
 import 'src/domain/platform_status.dart';
 
 import 'src/domain/access_grants.dart';
 import 'src/domain/account_auth.dart';
 import 'src/domain/assisted_recovery.dart';
 import 'src/domain/cell_meetings.dart';
+import 'src/domain/calendar_overlays.dart';
 import 'src/domain/cell_programmes.dart';
 import 'src/domain/cell_membership.dart';
 import 'src/domain/commands.dart';
@@ -496,6 +499,37 @@ Map<String, Object?> memberRecordData({
 
 /// [CellsRepository] answered by the test (story 2.6). Each field answers
 /// every read at once; the counters record how often each was asked.
+/// Epic 6 entry 19: the member's own cell meetings for the Calendar overlay.
+class FakeCellCalendar implements CellCalendarRepository {
+  AccessRead<MyCellMeetingsWindow> mine = const AccessReadDenied(
+    AccessDenial.notLinked,
+  );
+  int calls = 0;
+
+  @override
+  Future<AccessRead<MyCellMeetingsWindow>> fetchMyMeetings() async {
+    calls++;
+    return mine;
+  }
+}
+
+/// Epic 6 entry 19: an `api.cells_my_meetings` answer for [cellId] with
+/// [meetings] (`state` scheduled, moved or cancelled), as the server sends it.
+Map<String, Object?> cellMyMeetingsWire({
+  String? cellId,
+  required DateTime from,
+  List<Map<String, Object?>> meetings = const [],
+}) => {
+  'cell_id': cellId,
+  'from': from.toUtc().toIso8601String().replaceFirst(RegExp(r'\.\d+Z$'), 'Z'),
+  'until': from
+      .add(const Duration(days: 31))
+      .toUtc()
+      .toIso8601String()
+      .replaceFirst(RegExp(r'\.\d+Z$'), 'Z'),
+  'meetings': meetings,
+};
+
 class FakeCells implements CellsRepository {
   AccessRead<MyCell> mine = const AccessReadDenied(AccessDenial.notLinked);
   AccessRead<LeaderQueue> leader = const AccessReadDenied(
@@ -3291,6 +3325,7 @@ class ClientTestHarness {
   final membership = FakeMembership();
   final review = FakeReview();
   final cells = FakeCells();
+  final cellCalendar = FakeCellCalendar();
   final content = FakeContent();
   final bible = FakeBible();
   final sermons = FakeSermons();
@@ -3343,6 +3378,7 @@ class ClientTestHarness {
       membershipRepositoryProvider.overrideWithValue(membership),
       reviewRepositoryProvider.overrideWithValue(review),
       cellsRepositoryProvider.overrideWithValue(cells),
+      cellCalendarRepositoryProvider.overrideWithValue(cellCalendar),
       contentRepositoryProvider.overrideWithValue(content),
       bibleRepositoryProvider.overrideWithValue(bible),
       sermonsRepositoryProvider.overrideWithValue(sermons),

@@ -836,3 +836,74 @@ member E in another cell with its own duty, a Pending applicant P and a signed-o
 4. E's duty and E's cell meetings never appear on M's Calendar (and the reverse on E's phone).
 5. Signed out, and as P: the Calendar has no switches.
 6. Record pass/fail per step in `evidence-6.19/owner-check.md` (device; no numbers or ids).
+
+## Story 6.14: the finished Home and the top-bar search
+
+Migration: `20261028072741_content_public_search.sql`: the bounded anonymous read `api.content_public_search(query)`. No table, command,
+erase part or projection change; it returns each match through the kind's own public projection.
+
+### Search
+
+- **Who:** everyone, signed in or not (anon and authenticated EXECUTE only).
+- **What:** published sermons (title, speaker, scripture, notes, published series title),
+  published events that have not ended (title, description, location) and published
+  announcements (title, body). Never drafts, withdrawn, archived or ended items. Bible text is not
+  searched; hymns are not on the server.
+- **How:** the query is trimmed and its spaces folded; 2 to 100 characters (else HTTP 400,
+  `invalid`, detail `query`); every word (at most 8) must appear as plain text (`%` and `_` are
+  not wildcards). Title matches rank first; then each kind's own order. At most 10 of each kind;
+  `truncated: true` says a kind had more.
+- **On the phone:** the search button in the top bar (everyone) opens the search screen. Hymns are
+  found in the built-in hymn book as the user types, offline too; sermons, events and
+  announcements are asked from the server from 2 characters, a moment after typing stops. A
+  failed server read says "No connection" with Try again beside the hymns; it is never shown as
+  "nothing found". Answers are not saved offline.
+
+### Home
+
+Banners (theme first), then: a guest sees **Part of the church family?** with **Join** (opens
+Sign in / Create account); a Pending applicant sees **Your membership request** with church
+approval and the cell as two separate chips (opens the request); a member keeps the greeting,
+Needs attention, My duties, My follow-ups and My cell. Everyone then sees the pinned
+announcements with **See all**, Hymns for this Sunday and **Coming up**: the next three events as
+cards, an event's 16:9 poster opening the original poster (zoomable, with its text alternative)
+and its text opening the event; an event without a poster keeps its date badge. The current
+sermon series gets a card when its poster can be shown.
+
+### Local checks
+
+```text
+node --test tools/identity-e2e/content-search.test.mjs
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/content-search.mjs --evidence _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-6.14/content-search-e2e.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+pgTAP: `supabase/tests/content_public_search_test.sql` (fictional +44 7700 900571-900574, rolled
+back). The E2E uses +44 7700 900575-900578 (900579 reserved) and removes its accounts.
+
+### Owner manual check on staging (the ticket's verify)
+
+SYNTHETIC content only and **no notification** (publish announcements with "no notice"). Before:
+an editor publishes a theme banner, a pinned announcement, this Sunday's hymns, an event with a
+poster (church-owned rights) and a sermon, each with a word in common, for example `Kafue`.
+
+1. Signed out on a phone with this build: Home shows the theme, the **Join** card, the pinned
+   announcement with **See all**, the Sunday hymn chips and **Coming up** with the poster card.
+   Tap the poster: the whole poster opens; **See event** opens the event.
+2. Tap the search button, type `Kafue`: the sermon, the event and the announcement are listed;
+   type a hymn number (for example `24`): hymn 24 and chorus 24 come first. Open one of each.
+3. Airplane mode: search `24` again: the hymns are found and the screen says the server could not
+   be reached (not "nothing found").
+4. As a Pending applicant: Home shows **Your membership request** with **Awaiting church
+   approval** and the cell chip as two separate chips.
+5. As a member: Home keeps **My duties**, **My follow-ups** (when the member owns open work) and
+   **My cell**.
+6. Record pass/fail per step in `evidence-6.14/owner-check.md` (device; no numbers or ids).
+
+### Staging
+
+Applied 2026-10-28 as `20261028072741` (after entry 18's `20261028071717`). Both function hashes
+match the fresh local reset, boundary/unowned 0, signed-out search answers three empty lists
+(nothing is published on staging) and refuses 1 and 101 characters with 400 `invalid`
+(`evidence-6.14/staging-verify.md`). Nothing was published and no notification was sent.

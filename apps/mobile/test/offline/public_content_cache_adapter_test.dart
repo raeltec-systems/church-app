@@ -401,6 +401,126 @@ void main() {
     },
   );
 
+  // Review F4: an unchanged permitted banner is reused across refreshes; a
+  // changed, withdrawn or revoked one is never reused.
+  group('banner refresh reuse', () {
+    const campaign = '82828282-8282-4282-8282-828282828282';
+    PublicBanners banners(List<Map<String, Object?>> rows) =>
+        PublicBanners.fromJson(publicBannersData(rows));
+    Map<String, Object?> theme({int rights = 1}) =>
+        publicBannerData(rightsRevision: rights);
+    Map<String, Object?> second() => publicBannerData(
+      bannerId: campaign,
+      kind: 'campaign',
+      path: 'banner/$campaign/r1/image.png',
+    );
+    List<String> bannerFiles() =>
+        root
+            .listSync(recursive: true)
+            .whereType<File>()
+            .map((f) => f.uri.pathSegments.last)
+            .where((n) => n.startsWith('banner-offline-'))
+            .toList()
+          ..sort();
+
+    test(
+      'an unchanged banner survives a failing loader without a download',
+      () async {
+        await cache.writeRead(
+          PublicContentCacheKeys.homeBanners,
+          banners([theme()]),
+          loadBannerImage: (_) async => imageBytes,
+        );
+        var loads = 0;
+        final outcome = await cache.writeRead(
+          PublicContentCacheKeys.homeBanners,
+          banners([theme()]),
+          loadBannerImage: (_) async {
+            loads++;
+            throw const SocketException('SYNTHETIC offline');
+          },
+        );
+        expect(outcome, isA<PublicContentCacheSaved>());
+        expect(loads, 0);
+        final cold = PublicContentCacheAdapter(
+          supportDirectory: () async => root,
+        );
+        expect(
+          (await cold.readBanners())?.value.banners.single.offlineImageBytes,
+          imageBytes,
+        );
+      },
+    );
+
+    test(
+      'a changed rights revision is downloaded again, never reused',
+      () async {
+        await cache.writeRead(
+          PublicContentCacheKeys.homeBanners,
+          banners([theme()]),
+          loadBannerImage: (_) async => imageBytes,
+        );
+        var loads = 0;
+        await cache.writeRead(
+          PublicContentCacheKeys.homeBanners,
+          banners([theme(rights: 2)]),
+          loadBannerImage: (_) async {
+            loads++;
+            return null;
+          },
+        );
+        expect(loads, 1);
+        expect((await cache.readBanners())?.value.banners, isEmpty);
+        expect(bannerFiles(), isEmpty);
+      },
+    );
+
+    test('withdrawn and revoked banners leave the saved read before slow downloads', () async {
+      await cache.writeRead(
+        PublicContentCacheKeys.homeBanners,
+        banners([theme(), second()]),
+        loadBannerImage: (_) async => imageBytes,
+      );
+      expect(bannerFiles(), hasLength(2));
+      // The campaign is withdrawn (or its offline rights are revoked, which
+      // the controller sends as an omitted row); a new banner downloads
+      // slowly.
+      const fresh = '83838383-8383-4383-8383-838383838383';
+      final slow = Completer<Uint8List?>();
+      final write = cache.writeRead(
+        PublicContentCacheKeys.homeBanners,
+        banners([
+          theme(),
+          publicBannerData(
+            bannerId: fresh,
+            kind: 'campaign',
+            path: 'banner/$fresh/r1/image.png',
+          ),
+        ]),
+        loadBannerImage: (banner) =>
+            banner.bannerId == fresh ? slow.future : Future.value(null),
+      );
+      for (var i = 0; i < 20 && bannerFiles().length != 1; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+      final cold = PublicContentCacheAdapter(
+        supportDirectory: () async => root,
+      );
+      final during = await cold.readBanners();
+      expect(during?.value.banners.map((b) => b.bannerId), [
+        '81818181-8181-4181-8181-818181818181',
+      ]);
+      expect(bannerFiles(), hasLength(1));
+      slow.complete(null);
+      await write;
+      expect(
+        (await cache.readBanners())?.value.banners.map((b) => b.bannerId),
+        ['81818181-8181-4181-8181-818181818181'],
+      );
+      expect(bannerFiles(), hasLength(1));
+    });
+  });
+
   test('rights uncleared for offline use refuses without writing', () async {
     final outcome = await cache.writeRead(
       PublicContentCacheKeys.homeBanners,

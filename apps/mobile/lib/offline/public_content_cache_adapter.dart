@@ -434,7 +434,9 @@ class PublicContentCacheAdapter implements PublicContentCache {
           );
         }
         final directory = await _directory();
-        await _removeReadBeforeRefresh(directory, readKey);
+        // Withdrawn, superseded or revoked banners leave the saved read now,
+        // before any download; unchanged permitted ones stay for reuse.
+        await _pruneBannersBeforeRefresh(directory, projection);
         final eligible = <PublicBanner>[];
         final files = <String, String>{};
         for (final banner in projection.banners) {
@@ -1039,6 +1041,79 @@ class PublicContentCacheAdapter implements PublicContentCache {
     if (readKey == PublicContentCacheKeys.givingMethods) {
       await _removeUnusedGivingLogos(directory, const {});
     }
+  }
+
+  /// Keeps only saved banners the fresh projection still lists at the same
+  /// publication and rights revision (the file name encodes both), commits
+  /// that subset, and deletes every other banner file except the ones the
+  /// fresh projection names. The final commit then removes whatever the new
+  /// projection excludes.
+  Future<void> _pruneBannersBeforeRefresh(
+    Directory directory,
+    PublicBanners fresh,
+  ) async {
+    final wanted = {
+      for (final banner in fresh.banners)
+        banner.bannerId: _imageFileName(banner),
+    };
+    final file = await _manifest(directory);
+    if (!await file.exists()) {
+      await _removeUnusedBannerImages(directory, wanted.values.toSet());
+      return;
+    }
+    final manifest = await _readManifest(directory);
+    if (manifest == null) {
+      await _removeReadBeforeRefresh(
+        directory,
+        PublicContentCacheKeys.homeBanners,
+      );
+      return;
+    }
+    final reads = Map<String, Object?>.from(manifest['reads'] as Map);
+    final entry = reads[PublicContentCacheKeys.homeBanners];
+    final projection = entry is Map ? entry['projection'] : null;
+    final imageFiles = entry is Map ? entry['image_files'] : null;
+    if (entry is! Map ||
+        projection is! Map ||
+        projection['banners'] is! List ||
+        imageFiles is! Map) {
+      if (entry != null) {
+        await _removeReadBeforeRefresh(
+          directory,
+          PublicContentCacheKeys.homeBanners,
+        );
+      } else {
+        await _removeUnusedBannerImages(directory, wanted.values.toSet());
+      }
+      return;
+    }
+    final keptFiles = <String, String>{
+      for (final saved in imageFiles.entries)
+        if (saved.key is String &&
+            saved.value is String &&
+            wanted[saved.key] == saved.value)
+          saved.key as String: saved.value as String,
+    };
+    final banners = projection['banners'] as List;
+    final keptBanners = banners
+        .where((raw) => raw is Map && keptFiles.containsKey(raw['banner_id']))
+        .toList(growable: false);
+    if (keptBanners.length != banners.length ||
+        keptFiles.length != imageFiles.length) {
+      reads[PublicContentCacheKeys.homeBanners] = {
+        'saved_at': entry['saved_at'],
+        'projection': {
+          'banners': keptBanners,
+          'truncated': projection['truncated'],
+        },
+        'image_files': keptFiles,
+      };
+      await _commitManifest(
+        directory,
+        jsonEncode({'version': _manifestVersion, 'reads': reads}),
+      );
+    }
+    await _removeUnusedBannerImages(directory, wanted.values.toSet());
   }
 
   Future<void> _removeUnusedBannerImages(

@@ -628,6 +628,53 @@ void main() {
       },
     );
 
+    // Follow-up review C2.
+    test('an oversized saved banner at the same revision is replaced and stays repaired', () async {
+      await cache.writeRead(
+        PublicContentCacheKeys.homeBanners,
+        banners([theme()]),
+        loadBannerImage: (_) async => imageBytes,
+      );
+      final name = bannerFiles().single;
+      final file = root
+          .listSync(recursive: true)
+          .whereType<File>()
+          .singleWhere((f) => f.uri.pathSegments.last == name);
+      await file.writeAsBytes(Uint8List(5 * 1024 * 1024 + 1), flush: true);
+
+      var loads = 0;
+      Future<Uint8List?> loader(PublicBanner _) async {
+        loads++;
+        return imageBytes;
+      }
+
+      expect(
+        await cache.writeRead(
+          PublicContentCacheKeys.homeBanners,
+          banners([theme()]),
+          loadBannerImage: loader,
+        ),
+        isA<PublicContentCacheSaved>(),
+      );
+      expect(loads, 1);
+      expect(await file.readAsBytes(), imageBytes);
+      final cold = PublicContentCacheAdapter(
+        supportDirectory: () async => root,
+      );
+      expect(
+        (await cold.readBanners())?.value.banners.single.offlineImageBytes,
+        imageBytes,
+      );
+
+      // The next same-revision save reuses the repaired file.
+      await cache.writeRead(
+        PublicContentCacheKeys.homeBanners,
+        banners([theme()]),
+        loadBannerImage: loader,
+      );
+      expect(loads, 1);
+    });
+
     test(
       'a changed rights revision is downloaded again, never reused',
       () async {

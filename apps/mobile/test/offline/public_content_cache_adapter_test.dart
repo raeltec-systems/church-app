@@ -416,6 +416,78 @@ void main() {
     });
   });
 
+  // Review section 8: an unreadable manifest is replaced the same way for
+  // every read type, and images it may have referenced are removed.
+  group('corrupt manifest write policy', () {
+    final writes =
+        <String, (Object, Future<bool> Function(PublicContentCacheAdapter))>{
+          PublicContentCacheKeys.calendar: (
+            PublicEvents.fromJson(publicEventsData([publicEventData()])),
+            (c) async => (await c.readEvents())?.value.events.length == 1,
+          ),
+          PublicContentCacheKeys.homeBanners: (
+            PublicBanners.fromJson(publicBannersData([publicBannerData()])),
+            (c) async => (await c.readBanners())?.value.banners.length == 1,
+          ),
+          PublicContentCacheKeys.givingMethods: (
+            PublicGivingMethods.fromJson(
+              publicGivingMethodsData([publicGivingMethodData()]),
+            ),
+            (c) async =>
+                (await c.readGivingMethods())?.value.methods.length == 1,
+          ),
+          PublicContentCacheKeys.sermons: (
+            sermons(),
+            (c) async => (await c.readSermons())?.value.sermons.length == 1,
+          ),
+          PublicContentCacheKeys.bibleChapter: (
+            PublicBibleChapter(
+              translationId: '61616161-6161-4161-8161-616161616161',
+              translationCode: 'KJV',
+              translationName: 'King James Version',
+              reference: const BibleChapterRef(bookId: 'GEN', chapter: 1),
+              verses: const [BibleVerse(number: 1, text: 'SYNTHETIC verse')],
+              publicationRevision: 1,
+              publishedAt: DateTime.utc(2026, 10, 22),
+              offlineAllowed: true,
+            ),
+            (c) async => (await c.readBibleChapter()) != null,
+          ),
+        };
+    for (final MapEntry(key: readKey, value: (projection, readable))
+        in writes.entries) {
+      test('$readKey replaces an unreadable manifest', () async {
+        final folder = Directory(
+          '${root.path}${Platform.pathSeparator}bic-kafue'
+          '${Platform.pathSeparator}public-content-v1',
+        );
+        await folder.create(recursive: true);
+        await File('${folder.path}${Platform.pathSeparator}manifest.json')
+            .writeAsString('{not json');
+        // An image the unreadable manifest may have referenced.
+        final stray = File(
+          '${folder.path}${Platform.pathSeparator}giving-logo-offline-'
+          'stale-p1-r1.png',
+        );
+        await stray.writeAsBytes(imageBytes);
+
+        final outcome = await cache.writeRead(
+          readKey,
+          projection,
+          loadBannerImage: (_) async => imageBytes,
+          loadGivingLogo: (_) async => imageBytes,
+          loadSermonPoster: (_) async => imageBytes,
+        );
+        expect(outcome, isA<PublicContentCacheSaved>());
+        final cold = PublicContentCacheAdapter(
+          supportDirectory: () async => root,
+        );
+        expect(await readable(cold), isTrue);
+        expect(stray.existsSync(), isFalse);
+      });
+    }
+  });
+
   test('only allowlisted public list reads can create a manifest', () async {
     final outcome = await cache.writeRead(
       'content_staff_events',

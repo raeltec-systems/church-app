@@ -725,14 +725,23 @@ class PublicContentCacheAdapter implements PublicContentCache {
 
       final directory = await _directory();
       final manifest = await _readManifest(directory);
-      if (await (await _manifest(directory)).exists() && manifest == null) {
-        return const PublicContentCacheUnavailable();
-      }
+      // One policy for every read type: an unreadable manifest already reads
+      // as no saved content, so a successful write replaces it with just
+      // this read, and every image no longer referenced is removed.
+      final corrupt =
+          manifest == null && await (await _manifest(directory)).exists();
       final reads = Map<String, Object?>.from(
         (manifest?['reads'] as Map?) ?? const {},
       )..[readKey] = entry;
       final next = jsonEncode({'version': _manifestVersion, 'reads': reads});
       await _commitManifest(directory, next);
+      if (corrupt) {
+        try {
+          await _removeUnreferencedImages(directory, imageFiles);
+        } catch (_) {
+          // Unreferenced files are never read.
+        }
+      }
       if (readKey == PublicContentCacheKeys.sermons) {
         try {
           await _removeUnusedSermonPosters(directory, imageFiles);
@@ -1131,7 +1140,7 @@ class PublicContentCacheAdapter implements PublicContentCache {
     final manifest = await _readManifest(directory);
     if (manifest == null) {
       await file.delete();
-      await _removeUnusedBannerImages(directory, const {});
+      await _removeUnreferencedImages(directory, const {});
       return;
     }
     final reads = Map<String, Object?>.from(manifest['reads'] as Map);
@@ -1223,6 +1232,17 @@ class PublicContentCacheAdapter implements PublicContentCache {
       );
     }
     await _removeUnusedBannerImages(directory, wanted.values.toSet());
+  }
+
+  /// Every saved image kind, for a manifest that no longer references any
+  /// image outside [keep].
+  Future<void> _removeUnreferencedImages(
+    Directory directory,
+    Set<String> keep,
+  ) async {
+    await _removeUnusedBannerImages(directory, keep);
+    await _removeUnusedGivingLogos(directory, keep);
+    await _removeUnusedSermonPosters(directory, keep);
   }
 
   Future<void> _removeUnusedBannerImages(

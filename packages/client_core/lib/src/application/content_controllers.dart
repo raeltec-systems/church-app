@@ -108,15 +108,24 @@ abstract class PublicReadController<T> extends Notifier<PublicReadState<T>> {
         // A cache maintenance failure cannot replace a successful server read.
       }
       if (!ref.mounted || epoch != _epoch) return;
-      final savedAt = supportsOfflineSnapshot
-          ? await saveOfflineSnapshot(r.value)
-          : null;
-      if (!ref.mounted || epoch != _epoch) return;
-      state = PublicReadState<T>(
-        result: r,
-        asOf: DateTime.now(),
-        savedAt: savedAt,
-      );
+      // The fresh answer shows at once; saving it (and any optional images)
+      // for offline use follows and never holds the screen back. Withdrawal
+      // invalidation still happens inside the save, in queue order.
+      final asOf = DateTime.now();
+      state = PublicReadState<T>(result: r, asOf: asOf);
+      if (!supportsOfflineSnapshot) return;
+      DateTime? savedAt;
+      try {
+        savedAt = await saveOfflineSnapshot(r.value);
+      } catch (_) {
+        // An offline save failure cannot replace a successful server read.
+      }
+      if (!ref.mounted || epoch != _epoch || !identical(state.result, r)) {
+        return;
+      }
+      if (savedAt != null) {
+        state = PublicReadState<T>(result: r, asOf: asOf, savedAt: savedAt);
+      }
       return;
     }
     if (r is AccessReadFailed<T> && supportsOfflineSnapshot) {

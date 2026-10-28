@@ -1713,6 +1713,9 @@ class FakePublicContentCache implements PublicContentCache {
     );
   }
 
+  /// When set, every [writeRead] waits for it (a slow save or image fetch).
+  Completer<void>? writeGate;
+
   final removedEvents = <String>[];
 
   @override
@@ -1806,6 +1809,7 @@ class FakePublicContentCache implements PublicContentCache {
     Future<Uint8List?> Function(SermonPoster poster)? loadSermonPoster,
   }) async {
     writes.add((readKey, projection));
+    await writeGate?.future;
     if (!available) return const PublicContentCacheUnavailable();
     if (readKey == PublicContentCacheKeys.sermons &&
         projection is PublicSermons) {

@@ -55,4 +55,10 @@ class SupabaseContentRepository implements ContentRepository {
   ) => _reader.read('content_staff_event_rsvps', {
     'event_id': eventId,
   }, StaffEventRsvpsRead.fromJson);
+
+  @override
+  Future<AccessRead<EventDutyLinks>> fetchEventDutyLinks(String eventId) =>
+      _reader.read('content_staff_event_duty_links', {
+        'event_id': eventId,
+      }, EventDutyLinks.fromJson);
 }

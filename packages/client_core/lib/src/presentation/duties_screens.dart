@@ -6,12 +6,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../application/access_controllers.dart' show myAccessProvider;
+import '../application/content_controllers.dart'
+    show linkableEventsProvider, linkedEventProvider;
 import '../application/duties_controllers.dart';
 import '../application/providers.dart' show contactLauncherProvider;
 import '../domain/access_grants.dart';
 import '../domain/church_time.dart';
+import '../domain/content_events.dart' show PublicEvent, PublicEventRead;
 import '../domain/duties.dart';
 import '../domain/duty_calendar.dart';
+import 'calendar_screens.dart' show CalendarPaths, churchShortWhen;
 import 'church_widgets.dart';
 import 'followups_screens.dart' show FollowUpPaths;
 
@@ -20,6 +24,85 @@ part 'duties_outcome_screens.dart';
 part 'duties_reminder_widgets.dart';
 part 'duties_rota_screens.dart';
 part 'duties_special_screens.dart';
+
+/// Story 6.12: the published event a duty is linked to, as the public
+/// calendar shows it; it opens the event. Once the event is no longer public
+/// the duty says so, and a failed read never looks like no event.
+class _DutyLinkedEvent extends ConsumerWidget {
+  const _DutyLinkedEvent({required this.assignmentId, required this.eventId});
+
+  final String assignmentId;
+  final String eventId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final c = ChurchColors.of(context);
+    final read = ref.watch(linkedEventProvider(eventId));
+    Widget note(String text, String key) => Text(
+      text,
+      key: Key('$key-$assignmentId'),
+      style: ChurchType.secondary.copyWith(color: c.muted),
+    );
+    final body = switch (read) {
+      AsyncData(value: AccessReadOk(value: PublicEventRead(:final event?))) =>
+        FocusRing(
+          radius: 4,
+          child: InkWell(
+            key: Key('duty-event-$assignmentId'),
+            onTap: () => context.push(CalendarPaths.event(event.eventId)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          event.title,
+                          style: ChurchType.body.copyWith(
+                            fontWeight: FontWeight.w500,
+                            color: c.ink,
+                          ),
+                        ),
+                        Text(
+                          '${churchShortWhen(event.startsAt)} · '
+                          '${event.location}',
+                          style: ChurchType.secondary.copyWith(color: c.muted),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  ExcludeSemantics(
+                    child: Icon(Icons.chevron_right, size: 20, color: c.muted),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      AsyncData(value: AccessReadOk()) => note(
+        'This event is no longer on the church calendar.',
+        'duty-event-gone',
+      ),
+      AsyncData(value: AccessReadDenied()) || AsyncError() => note(
+        'The event could not be loaded. Check your connection and try again.',
+        'duty-event-failed',
+      ),
+      _ => const SizedBox.shrink(),
+    };
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 12),
+        const CardLabel('Event'),
+        const SizedBox(height: 6),
+        body,
+      ],
+    );
+  }
+}
 
 // Story 4.1: departments (Admin) and publishing with responses (leaders) on
 // staff web, and the member's duties with Accept / Can't make it on mobile.
@@ -3952,6 +4035,9 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
         if (a.changes != null || a.notesUpdatedAt != null)
           const SizedBox(height: 12),
         DetailTable(rows: rows),
+        // Story 6.12: the published event the duty is linked to.
+        if (a.eventRef case final ev?)
+          _DutyLinkedEvent(assignmentId: id, eventId: ev),
         if (a.instructions case final i?) ...[
           const SizedBox(height: 12),
           const CardLabel('Instructions'),

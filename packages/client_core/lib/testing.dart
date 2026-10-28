@@ -658,6 +658,17 @@ class FakeContent implements ContentRepository {
     return staffRsvps[eventId] ??
         const AccessReadDenied(AccessDenial.notGranted);
   }
+
+  /// Story 6.12: the linked-duty counts by event id (absent: none linked).
+  final Map<String, AccessRead<EventDutyLinks>> dutyLinks = {};
+  final List<String> dutyLinksAsked = [];
+
+  @override
+  Future<AccessRead<EventDutyLinks>> fetchEventDutyLinks(String eventId) async {
+    dutyLinksAsked.add(eventId);
+    return dutyLinks[eventId] ??
+        AccessReadOk(EventDutyLinks(eventId: eventId, linkedDuties: 0));
+  }
 }
 
 /// [BibleRepository] answered by tests (story 6.6).

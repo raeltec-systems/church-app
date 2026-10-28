@@ -734,6 +734,56 @@ node tools/auth-harness/local-phone-auth.mjs off
 6. Withdraw the rights record: the link disappears and the notes remain. Switch the phone to airplane mode: "Video needs a connection", notes readable.
 7. Record the results for entry 15. iOS playback waits for the owner's device in entry 15.
 
+## Story 6.12: duties linked to published events
+
+Migration: `supabase/migrations/20261027192013_content_event_duty_links.sql` (no `_rows` file). pgTAP: `supabase/tests/content_event_duty_links_test.sql`. E2E: `tools/identity-e2e/content-event-duty-links.mjs` (offline tests `content-event-duty-links.test.mjs`, fictional block +44 7700 900291-900297). Plan: `_bmad-output/initiative-church-app/epic-public-content-and-giving/story-link-duties-to-published-events-and-flag-their-review-when-a-plan.md`.
+
+### Model
+
+- Content registers its events as the 1.5 source type `content_event` (check hook `app.content_event_source_check`: current while published at the live revision number; `revision` null while the event is not public) and as the Duties `event` link source.
+- A department duty names an event through the Duties `event_ref`. Duties refuses anything but a published event (`validation_failed {"event_ref": "not_published"}`), checking only through `app.contract_check_source` (a Duties contract change, recorded in [contracts-and-owner-seams.md](contracts-and-owner-seams.md), Duties owner operations point 10). A stored link is kept when the event is later withdrawn; clearing a link is always allowed.
+- Inside Content's own command, after the event's item row is locked: `content.publish_event` flags the linked duties when the revision going live changes the time (start or end) or the place of the previous live revision (`time`, `place`; a title or description change flags nothing); `content.withdraw_event` and `content.archive_event` of a published event flag `cancelled`. The flag is the 4.11 `app.duties_owner_flag_review` with its 4.16 notice: one "Duty needs review" notice per department and change to each reachable leader and deputy other than the editor. No duty is republished, nothing of the duty changes and no answer is reset; the leader reviews it on the board.
+- The public event reads are unchanged: they never name a duty, rota, department or review.
+
+### Reads
+
+- `api.content_staff_event_duty_links(event_id)` (event editors: Media, Pastor, Admin; others 403 `not_granted`; anon refused): `{event_id, linked_duties, reviews_open, truncated}`, counts only (`linked_duties`: published department duties that have not started and name the event; null for an unknown event).
+- My duties rows carry `event_ref`; the rota and board already did.
+
+### Clients
+
+- Staff web, Duties > Rota: a date shows "Event: <title> · <date>" (or that it is no longer public); Change has a **Linked event (optional)** picker of published events (the public calendar read), sent as `event_ref` for this date or this and later dates. A link is a reference: nobody is asked again.
+- Staff web, Content > Events: an opened published or withdrawn event shows how many duties are linked and how many reviews are open, before Edit, Publish, Withdraw or Archive; the Withdraw and Archive questions repeat it. A failed read says so.
+- Mobile, duty detail: an **Event** row with the event's title, date and place, opening the event; an event no longer public says so.
+
+### Local runs
+
+```text
+npx supabase db reset --local
+npx supabase test db
+node --test tools/identity-e2e/content-event-duty-links.test.mjs
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/content-event-duty-links.mjs --evidence _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-6.12/local-e2e.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The E2E queues review notices but never runs the worker, and removes everything it created.
+
+### Owner manual check on staging (the ticket's verify)
+
+Every event change below sends real review notices to the linked departments' leaders and deputies. Do it only with SYNTHETIC departments whose leaders and deputies are test phones, and only when you choose to (the build sent none on staging).
+
+1. As an Admin, give a SYNTHETIC member the leader scope of a `SYNTHETIC Preaching Rota` department and publish a duty there; as Media, publish two SYNTHETIC events and leave a third as a draft.
+2. On staff web, Duties > Rota, open the duty's date, Change, and pick the first event in **Linked event**: it saves with "Only linked event change: answers stand.". Try the draft event's id through the API (`duties.revise_duty {event_ref}`): refused `not_published`. Link a second duty to the second event.
+3. On staff web, Content > Events, open the first event: "1 duty is linked to this event..." shows before you edit. Edit its start time and publish: the department's leader and deputy each get one "Duty needs review" notice; the duty shows **Needs review** (time) on the board; the member's answer is unchanged.
+4. Withdraw the second event: its duty is flagged cancelled, with one notice per leader or deputy; linking a duty to it now is refused.
+5. Signed out, open the Calendar and the first event: no duty, rota or department is shown. On the member's phone, the duty detail shows the event and opens it.
+6. The leader marks both reviews done on the board.
+
+### Staging (2026-10-27)
+
+Applied as `20261027192013`; all 12 function hashes match the fresh local reset; boundary/unowned 0; signed-out reads checked. No duty was linked and no notification was sent. Evidence: `evidence-6.12/staging-verify.md`.
+
 ## Story 6.19: My duties and My cell overlays on the Calendar
 
 Migration: `20261028064546_cells_my_meetings.sql`, a **Cells** contract change (see

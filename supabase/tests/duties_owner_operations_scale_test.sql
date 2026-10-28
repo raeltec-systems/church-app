@@ -91,6 +91,10 @@ values (pg_temp.mid(3), 'cell_leader', pg_temp.cell(), pg_temp.mid(1), pg_temp.u
 insert into app.fixture_events (title) values ('SYNTHETIC 4.11 Scale event');
 create function pg_temp.ev() returns uuid language sql as $$ select event_id from app.fixture_events limit 1 $$;
 
+-- Story 6.12: a duty's event_ref must name an event of a registered event source.
+select app.contract_register_source_type('fixture', 'fixture_event', 'app.fixture_event_check(jsonb)'::regprocedure);
+select app.duties_register_link_source('fixture', 'fixture_event', 'event');
+
 create temp table socc as
   with ins as (
     insert into app.duties_occurrences (department_id, duty_name, starts_at, location, occurrence_state,
@@ -124,9 +128,7 @@ select s.slot_id, pg_temp.mid(4), o.starts_at - interval '1 day', pg_temp.mid(3)
 
 select app.contract_register_source_type('fixture', 'fixture_programme_part',
                                          'app.fixture_programme_part_check(jsonb)'::regprocedure);
-select app.contract_register_source_type('fixture', 'fixture_event', 'app.fixture_event_check(jsonb)'::regprocedure);
 select app.duties_register_link_source('fixture', 'fixture_programme_part', 'cell_part');
-select app.duties_register_link_source('fixture', 'fixture_event', 'event');
 analyze app.duties_occurrences, app.duties_slots, app.duties_assignments, app.duties_part_links,
   app.duties_review_flags;
 

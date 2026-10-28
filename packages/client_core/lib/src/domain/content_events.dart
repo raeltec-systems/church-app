@@ -731,6 +731,52 @@ class StaffEventRsvpsRead {
   final EventRsvpNames? rsvps;
 }
 
+/// Story 6.12, `api.content_staff_event_duty_links`: how many department
+/// duties that have not started name an event, and how many reviews of its
+/// linked duties are open. Counts only: no duty, rota or person.
+class EventDutyLinks {
+  const EventDutyLinks({
+    required this.eventId,
+    required this.linkedDuties,
+    this.reviewsOpen = 0,
+    this.truncated = false,
+  });
+
+  factory EventDutyLinks.fromJson(Object? json) {
+    final m = wireMap(json, 'event duty links');
+    final linked = wireOpt<int>(m, 'linked_duties');
+    final open = wireOpt<int>(m, 'reviews_open') ?? 0;
+    if ((linked != null && linked < 0) || open < 0) {
+      throw const FormatException('unexpected event duty links');
+    }
+    return EventDutyLinks(
+      eventId: _text(m, 'event_id'),
+      linkedDuties: linked,
+      reviewsOpen: open,
+      truncated: wireOpt<bool>(m, 'truncated') ?? false,
+    );
+  }
+
+  final String eventId;
+
+  /// Null when the event is unknown.
+  final int? linkedDuties;
+  final int reviewsOpen;
+
+  /// More duties name the event than Duties counted (over 200).
+  final bool truncated;
+
+  /// The editor's line before a change, or null when no duty is linked.
+  String? get notice {
+    final n = linkedDuties;
+    if (n == null || n == 0) return null;
+    final more = truncated ? ' or more' : '';
+    final duties = n == 1 && !truncated ? '1 duty is' : '$n$more duties are';
+    return '$duties linked to this event. Publishing a new time or place, '
+        'or withdrawing it, asks their leaders to review them.';
+  }
+}
+
 /// The Content command function and the event commands (1.4 envelope).
 abstract final class ContentCommands {
   static const function = 'content_command';
@@ -764,6 +810,9 @@ abstract interface class ContentRepository {
 
   /// Story 6.11, an Admin or one of the event's organisers: who is going.
   Future<AccessRead<StaffEventRsvpsRead>> fetchStaffEventRsvps(String eventId);
+
+  /// Story 6.12, event editors: how many duties name the event.
+  Future<AccessRead<EventDutyLinks>> fetchEventDutyLinks(String eventId);
 }
 
 class UnconfiguredContentRepository implements ContentRepository {
@@ -787,6 +836,11 @@ class UnconfiguredContentRepository implements ContentRepository {
 
   @override
   Future<AccessRead<StaffEventRsvpsRead>> fetchStaffEventRsvps(
+    String eventId,
+  ) async => const AccessReadDenied(AccessDenial.unavailable);
+
+  @override
+  Future<AccessRead<EventDutyLinks>> fetchEventDutyLinks(
     String eventId,
   ) async => const AccessReadDenied(AccessDenial.unavailable);
 }

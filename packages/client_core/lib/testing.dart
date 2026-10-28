@@ -612,9 +612,13 @@ class FakeContent implements ContentRepository {
   int staffEventsCalls = 0;
   final publicEventAsked = <String>[];
 
+  /// When set, the public calendar read waits for it.
+  Completer<void>? publicEventsGate;
+
   @override
   Future<AccessRead<PublicEvents>> fetchPublicEvents() async {
     publicEventsCalls++;
+    await publicEventsGate?.future;
     return publicEvents;
   }
 

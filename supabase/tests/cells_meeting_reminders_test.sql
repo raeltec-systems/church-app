@@ -6,7 +6,7 @@
 -- snooze and the inbox over HTTP: tools/identity-e2e/cells-meeting-reminders.mjs. Every account,
 -- phone and name here is SYNTHETIC (fictional range +1 202 555 0160-0169).
 begin;
-select plan(54);
+select plan(70);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000052' || lpad(n::text, 2, '0'))::uuid $$;
@@ -383,6 +383,100 @@ select is((select count(*)::int from app.notifications_jobs j where j.source_typ
             and j.source_id = pg_temp.nth_id(0) and j.reminder_kind = 'cells_meeting_changed'
             and j.recipient_member_id = pg_temp.mid(5)) || '|' || pg_temp.changed_now(pg_temp.nth_id(0)), '3|1',
   'F8: a time and place change in one command sends one notice at one revision');
+
+-- Follow-up review finding F8: moved meetings that show the schedule's place ------------------------
+-- (1) Meeting 1 (nine days ahead) is moved a day later without a venue of its own, then the normal
+-- time and venue change together: generation revises its nominal fields only (a moved meeting
+-- keeps its own time), so the place fallback must notice it. (2) Meeting 3 (nominally 23 days
+-- ahead) is moved to tomorrow without a venue: its effective start is inside the 14-day window.
+-- Meeting 2 (16 days) is moved inside the window and cancelled; meeting 4 has its own venue.
+create function pg_temp.changed_all(p_meeting uuid) returns int language sql as $$
+  select count(*)::int from app.notifications_jobs j
+   where j.source_type = 'cells_meeting' and j.source_id = p_meeting and j.reminder_kind = 'cells_meeting_changed'
+     and j.recipient_member_id = pg_temp.mid(5)
+$$;
+create function pg_temp.move_plain(p_meeting uuid, p_starts timestamptz) returns jsonb language sql as $$
+  select pg_temp.cells(pg_temp.c(2), 'cells.move_meeting', pg_temp.rev(p_meeting),
+    jsonb_build_object('meeting_id', p_meeting, 'starts_at', app.cmd_utc(p_starts),
+                       'ends_at', app.cmd_utc(p_starts + interval '90 minutes')))
+$$;
+select pg_temp.move_plain(pg_temp.nth_id(1),
+  (select nominal_starts_at + interval '1 day' from app.cells_meetings where meeting_id = pg_temp.nth_id(1)));
+select pg_temp.move_plain(pg_temp.nth_id(3), date_trunc('minute', now()) + interval '1 day');
+select pg_temp.move_plain(pg_temp.nth_id(2), date_trunc('minute', now()) + interval '10 days');
+select pg_temp.cells(pg_temp.c(2), 'cells.cancel_meeting', pg_temp.rev(pg_temp.nth_id(2)),
+  jsonb_build_object('meeting_id', pg_temp.nth_id(2)));
+select is((select string_agg(m.meeting_state || ':' || (m.moved_venue is null)::text || ':'
+                             || (m.starts_at < now() + interval '14 days')::text, ',' order by m.occurrence_date)
+             from app.cells_meetings m where m.meeting_id in (pg_temp.nth_id(1), pg_temp.nth_id(2), pg_temp.nth_id(3))),
+  'moved:true:true,cancelled:true:true,moved:true:true',
+  'F8 follow-up setup: meetings 1 and 3 are moved inside the window with no venue of their own, 2 is cancelled');
+select ok((select nominal_starts_at > now() + interval '14 days' from app.cells_meetings where meeting_id = pg_temp.nth_id(3)),
+  'F8 follow-up setup: meeting 3 is nominally outside the notice window');
+create temp table f8m as
+select k, pg_temp.nth_id(k) as id, pg_temp.rev(pg_temp.nth_id(k)) as rev, pg_temp.changed_all(pg_temp.nth_id(k)) as total,
+       (select starts_at from app.cells_meetings where meeting_id = pg_temp.nth_id(k)) as starts
+  from unnest(array[1, 2, 3, 4]) k;
+create function pg_temp.f8_delta() returns text language sql as $$
+  select string_agg(f.k || ':' || (pg_temp.rev(f.id) - f.rev) || '/' || (pg_temp.changed_all(f.id) - f.total)
+                    || '/' || pg_temp.changed_now(f.id), ',' order by f.k) from f8m f
+$$;
+create function pg_temp.f8_reset() returns void language sql as $$
+  update f8m f set rev = pg_temp.rev(f.id), total = pg_temp.changed_all(f.id)
+$$;
+
+-- (1) Combined time and venue edit.
+select is(pg_temp.cells(pg_temp.c(1), 'cells.set_schedule', pg_temp.cell_rev(pg_temp.sh()),
+  pg_temp.sched('{"venue": "SYNTHETIC 18 Kafue Road", "start_time": "19:00", "end_time": "20:30"}')) ->> 'code',
+  null, 'F8 follow-up: the Admin changes the normal time and venue together');
+select is((select split_part(pg_temp.f8_delta(), ',', 1)), '1:1/1/1',
+  'F8 follow-up (1): the moved meeting with the schedule''s place gets one change notice at its new revision');
+select is((select m.starts_at = f.starts from app.cells_meetings m join f8m f on f.id = m.meeting_id where f.k = 1)
+          and app.cells_meeting_json(pg_temp.nth_id(1), true) ->> 'venue' = 'SYNTHETIC 18 Kafue Road', true,
+  'F8 follow-up (1): ... it keeps its own time and shows the new place');
+select is((select split_part(pg_temp.f8_delta(), ',', 2) || ',' || split_part(pg_temp.f8_delta(), ',', 4)),
+  '2:1/0/0,4:1/0/0',
+  'F8 follow-up (1): the cancelled meeting and the one with its own venue get no notice (only their nominal times move)');
+
+-- (2) Venue-only edit; the moved meeting is judged by its effective start.
+select pg_temp.f8_reset();
+create temp table f8req as select gen_random_uuid() as id, pg_temp.cell_rev(pg_temp.sh()) as exp;
+create temp table f8r as select pg_temp.cmd(pg_temp.c(1), 'api.cells_command', 'cells.set_schedule',
+  (select exp from f8req),
+  pg_temp.sched('{"venue": "SYNTHETIC 20 Kafue Road", "start_time": "19:00", "end_time": "20:30"}'),
+  (select id from f8req)) as r;
+select is((select r ->> 'code' from f8r), null, 'F8 follow-up: the Admin changes only the venue');
+select is((select split_part(pg_temp.f8_delta(), ',', 3)), '3:1/1/1',
+  'F8 follow-up (2): the meeting moved to tomorrow (nominally 23 days ahead) gets one change notice');
+select is((select split_part(pg_temp.f8_delta(), ',', 1)), '1:1/1/1',
+  'F8 follow-up (2): the other moved meeting gets one notice for the venue-only change too');
+select is((select split_part(pg_temp.f8_delta(), ',', 2) || ',' || split_part(pg_temp.f8_delta(), ',', 4)),
+  '2:0/0/0,4:0/0/0', 'F8 follow-up (2): the cancelled and overridden meetings are untouched');
+
+-- Replay and repeated edits.
+select pg_temp.f8_reset();
+select is(pg_temp.cmd(pg_temp.c(1), 'api.cells_command', 'cells.set_schedule',
+  (select exp from f8req),
+  pg_temp.sched('{"venue": "SYNTHETIC 20 Kafue Road", "start_time": "19:00", "end_time": "20:30"}'),
+  (select id from f8req)) = (select r from f8r), true, 'F8 follow-up: a replay of the venue change answers its stored result');
+select is(pg_temp.f8_delta(), '1:0/0/1,2:0/0/0,3:0/0/1,4:0/0/0',
+  'F8 follow-up: ... and revises nothing and sends no further notice');
+select pg_temp.cells(pg_temp.c(1), 'cells.set_schedule', pg_temp.cell_rev(pg_temp.sh()),
+  pg_temp.sched('{"venue": "SYNTHETIC 20 Kafue Road", "start_time": "19:00", "end_time": "20:30"}'));
+select is(pg_temp.f8_delta(), '1:0/0/1,2:0/0/0,3:0/0/1,4:0/0/0',
+  'F8 follow-up: the same schedule again changes nothing for the moved meetings');
+select pg_temp.cells(pg_temp.c(1), 'cells.set_schedule', pg_temp.cell_rev(pg_temp.sh()),
+  pg_temp.sched('{"venue": "SYNTHETIC 18 Kafue Road", "start_time": "18:30", "end_time": "20:00"}'));
+select is(pg_temp.f8_delta(), '1:1/1/1,2:1/0/0,3:1/1/1,4:1/0/0',
+  'F8 follow-up: a further time and venue change sends each moved meeting exactly one more notice');
+select app.cells_plan_meeting(pg_temp.nth_id(3), 'cells_meeting_changed');
+select is(pg_temp.f8_delta(), '1:1/1/1,2:1/0/0,3:1/1/1,4:1/0/0',
+  'F8 follow-up: re-planning the same revision does not send a second notice (revision dedup)');
+select pg_temp.f8_reset();
+select pg_temp.cells(pg_temp.c(1), 'cells.set_schedule', pg_temp.cell_rev(pg_temp.sh()),
+  pg_temp.sched('{"venue": "SYNTHETIC 18 Kafue Road", "start_time": "19:30", "end_time": "21:00"}'));
+select is(pg_temp.f8_delta(), '1:1/0/0,2:1/0/0,3:1/0/0,4:1/0/0',
+  'F8 follow-up: a time-only change leaves the moved meetings'' own times, so they get no notice');
 
 select * from finish();
 rollback;

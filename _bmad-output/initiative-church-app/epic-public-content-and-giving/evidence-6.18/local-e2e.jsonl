@@ -1,0 +1,11 @@
+{"step":"D00-precondition","target":"LOCAL","at":"2026-10-28T07:15:38.032Z","settings":{"phone":true,"sms_provider":""},"leftover_users_removed":"0"}
+{"step":"D01-signed-in-by-phone-with-media-and-two-departments","target":"LOCAL","at":"2026-10-28T07:15:46.464Z","verdict":"pass","setup":["done","done","done","done","done","done","done"]}
+{"step":"D02-the-leader-publishes-a-preaching-duty-with-a-topic","target":"LOCAL","at":"2026-10-28T07:15:47.495Z","verdict":"pass","published":["done","done"],"topic":"done"}
+{"step":"D10-only-the-assignee-and-managers-read-whether-it-was-sent","target":"LOCAL","at":"2026-10-28T07:15:47.873Z","verdict":"pass","member":[200,true],"refused":[403,403,403],"guest":401}
+{"step":"D11-a-member-without-the-duty-another-leader-and-media-are-refused","target":"LOCAL","at":"2026-10-28T07:15:48.380Z","verdict":"pass","sends":["not_found","not_found","not_found"],"no_topic":"no_topic"}
+{"step":"D20-the-assignee-sends-and-a-second-send-returns-the-same-draft","target":"LOCAL","at":"2026-10-28T07:15:48.780Z","verdict":"pass","first":["done",true],"second":["done",false],"same_draft":true}
+{"step":"D21-a-private-draft-with-the-topic-and-scripture-and-no-speaker","target":"LOCAL","at":"2026-10-28T07:15:49.216Z","verdict":"pass","draft":"-|true|true|draft","sent":true}
+{"step":"D30-the-draft-is-invisible-to-guests-and-members-and-marked-for-media","target":"LOCAL","at":"2026-10-28T07:15:49.245Z","verdict":"pass","guest_sees":false,"member_catalog_has_it":false,"member_staff":403,"media_state":"draft","from_duty_keys":["duty_name","duty_starts_at","sent_at"]}
+{"step":"D31-nothing-is-public-until-media-completes-and-publishes-it","target":"LOCAL","at":"2026-10-28T07:15:50.584Z","verdict":"pass","early":"required","saved":"done","private_before_publish":true,"published":"done","public_after":true}
+{"step":"D90-no-client-role-reads-the-link-or-the-duty-tables","target":"LOCAL","at":"2026-10-28T07:15:50.606Z","verdict":"pass","statuses":[406,406,406,406,406,406,406,406,406]}
+{"step":"D99-cleanup","target":"LOCAL","at":"2026-10-28T07:15:52.607Z","users_left":0,"unmarked":true,"departments_left":0,"members_left":0,"sermons_left":0}

@@ -669,6 +669,7 @@ class StaffSermonItem<T> {
     required this.publishedAt,
     required this.publishedBy,
     this.publicImage,
+    this.fromDuty,
   });
   factory StaffSermonItem.fromJson(
     Object? raw,
@@ -694,6 +695,9 @@ class StaffSermonItem<T> {
       publishedAt: wireOptInstant(m, 'published_at'),
       publishedBy: wireOpt<String>(m, 'published_by'),
       publicImage: PublicImageState.parse(m['public_image']),
+      fromDuty: m['from_duty'] == null
+          ? null
+          : SermonFromDuty.fromJson(m['from_duty']),
     );
   }
   final String id;
@@ -706,6 +710,9 @@ class StaffSermonItem<T> {
   /// A published series whose live revision has a poster: whether the public
   /// file is placed (null without a poster, and for sermons).
   final PublicImageState? publicImage;
+
+  /// Story 6.18: a sermon draft sent from a duty (null otherwise).
+  final SermonFromDuty? fromDuty;
   T get current => (draft ?? live)!;
   bool get canEdit => state != ContentState.archived;
   bool get canPublish =>
@@ -784,6 +791,68 @@ String _capacity(Map m) {
   return c;
 }
 
+/// Story 6.18: the duty a sermon draft was sent from, as the editors read it:
+/// the duty's name and start when it was sent, and when. Never who sent it.
+class SermonFromDuty {
+  const SermonFromDuty({
+    required this.dutyName,
+    required this.dutyStartsAt,
+    required this.sentAt,
+  });
+  factory SermonFromDuty.fromJson(Object? raw) {
+    final m = _object(raw, 'from_duty', const {
+      'duty_name',
+      'duty_starts_at',
+      'sent_at',
+    });
+    return SermonFromDuty(
+      dutyName: _text(m, 'duty_name'),
+      dutyStartsAt: wireInstant(m, 'duty_starts_at'),
+      sentAt: wireInstant(m, 'sent_at'),
+    );
+  }
+  final String dutyName;
+  final DateTime dutyStartsAt;
+  final DateTime sentAt;
+}
+
+/// Story 6.18, `api.content_duty_sermon_draft`: whether a duty's topic and
+/// scripture can be sent to Media, and whether they were. Read by the duty's
+/// current assignee or its managers; anyone else is refused.
+class DutySermonDraft {
+  const DutySermonDraft({
+    required this.occurrenceId,
+    required this.canSend,
+    this.sentAt,
+    this.published = false,
+  });
+  factory DutySermonDraft.fromJson(Object? raw) {
+    final m = _object(raw, 'duty sermon draft', const {
+      'occurrence_id',
+      'can_send',
+      'draft',
+    });
+    final draft = m['draft'] == null
+        ? null
+        : _object(m['draft'], 'draft', const {'sent_at', 'published'});
+    return DutySermonDraft(
+      occurrenceId: _text(m, 'occurrence_id'),
+      canSend: wireReq<bool>(m, 'can_send'),
+      sentAt: draft == null ? null : wireInstant(draft, 'sent_at'),
+      published: draft == null ? false : wireReq<bool>(draft, 'published'),
+    );
+  }
+  final String occurrenceId;
+  final bool canSend;
+
+  /// When it was sent to Media (null: not yet).
+  final DateTime? sentAt;
+
+  /// Media has published the sermon.
+  final bool published;
+  bool get sent => sentAt != null;
+}
+
 abstract final class SermonCommands {
   static const create = 'content.create_sermon';
   static const save = 'content.save_sermon';
@@ -796,6 +865,9 @@ abstract final class SermonCommands {
   static const withdrawSeries = 'content.withdraw_sermon_series';
   static const archiveSeries = 'content.archive_sermon_series';
   static const posterPurpose = 'sermon_series_poster';
+
+  /// Story 6.18, a member command: the duty's assignee or its managers.
+  static const draftFromDuty = 'content.draft_sermon_from_duty';
 }
 
 abstract interface class SermonsRepository {
@@ -803,6 +875,9 @@ abstract interface class SermonsRepository {
   Future<AccessRead<PublicSermonRead>> fetchPublicSermon(String sermonId);
   Future<AccessRead<StaffSermons>> fetchStaffSermons();
   Future<AccessRead<StaffSermonSeriesCatalog>> fetchStaffSeries();
+
+  /// Story 6.18: the duty's assignee or managers only.
+  Future<AccessRead<DutySermonDraft>> fetchDutySermonDraft(String occurrenceId);
 }
 
 class UnconfiguredSermonsRepository implements SermonsRepository {
@@ -820,6 +895,10 @@ class UnconfiguredSermonsRepository implements SermonsRepository {
   @override
   Future<AccessRead<StaffSermonSeriesCatalog>> fetchStaffSeries() async =>
       const AccessReadDenied(AccessDenial.unavailable);
+  @override
+  Future<AccessRead<DutySermonDraft>> fetchDutySermonDraft(
+    String occurrenceId,
+  ) async => const AccessReadDenied(AccessDenial.unavailable);
 }
 
 abstract interface class SermonLinkLauncher {

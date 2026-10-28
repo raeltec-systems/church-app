@@ -133,6 +133,10 @@ class _SermonCatalog extends ConsumerWidget {
                     if (f.scriptureReference.isNotEmpty) f.scriptureReference,
                   ].join(' · '),
                   mark: _sermonMark(sermon),
+                  origin: switch (sermon.fromDuty) {
+                    final d? => fromDutyLine(d),
+                    null => null,
+                  },
                   busy: state.busy,
                   onEdit: () =>
                       context.push('${SermonPaths.staff}/${sermon.id}'),
@@ -653,8 +657,12 @@ class _ItemRow extends StatelessWidget {
     required this.onEdit,
     required this.onLifecycle,
     this.series = false,
+    this.origin,
   });
   final StaffSermonItem<Object?> item;
+
+  /// Story 6.18: where a sermon draft came from ("From a duty: ...").
+  final String? origin;
   final String title, subtitle;
   final _Mark mark;
   final bool busy;
@@ -697,6 +705,11 @@ class _ItemRow extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: ChurchType.body.copyWith(color: c.ink),
               ),
+            ),
+          if (origin case final o?)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(o, key: Key('sermon-from-duty-$id'), style: muted),
             ),
           if (publishedLine.isNotEmpty)
             Padding(
@@ -862,6 +875,15 @@ class _SermonFormState extends ConsumerState<_SermonForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Story 6.18: a draft sent from a duty, for Media to complete.
+          if (widget.item?.fromDuty case final d?) ...[
+            Text(
+              '${fromDutyLine(d)}. Check the title, add the speaker and '
+              'notes, then publish. Nothing is public until you do.',
+              key: const Key('sermon-form-from-duty'),
+            ),
+            const SizedBox(height: 8),
+          ],
           const Text(
             'You can save an incomplete draft. Add the title, speaker, date and scripture before publishing. '
             'A sermon has one video, from YouTube or Facebook, and it needs verified display rights.',
@@ -1343,3 +1365,9 @@ class _RightsPicker extends StatelessWidget {
     );
   }
 }
+
+/// Story 6.18: "From a duty: Sunday sermon, Sun 1 Nov 09:00 (sent 28 Oct
+/// 10:15)" as editors read a draft sent from a duty. Never who sent it.
+String fromDutyLine(SermonFromDuty d) =>
+    'From a duty: ${d.dutyName}, ${churchShortWhen(d.dutyStartsAt)} '
+    '(sent ${churchShortWhen(d.sentAt)})';

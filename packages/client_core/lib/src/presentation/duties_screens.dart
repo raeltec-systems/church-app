@@ -10,6 +10,8 @@ import '../application/content_controllers.dart'
     show linkableEventsProvider, linkedEventProvider;
 import '../application/duties_controllers.dart';
 import '../application/providers.dart' show contactLauncherProvider;
+import '../application/sermon_controllers.dart'
+    show DutySermonDraftNotice, dutySermonDraftProvider;
 import '../domain/access_grants.dart';
 import '../domain/church_time.dart';
 import '../domain/content_events.dart' show PublicEvent, PublicEventRead;
@@ -23,6 +25,7 @@ part 'duties_coverage_screens.dart';
 part 'duties_outcome_screens.dart';
 part 'duties_reminder_widgets.dart';
 part 'duties_rota_screens.dart';
+part 'duties_sermon_draft_widgets.dart';
 part 'duties_special_screens.dart';
 
 /// Story 6.12: the published event a duty is linked to, as the public
@@ -4038,6 +4041,14 @@ class _DutyCardState extends ConsumerState<_DutyCard> {
         // Story 6.12: the published event the duty is linked to.
         if (a.eventRef case final ev?)
           _DutyLinkedEvent(assignmentId: id, eventId: ev),
+        // Story 6.18: the assignee sends the topic and scripture to Media.
+        if ((a.topic != null || a.scripture != null) &&
+            a.ownerKind != DutyOwnerKind.cell &&
+            a.response != DutyResponse.declined)
+          DutySermonDraftSection(
+            occurrenceId: a.occurrenceId,
+            keyPrefix: 'duty-sermon',
+          ),
         if (a.instructions case final i?) ...[
           const SizedBox(height: 12),
           const CardLabel('Instructions'),

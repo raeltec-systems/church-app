@@ -805,6 +805,18 @@ class FakeSermons implements SermonsRepository {
     seriesCalls++;
     return staffSeries;
   }
+
+  /// Story 6.18: the duty sermon-draft read per occurrence (default: refused).
+  final dutyDrafts = <String, AccessRead<DutySermonDraft>>{};
+  final dutyDraftCalls = <String>[];
+  @override
+  Future<AccessRead<DutySermonDraft>> fetchDutySermonDraft(
+    String occurrenceId,
+  ) async {
+    dutyDraftCalls.add(occurrenceId);
+    return dutyDrafts[occurrenceId] ??
+        const AccessReadDenied(AccessDenial.notGranted);
+  }
 }
 
 class FakeBibleTranslationPackageSource

@@ -784,6 +784,55 @@ Every event change below sends real review notices to the linked departments' le
 
 Applied as `20261027192013`; all 12 function hashes match the fresh local reset; boundary/unowned 0; signed-out reads checked. No duty was linked and no notification was sent. Evidence: `evidence-6.12/staging-verify.md`.
 
+## Story 6.18: sermon drafts from preaching duties
+
+Migration: `supabase/migrations/20261028071717_content_sermon_drafts_from_duties.sql` (no `_rows` file). pgTAP: `supabase/tests/content_sermon_duty_drafts_test.sql`. E2E: `tools/identity-e2e/content-sermon-duty-drafts.mjs` (offline tests `content-sermon-duty-drafts.test.mjs`, fictional block +44 7700 900116-900121; the pgTAP file uses 900112-900117 inside its rolled-back transaction). Plan: `_bmad-output/initiative-church-app/epic-public-content-and-giving/story-send-a-preaching-duty-s-topic-and-scripture-to-media-as-a-se-plan.md`.
+
+### Model
+
+- `content.draft_sermon_from_duty {occurrence_id}` (expected_revision null) is a Content member command. Its handler reads the duty only through the 4.11 owner read `app.duties_owner_topic`, which answers the duty's current assignee (pending or accepted) or its managers (the department's leader or deputy, or an Admin); anyone else gets `not_found`. A duty with neither topic nor scripture is refused `{"occurrence_id": "no_topic"}`; a cell programme part `{"occurrence_id": "cell_part"}`.
+- It creates one private sermon draft per duty occurrence (`app.content_sermon_duty_drafts`, race-safe): title from the topic (the scripture when there is no topic), scripture reference from the scripture, date the duty's start date in church time; no speaker, notes, series or video. A second send by anyone allowed answers the same draft (`created: false`) and changes nothing, even after Media edited or published it.
+- The draft is an ordinary 6.9 sermon: only Media, Pastor and Admin see it (Content > Sermons, **Waiting to publish**, marked "From a duty: <duty>, <date> (sent <date>)"), never who sent it. Publishing needs a speaker, so an unfinished draft cannot go public; nothing publishes automatically and no notice is sent.
+- Audit: the draft's creation is attributed with the capacity `duty_assignee` or `duty_manager`. Deletion: erase part `sermon_duty_drafts` anonymises the sender.
+
+### Reads
+
+- `api.content_duty_sermon_draft(occurrence_id)` (the duty's assignee or managers; others 403 `not_granted`, Q4 closed 403 `unavailable`, anon refused): `{occurrence_id, can_send, draft: null | {sent_at, published}}`.
+- `api.content_staff_sermons` rows carry `from_duty: null | {duty_name, duty_starts_at, sent_at}`.
+
+### Clients
+
+- Mobile, duty detail: when the duty has a topic or scripture (not a cell part, not declined), a **Sermon** section with **Send to Media**, then "Sent to Media on <date>. Media adds the speaker and publishes it." (or "Media has published the sermon."). An unconfirmed send offers **Check again** with the same request; a failed read says so with **Try again**; a refused read shows nothing.
+- Staff web, Duties > Rota: the same section on a published date with a topic or scripture, for its managers.
+- Staff web, Content > Sermons: the "From a duty" line on the row and at the top of the editor.
+
+### Local runs
+
+```text
+npx supabase db reset --local
+npx supabase test db
+node --test tools/identity-e2e/content-sermon-duty-drafts.test.mjs
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/content-sermon-duty-drafts.mjs --evidence _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-6.18/local-e2e.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+The E2E removes everything it created; it never runs the notification worker (publishing the duty queues a `duty_assigned` notice locally, which it removes).
+
+### Owner manual check on staging (the ticket's verify)
+
+Publishing a duty sends its member a real "duty assigned" notice. Use only SYNTHETIC members whose phones are test phones, and only when you choose to (the build sent none on staging).
+
+1. As an Admin, make a SYNTHETIC member leader of a `SYNTHETIC Preaching Rota` department, add a second SYNTHETIC member, and publish a duty for that member; Change the date to add a topic and scripture.
+2. On the member's phone, open the duty: **Sermon** shows **Send to Media**. Send it: "Sent. Media will prepare the sermon." Send again through the API (`content.draft_sermon_from_duty`): the same `sermon_id` with `created: false`.
+3. As a member without the duty, and as a leader of another department, call the same command and the status read: `not_found` and 403.
+4. Signed out, and as a member, the sermon list and `content_public_sermon(<sermon_id>)` show nothing.
+5. As Media, on staff web Content > Sermons, the draft is under **Waiting to publish** with "From a duty". Publish is refused until a speaker is added; add it, save and publish: only now is it public, and the member's duty says "Media has published the sermon.".
+
+### Staging (2026-10-28)
+
+Applied as `20261028071717` (after entry 19's `20261028064546`); all 8 added or replaced function hashes match the fresh local reset; boundary/unowned 0; signed-out reads checked. No duty was published, no draft made and no notification sent. Evidence: `evidence-6.18/staging-verify.md`.
+
 ## Story 6.19: My duties and My cell overlays on the Calendar
 
 Migration: `20261028064546_cells_my_meetings.sql`, a **Cells** contract change (see

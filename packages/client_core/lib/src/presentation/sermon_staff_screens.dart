@@ -10,6 +10,7 @@ import '../domain/content_events.dart';
 import '../domain/content_sermons.dart';
 import 'banner_screens.dart' show bannerReasonText;
 import 'calendar_screens.dart' show churchShortWhen, publicReadProblem;
+import 'content_staff_widgets.dart';
 import 'sermon_screens.dart';
 
 // Story 6.9 (staff web; Media, Pastor and Admin): sermons and their series.
@@ -619,32 +620,13 @@ Future<bool> _confirm(
   String title,
   String body,
   String yes,
-) async {
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (context) => ChurchDialog(
-      title: title,
-      content: Text(body),
-      actions: [
-        FocusRing(
-          child: TextButton(
-            key: const Key('sermon-confirm-no'),
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep it'),
-          ),
-        ),
-        FocusRing(
-          child: FilledButton(
-            key: const Key('sermon-confirm-yes'),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(yes),
-          ),
-        ),
-      ],
-    ),
-  );
-  return ok == true && context.mounted;
-}
+) => confirmContentChange(
+  context,
+  keyPrefix: 'sermon',
+  title: title,
+  body: body,
+  yes: yes,
+);
 
 class _ItemRow extends StatelessWidget {
   const _ItemRow({

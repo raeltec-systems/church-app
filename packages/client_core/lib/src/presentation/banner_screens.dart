@@ -12,6 +12,7 @@ import '../domain/access_grants.dart';
 import '../domain/content_banners.dart';
 import '../domain/content_events.dart' show ContentState, StaffEvent;
 import 'calendar_screens.dart' show churchShortWhen;
+import 'content_staff_widgets.dart';
 import 'home_banners.dart' show BannerPaths;
 
 // Story 6.2, staff web: the editors (Media, Pastor, Admin) keep Home's
@@ -411,32 +412,13 @@ Future<bool> _confirm(
   String title,
   String body,
   String yes,
-) async {
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (context) => ChurchDialog(
-      title: title,
-      content: Text(body),
-      actions: [
-        FocusRing(
-          child: TextButton(
-            key: const Key('content-confirm-no'),
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Keep it'),
-          ),
-        ),
-        FocusRing(
-          child: FilledButton(
-            key: const Key('content-confirm-yes'),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(yes),
-          ),
-        ),
-      ],
-    ),
-  );
-  return ok == true && context.mounted;
-}
+) => confirmContentChange(
+  context,
+  keyPrefix: 'content',
+  title: title,
+  body: body,
+  yes: yes,
+);
 
 // ---------------------------------------------------------------------------
 // Banners

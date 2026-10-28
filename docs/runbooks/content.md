@@ -958,3 +958,24 @@ Applied 2026-10-28 as `20261028072741` (after entry 18's `20261028071717`). Both
 match the fresh local reset, boundary/unowned 0, signed-out search answers three empty lists
 (nothing is published on staging) and refuses 1 and 101 characters with 400 `invalid`
 (`evidence-6.14/staging-verify.md`). Nothing was published and no notification was sent.
+
+## Release gate: local integration checks CI does not run (review G1, G2, 2026-10-28)
+
+CI's `db` job starts a local stack, but without `edge-runtime` and without the local phone sign-in switch, and its `auth-harness` job runs only the offline `*.test.mjs` files. So two Content guarantees have no CI evidence: the concurrent last RSVP place (G1; the pgTAP capacity checks are sequential and the race-tally tests are canned) and the scheduler to worker to Storage retention path (G2; the worker and helper tests are mocked). Both need the Edge runtime (`supabase functions serve`) and G1 needs real phone sign-in, so they stay a manual release gate; no CI infrastructure is added for them.
+
+Run them before every release that includes Content server changes (a `*content*` migration, `supabase/functions/content-assets/` or `supabase/functions/notifications-worker/`), on the release candidate commit, with Docker running and nobody else using the local database:
+
+```bash
+npx supabase start
+npx supabase db reset --local && npx supabase test db     # the full suite first, on a fresh reset
+node --test tools/identity-e2e/content-event-rsvp.test.mjs tools/identity-e2e/content-retention.test.mjs
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/content-event-rsvp.mjs --evidence _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-release/content-event-rsvp-e2e.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+node tools/identity-e2e/content-retention.mjs --evidence _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-release/content-retention-e2e.jsonl
+bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-release
+```
+
+- **G1 passes** when `content-event-rsvp.mjs` exits 0 with check `C21-racing-members-get-exactly-one-place`: five members RSVP at the same moment (`Promise.all`) for an event with one place; exactly one is going and four are refused as full; the winner cancels, the other four race again, and again exactly one is going. It uses fictional numbers +44 7700 900584-900598 (no other run may use them at the same time), starts `supabase functions serve` when `content-assets` is not running, and removes every row and Storage object it made.
+- **G2 passes** when `content-retention.mjs` exits 0: the existing pg_cron scheduler starts `notifications-worker`, which calls `content-assets?action=retention-cleanup`; old unreferenced ready and pending draft files are deleted from Storage and their metadata removed, a recent upload and a file a revision uses are kept, and a missing or wrong trigger claims nothing. It serves the functions itself with a temporary env file and removes it afterwards.
+- Record both exit codes and the commit in the release notes and keep the two redacted JSONL files. A failure blocks the release until it is fixed. If a run is interrupted, run `node tools/auth-harness/local-phone-auth.mjs off` before anything else.

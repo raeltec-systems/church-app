@@ -300,6 +300,7 @@ class MyDuty {
     this.positionName,
     this.topic,
     this.scripture,
+    this.eventRef,
     this.priorAcceptedAt,
     this.leaders = const [],
     this.slotId,
@@ -349,6 +350,7 @@ class MyDuty {
       positionName: _opt<String>(m, 'position_name'),
       topic: _opt<String>(m, 'topic'),
       scripture: _opt<String>(m, 'scripture'),
+      eventRef: _opt<String>(m, 'event_ref'),
       priorAcceptedAt: _priorAccepted(m, response),
       leaders: _leaders(m),
       slotId: _opt<String>(m, 'slot_id'),
@@ -433,6 +435,10 @@ class MyDuty {
   /// Story 4.3: optional topic and scripture of the occurrence.
   final String? topic;
   final String? scripture;
+
+  /// Story 6.12: the published event the duty is linked to (an event id;
+  /// the title comes from Content's public event read).
+  final String? eventRef;
 
   final String assignmentId;
 
@@ -1658,6 +1664,7 @@ class RotaOccurrence {
     this.instructions,
     this.topic,
     this.scripture,
+    this.eventRef,
     this.reminders,
     this.reviews = const [],
     this.linkedParts = 0,
@@ -1684,6 +1691,7 @@ class RotaOccurrence {
       instructions: _opt<String>(m, 'instructions'),
       topic: _opt<String>(m, 'topic'),
       scripture: _opt<String>(m, 'scripture'),
+      eventRef: _opt<String>(m, 'event_ref'),
       started: _req<bool>(m, 'started'),
       required: required,
       confirmed: confirmed,
@@ -1716,6 +1724,10 @@ class RotaOccurrence {
   final String? instructions;
   final String? topic;
   final String? scripture;
+
+  /// Story 6.12: the published event this date is linked to (an event id;
+  /// the title comes from Content's public event read).
+  final String? eventRef;
   final bool started;
 
   /// Positions in total, and current positions the member accepted.
@@ -2054,11 +2066,21 @@ class RotaEdit {
     this.instructions,
     this.topic,
     this.scripture,
+    this.eventRef = RotaEdit.keep,
     this.lead,
     this.overrideReason,
   });
 
   final RotaOccurrence occurrence;
+
+  /// Story 6.12: [eventRef] left as the occurrence has it.
+  static const keep = '<keep>';
+
+  /// Story 6.12: the linked published event's id (null: none; [keep]:
+  /// unchanged).
+  final String? eventRef;
+
+  String? get _eventRef => eventRef == keep ? occurrence.eventRef : eventRef;
 
   /// Story 4.4: why, when new times put an assignee into an overlap.
   final String? overrideReason;
@@ -2108,6 +2130,7 @@ class RotaEdit {
       DutyFields.instructions,
     if (_clean(topic) != occurrence.topic) DutyFields.topic,
     if (_clean(scripture) != occurrence.scripture) DutyFields.scripture,
+    if (_eventRef != occurrence.eventRef) DutyFields.eventRef,
   ];
 
   /// Asks assignees again (published occurrences only).
@@ -2115,7 +2138,8 @@ class RotaEdit {
     (f) =>
         f != DutyFields.instructions &&
         f != DutyFields.topic &&
-        f != DutyFields.scripture,
+        f != DutyFields.scripture &&
+        f != DutyFields.eventRef,
   );
 
   /// A published occurrence with an assignee needs [lead] for a material
@@ -2163,6 +2187,7 @@ class RotaEdit {
         'instructions': _clean(instructions, multiline: true),
       if (c.contains(DutyFields.topic)) 'topic': _clean(topic),
       if (c.contains(DutyFields.scripture)) 'scripture': _clean(scripture),
+      if (c.contains(DutyFields.eventRef)) 'event_ref': _eventRef,
       if (needsLead && lead != null)
         'response_deadline': utc(DutyLeads.before(reporting ?? starts, lead!)),
       if (needsLead) 'override_reason': ?DutyOverride.clean(overrideReason),
@@ -2187,6 +2212,7 @@ class RotaEdit {
         'instructions': _clean(instructions, multiline: true),
       if (c.contains(DutyFields.topic)) 'topic': _clean(topic),
       if (c.contains(DutyFields.scripture)) 'scripture': _clean(scripture),
+      if (c.contains(DutyFields.eventRef)) 'event_ref': _eventRef,
       if (material && lead != null) 'deadline_before': lead,
       if (material) 'override_reason': ?DutyOverride.clean(overrideReason),
     };

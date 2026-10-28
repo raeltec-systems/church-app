@@ -100,6 +100,9 @@ String _rotaError(String code) => switch (code) {
   'required_reassign' =>
     'Someone assigned can no longer serve: give that position to someone '
         'else first',
+  // Story 6.12: a linked event must be on the public calendar.
+  'not_published' =>
+    'That event is not on the public calendar: choose a published event',
   _ => 'Check this',
 };
 
@@ -777,6 +780,30 @@ class _RotaList extends StatelessWidget {
 
 /// The selected date: details, who takes each position, change (this date
 /// or this and later dates) and cancel (likewise).
+/// Story 6.12: the published event a rota date names, from the public
+/// calendar's read (never the other way round: the event shows no rota).
+class _RotaLinkedEvent extends ConsumerWidget {
+  const _RotaLinkedEvent({required this.occurrenceId, required this.eventId});
+
+  final String occurrenceId;
+  final String eventId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final read = ref.watch(linkedEventProvider(eventId));
+    final text = switch (read) {
+      AsyncData(value: AccessReadOk(value: PublicEventRead(:final event?))) =>
+        'Event: ${event.title} · ${churchShortWhen(event.startsAt)}',
+      AsyncData(value: AccessReadOk()) =>
+        'Event: no longer on the public calendar',
+      AsyncData(value: AccessReadDenied()) ||
+      AsyncError() => 'Event: could not be loaded',
+      _ => 'Event: loading',
+    };
+    return Text(text, key: Key('rota-event-$occurrenceId'));
+  }
+}
+
 class _OccurrencePanel extends ConsumerStatefulWidget {
   const _OccurrencePanel({
     super.key,
@@ -846,6 +873,9 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
     text: widget.occurrence.scripture ?? '',
   );
 
+  /// Story 6.12: the published event this date is linked to.
+  late String? _eventRef = widget.occurrence.eventRef;
+
   List<TextEditingController> get _all => [
     _name,
     _start,
@@ -875,6 +905,7 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
     instructions: _instructions.text,
     topic: _topic.text,
     scripture: _scripture.text,
+    eventRef: _eventRef,
     lead: DutyLeads.wire(_lead),
     overrideReason: _changeReason.text,
   );
@@ -930,6 +961,8 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
           if (o.instructions case final i?) Text('Instructions: $i'),
           if (o.topic case final t?) Text('Topic: $t'),
           if (o.scripture case final sc?) Text('Scripture: $sc'),
+          if (o.eventRef case final ev?)
+            _RotaLinkedEvent(occurrenceId: id, eventId: ev),
           if (o.state == RotaState.published)
             Text(
               '${o.confirmed} of ${o.required} confirmed',
@@ -1034,6 +1067,72 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Story 6.12: link this date (or this and the later dates) to a
+  /// published event, or to none. A link already made to an event that is no
+  /// longer public can be kept or removed.
+  Widget _eventPicker(String id, String? error) {
+    final read = ref.watch(linkableEventsProvider);
+    final events = switch (read) {
+      AsyncData(value: AccessReadOk(:final value)) => value.events,
+      _ => const <PublicEvent>[],
+    };
+    final failed =
+        read is AsyncError ||
+        (read is AsyncData && read.value is AccessReadDenied);
+    final current = widget.occurrence.eventRef;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DropdownButtonFormField<String?>(
+            key: Key('rota-edit-event-$id'),
+            initialValue: _eventRef,
+            isExpanded: true,
+            decoration: InputDecoration(
+              labelText: 'Linked event (optional)',
+              helperText:
+                  'Only published events. The public calendar never shows '
+                  'this rota.',
+              errorText: error,
+            ),
+            items: [
+              const DropdownMenuItem<String?>(
+                value: null,
+                child: Text('No linked event'),
+              ),
+              for (final e in events)
+                DropdownMenuItem<String?>(
+                  value: e.eventId,
+                  child: Text(
+                    '${e.title} · ${churchShortWhen(e.startsAt)}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              if (current != null && events.every((e) => e.eventId != current))
+                DropdownMenuItem<String?>(
+                  value: current,
+                  child: const Text('The linked event (no longer public)'),
+                ),
+            ],
+            onChanged: widget.busy
+                ? null
+                : (v) => setState(() => _eventRef = v),
+          ),
+          if (failed)
+            Text(
+              'Published events could not be loaded. Close and reopen the '
+              'date to try again.',
+              key: Key('rota-edit-event-failed-$id'),
+              style: ChurchType.secondary.copyWith(
+                color: ChurchColors.of(context).muted,
+              ),
+            ),
         ],
       ),
     );
@@ -1267,6 +1366,7 @@ class _OccurrencePanelState extends ConsumerState<_OccurrencePanel> {
           maxLength: 120,
           wires: ['scripture'],
         ),
+        _eventPicker(id, err(['event_ref'])),
         ListenableBuilder(
           listenable: Listenable.merge(_all),
           builder: (context, _) {

@@ -305,7 +305,9 @@ select is((pg_temp.readj(4, 'select api.duties_my_duties()') -> 'assignments' ->
             -- Story 4.11 keys are checked in duties_owner_operations_test.sql.
             - 'cell_id'
             -- Special assignment keys are checked in duties_special_assignments_test.sql.
-            - 'due_on',
+            - 'due_on'
+            -- Story 6.12 checks event_ref in content_event_duty_links_test.sql.
+            - 'event_ref',
   '{"revision": 1, "duty_name": "Sunday preaching", "department_name": "SYNTHETIC Preaching Rota", "reporting_at": null, "location": "SYNTHETIC Main hall", "instructions": "Arrive early.", "response": "pending", "responded_at": null, "note": null}'::jsonb,
   'with its detail, deadline and pending response');
 select is(jsonb_array_length(pg_temp.readj(5, 'select api.duties_my_duties()') -> 'assignments'), 1,

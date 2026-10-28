@@ -773,6 +773,35 @@ final staffEventRsvpsProvider = FutureProvider.autoDispose
       return ref.read(contentRepositoryProvider).fetchStaffEventRsvps(eventId);
     });
 
+/// Story 6.12, staff web: how many duties name an event, read again when the
+/// event's revision moves (a publish, withdrawal or archive may flag them).
+final eventDutyLinksProvider = FutureProvider.autoDispose
+    .family<AccessRead<EventDutyLinks>, ({String eventId, int revision})>((
+      ref,
+      key,
+    ) {
+      ref.watch(accountGenerationProvider);
+      return ref
+          .read(contentRepositoryProvider)
+          .fetchEventDutyLinks(key.eventId);
+    });
+
+/// Story 6.12, staff web: the published events a rota date may be linked to
+/// (the public calendar's read; nothing is cached).
+final linkableEventsProvider =
+    FutureProvider.autoDispose<AccessRead<PublicEvents>>((ref) {
+      ref.watch(accountGenerationProvider);
+      return ref.read(contentRepositoryProvider).fetchPublicEvents();
+    });
+
+/// Story 6.12: the published event a duty is linked to, as the public
+/// calendar shows it (`event: null` once it is no longer public).
+final linkedEventProvider = FutureProvider.autoDispose
+    .family<AccessRead<PublicEventRead>, String>((ref, eventId) {
+      ref.watch(accountGenerationProvider);
+      return ref.read(contentRepositoryProvider).fetchPublicEvent(eventId);
+    });
+
 /// Story 6.11: one saved event's poster upload: pick a file, send it to the
 /// server (purpose `event_poster`), keep the answer. Nothing is attached
 /// until the editor saves the draft with the uploaded poster.

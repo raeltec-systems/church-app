@@ -30,7 +30,10 @@ class PublicBannersController extends PublicReadController<PublicBanners> {
   bool get supportsOfflineSnapshot => true;
 
   @override
-  Future<DateTime?> saveOfflineSnapshot(PublicBanners value) async {
+  Future<DateTime?> saveOfflineSnapshot(
+    PublicBanners value, {
+    required int readGeneration,
+  }) async {
     final eligible = PublicBanners(
       value.banners.where((banner) => banner.offlineAllowed).toList(),
       truncated: value.truncated,
@@ -42,6 +45,7 @@ class PublicBannersController extends PublicReadController<PublicBanners> {
           PublicContentCacheKeys.homeBanners,
           eligible,
           loadBannerImage: repository.fetchPublicImage,
+          readGeneration: readGeneration,
         );
     return outcome is PublicContentCacheSaved ? outcome.savedAt : null;
   }

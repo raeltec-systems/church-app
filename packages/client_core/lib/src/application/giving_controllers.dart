@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:church_contracts/church_contracts.dart';
@@ -30,7 +31,10 @@ class PublicGivingMethodsController
   bool get supportsOfflineSnapshot => true;
 
   @override
-  Future<DateTime?> saveOfflineSnapshot(PublicGivingMethods value) async {
+  Future<DateTime?> saveOfflineSnapshot(
+    PublicGivingMethods value, {
+    required int readGeneration,
+  }) async {
     final outcome = await ref
         .read(publicContentCacheProvider)
         .writeRead(
@@ -39,6 +43,7 @@ class PublicGivingMethodsController
           loadGivingLogo: (logo) => ref
               .read(bannerRepositoryProvider)
               .fetchPublicAsset(logo.path, logo.mediaType),
+          readGeneration: readGeneration,
         );
     return outcome is PublicContentCacheSaved ? outcome.savedAt : null;
   }
@@ -88,16 +93,23 @@ class PublicGivingMethodController
   @override
   Future<void> onFreshRead(PublicGivingMethodRead value) async {
     final cache = ref.read(publicContentCacheProvider);
-    if (value.method == null) {
+    final method = value.method;
+    if (method == null) {
       await cache.removeGivingMethod(methodId);
-    } else {
-      await cache.reconcileGivingMethod(
-        value.method!,
-        loadGivingLogo: (logo) => ref
-            .read(bannerRepositoryProvider)
-            .fetchPublicAsset(logo.path, logo.mediaType),
-      );
+      return;
     }
+    // Safety first, and awaited: the saved row takes the fresh text and drops
+    // a superseded or revoked logo before the answer shows (review C1). The
+    // optional logo download never holds the fresh text back.
+    await cache.reconcileGivingMethod(method);
+    final assets = ref.read(bannerRepositoryProvider);
+    unawaited(
+      cache.saveGivingLogo(
+        method,
+        loadGivingLogo: (logo) =>
+            assets.fetchPublicAsset(logo.path, logo.mediaType),
+      ),
+    );
   }
 }
 

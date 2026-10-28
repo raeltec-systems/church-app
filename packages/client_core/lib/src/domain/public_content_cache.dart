@@ -60,6 +60,12 @@ class PublicContentCacheUnavailable extends PublicContentCacheWrite {
 /// The persistence seam for the allowlisted public list reads. Detail, staff
 /// and other public reads have no method that can cache them.
 abstract interface class PublicContentCache {
+  /// Advances, synchronously, with every withdrawal removal (sermon, event,
+  /// giving method). A list read takes it before its fetch and passes it to
+  /// [writeRead]: a removal requested after that fetch started is never
+  /// undone by its save, even when the save is queued after the removal.
+  int get readGeneration;
+
   Future<PublicContentSnapshot<PublicSermons>?> readSermons();
   Future<PublicContentSnapshot<PublicEvents>?> readEvents();
 
@@ -84,20 +90,33 @@ abstract interface class PublicContentCache {
   Future<void> removeEvent(String eventId);
 
   /// Reconcile a still-published method detail into an existing list row.
-  /// This leaves the list's order, flags and snapshot time intact.
-  Future<void> reconcileGivingMethod(
+  /// This leaves the list's order, flags and snapshot time intact. It never
+  /// downloads: a saved logo is kept only when it is the same logo revision
+  /// and its file is valid; otherwise the row loses its offline logo at once,
+  /// so a revoked or superseded logo never outlives the fresh read.
+  Future<void> reconcileGivingMethod(PublicGivingMethod method);
+
+  /// Optional, after [reconcileGivingMethod]: download the method's
+  /// offline-cleared logo outside the write queue and attach it only if the
+  /// saved row still matches [method] (same publication and logo revision).
+  /// Never throws; a failed download leaves the row without a logo.
+  Future<void> saveGivingLogo(
     PublicGivingMethod method, {
     required Future<Uint8List?> Function(PublicGivingLogo logo) loadGivingLogo,
   });
 
   /// The string key is checked at runtime so unsupported and protected
   /// projections can be refused explicitly instead of being persisted.
+  ///
+  /// [readGeneration] is [PublicContentCache.readGeneration] taken before the
+  /// fetch that produced [projection]; rows removed since then are left out.
   Future<PublicContentCacheWrite> writeRead(
     String readKey,
     Object projection, {
     Future<Uint8List?> Function(PublicBanner banner)? loadBannerImage,
     Future<Uint8List?> Function(PublicGivingLogo logo)? loadGivingLogo,
     Future<Uint8List?> Function(SermonPoster poster)? loadSermonPoster,
+    int? readGeneration,
   });
 }
 
@@ -105,6 +124,9 @@ abstract interface class PublicContentCache {
 /// public domain content.
 class NoPublicContentCache implements PublicContentCache {
   const NoPublicContentCache();
+
+  @override
+  int get readGeneration => 0;
 
   @override
   Future<PublicContentSnapshot<PublicSermons>?> readSermons() async => null;
@@ -133,7 +155,10 @@ class NoPublicContentCache implements PublicContentCache {
   Future<void> removeEvent(String eventId) async {}
 
   @override
-  Future<void> reconcileGivingMethod(
+  Future<void> reconcileGivingMethod(PublicGivingMethod method) async {}
+
+  @override
+  Future<void> saveGivingLogo(
     PublicGivingMethod method, {
     required Future<Uint8List?> Function(PublicGivingLogo logo) loadGivingLogo,
   }) async {}
@@ -145,5 +170,6 @@ class NoPublicContentCache implements PublicContentCache {
     Future<Uint8List?> Function(PublicBanner banner)? loadBannerImage,
     Future<Uint8List?> Function(PublicGivingLogo logo)? loadGivingLogo,
     Future<Uint8List?> Function(SermonPoster poster)? loadSermonPoster,
+    int? readGeneration,
   }) async => const PublicContentCacheUnavailable();
 }

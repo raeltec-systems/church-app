@@ -939,5 +939,6 @@ class _DelayedBibleCache extends FakePublicContentCache {
     Future<Uint8List?> Function(PublicBanner banner)? loadBannerImage,
     Future<Uint8List?> Function(PublicGivingLogo logo)? loadGivingLogo,
     Future<Uint8List?> Function(SermonPoster poster)? loadSermonPoster,
+    int? readGeneration,
   }) => pending.future;
 }

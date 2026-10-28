@@ -628,6 +628,53 @@ void main() {
       },
     );
 
+    // Follow-up review C2.
+    test('an oversized saved banner at the same revision is replaced and stays repaired', () async {
+      await cache.writeRead(
+        PublicContentCacheKeys.homeBanners,
+        banners([theme()]),
+        loadBannerImage: (_) async => imageBytes,
+      );
+      final name = bannerFiles().single;
+      final file = root
+          .listSync(recursive: true)
+          .whereType<File>()
+          .singleWhere((f) => f.uri.pathSegments.last == name);
+      await file.writeAsBytes(Uint8List(5 * 1024 * 1024 + 1), flush: true);
+
+      var loads = 0;
+      Future<Uint8List?> loader(PublicBanner _) async {
+        loads++;
+        return imageBytes;
+      }
+
+      expect(
+        await cache.writeRead(
+          PublicContentCacheKeys.homeBanners,
+          banners([theme()]),
+          loadBannerImage: loader,
+        ),
+        isA<PublicContentCacheSaved>(),
+      );
+      expect(loads, 1);
+      expect(await file.readAsBytes(), imageBytes);
+      final cold = PublicContentCacheAdapter(
+        supportDirectory: () async => root,
+      );
+      expect(
+        (await cold.readBanners())?.value.banners.single.offlineImageBytes,
+        imageBytes,
+      );
+
+      // The next same-revision save reuses the repaired file.
+      await cache.writeRead(
+        PublicContentCacheKeys.homeBanners,
+        banners([theme()]),
+        loadBannerImage: loader,
+      );
+      expect(loads, 1);
+    });
+
     test(
       'a changed rights revision is downloaded again, never reused',
       () async {
@@ -1111,10 +1158,12 @@ void main() {
 
       cacheClock = savedAt.add(const Duration(hours: 2));
       var redundantLogoFetch = false;
-      await cache.reconcileGivingMethod(
-        PublicGivingMethod.fromJson(
-          publicGivingMethodData(methodId: methodId, unsafe: true, logo: logo),
-        ),
+      final same = PublicGivingMethod.fromJson(
+        publicGivingMethodData(methodId: methodId, unsafe: true, logo: logo),
+      );
+      await cache.reconcileGivingMethod(same);
+      await cache.saveGivingLogo(
+        same,
         loadGivingLogo: (_) async {
           redundantLogoFetch = true;
           return null;
@@ -1139,15 +1188,23 @@ void main() {
       };
       final changedBytes = Uint8List.fromList([0x89, 0x50, 0x4e, 0x47, 0x02]);
       var changedLogoFetch = false;
-      await cache.reconcileGivingMethod(
-        PublicGivingMethod.fromJson(
-          publicGivingMethodData(
-            methodId: methodId,
-            publicationRevision: 2,
-            unsafe: false,
-            logo: changedLogo,
-          ),
+      final changed = PublicGivingMethod.fromJson(
+        publicGivingMethodData(
+          methodId: methodId,
+          publicationRevision: 2,
+          unsafe: false,
+          logo: changedLogo,
         ),
+      );
+      await cache.reconcileGivingMethod(changed);
+      // The safety half already dropped the superseded logo.
+      expect(
+        (await cache.readGivingMethods())?.value.methods.first.logo,
+        isNull,
+      );
+      expect(changedLogoFetch, isFalse);
+      await cache.saveGivingLogo(
+        changed,
         loadGivingLogo: (_) async {
           changedLogoFetch = true;
           return changedBytes;

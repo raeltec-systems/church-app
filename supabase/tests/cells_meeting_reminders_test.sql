@@ -6,7 +6,7 @@
 -- snooze and the inbox over HTTP: tools/identity-e2e/cells-meeting-reminders.mjs. Every account,
 -- phone and name here is SYNTHETIC (fictional range +1 202 555 0160-0169).
 begin;
-select plan(45);
+select plan(54);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000052' || lpad(n::text, 2, '0'))::uuid $$;
@@ -333,6 +333,56 @@ select is(pg_temp.reminder_at(pg_temp.nth_id(3), 5),
   (select starts_at - interval '24 hours' from app.cells_meetings where meeting_id = pg_temp.nth_id(3)),
   'review fix 4: confirming a member plans their reminders at once, back on the usual 24 hours');
 select is(app.cells_reminders_available(), true, 'the probe answers true while the Q2 fixture is usable');
+
+-- Review finding F8: a venue-only or map-pin-only schedule change is a meeting change ----------------
+-- Member 5 is the cell's confirmed member now; meeting 0 is two days ahead (inside the 14-day notice
+-- window), meeting 2 sixteen days ahead (outside it); meeting 4 gets a venue of its own.
+select pg_temp.cells(pg_temp.c(2), 'cells.move_meeting', pg_temp.rev(pg_temp.nth_id(4)),
+  jsonb_build_object('meeting_id', pg_temp.nth_id(4),
+    'starts_at', app.cmd_utc((select nominal_starts_at from app.cells_meetings where meeting_id = pg_temp.nth_id(4))),
+    'ends_at', app.cmd_utc((select nominal_ends_at from app.cells_meetings where meeting_id = pg_temp.nth_id(4))),
+    'venue', 'SYNTHETIC Church hall'));
+create function pg_temp.changed_now(p_meeting uuid) returns int language sql as $$
+  select count(*)::int from app.notifications_jobs j
+   where j.source_type = 'cells_meeting' and j.source_id = p_meeting and j.reminder_kind = 'cells_meeting_changed'
+     and j.source_revision = pg_temp.rev(p_meeting) and j.recipient_member_id = pg_temp.mid(5)
+$$;
+create temp table f8 as select pg_temp.rev(pg_temp.nth_id(0)) as r0, pg_temp.rev(pg_temp.nth_id(2)) as r2,
+                               pg_temp.rev(pg_temp.nth_id(4)) as r4,
+                               pg_temp.reminder_at(pg_temp.nth_id(0), 5) as reminded;
+select isnt((select reminded from f8), null, 'F8 setup: member 5 has a reminder for the next meeting');
+select is(pg_temp.cells(pg_temp.c(1), 'cells.set_schedule', pg_temp.cell_rev(pg_temp.sh()),
+  pg_temp.sched('{"venue": "SYNTHETIC 14 Kafue Road"}')) ->> 'code', null, 'F8: the Admin changes only the venue');
+select is((select pg_temp.rev(pg_temp.nth_id(0)) - r0 from f8) || '|' || pg_temp.changed_now(pg_temp.nth_id(0)),
+  '1|1', 'F8: the next meeting is revised and its member gets one change notice');
+select is(app.cells_meeting_json(pg_temp.nth_id(0), true) ->> 'venue', 'SYNTHETIC 14 Kafue Road',
+  'F8: ... and the read shows the new place');
+select is((select pg_temp.rev(pg_temp.nth_id(2)) - r2 from f8) || '|' || pg_temp.changed_now(pg_temp.nth_id(2)),
+  '1|0', 'F8: a meeting beyond the notice window is revised (reminders re-planned) without a notice');
+select is((select pg_temp.rev(pg_temp.nth_id(4)) - r4 from f8), 0::bigint,
+  'F8: a meeting with its own venue is not affected');
+delete from f8;
+insert into f8 select pg_temp.rev(pg_temp.nth_id(0)), pg_temp.rev(pg_temp.nth_id(2)), pg_temp.rev(pg_temp.nth_id(4)), null;
+select pg_temp.cells(pg_temp.c(1), 'cells.set_schedule', pg_temp.cell_rev(pg_temp.sh()),
+  pg_temp.sched('{"venue": "SYNTHETIC 14 Kafue Road", "map_pin": {"lat": -15.77, "lng": 28.18}}'));
+select is((select pg_temp.rev(pg_temp.nth_id(0)) - r0 from f8) || '|' || pg_temp.changed_now(pg_temp.nth_id(0))
+          || '|' || (select pg_temp.rev(pg_temp.nth_id(4)) - r4 from f8),
+  '1|1|0', 'F8: a map-pin-only change does the same (not for the meeting with its own venue)');
+delete from f8;
+insert into f8 select pg_temp.rev(pg_temp.nth_id(0)), pg_temp.rev(pg_temp.nth_id(2)), pg_temp.rev(pg_temp.nth_id(4)), null;
+select pg_temp.cells(pg_temp.c(1), 'cells.set_schedule', pg_temp.cell_rev(pg_temp.sh()),
+  pg_temp.sched('{"venue": "SYNTHETIC 14 Kafue Road", "map_pin": {"lat": -15.77, "lng": 28.18}}'));
+select is((select pg_temp.rev(pg_temp.nth_id(0)) - r0 from f8)
+          + (select count(*) from app.notifications_jobs j where j.source_type = 'cells_meeting'
+              and j.source_id = pg_temp.nth_id(0) and j.reminder_kind = 'cells_meeting_changed'
+              and j.recipient_member_id = pg_temp.mid(5)), 2::bigint,
+  'F8: the same place again changes nothing and sends no further notice (two notices in all)');
+select pg_temp.cells(pg_temp.c(1), 'cells.set_schedule', pg_temp.cell_rev(pg_temp.sh()),
+  pg_temp.sched('{"venue": "SYNTHETIC 16 Kafue Road", "start_time": "18:30", "end_time": "20:00"}'));
+select is((select count(*)::int from app.notifications_jobs j where j.source_type = 'cells_meeting'
+            and j.source_id = pg_temp.nth_id(0) and j.reminder_kind = 'cells_meeting_changed'
+            and j.recipient_member_id = pg_temp.mid(5)) || '|' || pg_temp.changed_now(pg_temp.nth_id(0)), '3|1',
+  'F8: a time and place change in one command sends one notice at one revision');
 
 select * from finish();
 rollback;

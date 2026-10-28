@@ -448,7 +448,7 @@ Evidence: `_bmad-output/initiative-church-app/epic-cell-meetings-and-programmes/
 
 - `api.cells_meeting_programme` adds `yours: [{part_id, occurrence_id}]`: the reader's own published parts and their Duties occurrence. The programme read never carries an answer; the member's own answer, reporting time and instructions come from their My duties read (`api.duties_my_duties`), matched by `occurrence_id`.
 - Members answer with the Duties commands (`duties.respond`, `duties.withdraw_acceptance`, `duties.accept_many`) at the assignment revision; a stale answer is `conflict`.
-- **Duties contract change:** `duties.confirm_by_leader {assignment_id, channel, reason}` (expected = assignment revision) also accepts a cell-owned assignment when the actor is a current leader or assistant of that cell. It records the 4.9 attributed confirmation (provenance `leader`, channel, reason, the leader as `responded_by`; audit `leader_confirmed` with capacity `cell_leader`/`cell_assistant`). Anyone else is `not_found` (a member, Admin alone, Pastor, another cell's leader, a department leader). A second confirmation is `conflict {"assignment_id": "responded"}`. Contact attempts, the coverage queue, leader alerts and outcomes stay department-only.
+- **Duties contract change:** `duties.confirm_by_leader {assignment_id, channel, reason}` (expected = assignment revision) also accepts a cell-owned assignment when the actor is a current leader or assistant of that cell. It records the 4.9 attributed confirmation (provenance `leader`, channel, reason, the leader as `responded_by`; audit `leader_confirmed` with capacity `cell_leader`/`cell_assistant`). Anyone else is `not_found` (a member, Admin alone, Pastor, another cell's leader, a department leader). A second confirmation is `conflict {"assignment_id": "responded"}`. Contact attempts, the coverage queue, leader alerts and outcomes stayed department-only until the 2026-10-28 owner decision (see "Coverage for cells" below).
 
 ### Clients
 
@@ -486,7 +486,7 @@ Record the outcome per step in `evidence-5.5/owner-check.md` (pass/fail, device,
 
 ### Known limits
 
-- No cell coverage queue, contact attempts or leader alerts for cell parts yet (department-only); the leader confirms from the published programme.
+- (Lifted 2026-10-28, "Coverage for cells" below.) The leader also confirms from the published programme.
 - A declined part is not reassigned from the programme yet (5.6 publishes revisions).
 - A member who moved to another cell keeps their old cell's parts until story 5.9 (transfers end them), and can still be confirmed there by the old leader.
 
@@ -818,3 +818,64 @@ row deletion). Plan: `_bmad-output/initiative-church-app/epic-public-content-and
 - **Staging (2026-10-28):** applied verbatim as `20261028064546`; the four `cells_my_*` function
   hashes match the fresh local replay (`api.cells_my_cell` unchanged); boundary and unowned 0;
   anon is refused (`42501`) and a session-less authenticated call answers `unauthenticated`.
+
+## Review fixes (2026-10-28): historical leaders, venue notices, coverage for cells
+
+### F6: the historical leader picker
+
+Migration `20261028130727_cells_record_roster.sql`. `api.cells_programme` answers a new field
+`record_roster`: the members whose confirmed membership of the cell covered the meeting's start
+(`member_id`, `display_name`, `account`, `in_cell`), only for the cell's leader and assistant and
+only once the meeting has started and was not cancelled (otherwise `[]`). It is exactly what
+`cells.record_actual_leaders` accepts, so a member who has moved since is credited as a member
+(the picker labels them "left the cell since"); someone who joined after the meeting, or was
+never a member, is still refused (`not_in_cell`). The current `roster` (planning, absences,
+access) is unchanged. An open "Who led it?" editor clears a chosen member that a reload no longer
+offers.
+
+### F8: venue-only and map-pin-only schedule changes
+
+Migration `20261028130929_cells_schedule_place_notices.sql` (replaces `app.cells_set_schedule`).
+When the Admin changes the schedule's venue or map pin, every future scheduled or moved meeting
+that shows the schedule's place (no venue of its own) and that generation did not already revise
+gets a new revision; reminders are re-planned at it, and a meeting in the next 14 days sends its
+members one `cells_meeting_changed` notice (keyed by revision: the same change is never sent
+twice; a time and place change in one command sends one notice). Past, cancelled, withdrawn
+meetings and meetings with their own venue are untouched. Tested locally only: no notification
+was sent on staging for this fix.
+
+### Coverage for cells (owner decision 2026-10-28; Duties contract change)
+
+Migration `20261028131249_duties_cell_coverage.sql`. The 5.5 limit "contact attempts, the
+coverage queue, leader alerts and outcomes stay department-only" is lifted. A cell's leader and
+assistant now work their cell's programme parts as a department's leaders and deputies work
+duties, through the shared Duties coverage queue (extended, not copied):
+
+- **Contact attempts:** `duties.record_contact_attempt` accepts a cell part's assignment from a
+  current leader or assistant of its cell (anyone else `not_found`; never on their own part). The
+  coverage case is owned by the cell (`duties_coverage_cases.cell_id`) and its Follow-ups task is
+  in the cell scope, supervised by the cell's other leader or assistant (a leader first).
+  Confirmed by leader and the member's own answer close the case.
+- **Coverage queue:** `api.duties_coverage` answers `cells` beside `departments`: each cell the
+  caller leads or assists (never through the Admin role or Pastor), its open parts in the window
+  as positions with the same statuses, counts, follow-ups and labelled contact routes. A cell has
+  no roster here (`can_manage` false): reassignment stays in Plan meeting.
+- **Leader alerts:** overdue, short-notice and decline alerts for a cell part go to the cell's
+  leader and assistant the app can reach, as `cell_part_response_overdue`,
+  `cell_part_short_notice` and `cell_part_declined` (generic text, open Coverage).
+- **Outcomes:** `duties.record_outcome` / `duties.correct_outcome` accept a started cell part from
+  its cell's leader or assistant; `api.duties_outcomes` answers `cells`.
+- **Clients:** staff web shows Coverage and Outcomes to a cell's leader or assistant; the mobile
+  Home "Needs attention" card (Open coverage, Record outcomes) shows for them too. A cell is named
+  from the leader's Cells read ("Your cell" until then).
+- **Boundaries:** Duties reads no Cells table; a cell's leaders are Identity grants on the
+  occurrence's own `cell_id`.
+- **Owner manual check (staging):** as a cell leader, decline a part as its member, see the
+  "Cell part declined" alert, open Coverage, record a contact attempt and, after the meeting,
+  record the outcome on Outcomes.
+
+### Staging (2026-10-28)
+
+Applied verbatim as `20261028130727` (F6), `20261028130849` (F7, `duties_special_due_on_changes`),
+`20261028130929` (F8) and `20261028131249` (coverage for cells). All 25 changed or added functions
+hash identically to the fresh local replay; boundary and unowned are 0. No notification was sent.

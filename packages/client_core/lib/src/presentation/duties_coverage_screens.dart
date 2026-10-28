@@ -9,8 +9,8 @@ part of 'duties_screens.dart';
 // and nothing shows as done until the server answers.
 
 const _coverageNeeds =
-    'The coverage queue is for the leaders and deputies of a department, and '
-    'for Pastor and Admin oversight.';
+    'The coverage queue is for the leaders and deputies of a department, the '
+    'leader and assistant of a cell, and for Pastor and Admin oversight.';
 
 String _channelPast(ContactChannel c) => switch (c) {
   ContactChannel.phone => 'by phone',
@@ -139,8 +139,29 @@ class DutyCoverageScreen extends StatelessWidget {
     provider: dutyCoverageProvider,
     needs: _coverageNeeds,
     loading: 'Loading coverage…',
-    body: (context, value, state) => _CoverageBody(value: value, state: state),
+    body: (context, value, state) => CellNames(
+      needed: value.departments.any((d) => d.isCell),
+      builder: (names) =>
+          _CoverageBody(value: value.named(names), state: state),
+    ),
   );
+}
+
+/// Coverage for cells: the names of the reader's cells (from the cell
+/// leader's Cells read, loaded only when the queue has a cell); a cell keeps
+/// its fallback name until then (or when that read is refused).
+class CellNames extends ConsumerWidget {
+  const CellNames({super.key, required this.needed, required this.builder});
+
+  final bool needed;
+  final Widget Function(Map<String, String> names) builder;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!needed) return builder(const {});
+    final cells = ref.watch(cellLeaderProvider).value?.cells ?? const [];
+    return builder({for (final c in cells) c.cellId: c.name});
+  }
 }
 
 /// The queue, in reading order: the days and duties asked for (one
@@ -248,7 +269,9 @@ class _CoverageBodyState extends ConsumerState<_CoverageBody> {
                 value: null,
                 child: Text('All departments'),
               ),
-              for (final d in v.departments)
+              // A cell is not a department filter (the server filters
+              // departments only).
+              for (final d in v.departments.where((d) => !d.isCell))
                 DropdownMenuItem<String?>(
                   value: d.departmentId,
                   child: Text(d.name, overflow: TextOverflow.ellipsis),
@@ -1428,14 +1451,14 @@ class _LeaderNeedsAttentionCardState
     _lifecycle = AppLifecycleListener(onResume: _reload);
     // Revisiting Home reads again (only for a leader: nobody else's Home
     // ever asks for coverage).
-    if (leadsADepartment(ref.read(myAccessProvider).grants) &&
+    if (looksAfterCoverage(ref.read(myAccessProvider).grants) &&
         ref.read(leaderAttentionProvider).result != null) {
       Future.microtask(_reload);
     }
   }
 
   void _reload() {
-    if (!mounted || !leadsADepartment(ref.read(myAccessProvider).grants)) {
+    if (!mounted || !looksAfterCoverage(ref.read(myAccessProvider).grants)) {
       return;
     }
     final s = ref.read(leaderAttentionProvider);
@@ -1453,7 +1476,8 @@ class _LeaderNeedsAttentionCardState
   @override
   Widget build(BuildContext context) {
     final grants = ref.watch(myAccessProvider.select((s) => s.grants));
-    if (!leadsADepartment(grants)) return const SizedBox.shrink();
+    // Coverage for cells: a cell's leader or assistant too.
+    if (!looksAfterCoverage(grants)) return const SizedBox.shrink();
     final c = ChurchColors.of(context);
     final s = ref.watch(leaderAttentionProvider);
     final on = c.onPrimary;

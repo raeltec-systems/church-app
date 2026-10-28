@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../application/access_controllers.dart' show myAccessProvider;
+// Coverage for cells: a cell's name from the cell leader's Cells read.
+import '../application/cell_controllers.dart' show cellLeaderProvider;
 import '../application/content_controllers.dart'
     show linkableEventsProvider, linkedEventProvider;
 import '../application/duties_controllers.dart';

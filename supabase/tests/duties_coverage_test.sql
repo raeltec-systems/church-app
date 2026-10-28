@@ -263,7 +263,8 @@ select is((select title || ' / ' || body || ' / ' || link from app.contract_remi
 select is((select label || '|' || array_to_string(scope_kinds, ',') || '|' || on_source_resolved || '|'
                   || on_source_cancelled || '|' || manual_create::text
              from app.followups_purposes where source_type = 'duties_coverage_case'),
-  'Duty cover follow-up|department_deputy,department_leader|close|close|false',
+  -- Coverage for cells (owner decision 2026-10-28): a cell's leader and assistant too.
+  'Duty cover follow-up|cell_assistant,cell_leader,department_deputy,department_leader|close|close|false',
   'Duties registers the coverage follow-up purpose with Follow-ups (not hand-made)');
 select is((select count(*)::int from app.contract_unowned_objects()), 0, 'no unowned objects');
 

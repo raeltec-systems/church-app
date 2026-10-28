@@ -259,19 +259,55 @@ Map<String, Object?> operationalDepartment({bool canManage = false}) => {
   'contact_routes': const <String, Object?>{},
 };
 
-AccessRead<DutyCoverage> coverage(List<Map<String, Object?>> departments) =>
-    AccessReadOk(
-      DutyCoverage.fromJson({
-        'window': {
-          'from': '2099-01-01',
-          'to': '2099-01-07',
-          'zone': 'Africa/Lusaka',
-        },
-        'duty': null,
-        'truncated': false,
-        'departments': departments,
-      }),
-    );
+AccessRead<DutyCoverage> coverage(
+  List<Map<String, Object?>> departments, {
+  List<Map<String, Object?>>? cells,
+}) => AccessReadOk(
+  DutyCoverage.fromJson({
+    'window': {
+      'from': '2099-01-01',
+      'to': '2099-01-07',
+      'zone': 'Africa/Lusaka',
+    },
+    'duty': null,
+    'truncated': false,
+    'departments': departments,
+    'cells': ?cells,
+  }),
+);
+
+const _cell = '5c5c5c5c-5c5c-4c5c-8c5c-5c5c5c5c5c5c';
+
+/// Coverage for cells: a cell the reader leads, with the department's
+/// positions as its programme parts (no roster: reassignment stays in the
+/// cell's programme).
+Map<String, Object?> cellGroup() {
+  final d = Map<String, Object?>.of(fullDepartment())
+    ..remove('department_id')
+    ..remove('name');
+  return {
+    ...d,
+    'cell_id': _cell,
+    'capacity': 'cell_leader',
+    'can_manage': false,
+    'members': const <Object?>[],
+  };
+}
+
+AccessRead<LeaderQueue> leaderQueue() => AccessReadOk(
+  LeaderQueue.fromJson({
+    'cells': [
+      {
+        'cell_id': _cell,
+        'name': 'SYNTHETIC Shikoswe Cell',
+        'broad_area': 'SYNTHETIC Kafue East',
+        'role': 'leader',
+        'members': const <Object?>[],
+        'requests': const <Object?>[],
+      },
+    ],
+  }),
+);
 
 void main() {
   group('wire mapping', () {
@@ -929,6 +965,74 @@ void main() {
   });
 
   group('the leader Home card', () {
+    testWidgets('coverage for cells: a cell leader works the cell\'s parts, '
+        'named from the Cells read, with no reassign', (tester) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.dutyCoverage,
+        setUp: (h) {
+          h.grants.myAccess = AccessReadOk(
+            syntheticGrants(
+              scopes: const [
+                ScopeGrant(scopeKind: 'cell_leader', scopeId: _cell),
+              ],
+            ),
+          );
+          h.cells.leader = leaderQueue();
+          h.coverage.coverage = coverage(const [], cells: [cellGroup()]);
+        },
+      );
+      expect(
+        tester.widget<Text>(byKey('coverage-dept-$_cell')).data,
+        'SYNTHETIC Shikoswe Cell',
+      );
+      expect(byKey('coverage-department'), findsNothing);
+      expect(find.textContaining('reassign or cancel'), findsNothing);
+      await tapKey(tester, 'coverage-attempt-$_slotX');
+      await enter(tester, 'coverage-attempt-date-$_slotX', '2099-01-02');
+      await enter(tester, 'coverage-attempt-time-$_slotX', '18:00');
+      await tapKey(tester, 'coverage-attempt-save-$_slotX');
+      final sent = h.gateway.sent.single;
+      expect(sent.request.command, 'duties.record_contact_attempt');
+      expect(sent.request.payload['assignment_id'], _asgX);
+    });
+
+    testWidgets('coverage for cells: a cell keeps a plain name when the Cells '
+        'read is refused', (tester) async {
+      await pumpAt(
+        tester,
+        ClientPaths.dutyCoverage,
+        setUp: (h) =>
+            h.coverage.coverage = coverage(const [], cells: [cellGroup()]),
+      );
+      expect(
+        tester.widget<Text>(byKey('coverage-dept-$_cell')).data,
+        'Your cell',
+      );
+    });
+
+    testWidgets('coverage for cells: a cell leader sees Needs attention', (
+      tester,
+    ) async {
+      await pumpAt(
+        tester,
+        ClientPaths.home,
+        memberHome: true,
+        setUp: (h) {
+          h.grants.myAccess = AccessReadOk(
+            syntheticGrants(
+              scopes: const [
+                ScopeGrant(scopeKind: 'cell_assistant', scopeId: _cell),
+              ],
+            ),
+          );
+          h.coverage.coverage = coverage(const [], cells: [cellGroup()]);
+        },
+      );
+      expect(byKey('home-attention-card'), findsOneWidget);
+      expect(byKey('home-attention-outcomes'), findsOneWidget);
+    });
+
     testWidgets('leaders see Needs attention; Open coverage', (tester) async {
       await pumpAt(
         tester,

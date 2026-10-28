@@ -112,6 +112,10 @@ abstract final class DutyFields {
   static const startsAt = 'starts_at';
   static const endsAt = 'ends_at';
   static const reportingAt = 'reporting_at';
+
+  /// Review finding F7: a special assignment's due date or timing mode (a
+  /// fixed time or "done by").
+  static const dueOn = 'due_on';
   static const location = 'location';
   static const memberId = 'member_id';
   static const instructions = 'instructions';
@@ -126,6 +130,7 @@ abstract final class DutyFields {
   static const order = [
     dutyName,
     startsAt,
+    dueOn,
     endsAt,
     reportingAt,
     location,
@@ -139,6 +144,7 @@ abstract final class DutyFields {
   static String label(String field) => switch (field) {
     dutyName => 'duty',
     startsAt => 'date or start time',
+    dueOn => 'due date',
     endsAt => 'end time',
     reportingAt => 'reporting time',
     location => 'place',

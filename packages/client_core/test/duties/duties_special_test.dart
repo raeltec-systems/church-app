@@ -605,6 +605,45 @@ void main() {
       expect(cancel.request.payload, {'occurrence_id': _occ});
     });
 
+    testWidgets('review section 8: after a conflict the open form offers the '
+        'latest version instead of resending its old revision', (
+      tester,
+    ) async {
+      final h = await pumpAt(
+        tester,
+        ClientPaths.dutySpecial,
+        setUp: (h) => h.special.special = specialRead([
+          specialAssignmentData(dueOn: '2099-11-30', revision: 4),
+        ]),
+      );
+      await tapKey(tester, 'special-open-$_occ');
+      await tapKey(tester, 'special-change-$_occ');
+      await enter(tester, 'special-$_occ-due', '2099-12-15');
+      await tapKey(tester, 'special-$_occ-save');
+      // Another Pastor changed it meanwhile: the reload reads revision 6.
+      h.special.special = specialRead([
+        specialAssignmentData(dueOn: '2099-12-01', revision: 6),
+      ]);
+      h.gateway.sent.single.refuse(ErrorCode.conflict);
+      await settle(tester);
+      expect(byKey('special-$_occ-stale'), findsOneWidget);
+      expect(enabled(tester, 'special-$_occ-save'), isFalse);
+      await tapKey(tester, 'special-$_occ-latest');
+      expect(byKey('special-$_occ-stale'), findsNothing);
+      expect(
+        tester.widget<TextField>(byKey('special-$_occ-due')).controller!.text,
+        '2099-12-01',
+      );
+      await enter(tester, 'special-$_occ-due', '2099-12-20');
+      await tapKey(tester, 'special-$_occ-save');
+      final again = h.gateway.sent.last;
+      expect(again.request.expectedRevision.value, 6);
+      expect(again.request.payload, {
+        'occurrence_id': _occ,
+        'due_on': '2099-12-20',
+      });
+    });
+
     testWidgets('Confirmed by the Pastor for a member reached by phone', (
       tester,
     ) async {

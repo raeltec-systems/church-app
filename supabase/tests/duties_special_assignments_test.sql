@@ -7,7 +7,7 @@
 -- privacy. Every account, phone and name is SYNTHETIC (fictional range +1 202 555 0111-0117).
 -- Duty times are fixed church-time (Africa/Lusaka) clock times on whole days.
 begin;
-select plan(102);
+select plan(118);
 
 create function pg_temp.u(n int) returns uuid language sql as
 $$ select ('00000000-0000-4000-8000-0000000071' || lpad(n::text, 2, '0'))::uuid $$;
@@ -390,7 +390,7 @@ select is((select r #>> '{data,change}' from (select pg_temp.revise(3, 'G2',
   'Pastor B moves the due date (a material change)');
 select is((select (x ->> 'response') || '|' || (x -> 'changes')::text || '|' || (x ->> 'previous_response') || '|' || (x ->> 'due_on')
              from (select pg_temp.mine(4, pg_temp.cur('G2')) as x) y),
-  'pending|["starts_at"]|declined|' || pg_temp.lusaka(25)::text,
+  'pending|["starts_at", "due_on"]|declined|' || pg_temp.lusaka(25)::text,
   'M is asked again, with what changed and the earlier answer kept');
 select is(pg_temp.err(pg_temp.duties(2, 'duties.revise_special', (select orev from g2old),
   jsonb_build_object('occurrence_id', pg_temp.occ('G2'), 'duty_name', 'SYNTHETIC Stale'))), 'conflict',
@@ -530,6 +530,69 @@ select is((select count(*)::int from jsonb_array_elements(pg_temp.readj(5, forma
              'select api.duties_member_history(%L::uuid)', pg_temp.mid(4))) -> 'entries') e
             where e ->> 'owner_kind' = 'special'), 0,
   'a department leader reading M''s history never sees a special assignment');
+
+-- Review finding F7: the timing mode is a change of its own ------------------------------------------------
+-- A due date (due moment 18:00) becomes an appointment at 18:00 on the same date with no end: the
+-- normalised start and end are equal, the obligation is not.
+select pg_temp.give('F7A', 3, jsonb_build_object('member_id', pg_temp.mid(4), 'duty_name', 'SYNTHETIC F7 Hand in the plan',
+  'due_on', pg_temp.lusaka(50)::text));
+select is((select due_on from app.duties_slot_revisions where slot_id = pg_temp.slot('F7A') and slot_revision = 1),
+  pg_temp.lusaka(50), 'F7: revision 1 records the due date');
+select pg_temp.duties(4, 'duties.respond', pg_temp.rev(pg_temp.cur('F7A')),
+  jsonb_build_object('assignment_id', pg_temp.cur('F7A'), 'response', 'accepted'));
+create temp table f7a as select pg_temp.cur('F7A') as id;
+select is((select r #>> '{data,change}' from (select pg_temp.revise(3, 'F7A', jsonb_build_object(
+  'starts_at', app.cmd_utc(pg_temp.at(50, '18:00')), 'ends_at', null)) as r) y), 'material',
+  'F7: deadline to appointment at the same instant, alone, is a material change (not unchanged)');
+select is((select o.due_on is null and o.starts_at = pg_temp.at(50, '18:00') from app.duties_occurrences o
+            where o.occurrence_id = pg_temp.occ('F7A')), true, 'F7: it is now a fixed time');
+select is((select pg_temp.cur('F7A') <> id and (pg_temp.mine(4, pg_temp.cur('F7A')) ->> 'response') = 'pending'
+                  and (pg_temp.mine(4, pg_temp.cur('F7A')) -> 'changes') = '["due_on"]'::jsonb
+                  and (pg_temp.mine(4, pg_temp.cur('F7A')) ->> 'previous_response') = 'accepted' from f7a), true,
+  'F7: M is asked again (a new acceptance), told the due date changed, the earlier answer kept');
+select is((select pg_temp.jobs(pg_temp.cur('F7A'), 'duty_changed', 4)), 1::bigint, 'F7: with the changed-duty notice');
+select is((select change_class || '|' || coalesce(due_on::text, '-') || '|' || array_to_string(changed_fields, ',')
+             from app.duties_slot_revisions where slot_id = pg_temp.slot('F7A')
+            order by slot_revision desc limit 1), 'material|-|due_on', 'F7: the revision history records it');
+create temp table f7a2 as select pg_temp.cur('F7A') as id;
+select is((select r #>> '{data,change}' from (select pg_temp.revise(3, 'F7A', jsonb_build_object(
+  'due_on', pg_temp.lusaka(50)::text)) as r) y), 'material',
+  'F7: and back, appointment to deadline at the same instant, alone');
+select is((select pg_temp.cur('F7A') <> id from f7a2)
+          and (select due_on from app.duties_slot_revisions where slot_id = pg_temp.slot('F7A')
+                order by slot_revision desc limit 1) = pg_temp.lusaka(50), true,
+  'F7: a new assignment, and the history has the due date again');
+
+-- With a notes change too, the mode change still asks again and checks overlaps.
+select pg_temp.give('F7B', 3, jsonb_build_object('member_id', pg_temp.mid(4), 'duty_name', 'SYNTHETIC F7 Count the hymn books',
+  'due_on', pg_temp.lusaka(51)::text));
+select pg_temp.duties(4, 'duties.respond', pg_temp.rev(pg_temp.cur('F7B')),
+  jsonb_build_object('assignment_id', pg_temp.cur('F7B'), 'response', 'accepted'));
+select is(pg_temp.err(pg_temp.pub('F7D', pg_temp.at(51, '18:00'))), 'ok',
+  'F7 setup: M has a department duty at 18:00 that day (no overlap with a due date)');
+select is(pg_temp.err(pg_temp.revise(3, 'F7B', jsonb_build_object(
+  'starts_at', app.cmd_utc(pg_temp.at(51, '18:00')), 'ends_at', null, 'instructions', 'SYNTHETIC In the vestry.'))),
+  'validation_failed|member_id=overlap,override_reason=required',
+  'F7: deadline to appointment with a notes change meets the overlap check (refused without a reason)');
+create temp table f7b as select pg_temp.cur('F7B') as id;
+select is((select r #>> '{data,change}' || '|' || (r #>> '{data,overrides}') from (select pg_temp.revise(3, 'F7B', jsonb_build_object(
+  'starts_at', app.cmd_utc(pg_temp.at(51, '18:00')), 'ends_at', null, 'instructions', 'SYNTHETIC In the vestry.',
+  'override_reason', 'SYNTHETIC both are short')) as r) y), 'material|1',
+  'F7: with an approved override it is a material change, the override recorded');
+select is((select (pg_temp.cur('F7B') <> id)::text || '|' || (pg_temp.mine(4, pg_temp.cur('F7B')) ->> 'response') || '|'
+                  || coalesce((pg_temp.mine(4, pg_temp.cur('F7B')) -> 'changes')::text, '-') from f7b),
+  'true|pending|["instructions", "due_on"]',
+  'F7: and M must accept again');
+create temp table f7b2 as select pg_temp.cur('F7B') as id;
+select is((select r #>> '{data,change}' from (select pg_temp.revise(3, 'F7B', jsonb_build_object(
+  'due_on', pg_temp.lusaka(51)::text, 'instructions', 'SYNTHETIC In the office.')) as r) y), 'material',
+  'F7: appointment to deadline with a notes change is material too');
+select is((select pg_temp.cur('F7B') <> id from f7b2), true, 'F7: ... a new assignment');
+create temp table f7b3 as select pg_temp.cur('F7B') as id;
+select is((select r #>> '{data,change}' from (select pg_temp.revise(3, 'F7B', jsonb_build_object(
+  'instructions', 'SYNTHETIC In the library.')) as r) y), 'notes',
+  'F7: a pure notes change keeps its behaviour');
+select is((select pg_temp.cur('F7B') = id from f7b3), true, 'F7: ... the same assignment, no new acceptance');
 
 -- Lifecycle and privacy --------------------------------------------------------------------------------
 select pg_temp.give('G7', 3, jsonb_build_object('member_id', pg_temp.mid(7), 'duty_name', 'SYNTHETIC Count the offering',

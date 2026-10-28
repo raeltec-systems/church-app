@@ -28,6 +28,8 @@ Fourteen migrations, in this order. Each was applied to staging under its hosted
 | 5.12 | `20261021132636_cells_external_check_fixes.sql` |
 | History (owner decision 2026-10-21) | `20261021195642_duties_history_all_kinds.sql`: My duty history lists cell programme parts too, with a `kind` filter |
 | Special assignments (owner decision 2026-10-21) | `20261021211830_duties_special_assignments.sql`: the Pastors give duties that belong to no department and no cell, at a fixed time or with a due date; My duties, the history (kind `special`) and **Special assignments** on staff web |
+| Review fixes 2026-10-28 | `20261028130727_cells_record_roster.sql` (F6, historical leader roster), `20261028130849_duties_special_due_on_changes.sql` (F7, due date is a material change; `duties_slot_revisions.due_on`), `20261028130929_cells_schedule_place_notices.sql` (F8, venue and pin changes notify) |
+| Coverage for cells (owner decision 2026-10-28) | `20261028131249_duties_cell_coverage.sql`: contact attempts, the coverage queue (`cells`), leader alerts (`cell_part_*` kinds) and outcomes for a cell's programme parts; `duties_coverage_cases.cell_id` (its `owner-approved-cleanup` marker cites the decision). Clients older than this build ignore `cells` (no regression) |
 
 The history migration replaces `api.duties_member_history` with a fourth argument, `kind`, and its entries may have no department (a cell part). A client older than this change fails to read a history that holds a cell part, so production clients must be built from `main` at promotion (the same rule as below).
 

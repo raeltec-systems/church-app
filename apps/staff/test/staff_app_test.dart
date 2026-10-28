@@ -403,6 +403,48 @@ void main() {
     }
   });
 
+  test('entry 6.16: a sub-page selects the destination it is under', () {
+    const paths = [
+      ClientPaths.contentSermons,
+      ClientPaths.contentSermonSeries,
+      ClientPaths.cellMeetings,
+      ClientPaths.fixture,
+    ];
+    expect(staffNavPathFor('/content/sermons', paths), '/content/sermons');
+    expect(staffNavPathFor('/content/sermons/new', paths), '/content/sermons');
+    expect(
+      staffNavPathFor('/content/sermon-series/s1', paths),
+      '/content/sermon-series',
+    );
+    expect(
+      staffNavPathFor('/cells/meetings/m1/plan', paths),
+      '/cells/meetings',
+    );
+    // Whole segments only, and the longest destination wins.
+    expect(staffNavPathFor('/content/sermonsx', paths), isNull);
+    expect(
+      staffNavPathFor('/fixture/reminders', [...paths, '/fixture/reminders']),
+      '/fixture/reminders',
+    );
+    expect(staffNavPathFor('/overview', paths), isNull);
+  });
+
+  testWidgets('entry 6.16: a sermon editor deep link opens Content selected', (
+    tester,
+  ) async {
+    await pumpStaff(
+      tester,
+      location: '${ClientPaths.contentSermons}/new',
+      setUp: (h) => h.grants.myAccess = AccessReadOk(
+        syntheticGrants(roles: const ['media']),
+      ),
+    );
+    final item = tester.widget<NavItem>(
+      find.byKey(const Key('nav-${ClientPaths.contentSermons}')),
+    );
+    expect(item.selected, isTrue);
+  });
+
   test('story 6.8: Sunday hymns for Admin, Media and worship leaders', () {
     final leader = syntheticGrants(
       scopes: const [

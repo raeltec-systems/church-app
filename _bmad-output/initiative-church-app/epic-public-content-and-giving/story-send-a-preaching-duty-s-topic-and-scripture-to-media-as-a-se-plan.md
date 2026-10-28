@@ -84,6 +84,7 @@ deferred:
 - pgTAP: full suite on a fresh reset 70 files, 5701 tests, pass. E2E 9/9 (`evidence-6.18/local-e2e.jsonl`); its offline tests 4/4. Migration checker: 93 ordered, unique, non-destructive.
 - Flutter: client_core 1109, mobile 95, staff 61, design_system 19, all pass; analyze clean. New `test/content/sermon_duty_drafts_test.dart` (12). No existing key or test changed.
 - Staging: 8 of 8 function hashes match; boundary/unowned 0; signed-out reads refused or empty (`evidence-6.18/staging-verify.md`). No duty published, no draft made, no notification sent.
+- After merging `story/5.8-meetings-held` (91ebdde, entry 19; runbook conflicts kept both sides): fresh reset, full pgTAP 71 files, 5722 tests, pass; E2E 9/9 (`evidence-6.18/local-e2e-after-merge.jsonl`); Flutter client_core 1124, mobile 95, staff 61, design_system 19, analyze clean.
 - Design: the Sermon section uses the detail's CardLabel and muted lines, one outlined action, honest sent / refused / unconfirmed / failed states and no state shown when the read is refused (app-screens rules); the staff list keeps one status mark per row and adds the origin as a muted line.
 
 ## Plan Change Log

@@ -176,6 +176,30 @@ class PublicEventsController extends PublicReadController<PublicEvents> {
   @override
   Future<PublicContentSnapshot<PublicEvents>?> readOfflineSnapshot() =>
       ref.read(publicContentCacheProvider).readEvents();
+
+  /// A fresh detail read said [eventId] is no longer public: drop it from
+  /// the list on screen and from the saved Calendar at once, so a failed
+  /// list refresh cannot bring it back. The list is then refreshed; a read
+  /// already in flight is restarted so it cannot show an older copy.
+  Future<void> forgetEvent(String eventId) async {
+    final value = state.value;
+    final listed =
+        value != null && value.events.any((e) => e.eventId == eventId);
+    final inFlight = state.loading;
+    if (listed) {
+      state = PublicReadState<PublicEvents>(
+        loading: state.loading,
+        result: AccessReadOk(value.withoutEvent(eventId)),
+        asOf: state.asOf,
+        refreshFailed: state.refreshFailed,
+        savedAt: state.savedAt,
+        offlineSnapshot: state.offlineSnapshot,
+      );
+    }
+    await ref.read(publicContentCacheProvider).removeEvent(eventId);
+    if (!ref.mounted) return;
+    if (listed || inFlight) unawaited(reload());
+  }
 }
 
 final publicEventsProvider =
@@ -184,6 +208,11 @@ final publicEventsProvider =
     );
 
 /// `api.content_public_event`: one event (null when it is not public).
+///
+/// Owner decision 2026-10-28: a saved Calendar event opens offline, read
+/// from the saved Calendar list the way a sermon reads from its saved
+/// catalog. An event the saved list does not hold (unknown, or removed after
+/// a fresh read said it was withdrawn) is never shown from the cache.
 class PublicEventController extends PublicReadController<PublicEventRead> {
   PublicEventController(this.eventId);
 
@@ -192,6 +221,31 @@ class PublicEventController extends PublicReadController<PublicEventRead> {
   @override
   Future<AccessRead<PublicEventRead>> fetch() =>
       ref.read(contentRepositoryProvider).fetchPublicEvent(eventId);
+
+  @override
+  bool get supportsOfflineSnapshot => true;
+
+  @override
+  Future<PublicContentSnapshot<PublicEventRead>?> readOfflineSnapshot() async {
+    final calendar = await ref.read(publicContentCacheProvider).readEvents();
+    final event = calendar?.value.events
+        .where((e) => e.eventId == eventId && e.offlineAllowed)
+        .firstOrNull;
+    return event == null
+        ? null
+        : PublicContentSnapshot(
+            value: PublicEventRead(event),
+            savedAt: calendar!.savedAt,
+          );
+  }
+
+  @override
+  Future<void> onFreshRead(PublicEventRead value) async {
+    // A known withdrawal invalidates the saved copy directly.
+    if (value.event == null) {
+      await ref.read(publicEventsProvider.notifier).forgetEvent(eventId);
+    }
+  }
 }
 
 final publicEventProvider = NotifierProvider.autoDispose

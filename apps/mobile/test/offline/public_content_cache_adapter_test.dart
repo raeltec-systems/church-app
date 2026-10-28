@@ -312,6 +312,25 @@ void main() {
     },
   );
 
+  test('removing a withdrawn event keeps the rest of the Calendar', () async {
+    const other = '72727272-7272-4272-8272-727272727272';
+    await cache.writeRead(
+      PublicContentCacheKeys.calendar,
+      PublicEvents.fromJson(
+        publicEventsData([
+          publicEventData(),
+          publicEventData(eventId: other),
+        ], truncated: true),
+      ),
+    );
+    await cache.removeEvent('71717171-7171-4171-8171-717171717171');
+    final cold = PublicContentCacheAdapter(supportDirectory: () async => root);
+    final snapshot = await cold.readEvents();
+    expect(snapshot?.value.events.map((e) => e.eventId), [other]);
+    expect(snapshot?.value.truncated, isTrue);
+    expect(snapshot?.savedAt, savedAt);
+  });
+
   test('only allowlisted public list reads can create a manifest', () async {
     final outcome = await cache.writeRead(
       'content_staff_events',

@@ -1713,6 +1713,19 @@ class FakePublicContentCache implements PublicContentCache {
     );
   }
 
+  final removedEvents = <String>[];
+
+  @override
+  Future<void> removeEvent(String eventId) async {
+    removedEvents.add(eventId);
+    final snapshot = events;
+    if (snapshot == null) return;
+    events = PublicContentSnapshot(
+      savedAt: snapshot.savedAt,
+      value: snapshot.value.withoutEvent(eventId),
+    );
+  }
+
   final removedSermons = <String>[];
 
   @override

@@ -79,6 +79,10 @@ abstract interface class PublicContentCache {
   /// the series stay; a poster no remaining row references is deleted.
   Future<void> removeSermon(String sermonId);
 
+  /// Remove an event from the saved Calendar after a successful fresh
+  /// detail read says it is no longer public. Other events stay.
+  Future<void> removeEvent(String eventId);
+
   /// Reconcile a still-published method detail into an existing list row.
   /// This leaves the list's order, flags and snapshot time intact.
   Future<void> reconcileGivingMethod(
@@ -124,6 +128,9 @@ class NoPublicContentCache implements PublicContentCache {
 
   @override
   Future<void> removeSermon(String sermonId) async {}
+
+  @override
+  Future<void> removeEvent(String eventId) async {}
 
   @override
   Future<void> reconcileGivingMethod(

@@ -755,6 +755,46 @@ class PublicContentCacheAdapter implements PublicContentCache {
     return completer.future;
   }
 
+  @override
+  Future<void> removeEvent(String eventId) {
+    final completer = Completer<void>();
+    _writeQueue = _writeQueue.then((_) async {
+      try {
+        await _removeEvent(eventId);
+      } catch (_) {
+        // The detail read already says the event is gone; a failed cleanup
+        // leaves the previous manifest, never a partial one.
+      } finally {
+        completer.complete();
+      }
+    });
+    return completer.future;
+  }
+
+  Future<void> _removeEvent(String eventId) async {
+    final directory = await _directory();
+    final manifest = await _readManifest(directory);
+    if (manifest == null) return;
+    final reads = Map<String, Object?>.from(manifest['reads'] as Map);
+    final entry = reads[PublicContentCacheKeys.calendar];
+    if (entry is! Map) return;
+    final projection = entry['projection'];
+    if (projection is! Map || projection['events'] is! List) return;
+    final events = projection['events'] as List;
+    final kept = events
+        .where((raw) => raw is Map && raw['event_id'] != eventId)
+        .toList(growable: false);
+    if (kept.length == events.length) return;
+    reads[PublicContentCacheKeys.calendar] = {
+      'saved_at': entry['saved_at'],
+      'projection': {'events': kept, 'truncated': projection['truncated']},
+    };
+    await _commitManifest(
+      directory,
+      jsonEncode({'version': _manifestVersion, 'reads': reads}),
+    );
+  }
+
   Future<void> _removeSermon(String sermonId) async {
     final directory = await _directory();
     final manifest = await _readManifest(directory);

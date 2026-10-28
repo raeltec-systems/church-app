@@ -84,7 +84,8 @@ deferred: []
 - Built in this session (no subagents, owner process change). The Calendar edit is additive: the month grouping now holds `(time, row)` pairs so the member's rows are inserted among the events; events keep their keys and order.
 - The overlay repository provider lives in `calendar_overlay_controllers.dart` (not `providers.dart`) and `CellsRepository` is untouched, to avoid conflicts with entry 12 and epic 7.
 - pgTAP first tried to end a membership by a direct update; the table's checks require a transfer, so the test transfers the member instead.
-- Verification: fresh reset, full pgTAP 69 files / 5,627 tests (the known board-timing check `duties_owner_decisions_test` 32 failed under full-suite load and passed alone); E2E 10/10; Flutter analyze clean and tests pass: design_system 19, client_core 1,101, mobile 95, staff 61.
+- After merging story/5.8-meetings-held (cd4d893, with 6.12): fresh reset, pgTAP 70 files / 5,674 tests all pass; E2E 10/10 (`evidence-6.19/calendar-overlays-e2e-after-merge.jsonl`); boundary/unowned 0; Flutter clean: design_system 19, client_core 1,112, mobile 95, staff 61.
+- Verification before the merge: fresh reset, full pgTAP 69 files / 5,627 tests (the known board-timing check `duties_owner_decisions_test` 32 failed under full-suite load and passed alone); E2E 10/10; Flutter analyze clean and tests pass: design_system 19, client_core 1,101, mobile 95, staff 61.
 - Staging: applied verbatim as `20261028064546` (local file renamed); 4 hashes match; boundary/unowned 0; anon refused. Evidence `evidence-6.19/`.
 
 ## Plan Change Log

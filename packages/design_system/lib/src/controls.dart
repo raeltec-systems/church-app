@@ -269,7 +269,18 @@ class NavItem extends StatelessWidget {
             children: [
               Icon(icon, color: fg, size: 24),
               const SizedBox(height: 3),
-              text,
+              // A tab label stays on one line: at large text sizes or on a
+              // narrow phone it shrinks to fit instead of breaking mid-word.
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  textAlign: TextAlign.center,
+                  style: text.style,
+                ),
+              ),
             ],
           )
         : Row(
@@ -287,7 +298,10 @@ class NavItem extends StatelessWidget {
     return _tab(
       semanticsLabel: count > 0 ? '$label, ${badgeLabel ?? count}' : null,
       highlight: highlight,
-      padding: EdgeInsets.symmetric(horizontal: onDark ? 10 : 12, vertical: 6),
+      padding: EdgeInsets.symmetric(
+        horizontal: vertical ? 2 : (onDark ? 10 : 12),
+        vertical: 6,
+      ),
       alignment: vertical ? Alignment.center : null,
       child: content,
     );

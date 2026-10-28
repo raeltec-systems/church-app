@@ -494,25 +494,37 @@ class BannerImageUpload {
       status == ImageUploadStatus.uploading;
 }
 
-/// One banner's image upload: pick a file, send it to the server, keep the
-/// answer. The server measures the bytes; nothing is attached until the
-/// editor saves the draft with the uploaded image.
-class BannerImageUploadController extends Notifier<BannerImageUpload> {
-  BannerImageUploadController(this.bannerId);
+/// Entry 6.16: one item's image upload, shared by banners, event posters and
+/// sermon-series posters (they were three copies): pick a file, send it to
+/// the server under [purpose], keep the answer. The server measures the
+/// bytes; nothing is attached until the editor saves the draft with the
+/// uploaded image. An answer that arrives after the account changed (the
+/// state was rebuilt) is dropped.
+abstract class ContentImageUploadController
+    extends Notifier<BannerImageUpload> {
+  ContentImageUploadController(this.itemId);
 
-  final String bannerId;
+  /// The banner, event or series the upload is for.
+  final String itemId;
+
+  /// The upload purpose the server checks (see [ContentPurposes]).
+  String get purpose;
+
+  int _epoch = 0;
 
   @override
   BannerImageUpload build() {
     ref.watch(accountGenerationProvider);
+    _epoch++;
     return const BannerImageUpload();
   }
 
   Future<void> pickAndUpload() async {
     if (state.busy) return;
+    final epoch = _epoch;
     state = const BannerImageUpload(status: ImageUploadStatus.picking);
     final file = await ref.read(contentFilePickerProvider).pickImage();
-    if (!ref.mounted) return;
+    if (!ref.mounted || epoch != _epoch) return;
     if (file == null) {
       state = const BannerImageUpload();
       return;
@@ -531,8 +543,8 @@ class BannerImageUploadController extends Notifier<BannerImageUpload> {
     );
     final outcome = await ref
         .read(bannerRepositoryProvider)
-        .uploadImage(bannerId, ContentPurposes.bannerImage, file);
-    if (!ref.mounted) return;
+        .uploadImage(itemId, purpose, file);
+    if (!ref.mounted || epoch != _epoch) return;
     state = switch (outcome) {
       ImageUploaded(:final image) => BannerImageUpload(
         status: ImageUploadStatus.uploaded,
@@ -552,6 +564,14 @@ class BannerImageUploadController extends Notifier<BannerImageUpload> {
   }
 
   void clear() => state = const BannerImageUpload();
+}
+
+/// One banner's image upload (purpose `banner_image`).
+class BannerImageUploadController extends ContentImageUploadController {
+  BannerImageUploadController(super.itemId);
+
+  @override
+  String get purpose => ContentPurposes.bannerImage;
 }
 
 final bannerImageUploadProvider = NotifierProvider.autoDispose

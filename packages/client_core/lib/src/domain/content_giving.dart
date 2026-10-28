@@ -70,19 +70,10 @@ enum MobileMoneyIdentifier {
   };
 }
 
-/// A required, non-blank string at [key].
-String _text(Map json, String key) {
-  final v = wireReq<String>(json, key);
-  if (v.trim().isEmpty) throw FormatException('unexpected $key');
-  return v;
-}
-
-/// An optional string at [key]: absent or null is null; blank is refused.
-String? _optText(Map json, String key) {
-  final v = wireOpt<String>(json, key);
-  if (v != null && v.trim().isEmpty) throw FormatException('unexpected $key');
-  return v;
-}
+// Entry 6.16: the shared wire readers (wire_json.dart), under the short
+// names this library has always used.
+const _text = wireText;
+const _optText = wireOptText;
 
 final _date = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$');
 

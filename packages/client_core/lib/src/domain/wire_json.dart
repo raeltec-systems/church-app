@@ -47,6 +47,42 @@ int wireRevision(Map json, [String key = 'revision']) {
   return r;
 }
 
+/// Entry 6.16: a required, non-blank string at [key] (the Content kinds had
+/// identical private copies since 6.1).
+String wireText(Map json, String key) {
+  final v = wireReq<String>(json, key);
+  if (v.trim().isEmpty) throw FormatException('unexpected $key');
+  return v;
+}
+
+/// An optional string at [key]: absent or null is null; blank is refused.
+String? wireOptText(Map json, String key) {
+  final v = wireOpt<String>(json, key);
+  if (v != null && v.trim().isEmpty) throw FormatException('unexpected $key');
+  return v;
+}
+
+/// A required positive integer at [key].
+int wirePositive(Map json, String key) {
+  final v = wireReq<int>(json, key);
+  if (v < 1) throw FormatException('unexpected $key');
+  return v;
+}
+
+/// The capacity a Content editor reads a staff catalog in (`admin`,
+/// `pastor` or `media`).
+String wireEditorCapacity(Map json) {
+  final capacity = wireReq<String>(json, 'capacity');
+  if (!const [
+    ChurchRoles.admin,
+    ChurchRoles.pastor,
+    ChurchRoles.media,
+  ].contains(capacity)) {
+    throw const FormatException('unexpected capacity');
+  }
+  return capacity;
+}
+
 /// How a listed member's account stands (`app_account`, `no_login`,
 /// `access_review`).
 AccountStanding wireAccount(Object? v) => switch (v) {

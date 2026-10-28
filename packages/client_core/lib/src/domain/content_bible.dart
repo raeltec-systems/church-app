@@ -9,11 +9,9 @@ import 'access_grants.dart';
 import 'content_events.dart' show ContentState;
 import 'wire_json.dart';
 
-String _text(Map m, String key) {
-  final value = wireReq<String>(m, key);
-  if (value.trim().isEmpty) throw FormatException('unexpected $key');
-  return value;
-}
+// Entry 6.16: the shared wire readers (wire_json.dart), under the short
+// names this library has always used.
+const _text = wireText;
 
 class BibleBook {
   const BibleBook(this.id, this.name, this.chapterCount);

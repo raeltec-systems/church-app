@@ -22,6 +22,7 @@ import '../domain/content_banners.dart'
 import '../application/providers.dart'
     show bannerRepositoryProvider, contentFilePickerProvider;
 import 'calendar_screens.dart' show churchShortWhen;
+import 'content_staff_widgets.dart';
 
 // Story 6.3, staff web: Admins keep the church's giving methods. The screen
 // answers "what can givers see now, and what waits for a second Admin?"
@@ -686,32 +687,14 @@ class _MethodRow extends ConsumerStatefulWidget {
 class _MethodRowState extends ConsumerState<_MethodRow> {
   var _editing = false;
 
-  Future<bool> _confirm(String title, String body, String yes) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => ChurchDialog(
+  Future<bool> _confirm(String title, String body, String yes) =>
+      confirmContentChange(
+        context,
+        keyPrefix: 'giving',
         title: title,
-        content: Text(body),
-        actions: [
-          FocusRing(
-            child: TextButton(
-              key: const Key('giving-confirm-no'),
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Keep it'),
-            ),
-          ),
-          FocusRing(
-            child: FilledButton(
-              key: const Key('giving-confirm-yes'),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(yes),
-            ),
-          ),
-        ],
-      ),
-    );
-    return ok == true && mounted;
-  }
+        body: body,
+        yes: yes,
+      );
 
   Future<void> _verify(StaffGivingMethod g) => showDialog<void>(
     context: context,

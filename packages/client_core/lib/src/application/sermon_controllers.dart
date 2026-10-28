@@ -273,61 +273,12 @@ BannerNotice _success(String command) => switch (command) {
   _ => BannerNotice.archived,
 };
 
-class SermonPosterUploadController extends Notifier<BannerImageUpload> {
-  SermonPosterUploadController(this.seriesId);
-  final String seriesId;
-  int _epoch = 0;
+/// One sermon series' poster upload (purpose `sermon_series_poster`).
+class SermonPosterUploadController extends ContentImageUploadController {
+  SermonPosterUploadController(super.itemId);
+
   @override
-  BannerImageUpload build() {
-    ref.watch(accountGenerationProvider);
-    _epoch++;
-    return const BannerImageUpload();
-  }
-
-  Future<void> pickAndUpload() async {
-    if (state.busy) return;
-    final epoch = _epoch;
-    state = const BannerImageUpload(status: ImageUploadStatus.picking);
-    final file = await ref.read(contentFilePickerProvider).pickImage();
-    if (!ref.mounted || epoch != _epoch) return;
-    if (file == null) {
-      state = const BannerImageUpload();
-      return;
-    }
-    if (file.unreadable) {
-      state = const BannerImageUpload(
-        status: ImageUploadStatus.refused,
-        outcome: ImageUploadRefused(fieldErrors: {'file': 'too_large'}),
-      );
-      return;
-    }
-    state = BannerImageUpload(
-      status: ImageUploadStatus.uploading,
-      bytes: file.bytes,
-    );
-    final outcome = await ref
-        .read(bannerRepositoryProvider)
-        .uploadImage(seriesId, SermonCommands.posterPurpose, file);
-    if (!ref.mounted || epoch != _epoch) return;
-    state = switch (outcome) {
-      ImageUploaded(:final image) => BannerImageUpload(
-        status: ImageUploadStatus.uploaded,
-        image: image,
-        bytes: file.bytes,
-        outcome: outcome,
-      ),
-      ImageUploadRefused() => BannerImageUpload(
-        status: ImageUploadStatus.refused,
-        outcome: outcome,
-      ),
-      _ => BannerImageUpload(
-        status: ImageUploadStatus.failed,
-        outcome: outcome,
-      ),
-    };
-  }
-
-  void clear() => state = const BannerImageUpload();
+  String get purpose => ContentPurposes.sermonSeriesPoster;
 }
 
 final sermonPosterUploadProvider = NotifierProvider.autoDispose

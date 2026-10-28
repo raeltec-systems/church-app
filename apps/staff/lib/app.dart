@@ -373,6 +373,19 @@ List<StaffDestination> staffDestinationsFor(
   for (final g in staffNavGroupsFor(grants, signedIn: signedIn)) ...g.items,
 ];
 
+/// Entry 6.16: the sidebar entry a page belongs to: the destination whose
+/// path is [location] or, for a sub-page such as `/content/sermons/<id>` or
+/// `/cells/meetings/<id>/plan`, the longest destination path it starts
+/// under (whole segments only). Null when no destination covers it.
+String? staffNavPathFor(String location, Iterable<String> paths) {
+  String? best;
+  for (final path in paths) {
+    final covers = location == path || location.startsWith('$path/');
+    if (covers && (best == null || path.length > best.length)) best = path;
+  }
+  return best;
+}
+
 /// Whether the wide sidebar is folded to a rail of icons. Memory only: it
 /// lasts while the tab is open (staff web keeps nothing on the device).
 class StaffSidebarController extends Notifier<bool> {
@@ -487,19 +500,23 @@ class StaffShell extends ConsumerWidget {
     final wide = _wide(context);
     final collapsed = wide && ref.watch(staffSidebarCollapsedProvider);
 
+    final selectedPath = staffNavPathFor(location, [
+      for (final g in groups) ...g.items.map((d) => d.path),
+    ]);
+
     Widget item(StaffDestination d, {required bool compact, String? group}) {
       final badge = badges[d.path];
       return NavItem(
         key: Key('nav-${d.path}'),
         label: d.label,
         icon: d.icon,
-        selected: location == d.path,
+        selected: selectedPath == d.path,
         onDark: true,
         compact: compact,
         fill: wide && !compact,
         badge: badge?.$1,
         badgeLabel: badge?.$2,
-        autofocus: focusSelectedNav && location == d.path,
+        autofocus: focusSelectedNav && selectedPath == d.path,
         onTap: () {
           if (group != null) {
             ref.read(staffNavSectionsProvider.notifier).expand(group);
@@ -517,7 +534,9 @@ class StaffShell extends ConsumerWidget {
         final expanded = label == null
             ? true
             : sectionExpansion[label] ??
-                  g.items.any((destination) => destination.path == location);
+                  g.items.any(
+                    (destination) => destination.path == selectedPath,
+                  );
         if (g.label case final label?) {
           navChildren.add(
             collapsed

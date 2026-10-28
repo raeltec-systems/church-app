@@ -8,6 +8,7 @@
 // image saved with the draft, publish refusals for rights and Q5). Fakes
 // only; the server is covered by supabase/tests/content_banners_test.sql
 // and tools/identity-e2e/content-banners.mjs.
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:church_client_core/church_client_core.dart';
@@ -1071,4 +1072,92 @@ void main() {
       expect(textOf(tester, 'rights-q5-$_rights'), 'Not on the Q5 list');
     });
   });
+
+  // Entry 6.16: banners, event posters and series posters share one upload
+  // controller; an answer that lands after the account changed is dropped.
+  group('image uploads', () {
+    ProviderContainer container(
+      _SlowBanners banners,
+      NotifierProvider<_Gen, int> gen,
+    ) => ProviderContainer(
+      overrides: [
+        bannerRepositoryProvider.overrideWithValue(banners),
+        contentFilePickerProvider.overrideWithValue(
+          FakeFilePicker()..next = picked('a.png'),
+        ),
+        accountGenerationProvider.overrideWith((ref) => ref.watch(gen)),
+      ],
+    );
+
+    test('each kind uploads under its own purpose', () async {
+      final banners = _SlowBanners()..hold = false;
+      final gen = NotifierProvider<_Gen, int>(_Gen.new);
+      final c = container(banners, gen);
+      addTearDown(c.dispose);
+      for (final p in [
+        bannerImageUploadProvider('b1'),
+        eventPosterUploadProvider('e1'),
+        sermonPosterUploadProvider('s1'),
+      ]) {
+        c.listen(p, (_, _) {});
+        await c.read(p.notifier).pickAndUpload();
+        expect(c.read(p).status, ImageUploadStatus.uploaded);
+      }
+      expect(
+        [for (final u in banners.uploads) (u.$1, u.$2)],
+        [
+          ('b1', 'banner_image'),
+          ('e1', 'event_poster'),
+          ('s1', 'sermon_series_poster'),
+        ],
+      );
+    });
+
+    test('an answer after an account change is dropped', () async {
+      for (final p in [
+        bannerImageUploadProvider('b1'),
+        eventPosterUploadProvider('e1'),
+        sermonPosterUploadProvider('s1'),
+      ]) {
+        final banners = _SlowBanners();
+        final gen = NotifierProvider<_Gen, int>(_Gen.new);
+        final c = container(banners, gen);
+        addTearDown(c.dispose);
+        c.listen(p, (_, _) {});
+        final upload = c.read(p.notifier).pickAndUpload();
+        await pumpEventQueue();
+        expect(c.read(p).status, ImageUploadStatus.uploading);
+        c.read(gen.notifier).bump();
+        expect(c.read(p).status, ImageUploadStatus.idle);
+        banners.release.complete();
+        await upload;
+        expect(c.read(p).status, ImageUploadStatus.idle);
+        expect(c.read(p).image, isNull);
+      }
+    });
+  });
+}
+
+class _Gen extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state++;
+}
+
+/// Holds every upload answer until [release] completes (unless [hold] is
+/// false).
+class _SlowBanners extends FakeBanners {
+  bool hold = true;
+  final release = Completer<void>();
+
+  @override
+  Future<ImageUploadOutcome> uploadImage(
+    String itemId,
+    String purpose,
+    PickedFile file,
+  ) async {
+    if (hold) await release.future;
+    return super.uploadImage(itemId, purpose, file);
+  }
 }

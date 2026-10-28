@@ -17,26 +17,11 @@ import 'access_grants.dart';
 import 'content_events.dart' show ContentState;
 import 'wire_json.dart';
 
-/// A required, non-blank string at [key].
-String _text(Map json, String key) {
-  final v = wireReq<String>(json, key);
-  if (v.trim().isEmpty) throw FormatException('unexpected $key');
-  return v;
-}
-
-/// An optional, non-blank string at [key] (null when absent or null).
-String? _optText(Map json, String key) {
-  final v = wireOpt<String>(json, key);
-  if (v != null && v.trim().isEmpty) throw FormatException('unexpected $key');
-  return v;
-}
-
-/// A required positive integer at [key].
-int _positive(Map json, String key) {
-  final v = wireReq<int>(json, key);
-  if (v < 1) throw FormatException('unexpected $key');
-  return v;
-}
+// Entry 6.16: the shared wire readers (wire_json.dart), under the short
+// names this library has always used.
+const _text = wireText;
+const _optText = wireOptText;
+const _positive = wirePositive;
 
 /// The image media types the server accepts (PNG, JPEG, WebP).
 const contentImageTypes = ['image/png', 'image/jpeg', 'image/webp'];
@@ -490,17 +475,7 @@ class StaffBanners {
   final bool truncated;
 }
 
-String _capacity(Map m) {
-  final capacity = wireReq<String>(m, 'capacity');
-  if (!const [
-    ChurchRoles.admin,
-    ChurchRoles.pastor,
-    ChurchRoles.media,
-  ].contains(capacity)) {
-    throw const FormatException('unexpected capacity');
-  }
-  return capacity;
-}
+const _capacity = wireEditorCapacity;
 
 /// The legal basis a rights record names.
 enum RightsBasis {
@@ -819,6 +794,9 @@ abstract final class ContentPurposes {
 
   /// Story 6.11: an event's poster.
   static const eventPoster = 'event_poster';
+
+  /// Story 6.9: a sermon series' poster.
+  static const sermonSeriesPoster = 'sermon_series_poster';
 }
 
 /// A file an editor picked: its name, the type the browser declared (never

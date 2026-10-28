@@ -20,6 +20,7 @@ import 'banner_screens.dart' show bannerReasonText;
 import 'calendar_screens.dart'
     show churchLongWhen, churchShortWhen, eventSpanText;
 import 'church_widgets.dart';
+import 'content_staff_widgets.dart';
 import 'home_banners.dart' show BannerPaths;
 
 // Story 6.1, staff web: the editors (Media, Pastor, Admin) draft, publish,
@@ -621,32 +622,14 @@ class _EventRow extends ConsumerStatefulWidget {
 class _EventRowState extends ConsumerState<_EventRow> {
   var _editing = false;
 
-  Future<bool> _confirm(String title, String body, String yes) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => ChurchDialog(
+  Future<bool> _confirm(String title, String body, String yes) =>
+      confirmContentChange(
+        context,
+        keyPrefix: 'event',
         title: title,
-        content: Text(body),
-        actions: [
-          FocusRing(
-            child: TextButton(
-              key: const Key('event-confirm-no'),
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Keep it'),
-            ),
-          ),
-          FocusRing(
-            child: FilledButton(
-              key: const Key('event-confirm-yes'),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(yes),
-            ),
-          ),
-        ],
-      ),
-    );
-    return ok == true && mounted;
-  }
+        body: body,
+        yes: yes,
+      );
 
   @override
   Widget build(BuildContext context) {

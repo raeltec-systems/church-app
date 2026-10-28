@@ -21,12 +21,9 @@ bool churchSameDay(DateTime a, DateTime b) {
   return x.year == y.year && x.month == y.month && x.day == y.day;
 }
 
-/// A required, non-blank string at [key].
-String _text(Map json, String key) {
-  final v = wireReq<String>(json, key);
-  if (v.trim().isEmpty) throw FormatException('unexpected $key');
-  return v;
-}
+// Entry 6.16: the shared wire readers (wire_json.dart), under the short
+// names this library has always used.
+const _text = wireText;
 
 /// Story 6.11: a published event's poster as everyone reads it, once it is
 /// placed in the public bucket: the file, its text alternative and whether

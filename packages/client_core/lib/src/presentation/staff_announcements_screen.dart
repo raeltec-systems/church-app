@@ -8,6 +8,7 @@ import '../domain/content_announcements.dart';
 import '../domain/content_events.dart' show ContentState;
 import 'announcement_screens.dart' show announcementExcerpt;
 import 'calendar_screens.dart' show churchShortWhen;
+import 'content_staff_widgets.dart';
 
 // Story 6.13, staff web: the editors (Media, Pastor, Admin) draft, publish,
 // withdraw and archive church announcements, and may notify members on
@@ -609,32 +610,14 @@ class _AnnouncementRow extends ConsumerStatefulWidget {
 class _AnnouncementRowState extends ConsumerState<_AnnouncementRow> {
   var _editing = false;
 
-  Future<bool> _confirm(String title, String body, String yes) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => ChurchDialog(
+  Future<bool> _confirm(String title, String body, String yes) =>
+      confirmContentChange(
+        context,
+        keyPrefix: 'announcement',
         title: title,
-        content: Text(body),
-        actions: [
-          FocusRing(
-            child: TextButton(
-              key: const Key('announcement-confirm-no'),
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Keep it'),
-            ),
-          ),
-          FocusRing(
-            child: FilledButton(
-              key: const Key('announcement-confirm-yes'),
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(yes),
-            ),
-          ),
-        ],
-      ),
-    );
-    return ok == true && mounted;
-  }
+        body: body,
+        yes: yes,
+      );
 
   /// The publish dialog: whether to also notify members. Null: cancelled.
   Future<bool?> _askPublish(StaffAnnouncement a) async {

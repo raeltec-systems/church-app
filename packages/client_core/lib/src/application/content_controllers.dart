@@ -7,16 +7,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../domain/access_grants.dart';
 import '../domain/commands.dart';
 import '../domain/content_banners.dart'
-    show
-        ContentPurposes,
-        FileSyncDone,
-        FileSyncOutcome,
-        ImageUploadRefused,
-        ImageUploaded;
+    show ContentPurposes, FileSyncDone, FileSyncOutcome;
 import '../domain/content_events.dart';
 import '../domain/public_content_cache.dart';
 import 'access_controllers.dart' show noteProtectedDenial;
-import 'banner_controllers.dart' show BannerImageUpload, ImageUploadStatus;
+import 'banner_controllers.dart'
+    show BannerImageUpload, ContentImageUploadController;
 import 'providers.dart';
 
 // Story 6.1: the public calendar (everyone, signed in or not) and the
@@ -802,64 +798,14 @@ final linkedEventProvider = FutureProvider.autoDispose
       return ref.read(contentRepositoryProvider).fetchPublicEvent(eventId);
     });
 
-/// Story 6.11: one saved event's poster upload: pick a file, send it to the
-/// server (purpose `event_poster`), keep the answer. Nothing is attached
-/// until the editor saves the draft with the uploaded poster.
-class EventPosterUploadController extends Notifier<BannerImageUpload> {
-  EventPosterUploadController(this.eventId);
-
-  final String eventId;
+/// Story 6.11: one saved event's poster upload (purpose `event_poster`).
+/// Nothing is attached until the editor saves the draft with the uploaded
+/// poster.
+class EventPosterUploadController extends ContentImageUploadController {
+  EventPosterUploadController(super.itemId);
 
   @override
-  BannerImageUpload build() {
-    ref.watch(accountGenerationProvider);
-    return const BannerImageUpload();
-  }
-
-  Future<void> pickAndUpload() async {
-    if (state.busy) return;
-    state = const BannerImageUpload(status: ImageUploadStatus.picking);
-    final file = await ref.read(contentFilePickerProvider).pickImage();
-    if (!ref.mounted) return;
-    if (file == null) {
-      state = const BannerImageUpload();
-      return;
-    }
-    // Larger than the route reads at all: refused here, nothing sent.
-    if (file.unreadable) {
-      state = const BannerImageUpload(
-        status: ImageUploadStatus.refused,
-        outcome: ImageUploadRefused(fieldErrors: {'file': 'too_large'}),
-      );
-      return;
-    }
-    state = BannerImageUpload(
-      status: ImageUploadStatus.uploading,
-      bytes: file.bytes,
-    );
-    final outcome = await ref
-        .read(bannerRepositoryProvider)
-        .uploadImage(eventId, ContentPurposes.eventPoster, file);
-    if (!ref.mounted) return;
-    state = switch (outcome) {
-      ImageUploaded(:final image) => BannerImageUpload(
-        status: ImageUploadStatus.uploaded,
-        image: image,
-        bytes: file.bytes,
-        outcome: outcome,
-      ),
-      ImageUploadRefused() => BannerImageUpload(
-        status: ImageUploadStatus.refused,
-        outcome: outcome,
-      ),
-      _ => BannerImageUpload(
-        status: ImageUploadStatus.failed,
-        outcome: outcome,
-      ),
-    };
-  }
-
-  void clear() => state = const BannerImageUpload();
+  String get purpose => ContentPurposes.eventPoster;
 }
 
 final eventPosterUploadProvider = NotifierProvider.autoDispose

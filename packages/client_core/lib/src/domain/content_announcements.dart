@@ -14,12 +14,9 @@ import 'access_grants.dart';
 import 'content_events.dart' show ContentState;
 import 'wire_json.dart';
 
-/// A required, non-blank string at [key].
-String _text(Map json, String key) {
-  final v = wireReq<String>(json, key);
-  if (v.trim().isEmpty) throw FormatException('unexpected $key');
-  return v;
-}
+// Entry 6.16: the shared wire readers (wire_json.dart), under the short
+// names this library has always used.
+const _text = wireText;
 
 /// One published announcement as everyone reads it: only the current
 /// published revision, never a draft, who edited it or who was notified.

@@ -795,7 +795,7 @@ My duties read (`api.duties_my_duties`) unchanged.
 
 - The Calendar tab shows two switches, **My duties** and **My cell**, only to a signed-in member
   with live access. Guests and Pending applicants see the public calendar alone, with no switch.
-  Both start off; the choice lasts for the app session and is dropped on an account change.
+  Both start on (owner decision 2026-10-28); the choice lasts for the app session and is dropped on an account change.
 - Switched on, the member's own items join the month lists among the events in time order, each
   with a mark: **My duty** (blue) or **My cell** (green). A duty shows its report time (or its
   times) and place; "done by" assignments say "Done by this day". A cell meeting shows its time

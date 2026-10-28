@@ -823,7 +823,7 @@ row deletion). Plan: `_bmad-output/initiative-church-app/epic-public-content-and
 
 ### F6: the historical leader picker
 
-Migration `20261028140001_cells_record_roster.sql`. `api.cells_programme` answers a new field
+Migration `20261028130727_cells_record_roster.sql`. `api.cells_programme` answers a new field
 `record_roster`: the members whose confirmed membership of the cell covered the meeting's start
 (`member_id`, `display_name`, `account`, `in_cell`), only for the cell's leader and assistant and
 only once the meeting has started and was not cancelled (otherwise `[]`). It is exactly what
@@ -835,7 +835,7 @@ offers.
 
 ### F8: venue-only and map-pin-only schedule changes
 
-Migration `20261028140003_cells_schedule_place_notices.sql` (replaces `app.cells_set_schedule`).
+Migration `20261028130929_cells_schedule_place_notices.sql` (replaces `app.cells_set_schedule`).
 When the Admin changes the schedule's venue or map pin, every future scheduled or moved meeting
 that shows the schedule's place (no venue of its own) and that generation did not already revise
 gets a new revision; reminders are re-planned at it, and a meeting in the next 14 days sends its
@@ -846,7 +846,7 @@ was sent on staging for this fix.
 
 ### Coverage for cells (owner decision 2026-10-28; Duties contract change)
 
-Migration `20261028140004_duties_cell_coverage.sql`. The 5.5 limit "contact attempts, the
+Migration `20261028131249_duties_cell_coverage.sql`. The 5.5 limit "contact attempts, the
 coverage queue, leader alerts and outcomes stay department-only" is lifted. A cell's leader and
 assistant now work their cell's programme parts as a department's leaders and deputies work
 duties, through the shared Duties coverage queue (extended, not copied):
@@ -873,3 +873,9 @@ duties, through the shared Duties coverage queue (extended, not copied):
 - **Owner manual check (staging):** as a cell leader, decline a part as its member, see the
   "Cell part declined" alert, open Coverage, record a contact attempt and, after the meeting,
   record the outcome on Outcomes.
+
+### Staging (2026-10-28)
+
+Applied verbatim as `20261028130727` (F6), `20261028130849` (F7, `duties_special_due_on_changes`),
+`20261028130929` (F8) and `20261028131249` (coverage for cells). All 25 changed or added functions
+hash identically to the fresh local replay; boundary and unowned are 0. No notification was sent.

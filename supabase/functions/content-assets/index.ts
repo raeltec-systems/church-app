@@ -51,6 +51,7 @@ import {
   retentionSystemEnvelope,
   sha256Hex,
   sanitizeImage,
+  syncPublicFiles,
   triggerMatches,
 } from './logic.mjs';
 
@@ -302,24 +303,26 @@ async function upload(req: Request, auth: string, itemId: string, purpose: strin
   });
 }
 
+// The sync loop itself is syncPublicFiles (logic.mjs): placement revalidates against a fresh plan
+// right before each upload and the final plan's removals are executed, so a withdrawal that lands
+// mid-sync never leaves a public file behind (review F1, 2026-10-28).
 async function sync(auth: string): Promise<Response> {
-  let placed = 0;
-  let removed = 0;
-  let plan = { place: [] as Json[], remove: [] as string[], waiting: 0, removals_pending: 0 };
-  for (let round = 0; round < MAX_PLAN_ROUNDS; round++) {
-    const read = await asCaller(auth, 'content_file_plan', {});
-    const refused = readRefusal(read.status);
-    if (refused) return refused;
-    plan = planFrom(read.json) as typeof plan;
-    const progressBefore = placed + removed;
-    for (const p of plan.place) {
+  const outcome = await syncPublicFiles({
+    readPlan: async () => {
+      const read = await asCaller(auth, 'content_file_plan', {});
+      const refused = readRefusal(read.status);
+      return refused ? { refused } : { plan: planFrom(read.json) };
+    },
+    readDraft: async (p: Json) => {
       const draft = await timed(`${SUPABASE_URL}/storage/v1/object/authenticated/${DRAFT_BUCKET}/${p.draft_path}`,
         { method: 'GET', headers: storageHeaders() }, FILE_TIMEOUT_MS);
       if (!draft || !draft.ok) {
         await draft?.body?.cancel();
-        continue;
+        return null;
       }
-      const bytes = new Uint8Array(await draft.arrayBuffer());
+      return new Uint8Array(await draft.arrayBuffer());
+    },
+    putPublic: async (p: Json, bytes: Uint8Array) => {
       const put = await timed(`${SUPABASE_URL}/storage/v1/object/${PUBLIC_BUCKET}/${p.public_path}`, {
         method: 'POST',
         headers: storageHeaders({
@@ -330,26 +333,21 @@ async function sync(auth: string): Promise<Response> {
         body: bytes,
       }, FILE_TIMEOUT_MS);
       if (put) await put.body?.cancel();
-      if (put?.ok) placed++;
-    }
-    if (plan.remove.length > 0) {
+      return put?.ok === true;
+    },
+    removePublic: async (paths: string[]) => {
       const del = await timed(`${SUPABASE_URL}/storage/v1/object/${PUBLIC_BUCKET}`, {
         method: 'DELETE',
         headers: storageHeaders({ 'content-type': 'application/json' }),
-        body: JSON.stringify({ prefixes: plan.remove }),
+        body: JSON.stringify({ prefixes: paths }),
       });
       const deleted = del?.ok ? await del.json().catch(() => null) : null;
       if (!del?.ok) await del?.body?.cancel();
-      if (Array.isArray(deleted)) removed += deleted.length;
-    }
-    if (placed + removed === progressBefore || (plan.waiting <= plan.place.length
-        && plan.removals_pending <= plan.remove.length)) break;
-  }
-  const after = await asCaller(auth, 'content_file_plan', {});
-  const refused = readRefusal(after.status);
-  if (refused) return refused;
-  plan = planFrom(after.json) as typeof plan;
-  return reply(200, { outcome: 'synced', placed, removed, waiting: plan.waiting, removals_pending: plan.removals_pending });
+      return Array.isArray(deleted) ? deleted.length : 0;
+    },
+  }, MAX_PLAN_ROUNDS);
+  if (outcome.refused) return outcome.refused as Response;
+  return reply(200, { outcome: 'synced', ...(outcome.result as Json) });
 }
 
 async function preview(auth: string, assetId: string): Promise<Response> {

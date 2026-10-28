@@ -41,8 +41,8 @@ List<MobileDestination> mobileDestinationsFor(MemberGrants? grants) =>
 /// Routes that show the top bar (logo, inbox, account or Sign in): the tab
 /// roots for everyone, and every other screen of a caller without member
 /// access except an event's, a giving method's, a hymn's (story 6.7) or a
-/// sermon's (story 6.9) detail and the announcements (story 6.13), which
-/// have their own back bar.
+/// sermon's (story 6.9) detail, the announcements (story 6.13) and the
+/// search (entry 14), which have their own back bar.
 bool _showsTopBar(String location, bool member) =>
     location == ClientPaths.home ||
     location == ClientPaths.bible ||
@@ -55,7 +55,9 @@ bool _showsTopBar(String location, bool member) =>
         !location.startsWith('${ClientPaths.bible}/') &&
         !location.startsWith('${ClientPaths.sermons}/') &&
         location != ClientPaths.announcements &&
-        !location.startsWith('${ClientPaths.announcements}/'));
+        !location.startsWith('${ClientPaths.announcements}/') &&
+        // Entry 14: the search screen has its own search bar.
+        location != ClientPaths.search);
 
 class MobileApp extends StatefulWidget {
   const MobileApp({
@@ -387,8 +389,9 @@ class MobileShell extends ConsumerWidget {
 }
 
 /// The handoff's top bar: the emblem alone (it carries the church name), then
-/// the inbox with its unread count and the member's initials; a caller
-/// without member access sees a Sign in pill instead.
+/// search (entry 14, everyone), the inbox with its unread count and the
+/// member's initials; a caller without member access sees a Sign in pill
+/// instead of the inbox and initials.
 class _TopBar extends ConsumerWidget {
   const _TopBar({required this.member, required this.location});
 
@@ -409,24 +412,72 @@ class _TopBar extends ConsumerWidget {
           child: Row(
             children: [
               const ChurchLogo(),
-              const Spacer(),
-              if (member) ...[
-                _InboxButton(location: location),
-                const SizedBox(width: 4),
-                _AccountButton(location: location),
-              ] else
-                FocusRing(
-                  child: FilledButton(
-                    key: const Key('nav-/account'),
-                    onPressed: () => goFromNav(context, ClientPaths.account),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 40),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                    child: Text(signedIn ? 'Account' : 'Sign in'),
-                  ),
+              const SizedBox(width: 12),
+              // The actions keep to the right; at large text sizes the Sign
+              // in pill gives way first (entry 14 added search beside it).
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    // Entry 14: search, for everyone.
+                    const _SearchButton(),
+                    const SizedBox(width: 4),
+                    if (member) ...[
+                      _InboxButton(location: location),
+                      const SizedBox(width: 4),
+                      _AccountButton(location: location),
+                    ] else
+                      Flexible(
+                        child: FocusRing(
+                          child: FilledButton(
+                            key: const Key('nav-/account'),
+                            onPressed: () =>
+                                goFromNav(context, ClientPaths.account),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(0, 40),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                            ),
+                            child: Text(
+                              signedIn ? 'Account' : 'Sign in',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
+              ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Entry 14: the top bar's search (hymns, sermons, events, announcements).
+class _SearchButton extends StatelessWidget {
+  const _SearchButton();
+
+  @override
+  Widget build(BuildContext context) {
+    final c = ChurchColors.of(context);
+    return Semantics(
+      button: true,
+      label: 'Search',
+      excludeSemantics: true,
+      child: FocusRing(
+        radius: 22,
+        child: InkResponse(
+          key: const Key('nav-/search'),
+          radius: 22,
+          onTap: () => context.push(ClientPaths.search),
+          child: SizedBox.square(
+            dimension: ChurchGeometry.minTarget,
+            child: Icon(Icons.search, color: c.ink, size: 24),
           ),
         ),
       ),

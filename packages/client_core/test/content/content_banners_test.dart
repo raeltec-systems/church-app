@@ -440,10 +440,11 @@ void main() {
         textOf(tester, 'home-banner-title-$_theme'),
         'SYNTHETIC God\'s faithfulness in Self Sustenance',
       );
-      // The carousel opens Home, above the greeting.
+      // The carousel opens Home, above the guest's Join card (entry 14:
+      // a guest's Home has no greeting).
       expect(
         tester.getTopLeft(byKey('home-banners')).dy,
-        lessThan(tester.getTopLeft(byKey('home-greeting')).dy),
+        lessThan(tester.getTopLeft(byKey('home-join-card')).dy),
       );
       // The banner fills the same Home column as member cards, at 16:9.
       final size = tester.getSize(byKey('home-banner-$_theme'));
@@ -600,7 +601,7 @@ void main() {
       await pumpAt(tester, ClientPaths.home, account: null);
       expect(byKey('home-banners'), findsNothing);
       expect(byKey('home-banners-failed'), findsNothing);
-      expect(byKey('home-greeting'), findsOneWidget);
+      expect(byKey('home-join-card'), findsOneWidget);
     });
 
     testWidgets('a failed read says so and can be retried', (tester) async {

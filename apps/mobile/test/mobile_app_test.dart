@@ -720,12 +720,54 @@ void main() {
       expect(find.byKey(const Key('nav-/calendar')), findsOneWidget);
       expect(find.byKey(const Key('nav-/duties')), findsNothing);
       expect(find.byKey(const Key('nav-/my-cell')), findsNothing);
-      expect(
-        tester.widget<Text>(find.byKey(const Key('home-greeting'))).data,
-        'Welcome',
-      );
+      // Entry 14 (layout change): no "Welcome" heading; the applicant's
+      // line (their request card once one is sent) leads instead.
+      expect(find.byKey(const Key('home-greeting')), findsNothing);
+      expect(find.byKey(const Key('home-signed-in-line')), findsOneWidget);
       expect(find.byKey(const Key('home-duties-card')), findsNothing);
       expect(find.byKey(const Key('coming-up')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'entry 14: a signed-out phone searches from the top bar: a hymn on the '
+    'phone and an announcement from the server, with its own back bar',
+    (tester) async {
+      const offering = '73737373-7373-4373-8373-737373737373';
+      final h = await pumpMobile(
+        tester,
+        location: ClientPaths.home,
+        setUp: (h) {
+          h.session.switchTo(null);
+          h.search.answer = AccessReadOk(
+            PublicSearchResults.fromJson(
+              publicSearchData(
+                query: 'SYNTHETIC hymn',
+                announcements: [publicAnnouncementData()],
+              ),
+            ),
+          );
+        },
+      );
+      expect(find.byKey(const Key('home-join-card')), findsOneWidget);
+      await tapKey(tester, 'nav-/search');
+      await tester.pumpAndSettle();
+      expect(find.byType(SearchScreen), findsOneWidget);
+      expect(find.text('Sign in'), findsNothing);
+      expect(find.byType(BackButton), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const Key('search-field')),
+        'SYNTHETIC hymn',
+      );
+      await tester.pump(searchDebounce + const Duration(milliseconds: 10));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('hymn-row-hymn-1')), findsOneWidget);
+      expect(find.byKey(const Key('announcement-row-$offering')), findsOne);
+      expect(h.search.asked, ['SYNTHETIC hymn']);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(HomeScreen), findsOneWidget);
+      expect(tester.takeException(), isNull);
     },
   );
 

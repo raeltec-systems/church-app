@@ -395,7 +395,9 @@ void main() {
   });
 
   group('Home', () {
-    testWidgets('a guest sees Welcome and Coming up, no member card', (
+    // Entry 14 (layout change): a guest's Home leads with the Join card
+    // instead of a "Welcome" heading and line.
+    testWidgets('a guest sees the Join card and Coming up, no member card', (
       tester,
     ) async {
       await pumpAt(
@@ -404,7 +406,8 @@ void main() {
         account: null,
         setUp: (h) => h.content.publicEvents = twoEvents(),
       );
-      expect(textOf(tester, 'home-greeting'), 'Welcome');
+      expect(byKey('home-greeting'), findsNothing);
+      expect(byKey('home-join-card'), findsOneWidget);
       expect(byKey('home-guest-line'), findsOneWidget);
       for (final card in [
         'home-duties-card',
@@ -429,7 +432,7 @@ void main() {
         setUp: (h) =>
             h.grants.myAccess = const AccessReadDenied(AccessDenial.notLinked),
       );
-      expect(textOf(tester, 'home-greeting'), 'Welcome');
+      expect(byKey('home-greeting'), findsNothing);
       expect(byKey('home-duties-card'), findsNothing);
       expect(byKey('coming-up-empty'), findsOneWidget);
       // Already signed in: not told to sign in.

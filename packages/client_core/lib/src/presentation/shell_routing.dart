@@ -20,6 +20,8 @@ import 'give_screens.dart';
 import 'giving_staff_screens.dart';
 import 'home_banners.dart';
 import 'home_screen.dart';
+import 'home_coming_up.dart';
+import 'search_screens.dart';
 import 'hymn_screens.dart';
 import 'hymn_list_screens.dart';
 import 'sunday_hymns_staff_screen.dart';
@@ -226,6 +228,14 @@ abstract final class ClientPaths {
   /// Story 2.11, staff web, Admin only: member deletions and the staff route
   /// for members who cannot use the app.
   static const adminMemberDeletions = '/admin/member-deletions';
+
+  /// Entry 14 (mobile, everyone): the top bar's search.
+  static const search = SearchPaths.search;
+
+  /// Entry 14: a Coming up poster in full.
+  static String eventPoster(String eventId) => HomePosterPaths.event(eventId);
+  static String seriesPoster(String seriesId) =>
+      HomePosterPaths.series(seriesId);
 
   /// Story 3.1 (both clients): the member's durable inbox.
   static const inbox = '/inbox';
@@ -487,7 +497,34 @@ GoRouter buildClientRouter({
                 ),
               ),
             ),
+            // Entry 14: a Coming up poster in full.
+            GoRoute(
+              path: 'posters/events/:eventId',
+              pageBuilder: (_, state) => page(
+                state,
+                HomePosterScreen.event(
+                  key: ValueKey(state.pathParameters['eventId']),
+                  id: state.pathParameters['eventId']!,
+                ),
+              ),
+            ),
+            GoRoute(
+              path: 'posters/series/:seriesId',
+              pageBuilder: (_, state) => page(
+                state,
+                HomePosterScreen.series(
+                  key: ValueKey(state.pathParameters['seriesId']),
+                  id: state.pathParameters['seriesId']!,
+                ),
+              ),
+            ),
           ],
+        ),
+        // Entry 14: the top bar's search (hymns on the device; sermons,
+        // events and announcements from the bounded public search read).
+        GoRoute(
+          path: ClientPaths.search,
+          pageBuilder: (_, state) => page(state, const SearchScreen()),
         ),
         GoRoute(
           path: ClientPaths.calendar,

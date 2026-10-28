@@ -11,6 +11,8 @@ import 'src/adapters/auth_session_storage.dart';
 import 'src/adapters/bible_package_source.dart';
 import 'src/adapters/content_file_picker.dart';
 import 'src/adapters/recovery_verifier_storage.dart';
+import 'src/application/calendar_overlay_controllers.dart'
+    show cellCalendarRepositoryProvider;
 import 'src/application/providers.dart';
 import 'src/domain/notification_settings.dart';
 import 'src/domain/password_recovery.dart';
@@ -98,6 +100,10 @@ Future<List<Override>> compositionOverrides(
       SupabaseReviewRepository(client),
     ),
     cellsRepositoryProvider.overrideWithValue(SupabaseCellsRepository(client)),
+    // Epic 6 entry 19: the member's own cell meetings (Calendar overlay).
+    cellCalendarRepositoryProvider.overrideWithValue(
+      SupabaseCellCalendarRepository(client),
+    ),
     contentRepositoryProvider.overrideWithValue(
       SupabaseContentRepository(client),
     ),

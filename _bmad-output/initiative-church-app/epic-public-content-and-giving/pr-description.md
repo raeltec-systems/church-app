@@ -2,6 +2,32 @@
 
 `main` was last updated at PR #3, so this branch (`story/5.8-meetings-held`) carries epic 4 (duties), epic 5 (cells and meetings) and epic 6 (public content and giving). Epics 4 and 5 were reviewed story by story when they were built. **Epic 6 has not been reviewed** (owner decision 2026-10-27: the build agent only builds, and this PR is the review). Please focus the review on epic 6.
 
+## Review fixes (after the 2026-10-28 review, HOLD)
+
+All findings of the 2026-10-28 review are fixed on this branch, each with a regression test. Every migration is on staging with its hashes verified, and boundary/unowned are 0.
+
+| Finding | Fix |
+|---|---|
+| F1 stale asset sync | `content-assets` rechecks the plan before each upload and carries out pending removals. There is a race test against the real handler. Deployed to staging (v3). |
+| F2 Bible import preflight | Busy guard and account epoch are taken before the first await; stale continuations are rejected. |
+| F3 withdrawn sermon offline | A null detail removes the sermon from the saved catalog directly. |
+| F4 banner images | Unchanged permitted revisions are reused; withdrawn or revoked ones are dropped before downloads. |
+| F5 calendar overlays | Personal overlays render whatever the public read returns. |
+| F6 historical roster | `record_roster` is membership at the meeting's start, for leader and assistant only. |
+| F7 special duty due date | `due_on` is a material change: re-acceptance, notice, overlap and revision history. |
+| F8 venue-only changes | Future meetings using the schedule venue are revised and send a deduplicated notice. |
+| Sermon-from-duty race | Authority is re-read after the advisory lock (`20261028123554`). |
+| Section 8 items | Manifest crash recovery and corrupt-manifest policy; display no longer waits on images; search query identity; picker reconciliation; special duty form reopen after a conflict. |
+| G1/G2 | CI has no Edge runtime or phone sign-in, so the runbook has a release-gate section with the RSVP last-seat and retention commands. |
+
+Owner decisions taken with the fixes (2026-10-28):
+- Cell leaders get the same coverage features as departments (contact attempts, coverage queue, alerts, outcomes), so the epic 5 coverage requirement now holds as written.
+- A saved calendar event opens offline.
+
+Also fixed: the banner E2E cleanup, which 6.11's organiser rows blocked (now 16/16).
+
+Known on this Windows build host only: four Node policy tests fail, on a file-permission check and a line-ending regex in files no fix touched. The hosted CI run will confirm.
+
 ## Epic 6 entries (plans in `_bmad-output/initiative-church-app/epic-public-content-and-giving/`)
 
 | Entry | What | Staging migration |

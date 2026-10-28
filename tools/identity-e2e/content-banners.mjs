@@ -187,6 +187,8 @@ async function main() {
     delete from app.content_audit a where a.item_id in (select item_id from gone_items);
     delete from app.content_banner_revisions r where r.item_id in (select item_id from gone_items);
     delete from app.content_rights_revisions r where r.item_id in (select item_id from gone_items);
+    delete from app.content_event_rsvps v where v.item_id in (select item_id from gone_items) or v.member_id in (select member_id from gone_members);
+    delete from app.content_event_organisers o where o.item_id in (select item_id from gone_items) or o.member_id in (select member_id from gone_members);
     delete from app.content_event_revisions r where r.item_id in (select item_id from gone_items);
     delete from app.content_items i where i.item_id in (select item_id from gone_items);
     delete from app.identity_access_audit a

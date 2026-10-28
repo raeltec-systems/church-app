@@ -1,0 +1,28 @@
+# head 970e8e0 + supabase/functions/content-assets/post-upload-refusal.test.mjs (reproduction, before the fix)
+# node --test supabase/functions/content-assets/post-upload-refusal.test.mjs supabase/functions/content-assets/sync-race.test.mjs  -> exit 1
+✖ F1 follow-up: post-upload plan refused with 401: the withdrawn origin object ends absent
+✖ F1 follow-up: after the 401 refusal every retry ends in a safe terminal state
+✖ F1 follow-up: post-upload plan refused with 403: the withdrawn origin object ends absent
+✖ F1 follow-up: after the 403 refusal every retry ends in a safe terminal state
+✖ F1 follow-up: post-upload plan refused with 503: the withdrawn origin object ends absent
+✖ F1 follow-up: after the 503 refusal every retry ends in a safe terminal state
+✖ F1 follow-up: post-upload plan read times out: the withdrawn origin object ends absent
+✖ F1 follow-up: a still-wanted file removed after a refusal is restored by the next authorized sync
+✖ F1 follow-up: a cleanup delete that fails is retried a bounded number of times, then the next sync removes it
+✖ F1 follow-up: logic: a refused read after placement removes exactly the placed paths
+✔ F1 logic: withdrawal and its sync while A pauses at draft: the public object ends absent
+✔ F1 handler: withdrawal and its sync while A pauses at draft: the public object ends absent
+✔ F1 logic: withdrawal and its sync while A pauses at upload: the public object ends absent
+✔ F1 handler: withdrawal and its sync while A pauses at upload: the public object ends absent
+✔ F1: an undisturbed sync places the file once and reports nothing pending
+✔ F1: a refused fresh plan stops the sync before any upload
+✔ F1: removals that never succeed end after bounded rounds and stay reported as pending
+ℹ tests 17
+ℹ suites 0
+ℹ pass 7
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 142.7808
+✖ failing tests:

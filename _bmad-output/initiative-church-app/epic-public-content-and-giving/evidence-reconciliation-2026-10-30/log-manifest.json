@@ -399,8 +399,27 @@
       "raw_bytes": 2178,
       "raw_sha256": "be637116e0079b3426f9366bf260b9644c99f9bf492e357b1e4b27e13ef5abfc",
       "compression_reason": "Preserve original terminal trailing padding byte-for-byte while keeping textual git diff checks clean."
+    },
+    {
+      "path": "logs/staff-signed-out-build.log.gz",
+      "encoding": "gzip",
+      "stored_bytes": 716,
+      "stored_sha256": "20e9a5507310983751860e5fc93b1c9923987ebb6c24108e8c472286d6d500e8",
+      "raw_bytes": 1279,
+      "raw_sha256": "758287bd1c09841f0999d7c4836c598f32bfd3b46687247d20a48bf44cb6054a",
+      "compression_reason": "Preserve original terminal padding byte-for-byte."
+    },
+    {
+      "path": "logs/browser-evidence-scan.log",
+      "encoding": "utf-8",
+      "stored_bytes": 437,
+      "stored_sha256": "05dceddaeb1280ff337fa2c3f52f0bbf6ca025e0aed8a985afd6482febd3dbe2",
+      "raw_bytes": 437,
+      "raw_sha256": "05dceddaeb1280ff337fa2c3f52f0bbf6ca025e0aed8a985afd6482febd3dbe2",
+      "compression_reason": null
     }
   ],
-  "updated_utc": "2026-10-30T20:04:20.327137+00:00",
-  "compression_policy": "Deterministic gzip for logs larger than 150,000 bytes or containing original terminal trailing padding; original raw bytes are preserved without trimming."
+  "updated_utc": "2026-10-30T20:16:17.275281+00:00",
+  "compression_policy": "Deterministic gzip for logs larger than 150,000 bytes or containing original terminal trailing padding; original raw bytes are preserved without trimming.",
+  "browser_followup_credential_scan": "browser-evidence-scan.json"
 }

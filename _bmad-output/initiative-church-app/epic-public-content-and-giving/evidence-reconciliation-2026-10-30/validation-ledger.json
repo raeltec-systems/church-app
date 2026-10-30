@@ -457,6 +457,46 @@
       "exit_code": 0,
       "status": "run-passed",
       "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/new-evidence-scan.log"
+    },
+    {
+      "name": "staff-signed-out-build",
+      "command": "flutter build web --no-pub --no-web-resources-cdn --no-wasm-dry-run --dart-define-from-file=/tmp/church-app-staging-public-client.json --output=/tmp/church-app-staff-staging-browser-web",
+      "cwd": "apps/staff",
+      "head": "c655dac95766011a22e3f6eb6cff674af2396b13",
+      "started_utc": "2026-10-30T20:07:30.620578+00:00",
+      "finished_utc": "2026-10-30T20:08:29.427537+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/staff-signed-out-build.log.gz"
+    },
+    {
+      "name": "staff-signed-out-browser",
+      "command": "node staff-signed-out-browser/smoke.mjs (see README.md for runtime paths and build command)",
+      "cwd": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30",
+      "head": "c655dac95766011a22e3f6eb6cff674af2396b13",
+      "started_utc": "2026-10-30T20:13:56.063Z",
+      "finished_utc": "2026-10-30T20:14:05.966Z",
+      "exit_code": 0,
+      "status": "run-passed",
+      "counts": {
+        "pass": 17,
+        "fail": 0,
+        "skipped": 0
+      },
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/staff-signed-out-browser/results.json",
+      "scope": "Signed-out DOM, semantics, keyboard, empty local validation, recovery entry/return, reload and responsive layout. No staging API requests and no authenticated backend retry evidence."
+    },
+    {
+      "name": "browser-evidence-scan",
+      "command": "bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30",
+      "cwd": ".",
+      "head": "c655dac95766011a22e3f6eb6cff674af2396b13",
+      "started_utc": "2026-10-30T20:15:51.825017+00:00",
+      "finished_utc": "2026-10-30T20:15:52.417216+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/browser-evidence-scan.log"
     }
-  ]
+  ],
+  "browser_followup_utc": "2026-10-30T20:14:05.966Z"
 }

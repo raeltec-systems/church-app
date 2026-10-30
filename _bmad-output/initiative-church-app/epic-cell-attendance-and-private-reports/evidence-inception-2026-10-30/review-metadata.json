@@ -1,0 +1,12 @@
+{
+  "date": "2026-10-30",
+  "repository": "/workspace/scratch/308c700530ee/church-app",
+  "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+  "review_copy": "/tmp/church-app-epic7-final-validation-z916rrim",
+  "source_hashes": {
+    "tickets.proposed.toml": "d5545493bb8dbf3e34a1f0596a98bf8736b159447c9aef0d4bd5436c9c5ed01b",
+    "inception-proposal-2026-10-30.md": "4338150da3e497e10719f7132f0a5f5780ae078560e2f95878823d44662e354c",
+    "epic-cell-attendance-and-private-reports.md": "25aa10104438f668a0706d438c2a32cb6df6d917169f3607178ae1cab0d7e8b4"
+  },
+  "canonical_tickets_in_real_tree": false
+}

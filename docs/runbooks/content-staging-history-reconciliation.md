@@ -6,7 +6,7 @@ This proposal repairs two missing history records only after fresh checks prove 
 complete intended effects already exist. It does not replay SQL, change application behavior,
 approve a policy gate, publish content, send notifications or promote production. The user
 explicitly reserved deployment and acceptance decisions; that is the reason approval is
-required here. No automatic approval review rejected this operation: it has not been requested.
+required here. The repair remains a proposal until that approval and the fresh checks exist.
 
 ## Evidence and exact target
 

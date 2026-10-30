@@ -73,6 +73,7 @@ inspected main; documentation changes are identified separately.
 | Dependencies and analysis | Existing locks enforced; all six package/app analyses clean |
 | Build and repository checks | Both web builds complete; environment, migration policy, import boundary, secret and evidence checks passed |
 | Bundle scan | 91 generated files clean; builds were not deployed |
+| Current staff browser smoke | 17/17 at desktop and 390 px, with screenshots; signed-out UI only, zero backend requests |
 
 Counts overlap across subsets and platforms and must not be summed into accepted
 workflows. An interrupted first core/build attempt lacked final success markers despite
@@ -86,6 +87,21 @@ passed all four jobs, including database/restore work unavailable in this worksp
 Its policy log explicitly **skipped staging drift because the access token was absent**.
 This is historical evidence for that exact source commit. PR CI is additional
 candidate-specific evidence; neither run is a witnessed app/device pilot or target parity.
+
+The branch checkpoint `c655dac95766011a22e3f6eb6cff674af2396b13` also produced fresh hosted
+database evidence: **72 pgTAP files / 5,841 tests**, Data API smoke and the isolated
+database/object restore steps all succeeded. At capture, GitHub still labelled the overall
+run and two jobs in progress despite successful listed steps, so the
+[checkpoint summary](evidence-reconciliation-2026-10-30/hosted-checkpoint-ci-summary.json)
+does not claim a completed green run. Inspect the PR's exact final head and workflow status
+before any release decision; its staging drift step still skips without the management token.
+
+The [actual staff browser smoke](evidence-reconciliation-2026-10-30/staff-signed-out-browser/README.md)
+exercised landing, keyboard navigation, local empty-field errors and recovery, password
+visibility, help/recovery entry, Back, reload and a 390 px layout. Seventeen checks passed;
+root also inspected the landing and desktop/narrow sign-in images. There were no page
+errors, staging API requests or mutation attempts. This is meaningful current UI evidence;
+it does not verify sign-in, authenticated permissions, recovery delivery or native devices.
 
 ## Fresh staging observations and release blocker
 

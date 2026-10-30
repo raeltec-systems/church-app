@@ -44,6 +44,12 @@ Both web builds completed their Wasm dry run and warned that `packages/cupertino
 
 The generated web artifacts remain local under `apps/staff/build/web` and `trials/staff_web/build/web`. They were scanned, not published or deployed. The old staff `browser_smoke.mjs` targets the superseded signed-out tracer UI and requires a local API; it was not treated as a current Epic 6 acceptance check.
 
+## Targeted current staff-browser check
+
+A further bounded browser smoke used a fresh signed-out Chrome context and a private staging-configured release build at source `c655dac95766011a22e3f6eb6cff674af2396b13`. All **17/17** checks passed: actual landing/sign-in rendering, named keyboard controls, empty-form validation/recovery, password visibility, church help, forgot-password entry and return, reload, and 1280×900 / 390×844 layouts. See [the browser report](staff-signed-out-browser/README.md), [results](staff-signed-out-browser/results.json), [build record](staff-signed-out-build.json) and [check record](staff-signed-out-browser.json).
+
+This is current rendered UI evidence. The signed-out staff flow intentionally made **zero staging API requests**, so it does not prove backend wiring, RLS or authenticated failure/retry behavior. No credentials or recovery address were entered; no email, notification, account creation or mutation was attempted. The staging-configured bundle stays private under `/tmp/church-app-staff-staging-browser-web`, outside committed artifacts. Console output contained only four software-renderer ReadPixels performance warnings; there were no application page errors. No runtime source changed.
+
 ## Checks that remain unrun or skipped
 
 | Check | Why this workspace cannot establish it | Required follow-up |

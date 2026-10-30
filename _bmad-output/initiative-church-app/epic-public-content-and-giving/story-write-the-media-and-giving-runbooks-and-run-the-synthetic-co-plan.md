@@ -9,8 +9,8 @@ route: 'oneshot'
 route_source: 'auto'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: []
-review_loop_iteration: 0
+lenses_ran: [quick]
+review_loop_iteration: 1
 context:
   - '{project-root}/_bmad-output/initiative-church-app/spec-church-app/design-contract.md'
   - '{project-root}/_bmad-output/initiative-church-app/epic-public-content-and-giving/epic-public-content-and-giving.md'
@@ -36,10 +36,22 @@ context:
 - Required useful outcomes: discover/read/search public content; publish/replace/withdraw with recovery; personal favourites and Sunday hymns; capacity-controlled RSVP and calendar export; current-role/stale-session denials; two-person giving verification and honest external handoff; own-only Calendar overlays and duty-to-Media draft; restart/offline/slow-media behavior. Each walkthrough step names role, setup, expected result and evidence.
 - Keep the accepted persistent public-upload take-back failure/process-death residual visible. Historical RSVP and retention integration results are evidence of their recorded revisions, not a substitute for the candidate's affected checks. Two-session sermon-duty lock contention remains a specific evidence gap until actually run.
 - The remaining human-in-the-loop pilot makes this story `in-progress`; completing its preparation does not mark the whole story `built` or `done`. Story 6.17 and production approval stay open. Epic 7 inception can proceed independently after this reconciliation without treating Epic 6 as accepted.
+- Fresh supported regressions completed on unchanged runtime sources, including 1,169 client-core and 115 mobile tests, VM/Chrome contracts, six analyses, two web builds and Linux non-Lusaka regressions. The full ledger retains interrupted attempts and verified retries; raw logs are preserved with deterministic compression where necessary. No local Docker/PostgreSQL or physical phone was available, so affected integrations and devices remain unverified here.
+- Fresh connected staging metadata/SELECT checks found both real purge bodies and zero module-guard findings, but only 99/101 history versions. Running the actual drift checker against that captured history failed with the two missing rows. Prepared `docs/runbooks/content-staging-history-reconciliation.md` for owner review; neither history nor functions were changed. A separate signed-out HTTP probe passed 15/15 bounded reads, with no keys/content retained in evidence.
+- Published checkpoint `66b1562e13abe939e9d328fa9f59fd35e6c3ea25`, then `c655dac95766011a22e3f6eb6cff674af2396b13`, on the authorized branch and draft PR #7. Runtime sources, migrations and dependency locks are unchanged. Connected GitHub publication and fetched tree comparison preserve working files.
+- Epic 7 remains a separate unapproved 14-entry proposal. Root dependency self-check added two collision edges; independent BMAD validation found and resolved the missing shared direct-contact adapter owner and early 4.16 handover prerequisite/semantics. Its final review reports complete scope/provider coverage with unresolved owner sequencing and Q4/Q6/Q8 decisions explicit; no canonical Epic 7 tickets or build status were created.
 
 ## Plan Change Log
 
+- 2026-10-30: No change to frozen intent. The acceptance package records fresh staging history drift as a confirmed release blocker rather than treating a missing purge body as current state. Preparation of the owner repair proposal does not authorize its execution.
+
 ## Review Triage Log
+
+- `medium`, patched — The context-free quick reviewer found that the manager-revocation lock case had John as the only reachable department leader. Checked `duties_report_handover`, `duties_has_reachable_leader` and `identity_revoke_scope`: an ordinary last-leader revoke rolls back with `handover_required`; Admin alone does not supply the required scope. The walkthrough now grants Peter an explicit reachable deputy scope before the case, requires successful revocation and explains the separate refusal/recovery path. No backend behavior changed and no concurrency result is claimed.
+- `medium`, patched — The quick reviewer found that UI-04 selected 8 November while the server's current Sunday on 30 October is 1 November. Checked `content_this_sunday`, `content_public_sunday_hymns` and `PublicSundayHymns.idsFor`: only the server's current week can supply the chip list, with a further Saturday/Sunday Home window. The walkthrough now reads the current server Sunday, requires device-week agreement, and records future/weekend-positive cases unverified until applicable.
+- `medium`, patched during independent procedure review — The first lock instructions confused assignment IDs in the normal duty URL with occurrence IDs used by the advisory lock. The final procedure uses an exact assignment/slot lookup, observes waiters blocked by the specific holder PID, and checks zero/one draft counts. Source checked against duty routing and `content_sermon_from_duty`.
+- `medium`, patched during independent procedure review — Navigation labels and local WEB/SAMPLE giving prerequisites were incomplete. Compared actual staff routes, source-rights fixtures and Giving validators; corrected the normal paths and supplied local-only, non-transacting fields. Source-book/video/provider checks remain explicit owner dependencies.
+- `low`, patched during independent procedure review — The old Sunday Home instruction implied device-date changes alone prove the server-selected list. Added the server/device date requirement; no time manipulation or device pass is claimed.
 
 ## Verification
 

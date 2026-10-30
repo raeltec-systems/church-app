@@ -1,0 +1,11 @@
+{
+  "name": "staff-signed-out-build",
+  "command": "flutter build web --no-pub --no-web-resources-cdn --no-wasm-dry-run --dart-define-from-file=/tmp/church-app-staging-public-client.json --output=/tmp/church-app-staff-staging-browser-web",
+  "cwd": "apps/staff",
+  "head": "c655dac95766011a22e3f6eb6cff674af2396b13",
+  "started_utc": "2026-10-30T20:07:30.620578+00:00",
+  "finished_utc": "2026-10-30T20:08:29.427537+00:00",
+  "exit_code": 0,
+  "status": "run-passed",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/staff-signed-out-build.log.gz"
+}

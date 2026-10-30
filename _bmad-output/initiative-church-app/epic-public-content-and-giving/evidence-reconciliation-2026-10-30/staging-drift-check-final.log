@@ -1,0 +1,3 @@
+check-migration-drift: staging (tmurpotfluignacfueki) drift
+check-migration-drift: DRIFT staging (tmurpotfluignacfueki): local 20261027140200_content_event_posters_rsvp_rows is older than hosted head 20261028150927 but not applied (out of order)
+check-migration-drift: DRIFT staging (tmurpotfluignacfueki): local 20261027182300_content_hymn_lists_rows is older than hosted head 20261028150927 but not applied (out of order)

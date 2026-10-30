@@ -1,0 +1,71 @@
+command: flutter test --reporter expanded
+cwd: trials/staff_web
+head: 66b1562e13abe939e9d328fa9f59fd35e6c3ea25
+started_utc: 2026-10-30T19:40:04.897020+00:00
+
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+Resolving dependencies...
+Downloading packages...
+  app_links 7.2.1 (7.2.2 available)
+  app_links_linux 1.0.3 (1.0.4 available)
+  app_links_web 1.0.4 (1.0.5 available)
+  crypto 3.0.7 (3.0.8 available)
+  gotrue 2.27.2 (2.27.3 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.18.3 (1.19.0 available)
+  realtime_client 2.13.0 (2.13.2 available)
+  shared_preferences 2.5.5 (2.5.6 available)
+  shared_preferences_android 2.4.28 (2.5.4 available)
+  shared_preferences_foundation 2.5.7 (2.6.1 available)
+  supabase 2.16.2 (2.16.5 available)
+  supabase_flutter 2.18.0 (2.18.3 available)
+  test_api 0.7.12 (0.7.15 available)
+  vector_math 2.4.0 (2.4.4 available)
+  vm_service 15.3.0 (15.4.0 available)
+  web 1.1.1 (1.1.2 available)
+Got dependencies!
+17 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/csv_export_test.dart
+00:00 +0: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/csv_export_test.dart: neutraliseCsvCell prefixes 61-led value with an apostrophe
+00:00 +1: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/csv_export_test.dart: neutraliseCsvCell prefixes 43-led value with an apostrophe
+00:00 +2: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/csv_export_test.dart: neutraliseCsvCell prefixes 45-led value with an apostrophe
+00:00 +3: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/csv_export_test.dart: neutraliseCsvCell prefixes 64-led value with an apostrophe
+00:00 +4: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/csv_export_test.dart: neutraliseCsvCell prefixes 9-led value with an apostrophe
+00:00 +5: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/csv_export_test.dart: neutraliseCsvCell prefixes 13-led value with an apostrophe
+00:00 +6: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/csv_export_test.dart: neutraliseCsvCell prefixes a trigger hidden behind leading spaces
+00:00 +7: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/csv_export_test.dart: neutraliseCsvCell leaves plain text and empty values unchanged
+00:00 +8: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/csv_export_test.dart: quoteCsvField doubles inner quotes and keeps commas/newlines inside
+00:00 +9: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/csv_export_test.dart: buildRotaCsv starts with a BOM, uses CRLF and the allowlisted header
+00:00 +10: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/csv_export_test.dart: buildRotaCsv has one row per slot
+00:00 +11: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/csv_export_test.dart: buildRotaCsv never contains private fields
+00:00 +12: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/csv_export_test.dart: buildRotaCsv neutralises every formula-led synthetic name and note
+00:00 +13: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/csv_export_test.dart: buildRotaCsv unassigned slots export an empty member
+00:01 +14: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: grid, view toggle and dialogs expose roles and names
+00:03 +15: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: grid, view toggle and dialogs expose roles and names
+00:03 +16: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: grid, view toggle and dialogs expose roles and names
+00:03 +17: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: grid, view toggle and dialogs expose roles and names
+00:03 +18: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: grid, view toggle and dialogs expose roles and names
+00:03 +19: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: grid, view toggle and dialogs expose roles and names
+00:04 +20: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: grid, view toggle and dialogs expose roles and names
+00:04 +21: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: arrow/Home/End/Control keys move focus and clamp at all edges
+00:06 +22: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: keyboard moves scroll the focused slot into view
+00:06 +23: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: a saved status shows in grid, list and CSV, and is announced after close
+00:08 +24: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: Cancel after changing member and status leaves the slot
+00:09 +25: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: Escape after changing member and status leaves the slot
+00:10 +26: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: the list view shows every slot with a labelled Change button
+00:11 +27: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: the status filter narrows grid and list to matching slots
+00:11 +28: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: filters that match no slot say so and block export
+00:12 +29: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: export preview states scope, leaks no private field, and downloads
+00:12 +30: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: a failed download is reported, not claimed
+00:13 +31: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: all buttons and fields meet the 44 px target
+00:13 +32: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: Grid view, both dialogs and the member menu fit at 200% text
+00:14 +33: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: List view, both dialogs and the member menu fit at 200% text
+00:15 +34: /workspace/scratch/308c700530ee/church-app/trials/staff_web/test/rota_trial/rota_trial_screen_test.dart: shell opens on the rota trial and reaches the tracer tab
+00:15 +35: All tests passed!
+
+finished_utc: 2026-10-30T19:40:32.013209+00:00
+exit_code: 0

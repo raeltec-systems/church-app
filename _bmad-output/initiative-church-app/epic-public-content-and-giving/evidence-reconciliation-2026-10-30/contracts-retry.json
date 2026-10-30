@@ -1,0 +1,11 @@
+{
+  "name": "contracts-retry",
+  "command": "npm run contracts:test",
+  "cwd": ".",
+  "head": "46debe04fe8ba4ca0f7bc639e9ba60c41f57cb19",
+  "started_utc": "2026-10-30T19:30:32.755979+00:00",
+  "finished_utc": "2026-10-30T19:30:33.214237+00:00",
+  "exit_code": 0,
+  "status": "run-passed",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/contracts-retry.log"
+}

@@ -1,0 +1,25 @@
+command: flutter --version
+cwd: .
+head: 66b1562e13abe939e9d328fa9f59fd35e6c3ea25
+started_utc: 2026-10-30T19:32:40.959705+00:00
+
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+Downloading Linux x64 Dart SDK from Flutter engine 692136cb6582dbfc5af3fb33c2515a069f2f66d0...
+** Resuming transfer from byte position 238721416
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100   172  100   172    0     0   1571      0 --:--:-- --:--:-- --:--:--  1577
+Building flutter tool...
+Resolving dependencies...
+Downloading packages...
+Got dependencies.
+Flutter 3.47.6 • channel [user-branch] • https://github.com/flutter/flutter.git
+Framework • revision 5fc346839b (4 weeks ago) • 2026-09-30 15:02:49 -0700
+Engine • hash b8c8d3d8d5d0095127057f8a29ca8cc53da2167c (revision 692136cb65) (30 days ago) • 2026-09-30 00:56:59.000Z
+Tools • Dart 3.13.5 • DevTools 2.60.0
+
+finished_utc: 2026-10-30T19:34:16.396110+00:00
+exit_code: 0

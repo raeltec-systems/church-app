@@ -1,0 +1,78 @@
+command: env TZ=America/New_York flutter test test/followups --reporter expanded --concurrency=2
+cwd: packages/client_core
+head: 66b1562e13abe939e9d328fa9f59fd35e6c3ea25
+started_utc: 2026-10-30T19:53:25.922943+00:00
+
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+Resolving dependencies...
+Downloading packages...
+  app_links 7.2.1 (7.2.2 available)
+  app_links_linux 1.0.3 (1.0.4 available)
+  app_links_web 1.0.4 (1.0.5 available)
+  crypto 3.0.7 (3.0.8 available)
+  cupertino_ui 1.1.1 (1.1.5 available)
+  flutter_secure_storage 10.0.0 (11.2.0 available)
+  flutter_secure_storage_darwin 0.2.0 (0.4.3 available)
+  go_router 18.0.2 (18.1.2 available)
+  gotrue 2.27.2 (2.27.3 available)
+  jni 1.1.0 (1.1.1 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  material_ui 1.5.0 (1.9.0 available)
+  realtime_client 2.13.0 (2.13.2 available)
+  shared_preferences 2.5.5 (2.5.6 available)
+  shared_preferences_android 2.4.28 (2.5.4 available)
+  shared_preferences_foundation 2.5.7 (2.6.1 available)
+  supabase 2.16.2 (2.16.5 available)
+  supabase_flutter 2.18.0 (2.18.3 available)
+  test_api 0.7.12 (0.7.15 available)
+  vector_math 2.4.3 (2.4.4 available)
+  vm_service 15.3.0 (15.4.0 available)
+  web 1.1.1 (1.1.2 available)
+Got dependencies!
+22 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart
+00:00 +0: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: wire parsing a task's reminders parse with plain labels
+00:00 +1: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: wire parsing a malformed reminder is refused
+00:00 +2: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: wire parsing an older server without reminders still parses
+00:00 +3: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: wire parsing a follow-up reminder deep-links to the task, nothing else
+00:00 +4: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: wire parsing the draft sends the creator's reminders, never for a fixed source
+00:00 +5: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the task shows which reminders apply
+00:00 +6: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the task shows which reminders apply
+00:00 +7: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the task shows which reminders apply
+00:00 +8: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the task shows which reminders apply
+00:00 +9: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the task shows which reminders apply
+00:00 +10: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the task shows which reminders apply
+00:02 +11: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: My follow-ups lists the owner's tasks with an Overdue label
+00:02 +12: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the creator picks the owner's reminders, or keeps the default
+00:03 +13: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the creator picks the owner's reminders, or keeps the default
+00:04 +14: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: the owner starts a task; it shows In progress only after the server confirms
+00:04 +15: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: a source with its own schedule offers no reminder choice
+00:05 +16: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: Waiting sends the review date from church time; Close needs a reason
+00:06 +17: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: owner decision Q4: the task's own group or a Pastor a Pastor outside the group is offered and accepted
+00:07 +18: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: a scope holder records for the owner, attributed; notes and activity show who
+00:07 +19: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: a scope holder records for the owner, attributed; notes and activity show who
+00:08 +20: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused validation_failed {"owner_member_id":"not_in_scope"} is explained
+00:09 +21: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused validation_failed {"owner_member_id":"not_in_scope"} is explained
+00:09 +22: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: an unknown outcome stays Not sent yet and checks again with the same request
+00:10 +23: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused validation_failed {"reminders":"fixed_by_source"} is explained
+00:11 +24: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: the supervisor creates a SYNTHETIC task and reassigns another
+00:12 +25: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused unavailable {"policy":"gate_closed"} is explained
+00:12 +26: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused unavailable {"policy":"gate_closed"} is explained
+00:12 +27: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused unavailable {"policy":"gate_closed"} is explained
+00:12 +28: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused unavailable {"policy":"gate_closed"} is explained
+00:13 +29: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused unavailable {"policy":"gate_closed"} is explained
+00:13 +30: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused unavailable {"policy":"gate_closed"} is explained
+00:13 +31: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: a failed My follow-ups read shows on the Home card
+00:13 +32: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters the task read asks followups_task for that id and reads its reminders; a closed gate is a denial, not a failure
+00:13 +33: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +34: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: re-tapping Create after an unknown outcome resends the same request and source; a confirmed create starts a new source
+00:16 +35: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: candidates come from the task scope's roster only
+00:16 +36: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: a reload while an update is in flight cannot send it twice
+00:18 +37: All tests passed!
+
+finished_utc: 2026-10-30T19:53:56.789358+00:00
+exit_code: 0

@@ -1,0 +1,623 @@
+command: flutter test --reporter expanded
+cwd: packages/client_core
+head: 66b1562e13abe939e9d328fa9f59fd35e6c3ea25
+started_utc: 2026-10-30T19:39:54.473921+00:00
+
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+Waiting for another flutter command to release the startup lock...
+Resolving dependencies...
+Downloading packages...
+  app_links 7.2.1 (7.2.2 available)
+  app_links_linux 1.0.3 (1.0.4 available)
+  app_links_web 1.0.4 (1.0.5 available)
+  crypto 3.0.7 (3.0.8 available)
+  cupertino_ui 1.1.1 (1.1.5 available)
+  flutter_secure_storage 10.0.0 (11.2.0 available)
+  flutter_secure_storage_darwin 0.2.0 (0.4.3 available)
+  go_router 18.0.2 (18.1.2 available)
+  gotrue 2.27.2 (2.27.3 available)
+  jni 1.1.0 (1.1.1 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  material_ui 1.5.0 (1.9.0 available)
+  realtime_client 2.13.0 (2.13.2 available)
+  shared_preferences 2.5.5 (2.5.6 available)
+  shared_preferences_android 2.4.28 (2.5.4 available)
+  shared_preferences_foundation 2.5.7 (2.6.1 available)
+  supabase 2.16.2 (2.16.5 available)
+  supabase_flutter 2.18.0 (2.18.3 available)
+  test_api 0.7.12 (0.7.15 available)
+  vector_math 2.4.3 (2.4.4 available)
+  vm_service 15.3.0 (15.4.0 available)
+  web 1.1.1 (1.1.2 available)
+Got dependencies!
+22 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart
+00:00 +0: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: no client or app code consumes lifecycle events
+00:00 +1: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: only adapters and the composition root reach Supabase or adapters
+00:00 +2: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: the boundary check catches lib/src/presentation/x.dart: import '../adapters/supabase_command_gateway.dart';
+00:00 +3: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: the boundary check catches lib/src/application/x.dart: import './../adapters/a.dart';
+00:00 +4: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: the boundary check catches lib/church_client_core.dart: export 'src/adapters/a.dart';
+00:00 +5: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: the boundary check catches lib/church_client_core.dart: export 'supabase_adapters.dart';
+00:00 +6: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: the boundary check catches lib/src/domain/x.dart: import 'package:church_client_core/supabase_adapters.dart';
+00:00 +7: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: the boundary check catches lib/src/presentation/x.dart: import 'package:church_client_core/src/adapters/a.dart' show A;
+00:00 +8: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: the boundary check catches lib/main.dart: import 'package:church_client_core/composition.dart';
+00:00 +9: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: the boundary check catches lib/app.dart: import 'package:supabase_flutter/supabase_flutter.dart';
+00:00 +10: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: the boundary check catches lib/app.dart: import "package:http/http.dart" as http;
+00:00 +11: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: the boundary check catches but not ordinary imports
+00:00 +12: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: only the owned client adapters may use persistence APIs
+00:00 +13: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: mobile public cache owns only the allowlisted public list reads
+00:00 +14: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: the Auth session storage adapters hold no domain or app state
+00:00 +15: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: the recovery verifier store holds only the PKCE verifier
+00:00 +16: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/boundaries_test.dart: secure request ids are canonical lowercase UUID v4 and contract-valid
+00:01 +17: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: mapping items carry the opened marker and the snooze, nothing else
+00:01 +18: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: mapping a current item carries the policy snooze choices
+00:01 +19: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: mapping a snooze answer says when, and whether it was clamped
+00:01 +20: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: mapping settings map categories and count live devices, never tokens
+00:01 +21: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: inbox list (both clients) markers say only what the member did in the app
+00:02 +22: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: inbox list (both clients) markers say only what the member did in the app
+00:02 +23: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: inbox list (both clients) markers say only what the member did in the app
+00:02 +24: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: inbox list (both clients) markers say only what the member did in the app
+00:02 +25: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: inbox list (both clients) markers say only what the member did in the app
+00:02 +26: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: inbox list (both clients) markers say only what the member did in the app
+00:02 +27: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: inbox list (both clients) markers say only what the member did in the app
+00:02 +28: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:02 +29: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:02 +30: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:02 +31: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:02 +32: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:02 +33: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:02 +34: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:03 +35: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:03 +36: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:03 +37: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:03 +38: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:03 +39: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:03 +40: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:03 +41: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:03 +42: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:03 +43: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:03 +44: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_test.dart: inbox screen (both clients) shows each item the server returns
+00:03 +45: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_item_test.dart: inbox item screen (both clients) tapping an inbox item opens it and asks the server
+00:03 +46: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_item_test.dart: inbox item screen (both clients) tapping an inbox item opens it and asks the server
+00:03 +47: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_item_test.dart: inbox item screen (both clients) tapping an inbox item opens it and asks the server
+00:03 +48: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_item_test.dart: inbox item screen (both clients) tapping an inbox item opens it and asks the server
+00:03 +49: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_item_test.dart: inbox item screen (both clients) tapping an inbox item opens it and asks the server
+00:03 +50: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_item_test.dart: inbox item screen (both clients) tapping an inbox item opens it and asks the server
+00:03 +51: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_item_test.dart: inbox item screen (both clients) tapping an inbox item opens it and asks the server
+00:03 +52: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_item_test.dart: inbox item screen (both clients) tapping an inbox item opens it and asks the server
+00:03 +53: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_item_test.dart: inbox item screen (both clients) tapping an inbox item opens it and asks the server
+00:03 +54: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_item_test.dart: inbox item screen (both clients) tapping an inbox item opens it and asks the server
+00:04 +55: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_item_test.dart: inbox item screen (both clients) tapping an inbox item opens it and asks the server
+00:04 +56: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_item_test.dart: inbox item screen (both clients) tapping an inbox item opens it and asks the server
+00:04 +57: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_item_test.dart: inbox item screen (both clients) tapping an inbox item opens it and asks the server
+00:04 +58: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:04 +59: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:04 +60: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:04 +61: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:04 +62: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:04 +63: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:04 +64: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:04 +65: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:04 +66: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:04 +67: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:04 +68: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:04 +69: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:04 +70: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:04 +71: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:04 +72: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:04 +73: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:04 +74: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:05 +75: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:05 +76: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation a tap opens the item, which the server checks again
+00:05 +77: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: snooze a snooze past the end is clamped and says so
+00:05 +78: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: snooze a snooze past the end is clamped and says so
+00:05 +79: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation the notification that launched the app opens its item
+00:05 +80: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation the notification that launched the app opens its item
+00:05 +81: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: snooze an answered or cancelled source cannot be snoozed
+00:05 +82: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: snooze an answered or cancelled source cannot be snoozed
+00:05 +83: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: snooze an answered or cancelled source cannot be snoozed
+00:05 +84: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/inbox_screens_test.dart: snooze an answered or cancelled source cannot be snoozed
+00:05 +85: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:05 +86: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:05 +87: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:05 +88: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:05 +89: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:05 +90: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:05 +91: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:05 +92: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:05 +93: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:06 +94: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:06 +95: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:06 +96: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:06 +97: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:06 +98: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:06 +99: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:06 +100: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:06 +101: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/notifications/push_test.dart: push tap and sign-in continuation signed out, the tapped item offers sign-in and returns to the item
+00:06 +102: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the task shows which reminders apply
+00:06 +103: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the task shows which reminders apply
+00:06 +104: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the task shows which reminders apply
+00:07 +105: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: My follow-ups lists the owner's tasks with an Overdue label
+00:07 +106: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: My follow-ups lists the owner's tasks with an Overdue label
+00:07 +107: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the creator picks the owner's reminders, or keeps the default
+00:07 +108: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the creator picks the owner's reminders, or keeps the default
+00:07 +109: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the creator picks the owner's reminders, or keeps the default
+00:07 +110: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the creator picks the owner's reminders, or keeps the default
+00:08 +111: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the creator picks the owner's reminders, or keeps the default
+00:08 +112: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the creator picks the owner's reminders, or keeps the default
+00:08 +113: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: the creator picks the owner's reminders, or keeps the default
+00:08 +114: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: the owner starts a task; it shows In progress only after the server confirms
+00:08 +115: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the leader reads the venue and moves one meeting in church time under its revision
+00:08 +116: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the leader reads the venue and moves one meeting in church time under its revision
+00:08 +117: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the leader reads the venue and moves one meeting in church time under its revision
+00:08 +118: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the leader reads the venue and moves one meeting in church time under its revision
+00:08 +119: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the leader reads the venue and moves one meeting in church time under its revision
+00:08 +120: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the leader reads the venue and moves one meeting in church time under its revision
+00:09 +121: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the leader reads the venue and moves one meeting in church time under its revision
+00:09 +122: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the leader reads the venue and moves one meeting in church time under its revision
+00:09 +123: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the leader reads the venue and moves one meeting in church time under its revision
+00:10 +124: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the leader reads the venue and moves one meeting in church time under its revision
+00:10 +125: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the leader reads the venue and moves one meeting in church time under its revision
+00:10 +126: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the leader reads the venue and moves one meeting in church time under its revision
+00:10 +127: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused validation_failed {"owner_member_id":"not_in_scope"} is explained
+00:10 +128: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused validation_failed {"owner_member_id":"not_in_scope"} is explained
+00:10 +129: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/password_recovery_test.dart: forgot password only a transport failure is distinguished
+00:10 +130: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings a cancel with an unknown outcome is checked again under the same request
+00:11 +131: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: an unknown outcome stays Not sent yet and checks again with the same request
+00:11 +132: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused validation_failed {"reminders":"fixed_by_source"} is explained
+00:11 +133: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused validation_failed {"reminders":"fixed_by_source"} is explained
+00:11 +134: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused validation_failed {"reminders":"fixed_by_source"} is explained
+00:11 +135: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused validation_failed {"reminders":"fixed_by_source"} is explained
+00:11 +136: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused validation_failed {"reminders":"fixed_by_source"} is explained
+00:11 +137: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused validation_failed {"reminders":"fixed_by_source"} is explained
+00:11 +138: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: the supervisor creates a SYNTHETIC task and reassigns another
+00:12 +139: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: the supervisor creates a SYNTHETIC task and reassigns another
+00:12 +140: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: the supervisor creates a SYNTHETIC task and reassigns another
+00:12 +141: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: the supervisor creates a SYNTHETIC task and reassigns another
+00:12 +142: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: the supervisor creates a SYNTHETIC task and reassigns another
+00:12 +143: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: the supervisor creates a SYNTHETIC task and reassigns another
+00:12 +144: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings an Admin sets the schedule and sees that a venue is set, never the venue
+00:12 +145: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings an Admin sets the schedule and sees that a venue is set, never the venue
+00:12 +146: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings an Admin sets the schedule and sees that a venue is set, never the venue
+00:12 +147: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_reminders_test.dart: over the real adapters a create refused unavailable {"policy":"gate_closed"} is explained
+00:13 +148: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: Admin routing lists what waits for handover and continues it (story 4.12)
+00:13 +149: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/password_recovery_test.dart: the member's recovery email a wrong password sends no proposal
+00:13 +150: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/password_recovery_test.dart: the member's recovery email a wrong password sends no proposal
+00:13 +151: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/password_recovery_test.dart: the member's recovery email a wrong password sends no proposal
+00:13 +152: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the first schedule needs a venue before it can be saved
+00:13 +153: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the first schedule needs a venue before it can be saved
+00:13 +154: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/password_recovery_test.dart: the member's recovery email an old sign-in must confirm the password again
+00:13 +155: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/password_recovery_test.dart: the member's recovery email an old sign-in must confirm the password again
+00:13 +156: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the next meeting leads with Plan the programme; Keep as is closes a move without sending
+00:13 +157: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the next meeting leads with Plan the programme; Keep as is closes a move without sending
+00:13 +158: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: staff web: cell meetings the next meeting leads with Plan the programme; Keep as is closes a move without sending
+00:13 +159: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:13 +160: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +161: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +162: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +163: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +164: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +165: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +166: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +167: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +168: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +169: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +170: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +171: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +172: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +173: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +174: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +175: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +176: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +177: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +178: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +179: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +180: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +181: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +182: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +183: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +184: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: after Saved the note field is empty, so a second Add note sends nothing
+00:14 +185: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: story 5.2: reminders and members to tell directly the leader changes the cell's reminders under their revision
+00:14 +186: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: story 5.2: reminders and members to tell directly the leader changes the cell's reminders under their revision
+00:14 +187: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: story 5.2: reminders and members to tell directly the leader changes the cell's reminders under their revision
+00:14 +188: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: story 5.2: reminders and members to tell directly the leader changes the cell's reminders under their revision
+00:14 +189: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: story 5.2: reminders and members to tell directly the leader changes the cell's reminders under their revision
+00:14 +190: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: story 5.2: reminders and members to tell directly the leader changes the cell's reminders under their revision
+00:14 +191: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: story 5.2: reminders and members to tell directly the leader changes the cell's reminders under their revision
+00:14 +192: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: re-tapping Create after an unknown outcome resends the same request and source; a confirmed create starts a new source
+00:14 +193: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: re-tapping Create after an unknown outcome resends the same request and source; a confirmed create starts a new source
+00:15 +194: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: re-tapping Create after an unknown outcome resends the same request and source; a confirmed create starts a new source
+00:15 +195: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: review S4: re-tapping Create after an unknown outcome resends the same request and source; a confirmed create starts a new source
+00:15 +196: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/password_recovery_test.dart: Admin recovery email approvals reject sends a code; a server refusal is explained
+00:15 +197: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/password_recovery_test.dart: Admin recovery email approvals reject sends a code; a server refusal is explained
+00:15 +198: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meetings_test.dart: story 5.2: reminders and members to tell directly an offset set elsewhere is offered as a choice and kept on save
+00:15 +199: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: a reload while an update is in flight cannot send it twice
+00:15 +200: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: a reload while an update is in flight cannot send it twice
+00:15 +201: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: a reload while an update is in flight cannot send it twice
+00:15 +202: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: a reload while an update is in flight cannot send it twice
+00:15 +203: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: a reload while an update is in flight cannot send it twice
+00:15 +204: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: a reload while an update is in flight cannot send it twice
+00:15 +205: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: a reload while an update is in flight cannot send it twice
+00:15 +206: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/followups/followups_test.dart: a reload while an update is in flight cannot send it twice
+00:16 +207: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen a non-Admin sees the server denial and nothing else
+00:16 +208: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen a non-Admin sees the server denial and nothing else
+00:16 +209: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen a non-Admin sees the server denial and nothing else
+00:16 +210: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen a non-Admin sees the server denial and nothing else
+00:16 +211: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen a non-Admin sees the server denial and nothing else
+00:16 +212: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen a non-Admin sees the server denial and nothing else
+00:16 +213: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen a non-Admin sees the server denial and nothing else
+00:16 +214: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen a non-Admin sees the server denial and nothing else
+00:16 +215: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/session_trust_test.dart: session trust on the client reopening with a restored session shows the summary with no password prompt
+00:17 +216: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/session_trust_test.dart: session trust on the client reopening with a restored session shows the summary with no password prompt
+00:17 +217: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/session_trust_test.dart: session trust on the client reopening with a restored session shows the summary with no password prompt
+00:17 +218: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/sign_in_and_account_test.dart: sign-in screen phone and password only: no SMS code, resend or verification UI
+00:18 +219: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/sign_in_and_account_test.dart: sign-in screen phone and password only: no SMS code, resend or verification UI
+00:18 +220: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/sign_in_and_account_test.dart: sign-in screen phone and password only: no SMS code, resend or verification UI
+00:18 +221: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/sign_in_and_account_test.dart: sign-in screen phone and password only: no SMS code, resend or verification UI
+00:18 +222: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/sign_in_and_account_test.dart: sign-in screen phone and password only: no SMS code, resend or verification UI
+00:18 +223: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/sign_in_and_account_test.dart: sign-in screen phone and password only: no SMS code, resend or verification UI
+00:18 +224: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/sign_in_and_account_test.dart: sign-in screen phone and password only: no SMS code, resend or verification UI
+00:19 +225: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/sign_in_and_account_test.dart: sign-in screen phone and password only: no SMS code, resend or verification UI
+00:19 +226: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen ask for details and reject send codes only
+00:19 +227: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen ask for details and reject send codes only
+00:19 +228: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen ask for details and reject send codes only
+00:19 +229: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_deletion_test.dart: Delete my account (mobile) the account page links a member to the deletion screen
+00:19 +230: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_deletion_test.dart: Delete my account (mobile) the account page links a member to the deletion screen
+00:19 +231: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_deletion_test.dart: Delete my account (mobile) the account page links a member to the deletion screen
+00:20 +232: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_deletion_test.dart: Delete my account (mobile) the account page links a member to the deletion screen
+00:20 +233: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_deletion_test.dart: Delete my account (mobile) the account page links a member to the deletion screen
+00:20 +234: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_deletion_test.dart: Delete my account (mobile) the account page links a member to the deletion screen
+00:20 +235: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_deletion_test.dart: Delete my account (mobile) the account page links a member to the deletion screen
+00:21 +236: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen add a member record without a login, with a labelled number
+00:21 +237: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen add a member record without a login, with a labelled number
+00:21 +238: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen add a member record without a login, with a labelled number
+00:21 +239: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen add a member record without a login, with a labelled number
+00:21 +240: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen add a member record without a login, with a labelled number
+00:21 +241: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen add a member record without a login, with a labelled number
+00:21 +242: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen add a member record without a login, with a labelled number
+00:21 +243: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen add a member record without a login, with a labelled number
+00:22 +244: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen add a member record without a login, with a labelled number
+00:22 +245: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen add a member record without a login, with a labelled number
+00:22 +246: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) answers how planned the meeting is first, with the gap in view and a member preview
+00:22 +247: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) answers how planned the meeting is first, with the gap in view and a member preview
+00:22 +248: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) answers how planned the meeting is first, with the gap in view and a member preview
+00:23 +249: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) answers how planned the meeting is first, with the gap in view and a member preview
+00:23 +250: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) answers how planned the meeting is first, with the gap in view and a member preview
+00:23 +251: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) answers how planned the meeting is first, with the gap in view and a member preview
+00:23 +252: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) answers how planned the meeting is first, with the gap in view and a member preview
+00:23 +253: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) answers how planned the meeting is first, with the gap in view and a member preview
+00:24 +254: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_deletion_test.dart: Delete my account (mobile) a refusal (notMember) keeps the account signed in
+00:24 +255: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_review_test.dart: staff web review screen reclaim sends the normalised username and the check
+00:24 +256: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/sign_in_and_account_test.dart: sign-in screen sign-in failure AuthFailure.unavailable keeps input and shows "Couldn't sign in"
+00:24 +257: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:24 +258: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:24 +259: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:24 +260: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:25 +261: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:25 +262: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:25 +263: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:25 +264: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:25 +265: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:25 +266: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:25 +267: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:25 +268: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:25 +269: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:25 +270: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:26 +271: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:26 +272: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:26 +273: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:26 +274: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:26 +275: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a save sends the whole draft at the programme revision, keeping part ids and leaving gaps open
+00:26 +276: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/sign_in_and_account_test.dart: my membership screen signed out: sign-in and create-account routes, no request
+00:26 +277: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/sign_in_and_account_test.dart: my membership screen signed out: sign-in and create-account routes, no request
+00:26 +278: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) refused parts are shown on their own row; the typed draft is kept
+00:26 +279: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) refused parts are shown on their own row; the typed draft is kept
+00:27 +280: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) refused parts are shown on their own row; the typed draft is kept
+00:27 +281: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) refused parts are shown on their own row; the typed draft is kept
+00:27 +282: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) refused parts are shown on their own row; the typed draft is kept
+00:27 +283: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) refused parts are shown on their own row; the typed draft is kept
+00:27 +284: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) refused parts are shown on their own row; the typed draft is kept
+00:27 +285: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) refused parts are shown on their own row; the typed draft is kept
+00:27 +286: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) refused parts are shown on their own row; the typed draft is kept
+00:27 +287: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) refused parts are shown on their own row; the typed draft is kept
+00:27 +288: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/grants_test.dart: my access My access lists the server's current roles
+00:27 +289: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/grants_test.dart: my access My access lists the server's current roles
+00:28 +290: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/grants_test.dart: my access My access lists the server's current roles
+00:28 +291: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/grants_test.dart: my access My access lists the server's current roles
+00:28 +292: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/grants_test.dart: my access My access lists the server's current roles
+00:28 +293: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a stale save is a conflict: the typed draft is kept until the leader loads the latest
+00:28 +294: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a stale save is a conflict: the typed draft is kept until the leader loads the latest
+00:28 +295: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a stale save is a conflict: the typed draft is kept until the leader loads the latest
+00:28 +296: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a stale save is a conflict: the typed draft is kept until the leader loads the latest
+00:28 +297: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a stale save is a conflict: the typed draft is kept until the leader loads the latest
+00:28 +298: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a stale save is a conflict: the typed draft is kept until the leader loads the latest
+00:28 +299: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a stale save is a conflict: the typed draft is kept until the leader loads the latest
+00:28 +300: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) a stale save is a conflict: the typed draft is kept until the leader loads the latest
+00:28 +301: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_application_test.dart: sign-up continues to the membership request Create account on mobile opens the request form
+00:29 +302: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_application_test.dart: sign-up continues to the membership request Create account on mobile opens the request form
+00:29 +303: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_application_test.dart: sign-up continues to the membership request Create account on mobile opens the request form
+00:29 +304: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_application_test.dart: sign-up continues to the membership request Create account on mobile opens the request form
+00:30 +305: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_application_test.dart: sign-up continues to the membership request Create account on mobile opens the request form
+00:30 +306: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_application_test.dart: sign-up continues to the membership request Create account on mobile opens the request form
+00:30 +307: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_application_test.dart: sign-up continues to the membership request Create account on mobile opens the request form
+00:30 +308: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_application_test.dart: sign-up continues to the membership request Create account on mobile opens the request form
+00:30 +309: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_application_test.dart: sign-up continues to the membership request Create account on mobile opens the request form
+00:30 +310: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: a row opens the panel: details, roles from the roster
+00:30 +311: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: a row opens the panel: details, roles from the roster
+00:30 +312: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: a row opens the panel: details, roles from the roster
+00:31 +313: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: a row opens the panel: details, roles from the roster
+00:31 +314: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: a row opens the panel: details, roles from the roster
+00:31 +315: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: a row opens the panel: details, roles from the roster
+00:31 +316: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: a row opens the panel: details, roles from the roster
+00:32 +317: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: a row opens the panel: details, roles from the roster
+00:32 +318: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: a row opens the panel: details, roles from the roster
+00:32 +319: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: a row opens the panel: details, roles from the roster
+00:32 +320: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: a row opens the panel: details, roles from the roster
+00:32 +321: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: a row opens the panel: details, roles from the roster
+00:32 +322: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: a row opens the panel: details, roles from the roster
+00:32 +323: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) publish needs a saved draft, then sends the revision
+00:32 +324: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) publish needs a saved draft, then sends the revision
+00:33 +325: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) publish needs a saved draft, then sends the revision
+00:33 +326: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells adds a cell with its safe sign-up label
+00:33 +327: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells adds a cell with its safe sign-up label
+00:33 +328: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells adds a cell with its safe sign-up label
+00:33 +329: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells adds a cell with its safe sign-up label
+00:34 +330: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells adds a cell with its safe sign-up label
+00:34 +331: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells adds a cell with its safe sign-up label
+00:34 +332: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells adds a cell with its safe sign-up label
+00:34 +333: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells adds a cell with its safe sign-up label
+00:34 +334: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells adds a cell with its safe sign-up label
+00:34 +335: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells adds a cell with its safe sign-up label
+00:34 +336: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells adds a cell with its safe sign-up label
+00:34 +337: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells adds a cell with its safe sign-up label
+00:34 +338: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells adds a cell with its safe sign-up label
+00:34 +339: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells adds a cell with its safe sign-up label
+00:34 +340: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells adds a cell with its safe sign-up label
+00:35 +341: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: an access review hold asks for a reason and names the member
+00:35 +342: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: an access review hold asks for a reason and names the member
+00:35 +343: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: an access review hold asks for a reason and names the member
+00:35 +344: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: an access review hold asks for a reason and names the member
+00:35 +345: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: an access review hold asks for a reason and names the member
+00:35 +346: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells a leader is an Identity scope grant with the member's grant revision
+00:35 +347: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells a leader is an Identity scope grant with the member's grant revision
+00:36 +348: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells a leader is an Identity scope grant with the member's grant revision
+00:36 +349: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: deactivating asks first, sends the reason, keeps the outcome
+00:36 +350: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: deactivating asks first, sends the reason, keeps the outcome
+00:36 +351: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells removing a leader revokes the scope
+00:36 +352: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) cancelling asks once more, then sends the revision
+00:36 +353: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) cancelling asks once more, then sends the revision
+00:36 +354: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_programmes_test.dart: Plan meeting (staff web) cancelling asks once more, then sends the revision
+00:36 +355: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: an unknown outcome is checked again with the same request
+00:37 +356: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: an unknown outcome is checked again with the same request
+00:37 +357: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/member_panel_test.dart: an unknown outcome is checked again with the same request
+00:37 +358: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells a follow-up needs the cell the Admin checked
+00:37 +359: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells a follow-up needs the cell the Admin checked
+00:37 +360: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells a follow-up needs the cell the Admin checked
+00:37 +361: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells a follow-up needs the cell the Admin checked
+00:37 +362: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells a follow-up needs the cell the Admin checked
+00:37 +363: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells a follow-up needs the cell the Admin checked
+00:37 +364: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meeting_records_test.dart: staff web, Plan meeting after the meeting a started meeting asks whether it was held; Yes records it with no revision
+00:37 +365: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meeting_records_test.dart: staff web, Plan meeting after the meeting a started meeting asks whether it was held; Yes records it with no revision
+00:38 +366: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meeting_records_test.dart: staff web, Plan meeting after the meeting a started meeting asks whether it was held; Yes records it with no revision
+00:38 +367: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_membership_test.dart: staff web: Admin cells the Admin's own record cannot be decided by them
+00:38 +368: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meeting_records_test.dart: staff web, Plan meeting after the meeting one click records the parts led as planned; a substitute is chosen per part
+00:38 +369: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meeting_records_test.dart: staff web, Plan meeting after the meeting one click records the parts led as planned; a substitute is chosen per part
+00:38 +370: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meeting_records_test.dart: staff web, Plan meeting after the meeting one click records the parts led as planned; a substitute is chosen per part
+00:38 +371: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meeting_records_test.dart: staff web, Plan meeting after the meeting one click records the parts led as planned; a substitute is chosen per part
+00:39 +372: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meeting_records_test.dart: staff web, Plan meeting after the meeting one click records the parts led as planned; a substitute is chosen per part
+00:39 +373: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_transfer_test.dart: a pending handover is shown and marked done at the cell revision; "still no leader" is said
+00:39 +374: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_transfer_test.dart: a pending handover is shown and marked done at the cell revision; "still no leader" is said
+00:39 +375: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_transfer_test.dart: a pending handover is shown and marked done at the cell revision; "still no leader" is said
+00:39 +376: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_transfer_test.dart: a pending handover is shown and marked done at the cell revision; "still no leader" is said
+00:39 +377: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_transfer_test.dart: a pending handover is shown and marked done at the cell revision; "still no leader" is said
+00:39 +378: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_transfer_test.dart: a pending handover is shown and marked done at the cell revision; "still no leader" is said
+00:39 +379: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_transfer_test.dart: a pending handover is shown and marked done at the cell revision; "still no leader" is said
+00:39 +380: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_transfer_test.dart: a pending handover is shown and marked done at the cell revision; "still no leader" is said
+00:39 +381: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_transfer_test.dart: a pending handover is shown and marked done at the cell revision; "still no leader" is said
+00:39 +382: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_transfer_test.dart: a pending handover is shown and marked done at the cell revision; "still no leader" is said
+00:40 +383: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_transfer_test.dart: a pending handover is shown and marked done at the cell revision; "still no leader" is said
+00:40 +384: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_transfer_test.dart: a pending handover is shown and marked done at the cell revision; "still no leader" is said
+00:40 +385: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meeting_records_test.dart: staff web, Plan meeting after the meeting a recorded part shows who stood in, the earlier value and why; a change needs a reason
+00:40 +386: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_transfer_test.dart: story 5.12: a refusal for a member who leads their cell is said as such
+00:40 +387: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: access review required (help screen and gate) a session in review sees only the generic help screen
+00:41 +388: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: access review required (help screen and gate) a session in review sees only the generic help screen
+00:41 +389: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: access review required (help screen and gate) a session in review sees only the generic help screen
+00:41 +390: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: access review required (help screen and gate) a session in review sees only the generic help screen
+00:41 +391: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: access review required (help screen and gate) a session in review sees only the generic help screen
+00:42 +392: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: access review required (help screen and gate) a session in review sees only the generic help screen
+00:42 +393: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_lifecycle_test.dart: Admin membership lifecycle (staff web) a non-Admin sees the server denial only
+00:42 +394: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meeting_records_test.dart: staff web, Plan meeting after the meeting held is corrected with a reason at the record revision
+00:42 +395: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meeting_records_test.dart: staff web, Plan meeting after the meeting held is corrected with a reason at the record revision
+00:42 +396: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meeting_records_test.dart: staff web, Plan meeting after the meeting held is corrected with a reason at the record revision
+00:42 +397: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_meeting_records_test.dart: staff web, Plan meeting after the meeting held is corrected with a reason at the record revision
+00:42 +398: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: access review required (help screen and gate) every private destination is gated while in review
+00:42 +399: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: access review required (help screen and gate) every private destination is gated while in review
+00:42 +400: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: access review required (help screen and gate) every private destination is gated while in review
+00:42 +401: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: access review required (help screen and gate) every private destination is gated while in review
+00:42 +402: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_lifecycle_test.dart: Admin membership lifecycle (staff web) a capped Follow-ups handover is continued by the Admin (story 4.12)
+00:43 +403: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_lifecycle_test.dart: Admin membership lifecycle (staff web) a capped Follow-ups handover is continued by the Admin (story 4.12)
+00:43 +404: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: access review required (help screen and gate) the church contact is shown when the church set one
+00:43 +405: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: access review required (help screen and gate) the church contact is shown when the church set one
+00:43 +406: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: access review required (help screen and gate) the church contact is shown when the church set one
+00:43 +407: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_lifecycle_test.dart: Admin membership lifecycle (staff web) a step that moved nothing says so (review N11)
+00:43 +408: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_lifecycle_test.dart: Admin membership lifecycle (staff web) a step that moved nothing says so (review N11)
+00:43 +409: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_lifecycle_test.dart: Admin membership lifecycle (staff web) a step that moved nothing says so (review N11)
+00:43 +410: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_lifecycle_test.dart: Admin membership lifecycle (staff web) a step that moved nothing says so (review N11)
+00:43 +411: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:43 +412: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:43 +413: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:43 +414: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:43 +415: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:43 +416: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:43 +417: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:43 +418: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:43 +419: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:43 +420: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:43 +421: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:44 +422: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:44 +423: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:44 +424: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:44 +425: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:44 +426: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:44 +427: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:44 +428: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:44 +429: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:44 +430: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:44 +431: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:44 +432: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: mobile My cell You're on leads with the real answer, reporting time and instructions; Accept answers through Duties
+00:45 +433: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/membership_lifecycle_test.dart: Admin membership lifecycle (staff web) the last Admin and the last responsible person are refused with their own notices
+00:45 +434: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:45 +435: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:45 +436: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:45 +437: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:45 +438: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:45 +439: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:46 +440: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:46 +441: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:46 +442: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:46 +443: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:46 +444: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:46 +445: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:46 +446: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:46 +447: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:46 +448: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:46 +449: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:46 +450: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account the sign-in help links to it only where it is enabled
+00:46 +451: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: sign-in details (member) server refusals are explained
+00:46 +452: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: sign-in details (member) server refusals are explained
+00:47 +453: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: sign-in details (member) server refusals are explained
+00:47 +454: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: story 5.7: Cannot attend a member sends a notice with a note; their part is still theirs
+00:47 +455: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: story 5.7: Cannot attend a member sends a notice with a note; their part is still theirs
+00:47 +456: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: story 5.7: Cannot attend a member sends a notice with a note; their part is still theirs
+00:47 +457: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: story 5.7: Cannot attend a member sends a notice with a note; their part is still theirs
+00:47 +458: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: story 5.7: Cannot attend a member sends a notice with a note; their part is still theirs
+00:47 +459: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/cell_youre_on_test.dart: story 5.7: Cannot attend a member sends a notice with a note; their part is still theirs
+00:47 +460: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account request shows the code; the password is set with the same secret once
+00:47 +461: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account request shows the code; the password is set with the same secret once
+00:47 +462: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account request shows the code; the password is set with the same secret once
+00:47 +463: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account request shows the code; the password is set with the same secret once
+00:48 +464: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account request shows the code; the password is set with the same secret once
+00:48 +465: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: Admin credential review reject sends a reason code; a taken number is explained
+00:48 +466: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: Admin credential review reject sends a reason code; a taken number is explained
+00:48 +467: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: Admin credential review reject sends a reason code; a taken number is explained
+00:48 +468: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: Admin credential review reject sends a reason code; a taken number is explained
+00:48 +469: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: Admin credential review reject sends a reason code; a taken number is explained
+00:48 +470: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: Admin credential review reject sends a reason code; a taken number is explained
+00:48 +471: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/credential_review_test.dart: Admin credential review reject sends a reason code; a taken number is explained
+00:48 +472: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account a rejected redemption ends the request
+00:48 +473: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account a rejected redemption ends the request
+00:48 +474: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/identity/assisted_recovery_test.dart: mobile: I need help accessing my account a rejected redemption ends the request
+00:48 +475: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:48 +476: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:48 +477: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:48 +478: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:49 +479: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:49 +480: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:49 +481: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:49 +482: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:49 +483: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:49 +484: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:50 +485: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:50 +486: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:50 +487: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:50 +488: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:51 +489: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:51 +490: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:51 +491: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:51 +492: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:51 +493: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:51 +494: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:51 +495: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:51 +496: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:51 +497: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:51 +498: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:51 +499: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:51 +500: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:52 +501: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:52 +502: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:52 +503: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:54 +504: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a time change asks again with a new deadline; history kept
+00:54 +505: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings another department's duty shows as a busy time; a reason is sent
+00:54 +506: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings another department's duty shows as a busy time; a reason is sent
+00:54 +507: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings another department's duty shows as a busy time; a reason is sent
+00:54 +508: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings another department's duty shows as a busy time; a reason is sent
+00:54 +509: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings another department's duty shows as a busy time; a reason is sent
+00:54 +510: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings another department's duty shows as a busy time; a reason is sent
+00:54 +511: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings another department's duty shows as a busy time; a reason is sent
+00:55 +512: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings another department's duty shows as a busy time; a reason is sent
+00:55 +513: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings another department's duty shows as a busy time; a reason is sent
+00:56 +514: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings another department's duty shows as a busy time; a reason is sent
+00:56 +515: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings another department's duty shows as a busy time; a reason is sent
+00:56 +516: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen shows Not recorded, the answer apart and the trail
+02:04 +517: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen shows Not recorded, the answer apart and the trail
+02:05 +518: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen shows Not recorded, the answer apart and the trail
+02:05 +519: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings a refusal for the overlap asks for the reason
+04:28 +520: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a duty that started meanwhile gets the leader notice
+04:29 +521: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a duty that started meanwhile gets the leader notice
+04:29 +522: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a duty that started meanwhile gets the leader notice
+04:29 +523: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a duty that started meanwhile gets the leader notice
+04:29 +524: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a duty that started meanwhile gets the leader notice
+04:29 +525: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a duty that started meanwhile gets the leader notice
+04:29 +526: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a duty that started meanwhile gets the leader notice
+04:29 +527: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a duty that started meanwhile gets the leader notice
+04:29 +528: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_revisions_test.dart: staff web: changing a duty a duty that started meanwhile gets the leader notice
+04:29 +529: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen record an outcome (nothing shown until the server answers)
+04:29 +530: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings no overlap: no reason, and no claim that they are free
+04:30 +531: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings no overlap: no reason, and no claim that they are free
+04:30 +532: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings no overlap: no reason, and no claim that they are free
+04:30 +533: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings no overlap: no reason, and no claim that they are free
+04:31 +534: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+04:31 +535: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+04:31 +536: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+04:32 +537: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+04:32 +538: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+04:32 +539: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+04:32 +540: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+04:32 +541: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+04:32 +542: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+04:33 +543: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+04:33 +544: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+04:33 +545: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) cards, counts, filters and the contact route
+04:33 +546: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: publishing with overlap warnings changing a duty asks about the person at the new times
+04:33 +547: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: the Outcomes screen a reader without a department scope sees the need
+04:33 +548: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) the window and duty filters are read from the server
+04:34 +549: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) the window and duty filters are read from the server
+04:34 +550: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_overlaps_test.dart: staff web: the rota picker giving a published position with a reason
+04:34 +551: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: review fixes S2: with From cleared the window ends today
+04:34 +552: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: review fixes S2: with From cleared the window ends today
+04:34 +553: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) record a contact attempt
+04:35 +554: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) record a contact attempt
+04:35 +555: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: review fixes N2: nothing to record about an erased member
+04:35 +556: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) a follow-up after the duty starts is refused before sending
+04:36 +557: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: review fixes N4: an unknown outcome shows Not sent and Check again resends it
+04:36 +558: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) Confirmed by leader needs a reason and says what it is
+04:37 +559: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) Confirmed by leader needs a reason and says what it is
+04:37 +560: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) Confirmed by leader needs a reason and says what it is
+04:37 +561: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) Confirmed by leader needs a reason and says what it is
+04:37 +562: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) Confirmed by leader needs a reason and says what it is
+04:38 +563: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) Confirmed by leader needs a reason and says what it is
+04:38 +564: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_outcomes_test.dart: My duties the member sees their own outcome, or Not recorded yet
+04:38 +565: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) a decline is not confirmed: the refusal says reassign
+04:38 +566: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) a decline is not confirmed: the refusal says reassign
+04:38 +567: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) a decline is not confirmed: the refusal says reassign
+04:39 +568: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) reassign the decline and cancel a position
+04:41 +569: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (leader) an unknown outcome is not shown as done
+04:41 +570: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: review fixes S2: no contact work on the leader's own duty
+04:42 +571: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: review fixes N7: a malformed From date is an error, not today
+04:42 +572: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (Pastor and Admin: nothing private) Pastor: church-wide gaps, read only
+04:42 +573: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (Pastor and Admin: nothing private) Admin without the scope: manage, never contact
+04:42 +574: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the queue (Pastor and Admin: nothing private) a refused read never looks empty
+04:43 +575: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: labels elsewhere the board says Confirmed by leader and Cancelled
+04:43 +576: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: labels elsewhere the member reads Confirmed by your leader
+04:43 +577: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the leader Home card coverage for cells: a cell leader works the cell's parts, named from the Cells read, with no reassign
+04:44 +578: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the leader Home card coverage for cells: a cell keeps a plain name when the Cells read is refused
+04:44 +579: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the leader Home card coverage for cells: a cell leader sees Needs attention
+04:44 +580: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the leader Home card leaders see Needs attention; Open coverage
+04:45 +581: /workspace/scratch/308c700530ee/church-app/packages/client_core/test/duties/duties_coverage_test.dart: the leader Home card members without a department scope see no card
+
+finished_utc: 2026-10-30T19:47:26.384761+00:00
+exit_code: 0

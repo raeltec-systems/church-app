@@ -1,0 +1,47 @@
+{
+  "status": "blocked",
+  "environment": "This task Linux workspace; no Docker/Podman executable or engine socket",
+  "evidence": "logs/local-stack-detection.log",
+  "unrun_checks": [
+    {
+      "name": "Fresh local Supabase / pgTAP / API smoke / object restore rehearsal",
+      "commands": [
+        "npx supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,supavisor,realtime,postgres-meta",
+        "npx supabase db reset --local",
+        "npm run db:test",
+        "npm run db:smoke",
+        "npm run recovery:rehearse"
+      ],
+      "reason": "Requires a local Docker engine; no database was reset or touched. Prior main hosted CI is separate evidence."
+    },
+    {
+      "name": "G1 real HTTP RSVP capacity race",
+      "commands": [
+        "npx supabase start",
+        "npx supabase db reset --local",
+        "npx supabase test db",
+        "node tools/auth-harness/local-phone-auth.mjs on",
+        "node tools/identity-e2e/content-event-rsvp.mjs --evidence <candidate-output>/content-event-rsvp-e2e.jsonl",
+        "node tools/auth-harness/local-phone-auth.mjs off"
+      ],
+      "reason": "Requires local Auth/PostgREST/Storage/Edge runtime and Docker. Harness creates and cleans reserved fictional identities; unit race-tally tests do not substitute."
+    },
+    {
+      "name": "G2 scheduler/worker/Storage retention",
+      "commands": [
+        "node tools/identity-e2e/content-retention.mjs --evidence <candidate-output>/content-retention-e2e.jsonl"
+      ],
+      "reason": "Requires full disposable local Supabase stack including pg_cron and Edge runtime. Runner mints local credentials and cleans its fixtures."
+    },
+    {
+      "name": "Real sermon-from-duty two-session lock contention",
+      "commands": [],
+      "reason": "No PostgreSQL runtime here; existing single-session injected stale-read test does not establish two-session locking. See the owner walkthrough for the required separate-session scenario."
+    },
+    {
+      "name": "Physical Android/iOS external handoff, player, push, offline relaunch and source-book comparison",
+      "commands": [],
+      "reason": "No physical phone, Android SDK/emulator, Xcode/iOS device or printed hymn book attached. Owner evidence and permission required for any live notification. App/widget tests are not device acceptance."
+    }
+  ]
+}

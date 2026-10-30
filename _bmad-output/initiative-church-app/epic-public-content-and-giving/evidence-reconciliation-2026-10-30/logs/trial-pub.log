@@ -1,0 +1,34 @@
+command: flutter pub get --enforce-lockfile
+cwd: trials/staff_web
+head: 66b1562e13abe939e9d328fa9f59fd35e6c3ea25
+started_utc: 2026-10-30T19:39:53.226296+00:00
+
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+Resolving dependencies...
+Downloading packages...
+  app_links 7.2.1 (7.2.2 available)
+  app_links_linux 1.0.3 (1.0.4 available)
+  app_links_web 1.0.4 (1.0.5 available)
+  crypto 3.0.7 (3.0.8 available)
+  gotrue 2.27.2 (2.27.3 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.18.3 (1.19.0 available)
+  realtime_client 2.13.0 (2.13.2 available)
+  shared_preferences 2.5.5 (2.5.6 available)
+  shared_preferences_android 2.4.28 (2.5.4 available)
+  shared_preferences_foundation 2.5.7 (2.6.1 available)
+  supabase 2.16.2 (2.16.5 available)
+  supabase_flutter 2.18.0 (2.18.3 available)
+  test_api 0.7.12 (0.7.15 available)
+  vector_math 2.4.0 (2.4.4 available)
+  vm_service 15.3.0 (15.4.0 available)
+  web 1.1.1 (1.1.2 available)
+Got dependencies!
+17 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+
+finished_utc: 2026-10-30T19:39:54.110744+00:00
+exit_code: 0

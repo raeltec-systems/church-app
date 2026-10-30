@@ -1,0 +1,462 @@
+{
+  "generated_utc": "2026-10-30T19:58:18.218343+00:00",
+  "source_baseline": "c96cd562b2650c37f5d3d879cb12891419700139",
+  "working_head_at_summary": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+  "results": [
+    {
+      "name": "policy",
+      "command": "npm run ci:policy-test",
+      "cwd": ".",
+      "head": "c96cd562b2650c37f5d3d879cb12891419700139",
+      "started_utc": "2026-10-30T19:29:11.254768+00:00",
+      "finished_utc": "2026-10-30T19:29:11.600759+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/policy.log",
+      "counts": {
+        "tests": 56,
+        "pass": 56,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "environment",
+      "command": "npm run env:check",
+      "cwd": ".",
+      "head": "c96cd562b2650c37f5d3d879cb12891419700139",
+      "started_utc": "2026-10-30T19:29:08.821405+00:00",
+      "finished_utc": "2026-10-30T19:29:08.962450+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/environment.log"
+    },
+    {
+      "name": "migrations-retry",
+      "command": "npm run ci:migrations -- --base origin/main",
+      "cwd": ".",
+      "head": "c96cd562b2650c37f5d3d879cb12891419700139",
+      "started_utc": "2026-10-30T19:29:27.148807+00:00",
+      "finished_utc": "2026-10-30T19:29:27.341412+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/migrations-retry.log"
+    },
+    {
+      "name": "secrets-retry",
+      "command": "npm run ci:secrets",
+      "cwd": ".",
+      "head": "c96cd562b2650c37f5d3d879cb12891419700139",
+      "started_utc": "2026-10-30T19:29:27.380444+00:00",
+      "finished_utc": "2026-10-30T19:29:28.139903+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/secrets-retry.log"
+    },
+    {
+      "name": "imports",
+      "command": "npm run ci:function-imports",
+      "cwd": ".",
+      "head": "c96cd562b2650c37f5d3d879cb12891419700139",
+      "started_utc": "2026-10-30T19:29:09.339380+00:00",
+      "finished_utc": "2026-10-30T19:29:09.469433+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/imports.log"
+    },
+    {
+      "name": "contracts-retry",
+      "command": "npm run contracts:test",
+      "cwd": ".",
+      "head": "46debe04fe8ba4ca0f7bc639e9ba60c41f57cb19",
+      "started_utc": "2026-10-30T19:30:32.755979+00:00",
+      "finished_utc": "2026-10-30T19:30:33.214237+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/contracts-retry.log",
+      "counts": {
+        "tests": 267,
+        "pass": 267,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "harness",
+      "command": "node --test tools/auth-harness/*.test.mjs tools/identity-e2e/*.test.mjs supabase/functions/*/*.test.mjs tools/identity-deletion/*.test.mjs tools/notifications/*.test.mjs tools/hymn-book/*.test.mjs",
+      "cwd": ".",
+      "head": "c96cd562b2650c37f5d3d879cb12891419700139",
+      "started_utc": "2026-10-30T19:29:14.734213+00:00",
+      "finished_utc": "2026-10-30T19:29:16.469231+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/harness.log",
+      "counts": {
+        "tests": 410,
+        "pass": 410,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "content-assets-retry",
+      "command": "node --test supabase/functions/content-assets/*.test.mjs",
+      "cwd": ".",
+      "head": "46debe04fe8ba4ca0f7bc639e9ba60c41f57cb19",
+      "started_utc": "2026-10-30T19:30:32.484373+00:00",
+      "finished_utc": "2026-10-30T19:30:32.720777+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/content-assets-retry.log",
+      "counts": {
+        "tests": 34,
+        "pass": 34,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "evidence-scans",
+      "command": "bash /workspace/scratch/308c700530ee/church-evidence-scans.sh",
+      "cwd": ".",
+      "head": "c96cd562b2650c37f5d3d879cb12891419700139",
+      "started_utc": "2026-10-30T19:29:42.805278+00:00",
+      "finished_utc": "2026-10-30T19:29:44.313003+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/evidence-scans.log"
+    },
+    {
+      "name": "drift-check",
+      "command": "npm run ci:drift:staging",
+      "cwd": ".",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:39:19.218588+00:00",
+      "finished_utc": "2026-10-30T19:39:19.365493+00:00",
+      "exit_code": 0,
+      "status": "skipped",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/drift-check.log",
+      "interpretation": "The script exited 0 but explicitly skipped: SUPABASE_ACCESS_TOKEN is not set. No hosted migration parity was checked."
+    },
+    {
+      "name": "contracts-pub",
+      "command": "dart pub get --enforce-lockfile",
+      "cwd": "packages/contracts/dart",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:33:50.357831+00:00",
+      "finished_utc": "2026-10-30T19:34:36.967851+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/contracts-pub.log"
+    },
+    {
+      "name": "contracts-analyze",
+      "command": "dart analyze --fatal-infos",
+      "cwd": "packages/contracts/dart",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:35:57.431925+00:00",
+      "finished_utc": "2026-10-30T19:35:58.961748+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/contracts-analyze.log"
+    },
+    {
+      "name": "contracts-vm",
+      "command": "dart test --reporter expanded",
+      "cwd": "packages/contracts/dart",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:35:54.150358+00:00",
+      "finished_utc": "2026-10-30T19:36:01.889166+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/contracts-vm.log",
+      "counts": {
+        "pass": 284,
+        "skipped": 0,
+        "fail": 0
+      }
+    },
+    {
+      "name": "contracts-chrome",
+      "command": "CHROME_EXECUTABLE=/workspace/scratch/308c700530ee/toolchains/bin/chrome dart test -p chrome --reporter expanded",
+      "cwd": "packages/contracts/dart",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:38:09.088493+00:00",
+      "finished_utc": "2026-10-30T19:38:22.806577+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/contracts-chrome.log",
+      "counts": {
+        "pass": 283,
+        "skipped": 0,
+        "fail": 0
+      }
+    },
+    {
+      "name": "design-system-pub",
+      "command": "flutter pub get --enforce-lockfile",
+      "cwd": "packages/design_system",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:38:43.734711+00:00",
+      "finished_utc": "2026-10-30T19:38:54.720826+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/design-system-pub.log"
+    },
+    {
+      "name": "design-system-analyze",
+      "command": "flutter analyze",
+      "cwd": "packages/design_system",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:38:54.750190+00:00",
+      "finished_utc": "2026-10-30T19:39:04.167148+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/design-system-analyze.log.gz"
+    },
+    {
+      "name": "design-system-test",
+      "command": "flutter test --reporter expanded",
+      "cwd": "packages/design_system",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:39:04.205433+00:00",
+      "finished_utc": "2026-10-30T19:39:16.359921+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/design-system-test.log",
+      "counts": {
+        "pass": 20,
+        "skipped": 0,
+        "fail": 0
+      }
+    },
+    {
+      "name": "client-core-pub",
+      "command": "flutter pub get --enforce-lockfile",
+      "cwd": "packages/client_core",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:38:47.866580+00:00",
+      "finished_utc": "2026-10-30T19:39:29.487404+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/client-core-pub.log"
+    },
+    {
+      "name": "client-core-analyze",
+      "command": "flutter analyze",
+      "cwd": "packages/client_core",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:39:29.531057+00:00",
+      "finished_utc": "2026-10-30T19:39:54.425209+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/client-core-analyze.log.gz"
+    },
+    {
+      "name": "client-core-test-retry",
+      "command": "flutter test --reporter expanded --concurrency=2",
+      "cwd": "packages/client_core",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:47:36.140804+00:00",
+      "finished_utc": "2026-10-30T19:50:27.062867+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/client-core-test-retry.log.gz",
+      "counts": {
+        "pass": 1169,
+        "skipped": 0,
+        "fail": 0
+      }
+    },
+    {
+      "name": "mobile-pub",
+      "command": "flutter pub get --enforce-lockfile",
+      "cwd": "../mobile-validation/apps/mobile",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:46:01.903747+00:00",
+      "finished_utc": "2026-10-30T19:46:13.496055+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/mobile-pub.log"
+    },
+    {
+      "name": "mobile-analyze",
+      "command": "flutter analyze",
+      "cwd": "../mobile-validation/apps/mobile",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:48:08.616939+00:00",
+      "finished_utc": "2026-10-30T19:48:35.453898+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/mobile-analyze.log.gz"
+    },
+    {
+      "name": "mobile-test",
+      "command": "flutter test --reporter expanded --concurrency=2",
+      "cwd": "../mobile-validation/apps/mobile",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:50:52.765855+00:00",
+      "finished_utc": "2026-10-30T19:51:29.769232+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/mobile-test.log",
+      "counts": {
+        "pass": 115,
+        "skipped": 0,
+        "fail": 0
+      }
+    },
+    {
+      "name": "staff-pub",
+      "command": "flutter pub get --enforce-lockfile",
+      "cwd": "apps/staff",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:39:50.403294+00:00",
+      "finished_utc": "2026-10-30T19:39:51.565608+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/staff-pub.log"
+    },
+    {
+      "name": "staff-analyze",
+      "command": "flutter analyze",
+      "cwd": "apps/staff",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:39:51.602095+00:00",
+      "finished_utc": "2026-10-30T19:40:08.460156+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/staff-analyze.log.gz"
+    },
+    {
+      "name": "staff-test",
+      "command": "flutter test --reporter expanded",
+      "cwd": "apps/staff",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:40:08.509228+00:00",
+      "finished_utc": "2026-10-30T19:41:02.257465+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/staff-test.log",
+      "counts": {
+        "pass": 63,
+        "skipped": 0,
+        "fail": 0
+      }
+    },
+    {
+      "name": "trial-pub",
+      "command": "flutter pub get --enforce-lockfile",
+      "cwd": "trials/staff_web",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:39:53.226296+00:00",
+      "finished_utc": "2026-10-30T19:39:54.110744+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/trial-pub.log"
+    },
+    {
+      "name": "trial-analyze",
+      "command": "flutter analyze",
+      "cwd": "trials/staff_web",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:39:54.151622+00:00",
+      "finished_utc": "2026-10-30T19:40:04.854875+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/trial-analyze.log.gz"
+    },
+    {
+      "name": "trial-test",
+      "command": "flutter test --reporter expanded",
+      "cwd": "trials/staff_web",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:40:04.897020+00:00",
+      "finished_utc": "2026-10-30T19:40:32.013209+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/trial-test.log",
+      "counts": {
+        "pass": 35,
+        "skipped": 0,
+        "fail": 0
+      }
+    },
+    {
+      "name": "timezone-duties",
+      "command": "env TZ=America/New_York flutter test test/duties --reporter expanded --concurrency=2",
+      "cwd": "packages/client_core",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:51:29.822534+00:00",
+      "finished_utc": "2026-10-30T19:53:25.847176+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/timezone-duties.log",
+      "counts": {
+        "pass": 224,
+        "skipped": 0,
+        "fail": 0
+      }
+    },
+    {
+      "name": "timezone-followups",
+      "command": "env TZ=America/New_York flutter test test/followups --reporter expanded --concurrency=2",
+      "cwd": "packages/client_core",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:53:25.922943+00:00",
+      "finished_utc": "2026-10-30T19:53:56.789358+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/timezone-followups.log",
+      "counts": {
+        "pass": 37,
+        "skipped": 0,
+        "fail": 0
+      }
+    },
+    {
+      "name": "staff-web-build-retry",
+      "command": "flutter build web --no-web-resources-cdn",
+      "cwd": "apps/staff",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:53:56.848944+00:00",
+      "finished_utc": "2026-10-30T19:55:33.219680+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/staff-web-build-retry.log.gz"
+    },
+    {
+      "name": "trial-web-build",
+      "command": "flutter build web",
+      "cwd": "trials/staff_web",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:40:32.112081+00:00",
+      "finished_utc": "2026-10-30T19:45:12.942598+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/trial-web-build.log.gz"
+    },
+    {
+      "name": "bundle-scan",
+      "command": "node tools/ci/scan-secrets.mjs --bundle apps/staff/build/web trials/staff_web/build/web",
+      "cwd": ".",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:56:22.785452+00:00",
+      "finished_utc": "2026-10-30T19:56:23.240185+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/bundle-scan.log"
+    },
+    {
+      "name": "new-evidence-scan",
+      "command": "bash tools/auth-harness/scan-evidence.sh _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30",
+      "cwd": ".",
+      "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+      "started_utc": "2026-10-30T19:58:06.902168+00:00",
+      "finished_utc": "2026-10-30T19:58:06.989098+00:00",
+      "exit_code": 0,
+      "status": "run-passed",
+      "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/new-evidence-scan.log"
+    }
+  ]
+}

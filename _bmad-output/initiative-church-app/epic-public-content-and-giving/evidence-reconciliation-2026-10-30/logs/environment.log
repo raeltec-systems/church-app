@@ -1,0 +1,13 @@
+command: npm run env:check
+cwd: .
+head: c96cd562b2650c37f5d3d879cb12891419700139
+started_utc: 2026-10-30T19:29:08.821405+00:00
+
+
+> env:check
+> node tools/env/environments.mjs check
+
+environments: 3 configs valid (separate refs, synthetic non-production recipients, production private/sending disabled, bounded system route, alerting/scheduler off, isolated restores with real-data backups off)
+
+finished_utc: 2026-10-30T19:29:08.962450+00:00
+exit_code: 0

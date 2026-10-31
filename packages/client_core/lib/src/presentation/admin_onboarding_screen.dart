@@ -146,7 +146,7 @@ class _AdminOnboardingScreenState extends ConsumerState<AdminOnboardingScreen> {
           autocorrect: false,
           enableSuggestions: false,
           decoration: const InputDecoration(
-            labelText: 'Private setup invitation',
+            labelText: 'Setup invitation',
             helperText: 'Paste it here, not into the address bar.',
           ),
         ),
@@ -157,7 +157,7 @@ class _AdminOnboardingScreenState extends ConsumerState<AdminOnboardingScreen> {
           keyboardType: TextInputType.phone,
           autofillHints: const [AutofillHints.telephoneNumber],
           decoration: const InputDecoration(
-            labelText: 'Invited phone username',
+            labelText: 'Phone username',
             helperText: 'Include the country code. This does not verify phone ownership.',
           ),
         ),
@@ -204,7 +204,7 @@ class _AdminOnboardingScreenState extends ConsumerState<AdminOnboardingScreen> {
             isNew ? AutofillHints.newPassword : AutofillHints.password,
           ],
           decoration: InputDecoration(
-            labelText: isNew ? 'Choose a password' : 'Current password',
+            labelText: isNew ? 'New password' : 'Current password',
             helperText:
                 'At least 8 characters. Only you should know this password.',
             suffixIcon: IconButton(

@@ -1,0 +1,103 @@
+name: Epic 7 planning evidence
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/epic7-planning.yml'
+      - '.agents/skills/bmad-ticket/**'
+      - '_bmad/**'
+      - '_bmad-output/initiative-church-app/**'
+
+permissions:
+  contents: read
+
+jobs:
+  planning:
+    name: BMAD configuration, approved breakdown and dependencies
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          version: '0.10.0'
+      - name: Resolve the repository BMAD ticket workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GITHUB_WORKSPACE"
+          skill="$root/.agents/skills/bmad-ticket"
+          out="$RUNNER_TEMP/epic7-planning"
+          mkdir -p "$out"
+          git rev-parse HEAD | tee "$out/head.txt"
+          uv --version | tee "$out/uv-version.txt"
+          uv run "$root/_bmad/scripts/resolve_config.py" --project-root "$root" \
+            --key core.output_folder --key core.active_initiative | tee "$out/config.json"
+          uv run "$skill/scripts/read_toml.py" \
+            --file "$root/_bmad/custom/ticketing-store-config.toml" -k tickets -k verbs.write -k verbs.query \
+            > "$out/store.json"
+          uv run "$root/_bmad/scripts/resolve_customization.py" --project-root "$root" --skill "$skill" \
+            -k workflow.activation_steps_prepend -k workflow.activation_steps_append \
+            -k workflow.persistent_facts -k workflow.on_complete \
+            -k workflow.checks -k workflow.ordering -k workflow.publication \
+            -k workflow.estimation -k workflow.slice_to_tickets \
+            | tee "$out/workflow.json"
+          uv run "$skill/scripts/tickets.py" --project-root "$root" --help > "$out/tickets-help.txt"
+      - name: Inspect the ticket tree and validate unchanged approved entries
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$GITHUB_WORKSPACE"
+          skill="$root/.agents/skills/bmad-ticket"
+          tree="$root/_bmad-output/initiative-church-app"
+          epic="$tree/epic-cell-attendance-and-private-reports"
+          out="$RUNNER_TEMP/epic7-planning"
+          uv run "$skill/scripts/tickets.py" --project-root "$root" status "$tree" > "$out/initiative-status.json"
+          uv run "$skill/scripts/tickets.py" --project-root "$root" status "$epic" > "$out/epic7-status.json"
+          uv run "$skill/scripts/tickets.py" --project-root "$root" next "$epic" > "$out/epic7-next.json"
+          git show 34f273a9d31480be07e9a71eb84e502c486dd886:_bmad-output/initiative-church-app/epic-cell-attendance-and-private-reports/tickets.proposed.toml > "$out/approved-baseline.toml"
+          python3 - <<'PY'
+          import json, os, pathlib, tomllib
+          root = pathlib.Path(os.environ['GITHUB_WORKSPACE'])
+          out = pathlib.Path(os.environ['RUNNER_TEMP']) / 'epic7-planning'
+          epic = root / '_bmad-output/initiative-church-app/epic-cell-attendance-and-private-reports'
+          baseline = tomllib.loads((out / 'approved-baseline.toml').read_text())
+          canonical = epic / 'tickets.toml'
+          result = {'scope': 'Planning structure only; not implementation, acceptance, deployment or database parity.'}
+          assert len(baseline['entry']) == 14
+          assert [e['id'] for e in baseline['entry']] == list(range(1, 15))
+          result['canonical_present'] = canonical.exists()
+          if canonical.exists():
+              actual = tomllib.loads(canonical.read_text())
+              assert actual == baseline, 'Approved entry content changed; obtain a reviewed scope decision.'
+              status = json.loads((out / 'epic7-status.json').read_text())
+              for key in ('unpinned_after', 'undeclared_after', 'order_conflict'):
+                  assert not status.get(key), f'{key}: {status.get(key)}'
+              assert len(status['tickets']) == 14
+              result['entry_count'] = 14
+              result['states'] = status['counts']
+              result['preexisting_tree_problems'] = status.get('problems', [])
+              refs = [r for e in actual['entry'] for r in e.get('references', [])]
+              for ref in refs:
+                  assert (root / ref.split('#', 1)[0]).is_file(), f'Missing reference: {ref}'
+              result['reference_files_checked'] = len(refs)
+              result['longest_remaining_chain'] = status.get('longest_remaining_chain', [])
+          else:
+              result['result'] = 'Activation recorded; canonical adoption is still pending.'
+          next_state = json.loads((out / 'epic7-next.json').read_text())
+          result['next'] = next_state
+          (out / 'summary.json').write_text(json.dumps(result, indent=2) + '\n')
+          print(json.dumps(result, indent=2))
+          PY
+      - name: Preserve exact-head planning evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: epic7-planning-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/epic7-planning/
+          if-no-files-found: error
+          retention-days: 14

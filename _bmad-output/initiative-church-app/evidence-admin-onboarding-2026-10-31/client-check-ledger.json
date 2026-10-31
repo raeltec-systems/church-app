@@ -1,0 +1,468 @@
+[
+  {
+    "label": "core-analysis",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "analyze",
+      "--no-pub"
+    ],
+    "cwd": "packages/client_core",
+    "source": "71363c15332b8d2138494c57ec75f92c59252029",
+    "started_at_utc": "2026-10-31T11:29:48.996320+00:00",
+    "finished_at_utc": "2026-10-31T11:30:03.906718+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "core-analysis.log",
+    "log_sha256": "ddea0ac267f81df05c0e35909a43bda9a4338d8c596c70488ce72a9ec3624eaa"
+  },
+  {
+    "label": "core-full-tests",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "test",
+      "--no-pub",
+      "--concurrency=2",
+      "--reporter",
+      "expanded"
+    ],
+    "cwd": "packages/client_core",
+    "source": "71363c15332b8d2138494c57ec75f92c59252029",
+    "started_at_utc": "2026-10-31T11:30:03.914612+00:00",
+    "finished_at_utc": "2026-10-31T11:32:38.635113+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "core-full-tests.log",
+    "log_sha256": "3c87c1571e213e75433559c1e060deb6cfcb3d27f101b1a5eb29d7225088ea15"
+  },
+  {
+    "label": "staff-locked-dependencies",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "pub",
+      "get",
+      "--enforce-lockfile"
+    ],
+    "cwd": "apps/staff",
+    "source": "71363c15332b8d2138494c57ec75f92c59252029",
+    "started_at_utc": "2026-10-31T11:32:38.644850+00:00",
+    "finished_at_utc": "2026-10-31T11:32:40.011907+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "staff-locked-dependencies.log",
+    "log_sha256": "94ceb8edfdef9afbbaae8becc9f3f3fd02149cff177550a3b891c57011af0979"
+  },
+  {
+    "label": "staff-analysis",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "analyze",
+      "--no-pub"
+    ],
+    "cwd": "apps/staff",
+    "source": "71363c15332b8d2138494c57ec75f92c59252029",
+    "started_at_utc": "2026-10-31T11:32:40.018517+00:00",
+    "finished_at_utc": "2026-10-31T11:32:51.299660+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "staff-analysis.log",
+    "log_sha256": "65b25c74b57df2f7502b70cdc79ea8e6701ab2b66a07bb857906bda792ddb17d"
+  },
+  {
+    "label": "staff-tests",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "test",
+      "--no-pub",
+      "--concurrency=2",
+      "--reporter",
+      "expanded"
+    ],
+    "cwd": "apps/staff",
+    "source": "71363c15332b8d2138494c57ec75f92c59252029",
+    "started_at_utc": "2026-10-31T11:32:51.306740+00:00",
+    "finished_at_utc": "2026-10-31T11:33:19.353748+00:00",
+    "exit": 1,
+    "result": "run-failed",
+    "log": "staff-tests.log",
+    "log_sha256": "d8e4abd7ac314e5b3c8befb00042388a1ea85af171f1e54b910c621d2e271a8c"
+  },
+  {
+    "label": "mobile-locked-dependencies",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "pub",
+      "get",
+      "--enforce-lockfile"
+    ],
+    "cwd": "apps/mobile",
+    "source": "71363c15332b8d2138494c57ec75f92c59252029",
+    "started_at_utc": "2026-10-31T11:33:19.361516+00:00",
+    "finished_at_utc": "2026-10-31T11:33:20.847202+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "mobile-locked-dependencies.log",
+    "log_sha256": "f1ce52260eb7db1b32335c4b6b7a88db475b3de7912ddaa7b4513b55c53fe9a2"
+  },
+  {
+    "label": "mobile-analysis",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "analyze",
+      "--no-pub"
+    ],
+    "cwd": "apps/mobile",
+    "source": "71363c15332b8d2138494c57ec75f92c59252029",
+    "started_at_utc": "2026-10-31T11:33:20.855240+00:00",
+    "finished_at_utc": "2026-10-31T11:33:38.786010+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "mobile-analysis.log",
+    "log_sha256": "9ca17dd09aa4173ce650d0aa82f37276de1d40f91e751f4e7cbd5bf357b9ce82"
+  },
+  {
+    "label": "mobile-tests",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "test",
+      "--no-pub",
+      "--concurrency=2",
+      "--reporter",
+      "expanded"
+    ],
+    "cwd": "apps/mobile",
+    "source": "bb5d9a3606d1838c3e1f2919902b4e471a9e0da1",
+    "started_at_utc": "2026-10-31T11:33:38.793508+00:00",
+    "finished_at_utc": "2026-10-31T11:34:08.100375+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "mobile-tests.log",
+    "log_sha256": "c2daa097611be1ff0dc8d85605935cbd66209bb4f25618309c1b2d12eac9e79d"
+  },
+  {
+    "label": "design-locked-dependencies",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "pub",
+      "get",
+      "--enforce-lockfile"
+    ],
+    "cwd": "packages/design_system",
+    "source": "bb5d9a3606d1838c3e1f2919902b4e471a9e0da1",
+    "started_at_utc": "2026-10-31T11:34:08.107532+00:00",
+    "finished_at_utc": "2026-10-31T11:34:09.035692+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "design-locked-dependencies.log",
+    "log_sha256": "e358a0d389f342cd6e312d96c7c672271f094418aad2ac03254d76d02563d9c7"
+  },
+  {
+    "label": "design-analysis",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "analyze",
+      "--no-pub"
+    ],
+    "cwd": "packages/design_system",
+    "source": "bb5d9a3606d1838c3e1f2919902b4e471a9e0da1",
+    "started_at_utc": "2026-10-31T11:34:09.042357+00:00",
+    "finished_at_utc": "2026-10-31T11:34:14.878557+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "design-analysis.log",
+    "log_sha256": "e4a8e10081d7cf0bb515bc405b17504927632deb6e2124885cd11d2f2b898b0b"
+  },
+  {
+    "label": "design-tests",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "test",
+      "--no-pub",
+      "--concurrency=2",
+      "--reporter",
+      "expanded"
+    ],
+    "cwd": "packages/design_system",
+    "source": "bb5d9a3606d1838c3e1f2919902b4e471a9e0da1",
+    "started_at_utc": "2026-10-31T11:34:14.885843+00:00",
+    "finished_at_utc": "2026-10-31T11:34:24.515220+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "design-tests.log",
+    "log_sha256": "c3eb361a0ccd1ce81d00fece3b27a24fac0623469f9399ea40ebb0fd8696c8d6"
+  },
+  {
+    "label": "contracts-locked-dependencies",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "pub",
+      "get",
+      "--enforce-lockfile"
+    ],
+    "cwd": "packages/contracts/dart",
+    "source": "bb5d9a3606d1838c3e1f2919902b4e471a9e0da1",
+    "started_at_utc": "2026-10-31T11:34:24.525482+00:00",
+    "finished_at_utc": "2026-10-31T11:34:26.048327+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "contracts-locked-dependencies.log",
+    "log_sha256": "4a37ec0f77bdbad8ec351a2bc20ea6f16955208cd3e7de25e3084e28d95fbb4b"
+  },
+  {
+    "label": "contracts-analysis",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "analyze",
+      "--no-pub"
+    ],
+    "cwd": "packages/contracts/dart",
+    "source": "bb5d9a3606d1838c3e1f2919902b4e471a9e0da1",
+    "started_at_utc": "2026-10-31T11:34:26.055464+00:00",
+    "finished_at_utc": "2026-10-31T11:34:30.234742+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "contracts-analysis.log",
+    "log_sha256": "5072d3825732b9663a45940b73d32e841a6a6e894159017a35fb386c89251608"
+  },
+  {
+    "label": "contracts-tests",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "test",
+      "--no-pub",
+      "--concurrency=2",
+      "--reporter",
+      "expanded"
+    ],
+    "cwd": "packages/contracts/dart",
+    "source": "bb5d9a3606d1838c3e1f2919902b4e471a9e0da1",
+    "started_at_utc": "2026-10-31T11:34:30.241806+00:00",
+    "finished_at_utc": "2026-10-31T11:34:31.757106+00:00",
+    "exit": 65,
+    "result": "run-failed",
+    "log": "contracts-tests.log",
+    "log_sha256": "b2039ce9f13a20e532f63de209c986679b688e59998b8f4a3bc1ffc6555296fc"
+  },
+  {
+    "label": "trial-locked-dependencies",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "pub",
+      "get",
+      "--enforce-lockfile"
+    ],
+    "cwd": "trials/staff_web",
+    "source": "bb5d9a3606d1838c3e1f2919902b4e471a9e0da1",
+    "started_at_utc": "2026-10-31T11:34:31.764913+00:00",
+    "finished_at_utc": "2026-10-31T11:34:33.016222+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "trial-locked-dependencies.log",
+    "log_sha256": "d51a44968ef7d87bad6bb3f3b6715ba0fa84332b83a1f50d78bf81eb56d5e2b6"
+  },
+  {
+    "label": "trial-analysis",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "analyze",
+      "--no-pub"
+    ],
+    "cwd": "trials/staff_web",
+    "source": "bb5d9a3606d1838c3e1f2919902b4e471a9e0da1",
+    "started_at_utc": "2026-10-31T11:34:33.023224+00:00",
+    "finished_at_utc": "2026-10-31T11:34:41.078636+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "trial-analysis.log",
+    "log_sha256": "0ce333fe574dedd8eae80182216f3824905295176ba210bac094fb6404cab683"
+  },
+  {
+    "label": "trial-tests",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "test",
+      "--no-pub",
+      "--concurrency=2",
+      "--reporter",
+      "expanded"
+    ],
+    "cwd": "trials/staff_web",
+    "source": "bb5d9a3606d1838c3e1f2919902b4e471a9e0da1",
+    "started_at_utc": "2026-10-31T11:34:41.085445+00:00",
+    "finished_at_utc": "2026-10-31T11:34:58.190874+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "trial-tests.log",
+    "log_sha256": "aa84413d8442257949581cd155b20b3466e906b47b1614fb82f8690ecbe5d808"
+  },
+  {
+    "label": "contracts-chrome",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "test",
+      "--no-pub",
+      "--platform",
+      "chrome",
+      "--reporter",
+      "expanded"
+    ],
+    "cwd": "packages/contracts/dart",
+    "source": "bb5d9a3606d1838c3e1f2919902b4e471a9e0da1",
+    "started_at_utc": "2026-10-31T11:34:58.199704+00:00",
+    "finished_at_utc": "2026-10-31T11:34:59.695706+00:00",
+    "exit": 1,
+    "result": "run-failed",
+    "log": "contracts-chrome.log",
+    "log_sha256": "094e84a3334e3860a4f8c5950ea997b3a555afd0c17d525aa9ea5a1ac3f586f9"
+  },
+  {
+    "label": "staff-web-build",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "build",
+      "web",
+      "--no-pub",
+      "--no-web-resources-cdn"
+    ],
+    "cwd": "apps/staff",
+    "source": "4e28f6f1b3e09f63b774538fb01aef80ecb66a6c",
+    "started_at_utc": "2026-10-31T11:34:59.707785+00:00",
+    "finished_at_utc": "2026-10-31T11:36:11.409197+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "staff-web-build.log",
+    "log_sha256": "f2324e3185501869ff574ff01139377412f5f3cb67c90873a89b280721943ad5"
+  },
+  {
+    "label": "trial-web-build",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "build",
+      "web",
+      "--no-pub",
+      "--no-web-resources-cdn"
+    ],
+    "cwd": "trials/staff_web",
+    "source": "4e28f6f1b3e09f63b774538fb01aef80ecb66a6c",
+    "started_at_utc": "2026-10-31T11:36:11.417186+00:00",
+    "finished_at_utc": "2026-10-31T11:36:48.315547+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "trial-web-build.log",
+    "log_sha256": "6daeb25ee2cd33cd9f301042d2f992e0569d2862eb5841f5ffe61f2d19690ea5"
+  },
+  {
+    "label": "android-debug-build",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "build",
+      "apk",
+      "--debug",
+      "--no-pub"
+    ],
+    "cwd": "apps/mobile",
+    "source": "4e28f6f1b3e09f63b774538fb01aef80ecb66a6c",
+    "started_at_utc": "2026-10-31T11:36:48.323041+00:00",
+    "finished_at_utc": "2026-10-31T11:38:16.894055+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "android-debug-build.log",
+    "log_sha256": "7d3decdb52cde115af49202cfb2ca37eb9359fa71793b26e8a1537b3ed68ffb3"
+  },
+  {
+    "label": "environment-check",
+    "command": [
+      "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\2\\church-content-tools-20261031\\node-v22.23.4-win-x64\\node.exe",
+      "tools/env/environments.mjs",
+      "check"
+    ],
+    "cwd": "",
+    "source": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "started_at_utc": "2026-10-31T11:38:16.902925+00:00",
+    "finished_at_utc": "2026-10-31T11:38:17.001681+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "environment-check.log",
+    "log_sha256": "c43fcaa27472fffd3364a4474ae019cd76a3b92a997e3b6c06f89f7101b7a681"
+  },
+  {
+    "label": "function-import-check",
+    "command": [
+      "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\2\\church-content-tools-20261031\\node-v22.23.4-win-x64\\node.exe",
+      "tools/ci/check-function-imports.mjs"
+    ],
+    "cwd": "",
+    "source": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "started_at_utc": "2026-10-31T11:38:17.008216+00:00",
+    "finished_at_utc": "2026-10-31T11:38:17.106157+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "function-import-check.log",
+    "log_sha256": "295754024e46af307b5299c4c01070696681128554cc0216b36e9283f2b93731"
+  },
+  {
+    "label": "secret-scan",
+    "command": [
+      "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\2\\church-content-tools-20261031\\node-v22.23.4-win-x64\\node.exe",
+      "tools/ci/scan-secrets.mjs"
+    ],
+    "cwd": "",
+    "source": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "started_at_utc": "2026-10-31T11:38:17.114419+00:00",
+    "finished_at_utc": "2026-10-31T11:38:29.260671+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "secret-scan.log",
+    "log_sha256": "40ad02cc1cfed9a675f181eb580ef7c7e593b3127dfe6a07e9cd802e24221471"
+  },
+  {
+    "label": "migration-immutability",
+    "command": [
+      "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\2\\church-content-tools-20261031\\node-v22.23.4-win-x64\\node.exe",
+      "tools/ci/check-migrations.mjs",
+      "--base",
+      "origin/main"
+    ],
+    "cwd": "",
+    "source": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "started_at_utc": "2026-10-31T11:38:29.267504+00:00",
+    "finished_at_utc": "2026-10-31T11:38:29.506469+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "migration-immutability.log",
+    "log_sha256": "af7de5a0f52a0dc4499d66aa4a1d06320a939bb3c7e6d6eea2b319d790c49676"
+  },
+  {
+    "label": "ts-contracts",
+    "command": [
+      "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\2\\church-content-tools-20261031\\node-v22.23.4-win-x64\\node.exe",
+      "--test",
+      "packages/contracts/ts/contracts.test.ts"
+    ],
+    "cwd": "",
+    "source": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "started_at_utc": "2026-10-31T11:38:29.514372+00:00",
+    "finished_at_utc": "2026-10-31T11:38:29.886580+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "ts-contracts.log",
+    "log_sha256": "01b3b7106e94a597daf69b98d438d86a73b47adb5358d82c35be3dc862bd8cbf"
+  },
+  {
+    "label": "web-bundle-scan",
+    "command": [
+      "C:\\Users\\ADMINI~1\\AppData\\Local\\Temp\\2\\church-content-tools-20261031\\node-v22.23.4-win-x64\\node.exe",
+      "tools/ci/scan-secrets.mjs",
+      "--bundle",
+      "apps/staff/build/web",
+      "trials/staff_web/build/web"
+    ],
+    "cwd": "",
+    "source": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "started_at_utc": "2026-10-31T11:38:29.896242+00:00",
+    "finished_at_utc": "2026-10-31T11:38:30.374505+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "web-bundle-scan.log",
+    "log_sha256": "835648fad7bf134f6997d1a055472dde990e0481994dc23d8651ce1825aed142"
+  }
+]

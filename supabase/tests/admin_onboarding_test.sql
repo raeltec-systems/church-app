@@ -1,8 +1,13 @@
--- AUTHORED ONLY: not executed in this delivery. Requires a fresh isolated LOCAL stack.
+-- Run only with the repository pgTAP runner against a disposable LOCAL stack.
 -- These database protocol/privilege tests do not replace real Auth/HTTP/concurrency tests.
 begin;
 select no_plan();
-select is(app.platform_current_environment(),'local','this suite is for an isolated local database');
+-- A new unmarked database deliberately has production behaviour. Exercise that
+-- default before installing the transaction-scoped fixture, rolled back below.
+select is(app.platform_current_environment(),'production','unmarked database fails closed as production');
+select ok(app.identity_admin_setup_notice(true) is null,'production refuses a synthetic setup notice');
+select app.platform_set_environment('local', 'pgtap owner-invited commissioning');
+select is(app.platform_current_environment(),'local','test fixture is explicitly local inside this transaction');
 select has_table('app','identity_admin_commissioning','permanent commissioning latch exists');
 select has_table('app','identity_admin_setup_invites','private invitation store exists');
 select has_table('app','identity_admin_setup_audit','separate operator provenance exists');

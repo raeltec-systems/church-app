@@ -163,8 +163,10 @@ select is((select array_agg(command || ':' || retain_result::text order by comma
   array['notifications.push_claim:true', 'notifications.push_prepare:false', 'notifications.push_record:true',
         'notifications.push_release:true'],
   'four push commands; only push_prepare (it answers device tokens) keeps no result');
-select is((select count(*)::int from app.sys_command_kinds where not retain_result), 1,
-  'every other system command keeps its replayable result');
+select results_eq(
+  $$select command from app.sys_command_kinds where not retain_result order by command$$,
+  $$values ('identity.admin_setup'::text), ('notifications.push_prepare'::text)$$,
+  'only commissioning authority and device-token preparation omit retained results; every other command remains replayable');
 select is((select push_enabled from app.notifications_worker_settings), false, 'push is off by default');
 select throws_ok($$select app.notifications_configure_worker('{"push_enabled": "yes"}', 'israel')$$, '22023', null,
   'push_enabled must be a boolean');

@@ -1,0 +1,12 @@
+{
+  "name": "staff-web-build",
+  "command": "flutter build web --no-web-resources-cdn",
+  "cwd": "apps/staff",
+  "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+  "started_utc": "2026-10-30T19:41:02.314279+00:00",
+  "finished_utc": "2026-10-30T19:47:26.364821+00:00",
+  "exit_code": 0,
+  "status": "skipped",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/staff-web-build.log.gz",
+  "interpretation": "Incomplete attempt during resource contention; explicitly stopped before the success marker. Flutter handled termination with exit 0, which is NOT a passed test/build. Use the -retry result; no acceptance claim from this attempt."
+}

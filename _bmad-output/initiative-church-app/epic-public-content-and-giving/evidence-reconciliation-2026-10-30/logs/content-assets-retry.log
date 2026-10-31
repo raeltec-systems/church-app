@@ -1,0 +1,222 @@
+command: node --test supabase/functions/content-assets/*.test.mjs
+cwd: .
+head: 46debe04fe8ba4ca0f7bc639e9ba60c41f57cb19
+started_utc: 2026-10-30T19:30:32.484373+00:00
+
+TAP version 13
+# Subtest: PNG, JPEG and WebP are measured from their bytes
+ok 1 - PNG, JPEG and WebP are measured from their bytes
+  ---
+  duration_ms: 2.528623
+  type: 'test'
+  ...
+# Subtest: a disguised or unknown file is refused whatever its name or declared type
+ok 2 - a disguised or unknown file is refused whatever its name or declared type
+  ---
+  duration_ms: 0.379075
+  type: 'test'
+  ...
+# Subtest: a right signature with an unreadable header is an invalid image
+ok 3 - a right signature with an unreadable header is an invalid image
+  ---
+  duration_ms: 0.249428
+  type: 'test'
+  ...
+# Subtest: a declared type that contradicts the bytes is a mismatch; no declaration claims nothing
+ok 4 - a declared type that contradicts the bytes is a mismatch; no declaration claims nothing
+  ---
+  duration_ms: 0.230169
+  type: 'test'
+  ...
+# Subtest: requests: three actions, each with exactly its parameters and method
+ok 5 - requests: three actions, each with exactly its parameters and method
+  ---
+  duration_ms: 1.448676
+  type: 'test'
+  ...
+# Subtest: retention request body is bounded and rejects caller-selected fields
+ok 6 - retention request body is bounded and rejects caller-selected fields
+  ---
+  duration_ms: 0.299964
+  type: 'test'
+  ...
+# Subtest: retention requires a well-formed purpose credential and the scheduler trigger
+ok 7 - retention requires a well-formed purpose credential and the scheduler trigger
+  ---
+  duration_ms: 0.441679
+  type: 'test'
+  ...
+# Subtest: retention claims accept only bounded, well-formed private draft paths
+ok 8 - retention claims accept only bounded, well-formed private draft paths
+  ---
+  duration_ms: 0.467048
+  type: 'test'
+  ...
+# Subtest: only a bearer token is accepted as the caller
+ok 9 - only a bearer token is accepted as the caller
+  ---
+  duration_ms: 0.408429
+  type: 'test'
+  ...
+# Subtest: size: the declared length and the 10 MiB body cap
+ok 10 - size: the declared length and the 10 MiB body cap
+  ---
+  duration_ms: 0.50807
+  type: 'test'
+  ...
+# Subtest: database refusals map to statuses carrying only codes
+ok 11 - database refusals map to statuses carrying only codes
+  ---
+  duration_ms: 0.508791
+  type: 'test'
+  ...
+# Subtest: a sync plan keeps only well-formed entries
+ok 12 - a sync plan keeps only well-formed entries
+  ---
+  duration_ms: 0.454169
+  type: 'test'
+  ...
+# Subtest: uploads are creates (expected null); CORS allows staff web without cookies
+ok 13 - uploads are creates (expected null); CORS allows staff web without cookies
+  ---
+  duration_ms: 12.372745
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: post-upload plan refused with 401: the withdrawn origin object ends absent
+ok 14 - F1 follow-up: post-upload plan refused with 401: the withdrawn origin object ends absent
+  ---
+  duration_ms: 33.705159
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: after the 401 refusal every retry ends in a safe terminal state
+ok 15 - F1 follow-up: after the 401 refusal every retry ends in a safe terminal state
+  ---
+  duration_ms: 2.324904
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: post-upload plan refused with 403: the withdrawn origin object ends absent
+ok 16 - F1 follow-up: post-upload plan refused with 403: the withdrawn origin object ends absent
+  ---
+  duration_ms: 1.004503
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: after the 403 refusal every retry ends in a safe terminal state
+ok 17 - F1 follow-up: after the 403 refusal every retry ends in a safe terminal state
+  ---
+  duration_ms: 1.858737
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: post-upload plan refused with 503: the withdrawn origin object ends absent
+ok 18 - F1 follow-up: post-upload plan refused with 503: the withdrawn origin object ends absent
+  ---
+  duration_ms: 1.080948
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: after the 503 refusal every retry ends in a safe terminal state
+ok 19 - F1 follow-up: after the 503 refusal every retry ends in a safe terminal state
+  ---
+  duration_ms: 2.46781
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: post-upload plan read times out: the withdrawn origin object ends absent
+ok 20 - F1 follow-up: post-upload plan read times out: the withdrawn origin object ends absent
+  ---
+  duration_ms: 1.015819
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: a still-wanted file removed after a refusal is restored by the next authorized sync
+ok 21 - F1 follow-up: a still-wanted file removed after a refusal is restored by the next authorized sync
+  ---
+  duration_ms: 1.650241
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: a cleanup delete that fails is retried a bounded number of times, then the next sync removes it
+ok 22 - F1 follow-up: a cleanup delete that fails is retried a bounded number of times, then the next sync removes it
+  ---
+  duration_ms: 1.503739
+  type: 'test'
+  ...
+# Subtest: F1 follow-up: logic: a refused read after placement removes exactly the placed paths
+ok 23 - F1 follow-up: logic: a refused read after placement removes exactly the placed paths
+  ---
+  duration_ms: 0.971092
+  type: 'test'
+  ...
+# Subtest: a complete PNG keeps its pixels; text chunks and appended bytes are dropped
+ok 24 - a complete PNG keeps its pixels; text chunks and appended bytes are dropped
+  ---
+  duration_ms: 77.992219
+  type: 'test'
+  ...
+# Subtest: a PNG header alone, a truncated, corrupted or short PNG is an invalid image
+ok 25 - a PNG header alone, a truncated, corrupted or short PNG is an invalid image
+  ---
+  duration_ms: 42.976493
+  type: 'test'
+  ...
+# Subtest: a JPEG keeps its frame and scans; Exif, comments and appended bytes are dropped
+ok 26 - a JPEG keeps its frame and scans; Exif, comments and appended bytes are dropped
+  ---
+  duration_ms: 1.525302
+  type: 'test'
+  ...
+# Subtest: a WebP keeps its image; Exif, XMP and appended bytes are dropped; animation is refused
+ok 27 - a WebP keeps its image; Exif, XMP and appended bytes are dropped; animation is refused
+  ---
+  duration_ms: 1.026065
+  type: 'test'
+  ...
+# Subtest: F1 logic: withdrawal and its sync while A pauses at draft: the public object ends absent
+ok 28 - F1 logic: withdrawal and its sync while A pauses at draft: the public object ends absent
+  ---
+  duration_ms: 2.933697
+  type: 'test'
+  ...
+# Subtest: F1 handler: withdrawal and its sync while A pauses at draft: the public object ends absent
+ok 29 - F1 handler: withdrawal and its sync while A pauses at draft: the public object ends absent
+  ---
+  duration_ms: 26.047252
+  type: 'test'
+  ...
+# Subtest: F1 logic: withdrawal and its sync while A pauses at upload: the public object ends absent
+ok 30 - F1 logic: withdrawal and its sync while A pauses at upload: the public object ends absent
+  ---
+  duration_ms: 0.469091
+  type: 'test'
+  ...
+# Subtest: F1 handler: withdrawal and its sync while A pauses at upload: the public object ends absent
+ok 31 - F1 handler: withdrawal and its sync while A pauses at upload: the public object ends absent
+  ---
+  duration_ms: 1.90008
+  type: 'test'
+  ...
+# Subtest: F1: an undisturbed sync places the file once and reports nothing pending
+ok 32 - F1: an undisturbed sync places the file once and reports nothing pending
+  ---
+  duration_ms: 0.885973
+  type: 'test'
+  ...
+# Subtest: F1: a refused fresh plan stops the sync before any upload
+ok 33 - F1: a refused fresh plan stops the sync before any upload
+  ---
+  duration_ms: 0.287826
+  type: 'test'
+  ...
+# Subtest: F1: removals that never succeed end after bounded rounds and stay reported as pending
+ok 34 - F1: removals that never succeed end after bounded rounds and stay reported as pending
+  ---
+  duration_ms: 0.292884
+  type: 'test'
+  ...
+1..34
+# tests 34
+# suites 0
+# pass 34
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 195.247512
+
+finished_utc: 2026-10-30T19:30:32.720777+00:00
+exit_code: 0

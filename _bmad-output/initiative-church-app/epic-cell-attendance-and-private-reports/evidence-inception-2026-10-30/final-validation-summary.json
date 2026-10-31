@@ -1,0 +1,29 @@
+{
+  "review_status": "ready_for_owner_review_unapproved",
+  "date": "2026-10-30",
+  "required_findings_open": [],
+  "required_findings_resolved": [
+    "F1 shared Follow-ups direct-contact fallback ownership and consumer handoffs",
+    "F2 4.16 prerequisite and truthful handover/revocation semantics"
+  ],
+  "owner_suggestions_open": [
+    "Explicitly accept or change the sequencing tradeoff: report-care contract review at 7.1, implementation at 7.7"
+  ],
+  "entry_count": 14,
+  "entry_reference_count": 57,
+  "companion_link_count": 18,
+  "reference_issues": [],
+  "formal_status_exit_code": 0,
+  "unpinned_after": [],
+  "undeclared_after": [],
+  "order_conflict": [],
+  "pre_existing_warnings": [
+    "epic-public-content-and-giving/story-f1-giving-admin-tenure-plan.md: ticket '' names no entry or leaf file in epic-public-content-and-giving; skipped",
+    "epic-public-content-and-giving/story-f2-church-owned-images-plan.md: ticket '' names no entry or leaf file in epic-public-content-and-giving; skipped",
+    "epic-public-content-and-giving/story-f3-delete-unreferenced-uploads-plan.md: ticket '' names no entry or leaf file in epic-public-content-and-giving; skipped"
+  ],
+  "application_tests_run": false,
+  "canonical_epic7_created_in_real_repository": false,
+  "approval_or_acceptance_recorded": false,
+  "deployment_performed": false
+}

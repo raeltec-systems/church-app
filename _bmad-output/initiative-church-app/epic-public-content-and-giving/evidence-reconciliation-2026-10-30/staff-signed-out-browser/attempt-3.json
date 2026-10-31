@@ -1,0 +1,612 @@
+{
+  "source_head": "c655dac95766011a22e3f6eb6cff674af2396b13",
+  "started_utc": "2026-10-30T20:13:02.988Z",
+  "finished_utc": "2026-10-30T20:13:10.618Z",
+  "status": "run-failed",
+  "browser_plugin": "Browser plugin not available; installed Playwright used",
+  "playwright_version": "1.62.1",
+  "chromium_version": "151.0.7922.34",
+  "build_config": "Staging public-client configuration consumed privately; configured bundle remains outside the repository",
+  "origin": "http://127.0.0.1:44633/",
+  "viewports": [
+    {
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "width": 390,
+      "height": 844
+    }
+  ],
+  "checks": [
+    {
+      "id": "B01",
+      "name": "Page identity and meaningful landing",
+      "status": "pass",
+      "detail": {
+        "url": "http://127.0.0.1:44633/#/overview",
+        "title": "BICC Kafue staff"
+      }
+    },
+    {
+      "id": "B02",
+      "name": "Signed-out landing has one entry action and no staff sections",
+      "status": "pass",
+      "detail": {}
+    },
+    {
+      "id": "B03",
+      "name": "Keyboard Tab reaches named sign-in action",
+      "status": "pass",
+      "detail": {
+        "focus": {
+          "tag": "FLT-SEMANTICS",
+          "role": "button",
+          "name": "Sign in",
+          "rect": {
+            "x": 447,
+            "y": 543,
+            "width": 386,
+            "height": 48
+          }
+        }
+      }
+    },
+    {
+      "id": "B04",
+      "name": "Keyboard Enter opens the sign-in screen",
+      "status": "pass",
+      "detail": {
+        "url": "http://127.0.0.1:44633/#/sign-in"
+      }
+    },
+    {
+      "id": "B05",
+      "name": "Keyboard traversal reaches phone, password, submit and help controls",
+      "status": "pass",
+      "detail": {
+        "stops": [
+          {
+            "tag": "FLT-SEMANTICS",
+            "role": "radio",
+            "name": "Create account",
+            "rect": {
+              "x": 571.6666870117188,
+              "y": 111,
+              "width": 287.328125,
+              "height": 48
+            }
+          },
+          {
+            "tag": "FLT-SEMANTICS",
+            "role": "button",
+            "name": "Country code\nZambia (+260)",
+            "rect": {
+              "x": 410,
+              "y": 250,
+              "width": 460,
+              "height": 92
+            }
+          },
+          {
+            "tag": "INPUT",
+            "role": null,
+            "name": "Phone number (your username)",
+            "rect": {
+              "x": 410,
+              "y": 354,
+              "width": 468,
+              "height": 86
+            }
+          },
+          {
+            "tag": "INPUT",
+            "role": null,
+            "name": "Password",
+            "rect": {
+              "x": 410,
+              "y": 446,
+              "width": 468,
+              "height": 68
+            }
+          },
+          {
+            "tag": "FLT-SEMANTICS",
+            "role": "button",
+            "name": "Show password",
+            "rect": {
+              "x": 815,
+              "y": 453,
+              "width": 48,
+              "height": 48
+            }
+          },
+          {
+            "tag": "FLT-SEMANTICS",
+            "role": "button",
+            "name": "Sign in",
+            "rect": {
+              "x": 417,
+              "y": 535,
+              "width": 446,
+              "height": 48
+            }
+          },
+          {
+            "tag": "FLT-SEMANTICS",
+            "role": "button",
+            "name": "Forgot password?",
+            "rect": {
+              "x": 417,
+              "y": 609,
+              "width": 151.109375,
+              "height": 48
+            }
+          },
+          {
+            "tag": "FLT-SEMANTICS",
+            "role": "button",
+            "name": "Get church help",
+            "rect": {
+              "x": 590.1202392578125,
+              "y": 609,
+              "width": 136.3125,
+              "height": 48
+            }
+          },
+          {
+            "tag": "FLT-SEMANTICS",
+            "role": "radio",
+            "name": "Sign in",
+            "rect": {
+              "x": 421,
+              "y": 111,
+              "width": 136.65625,
+              "height": 48
+            }
+          },
+          {
+            "tag": "FLT-SEMANTICS",
+            "role": "radio",
+            "name": "Create account",
+            "rect": {
+              "x": 571.6666870117188,
+              "y": 111,
+              "width": 287.328125,
+              "height": 48
+            }
+          },
+          {
+            "tag": "FLT-SEMANTICS",
+            "role": "button",
+            "name": "Country code\nZambia (+260)",
+            "rect": {
+              "x": 410,
+              "y": 250,
+              "width": 460,
+              "height": 92
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "B06",
+      "name": "Empty sign-in stays local and shows both field errors",
+      "status": "pass",
+      "detail": {}
+    },
+    {
+      "id": "B07",
+      "name": "Create-account mode is reachable without submitting",
+      "status": "pass",
+      "detail": {}
+    },
+    {
+      "id": "B08",
+      "name": "Switching back recovers from local validation state",
+      "status": "pass",
+      "detail": {}
+    },
+    {
+      "id": "B09",
+      "name": "Password visibility toggle updates its accessible action",
+      "status": "pass",
+      "detail": {
+        "snapshot": "- heading \"Sign in\" [level=2]\n- group:\n  - radiogroup \"Sign in or create an account\":\n    - radio \"Sign in\" [checked]\n    - radio \"Create account\"\n  - text: Your phone number is your sign-in username. We never send codes by SMS, and using a number here does not verify that you own it.\n  - button \"Country code Zambia (+260)\": Used when you type a local number. Numbers starting with + work for any country.\n  - textbox \"Phone number (your username)\"\n  - text: For example +260 \u2026, or a local number.\n  - textbox \"Password\"\n  - button \"Hide password\"\n  - button \"Sign in\"\n  - button \"Forgot password?\"\n  - button \"Get church help\""
+      }
+    },
+    {
+      "id": "B10",
+      "name": "Church-help action explains the real recovery route",
+      "status": "pass",
+      "detail": {}
+    },
+    {
+      "id": "B11",
+      "name": "Forgot-password entry and return are reachable without sending email",
+      "status": "pass",
+      "detail": {}
+    },
+    {
+      "id": "B12",
+      "name": "Back to sign in returns to empty credential fields",
+      "status": "pass",
+      "detail": {}
+    },
+    {
+      "id": "B13",
+      "name": "Reload restores the signed-out sign-in route",
+      "status": "pass",
+      "detail": {}
+    },
+    {
+      "id": "B14",
+      "name": "Narrow sign-in fields fit without page-level horizontal overflow",
+      "status": "fail",
+      "detail": {
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "layout": {
+          "innerWidth": 390,
+          "scrollWidth": 390,
+          "bodyScrollWidth": 1100
+        },
+        "inputBoxes": [
+          {
+            "x": 32,
+            "y": 374,
+            "width": 334,
+            "height": 86
+          },
+          {
+            "x": 32,
+            "y": 466,
+            "width": 334,
+            "height": 68
+          }
+        ]
+      }
+    },
+    {
+      "id": "B15",
+      "name": "Narrow layout scrolls to church help",
+      "status": "pass",
+      "detail": {}
+    },
+    {
+      "id": "B16",
+      "name": "No framework/runtime page error",
+      "status": "pass",
+      "detail": {
+        "pageErrors": []
+      }
+    },
+    {
+      "id": "B17",
+      "name": "No auth or mutation request attempted",
+      "status": "pass",
+      "detail": {
+        "denied": [],
+        "stagingRequestCount": 0
+      }
+    }
+  ],
+  "snapshots": {
+    "landing": "- group:\n  - img \"Brethren in Christ Church Kafue\"\n  - heading \"BICC Kafue staff\" [level=2]\n  - text: Members, cells and duties for the church office, the pastors and the leaders.\n  - button \"Sign in\"",
+    "signin": "- heading \"Sign in\" [level=2]\n- group:\n  - radiogroup \"Sign in or create an account\":\n    - radio \"Sign in\" [checked]\n    - radio \"Create account\"\n  - text: Your phone number is your sign-in username. We never send codes by SMS, and using a number here does not verify that you own it.\n  - button \"Country code Zambia (+260)\": Used when you type a local number. Numbers starting with + work for any country.\n  - textbox \"Phone number (your username)\"\n  - text: For example +260 \u2026, or a local number.\n  - textbox \"Password\"\n  - button \"Show password\"\n  - button \"Sign in\"\n  - button \"Forgot password?\"\n  - button \"Get church help\"",
+    "emptyForm": "- heading \"Sign in\" [level=2]\n- group:\n  - radiogroup \"Sign in or create an account\":\n    - radio \"Sign in\" [checked]\n    - radio \"Create account\"\n  - text: Your phone number is your sign-in username. We never send codes by SMS, and using a number here does not verify that you own it.\n  - button \"Country code Zambia (+260)\": Used when you type a local number. Numbers starting with + work for any country.\n  - textbox \"Phone number (your username)\"\n  - text: Enter your phone number.\n  - textbox \"Password\"\n  - button \"Show password\"\n  - text: Enter your password.\n  - button \"Sign in\"\n  - button \"Forgot password?\"\n  - button \"Get church help\"",
+    "passwordVisible": "- heading \"Sign in\" [level=2]\n- group:\n  - radiogroup \"Sign in or create an account\":\n    - radio \"Sign in\" [checked]\n    - radio \"Create account\"\n  - text: Your phone number is your sign-in username. We never send codes by SMS, and using a number here does not verify that you own it.\n  - button \"Country code Zambia (+260)\": Used when you type a local number. Numbers starting with + work for any country.\n  - textbox \"Phone number (your username)\"\n  - text: For example +260 \u2026, or a local number.\n  - textbox \"Password\"\n  - button \"Hide password\"\n  - button \"Sign in\"\n  - button \"Forgot password?\"\n  - button \"Get church help\"",
+    "help": "- heading \"Sign in\" [level=2]\n- group:\n  - radiogroup \"Sign in or create an account\":\n    - radio \"Sign in\" [checked]\n    - radio \"Create account\"\n  - text: Your phone number is your sign-in username. We never send codes by SMS, and using a number here does not verify that you own it.\n  - button \"Country code Zambia (+260)\": Used when you type a local number. Numbers starting with + work for any country.\n  - textbox \"Phone number (your username)\"\n  - text: For example +260 \u2026, or a local number.\n  - textbox \"Password\"\n  - button \"Show password Show password\"\n  - button \"Sign in\"\n  - button \"Forgot password?\"\n  - button \"Get church help\"\n  - heading \"Get help from the church Ask the church office or your cell leader for help with signing in. They will check who you are in person. Staff never ask for, choose or see your password, and no code is sent by SMS.\" [level=2]",
+    "forgot": "- heading \"Forgot password\" [level=2]\n- group:\n  - text: Enter the recovery email the church approved for your account. We send a link to set a new password. Open it on this device.\n  - textbox \"Recovery email\"\n  - button \"Send reset link\"\n  - heading \"No recovery email, or can't reach it? Ask the church office for help. They check who you are in person, then you set a new password yourself. Staff never see, choose or send your password, and no code is sent by SMS.\" [level=2]\n  - button \"Back to sign in\"",
+    "narrow": "- heading \"Sign in\" [level=2]\n- group:\n  - radiogroup \"Sign in or create an account\":\n    - radio \"Sign in\" [checked]\n    - radio \"Create account\"\n  - text: Your phone number is your sign-in username. We never send codes by SMS, and using a number here does not verify that you own it.\n  - button \"Country code Zambia (+260)\": Used when you type a local number. Numbers starting with + work for any country.\n  - textbox \"Phone number (your username)\"\n  - text: For example +260 \u2026, or a local number.\n  - textbox \"Password\"\n  - button \"Show password\"\n  - button \"Sign in\"\n  - button \"Forgot password?\"\n  - button \"Get church help\""
+  },
+  "screenshots": [
+    "desktop-landing.png",
+    "desktop-landing-focus.png",
+    "desktop-sign-in.png",
+    "desktop-empty-validation.png",
+    "desktop-help.png",
+    "desktop-forgot-password.png",
+    "narrow-sign-in.png",
+    "narrow-help.png"
+  ],
+  "traffic": [
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/flutter_bootstrap.js"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/canvaskit/chromium/canvaskit.wasm"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/canvaskit/chromium/canvaskit.js"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/main.dart.js"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/FontManifest.json"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/fonts/MaterialIcons-Regular.otf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Outfit-SemiBold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Outfit-Bold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Figtree-Regular.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Figtree-Medium.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Figtree-SemiBold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Figtree-Bold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/JetBrainsMono-Regular.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/JetBrainsMono-Medium.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/JetBrainsMono-SemiBold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/fonts/fallback/Roboto-Regular.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/AssetManifest.bin.json"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/assets/bic-logo.png"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/flutter_bootstrap.js"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/canvaskit/chromium/canvaskit.wasm"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/canvaskit/chromium/canvaskit.js"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/main.dart.js"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/FontManifest.json"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/fonts/MaterialIcons-Regular.otf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Outfit-SemiBold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Outfit-Bold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Figtree-Regular.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Figtree-Medium.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Figtree-SemiBold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Figtree-Bold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/JetBrainsMono-Regular.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/JetBrainsMono-Medium.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/JetBrainsMono-SemiBold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/fonts/fallback/Roboto-Regular.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/flutter_bootstrap.js"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/canvaskit/chromium/canvaskit.wasm"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/canvaskit/chromium/canvaskit.js"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/main.dart.js"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/FontManifest.json"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/fonts/MaterialIcons-Regular.otf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Outfit-SemiBold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Outfit-Bold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Figtree-Regular.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Figtree-Medium.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Figtree-SemiBold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Figtree-Bold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/JetBrainsMono-Regular.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/JetBrainsMono-Medium.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/JetBrainsMono-SemiBold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/fonts/fallback/Roboto-Regular.ttf"
+    }
+  ],
+  "denied": [],
+  "consoleMessages": [
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x11f400165600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x11f400165600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x11f400165600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0x11f400165600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+    }
+  ],
+  "pageErrors": [],
+  "fatal": null,
+  "scope_limitations": [
+    "Fresh signed-out context only; no credentials, account creation, email sending or notification actions.",
+    "The current signed-out staff routes issue no backend reads. Configured build and browser behavior do not establish staging backend workflow acceptance.",
+    "Empty-form recovery is local UI validation, not failed-login/backend retry evidence.",
+    "Semantic names and keyboard traversal are a smoke check, not a complete accessibility audit."
+  ],
+  "interpretation": "Harness measurement failure: body.scrollWidth includes hidden/semantic Flutter DOM and is not the page scrolling element. Final check measures the actual scrolling element and attempts horizontal scrolling; field layout and screenshot fit. Product unchanged.",
+  "superseded_by": "results.json"
+}

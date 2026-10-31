@@ -1,0 +1,12 @@
+{
+  "name": "flutter-precache",
+  "command": "flutter precache --web --linux --no-android --no-ios --no-windows --no-macos --no-fuchsia",
+  "cwd": ".",
+  "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+  "started_utc": "2026-10-30T19:35:09.652074+00:00",
+  "finished_utc": "2026-10-30T19:38:00.556692+00:00",
+  "exit_code": 0,
+  "status": "skipped",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/flutter-precache.log.gz",
+  "interpretation": "Initial precache was stopped during slow Web SDK transfer to install the complete checksum-verified official archive. The process exited 0 after signal handling; do not treat this attempt as complete. Superseded by flutter-precache-retry."
+}

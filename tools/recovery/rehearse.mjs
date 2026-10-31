@@ -32,6 +32,7 @@ import {
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { localStatus, localContainer, localTarget } from '../auth-harness/local-target.mjs';
 import { LocalSegmentJournal, SEGMENT_RE, verifyJournal } from './journal.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -40,7 +41,7 @@ const JOURNAL_DIR = join(STATE_DIR, 'journal');
 const RUN_FILE = join(STATE_DIR, 'run.json');
 export const OPERATOR = 'israel';
 export const BUCKET = 'rcv-synthetic-rehearsal';
-export const ISOLATED = 'bic-rcv-isolated';
+export const ISOLATED = `bic-rcv-isolated-${localTarget().project}`;
 const MARKER_BY = 'recovery-rehearsal';
 export const NEGATIVE_SCENARIOS = ['absent', 'gap', 'tampered', 'unsealed', 'early_seal'];
 
@@ -84,16 +85,9 @@ export const uuidLiteral = (u) => {
 let localEnvCache = null;
 function localEnv() {
   if (localEnvCache) return localEnvCache;
-  const out = run('npx', ['supabase', 'status', '-o', 'env']).out;
-  const env = {};
-  for (const line of out.split('\n')) {
-    const m = /^([A-Z_]+)="?(.*?)"?$/.exec(line.trim());
-    if (m) env[m[1]] = m[2];
-  }
+  const env = localStatus();
   for (const k of ['API_URL', 'SECRET_KEY', 'SERVICE_ROLE_KEY']) if (!env[k]) throw new Error(`local stack not running (${k} missing)`);
-  if (!/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(env.API_URL)) throw new Error('source must be the LOCAL stack');
-  const db = run('docker', ['ps', '--filter', 'name=supabase_db_', '--format', '{{.Names}}']).out.split('\n')[0];
-  if (!db) throw new Error('local database container not found');
+  const db = localContainer('db');
   localEnvCache = { ...env, DB_CONTAINER: db };
   return localEnvCache;
 }

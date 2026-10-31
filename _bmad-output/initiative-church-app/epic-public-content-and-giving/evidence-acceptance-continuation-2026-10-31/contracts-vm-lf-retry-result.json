@@ -1,0 +1,8 @@
+{
+    "observed_at_utc":  "2026-10-31T08:27:28.8111066Z",
+    "configuration":  "same committed fixture bytes with LF working tree",
+    "command":  "cd packages/contracts/dart; dart test",
+    "result":  "run-passed",
+    "head":  "8ed2387e67564469c4e6ddb04773f752e3c5e1a7",
+    "exit":  0
+}

@@ -1,0 +1,129 @@
+{
+  "url": "http://127.0.0.1:36241/",
+  "title": "BICC Kafue staff",
+  "landing": "- group:\n  - img \"Brethren in Christ Church Kafue\"\n  - heading \"BICC Kafue staff\" [level=2]\n  - text: Members, cells and duties for the church office, the pastors and the leaders.\n  - button \"Sign in\"",
+  "focus": {
+    "tag": "FLT-SEMANTICS",
+    "role": "button",
+    "name": null,
+    "text": "Sign in"
+  },
+  "signin": "- heading \"Sign in\" [level=2]\n- group:\n  - radiogroup \"Sign in or create an account\":\n    - radio \"Sign in\" [checked]\n    - radio \"Create account\"\n  - text: Your phone number is your sign-in username. We never send codes by SMS, and using a number here does not verify that you own it.\n  - button \"Country code Zambia (+260)\": Used when you type a local number. Numbers starting with + work for any country.\n  - textbox \"Phone number (your username)\"\n  - text: For example +260 …, or a local number.\n  - textbox \"Password\"\n  - button \"Show password\"\n  - button \"Sign in\"\n  - button \"Forgot password?\"\n  - button \"Get church help\"",
+  "traffic": [
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/flutter_bootstrap.js"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/canvaskit/chromium/canvaskit.wasm"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/canvaskit/chromium/canvaskit.js"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/main.dart.js"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/FontManifest.json"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/fonts/MaterialIcons-Regular.otf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Outfit-SemiBold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Outfit-Bold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Figtree-Regular.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Figtree-Medium.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Figtree-SemiBold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/Figtree-Bold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/JetBrainsMono-Regular.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/JetBrainsMono-Medium.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/fonts/JetBrainsMono-SemiBold.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/fonts/fallback/Roboto-Regular.ttf"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/AssetManifest.bin.json"
+    },
+    {
+      "kind": "local",
+      "method": "GET",
+      "path": "/assets/packages/church_design_system/assets/bic-logo.png"
+    }
+  ],
+  "denied": [],
+  "consoleMessages": [
+    {
+      "type": "warning",
+      "text": "[.WebGL-0xbf40341c200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0xbf40341c200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0xbf40341c200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels"
+    },
+    {
+      "type": "warning",
+      "text": "[.WebGL-0xbf40341c200]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+    }
+  ],
+  "pageErrors": []
+}

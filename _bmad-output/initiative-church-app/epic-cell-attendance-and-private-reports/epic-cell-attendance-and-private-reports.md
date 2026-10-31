@@ -22,7 +22,7 @@ Cell leaders can record what happened, follow up permitted needs and submit priv
 
 ## Requirements
 
-The requirement source is the parent spec, CAP-8, read with every companion. The scope and Done when below define this epic’s contribution. Detailed implementation slices are completed at its inception; no new local requirement IDs are introduced.
+The requirement source is the parent spec, CAP-8, read with every companion. The scope and Done when below define this epic’s contribution. The approved 14-story inception is recorded in [tickets.toml](tickets.toml); no new local requirement IDs are introduced.
 
 ## Done when
 
@@ -44,7 +44,7 @@ Cells owns registers, visitors and report records. Programme recurrence and meet
 - Epic 4 (epic-duties-coverage-and-follow-ups) supplies Follow-ups owner APIs, source/purpose registration, restricted task context and authorized attributed owner actions.
 - Epic 5 (epic-cell-meetings-and-programmes) supplies Canonical Cells meeting/occurrence IDs, meeting held/cancelled lifecycle and separate actual programme-leader records; not every programme screen.
 
-At inception, each consuming story pins the provider entry that delivers this output. These are output dependencies, not an extra whole-epic gate; unrelated provider work does not become a prerequisite.
+The approved breakdown pins each consuming story to its provider entries. These are output dependencies, not an extra whole-epic gate; unrelated provider work does not become a prerequisite.
 
 ## References
 
@@ -55,6 +55,7 @@ At inception, each consuming story pins the provider entry that delivers this ou
 - design — _bmad-output/initiative-church-app/spec-church-app/design-contract.md, the applicable mobile/staff screens and state overrides.
 - delivery — _bmad-output/initiative-church-app/spec-church-app/delivery-and-decisions.md, Milestone 4; Q4, Q6, Q8
 - acceptance — _bmad-output/initiative-church-app/spec-church-app/acceptance-map.md, relevant compound checks and detailed verification boundaries.
+- adoption — _bmad-output/initiative-church-app/epic-cell-attendance-and-private-reports/adoption-2026-10-31.md, approval scope, validation and remaining checkpoints.
 
 ## Notes
 
@@ -62,4 +63,8 @@ At inception, each consuming story pins the provider entry that delivers this ou
 - Constraint: Follow-up flags, trend denominators and report completeness must use recorded meeting facts. Neither intention notices nor duty acceptance are attendance evidence.
 - Constraint: This owner implements its required mobile/staff screens, source-specific safe projections, files and refresh signals, and registers its real lifecycle/handover/deletion effects before activation; shared platform stubs are not completed feature behavior.
 - Risk: high because this epic changes shared application behavior or protected state; require the independent permission/contract regression suite and owner release review in addition to story checks.
-- Assumption: This is a future epic envelope; run bmad-ticket inception before building it, preserving its ID, scope, dependencies and production verification.
+- Decision: 2026-10-31 — Israel replied "approved both" to the narrow staging-history repair and the recommended 14-story Epic 7 breakdown and sequence, then confirmed continuation. Adopt the reviewed entries from 34f273a9d31480be07e9a71eb84e502c486dd886 as canonical tickets.toml without changing their contents or IDs. The original proposal remains a historical record.
+- Decision: 2026-10-31 — Retain the staff-to-mobile historical register as the first tracer, with report-care authority and lifecycle reviewed at 7.1's planning checkpoint. Reporting implementation follows in 7.7 after attendance/visitor contracts; the owner approved this sequencing tradeoff and the 14-story grouping rather than the 12/11-story alternatives.
+- Decision: 2026-10-31 — Keep one implementation lane because the stories share Cells schema, command registration and client routes. Story 7.3 owns the shared direct-contact fallback consumed by 7.5 and 7.9; 4.16 remains a pinned prerequisite for lifecycle semantics.
+- Decision: 2026-10-31 — Retain the proposed plan/done human checkpoints, owner pilot 7.12, refactor 7.13 and final verification 7.14. Q4/Q6/Q8 values, affected story-plan approval, implementation acceptance and release are not approved by adopting the breakdown.
+- Decision: 2026-10-31 — Recap publication, visit negotiation, prayer, service trends and offerings remain in their own epics. Every personal-data story must deliver its own access/lifecycle/deletion protections; 7.10 is integrated verification, not deferred safety. No new leaf, build plan, implementation status or production claim is created by inception adoption.

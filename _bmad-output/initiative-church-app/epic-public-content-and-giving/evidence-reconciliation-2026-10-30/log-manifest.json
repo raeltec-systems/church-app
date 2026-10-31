@@ -1,0 +1,425 @@
+{
+  "generated_utc": "2026-10-30T19:58:26.473020+00:00",
+  "gzip_settings": {
+    "mtime": 0,
+    "filename": "",
+    "compresslevel": 9
+  },
+  "credential_scan_before_compression": "new-evidence-scan.json",
+  "files": [
+    {
+      "path": "logs/bundle-scan.log",
+      "encoding": "utf-8",
+      "stored_bytes": 303,
+      "stored_sha256": "32f472d0b96c863baa85e67811d28551996e6822ead527530844dfedeb989e91",
+      "raw_bytes": 303,
+      "raw_sha256": "32f472d0b96c863baa85e67811d28551996e6822ead527530844dfedeb989e91"
+    },
+    {
+      "path": "logs/client-core-analyze.log.gz",
+      "encoding": "gzip",
+      "stored_bytes": 743,
+      "stored_sha256": "87e1d9b5df4dad3e8136c41074eec33ee61aebe5c211d855b5c424ae8d66f91c",
+      "raw_bytes": 1556,
+      "raw_sha256": "55e0b980cc90a0fc188c1a5620b3123015d05e5ca50f1aa2a825b4b235d482ab",
+      "compression_reason": "Preserve original terminal trailing padding byte-for-byte while keeping textual git diff checks clean."
+    },
+    {
+      "path": "logs/client-core-pub.log",
+      "encoding": "utf-8",
+      "stored_bytes": 1478,
+      "stored_sha256": "b5ca9a43fe1a4c057c93d1a5136437def9f7f634be21e6560155dec9bf3d394a",
+      "raw_bytes": 1478,
+      "raw_sha256": "b5ca9a43fe1a4c057c93d1a5136437def9f7f634be21e6560155dec9bf3d394a"
+    },
+    {
+      "path": "logs/client-core-test-retry.log.gz",
+      "encoding": "gzip",
+      "stored_bytes": 20309,
+      "stored_sha256": "8beb1de7d42529ec5a48053d9e95b8c987103c09c991c3fd1ff3aa72f4fbc2f6",
+      "raw_bytes": 229918,
+      "raw_sha256": "35df8c5ff87d1b1a1fb6dff4004b8b1bad0c6f86c9292b61774965837e59277c"
+    },
+    {
+      "path": "logs/client-core-test.log",
+      "encoding": "utf-8",
+      "stored_bytes": 118703,
+      "stored_sha256": "c0da9aca20752a59640cd8095710f1060b0263b6373d980164ad6efe3130274f",
+      "raw_bytes": 118703,
+      "raw_sha256": "c0da9aca20752a59640cd8095710f1060b0263b6373d980164ad6efe3130274f"
+    },
+    {
+      "path": "logs/content-assets-retry.log",
+      "encoding": "utf-8",
+      "stored_bytes": 7939,
+      "stored_sha256": "5a02bbb10d9a6c6bb7d9d0c71ce3810f0bef8ea5cba44488f5cbb8e05bb00c6f",
+      "raw_bytes": 7939,
+      "raw_sha256": "5a02bbb10d9a6c6bb7d9d0c71ce3810f0bef8ea5cba44488f5cbb8e05bb00c6f"
+    },
+    {
+      "path": "logs/content-assets.log",
+      "encoding": "utf-8",
+      "stored_bytes": 1063,
+      "stored_sha256": "9dac4269cf21df34ed4954313ac43ed2cd9448c9dc2ac3d2f4aaa465dab8f28e",
+      "raw_bytes": 1063,
+      "raw_sha256": "9dac4269cf21df34ed4954313ac43ed2cd9448c9dc2ac3d2f4aaa465dab8f28e"
+    },
+    {
+      "path": "logs/contracts-analyze.log",
+      "encoding": "utf-8",
+      "stored_bytes": 401,
+      "stored_sha256": "ea96597dc06fd56620e5263d42519be17d7c7268dadb2f7a2a180987adcf8503",
+      "raw_bytes": 401,
+      "raw_sha256": "ea96597dc06fd56620e5263d42519be17d7c7268dadb2f7a2a180987adcf8503"
+    },
+    {
+      "path": "logs/contracts-chrome.log",
+      "encoding": "utf-8",
+      "stored_bytes": 24251,
+      "stored_sha256": "30e3327ffe55c3402e47a4555171e055ed64fb89954cf9554b91c6d57d7e7a05",
+      "raw_bytes": 24251,
+      "raw_sha256": "30e3327ffe55c3402e47a4555171e055ed64fb89954cf9554b91c6d57d7e7a05"
+    },
+    {
+      "path": "logs/contracts-pub.log",
+      "encoding": "utf-8",
+      "stored_bytes": 1191,
+      "stored_sha256": "aec017e51a74278885b49924f086a93ce6c263d0fc1160ca4b24f017554f2536",
+      "raw_bytes": 1191,
+      "raw_sha256": "aec017e51a74278885b49924f086a93ce6c263d0fc1160ca4b24f017554f2536"
+    },
+    {
+      "path": "logs/contracts-retry.log",
+      "encoding": "utf-8",
+      "stored_bytes": 44508,
+      "stored_sha256": "a611dfed98fe7a1754907b23eb5b328394f0be508327a6e08610e10c2ddd66da",
+      "raw_bytes": 44508,
+      "raw_sha256": "a611dfed98fe7a1754907b23eb5b328394f0be508327a6e08610e10c2ddd66da"
+    },
+    {
+      "path": "logs/contracts-vm.log",
+      "encoding": "utf-8",
+      "stored_bytes": 24337,
+      "stored_sha256": "de8891b9b9dd6f03a7bb97e8693df797b92eb1c3db782e76cb16f67c9df8c13d",
+      "raw_bytes": 24337,
+      "raw_sha256": "de8891b9b9dd6f03a7bb97e8693df797b92eb1c3db782e76cb16f67c9df8c13d"
+    },
+    {
+      "path": "logs/contracts.log",
+      "encoding": "utf-8",
+      "stored_bytes": 536,
+      "stored_sha256": "0580ef924d79c01be6d1f69204fc3dcb22bf7b95e3b0f123af6c6496021be818",
+      "raw_bytes": 536,
+      "raw_sha256": "0580ef924d79c01be6d1f69204fc3dcb22bf7b95e3b0f123af6c6496021be818"
+    },
+    {
+      "path": "logs/design-system-analyze.log.gz",
+      "encoding": "gzip",
+      "stored_bytes": 497,
+      "stored_sha256": "68e0ce6715b3fceacc1eb364252f39613ff19b44860ac80b756f6714339d9189",
+      "raw_bytes": 807,
+      "raw_sha256": "19e7c7f9a89db8b451fc35cfc1054d5fea8834aa817b27168a2d1f0c0c8098e3",
+      "compression_reason": "Preserve original terminal trailing padding byte-for-byte while keeping textual git diff checks clean."
+    },
+    {
+      "path": "logs/design-system-pub.log",
+      "encoding": "utf-8",
+      "stored_bytes": 730,
+      "stored_sha256": "e2292f9b352ca0e3e954013af58b1bae6ff0f533ffb0599728947e44e2c6a5ae",
+      "raw_bytes": 730,
+      "raw_sha256": "e2292f9b352ca0e3e954013af58b1bae6ff0f533ffb0599728947e44e2c6a5ae"
+    },
+    {
+      "path": "logs/design-system-test.log",
+      "encoding": "utf-8",
+      "stored_bytes": 4065,
+      "stored_sha256": "4eb0f038c1098437e3049a998ae514c186c0377bb20cb833dfb58cd93e02dea5",
+      "raw_bytes": 4065,
+      "raw_sha256": "4eb0f038c1098437e3049a998ae514c186c0377bb20cb833dfb58cd93e02dea5"
+    },
+    {
+      "path": "logs/drift-check.log",
+      "encoding": "utf-8",
+      "stored_bytes": 422,
+      "stored_sha256": "5ec56af423db737c01cba1ff654cee638200145b77079c380233c2d160e07dac",
+      "raw_bytes": 422,
+      "raw_sha256": "5ec56af423db737c01cba1ff654cee638200145b77079c380233c2d160e07dac"
+    },
+    {
+      "path": "logs/environment.log",
+      "encoding": "utf-8",
+      "stored_bytes": 455,
+      "stored_sha256": "2489d4bb445127442bf9c72b75d0a978e96192e0f8339f4d25261b9734014750",
+      "raw_bytes": 455,
+      "raw_sha256": "2489d4bb445127442bf9c72b75d0a978e96192e0f8339f4d25261b9734014750"
+    },
+    {
+      "path": "logs/evidence-scans.log",
+      "encoding": "utf-8",
+      "stored_bytes": 7018,
+      "stored_sha256": "bb74f7b87522510bdf3a0bb4dcc6911e9dcebee059b7a69ea4182e7639d76333",
+      "raw_bytes": 7018,
+      "raw_sha256": "bb74f7b87522510bdf3a0bb4dcc6911e9dcebee059b7a69ea4182e7639d76333"
+    },
+    {
+      "path": "logs/flutter-precache-retry.log",
+      "encoding": "utf-8",
+      "stored_bytes": 727,
+      "stored_sha256": "4ca1277af26b54a1e9c51ca29e261dad43bdac669c724ef7c958ca45e8b8a886",
+      "raw_bytes": 727,
+      "raw_sha256": "4ca1277af26b54a1e9c51ca29e261dad43bdac669c724ef7c958ca45e8b8a886"
+    },
+    {
+      "path": "logs/flutter-precache.log.gz",
+      "encoding": "gzip",
+      "stored_bytes": 494,
+      "stored_sha256": "3b20e898461be673f8df2844f1c52ece67bc756526e793fb07d42d08a5ba3184",
+      "raw_bytes": 1115,
+      "raw_sha256": "1f35a524737a753ef8a0610a7bea94af87d390eeb841f402cd146faa53204eef",
+      "compression_reason": "Preserve original terminal trailing padding byte-for-byte while keeping textual git diff checks clean."
+    },
+    {
+      "path": "logs/flutter-version-retry.log",
+      "encoding": "utf-8",
+      "stored_bytes": 1216,
+      "stored_sha256": "881841cbabb61f0af954f0a8066261102fb8b05bb098901e9833536f9a946690",
+      "raw_bytes": 1216,
+      "raw_sha256": "881841cbabb61f0af954f0a8066261102fb8b05bb098901e9833536f9a946690"
+    },
+    {
+      "path": "logs/flutter-version.log",
+      "encoding": "utf-8",
+      "stored_bytes": 8580,
+      "stored_sha256": "c5a42350f295403c730d562375f52912dce6155c7fff9e43ecd89f7e99cc535b",
+      "raw_bytes": 8580,
+      "raw_sha256": "c5a42350f295403c730d562375f52912dce6155c7fff9e43ecd89f7e99cc535b"
+    },
+    {
+      "path": "logs/harness.log",
+      "encoding": "utf-8",
+      "stored_bytes": 78928,
+      "stored_sha256": "5b6e023c32e9bf1ea59e68bcd248fbd9b4045e62d780501553dee9237c7cb8c5",
+      "raw_bytes": 78928,
+      "raw_sha256": "5b6e023c32e9bf1ea59e68bcd248fbd9b4045e62d780501553dee9237c7cb8c5"
+    },
+    {
+      "path": "logs/imports.log",
+      "encoding": "utf-8",
+      "stored_bytes": 339,
+      "stored_sha256": "5a345aadf6be3f8723739a92fc2370b879e93b3d645af097a88529dab77924f2",
+      "raw_bytes": 339,
+      "raw_sha256": "5a345aadf6be3f8723739a92fc2370b879e93b3d645af097a88529dab77924f2"
+    },
+    {
+      "path": "logs/local-stack-detection.log",
+      "encoding": "utf-8",
+      "stored_bytes": 443,
+      "stored_sha256": "7b846107d4ec9d18c103529868262d91bbb5e293909706a3cae1fdcef43e3716",
+      "raw_bytes": 443,
+      "raw_sha256": "7b846107d4ec9d18c103529868262d91bbb5e293909706a3cae1fdcef43e3716"
+    },
+    {
+      "path": "logs/migrations-retry.log",
+      "encoding": "utf-8",
+      "stored_bytes": 427,
+      "stored_sha256": "8f6dce8b49c85c2f68f89b5d3343688f70a0fa1c2abcf66865a8ec6c676869ec",
+      "raw_bytes": 427,
+      "raw_sha256": "8f6dce8b49c85c2f68f89b5d3343688f70a0fa1c2abcf66865a8ec6c676869ec"
+    },
+    {
+      "path": "logs/migrations.log",
+      "encoding": "utf-8",
+      "stored_bytes": 327,
+      "stored_sha256": "5c100147859ba90698d22df9f2b5fdb96b20fa936559b868a70e4be1e0c8d75a",
+      "raw_bytes": 327,
+      "raw_sha256": "5c100147859ba90698d22df9f2b5fdb96b20fa936559b868a70e4be1e0c8d75a"
+    },
+    {
+      "path": "logs/mobile-analyze.log.gz",
+      "encoding": "gzip",
+      "stored_bytes": 953,
+      "stored_sha256": "8922a46e202da6629638b3b1140e4fc07ee3742b98b8d530d2c0ac3a2c0a061b",
+      "raw_bytes": 2191,
+      "raw_sha256": "3577dffe0fe3cc24581632c3a519cdc6af7366173b9f821591d8e97c5eb61bdb",
+      "compression_reason": "Preserve original terminal trailing padding byte-for-byte while keeping textual git diff checks clean."
+    },
+    {
+      "path": "logs/mobile-pub.log",
+      "encoding": "utf-8",
+      "stored_bytes": 2113,
+      "stored_sha256": "df4daa8ffe00988566824c98c030093afda8245b5f42bad1120de746e93662e6",
+      "raw_bytes": 2113,
+      "raw_sha256": "df4daa8ffe00988566824c98c030093afda8245b5f42bad1120de746e93662e6"
+    },
+    {
+      "path": "logs/mobile-test.log",
+      "encoding": "utf-8",
+      "stored_bytes": 23877,
+      "stored_sha256": "d2597b2b9407a0c5aa86c3d520bbb18ca0b9593685d4c4af3f49547612838ef9",
+      "raw_bytes": 23877,
+      "raw_sha256": "d2597b2b9407a0c5aa86c3d520bbb18ca0b9593685d4c4af3f49547612838ef9"
+    },
+    {
+      "path": "logs/new-evidence-scan.log",
+      "encoding": "utf-8",
+      "stored_bytes": 437,
+      "stored_sha256": "4f5ef8c7fd63da6fea4449e49018490d1d9ab0a5e441e4cb28a71041f726ae04",
+      "raw_bytes": 437,
+      "raw_sha256": "4f5ef8c7fd63da6fea4449e49018490d1d9ab0a5e441e4cb28a71041f726ae04"
+    },
+    {
+      "path": "logs/policy.log",
+      "encoding": "utf-8",
+      "stored_bytes": 11368,
+      "stored_sha256": "cc88cb98e27cfb243cebb2094a4626bd154584f12739e3fceed1b915e824ce4a",
+      "raw_bytes": 11368,
+      "raw_sha256": "cc88cb98e27cfb243cebb2094a4626bd154584f12739e3fceed1b915e824ce4a"
+    },
+    {
+      "path": "logs/secrets-retry.log",
+      "encoding": "utf-8",
+      "stored_bytes": 282,
+      "stored_sha256": "f36be8bf111e82abde30fbbcaf2419596eb2c28dc795bd6d171a207fe47e21a9",
+      "raw_bytes": 282,
+      "raw_sha256": "f36be8bf111e82abde30fbbcaf2419596eb2c28dc795bd6d171a207fe47e21a9"
+    },
+    {
+      "path": "logs/secrets.log",
+      "encoding": "utf-8",
+      "stored_bytes": 272,
+      "stored_sha256": "14462b705ea9ccf5a4a85b8e92a427d4ce9e7fab3a3e8cfef14fc443add18e11",
+      "raw_bytes": 272,
+      "raw_sha256": "14462b705ea9ccf5a4a85b8e92a427d4ce9e7fab3a3e8cfef14fc443add18e11"
+    },
+    {
+      "path": "logs/staff-analyze.log.gz",
+      "encoding": "gzip",
+      "stored_bytes": 803,
+      "stored_sha256": "08316636e4a25363b21dd6f27c3abbdc59ec0487d48ace40194cade47c7aa0fd",
+      "raw_bytes": 1724,
+      "raw_sha256": "62d8ed4b85013ae9b4fdf19bb5e46e32a2cdd1f8955034760aeb0779501b1c3e",
+      "compression_reason": "Preserve original terminal trailing padding byte-for-byte while keeping textual git diff checks clean."
+    },
+    {
+      "path": "logs/staff-pub.log",
+      "encoding": "utf-8",
+      "stored_bytes": 1646,
+      "stored_sha256": "ec6bf7be6ae5a91d3531cd836211818be3de0e670c8ccff76d283afc91bd8b83",
+      "raw_bytes": 1646,
+      "raw_sha256": "ec6bf7be6ae5a91d3531cd836211818be3de0e670c8ccff76d283afc91bd8b83"
+    },
+    {
+      "path": "logs/staff-test.log",
+      "encoding": "utf-8",
+      "stored_bytes": 7043,
+      "stored_sha256": "a7decea455375cef79e719bfd209212c60acbaa3609ca27e325f4ee32d82c46b",
+      "raw_bytes": 7043,
+      "raw_sha256": "a7decea455375cef79e719bfd209212c60acbaa3609ca27e325f4ee32d82c46b"
+    },
+    {
+      "path": "logs/staff-web-build-retry.log.gz",
+      "encoding": "gzip",
+      "stored_bytes": 1243,
+      "stored_sha256": "ba51c10a8a2f466cf9f8fa1af9bdc764026b8f5cf7062884450846ae5abfaed1",
+      "raw_bytes": 2593,
+      "raw_sha256": "4c92d272a4c54f59635f56183d858c6e8a6e3f7320a43e9c77fea46d3e25ae52",
+      "compression_reason": "Preserve original terminal trailing padding byte-for-byte while keeping textual git diff checks clean."
+    },
+    {
+      "path": "logs/staff-web-build.log.gz",
+      "encoding": "gzip",
+      "stored_bytes": 862,
+      "stored_sha256": "c79450ce987681e79cb53e1e66fb099f2da03a12c32d9d217f4f2d81c715395c",
+      "raw_bytes": 1805,
+      "raw_sha256": "95864ff631a901d85c4594db16c7a2b10b447ec168feb788366b6ad60d9499d1",
+      "compression_reason": "Preserve original terminal trailing padding byte-for-byte while keeping textual git diff checks clean."
+    },
+    {
+      "path": "logs/supabase-version-retry.log",
+      "encoding": "utf-8",
+      "stored_bytes": 442,
+      "stored_sha256": "b9c2ca0a93b44c3dfd58d55035de86879a8b875260bd794bdfa46f5ac22506df",
+      "raw_bytes": 442,
+      "raw_sha256": "b9c2ca0a93b44c3dfd58d55035de86879a8b875260bd794bdfa46f5ac22506df"
+    },
+    {
+      "path": "logs/supabase-version.log",
+      "encoding": "utf-8",
+      "stored_bytes": 5712,
+      "stored_sha256": "b24af87bd453cd4735b2e8f29607ad5a1de169cbfc29967ff734608af0d0b6ab",
+      "raw_bytes": 5712,
+      "raw_sha256": "b24af87bd453cd4735b2e8f29607ad5a1de169cbfc29967ff734608af0d0b6ab"
+    },
+    {
+      "path": "logs/timezone-duties.log",
+      "encoding": "utf-8",
+      "stored_bytes": 45214,
+      "stored_sha256": "41cbbb53d03d03a10d23812a2a48620163aa9ec022a8a121e81985d2ba029e48",
+      "raw_bytes": 45214,
+      "raw_sha256": "41cbbb53d03d03a10d23812a2a48620163aa9ec022a8a121e81985d2ba029e48"
+    },
+    {
+      "path": "logs/timezone-followups.log",
+      "encoding": "utf-8",
+      "stored_bytes": 8715,
+      "stored_sha256": "d86a55a21b7bff8e4c496c129b7dae17e3eb75f105d86cbd931e1ea084842b44",
+      "raw_bytes": 8715,
+      "raw_sha256": "d86a55a21b7bff8e4c496c129b7dae17e3eb75f105d86cbd931e1ea084842b44"
+    },
+    {
+      "path": "logs/trial-analyze.log.gz",
+      "encoding": "gzip",
+      "stored_bytes": 677,
+      "stored_sha256": "c6ff9d83828260224a15242d502052f341d63ff3171c5716722c29887a581023",
+      "raw_bytes": 1332,
+      "raw_sha256": "76f7749cd5c8abcfc3fdf84cf8f4f1c60e7b169291a6c2e7fb1e500930841ab3",
+      "compression_reason": "Preserve original terminal trailing padding byte-for-byte while keeping textual git diff checks clean."
+    },
+    {
+      "path": "logs/trial-pub.log",
+      "encoding": "utf-8",
+      "stored_bytes": 1255,
+      "stored_sha256": "6a0525ef29768db65d177ae38ebc9cea41193e12cff5edd40b746c5cc9258796",
+      "raw_bytes": 1255,
+      "raw_sha256": "6a0525ef29768db65d177ae38ebc9cea41193e12cff5edd40b746c5cc9258796"
+    },
+    {
+      "path": "logs/trial-test.log",
+      "encoding": "utf-8",
+      "stored_bytes": 7336,
+      "stored_sha256": "6b3a2f1b0ea1eec1c2115c853bf78fd423fdb643cf68e7023730162557f1723a",
+      "raw_bytes": 7336,
+      "raw_sha256": "6b3a2f1b0ea1eec1c2115c853bf78fd423fdb643cf68e7023730162557f1723a"
+    },
+    {
+      "path": "logs/trial-web-build.log.gz",
+      "encoding": "gzip",
+      "stored_bytes": 1101,
+      "stored_sha256": "45676f85feee80ea9b1339c79c64fe34625861c987c9a0d834ffb473a5a3074d",
+      "raw_bytes": 2178,
+      "raw_sha256": "be637116e0079b3426f9366bf260b9644c99f9bf492e357b1e4b27e13ef5abfc",
+      "compression_reason": "Preserve original terminal trailing padding byte-for-byte while keeping textual git diff checks clean."
+    },
+    {
+      "path": "logs/staff-signed-out-build.log.gz",
+      "encoding": "gzip",
+      "stored_bytes": 716,
+      "stored_sha256": "20e9a5507310983751860e5fc93b1c9923987ebb6c24108e8c472286d6d500e8",
+      "raw_bytes": 1279,
+      "raw_sha256": "758287bd1c09841f0999d7c4836c598f32bfd3b46687247d20a48bf44cb6054a",
+      "compression_reason": "Preserve original terminal padding byte-for-byte."
+    },
+    {
+      "path": "logs/browser-evidence-scan.log",
+      "encoding": "utf-8",
+      "stored_bytes": 437,
+      "stored_sha256": "05dceddaeb1280ff337fa2c3f52f0bbf6ca025e0aed8a985afd6482febd3dbe2",
+      "raw_bytes": 437,
+      "raw_sha256": "05dceddaeb1280ff337fa2c3f52f0bbf6ca025e0aed8a985afd6482febd3dbe2",
+      "compression_reason": null
+    }
+  ],
+  "updated_utc": "2026-10-30T20:16:17.275281+00:00",
+  "compression_policy": "Deterministic gzip for logs larger than 150,000 bytes or containing original terminal trailing padding; original raw bytes are preserved without trimming.",
+  "browser_followup_credential_scan": "browser-evidence-scan.json"
+}

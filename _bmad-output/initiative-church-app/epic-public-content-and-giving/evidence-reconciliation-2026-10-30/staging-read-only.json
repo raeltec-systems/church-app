@@ -1,0 +1,200 @@
+{
+  "inspected_at_utc": "2026-10-30 19:48:59 UTC",
+  "source_commit": "c96cd562b2650c37f5d3d879cb12891419700139",
+  "project": {
+    "ref": "tmurpotfluignacfueki",
+    "name": "bic-kafue-platform-test",
+    "environment": "staging"
+  },
+  "method": "Read-only connected Supabase metadata and SELECT queries; no rows, functions, history, gates or notifications changed.",
+  "migration_history": {
+    "expected": 101,
+    "recorded": 99,
+    "missing_history": [
+      {
+        "version": "20261027140200",
+        "path": "supabase/migrations/20261027140200_content_event_posters_rsvp_rows.sql"
+      },
+      {
+        "version": "20261027182300",
+        "path": "supabase/migrations/20261027182300_content_hymn_lists_rows.sql"
+      }
+    ],
+    "unexpected_history": [],
+    "versions": [
+      "20261003112319",
+      "20261003114608",
+      "20261003123459",
+      "20261003131021",
+      "20261003134340",
+      "20261003154040",
+      "20261003155428",
+      "20261006215306",
+      "20261006215400",
+      "20261006215842",
+      "20261006223524",
+      "20261006234820",
+      "20261007050512",
+      "20261007063340",
+      "20261007075946",
+      "20261007093323",
+      "20261007111436",
+      "20261007120810",
+      "20261007131600",
+      "20261007140729",
+      "20261007151523",
+      "20261007160100",
+      "20261007174952",
+      "20261007175000",
+      "20261007193513",
+      "20261008073631",
+      "20261008090057",
+      "20261008102121",
+      "20261008121248",
+      "20261008135811",
+      "20261008135900",
+      "20261008155801",
+      "20261008183514",
+      "20261013193932",
+      "20261013194009",
+      "20261013220239",
+      "20261013220300",
+      "20261014001142",
+      "20261014023442",
+      "20261014052239",
+      "20261014081513",
+      "20261014110258",
+      "20261014130535",
+      "20261014171038",
+      "20261014212507",
+      "20261015002121",
+      "20261015035112",
+      "20261015110202",
+      "20261015143102",
+      "20261015190139",
+      "20261021073514",
+      "20261021081026",
+      "20261021084446",
+      "20261021093943",
+      "20261021094249",
+      "20261021101314",
+      "20261021101323",
+      "20261021104522",
+      "20261021111547",
+      "20261021115855",
+      "20261021122802",
+      "20261021132636",
+      "20261021195642",
+      "20261021211830",
+      "20261021233523",
+      "20261022011438",
+      "20261022011557",
+      "20261022012809",
+      "20261022100601",
+      "20261022102525",
+      "20261022112247",
+      "20261022123202",
+      "20261022134510",
+      "20261022134835",
+      "20261022141846",
+      "20261022142816",
+      "20261022153240",
+      "20261022154622",
+      "20261023020507",
+      "20261023020509",
+      "20261023033756",
+      "20261023082634",
+      "20261023100446",
+      "20261023120311",
+      "20261026151013",
+      "20261027083618",
+      "20261027140149",
+      "20261027182223",
+      "20261027191003",
+      "20261027192013",
+      "20261028064546",
+      "20261028071717",
+      "20261028072741",
+      "20261028123554",
+      "20261028130727",
+      "20261028130849",
+      "20261028130929",
+      "20261028131249",
+      "20261028150927"
+    ]
+  },
+  "purge_functions": [
+    {
+      "function_name": "app.content_rsvp_purge_rows(uuid)",
+      "body_md5": "e4bf897a38a19fafb16c34eedaff717d",
+      "security_definer": false,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "rsvp_delete_present": true,
+      "favourite_delete_present": false,
+      "missing_rows_stub_present": false,
+      "normalized_body_md5": "3dd55a0d61f54b81d13006bdfa481ea6",
+      "repository_body_md5": "3dd55a0d61f54b81d13006bdfa481ea6",
+      "normalized_body_matches_repository": true,
+      "service_role_execute": false
+    },
+    {
+      "function_name": "app.content_hymn_favourite_purge_rows(uuid)",
+      "body_md5": "481c71eff861014690a17f1120efcf70",
+      "security_definer": false,
+      "settings": [
+        "search_path=\"\""
+      ],
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "rsvp_delete_present": false,
+      "favourite_delete_present": true,
+      "missing_rows_stub_present": false,
+      "normalized_body_md5": "907c140ce9fc7bf5f3fd494f9f807194",
+      "repository_body_md5": "907c140ce9fc7bf5f3fd494f9f807194",
+      "normalized_body_matches_repository": true,
+      "service_role_execute": false
+    }
+  ],
+  "module_guards": {
+    "boundary_violations": 0,
+    "unowned_objects": 0
+  },
+  "edge_functions": [
+    {
+      "slug": "identity-assisted-recovery",
+      "version": 6,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    },
+    {
+      "slug": "identity-deletion",
+      "version": 6,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    },
+    {
+      "slug": "notifications-worker",
+      "version": 10,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    },
+    {
+      "slug": "content-assets",
+      "version": 4,
+      "status": "ACTIVE",
+      "verify_jwt": false
+    }
+  ],
+  "conclusions": [
+    "99/101 migration versions are recorded; the two _rows files have no migration-history entry. Do not claim zero migration-history drift.",
+    "Both purge bodies are present and match the repository after CRLF normalization; neither fail-closed stub remains.",
+    "anon, authenticated and service_role cannot directly execute either purge helper; both are invoker functions with an empty search_path.",
+    "Boundary violations and unowned objects are zero at this observation; this is not whole-schema or whole-workflow acceptance.",
+    "content-assets is active at v4; deployed function metadata alone does not prove exact source-byte parity.",
+    "Do not replay either rows file or repair migration history without a separately reviewed and owner-approved operation."
+  ]
+}

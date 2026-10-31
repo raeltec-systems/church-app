@@ -1,0 +1,11 @@
+{
+  "project": "church-content-acceptance-20261031",
+  "local_phone_switch_off": true,
+  "own_project_stopped": true,
+  "own_data_volumes_preserved": true,
+  "config_restored_sha256": "d4153291d54e446c42f4e5c33f3b93344f340c67a82a088c368327e59fa803da",
+  "shared_original_db_id_and_start_time_unchanged": true,
+  "shared_original_checkout_edited": false,
+  "hosted_mutations": false,
+  "append_only_fixture_journals": "preserved privately; not distributed"
+}

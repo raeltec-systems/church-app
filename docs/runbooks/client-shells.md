@@ -1,5 +1,12 @@
 # Client shells, design system and request states (story 1.7)
 
+Historical scope: this document records the original story 1.7 shells and tracer checks.
+Current normal member/leader setup and Epic 6 acceptance procedures are in the
+[owner walkthrough](content-owner-walkthrough.md). The apps now include identity, duties,
+follow-ups, cell programmes and public content. In particular, the old staff browser smoke
+script below expects tracer navigation that the current signed-out portal does not expose.
+Its assertions and the original session behavior below must not be used as a current acceptance specification.
+
 ## Layout
 
 | Path | What it holds |

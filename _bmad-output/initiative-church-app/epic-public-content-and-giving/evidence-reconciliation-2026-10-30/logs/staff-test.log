@@ -1,0 +1,109 @@
+command: flutter test --reporter expanded
+cwd: apps/staff
+head: 66b1562e13abe939e9d328fa9f59fd35e6c3ea25
+started_utc: 2026-10-30T19:40:08.509228+00:00
+
+   Woah! You appear to be trying to run flutter as root.
+   We strongly recommend running the flutter tool without superuser privileges.
+  /
+📎
+Resolving dependencies...
+Downloading packages...
+  app_links 7.2.1 (7.2.2 available)
+  app_links_linux 1.0.3 (1.0.4 available)
+  app_links_web 1.0.4 (1.0.5 available)
+  code_assets 1.2.1 (2.1.0 available)
+  crypto 3.0.7 (3.0.8 available)
+  cupertino_ui 1.1.1 (1.1.5 available)
+  flutter_secure_storage 10.0.0 (11.2.0 available)
+  flutter_secure_storage_darwin 0.2.0 (0.4.3 available)
+  go_router 18.0.2 (18.1.2 available)
+  gotrue 2.27.2 (2.27.3 available)
+  hooks 2.0.2 (2.2.0 available)
+  jni 1.1.0 (1.1.1 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  material_ui 1.5.0 (1.9.0 available)
+  meta 1.18.3 (1.19.0 available)
+  objective_c 9.5.0 (9.6.2 available)
+  realtime_client 2.13.0 (2.13.2 available)
+  record_use 0.6.0 (1.1.1 available)
+  shared_preferences 2.5.5 (2.5.6 available)
+  shared_preferences_android 2.4.28 (2.5.4 available)
+  shared_preferences_foundation 2.5.7 (2.6.1 available)
+  supabase 2.16.2 (2.16.5 available)
+  supabase_flutter 2.18.0 (2.18.3 available)
+  test_api 0.7.12 (0.7.15 available)
+  vector_math 2.4.0 (2.4.4 available)
+  vm_service 15.3.0 (15.4.0 available)
+  web 1.1.1 (1.1.2 available)
+Got dependencies!
+27 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /workspace/scratch/308c700530ee/church-app/apps/staff/test/staff_app_test.dart
+00:00 +0: staff work areas fold to keep the sidebar short
+00:01 +1: tracer read shows in the shell; sidebar tabs are named
+00:02 +2: reminder health maps each server refusal to its own message
+00:03 +3: reminder health reports a failed read separately from a refusal
+00:03 +4: reminder health is not in the navigation while signed out
+00:03 +5: story 4.10: Outcomes for department leaders, history for members
+00:03 +6: special assignments: the Pastors only
+00:03 +7: story 6.1: Events for Media, Pastor and Admin only
+00:03 +8: story 6.2: Banners and Rights for Media, Pastor and Admin only
+00:03 +9: story 6.9: sermon and series editors follow Bible for Media, Pastor and Admin
+00:03 +10: entry 6.16: a sub-page selects the destination it is under
+00:03 +11: entry 6.16: a sermon editor deep link opens Content selected
+00:04 +12: story 6.8: Sunday hymns for Admin, Media and worship leaders
+00:04 +13: story 6.6: Bible imports are for Media, Pastor and Admin
+00:04 +14: story 6.6: a Media editor opens Bible imports
+00:04 +15: story 6.2: a Media member opens Banners from the sidebar
+00:05 +16: story 6.3: Giving for Admins only, in the Content group
+00:05 +17: story 6.3: an Admin opens Giving from the sidebar and cannot verify their own save
+00:06 +18: story 6.3: a Media member has no Giving entry and is told who manages it
+00:06 +19: story 6.1: a Media member opens Events from the sidebar and drafts an event
+00:08 +20: story 6.13: Announcements for Media, Pastor and Admin only
+00:08 +21: story 6.13: a Media member opens Announcements from the sidebar; a plain member has no entry
+00:08 +22: story 6.13: a plain member sees no Announcements entry
+00:08 +23: reminder health renders aggregate status for an authorized read
+00:09 +24: story 2.1: account tab -> member summary; sign out; phone sign-in again
+00:10 +25: story 2.2: refresh and resume keep the session; a session the server no longer trusts is ended and its state cleared
+00:10 +26: unconfigured build explains itself and does not send commands
+00:10 +27: synthetic read/write fixture: create, change, conflict kept
+00:11 +28: story 2.3: the sidebar follows the server's current grants at the next navigation (grant, then revoke in another tab)
+00:12 +29: story 4.1: Duties follows a department scope and Departments the Admin grant; a cell scope gives neither
+00:13 +30: story 4.6: My follow-ups follows member access, Follow-ups a leader scope and Follow-up routing the Admin grant
+00:14 +31: story 4.7: a supervisor's overdue alert opens the follow-up task
+00:15 +32: story 4.8: a leader's overdue alert opens the Duties board
+00:15 +33: story 4.3: Rota follows the department scope and opens the rota grid
+00:16 +34: story 4.9: Coverage follows the department scope and opens the queue
+00:16 +35: story 2.5: Members & applications follows the Admin grant and opens the review queue
+00:17 +36: story 2.6: Cells follows the Admin grant and My cell group follows a cell scope
+00:18 +37: Admins see Recovery emails; the queue is the server answer
+00:18 +38: story 2.8: Admins see Access reviews; the queue is the server answer
+00:19 +39: story 2.9: Admins see Account recovery; the cases are the server answer
+00:20 +40: story 2.10: Admins see Membership status; deactivated members, login holds and handovers are the server answer
+00:20 +41: story 2.11: Admins see Member deletions; deletions and their steps are the server answer
+00:21 +42: story 2.11: a non-Admin opening Member deletions sees only the denial
+00:21 +43: story 2.10: a deactivated membership on staff web says so after sign-in
+00:21 +44: story 2.8: a held session on staff web sees only the help screen
+00:21 +45: an account switch drops the protected state
+00:22 +46: leaving and returning keeps this account's in-memory state (AD-13 clears it on account change, not on navigation)
+00:22 +47: a PointerDeviceKind.touch tap on a tab leaves no focus ring behind
+00:22 +48: a PointerDeviceKind.mouse tap on a tab leaves no focus ring behind
+00:22 +49: keyboard: Tab reaches the menu button, then the nav tabs; Enter navigates
+00:23 +50: 2x text, desktop: both destinations render without overflow
+00:23 +51: 2x text, narrow: both destinations render without overflow
+00:24 +52: sidebar at 1x; top bar at 2x text on the same window
+00:24 +53: signed out: the sign-in landing with one way in, no navigation and no developer page
+00:24 +54: an Admin's Overview: figures from the existing reads, what needs attention, each opening the screen that resolves it
+00:24 +55: a cell leader's Overview: requests to join their cell; a read the server refused is a dash, never a zero
+00:25 +56: the sidebar folds to a rail of named icons and back; the choice lasts across screens and the content takes the width
+00:25 +57: the role switch appears only with two staff roles and narrows the sidebar to the role being viewed
+00:26 +58: only the composition root reaches Supabase; no client persistence
+00:26 +59: the app guard catches a shell that reaches the adapters
+00:26 +60: story 3.1: a member opens the Inbox and sees the server's item; signing out drops it
+00:26 +61: story 3.7: staff web shows markers, snooze and the same settings; a signal re-reads the inbox
+00:27 +62: story 3.7: a signed-out link to an item returns to it after sign-in
+00:28 +63: All tests passed!
+
+finished_utc: 2026-10-30T19:41:02.257465+00:00
+exit_code: 0

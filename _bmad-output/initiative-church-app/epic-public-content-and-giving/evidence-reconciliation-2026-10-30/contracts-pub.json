@@ -1,0 +1,11 @@
+{
+  "name": "contracts-pub",
+  "command": "dart pub get --enforce-lockfile",
+  "cwd": "packages/contracts/dart",
+  "head": "66b1562e13abe939e9d328fa9f59fd35e6c3ea25",
+  "started_utc": "2026-10-30T19:33:50.357831+00:00",
+  "finished_utc": "2026-10-30T19:34:36.967851+00:00",
+  "exit_code": 0,
+  "status": "run-passed",
+  "evidence": "_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/logs/contracts-pub.log"
+}

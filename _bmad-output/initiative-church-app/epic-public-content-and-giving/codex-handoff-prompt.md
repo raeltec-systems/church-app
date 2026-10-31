@@ -1,119 +1,95 @@
-You are taking over the remaining work of **epic 6 ("Public church content and giving instructions")** of the BICC Kafue church app: a Flutter mobile app and a Flutter staff web over Supabase/Postgres. The repository is `C:\Users\Administrator\church-app` (Windows). Work on branch `story/5.8-meetings-held`, which is at `a125e79` or later. Read this whole brief before you start.
+# Resume guide: Epic 6 acceptance and Epic 7 inception
 
-## Where things stand
+Reconciled 30 October 2026 for Israel Muyoba. Repository: `raeltec-systems/church-app`.
 
-- **Planned:** the epic is planned in `_bmad-output/initiative-church-app/epic-public-content-and-giving/`:
-  - `epic-public-content-and-giving.md`: the requirements K1-K17, and Notes recording every decision, assumption and open question. **Read the Notes: they hold the owner's decisions.**
-  - `tickets.toml`: 19 entries in build order, each with description, verify, covers, after, hitl, risk, references and, for some, external_check.
-- **Built, merged and on staging:** entries **1** (publication lifecycle, events, Home and Calendar tabs), **2** (rights registry, `q5_content_rights` gate, private and public storage buckets, `content-assets` Edge function, Home banners), **3** (Admin-verified giving methods, `q3_giving` gate, Give tab) and **13** (pinned announcements with an optional generic notice).
-  - Read their plan files (`story-*-plan.md` in the epic folder) and their migrations (`supabase/migrations/2026102123*` and `2026102201*`) before you write anything. They define the shared patterns you must follow:
-  - **Registries:** a new content kind, its commands and its deletion steps are added as rows in the Content registries. Never replace a shared function.
-  - **Public reads:** functions only; no client role touches a Content table.
-  - **Commands:** one command envelope, `api.content_command`.
-  - **Deletion:** one Content deletion hook, which later entries add parts to.
-- **Staff web:** fully redesigned. It has a grouped, foldable sidebar with a **Content** group (Events, Banners, Rights, Announcements, Giving), an Overview, and a shared white page header. New staff screens go into this structure.
-- **Mobile:**
-  - **Look:** redesigned to the design handoff.
-  - **Tabs:** today Home, Give and Calendar. The owner decided on the design's five tabs, in this order: **Home, Bible & Hymns, Sermons, Give, Calendar**. Entries 6 and 9 add the two missing ones.
-  - **Home:** lives in `home_screen.dart`.
-  - **My duties and My cell:** open from their Home cards and the Account menu.
+## Current position and authorized work
 
-## Owner decisions you must follow (also in the epic Notes)
-1. **Tabs:** the five design tabs above.
-2. **Giving:** a destination added or changed by one Admin is verified by a different Admin before members see it. This is built in 6.3.
-3. **RSVP:** the event's organisers and Admin see RSVP names; everyone else sees only the count and the spaces left (entry 11).
-4. **Hymns for this Sunday:** set by Media plus members given a worship-leader scope (entry 8).
-5. **Event editors:** Media, Pastor and Admin.
-6. **Church-owned images need no Q5 rights approval;** only third-party material does. 6.2 built the stricter rule, so fix it (follow-up F2 below).
-7. **No consent record** for photos showing people.
-8. **Replaced or abandoned private uploads** (draft files no published revision uses) are deleted automatically after **30 days** (follow-up F3).
-9. **New Admins and giving:** an Admin who became Admin less than **14 days** ago cannot verify a giving method, and the Verify dialog shows the verifier's "Admin since <date>, granted by <name>" (follow-up F1).
-10. **Members never see internal process.** Empty states are plain: for example, Give says "No giving methods yet / When the church adds how to give, it will show here."
+Start by inspecting the actual checkout, applicable instructions, status, worktrees, remotes and current `origin/main`. Preserve concurrent/uncommitted work. The verified starting main is **`c96cd562b2650c37f5d3d879cb12891419700139`**, merged on 28 October 2026. Its tree matches the former `story/5.8-meetings-held` integration branch; there is no unmerged feature implementation to resume there.
 
-Still open; these block production only, so build with SYNTHETIC or public-domain content:
-- Q3: the church's real giving details.
-- Q5: which Bible translation and hymn book, and the rights to sermon media and offline use.
-- Whether keeping display-only items in the app's cache counts as offline use. Until answered, such items show online only.
+The current acceptance branch is **`acceptance/epic-6-reconcile-epic-7-plan`**. The user authorizes regular commits and pushes to this branch so progress is recoverable. That authorization does not include merge to main, deployment, policy approval, notification sending or acceptance completion. Recheck the remote head before publishing changes; use normal non-forced pushes and preserve other work.
 
-## What to build, in this order
-1. **Follow-ups F1, F2, F3**, as small separate changes:
-   - **F1:** the 14-day rule, enforced by the server in the giving verify command, and the staff Verify dialog text.
-   - **F2:** church-owned images skip the Q5 check.
-   - **F3:** 30-day deletion of unreferenced private uploads, using the platform's existing scheduled or system mechanism. Read how the notifications worker and system principal are run; do not invent a new scheduler.
-2. **Entry 4:** the offline public cache. It is the one allowed exception in `boundaries_test`; read the entry.
-3. **Entries 5, 6, 9, 11.**
-4. **Entries 7, 12, 19.**
-5. **Entry 8.** Right after it is on staging, the owner must hand-apply its `_rows` file on staging; see the epic Notes. Tell him at once.
-6. **Entries 10, 14.**
-7. **Entry 18.**
-8. **Entry 16** (refactor sweep).
-9. **Entries 15 and 17** are **hitl**: prepare everything they need (runbooks, pilot script, the promotion runbook and checks), then **stop and hand over to the owner**. Never promote to production.
+Epic 6 features 6.1–6.14, 6.16, 6.18, 6.19 and the Giving-tenure, church-owned-image and private-upload-retention follow-ups have built plans and are merged. **6.15 (owner pilot) and 6.17 (integrated acceptance/promotion) remain open.** The owner permitted the refactor sweep before the pilot, so do not repeat it or treat it as waiving the pilot. Epic 7 is selected for BMAD inception only; its proposed breakdown and unresolved policy decisions require owner review before agreement/build.
 
-Entry 11 also has an owner `_rows` file to hand-apply on staging. Respect each entry's `after` list. Build one entry at a time, unless two entries share no files and you can keep them fully separate.
+The [historical handoff at the starting commit](https://github.com/raeltec-systems/church-app/blob/c96cd562b2650c37f5d3d879cb12891419700139/_bmad-output/initiative-church-app/epic-public-content-and-giving/codex-handoff-prompt.md) preserves the earlier build context. Its Windows path, `a125e79` starting point, pending-feature list, “never push”, staging-deployment directions and renderer bypass were superseded. Do not use them as current instructions or authority.
 
-## How to build each entry (the project's process)
-- **Build skill:** follow `.agents/skills/bmad-build-auto/` (`workflow.md`, `step-01`..`step-04`, `plan-template.md`). Its SKILL.md runs a render script with `uv`, which is not installed here: run it with `python` (`python _bmad/scripts/render_skill.py --project-root <root> --skill <skill-root>`), or follow the step files directly.
-- **Plan file:** write the story's plan beside the epic, in the same format as entries 1, 2, 3 and 13, and keep its status current with `tickets.py mark`, per `.agents/skills/bmad-ticket/references/tree-rules.md`. A finished entry is `built`. Only the owner marks `done`.
-- **Branches:** create one branch per entry from `story/5.8-meetings-held` (`epic6/<entry>-<slug>`). When every check below passes and the plan is `built`, merge it back with `--no-ff`. Before merging, merge the latest `story/5.8-meetings-held` into your branch and resolve conflicts keeping both sides' additions. The shared files that conflict are `shell_routing.dart`, `church_client_core.dart`, `providers.dart`, `composition.dart`, `testing.dart`, both `app.dart` files, `command_foundation_test.sql`, `cross_epic_contracts_test.sql`, the content test files' registry and privilege lists, and the runbooks. Scope your own tests' registry and privilege assertions to your own kind, as 6.2, 6.3 and 6.13 do, so later kinds don't break them.
-- **Commits:** commit as `git -c user.name="Israel Muyoba" -c user.email="israel.muyoba@raeltec.com" commit`. Use clear messages; never push.
-- **Database:**
-  - Migrations go under `supabase/migrations/`. They must be ASCII only, with no backslashes anywhere in the file.
-  - A destructive statement needs a line `-- owner-approved-cleanup: <decision reference>`.
-  - `node tools/ci/check-migrations.mjs --base origin/main` must pass.
-  - Module ownership must hold: `select count(*) from app.contract_boundary_violations()` = 0 and `app.contract_unowned_objects()` = 0. Content may not read another module's tables; reach other modules through their registered functions or hooks.
-  - pgTAP tests go in `supabase/tests/`. Run the **full** suite on a freshly reset local database: `npx supabase db reset --local`, then `npx supabase test db`. The local Supabase stack runs in Docker.
-- **End-to-end:**
-  - Write an HTTP E2E script in `tools/identity-e2e/`, in the style of `content-events.mjs`, `content-giving.mjs` and `content-announcements.mjs`, with its offline unit tests.
-  - Use only fictional UK numbers `+44 7700 900xxx`. Before choosing a block, `grep` the repo to confirm it is unused. Runs free at last count: 111-121, 161-169, 172-180, 291-299, 571-579, 584-598, 604-612, 630-638, 641-649, 651-659, 690-698.
-- **Clients:** `packages/client_core` (domain, application and presentation per module), `packages/design_system`, `apps/mobile` and `apps/staff`.
-  - `flutter analyze` must be clean and `flutter test` must pass in all four.
-  - Run `dart format` only on files you changed. Running it on a whole `lib` folder rewrites unrelated files.
-  - Keep every existing widget key and behaviour; change tests only for copy or layout changes, and say which.
-- **Design (mandatory for every screen):**
-  - The design handoff `docs/design-handoff/README.md` is authoritative for brand, colours, fonts (Outfit, Figtree; JetBrains Mono only for times and figures) and each screen's content. Screens: 1 Home, 5 Bible & Hymns, 6 Sermons, 7 Give, 8 Calendar, the Admin web; its `design/` folder holds the prototype.
-  - The taste rules in `.agents/skills/design-taste-frontend/references/app-screens.md` and `references/tells.md` are mandatory. Read them whole before building any screen:
-    - colour on data, not chrome
-    - one status mark per row
-    - grouped rows split by lines, not a box per item
-    - sentence case, no tracked uppercase labels, no monospace decoration
-    - KPIs as type
-    - tables as rules and alignment, with numbers right-aligned in tabular figures
-    - honest empty, zero, error and offline states, where a failed read never looks like an empty list
-  - Reuse the design system: ChurchCard, HeroCard, DateBadge, SectionHeader, CardLabel, DetailTable, MenuRow, BottomActionBar, RadioSegments, StatusLabel, ChurchLogo, the staff pieces in `staff.dart`, and `church_widgets.dart`.
-  - Mobile pushed screens have a back bar. Members never see internal process.
-- **Windows quirks:**
-  - Don't write files through shell heredocs that contain quotes; write scripts to files and run them.
-  - Building the Android APK needs `$env:JAVA_TOOL_OPTIONS='-Djdk.net.unixdomain.tmpdir=C:\gtmp'` set in PowerShell:
-    - `flutter build apk --release --split-per-abi --target-platform android-arm64 --dart-define=SUPABASE_URL=https://tmurpotfluignacfueki.supabase.co --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_B7rxJq4-D4PBNohOgz3qmg_SfbQWRSY`
-  - The staff web builds the same way:
-    - `flutter build web --release --no-web-resources-cdn` with the same two defines.
-- **Synthetic data only:** names start with `SYNTHETIC` (sample giving methods with `SAMPLE`), with public-domain or synthetic text and images. Never real member data.
+## Read first
 
-## Staging (Supabase project `tmurpotfluignacfueki`); never production
-- For each migration:
-  - Apply it to staging **verbatim** with whatever access you have: a Supabase MCP connection to this project (`apply_migration`), or the Supabase CLI linked to it. **If you have no staging access, stop and ask the owner; do not guess.**
-  - If staging records a different version than your file name, rename the local file to the hosted version, as earlier entries did.
-  - Then verify on staging:
-    - every function you added or changed hashes identically to the fresh local reset (`md5(replace(pg_get_functiondef(oid), chr(13), ''))`)
-    - the boundary and unowned checks are 0
-    - the signed-out reads answer as your tests expect
-- **Edge functions:** deploy any you add or change, as 6.2 did with `content-assets`.
-- **Promotion runbook:** add every migration and owner step to `docs/runbooks/production-promotion-content.md`. Add the content operations to `docs/runbooks/content.md`, with an "Owner manual check" per entry.
-- **Push notifications are live on staging:** about 30 test phones receive real pushes. Never publish anything with a notification on staging without the owner's go-ahead.
-- **Never touch production**, and never approve a policy gate.
+1. The initiative and its `tickets.toml` under `_bmad-output/initiative-church-app/`.
+2. `spec-church-app/`: the spec, functional requirements, design contract, acceptance map and delivery/decisions register; then the architecture and owner decision files.
+3. This epic’s envelope/Notes, current `tickets.toml`, relevant plans and [implementation/acceptance history](pr-description.md).
+4. [Acceptance reconciliation](acceptance-reconciliation-2026-10-30.md), [owner walkthrough](../../../docs/runbooks/content-owner-walkthrough.md), [Content runbook](../../../docs/runbooks/content.md) and [promotion runbook](../../../docs/runbooks/production-promotion-content.md).
+5. `docs/runbooks/contracts-and-owner-seams.md`, `identity-access.md`, `notifications.md`, `environments-and-promotion.md` and the Epic 7 envelope before inception.
 
-## Independent review
-Entries with an `external_check` (8, 11, 12 and 17 remain, plus the follow-ups when they touch giving) need an independent review against the entry's verify and the epic requirements, done in a fresh pass or by a separate agent. Fix what it finds; record anything deferred in the plan with a reason.
+Dates and story-plan `built` statuses are not owner acceptance. Existing evidence applies to its own commit, environment and scope. Record new results explicitly as `run-passed`, `run-failed`, `blocked`, `skipped` or `authored only`.
 
-## Report back after each entry
-Keep it short:
-- the branch and merge commit
-- what was built (server, staff, mobile)
-- decisions and why
-- test counts: pgTAP files and tests, E2E, Flutter per package
-- the staging version and verification
-- the review result
-- owner steps now due (for example a `_rows` file to hand-apply)
-- new owner questions, each in one line
+## BMAD workflow
 
-Ask the owner only for decisions that are truly his; otherwise decide, record the decision in the plan and the epic Notes, and continue to the next entry.
+Read the current relevant `.agents/skills/bmad-ticket/SKILL.md`, `bmad-build/SKILL.md`, `bmad-code-review/SKILL.md` or other named skill before activating it. Resolve configuration, store and customization through the scripts the skill names.
+
+For build/review wrappers that require rendering, invoke the exact command required by their current SKILL.md with actual absolute paths:
+
+```bash
+uv run --no-cache "{project-root}/_bmad/scripts/render_skill.py" --project-root "{project-root}" --skill "{skill-root}"
+```
+
+Read the generated workflow. If tooling/network access prevents the renderer, investigate supported environment recovery; report unresolved failures and halt that workflow. **Do not invoke workflow source files directly or substitute another execution route.** The current session resolved its renderer dependency download through the supported permission escalation; that result is not a permanent claim about the next executor.
+
+Story 6.15 has an in-progress preparation plan. Its remaining human pilot prevents marking the whole story `built` or `done`. Story 6.17 stays open through the release evidence/approval boundary. Use ticket tooling for truthful state. Epic 7 uses **bmad-ticket full inception**, preserving CAP-8 and output dependencies; propose the story sequence and visibly unresolved Q4/Q6/Q8 decisions before treating it as agreed.
+
+## Binding behavior and design
+
+A church member or leader must accomplish the promised work through ordinary navigation, not merely call an endpoint. Verify navigation, meaningful content, backend authorization, saved state, feedback, failure/retry, restart and applicable offline behavior. Missing user-facing workflow is unfinished implementation; inaccessible hardware or environment is unverified behavior. Keep those categories separate.
+
+Read `docs/design-handoff/README.md`, the HTML prototypes and relevant images together with the later binding `spec-church-app/design-contract.md`. Reuse `packages/design_system` and shared client components. Preserve the five tabs **Home, Bible & Hymns, Sermons, Give, Calendar**, with My duties, My follow-ups and My cell on Home/account routes. Preserve readable status text, accessible targets, usable back/cancel/retry, safe role navigation and plain empty/error/offline states. Inspect actual reference images before changing a screen; apply the repository taste rules alongside the binding contract.
+
+Keep these settled decisions:
+
+- A new/changed giving destination needs another Admin’s verification. The verifier must hold the active Admin grant for at least 14 elapsed days. Giving remains instruction-only, with no amount form, payer record, receipt or payment-success state.
+- Event organisers and Admin see RSVP names; others see counts/spaces only. Current organisers must be event editors. An unscoped ministry leader is not silently granted that access.
+- Admin, Media and a granted worship leader set Sunday hymns; Pastor alone does not. Favourites belong only to the current member.
+- The supplied official BICC Tonga hymn book ships inside both clients (199 hymns and 67 choruses); staff do not import/edit its text. No sample book is pending. Hymns 25, 29 and 30 still need the recorded printed-source stanza spot-check.
+- YouTube or public Facebook video/livestream links are supported. The owner **descoped background audio and hymn audio on 27 October**. Do not reintroduce them as acceptance failures.
+- Verified church-owned images bypass Q5 under the recorded exemption; third-party material still needs the applicable source/use clearance. Display-only material is online-only. Private records never enter the public cache.
+- Current series posters alone persist offline under the owner’s data-saving decision. Protected duties/cell overlays remain outside that cache.
+- Sermon drafts from duties are private snapshots. A second authorized send refers to the existing draft; Media completes and deliberately publishes it.
+- Content reaches other modules only through registered owner operations/hooks. Preserve command registries, current authorization, immutable published revisions, idempotency/revision checks and lifecycle/deletion behavior; never broaden table grants to make a journey pass.
+
+## Reconciled evidence and remaining verification
+
+[Hosted run 40733936249](https://github.com/raeltec-systems/church-app/actions/runs/40733936249) succeeded on exact starting main. Its policy log explicitly skipped staging migration drift because `SUPABASE_ACCESS_TOKEN` was unset. See [the inspected summary](evidence-reconciliation-2026-10-30/hosted-main-ci-summary.json). This is historical base-commit evidence, not a candidate-head run or physical-device pilot.
+
+The [migration manifest](evidence-reconciliation-2026-10-30/migration-manifest.json) enumerates and hashes all 101 tracked SQL migrations at that base. It includes the later Cells/Duties review fixes, notably `20261028150927_cells_moved_meeting_place_notices.sql`; compare the complete set, not the old 14-migration subset. A manifest of files is not a report of deployed versions.
+
+Do not reopen historical F1/F3/F8/C1/C2 from an old HOLD list: later source fixes and regressions exist. G1 real last-seat RSVP and G2 scheduler/worker/Storage retention have recorded 13/13 and 6/6 release runs. Rerun affected release gates on the candidate as required by `content.md`, keeping old evidence distinct from new results.
+
+Still specifically unverified: **actual two-session sermon-from-duty lock contention**. The existing SQL regression injects a stale first read and proves the later authority recheck; it does not establish an authentic waiting transaction. A real test must observe the advisory-lock wait, commit reassignment/cancellation/revocation before release, and show refusal with no draft, plus permitted/idempotent recovery.
+
+The connected [read-only staging inspection](evidence-reconciliation-2026-10-30/staging-read-only.json), at **30 October 2026, 21:48:59 Africa/Lusaka (19:48:59 UTC)**, confirmed `bic-kafue-platform-test` (`tmurpotfluignacfueki`). It found **99/101 expected migration versions** with no unexpected versions; `20261027140200` (RSVP rows) and `20261027182300` (hymn-favourites rows) are absent from history. Both real purge bodies are installed, have no missing-rows stub and match repository bodies after CRLF normalization. Both are invoker functions with empty `search_path`; `anon`, `authenticated` and `service_role` cannot execute either directly. Boundary and unowned counts are 0. Edge metadata confirms **content-assets ACTIVE v4** and **notifications-worker ACTIVE v10**.
+
+**Migration-history drift is known and nonzero.** The installed bodies corroborate the later 28 October manual-apply report, but do not supply the missing history entries or prove whole-schema/function/Edge source-byte parity. No deletion or Storage workflow was run by this read. Keep those remaining checks and the device pilot open. Do not replay either `_rows` file or repair history automatically; the discrepancy needs separately reviewed, owner-authorized remediation. This task does not authorize staging mutation or deployment.
+
+Accepted residual (owner, 28 October): process death after a public upload or persistent take-back failure may leave public bytes until the next authorized sync. No autonomous public-object sweep was added. Preserve bounded retries and the residual; do not claim universally immediate removal or redesign system privileges without a scope decision.
+
+## Execute feasible checks
+
+Use the pins in `.github/workflows/ci.yml`: Node 22, Flutter 3.47.6 and Supabase CLI 2.119.0 from the package lock, plus Docker and Chrome where required. Inspect the aggregate runner before use: it resets the isolated local database and restores generated Linux Flutter files. Protect shared work and run it only against the intended disposable checkout/stack.
+
+```bash
+npm ci
+npm run ci:policy-test
+npm run env:check
+npm run ci:migrations -- --base origin/main
+npm run ci:secrets
+npm run ci:function-imports
+npm run contracts:test
+node --test supabase/functions/content-assets/*.test.mjs
+bash tools/ci/run-local-ci.sh /tmp/church-app-ci-results.txt --base origin/main
+```
+
+Use the current Content release-gate commands for real HTTP RSVP/retention tests; offline `*.test.mjs` files are not those live integrations. Inspect every step’s result. Keep exact command, full commit, environment/tool versions, date, exit/counts and redacted evidence path. For a blocked check state the missing dependency/access and exact local setup/steps/expected result; do not record it as passed.
+
+Staging has live push recipients. Existing harnesses use guarded local origins and reserved fictional phone blocks; preserve those boundaries. The owner’s narrow live-staging membership exception is documented in the owner decision file, but automated fixtures stay SYNTHETIC and giving samples stay SAMPLE. Use a separate isolated local fixture dataset for a natural-looking walkthrough when needed. Do not publish notifications or approve gates without explicit authority.
+
+## Return to Israel
+
+Give the actual branch/head and pushed commits; explain useful workflows completed and any true implementation gap. Separately list unverified workflows, accepted residuals and owner decisions. Link the candidate evidence ledger, runnable owner walkthrough, design evidence for any touched screen and the Epic 7 inception proposal. State deployment/merge/approval status explicitly. Complete independent preparation while owner-only checks remain open; do not manufacture acceptance so Epic 7 planning can proceed.

@@ -1,0 +1,9 @@
+command: npx --no-install supabase status
+cwd: .
+head: 46debe04fe8ba4ca0f7bc639e9ba60c41f57cb19
+started_utc: 2026-10-30T19:30:55.012176+00:00
+
+{"linked_project":null,"_tag":"Error","error":{"code":"StatusDbInspectError","message":"failed to inspect container health: docker: command not found (podman also not found) — install Docker Desktop or Podman and ensure it is on PATH"}}
+
+finished_utc: 2026-10-30T19:30:56.210209+00:00
+exit_code: 1

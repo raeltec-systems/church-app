@@ -25,6 +25,7 @@
 // run (append-only operator journal, as in 1.9).
 //
 // Usage: node tools/identity-e2e/assisted.mjs [--evidence <file.jsonl>]
+import { removeLocalEdgeRuntime } from '../auth-harness/local-target.mjs';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -539,7 +540,7 @@ async function main() {
     try { process.kill(-serve.pid, 'SIGINT'); } catch { /* already gone */ }
     await sleep(3000);
     try { process.kill(-serve.pid, 'SIGKILL'); } catch { /* already gone */ }
-    try { execFileSync('docker', ['rm', '-f', 'supabase_edge_runtime_church-app'], { stdio: 'ignore' }); } catch { /* not running */ }
+    try { removeLocalEdgeRuntime(); } catch { /* not running */ }
     rmSync(envDir, { recursive: true, force: true });
     psql(`select app.sys_revoke_credential('${credentialId}', 'israel'); select app.sys_disable_principal('${principal}', 'israel');`);
     const left = cleanup();

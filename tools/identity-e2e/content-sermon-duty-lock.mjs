@@ -117,7 +117,7 @@ export async function runContention({ check, log, psql, people, duty, send, gran
   const reassignment = await create(20, 'reassignment');
   await runRevocation('DL11', reassignment, member,
     () => duty(leader.token, 'duties.revise_duty', reassignment.revision, {
-      occurrence_id: reassignment.occurrence, slot_changes: [{ slot_id: reassignment.slot, member_id: other.member }],
+      occurrence_id: reassignment.occurrence, member_id: other.member,
     }), other);
 
   const cancellation = await create(21, 'cancellation');

@@ -77,7 +77,7 @@ async function main() {
     {version:1,command:cmd,request_id:requestId,expected_revision:revision,payload});
   const input={version:1,action:'inspect',invitation:invite,phone_username:phone};
   const fn=(body,headers={})=>http('/functions/v1/identity-admin-onboarding',{body,headers,publicResponse:true});
-  let serve;let ownedEdge=null;let logs='';let temp;let mutated=false;
+  let serve;let ownedEdge=null;let logs='';let temp;let mutated=false;let phase='preconditions';
   try {
     const settings=await http('/auth/v1/settings',{method:'GET'});
     const disabled=await http('/auth/v1/signup',{body:{phone:'+447700900819',password:pw}});
@@ -103,6 +103,7 @@ async function main() {
       ${existingId?q(existingId)+'::uuid':'null'},true,'in_person','SETUP-http-${scenario}','israel');`));
     check('operator-invitation-creates-no-member-or-role',sql('select count(*) from app.identity_members;')==='0'
       && sql("select count(*) from app.identity_grants where role='admin';")==='0',{scenario});
+    phase='protect-temporary-environment';
     temp=mkdtempSync(join(tmpdir(),'church-admin-e2e-'));
     if(process.platform==='win32') {
       const who=execFileSync('whoami',[],{encoding:'utf8'}).trim();
@@ -110,6 +111,7 @@ async function main() {
     }
     const envFile=join(temp,'functions.env');
     writeFileSync(envFile,`IDENTITY_ADMIN_SETUP_SYSTEM_CREDENTIAL=${credential}\nIDENTITY_ADMIN_SETUP_ENVIRONMENT=local\nIDENTITY_ADMIN_SETUP_ALLOWED_ORIGINS=http://127.0.0.1:56480\n`,{mode:0o600});
+    phase='start-edge-runtime';
     serve=spawn(process.execPath,[cli,'functions','serve','identity-admin-onboarding','--env-file',envFile],
       {cwd:ROOT,stdio:['ignore','pipe','pipe'],windowsHide:true});
     serve.stdout.on('data',b=>{logs+=b;});serve.stderr.on('data',b=>{logs+=b;});
@@ -120,7 +122,9 @@ async function main() {
       await sleep(1000);
     }
     if(!up)throw new Error('edge_runtime_not_ready');
+    phase='verify-edge-container-identity';
     ownedEdge=localContainer('edge_runtime',target);
+    phase='actual-http-workflows';
     const originDenied=await fn(input,{origin:'https://unapproved.invalid'});
     check('unapproved-browser-origin-refused',originDenied.status===403,{http:originDenied.status});
     const wrong=await fn({...input,phone_username:'+447700900819'});
@@ -212,6 +216,10 @@ async function main() {
     }
     check('no-setup-secrets-in-public-replies-or-service-logs',
       secrets.every(s=>!responses.join('\n').includes(s) && !allLogs.join('\n').includes(s)),{});
+  } catch(error) {
+    const code=typeof error?.code==='string' && /^[A-Z_]+$/.test(error.code) ? error.code : null;
+    check('scenario-completed',false,{phase,error_code:code});
+    throw error;
   } finally {
     if(serve && serve.exitCode===null && serve.signalCode===null) {
       if(process.platform==='win32')spawnSync('taskkill',['/PID',String(serve.pid),'/T','/F'],{stdio:'pipe'});

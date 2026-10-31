@@ -59,7 +59,7 @@ create table app.identity_admin_setup_audit (
   event_id bigint generated always as identity primary key,
   invitation_id uuid not null,
   action text not null check (action in ('issued','revoked','provisioning_started',
-    'provider_rejected','commissioned','application_commissioned','erased')),
+    'provider_rejected','completion_refused','commissioned','application_commissioned','erased')),
   operator text,
   member_id uuid,
   application_id uuid,
@@ -460,7 +460,21 @@ begin
       where invitation_id=i.invitation_id returning * into i;
     insert into app.identity_admin_setup_audit(invitation_id,action,operator,operation_id)
       values(i.invitation_id,'provisioning_started',i.issued_by,i.operation_id);
-    if i.mode='existing_account' then r:=app.identity_admin_setup_finish(i.invitation_id,v_session);
+    if i.mode='existing_account' then
+      r:=app.identity_admin_setup_finish(i.invitation_id,v_session);
+      if coalesce(r->>'outcome','') not in ('completed','activation_pending') then
+        -- Existing-account enrollment makes no external account-creation call.
+        -- A definite SQL refusal must not leave a fictitious unresolved provider
+        -- operation. Drop its submitted data and require a deliberate fresh proof.
+        update app.identity_admin_setup_invites
+          set state='issued',request_id=null,operation_id=null,correlation_nonce=null,
+            started_at=null,provider_settled_at=clock_timestamp(),full_name=null,
+            privacy_notice_version=null,intent_hash=null
+          where invitation_id=i.invitation_id;
+        insert into app.identity_admin_setup_audit(invitation_id,action,operator,operation_id)
+          values(i.invitation_id,'completion_refused',i.issued_by,i.operation_id);
+        r:=jsonb_build_object('outcome','refused');
+      end if;
     else
       r:=jsonb_build_object('outcome','provision','auth_user_id',i.auth_user_id,
         'operation_id',i.operation_id,'correlation_nonce',i.correlation_nonce);

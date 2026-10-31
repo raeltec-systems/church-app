@@ -79,6 +79,8 @@ The combined source-read/migration-preparation tool call was safety-blocked befo
 
 Final client-source checkpoint `5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4`: core 1,218/1,218 and staff 68/68 passed with clean analyses; web and Android debug builds passed from stable source. Full hosted CI 41197732871 passed all four jobs. Correct Dart contract reruns passed 284 VM / 283 Chrome; originals remain failed in the ledger. The evidence folder `evidence-admin-onboarding-2026-10-31/` records commands, source hashes, original failures, widget renders and strict unfinished/unverified boundaries. These results do not implement or accept the missing commissioning or full management backend. No independent review has run. The feature remains in progress, with the backend file-preparation step handed to Israel; no new deployment or real Admin creation.
 
+31 October continuation after owner-created migration files: both CLI-generated files exist but remain empty on the connected worktree. The tool separately blocked saving the onboarding migration and its service logic before either write. The owner receives a manual source-only ZIP with draft migrations/service/tests and explicit unfinished/unverified boundaries; it has not been copied back through an alternate tool. No database application or deployment occurred. The independent client fix at `f7ae2440d7e1cb17193196fd55bd9d96441050f1` reopens setup only after a complete, unexpired ready status and never automatically resends a password; 52 focused client tests and client_core analysis passed. The evidence and continuation are in [backend source handoff](evidence-admin-onboarding-backend-2026-10-31/README.md). Implementation and the matrix test audit remain open.
+
 ## Plan Change Log
 
 ## Review Triage Log

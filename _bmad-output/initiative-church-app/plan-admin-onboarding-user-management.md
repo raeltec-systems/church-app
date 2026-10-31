@@ -35,6 +35,7 @@ context:
 | State/action | Required behaviour |
 | --- | --- |
 | Authorised setup; public signup closed | One intended member/link/Admin; ordinary password sign-in follows. |
+| Data/access gates closed | Refuse live-data enrollment before Q4; show activation pending while private access stays closed. |
 | Invalid, expired, revoked, replayed or wrong-account authority | Refuse without privilege change. |
 | Parallel setup, provider timeout or account collision | Fence/reconcile one operation; never reset/adopt an unrelated account. |
 | Commissioned environment loses all Admins | Setup remains closed; existing recovery applies. |
@@ -59,7 +60,7 @@ Read `admin-onboarding-user-management-audit.md` for inspected source locations.
 - [ ] `docs/runbooks/identity-support.md`, `docs/runbooks/production-promotion-identity.md`: replace gap statements only after evidence; document activation and actual user walkthrough.
 
 **Acceptance:**
-- Given owner-authorised enrollment and closed signup, when setup completes, then the intended person can sign in as Admin without manual table editing; no policy gate is implicitly opened.
+- Given owner-authorised enrollment, approved data/access prerequisites and closed signup, when setup completes, then the intended person can sign in as Admin without manual table editing; no policy gate is implicitly opened.
 - Given each role/account state, when using the normal management UI, then persistence, audit, permission denials and recovery concern the correct person; contact edits never change login bindings.
 - Given concurrent clients or revoked authority, when actions run, then no duplicate privilege or unauthorised detail survives.
 - Given the approved references, when using desktop/narrow layouts and keyboard/text scaling, then the table/detail and error/retry flows remain usable.

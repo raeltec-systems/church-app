@@ -242,23 +242,16 @@ node tools/identity-e2e/staging-suite.mjs --evidence <evidence>/staging-suite.js
 Every check passes (findings are reviewed separately), and the owner's email run, deletion
 worker run and device demonstration (`evidence-2.14/owner-demonstration.md`) are done.
 
-## Open question for the owner: the first real Admin (from 2.12, RB1)
+<a id="open-question-for-the-owner-the-first-real-admin-from-212-rb1"></a>
+## Owner-approved first-Admin onboarding (31 October 2026)
 
-Production has no path to the first real Admin: applications need an Admin to approve them, and
-`app.identity_seed_synthetic_link` refuses production (synthetic names and fictional numbers
-only). `app.identity_bootstrap_admin` then needs an approved member with a usable link. Options:
+Israel approved the owner-issued, account/environment-bound, single-use 24-hour invitation and setup wizard. The feature branch now implements the initial enrollment path and restricted operator issue/status/revoke/reconciliation/cleanup tooling. The intended person enters their own password in the app; an explicitly bound existing account proves its current password. No direct table edit or first-signup-wins rule is allowed.
 
-1. **Reviewed operator procedure (recommended).** A small migration adds an operator-only
-   function that approves exactly one pending application **while `identity_usable_admin_count()`
-   is 0**, after the owner's in-person identity check, records the check and the confirming owner
-   (like RB8's two-person rule), and then bootstraps that member as Admin. Audited and journalled;
-   refuses once any usable Admin exists. Needs G5 approved (a real name and number), its own
-   story, pgTAP and a staging rehearsal.
-2. **Approve the application by hand in SQL.** Not acceptable (RB1 says do not improvise it).
-3. **Leave production without an Admin** until a later release. Production then stays fully
-   fail-closed, which is the current state.
+See [restricted onboarding operations](admin-onboarding-operations.md), [normal staff walkthrough](admin-onboarding-user-management-walkthrough.md) and [isolated verification](admin-onboarding-verification.md). Runtime evidence must match the exact promoted candidate, including the Auth transaction guards and cleanup paths. A code implementation or passing local test does not mean it has been deployed.
 
-Until the owner chooses, production stays at option 3.
+Before hosted enrollment, review/apply the migrations, configure the purpose-bound Edge credential and exact staff origins, establish the reviewed privacy notice under approved Q4, and obtain candidate-specific promotion approval. Public registration may stay closed during first setup. Private-access and other policy gates are never opened by enrollment. Until those release prerequisites are satisfied, production remains fail-closed.
+
+Once commissioned, a permanent non-personal latch prevents first-time setup from reopening when all Admins are held, removed or unavailable. Use the existing two-person identity-checked recovery procedure, not a new first-Admin invitation. Existing staging installations with historical Admin grants are already commissioned; do not erase their history to test the wizard.
 
 ## Also decided at this gate (from 2.7)
 

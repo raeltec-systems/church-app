@@ -1692,15 +1692,17 @@ void main() {
     expect(navLabel(), isNull);
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('nav-/admin/users')), findsOneWidget);
     expect(find.byKey(const Key('nav-/admin/members')), findsOneWidget);
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pump();
-    expect(navLabel(), 'Members');
+    expect(navLabel(), 'Users & access');
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('review-reload')), findsOneWidget);
+    expect(find.byType(UserManagementScreen), findsOneWidget);
+    expect(find.byKey(const Key('users-reload')), findsOneWidget);
     // Focus stays on the selected tab after keyboard navigation.
-    expect(navLabel(), 'Members');
+    expect(navLabel(), 'Users & access');
   });
 
   for (final (size, label) in [

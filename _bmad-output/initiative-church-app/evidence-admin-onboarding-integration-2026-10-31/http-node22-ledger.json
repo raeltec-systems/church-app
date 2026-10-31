@@ -1,0 +1,29 @@
+[
+  {
+    "check": "node22-phone-on-new",
+    "source": "1a449aca8c6bdf8367421efa5292d35224b71526",
+    "node": "22.16.0",
+    "exit": 0,
+    "started_at": "2026-10-31T14:22:50.410774+00:00",
+    "finished_at": "2026-10-31T14:23:02.043621+00:00",
+    "log_sha256": "9f860ad200767e3ccf67cd6e40413bbf35cdca262be69297c06a811acae4d1e4"
+  },
+  {
+    "check": "http-new-node22",
+    "source": "1a449aca8c6bdf8367421efa5292d35224b71526",
+    "node": "22.16.0",
+    "exit": 1,
+    "started_at": "2026-10-31T14:23:02.045968+00:00",
+    "finished_at": "2026-10-31T14:23:45.764402+00:00",
+    "log_sha256": "7b6e61348ead09bbfaa3b5ac420c01972a99520b688c27d6d7438ac9621b0ed3"
+  },
+  {
+    "check": "node22-final-phone-off",
+    "source": "1a449aca8c6bdf8367421efa5292d35224b71526",
+    "node": "22.16.0",
+    "exit": 0,
+    "started_at": "2026-10-31T14:23:45.773288+00:00",
+    "finished_at": "2026-10-31T14:23:57.330736+00:00",
+    "log_sha256": "1347bc3ad6f71e5b6dfb9d67642b2fcf183f27160578ddaa75e4c27e44419172"
+  }
+]

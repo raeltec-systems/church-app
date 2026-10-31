@@ -1,0 +1,5 @@
+auth harness and identity E2E tools (offline unit tests)	Run actions/setup-node@v4	2026-10-31T14:14:27.0077344Z node: v22.23.4
+auth harness and identity E2E tools (offline unit tests)	Harness, function and shared-module tests (no network, no credentials; supabase/functions/*/ includes _shared)	2026-10-31T14:14:30.4579253Z # tests 489
+auth harness and identity E2E tools (offline unit tests)	Harness, function and shared-module tests (no network, no credentials; supabase/functions/*/ includes _shared)	2026-10-31T14:14:30.4579813Z # pass 489
+auth harness and identity E2E tools (offline unit tests)	Harness, function and shared-module tests (no network, no credentials; supabase/functions/*/ includes _shared)	2026-10-31T14:14:30.4580004Z # fail 0
+auth harness and identity E2E tools (offline unit tests)	Harness, function and shared-module tests (no network, no credentials; supabase/functions/*/ includes _shared)	2026-10-31T14:14:30.4582208Z # skipped 0

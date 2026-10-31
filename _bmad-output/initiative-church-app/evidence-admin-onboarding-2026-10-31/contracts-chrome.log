@@ -1,0 +1,56 @@
+Error: Couldn't resolve the package 'flutter_test' in 'package:flutter_test/flutter_test.dart'.
+org-dartlang-app:///main.dart:8:8: Error: Not found: 'package:flutter_test/flutter_test.dart'
+import 'package:flutter_test/flutter_test.dart';
+       ^
+org-dartlang-app:///fixtures_files_test.dart:7:8: Error: Error when reading 'org-dartlang-app:///tool/embed_fixtures.dart': File not found
+import '../tool/embed_fixtures.dart' as embed;
+       ^
+org-dartlang-app:///main.dart:10:13: Error: Type 'WebTest' not found.
+Map<String, WebTest> webTestMap = <String, WebTest>{
+            ^^^^^^^
+org-dartlang-app:///main.dart:10:13: Error: 'WebTest' isn't a type.
+Map<String, WebTest> webTestMap = <String, WebTest>{
+            ^^^^^^^
+org-dartlang-app:///main.dart:10:44: Error: 'WebTest' isn't a type.
+Map<String, WebTest> webTestMap = <String, WebTest>{
+                                           ^^^^^^^
+org-dartlang-app:///main.dart:26:9: Error: 'WebTest' isn't a type.
+  final WebTest? webTest = webTestMap[testSelector];
+        ^^^^^^^
+org-dartlang-app:///main.dart:26:39: Error: Undefined name 'testSelector'.
+  final WebTest? webTest = webTestMap[testSelector];
+                                      ^^^^^^^^^^^^
+org-dartlang-app:///main.dart:28:37: Error: Undefined name 'testSelector'.
+    throw Exception('Web test for ${testSelector} not found');
+                                    ^^^^^^^^^^^^
+org-dartlang-app:///main.dart:30:10: Error: Method not found: 'runWebTest'.
+  return runWebTest(webTest);
+         ^^^^^^^^^^
+org-dartlang-app:///fixtures_files_test.dart:11:18: Error: Method not found: 'readFile'.
+    expect(embed.readFile('test/fixtures.g.dart'), embed.render(),
+                 ^^^^^^^^
+org-dartlang-app:///fixtures_files_test.dart:11:58: Error: Method not found: 'render'.
+    expect(embed.readFile('test/fixtures.g.dart'), embed.render(),
+                                                         ^^^^^^
+Unhandled exception:
+Unsupported operation: Unsupported invalid type InvalidType(<invalid>) (InvalidType). Encountered while compiling org-dartlang-app:///main.dart, which contains the type: InterfaceType(IdentityMap<String, <invalid>>).
+#0      LibraryCompiler._typeCompilationError (package:dev_compiler/src/kernel/compiler_new.dart:4494)
+#1      LibraryCompiler._emitType (package:dev_compiler/src/kernel/compiler_new.dart:4459)
+#2      LibraryCompiler.visitMapLiteral (package:dev_compiler/src/kernel/compiler_new.dart:8818)
+#3      MapLiteral.accept (package:kernel/src/ast/expressions.dart:4686)
+#4      LibraryCompiler._visitExpression (package:dev_compiler/src/kernel/compiler_new.dart:5139)
+#5      LibraryCompiler._visitInitializer (package:dev_compiler/src/kernel/compiler_new.dart:2733)
+#6      LibraryCompiler._emitLazyMember (package:dev_compiler/src/kernel/compiler_new.dart:3584)
+#7      LibraryCompiler._emitLazyMembers (package:dev_compiler/src/kernel/compiler_new.dart:3664)
+#8      LibraryCompiler._emitLibraryMembers (package:dev_compiler/src/kernel/compiler_new.dart:4148)
+#9      LibraryCompiler._emitLibrary (package:dev_compiler/src/kernel/compiler_new.dart:1351)
+#10     LibraryCompiler.emitLibrary (package:dev_compiler/src/kernel/compiler_new.dart:964)
+#11     LibraryBundleCompiler.emitModule (package:dev_compiler/src/kernel/compiler_new.dart:166)
+#12     IncrementalJavaScriptBundler.compile (package:frontend_server/src/javascript_bundle.dart:366)
+#13     FrontendCompiler.writeJavaScriptBundle (package:frontend_server/frontend_server.dart:1127)
+<asynchronous suspension>
+#14     FrontendCompiler.compile (package:frontend_server/frontend_server.dart:904)
+<asynchronous suspension>
+#15     listenAndCompile.<anonymous closure> (package:frontend_server/frontend_server.dart:1702)
+<asynchronous suspension>
+The Dart compiler exited unexpectedly.

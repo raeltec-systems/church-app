@@ -1,0 +1,8 @@
+{
+    "scope":  "Offline and POSIX policy tests in a network-disabled container with repository read-only; no database touched",
+    "finished_at_utc":  "2026-10-31T11:30:23.5633990Z",
+    "source":  "71363c15332b8d2138494c57ec75f92c59252029",
+    "started_at_utc":  "2026-10-31T11:30:14.7237011Z",
+    "exit":  0,
+    "image":  "node:22-bookworm"
+}

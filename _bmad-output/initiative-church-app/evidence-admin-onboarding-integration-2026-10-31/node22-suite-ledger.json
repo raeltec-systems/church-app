@@ -1,0 +1,20 @@
+[
+  {
+    "check": "offline-node22",
+    "source": "1a449aca8c6bdf8367421efa5292d35224b71526",
+    "node": "22.16.0",
+    "exit": 1,
+    "started_at": "2026-10-31T14:20:13.010845+00:00",
+    "finished_at": "2026-10-31T14:20:32.512174+00:00",
+    "log_sha256": "5c88af5e2e3088763826494010da5883dd3d111af3a5cd7758547ed4f373045d"
+  },
+  {
+    "check": "ts-contracts-node22",
+    "source": "1a449aca8c6bdf8367421efa5292d35224b71526",
+    "node": "22.16.0",
+    "exit": 1,
+    "started_at": "2026-10-31T14:20:32.520416+00:00",
+    "finished_at": "2026-10-31T14:20:32.699393+00:00",
+    "log_sha256": "e2670c62a738cf67132db5ad3a97611405c85c71ec934c0cc1d7650f25369a48"
+  }
+]

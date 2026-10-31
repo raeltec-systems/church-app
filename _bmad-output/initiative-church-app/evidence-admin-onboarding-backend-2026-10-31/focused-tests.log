@@ -1,0 +1,54 @@
+00:00 +0: loading C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart
+00:00 +0: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: status-only recovery confirmed not-started outcome reopens input without resending a password
+00:00 +1: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: status-only recovery expired ready response cannot reopen the setup form
+00:00 +2: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: status-only recovery incomplete ready response cannot reopen the setup form
+00:00 +3: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: commissioning response contract invitation diagnostics never disclose the value
+00:00 +4: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: commissioning response contract ready requires a mode, privacy notice and UTC expiry
+00:00 +5: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: commissioning response contract unknown status and success without fresh sign-in are refused
+00:00 +6: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: commissioning response contract activation pending remains distinct from active access
+00:00 +7: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: transport only a secure URL and publishable key are accepted
+00:00 +8: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: transport invitation travels only in POST body; no ambient authorization
+00:00 +9: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: transport status never resends the password
+00:00 +10: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: transport HTTP 401 cannot claim completed even with a success-shaped body
+00:00 +11: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: transport HTTP 403 cannot claim completed even with a success-shaped body
+00:00 +12: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: transport HTTP 404 cannot claim completed even with a success-shaped body
+00:00 +13: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: transport HTTP 500 cannot claim completed even with a success-shaped body
+00:00 +14: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: transport HTTP 503 cannot claim completed even with a success-shaped body
+00:00 +15: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: transport malformed, oversized and lost mutation answers remain uncertain
+00:00 +16: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: in-memory flow controller reload resumes the server-correlated pending operation without a password
+00:00 +17: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: in-memory flow controller returning invitation holder sees completion without signing in automatically
+00:00 +18: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: in-memory flow controller short multibyte passwords do not meet the character minimum
+00:00 +19: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: in-memory flow controller no password submission before invitation validation
+00:00 +20: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: in-memory flow controller successful check allows one submission and status-only recovery
+00:00 +21: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: in-memory flow controller parallel submit clicks cannot issue two mutations
+00:00 +22: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: in-memory flow controller late check after cancellation cannot restore an invitation
+00:00 +23: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: in-memory flow controller account switch discards pending setup results
+00:00 +24: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: in-memory flow controller privacy consent and a usable password are required
+00:00 +25: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: in-memory flow controller expired ready response cannot enable submission
+00:00 +26: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: in-memory flow controller explicit activation pending does not claim active Admin access
+00:00 +27: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: setup screen empty install fails closed, no fictitious success
+00:00 +28: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: setup screen empty install fails closed, no fictitious success
+00:01 +29: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: signed out deep link mounts no protected management screen
+00:01 +30: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: signed out deep link mounts no protected management screen
+00:01 +31: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: signed out deep link mounts no protected management screen
+00:01 +32: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/admin_onboarding_test.dart: setup screen 390px and 200 percent text have no overflow
+00:01 +33: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: roles [] do not grant user administration
+00:01 +34: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: roles [media] do not grant user administration
+00:01 +35: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: roles [pastor] do not grant user administration
+00:01 +36: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: roles [media, pastor] do not grant user administration
+00:01 +37: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: network failure differs from lack of permission
+00:01 +38: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: default directory enters the real member table section
+00:02 +39: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: Applications opens its actual existing workflow
+00:02 +40: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: Roles & access opens its actual existing workflow
+00:02 +41: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: Access reviews opens its actual existing workflow
+00:02 +42: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: Recovery emails opens its actual existing workflow
+00:02 +43: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: Account recovery opens its actual existing workflow
+00:02 +44: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: Membership status opens its actual existing workflow
+00:02 +45: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: Member deletions opens its actual existing workflow
+00:02 +46: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: Username disputes opens its actual existing workflow
+00:02 +47: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: area selector changes the route and mounts only the selected area
+00:02 +48: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: observed revocation removes all management controls
+00:03 +49: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: switching accounts drops the management area
+00:03 +50: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: narrow high-text-scale workspace remains usable
+00:03 +51: C:/Users/Administrator/church-app-admin-onboarding/packages/client_core/test/identity/user_management_screen_test.dart: old member route retains its applications-first navigation
+00:03 +52: All tests passed!

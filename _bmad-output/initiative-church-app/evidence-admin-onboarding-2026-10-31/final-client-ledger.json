@@ -1,0 +1,120 @@
+[
+  {
+    "label": "final-core-analysis",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "analyze",
+      "--no-pub"
+    ],
+    "cwd": "packages/client_core",
+    "source": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "head_after": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "source_stable": true,
+    "started_at_utc": "2026-10-31T11:39:57.987569+00:00",
+    "finished_at_utc": "2026-10-31T11:40:12.968790+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "final-core-analysis.log",
+    "log_sha256": "7f4267622a9b62140e2d4c4ccefd8264c09e24b08080a95829ad5e926c432fef"
+  },
+  {
+    "label": "final-core-tests",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "test",
+      "--no-pub",
+      "--concurrency=2",
+      "--reporter",
+      "expanded"
+    ],
+    "cwd": "packages/client_core",
+    "source": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "head_after": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "source_stable": true,
+    "started_at_utc": "2026-10-31T11:40:13.053095+00:00",
+    "finished_at_utc": "2026-10-31T11:42:49.362983+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "final-core-tests.log",
+    "log_sha256": "7e9bc3db4a891a355bbc6eee860b43d9d04119a5b00eae2eea05e33e918c5c5b"
+  },
+  {
+    "label": "final-staff-analysis",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "analyze",
+      "--no-pub"
+    ],
+    "cwd": "apps/staff",
+    "source": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "head_after": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "source_stable": true,
+    "started_at_utc": "2026-10-31T11:42:49.437948+00:00",
+    "finished_at_utc": "2026-10-31T11:43:00.704710+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "final-staff-analysis.log",
+    "log_sha256": "65b25c74b57df2f7502b70cdc79ea8e6701ab2b66a07bb857906bda792ddb17d"
+  },
+  {
+    "label": "final-staff-tests",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "test",
+      "--no-pub",
+      "--concurrency=2",
+      "--reporter",
+      "expanded"
+    ],
+    "cwd": "apps/staff",
+    "source": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "head_after": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "source_stable": true,
+    "started_at_utc": "2026-10-31T11:43:00.781897+00:00",
+    "finished_at_utc": "2026-10-31T11:43:18.852222+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "final-staff-tests.log",
+    "log_sha256": "6bde30eab644acc873dbaa57b8bb7487dca7c6915cbeb5e949a787a7c04dd7fa"
+  },
+  {
+    "label": "final-staff-web-build",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "build",
+      "web",
+      "--no-pub",
+      "--no-web-resources-cdn"
+    ],
+    "cwd": "apps/staff",
+    "source": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "head_after": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "source_stable": true,
+    "started_at_utc": "2026-10-31T11:43:18.937374+00:00",
+    "finished_at_utc": "2026-10-31T11:44:31.565095+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "final-staff-web-build.log",
+    "log_sha256": "35d591571669b1778c4ef878fff7da52aadb3f72c964e37d7c51387b0f3df76e"
+  },
+  {
+    "label": "final-android-debug-build",
+    "command": [
+      "C:\\src\\flutter\\bin\\flutter.bat",
+      "build",
+      "apk",
+      "--debug",
+      "--no-pub"
+    ],
+    "cwd": "apps/mobile",
+    "source": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "head_after": "5d8a3444b2d3e8a29f1304d35f90dbbdda5cf5a4",
+    "source_stable": true,
+    "started_at_utc": "2026-10-31T11:44:31.644381+00:00",
+    "finished_at_utc": "2026-10-31T11:44:56.805681+00:00",
+    "exit": 0,
+    "result": "run-passed",
+    "log": "final-android-debug-build.log",
+    "log_sha256": "4ae6c8a79be6ca2012092088242873c4848f04ca15810f66e9e4e9b8c20e811d"
+  }
+]

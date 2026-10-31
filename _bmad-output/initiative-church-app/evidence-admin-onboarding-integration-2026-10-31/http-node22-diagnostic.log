@@ -1,0 +1,24 @@
+{"step":"public-signup-closed-phone-signin-enabled","target":"LOCAL","at":"2026-10-31T14:26:17.745Z","verdict":"pass","scenario":"new","settings_http":200,"signup_http":422}
+{"step":"operator-invitation-creates-no-member-or-role","target":"LOCAL","at":"2026-10-31T14:26:18.501Z","verdict":"pass","scenario":"new"}
+{"step":"unapproved-browser-origin-refused","target":"LOCAL","at":"2026-10-31T14:26:20.784Z","verdict":"pass","http":403}
+{"step":"wrong-account-invitation-refused","target":"LOCAL","at":"2026-10-31T14:26:20.835Z","verdict":"pass","outcome":"refused"}
+{"step":"real-edge-inspects-account-bound-invitation","target":"LOCAL","at":"2026-10-31T14:26:20.869Z","verdict":"pass","http":200,"mode":"new_account"}
+{"step":"parallel-completion-produces-one-identity-and-grant","target":"LOCAL","at":"2026-10-31T14:26:21.156Z","verdict":"pass","scenario":"new","first":"completed","second":"pending","status":"completed","counts":{"accounts":1,"members":1,"links":1,"admins":1}}
+{"step":"completion-never-returns-a-session","target":"LOCAL","at":"2026-10-31T14:26:21.157Z","verdict":"pass"}
+{"step":"ordinary-password-signin-after-setup","target":"LOCAL","at":"2026-10-31T14:26:27.775Z","verdict":"pass","http":200,"scenario":"new"}
+{"step":"normal-current-access-reports-admin","target":"LOCAL","at":"2026-10-31T14:26:27.805Z","verdict":"pass","http":200}
+{"step":"normal-admin-directory-is-live","target":"LOCAL","at":"2026-10-31T14:26:27.820Z","verdict":"pass","http":200}
+{"step":"normal-admin-creates-accountless-member","target":"LOCAL","at":"2026-10-31T14:26:27.835Z","verdict":"pass","http":200,"code":null}
+{"step":"profile-correction-persists-and-replays-once","target":"LOCAL","at":"2026-10-31T14:26:27.979Z","verdict":"pass","http":200,"code":null,"detail_http":200}
+{"step":"stale-profile-edit-refused","target":"LOCAL","at":"2026-10-31T14:26:27.992Z","verdict":"pass","code":"conflict"}
+{"step":"contact-correction-does-not-change-login","target":"LOCAL","at":"2026-10-31T14:26:28.243Z","verdict":"pass"}
+{"step":"safe-activity-projection-reports-correction","target":"LOCAL","at":"2026-10-31T14:26:28.259Z","verdict":"pass","http":200}
+{"step":"deactivated-member-remains-manageable","target":"LOCAL","at":"2026-10-31T14:26:28.327Z","verdict":"pass","deactivation_code":null,"directory_http":200}
+{"step":"guest-denied-directory","target":"LOCAL","at":"2026-10-31T14:26:28.333Z","verdict":"pass","http":401}
+{"step":"signed-in-non-admin-denied-details","target":"LOCAL","at":"2026-10-31T14:26:28.554Z","verdict":"pass","http":403}
+{"step":"held-admin-session-loses-management-access","target":"LOCAL","at":"2026-10-31T14:26:28.687Z","verdict":"pass","http":403}
+{"step":"commissioning-remains-closed-with-no-usable-admin","target":"LOCAL","at":"2026-10-31T14:26:28.896Z","verdict":"pass"}
+{"step":"no-setup-secrets-in-public-replies-or-service-logs","target":"LOCAL","at":"2026-10-31T14:26:29.318Z","verdict":"pass"}
+{"step":"disposable-database-cleanup","target":"LOCAL","at":"2026-10-31T14:27:08.273Z","verdict":"pass","reset_exit":0}
+
+22/22 checks passed

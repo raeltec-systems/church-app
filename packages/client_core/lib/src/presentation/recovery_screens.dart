@@ -863,7 +863,8 @@ class _RecoveryEmailScreenState extends ConsumerState<RecoveryEmailScreen> {
 // ---------------------------------------------------------------------------
 
 class RecoveryEmailReviewScreen extends ConsumerStatefulWidget {
-  const RecoveryEmailReviewScreen({super.key});
+  const RecoveryEmailReviewScreen({super.key, this.targetMemberId});
+  final String? targetMemberId;
 
   @override
   ConsumerState<RecoveryEmailReviewScreen> createState() =>
@@ -930,7 +931,13 @@ class _RecoveryEmailReviewScreenState
           ],
         ),
       );
-    } else if (s.items.isEmpty) {
+    } else if (s.items
+        .where(
+          (item) =>
+              widget.targetMemberId == null ||
+              item.memberId == widget.targetMemberId,
+        )
+        .isEmpty) {
       children.add(
         const RequestStateBanner(
           key: Key('recovery-review-empty'),
@@ -940,7 +947,11 @@ class _RecoveryEmailReviewScreenState
         ),
       );
     } else {
-      for (final item in s.items) {
+      for (final item in s.items.where(
+        (item) =>
+            widget.targetMemberId == null ||
+            item.memberId == widget.targetMemberId,
+      )) {
         children.addAll([_item(context, item, s.busy), _gap]);
       }
     }

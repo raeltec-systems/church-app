@@ -9,6 +9,8 @@ import 'package:church_contracts/church_contracts.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
 
 import 'src/application/providers.dart';
+import 'src/application/user_management_controllers.dart';
+import 'src/domain/user_management.dart';
 import 'src/application/hymn_controllers.dart';
 import 'src/application/search_controllers.dart'
     show contentSearchRepositoryProvider;
@@ -3450,6 +3452,77 @@ Map<String, Object?> openedItemData({
   'snoozed_until': ?snoozedUntil,
 };
 
+/// Response-controlled management reads; never used by production composition.
+class FakeUserManagement implements UserManagementRepository {
+  AccessRead<UserDirectoryPage> page = const AccessReadOk(
+    UserDirectoryPage(members: [], roles: []),
+  );
+  final details = <String, AccessRead<UserDetail>>{};
+  final activityPages = <String, AccessRead<UserActivityPage>>{};
+  final directoryCalls = <(UserFilter, MemberCursor?)>[];
+  final detailCalls = <String>[];
+  final activityCalls = <(String, UserActivityCursor?)>[];
+  Future<AccessRead<UserDirectoryPage>> Function(UserFilter, MemberCursor?)?
+  onDirectory;
+  Future<AccessRead<UserDetail>> Function(String)? onDetail;
+  Future<AccessRead<UserActivityPage>> Function(String, UserActivityCursor?)?
+  onActivity;
+  @override
+  Future<AccessRead<UserDirectoryPage>> directory(
+    UserFilter filter, {
+    MemberCursor? after,
+  }) {
+    directoryCalls.add((filter, after));
+    return onDirectory?.call(filter, after) ?? Future.value(page);
+  }
+
+  @override
+  Future<AccessRead<UserDetail>> detail(String memberId) {
+    detailCalls.add(memberId);
+    return onDetail?.call(memberId) ??
+        Future.value(
+          details[memberId] ?? const AccessReadFailed(unreachable: false),
+        );
+  }
+
+  @override
+  Future<AccessRead<UserActivityPage>> activity(
+    String memberId, {
+    UserActivityCursor? after,
+  }) {
+    activityCalls.add((memberId, after));
+    return onActivity?.call(memberId, after) ??
+        Future.value(
+          activityPages[memberId] ??
+              const AccessReadOk(UserActivityPage(events: [])),
+        );
+  }
+}
+
+Map<String, Object?> managedMemberData({
+  String id = '66666666-6666-4666-8666-666666666666',
+  String name = 'SYNTHETIC Ruth Mwale',
+  int revision = 1,
+  int grantRevision = 1,
+  String membership = 'approved',
+  String account = 'no_login',
+  List<String> roles = const [],
+  List<Map<String, Object?>> routes = const [],
+  bool deleting = false,
+}) => {
+  ...memberRecordData(
+    id: id,
+    name: name,
+    revision: revision,
+    account: account,
+    routes: routes,
+  ),
+  'membership_state': membership,
+  'deletion_pending': deleting,
+  'commissioned_admin': false,
+  'grants': grantsData(memberId: id, revision: grantRevision, roles: roles),
+};
+
 /// The fakes and provider overrides an app or screen test runs against.
 class ClientTestHarness {
   ClientTestHarness({String? account = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'})
@@ -3463,6 +3536,7 @@ class ClientTestHarness {
   final grants = FakeGrants();
   final membership = FakeMembership();
   final review = FakeReview();
+  final users = FakeUserManagement();
   final cells = FakeCells();
   final cellCalendar = FakeCellCalendar();
   final content = FakeContent();
@@ -3517,6 +3591,7 @@ class ClientTestHarness {
       grantsRepositoryProvider.overrideWithValue(grants),
       membershipRepositoryProvider.overrideWithValue(membership),
       reviewRepositoryProvider.overrideWithValue(review),
+      userManagementRepositoryProvider.overrideWithValue(users),
       cellsRepositoryProvider.overrideWithValue(cells),
       cellCalendarRepositoryProvider.overrideWithValue(cellCalendar),
       contentRepositoryProvider.overrideWithValue(content),

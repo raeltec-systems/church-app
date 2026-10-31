@@ -1,0 +1,4 @@
+{"step":"public-signup-closed-phone-signin-enabled","target":"LOCAL","at":"2026-10-31T14:23:03.505Z","verdict":"pass","scenario":"new","settings_http":200,"signup_http":422}
+{"step":"operator-invitation-creates-no-member-or-role","target":"LOCAL","at":"2026-10-31T14:23:04.202Z","verdict":"pass","scenario":"new"}
+{"step":"scenario-completed","target":"LOCAL","at":"2026-10-31T14:23:06.444Z","verdict":"FAIL","phase":"actual-http-workflows","error_code":null}
+{"step":"disposable-database-cleanup","target":"LOCAL","at":"2026-10-31T14:23:45.744Z","verdict":"pass","reset_exit":0}

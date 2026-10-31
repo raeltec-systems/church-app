@@ -1,0 +1,5 @@
+Error on line 4, column 3 of dart_test.yaml: Unknown platform "chrome".
+  ╷
+4 │   chrome:
+  │   ^^^^^^
+  ╵

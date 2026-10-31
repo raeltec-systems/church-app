@@ -421,9 +421,17 @@ begin
     or not app.identity_admin_setup_operator_active(i.issued_by) or app.rcv_serving_hold() then
     return jsonb_build_object('data',jsonb_build_object('outcome','refused'));
   end if;
-  if v_action in ('status','finish') and i.request_id is not null
+  if v_action in ('begin','status','finish') and i.request_id is not null
     and i.request_id::text is distinct from p->>'request_id' then
     return jsonb_build_object('data',jsonb_build_object('outcome','refused'));
+  end if;
+  if v_action='begin' and i.intent_hash is not null then
+    select x.errors,x.full_name into v_errors,v_name
+      from app.identity_application_name(p->'full_name','{}'::jsonb) x;
+    v_hash:=sha256(convert_to(jsonb_build_array(v_name,p->>'privacy_notice_version',p->>'request_id')::text,'UTF8'));
+    if v_errors<>'{}'::jsonb or i.intent_hash is distinct from v_hash then
+      return jsonb_build_object('data',jsonb_build_object('outcome','refused'));
+    end if;
   end if;
   n:=app.identity_admin_setup_notice(i.is_synthetic);
   if n is null then return jsonb_build_object('data',jsonb_build_object('outcome','refused')); end if;

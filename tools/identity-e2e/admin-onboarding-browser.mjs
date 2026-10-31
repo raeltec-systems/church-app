@@ -69,6 +69,10 @@ async function main(){
   await page.getByRole('checkbox',{name:'I have read the privacy notice and agree to this setup.'}).click();await page.waitForTimeout(200);await button('Complete Admin setup').click();
   must('normal-wizard-creates-first-admin',await shown(page.getByRole('heading',{name:/^Setup complete /})));
   must('setup-authority-stays-out-of-location',!page.url().includes(invitation)&&!page.url().includes(pw));
+  const competing=await api('/functions/v1/identity-admin-onboarding',{version:1,action:'complete',
+    invitation,phone_username:'+447700900818',request_id:randomUUID(),full_name:'SYNTHETIC Naomi Phiri',
+    password:pw,privacy_notice_version:'synthetic-admin-setup-1',privacy_accepted:true});
+  must('supplemental-http-competing-request-refused',competing.status===200&&competing.body.outcome==='refused');
   await sleep(EPOCH_WAIT_MS);await button('Go to sign in').click();
   phase='sign-in';await enter('Phone number (your username)','+447700900818');await enter('Password',pw);await button('Sign in').click();
   await shown(page.getByRole('heading',{name:'Overview',exact:true}));await button('People section People').click();await page.getByRole('tab',{name:'Users & access',exact:true}).click();

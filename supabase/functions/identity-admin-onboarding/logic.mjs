@@ -80,6 +80,11 @@ export async function runRequest(p, clientKey, ports) {
     if (p.action === 'inspect') return publicReply(await ports.system({...common,action:'inspect'}));
     if (p.action === 'status') return publicReply(await ports.system({...request,action:'status'}));
     const inspected = await ports.system({...common,action:'inspect'});
+    if (['pending','completed','activation_pending'].includes(inspected?.outcome)) {
+      // A different browser submission must not borrow another request's success.
+      // Status is read-only and tied to this original request, never its password.
+      return publicReply(await ports.system({...request,action:'status'}));
+    }
     if (inspected?.outcome !== 'ready') return publicReply(inspected);
     if (publicReply(inspected).outcome !== 'ready'
         || inspected.privacy_notice_version !== p.privacy_notice_version) return {outcome:'refused'};

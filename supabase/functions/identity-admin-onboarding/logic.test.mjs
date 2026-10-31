@@ -131,3 +131,21 @@ test('expired or malformed private metadata never appears in errors',async()=>{
   const r=await runRequest(common,'b'.repeat(64),f.ports);
   assert.deepEqual(r,{outcome:'unavailable'});assert.ok(!JSON.stringify(r).includes(complete.password));
 });
+
+test('a competing complete request cannot borrow a prior completion',async()=>{
+  const f=fixture([completed,{outcome:'refused'}]);
+  assert.deepEqual(await runRequest({...complete,request_id:id(9)},'b'.repeat(64),f.ports),{outcome:'refused'});
+  assert.deepEqual(f.calls.map(x=>x.action),['inspect','status']);
+  assert.equal(f.calls[1].request_id,id(9));assert.equal(f.creates.length,0);
+});
+test('completed-request retry reconciles its own request without a password resend',async()=>{
+  const f=fixture([completed,completed]);
+  assert.deepEqual(await runRequest(complete,'b'.repeat(64),f.ports),completed);
+  assert.deepEqual(f.calls.map(x=>x.action),['inspect','status']);
+  assert.ok(f.calls.every(x=>!('password' in x)));assert.equal(f.creates.length,0);
+});
+test('an already pending completion still checks the callers request identity',async()=>{
+  const f=fixture([pending,{outcome:'refused'}]);
+  assert.deepEqual(await runRequest({...complete,request_id:id(9)},'b'.repeat(64),f.ports),{outcome:'refused'});
+  assert.equal(f.calls[1].action,'status');assert.equal(f.creates.length,0);
+});

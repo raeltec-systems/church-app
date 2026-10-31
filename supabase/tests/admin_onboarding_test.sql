@@ -90,6 +90,14 @@ select is(pg_temp.setup_call('begin',jsonb_build_object(
   'request_id','a1111111-1111-4111-8111-111111111111','full_name','SYNTHETIC First Administrator',
   'privacy_notice_version','synthetic-admin-setup-1','privacy_accepted',true))->>'outcome',
   'pending','repeated begin does not redispatch provider authority');
+select is(pg_temp.setup_call('begin',jsonb_build_object(
+  'request_id','b1111111-1111-4111-8111-111111111111','full_name','SYNTHETIC First Administrator',
+  'privacy_notice_version','synthetic-admin-setup-1','privacy_accepted',true))->>'outcome',
+  'refused','another request cannot claim the first pending operation');
+select is(pg_temp.setup_call('begin',jsonb_build_object(
+  'request_id','a1111111-1111-4111-8111-111111111111','full_name','SYNTHETIC Changed Submission',
+  'privacy_notice_version','synthetic-admin-setup-1','privacy_accepted',true))->>'outcome',
+  'refused','same-request changed profile intent cannot replay a pending begin');
 select is(pg_temp.setup_call('status','{"request_id":"b1111111-1111-4111-8111-111111111111"}')->>'outcome',
   'refused','wrong operation status denied');
 select is(pg_temp.setup_call('status','{"request_id":"a1111111-1111-4111-8111-111111111111"}')->>'outcome',

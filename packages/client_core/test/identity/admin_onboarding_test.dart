@@ -103,6 +103,67 @@ Future<void> complete(ProviderContainer c) => c
     );
 
 void main() {
+  group('status-only recovery', () {
+    test('confirmed not-started outcome reopens input without resending a password', () async {
+      final fake = SetupFake()..checked = Future.value(ready());
+      final container = containerFor(fake);
+      await inspect(container);
+      await complete(container);
+      expect(
+        container.read(adminOnboardingProvider).phase,
+        AdminSetupPhase.resolving,
+      );
+      final originalRequestId = fake.lastRequestId;
+      await container.read(adminOnboardingProvider.notifier).checkStatus();
+      expect(
+        container.read(adminOnboardingProvider).phase,
+        AdminSetupPhase.details,
+      );
+      expect(fake.completions, 1);
+      expect(fake.checkedRequestId, originalRequestId);
+      // Only a deliberate new user submit can send the password again.
+      await complete(container);
+      expect(fake.completions, 2);
+      expect(fake.lastRequestId, originalRequestId);
+    });
+
+    test('expired ready response cannot reopen the setup form', () async {
+      final expired = AdminOnboardingReply.fromJson({
+        ...readyJson(),
+        'expires_at': DateTime.now()
+            .toUtc()
+            .subtract(const Duration(minutes: 1))
+            .toIso8601String(),
+      });
+      final fake = SetupFake()..checked = Future.value(expired);
+      final container = containerFor(fake);
+      await inspect(container);
+      await complete(container);
+      await container.read(adminOnboardingProvider.notifier).checkStatus();
+      expect(
+        container.read(adminOnboardingProvider).phase,
+        AdminSetupPhase.resolving,
+      );
+      expect(fake.completions, 1);
+    });
+
+    test('incomplete ready response cannot reopen the setup form', () async {
+      final fake = SetupFake()
+        ..checked = Future.value(
+          const AdminOnboardingReply(AdminOnboardingOutcome.ready),
+        );
+      final container = containerFor(fake);
+      await inspect(container);
+      await complete(container);
+      await container.read(adminOnboardingProvider.notifier).checkStatus();
+      expect(
+        container.read(adminOnboardingProvider).phase,
+        AdminSetupPhase.resolving,
+      );
+      expect(fake.completions, 1);
+    });
+  });
+
   group('commissioning response contract', () {
     test('invitation diagnostics never disclose the value', () {
       expect(

@@ -208,6 +208,18 @@ class AdminOnboardingController extends Notifier<AdminSetupState> {
         phase: AdminSetupPhase.complete,
         outcome: reply.outcome,
       );
+    } else if (reply.outcome == AdminOnboardingOutcome.ready &&
+        reply.mode != null &&
+        reply.privacyVersion != null &&
+        reply.privacyText != null &&
+        reply.expiresAt != null &&
+        reply.expiresAt!.isAfter(DateTime.now().toUtc())) {
+      // Status has positively established that no provisioning is in flight.
+      // Reopen the form, but never resend the password automatically.
+      state = AdminSetupState(
+        phase: AdminSetupPhase.details,
+        invitationDetails: reply,
+      );
     } else if (reply.outcome == AdminOnboardingOutcome.passwordRejected &&
         ready != null) {
       state = AdminSetupState(

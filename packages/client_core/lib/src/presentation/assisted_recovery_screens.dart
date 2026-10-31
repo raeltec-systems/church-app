@@ -1,3 +1,5 @@
+import '../domain/user_management.dart';
+
 import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -421,7 +423,8 @@ class _AccountHelpScreenState extends ConsumerState<AccountHelpScreen> {
 // ---------------------------------------------------------------------------
 
 class RecoveryCasesScreen extends ConsumerStatefulWidget {
-  const RecoveryCasesScreen({super.key});
+  const RecoveryCasesScreen({super.key, this.target});
+  final UserDetail? target;
 
   @override
   ConsumerState<RecoveryCasesScreen> createState() =>
@@ -668,8 +671,22 @@ class _RecoveryCasesScreenState extends ConsumerState<RecoveryCasesScreen> {
           _gap,
         ]);
       }
-      final open = cases.cases.where((x) => x.isOpen).toList();
-      final closed = cases.cases.where((x) => !x.isOpen).toList();
+      final open = cases.cases
+          .where(
+            (x) =>
+                x.isOpen &&
+                (widget.target == null ||
+                    x.memberId == widget.target!.member.id),
+          )
+          .toList();
+      final closed = cases.cases
+          .where(
+            (x) =>
+                !x.isOpen &&
+                (widget.target == null ||
+                    x.memberId == widget.target!.member.id),
+          )
+          .toList();
       children.addAll([
         Semantics(
           header: true,
@@ -890,7 +907,19 @@ class _RecoveryCasesScreenState extends ConsumerState<RecoveryCasesScreen> {
   }
 
   List<Widget> _openCaseForm(BuildContext context, RecoveryCasesState s) {
-    final picked = _picked;
+    final target = widget.target;
+    if (target != null &&
+        (target.ownRecord ||
+            target.member.membership != 'approved' ||
+            target.member.deletionPending ||
+            target.member.record.account == AccountStanding.noLogin)) {
+      return const [
+        Text(
+          'This record is not eligible for assisted account recovery. Return to the person to review their membership and account state.',
+        ),
+      ];
+    }
+    final picked = target?.member.record ?? _picked;
     final search = s.search;
     final canOpen =
         picked != null && _openCheck != null && _evidence.isNotEmpty && !s.busy;
@@ -900,53 +929,55 @@ class _RecoveryCasesScreenState extends ConsumerState<RecoveryCasesScreen> {
         child: Text('Open a recovery case', style: ChurchType.cardTitle),
       ),
       const SizedBox(height: 8),
-      Row(
-        children: [
-          Expanded(
-            child: RevealOnFocus(
-              child: TextField(
-                key: const Key('recovery-search-field'),
-                controller: _query,
-                onSubmitted: (_) => _ctl.searchMembers(_query.text),
-                decoration: const InputDecoration(
-                  labelText: 'Find a member by name or contact number',
+      if (target == null) ...[
+        Row(
+          children: [
+            Expanded(
+              child: RevealOnFocus(
+                child: TextField(
+                  key: const Key('recovery-search-field'),
+                  controller: _query,
+                  onSubmitted: (_) => _ctl.searchMembers(_query.text),
+                  decoration: const InputDecoration(
+                    labelText: 'Find a member by name or contact number',
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          FocusRing(
-            child: OutlinedButton(
-              key: const Key('recovery-search'),
-              onPressed: s.searching
-                  ? null
-                  : () => _ctl.searchMembers(_query.text),
-              child: const Text('Search'),
+            const SizedBox(width: 8),
+            FocusRing(
+              child: OutlinedButton(
+                key: const Key('recovery-search'),
+                onPressed: s.searching
+                    ? null
+                    : () => _ctl.searchMembers(_query.text),
+                child: const Text('Search'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (search is AccessReadOk<List<MemberRecord>>) ...[
+          if (search.value.isEmpty)
+            const Text('No member found.', key: Key('recovery-search-empty')),
+          RadioGroup<String>(
+            groupValue: picked?.memberId,
+            onChanged: (v) => setState(
+              () => _picked = search.value.firstWhere((m) => m.memberId == v),
+            ),
+            child: Column(
+              children: [
+                for (final m in search.value)
+                  RadioListTile<String>(
+                    key: Key('recovery-pick-${m.memberId}'),
+                    value: m.memberId,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(m.displayName),
+                  ),
+              ],
             ),
           ),
         ],
-      ),
-      const SizedBox(height: 8),
-      if (search is AccessReadOk<List<MemberRecord>>) ...[
-        if (search.value.isEmpty)
-          const Text('No member found.', key: Key('recovery-search-empty')),
-        RadioGroup<String>(
-          groupValue: picked?.memberId,
-          onChanged: (v) => setState(
-            () => _picked = search.value.firstWhere((m) => m.memberId == v),
-          ),
-          child: Column(
-            children: [
-              for (final m in search.value)
-                RadioListTile<String>(
-                  key: Key('recovery-pick-${m.memberId}'),
-                  value: m.memberId,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(m.displayName),
-                ),
-            ],
-          ),
-        ),
       ],
       if (picked != null) ...[
         const SizedBox(height: 8),

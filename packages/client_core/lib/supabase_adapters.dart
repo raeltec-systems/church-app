@@ -34,3 +34,5 @@ export 'src/adapters/supabase_review_repository.dart';
 export 'src/adapters/supabase_session_repository.dart';
 
 export 'src/adapters/supabase_admin_onboarding_repository.dart';
+
+export 'src/adapters/supabase_user_management_repository.dart';

@@ -97,15 +97,11 @@ void main() {
     expect(find.byType(MembershipReviewScreen), findsNothing);
   });
 
-  testWidgets('default directory enters the real member table section', (
+  testWidgets('default directory enters the all-status management table', (
     tester,
   ) async {
     await pump(tester);
-    final screen = tester.widget<MembershipReviewScreen>(
-      find.byType(MembershipReviewScreen),
-    );
-    expect(screen.initialSection, MembershipReviewSection.members);
-    expect(screen.showSectionSelector, isFalse);
+    expect(find.byType(UserDirectoryScreen), findsOneWidget);
     expect(find.byKey(const Key('review-sections')), findsNothing);
     expect(find.byKey(const Key('member-query')), findsOneWidget);
     expect(find.byKey(const Key('add-member-record')), findsOneWidget);
@@ -159,7 +155,7 @@ void main() {
     tester,
   ) async {
     final h = await pump(tester);
-    expect(find.byType(MembershipReviewScreen), findsOneWidget);
+    expect(find.byType(UserDirectoryScreen), findsOneWidget);
     h.grants.myAccess = AccessReadOk(syntheticGrants(roles: [], revision: 2));
     final context = tester.element(find.byType(UserManagementScreen));
     final container = ProviderScope.containerOf(context, listen: false);

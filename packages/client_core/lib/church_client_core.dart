@@ -117,3 +117,7 @@ export 'src/domain/admin_onboarding.dart';
 export 'src/application/admin_onboarding_controllers.dart';
 export 'src/presentation/admin_onboarding_screen.dart';
 export 'src/presentation/user_management_screen.dart';
+
+export 'src/domain/user_management.dart';
+export 'src/application/user_management_controllers.dart';
+export 'src/presentation/user_directory_screen.dart';

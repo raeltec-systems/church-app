@@ -22,10 +22,12 @@ class MembershipReviewScreen extends ConsumerStatefulWidget {
     super.key,
     this.initialSection = MembershipReviewSection.applications,
     this.showSectionSelector = true,
+    this.initialAddMember = false,
   });
 
   final MembershipReviewSection initialSection;
   final bool showSectionSelector;
+  final bool initialAddMember;
 
   @override
   ConsumerState<MembershipReviewScreen> createState() =>
@@ -184,7 +186,10 @@ class _MembershipReviewScreenState
             s,
             ctl,
           ),
-          MembershipReviewSection.members => _MembersSection(state: s),
+          MembershipReviewSection.members => _MembersSection(
+            state: s,
+            initiallyAdding: widget.initialAddMember,
+          ),
           MembershipReviewSection.reclaim => _ReclaimSection(state: s),
         },
       ]);
@@ -941,8 +946,9 @@ class _ApplicationCardState extends ConsumerState<_ApplicationCard> {
 
 /// All members (with and without a login), add a record, unlink.
 class _MembersSection extends ConsumerStatefulWidget {
-  const _MembersSection({required this.state});
+  const _MembersSection({required this.state, this.initiallyAdding = false});
   final ReviewState state;
+  final bool initiallyAdding;
 
   @override
   ConsumerState<_MembersSection> createState() => _MembersSectionState();
@@ -955,7 +961,7 @@ class _MembersSectionState extends ConsumerState<_MembersSection> {
   final _holder = TextEditingController();
   ConsentBasis? _consent;
   ContactOwner _owner = ContactOwner.member;
-  bool _adding = false;
+  late bool _adding = widget.initiallyAdding;
   String? _nameError;
   String? _phoneError;
   String? _consentError;

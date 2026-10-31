@@ -456,6 +456,12 @@ GoRouter buildClientRouter({
           state,
           UserManagementScreen(
             area: UserManagementArea.parse(state.uri.queryParameters['view']),
+            memberId:
+                RegExp(
+                  r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+                ).hasMatch(state.uri.queryParameters['member'] ?? '')
+                ? state.uri.queryParameters['member']
+                : null,
           ),
         ),
       ),

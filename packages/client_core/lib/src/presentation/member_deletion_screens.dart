@@ -1,3 +1,5 @@
+import '../domain/user_management.dart';
+
 import 'package:church_design_system/church_design_system.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -282,7 +284,8 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
 /// or a deactivated membership) after an identity check. Staff never see a
 /// password, a contact detail or any care or finance content.
 class MemberDeletionScreen extends ConsumerStatefulWidget {
-  const MemberDeletionScreen({super.key});
+  const MemberDeletionScreen({super.key, this.target});
+  final UserDetail? target;
 
   @override
   ConsumerState<MemberDeletionScreen> createState() =>
@@ -381,12 +384,19 @@ class _MemberDeletionScreenState extends ConsumerState<MemberDeletionScreen> {
           ),
         )
         ..add(const SizedBox(height: 8));
-      if (o.deletions.isEmpty) {
+      if (o.deletions
+          .where(
+            (d) =>
+                widget.target == null || d.memberId == widget.target!.member.id,
+          )
+          .isEmpty) {
         children.add(
           const Text('No member is being deleted.', key: Key('deletions-none')),
         );
       }
-      for (final d in o.deletions) {
+      for (final d in o.deletions.where(
+        (d) => widget.target == null || d.memberId == widget.target!.member.id,
+      )) {
         children.addAll([_deletion(context, d), const SizedBox(height: 12)]);
       }
       children
@@ -401,7 +411,9 @@ class _MemberDeletionScreenState extends ConsumerState<MemberDeletionScreen> {
           ),
         )
         ..add(const SizedBox(height: 8));
-      for (final m in o.deactivated) {
+      for (final m in o.deactivated.where(
+        (m) => widget.target == null || m.memberId == widget.target!.member.id,
+      )) {
         children.addAll([
           _target(
             context,
@@ -596,6 +608,24 @@ class _MemberDeletionScreenState extends ConsumerState<MemberDeletionScreen> {
   }
 
   List<Widget> _find(BuildContext context, MemberDeletionAdminState s) {
+    final target = widget.target;
+    if (target != null) {
+      final m = target.member;
+      if (m.deletionPending || m.membership == 'deactivated') return const [];
+      return [
+        _target(
+          context,
+          key: 'selected-${m.id}',
+          memberId: m.id,
+          name: m.record.displayName,
+          revision: m.record.revision,
+          account: m.record.account,
+          own: target.ownRecord,
+          synthetic: m.record.isSynthetic,
+          busy: s.busy,
+        ),
+      ];
+    }
     final found = s.search;
     return [
       const SizedBox(height: 8),

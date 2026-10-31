@@ -4,6 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../application/access_controllers.dart';
+import '../application/user_management_controllers.dart';
+import 'user_directory_screen.dart';
+import 'user_target_workspace.dart';
+import '../domain/user_management.dart';
 import '../application/assisted_recovery_controllers.dart';
 import '../application/credential_controllers.dart';
 import '../application/member_deletion_controllers.dart';
@@ -20,13 +24,17 @@ import 'membership_lifecycle_screen.dart';
 import 'membership_review_screen.dart';
 import 'recovery_screens.dart';
 
-/// These areas use the existing Identity reads and commands. The future
-/// all-status directory/activity projection is not simulated by this workspace.
+/// All areas use current-authority Identity reads and commands.
 enum UserManagementArea {
   members(
     'members',
     'Members',
-    'Search approved members, inspect roles and manage account access.',
+    'Search membership/account states, inspect roles and manage access.',
+  ),
+  addMember(
+    'add-member',
+    'Add member record',
+    'Record an agreed member without creating a login.',
   ),
   applications(
     'applications',
@@ -76,8 +84,13 @@ enum UserManagementArea {
 
   static UserManagementArea parse(String? value) =>
       values.where((area) => area.path == value).firstOrNull ?? members;
-  String get location =>
-      Uri(path: '/admin/users', queryParameters: {'view': path}).toString();
+  bool get supportsPerson =>
+      ![addMember, applications, usernames].contains(this);
+  String get location => locationFor(null);
+  String locationFor(String? memberId) => Uri(
+    path: '/admin/users',
+    queryParameters: {'view': path, 'member': ?memberId},
+  ).toString();
 }
 
 /// One entry for real membership/access workflows. Only the selected work
@@ -86,8 +99,10 @@ class UserManagementScreen extends ConsumerWidget {
   const UserManagementScreen({
     super.key,
     this.area = UserManagementArea.members,
+    this.memberId,
   });
   final UserManagementArea area;
+  final String? memberId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -97,6 +112,7 @@ class UserManagementScreen extends ConsumerWidget {
           next.grants?.isAdmin != true) {
         // Drop previously read people/cases when current authority ends.
         // Each area must fetch again if Admin access is restored later.
+        ref.invalidate(userManagementProvider);
         ref.invalidate(membershipReviewProvider);
         ref.invalidate(grantAdminProvider);
         ref.invalidate(credentialReviewProvider);
@@ -114,6 +130,49 @@ class UserManagementScreen extends ConsumerWidget {
     final signedOut = ref.watch(
       accountProvider.select((s) => s.accountId == null),
     );
+    final unsettled =
+        canManage &&
+        switch (area) {
+          UserManagementArea.members || UserManagementArea.roles
+              when memberId != null =>
+            ref.watch(userManagementProvider.select((s) => s.unsettled)),
+          UserManagementArea.members => ref.watch(
+            userManagementProvider.select((s) => s.unsettled),
+          ),
+          UserManagementArea.roles => ref.watch(
+            grantAdminProvider.select((s) => s.busy || s.unconfirmed != null),
+          ),
+          UserManagementArea.accessReviews => ref.watch(
+            credentialReviewProvider.select(
+              (s) => s.busy || s.unconfirmed != null,
+            ),
+          ),
+          UserManagementArea.recoveryEmails => ref.watch(
+            recoveryEmailReviewProvider.select(
+              (s) => s.busy || s.unconfirmed != null,
+            ),
+          ),
+          UserManagementArea.recovery => ref.watch(
+            recoveryCasesProvider.select(
+              (s) => s.busy || s.unconfirmed != null,
+            ),
+          ),
+          UserManagementArea.membership => ref.watch(
+            membershipLifecycleProvider.select(
+              (s) => s.busy || s.unconfirmed != null,
+            ),
+          ),
+          UserManagementArea.deletions => ref.watch(
+            memberDeletionAdminProvider.select(
+              (s) => s.busy || s.unconfirmed != null,
+            ),
+          ),
+          _ => ref.watch(
+            membershipReviewProvider.select(
+              (s) => s.busy || s.unconfirmed != null,
+            ),
+          ),
+        };
     final body = canManage
         ? Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -141,40 +200,39 @@ class UserManagementScreen extends ConsumerWidget {
                           child: Text(value.label),
                         ),
                     ],
-                    onChanged: (value) {
-                      if (value != null && value != area) {
-                        context.go(value.location);
-                      }
-                    },
+                    onChanged: unsettled
+                        ? null
+                        : (value) {
+                            if (value != null && value != area) {
+                              context.go(
+                                value.locationFor(
+                                  value.supportsPerson ? memberId : null,
+                                ),
+                              );
+                            }
+                          },
                   ),
                 ),
               ),
               Expanded(
                 child: KeyedSubtree(
                   key: ValueKey('users-$generation-${area.path}'),
-                  child: switch (area) {
-                    UserManagementArea.members => const MembershipReviewScreen(
-                      initialSection: MembershipReviewSection.members,
-                      showSectionSelector: false,
-                    ),
-                    UserManagementArea.applications =>
-                      const MembershipReviewScreen(showSectionSelector: false),
-                    UserManagementArea.roles => const GrantAdminScreen(),
-                    UserManagementArea.accessReviews =>
-                      const CredentialReviewScreen(),
-                    UserManagementArea.recoveryEmails =>
-                      const RecoveryEmailReviewScreen(),
-                    UserManagementArea.recovery => const RecoveryCasesScreen(),
-                    UserManagementArea.membership =>
-                      const MembershipLifecycleScreen(),
-                    UserManagementArea.deletions =>
-                      const MemberDeletionScreen(),
-                    UserManagementArea.usernames =>
-                      const MembershipReviewScreen(
-                        initialSection: MembershipReviewSection.reclaim,
-                        showSectionSelector: false,
-                      ),
-                  },
+                  child:
+                      memberId != null &&
+                          area.supportsPerson &&
+                          area != UserManagementArea.members &&
+                          area != UserManagementArea.roles
+                      ? UserTargetWorkspace(
+                          key: ValueKey('target-${area.path}-$memberId'),
+                          memberId: memberId!,
+                          area: area.path,
+                          back: () => context.go(
+                            UserManagementArea.members.locationFor(memberId),
+                          ),
+                          showEveryone: () => context.go(area.location),
+                          builder: (target) => _area(context, target),
+                        )
+                      : _area(context, null),
                 ),
               ),
             ],
@@ -227,4 +285,36 @@ class UserManagementScreen extends ConsumerWidget {
       body: body,
     );
   }
+
+  Widget _area(BuildContext context, UserDetail? target) => switch (area) {
+    UserManagementArea.members => _directory(context),
+    UserManagementArea.roles when memberId != null => _directory(context),
+    UserManagementArea.roles => const GrantAdminScreen(),
+    UserManagementArea.addMember => const MembershipReviewScreen(
+      initialSection: MembershipReviewSection.members,
+      showSectionSelector: false,
+      initialAddMember: true,
+    ),
+    UserManagementArea.applications => const MembershipReviewScreen(
+      showSectionSelector: false,
+    ),
+    UserManagementArea.accessReviews => CredentialReviewScreen(target: target),
+    UserManagementArea.recoveryEmails => RecoveryEmailReviewScreen(
+      targetMemberId: target?.member.id,
+    ),
+    UserManagementArea.recovery => RecoveryCasesScreen(target: target),
+    UserManagementArea.membership => MembershipLifecycleScreen(target: target),
+    UserManagementArea.deletions => MemberDeletionScreen(target: target),
+    UserManagementArea.usernames => const MembershipReviewScreen(
+      initialSection: MembershipReviewSection.reclaim,
+      showSectionSelector: false,
+    ),
+  };
+  Widget _directory(BuildContext context) => UserDirectoryScreen(
+    memberId: memberId,
+    selectLocation: (id) =>
+        context.go(UserManagementArea.members.locationFor(id)),
+    openArea: (view, id) =>
+        context.go(UserManagementArea.parse(view).locationFor(id)),
+  );
 }

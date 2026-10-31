@@ -15,6 +15,7 @@ import 'src/application/calendar_overlay_controllers.dart'
     show cellCalendarRepositoryProvider;
 import 'src/application/providers.dart';
 import 'src/application/admin_onboarding_controllers.dart';
+import 'src/application/user_management_controllers.dart';
 import 'src/application/search_controllers.dart'
     show contentSearchRepositoryProvider;
 import 'src/domain/notification_settings.dart';
@@ -106,6 +107,9 @@ Future<List<Override>> compositionOverrides(
     ),
     membershipRepositoryProvider.overrideWithValue(
       SupabaseMembershipRepository(client),
+    ),
+    userManagementRepositoryProvider.overrideWithValue(
+      SupabaseUserManagementRepository(client),
     ),
     reviewRepositoryProvider.overrideWithValue(
       SupabaseReviewRepository(client),

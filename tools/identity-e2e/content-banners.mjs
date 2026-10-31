@@ -25,6 +25,7 @@
 // Everything it created (rows and Storage objects) is removed.
 //
 // Usage: node tools/identity-e2e/content-banners.mjs [--evidence <file.jsonl>]
+import { removeLocalEdgeRuntime } from '../auth-harness/local-target.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { deflateSync } from 'node:zlib';
@@ -531,7 +532,7 @@ async function main() {
         try { process.kill(-serve.pid, 'SIGINT'); } catch { /* gone */ }
       }
       await sleep(2000);
-      try { execFileSync('docker', ['rm', '-f', 'supabase_edge_runtime_church-app'], { stdio: 'ignore' }); } catch { /* not running */ }
+      try { removeLocalEdgeRuntime(); } catch { /* not running */ }
     }
     if (marked) {
       psql(`delete from app.platform_environment where set_by = 'content-banners-e2e';

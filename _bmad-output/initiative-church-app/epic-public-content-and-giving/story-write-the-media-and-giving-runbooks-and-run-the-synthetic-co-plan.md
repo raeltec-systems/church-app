@@ -59,3 +59,11 @@ context:
 - Run the BMAD ticket status/find tools and validate edited TOML/reference paths. Scan new evidence for credentials and personal data; inspect `git diff --check` and the final branch diff.
 - Cross-check every current runbook assertion against later code/evidence. Verify applied-row history read-only before any further action; a stale paragraph does not authorise replay.
 - Independently review the changes against this intent and the user's handoff. Do not turn source review, widget tests, old hosted CI, or written device instructions into claims of a witnessed normal-app/device pilot.
+
+## Continuation 31 October 2026: executable acceptance preparation
+
+Israel asked to finish 6.15 and 6.17. Resumed the installed rendered oneshot workflow on a clean separate worktree at `a0c842c48fe96f19e3b52a5a77fd85af2ea58215`; the existing baseline and frozen intent remain unchanged. The original checkout has extensive unrelated deletions and a running shared local Supabase project, so neither is reset or reused.
+
+Investigation found an execution-safety defect in the test tooling: identity HTTP tests used the current CLI project but SQL selected the default or first database container; smoke and restore helpers similarly selected the first container. A separate project/port alone was unsafe. The bounded correction binds HTTP, SQL and owned Edge cleanup to the configured project, validated local Docker transport, exact labels/network/ports and immutable container IDs. Default legacy origin checks stay strict. The application, SQL migrations, permission model and approved design are unchanged.
+
+Node 22 and Flutter 3.47.6 are required. Isolated local integration runs are engineering evidence, not staging or owner/device acceptance. The current host exposes Chrome/Edge/Windows only, not an Android or iOS device. Independent review for these changes has not run; subagents are unavailable. Results, configuration deltas and exact tested commits will be recorded separately, without changing hitl completion status.

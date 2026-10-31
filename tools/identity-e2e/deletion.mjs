@@ -26,6 +26,7 @@
 // append-only); the run's credential is revoked and its principal disabled.
 //
 // Usage: node tools/identity-e2e/deletion.mjs [--evidence <file.jsonl>]
+import { removeLocalEdgeRuntime } from '../auth-harness/local-target.mjs';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -649,7 +650,7 @@ async function main() {
     try { process.kill(-serve.pid, 'SIGINT'); } catch { /* already gone */ }
     await sleep(3000);
     try { process.kill(-serve.pid, 'SIGKILL'); } catch { /* already gone */ }
-    try { execFileSync('docker', ['rm', '-f', 'supabase_edge_runtime_church-app'], { stdio: 'ignore' }); } catch { /* not running */ }
+    try { removeLocalEdgeRuntime(); } catch { /* not running */ }
     if (isolated) spawnSync('docker', ['rm', '-f', ISOLATED]);
     rmSync(work, { recursive: true, force: true });
     psql(`select app.sys_revoke_credential('${credentialId}', '${OPERATOR}'); select app.sys_disable_principal('${principal}', '${OPERATOR}');`);

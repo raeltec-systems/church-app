@@ -146,6 +146,10 @@ export async function executeOperator(opts,ports,{load=readPrivateJson,save=writ
     save(file,{...stored,invitation_id:issued.invitation_id,expires_at:issued.expires_at},{replace:true});
     return {...operatorSummary(issued),outcome:'issued',private_invitation_file:file};
   }
+  if(stored && opts['--invitation-id']) {
+    const expected=stored.invitation_id ?? (await ports.query(operatorSql(environment,'lookup',{invitation:stored.invitation})))?.invitation_id;
+    if(expected!==opts['--invitation-id'])throw new Error('state_invitation_mismatch');
+  }
   let invitationId=opts['--invitation-id']??stored?.invitation_id??null;
   if(!invitationId && stored) {
     const known=await ports.query(operatorSql(environment,'lookup',{invitation:stored.invitation}));

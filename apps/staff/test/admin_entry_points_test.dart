@@ -80,6 +80,25 @@ void main() {
     h.grants.roster = AccessReadOk(
       syntheticRoster(memberId: person, name: 'SYNTHETIC Ruth Mwale'),
     );
+    final managed = ManagedMember.fromJson(
+      managedMemberData(
+        id: person,
+        name: 'SYNTHETIC Ruth Mwale',
+        account: 'app_account',
+      ),
+    );
+    h.users.page = AccessReadOk(
+      UserDirectoryPage(
+        members: [managed],
+        roles: const [
+          RoleOption('admin', available: true),
+          RoleOption('media', available: true),
+        ],
+      ),
+    );
+    h.users.details[person] = AccessReadOk(
+      UserDetail(managed, ownRecord: false),
+    );
     await tester.pumpWidget(
       ProviderScope(
         overrides: h.overrides(),
@@ -151,18 +170,20 @@ void main() {
       await tester.tap(find.byKey(const Key('nav-${ClientPaths.adminUsers}')));
       await settle(tester);
       expect(find.byType(UserManagementScreen), findsOneWidget);
-      await tester.tap(find.byKey(const Key('member-record-$person')));
+      await tester.tap(find.byKey(const Key('user-row-$person')));
       await settle(tester);
-      expect(find.byKey(const Key('member-panel')), findsOneWidget);
+      expect(find.byKey(const Key('user-detail-$person')), findsOneWidget);
       await capture(tester, 'users-selected-person');
-      final role = find
-          .descendant(
-            of: find.byKey(const Key('member-panel-role-media')),
-            matching: find.byType(InkWell),
-          )
-          .first;
+      final role = find.byKey(const Key('user-role-media'));
       await tester.ensureVisible(role);
       await tester.tap(role);
+      await settle(tester);
+      // Confirm the exact person and consequence before granting a role.
+      expect(
+        find.text('Grant Media for SYNTHETIC Ruth Mwale?'),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Grant role'));
       await settle(tester);
       final sent = h.gateway.sent.single;
       expect(sent.function, 'identity_grant_command');
@@ -184,7 +205,7 @@ void main() {
         find.byKey(const Key('nav-${ClientPaths.adminUsers}')),
         findsNothing,
       );
-      expect(find.byKey(const Key('member-record-$person')), findsNothing);
+      expect(find.byKey(const Key('user-row-$person')), findsNothing);
       expect(find.text('Admin access required'), findsOneWidget);
     },
   );

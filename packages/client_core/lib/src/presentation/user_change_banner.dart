@@ -16,8 +16,7 @@ String userChangeMessage(UserManagementState s) {
     UserChangeNotice.invalid =>
       'Nothing changed. Check the name, contact details and consent choice.',
     UserChangeNotice.refused =>
-      s.fieldErrors.values.contains('last_admin') ||
-              s.fieldErrors['role'] == 'unsupported'
+      s.fieldErrors.values.contains('last_admin')
           ? 'The last usable Admin cannot be removed. Another eligible Admin must be available first.'
           : 'The server refused this change. Check the person\'s current state and the required identity or approval steps.',
     UserChangeNotice.unknown => 'The outcome is not confirmed. Check the same request before making another change.',

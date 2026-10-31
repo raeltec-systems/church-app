@@ -6,7 +6,7 @@ This runbook covers the new commissioning service and user-management APIs. It i
 
 The two scenarios use the actual locally served `identity-admin-onboarding` Edge Function, the purpose-bound system command, PostgreSQL, GoTrue and the ordinary authenticated APIs. Public registration is disabled. `new` commissions an absent account; `existing` explicitly binds an existing account and authenticates its current password without resetting it. Each scenario races two HTTP submissions, verifies one member/account/link/Admin, signs in normally, exercises member creation, profile correction, replay, conflict, directory filtering, activity projection and permission denials, and checks service logs for setup-secret leakage.
 
-A transaction-scoped pgTAP completion test separately checks purpose isolation, refusal of user-editable provider correlation, single-grant completion, session revocation, held-account replay refusal and enrollment-data erasure. The ordinary user-management schema tests are not a substitute for its unimplemented staff UI.
+A transaction-scoped pgTAP completion test separately checks purpose isolation, refusal of user-editable provider correlation, single-grant completion, session revocation, held-account replay refusal and enrollment-data erasure. The user-management directory, profile editor, activity and target-specific support screens are implemented; database tests are not a substitute for their normal-interface walkthrough.
 
 ## Required isolation
 
@@ -48,16 +48,35 @@ Each scenario removes only its own Edge process/container, removes its temporary
 
 Keep Supabase `start` and `status -o env` output private: they can contain local credentials. Share only the redacted JSONL evidence and test summaries after scanning them. Do not share passwords, invitation values, access/refresh tokens, function environment files or raw Auth responses.
 
+## Operator recovery and normal browser rehearsals
+
+Run the operator rehearsal **sequentially** after the ordinary HTTP scenarios, with a fresh disposable database and phone sign-in enabled:
+
+```powershell
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/admin-onboarding-operations.mjs --evidence "$env:TEMP\church-admin-owner-evidence\operator.jsonl"
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+This drives the actual restricted CLI and GoTrue create/delete endpoints. A lost provider response is deliberately injected at the reservation boundary, not mistaken for a real network outage. It checks revocation, same-state retries, absent/present orphan reconciliation, late-call refusal, unknown deletion, preservation of an existing account and private evidence. Each run resets only its checked disposable database.
+
+The optional rendered browser harness requires a **staff web build configured for this exact local API and publishable key**, Chrome and Playwright already installed in a separate tooling directory. It does not install dependencies or deploy anything:
+
+```powershell
+$env:CHURCH_PLAYWRIGHT_MODULE = '<absolute path to the installed playwright module>'
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/admin-onboarding-browser.mjs --web-root '<absolute path to the matching apps/staff/build/web>' --evidence "$env:TEMP\church-admin-owner-evidence\browser\results.jsonl"
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+Use the recorded evidence ledger for exact source and tool versions. Do not treat an authored or partially completed harness as a passing scenario. A browser result establishes only the actions it actually exercised; full multi-account role/hold/restoration and device-owner acceptance remain separate. Run a single database/browser harness at a time and wait for its cleanup before starting another.
+
 ## What remains before real enrollment
 
-The normal first-Admin wizard exists, and these tests exercise its actual server protocol, but an authenticated browser/device walkthrough is still required. The following are implementation gaps, not test-environment limitations:
+The implementation includes the restricted operator CLI, guarded reconciliation/expiry/orphan cleanup, and normal filtered directory/profile/contact/activity/support UI. Read [operator instructions](admin-onboarding-operations.md) and [owner walkthrough](admin-onboarding-user-management-walkthrough.md).
 
-- The complete secure operator CLI for issuing, revoking and inspecting invitations.
-- Controlled reconciliation and orphan cleanup when provider creation remains uncertain with no account visible; safe expiry/unclaimed-invitation cleanup. The current code intentionally prevents unsafe reissue rather than claiming recovery is finished.
-- The new filtered directory, profile/contact editor and activity view in the normal Users & access screen, plus selected-person continuity through recovery/lifecycle queues. The current workspace still reuses the older screens.
-
-Full new-path deletion/restore coverage, independent security review and owner acceptance remain open. A passing historical restore suite does not establish that every new enrollment scenario has been restored and reconciled.
+Independent security review, complete new-path restore/deletion acceptance, any tool-blocked multi-account browser checks and the owner pilot remain open. Passing existing restore regression does not establish every new enrollment recovery scenario. Do not weaken privacy or permission checks to turn an unverified case into a pass.
 
 Real enrollment requires the appropriate approved personal-data notice and privacy policy, environment-specific system credentials and origin configuration, and candidate-specific deployment approval. Setup does not approve these itself. Private access can remain activation-pending after enrollment. Losing the last usable Admin never reopens first-time setup.
 
-No production or staging deployment follows automatically from this runbook, a passing CI run, or a passing local rehearsal. Keep PR #8 draft until the approved scope and required review are complete.
+No production or staging deployment follows automatically from this runbook, a passing CI run, or a passing local rehearsal. Keep PR #8 draft until the required independent review and release prerequisites are complete.

@@ -1700,7 +1700,7 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     expect(find.byType(UserManagementScreen), findsOneWidget);
-    expect(find.byKey(const Key('review-reload')), findsOneWidget);
+    expect(find.byKey(const Key('users-reload')), findsOneWidget);
     // Focus stays on the selected tab after keyboard navigation.
     expect(navLabel(), 'Users & access');
   });

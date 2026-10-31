@@ -58,8 +58,19 @@ insert into app.identity_members(member_id,display_name,membership_state,is_synt
 select throws_ok($$insert into app.identity_account_links(member_id,auth_user_id,approved_phone,approved_by)
  values('00000000-0000-4000-8000-000000031898',(select (j->>'auth_user_id')::uuid from v where k='reservation'),'+447700900818','pgtap')$$,
  '42501',null,'quarantined orphan cannot acquire member history between prepare and Auth deletion');
+insert into auth.audit_log_entries(id,instance_id,payload,created_at,ip_address)
+select gen_random_uuid(),'00000000-0000-0000-0000-000000000000',
+  jsonb_build_object('traits',jsonb_build_object('user_id',j->>'auth_user_id','user_phone','SYNTHETIC-CONTACT')),clock_timestamp(),''
+from v where k='reservation';
+insert into auth.audit_log_entries(id,instance_id,payload,created_at,ip_address)
+values('00000000-0000-4000-8000-000000031896','00000000-0000-0000-0000-000000000000',
+  '{"traits":{"user_id":"00000000-0000-4000-8000-000000031895","user_phone":"SYNTHETIC-UNRELATED"}}',clock_timestamp(),'');
 delete from auth.users where id=(select (j->>'auth_user_id')::uuid from v where k='reservation');
 select is(app.identity_admin_setup_cleanup_finish((select (j->>'invitation_id')::uuid from v where k='invite'),'israel')->>'outcome','cleaned','confirmed Auth absence completes cleanup');
+select ok(not app.identity_deletion_auth_audit_present((select (j->>'auth_user_id')::uuid from v where k='reservation')),
+  'orphan contact-bearing Auth audit rows are erased before the correlation id is discarded');
+select is((select count(*)::int from auth.audit_log_entries where id='00000000-0000-4000-8000-000000031896'),1,
+  'unrelated Auth audit data is preserved');
 select throws_ok($$select pg_temp.insert_provider((select j from v where k='reservation'))$$,'42501',null,'late provider retry cannot recreate an erased orphan');
 rollback to present_provider;
 

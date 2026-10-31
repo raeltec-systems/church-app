@@ -671,7 +671,22 @@ create constraint trigger identity_admin_setup_provider_commit after insert on a
 
 create function app.identity_admin_setup_redact_unclaimed(p_invitation uuid) returns void
 language plpgsql set search_path = '' as $$
+declare i app.identity_admin_setup_invites;
 begin
+  select * into i from app.identity_admin_setup_invites where invitation_id=p_invitation for update;
+  if i.mode='new_account' and i.auth_user_id is not null then
+    -- Auth retains contact-bearing audit records after account deletion. Purge
+    -- only the proven-absent, never-linked setup orphan before losing its id.
+    if exists(select 1 from auth.users where id=i.auth_user_id)
+      or exists(select 1 from app.identity_account_links where auth_user_id=i.auth_user_id)
+      or exists(select 1 from app.identity_deletion_accounts where auth_user_id=i.auth_user_id) then
+      raise exception using errcode='22023',message='setup orphan absence not confirmed';
+    end if;
+    if pg_catalog.to_regclass('auth.audit_log_entries') is not null then
+      execute 'delete from auth.audit_log_entries e where e.payload ->> ''actor_id'' = $1
+        or e.payload -> ''traits'' ->> ''user_id'' = $1' using i.auth_user_id::text;
+    end if;
+  end if;
   update app.identity_admin_setup_invites set state='erased',digest=null,phone_username=null,
     auth_user_id=null,case_reference=null,request_id=null,operation_id=null,correlation_nonce=null,
     full_name=null,privacy_notice_version=null,intent_hash=null,member_id=null,grant_id=null,

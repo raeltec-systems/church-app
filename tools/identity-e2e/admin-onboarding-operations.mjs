@@ -90,6 +90,7 @@ async function main() {
     const deleted=cli('reconcile',b.state);
     must('cli-deletes-only-correlated-orphan-through-real-auth',deleted.exit===0&&deleted.value.outcome==='cleaned'
       &&sql('select count(*) from auth.users;')==='0');
+    must('orphan-auth-audit-personal-data-is-erased',sql(`select app.identity_deletion_auth_audit_present(${q(reserved.auth_user_id)}::uuid);`)==='f');
     const replay=cli('cleanup',b.state);must('cli-cleanup-is-idempotent',replay.exit===0&&replay.value.outcome==='cleaned');
     const lateAgain=await provider(reserved);
     must('real-provider-retry-cannot-recreate-cleaned-orphan',lateAgain.status>=400&&sql('select count(*) from auth.users;')==='0',{http:lateAgain.status});

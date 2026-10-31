@@ -115,3 +115,17 @@ test('status of an interrupted issue uses the prepared digest without minting or
     assert.equal(result.outcome,'not_observed');assert.equal(queries.length,1);assert.ok(queries[0].includes('lookup_digest'));assert.ok(!queries[0].includes(invitation));
   } finally {rmSync(parent,{recursive:true,force:true});}
 });
+
+test('an explicit invitation cannot override the selected private state',async()=>{
+  const parent=mkdtempSync(join(tmpdir(),'church-admin-target-test-'));
+  try {
+    const dir=privateDirectory(join(parent,'private'));
+    writePrivateJson(join(dir,'invitation.json'),{version:1,environment:'local',target:'isolated',request,
+      invitation:mintInvitation('local'),invitation_id:id});
+    let calls=0;
+    const opts=parseArgs(['cleanup','--env','local','--confirm-target','isolated','--state-dir',dir,
+      '--invitation-id','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa']);
+    await assert.rejects(()=>executeOperator(opts,{tag:'isolated',query:async()=>{calls++;return {};}}),/state_invitation_mismatch/);
+    assert.equal(calls,0);
+  } finally {rmSync(parent,{recursive:true,force:true});}
+});

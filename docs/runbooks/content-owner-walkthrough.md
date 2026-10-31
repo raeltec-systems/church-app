@@ -6,7 +6,9 @@ Prepared 30 October 2026. **This is a runnable acceptance procedure, not a recor
 
 On Windows use Git Bash with Docker Desktop's Linux engine running; on macOS/Linux use Bash and Docker. Android needs an SDK/emulator or a USB-debuggable phone. iOS needs macOS, Xcode and a simulator or provisioned device. Use **Node 22, Flutter 3.47.6 / Dart 3.13.5, and the locked Supabase CLI 2.119.0**. Do not silently use another Flutter version.
 
-Make a dedicated checkout. The local stack uses project ID `church-app` and port 54321; a second checkout does **not** create an independent database. Stop other work using that local stack before resetting it.
+Make a dedicated checkout. By default the stack uses project ID `church-app` and port 54321; a second checkout does **not** create an independent database. Never reset a shared stack. The 31 October continuation used a separate project `church-content-acceptance-20261031`, API 55421 / DB 55422, with all other configured ports changed to unused values. Its exact temporary config delta is in the [continuation evidence](../../_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-acceptance-continuation-2026-10-31/README.md). Restore that configuration intentionally before reproducing its local tests; it is not the tracked default.
+
+The local test helpers now verify the current config, loopback API, Docker project labels, network, mapped ports and exact container ID. Missing or mismatched targets are refused rather than falling back to another running database. The examples below use default port 54321; substitute the deliberately configured port consistently, including emulator/USB forwarding. Keep the local mail service enabled for the full deletion test's email-change fixture.
 
 ```bash
 git clone --branch acceptance/epic-6-reconcile-epic-7-plan https://github.com/raeltec-systems/church-app.git church-app-acceptance
@@ -72,7 +74,7 @@ node tools/identity-e2e/content-retention.mjs --evidence /tmp/church-content-own
 bash tools/auth-harness/scan-evidence.sh /tmp/church-content-owner-evidence
 ```
 
-Expected: RSVP **13/13**, including exactly one winner/four Full responses twice; retention **6/6**, including actual scheduler → worker → Storage removal and retained recent/referenced files. An interruption always requires `node tools/auth-harness/local-phone-auth.mjs off`. These are real integrations; the corresponding `*.test.mjs` files are offline unit tests and cannot replace them. The existing 28 October results remain historical evidence.
+Expected: RSVP **13/13**, including one winner/four Full responses in the first five-client race and one winner/three Full responses in the second four-client race; retention **6/6**, including actual scheduler → worker → Storage removal and retained recent/referenced files. An interruption always requires `node tools/auth-harness/local-phone-auth.mjs off`. These are real integrations; the corresponding `*.test.mjs` files are offline unit tests and cannot replace them. The existing 28 October results remain historical evidence.
 
 ## 3. Start the actual clients
 
@@ -80,7 +82,7 @@ For an isolated local pilot, reset once after the automated suites, then keep th
 
 ```bash
 npx supabase db reset --local
-docker exec -i supabase_db_church-app psql -U postgres -X -v ON_ERROR_STOP=1 <<'SQL'
+docker exec -i "$(node tools/auth-harness/local-target.mjs db)" psql -U postgres -X -v ON_ERROR_STOP=1 <<'SQL'
 do $$ begin
   if app.platform_current_environment() is not null
      and app.platform_current_environment() <> 'local' then
@@ -141,7 +143,7 @@ Use the following coherent dataset in the **disposable local stack**, after the 
 Create each account through the app's phone/password signup, choosing private test passwords and leaving optional email blank. Bootstrap **only the first local Admin** after her Auth account exists; stop before submitting her membership application:
 
 ```bash
-docker exec -i supabase_db_church-app psql -U postgres -X -v ON_ERROR_STOP=1 <<'SQL'
+docker exec -i "$(node tools/auth-harness/local-target.mjs db)" psql -U postgres -X -v ON_ERROR_STOP=1 <<'SQL'
 do $$ begin
   if app.platform_current_environment() is distinct from 'local' then
     raise exception 'Expected local';
@@ -159,7 +161,7 @@ Sign Grace out and back in after the trust-epoch margin (more than five seconds)
 For the local positive giving-verification case only, age Peter's fictional Admin grant after Grace grants it. This is fixture preparation already used by the local giving runner, not an operational tenure override:
 
 ```bash
-docker exec -i supabase_db_church-app psql -U postgres -X -v ON_ERROR_STOP=1 <<'SQL'
+docker exec -i "$(node tools/auth-harness/local-target.mjs db)" psql -U postgres -X -v ON_ERROR_STOP=1 <<'SQL'
 begin;
 do $$ begin
   if app.platform_current_environment() is distinct from 'local' then
@@ -250,6 +252,18 @@ All rows below start **authored only**. Fill a result and evidence reference for
 | Revoked/held/stale private session | Public remains public | Current private predicate governs; cached authority is insufficient | Current grants govern | Current grant governs | Current Admin grant governs |
 
 ## 6. Real sermon-from-duty contention gate
+
+The actual database/HTTP concurrency check now has a runnable local driver. It uses independent transactions, verifies actual advisory-lock waiters, and exercises reassignment, cancellation, revoked scope and duplicate sends. It changes no application function to manufacture the race. Run before persistent pilot fixtures; keep phone auth enabled only for the run:
+
+```bash
+node tools/auth-harness/local-phone-auth.mjs on
+node tools/identity-e2e/content-sermon-duty-drafts.mjs --contention \
+  --evidence /tmp/church-content-owner-evidence/sermon-lock.jsonl
+node tools/auth-harness/local-phone-auth.mjs off
+```
+
+Expected: **13/13**, including four `DL11`-`DL14` real-contention checks and zero remaining fixture users/items. If interrupted, still turn the local phone switch off. This proves the backend race; it does not replace the normal-UI two-session walkthrough below or the owner's device sign-off.
+
 
 The pgTAP stale-first-read wrapper is useful, but it does not demonstrate two live sessions waiting on a lock. This remains **unverified** until the following controlled local exercise is witnessed. It is not a proven product defect.
 

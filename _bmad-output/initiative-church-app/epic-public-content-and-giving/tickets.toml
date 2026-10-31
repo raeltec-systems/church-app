@@ -255,6 +255,6 @@ covers = ["K1", "K2", "K3", "K4", "K5", "K6", "K7", "K8", "K9", "K10", "K11", "K
 after = [15, 16, "5.12"]
 hitl = true
 risk = "high"
-unknown = "Production requires prior Duties/Cells promotion (5.12 after 4.15), witnessed entry 15/17 evidence, an explicit owner promotion decision and Q3/Q5 approved for their uses or visibly fail-closed. The observed two-version staging history drift needs separately reviewed owner-authorized remediation; remaining unverified checks and the giving store-review caution stay visible; this entry remains open until its evidence and approval are recorded."
+unknown = "Production requires prior Duties/Cells promotion (5.12 after 4.15), witnessed entry 15/17 evidence, an explicit owner promotion decision and Q3/Q5 approved for their uses or visibly fail-closed. The two-version staging migration-history blocker was verified closed on 31 October 2026 (acceptance-update-2026-10-31.md); broader deployed parity, remaining unverified checks and the giving store-review caution stay visible; this entry remains open until its evidence and approval are recorded."
 references = ["_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#launch-checks", "_bmad-output/initiative-church-app/spec-church-app/acceptance-map.md#verification-boundaries", "docs/runbooks/environments-and-promotion.md", "docs/runbooks/production-promotion-cells.md"]
 external_check = "An independent reviewer reruns the public-read, file, giving and duty-link cases before promotion, and Israel approves the `q3_giving` and `q5_content_rights` values."

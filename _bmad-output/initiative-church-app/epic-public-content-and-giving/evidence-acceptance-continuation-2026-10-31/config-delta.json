@@ -1,0 +1,10 @@
+{
+  "original_sha256": "d4153291d54e446c42f4e5c33f3b93344f340c67a82a088c368327e59fa803da",
+  "isolated_sha256": "64f766d8431d5b633bd2af1660396b90ccfc5710c3d27cdd6827e0ef3a4484a2",
+  "project": "church-content-acceptance-20261031",
+  "api_port": 55421,
+  "db_port": 55422,
+  "purpose": "disposable synthetic local acceptance; original church-app project untouched",
+  "final_isolated_sha256": "37eddcbf0105b05e913b0796ab25e3f7ce21ebbe30a58ea3358ae50f0fc40796",
+  "final_representation": "Original isolated configuration with CRLF converted to LF during test-fixture normalization; no other differences."
+}

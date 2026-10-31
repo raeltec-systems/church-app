@@ -67,3 +67,21 @@ Israel asked to finish 6.15 and 6.17. Resumed the installed rendered oneshot wor
 Investigation found an execution-safety defect in the test tooling: identity HTTP tests used the current CLI project but SQL selected the default or first database container; smoke and restore helpers similarly selected the first container. A separate project/port alone was unsafe. The bounded correction binds HTTP, SQL and owned Edge cleanup to the configured project, validated local Docker transport, exact labels/network/ports and immutable container IDs. Default legacy origin checks stay strict. The application, SQL migrations, permission model and approved design are unchanged.
 
 Node 22 and Flutter 3.47.6 are required. Isolated local integration runs are engineering evidence, not staging or owner/device acceptance. The current host exposes Chrome/Edge/Windows only, not an Android or iOS device. Independent review for these changes has not run; subagents are unavailable. Results, configuration deltas and exact tested commits will be recorded separately, without changing hitl completion status.
+
+### Continuation evidence disposition
+
+See [the 31 October executable validation package](evidence-acceptance-continuation-2026-10-31/README.md). The local target-selection defect is fixed, actual G1/G2 and four PostgreSQL lock races were executed, and the full deletion runner was made runnable on Windows. All initial failures and follow-up results remain separately recorded. No application UI, design primitive, SQL migration or permission policy was altered. The older quick-review entries above are historical; independent review of this continuation has not run. The rendered BMAD review paused at its step-1 confirmation checkpoint. Neither this preparation nor unit/API evidence closes the human-owned pilot or promotion story.
+
+### Resumed verification and publication checkpoint
+
+The renderer was run through the installed wrapper, and tickets were resolved
+with the explicit initiative folder because no local active initiative is set.
+Recovered run evidence is preserved with its actual source checkpoints, not
+relabelled as a new execution. Native Android debug compilation and artifact
+hash are recorded, without an installation, push, staging-pilot or release claim.
+The only additional code change in this resumed segment is
+`tools/auth-harness/scan-evidence.test.mjs`: decoded filesystem paths and explicit
+Git Bash selection fix the observed Windows launcher failures, including paths
+with spaces, while abnormal launch exits now fail the security assertions.
+The scan policy is unchanged. Broader suite results and the independent-review
+handoff remain distinct from historical quick-review metadata above.

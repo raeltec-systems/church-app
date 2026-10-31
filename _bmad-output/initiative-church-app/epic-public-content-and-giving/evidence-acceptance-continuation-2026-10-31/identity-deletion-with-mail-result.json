@@ -1,0 +1,10 @@
+{
+    "head":  "8ed2387e67564469c4e6ddb04773f752e3c5e1a7",
+    "exit":  1,
+    "mail_service":  "local mailpit only",
+    "result":  "run-failed",
+    "finished_at_utc":  "2026-10-31T08:28:16.1517346Z",
+    "target":  "church-content-acceptance-20261031",
+    "command":  "node tools/identity-e2e/deletion.mjs --evidence \u003cprivate-output\u003e/identity-deletion-with-mail.jsonl",
+    "started_at_utc":  "2026-10-31T08:28:06.9281604Z"
+}

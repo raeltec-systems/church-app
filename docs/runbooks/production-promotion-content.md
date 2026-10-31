@@ -14,7 +14,11 @@ The owner promotes epic 6 himself, with the same promote workflow as the earlier
 
 Related: [content.md](content.md), [contracts-and-owner-seams.md](contracts-and-owner-seams.md). Staging evidence: `_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-6.*/`.
 
-## Fresh staging inspection and open history drift
+## Current checkpoint: 31 October continuation
+
+The narrow staging history mismatch below is now **closed**, not awaiting another repair: see [acceptance-update-2026-10-31.md](../../_bmad-output/initiative-church-app/epic-public-content-and-giving/acceptance-update-2026-10-31.md). Do not replay the two migrations. New local database, RSVP, retention and actual sermon-lock evidence is in the [continuation package](../../_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-acceptance-continuation-2026-10-31/README.md). The owner walkthrough, known functionality dispositions, staging parity and production prerequisites remain separate gates. No promotion is approved or performed by this update.
+
+## Historical 30 October staging inspection: history drift later repaired
 
 [Read-only evidence](../../_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-reconciliation-2026-10-30/staging-read-only.json), observed **30 October 2026, 21:48:59 Africa/Lusaka (19:48:59 UTC)**, confirms project `bic-kafue-platform-test` / `tmurpotfluignacfueki`:
 

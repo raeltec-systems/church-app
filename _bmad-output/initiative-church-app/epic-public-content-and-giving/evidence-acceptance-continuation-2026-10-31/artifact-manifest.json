@@ -1,0 +1,212 @@
+[
+    {
+        "file":  "G1-rsvp.jsonl",
+        "original_sha256":  "02b6a537e1dfbef8507042874a32d9679afcfd248d3ec21247e8dcb2a9dfbe41",
+        "published_sha256":  "02b6a537e1dfbef8507042874a32d9679afcfd248d3ec21247e8dcb2a9dfbe41",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "file":  "G2-retention.jsonl",
+        "original_sha256":  "bdf0c1f27f9d6dab93be706a510fb24cbff53320ed2ed68f25f5d9c0ddcb4ecd",
+        "published_sha256":  "bdf0c1f27f9d6dab93be706a510fb24cbff53320ed2ed68f25f5d9c0ddcb4ecd",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "file":  "sermon-lock.jsonl",
+        "original_sha256":  "07b0a7a4405150e8b1a36605a2316e32ec77011320a726789d5439e5f91612f3",
+        "published_sha256":  "07b0a7a4405150e8b1a36605a2316e32ec77011320a726789d5439e5f91612f3",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "file":  "sermon-lock-retry.jsonl",
+        "original_sha256":  "88ae96eb3b09b0b96e8915bf499d16d7d87fe09d8eebe523aa7c463338b77c80",
+        "published_sha256":  "88ae96eb3b09b0b96e8915bf499d16d7d87fe09d8eebe523aa7c463338b77c80",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "file":  "identity-deletion-retry.jsonl",
+        "original_sha256":  "6d149c65af6595a05470bdb028212c24f4bf7c115bbef8beb78a00f88ac117e4",
+        "published_sha256":  "6d149c65af6595a05470bdb028212c24f4bf7c115bbef8beb78a00f88ac117e4",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "file":  "contracts-vm-lf-retry-result.json",
+        "original_sha256":  "befa025e5f3c1f5ef20b6395dfe301b892b6c077a27cf2e7f90eb8b9edff05bf",
+        "published_sha256":  "befa025e5f3c1f5ef20b6395dfe301b892b6c077a27cf2e7f90eb8b9edff05bf",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "file":  "offline-retry-result.json",
+        "original_sha256":  "29f41fffae83160fea0b26ea9642cdbb9c79fbeaf9669196ce23ec1446f0921a",
+        "published_sha256":  "29f41fffae83160fea0b26ea9642cdbb9c79fbeaf9669196ce23ec1446f0921a",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "file":  "flutter-ledger.jsonl",
+        "original_sha256":  "38b1f8f0634f65a750bf556f94337c8c7a06dce7d1f3c947fa04e808cce4bd82",
+        "published_sha256":  "b80f1514cc7c7e0b3bccd1b23080897dd6d8be0f37067c3da3f60d0ab03b4615",
+        "representation":  "private output paths replaced; all observations and results retained"
+    },
+    {
+        "file":  "integration-ledger.jsonl",
+        "original_sha256":  "d9851e4f21a094cccbe5dd8aeb790c9ce30fac47213a6b12ce55b82fdab7559e",
+        "published_sha256":  "976928439fd7c4db9b7c73c7ddfcb0ae3cfbc6abcb1a66140ef9827478cd3fb2",
+        "representation":  "private output paths replaced; all observations and results retained"
+    },
+    {
+        "private_log":  "pgTAP.log",
+        "bytes":  8831,
+        "sha256":  "409c06972a271b6793a1744303a58e1df2acffd242a04e65ee7c7b1595029c91",
+        "published":  false
+    },
+    {
+        "private_log":  "offline-full.log",
+        "bytes":  84370,
+        "sha256":  "fed305d54b69a0e46e7c517f44953e7705c15a943d2dd29d26140f6f95b6a688",
+        "published":  false
+    },
+    {
+        "private_log":  "policy-full.log",
+        "bytes":  12490,
+        "sha256":  "839f4c95e71d296bf5ae4d948c45b10a0300af54a0ffcd8d104585fb0b824cce",
+        "published":  false
+    },
+    {
+        "private_log":  "offline-retry.log",
+        "bytes":  84180,
+        "sha256":  "38084593c6f420f5e85075d10911003d3064e53d3d9da0a060be813cad88a83e",
+        "published":  false
+    },
+    {
+        "private_log":  "policy-retry.log",
+        "bytes":  11931,
+        "sha256":  "14a5539688da5cf43aa8318d5bb35d78d299145b8fca930c8db766a1a7c811cf",
+        "published":  false
+    },
+    {
+        "private_log":  "identity-deletion.log",
+        "bytes":  726,
+        "sha256":  "d82ddf427a0857babe12b87107c652f8f90ec758b74f3f244acbf9bc4fad3f58",
+        "published":  false
+    },
+    {
+        "private_log":  "identity-deletion-retry.log",
+        "bytes":  4996,
+        "sha256":  "82497a35f8516a8855adbd0a121546308f380e029c57e448d94d1a580429b3c8",
+        "published":  false
+    },
+    {
+        "private_log":  "packages-contracts-dart-dart-test.log",
+        "bytes":  140551,
+        "sha256":  "d350a9459412f2c0360784efc63d7c69ae2d76248d384d9b5d67fbcca8272335",
+        "published":  false
+    },
+    {
+        "private_log":  "contracts-vm-lf-retry.log",
+        "bytes":  24949,
+        "sha256":  "ffbb46bef3389047ab82d49bc0f6e1bec6e4af3cadbb3320d8ad184e7eb48f8b",
+        "published":  false
+    },
+    {
+        "private_log":  "staff-local-web-build.log",
+        "bytes":  2226,
+        "sha256":  "6a83452be80351b7746094826cd8a35e3fe2b8c3704a473f27800144b0a4feb0",
+        "published":  false
+    },
+    {
+        "private_log":  "local-target-pinned-node22.log",
+        "bytes":  9800,
+        "sha256":  "2ed2d93856db5e8008fc11e34deb09a8c356f697a05a99a42634f5a68e30093e",
+        "published":  false
+    },
+    {
+        "file":  "identity-deletion-result.json",
+        "original_sha256":  "01672cb9fe1bcf5aa4a54322c00d263b7d5b7126d800987462aba34908e1647b",
+        "published_sha256":  "01672cb9fe1bcf5aa4a54322c00d263b7d5b7126d800987462aba34908e1647b",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "file":  "identity-deletion-retry-result.json",
+        "original_sha256":  "2eac88a757b307ad408e926e6a2ec4bd88d623206fd104e913ae534a42df8f4e",
+        "published_sha256":  "2eac88a757b307ad408e926e6a2ec4bd88d623206fd104e913ae534a42df8f4e",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "file":  "identity-deletion-with-mail.jsonl",
+        "original_sha256":  "cf8538756975348260277ae3e39f7d8ca626603f65da73079325be971626dc06",
+        "published_sha256":  "cf8538756975348260277ae3e39f7d8ca626603f65da73079325be971626dc06",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "file":  "identity-deletion-with-mail-result.json",
+        "original_sha256":  "520b8d23ddde05295a21923c1abd0b5a6bf09607a7d1bd50701476049b8d659b",
+        "published_sha256":  "520b8d23ddde05295a21923c1abd0b5a6bf09607a7d1bd50701476049b8d659b",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "file":  "identity-deletion-with-mail-stable.jsonl",
+        "original_sha256":  "7077a2dc038518035342033b279a828303df47d641cf4ddb64f9140dbb7cc49e",
+        "published_sha256":  "7077a2dc038518035342033b279a828303df47d641cf4ddb64f9140dbb7cc49e",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "file":  "identity-deletion-with-mail-stable-result.json",
+        "original_sha256":  "904161883607f458a2a14362542528860c0bfbc9c1328cddb92a93d27ed04a62",
+        "published_sha256":  "904161883607f458a2a14362542528860c0bfbc9c1328cddb92a93d27ed04a62",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "file":  "ci-engineering-head.json",
+        "original_sha256":  "9d853488991ddffa9b2fae0be7887a210aef1d89703db0820fdc98962b4ba7c8",
+        "published_sha256":  "9d853488991ddffa9b2fae0be7887a210aef1d89703db0820fdc98962b4ba7c8",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "file":  "ci-engineering-jobs.json",
+        "original_sha256":  "f52a8bcac9b0a973696c49dcef4615a2719825d71f0e5a74f95bf9ef8633550c",
+        "published_sha256":  "f52a8bcac9b0a973696c49dcef4615a2719825d71f0e5a74f95bf9ef8633550c",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "file":  "cleanup-result.json",
+        "original_sha256":  "c66f83874ba8962805412b86b2b9b1dd6647a633c1883591f24490b997a50c0a",
+        "published_sha256":  "c66f83874ba8962805412b86b2b9b1dd6647a633c1883591f24490b997a50c0a",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "file":  "config-delta.json",
+        "original_sha256":  "882f76274b4460b70c6d448e37a47a7c81471ac50b05a8e67f1b85f074ec9982",
+        "published_sha256":  "882f76274b4460b70c6d448e37a47a7c81471ac50b05a8e67f1b85f074ec9982",
+        "representation":  "UTF-8 LF; JSON content preserved"
+    },
+    {
+        "private_log":  "identity-deletion-with-mail.log",
+        "bytes":  451,
+        "sha256":  "1e7e7e33c6740ef2424d827701dcd6431deb820cc9e28854183990191084f9c4",
+        "published":  false
+    },
+    {
+        "private_log":  "identity-deletion-with-mail-stable.log",
+        "bytes":  4953,
+        "sha256":  "98eb63990cda23716174a99719003a8dcddbcc131807ac2936094680abb2eb99",
+        "published":  false
+    },
+    {
+        "private_log":  "flutter-doctor.log",
+        "bytes":  2273,
+        "sha256":  "b2e11c1a63bb191a7a07fe8645cfee559b4831700d99b6452ffac13fc13c97b6",
+        "published":  false
+    },
+    {
+        "representation":  "UTF-8 LF with trailing terminal display padding removed; observations preserved",
+        "original_sha256":  "ff52a097160490ec3e0fcf46cc1297db6a4250b6a867c552673c0d85c212ae0c",
+        "file":  "android-debug-build.log",
+        "published_sha256":  "edffac8fd299d4817269fbc9c482c8351d532b854d84e7e1ed7fa23de934034e"
+    },
+    {
+        "representation":  "Copied original sanitized build result",
+        "original_sha256":  "8140538f7781d3ffe1354772683ded240e50d9f0668963da808367beb1556faa",
+        "file":  "android-debug-build-result.json",
+        "published_sha256":  "8140538f7781d3ffe1354772683ded240e50d9f0668963da808367beb1556faa"
+    }
+]

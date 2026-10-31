@@ -564,8 +564,9 @@ begin
     or i.environment<>app.platform_current_environment()
     or not app.identity_admin_setup_operator_active(i.issued_by)
     or v_notice->>'version' is distinct from i.privacy_notice_version
-    or new.raw_app_meta_data->>'church_setup_operation' is distinct from i.operation_id::text
-    or new.raw_app_meta_data->>'church_setup_nonce' is distinct from i.correlation_nonce::text
+    or ((coalesce(new.raw_app_meta_data,'{}'::jsonb) ?| array['church_setup_operation','church_setup_nonce'])
+      and (new.raw_app_meta_data->>'church_setup_operation' is distinct from i.operation_id::text
+        or new.raw_app_meta_data->>'church_setup_nonce' is distinct from i.correlation_nonce::text))
     or '+'||ltrim(new.phone,'+') is distinct from i.phone_username then
     raise exception using errcode='42501',message='setup account creation refused';
   end if;
@@ -600,14 +601,41 @@ create trigger identity_admin_setup_link_fence before insert or update of auth_u
 -- use the pre-existing credential/binding review workflow instead of this fence.
 create function app.identity_admin_setup_auth_update_guard() returns trigger
 language plpgsql security definer set search_path = '' as $$
-declare i app.identity_admin_setup_invites;
+declare i app.identity_admin_setup_invites; v_closed boolean; v_notice jsonb;
+  v_changed boolean;
 begin
+  v_changed := old.raw_app_meta_data->>'church_setup_operation' is distinct from new.raw_app_meta_data->>'church_setup_operation'
+    or old.raw_app_meta_data->>'church_setup_nonce' is distinct from new.raw_app_meta_data->>'church_setup_nonce';
+  if v_changed and coalesce(new.raw_app_meta_data,'{}'::jsonb) ?| array['church_setup_operation','church_setup_nonce'] then
+    -- GoTrue creates its provider scaffold first and adds app_metadata in the
+    -- SAME transaction. Validate that second write, including late calls after
+    -- cleanup has erased the invitation's account identifier.
+    perform 1 from app.identity_roles where role='admin' for update;
+    select commissioned_at is not null into v_closed
+      from app.identity_admin_commissioning where singleton for update;
+    select * into i from app.identity_admin_setup_invites
+      where mode='new_account' and auth_user_id=new.id for update;
+    v_notice:=app.identity_admin_setup_notice(i.is_synthetic);
+    if i.invitation_id is null or v_notice is null or v_closed or i.state<>'provisioning'
+      or i.cleanup_started_at is not null or i.expires_at<=clock_timestamp()
+      or i.environment<>app.platform_current_environment()
+      or not app.identity_admin_setup_operator_active(i.issued_by)
+      or v_notice->>'version' is distinct from i.privacy_notice_version
+      or old.id is distinct from new.id or old.phone is distinct from new.phone
+      or new.raw_app_meta_data->>'church_setup_operation' is distinct from i.operation_id::text
+      or new.raw_app_meta_data->>'church_setup_nonce' is distinct from i.correlation_nonce::text
+      or '+'||ltrim(new.phone,'+') is distinct from i.phone_username then
+      raise exception using errcode='42501',message='setup provider metadata refused';
+    end if;
+    -- Only the initial empty-to-valid provider metadata transition is allowed.
+    if not (coalesce(old.raw_app_meta_data,'{}'::jsonb) ?| array['church_setup_operation','church_setup_nonce']) then
+      return new;
+    end if;
+  end if;
   select * into i from app.identity_admin_setup_invites
     where mode='new_account' and auth_user_id=old.id;
-  if found and i.state<>'completed' and (
-    old.id is distinct from new.id or old.phone is distinct from new.phone
-    or old.raw_app_meta_data->>'church_setup_operation' is distinct from new.raw_app_meta_data->>'church_setup_operation'
-    or old.raw_app_meta_data->>'church_setup_nonce' is distinct from new.raw_app_meta_data->>'church_setup_nonce') then
+  if found and i.state<>'completed' and (old.id is distinct from new.id
+    or old.phone is distinct from new.phone or v_changed) then
     raise exception using errcode='42501',message='unclaimed setup account changes refused';
   end if;
   return new;
@@ -615,6 +643,31 @@ end;
 $$;
 create trigger identity_admin_setup_provider_correlation before update of id,phone,raw_app_meta_data
   on auth.users for each row execute function app.identity_admin_setup_auth_update_guard();
+
+-- A provisional Auth insert is never allowed to COMMIT without server-owned
+-- correlation. Inspect the final row, not the earlier INSERT trigger snapshot.
+-- This models GoTrue's actual atomic insert-then-update account creation.
+create function app.identity_admin_setup_auth_commit_guard() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare u auth.users; i app.identity_admin_setup_invites;
+begin
+  select * into u from auth.users where id=new.id;
+  if not found then return null; end if;
+  select * into i from app.identity_admin_setup_invites where mode='new_account' and auth_user_id=u.id;
+  if i.invitation_id is null and not (coalesce(u.raw_app_meta_data,'{}'::jsonb)
+      ?| array['church_setup_operation','church_setup_nonce']) then return null; end if;
+  if i.invitation_id is null or i.state<>'provisioning' or i.cleanup_started_at is not null
+    or i.expires_at<=clock_timestamp() or i.environment<>app.platform_current_environment()
+    or u.raw_app_meta_data->>'church_setup_operation' is distinct from i.operation_id::text
+    or u.raw_app_meta_data->>'church_setup_nonce' is distinct from i.correlation_nonce::text
+    or '+'||ltrim(u.phone,'+') is distinct from i.phone_username then
+    raise exception using errcode='42501',message='setup provider transaction incomplete';
+  end if;
+  return null;
+end;
+$$;
+create constraint trigger identity_admin_setup_provider_commit after insert on auth.users
+  deferrable initially deferred for each row execute function app.identity_admin_setup_auth_commit_guard();
 
 create function app.identity_admin_setup_redact_unclaimed(p_invitation uuid) returns void
 language plpgsql set search_path = '' as $$

@@ -83,6 +83,7 @@ rollback to expiry;
 savepoint completed;
 insert into v values('invite',pg_temp.issue('a')),('reservation',pg_temp.reserve());
 select pg_temp.insert_provider((select j from v where k='reservation'));
+set constraints auth.identity_admin_setup_provider_commit immediate;
 select is(pg_temp.call('finish',jsonb_build_object('operation_id',(select j->>'operation_id' from v where k='reservation'),'provider_result','observed'))->>'outcome','completed','normal commissioning still completes behind the insertion/link fences');
 update app.identity_admin_setup_invites set issued_at=clock_timestamp()-interval '2 hours',expires_at=clock_timestamp()-interval '1 minute';
 select is(app.identity_admin_setup_cleanup_prepare((select (j->>'invitation_id')::uuid from v where k='invite'),'israel')->>'outcome','completed','completed setup only discards expired temporary authority');

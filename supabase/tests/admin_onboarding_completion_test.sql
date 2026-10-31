@@ -43,15 +43,19 @@ select ok(not exists(select 1 from app.sys_receipts r
   'system receipts retain no provisioning nonce or private response');
 insert into setup_ids select 'account',(v->'data'->>'auth_user_id')::uuid from setup_results where k='begin';
 -- User-editable metadata is rejected before Auth can insert the reserved account.
-select throws_ok($test$
+create function pg_temp.untrusted_provider() returns void language plpgsql as $test$
+begin
 insert into auth.users(id,instance_id,aud,role,phone,phone_confirmed_at,encrypted_password,
   raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
 select (v->'data'->>'auth_user_id')::uuid,'00000000-0000-0000-0000-000000000000','authenticated','authenticated',
   '447700900818',clock_timestamp(),'SYNTHETIC-NOT-A-PASSWORD-HASH','{}'::jsonb,
   jsonb_build_object('church_setup_operation',v->'data'->>'operation_id',
     'church_setup_nonce',v->'data'->>'correlation_nonce'),clock_timestamp(),clock_timestamp()
-from setup_results where k='begin'
-$test$,'42501',null,'user-editable metadata cannot authorize provider creation');
+from setup_results where k='begin';
+set constraints auth.identity_admin_setup_provider_commit immediate;
+end;
+$test$;
+select throws_ok($$select pg_temp.untrusted_provider()$$,'42501',null,'user-editable metadata cannot authorize provider creation');
 select is((select count(*)::int from auth.users),0,'untrusted correlation creates no Auth account');
 select is((select count(*)::int from app.identity_grants where role='admin'),0,'untrusted provider correlation grants nothing');
 -- A legitimate server-owned correlation still completes the original reservation.
@@ -62,6 +66,7 @@ select (v->'data'->>'auth_user_id')::uuid,'00000000-0000-0000-0000-000000000000'
   jsonb_build_object('church_setup_operation',v->'data'->>'operation_id',
     'church_setup_nonce',v->'data'->>'correlation_nonce'),'{}'::jsonb,clock_timestamp(),clock_timestamp()
 from setup_results where k='begin';
+set constraints auth.identity_admin_setup_provider_commit immediate;
 insert into auth.sessions(id,user_id,aal,created_at)
   values('b1111111-1111-4111-8111-111111111111',(select v from setup_ids where k='account'),'aal1',clock_timestamp());
 insert into setup_results values('complete',pg_temp.setup('status',

@@ -218,7 +218,9 @@ async function main() {
       secrets.every(s=>!responses.join('\n').includes(s) && !allLogs.join('\n').includes(s)),{});
   } catch(error) {
     const code=typeof error?.code==='string' && /^[A-Z_]+$/.test(error.code) ? error.code : null;
-    check('scenario-completed',false,{phase,error_code:code});
+    const safeCode=value=>typeof value==='string' && /^[A-Za-z0-9_]+$/.test(value) ? value : null;
+    check('scenario-completed',false,{phase,error_code:code,
+      error_name:safeCode(error?.name),cause_code:safeCode(error?.cause?.code)});
     throw error;
   } finally {
     if(serve && serve.exitCode===null && serve.signalCode===null) {

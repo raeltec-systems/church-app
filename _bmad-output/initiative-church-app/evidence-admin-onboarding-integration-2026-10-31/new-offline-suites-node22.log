@@ -1,0 +1,328 @@
+TAP version 13
+# Subtest: valid inspect, complete and status requests parse
+ok 1 - valid inspect, complete and status requests parse
+  ---
+  duration_ms: 2.3508
+  type: 'test'
+  ...
+# Subtest: parse refuses version
+ok 2 - parse refuses version
+  ---
+  duration_ms: 0.1619
+  type: 'test'
+  ...
+# Subtest: parse refuses action
+ok 3 - parse refuses action
+  ---
+  duration_ms: 0.1333
+  type: 'test'
+  ...
+# Subtest: parse refuses wrong environment
+ok 4 - parse refuses wrong environment
+  ---
+  duration_ms: 0.0967
+  type: 'test'
+  ...
+# Subtest: parse refuses short invitation
+ok 5 - parse refuses short invitation
+  ---
+  duration_ms: 0.1544
+  type: 'test'
+  ...
+# Subtest: parse refuses unnormalized phone
+ok 6 - parse refuses unnormalized phone
+  ---
+  duration_ms: 0.1614
+  type: 'test'
+  ...
+# Subtest: parse refuses forged account
+ok 7 - parse refuses forged account
+  ---
+  duration_ms: 0.1742
+  type: 'test'
+  ...
+# Subtest: parse refuses forged role
+ok 8 - parse refuses forged role
+  ---
+  duration_ms: 0.0763
+  type: 'test'
+  ...
+# Subtest: parse refuses forged metadata
+ok 9 - parse refuses forged metadata
+  ---
+  duration_ms: 0.2929
+  type: 'test'
+  ...
+# Subtest: complete refuses missing consent
+ok 10 - complete refuses missing consent
+  ---
+  duration_ms: 0.4462
+  type: 'test'
+  ...
+# Subtest: complete refuses invalid request id
+ok 11 - complete refuses invalid request id
+  ---
+  duration_ms: 0.1377
+  type: 'test'
+  ...
+# Subtest: complete refuses control name
+ok 12 - complete refuses control name
+  ---
+  duration_ms: 0.1048
+  type: 'test'
+  ...
+# Subtest: complete refuses empty name
+ok 13 - complete refuses empty name
+  ---
+  duration_ms: 0.0635
+  type: 'test'
+  ...
+# Subtest: complete refuses missing notice
+ok 14 - complete refuses missing notice
+  ---
+  duration_ms: 0.1209
+  type: 'test'
+  ...
+# Subtest: complete refuses short password
+ok 15 - complete refuses short password
+  ---
+  duration_ms: 0.0553
+  type: 'test'
+  ...
+# Subtest: complete refuses oversized password
+ok 16 - complete refuses oversized password
+  ---
+  duration_ms: 0.045
+  type: 'test'
+  ...
+# Subtest: complete refuses utf8 password truncation
+ok 17 - complete refuses utf8 password truncation
+  ---
+  duration_ms: 0.0554
+  type: 'test'
+  ...
+# Subtest: oversized and malformed JSON are refused
+ok 18 - oversized and malformed JSON are refused
+  ---
+  duration_ms: 0.1474
+  type: 'test'
+  ...
+# Subtest: status cannot carry password or overwrite profile
+ok 19 - status cannot carry password or overwrite profile
+  ---
+  duration_ms: 0.0888
+  type: 'test'
+  ...
+# Subtest: prototype-named keys are rejected
+ok 20 - prototype-named keys are rejected
+  ---
+  duration_ms: 0.0637
+  type: 'test'
+  ...
+# Subtest: public responses strip internal ids, credentials and metadata
+ok 21 - public responses strip internal ids, credentials and metadata
+  ---
+  duration_ms: 0.1641
+  type: 'test'
+  ...
+# Subtest: ready response is explicit and bounded
+ok 22 - ready response is explicit and bounded
+  ---
+  duration_ms: 0.2907
+  type: 'test'
+  ...
+# Subtest: success cannot mint a session or silently activate private access
+ok 23 - success cannot mint a session or silently activate private access
+  ---
+  duration_ms: 0.1016
+  type: 'test'
+  ...
+# Subtest: provider undefined stays unknown
+ok 24 - provider undefined stays unknown
+  ---
+  duration_ms: 0.0841
+  type: 'test'
+  ...
+# Subtest: provider 408 stays unknown
+ok 25 - provider 408 stays unknown
+  ---
+  duration_ms: 0.0346
+  type: 'test'
+  ...
+# Subtest: provider 429 stays unknown
+ok 26 - provider 429 stays unknown
+  ---
+  duration_ms: 0.0306
+  type: 'test'
+  ...
+# Subtest: provider 500 stays unknown
+ok 27 - provider 500 stays unknown
+  ---
+  duration_ms: 0.0354
+  type: 'test'
+  ...
+# Subtest: provider 502 stays unknown
+ok 28 - provider 502 stays unknown
+  ---
+  duration_ms: 0.0297
+  type: 'test'
+  ...
+# Subtest: provider 503 stays unknown
+ok 29 - provider 503 stays unknown
+  ---
+  duration_ms: 0.0302
+  type: 'test'
+  ...
+# Subtest: provider distinguishes definitive weak password, collision and success
+ok 30 - provider distinguishes definitive weak password, collision and success
+  ---
+  duration_ms: 0.0659
+  type: 'test'
+  ...
+# Subtest: hash is deterministic and not the usable invitation
+ok 31 - hash is deterministic and not the usable invitation
+  ---
+  duration_ms: 17.2604
+  type: 'test'
+  ...
+# Subtest: new-account path creates exactly the server-reserved id and then finalizes
+ok 32 - new-account path creates exactly the server-reserved id and then finalizes
+  ---
+  duration_ms: 1.4089
+  type: 'test'
+  ...
+# Subtest: invalid or revoked invitation never reaches account creation
+ok 33 - invalid or revoked invitation never reaches account creation
+  ---
+  duration_ms: 0.4681
+  type: 'test'
+  ...
+# Subtest: changed notice version prevents account creation
+ok 34 - changed notice version prevents account creation
+  ---
+  duration_ms: 0.5648
+  type: 'test'
+  ...
+# Subtest: duplicate pending request never dispatches another provider creation
+ok 35 - duplicate pending request never dispatches another provider creation
+  ---
+  duration_ms: 0.4795
+  type: 'test'
+  ...
+# Subtest: malformed reservation never becomes account-creation authority
+ok 36 - malformed reservation never becomes account-creation authority
+  ---
+  duration_ms: 0.6203
+  type: 'test'
+  ...
+# Subtest: provider timeout is reconciled without retrying or claiming completion
+ok 37 - provider timeout is reconciled without retrying or claiming completion
+  ---
+  duration_ms: 0.754
+  type: 'test'
+  ...
+# Subtest: lost completion response is uncertain, not success
+ok 38 - lost completion response is uncertain, not success
+  ---
+  duration_ms: 0.6301
+  type: 'test'
+  ...
+# Subtest: status uses the original request and never sends a password or creates a user
+ok 39 - status uses the original request and never sends a password or creates a user
+  ---
+  duration_ms: 0.6098
+  type: 'test'
+  ...
+# Subtest: existing account is authenticated, never created or reset
+ok 40 - existing account is authenticated, never created or reset
+  ---
+  duration_ms: 1.0188
+  type: 'test'
+  ...
+# Subtest: incorrect existing password cannot request a privileged database mutation
+ok 41 - incorrect existing password cannot request a privileged database mutation
+  ---
+  duration_ms: 0.7654
+  type: 'test'
+  ...
+# Subtest: existing proof session is cleaned even when database completion is unavailable
+ok 42 - existing proof session is cleaned even when database completion is unavailable
+  ---
+  duration_ms: 0.9271
+  type: 'test'
+  ...
+# Subtest: expired or malformed private metadata never appears in errors
+ok 43 - expired or malformed private metadata never appears in errors
+  ---
+  duration_ms: 0.6474
+  type: 'test'
+  ...
+# Subtest: commissioning rehearsal accepts only its dedicated local stack
+ok 44 - commissioning rehearsal accepts only its dedicated local stack
+  ---
+  duration_ms: 1.0602
+  type: 'test'
+  ...
+# Subtest: commissioning rehearsal refuses shared project
+ok 45 - commissioning rehearsal refuses shared project
+  ---
+  duration_ms: 0.2735
+  type: 'test'
+  ...
+# Subtest: commissioning rehearsal refuses shared API port
+ok 46 - commissioning rehearsal refuses shared API port
+  ---
+  duration_ms: 0.0977
+  type: 'test'
+  ...
+# Subtest: commissioning rehearsal refuses shared DB port
+ok 47 - commissioning rehearsal refuses shared DB port
+  ---
+  duration_ms: 0.078
+  type: 'test'
+  ...
+# Subtest: commissioning rehearsal refuses hosted URL
+ok 48 - commissioning rehearsal refuses hosted URL
+  ---
+  duration_ms: 1.3879
+  type: 'test'
+  ...
+# Subtest: commissioning rehearsal refuses mismatched local origin
+ok 49 - commissioning rehearsal refuses mismatched local origin
+  ---
+  duration_ms: 0.1088
+  type: 'test'
+  ...
+# Subtest: commissioning rehearsal refuses port collision
+ok 50 - commissioning rehearsal refuses port collision
+  ---
+  duration_ms: 0.1642
+  type: 'test'
+  ...
+# Subtest: commissioning rehearsal refuses invalid port
+ok 51 - commissioning rehearsal refuses invalid port
+  ---
+  duration_ms: 0.0743
+  type: 'test'
+  ...
+# Subtest: commissioning rehearsal refuses nonintegral port
+ok 52 - commissioning rehearsal refuses nonintegral port
+  ---
+  duration_ms: 0.3073
+  type: 'test'
+  ...
+# Subtest: only the rehearsal fictional number range is accepted
+ok 53 - only the rehearsal fictional number range is accepted
+  ---
+  duration_ms: 0.5157
+  type: 'test'
+  ...
+1..53
+# tests 53
+# suites 0
+# pass 53
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 124.2233

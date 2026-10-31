@@ -1,0 +1,9 @@
+Connecting to local database...
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/admin_onboarding_existing_test.sql .... ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/admin_onboarding_completion_test.sql .. ok
+/Users/Administrator/church-admin-final-verification-20261031/supabase/tests/admin_onboarding_test.sql ............. ok
+All tests successful.
+Files=3, Tests=81,  2 wallclock secs ( 0.05 usr  0.02 sys +  0.02 cusr  0.04 csys =  0.13 CPU)
+Result: PASS
+A new version of Supabase CLI is available: v2.122.0 (currently installed v2.119.0)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

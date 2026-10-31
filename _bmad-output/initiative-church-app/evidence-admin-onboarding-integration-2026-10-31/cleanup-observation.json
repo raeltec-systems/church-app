@@ -1,0 +1,7 @@
+{
+  "at": "2026-10-31T14:28:47.520688+00:00",
+  "stop_exit": 0,
+  "dedicated_project_containers_remaining": false,
+  "shared_database_observed": "supabase_db_church-app Up 7 hours (healthy)",
+  "scope": "only the disposable church-admin-backend-20261031 project was stopped; no shared reset or hosted write"
+}

@@ -6,6 +6,7 @@ on:
       - '.github/workflows/history-repair-validation.yml'
       - 'tools/ci/*staging-history-repair.py'
       - 'docs/runbooks/content-staging-history-manual.md'
+      - '_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-history-repair-2026-10-31/**'
 
 permissions:
   contents: read
@@ -39,6 +40,9 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: Generate reviewed manual SQL without database access
         shell: bash
         run: |
@@ -47,6 +51,25 @@ jobs:
           git rev-parse HEAD > "$RUNNER_TEMP/history-repair/head.txt"
           python3 -m py_compile tools/ci/build-staging-history-repair.py tools/ci/test-staging-history-repair.py
           python3 tools/ci/build-staging-history-repair.py --output "$RUNNER_TEMP/history-repair"
+      - name: Verify captured owner history with the strict repository checker
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="_bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-history-repair-2026-10-31/owner-after-migrations.json"
+          cp "$evidence" "$RUNNER_TEMP/history-repair/owner-after-migrations.json"
+          python3 - <<'PY'
+          import json, os, pathlib
+          out = pathlib.Path(os.environ['RUNNER_TEMP']) / 'history-repair'
+          actual = json.loads((out / 'owner-after-migrations.json').read_text())
+          expected = json.loads((out / 'expected-migrations.json').read_text())
+          rows = actual['migrations']
+          assert actual['source_sha256'] == 'd7ebd7e590ba056560473210493236a5b9a815118b605600a0be57afb2a2ec1c'
+          assert actual['migration_count'] == len(rows) == len({r['version'] for r in rows}) == 101
+          assert {r['version']: r['name'] for r in rows} == expected
+          print('Captured owner history: all 101 unique version/name pairs match the reviewed manifest.')
+          print('Scope: dated captured observation, not a live database or application acceptance check.')
+          PY
+          node tools/ci/check-migration-drift.mjs --env staging --hosted-file "$evidence" --require-synced 2>&1 | tee "$RUNNER_TEMP/history-repair/strict-owner-history-drift.log"
       - name: Exercise success, no-op, concurrency and refusal paths locally
         shell: bash
         run: |

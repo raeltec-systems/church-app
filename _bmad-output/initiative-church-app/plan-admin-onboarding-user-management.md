@@ -3,7 +3,7 @@ title: 'First Admin onboarding and user management'
 type: 'feature'
 ticket: ''
 created: '2026-10-31'
-status: 'draft'
+status: 'ready-for-dev'
 baseline_revision: '6f5cfe78afb99f0e572a285ad7421215eb6e978b'
 route: 'full'
 route_source: 'auto'
@@ -16,7 +16,7 @@ context:
   - '{project-root}/docs/runbooks/identity-support.md'
 ---
 
-<frozen-after-approval reason="human-owned intent; locks only after approval">
+<frozen-after-approval reason="human-owned intent; approved 2026-10-31">
 
 ## Intent
 
@@ -42,6 +42,8 @@ context:
 | Search/filter/select/change person | Bounded current data; correct owner commands, revisions and audit. |
 | Stale session, lost connection, conflicting edit | Deny or retry truthfully; clear protected state when access ends. |
 
+**Owner decision (31 October 2026):** Israel approved option A and the full Users & access scope: owner-issued, account-bound, single-use setup invitation, 24-hour expiry, secure manual delivery and revoke/reissue. Implementation may proceed on the feature branch. Hosted activation, policy decisions, deployment and acceptance remain separately controlled.
+
 </frozen-after-approval>
 
 ## Code Map
@@ -65,13 +67,11 @@ Read `admin-onboarding-user-management-audit.md` for inspected source locations.
 - Given concurrent clients or revoked authority, when actions run, then no duplicate privilege or unauthorised detail survives.
 - Given the approved references, when using desktop/narrow layouts and keyboard/text scaling, then the table/detail and error/retry flows remain usable.
 
-## Open Questions
-
-1. Approve **owner-issued, account-bound setup invitation** (recommended: 24-hour expiry, secure manual delivery, revoke/reissue), or retain **operator approval of a pending application**? The former supplies normal onboarding while public signup stays closed. The latter still needs an authorised initial Auth-enrollment step. Neither allows public self-promotion. Record this security choice before coding; activation approvals remain separate.
-
 ## Implementation Notes
 
 Investigation only; new isolated branch, baseline preserved. Full route exceeds 100 lines. BMAD step-02 human checkpoint remains open. No independent review or new feature tests have run. Epic 6/7 statuses remain unchanged.
+
+Approval recorded after rereading the exact plan at ab88f5bb9236ac9157fa7e0aca2c026cf5535110. Prior planning-only notes above remain historical.
 
 ## Plan Change Log
 

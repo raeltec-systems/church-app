@@ -13,6 +13,8 @@ permissions:
 
 jobs:
   planning:
+    # This approval-equality check belongs to the adoption PR, not future story changes.
+    if: github.event.pull_request.number == 7 && github.event.pull_request.head.repo.full_name == github.repository
     name: BMAD configuration, approved breakdown and dependencies
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -25,6 +27,7 @@ jobs:
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
           version: '0.10.0'
+          enable-cache: false
       - name: Resolve the repository BMAD ticket workflow
         shell: bash
         run: |
@@ -70,26 +73,30 @@ jobs:
           result = {'scope': 'Planning structure only; not implementation, acceptance, deployment or database parity.'}
           assert len(baseline['entry']) == 14
           assert [e['id'] for e in baseline['entry']] == list(range(1, 15))
-          result['canonical_present'] = canonical.exists()
-          if canonical.exists():
-              actual = tomllib.loads(canonical.read_text())
-              assert actual == baseline, 'Approved entry content changed; obtain a reviewed scope decision.'
-              status = json.loads((out / 'epic7-status.json').read_text())
-              for key in ('unpinned_after', 'undeclared_after', 'order_conflict'):
-                  assert not status.get(key), f'{key}: {status.get(key)}'
-              assert len(status['tickets']) == 14
-              result['entry_count'] = 14
-              result['states'] = status['counts']
-              result['preexisting_tree_problems'] = status.get('problems', [])
-              refs = [r for e in actual['entry'] for r in e.get('references', [])]
-              for ref in refs:
-                  assert (root / ref.split('#', 1)[0]).is_file(), f'Missing reference: {ref}'
-              result['reference_files_checked'] = len(refs)
-              result['longest_remaining_chain'] = status.get('longest_remaining_chain', [])
-          else:
-              result['result'] = 'Activation recorded; canonical adoption is still pending.'
-          next_state = json.loads((out / 'epic7-next.json').read_text())
-          result['next'] = next_state
+          assert canonical.is_file(), 'Canonical breakdown missing after owner-approved adoption'
+          actual = tomllib.loads(canonical.read_text())
+          assert actual == baseline, 'Approved entry content changed; obtain a reviewed scope decision.'
+          status = json.loads((out / 'epic7-status.json').read_text())
+          for key in ('unpinned_after', 'undeclared_after', 'order_conflict'):
+              assert not status.get(key), f'{key}: {status.get(key)}'
+          assert len(status['tickets']) == 14
+          assert all(t['state'] == 'planned' and not t.get('drift') for t in status['tickets'])
+          expected_problems = {
+              "epic-public-content-and-giving/story-f1-giving-admin-tenure-plan.md: ticket '' names no entry or leaf file in epic-public-content-and-giving; skipped",
+              "epic-public-content-and-giving/story-f2-church-owned-images-plan.md: ticket '' names no entry or leaf file in epic-public-content-and-giving; skipped",
+              "epic-public-content-and-giving/story-f3-delete-unreferenced-uploads-plan.md: ticket '' names no entry or leaf file in epic-public-content-and-giving; skipped",
+          }
+          assert set(status.get('problems', [])) == expected_problems, 'Ticket warnings differ from the reviewed baseline'
+          result['canonical_present'] = True
+          result['entry_count'] = 14
+          result['states'] = status['counts']
+          result['preexisting_tree_problems'] = status.get('problems', [])
+          refs = [r for e in actual['entry'] for r in e.get('references', [])]
+          for ref in refs:
+              assert (root / ref.split('#', 1)[0]).is_file(), f'Missing reference: {ref}'
+          result['reference_files_checked'] = len(refs)
+          result['longest_remaining_chain'] = status.get('longest_remaining_chain', [])
+          result['next'] = json.loads((out / 'epic7-next.json').read_text())
           (out / 'summary.json').write_text(json.dumps(result, indent=2) + '\n')
           print(json.dumps(result, indent=2))
           PY

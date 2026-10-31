@@ -1,0 +1,63 @@
+name: Manual history repair validation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/history-repair-validation.yml'
+      - 'tools/ci/*staging-history-repair.py'
+      - 'docs/runbooks/content-staging-history-manual.md'
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-repair:
+    if: github.event.pull_request.number == 7 && github.event.pull_request.head.repo.full_name == github.repository
+    name: Guarded metadata repair on isolated PostgreSQL fixtures
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: history_repair_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - '127.0.0.1:55432:5432'
+        options: >-
+          --health-cmd "pg_isready -U postgres -d history_repair_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: '127.0.0.1'
+      PGPORT: '55432'
+      PGDATABASE: history_repair_test
+      PGUSER: postgres
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Generate reviewed manual SQL without database access
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/history-repair"
+          git rev-parse HEAD > "$RUNNER_TEMP/history-repair/head.txt"
+          python3 -m py_compile tools/ci/build-staging-history-repair.py tools/ci/test-staging-history-repair.py
+          python3 tools/ci/build-staging-history-repair.py --output "$RUNNER_TEMP/history-repair"
+      - name: Exercise success, no-op, concurrency and refusal paths locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v psql
+          python3 tools/ci/test-staging-history-repair.py --repo-root "$GITHUB_WORKSPACE" --bundle "$RUNNER_TEMP/history-repair" 2>&1 | tee "$RUNNER_TEMP/history-repair/fixture-validation.log"
+      - name: Preserve scripts and exact-head fixture evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: history-repair-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/history-repair/
+          if-no-files-found: error
+          retention-days: 14

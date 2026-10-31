@@ -1,0 +1,36 @@
+{
+  "source": "33e97b2c4443578a0a86a92c02014b5730048bbd",
+  "entriesScanned": 423,
+  "skippedForSize": 0,
+  "findings": [],
+  "native": [
+    {
+      "entry": "lib/arm64-v8a/libapp.so",
+      "bytes": 11600776,
+      "stagingUrlPresent": true,
+      "configuredPublishableKeyPresent": true
+    },
+    {
+      "entry": "lib/armeabi-v7a/libapp.so",
+      "bytes": 12681800,
+      "stagingUrlPresent": true,
+      "configuredPublishableKeyPresent": true
+    },
+    {
+      "entry": "lib/x86_64/libapp.so",
+      "bytes": 11928456,
+      "stagingUrlPresent": true,
+      "configuredPublishableKeyPresent": true
+    }
+  ],
+  "sha256": "948845752c3f853f882853720471e35909dc9cb47c70f07a07aa3b25358603cd",
+  "signatureVerified": true,
+  "signer": "Android Debug (existing development signing key)",
+  "package": "zm.bickafue.bic_kafue_mobile",
+  "versionName": "0.1.0",
+  "versionCode": 2026103101,
+  "minSdk": 24,
+  "targetSdk": 36,
+  "pushConfigured": false,
+  "installedOnDevice": false
+}

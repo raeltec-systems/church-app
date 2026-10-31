@@ -66,6 +66,12 @@ const staffAdminDestination = (
 );
 
 /// Story 2.5: shown while the server's current answer includes Admin.
+const staffUsersDestination = (
+  path: ClientPaths.adminUsers,
+  label: 'Users & access',
+  icon: Icons.manage_accounts_outlined,
+);
+
 const staffMembersDestination = (
   path: ClientPaths.adminMembers,
   label: 'Members',
@@ -292,6 +298,7 @@ List<StaffNavGroup> staffNavGroupsFor(
     (
       label: 'People',
       items: [
+        if (admin) staffUsersDestination,
         if (admin) staffMembersDestination,
         if (supervisesFollowUps(grants)) staffFollowUpSupervisionDestination,
         if (admin) staffFollowUpRoutingDestination,

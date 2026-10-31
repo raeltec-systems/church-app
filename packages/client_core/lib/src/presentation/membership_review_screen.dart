@@ -18,25 +18,38 @@ import 'member_detail_panel.dart';
 /// read and action otherwise. Duplicate candidates are a staff aid: nothing
 /// is linked unless the Admin chooses to.
 class MembershipReviewScreen extends ConsumerStatefulWidget {
-  const MembershipReviewScreen({super.key});
+  const MembershipReviewScreen({
+    super.key,
+    this.initialSection = MembershipReviewSection.applications,
+    this.showSectionSelector = true,
+  });
+
+  final MembershipReviewSection initialSection;
+  final bool showSectionSelector;
 
   @override
   ConsumerState<MembershipReviewScreen> createState() =>
       _MembershipReviewScreenState();
 }
 
-enum _Section { applications, members, reclaim }
+enum MembershipReviewSection { applications, members, reclaim }
 
 class _MembershipReviewScreenState
     extends ConsumerState<MembershipReviewScreen> {
   late final AppLifecycleListener _lifecycle;
   final _noticeFocus = FocusNode(debugLabel: 'review notice');
-  _Section _section = _Section.applications;
+  MembershipReviewSection _section = MembershipReviewSection.applications;
 
   @override
   void initState() {
     super.initState();
+    _section = widget.initialSection;
     _lifecycle = AppLifecycleListener(onResume: _reload);
+    if (_section == MembershipReviewSection.members) {
+      Future.microtask(() {
+        if (mounted) ref.read(membershipReviewProvider.notifier).search(null);
+      });
+    }
     // Revisiting the screen asks the server again.
     if (ref.read(membershipReviewProvider).queueResult != null) {
       Future.microtask(_reload);
@@ -131,36 +144,48 @@ class _MembershipReviewScreenState
       final more = s.queueNext == null ? '' : '+';
       children.addAll([
         // The handoff's segmented track, as wide as its options.
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: RadioSegments<_Section>(
-              key: const Key('review-sections'),
-              label: 'Show',
-              options: [
-                SegmentOption(
-                  _Section.applications,
-                  'Applications (${s.applications.length}$more)',
-                ),
-                const SegmentOption(_Section.members, 'All members'),
-                const SegmentOption(_Section.reclaim, 'Reclaim a username'),
-              ],
-              selected: _section,
-              onChanged: (v) {
-                setState(() => _section = v);
-                if (v == _Section.members && s.searchResult == null) {
-                  ctl.search(null);
-                }
-              },
+        if (widget.showSectionSelector)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: RadioSegments<MembershipReviewSection>(
+                key: const Key('review-sections'),
+                label: 'Show',
+                options: [
+                  SegmentOption(
+                    MembershipReviewSection.applications,
+                    'Applications (${s.applications.length}$more)',
+                  ),
+                  const SegmentOption(
+                    MembershipReviewSection.members,
+                    'All members',
+                  ),
+                  const SegmentOption(
+                    MembershipReviewSection.reclaim,
+                    'Reclaim a username',
+                  ),
+                ],
+                selected: _section,
+                onChanged: (v) {
+                  setState(() => _section = v);
+                  if (v == MembershipReviewSection.members &&
+                      s.searchResult == null) {
+                    ctl.search(null);
+                  }
+                },
+              ),
             ),
           ),
-        ),
         const SizedBox(height: ChurchGeometry.sectionGap),
         switch (_section) {
-          _Section.applications => _applications(context, s, ctl),
-          _Section.members => _MembersSection(state: s),
-          _Section.reclaim => _ReclaimSection(state: s),
+          MembershipReviewSection.applications => _applications(
+            context,
+            s,
+            ctl,
+          ),
+          MembershipReviewSection.members => _MembersSection(state: s),
+          MembershipReviewSection.reclaim => _ReclaimSection(state: s),
         },
       ]);
     }

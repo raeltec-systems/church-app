@@ -14,6 +14,7 @@ import 'src/adapters/recovery_verifier_storage.dart';
 import 'src/application/calendar_overlay_controllers.dart'
     show cellCalendarRepositoryProvider;
 import 'src/application/providers.dart';
+import 'src/application/admin_onboarding_controllers.dart';
 import 'src/application/search_controllers.dart'
     show contentSearchRepositoryProvider;
 import 'src/domain/notification_settings.dart';
@@ -79,6 +80,14 @@ Future<List<Override>> compositionOverrides(
   // allowlisted targets (mobile URL scheme; staff web's own origin).
   final redirects = kIsWeb ? AuthRedirects.web(Uri.base) : AuthRedirects.mobile;
   return [
+    adminOnboardingRepositoryProvider.overrideWith((ref) {
+      final repository = SupabaseAdminOnboardingRepository(
+        supabaseUrl: config.supabaseUrl,
+        publishableKey: config.publishableKey,
+      );
+      ref.onDispose(repository.close);
+      return repository;
+    }),
     platformStatusRepositoryProvider.overrideWithValue(
       SupabasePlatformStatusRepository(client),
     ),

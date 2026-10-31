@@ -3,7 +3,7 @@ title: 'First Admin onboarding and user management'
 type: 'feature'
 ticket: ''
 created: '2026-10-31'
-status: 'ready-for-dev'
+status: 'in-progress'
 baseline_revision: '6f5cfe78afb99f0e572a285ad7421215eb6e978b'
 route: 'full'
 route_source: 'auto'
@@ -72,6 +72,10 @@ Read `admin-onboarding-user-management-audit.md` for inspected source locations.
 Investigation only; new isolated branch, baseline preserved. Full route exceeds 100 lines. BMAD step-02 human checkpoint remains open. No independent review or new feature tests have run. Epic 6/7 statuses remain unchanged.
 
 Approval recorded after rereading the exact plan at ab88f5bb9236ac9157fa7e0aca2c026cf5535110. Prior planning-only notes above remain historical.
+
+31 October implementation checkpoint: added the invitation client contract, bounded POST adapter, in-memory controller, setup screen and shared route/composition wiring. Added Users & access as an additive staff entry reusing existing protected screens; old routes remain compatible. These are partial client changes, not completed backend onboarding or the full approved management directory/edit/activity scope. Focused client checks passed 49/49 after correcting a duplicate-header overflow and an unresolved fake roster in the test. Earlier failures are retained privately for the final ledger.
+
+The combined source-read/migration-preparation tool call was safety-blocked before execution. The two CLI migration-new commands were given to Israel for manual execution; no migration files exist yet and no alternate route was used to perform that blocked operation. New commissioning, provisioning/fencing, directory/activity/profile-correction server operations and end-to-end security evidence remain unfinished. No deployed app or backend was changed. Implementation remains in progress; no independent review is claimed.
 
 ## Plan Change Log
 

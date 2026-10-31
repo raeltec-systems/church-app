@@ -1117,6 +1117,14 @@ class StaffSignInLanding extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  FocusRing(
+                    child: TextButton(
+                      key: const Key('landing-admin-setup'),
+                      onPressed: () => context.go(ClientPaths.adminSetup),
+                      child: const Text('Have an owner setup invitation?'),
+                    ),
+                  ),
                 ],
               ),
             ),

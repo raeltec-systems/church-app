@@ -3,6 +3,8 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
 import 'access_screens.dart';
+import 'admin_onboarding_screen.dart';
+import 'user_management_screen.dart';
 import 'announcement_screens.dart';
 import 'assisted_recovery_screens.dart';
 import 'account_screen.dart';
@@ -61,6 +63,9 @@ abstract final class ClientPaths {
   static const signIn = '/sign-in';
   static const createAccount = '/create-account';
 
+  /// Owner-invited commissioning only; the server decides whether setup is open.
+  static const adminSetup = '/setup/admin';
+
   /// The signed-in member's current roles and scopes (story 2.3).
   static const access = '/access';
 
@@ -73,6 +78,9 @@ abstract final class ClientPaths {
   /// Staff web, Admin only: applications, member records, unlinking and
   /// phone-username reclaim (story 2.5).
   static const adminMembers = '/admin/members';
+
+  /// Unified staff entry; every child retains its current server grants.
+  static const adminUsers = '/admin/users';
 
   /// Staff web, Admin only: cells, leaders, requests and follow-up (2.6).
   static const adminCells = '/admin/cells';
@@ -441,6 +449,19 @@ GoRouter buildClientRouter({
       GoRoute(
         path: ClientPaths.access,
         pageBuilder: (_, state) => page(state, const MyAccessScreen()),
+      ),
+      GoRoute(
+        path: ClientPaths.adminUsers,
+        pageBuilder: (_, state) => page(
+          state,
+          UserManagementScreen(
+            area: UserManagementArea.parse(state.uri.queryParameters['view']),
+          ),
+        ),
+      ),
+      GoRoute(
+        path: ClientPaths.adminSetup,
+        pageBuilder: (_, state) => page(state, const AdminOnboardingScreen()),
       ),
       GoRoute(
         path: ClientPaths.adminGrants,

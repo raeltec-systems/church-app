@@ -39,6 +39,8 @@ create table app.identity_admin_setup_invites (
   correlation_nonce uuid,
   started_at timestamptz,
   provider_settled_at timestamptz,
+  cleanup_started_at timestamptz,
+  cleanup_completed_at timestamptz,
   full_name text,
   privacy_notice_version text,
   intent_hash bytea,
@@ -59,7 +61,8 @@ create table app.identity_admin_setup_audit (
   event_id bigint generated always as identity primary key,
   invitation_id uuid not null,
   action text not null check (action in ('issued','revoked','provisioning_started',
-    'provider_rejected','completion_refused','commissioned','application_commissioned','erased')),
+    'provider_rejected','completion_refused','commissioned','application_commissioned','erased',
+    'cleanup_started','cleanup_completed','completion_redacted')),
   operator text,
   member_id uuid,
   application_id uuid,
@@ -164,10 +167,24 @@ begin
   if p_synthetic and p_phone_username !~ '^\+(120255501[0-9]{2}|447700900[0-9]{3})$' then
     raise exception using errcode='22023', message='synthetic setup requires a reserved fictional username';
   end if;
+  select * into v_active from app.identity_admin_setup_invites where digest=p_digest;
+  if found then
+    if v_active.environment=app.platform_current_environment()
+      and v_active.phone_username=p_phone_username and v_active.is_synthetic=p_synthetic
+      and v_active.issued_by=p_operator and v_active.identity_check=p_identity_check
+      and v_active.case_reference=p_case_reference
+      and v_active.mode=(case when p_existing_account is null then 'new_account' else 'existing_account' end)
+      and (p_existing_account is null or v_active.auth_user_id=p_existing_account)
+      and v_active.state='issued' and v_active.expires_at>clock_timestamp() then
+      return jsonb_build_object('invitation_id',v_active.invitation_id,'expires_at',app.cmd_utc(v_active.expires_at));
+    end if;
+    raise exception using errcode='22023',message='invitation issue conflicts with a prior request';
+  end if;
   select i.* into v_active from app.identity_admin_setup_invites i
     join app.identity_admin_commissioning c on c.active_invitation_id = i.invitation_id
     where c.singleton;
-  if (v_active.started_at is not null and v_active.provider_settled_at is null)
+  if (v_active.cleanup_started_at is not null and v_active.cleanup_completed_at is null)
+    or (v_active.started_at is not null and v_active.provider_settled_at is null)
     or (v_active.state='issued' and v_active.expires_at>clock_timestamp()) then
     raise exception using errcode='22023',
       message='active or unresolved invitation; revoke or reconcile before reissuing';
@@ -348,6 +365,9 @@ begin
   v_by:='operator:'||i.issued_by;
   insert into app.identity_members(display_name,membership_state,is_synthetic)
     values(i.full_name,'approved',i.is_synthetic) returning member_id into v_member;
+  -- The internal link guard admits this new-account link only to the member
+  -- reserved by this locked completion, never to a coincidentally matching person.
+  update app.identity_admin_setup_invites set member_id=v_member where invitation_id=i.invitation_id;
   insert into app.identity_account_links(member_id,auth_user_id,approved_phone,
     approved_recovery_email,approved_by,sessions_valid_after)
   values(v_member,u.id,i.phone_username,lower(nullif(u.email,'')),v_by,clock_timestamp())
@@ -522,3 +542,236 @@ do $$ declare p regprocedure; begin
   end loop;
 end $$;
 notify pgrst, 'reload schema';
+
+-- Provider writes are fenced inside the Auth transaction, not by a timer or by
+-- assuming that a missing account means an in-flight HTTP request has stopped.
+-- Only server-owned app_metadata and the reserved account id participate.
+create function app.identity_admin_setup_auth_insert_guard() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare i app.identity_admin_setup_invites; v_closed boolean; v_notice jsonb;
+begin
+  if not (coalesce(new.raw_app_meta_data,'{}'::jsonb) ?| array['church_setup_operation','church_setup_nonce'])
+    and not exists(select 1 from app.identity_admin_setup_invites
+      where mode='new_account' and auth_user_id=new.id) then return new; end if;
+  perform 1 from app.identity_roles where role='admin' for update;
+  select commissioned_at is not null into v_closed
+    from app.identity_admin_commissioning where singleton for update;
+  select * into i from app.identity_admin_setup_invites
+    where mode='new_account' and auth_user_id=new.id for update;
+  v_notice:=app.identity_admin_setup_notice(i.is_synthetic);
+  if i.invitation_id is null or v_notice is null or v_closed or i.state<>'provisioning'
+    or i.cleanup_started_at is not null or i.expires_at<=clock_timestamp()
+    or i.environment<>app.platform_current_environment()
+    or not app.identity_admin_setup_operator_active(i.issued_by)
+    or v_notice->>'version' is distinct from i.privacy_notice_version
+    or new.raw_app_meta_data->>'church_setup_operation' is distinct from i.operation_id::text
+    or new.raw_app_meta_data->>'church_setup_nonce' is distinct from i.correlation_nonce::text
+    or '+'||ltrim(new.phone,'+') is distinct from i.phone_username then
+    raise exception using errcode='42501',message='setup account creation refused';
+  end if;
+  return new;
+end;
+$$;
+create trigger identity_admin_setup_provider_fence before insert on auth.users
+  for each row execute function app.identity_admin_setup_auth_insert_guard();
+
+-- Before normal membership linking, new-account commissioning must already be
+-- complete (or be the exact internal member reserved by the locked completion).
+-- A quarantined orphan cannot become a real member between cleanup prepare and
+-- Auth deletion. Existing-account invitations do not quarantine their holder.
+create function app.identity_admin_setup_link_guard() returns trigger
+language plpgsql set search_path = '' as $$
+declare i app.identity_admin_setup_invites;
+begin
+  select * into i from app.identity_admin_setup_invites
+    where mode='new_account' and auth_user_id=new.auth_user_id;
+  if found and not (i.state='completed' or (i.state='provisioning'
+    and i.member_id=new.member_id and i.cleanup_started_at is null)) then
+    raise exception using errcode='42501',message='setup account cannot be linked here';
+  end if;
+  return new;
+end;
+$$;
+create trigger identity_admin_setup_link_fence before insert or update of auth_user_id,member_id
+  on app.identity_account_links for each row execute function app.identity_admin_setup_link_guard();
+
+-- Keep the correlation markers on an unclaimed created account until cleanup.
+-- GoTrue's ordinary sign-in timestamp updates are unaffected. Completed members
+-- use the pre-existing credential/binding review workflow instead of this fence.
+create function app.identity_admin_setup_auth_update_guard() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare i app.identity_admin_setup_invites;
+begin
+  select * into i from app.identity_admin_setup_invites
+    where mode='new_account' and auth_user_id=old.id;
+  if found and i.state<>'completed' and (
+    old.id is distinct from new.id or old.phone is distinct from new.phone
+    or old.raw_app_meta_data->>'church_setup_operation' is distinct from new.raw_app_meta_data->>'church_setup_operation'
+    or old.raw_app_meta_data->>'church_setup_nonce' is distinct from new.raw_app_meta_data->>'church_setup_nonce') then
+    raise exception using errcode='42501',message='unclaimed setup account changes refused';
+  end if;
+  return new;
+end;
+$$;
+create trigger identity_admin_setup_provider_correlation before update of id,phone,raw_app_meta_data
+  on auth.users for each row execute function app.identity_admin_setup_auth_update_guard();
+
+create function app.identity_admin_setup_redact_unclaimed(p_invitation uuid) returns void
+language plpgsql set search_path = '' as $$
+begin
+  update app.identity_admin_setup_invites set state='erased',digest=null,phone_username=null,
+    auth_user_id=null,case_reference=null,request_id=null,operation_id=null,correlation_nonce=null,
+    full_name=null,privacy_notice_version=null,intent_hash=null,member_id=null,grant_id=null,
+    provider_settled_at=clock_timestamp(),cleanup_completed_at=clock_timestamp()
+    where invitation_id=p_invitation and state<>'completed';
+end;
+$$;
+
+create function app.identity_admin_setup_cleanup_prepare(p_invitation uuid,p_operator text) returns jsonb
+language plpgsql set search_path = '' as $$
+declare i app.identity_admin_setup_invites; u auth.users;
+begin
+  perform app.ops_require_operator(p_operator);
+  perform 1 from app.identity_roles where role='admin' for update;
+  perform 1 from app.identity_admin_commissioning where singleton for update;
+  select * into i from app.identity_admin_setup_invites where invitation_id=p_invitation for update;
+  if not found or i.environment<>app.platform_current_environment() then
+    raise exception using errcode='22023',message='invitation unavailable in this environment';
+  end if;
+  if i.state='erased' then return jsonb_build_object('outcome','cleaned'); end if;
+  if i.state='completed' then
+    if i.expires_at>clock_timestamp() then
+      return jsonb_build_object('outcome','completed','cleanup_eligible',false);
+    end if;
+    if i.digest is not null or i.correlation_nonce is not null then
+      update app.identity_admin_setup_invites set digest=null,phone_username=null,case_reference=null,
+        request_id=null,operation_id=null,correlation_nonce=null,full_name=null,intent_hash=null,
+        cleanup_started_at=coalesce(cleanup_started_at,clock_timestamp()),cleanup_completed_at=clock_timestamp()
+        where invitation_id=p_invitation;
+      insert into app.identity_admin_setup_audit(invitation_id,action,operator,member_id)
+        values(p_invitation,'completion_redacted',p_operator,i.member_id);
+    end if;
+    return jsonb_build_object('outcome','completed','cleanup_eligible',false);
+  end if;
+  if i.mode='new_account' and (
+    exists(select 1 from app.identity_account_links where auth_user_id=i.auth_user_id)
+    or exists(select 1 from app.identity_deletion_accounts where auth_user_id=i.auth_user_id)
+    or i.member_id is not null or i.grant_id is not null) then
+    raise exception using errcode='22023',message='member history requires normal identity recovery';
+  end if;
+  -- Revocation and the Auth insertion guard take the same locks. After this
+  -- transaction commits, no old provider operation can insert its reserved id.
+  update app.identity_admin_setup_invites set state='revoked',revoked_at=coalesce(revoked_at,clock_timestamp()),
+    digest=null,full_name=null,intent_hash=null,cleanup_started_at=coalesce(cleanup_started_at,clock_timestamp())
+    where invitation_id=p_invitation;
+  if i.cleanup_started_at is null then
+    insert into app.identity_admin_setup_audit(invitation_id,action,operator,operation_id)
+      values(p_invitation,'cleanup_started',p_operator,i.operation_id);
+  end if;
+  if i.mode='existing_account' then
+    -- Never remove or alter the account that existed before the invitation.
+    perform app.identity_admin_setup_redact_unclaimed(p_invitation);
+    insert into app.identity_admin_setup_audit(invitation_id,action,operator)
+      values(p_invitation,'cleanup_completed',p_operator);
+    return jsonb_build_object('outcome','cleaned','existing_account_preserved',true);
+  end if;
+  select * into u from auth.users where id=i.auth_user_id for update;
+  if not found then
+    perform app.identity_admin_setup_redact_unclaimed(p_invitation);
+    insert into app.identity_admin_setup_audit(invitation_id,action,operator)
+      values(p_invitation,'cleanup_completed',p_operator);
+    return jsonb_build_object('outcome','cleaned','late_provider_fenced',true);
+  end if;
+  if i.operation_id is null or i.correlation_nonce is null
+    or u.raw_app_meta_data->>'church_setup_operation' is distinct from i.operation_id::text
+    or u.raw_app_meta_data->>'church_setup_nonce' is distinct from i.correlation_nonce::text
+    or '+'||ltrim(u.phone,'+') is distinct from i.phone_username then
+    -- Do not delete a collision or independently altered account. The revoked
+    -- invitation remains fenced and reissue remains blocked for operator review.
+    return jsonb_build_object('outcome','operator_review_required');
+  end if;
+  perform app.identity_revoke_auth_sessions(u.id);
+  return jsonb_build_object('outcome','delete_orphan','auth_user_id',u.id,
+    'invitation_id',i.invitation_id,'operation_id',i.operation_id);
+end;
+$$;
+
+create function app.identity_admin_setup_cleanup_finish(p_invitation uuid,p_operator text) returns jsonb
+language plpgsql set search_path = '' as $$
+declare i app.identity_admin_setup_invites;
+begin
+  perform app.ops_require_operator(p_operator);
+  perform 1 from app.identity_roles where role='admin' for update;
+  perform 1 from app.identity_admin_commissioning where singleton for update;
+  select * into i from app.identity_admin_setup_invites where invitation_id=p_invitation for update;
+  if not found or i.environment<>app.platform_current_environment() then
+    raise exception using errcode='22023',message='invitation unavailable in this environment';
+  end if;
+  if i.state='erased' then return jsonb_build_object('outcome','cleaned'); end if;
+  if i.state<>'revoked' or i.cleanup_started_at is null or i.mode<>'new_account'
+    or i.member_id is not null or i.grant_id is not null
+    or exists(select 1 from app.identity_account_links where auth_user_id=i.auth_user_id)
+    or exists(select 1 from app.identity_deletion_accounts where auth_user_id=i.auth_user_id) then
+    raise exception using errcode='22023',message='cleanup is not authorised for this account';
+  end if;
+  if exists(select 1 from auth.users where id=i.auth_user_id) then
+    return jsonb_build_object('outcome','cleanup_pending');
+  end if;
+  perform app.identity_admin_setup_redact_unclaimed(p_invitation);
+  insert into app.identity_admin_setup_audit(invitation_id,action,operator)
+    values(p_invitation,'cleanup_completed',p_operator);
+  return jsonb_build_object('outcome','cleaned','late_provider_fenced',true);
+end;
+$$;
+
+create function app.identity_admin_setup_operator_view(p_invitation uuid,p_operator text) returns jsonb
+language plpgsql set search_path = '' as $$
+begin
+  perform app.ops_require_operator(p_operator);
+  if p_invitation is null then return app.identity_admin_setup_operator_status(p_operator); end if;
+  return (select jsonb_build_object('invitation_id',i.invitation_id,'state',i.state,'mode',i.mode,
+    'environment',i.environment,'expires_at',app.cmd_utc(i.expires_at),
+    'expired',i.expires_at<=clock_timestamp(),'commissioned',c.commissioned_at is not null,
+    'provider_reconciliation_required',i.started_at is not null and i.provider_settled_at is null,
+    'cleanup_pending',i.cleanup_started_at is not null and i.cleanup_completed_at is null,
+    'provider_account_present',exists(select 1 from auth.users u where u.id=i.auth_user_id))
+    from app.identity_admin_setup_invites i cross join app.identity_admin_commissioning c
+    where i.invitation_id=p_invitation and i.environment=app.platform_current_environment() and c.singleton);
+end;
+$$;
+
+create function app.identity_admin_setup_cleanup_candidates(p_operator text) returns jsonb
+language plpgsql set search_path = '' as $$
+begin
+  perform app.ops_require_operator(p_operator);
+  return (select coalesce(jsonb_agg(jsonb_build_object('invitation_id',i.invitation_id,'state',i.state,
+    'mode',i.mode,'expired',i.expires_at<=clock_timestamp()) order by i.issued_at,i.invitation_id),'[]'::jsonb)
+    from (select * from app.identity_admin_setup_invites
+      where environment=app.platform_current_environment() and state<>'erased'
+        and (state in ('revoked','failed') or expires_at<=clock_timestamp())
+        and not (state='completed' and cleanup_completed_at is not null)
+      order by issued_at,invitation_id limit 25) i);
+end;
+$$;
+
+do $$ declare p regprocedure; begin
+  for p in select oid::regprocedure from pg_proc where pronamespace='app'::regnamespace
+    and proname like 'identity_admin_setup_%'
+  loop execute format('revoke all on function %s from public,anon,authenticated,service_role',p); end loop;
+end $$;
+
+create function app.identity_admin_setup_lookup_digest(p_digest text,p_operator text) returns jsonb
+language plpgsql set search_path = '' as $$
+declare v_id uuid;
+begin
+  perform app.ops_require_operator(p_operator);
+  if p_digest is null or p_digest !~ '^[0-9a-f]{64}$' then
+    raise exception using errcode='22023',message='invalid invitation lookup';
+  end if;
+  select invitation_id into v_id from app.identity_admin_setup_invites
+    where digest=p_digest and environment=app.platform_current_environment();
+  if v_id is null then return null; end if;
+  return app.identity_admin_setup_operator_view(v_id,p_operator);
+end;
+$$;
+revoke all on function app.identity_admin_setup_lookup_digest(text,text) from public,anon,authenticated,service_role;

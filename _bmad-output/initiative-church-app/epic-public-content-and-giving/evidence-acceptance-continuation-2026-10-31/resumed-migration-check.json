@@ -1,0 +1,12 @@
+{
+    "exit":  0,
+    "action":  "After confirming all 101 working files byte-for-byte equal HEAD, refreshed only their index entries; no SQL or manifest was changed",
+    "observed_at_utc":  "2026-10-31T08:57:55.4586652Z",
+    "original_failed_check_preserved":  "resumed-supporting-checks.json",
+    "command":  "node tools/ci/check-migrations.mjs --base origin/main",
+    "source_files_changed":  0,
+    "migration_count":  101,
+    "log_sha256":  "d82bc3ae2d42bdc926be886c8550fec68f5b20abf7aac69d3268b2f76515d962",
+    "head":  "53b3176b6aefa6c1f4c56986679f24130dfdec04",
+    "new_migrations":  0
+}

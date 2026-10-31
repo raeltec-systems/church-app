@@ -1,0 +1,56 @@
+[
+    {
+        "log_sha256":  "4d5465fdfcaef78a0985a1e133597603618d6bbbe2658694b4cd901beb5e7b28",
+        "finished_at_utc":  "2026-10-31T08:54:07.7136350Z",
+        "check":  "environments",
+        "started_at_utc":  "2026-10-31T08:54:07.6015312Z",
+        "command":  "node tools/env/environments.mjs check",
+        "head":  "53b3176b6aefa6c1f4c56986679f24130dfdec04",
+        "exit":  0
+    },
+    {
+        "log_sha256":  "1207bfea4dfaca08e21bbdad54e22f9660f0cf9368a6745f33ca6d7ac6c49f39",
+        "finished_at_utc":  "2026-10-31T08:54:08.0773778Z",
+        "check":  "migrations",
+        "started_at_utc":  "2026-10-31T08:54:07.7868128Z",
+        "command":  "node tools/ci/check-migrations.mjs --base origin/main",
+        "head":  "53b3176b6aefa6c1f4c56986679f24130dfdec04",
+        "exit":  1
+    },
+    {
+        "log_sha256":  "09b2d170c59f3e2f29030f77d8c90cac39f7ac453d15a042e9b1dbfcd0cd7c11",
+        "finished_at_utc":  "2026-10-31T08:54:09.9101201Z",
+        "check":  "secrets",
+        "started_at_utc":  "2026-10-31T08:54:08.0822917Z",
+        "command":  "node tools/ci/scan-secrets.mjs",
+        "head":  "53b3176b6aefa6c1f4c56986679f24130dfdec04",
+        "exit":  0
+    },
+    {
+        "log_sha256":  "ae0f081676f7f6f86b60464132bd1b7850741c8248f0632f535752d3c8a10370",
+        "finished_at_utc":  "2026-10-31T08:54:09.9797692Z",
+        "check":  "function-imports",
+        "started_at_utc":  "2026-10-31T08:54:09.9141401Z",
+        "command":  "node tools/ci/check-function-imports.mjs",
+        "head":  "53b3176b6aefa6c1f4c56986679f24130dfdec04",
+        "exit":  0
+    },
+    {
+        "log_sha256":  "87aaf4297c54c31f0e7bdc5ae94acd787c6c4699ae43f55f88af1a745e39a922",
+        "finished_at_utc":  "2026-10-31T08:54:10.4540129Z",
+        "check":  "contracts-ts",
+        "started_at_utc":  "2026-10-31T08:54:09.9832968Z",
+        "command":  "node --test packages/contracts/ts/contracts.test.ts",
+        "head":  "53b3176b6aefa6c1f4c56986679f24130dfdec04",
+        "exit":  0
+    },
+    {
+        "log_sha256":  "4a02bb5b30dc4bab2190e34e8a52a9239e636cd859b6df92ce5cb6d2849a9e85",
+        "finished_at_utc":  "2026-10-31T08:54:10.5453027Z",
+        "check":  "captured-staging-history",
+        "started_at_utc":  "2026-10-31T08:54:10.4600533Z",
+        "command":  "node tools/ci/check-migration-drift.mjs --env staging --hosted-file _bmad-output/initiative-church-app/epic-public-content-and-giving/evidence-history-repair-2026-10-31/owner-after-migrations.json --require-synced",
+        "head":  "53b3176b6aefa6c1f4c56986679f24130dfdec04",
+        "exit":  0
+    }
+]

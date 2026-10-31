@@ -59,3 +59,6 @@ launch failure count as successful detection of forbidden evidence. Fixtures
 exercise paths with spaces and a hash character. The focused Windows run passed
 3/3 with no skipped cases; broader reruns are recorded separately. Historical
 433/436 and 55/56 results above remain failed observations, not rewritten passes.
+## Completed resumed validation
+
+The resumed 53b3176 engineering checkpoint passed 436/436 offline tests on native Windows, 436/436 offline tests plus 56/56 policy tests in network-disabled Linux, and 267/267 TypeScript contracts. The full four-job CI also completed successfully at that exact SHA. See `resumed-validation.md` and `resumed-ci.json`. The native Windows POSIX-mode assertion remains an earlier failed observation; it is not proof of Windows ACL protection, and no production credential was minted for these checks. No owner/device, independent-review or promotion gate was closed.

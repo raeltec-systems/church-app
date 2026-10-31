@@ -91,3 +91,7 @@ The [owner closeout checklist](../../../../docs/runbooks/content-acceptance-clos
 BMAD quick review was rendered and its current continuation diff and commit claims staged outside the repository. Step 1's confirmation checkpoint was not passed; no independent lenses ran for this continuation. Historical quick-review metadata in the 6.15 plan does not cover these new changes. No independent reviewer is claimed.
 
 **6.15 is not done. 6.17 is not done.** Tests are evidence toward acceptance, not a substitute for the owner-observed outcomes or the required controlled production promotion.
+
+## Subsequent resumed checkpoint
+
+See [resumed-validation.md](resumed-validation.md) for the passing 436/436 native Windows and Linux offline reruns, 56/56 Linux policy tests, 267/267 TypeScript contracts, immutable migration verification and corrected publication hashes. The historical failed Windows runs above remain separate. Fresh read-only staging Edge metadata is retained in `staging-edge-metadata-observation.json`; full deployed parity is not claimed.

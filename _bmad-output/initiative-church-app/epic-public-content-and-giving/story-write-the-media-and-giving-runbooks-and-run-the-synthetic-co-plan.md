@@ -9,7 +9,7 @@ route: 'oneshot'
 route_source: 'auto'
 review: 'quick'
 review_source: 'pinned'
-lenses_ran: [quick]
+lenses_ran: []
 review_loop_iteration: 1
 context:
   - '{project-root}/_bmad-output/initiative-church-app/spec-church-app/design-contract.md'
@@ -85,3 +85,10 @@ Git Bash selection fix the observed Windows launcher failures, including paths
 with spaces, while abnormal launch exits now fail the security assertions.
 The scan policy is unchanged. Broader suite results and the independent-review
 handoff remain distinct from historical quick-review metadata above.
+
+### Current independent-review boundary
+
+The historical 30 October quick review remains described above. No independent
+review lens ran for the resumed continuation, so current lenses_ran is empty.
+The expanded context-free prompt is saved beside this plan; completion and
+acceptance are not asserted while that review and the owner pilot are outstanding.

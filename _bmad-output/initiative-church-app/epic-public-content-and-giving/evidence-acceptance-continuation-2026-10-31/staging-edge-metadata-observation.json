@@ -1,0 +1,51 @@
+{
+  "observed_date_utc": "2026-10-31",
+  "target_project": "tmurpotfluignacfueki",
+  "source": "Connected Supabase.list_edge_functions; Supabase.get_edge_function(content-assets)",
+  "operation": "read-only",
+  "functions": [
+    {
+      "slug": "identity-assisted-recovery",
+      "version": 6,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "bundle_sha256": "9c69e1c2f0a340af54ccc215af15e30e16b18a8f668f1585203f453576c7ef9a"
+    },
+    {
+      "slug": "identity-deletion",
+      "version": 6,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "bundle_sha256": "913c46f374c107e30f52998a74eb64032cb7e643bd97a8faa5a60e3448c91feb"
+    },
+    {
+      "slug": "notifications-worker",
+      "version": 10,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "bundle_sha256": "3c36547e36a46990e4ae6474dcc09ef23f5998762b43be6901e29d01ef40b7f7"
+    },
+    {
+      "slug": "content-assets",
+      "version": 4,
+      "status": "ACTIVE",
+      "verify_jwt": false,
+      "bundle_sha256": "621b1f7210223c7cc85701f80807fa5c7cdeab3d253c3c60ab629aaa13f6a532"
+    }
+  ],
+  "content_source_inspection": {
+    "returned_files": [
+      "source/index.ts",
+      "source/logic.mjs",
+      "_shared/system_access.mjs"
+    ],
+    "post_upload_take_back_present": true,
+    "retention_trigger_and_system_route_present": true,
+    "full_byte_parity_proven": false
+  },
+  "limits": [
+    "Reported bundle hashes are not per-file comparisons against the repository.",
+    "Metadata/source inspection does not prove deployed database parity, configured secrets, scheduler delivery, Storage behavior or a signed-in app journey.",
+    "No function was invoked, changed or deployed."
+  ]
+}
